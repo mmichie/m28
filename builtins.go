@@ -19,6 +19,9 @@ func setupBuiltins(env *Environment) {
 	env.Set(LispSymbol("<"), LispFunc(lessThan))
 	env.Set(LispSymbol(">"), LispFunc(greaterThan))
 	env.Set(LispSymbol("="), LispFunc(equals))
+	env.Set(LispSymbol(">="), LispFunc(greaterThanOrEqual))
+	env.Set(LispSymbol("<="), LispFunc(lessThanOrEqual))
+	env.Set(LispSymbol("!="), LispFunc(notEqual))
 
 	// List operations
 	env.Set(LispSymbol("car"), LispFunc(car))
@@ -319,6 +322,61 @@ func greaterThan(args []LispValue, _ *Environment) (LispValue, error) {
 			return false, nil
 		}
 		prev = num
+	}
+	return true, nil
+}
+
+func greaterThanOrEqual(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("'>=' expects at least two arguments")
+	}
+	prev, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("'>=' expects numbers, got %T", args[0])
+	}
+	for _, arg := range args[1:] {
+		num, ok := arg.(float64)
+		if !ok {
+			return nil, fmt.Errorf("'>=' expects numbers, got %T", arg)
+		}
+		if prev < num {
+			return false, nil
+		}
+		prev = num
+	}
+	return true, nil
+}
+
+func lessThanOrEqual(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("'<=' expects at least two arguments")
+	}
+	prev, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("'<=' expects numbers, got %T", args[0])
+	}
+	for _, arg := range args[1:] {
+		num, ok := arg.(float64)
+		if !ok {
+			return nil, fmt.Errorf("'<=' expects numbers, got %T", arg)
+		}
+		if prev > num {
+			return false, nil
+		}
+		prev = num
+	}
+	return true, nil
+}
+
+func notEqual(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("'!=' expects at least two arguments")
+	}
+	first := args[0]
+	for _, arg := range args[1:] {
+		if equalValues(first, arg) {
+			return false, nil
+		}
 	}
 	return true, nil
 }
