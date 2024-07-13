@@ -11,7 +11,7 @@ func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 			return nil, fmt.Errorf("undefined symbol: %s", e)
 		}
 		return value, nil
-	case float64, string:
+	case float64, string, bool:
 		return e, nil
 	case LispList:
 		if len(e) == 0 {
@@ -42,6 +42,8 @@ func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 				return evalCond(e, env)
 			case "case":
 				return evalCase(e, env)
+			case "and":
+				return evalAnd(e, env)
 			}
 		}
 
@@ -67,6 +69,10 @@ func evalCond(list LispList, env *Environment) (LispValue, error) {
 		clauseList, ok := clause.(LispList)
 		if !ok || len(clauseList) < 2 {
 			return nil, fmt.Errorf("invalid cond clause")
+		}
+
+		if clauseList[0] == LispSymbol("else") {
+			return evalBegin(LispList(append([]LispValue{LispSymbol("begin")}, clauseList[1:]...)), env)
 		}
 
 		condition, err := EvalExpression(clauseList[0], env)
@@ -399,4 +405,20 @@ func evalCase(list LispList, env *Environment) (LispValue, error) {
 	}
 
 	return nil, nil
+}
+
+func evalAnd(list LispList, env *Environment) (LispValue, error) {
+	if len(list) == 1 {
+		return true, nil
+	}
+	for _, expr := range list[1:] {
+		result, err := EvalExpression(expr, env)
+		if err != nil {
+			return nil, err
+		}
+		if !IsTruthy(result) {
+			return false, nil
+		}
+	}
+	return true, nil
 }

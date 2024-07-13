@@ -98,6 +98,14 @@ func parse(tokens *[]string) (LispValue, error) {
 }
 
 func parseAtom(token string) (LispValue, error) {
+	// Check if it's a boolean literal
+	if token == "#f" {
+		return false, nil
+	}
+	if token == "#t" {
+		return true, nil
+	}
+
 	// Check if it's a string literal
 	if strings.HasPrefix(token, "\"") && strings.HasSuffix(token, "\"") {
 		unquoted, err := strconv.Unquote(token)
@@ -112,6 +120,6 @@ func parseAtom(token string) (LispValue, error) {
 		return num, nil
 	}
 
-	// If it's not a string or number, it's a symbol
+	// If it's not a boolean, string, or number, it's a symbol
 	return LispSymbol(token), nil
 }

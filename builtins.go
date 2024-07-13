@@ -33,7 +33,7 @@ func setupBuiltins(env *Environment) {
 	// Logic operations
 	env.Set(LispSymbol("and"), LispFunc(and))
 	env.Set(LispSymbol("or"), LispFunc(or))
-	env.Set(LispSymbol("not"), LispFunc(not))
+	env.Set(LispSymbol("not"), LispFunc(notFunc))
 
 	// Type checking
 	env.Set(LispSymbol("number?"), LispFunc(isNumber))
@@ -49,6 +49,17 @@ func setupBuiltins(env *Environment) {
 	env.Set(LispSymbol("append"), LispFunc(appendFunc))
 	env.Set(LispSymbol("error"), LispFunc(errorFunc))
 	env.Set(LispSymbol("apply"), LispFunc(applyFunc))
+
+	env.Set(LispSymbol("eq?"), LispFunc(eqFunc))
+	env.Set(LispSymbol("pair?"), LispFunc(pairFunc))
+	env.Set(LispSymbol("caar"), LispFunc(caarFunc))
+	env.Set(LispSymbol("cadar"), LispFunc(cadarFunc))
+	env.Set(LispSymbol("equal?"), LispFunc(equalFunc))
+	env.Set(LispSymbol("integer?"), LispFunc(integerFunc))
+
+	// Add boolean literals
+	env.Set(LispSymbol("#f"), false)
+	env.Set(LispSymbol("#t"), true)
 
 	// Special forms are handled in the evaluator, not here
 	// define, lambda, if, begin, quote are all special forms
@@ -453,22 +464,22 @@ func nullFunc(args []LispValue, _ *Environment) (LispValue, error) {
 
 func car(args []LispValue, _ *Environment) (LispValue, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("'car' expects exactly one argument")
+		return nil, fmt.Errorf("car expects exactly one argument")
 	}
 	list, ok := args[0].(LispList)
 	if !ok || len(list) == 0 {
-		return nil, fmt.Errorf("'car' expects a non-empty list")
+		return nil, fmt.Errorf("car expects a non-empty list")
 	}
 	return list[0], nil
 }
 
 func cdr(args []LispValue, _ *Environment) (LispValue, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("'cdr' expects exactly one argument")
+		return nil, fmt.Errorf("cdr expects exactly one argument")
 	}
 	list, ok := args[0].(LispList)
 	if !ok || len(list) == 0 {
-		return nil, fmt.Errorf("'cdr' expects a non-empty list")
+		return nil, fmt.Errorf("cdr expects a non-empty list")
 	}
 	return LispList(list[1:]), nil
 }
@@ -506,9 +517,9 @@ func or(args []LispValue, _ *Environment) (LispValue, error) {
 	return false, nil
 }
 
-func not(args []LispValue, _ *Environment) (LispValue, error) {
+func notFunc(args []LispValue, _ *Environment) (LispValue, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("'not' expects exactly one argument")
+		return nil, fmt.Errorf("not expects exactly one argument")
 	}
 	return !IsTruthy(args[0]), nil
 }
@@ -603,4 +614,67 @@ func applyFunc(args []LispValue, env *Environment) (LispValue, error) {
 	}
 
 	return apply(fn, applyArgs, env)
+}
+
+func eqFunc(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("eq? expects exactly two arguments")
+	}
+	return args[0] == args[1], nil
+}
+
+func pairFunc(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("pair? expects exactly one argument")
+	}
+	_, ok := args[0].(LispList)
+	return ok && len(args[0].(LispList)) > 0, nil
+}
+
+func caarFunc(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("caar expects exactly one argument")
+	}
+	list, ok := args[0].(LispList)
+	if !ok || len(list) == 0 {
+		return nil, fmt.Errorf("caar expects a non-empty list")
+	}
+	firstElem, ok := list[0].(LispList)
+	if !ok || len(firstElem) == 0 {
+		return nil, fmt.Errorf("caar expects a list whose first element is a non-empty list")
+	}
+	return firstElem[0], nil
+}
+
+func cadarFunc(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("cadar expects exactly one argument")
+	}
+	list, ok := args[0].(LispList)
+	if !ok || len(list) < 2 {
+		return nil, fmt.Errorf("cadar expects a list with at least two elements")
+	}
+	secondElem, ok := list[1].(LispList)
+	if !ok || len(secondElem) == 0 {
+		return nil, fmt.Errorf("cadar expects a list whose second element is a non-empty list")
+	}
+	return secondElem[0], nil
+}
+
+func equalFunc(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("equal? expects exactly two arguments")
+	}
+	return equalValues(args[0], args[1]), nil
+}
+
+func integerFunc(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("integer? expects exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return false, nil
+	}
+	return float64(int(num)) == num, nil
 }
