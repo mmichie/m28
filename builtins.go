@@ -47,6 +47,8 @@ func setupBuiltins(env *Environment) {
 	env.Set(LispSymbol("string-append"), LispFunc(stringAppend))
 	env.Set(LispSymbol("number->string"), LispFunc(numberToString))
 	env.Set(LispSymbol("append"), LispFunc(appendFunc))
+	env.Set(LispSymbol("error"), LispFunc(errorFunc))
+	env.Set(LispSymbol("apply"), LispFunc(applyFunc))
 
 	// Special forms are handled in the evaluator, not here
 	// define, lambda, if, begin, quote are all special forms
@@ -568,4 +570,37 @@ func isList(args []LispValue, _ *Environment) (LispValue, error) {
 	}
 	_, ok := args[0].(LispList)
 	return ok, nil
+}
+
+func errorFunc(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("Error")
+	}
+	errorMsg := make([]string, len(args))
+	for i, arg := range args {
+		errorMsg[i] = PrintValue(arg)
+	}
+	return nil, fmt.Errorf(strings.Join(errorMsg, " "))
+}
+
+func applyFunc(args []LispValue, env *Environment) (LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("'apply' expects at least two arguments")
+	}
+
+	fn := args[0]
+	lastArg := args[len(args)-1]
+
+	var applyArgs []LispValue
+	for _, arg := range args[1 : len(args)-1] {
+		applyArgs = append(applyArgs, arg)
+	}
+
+	if list, ok := lastArg.(LispList); ok {
+		applyArgs = append(applyArgs, list...)
+	} else {
+		return nil, fmt.Errorf("last argument to 'apply' must be a list")
+	}
+
+	return apply(fn, applyArgs, env)
 }

@@ -14,8 +14,9 @@ type LispFunc func([]LispValue, *Environment) (LispValue, error)
 
 // Lambda represents a lambda function
 type Lambda struct {
-	Params  []LispSymbol
-	Body    LispValue
-	Env     *Environment
-	Closure *Environment
+	Params    []LispSymbol
+	RestParam LispSymbol
+	Body      LispValue
+	Env       *Environment
+	Closure   *Environment
 }

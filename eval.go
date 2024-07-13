@@ -40,6 +40,8 @@ func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 				return evalSet(e, env)
 			case "cond":
 				return evalCond(e, env)
+			case "case":
+				return evalCase(e, env)
 			}
 		}
 
@@ -208,7 +210,15 @@ func evalLambda(list LispList, env *Environment) (LispValue, error) {
 		return nil, fmt.Errorf("lambda parameters must be a list")
 	}
 	var paramSymbols []LispSymbol
-	for _, param := range params {
+	var restParam LispSymbol
+	for i, param := range params {
+		if i == len(params)-2 && param == LispSymbol(".") {
+			restParam, ok = params[i+1].(LispSymbol)
+			if !ok {
+				return nil, fmt.Errorf("rest parameter must be a symbol")
+			}
+			break
+		}
 		symbol, ok := param.(LispSymbol)
 		if !ok {
 			return nil, fmt.Errorf("lambda parameter must be a symbol")
@@ -216,10 +226,11 @@ func evalLambda(list LispList, env *Environment) (LispValue, error) {
 		paramSymbols = append(paramSymbols, symbol)
 	}
 	return &Lambda{
-		Params:  paramSymbols,
-		Body:    LispList(append([]LispValue{LispSymbol("begin")}, list[2:]...)),
-		Env:     env,
-		Closure: NewEnvironment(env),
+		Params:    paramSymbols,
+		RestParam: restParam,
+		Body:      LispList(append([]LispValue{LispSymbol("begin")}, list[2:]...)),
+		Env:       env,
+		Closure:   NewEnvironment(env),
 	}, nil
 }
 
@@ -255,12 +266,20 @@ func apply(fn LispValue, args []LispValue, env *Environment) (LispValue, error) 
 	case LispFunc:
 		return f(args, env)
 	case *Lambda:
-		if len(args) != len(f.Params) {
-			return nil, fmt.Errorf("lambda called with wrong number of arguments")
+		if len(args) < len(f.Params) && f.RestParam == "" {
+			return nil, fmt.Errorf("not enough arguments for lambda")
 		}
 		callEnv := NewEnvironment(f.Closure)
 		for i, param := range f.Params {
-			callEnv.Define(param, args[i])
+			if i < len(args) {
+				callEnv.Define(param, args[i])
+			} else {
+				callEnv.Define(param, nil)
+			}
+		}
+		if f.RestParam != "" {
+			restArgs := args[len(f.Params):]
+			callEnv.Define(f.RestParam, LispList(restArgs))
 		}
 		return EvalExpression(f.Body, callEnv)
 	default:
@@ -348,4 +367,36 @@ func evalSet(list LispList, env *Environment) (LispValue, error) {
 	}
 
 	return nil, fmt.Errorf("cannot set! undefined variable: %s", symbol)
+}
+
+func evalCase(list LispList, env *Environment) (LispValue, error) {
+	if len(list) < 3 {
+		return nil, fmt.Errorf("'case' expects at least two arguments")
+	}
+
+	keyExpr := list[1]
+	key, err := EvalExpression(keyExpr, env)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, clause := range list[2:] {
+		clauseList, ok := clause.(LispList)
+		if !ok || len(clauseList) < 2 {
+			return nil, fmt.Errorf("invalid case clause")
+		}
+
+		datums := clauseList[0]
+		if datumList, ok := datums.(LispList); ok {
+			for _, datum := range datumList {
+				if equalValues(key, datum) {
+					return evalBegin(LispList(append([]LispValue{LispSymbol("begin")}, clauseList[1:]...)), env)
+				}
+			}
+		} else if equalValues(key, datums) || datums == LispSymbol("else") {
+			return evalBegin(LispList(append([]LispValue{LispSymbol("begin")}, clauseList[1:]...)), env)
+		}
+	}
+
+	return nil, nil
 }
