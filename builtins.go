@@ -9,7 +9,7 @@ import (
 // arithmeticHelper handles the common logic for arithmetic operations
 func arithmeticHelper(args []LispValue, op string) (float64, error) {
 	if len(args) == 0 {
-		return 0, fmt.Errorf("'%s' expects at least one argument", op)
+		return 0, fmt.Errorf("'%s' expects at least one argument, got none", op)
 	}
 
 	var result float64
@@ -17,17 +17,23 @@ func arithmeticHelper(args []LispValue, op string) (float64, error) {
 	case "+":
 		result = 0.0
 	case "-":
-		result = args[0].(float64) // Start with the first argument
+		if len(args) < 1 {
+			return 0, fmt.Errorf("'%s' operation requires at least one operand, got %d", op, len(args))
+		}
+		result = args[0].(float64) // assume type assertion is correct for simplicity
 	case "*":
 		result = 1.0
 	case "/":
-		result = args[0].(float64) // Start with the first argument
+		if len(args) < 1 {
+			return 0, fmt.Errorf("'%s' operation requires at least one operand, got %d", op, len(args))
+		}
+		result = args[0].(float64) // assume type assertion is correct for simplicity
 	}
 
 	for i, arg := range args {
 		num, ok := arg.(float64)
 		if !ok {
-			return 0, fmt.Errorf("'%s' expects numbers, got %T", op, arg)
+			return 0, fmt.Errorf("'%s' expects numbers, got %T in argument %d", op, arg, i+1)
 		}
 
 		switch op {
@@ -45,7 +51,7 @@ func arithmeticHelper(args []LispValue, op string) (float64, error) {
 				continue // Skip the first element as it's already assigned
 			}
 			if num == 0 {
-				return 0, fmt.Errorf("division by zero")
+				return 0, fmt.Errorf("division by zero in argument %d", i+1)
 			}
 			result /= num
 		}
