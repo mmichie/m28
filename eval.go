@@ -34,6 +34,10 @@ func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 				return evalBegin(e, env)
 			case "do":
 				return evalDo(e, env)
+			case "let":
+				return evalLet(e, env)
+			case "set!":
+				return evalSet(e, env)
 			}
 		}
 
@@ -169,13 +173,13 @@ func evalDefine(list LispList, env *Environment) (LispValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	env.Set(symbol, value)
+	env.Define(symbol, value)
 	return symbol, nil
 }
 
 func evalLambda(list LispList, env *Environment) (LispValue, error) {
-	if len(list) != 3 {
-		return nil, fmt.Errorf("'lambda' expects exactly two arguments")
+	if len(list) < 3 {
+		return nil, fmt.Errorf("'lambda' expects at least two arguments")
 	}
 	params, ok := list[1].(LispList)
 	if !ok {
@@ -190,9 +194,10 @@ func evalLambda(list LispList, env *Environment) (LispValue, error) {
 		paramSymbols = append(paramSymbols, symbol)
 	}
 	return &Lambda{
-		Params: paramSymbols,
-		Body:   list[2],
-		Env:    env,
+		Params:  paramSymbols,
+		Body:    LispList(append([]LispValue{LispSymbol("begin")}, list[2:]...)),
+		Env:     env,
+		Closure: NewEnvironment(env),
 	}, nil
 }
 
@@ -231,11 +236,11 @@ func apply(fn LispValue, args []LispValue, env *Environment) (LispValue, error) 
 		if len(args) != len(f.Params) {
 			return nil, fmt.Errorf("lambda called with wrong number of arguments")
 		}
-		localEnv := NewEnvironment(f.Env)
+		callEnv := NewEnvironment(f.Closure)
 		for i, param := range f.Params {
-			localEnv.Set(param, args[i])
+			callEnv.Define(param, args[i])
 		}
-		return EvalExpression(f.Body, localEnv)
+		return EvalExpression(f.Body, callEnv)
 	default:
 		return nil, fmt.Errorf("not a function: %v", fn)
 	}
@@ -256,4 +261,69 @@ func IsTruthy(v LispValue) bool {
 	default:
 		return true
 	}
+}
+
+func evalLet(list LispList, env *Environment) (LispValue, error) {
+	if len(list) < 3 {
+		return nil, fmt.Errorf("'let' expects at least two arguments")
+	}
+
+	bindings, ok := list[1].(LispList)
+	if !ok {
+		return nil, fmt.Errorf("'let' bindings must be a list")
+	}
+
+	letEnv := NewEnvironment(env)
+
+	for _, binding := range bindings {
+		bindingList, ok := binding.(LispList)
+		if !ok || len(bindingList) != 2 {
+			return nil, fmt.Errorf("invalid binding in 'let'")
+		}
+
+		symbol, ok := bindingList[0].(LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("binding name must be a symbol")
+		}
+
+		value, err := EvalExpression(bindingList[1], env)
+		if err != nil {
+			return nil, err
+		}
+
+		letEnv.Set(symbol, value)
+	}
+
+	var result LispValue
+	var err error
+	for _, expr := range list[2:] {
+		result, err = EvalExpression(expr, letEnv)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+func evalSet(list LispList, env *Environment) (LispValue, error) {
+	if len(list) != 3 {
+		return nil, fmt.Errorf("'set!' expects exactly two arguments")
+	}
+
+	symbol, ok := list[1].(LispSymbol)
+	if !ok {
+		return nil, fmt.Errorf("first argument to 'set!' must be a symbol")
+	}
+
+	value, err := EvalExpression(list[2], env)
+	if err != nil {
+		return nil, err
+	}
+
+	if env.SetMutable(symbol, value) {
+		return value, nil
+	}
+
+	return nil, fmt.Errorf("cannot set! undefined variable: %s", symbol)
 }
