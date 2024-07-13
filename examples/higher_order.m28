@@ -1,0 +1,22 @@
+(define apply-twice
+  (lambda (f x)
+    (f (f x))))
+
+(define add-one
+  (lambda (x) (+ x 1)))
+
+(print "Applying add-one twice to 5:")
+(print (apply-twice add-one 5))
+
+(define compose
+  (lambda (f g)
+    (lambda (x) (f (g x)))))
+
+(define square
+  (lambda (x) (* x x)))
+
+(define square-and-add-one
+  (compose add-one square))
+
+(print "Square and add one to 5:")
+(print (square-and-add-one 5))
