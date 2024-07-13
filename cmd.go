@@ -29,7 +29,7 @@ func GetCommands() []Command {
 				if len(args) == 0 {
 					return fmt.Errorf("eval command requires an expression")
 				}
-				interpreter := NewInterpreter()
+				interpreter := New()
 				result, err := interpreter.Execute(args[0])
 				if err != nil {
 					return err

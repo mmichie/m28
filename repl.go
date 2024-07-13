@@ -58,7 +58,7 @@ func (i *Interpreter) REPL() {
 
 // RunREPL creates a new interpreter and starts the REPL
 func RunREPL() {
-	interpreter := NewInterpreter()
+	interpreter := New()
 	interpreter.REPL()
 }
 

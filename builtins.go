@@ -6,6 +6,49 @@ import (
 	"strings"
 )
 
+func setupBuiltins(env *Environment) {
+	env.Set(LispSymbol("nil"), nil)
+
+	// Arithmetic operations
+	env.Set(LispSymbol("+"), LispFunc(add))
+	env.Set(LispSymbol("-"), LispFunc(subtract))
+	env.Set(LispSymbol("*"), LispFunc(multiply))
+	env.Set(LispSymbol("/"), LispFunc(divide))
+
+	// Comparison operations
+	env.Set(LispSymbol("<"), LispFunc(lessThan))
+	env.Set(LispSymbol(">"), LispFunc(greaterThan))
+	env.Set(LispSymbol("="), LispFunc(equals))
+
+	// List operations
+	env.Set(LispSymbol("car"), LispFunc(car))
+	env.Set(LispSymbol("cdr"), LispFunc(cdr))
+	env.Set(LispSymbol("cons"), LispFunc(cons))
+	env.Set(LispSymbol("list"), LispFunc(list))
+	env.Set(LispSymbol("length"), LispFunc(length))
+
+	// Logic operations
+	env.Set(LispSymbol("and"), LispFunc(and))
+	env.Set(LispSymbol("or"), LispFunc(or))
+	env.Set(LispSymbol("not"), LispFunc(not))
+
+	// Type checking
+	env.Set(LispSymbol("number?"), LispFunc(isNumber))
+	env.Set(LispSymbol("string?"), LispFunc(isString))
+	env.Set(LispSymbol("symbol?"), LispFunc(isSymbol))
+	env.Set(LispSymbol("list?"), LispFunc(isList))
+	env.Set(LispSymbol("null?"), LispFunc(nullFunc))
+
+	// Other functions
+	env.Set(LispSymbol("print"), LispFunc(printFunc))
+	env.Set(LispSymbol("string-append"), LispFunc(stringAppend))
+	env.Set(LispSymbol("number->string"), LispFunc(numberToString))
+	env.Set(LispSymbol("append"), LispFunc(appendFunc))
+
+	// Special forms are handled in the evaluator, not here
+	// define, lambda, if, begin, quote are all special forms
+}
+
 // arithmeticHelper handles the common logic for arithmetic operations
 func arithmeticHelper(args []LispValue, op string) (float64, error) {
 	if len(args) == 0 {
