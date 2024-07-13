@@ -12,8 +12,16 @@ func tokenize(input string) []string {
 	var currentToken strings.Builder
 	inString := false
 	escaped := false
+	inComment := false
 
 	for _, char := range input {
+		if inComment {
+			if char == '\n' {
+				inComment = false
+			}
+			continue
+		}
+
 		if inString {
 			if escaped {
 				currentToken.WriteRune(char)
@@ -29,26 +37,37 @@ func tokenize(input string) []string {
 			} else {
 				currentToken.WriteRune(char)
 			}
-		} else if char == '"' {
-			if currentToken.Len() > 0 {
-				tokens = append(tokens, currentToken.String())
-				currentToken.Reset()
-			}
-			currentToken.WriteRune(char)
-			inString = true
-		} else if unicode.IsSpace(char) {
-			if currentToken.Len() > 0 {
-				tokens = append(tokens, currentToken.String())
-				currentToken.Reset()
-			}
-		} else if char == '(' || char == ')' || char == '\'' {
-			if currentToken.Len() > 0 {
-				tokens = append(tokens, currentToken.String())
-				currentToken.Reset()
-			}
-			tokens = append(tokens, string(char))
 		} else {
-			currentToken.WriteRune(char)
+			switch char {
+			case ';':
+				if currentToken.Len() > 0 {
+					tokens = append(tokens, currentToken.String())
+					currentToken.Reset()
+				}
+				inComment = true
+			case '"':
+				if currentToken.Len() > 0 {
+					tokens = append(tokens, currentToken.String())
+					currentToken.Reset()
+				}
+				currentToken.WriteRune(char)
+				inString = true
+			case '(', ')', '\'':
+				if currentToken.Len() > 0 {
+					tokens = append(tokens, currentToken.String())
+					currentToken.Reset()
+				}
+				tokens = append(tokens, string(char))
+			default:
+				if unicode.IsSpace(char) {
+					if currentToken.Len() > 0 {
+						tokens = append(tokens, currentToken.String())
+						currentToken.Reset()
+					}
+				} else {
+					currentToken.WriteRune(char)
+				}
+			}
 		}
 	}
 
