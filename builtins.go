@@ -14,6 +14,7 @@ func setupBuiltins(env *Environment) {
 	env.Set(LispSymbol("-"), LispFunc(subtract))
 	env.Set(LispSymbol("*"), LispFunc(multiply))
 	env.Set(LispSymbol("/"), LispFunc(divide))
+	env.Set(LispSymbol("%"), LispFunc(mod))
 
 	// Comparison operations
 	env.Set(LispSymbol("<"), LispFunc(lessThan))
@@ -87,6 +88,10 @@ func arithmeticHelper(args []LispValue, op string) (float64, error) {
 			return 0, fmt.Errorf("'%s' operation requires at least one operand, got %d", op, len(args))
 		}
 		result = args[0].(float64) // assume type assertion is correct for simplicity
+	case "%":
+		if len(args) != 2 {
+			return 0, fmt.Errorf("'%s' operation requires exactly two operands, got %d", op, len(args))
+		}
 	}
 
 	for i, arg := range args {
@@ -113,6 +118,12 @@ func arithmeticHelper(args []LispValue, op string) (float64, error) {
 				return 0, fmt.Errorf("division by zero in argument %d", i+1)
 			}
 			result /= num
+		case "%":
+			if i == 0 {
+				result = float64(int(result) % int(num))
+			} else {
+				result = float64(int(result) % int(num))
+			}
 		}
 	}
 
@@ -133,6 +144,10 @@ func multiply(args []LispValue, _ *Environment) (LispValue, error) {
 
 func divide(args []LispValue, _ *Environment) (LispValue, error) {
 	return arithmeticHelper(args, "/")
+}
+
+func mod(args []LispValue, _ *Environment) (LispValue, error) {
+	return arithmeticHelper(args, "%")
 }
 
 func lessThan(args []LispValue, _ *Environment) (LispValue, error) {
