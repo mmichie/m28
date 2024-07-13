@@ -41,7 +41,7 @@ func tokenize(input string) []string {
 				tokens = append(tokens, currentToken.String())
 				currentToken.Reset()
 			}
-		} else if char == '(' || char == ')' {
+		} else if char == '(' || char == ')' || char == '\'' {
 			if currentToken.Len() > 0 {
 				tokens = append(tokens, currentToken.String())
 				currentToken.Reset()
@@ -66,8 +66,8 @@ func parse(tokens *[]string) (LispValue, error) {
 	token := (*tokens)[0]
 	*tokens = (*tokens)[1:]
 
-	switch {
-	case token == "(":
+	switch token {
+	case "(":
 		var list LispList
 		for len(*tokens) > 0 && (*tokens)[0] != ")" {
 			val, err := parse(tokens)
@@ -81,9 +81,12 @@ func parse(tokens *[]string) (LispValue, error) {
 		}
 		*tokens = (*tokens)[1:] // consume the closing parenthesis
 		return list, nil
-	case token == ")":
+	case ")":
 		return nil, fmt.Errorf("unexpected closing parenthesis")
-	case token == "'":
+	case "'":
+		if len(*tokens) == 0 {
+			return nil, fmt.Errorf("unexpected EOF after quote")
+		}
 		quoted, err := parse(tokens)
 		if err != nil {
 			return nil, err

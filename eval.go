@@ -38,6 +38,8 @@ func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 				return evalLet(e, env)
 			case "set!":
 				return evalSet(e, env)
+			case "cond":
+				return evalCond(e, env)
 			}
 		}
 
@@ -56,6 +58,26 @@ func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 	default:
 		return nil, fmt.Errorf("unknown expression type: %T", e)
 	}
+}
+
+func evalCond(list LispList, env *Environment) (LispValue, error) {
+	for _, clause := range list[1:] {
+		clauseList, ok := clause.(LispList)
+		if !ok || len(clauseList) < 2 {
+			return nil, fmt.Errorf("invalid cond clause")
+		}
+
+		condition, err := EvalExpression(clauseList[0], env)
+		if err != nil {
+			return nil, err
+		}
+
+		if IsTruthy(condition) {
+			return evalBegin(LispList(append([]LispValue{LispSymbol("begin")}, clauseList[1:]...)), env)
+		}
+	}
+
+	return nil, nil // No clause was true
 }
 
 func evalDo(list LispList, env *Environment) (LispValue, error) {
