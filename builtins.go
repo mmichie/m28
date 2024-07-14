@@ -62,6 +62,8 @@ func setupBuiltins(env *Environment) {
 	env.Set(LispSymbol("#f"), false)
 	env.Set(LispSymbol("#t"), true)
 
+	env.Set(LispSymbol("assoc"), LispFunc(assoc))
+
 	// Special forms are handled in the evaluator, not here
 	// define, lambda, if, begin, quote are all special forms
 }
@@ -692,4 +694,25 @@ func integerFunc(args []LispValue, _ *Environment) (LispValue, error) {
 		return false, nil
 	}
 	return float64(int(num)) == num, nil
+}
+
+func assoc(args []LispValue, _ *Environment) (LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("assoc expects exactly two arguments")
+	}
+	key := args[0]
+	alist, ok := args[1].(LispList)
+	if !ok {
+		return nil, fmt.Errorf("assoc expects a list as its second argument")
+	}
+	for _, pair := range alist {
+		pairList, ok := pair.(LispList)
+		if !ok || len(pairList) < 1 {
+			continue
+		}
+		if equalValues(key, pairList[0]) {
+			return pair, nil
+		}
+	}
+	return nil, nil
 }
