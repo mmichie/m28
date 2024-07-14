@@ -63,6 +63,9 @@ func setupBuiltins(env *Environment) {
 	env.Set(LispSymbol("#t"), true)
 
 	env.Set(LispSymbol("assoc"), LispFunc(assoc))
+	env.Set(LispSymbol("filter"), LispFunc(filter))
+	env.Set(LispSymbol("match"), LispFunc(match))
+	env.Set(LispSymbol("exists?"), LispFunc(exists))
 
 	// Special forms are handled in the evaluator, not here
 	// define, lambda, if, begin, quote are all special forms
@@ -715,4 +718,95 @@ func assoc(args []LispValue, _ *Environment) (LispValue, error) {
 		}
 	}
 	return nil, nil
+}
+
+func filter(args []LispValue, env *Environment) (LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("filter expects exactly two arguments")
+	}
+	predFunc, ok := args[0].(*Lambda)
+	if !ok {
+		return nil, fmt.Errorf("first argument to filter must be a function")
+	}
+	list, ok := args[1].(LispList)
+	if !ok {
+		return nil, fmt.Errorf("second argument to filter must be a list")
+	}
+
+	var result LispList
+	for _, item := range list {
+		predicateResult, err := apply(predFunc, []LispValue{item}, env)
+		if err != nil {
+			return nil, err
+		}
+		if IsTruthy(predicateResult) {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func match(args []LispValue, env *Environment) (LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("match expects exactly two arguments")
+	}
+	pattern := args[0]
+	fact := args[1]
+
+	var matchHelper func(p, f LispValue) bool
+	matchHelper = func(p, f LispValue) bool {
+		switch pt := p.(type) {
+		case LispList:
+			ft, ok := f.(LispList)
+			if !ok {
+				return false
+			}
+			if len(pt) != len(ft) {
+				return false
+			}
+			for i := range pt {
+				if !matchHelper(pt[i], ft[i]) {
+					return false
+				}
+			}
+			return true
+		case LispSymbol:
+			if pt == LispSymbol("?") {
+				return true
+			}
+			return equalValues(p, f)
+		default:
+			return equalValues(p, f)
+		}
+	}
+
+	return matchHelper(pattern, fact), nil
+}
+
+func exists(args []LispValue, env *Environment) (LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("exists? expects exactly two arguments")
+	}
+
+	predFunc, ok := args[0].(*Lambda)
+	if !ok {
+		return nil, fmt.Errorf("first argument to exists? must be a function")
+	}
+
+	list, ok := args[1].(LispList)
+	if !ok {
+		return nil, fmt.Errorf("second argument to exists? must be a list")
+	}
+
+	for _, item := range list {
+		result, err := apply(predFunc, []LispValue{item}, env)
+		if err != nil {
+			return nil, err
+		}
+		if IsTruthy(result) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
