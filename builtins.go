@@ -280,7 +280,7 @@ func assoc(args []LispValue, _ *Environment) (LispValue, error) {
 		if !ok || len(pairList) < 1 {
 			continue
 		}
-		if equalValues(key, pairList[0]) {
+		if EqualValues(key, pairList[0]) {
 			return pair, nil
 		}
 	}
@@ -341,9 +341,9 @@ func match(args []LispValue, env *Environment) (LispValue, error) {
 			if pt == LispSymbol("?") {
 				return true
 			}
-			return equalValues(p, f)
+			return EqualValues(p, f)
 		default:
-			return equalValues(p, f)
+			return EqualValues(p, f)
 		}
 	}
 
