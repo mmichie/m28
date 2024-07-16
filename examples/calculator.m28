@@ -1,14 +1,14 @@
 (define calculator
   (lambda (op x y)
     (cond
-      ((= op '+) (+ x y))
-      ((= op '-) (- x y))
-      ((= op '*) (* x y))
-      ((= op '/) (/ x y))
+      ((equal? op "+") (+ x y))
+      ((equal? op "-") (- x y))
+      ((equal? op "*") (* x y))
+      ((equal? op "/") (/ x y))
       (else (print "Unknown operation")))))
 
 (print "Calculator:")
-(print (string-append "5 + 3 = " (number->string (calculator '+ 5 3))))
-(print (string-append "10 - 4 = " (number->string (calculator '- 10 4))))
-(print (string-append "6 * 7 = " (number->string (calculator '* 6 7))))
-(print (string-append "15 / 3 = " (number->string (calculator '/ 15 3))))
+(print (string-append "5 + 3 = " (number->string (calculator "+" 5 3))))
+(print (string-append "10 - 4 = " (number->string (calculator "-" 10 4))))
+(print (string-append "6 * 7 = " (number->string (calculator "*" 6 7))))
+(print (string-append "15 / 3 = " (number->string (calculator "/" 15 3))))
