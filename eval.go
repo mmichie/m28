@@ -267,7 +267,8 @@ func evalArgs(args LispList, env *Environment) ([]LispValue, error) {
 	return evaluated, nil
 }
 
-func apply(fn LispValue, args []LispValue, env *Environment) (LispValue, error) {
+// Apply applies a function to arguments
+func Apply(fn LispValue, args []LispValue, env *Environment) (LispValue, error) {
 	switch f := fn.(type) {
 	case LispFunc:
 		return f(args, env)
@@ -293,6 +294,7 @@ func apply(fn LispValue, args []LispValue, env *Environment) (LispValue, error) 
 	}
 }
 
+// IsTruthy determines if a value is considered true in Lisp
 func IsTruthy(v LispValue) bool {
 	switch v := v.(type) {
 	case nil:
