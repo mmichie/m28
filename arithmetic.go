@@ -50,9 +50,13 @@ func convertToNumbers(args []LispValue) ([]float64, error) {
 func add(numbers []float64) (float64, error) {
 	result := 0.0
 	for _, num := range numbers {
+		prevResult := result
 		result += num
 		if math.IsInf(result, 0) {
 			return 0, fmt.Errorf("overflow in addition")
+		}
+		if result == prevResult && num != 0 {
+			return 0, fmt.Errorf("underflow in addition")
 		}
 	}
 	return result, nil
@@ -64,9 +68,13 @@ func subtract(numbers []float64) (float64, error) {
 	}
 	result := numbers[0]
 	for _, num := range numbers[1:] {
+		prevResult := result
 		result -= num
 		if math.IsInf(result, 0) {
 			return 0, fmt.Errorf("overflow in subtraction")
+		}
+		if result == prevResult && num != 0 {
+			return 0, fmt.Errorf("underflow in subtraction")
 		}
 	}
 	return result, nil
@@ -75,9 +83,13 @@ func subtract(numbers []float64) (float64, error) {
 func multiply(numbers []float64) (float64, error) {
 	result := 1.0
 	for _, num := range numbers {
+		prevResult := result
 		result *= num
 		if math.IsInf(result, 0) {
 			return 0, fmt.Errorf("overflow in multiplication")
+		}
+		if result == prevResult && num != 1 && num != 0 {
+			return 0, fmt.Errorf("underflow in multiplication")
 		}
 	}
 	return result, nil
@@ -92,9 +104,13 @@ func divide(numbers []float64) (float64, error) {
 		if num == 0 {
 			return 0, fmt.Errorf("division by zero")
 		}
+		prevResult := result
 		result /= num
 		if math.IsInf(result, 0) {
 			return 0, fmt.Errorf("overflow in division")
+		}
+		if result == prevResult && num != 1 {
+			return 0, fmt.Errorf("underflow in division")
 		}
 	}
 	return result, nil
@@ -108,4 +124,8 @@ func mod(numbers []float64) (float64, error) {
 		return 0, fmt.Errorf("modulo by zero")
 	}
 	return math.Mod(numbers[0], numbers[1]), nil
+}
+
+func floatEquals(a, b float64) bool {
+	return math.Nextafter(a, b) == b
 }
