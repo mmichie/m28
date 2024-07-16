@@ -38,13 +38,24 @@ func makeArithmeticFunc(fn ArithmeticFunc) BuiltinFunc {
 func convertToNumbers(args []LispValue) ([]float64, error) {
 	numbers := make([]float64, len(args))
 	for i, arg := range args {
-		if num, ok := arg.(float64); ok {
-			numbers[i] = num
-		} else {
+		num, err := toFloat64(arg)
+		if err != nil {
 			return nil, fmt.Errorf("argument %d is not a number: %v", i+1, arg)
 		}
+		numbers[i] = num
 	}
 	return numbers, nil
+}
+
+func toFloat64(v LispValue) (float64, error) {
+	switch num := v.(type) {
+	case float64:
+		return num, nil
+	case int:
+		return float64(num), nil
+	default:
+		return 0, fmt.Errorf("not a number")
+	}
 }
 
 func add(numbers []float64) (float64, error) {
