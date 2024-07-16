@@ -23,10 +23,26 @@ func (i *Interpreter) Eval(expr LispValue) (LispValue, error) {
 	return EvalExpression(expr, i.env)
 }
 
-// Parse converts a string into a LispValue
 func (i *Interpreter) Parse(input string) (LispValue, error) {
 	tokens := tokenize(input)
-	return parseMultiple(&tokens)
+	return parseMultiple(tokens)
+}
+
+func parseMultiple(tokens []string) (LispValue, error) {
+	var expressions LispList
+	index := 0
+	for index < len(tokens) {
+		expr, newIndex, err := parse(tokens, index)
+		if err != nil {
+			return nil, err
+		}
+		expressions = append(expressions, expr)
+		index = newIndex
+	}
+	if len(expressions) == 1 {
+		return expressions[0], nil
+	}
+	return expressions, nil
 }
 
 // Execute parses and evaluates a M28 Lisp expression
@@ -86,19 +102,4 @@ func (i *Interpreter) ExecuteFile(filename string) error {
 	}
 
 	return nil
-}
-
-func parseMultiple(tokens *[]string) (LispValue, error) {
-	var expressions LispList
-	for len(*tokens) > 0 {
-		expr, err := parse(tokens)
-		if err != nil {
-			return nil, err
-		}
-		expressions = append(expressions, expr)
-	}
-	if len(expressions) == 1 {
-		return expressions[0], nil
-	}
-	return expressions, nil
 }

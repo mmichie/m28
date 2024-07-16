@@ -2,117 +2,66 @@ package m28
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 func tokenize(input string) []string {
-	var tokens []string
-	var currentToken strings.Builder
-	inString := false
-	escaped := false
-	inComment := false
+	// Remove all comments
+	noComments := regexp.MustCompile(`(?m)^;.*$|;.*`).ReplaceAllString(input, "")
 
-	for _, char := range input {
-		if inComment {
-			if char == '\n' {
-				inComment = false
-			}
-			continue
-		}
+	// Then tokenize the remaining input
+	re := regexp.MustCompile(`(\(|\)|'|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s()]+)`)
+	tokens := re.FindAllString(noComments, -1)
 
-		if inString {
-			if escaped {
-				currentToken.WriteRune(char)
-				escaped = false
-			} else if char == '\\' {
-				escaped = true
-				currentToken.WriteRune(char)
-			} else if char == '"' {
-				currentToken.WriteRune(char)
-				tokens = append(tokens, currentToken.String())
-				currentToken.Reset()
-				inString = false
-			} else {
-				currentToken.WriteRune(char)
-			}
-		} else {
-			switch char {
-			case ';':
-				if currentToken.Len() > 0 {
-					tokens = append(tokens, currentToken.String())
-					currentToken.Reset()
-				}
-				inComment = true
-			case '"':
-				if currentToken.Len() > 0 {
-					tokens = append(tokens, currentToken.String())
-					currentToken.Reset()
-				}
-				currentToken.WriteRune(char)
-				inString = true
-			case '(', ')', '\'':
-				if currentToken.Len() > 0 {
-					tokens = append(tokens, currentToken.String())
-					currentToken.Reset()
-				}
-				tokens = append(tokens, string(char))
-			default:
-				if unicode.IsSpace(char) {
-					if currentToken.Len() > 0 {
-						tokens = append(tokens, currentToken.String())
-						currentToken.Reset()
-					}
-				} else {
-					currentToken.WriteRune(char)
-				}
-			}
+	var filteredTokens []string
+	for _, token := range tokens {
+		trimmed := strings.TrimSpace(token)
+		if trimmed != "" {
+			filteredTokens = append(filteredTokens, trimmed)
 		}
 	}
-
-	if currentToken.Len() > 0 {
-		tokens = append(tokens, currentToken.String())
-	}
-
-	return tokens
+	return filteredTokens
 }
 
-func parse(tokens *[]string) (LispValue, error) {
-	if len(*tokens) == 0 {
-		return nil, fmt.Errorf("unexpected EOF")
+func parse(tokens []string, index int) (LispValue, int, error) {
+	if index >= len(tokens) {
+		return nil, index, fmt.Errorf("unexpected EOF")
 	}
-	token := (*tokens)[0]
-	*tokens = (*tokens)[1:]
+
+	token := tokens[index]
+	index++
 
 	switch token {
 	case "(":
 		var list LispList
-		for len(*tokens) > 0 && (*tokens)[0] != ")" {
-			val, err := parse(tokens)
+		for index < len(tokens) && tokens[index] != ")" {
+			val, newIndex, err := parse(tokens, index)
 			if err != nil {
-				return nil, err
+				return nil, newIndex, err
 			}
 			list = append(list, val)
+			index = newIndex
 		}
-		if len(*tokens) == 0 {
-			return nil, fmt.Errorf("missing closing parenthesis")
+		if index >= len(tokens) {
+			return nil, index, fmt.Errorf("missing closing parenthesis")
 		}
-		*tokens = (*tokens)[1:] // consume the closing parenthesis
-		return list, nil
+		return list, index + 1, nil // consume the closing parenthesis
 	case ")":
-		return nil, fmt.Errorf("unexpected closing parenthesis")
+		return nil, index, fmt.Errorf("unexpected closing parenthesis")
 	case "'":
-		if len(*tokens) == 0 {
-			return nil, fmt.Errorf("unexpected EOF after quote")
+		if index >= len(tokens) {
+			return nil, index, fmt.Errorf("unexpected EOF after quote")
 		}
-		quoted, err := parse(tokens)
+		quoted, newIndex, err := parse(tokens, index)
 		if err != nil {
-			return nil, err
+			return nil, newIndex, err
 		}
-		return LispList{LispSymbol("quote"), quoted}, nil
+		return LispList{LispSymbol("quote"), quoted}, newIndex, nil
 	default:
-		return parseAtom(token)
+		atom, err := parseAtom(token)
+		return atom, index, err
 	}
 }
 
@@ -124,7 +73,6 @@ func parseAtom(token string) (LispValue, error) {
 	if token == "#t" {
 		return true, nil
 	}
-
 	// Check if it's a string literal
 	if strings.HasPrefix(token, "\"") && strings.HasSuffix(token, "\"") {
 		unquoted, err := strconv.Unquote(token)
@@ -133,12 +81,10 @@ func parseAtom(token string) (LispValue, error) {
 		}
 		return unquoted, nil
 	}
-
 	// Check if it's a number
 	if num, err := strconv.ParseFloat(token, 64); err == nil {
 		return num, nil
 	}
-
 	// If it's not a boolean, string, or number, it's a symbol
 	return LispSymbol(token), nil
 }
