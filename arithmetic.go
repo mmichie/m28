@@ -1,0 +1,98 @@
+package m28
+
+import (
+	"fmt"
+)
+
+type ArithmeticFunc func([]float64) (float64, error)
+
+var arithmeticFuncs = map[string]ArithmeticFunc{
+	"+": add,
+	"-": subtract,
+	"*": multiply,
+	"/": divide,
+	"%": mod,
+}
+
+func registerArithmeticFuncs(env *Environment) {
+	for name, fn := range arithmeticFuncs {
+		env.Set(LispSymbol(name), LispFunc(makeArithmeticFunc(fn)))
+	}
+}
+
+func makeArithmeticFunc(fn ArithmeticFunc) BuiltinFunc {
+	return func(args []LispValue, _ *Environment) (LispValue, error) {
+		numbers, err := convertToNumbers(args)
+		if err != nil {
+			return nil, err
+		}
+		result, err := fn(numbers)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+}
+
+func convertToNumbers(args []LispValue) ([]float64, error) {
+	numbers := make([]float64, len(args))
+	for i, arg := range args {
+		if num, ok := arg.(float64); ok {
+			numbers[i] = num
+		} else {
+			return nil, fmt.Errorf("argument %d is not a number: %v", i+1, arg)
+		}
+	}
+	return numbers, nil
+}
+
+func add(numbers []float64) (float64, error) {
+	result := 0.0
+	for _, num := range numbers {
+		result += num
+	}
+	return result, nil
+}
+
+func subtract(numbers []float64) (float64, error) {
+	if len(numbers) == 0 {
+		return 0, fmt.Errorf("subtract requires at least one argument")
+	}
+	result := numbers[0]
+	for _, num := range numbers[1:] {
+		result -= num
+	}
+	return result, nil
+}
+
+func multiply(numbers []float64) (float64, error) {
+	result := 1.0
+	for _, num := range numbers {
+		result *= num
+	}
+	return result, nil
+}
+
+func divide(numbers []float64) (float64, error) {
+	if len(numbers) == 0 {
+		return 0, fmt.Errorf("divide requires at least one argument")
+	}
+	result := numbers[0]
+	for _, num := range numbers[1:] {
+		if num == 0 {
+			return 0, fmt.Errorf("division by zero")
+		}
+		result /= num
+	}
+	return result, nil
+}
+
+func mod(numbers []float64) (float64, error) {
+	if len(numbers) != 2 {
+		return 0, fmt.Errorf("modulo requires exactly two arguments")
+	}
+	if numbers[1] == 0 {
+		return 0, fmt.Errorf("modulo by zero")
+	}
+	return float64(int(numbers[0]) % int(numbers[1])), nil
+}

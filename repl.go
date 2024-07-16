@@ -61,27 +61,3 @@ func RunREPL() {
 	interpreter := New()
 	interpreter.REPL()
 }
-
-// PrintValue converts a LispValue to a string representation
-func PrintValue(val LispValue) string {
-	switch v := val.(type) {
-	case LispSymbol:
-		return string(v)
-	case float64:
-		return fmt.Sprintf("%g", v)
-	case string:
-		return fmt.Sprintf("%q", v)
-	case LispList:
-		elements := make([]string, len(v))
-		for i, elem := range v {
-			elements[i] = PrintValue(elem)
-		}
-		return "(" + strings.Join(elements, " ") + ")"
-	case LispFunc:
-		return "#<function>"
-	case *Lambda:
-		return "#<lambda>"
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}

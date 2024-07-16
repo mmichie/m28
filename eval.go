@@ -1,6 +1,8 @@
 package m28
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // EvalExpression evaluates a LispValue in the given environment
 func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
@@ -58,115 +60,9 @@ func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 			return nil, err
 		}
 
-		return apply(fn, args, env)
+		return Apply(fn, args, env)
 	default:
 		return nil, fmt.Errorf("unknown expression type: %T", e)
-	}
-}
-
-func evalCond(list LispList, env *Environment) (LispValue, error) {
-	for _, clause := range list[1:] {
-		clauseList, ok := clause.(LispList)
-		if !ok || len(clauseList) < 2 {
-			return nil, fmt.Errorf("invalid cond clause")
-		}
-
-		if clauseList[0] == LispSymbol("else") {
-			return evalBegin(LispList(append([]LispValue{LispSymbol("begin")}, clauseList[1:]...)), env)
-		}
-
-		condition, err := EvalExpression(clauseList[0], env)
-		if err != nil {
-			return nil, err
-		}
-
-		if IsTruthy(condition) {
-			return evalBegin(LispList(append([]LispValue{LispSymbol("begin")}, clauseList[1:]...)), env)
-		}
-	}
-
-	return nil, nil // No clause was true
-}
-
-func evalDo(list LispList, env *Environment) (LispValue, error) {
-	if len(list) < 3 {
-		return nil, fmt.Errorf("'do' expects at least three arguments")
-	}
-
-	// Parse variable bindings
-	bindings, ok := list[1].(LispList)
-	if !ok {
-		return nil, fmt.Errorf("first argument to 'do' must be a list of bindings")
-	}
-
-	// Create a new environment for the do loop
-	localEnv := NewEnvironment(env)
-
-	// Initialize variables
-	for _, binding := range bindings {
-		bindingList, ok := binding.(LispList)
-		if !ok || len(bindingList) < 2 {
-			return nil, fmt.Errorf("invalid binding in 'do'")
-		}
-		symbol, ok := bindingList[0].(LispSymbol)
-		if !ok {
-			return nil, fmt.Errorf("binding variable must be a symbol")
-		}
-		initValue, err := EvalExpression(bindingList[1], localEnv)
-		if err != nil {
-			return nil, err
-		}
-		localEnv.Set(symbol, initValue)
-	}
-
-	// Parse end test and result forms
-	endTest, ok := list[2].(LispList)
-	if !ok || len(endTest) < 1 {
-		return nil, fmt.Errorf("invalid end test in 'do'")
-	}
-
-	// Main loop
-	for {
-		// Check end condition
-		endResult, err := EvalExpression(endTest[0], localEnv)
-		if err != nil {
-			return nil, err
-		}
-		if IsTruthy(endResult) {
-			// Execute result forms and return
-			if len(endTest) > 1 {
-				var result LispValue
-				for _, resultForm := range endTest[1:] {
-					result, err = EvalExpression(resultForm, localEnv)
-					if err != nil {
-						return nil, err
-					}
-				}
-				return result, nil
-			}
-			return nil, nil // If no result forms, return nil
-		}
-
-		// Execute body
-		for _, bodyForm := range list[3:] {
-			_, err := EvalExpression(bodyForm, localEnv)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		// Update bindings
-		for _, binding := range bindings {
-			bindingList := binding.(LispList)
-			symbol := bindingList[0].(LispSymbol)
-			if len(bindingList) > 2 {
-				newValue, err := EvalExpression(bindingList[2], localEnv)
-				if err != nil {
-					return nil, err
-				}
-				localEnv.Set(symbol, newValue)
-			}
-		}
 	}
 }
 
@@ -255,60 +151,85 @@ func evalBegin(list LispList, env *Environment) (LispValue, error) {
 	return result, nil
 }
 
-func evalArgs(args LispList, env *Environment) ([]LispValue, error) {
-	evaluated := make([]LispValue, len(args))
-	for i, arg := range args {
-		value, err := EvalExpression(arg, env)
+func evalDo(list LispList, env *Environment) (LispValue, error) {
+	if len(list) < 3 {
+		return nil, fmt.Errorf("'do' expects at least three arguments")
+	}
+
+	// Parse variable bindings
+	bindings, ok := list[1].(LispList)
+	if !ok {
+		return nil, fmt.Errorf("first argument to 'do' must be a list of bindings")
+	}
+
+	// Create a new environment for the do loop
+	localEnv := NewEnvironment(env)
+
+	// Initialize variables
+	for _, binding := range bindings {
+		bindingList, ok := binding.(LispList)
+		if !ok || len(bindingList) < 2 {
+			return nil, fmt.Errorf("invalid binding in 'do'")
+		}
+		symbol, ok := bindingList[0].(LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("binding variable must be a symbol")
+		}
+		initValue, err := EvalExpression(bindingList[1], localEnv)
 		if err != nil {
 			return nil, err
 		}
-		evaluated[i] = value
+		localEnv.Set(symbol, initValue)
 	}
-	return evaluated, nil
-}
 
-// Apply applies a function to arguments
-func Apply(fn LispValue, args []LispValue, env *Environment) (LispValue, error) {
-	switch f := fn.(type) {
-	case LispFunc:
-		return f(args, env)
-	case *Lambda:
-		if len(args) < len(f.Params) && f.RestParam == "" {
-			return nil, fmt.Errorf("not enough arguments for lambda")
+	// Parse end test and result forms
+	endTest, ok := list[2].(LispList)
+	if !ok || len(endTest) < 1 {
+		return nil, fmt.Errorf("invalid end test in 'do'")
+	}
+
+	// Main loop
+	for {
+		// Check end condition
+		endResult, err := EvalExpression(endTest[0], localEnv)
+		if err != nil {
+			return nil, err
 		}
-		callEnv := NewEnvironment(f.Closure)
-		for i, param := range f.Params {
-			if i < len(args) {
-				callEnv.Define(param, args[i])
-			} else {
-				callEnv.Define(param, nil)
+		if IsTruthy(endResult) {
+			// Execute result forms and return
+			if len(endTest) > 1 {
+				var result LispValue
+				for _, resultForm := range endTest[1:] {
+					result, err = EvalExpression(resultForm, localEnv)
+					if err != nil {
+						return nil, err
+					}
+				}
+				return result, nil
+			}
+			return nil, nil // If no result forms, return nil
+		}
+
+		// Execute body
+		for _, bodyForm := range list[3:] {
+			_, err := EvalExpression(bodyForm, localEnv)
+			if err != nil {
+				return nil, err
 			}
 		}
-		if f.RestParam != "" {
-			restArgs := args[len(f.Params):]
-			callEnv.Define(f.RestParam, LispList(restArgs))
-		}
-		return EvalExpression(f.Body, callEnv)
-	default:
-		return nil, fmt.Errorf("not a function: %v", fn)
-	}
-}
 
-// IsTruthy determines if a value is considered true in Lisp
-func IsTruthy(v LispValue) bool {
-	switch v := v.(type) {
-	case nil:
-		return false
-	case bool:
-		return v
-	case float64:
-		return v != 0
-	case string:
-		return v != ""
-	case LispList:
-		return len(v) > 0
-	default:
-		return true
+		// Update bindings
+		for _, binding := range bindings {
+			bindingList := binding.(LispList)
+			symbol := bindingList[0].(LispSymbol)
+			if len(bindingList) > 2 {
+				newValue, err := EvalExpression(bindingList[2], localEnv)
+				if err != nil {
+					return nil, err
+				}
+				localEnv.Set(symbol, newValue)
+			}
+		}
 	}
 }
 
@@ -377,6 +298,30 @@ func evalSet(list LispList, env *Environment) (LispValue, error) {
 	return nil, fmt.Errorf("cannot set! undefined variable: %s", symbol)
 }
 
+func evalCond(list LispList, env *Environment) (LispValue, error) {
+	for _, clause := range list[1:] {
+		clauseList, ok := clause.(LispList)
+		if !ok || len(clauseList) < 2 {
+			return nil, fmt.Errorf("invalid cond clause")
+		}
+
+		if clauseList[0] == LispSymbol("else") {
+			return evalBegin(LispList(append([]LispValue{LispSymbol("begin")}, clauseList[1:]...)), env)
+		}
+
+		condition, err := EvalExpression(clauseList[0], env)
+		if err != nil {
+			return nil, err
+		}
+
+		if IsTruthy(condition) {
+			return evalBegin(LispList(append([]LispValue{LispSymbol("begin")}, clauseList[1:]...)), env)
+		}
+	}
+
+	return nil, nil // No clause was true
+}
+
 func evalCase(list LispList, env *Environment) (LispValue, error) {
 	if len(list) < 3 {
 		return nil, fmt.Errorf("'case' expects at least two arguments")
@@ -423,4 +368,74 @@ func evalAnd(list LispList, env *Environment) (LispValue, error) {
 		}
 	}
 	return true, nil
+}
+
+func evalArgs(args LispList, env *Environment) ([]LispValue, error) {
+	evaluated := make([]LispValue, len(args))
+	for i, arg := range args {
+		value, err := EvalExpression(arg, env)
+		if err != nil {
+			return nil, err
+		}
+		evaluated[i] = value
+	}
+	return evaluated, nil
+}
+
+// Apply applies a function to arguments
+func Apply(fn LispValue, args []LispValue, env *Environment) (LispValue, error) {
+	switch f := fn.(type) {
+	case LispFunc:
+		return f(args, env)
+	case *Lambda:
+		if len(args) < len(f.Params) && f.RestParam == "" {
+			return nil, fmt.Errorf("not enough arguments for lambda")
+		}
+		callEnv := NewEnvironment(f.Closure)
+		for i, param := range f.Params {
+			if i < len(args) {
+				callEnv.Define(param, args[i])
+			} else {
+				callEnv.Define(param, nil)
+			}
+		}
+		if f.RestParam != "" {
+			restArgs := args[len(f.Params):]
+			callEnv.Define(f.RestParam, LispList(restArgs))
+		}
+		return EvalExpression(f.Body, callEnv)
+	default:
+		return nil, fmt.Errorf("not a function: %v", fn)
+	}
+}
+
+// Helper function
+func equalValues(a, b LispValue) bool {
+	switch va := a.(type) {
+	case float64:
+		if vb, ok := b.(float64); ok {
+			return va == vb
+		}
+	case string:
+		if vb, ok := b.(string); ok {
+			return va == vb
+		}
+	case LispSymbol:
+		if vb, ok := b.(LispSymbol); ok {
+			return va == vb
+		}
+	case LispList:
+		if vb, ok := b.(LispList); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !equalValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
 }
