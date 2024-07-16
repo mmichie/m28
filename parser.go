@@ -7,17 +7,13 @@ import (
 	"strings"
 )
 
-var (
-	commentRegex = regexp.MustCompile(`(?m)^;.*$|;.*`)
-	tokenRegex   = regexp.MustCompile(`(\(|\)|'|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s()]+)`)
-)
-
 func tokenize(input string) []string {
 	// Remove all comments
-	noComments := commentRegex.ReplaceAllString(input, "")
+	noComments := regexp.MustCompile(`(?m)^;.*$|;.*`).ReplaceAllString(input, "")
 
 	// Then tokenize the remaining input
-	tokens := tokenRegex.FindAllString(noComments, -1)
+	re := regexp.MustCompile(`(\(|\)|\[|\]|'|` + "`" + `|,@|,|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s()[\]'` + "`" + `,]+)`)
+	tokens := re.FindAllString(noComments, -1)
 
 	var filteredTokens []string
 	for _, token := range tokens {
@@ -38,12 +34,18 @@ func parse(tokens []string, index int) (LispValue, int, error) {
 	index++
 
 	switch token {
-	case "(":
+	case "(", "[":
 		return parseList(tokens, index)
-	case ")":
-		return nil, index, fmt.Errorf("unexpected closing parenthesis")
+	case ")", "]":
+		return nil, index, fmt.Errorf("unexpected closing parenthesis or bracket")
 	case "'":
 		return parseQuote(tokens, index)
+	case "`":
+		return parseQuasiquote(tokens, index)
+	case ",":
+		return parseUnquote(tokens, index)
+	case ",@":
+		return parseUnquoteSplicing(tokens, index)
 	default:
 		return parseAtom(token), index, nil
 	}
@@ -51,7 +53,7 @@ func parse(tokens []string, index int) (LispValue, int, error) {
 
 func parseList(tokens []string, index int) (LispValue, int, error) {
 	var list LispList
-	for index < len(tokens) && tokens[index] != ")" {
+	for index < len(tokens) && tokens[index] != ")" && tokens[index] != "]" {
 		val, newIndex, err := parse(tokens, index)
 		if err != nil {
 			return nil, newIndex, err
@@ -60,20 +62,41 @@ func parseList(tokens []string, index int) (LispValue, int, error) {
 		index = newIndex
 	}
 	if index >= len(tokens) {
-		return nil, index, fmt.Errorf("missing closing parenthesis")
+		return nil, index, fmt.Errorf("missing closing parenthesis or bracket")
 	}
-	return list, index + 1, nil // consume the closing parenthesis
+	return list, index + 1, nil // consume the closing parenthesis or bracket
 }
 
 func parseQuote(tokens []string, index int) (LispValue, int, error) {
-	if index >= len(tokens) {
-		return nil, index, fmt.Errorf("unexpected EOF after quote")
-	}
-	quoted, newIndex, err := parse(tokens, index)
+	expr, newIndex, err := parse(tokens, index)
 	if err != nil {
 		return nil, newIndex, err
 	}
-	return LispList{LispSymbol("quote"), quoted}, newIndex, nil
+	return LispList{LispSymbol("quote"), expr}, newIndex, nil
+}
+
+func parseQuasiquote(tokens []string, index int) (LispValue, int, error) {
+	expr, newIndex, err := parse(tokens, index)
+	if err != nil {
+		return nil, newIndex, err
+	}
+	return Quasiquote{Expr: expr}, newIndex, nil
+}
+
+func parseUnquote(tokens []string, index int) (LispValue, int, error) {
+	expr, newIndex, err := parse(tokens, index)
+	if err != nil {
+		return nil, newIndex, err
+	}
+	return Unquote{Expr: expr}, newIndex, nil
+}
+
+func parseUnquoteSplicing(tokens []string, index int) (LispValue, int, error) {
+	expr, newIndex, err := parse(tokens, index)
+	if err != nil {
+		return nil, newIndex, err
+	}
+	return UnquoteSplicing{Expr: expr}, newIndex, nil
 }
 
 func parseAtom(token string) LispValue {

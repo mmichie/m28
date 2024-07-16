@@ -10,17 +10,19 @@ var specialForms map[LispSymbol]SpecialFormFunc
 
 func init() {
 	specialForms = map[LispSymbol]SpecialFormFunc{
-		"quote":  evalQuote,
-		"if":     evalIf,
-		"define": evalDefine,
-		"lambda": evalLambda,
-		"begin":  evalBegin,
-		"do":     evalDo,
-		"let":    evalLet,
-		"set!":   evalSet,
-		"cond":   evalCond,
-		"case":   evalCase,
-		"and":    evalAnd,
+		"quote":        evalQuote,
+		"if":           evalIf,
+		"define":       evalDefine,
+		"lambda":       evalLambda,
+		"begin":        evalBegin,
+		"do":           evalDo,
+		"let":          evalLet,
+		"set!":         evalSet,
+		"cond":         evalCond,
+		"case":         evalCase,
+		"and":          evalAnd,
+		"define-macro": evalDefineMacro,
+		"macroexpand":  evalMacroexpand,
 	}
 }
 
@@ -32,17 +34,22 @@ func evalQuote(args []LispValue, _ *Environment) (LispValue, error) {
 }
 
 func evalIf(args []LispValue, env *Environment) (LispValue, error) {
-	if len(args) != 3 {
-		return nil, fmt.Errorf("'if' expects exactly three arguments")
+	if len(args) < 2 || len(args) > 3 {
+		return nil, fmt.Errorf("'if' expects two or three arguments")
 	}
+
 	condition, err := EvalExpression(args[0], env)
 	if err != nil {
 		return nil, err
 	}
+
 	if IsTruthy(condition) {
 		return EvalExpression(args[1], env)
+	} else if len(args) == 3 {
+		return EvalExpression(args[2], env)
 	}
-	return EvalExpression(args[2], env)
+
+	return nil, nil // If no else clause and condition is false, return nil
 }
 
 func evalDefine(args []LispValue, env *Environment) (LispValue, error) {
@@ -339,4 +346,134 @@ func updateDoBindings(bindings LispValue, env *Environment) error {
 		}
 	}
 	return nil
+}
+
+func evalMacroexpand(args []LispValue, env *Environment) (LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("macroexpand requires exactly 1 argument")
+	}
+
+	expanded, _, err := macroexpand(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	return expanded, nil
+}
+
+func extractParamsAndBody(args []LispValue) ([]LispSymbol, LispSymbol, LispValue, error) {
+	if len(args) < 2 {
+		return nil, "", nil, fmt.Errorf("lambda requires parameters and body")
+	}
+
+	paramList, ok := args[0].(LispList)
+	if !ok {
+		return nil, "", nil, fmt.Errorf("lambda parameters must be a list")
+	}
+
+	var params []LispSymbol
+	var restParam LispSymbol
+	for i, param := range paramList {
+		symbol, ok := param.(LispSymbol)
+		if !ok {
+			return nil, "", nil, fmt.Errorf("lambda parameter must be a symbol")
+		}
+		if symbol == "." {
+			if i+1 < len(paramList) {
+				restParam, ok = paramList[i+1].(LispSymbol)
+				if !ok {
+					return nil, "", nil, fmt.Errorf("rest parameter must be a symbol")
+				}
+				break
+			}
+			return nil, "", nil, fmt.Errorf("invalid rest parameter syntax")
+		}
+		params = append(params, symbol)
+	}
+
+	body := LispList(append([]LispValue{LispSymbol("begin")}, args[1:]...))
+	return params, restParam, body, nil
+}
+
+func evalDefineMacro(args []LispValue, env *Environment) (LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("define-macro requires at least 2 arguments")
+	}
+
+	macroName, ok := args[0].(LispSymbol)
+	if !ok {
+		return nil, fmt.Errorf("macro name must be a symbol")
+	}
+
+	lambdaExpr, ok := args[1].(LispList)
+	if !ok || len(lambdaExpr) < 2 {
+		return nil, fmt.Errorf("invalid macro definition")
+	}
+
+	if lambdaExpr[0] != LispSymbol("lambda") {
+		return nil, fmt.Errorf("macro body must be a lambda expression")
+	}
+
+	params, restParam, body, err := extractParamsAndBody(lambdaExpr[1:])
+	if err != nil {
+		return nil, err
+	}
+
+	macro := &Macro{
+		Params:    params,
+		RestParam: restParam,
+		Body:      body,
+		Env:       env,
+	}
+
+	env.Define(macroName, macro)
+	return macroName, nil
+}
+
+func macroexpand(expr LispValue, env *Environment) (LispValue, bool, error) {
+	list, ok := expr.(LispList)
+	if !ok || len(list) == 0 {
+		return expr, false, nil
+	}
+
+	symbol, ok := list[0].(LispSymbol)
+	if !ok {
+		return expr, false, nil
+	}
+
+	macro, ok := env.Get(symbol)
+	if !ok {
+		return expr, false, nil
+	}
+
+	m, ok := macro.(*Macro)
+	if !ok {
+		return expr, false, nil
+	}
+
+	macroEnv := NewEnvironment(m.Env)
+
+	// Handle regular parameters
+	for i, param := range m.Params {
+		if i+1 < len(list) {
+			macroEnv.Define(param, list[i+1])
+		} else {
+			return nil, false, fmt.Errorf("not enough arguments for macro %s", symbol)
+		}
+	}
+
+	// Handle rest parameter
+	if m.RestParam != "" {
+		restArgs := list[len(m.Params)+1:]
+		macroEnv.Define(m.RestParam, LispList(restArgs))
+	} else if len(list) > len(m.Params)+1 {
+		return nil, false, fmt.Errorf("too many arguments for macro %s", symbol)
+	}
+
+	expanded, err := EvalExpression(m.Body, macroEnv)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return expanded, true, nil
 }

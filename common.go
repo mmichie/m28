@@ -3,6 +3,7 @@ package m28
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 )
 
@@ -67,13 +68,11 @@ func EqualValues(a, b LispValue) bool {
 			return true
 		}
 	case LispFunc:
-		if _, ok := b.(LispFunc); ok {
-			// Functions are only equal if they are the same function object
-			return &va == &b.(LispFunc)
+		if vb, ok := b.(LispFunc); ok {
+			return reflect.ValueOf(va).Pointer() == reflect.ValueOf(vb).Pointer()
 		}
 	case *Lambda:
 		if vb, ok := b.(*Lambda); ok {
-			// Lambdas are only equal if they are the same lambda object
 			return va == vb
 		}
 	}

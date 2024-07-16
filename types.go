@@ -20,3 +20,26 @@ type Lambda struct {
 	Env       *Environment
 	Closure   *Environment
 }
+
+// Macro represents a Lisp macro
+type Macro struct {
+	Params    []LispSymbol
+	RestParam LispSymbol
+	Body      LispValue
+	Env       *Environment
+}
+
+// Quasiquote represents a quasiquoted expression
+type Quasiquote struct {
+	Expr LispValue
+}
+
+// Unquote represents an unquoted expression
+type Unquote struct {
+	Expr LispValue
+}
+
+// UnquoteSplicing represents an unquote-splicing expression
+type UnquoteSplicing struct {
+	Expr LispValue
+}

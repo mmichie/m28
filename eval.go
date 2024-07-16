@@ -4,7 +4,6 @@ import (
 	"fmt"
 )
 
-// EvalExpression evaluates a LispValue in the given environment
 func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 	switch e := expr.(type) {
 	case LispSymbol:
@@ -12,9 +11,63 @@ func EvalExpression(expr LispValue, env *Environment) (LispValue, error) {
 	case float64, string, bool:
 		return e, nil
 	case LispList:
+		expanded, wasExpanded, err := macroexpand(e, env)
+		if err != nil {
+			return nil, err
+		}
+		if wasExpanded {
+			return EvalExpression(expanded, env)
+		}
 		return evalList(e, env)
+	case Quasiquote:
+		return evalQuasiquote(e.Expr, env, 0)
+	case Unquote, UnquoteSplicing:
+		return nil, fmt.Errorf("unquote or unquote-splicing not in quasiquote")
 	default:
 		return nil, fmt.Errorf("unknown expression type: %T", e)
+	}
+}
+
+func evalQuasiquote(expr LispValue, env *Environment, depth int) (LispValue, error) {
+	switch e := expr.(type) {
+	case Unquote:
+		if depth == 0 {
+			return EvalExpression(e.Expr, env)
+		}
+		unquoted, err := evalQuasiquote(e.Expr, env, depth-1)
+		return Unquote{Expr: unquoted}, err
+	case UnquoteSplicing:
+		if depth == 0 {
+			return nil, fmt.Errorf("unquote-splicing not in list")
+		}
+		unquoted, err := evalQuasiquote(e.Expr, env, depth-1)
+		return UnquoteSplicing{Expr: unquoted}, err
+	case Quasiquote:
+		return evalQuasiquote(e.Expr, env, depth+1)
+	case LispList:
+		result := make(LispList, 0, len(e))
+		for _, item := range e {
+			if us, ok := item.(UnquoteSplicing); ok && depth == 0 {
+				spliced, err := EvalExpression(us.Expr, env)
+				if err != nil {
+					return nil, err
+				}
+				splicedList, ok := spliced.(LispList)
+				if !ok {
+					return nil, fmt.Errorf("unquote-splicing of non-list")
+				}
+				result = append(result, splicedList...)
+			} else {
+				evaluated, err := evalQuasiquote(item, env, depth)
+				if err != nil {
+					return nil, err
+				}
+				result = append(result, evaluated)
+			}
+		}
+		return result, nil
+	default:
+		return expr, nil
 	}
 }
 
