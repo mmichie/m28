@@ -2,6 +2,7 @@ package m28
 
 import (
 	"fmt"
+	"math"
 )
 
 type ArithmeticFunc func([]float64) (float64, error)
@@ -94,5 +95,5 @@ func mod(numbers []float64) (float64, error) {
 	if numbers[1] == 0 {
 		return 0, fmt.Errorf("modulo by zero")
 	}
-	return float64(int(numbers[0]) % int(numbers[1])), nil
+	return math.Mod(numbers[0], numbers[1]), nil
 }
