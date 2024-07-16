@@ -2,6 +2,7 @@ package m28
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -13,7 +14,7 @@ func IsTruthy(v LispValue) bool {
 	case bool:
 		return v
 	case float64:
-		return v != 0
+		return v != 0 && !math.IsNaN(v)
 	case string:
 		return v != ""
 	case LispList:
@@ -28,6 +29,15 @@ func EqualValues(a, b LispValue) bool {
 	switch va := a.(type) {
 	case float64:
 		if vb, ok := b.(float64); ok {
+			if math.IsNaN(va) && math.IsNaN(vb) {
+				return true
+			}
+			if math.IsInf(va, 1) && math.IsInf(vb, 1) {
+				return true
+			}
+			if math.IsInf(va, -1) && math.IsInf(vb, -1) {
+				return true
+			}
 			return va == vb
 		}
 	case string:
@@ -38,6 +48,12 @@ func EqualValues(a, b LispValue) bool {
 		if vb, ok := b.(LispSymbol); ok {
 			return va == vb
 		}
+	case bool:
+		if vb, ok := b.(bool); ok {
+			return va == vb
+		}
+	case nil:
+		return b == nil
 	case LispList:
 		if vb, ok := b.(LispList); ok {
 			if len(va) != len(vb) {
@@ -50,6 +66,16 @@ func EqualValues(a, b LispValue) bool {
 			}
 			return true
 		}
+	case LispFunc:
+		if _, ok := b.(LispFunc); ok {
+			// Functions are only equal if they are the same function object
+			return &va == &b.(LispFunc)
+		}
+	case *Lambda:
+		if vb, ok := b.(*Lambda); ok {
+			// Lambdas are only equal if they are the same lambda object
+			return va == vb
+		}
 	}
 	return false
 }
@@ -60,20 +86,24 @@ func PrintValue(val LispValue) string {
 	case LispSymbol:
 		return string(v)
 	case float64:
+		if math.IsNaN(v) {
+			return "+nan.0"
+		}
+		if math.IsInf(v, 1) {
+			return "+inf.0"
+		}
+		if math.IsInf(v, -1) {
+			return "-inf.0"
+		}
 		return fmt.Sprintf("%g", v)
 	case string:
 		return fmt.Sprintf("%q", v)
 	case LispList:
-		var sb strings.Builder
-		sb.WriteString("(")
+		elements := make([]string, len(v))
 		for i, elem := range v {
-			if i > 0 {
-				sb.WriteString(" ")
-			}
-			sb.WriteString(PrintValue(elem))
+			elements[i] = PrintValue(elem)
 		}
-		sb.WriteString(")")
-		return sb.String()
+		return "(" + strings.Join(elements, " ") + ")"
 	case LispFunc:
 		return "#<function>"
 	case *Lambda:
