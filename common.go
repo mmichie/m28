@@ -64,11 +64,16 @@ func PrintValue(val LispValue) string {
 	case string:
 		return fmt.Sprintf("%q", v)
 	case LispList:
-		elements := make([]string, len(v))
+		var sb strings.Builder
+		sb.WriteString("(")
 		for i, elem := range v {
-			elements[i] = PrintValue(elem)
+			if i > 0 {
+				sb.WriteString(" ")
+			}
+			sb.WriteString(PrintValue(elem))
 		}
-		return "(" + strings.Join(elements, " ") + ")"
+		sb.WriteString(")")
+		return sb.String()
 	case LispFunc:
 		return "#<function>"
 	case *Lambda:
