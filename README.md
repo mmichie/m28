@@ -10,7 +10,7 @@ execute Lisp code from files.
 To use M28, follow these steps:
 
 1. Ensure you have Go installed on your system.
-2. Clone the repository: `git clone https://github.com/yourusername/m28.git`
+2. Clone the repository: `git clone https://github.com/mmichie/m28.git`
 3. Navigate to the project directory: `cd m28`
 4. Build the project: `make`
 
