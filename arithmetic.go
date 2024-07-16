@@ -38,8 +38,8 @@ func makeArithmeticFunc(fn ArithmeticFunc) BuiltinFunc {
 func convertToNumbers(args []LispValue) ([]float64, error) {
 	numbers := make([]float64, len(args))
 	for i, arg := range args {
-		num, err := toFloat64(arg)
-		if err != nil {
+		num, ok := arg.(float64)
+		if !ok {
 			return nil, fmt.Errorf("argument %d is not a number: %v", i+1, arg)
 		}
 		numbers[i] = num
@@ -47,21 +47,13 @@ func convertToNumbers(args []LispValue) ([]float64, error) {
 	return numbers, nil
 }
 
-func toFloat64(v LispValue) (float64, error) {
-	switch num := v.(type) {
-	case float64:
-		return num, nil
-	case int:
-		return float64(num), nil
-	default:
-		return 0, fmt.Errorf("not a number")
-	}
-}
-
 func add(numbers []float64) (float64, error) {
 	result := 0.0
 	for _, num := range numbers {
 		result += num
+		if math.IsInf(result, 0) {
+			return 0, fmt.Errorf("overflow in addition")
+		}
 	}
 	return result, nil
 }
@@ -73,6 +65,9 @@ func subtract(numbers []float64) (float64, error) {
 	result := numbers[0]
 	for _, num := range numbers[1:] {
 		result -= num
+		if math.IsInf(result, 0) {
+			return 0, fmt.Errorf("overflow in subtraction")
+		}
 	}
 	return result, nil
 }
@@ -81,6 +76,9 @@ func multiply(numbers []float64) (float64, error) {
 	result := 1.0
 	for _, num := range numbers {
 		result *= num
+		if math.IsInf(result, 0) {
+			return 0, fmt.Errorf("overflow in multiplication")
+		}
 	}
 	return result, nil
 }
@@ -95,6 +93,9 @@ func divide(numbers []float64) (float64, error) {
 			return 0, fmt.Errorf("division by zero")
 		}
 		result /= num
+		if math.IsInf(result, 0) {
+			return 0, fmt.Errorf("overflow in division")
+		}
 	}
 	return result, nil
 }
