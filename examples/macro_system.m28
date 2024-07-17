@@ -1,0 +1,25 @@
+(define-macro when
+  (lambda (condition . body)
+    `(if ,condition
+         (begin ,@body)
+         nil)))  ; Add nil as the else clause
+
+(define-macro unless
+  (lambda (condition . body)
+    `(if (not ,condition)
+         (begin ,@body)
+         nil)))  ; Add nil as the else clause
+
+(define x 10)
+
+(print "Using 'when' macro:")
+(when (> x 5)
+  (print "x is greater than 5")
+  (print "The value of x is:")
+  (print x))
+
+(print "Using 'unless' macro:")
+(unless (< x 5)
+  (print "x is not less than 5")
+  (print "The value of x is:")
+  (print x))
