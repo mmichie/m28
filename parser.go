@@ -8,13 +8,22 @@ import (
 )
 
 func tokenize(input string) []string {
-	// Remove all comments
-	noComments := regexp.MustCompile(`(?m)^;.*$|;.*`).ReplaceAllString(input, "")
+	noComments := removeComments(input)
+	rawTokens := splitIntoRawTokens(noComments)
+	return filterAndTrimTokens(rawTokens)
+}
 
-	// Then tokenize the remaining input
-	re := regexp.MustCompile(`(\(|\)|\[|\]|'|` + "`" + `|,@|,|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s()[\]'` + "`" + `,]+)`)
-	tokens := re.FindAllString(noComments, -1)
+func removeComments(input string) string {
+	commentRegex := regexp.MustCompile(`(?m)^;.*$|;.*`)
+	return commentRegex.ReplaceAllString(input, "")
+}
 
+func splitIntoRawTokens(input string) []string {
+	tokenRegex := regexp.MustCompile(`(\(|\)|\[|\]|'|` + "`" + `|,@|,|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s()[\]'` + "`" + `,]+)`)
+	return tokenRegex.FindAllString(input, -1)
+}
+
+func filterAndTrimTokens(tokens []string) []string {
 	var filteredTokens []string
 	for _, token := range tokens {
 		trimmed := strings.TrimSpace(token)
@@ -100,27 +109,44 @@ func parseUnquoteSplicing(tokens []string, index int) (LispValue, int, error) {
 }
 
 func parseAtom(token string) LispValue {
-	// Check if it's a boolean literal
-	if token == "#f" {
-		return false
+	if isBooleanLiteral(token) {
+		return parseBooleanLiteral(token)
 	}
-	if token == "#t" {
-		return true
+	if isStringLiteral(token) {
+		return parseStringLiteral(token)
 	}
-
-	// Check if it's a string literal
-	if strings.HasPrefix(token, "\"") && strings.HasSuffix(token, "\"") {
-		unquoted, err := strconv.Unquote(token)
-		if err == nil {
-			return unquoted
-		}
+	if isNumeric(token) {
+		return parseNumeric(token)
 	}
-
-	// Check if it's a number
-	if num, err := strconv.ParseFloat(token, 64); err == nil {
-		return num
-	}
-
-	// If it's not a boolean, string, or number, it's a symbol
 	return LispSymbol(token)
+}
+
+func isBooleanLiteral(token string) bool {
+	return token == "#f" || token == "#t"
+}
+
+func parseBooleanLiteral(token string) bool {
+	return token == "#t"
+}
+
+func isStringLiteral(token string) bool {
+	return strings.HasPrefix(token, "\"") && strings.HasSuffix(token, "\"")
+}
+
+func parseStringLiteral(token string) string {
+	unquoted, err := strconv.Unquote(token)
+	if err == nil {
+		return unquoted
+	}
+	return token // Return the original token if unquoting fails
+}
+
+func isNumeric(token string) bool {
+	_, err := strconv.ParseFloat(token, 64)
+	return err == nil
+}
+
+func parseNumeric(token string) float64 {
+	num, _ := strconv.ParseFloat(token, 64)
+	return num
 }
