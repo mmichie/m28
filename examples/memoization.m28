@@ -1,0 +1,27 @@
+(define make-memoized
+  (lambda (f)
+    (let ((cache '()))
+      (lambda (x)
+        (let ((cached-result (assoc x cache)))
+          (if cached-result
+              (cdr cached-result)
+              (let ((result (f x)))
+                (set! cache (cons (cons x result) cache))
+                result)))))))
+
+(define slow-fib
+  (lambda (n)
+    (if (< n 2)
+        n
+        (+ (slow-fib (- n 1)) (slow-fib (- n 2))))))
+
+(define memoized-fib (make-memoized slow-fib))
+
+(print "Computing slow-fib(30):")
+(print (slow-fib 30))
+
+(print "Computing memoized-fib(30):")
+(print (memoized-fib 30))
+
+(print "Computing memoized-fib(30) again (should be faster):")
+(print (memoized-fib 30))
