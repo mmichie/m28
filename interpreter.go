@@ -60,9 +60,10 @@ func (i *Interpreter) Execute(input string) (string, error) {
 
 // ExecuteFile reads and executes M28 Lisp code from a file
 func (i *Interpreter) ExecuteFile(filename string) error {
-	// Check if the file has the .m28 extension
-	if filepath.Ext(filename) != ".m28" {
-		return fmt.Errorf("file must have .m28 extension")
+	// Check if the file has either .m28 or .lisp extension
+	ext := filepath.Ext(filename)
+	if ext != ".m28" && ext != ".lisp" {
+		return fmt.Errorf("file must have either .m28 or .lisp extension")
 	}
 
 	// Read the file contents

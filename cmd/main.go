@@ -18,7 +18,8 @@ func main() {
 		return
 	}
 
-	if filepath.Ext(args[0]) == ".m28" {
+	ext := filepath.Ext(args[0])
+	if ext == ".m28" || ext == ".lisp" {
 		err := interpreter.ExecuteFile(args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error executing file: %v\n", err)
