@@ -1,0 +1,48 @@
+(define facts '())
+
+(define assert!
+  (lambda (fact)
+    (set! facts (cons fact facts))))
+
+(define query
+  (lambda (pattern)
+    (filter (lambda (fact) (match pattern fact)) facts)))
+
+(assert! '(parent john mary))
+(assert! '(parent john tom))
+(assert! '(parent mary lisa))
+(assert! '(parent mary anna))
+(assert! '(male john))
+(assert! '(female mary))
+(assert! '(female lisa))
+(assert! '(female anna))
+
+(define grandfather
+  (lambda (x y)
+    (and (exists? (lambda (z) (match (list 'parent x '?) facts))
+                  facts)
+         (exists? (lambda (z) (match (list 'parent '? y) facts))
+                  facts)
+         (exists? (lambda (z) (match (list 'male x) facts))
+                  facts))))
+
+(print "John's children:")
+(print (query '(parent john ?)))
+
+(print "Is John a grandfather of Lisa?")
+(print (grandfather 'john 'lisa))
+
+(print "Is John a grandfather of Tom?")
+(print (grandfather 'john 'tom))
+
+(print "All females:")
+(print (query '(female ?)))
+
+(print "Mary's children:")
+(print (query '(parent mary ?)))
+
+(print "Is there a male in the family?")
+(print (exists? (lambda (fact) (match '(male ?) fact)) facts))
+
+(print "Is there a child named Bob?")
+(print (exists? (lambda (fact) (match '(parent ? bob) fact)) facts))
