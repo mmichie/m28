@@ -23,7 +23,7 @@ func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	for _, arg := range args {
 		num, ok := arg.(float64)
 		if !ok {
-			return nil, fmt.Errorf("+ requires numeric arguments")
+			return nil, fmt.Errorf("+ requires numeric arguments, got %v", arg)
 		}
 		result += num
 	}
@@ -36,7 +36,7 @@ func subtract(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	}
 	first, ok := args[0].(float64)
 	if !ok {
-		return nil, fmt.Errorf("- requires numeric arguments")
+		return nil, fmt.Errorf("- requires numeric arguments, got %v", args[0])
 	}
 	if len(args) == 1 {
 		return -first, nil
@@ -45,7 +45,7 @@ func subtract(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	for _, arg := range args[1:] {
 		num, ok := arg.(float64)
 		if !ok {
-			return nil, fmt.Errorf("- requires numeric arguments")
+			return nil, fmt.Errorf("- requires numeric arguments, got %v", arg)
 		}
 		result -= num
 	}
@@ -60,7 +60,7 @@ func multiply(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	for _, arg := range args {
 		num, ok := arg.(float64)
 		if !ok {
-			return nil, fmt.Errorf("* requires numeric arguments")
+			return nil, fmt.Errorf("* requires numeric arguments, got %v", arg)
 		}
 		result *= num
 	}
@@ -73,13 +73,13 @@ func divide(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	}
 	first, ok := args[0].(float64)
 	if !ok {
-		return nil, fmt.Errorf("/ requires numeric arguments")
+		return nil, fmt.Errorf("/ requires numeric arguments, got %v", args[0])
 	}
 	result := first
 	for _, arg := range args[1:] {
 		num, ok := arg.(float64)
 		if !ok {
-			return nil, fmt.Errorf("/ requires numeric arguments")
+			return nil, fmt.Errorf("/ requires numeric arguments, got %v", arg)
 		}
 		if num == 0 {
 			return nil, fmt.Errorf("division by zero")
@@ -96,7 +96,7 @@ func modulo(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	a, ok1 := args[0].(float64)
 	b, ok2 := args[1].(float64)
 	if !ok1 || !ok2 {
-		return nil, fmt.Errorf("%% requires numeric arguments")
+		return nil, fmt.Errorf("%% requires numeric arguments, got %v and %v", args[0], args[1])
 	}
 	if b == 0 {
 		return nil, fmt.Errorf("modulo by zero")

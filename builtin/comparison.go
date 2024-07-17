@@ -12,6 +12,7 @@ func init() {
 	core.RegisterBuiltin("<=", lessOrEqual)
 	core.RegisterBuiltin(">=", greaterOrEqual)
 	core.RegisterBuiltin("=", equal)
+	core.RegisterBuiltin("equal?", equalFunc)
 }
 
 func lessThan(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -59,4 +60,11 @@ func compareNumbers(args []core.LispValue, compare func(float64, float64) bool) 
 		prev = num
 	}
 	return true, nil
+}
+
+func equalFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("equal? requires exactly two arguments")
+	}
+	return core.EqualValues(args[0], args[1]), nil
 }

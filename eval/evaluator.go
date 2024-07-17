@@ -20,14 +20,10 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 	switch v := expr.(type) {
 	case core.LispSymbol:
 		return evalSymbol(v, env)
-	case float64, string, bool:
+	case float64, int, string, bool:
 		return v, nil
 	case core.LispList:
 		return e.evalList(v, env)
-	case core.Quasiquote:
-		return e.evalQuasiquote(v.Expr, env, 0)
-	case core.Unquote, core.UnquoteSplicing:
-		return nil, fmt.Errorf("unquote or unquote-splicing not in quasiquote")
 	default:
 		return nil, fmt.Errorf("unknown expression type: %T", expr)
 	}
@@ -54,39 +50,38 @@ func (e *Evaluator) evalList(list core.LispList, env core.Environment) (core.Lis
 		if specialForm, ok := e.specialForms[v]; ok {
 			return specialForm(e, rest, env)
 		}
-		// Check if it's a built-in function
-		if builtinFunc, ok := core.BuiltinFuncs[v]; ok {
-			args, err := e.evalArgs(rest, env)
-			if err != nil {
-				return nil, err
-			}
-			return builtinFunc(args, env)
+		fn, err := e.Eval(v, env)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating symbol %s: %v", v, err)
 		}
+		args, err := e.evalArgs(rest, env)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating arguments: %v", err)
+		}
+		return e.Apply(fn, args, env)
+	default:
+		fn, err := e.Eval(first, env)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating function: %v", err)
+		}
+		args, err := e.evalArgs(rest, env)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating arguments: %v", err)
+		}
+		return e.Apply(fn, args, env)
 	}
-
-	fn, err := e.Eval(first, env)
-	if err != nil {
-		return nil, err
-	}
-
-	args, err := e.evalArgs(rest, env)
-	if err != nil {
-		return nil, err
-	}
-
-	return e.Apply(fn, args, env)
 }
 
-func (e *Evaluator) evalArgs(exprs []core.LispValue, env core.Environment) ([]core.LispValue, error) {
-	args := make([]core.LispValue, len(exprs))
-	for i, expr := range exprs {
-		arg, err := e.Eval(expr, env)
+func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]core.LispValue, error) {
+	evaluated := make([]core.LispValue, len(args))
+	for i, arg := range args {
+		value, err := e.Eval(arg, env)
 		if err != nil {
 			return nil, err
 		}
-		args[i] = arg
+		evaluated[i] = value
 	}
-	return args, nil
+	return evaluated, nil
 }
 
 func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Environment) (core.LispValue, error) {
@@ -101,27 +96,17 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 }
 
 func (e *Evaluator) applyLambda(lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < len(lambda.Params) && lambda.RestParam == "" {
-		return nil, fmt.Errorf("not enough arguments for lambda: expected %d, got %d", len(lambda.Params), len(args))
+	if len(args) != len(lambda.Params) {
+		return nil, fmt.Errorf("wrong number of arguments: expected %d, got %d", len(lambda.Params), len(args))
 	}
 
-	callEnv := env.NewEnvironment(lambda.Closure)
+	lambdaEnv := env.NewEnvironment(lambda.Closure)
 	for i, param := range lambda.Params {
-		if i < len(args) {
-			callEnv.Define(param, args[i])
-		} else {
-			callEnv.Define(param, nil)
-		}
+		lambdaEnv.Define(param, args[i])
 	}
 
-	if lambda.RestParam != "" {
-		restArgs := args[len(lambda.Params):]
-		callEnv.Define(lambda.RestParam, core.LispList(restArgs))
-	}
-
-	return e.Eval(lambda.Body, callEnv)
+	return e.Eval(lambda.Body, lambdaEnv)
 }
-
 func (e *Evaluator) evalQuasiquote(expr core.LispValue, env core.Environment, depth int) (core.LispValue, error) {
 	switch v := expr.(type) {
 	case core.Unquote:
