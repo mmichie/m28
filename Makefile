@@ -3,7 +3,7 @@
 # Variables
 BINARY_NAME=m28
 BINARY_DIR=bin
-SRC_DIR=cmd
+SRC_DIR=./
 PKG_DIRS=$(shell go list ./... | grep -v /vendor/)
 
 # Default target
