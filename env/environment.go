@@ -13,10 +13,15 @@ type Environment struct {
 
 // NewEnvironment creates a new environment
 func NewEnvironment(outer core.Environment) *Environment {
-	return &Environment{
+	env := &Environment{
 		vars:  make(map[core.LispSymbol]core.LispValue),
 		outer: outer,
 	}
+
+	// Add nil to the environment
+	env.Define(core.LispSymbol("nil"), core.Nil{})
+
+	return env
 }
 
 // Get retrieves a value from the environment

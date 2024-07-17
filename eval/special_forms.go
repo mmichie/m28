@@ -15,6 +15,7 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"define":       evalDefine,
 		"lambda":       evalLambda,
 		"begin":        evalBegin,
+		"do":           evalDo,
 		"set!":         evalSet,
 		"let":          evalLet,
 		"and":          evalAnd,
@@ -256,4 +257,82 @@ func evalQuasiquoteForm(e *Evaluator, args []core.LispValue, env core.Environmen
 		return nil, fmt.Errorf("quasiquote requires exactly one argument")
 	}
 	return e.evalQuasiquote(args[0], env, 0)
+}
+
+func evalDo(e *Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("'do' expects at least two arguments")
+	}
+
+	bindings, ok := args[0].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("first argument to 'do' must be a list of bindings")
+	}
+
+	test, ok := args[1].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("second argument to 'do' must be a test expression")
+	}
+
+	body := args[2:]
+
+	localEnv := env.NewEnvironment(env)
+
+	// Initialize bindings
+	for _, binding := range bindings {
+		bindingList, ok := binding.(core.LispList)
+		if !ok || len(bindingList) < 2 {
+			return nil, fmt.Errorf("invalid binding in 'do'")
+		}
+		symbol, ok := bindingList[0].(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("binding variable must be a symbol")
+		}
+		initValue, err := e.Eval(bindingList[1], localEnv)
+		if err != nil {
+			return nil, err
+		}
+		localEnv.Define(symbol, initValue)
+	}
+
+	for {
+		// Evaluate test
+		testResult, err := e.Eval(test[0], localEnv)
+		if err != nil {
+			return nil, err
+		}
+
+		if core.IsTruthy(testResult) {
+			// Return the result of evaluating the rest of the test expression
+			if len(test) > 1 {
+				return evalBegin(e, test[1:], localEnv)
+			}
+			return core.Nil{}, nil // Return nil if there are no expressions after the test
+		}
+
+		// Evaluate body
+		_, err = evalBegin(e, body, localEnv)
+		if err != nil {
+			return nil, err
+		}
+
+		// Update bindings
+		for _, binding := range bindings {
+			bindingList, ok := binding.(core.LispList)
+			if !ok || len(bindingList) < 2 {
+				return nil, fmt.Errorf("invalid binding in 'do'")
+			}
+			if len(bindingList) > 2 {
+				symbol, ok := bindingList[0].(core.LispSymbol)
+				if !ok {
+					return nil, fmt.Errorf("binding variable must be a symbol")
+				}
+				newValue, err := e.Eval(bindingList[2], localEnv)
+				if err != nil {
+					return nil, err
+				}
+				localEnv.Set(symbol, newValue)
+			}
+		}
+	}
 }

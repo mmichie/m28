@@ -18,6 +18,9 @@ type LispList []LispValue
 // BuiltinFunc represents a built-in function
 type BuiltinFunc func([]LispValue, Environment) (LispValue, error)
 
+// Nil represents the nil value in Lisp
+type Nil struct{}
+
 // Environment interface defines the methods for managing variable bindings
 type Environment interface {
 	Get(symbol LispSymbol) (LispValue, bool)
@@ -79,7 +82,7 @@ func RegisterBuiltin(name string, fn BuiltinFunc) {
 // IsTruthy determines if a value is considered true in Lisp
 func IsTruthy(v LispValue) bool {
 	switch v := v.(type) {
-	case nil:
+	case nil, Nil:
 		return false
 	case bool:
 		return v
@@ -122,8 +125,8 @@ func EqualValues(a, b LispValue) bool {
 		if vb, ok := b.(bool); ok {
 			return va == vb
 		}
-	case nil:
-		return b == nil
+	case nil, *struct{}:
+		return false
 	case LispList:
 		if vb, ok := b.(LispList); ok {
 			if len(va) != len(vb) {
@@ -173,7 +176,7 @@ func PrintValue(val LispValue) string {
 			return "#t"
 		}
 		return "#f"
-	case nil:
+	case Nil:
 		return "nil"
 	default:
 		return fmt.Sprintf("%v", v)
