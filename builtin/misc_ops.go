@@ -11,7 +11,6 @@ func init() {
 	core.RegisterBuiltin("string?", isString)
 	core.RegisterBuiltin("symbol?", isSymbol)
 	core.RegisterBuiltin("list?", isList)
-	core.RegisterBuiltin("null?", isNull)
 	core.RegisterBuiltin("not", not)
 	core.RegisterBuiltin("print", print)
 }
@@ -46,14 +45,6 @@ func isList(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	}
 	_, ok := args[0].(core.LispList)
 	return ok, nil
-}
-
-func isNull(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("null? requires exactly one argument")
-	}
-	list, ok := args[0].(core.LispList)
-	return ok && len(list) == 0, nil
 }
 
 func not(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
