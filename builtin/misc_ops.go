@@ -2,9 +2,34 @@ package builtin
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/eval"
 )
+
+var (
+	evaluator *eval.Evaluator
+	evalOnce  sync.Once
+	evalMutex sync.RWMutex
+)
+
+func SetEvaluator(e *eval.Evaluator) {
+	evalOnce.Do(func() {
+		evalMutex.Lock()
+		defer evalMutex.Unlock()
+		evaluator = e
+	})
+}
+
+func getEvaluator() (*eval.Evaluator, error) {
+	evalMutex.RLock()
+	defer evalMutex.RUnlock()
+	if evaluator == nil {
+		return nil, fmt.Errorf("evaluator not set")
+	}
+	return evaluator, nil
+}
 
 func init() {
 	core.RegisterBuiltin("number?", isNumber)
@@ -16,6 +41,8 @@ func init() {
 	core.RegisterBuiltin("assoc", assoc)
 	core.RegisterBuiltin("pair?", isPair)
 	core.RegisterBuiltin("integer?", isInteger)
+	core.RegisterBuiltin("error", errorFunc)
+	core.RegisterBuiltin("apply", applyFunc)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -103,4 +130,36 @@ func isInteger(args []core.LispValue, _ core.Environment) (core.LispValue, error
 	}
 	_, ok := args[0].(int)
 	return ok, nil
+}
+
+func errorFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("error function requires at least one argument")
+	}
+	errorMsg := core.PrintValue(args[0])
+	return nil, fmt.Errorf(errorMsg)
+}
+
+func applyFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	e, err := getEvaluator()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(args) < 2 {
+		return nil, fmt.Errorf("apply requires at least two arguments")
+	}
+
+	fn := args[0]
+	lastArg := args[len(args)-1]
+	middleArgs := args[1 : len(args)-1]
+
+	argList, ok := lastArg.(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("last argument to apply must be a list")
+	}
+
+	allArgs := append(middleArgs, argList...)
+
+	return e.Apply(fn, allArgs, env)
 }

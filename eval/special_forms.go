@@ -23,6 +23,7 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"cond":         evalCond,
 		"define-macro": evalDefineMacro,
 		"quasiquote":   evalQuasiquoteForm,
+		"case":         evalCase,
 	}
 }
 
@@ -335,4 +336,34 @@ func evalDo(e *Evaluator, args []core.LispValue, env core.Environment) (core.Lis
 			}
 		}
 	}
+}
+
+func evalCase(e *Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("case requires at least 2 arguments")
+	}
+
+	key, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, clause := range args[1:] {
+		clauseList, ok := clause.(core.LispList)
+		if !ok || len(clauseList) < 2 {
+			return nil, fmt.Errorf("invalid case clause")
+		}
+
+		if clauseList[0] == core.LispSymbol("else") {
+			return e.evalBegin(clauseList[1:], env)
+		}
+
+		for _, test := range clauseList[0].(core.LispList) {
+			if core.EqualValues(key, test) {
+				return e.evalBegin(clauseList[1:], env)
+			}
+		}
+	}
+
+	return nil, nil
 }

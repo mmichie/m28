@@ -153,3 +153,17 @@ func (e *Evaluator) evalQuasiquoteList(list core.LispList, env core.Environment,
 	}
 	return result, nil
 }
+
+func (e *Evaluator) evalBegin(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	var result core.LispValue
+	var err error
+
+	for _, arg := range args {
+		result, err = e.Eval(arg, env)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mmichie/m28/builtin"
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/env"
 	"github.com/mmichie/m28/eval"
@@ -22,9 +23,11 @@ type REPL struct {
 func NewREPL() *REPL {
 	environment := env.NewEnvironment(nil)
 	environment.SetupBuiltins()
+	evaluator := eval.NewEvaluator()
+	builtin.SetEvaluator(evaluator)
 	return &REPL{
 		env:       environment,
-		evaluator: eval.NewEvaluator(),
+		evaluator: evaluator,
 		parser:    parser.NewParser(),
 	}
 }
