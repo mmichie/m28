@@ -24,6 +24,8 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"define-macro": evalDefineMacro,
 		"quasiquote":   evalQuasiquoteForm,
 		"case":         evalCase,
+		"when":         evalWhen,
+		"unless":       evalUnless,
 	}
 }
 
@@ -365,5 +367,33 @@ func evalCase(e *Evaluator, args []core.LispValue, env core.Environment) (core.L
 		}
 	}
 
+	return nil, nil
+}
+
+func evalWhen(e *Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("when requires at least two arguments")
+	}
+	condition, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	if core.IsTruthy(condition) {
+		return e.evalBegin(args[1:], env)
+	}
+	return nil, nil
+}
+
+func evalUnless(e *Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("unless requires at least two arguments")
+	}
+	condition, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	if !core.IsTruthy(condition) {
+		return e.evalBegin(args[1:], env)
+	}
 	return nil, nil
 }

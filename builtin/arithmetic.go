@@ -13,6 +13,8 @@ func RegisterArithmeticFuncs() {
 	core.RegisterBuiltin("*", multiply)
 	core.RegisterBuiltin("/", divide)
 	core.RegisterBuiltin("%", modulo)
+	core.RegisterBuiltin("max", maxFunc)
+	core.RegisterBuiltin("min", minFunc)
 }
 
 func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -102,4 +104,30 @@ func modulo(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 		return nil, fmt.Errorf("modulo by zero")
 	}
 	return math.Mod(a, b), nil
+}
+
+func maxFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("max requires at least one argument")
+	}
+	max := args[0].(float64)
+	for _, arg := range args[1:] {
+		if num, ok := arg.(float64); ok && num > max {
+			max = num
+		}
+	}
+	return max, nil
+}
+
+func minFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("min requires at least one argument")
+	}
+	min := args[0].(float64)
+	for _, arg := range args[1:] {
+		if num, ok := arg.(float64); ok && num < min {
+			min = num
+		}
+	}
+	return min, nil
 }

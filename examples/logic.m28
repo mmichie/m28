@@ -16,33 +16,32 @@
 (assert! '(female mary))
 (assert! '(female lisa))
 (assert! '(female anna))
+(assert! '(parent tom bob))
+(assert! '(male tom))
 
 (define grandfather
   (lambda (x y)
-    (and (exists? (lambda (z) (match (list 'parent x '?) facts))
-                  facts)
-         (exists? (lambda (z) (match (list 'parent '? y) facts))
-                  facts)
-         (exists? (lambda (z) (match (list 'male x) facts))
+    (and (exists? (lambda (z) (match (list 'male x) z)) facts)
+         (exists? (lambda (z) 
+                    (and (match (list 'parent x '?) z)
+                         (exists? (lambda (w) 
+                                    (match (list 'parent (cadr z) y) w))
+                                  facts)))
                   facts))))
 
 (print "John's children:")
 (print (query '(parent john ?)))
-
 (print "Is John a grandfather of Lisa?")
 (print (grandfather 'john 'lisa))
-
 (print "Is John a grandfather of Tom?")
 (print (grandfather 'john 'tom))
-
+(print "Is John a grandfather of Bob?")
+(print (grandfather 'john 'bob))
 (print "All females:")
 (print (query '(female ?)))
-
 (print "Mary's children:")
 (print (query '(parent mary ?)))
-
 (print "Is there a male in the family?")
 (print (exists? (lambda (fact) (match '(male ?) fact)) facts))
-
 (print "Is there a child named Bob?")
 (print (exists? (lambda (fact) (match '(parent ? bob) fact)) facts))
