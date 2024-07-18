@@ -14,7 +14,8 @@ func init() {
 	core.RegisterBuiltin("not", not)
 	core.RegisterBuiltin("print", print)
 	core.RegisterBuiltin("assoc", assoc)
-
+	core.RegisterBuiltin("pair?", isPair)
+	core.RegisterBuiltin("integer?", isInteger)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -86,4 +87,20 @@ func assoc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 		}
 	}
 	return nil, nil // Return nil if no matching key is found
+}
+
+func isPair(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("pair? requires exactly one argument")
+	}
+	_, ok := args[0].(core.LispList)
+	return ok, nil
+}
+
+func isInteger(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("integer? requires exactly one argument")
+	}
+	_, ok := args[0].(int)
+	return ok, nil
 }
