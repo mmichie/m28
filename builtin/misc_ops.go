@@ -43,6 +43,9 @@ func init() {
 	core.RegisterBuiltin("integer?", isInteger)
 	core.RegisterBuiltin("error", errorFunc)
 	core.RegisterBuiltin("apply", applyFunc)
+	core.RegisterBuiltin("filter", filterFunc)
+	core.RegisterBuiltin("match", matchFunc)
+	core.RegisterBuiltin("exists?", existsFunc)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -162,4 +165,111 @@ func applyFunc(args []core.LispValue, env core.Environment) (core.LispValue, err
 	allArgs := append(middleArgs, argList...)
 
 	return e.Apply(fn, allArgs, env)
+}
+
+func filterFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("filter requires exactly two arguments")
+	}
+
+	predicate, ok := args[0].(*core.Lambda)
+	if !ok {
+		return nil, fmt.Errorf("first argument to filter must be a function")
+	}
+
+	list, ok := args[1].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("second argument to filter must be a list")
+	}
+
+	result := make(core.LispList, 0)
+	e, err := getEvaluator()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range list {
+		predicateResult, err := e.Apply(predicate, []core.LispValue{item}, env)
+		if err != nil {
+			return nil, err
+		}
+
+		if core.IsTruthy(predicateResult) {
+			result = append(result, item)
+		}
+	}
+
+	return result, nil
+}
+
+func matchFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("match requires exactly two arguments")
+	}
+
+	pattern, ok := args[0].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("first argument to match must be a list")
+	}
+
+	fact, ok := args[1].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("second argument to match must be a list")
+	}
+
+	return matchLists(pattern, fact), nil
+}
+
+func matchLists(pattern, fact core.LispList) core.LispValue {
+	if len(pattern) != len(fact) {
+		return false
+	}
+
+	for i, patternItem := range pattern {
+		factItem := fact[i]
+
+		if patternItem == core.LispSymbol("?") {
+			continue
+		}
+
+		if !core.EqualValues(patternItem, factItem) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func existsFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("exists? requires exactly two arguments")
+	}
+
+	predicate, ok := args[0].(*core.Lambda)
+	if !ok {
+		return nil, fmt.Errorf("first argument to exists? must be a function")
+	}
+
+	list, ok := args[1].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("second argument to exists? must be a list")
+	}
+
+	e, err := getEvaluator()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range list {
+		result, err := e.Apply(predicate, []core.LispValue{item}, env)
+		if err != nil {
+			return nil, err
+		}
+
+		if core.IsTruthy(result) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
