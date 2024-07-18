@@ -14,6 +14,9 @@ func init() {
 	core.RegisterBuiltin("length", length)
 	core.RegisterBuiltin("null?", isNull)
 	core.RegisterBuiltin("append", appendFunc)
+	core.RegisterBuiltin("car", carFunc)
+	core.RegisterBuiltin("cdr", cdrFunc)
+	core.RegisterBuiltin("cadr", cadrFunc)
 }
 
 func car(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -91,4 +94,37 @@ func isNull(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	default:
 		return false, nil
 	}
+}
+
+func carFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("car requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) == 0 {
+		return nil, fmt.Errorf("car requires a non-empty list")
+	}
+	return list[0], nil
+}
+
+func cdrFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("cdr requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) == 0 {
+		return nil, fmt.Errorf("cdr requires a non-empty list")
+	}
+	return core.LispList(list[1:]), nil
+}
+
+func cadrFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("cadr requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) < 2 {
+		return nil, fmt.Errorf("cadr requires a list with at least two elements")
+	}
+	return list[1], nil
 }
