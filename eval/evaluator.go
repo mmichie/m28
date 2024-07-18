@@ -90,9 +90,16 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 		return f(args, env)
 	case *core.Lambda:
 		return e.applyLambda(f, args, env)
-	default:
-		return nil, fmt.Errorf("not a function: %v", fn)
+	case core.LispList:
+		if len(f) > 0 && f[0] == core.LispSymbol("lambda") {
+			lambda, err := evalLambda(e, f[1:], env)
+			if err != nil {
+				return nil, err
+			}
+			return e.applyLambda(lambda.(*core.Lambda), args, env)
+		}
 	}
+	return nil, fmt.Errorf("not a function: %v", fn)
 }
 
 func (e *Evaluator) applyLambda(lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
@@ -107,6 +114,7 @@ func (e *Evaluator) applyLambda(lambda *core.Lambda, args []core.LispValue, env 
 
 	return e.Eval(lambda.Body, lambdaEnv)
 }
+
 func (e *Evaluator) evalQuasiquote(expr core.LispValue, env core.Environment, depth int) (core.LispValue, error) {
 	switch v := expr.(type) {
 	case core.Unquote:

@@ -17,7 +17,11 @@ func NewParser() *Parser {
 
 func (p *Parser) Parse(input string) (core.LispValue, error) {
 	tokens := tokenize(input)
-	return parseMultiple(tokens)
+	result, err := parseMultiple(tokens)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func tokenize(input string) []string {

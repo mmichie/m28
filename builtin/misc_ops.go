@@ -172,11 +172,7 @@ func filterFunc(args []core.LispValue, env core.Environment) (core.LispValue, er
 		return nil, fmt.Errorf("filter requires exactly two arguments")
 	}
 
-	predicate, ok := args[0].(*core.Lambda)
-	if !ok {
-		return nil, fmt.Errorf("first argument to filter must be a function")
-	}
-
+	predicate := args[0]
 	list, ok := args[1].(core.LispList)
 	if !ok {
 		return nil, fmt.Errorf("second argument to filter must be a list")
