@@ -197,3 +197,35 @@ func PrintValueWithoutQuotes(val LispValue) string {
 		return PrintValue(val)
 	}
 }
+
+// EqValues compares two Lisp values for equality (identity)
+func EqValues(a, b LispValue) bool {
+	switch va := a.(type) {
+	case LispSymbol:
+		if vb, ok := b.(LispSymbol); ok {
+			return va == vb
+		}
+	case float64:
+		if vb, ok := b.(float64); ok {
+			return va == vb
+		}
+	case string:
+		if vb, ok := b.(string); ok {
+			return va == vb
+		}
+	case bool:
+		if vb, ok := b.(bool); ok {
+			return va == vb
+		}
+	case nil:
+		return b == nil
+	case Nil:
+		_, ok := b.(Nil)
+		return ok
+	case LispList:
+		if vb, ok := b.(LispList); ok {
+			return &va == &vb // Compare pointers for lists
+		}
+	}
+	return false
+}

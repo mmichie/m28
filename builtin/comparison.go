@@ -14,6 +14,7 @@ func init() {
 	core.RegisterBuiltin("=", equal)
 	core.RegisterBuiltin("equal?", equalFunc)
 	core.RegisterBuiltin("equal", equalFunc) // Alias for Common Lisp compatibility
+	core.RegisterBuiltin("eq", eqFunc)
 }
 
 func lessThan(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -73,4 +74,11 @@ func equalFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 		}
 	}
 	return true, nil
+}
+
+func eqFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("eq requires exactly two arguments")
+	}
+	return core.EqValues(args[0], args[1]), nil
 }
