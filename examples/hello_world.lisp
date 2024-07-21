@@ -1,4 +1,4 @@
 (defun greet (name) 
-  (string-append "Hello, " name "!"))
+  (concatenate 'string "Hello, " name "!"))
 
 (print (greet "World"))
