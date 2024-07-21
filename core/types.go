@@ -40,10 +40,16 @@ type Parser interface {
 	Parse(input string) (LispValue, error)
 }
 
-// Lambda represents a lambda function
+type OptionalParam struct {
+	Name         LispSymbol
+	DefaultValue LispValue
+}
+
 type Lambda struct {
 	Params    []LispSymbol
-	RestParam LispSymbol
+	Optional  []OptionalParam
+	Rest      LispSymbol
+	KeyParams map[LispSymbol]LispValue
 	Body      LispValue
 	Env       Environment
 	Closure   Environment

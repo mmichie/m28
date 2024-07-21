@@ -12,6 +12,7 @@ func RegisterStringOps() {
 	core.RegisterBuiltin("string-append", stringAppend)
 	core.RegisterBuiltin("number->string", numberToString)
 	core.RegisterBuiltin("concatenate", concatenate)
+	core.RegisterBuiltin("string-upcase", stringUpcase)
 }
 
 func stringAppend(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -63,4 +64,17 @@ func concatenate(args []core.LispValue, _ core.Environment) (core.LispValue, err
 	}
 
 	return result.String(), nil
+}
+
+func stringUpcase(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("string-upcase expects 1 argument, got %d", len(args))
+	}
+
+	str, ok := args[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("string-upcase expects a string argument, got %T", args[0])
+	}
+
+	return strings.ToUpper(str), nil
 }
