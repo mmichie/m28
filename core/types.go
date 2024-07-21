@@ -182,3 +182,12 @@ func PrintValue(val LispValue) string {
 		return fmt.Sprintf("%v", v)
 	}
 }
+
+func PrintValueWithoutQuotes(val LispValue) string {
+	switch v := val.(type) {
+	case string:
+		return v
+	default:
+		return PrintValue(val)
+	}
+}
