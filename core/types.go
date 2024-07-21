@@ -173,9 +173,9 @@ func PrintValue(val LispValue) string {
 		return "#<lambda>"
 	case bool:
 		if v {
-			return "#t"
+			return "t"
 		}
-		return "#f"
+		return "nil"
 	case Nil:
 		return "nil"
 	default:

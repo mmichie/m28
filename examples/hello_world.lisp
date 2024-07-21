@@ -1,2 +1,4 @@
-(define greet (lambda (name) (string-append "Hello, " name "!")))
+(defun greet (name) 
+  (string-append "Hello, " name "!"))
+
 (print (greet "World"))
