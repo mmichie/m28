@@ -7,6 +7,7 @@ import (
 )
 
 func init() {
+	core.RegisterBuiltin("any", anyFunc)
 	core.RegisterBuiltin("car", car)
 	core.RegisterBuiltin("cdr", cdr)
 	core.RegisterBuiltin("cons", cons)
@@ -21,6 +22,7 @@ func init() {
 	core.RegisterBuiltin("list", listFunc)
 	core.RegisterBuiltin("append", appendFunc)
 	core.RegisterBuiltin("length", lengthFunc)
+	core.RegisterBuiltin("consp", conspFunc)
 }
 
 func car(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -165,5 +167,52 @@ func lengthFunc(args []core.LispValue, _ core.Environment) (core.LispValue, erro
 		return float64(len(v)), nil
 	default:
 		return nil, fmt.Errorf("length requires a list or string argument")
+	}
+}
+
+func anyFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("any requires exactly two arguments")
+	}
+
+	predicate, ok := args[0].(*core.Lambda)
+	if !ok {
+		return nil, fmt.Errorf("first argument to any must be a function")
+	}
+
+	list, ok := args[1].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("second argument to any must be a list")
+	}
+
+	e, err := getEvaluator()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range list {
+		result, err := e.Apply(predicate, []core.LispValue{item}, env)
+		if err != nil {
+			return nil, err
+		}
+
+		if core.IsTruthy(result) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func conspFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("consp requires exactly one argument")
+	}
+
+	switch v := args[0].(type) {
+	case core.LispList:
+		return len(v) > 0, nil
+	default:
+		return false, nil
 	}
 }

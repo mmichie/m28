@@ -13,6 +13,7 @@ func RegisterArithmeticFuncs() {
 	core.RegisterBuiltin("*", multiply)
 	core.RegisterBuiltin("/", divide)
 	core.RegisterBuiltin("%", modulo)
+	core.RegisterBuiltin("mod", modulo)
 	core.RegisterBuiltin("max", maxFunc)
 	core.RegisterBuiltin("min", minFunc)
 }
