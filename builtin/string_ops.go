@@ -11,8 +11,11 @@ import (
 func RegisterStringOps() {
 	core.RegisterBuiltin("string-append", stringAppend)
 	core.RegisterBuiltin("number->string", numberToString)
+	core.RegisterBuiltin("string->number", stringToNumber)
 	core.RegisterBuiltin("concatenate", concatenate)
 	core.RegisterBuiltin("string-upcase", stringUpcase)
+	core.RegisterBuiltin("print-value", printValue)
+	core.RegisterBuiltin("to-number", toNumber)
 }
 
 func stringAppend(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -77,4 +80,58 @@ func stringUpcase(args []core.LispValue, _ core.Environment) (core.LispValue, er
 	}
 
 	return strings.ToUpper(str), nil
+}
+
+func stringToNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("string->number requires exactly one argument")
+	}
+
+	switch arg := args[0].(type) {
+	case string:
+		num, err := strconv.ParseFloat(arg, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid number format: %s", arg)
+		}
+		return num, nil
+	case float64:
+		return arg, nil
+	case int:
+		return float64(arg), nil
+	default:
+		return nil, fmt.Errorf("string->number requires a string or number argument, got %T", arg)
+	}
+}
+
+func printValue(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("print-value requires exactly one argument")
+	}
+	return core.PrintValue(args[0]), nil
+}
+
+func toNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("to-number requires exactly one argument")
+	}
+
+	switch v := args[0].(type) {
+	case float64:
+		return v, nil
+	case int:
+		return float64(v), nil
+	case string:
+		num, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid number format: %s", v)
+		}
+		return num, nil
+	default:
+		str := core.PrintValue(v)
+		num, err := strconv.ParseFloat(str, 64)
+		if err != nil {
+			return nil, fmt.Errorf("cannot convert to number: %s", str)
+		}
+		return num, nil
+	}
 }
