@@ -1,5 +1,4 @@
 (defun greet (name &optional (greeting "Hello") &key (shout nil))
-  (print (list 'greet-args name greeting shout))
   (let ((message (concatenate 'string greeting ", " name "!")))
     (if shout
         (string-upcase message)
