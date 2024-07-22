@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 )
 
 type Evaluator interface {
@@ -177,6 +178,8 @@ func PrintValue(val LispValue) string {
 		return "#<builtin-function>"
 	case *Lambda:
 		return "#<lambda>"
+	case *LispHashTable:
+		return "#<HASH-TABLE>"
 	case bool:
 		if v {
 			return "t"
@@ -228,4 +231,39 @@ func EqValues(a, b LispValue) bool {
 		}
 	}
 	return false
+}
+
+// LispHashTable represents a Lisp hash table
+type LispHashTable struct {
+	data map[LispValue]LispValue
+	mu   sync.RWMutex
+}
+
+// NewLispHashTable creates a new LispHashTable
+func NewLispHashTable() *LispHashTable {
+	return &LispHashTable{
+		data: make(map[LispValue]LispValue),
+	}
+}
+
+// Get retrieves a value from the hash table
+func (ht *LispHashTable) Get(key LispValue) (LispValue, bool) {
+	ht.mu.RLock()
+	defer ht.mu.RUnlock()
+	val, ok := ht.data[key]
+	return val, ok
+}
+
+// Set sets a value in the hash table
+func (ht *LispHashTable) Set(key, value LispValue) {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+	ht.data[key] = value
+}
+
+// Delete removes a key-value pair from the hash table
+func (ht *LispHashTable) Delete(key LispValue) {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+	delete(ht.data, key)
 }
