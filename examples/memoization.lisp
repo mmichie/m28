@@ -13,7 +13,7 @@
       n
       (+ (slow-fib (- n 1)) (slow-fib (- n 2)))))
 
-(defvar memoized-fib (make-memoized #'slow-fib))
+(defvar memoized-fib (make-memoized slow-fib))
 
 (print "Computing slow-fib(30):")
 (print (slow-fib 30))
