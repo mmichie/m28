@@ -46,6 +46,7 @@ func init() {
 	core.RegisterBuiltin("match", matchFunc)
 	core.RegisterBuiltin("exists?", existsFunc)
 	core.RegisterBuiltin("funcall", funcallFunc)
+	core.RegisterBuiltin("numberp", numberp)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -284,4 +285,13 @@ func funcallFunc(args []core.LispValue, env core.Environment) (core.LispValue, e
 	}
 
 	return e.Apply(fn, fnArgs, env)
+}
+
+func numberp(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("numberp requires exactly one argument")
+	}
+
+	_, ok := args[0].(float64)
+	return ok, nil
 }
