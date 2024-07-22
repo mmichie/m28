@@ -1,12 +1,10 @@
-(define facts '())
+(defvar facts '())
 
-(define assert!
-  (lambda (fact)
-    (set! facts (cons fact facts))))
+(defun assert! (fact)
+  (setq facts (cons fact facts)))
 
-(define query
-  (lambda (pattern)
-    (filter (lambda (fact) (match pattern fact)) facts)))
+(defun query (pattern)
+  (filter (lambda (fact) (match pattern fact)) facts))
 
 (assert! '(parent john mary))
 (assert! '(parent john tom))
@@ -19,15 +17,14 @@
 (assert! '(parent tom bob))
 (assert! '(male tom))
 
-(define grandfather
-  (lambda (x y)
-    (and (exists? (lambda (z) (match (list 'male x) z)) facts)
-         (exists? (lambda (z) 
-                    (and (match (list 'parent x '?) z)
-                         (exists? (lambda (w) 
-                                    (match (list 'parent (cadr z) y) w))
-                                  facts)))
-                  facts))))
+(defun grandfather (x y)
+  (and (any (lambda (z) (match (list 'male x) z)) facts)
+       (any (lambda (z) 
+              (and (match (list 'parent x '?) z)
+                   (any (lambda (w) 
+                          (match (list 'parent (cadr z) y) w))
+                        facts)))
+            facts)))
 
 (print "John's children:")
 (print (query '(parent john ?)))
@@ -42,6 +39,6 @@
 (print "Mary's children:")
 (print (query '(parent mary ?)))
 (print "Is there a male in the family?")
-(print (exists? (lambda (fact) (match '(male ?) fact)) facts))
+(print (any (lambda (fact) (match '(male ?) fact)) facts))
 (print "Is there a child named Bob?")
-(print (exists? (lambda (fact) (match '(parent ? bob) fact)) facts))
+(print (any (lambda (fact) (match '(parent ? bob) fact)) facts))
