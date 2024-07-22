@@ -16,6 +16,7 @@ func init() {
 	core.RegisterBuiltin("car", carFunc)
 	core.RegisterBuiltin("cdr", cdrFunc)
 	core.RegisterBuiltin("cadr", cadrFunc)
+	core.RegisterBuiltin("caddr", caddrFunc)
 	core.RegisterBuiltin("cons", consFunc)
 	core.RegisterBuiltin("list", listFunc)
 	core.RegisterBuiltin("append", appendFunc)
@@ -42,6 +43,17 @@ func cdr(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 		return nil, fmt.Errorf("cdr requires a non-empty list")
 	}
 	return core.LispList(list[1:]), nil
+}
+
+func caddrFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("caddr requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) < 3 {
+		return nil, fmt.Errorf("caddr requires a list with at least three elements")
+	}
+	return list[2], nil
 }
 
 func cons(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
