@@ -47,6 +47,8 @@ func init() {
 	core.RegisterBuiltin("exists?", existsFunc)
 	core.RegisterBuiltin("funcall", funcallFunc)
 	core.RegisterBuiltin("numberp", numberp)
+	core.RegisterBuiltin("symbolp", symbolpFunc)
+	core.RegisterBuiltin("symbol->string", symbolToStringFunc)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -294,4 +296,26 @@ func numberp(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 
 	_, ok := args[0].(float64)
 	return ok, nil
+}
+
+func symbolpFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("symbolp requires exactly one argument")
+	}
+
+	_, isSymbol := args[0].(core.LispSymbol)
+	return isSymbol, nil
+}
+
+func symbolToStringFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("symbol->string requires exactly one argument")
+	}
+
+	symbol, isSymbol := args[0].(core.LispSymbol)
+	if !isSymbol {
+		return nil, fmt.Errorf("symbol->string requires a symbol as its argument")
+	}
+
+	return string(symbol), nil
 }
