@@ -34,6 +34,12 @@ func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, e
 		}
 	}
 
+	// Bind rest parameter
+	if lambda.Rest != "" {
+		restArgs := args[len(lambda.Params)+len(lambda.Optional):]
+		lambdaEnv.Define(lambda.Rest, core.LispList(restArgs))
+	}
+
 	// Bind key parameters
 	for key, defaultValue := range lambda.KeyParams {
 		found := false
