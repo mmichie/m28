@@ -4,19 +4,21 @@ import (
 	"fmt"
 
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/special_forms"
 )
 
 type Evaluator struct {
-	specialForms map[core.LispSymbol]SpecialFormFunc
+	specialForms map[core.LispSymbol]special_forms.SpecialFormFunc
 }
 
-func NewEvaluator() *Evaluator {
+func NewEvaluator() core.Evaluator {
 	return &Evaluator{
-		specialForms: GetSpecialForms(),
+		specialForms: special_forms.GetSpecialForms(),
 	}
 }
 
 func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispValue, error) {
+
 	switch v := expr.(type) {
 	case core.LispSymbol:
 		return evalSymbol(v, env)
@@ -97,7 +99,7 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 		return e.applyLambda(f, args, env)
 	case core.LispList:
 		if len(f) > 0 && f[0] == core.LispSymbol("lambda") {
-			lambda, err := EvalLambda(e, f[1:], env)
+			lambda, err := special_forms.EvalLambda(e, f[1:], env)
 			if err != nil {
 				return nil, err
 			}
@@ -108,62 +110,17 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 }
 
 func (e *Evaluator) evalQuasiquote(expr core.LispValue, env core.Environment, depth int) (core.LispValue, error) {
-	switch v := expr.(type) {
-	case core.Unquote:
-		if depth == 0 {
-			return e.Eval(v.Expr, env)
-		}
-		unquoted, err := e.evalQuasiquote(v.Expr, env, depth-1)
-		return core.Unquote{Expr: unquoted}, err
-	case core.UnquoteSplicing:
-		if depth == 0 {
-			return nil, fmt.Errorf("unquote-splicing not in list")
-		}
-		unquoted, err := e.evalQuasiquote(v.Expr, env, depth-1)
-		return core.UnquoteSplicing{Expr: unquoted}, err
-	case core.Quasiquote:
-		return e.evalQuasiquote(v.Expr, env, depth+1)
-	case core.LispList:
-		return e.evalQuasiquoteList(v, env, depth)
-	default:
-		return expr, nil
-	}
+	return special_forms.EvalQuasiquote(e, expr, env, depth)
 }
 
 func (e *Evaluator) evalQuasiquoteList(list core.LispList, env core.Environment, depth int) (core.LispValue, error) {
-	result := make(core.LispList, 0, len(list))
-	for _, item := range list {
-		if us, ok := item.(core.UnquoteSplicing); ok && depth == 0 {
-			spliced, err := e.Eval(us.Expr, env)
-			if err != nil {
-				return nil, err
-			}
-			splicedList, ok := spliced.(core.LispList)
-			if !ok {
-				return nil, fmt.Errorf("unquote-splicing of non-list")
-			}
-			result = append(result, splicedList...)
-		} else {
-			evaluated, err := e.evalQuasiquote(item, env, depth)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, evaluated)
-		}
-	}
-	return result, nil
+	return special_forms.EvalQuasiquoteList(e, list, env, depth)
 }
 
 func (e *Evaluator) evalBegin(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	var result core.LispValue
-	var err error
+	return special_forms.EvalProgn(e, args, env)
+}
 
-	for _, arg := range args {
-		result, err = e.Eval(arg, env)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
+func (e *Evaluator) applyLambda(lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	return special_forms.ApplyLambda(e, lambda, args, env)
 }

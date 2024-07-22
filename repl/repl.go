@@ -16,7 +16,7 @@ import (
 
 type REPL struct {
 	env       core.Environment
-	evaluator *eval.Evaluator
+	evaluator core.Evaluator
 	parser    *parser.Parser
 }
 

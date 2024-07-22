@@ -5,16 +5,15 @@ import (
 	"sync"
 
 	"github.com/mmichie/m28/core"
-	"github.com/mmichie/m28/eval"
 )
 
 var (
-	evaluator *eval.Evaluator
+	evaluator core.Evaluator
 	evalOnce  sync.Once
 	evalMutex sync.RWMutex
 )
 
-func SetEvaluator(e *eval.Evaluator) {
+func SetEvaluator(e core.Evaluator) {
 	evalOnce.Do(func() {
 		evalMutex.Lock()
 		defer evalMutex.Unlock()
@@ -22,7 +21,7 @@ func SetEvaluator(e *eval.Evaluator) {
 	})
 }
 
-func getEvaluator() (*eval.Evaluator, error) {
+func getEvaluator() (core.Evaluator, error) {
 	evalMutex.RLock()
 	defer evalMutex.RUnlock()
 	if evaluator == nil {

@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+type Evaluator interface {
+	Eval(expr LispValue, env Environment) (LispValue, error)
+	Apply(fn LispValue, args []LispValue, env Environment) (LispValue, error)
+}
+
 // LispValue represents any Lisp value
 type LispValue interface{}
 
@@ -28,11 +33,6 @@ type Environment interface {
 	Define(symbol LispSymbol, value LispValue)
 	SetMutable(symbol LispSymbol, value LispValue) bool
 	NewEnvironment(outer Environment) Environment
-}
-
-// Evaluator interface defines the method for evaluating Lisp expressions
-type Evaluator interface {
-	Eval(expr LispValue, env Environment) (LispValue, error)
 }
 
 // Parser interface defines the method for parsing Lisp code
