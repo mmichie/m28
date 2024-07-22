@@ -29,6 +29,7 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"defmacro":  EvalDefmacro,
 		"all":       EvalAll,
 		"dolist":    EvalDolist,
+		"loop":      EvalLoop,
 	}
 }
 
