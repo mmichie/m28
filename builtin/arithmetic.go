@@ -20,7 +20,7 @@ func RegisterArithmeticFuncs() {
 
 func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	if len(args) < 2 {
-		return nil, fmt.Errorf("+ requires at least two arguments")
+		return nil, fmt.Errorf("+ requires at least two arguments, got %d", len(args))
 	}
 	result := 0.0
 	for _, arg := range args {
