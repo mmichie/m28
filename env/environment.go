@@ -66,6 +66,7 @@ func (e *Environment) SetupBuiltins() {
 	builtin.RegisterArithmeticFuncs()
 	builtin.RegisterStringOps()
 	builtin.RegisterIOOps()
+	builtin.RegisterTestOps()
 	for name, fn := range core.BuiltinFuncs {
 		e.Set(core.LispSymbol(name), fn)
 	}

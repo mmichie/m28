@@ -28,6 +28,7 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"or":        EvalOr,
 		"defmacro":  EvalDefmacro,
 		"all":       EvalAll,
+		"dolist":    EvalDolist,
 	}
 }
 
@@ -141,4 +142,46 @@ func EvalDo(e core.Evaluator, args []core.LispValue, env core.Environment) (core
 			loopEnv.Set(varName, newVal)
 		}
 	}
+}
+
+func EvalDolist(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("dolist requires at least 2 arguments")
+	}
+
+	spec, ok := args[0].(core.LispList)
+	if !ok || len(spec) != 2 {
+		return nil, fmt.Errorf("invalid dolist specification")
+	}
+
+	varSymbol, ok := spec[0].(core.LispSymbol)
+	if !ok {
+		return nil, fmt.Errorf("dolist variable must be a symbol")
+	}
+
+	listExpr, err := e.Eval(spec[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	list, ok := listExpr.(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("dolist requires a list")
+	}
+
+	loopEnv := env.NewEnvironment(env)
+	var result core.LispValue
+
+	for _, item := range list {
+		loopEnv.Set(varSymbol, item)
+
+		for _, form := range args[1:] {
+			result, err = e.Eval(form, loopEnv)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return result, nil
 }
