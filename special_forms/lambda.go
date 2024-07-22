@@ -62,15 +62,25 @@ func bindRestParam(lambda *core.Lambda, args []core.LispValue, env core.Environm
 }
 
 func bindKeyParams(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, env core.Environment) error {
+	restArgsStart := len(lambda.Params) + len(lambda.Optional)
+
 	for key, defaultValue := range lambda.KeyParams {
-		if value, found := findKeyParam(key, args[len(lambda.Params)+len(lambda.Optional):]); found {
+		var value core.LispValue
+		var found bool
+
+		// Only look for key parameters in the remaining arguments
+		if restArgsStart < len(args) {
+			value, found = findKeyParam(key, args[restArgsStart:])
+		}
+
+		if found {
 			env.Define(key, value)
 		} else if defaultValue != nil {
-			value, err := e.Eval(defaultValue, env)
+			evaluatedDefault, err := e.Eval(defaultValue, env)
 			if err != nil {
 				return err
 			}
-			env.Define(key, value)
+			env.Define(key, evaluatedDefault)
 		} else {
 			env.Define(key, nil)
 		}
