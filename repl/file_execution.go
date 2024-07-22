@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/mmichie/m28/core"
 )
 
 func (r *REPL) ExecuteFile(filename string) error {
@@ -35,13 +33,11 @@ func (r *REPL) ExecuteFile(filename string) error {
 		if strings.Count(input.String(), "(") == strings.Count(input.String(), ")") {
 			expr := strings.TrimSpace(input.String())
 			if expr != "" {
-				result, err := r.EvaluateString(expr)
+				_, err := r.EvaluateString(expr)
 				if err != nil {
 					return fmt.Errorf("error evaluating expression at line %d: %v", lineNumber, err)
 				}
-				if result != nil {
-					fmt.Printf("Result: %v\n", core.PrintValue(result))
-				}
+				// We don't print anything here. The print function in Lisp will handle output.
 			}
 			input.Reset()
 		}
