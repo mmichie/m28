@@ -45,7 +45,7 @@ func init() {
 	core.RegisterBuiltin("filter", filterFunc)
 	core.RegisterBuiltin("match", matchFunc)
 	core.RegisterBuiltin("exists?", existsFunc)
-	core.RegisterBuiltin("null?", isNull)
+	core.RegisterBuiltin("funcall", funcallFunc)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -270,16 +270,18 @@ func existsFunc(args []core.LispValue, env core.Environment) (core.LispValue, er
 	return false, nil
 }
 
-func isNull(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("null? expects exactly one argument")
+func funcallFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("funcall requires at least one argument")
 	}
-	switch v := args[0].(type) {
-	case core.LispList:
-		return len(v) == 0, nil
-	case core.Nil:
-		return true, nil
-	default:
-		return false, nil
+
+	fn := args[0]
+	fnArgs := args[1:]
+
+	e, err := getEvaluator()
+	if err != nil {
+		return nil, err
 	}
+
+	return e.Apply(fn, fnArgs, env)
 }
