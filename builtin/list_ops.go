@@ -14,6 +14,7 @@ func init() {
 	core.RegisterBuiltin("list", list)
 	core.RegisterBuiltin("length", length)
 	core.RegisterBuiltin("null?", isNull)
+	core.RegisterBuiltin("null", isNull)
 	core.RegisterBuiltin("car", carFunc)
 	core.RegisterBuiltin("cdr", cdrFunc)
 	core.RegisterBuiltin("cadr", cadrFunc)
