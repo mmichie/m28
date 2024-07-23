@@ -33,6 +33,7 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"loop":      EvalLoop,
 		"dotimes":   EvalDotimes,
 		"setf":      EvalSetf,
+		"while":     EvalWhile,
 	}
 }
 
@@ -423,4 +424,35 @@ func setfGethash(e core.Evaluator, args []core.LispValue, value core.LispValue, 
 
 	ht.Set(key, value)
 	return value, nil
+}
+
+func EvalWhile(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("while requires at least 2 arguments")
+	}
+
+	condition := args[0]
+	body := args[1:]
+
+	var result core.LispValue
+
+	for {
+		condResult, err := e.Eval(condition, env)
+		if err != nil {
+			return nil, err
+		}
+
+		if !core.IsTruthy(condResult) {
+			break
+		}
+
+		for _, expr := range body {
+			result, err = e.Eval(expr, env)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return result, nil
 }
