@@ -20,6 +20,7 @@ func RegisterSequenceOps() {
 	core.RegisterBuiltin("substitute", substituteFunc)
 	core.RegisterBuiltin("sort", sortFunc)
 	core.RegisterBuiltin("stable-sort", stableSortFunc)
+	core.RegisterBuiltin("position", positionFunc)
 }
 
 func subseqFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
@@ -346,4 +347,39 @@ func sortHelper(args []core.LispValue, env core.Environment, stable bool) (core.
 	}
 
 	return result, nil
+}
+
+func positionFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 && len(args) != 3 {
+		return nil, fmt.Errorf("position requires 2 or 3 arguments")
+	}
+
+	item := args[0]
+	sequence, ok := args[1].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("second argument to position must be a sequence")
+	}
+
+	testFn := core.EqualValues
+	if len(args) == 3 {
+		fn, ok := args[2].(*core.Lambda)
+		if !ok {
+			return nil, fmt.Errorf("third argument to position must be a function")
+		}
+		testFn = func(a, b core.LispValue) bool {
+			result, err := env.(core.Evaluator).Apply(fn, []core.LispValue{a, b}, env)
+			if err != nil {
+				return false
+			}
+			return core.IsTruthy(result)
+		}
+	}
+
+	for i, elem := range sequence {
+		if testFn(item, elem) {
+			return float64(i), nil
+		}
+	}
+
+	return nil, nil
 }
