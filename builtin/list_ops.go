@@ -24,6 +24,13 @@ func init() {
 	core.RegisterBuiltin("append", appendFunc)
 	core.RegisterBuiltin("length", lengthFunc)
 	core.RegisterBuiltin("consp", conspFunc)
+	core.RegisterBuiltin("first", firstFunc)
+	core.RegisterBuiltin("second", secondFunc)
+	core.RegisterBuiltin("third", thirdFunc)
+	core.RegisterBuiltin("nth", nthFunc)
+	core.RegisterBuiltin("last", lastFunc)
+	core.RegisterBuiltin("butlast", butlastFunc)
+	core.RegisterBuiltin("nthcdr", nthcdrFunc)
 }
 
 func car(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -216,4 +223,100 @@ func conspFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 	default:
 		return false, nil
 	}
+}
+
+func firstFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("first requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) == 0 {
+		return nil, fmt.Errorf("first requires a non-empty list")
+	}
+	return list[0], nil
+}
+
+func secondFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("second requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) < 2 {
+		return nil, fmt.Errorf("second requires a list with at least two elements")
+	}
+	return list[1], nil
+}
+
+func thirdFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("third requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) < 3 {
+		return nil, fmt.Errorf("third requires a list with at least three elements")
+	}
+	return list[2], nil
+}
+
+func nthFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("nth requires exactly two arguments")
+	}
+	n, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("nth first argument must be a number")
+	}
+	list, ok := args[1].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("nth second argument must be a list")
+	}
+	index := int(n)
+	if index < 0 || index >= len(list) {
+		return nil, fmt.Errorf("nth index out of bounds")
+	}
+	return list[index], nil
+}
+
+func lastFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("last requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) == 0 {
+		return nil, fmt.Errorf("last requires a non-empty list")
+	}
+	return list[len(list)-1], nil
+}
+
+func butlastFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("butlast requires exactly one argument")
+	}
+	list, ok := args[0].(core.LispList)
+	if !ok || len(list) == 0 {
+		return nil, fmt.Errorf("butlast requires a non-empty list")
+	}
+	return core.LispList(list[:len(list)-1]), nil
+}
+
+func nthcdrFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("nthcdr requires exactly two arguments")
+	}
+	n, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("nthcdr first argument must be a number")
+	}
+	list, ok := args[1].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("nthcdr second argument must be a list")
+	}
+	index := int(n)
+	if index < 0 {
+		return nil, fmt.Errorf("nthcdr index must be non-negative")
+	}
+	if index >= len(list) {
+		return core.LispList{}, nil
+	}
+	return core.LispList(list[index:]), nil
 }
