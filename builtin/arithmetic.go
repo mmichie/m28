@@ -21,7 +21,12 @@ func RegisterArithmeticFuncs() {
 	core.RegisterBuiltin("round", roundFunc)
 	core.RegisterBuiltin("truncate", truncateFunc)
 	core.RegisterBuiltin("rem", remFunc)
-
+	core.RegisterBuiltin("abs", absFunc)
+	core.RegisterBuiltin("evenp", evenpFunc)
+	core.RegisterBuiltin("oddp", oddpFunc)
+	core.RegisterBuiltin("zerop", zeropFunc)
+	core.RegisterBuiltin("plusp", pluspFunc)
+	core.RegisterBuiltin("minusp", minuspFunc)
 }
 
 func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -196,4 +201,70 @@ func remFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 		return nil, fmt.Errorf("division by zero in rem")
 	}
 	return math.Remainder(num1, num2), nil
+}
+
+func absFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("abs requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("abs requires a numeric argument")
+	}
+	return math.Abs(num), nil
+}
+
+func evenpFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("evenp requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("evenp requires a numeric argument")
+	}
+	return math.Mod(num, 2) == 0, nil
+}
+
+func oddpFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("oddp requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("oddp requires a numeric argument")
+	}
+	return math.Mod(num, 2) != 0, nil
+}
+
+func zeropFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("zerop requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("zerop requires a numeric argument")
+	}
+	return num == 0, nil
+}
+
+func pluspFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("plusp requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("plusp requires a numeric argument")
+	}
+	return num > 0, nil
+}
+
+func minuspFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("minusp requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("minusp requires a numeric argument")
+	}
+	return num < 0, nil
 }
