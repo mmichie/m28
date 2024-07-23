@@ -49,6 +49,7 @@ func init() {
 	core.RegisterBuiltin("numberp", numberp)
 	core.RegisterBuiltin("symbolp", symbolpFunc)
 	core.RegisterBuiltin("symbol->string", symbolToStringFunc)
+	core.RegisterBuiltin("atom", atomFunc)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -318,4 +319,19 @@ func symbolToStringFunc(args []core.LispValue, env core.Environment) (core.LispV
 	}
 
 	return string(symbol), nil
+}
+
+func atomFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("atom requires exactly one argument")
+	}
+
+	switch args[0].(type) {
+	case core.LispSymbol, float64, string, bool, core.Nil:
+		return true, nil
+	case core.LispList:
+		return false, nil
+	default:
+		return true, nil
+	}
 }
