@@ -31,6 +31,8 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"all":       EvalAll,
 		"dolist":    EvalDolist,
 		"loop":      EvalLoop,
+		"dotimes":   EvalDotimes,
+		"setf":      EvalSetf,
 	}
 }
 
@@ -232,4 +234,193 @@ func EvalLetStar(e core.Evaluator, args []core.LispValue, env core.Environment) 
 	}
 
 	return result, nil
+}
+
+func EvalDotimes(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("dotimes requires at least 2 arguments")
+	}
+
+	spec, ok := args[0].(core.LispList)
+	if !ok || len(spec) != 2 {
+		return nil, fmt.Errorf("invalid dotimes specification")
+	}
+
+	varSymbol, ok := spec[0].(core.LispSymbol)
+	if !ok {
+		return nil, fmt.Errorf("dotimes variable must be a symbol")
+	}
+
+	countExpr, err := e.Eval(spec[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	count, ok := countExpr.(float64)
+	if !ok {
+		return nil, fmt.Errorf("dotimes count must evaluate to a number")
+	}
+
+	loopEnv := env.NewEnvironment(env)
+	var result core.LispValue
+
+	for i := 0; i < int(count); i++ {
+		loopEnv.Set(varSymbol, float64(i))
+
+		for _, form := range args[1:] {
+			result, err = e.Eval(form, loopEnv)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func EvalSetf(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("setf requires exactly 2 arguments")
+	}
+
+	place := args[0]
+	value, err := e.Eval(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	switch p := place.(type) {
+	case core.LispSymbol:
+		// Simple variable assignment
+		if !env.SetMutable(p, value) {
+			return nil, fmt.Errorf("cannot setf undefined variable: %s", p)
+		}
+		return value, nil
+
+	case core.LispList:
+		// Handle structure updates
+		if len(p) < 2 {
+			return nil, fmt.Errorf("invalid setf place: %v", p)
+		}
+		accessor, ok := p[0].(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("invalid setf accessor: %v", p[0])
+		}
+
+		switch accessor {
+		case "car", "first":
+			return setfCar(e, p[1:], value, env)
+		case "cdr", "rest":
+			return setfCdr(e, p[1:], value, env)
+		case "nth":
+			return setfNth(e, p[1:], value, env)
+		case "gethash":
+			return setfGethash(e, p[1:], value, env)
+		default:
+			return nil, fmt.Errorf("unsupported setf accessor: %s", accessor)
+		}
+
+	default:
+		return nil, fmt.Errorf("invalid setf place: %v", place)
+	}
+}
+
+func setfCar(e core.Evaluator, args []core.LispValue, value core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("setf (car ...) requires exactly 1 argument")
+	}
+
+	list, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	l, ok := list.(core.LispList)
+	if !ok || len(l) == 0 {
+		return nil, fmt.Errorf("setf (car ...) requires a non-empty list")
+	}
+
+	l[0] = value
+	return value, nil
+}
+
+func setfCdr(e core.Evaluator, args []core.LispValue, value core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("setf (cdr ...) requires exactly 1 argument")
+	}
+
+	list, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	l, ok := list.(core.LispList)
+	if !ok || len(l) == 0 {
+		return nil, fmt.Errorf("setf (cdr ...) requires a non-empty list")
+	}
+
+	newCdr, ok := value.(core.LispList)
+	if !ok {
+		newCdr = core.LispList{value}
+	}
+
+	l = append(l[:1], newCdr...)
+	return newCdr, nil
+}
+
+func setfNth(e core.Evaluator, args []core.LispValue, value core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("setf (nth ...) requires exactly 2 arguments")
+	}
+
+	index, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	i, ok := index.(float64)
+	if !ok {
+		return nil, fmt.Errorf("setf (nth ...) index must be a number")
+	}
+
+	list, err := e.Eval(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	l, ok := list.(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("setf (nth ...) requires a list")
+	}
+
+	if int(i) < 0 || int(i) >= len(l) {
+		return nil, fmt.Errorf("setf (nth ...) index out of bounds")
+	}
+
+	l[int(i)] = value
+	return value, nil
+}
+
+func setfGethash(e core.Evaluator, args []core.LispValue, value core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("setf (gethash ...) requires exactly 2 arguments")
+	}
+
+	key, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	hashTable, err := e.Eval(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	ht, ok := hashTable.(*core.LispHashTable)
+	if !ok {
+		return nil, fmt.Errorf("setf (gethash ...) requires a hash table")
+	}
+
+	ht.Set(key, value)
+	return value, nil
 }
