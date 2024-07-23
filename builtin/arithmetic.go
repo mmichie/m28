@@ -16,6 +16,12 @@ func RegisterArithmeticFuncs() {
 	core.RegisterBuiltin("mod", modulo)
 	core.RegisterBuiltin("max", maxFunc)
 	core.RegisterBuiltin("min", minFunc)
+	core.RegisterBuiltin("floor", floorFunc)
+	core.RegisterBuiltin("ceiling", ceilingFunc)
+	core.RegisterBuiltin("round", roundFunc)
+	core.RegisterBuiltin("truncate", truncateFunc)
+	core.RegisterBuiltin("rem", remFunc)
+
 }
 
 func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -131,4 +137,63 @@ func minFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 		}
 	}
 	return min, nil
+}
+
+func floorFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("floor requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("floor requires a number argument")
+	}
+	return math.Floor(num), nil
+}
+
+func ceilingFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("ceiling requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("ceiling requires a number argument")
+	}
+	return math.Ceil(num), nil
+}
+
+func roundFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("round requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("round requires a number argument")
+	}
+	return math.Round(num), nil
+}
+
+func truncateFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("truncate requires exactly one argument")
+	}
+	num, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("truncate requires a number argument")
+	}
+	return math.Trunc(num), nil
+}
+
+func remFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("rem requires exactly two arguments")
+	}
+	num1, ok1 := args[0].(float64)
+	num2, ok2 := args[1].(float64)
+	if !ok1 || !ok2 {
+		return nil, fmt.Errorf("rem requires two number arguments")
+	}
+	if num2 == 0 {
+		return nil, fmt.Errorf("division by zero in rem")
+	}
+	return math.Remainder(num1, num2), nil
 }
