@@ -21,6 +21,7 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"defvar":    EvalDefvar,
 		"lambda":    EvalLambda,
 		"let":       EvalLet,
+		"let*":      EvalLetStar,
 		"setq":      EvalSetq,
 		"progn":     EvalProgn,
 		"do":        EvalDo,
@@ -181,6 +182,52 @@ func EvalDolist(e core.Evaluator, args []core.LispValue, env core.Environment) (
 			if err != nil {
 				return nil, err
 			}
+		}
+	}
+
+	return result, nil
+}
+
+func EvalLetStar(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("let* requires at least 2 arguments")
+	}
+
+	bindings, ok := args[0].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("let* bindings must be a list")
+	}
+
+	letStarEnv := env.NewEnvironment(env)
+
+	for _, binding := range bindings {
+		bindingList, ok := binding.(core.LispList)
+		if !ok || len(bindingList) != 2 {
+			return nil, fmt.Errorf("invalid binding in let*")
+		}
+
+		symbol, ok := bindingList[0].(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("binding name must be a symbol")
+		}
+
+		// Evaluate the binding value in the current letStarEnv
+		value, err := e.Eval(bindingList[1], letStarEnv)
+		if err != nil {
+			return nil, err
+		}
+
+		// Bind the value to the symbol in the letStarEnv
+		letStarEnv.Define(symbol, value)
+	}
+
+	// Evaluate the body forms in the letStarEnv
+	var result core.LispValue
+	var err error
+	for _, form := range args[1:] {
+		result, err = e.Eval(form, letStarEnv)
+		if err != nil {
+			return nil, err
 		}
 	}
 
