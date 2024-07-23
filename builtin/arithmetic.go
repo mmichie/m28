@@ -16,12 +16,9 @@ func RegisterArithmeticFuncs() {
 	core.RegisterBuiltin("mod", modulo)
 	core.RegisterBuiltin("max", maxFunc)
 	core.RegisterBuiltin("min", minFunc)
-	core.RegisterBuiltin("floor", floorFunc)
-	core.RegisterBuiltin("ceiling", ceilingFunc)
 	core.RegisterBuiltin("round", roundFunc)
 	core.RegisterBuiltin("truncate", truncateFunc)
 	core.RegisterBuiltin("rem", remFunc)
-	core.RegisterBuiltin("abs", absFunc)
 	core.RegisterBuiltin("evenp", evenpFunc)
 	core.RegisterBuiltin("oddp", oddpFunc)
 	core.RegisterBuiltin("zerop", zeropFunc)
@@ -144,28 +141,6 @@ func minFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 	return min, nil
 }
 
-func floorFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("floor requires exactly one argument")
-	}
-	num, ok := args[0].(float64)
-	if !ok {
-		return nil, fmt.Errorf("floor requires a number argument")
-	}
-	return math.Floor(num), nil
-}
-
-func ceilingFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("ceiling requires exactly one argument")
-	}
-	num, ok := args[0].(float64)
-	if !ok {
-		return nil, fmt.Errorf("ceiling requires a number argument")
-	}
-	return math.Ceil(num), nil
-}
-
 func roundFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("round requires exactly one argument")
@@ -201,17 +176,6 @@ func remFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 		return nil, fmt.Errorf("division by zero in rem")
 	}
 	return math.Remainder(num1, num2), nil
-}
-
-func absFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("abs requires exactly one argument")
-	}
-	num, ok := args[0].(float64)
-	if !ok {
-		return nil, fmt.Errorf("abs requires a numeric argument")
-	}
-	return math.Abs(num), nil
 }
 
 func evenpFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
