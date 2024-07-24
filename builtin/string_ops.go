@@ -16,6 +16,7 @@ func RegisterStringOps() {
 	core.RegisterBuiltin("string-upcase", stringUpcase)
 	core.RegisterBuiltin("print-value", printValue)
 	core.RegisterBuiltin("to-number", toNumber)
+	core.RegisterBuiltin("string=", stringEqualFunc)
 }
 
 func stringAppend(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -107,7 +108,12 @@ func printValue(args []core.LispValue, _ core.Environment) (core.LispValue, erro
 	if len(args) != 1 {
 		return nil, fmt.Errorf("print-value requires exactly one argument")
 	}
-	return core.PrintValue(args[0]), nil
+	switch v := args[0].(type) {
+	case string:
+		return v, nil
+	default:
+		return core.PrintValue(args[0]), nil
+	}
 }
 
 func toNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -134,4 +140,19 @@ func toNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 		}
 		return num, nil
 	}
+}
+
+func stringEqualFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("string= requires exactly two arguments")
+	}
+
+	str1, ok1 := args[0].(string)
+	str2, ok2 := args[1].(string)
+
+	if !ok1 || !ok2 {
+		return nil, fmt.Errorf("string= requires two string arguments")
+	}
+
+	return str1 == str2, nil
 }

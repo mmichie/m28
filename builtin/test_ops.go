@@ -48,9 +48,15 @@ func ignoreErrorsFunc(args []core.LispValue, env core.Environment) (core.LispVal
 		return nil, fmt.Errorf("ignore-errors requires exactly 1 argument")
 	}
 
-	result, err := env.(core.Evaluator).Eval(args[0], env)
+	e, err := getEvaluator()
 	if err != nil {
-		return nil, nil // Return nil instead of the error
+		return nil, err
+	}
+
+	result, err := e.Eval(args[0], env)
+	if err != nil {
+		// If an error occurs, return nil instead of the error
+		return nil, nil
 	}
 
 	return result, nil

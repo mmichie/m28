@@ -169,9 +169,24 @@ func reduceFunc(args []core.LispValue, env core.Environment) (core.LispValue, er
 		return nil, fmt.Errorf("reduce requires 2 or 3 arguments")
 	}
 
-	fn, ok := args[0].(*core.Lambda)
-	if !ok {
-		return nil, fmt.Errorf("first argument to reduce must be a function")
+	var fn core.LispValue
+	var found bool
+
+	// If the first argument is a symbol, try to evaluate it
+	if symbol, ok := args[0].(core.LispSymbol); ok {
+		fn, found = env.Get(symbol)
+		if !found {
+			return nil, fmt.Errorf("undefined function: %s", symbol)
+		}
+	} else {
+		fn = args[0]
+	}
+
+	// Check if fn is actually a function
+	if _, ok := fn.(*core.Lambda); !ok {
+		if _, ok := fn.(core.BuiltinFunc); !ok {
+			return nil, fmt.Errorf("first argument to reduce must be a function")
+		}
 	}
 
 	sequence, ok := args[1].(core.LispList)
@@ -324,8 +339,19 @@ func sortHelper(args []core.LispValue, env core.Environment, stable bool) (core.
 		return nil, fmt.Errorf("first argument to sort/stable-sort must be a sequence")
 	}
 
-	predicate, ok := args[1].(*core.Lambda)
-	if !ok {
+	var predicate core.LispValue
+	switch p := args[1].(type) {
+	case core.LispSymbol:
+		var found bool
+		predicate, found = env.Get(p)
+		if !found {
+			return nil, fmt.Errorf("undefined function: %s", p)
+		}
+	case *core.Lambda:
+		predicate = p
+	case core.BuiltinFunc:
+		predicate = p
+	default:
 		return nil, fmt.Errorf("second argument to sort/stable-sort must be a function")
 	}
 
