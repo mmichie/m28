@@ -33,15 +33,13 @@ func formatFunc(args []core.LispValue, env core.Environment) (core.LispValue, er
 	return nil, nil
 }
 
-func assertFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+func assertFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("assert requires exactly 1 argument")
+		return nil, fmt.Errorf("assert requires exactly one argument")
 	}
-
 	if !core.IsTruthy(args[0]) {
 		return nil, fmt.Errorf("assertion failed")
 	}
-
 	return core.LispSymbol("t"), nil
 }
 

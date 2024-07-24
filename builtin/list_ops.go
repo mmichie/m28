@@ -49,6 +49,8 @@ func isNull(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 		return len(v) == 0, nil
 	case core.Nil:
 		return true, nil
+	case nil:
+		return true, nil
 	default:
 		return false, nil
 	}
