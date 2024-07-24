@@ -8,26 +8,25 @@ import (
 
 func init() {
 	core.RegisterBuiltin("any", anyFunc)
-	core.RegisterBuiltin("list", list)
-	core.RegisterBuiltin("length", length)
-	core.RegisterBuiltin("null?", isNull)
-	core.RegisterBuiltin("null", isNull)
+	core.RegisterBuiltin("append", appendFunc)
+	core.RegisterBuiltin("butlast", butlastFunc)
+	core.RegisterBuiltin("caddr", caddrFunc)
+	core.RegisterBuiltin("cadr", cadrFunc)
 	core.RegisterBuiltin("car", carFunc)
 	core.RegisterBuiltin("cdr", cdrFunc)
-	core.RegisterBuiltin("cadr", cadrFunc)
-	core.RegisterBuiltin("caddr", caddrFunc)
 	core.RegisterBuiltin("cons", consFunc)
-	core.RegisterBuiltin("list", listFunc)
-	core.RegisterBuiltin("append", appendFunc)
-	core.RegisterBuiltin("length", lengthFunc)
 	core.RegisterBuiltin("consp", conspFunc)
 	core.RegisterBuiltin("first", firstFunc)
+	core.RegisterBuiltin("last", lastFunc)
+	core.RegisterBuiltin("length", lengthFunc)
+	core.RegisterBuiltin("list", listFunc)
+	core.RegisterBuiltin("mapcar", mapcarFunc)
+	core.RegisterBuiltin("nth", nthFunc)
+	core.RegisterBuiltin("nthcdr", nthcdrFunc)
+	core.RegisterBuiltin("null", isNull)
+	core.RegisterBuiltin("null?", isNull)
 	core.RegisterBuiltin("second", secondFunc)
 	core.RegisterBuiltin("third", thirdFunc)
-	core.RegisterBuiltin("nth", nthFunc)
-	core.RegisterBuiltin("last", lastFunc)
-	core.RegisterBuiltin("butlast", butlastFunc)
-	core.RegisterBuiltin("nthcdr", nthcdrFunc)
 }
 
 func caddrFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
@@ -39,24 +38,6 @@ func caddrFunc(args []core.LispValue, env core.Environment) (core.LispValue, err
 		return nil, fmt.Errorf("caddr requires a list with at least three elements")
 	}
 	return list[2], nil
-}
-
-func list(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	return core.LispList(args), nil
-}
-
-func length(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("length requires exactly one argument")
-	}
-	switch v := args[0].(type) {
-	case core.LispList:
-		return float64(len(v)), nil
-	case string:
-		return float64(len(v)), nil
-	default:
-		return nil, fmt.Errorf("length requires a list or string argument")
-	}
 }
 
 func isNull(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -300,4 +281,50 @@ func consFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	default:
 		return core.LispList{args[0], args[1]}, nil
 	}
+}
+
+func mapcarFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("mapcar requires at least two arguments")
+	}
+
+	fn, ok := args[0].(*core.Lambda)
+	if !ok {
+		return nil, fmt.Errorf("first argument to mapcar must be a function")
+	}
+
+	lists := make([]core.LispList, len(args)-1)
+	minLen := -1
+
+	for i, arg := range args[1:] {
+		list, ok := arg.(core.LispList)
+		if !ok {
+			return nil, fmt.Errorf("all arguments after the function must be lists")
+		}
+		lists[i] = list
+		if minLen == -1 || len(list) < minLen {
+			minLen = len(list)
+		}
+	}
+
+	result := make(core.LispList, minLen)
+	e, err := getEvaluator()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < minLen; i++ {
+		fnArgs := make([]core.LispValue, len(lists))
+		for j, list := range lists {
+			fnArgs[j] = list[i]
+		}
+
+		value, err := e.Apply(fn, fnArgs, env)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = value
+	}
+
+	return result, nil
 }
