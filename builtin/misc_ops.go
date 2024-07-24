@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/mmichie/m28/core"
@@ -135,8 +136,14 @@ func isInteger(args []core.LispValue, _ core.Environment) (core.LispValue, error
 	if len(args) != 1 {
 		return nil, fmt.Errorf("integer? requires exactly one argument")
 	}
-	_, ok := args[0].(int)
-	return ok, nil
+	switch v := args[0].(type) {
+	case float64:
+		return math.Floor(v) == v, nil
+	case int:
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 func errorFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -167,6 +174,15 @@ func applyFunc(args []core.LispValue, env core.Environment) (core.LispValue, err
 	}
 
 	allArgs := append(middleArgs, argList...)
+
+	// If fn is a symbol, we need to look it up in the environment
+	if symbol, ok := fn.(core.LispSymbol); ok {
+		var found bool
+		fn, found = env.Get(symbol)
+		if !found {
+			return nil, fmt.Errorf("undefined function: %s", symbol)
+		}
+	}
 
 	return e.Apply(fn, allArgs, env)
 }
