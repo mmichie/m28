@@ -188,6 +188,99 @@ func parseParameters(params core.LispList) (parameterInfo, error) {
 	return info, nil
 }
 
+func EvalLetStar(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("let* requires at least 2 arguments")
+	}
+
+	bindings, ok := args[0].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("let* bindings must be a list")
+	}
+
+	letStarEnv := env.NewEnvironment(env)
+
+	for _, binding := range bindings {
+		bindingList, ok := binding.(core.LispList)
+		if !ok || len(bindingList) != 2 {
+			return nil, fmt.Errorf("invalid binding in let*")
+		}
+
+		symbol, ok := bindingList[0].(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("binding name must be a symbol")
+		}
+
+		// Evaluate the binding value in the current letStarEnv
+		value, err := e.Eval(bindingList[1], letStarEnv)
+		if err != nil {
+			return nil, err
+		}
+
+		// Bind the value to the symbol in the letStarEnv
+		letStarEnv.Define(symbol, value)
+	}
+
+	// Evaluate the body forms in the letStarEnv
+	var result core.LispValue
+	var err error
+	for _, form := range args[1:] {
+		result, err = e.Eval(form, letStarEnv)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+func EvalSetf(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("setf requires exactly 2 arguments")
+	}
+
+	place := args[0]
+	value, err := e.Eval(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	switch p := place.(type) {
+	case core.LispSymbol:
+		// Simple variable assignment
+		if !env.SetMutable(p, value) {
+			return nil, fmt.Errorf("cannot setf undefined variable: %s", p)
+		}
+		return value, nil
+
+	case core.LispList:
+		// Handle structure updates
+		if len(p) < 2 {
+			return nil, fmt.Errorf("invalid setf place: %v", p)
+		}
+		accessor, ok := p[0].(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("invalid setf accessor: %v", p[0])
+		}
+
+		switch accessor {
+		case "car", "first":
+			return setfCar(e, p[1:], value, env)
+		case "cdr", "rest":
+			return setfCdr(e, p[1:], value, env)
+		case "nth":
+			return setfNth(e, p[1:], value, env)
+		case "gethash":
+			return setfGethash(e, p[1:], value, env)
+		default:
+			return nil, fmt.Errorf("unsupported setf accessor: %s", accessor)
+		}
+
+	default:
+		return nil, fmt.Errorf("invalid setf place: %v", place)
+	}
+}
+
 type parameterInfo struct {
 	required  []core.LispSymbol
 	optional  []core.OptionalParam

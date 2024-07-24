@@ -130,6 +130,131 @@ func handleForClause(e core.Evaluator, args []core.LispValue, i int, env core.En
 	return len(args), nil // Return to the end of args to finish the loop
 }
 
+func EvalDo(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("do requires at least 2 arguments")
+	}
+
+	// Parse variable specifications
+	varSpecs, ok := args[0].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("first argument to do must be a list of variable specifications")
+	}
+
+	// Create a new environment for the loop
+	loopEnv := env.NewEnvironment(env)
+
+	// Initialize variables
+	for _, spec := range varSpecs {
+		varSpec, ok := spec.(core.LispList)
+		if !ok || len(varSpec) < 2 {
+			return nil, fmt.Errorf("invalid variable specification in do")
+		}
+		varName, ok := varSpec[0].(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("variable name must be a symbol")
+		}
+		initVal, err := e.Eval(varSpec[1], env)
+		if err != nil {
+			return nil, err
+		}
+		loopEnv.Define(varName, initVal)
+	}
+
+	// Parse end test and result forms
+	endTest, ok := args[1].(core.LispList)
+	if !ok || len(endTest) < 1 {
+		return nil, fmt.Errorf("second argument to do must be a list with at least one element")
+	}
+
+	// Main loop
+	for {
+		// Check end test
+		testResult, err := e.Eval(endTest[0], loopEnv)
+		if err != nil {
+			return nil, err
+		}
+		if core.IsTruthy(testResult) {
+			// Evaluate and return result forms
+			var result core.LispValue
+			for _, form := range endTest[1:] {
+				result, err = e.Eval(form, loopEnv)
+				if err != nil {
+					return nil, err
+				}
+			}
+			return result, nil
+		}
+
+		// Evaluate body forms
+		for _, form := range args[2:] {
+			_, err := e.Eval(form, loopEnv)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Update variables
+		newValues := make(map[core.LispSymbol]core.LispValue)
+		for _, spec := range varSpecs {
+			varSpec := spec.(core.LispList)
+			varName := varSpec[0].(core.LispSymbol)
+			if len(varSpec) > 2 {
+				newVal, err := e.Eval(varSpec[2], loopEnv)
+				if err != nil {
+					return nil, err
+				}
+				newValues[varName] = newVal
+			}
+		}
+		for varName, newVal := range newValues {
+			loopEnv.Set(varName, newVal)
+		}
+	}
+}
+
+func EvalDolist(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("dolist requires at least 2 arguments")
+	}
+
+	spec, ok := args[0].(core.LispList)
+	if !ok || len(spec) != 2 {
+		return nil, fmt.Errorf("invalid dolist specification")
+	}
+
+	varSymbol, ok := spec[0].(core.LispSymbol)
+	if !ok {
+		return nil, fmt.Errorf("dolist variable must be a symbol")
+	}
+
+	listExpr, err := e.Eval(spec[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	list, ok := listExpr.(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("dolist requires a list")
+	}
+
+	loopEnv := env.NewEnvironment(env)
+	var result core.LispValue
+
+	for _, item := range list {
+		loopEnv.Set(varSymbol, item)
+
+		for _, form := range args[1:] {
+			result, err = e.Eval(form, loopEnv)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return result, nil
+}
+
 // Define a custom error type for signaling a return from the loop
 type returnError struct {
 	value core.LispValue
@@ -137,6 +262,79 @@ type returnError struct {
 
 func (e returnError) Error() string {
 	return "return from loop"
+}
+
+func EvalDotimes(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("dotimes requires at least 2 arguments")
+	}
+
+	spec, ok := args[0].(core.LispList)
+	if !ok || len(spec) != 2 {
+		return nil, fmt.Errorf("invalid dotimes specification")
+	}
+
+	varSymbol, ok := spec[0].(core.LispSymbol)
+	if !ok {
+		return nil, fmt.Errorf("dotimes variable must be a symbol")
+	}
+
+	countExpr, err := e.Eval(spec[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	count, ok := countExpr.(float64)
+	if !ok {
+		return nil, fmt.Errorf("dotimes count must evaluate to a number")
+	}
+
+	loopEnv := env.NewEnvironment(env)
+	var result core.LispValue
+
+	for i := 0; i < int(count); i++ {
+		loopEnv.Set(varSymbol, float64(i))
+
+		for _, form := range args[1:] {
+			result, err = e.Eval(form, loopEnv)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func EvalWhile(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("while requires at least 2 arguments")
+	}
+
+	condition := args[0]
+	body := args[1:]
+
+	var result core.LispValue
+
+	for {
+		condResult, err := e.Eval(condition, env)
+		if err != nil {
+			return nil, err
+		}
+
+		if !core.IsTruthy(condResult) {
+			break
+		}
+
+		for _, expr := range body {
+			result, err = e.Eval(expr, env)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // Add a new built-in function to allow breaking out of the loop
