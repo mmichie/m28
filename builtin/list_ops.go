@@ -8,9 +8,6 @@ import (
 
 func init() {
 	core.RegisterBuiltin("any", anyFunc)
-	core.RegisterBuiltin("car", car)
-	core.RegisterBuiltin("cdr", cdr)
-	core.RegisterBuiltin("cons", cons)
 	core.RegisterBuiltin("list", list)
 	core.RegisterBuiltin("length", length)
 	core.RegisterBuiltin("null?", isNull)
@@ -33,28 +30,6 @@ func init() {
 	core.RegisterBuiltin("nthcdr", nthcdrFunc)
 }
 
-func car(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("car requires exactly one argument")
-	}
-	list, ok := args[0].(core.LispList)
-	if !ok || len(list) == 0 {
-		return nil, fmt.Errorf("car requires a non-empty list")
-	}
-	return list[0], nil
-}
-
-func cdr(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("cdr requires exactly one argument")
-	}
-	list, ok := args[0].(core.LispList)
-	if !ok || len(list) == 0 {
-		return nil, fmt.Errorf("cdr requires a non-empty list")
-	}
-	return core.LispList(list[1:]), nil
-}
-
 func caddrFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("caddr requires exactly one argument")
@@ -64,16 +39,6 @@ func caddrFunc(args []core.LispValue, env core.Environment) (core.LispValue, err
 		return nil, fmt.Errorf("caddr requires a list with at least three elements")
 	}
 	return list[2], nil
-}
-
-func cons(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("cons requires exactly two arguments")
-	}
-	if list, ok := args[1].(core.LispList); ok {
-		return append(core.LispList{args[0]}, list...), nil
-	}
-	return core.LispList{args[0], args[1]}, nil
 }
 
 func list(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -123,11 +88,19 @@ func cdrFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 	if len(args) != 1 {
 		return nil, fmt.Errorf("cdr requires exactly one argument")
 	}
-	list, ok := args[0].(core.LispList)
-	if !ok || len(list) == 0 {
-		return nil, fmt.Errorf("cdr requires a non-empty list")
+	switch v := args[0].(type) {
+	case core.LispList:
+		if len(v) == 0 {
+			return nil, fmt.Errorf("cdr: cannot take cdr of empty list")
+		}
+		if len(v) == 2 {
+			// This is likely a pair created by cons
+			return v[1], nil
+		}
+		return core.LispList(v[1:]), nil
+	default:
+		return nil, fmt.Errorf("cdr requires a list argument, got %T", args[0])
 	}
-	return core.LispList(list[1:]), nil
 }
 
 func cadrFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
@@ -139,13 +112,6 @@ func cadrFunc(args []core.LispValue, env core.Environment) (core.LispValue, erro
 		return nil, fmt.Errorf("cadr requires a list with at least two elements")
 	}
 	return list[1], nil
-}
-
-func consFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("cons requires exactly two arguments")
-	}
-	return core.LispList{args[0], args[1]}, nil
 }
 
 func listFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -319,4 +285,19 @@ func nthcdrFunc(args []core.LispValue, _ core.Environment) (core.LispValue, erro
 		return core.LispList{}, nil
 	}
 	return core.LispList(list[index:]), nil
+}
+
+func consFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("cons requires exactly two arguments")
+	}
+
+	switch second := args[1].(type) {
+	case core.LispList:
+		return append(core.LispList{args[0]}, second...), nil
+	case core.Nil:
+		return core.LispList{args[0]}, nil
+	default:
+		return core.LispList{args[0], args[1]}, nil
+	}
 }
