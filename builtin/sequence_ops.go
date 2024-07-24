@@ -145,8 +145,13 @@ func removeIfHelper(args []core.LispValue, env core.Environment, removeIfTrue bo
 	}
 
 	result := make(core.LispList, 0, len(seq))
+	e, err := getEvaluator()
+	if err != nil {
+		return nil, err
+	}
+
 	for _, elem := range seq {
-		predicateResult, err := env.(core.Evaluator).Apply(predicate, []core.LispValue{elem}, env)
+		predicateResult, err := e.Apply(predicate, []core.LispValue{elem}, env)
 		if err != nil {
 			return nil, err
 		}
