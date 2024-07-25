@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"sync"
 )
@@ -107,47 +108,74 @@ func IsTruthy(v LispValue) bool {
 // EqualValues compares two Lisp values for equality
 func EqualValues(a, b LispValue) bool {
 	switch va := a.(type) {
-	case float64:
-		if vb, ok := b.(float64); ok {
-			if math.IsNaN(va) && math.IsNaN(vb) {
-				return true
-			}
-			if math.IsInf(va, 1) && math.IsInf(vb, 1) {
-				return true
-			}
-			if math.IsInf(va, -1) && math.IsInf(vb, -1) {
-				return true
-			}
-			return va == vb
-		}
-	case string:
-		if vb, ok := b.(string); ok {
-			return va == vb
-		}
-	case LispSymbol:
-		if vb, ok := b.(LispSymbol); ok {
-			return va == vb
-		}
-	case bool:
-		if vb, ok := b.(bool); ok {
-			return va == vb
-		}
-	case nil, *struct{}:
-		return false
 	case LispList:
-		if vb, ok := b.(LispList); ok {
-			if len(va) != len(vb) {
+		vb, ok := b.(LispList)
+		if !ok {
+			return false
+		}
+		if len(va) != len(vb) {
+			return false
+		}
+		for i := range va {
+			if !EqualValues(va[i], vb[i]) {
 				return false
 			}
-			for i := range va {
-				if !EqualValues(va[i], vb[i]) {
-					return false
-				}
-			}
+		}
+		return true
+
+	case float64:
+		vb, ok := b.(float64)
+		if !ok {
+			return false
+		}
+		if math.IsNaN(va) && math.IsNaN(vb) {
 			return true
 		}
+		if math.IsInf(va, 1) && math.IsInf(vb, 1) {
+			return true
+		}
+		if math.IsInf(va, -1) && math.IsInf(vb, -1) {
+			return true
+		}
+		return va == vb
+
+	case string:
+		vb, ok := b.(string)
+		if !ok {
+			return false
+		}
+		return va == vb
+
+	case LispSymbol:
+		vb, ok := b.(LispSymbol)
+		if !ok {
+			return false
+		}
+		return va == vb
+
+	case bool:
+		vb, ok := b.(bool)
+		if !ok {
+			return false
+		}
+		return va == vb
+
+	case nil:
+		return b == nil
+
+	case Nil:
+		switch b.(type) {
+		case Nil:
+			return true
+		case LispList:
+			return len(b.(LispList)) == 0
+		default:
+			return false
+		}
+	default:
+		// For any other types, use reflect.DeepEqual as a fallback
+		return reflect.DeepEqual(a, b)
 	}
-	return false
 }
 
 // PrintValue converts a LispValue to a string representation
@@ -169,9 +197,18 @@ func PrintValue(val LispValue) string {
 	case string:
 		return fmt.Sprintf("%q", v)
 	case LispList:
-		elements := make([]string, len(v))
+		if len(v) == 0 {
+			return "nil"
+		}
+		elements := make([]string, 0, len(v))
 		for i, elem := range v {
-			elements[i] = PrintValue(elem)
+			if i == len(v)-2 && !IsList(v[i+1]) {
+				// This is a dotted pair at the end
+				elements = append(elements, PrintValue(elem))
+				elements = append(elements, ".", PrintValue(v[i+1]))
+				break
+			}
+			elements = append(elements, PrintValue(elem))
 		}
 		return "(" + strings.Join(elements, " ") + ")"
 	case BuiltinFunc:
@@ -190,6 +227,12 @@ func PrintValue(val LispValue) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// Helper function to check if a value is a list
+func IsList(v LispValue) bool {
+	_, isList := v.(LispList)
+	return isList
 }
 
 func PrintValueWithoutQuotes(val LispValue) string {

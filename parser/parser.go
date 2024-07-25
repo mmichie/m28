@@ -85,6 +85,25 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 func parseList(tokens []string, index int) (core.LispValue, int, error) {
 	var list core.LispList
 	for index < len(tokens) && tokens[index] != ")" {
+		if tokens[index] == "." {
+			// This is a dotted pair
+			index++
+			if index >= len(tokens) {
+				return nil, index, fmt.Errorf("unexpected end of input after dot")
+			}
+			lastElem, newIndex, err := parse(tokens, index)
+			if err != nil {
+				return nil, newIndex, err
+			}
+			if newIndex >= len(tokens) || tokens[newIndex] != ")" {
+				return nil, newIndex, fmt.Errorf("expected ) after dotted pair")
+			}
+			if len(list) == 0 {
+				return nil, newIndex, fmt.Errorf("invalid dotted pair syntax")
+			}
+			return append(list, lastElem), newIndex + 1, nil
+		}
+
 		val, newIndex, err := parse(tokens, index)
 		if err != nil {
 			return nil, newIndex, err
@@ -139,6 +158,9 @@ func parseAtom(token string) core.LispValue {
 		if err == nil {
 			return unquoted
 		}
+	}
+	if token == "nil" {
+		return core.Nil{}
 	}
 	return core.LispSymbol(token)
 }

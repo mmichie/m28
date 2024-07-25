@@ -18,11 +18,10 @@ func NewEvaluator() core.Evaluator {
 }
 
 func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispValue, error) {
-
 	switch v := expr.(type) {
 	case core.LispSymbol:
 		return evalSymbol(v, env)
-	case float64, int, string, bool:
+	case float64, int, string, bool, core.Nil:
 		return v, nil
 	case core.LispList:
 		return e.evalList(v, env)
@@ -32,6 +31,9 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 }
 
 func evalSymbol(symbol core.LispSymbol, env core.Environment) (core.LispValue, error) {
+	if symbol == "nil" {
+		return core.Nil{}, nil
+	}
 	value, ok := env.Get(symbol)
 	if !ok {
 		return nil, fmt.Errorf("undefined symbol: %s", symbol)
@@ -77,9 +79,19 @@ func (e *Evaluator) evalList(list core.LispList, env core.Environment) (core.Lis
 func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]core.LispValue, error) {
 	evaluated := make([]core.LispValue, len(args))
 	for i, arg := range args {
-		if symbol, ok := arg.(core.LispSymbol); ok && len(symbol) > 1 && symbol[0] == ':' {
-			// This is a keyword argument, don't evaluate it
-			evaluated[i] = arg
+		if symbol, ok := arg.(core.LispSymbol); ok {
+			if len(symbol) > 1 && symbol[0] == ':' {
+				// This is a keyword argument, don't evaluate it
+				evaluated[i] = arg
+			} else if symbol == "nil" {
+				evaluated[i] = core.Nil{}
+			} else {
+				value, err := e.Eval(arg, env)
+				if err != nil {
+					return nil, err
+				}
+				evaluated[i] = value
+			}
 		} else {
 			value, err := e.Eval(arg, env)
 			if err != nil {

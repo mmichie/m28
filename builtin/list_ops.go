@@ -62,7 +62,7 @@ func carFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 	}
 	list, ok := args[0].(core.LispList)
 	if !ok || len(list) == 0 {
-		return nil, fmt.Errorf("car requires a non-empty list")
+		return nil, fmt.Errorf("car requires a non-empty list or pair")
 	}
 	return list[0], nil
 }
@@ -76,8 +76,11 @@ func cdrFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 		if len(v) == 0 {
 			return nil, fmt.Errorf("cdr: cannot take cdr of empty list")
 		}
-		if len(v) == 2 {
-			// This is likely a pair created by cons
+		if len(v) == 1 {
+			return core.Nil{}, nil
+		}
+		if len(v) == 2 && !core.IsList(v[1]) {
+			// This is a dotted pair, return the second element directly
 			return v[1], nil
 		}
 		return core.LispList(v[1:]), nil
@@ -277,11 +280,16 @@ func consFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 
 	switch second := args[1].(type) {
 	case core.LispList:
+		if len(second) == 2 && !core.IsList(second[1]) {
+			// Handle nested dotted pairs
+			return core.LispList{args[0], second[0], second[1]}, nil
+		}
 		return append(core.LispList{args[0]}, second...), nil
 	case core.Nil:
 		return core.LispList{args[0]}, nil
 	default:
-		return core.LispList{args[0], args[1]}, nil
+		// Create a dotted pair for non-list, non-nil second argument
+		return core.LispList{args[0], second}, nil
 	}
 }
 

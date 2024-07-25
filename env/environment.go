@@ -18,7 +18,6 @@ func NewEnvironment(outer core.Environment) *Environment {
 		outer: outer,
 	}
 
-	// Add nil to the environment
 	env.Define(core.LispSymbol("nil"), core.Nil{})
 	env.Define(core.LispSymbol("t"), true)
 
