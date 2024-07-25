@@ -1,12 +1,11 @@
 package repl
 
 import (
-	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
+	"github.com/chzyer/readline"
 	"github.com/mmichie/m28/builtin"
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/env"
@@ -18,6 +17,8 @@ type REPL struct {
 	env       core.Environment
 	evaluator core.Evaluator
 	parser    *parser.Parser
+	rl        *readline.Instance
+	viMode    bool
 }
 
 func NewREPL() *REPL {
@@ -25,24 +26,38 @@ func NewREPL() *REPL {
 	environment.SetupBuiltins()
 	evaluator := eval.NewEvaluator()
 	builtin.SetEvaluator(evaluator)
+
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:          "m28> ",
+		HistoryFile:     "/tmp/m28_history",
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	return &REPL{
 		env:       environment,
 		evaluator: evaluator,
 		parser:    parser.NewParser(),
+		rl:        rl,
+		viMode:    false,
 	}
 }
 
 func (r *REPL) Run() {
 	fmt.Println("Welcome to the M28 Lisp REPL!")
 	fmt.Println("Type 'exit' or 'quit' to exit the REPL.")
-
-	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Use Ctrl+C to interrupt.")
+	fmt.Println("Type ':toggle-keybindings' to switch between Emacs and VI keybindings.")
 
 	for {
-		fmt.Print("m28> ")
-		input, err := reader.ReadString('\n')
+		input, err := r.rl.Readline()
 		if err != nil {
-			if err == io.EOF {
+			if err == readline.ErrInterrupt {
+				continue
+			} else if err == io.EOF {
 				fmt.Println("\nGoodbye!")
 				return
 			}
@@ -54,6 +69,11 @@ func (r *REPL) Run() {
 		if input == "exit" || input == "quit" {
 			fmt.Println("Goodbye!")
 			return
+		}
+
+		if input == ":toggle-keybindings" {
+			r.toggleKeybindings()
+			continue
 		}
 
 		if input == "" {
@@ -76,4 +96,19 @@ func (r *REPL) EvaluateString(input string) (core.LispValue, error) {
 	}
 
 	return r.evaluator.Eval(expr, r.env)
+}
+
+func (r *REPL) toggleKeybindings() {
+	r.viMode = !r.viMode
+	if r.viMode {
+		r.rl.SetVimMode(true)
+		fmt.Println("Switched to VI keybindings")
+	} else {
+		r.rl.SetVimMode(false)
+		fmt.Println("Switched to Emacs keybindings")
+	}
+}
+
+func (r *REPL) Close() {
+	r.rl.Close()
 }
