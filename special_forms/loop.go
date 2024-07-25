@@ -2,9 +2,20 @@ package special_forms
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/mmichie/m28/core"
 )
+
+type loopState struct {
+	env           core.Environment
+	accumulators  map[core.LispSymbol]core.LispValue
+	variables     map[core.LispSymbol]core.LispValue
+	whileClause   core.LispValue
+	untilClause   core.LispValue
+	doClause      []core.LispValue
+	finallyClause []core.LispValue
+}
 
 func EvalLoop(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) < 1 {
@@ -39,95 +50,286 @@ func evalSimpleLoop(e core.Evaluator, body []core.LispValue, env core.Environmen
 }
 
 func evalComplexLoop(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	loopEnv := env.NewEnvironment(env)
-	var result core.LispValue
-	var err error
+	state := &loopState{
+		env:          env.NewEnvironment(env),
+		accumulators: make(map[core.LispSymbol]core.LispValue),
+		variables:    make(map[core.LispSymbol]core.LispValue),
+	}
 
 	// Parse loop clauses
+	err := parseLoopClauses(e, args, state)
+	if err != nil {
+		return nil, err
+	}
+
+	// Execute the loop
+	for {
+		if state.whileClause != nil {
+			condition, err := e.Eval(state.whileClause, state.env)
+			if err != nil {
+				return nil, err
+			}
+			if !core.IsTruthy(condition) {
+				break
+			}
+		}
+
+		if state.untilClause != nil {
+			condition, err := e.Eval(state.untilClause, state.env)
+			if err != nil {
+				return nil, err
+			}
+			if core.IsTruthy(condition) {
+				break
+			}
+		}
+
+		for _, doExpr := range state.doClause {
+			_, err := e.Eval(doExpr, state.env)
+			if err != nil {
+				if returnErr, ok := err.(returnError); ok {
+					return returnErr.value, nil
+				}
+				return nil, err
+			}
+		}
+
+		// Update loop variables
+		for varName, updateExpr := range state.variables {
+			value, err := e.Eval(updateExpr, state.env)
+			if err != nil {
+				return nil, err
+			}
+			state.env.Set(varName, value)
+		}
+	}
+
+	// Execute finally clause
+	if len(state.finallyClause) > 0 {
+		var result core.LispValue
+		var err error
+		for _, expr := range state.finallyClause {
+			result, err = e.Eval(expr, state.env)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return result, nil
+	}
+
+	// Return accumulated results
+	if len(state.accumulators) > 0 {
+		var results core.LispList
+		for _, value := range state.accumulators {
+			results = append(results, value)
+		}
+		if len(results) == 1 {
+			return results[0], nil
+		}
+		return results, nil
+	}
+
+	return nil, nil
+}
+
+func parseLoopClauses(e core.Evaluator, args []core.LispValue, state *loopState) error {
 	i := 0
 	for i < len(args) {
 		clause, ok := args[i].(core.LispSymbol)
 		if !ok {
-			return nil, fmt.Errorf("expected loop clause, got: %v", args[i])
+			return fmt.Errorf("expected loop clause, got: %v", args[i])
 		}
+		i++
+
 		switch clause {
 		case "for":
-			i, err = handleForClause(e, args, i, loopEnv)
+			err := handleForClause(e, args, &i, state)
 			if err != nil {
-				return nil, err
+				return err
 			}
-		case "do":
+		case "collect":
+			err := handleCollectClause(e, args, &i, state)
+			if err != nil {
+				return err
+			}
+		case "sum":
+			err := handleSumClause(e, args, &i, state)
+			if err != nil {
+				return err
+			}
+		case "maximize":
+			err := handleMaximizeClause(e, args, &i, state)
+			if err != nil {
+				return err
+			}
+		case "minimize":
+			err := handleMinimizeClause(e, args, &i, state)
+			if err != nil {
+				return err
+			}
+		case "while":
+			if i >= len(args) {
+				return fmt.Errorf("while clause requires a condition")
+			}
+			state.whileClause = args[i]
 			i++
-			for i < len(args) && args[i] != core.LispSymbol("for") {
-				result, err = e.Eval(args[i], loopEnv)
-				if err != nil {
-					// Check if the error is a special return signal
-					if returnErr, ok := err.(returnError); ok {
-						return returnErr.value, nil
-					}
-					return nil, err
-				}
-				i++
+		case "until":
+			if i >= len(args) {
+				return fmt.Errorf("until clause requires a condition")
 			}
+			state.untilClause = args[i]
+			i++
+		case "do":
+			state.doClause = append(state.doClause, args[i])
+			i++
+		case "finally":
+			state.finallyClause = append(state.finallyClause, args[i:]...)
+			i = len(args)
 		default:
-			return nil, fmt.Errorf("unsupported loop clause: %v", clause)
+			return fmt.Errorf("unsupported loop clause: %v", clause)
 		}
 	}
-
-	return result, nil
+	return nil
 }
 
-func handleForClause(e core.Evaluator, args []core.LispValue, i int, env core.Environment) (int, error) {
-	if i+3 >= len(args) {
-		return 0, fmt.Errorf("incomplete for clause")
+func handleForClause(e core.Evaluator, args []core.LispValue, i *int, state *loopState) error {
+	if *i+2 >= len(args) {
+		return fmt.Errorf("for clause requires at least 3 arguments")
 	}
 
-	varSymbol, ok := args[i+1].(core.LispSymbol)
+	varName, ok := args[*i].(core.LispSymbol)
 	if !ok {
-		return 0, fmt.Errorf("for clause requires a symbol")
+		return fmt.Errorf("for clause requires a symbol as variable name")
+	}
+	*i++
+
+	fromExpr := args[*i]
+	*i++
+
+	var toExpr core.LispValue
+	var byExpr core.LispValue = core.LispSymbol("1") // Default step is 1
+
+	if *i < len(args) && args[*i] == core.LispSymbol("to") {
+		*i++
+		if *i >= len(args) {
+			return fmt.Errorf("for clause 'to' requires a value")
+		}
+		toExpr = args[*i]
+		*i++
+
+		if *i < len(args) && args[*i] == core.LispSymbol("by") {
+			*i++
+			if *i >= len(args) {
+				return fmt.Errorf("for clause 'by' requires a value")
+			}
+			byExpr = args[*i]
+			*i++
+		}
 	}
 
-	if args[i+2] != core.LispSymbol("across") {
-		return 0, fmt.Errorf("only 'across' is supported in for clause")
-	}
-
-	sequence, err := e.Eval(args[i+3], env)
+	fromVal, err := e.Eval(fromExpr, state.env)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	var seqList core.LispList
-	switch seq := sequence.(type) {
-	case core.LispList:
-		seqList = seq
-	case string:
-		seqList = make(core.LispList, len(seq))
-		for i, ch := range seq {
-			seqList[i] = string(ch)
-		}
-	default:
-		return 0, fmt.Errorf("for across requires a list or string")
+	state.env.Set(varName, fromVal)
+
+	updateExpr := core.LispList{core.LispSymbol("+"), varName, byExpr}
+	state.variables[varName] = updateExpr
+
+	if toExpr != nil {
+		state.whileClause = core.LispList{core.LispSymbol("<="), varName, toExpr}
 	}
 
-	for _, item := range seqList {
-		env.Set(varSymbol, item)
-		// Evaluate the rest of the loop body
-		for j := i + 4; j < len(args); j++ {
-			if args[j] == core.LispSymbol("for") {
-				break
-			}
-			_, err = e.Eval(args[j], env)
-			if err != nil {
-				// Check if the error is a special return signal
-				if returnErr, ok := err.(returnError); ok {
-					return 0, returnErr
-				}
-				return 0, err
-			}
-		}
+	return nil
+}
+
+func handleCollectClause(e core.Evaluator, args []core.LispValue, i *int, state *loopState) error {
+	if *i >= len(args) {
+		return fmt.Errorf("collect clause requires an expression")
 	}
 
-	return len(args), nil // Return to the end of args to finish the loop
+	collectExpr := args[*i]
+	*i++
+
+	collectVar := core.LispSymbol("collect-result")
+	if _, exists := state.accumulators[collectVar]; !exists {
+		state.accumulators[collectVar] = core.LispList{}
+	}
+
+	state.doClause = append(state.doClause, core.LispList{
+		core.LispSymbol("setq"),
+		collectVar,
+		core.LispList{core.LispSymbol("append"), collectVar, core.LispList{core.LispSymbol("list"), collectExpr}},
+	})
+
+	return nil
+}
+
+func handleSumClause(e core.Evaluator, args []core.LispValue, i *int, state *loopState) error {
+	if *i >= len(args) {
+		return fmt.Errorf("sum clause requires an expression")
+	}
+
+	sumExpr := args[*i]
+	*i++
+
+	sumVar := core.LispSymbol("sum-result")
+	if _, exists := state.accumulators[sumVar]; !exists {
+		state.accumulators[sumVar] = float64(0)
+	}
+
+	state.doClause = append(state.doClause, core.LispList{
+		core.LispSymbol("setq"),
+		sumVar,
+		core.LispList{core.LispSymbol("+"), sumVar, sumExpr},
+	})
+
+	return nil
+}
+
+func handleMaximizeClause(e core.Evaluator, args []core.LispValue, i *int, state *loopState) error {
+	if *i >= len(args) {
+		return fmt.Errorf("maximize clause requires an expression")
+	}
+
+	maxExpr := args[*i]
+	*i++
+
+	maxVar := core.LispSymbol("max-result")
+	if _, exists := state.accumulators[maxVar]; !exists {
+		state.accumulators[maxVar] = float64(math.Inf(-1))
+	}
+
+	state.doClause = append(state.doClause, core.LispList{
+		core.LispSymbol("setq"),
+		maxVar,
+		core.LispList{core.LispSymbol("max"), maxVar, maxExpr},
+	})
+
+	return nil
+}
+
+func handleMinimizeClause(e core.Evaluator, args []core.LispValue, i *int, state *loopState) error {
+	if *i >= len(args) {
+		return fmt.Errorf("minimize clause requires an expression")
+	}
+
+	minExpr := args[*i]
+	*i++
+
+	minVar := core.LispSymbol("min-result")
+	if _, exists := state.accumulators[minVar]; !exists {
+		state.accumulators[minVar] = float64(math.Inf(1))
+	}
+
+	state.doClause = append(state.doClause, core.LispList{
+		core.LispSymbol("setq"),
+		minVar,
+		core.LispList{core.LispSymbol("min"), minVar, minExpr},
+	})
+
+	return nil
 }
 
 func EvalDo(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
