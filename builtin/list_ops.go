@@ -16,6 +16,7 @@ func init() {
 	core.RegisterBuiltin("cdr", cdrFunc)
 	core.RegisterBuiltin("cons", consFunc)
 	core.RegisterBuiltin("consp", conspFunc)
+	core.RegisterBuiltin("copy-list", copyListFunc)
 	core.RegisterBuiltin("first", firstFunc)
 	core.RegisterBuiltin("last", lastFunc)
 	core.RegisterBuiltin("length", lengthFunc)
@@ -333,4 +334,23 @@ func mapcarFunc(args []core.LispValue, env core.Environment) (core.LispValue, er
 	}
 
 	return result, nil
+}
+
+func copyListFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("copy-list requires exactly one argument")
+	}
+
+	list, ok := args[0].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("copy-list argument must be a list")
+	}
+
+	// Create a new list with the same length as the original
+	newList := make(core.LispList, len(list))
+
+	// Copy each element from the original list to the new list
+	copy(newList, list)
+
+	return newList, nil
 }
