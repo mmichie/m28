@@ -201,13 +201,7 @@ func PrintValue(val LispValue) string {
 			return "nil"
 		}
 		elements := make([]string, 0, len(v))
-		for i, elem := range v {
-			if i == len(v)-2 && !IsList(v[i+1]) {
-				// This is a dotted pair at the end
-				elements = append(elements, PrintValue(elem))
-				elements = append(elements, ".", PrintValue(v[i+1]))
-				break
-			}
+		for _, elem := range v {
 			elements = append(elements, PrintValue(elem))
 		}
 		return "(" + strings.Join(elements, " ") + ")"
@@ -232,7 +226,7 @@ func PrintValue(val LispValue) string {
 // Helper function to check if a value is a list
 func IsList(v LispValue) bool {
 	_, isList := v.(LispList)
-	return isList
+	return isList || v == nil || v == Nil{}
 }
 
 func PrintValueWithoutQuotes(val LispValue) string {

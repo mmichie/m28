@@ -280,15 +280,11 @@ func consFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 
 	switch second := args[1].(type) {
 	case core.LispList:
-		if len(second) == 2 && !core.IsList(second[1]) {
-			// Handle nested dotted pairs
-			return core.LispList{args[0], second[0], second[1]}, nil
-		}
 		return append(core.LispList{args[0]}, second...), nil
 	case core.Nil:
 		return core.LispList{args[0]}, nil
 	default:
-		// Create a dotted pair for non-list, non-nil second argument
+		// Create a proper list when the second argument is not a list
 		return core.LispList{args[0], second}, nil
 	}
 }
