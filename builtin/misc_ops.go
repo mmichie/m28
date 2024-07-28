@@ -3,6 +3,7 @@ package builtin
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"sync"
 
 	"github.com/mmichie/m28/core"
@@ -350,4 +351,193 @@ func atomFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	default:
 		return core.PythonicBool(true), nil
 	}
+}
+
+func dictFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) > 1 {
+		return nil, fmt.Errorf("dict() takes at most 1 argument")
+	}
+	if len(args) == 0 {
+		return make(map[core.LispValue]core.LispValue), nil
+	}
+	switch arg := args[0].(type) {
+	case core.LispList:
+		dict := make(map[core.LispValue]core.LispValue)
+		for _, item := range arg {
+			pair, ok := item.(core.LispList)
+			if !ok || len(pair) != 2 {
+				return nil, fmt.Errorf("dict() requires an iterable of key/value pairs")
+			}
+			dict[pair[0]] = pair[1]
+		}
+		return dict, nil
+	default:
+		return nil, fmt.Errorf("dict() argument must be an iterable of key/value pairs")
+	}
+}
+
+func frozensetFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	// Note: This is a placeholder. Implementing frozenset would require additional data structures.
+	return nil, fmt.Errorf("frozenset() is not implemented in this Lisp interpreter")
+}
+
+func getattrFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	// Note: This is a placeholder. Implementing getattr would require additional work on object system.
+	return nil, fmt.Errorf("getattr() is not implemented in this Lisp interpreter")
+}
+
+func globalsFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 0 {
+		return nil, fmt.Errorf("globals() takes no arguments")
+	}
+	return env, nil
+}
+
+func hasattrFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	// Note: This is a placeholder. Implementing hasattr would require additional work on object system.
+	return nil, fmt.Errorf("hasattr() is not implemented in this Lisp interpreter")
+}
+
+func hashFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("hash() takes exactly one argument")
+	}
+	// This is a very simple hash function and should not be used for cryptographic purposes
+	return float64(hashString(fmt.Sprintf("%v", args[0]))), nil
+}
+
+func hashString(s string) uint32 {
+	h := uint32(2166136261)
+	for i := 0; i < len(s); i++ {
+		h = (h * 16777619) ^ uint32(s[i])
+	}
+	return h
+}
+
+func idFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("id() takes exactly one argument")
+	}
+	return float64(reflect.ValueOf(args[0]).Pointer()), nil
+}
+
+func localsFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 0 {
+		return nil, fmt.Errorf("locals() takes no arguments")
+	}
+	return env, nil
+}
+
+func setFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) > 1 {
+		return nil, fmt.Errorf("set() takes at most 1 argument")
+	}
+	if len(args) == 0 {
+		return make(map[core.LispValue]bool), nil
+	}
+	iterable, ok := args[0].(core.LispList)
+	if !ok {
+		return nil, fmt.Errorf("set() argument must be iterable")
+	}
+	set := make(map[core.LispValue]bool)
+	for _, item := range iterable {
+		set[item] = true
+	}
+	return set, nil
+}
+
+func sliceFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) < 1 || len(args) > 3 {
+		return nil, fmt.Errorf("slice() takes 1 to 3 arguments")
+	}
+	var start, stop, step float64
+	switch len(args) {
+	case 1:
+		stop = args[0].(float64)
+		start, step = 0, 1
+	case 2:
+		start, stop = args[0].(float64), args[1].(float64)
+		step = 1
+	case 3:
+		start, stop, step = args[0].(float64), args[1].(float64), args[2].(float64)
+	}
+	return core.LispList{start, stop, step}, nil
+}
+
+func varsFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) > 1 {
+		return nil, fmt.Errorf("vars() takes at most 1 argument")
+	}
+	if len(args) == 0 {
+		return env, nil
+	}
+	// Note: This is a simplified implementation. In a full implementation,
+	// we would need to handle different types of objects.
+	return nil, fmt.Errorf("vars() with an argument is not implemented in this Lisp interpreter")
+}
+
+// Additional utility functions that might be useful
+
+func lenFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("len() takes exactly one argument")
+	}
+	switch v := args[0].(type) {
+	case core.LispList:
+		return float64(len(v)), nil
+	case string:
+		return float64(len(v)), nil
+	case map[core.LispValue]core.LispValue:
+		return float64(len(v)), nil
+	case map[core.LispValue]bool:
+		return float64(len(v)), nil
+	default:
+		return nil, fmt.Errorf("object of type '%T' has no len()", v)
+	}
+}
+
+func mapFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("map() requires at least two arguments")
+	}
+	fn := args[0]
+	iterables := args[1:]
+
+	// Check if all arguments after the function are iterable
+	lengths := make([]int, len(iterables))
+	for i, arg := range iterables {
+		list, ok := arg.(core.LispList)
+		if !ok {
+			return nil, fmt.Errorf("map() arguments after the first must be iterable")
+		}
+		lengths[i] = len(list)
+	}
+
+	// Find the minimum length
+	minLen := lengths[0]
+	for _, l := range lengths[1:] {
+		if l < minLen {
+			minLen = l
+		}
+	}
+
+	result := make(core.LispList, minLen)
+	e, err := getEvaluator()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < minLen; i++ {
+		args := make([]core.LispValue, len(iterables))
+		for j, iterable := range iterables {
+			args[j] = iterable.(core.LispList)[i]
+		}
+		res, err := e.Apply(fn, args, env)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = res
+	}
+
+	return result, nil
 }

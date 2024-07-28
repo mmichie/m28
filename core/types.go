@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -103,6 +104,25 @@ func (s *PythonicSet) Add(value LispValue) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.data[value] = struct{}{}
+}
+
+// Helper method for PythonicSet to get sorted elements
+func (s *PythonicSet) sortedElements() []LispValue {
+	elements := make([]LispValue, 0, len(s.data))
+	for elem := range s.data {
+		elements = append(elements, elem)
+	}
+	sort.Slice(elements, func(i, j int) bool {
+		return Compare(elements[i], elements[j]) < 0
+	})
+	return elements
+}
+
+// Add Size method to PythonicSet
+func (s *PythonicSet) Size() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.data)
 }
 
 // Contains checks if an element is in the PythonicSet
@@ -311,4 +331,98 @@ func PrintValueWithoutQuotes(val LispValue) string {
 func IsList(v LispValue) bool {
 	_, isList := v.(LispList)
 	return isList || v == nil
+}
+
+// Compare compares two LispValues and returns an integer indicating their relative order.
+// Returns -1 if a < b, 0 if a == b, and 1 if a > b.
+func Compare(a, b LispValue) int {
+	switch va := a.(type) {
+	case float64:
+		if vb, ok := b.(float64); ok {
+			if va < vb {
+				return -1
+			} else if va > vb {
+				return 1
+			}
+			return 0
+		}
+	case string:
+		if vb, ok := b.(string); ok {
+			return strings.Compare(va, vb)
+		}
+	case LispSymbol:
+		if vb, ok := b.(LispSymbol); ok {
+			return strings.Compare(string(va), string(vb))
+		}
+	case PythonicBool:
+		if vb, ok := b.(PythonicBool); ok {
+			if va == vb {
+				return 0
+			} else if va {
+				return 1
+			} else {
+				return -1
+			}
+		}
+	case LispList:
+		if vb, ok := b.(LispList); ok {
+			for i := 0; i < len(va) && i < len(vb); i++ {
+				if cmp := Compare(va[i], vb[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(va) < len(vb) {
+				return -1
+			} else if len(va) > len(vb) {
+				return 1
+			}
+			return 0
+		}
+	case *PythonicDict:
+		if vb, ok := b.(*PythonicDict); ok {
+			if va.Size() != vb.Size() {
+				if va.Size() < vb.Size() {
+					return -1
+				}
+				return 1
+			}
+			// Compare keys in sorted order
+			aKeys := va.sortedKeys()
+			bKeys := vb.sortedKeys()
+			for i := 0; i < len(aKeys); i++ {
+				if cmp := Compare(aKeys[i], bKeys[i]); cmp != 0 {
+					return cmp
+				}
+				aVal, _ := va.Get(aKeys[i])
+				bVal, _ := vb.Get(bKeys[i])
+				if cmp := Compare(aVal, bVal); cmp != 0 {
+					return cmp
+				}
+			}
+			return 0
+		}
+	case *PythonicSet:
+		if vb, ok := b.(*PythonicSet); ok {
+			if va.Size() != vb.Size() {
+				if va.Size() < vb.Size() {
+					return -1
+				}
+				return 1
+			}
+			// Compare elements in sorted order
+			aElems := va.sortedElements()
+			bElems := vb.sortedElements()
+			for i := 0; i < len(aElems); i++ {
+				if cmp := Compare(aElems[i], bElems[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			return 0
+		}
+	}
+
+	// For incomparable types, we'll use their string representations
+	sa := PrintValue(a)
+	sb := PrintValue(b)
+	return strings.Compare(sa, sb)
 }

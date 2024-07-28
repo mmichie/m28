@@ -1,6 +1,7 @@
 package core
 
 import (
+	"sort"
 	"sync"
 )
 
@@ -50,4 +51,17 @@ func (d *PythonicDict) Iterate(f func(key, value LispValue) error) error {
 		}
 	}
 	return nil
+}
+
+// Helper method for PythonicDict to get sorted keys
+func (d *PythonicDict) sortedKeys() []LispValue {
+	keys := make([]LispValue, 0, d.Size())
+	d.Iterate(func(k, v LispValue) error {
+		keys = append(keys, k)
+		return nil
+	})
+	sort.Slice(keys, func(i, j int) bool {
+		return Compare(keys[i], keys[j]) < 0
+	})
+	return keys
 }
