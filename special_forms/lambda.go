@@ -9,98 +9,31 @@ import (
 func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	lambdaEnv := env.NewEnvironment(lambda.Closure)
 
-	if err := bindRequiredParams(lambda, args, lambdaEnv); err != nil {
-		return nil, err
-	}
-
-	if err := bindOptionalParams(e, lambda, args, lambdaEnv); err != nil {
-		return nil, err
-	}
-
-	bindRestParam(lambda, args, lambdaEnv)
-
-	if err := bindKeyParams(e, lambda, args, lambdaEnv); err != nil {
+	if err := bindParams(lambda, args, lambdaEnv); err != nil {
 		return nil, err
 	}
 
 	return evalLambdaBody(e, lambda, lambdaEnv)
 }
 
-func bindRequiredParams(lambda *core.Lambda, args []core.LispValue, env core.Environment) error {
-	if len(args) < len(lambda.Params) {
-		return fmt.Errorf("not enough arguments: expected at least %d, got %d", len(lambda.Params), len(args))
+func bindParams(lambda *core.Lambda, args []core.LispValue, env core.Environment) error {
+	if len(args) != len(lambda.Params) {
+		return fmt.Errorf("lambda expected %d arguments, got %d", len(lambda.Params), len(args))
 	}
+
 	for i, param := range lambda.Params {
 		env.Define(param, args[i])
 	}
+
 	return nil
-}
-
-func bindOptionalParams(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, env core.Environment) error {
-	optionalIndex := len(lambda.Params)
-	for i, opt := range lambda.Optional {
-		if optionalIndex+i < len(args) {
-			env.Define(opt.Name, args[optionalIndex+i])
-		} else if opt.DefaultValue != nil {
-			defaultValue, err := e.Eval(opt.DefaultValue, env)
-			if err != nil {
-				return err
-			}
-			env.Define(opt.Name, defaultValue)
-		} else {
-			env.Define(opt.Name, nil)
-		}
-	}
-	return nil
-}
-
-func bindRestParam(lambda *core.Lambda, args []core.LispValue, env core.Environment) {
-	if lambda.Rest != "" {
-		restArgs := args[len(lambda.Params)+len(lambda.Optional):]
-		env.Define(lambda.Rest, core.LispList(restArgs))
-	}
-}
-
-func bindKeyParams(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, env core.Environment) error {
-	restArgsStart := len(lambda.Params) + len(lambda.Optional)
-
-	for key, defaultValue := range lambda.KeyParams {
-		var value core.LispValue
-		var found bool
-
-		// Only look for key parameters in the remaining arguments
-		if restArgsStart < len(args) {
-			value, found = findKeyParam(key, args[restArgsStart:])
-		}
-
-		if found {
-			env.Define(key, value)
-		} else if defaultValue != nil {
-			evaluatedDefault, err := e.Eval(defaultValue, env)
-			if err != nil {
-				return err
-			}
-			env.Define(key, evaluatedDefault)
-		} else {
-			env.Define(key, nil)
-		}
-	}
-	return nil
-}
-
-func findKeyParam(key core.LispSymbol, args []core.LispValue) (core.LispValue, bool) {
-	for i := 0; i < len(args); i += 2 {
-		if i+1 < len(args) && args[i] == core.LispSymbol(":"+string(key)) {
-			return args[i+1], true
-		}
-	}
-	return nil, false
 }
 
 func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment) (core.LispValue, error) {
-	bodyList, ok := lambda.Body.(core.LispList)
-	if !ok {
-		return nil, fmt.Errorf("lambda body must be a list")
-	}
-	return EvalProgn(e, bodyList, env)
+	return e.Eval(lambda.Body, env)
 }
+
+// EvalLambda is now defined in special_forms/special_forms.go as EvalLambdaPython
+// You can remove it from here if it's not needed anymore
+
+// Helper function for parsing parameters is no longer needed for Python-like lambdas
+// You can remove the parseParameters function if it's not used elsewhere

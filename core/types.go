@@ -56,15 +56,12 @@ type Evaluator interface {
 	EvalBegin(args []LispValue, env Environment) (LispValue, error)
 }
 
-// Lambda represents a Lisp lambda function
+// Lambda represents a Python-like lambda function
 type Lambda struct {
-	Params    []LispSymbol
-	Optional  []OptionalParam
-	Rest      LispSymbol
-	KeyParams map[LispSymbol]LispValue
-	Body      LispValue
-	Env       Environment
-	Closure   Environment
+	Params  []LispSymbol
+	Body    LispValue
+	Env     Environment
+	Closure Environment
 }
 
 // OptionalParam represents an optional parameter in a Lambda

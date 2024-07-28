@@ -10,134 +10,133 @@ type SpecialFormFunc func(core.Evaluator, []core.LispValue, core.Environment) (c
 
 func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 	return map[core.LispSymbol]SpecialFormFunc{
-		"all":          EvalAll,
-		"and":          EvalAnd,
-		"backquote":    EvalBackquote,
-		"case":         EvalCase,
-		"cond":         EvalCond,
-		"defmacro":     EvalDefmacro,
-		"defun":        EvalDefun,
-		"defvar":       EvalDefvar,
-		"delete-file":  EvalDeleteFile,
-		"do":           EvalDo,
-		"dolist":       EvalDolist,
-		"dotimes":      EvalDotimes,
-		"file-exists?": EvalFileExists,
-		"if":           EvalIf,
-		"lambda":       EvalLambda,
-		"let":          EvalLet,
-		"let*":         EvalLetStar,
-		"load":         EvalLoad,
-		"loop":         EvalLoop,
-		"or":           EvalOr,
-		"progn":        EvalProgn,
-		"quote":        EvalQuote,
-		"read-file":    EvalReadFile,
-		"setf":         EvalSetf,
-		"setq":         EvalSetq,
-		"unless":       EvalUnless,
-		"when":         EvalWhen,
-		"while":        EvalWhile,
-		"write-file":   EvalWriteFile,
+		"class":    EvalClass,
+		"def":      EvalDef,
+		"if":       EvalIfPython,
+		"for":      EvalFor,
+		"while":    EvalWhilePython,
+		"import":   EvalImport,
+		"try":      EvalTry,
+		"raise":    EvalRaise,
+		"with":     EvalWith,
+		"lambda":   EvalLambdaPython,
+		"return":   EvalReturn,
+		"yield":    EvalYield,
+		"global":   EvalGlobal,
+		"nonlocal": EvalNonlocal,
+		"assert":   EvalAssert,
+		"del":      EvalDel,
+		"break":    EvalBreak,
+		"continue": EvalContinue,
+		"pass":     EvalPass,
 	}
 }
 
-func setfCar(e core.Evaluator, args []core.LispValue, value core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("setf (car ...) requires exactly 1 argument")
-	}
-
-	list, err := e.Eval(args[0], env)
-	if err != nil {
-		return nil, err
-	}
-
-	l, ok := list.(core.LispList)
-	if !ok || len(l) == 0 {
-		return nil, fmt.Errorf("setf (car ...) requires a non-empty list")
-	}
-
-	l[0] = value
-	return value, nil
+func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for class definition
+	return nil, fmt.Errorf("class: not implemented yet")
 }
 
-func setfCdr(e core.Evaluator, args []core.LispValue, value core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("setf (cdr ...) requires exactly 1 argument")
-	}
-
-	list, err := e.Eval(args[0], env)
-	if err != nil {
-		return nil, err
-	}
-
-	l, ok := list.(core.LispList)
-	if !ok || len(l) == 0 {
-		return nil, fmt.Errorf("setf (cdr ...) requires a non-empty list")
-	}
-
-	newCdr, ok := value.(core.LispList)
-	if !ok {
-		newCdr = core.LispList{value}
-	}
-
-	l = append(l[:1], newCdr...)
-	return newCdr, nil
+func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for function definition
+	return nil, fmt.Errorf("def: not implemented yet")
 }
 
-func setfNth(e core.Evaluator, args []core.LispValue, value core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("setf (nth ...) requires exactly 2 arguments")
+func EvalIfPython(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 || len(args) > 3 {
+		return nil, fmt.Errorf("if requires 2 or 3 arguments")
 	}
 
-	index, err := e.Eval(args[0], env)
+	condition, err := e.Eval(args[0], env)
 	if err != nil {
 		return nil, err
 	}
 
-	i, ok := index.(float64)
-	if !ok {
-		return nil, fmt.Errorf("setf (nth ...) index must be a number")
+	if core.IsTruthy(condition) {
+		return e.Eval(args[1], env)
+	} else if len(args) == 3 {
+		return e.Eval(args[2], env)
 	}
 
-	list, err := e.Eval(args[1], env)
-	if err != nil {
-		return nil, err
-	}
-
-	l, ok := list.(core.LispList)
-	if !ok {
-		return nil, fmt.Errorf("setf (nth ...) requires a list")
-	}
-
-	if int(i) < 0 || int(i) >= len(l) {
-		return nil, fmt.Errorf("setf (nth ...) index out of bounds")
-	}
-
-	l[int(i)] = value
-	return value, nil
+	return nil, nil
 }
 
-func setfGethash(e core.Evaluator, args []core.LispValue, value core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("setf (gethash ...) requires exactly 2 arguments")
-	}
+func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for for loop
+	return nil, fmt.Errorf("for: not implemented yet")
+}
 
-	key, err := e.Eval(args[0], env)
-	if err != nil {
-		return nil, err
-	}
+func EvalWhilePython(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for while loop
+	return nil, fmt.Errorf("while: not implemented yet")
+}
 
-	hashTable, err := e.Eval(args[1], env)
-	if err != nil {
-		return nil, err
-	}
+func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for import statement
+	return nil, fmt.Errorf("import: not implemented yet")
+}
 
-	ht, ok := hashTable.(*core.PythonicDict)
-	if !ok {
-		return nil, fmt.Errorf("setf (gethash ...) requires a hash table")
-	}
+func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for try-except-finally
+	return nil, fmt.Errorf("try: not implemented yet")
+}
 
-	ht.Set(key, value)
-	return value, nil
+func EvalRaise(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for raise
+	return nil, fmt.Errorf("raise: not implemented yet")
+}
+
+func EvalWith(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for with statement
+	return nil, fmt.Errorf("with: not implemented yet")
+}
+
+func EvalLambdaPython(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for lambda functions
+	return nil, fmt.Errorf("lambda: not implemented yet")
+}
+
+func EvalReturn(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for return statement
+	return nil, fmt.Errorf("return: not implemented yet")
+}
+
+func EvalYield(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for yield statement
+	return nil, fmt.Errorf("yield: not implemented yet")
+}
+
+func EvalGlobal(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for global statement
+	return nil, fmt.Errorf("global: not implemented yet")
+}
+
+func EvalNonlocal(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for nonlocal statement
+	return nil, fmt.Errorf("nonlocal: not implemented yet")
+}
+
+func EvalAssert(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for assert statement
+	return nil, fmt.Errorf("assert: not implemented yet")
+}
+
+func EvalDel(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for del statement
+	return nil, fmt.Errorf("del: not implemented yet")
+}
+
+func EvalBreak(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for break statement
+	return nil, fmt.Errorf("break: not implemented yet")
+}
+
+func EvalContinue(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for continue statement
+	return nil, fmt.Errorf("continue: not implemented yet")
+}
+
+func EvalPass(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Implementation for pass statement
+	return nil, nil
 }

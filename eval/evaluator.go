@@ -144,14 +144,14 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 	case core.BuiltinFunc:
 		return f(args, env)
 	case *core.Lambda:
-		return e.applyLambda(f, args, env)
+		return special_forms.ApplyLambda(e, f, args, env)
 	case core.LispList:
 		if len(f) > 0 && f[0] == core.LispSymbol("lambda") {
-			lambda, err := special_forms.EvalLambda(e, f[1:], env)
+			lambda, err := special_forms.EvalLambdaPython(e, f[1:], env)
 			if err != nil {
 				return nil, err
 			}
-			return e.applyLambda(lambda.(*core.Lambda), args, env)
+			return special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
 		}
 	}
 	return nil, fmt.Errorf("not a function: %v", fn)
