@@ -51,9 +51,6 @@ type Environment interface {
 type Evaluator interface {
 	Eval(expr LispValue, env Environment) (LispValue, error)
 	Apply(fn LispValue, args []LispValue, env Environment) (LispValue, error)
-	EvalQuasiquote(expr LispValue, env Environment, depth int) (LispValue, error)
-	EvalQuasiquoteList(list LispList, env Environment, depth int) (LispValue, error)
-	EvalBegin(args []LispValue, env Environment) (LispValue, error)
 }
 
 // Lambda represents a Python-like lambda function
