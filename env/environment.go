@@ -64,13 +64,7 @@ func (e *Environment) NewEnvironment(outer core.Environment) core.Environment {
 // SetupBuiltins initializes the environment with builtin functions
 func (e *Environment) SetupBuiltins() {
 	builtin.RegisterArithmeticFuncs()
-	builtin.RegisterStringOps()
-	builtin.RegisterIOOps()
-	builtin.RegisterTestOps()
-	builtin.RegisterHashTableOps()
-	builtin.RegisterSequenceOps()
-	builtin.RegisterTypePredicates()
-	builtin.RegisterMathOps()
+	builtin.RegisterPythonBuiltins()
 
 	for name, fn := range core.BuiltinFuncs {
 		e.Set(core.LispSymbol(name), fn)
