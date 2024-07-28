@@ -87,19 +87,28 @@ func (e *Evaluator) evalList(list core.LispList, env core.Environment) (core.Lis
 }
 
 func (e *Evaluator) evalDict(dict *core.PythonicDict, env core.Environment) (core.LispValue, error) {
-	newDict := core.NewPythonicDict()
-	for k, v := range dict.Data() {
-		evalKey, err := e.Eval(k, env)
+	result := core.NewPythonicDict()
+
+	// Iterate over the original dict and evaluate each key-value pair
+	keyFunc := func(key, value core.LispValue) error {
+		evaluatedKey, err := e.Eval(key, env)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		evalValue, err := e.Eval(v, env)
+		evaluatedValue, err := e.Eval(value, env)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		newDict.Set(evalKey, evalValue)
+		result.Set(evaluatedKey, evaluatedValue)
+		return nil
 	}
-	return newDict, nil
+
+	err := dict.Iterate(keyFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (e *Evaluator) evalSet(set *core.PythonicSet, env core.Environment) (core.LispValue, error) {
@@ -159,16 +168,4 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 
 func (e *Evaluator) applyLambda(lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	return special_forms.ApplyLambda(e, lambda, args, env)
-}
-
-func (e *Evaluator) EvalQuasiquote(expr core.LispValue, env core.Environment, depth int) (core.LispValue, error) {
-	return special_forms.EvalQuasiquote(e, expr, env, depth)
-}
-
-func (e *Evaluator) EvalQuasiquoteList(list core.LispList, env core.Environment, depth int) (core.LispValue, error) {
-	return special_forms.EvalQuasiquoteList(e, list, env, depth)
-}
-
-func (e *Evaluator) EvalBegin(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	return special_forms.EvalProgn(e, args, env)
 }

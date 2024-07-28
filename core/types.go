@@ -26,12 +26,6 @@ type PythonicBool bool
 // PythonicNone represents Python's None value
 type PythonicNone struct{}
 
-// PythonicDict represents a Python-style dictionary
-type PythonicDict struct {
-	data map[LispValue]LispValue
-	mu   sync.RWMutex
-}
-
 // PythonicSet represents a Python-style set
 type PythonicSet struct {
 	data map[LispValue]struct{}
@@ -95,42 +89,6 @@ var BuiltinFuncs = make(map[LispSymbol]BuiltinFunc)
 // RegisterBuiltin registers a builtin function
 func RegisterBuiltin(name string, fn BuiltinFunc) {
 	BuiltinFuncs[LispSymbol(name)] = fn
-}
-
-// NewPythonicDict creates a new PythonicDict
-func NewPythonicDict() *PythonicDict {
-	return &PythonicDict{
-		data: make(map[LispValue]LispValue),
-	}
-}
-
-// Set adds or updates a key-value pair in the PythonicDict
-func (d *PythonicDict) Set(key, value LispValue) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.data[key] = value
-}
-
-// Get retrieves a value from the PythonicDict
-func (d *PythonicDict) Get(key LispValue) (LispValue, bool) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	value, ok := d.data[key]
-	return value, ok
-}
-
-// Delete removes a key-value pair from the PythonicDict
-func (d *PythonicDict) Delete(key LispValue) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	delete(d.data, key)
-}
-
-// Data returns the underlying map of the PythonicDict
-func (d *PythonicDict) Data() map[LispValue]LispValue {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return d.data
 }
 
 // NewPythonicSet creates a new PythonicSet
