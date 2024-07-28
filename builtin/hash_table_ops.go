@@ -14,7 +14,7 @@ func RegisterHashTableOps() {
 }
 
 func makeHashTableFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	return core.NewLispHashTable(), nil
+	return core.NewPythonicDict(), nil
 }
 
 func gethashFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
@@ -22,14 +22,14 @@ func gethashFunc(args []core.LispValue, env core.Environment) (core.LispValue, e
 		return nil, fmt.Errorf("gethash requires exactly 2 arguments")
 	}
 
-	ht, ok := args[1].(*core.LispHashTable)
+	ht, ok := args[1].(*core.PythonicDict)
 	if !ok {
 		return nil, fmt.Errorf("second argument to gethash must be a hash table")
 	}
 
 	value, found := ht.Get(args[0])
 	if !found {
-		return nil, nil
+		return core.PythonicNone{}, nil
 	}
 	return value, nil
 }
@@ -39,7 +39,7 @@ func sethashFunc(args []core.LispValue, env core.Environment) (core.LispValue, e
 		return nil, fmt.Errorf("sethash requires exactly 3 arguments")
 	}
 
-	ht, ok := args[2].(*core.LispHashTable)
+	ht, ok := args[2].(*core.PythonicDict)
 	if !ok {
 		return nil, fmt.Errorf("third argument to sethash must be a hash table")
 	}
@@ -53,11 +53,11 @@ func remhashFunc(args []core.LispValue, env core.Environment) (core.LispValue, e
 		return nil, fmt.Errorf("remhash requires exactly 2 arguments")
 	}
 
-	ht, ok := args[1].(*core.LispHashTable)
+	ht, ok := args[1].(*core.PythonicDict)
 	if !ok {
 		return nil, fmt.Errorf("second argument to remhash must be a hash table")
 	}
 
 	ht.Delete(args[0])
-	return core.LispSymbol("t"), nil
+	return core.PythonicBool(true), nil
 }

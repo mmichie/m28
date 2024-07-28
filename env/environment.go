@@ -18,8 +18,9 @@ func NewEnvironment(outer core.Environment) *Environment {
 		outer: outer,
 	}
 
-	env.Define(core.LispSymbol("nil"), core.Nil{})
-	env.Define(core.LispSymbol("t"), true)
+	env.Define(core.LispSymbol("None"), core.PythonicNone{})
+	env.Define(core.LispSymbol("True"), core.PythonicBool(true))
+	env.Define(core.LispSymbol("False"), core.PythonicBool(false))
 
 	return env
 }

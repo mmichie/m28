@@ -343,11 +343,11 @@ func atomFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	}
 
 	switch args[0].(type) {
-	case core.LispSymbol, float64, string, bool, core.Nil:
-		return true, nil
+	case core.LispSymbol, float64, string, bool, core.PythonicNone:
+		return core.PythonicBool(true), nil
 	case core.LispList:
-		return false, nil
+		return core.PythonicBool(false), nil
 	default:
-		return true, nil
+		return core.PythonicBool(true), nil
 	}
 }

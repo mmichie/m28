@@ -133,7 +133,7 @@ func setfGethash(e core.Evaluator, args []core.LispValue, value core.LispValue, 
 		return nil, err
 	}
 
-	ht, ok := hashTable.(*core.LispHashTable)
+	ht, ok := hashTable.(*core.PythonicDict)
 	if !ok {
 		return nil, fmt.Errorf("setf (gethash ...) requires a hash table")
 	}

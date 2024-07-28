@@ -47,13 +47,13 @@ func isNull(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	}
 	switch v := args[0].(type) {
 	case core.LispList:
-		return len(v) == 0, nil
-	case core.Nil:
-		return true, nil
+		return core.PythonicBool(len(v) == 0), nil
+	case core.PythonicNone:
+		return core.PythonicBool(true), nil
 	case nil:
-		return true, nil
+		return core.PythonicBool(true), nil
 	default:
-		return false, nil
+		return core.PythonicBool(false), nil
 	}
 }
 
@@ -78,7 +78,7 @@ func cdrFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 			return nil, fmt.Errorf("cdr: cannot take cdr of empty list")
 		}
 		if len(v) == 1 {
-			return core.Nil{}, nil
+			return core.LispList{}, nil
 		}
 		if len(v) == 2 && !core.IsList(v[1]) {
 			// This is a dotted pair, return the second element directly
@@ -282,7 +282,7 @@ func consFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	switch second := args[1].(type) {
 	case core.LispList:
 		return append(core.LispList{args[0]}, second...), nil
-	case core.Nil:
+	case core.PythonicNone:
 		return core.LispList{args[0]}, nil
 	default:
 		// Create a proper list when the second argument is not a list

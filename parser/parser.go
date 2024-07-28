@@ -30,7 +30,7 @@ func tokenize(input string) []string {
 }
 
 func removeComments(input string) string {
-	commentRegex := regexp.MustCompile(`(?m)^;.*$|;.*`)
+	commentRegex := regexp.MustCompile(`(?m)^#.*$|#.*`)
 	return commentRegex.ReplaceAllString(input, "")
 }
 
@@ -159,8 +159,13 @@ func parseAtom(token string) core.LispValue {
 			return unquoted
 		}
 	}
-	if token == "nil" {
-		return core.Nil{}
+	switch token {
+	case "True":
+		return core.PythonicBool(true)
+	case "False":
+		return core.PythonicBool(false)
+	case "None":
+		return core.PythonicNone{}
 	}
 	return core.LispSymbol(token)
 }
