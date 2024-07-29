@@ -21,6 +21,7 @@ func RegisterIterableBuiltins() {
 	core.RegisterBuiltin("reversed", reversedFunc)
 	core.RegisterBuiltin("sorted", sortedFunc)
 	core.RegisterBuiltin("zip", zipFunc)
+	core.RegisterBuiltin("list", listFunc)
 }
 
 func allFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -169,4 +170,8 @@ func zipFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 		result[i] = tuple
 	}
 	return result, nil
+}
+
+func listFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	return core.LispList(args), nil
 }

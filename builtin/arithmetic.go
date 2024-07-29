@@ -17,6 +17,20 @@ func RegisterArithmeticFuncs() {
 	core.RegisterBuiltin("%", modulo)
 	core.RegisterBuiltin("//", floorDivide)
 	core.RegisterBuiltin("**", power)
+	core.RegisterBuiltin("=", assignFunc)
+}
+
+func assignFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("= requires exactly two arguments")
+	}
+	symbol, ok := args[0].(core.LispSymbol)
+	if !ok {
+		return nil, fmt.Errorf("first argument to = must be a symbol")
+	}
+	value := args[1]
+	env.Define(symbol, value) // Change Set to Define
+	return value, nil
 }
 
 func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {

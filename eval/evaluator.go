@@ -37,6 +37,22 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 
 		switch f := first.(type) {
 		case core.LispSymbol:
+			if f == core.LispSymbol("=") {
+				// Special handling for assignment
+				if len(rest) != 2 {
+					return nil, fmt.Errorf("= requires exactly two arguments")
+				}
+				symbol, ok := rest[0].(core.LispSymbol)
+				if !ok {
+					return nil, fmt.Errorf("first argument to = must be a symbol")
+				}
+				value, err := e.Eval(rest[1], env)
+				if err != nil {
+					return nil, err
+				}
+				env.Define(symbol, value)
+				return value, nil
+			}
 			if specialForm, ok := e.specialForms[f]; ok {
 				return specialForm(e, rest, env)
 			}
