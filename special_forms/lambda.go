@@ -13,7 +13,34 @@ func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, e
 		return nil, err
 	}
 
-	return evalLambdaBody(e, lambda, lambdaEnv)
+	result, err := evalLambdaBody(e, lambda, lambdaEnv)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the result is a literal value (like a number), return it directly
+	switch result.(type) {
+	case float64, int, string, core.PythonicBool, core.PythonicNone:
+		return result, nil
+	}
+
+	// Otherwise, evaluate the result
+	return e.Eval(result, lambdaEnv)
+}
+
+func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment) (core.LispValue, error) {
+	if list, ok := lambda.Body.(core.LispList); ok {
+		var result core.LispValue
+		var err error
+		for _, expr := range list {
+			result, err = e.Eval(expr, env)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return result, nil
+	}
+	return e.Eval(lambda.Body, env)
 }
 
 func bindParams(lambda *core.Lambda, args []core.LispValue, env core.Environment) error {
@@ -27,13 +54,3 @@ func bindParams(lambda *core.Lambda, args []core.LispValue, env core.Environment
 
 	return nil
 }
-
-func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment) (core.LispValue, error) {
-	return e.Eval(lambda.Body, env)
-}
-
-// EvalLambda is now defined in special_forms/special_forms.go as EvalLambdaPython
-// You can remove it from here if it's not needed anymore
-
-// Helper function for parsing parameters is no longer needed for Python-like lambdas
-// You can remove the parseParameters function if it's not used elsewhere

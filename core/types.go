@@ -40,6 +40,8 @@ type Environment interface {
 	Define(symbol LispSymbol, value LispValue)
 	SetMutable(symbol LispSymbol, value LispValue) bool
 	NewEnvironment(outer Environment) Environment
+	String() string
+	StringWithDepth(depth int) string
 }
 
 // Evaluator interface defines the methods for evaluating Lisp expressions

@@ -58,17 +58,33 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 	if len(args) < 2 {
 		return nil, fmt.Errorf("def requires at least a name and a body")
 	}
-	funcName, ok := args[0].(core.LispSymbol)
+
+	// Check if the first argument is a list
+	funcDef, ok := args[0].(core.LispList)
+	if !ok || len(funcDef) == 0 {
+		return nil, fmt.Errorf("invalid function definition")
+	}
+
+	// The first element of the list should be the function name
+	funcName, ok := funcDef[0].(core.LispSymbol)
 	if !ok {
 		return nil, fmt.Errorf("function name must be a symbol")
 	}
 
-	params, body, err := parseFunctionDefinition(args[1:])
-	if err != nil {
-		return nil, err
+	// The rest of the elements in funcDef are the parameters
+	params := make([]core.LispSymbol, len(funcDef)-1)
+	for i, param := range funcDef[1:] {
+		paramSymbol, ok := param.(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("function parameter must be a symbol")
+		}
+		params[i] = paramSymbol
 	}
 
-	function := &core.Lambda{Params: params, Body: body, Env: env}
+	// The body is the rest of the args
+	body := core.LispList(args[1:])
+
+	function := &core.Lambda{Params: params, Body: body, Env: env, Closure: env}
 	env.Define(funcName, function)
 	return function, nil
 }
@@ -89,7 +105,7 @@ func EvalIfPython(e core.Evaluator, args []core.LispValue, env core.Environment)
 		return e.Eval(args[2], env)
 	}
 
-	return nil, nil
+	return core.PythonicNone{}, nil
 }
 
 func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {

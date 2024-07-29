@@ -26,6 +26,3 @@ func RegisterMiscBuiltins() {
 	core.RegisterBuiltin("slice", sliceFunc)
 	core.RegisterBuiltin("vars", varsFunc)
 }
-
-// Implementations for the misc builtins should be added here
-// (dict, frozenset, getattr, globals, hasattr, hash, id, locals, set, slice, vars)

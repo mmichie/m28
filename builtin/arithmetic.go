@@ -23,6 +23,21 @@ func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("+ requires at least two arguments")
 	}
+
+	// Check if we're dealing with strings
+	if _, ok := args[0].(string); ok {
+		result := ""
+		for _, arg := range args {
+			s, ok := arg.(string)
+			if !ok {
+				return nil, fmt.Errorf("+ cannot mix strings and non-strings")
+			}
+			result += s
+		}
+		return result, nil
+	}
+
+	// If not strings, assume numbers
 	result := args[0].(float64)
 	for _, arg := range args[1:] {
 		result += arg.(float64)

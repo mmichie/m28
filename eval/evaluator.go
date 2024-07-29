@@ -20,18 +20,84 @@ func NewEvaluator() core.Evaluator {
 func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispValue, error) {
 	switch v := expr.(type) {
 	case core.LispSymbol:
-		return evalSymbol(v, env)
+		value, ok := env.Get(v)
+		if !ok {
+			return nil, fmt.Errorf("undefined symbol: %s", v)
+		}
+		return value, nil
 	case float64, int, string, core.PythonicBool, core.PythonicNone:
 		return v, nil
 	case core.LispList:
-		return e.evalList(v, env)
-	case *core.PythonicDict:
-		return e.evalDict(v, env)
-	case *core.PythonicSet:
-		return e.evalSet(v, env)
+		if len(v) == 0 {
+			return core.LispList{}, nil
+		}
+
+		first := v[0]
+		rest := v[1:]
+
+		switch f := first.(type) {
+		case core.LispSymbol:
+			if specialForm, ok := e.specialForms[f]; ok {
+				return specialForm(e, rest, env)
+			}
+			fn, err := e.Eval(f, env)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating symbol %s: %v", f, err)
+			}
+			args, err := e.evalArgs(rest, env)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating arguments: %v", err)
+			}
+			return e.Apply(fn, args, env)
+		default:
+			fn, err := e.Eval(first, env)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating function: %v", err)
+			}
+			args, err := e.evalArgs(rest, env)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating arguments: %v", err)
+			}
+			return e.Apply(fn, args, env)
+		}
 	default:
 		return nil, fmt.Errorf("unknown expression type: %T", expr)
 	}
+}
+
+func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]core.LispValue, error) {
+	evaluated := make([]core.LispValue, len(args))
+	for i, arg := range args {
+		if symbol, ok := arg.(core.LispSymbol); ok && len(symbol) > 1 && symbol[0] == ':' {
+			// This is a keyword argument, don't evaluate it
+			evaluated[i] = arg
+		} else {
+			value, err := e.Eval(arg, env)
+			if err != nil {
+				return nil, err
+			}
+			evaluated[i] = value
+		}
+	}
+	return evaluated, nil
+}
+
+func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	switch f := fn.(type) {
+	case core.BuiltinFunc:
+		return f(args, env)
+	case *core.Lambda:
+		return special_forms.ApplyLambda(e, f, args, env)
+	case core.LispList:
+		if len(f) > 0 && f[0] == core.LispSymbol("lambda") {
+			lambda, err := special_forms.EvalLambdaPython(e, f[1:], env)
+			if err != nil {
+				return nil, err
+			}
+			return special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
+		}
+	}
+	return nil, fmt.Errorf("not a function: %v", fn)
 }
 
 func evalSymbol(symbol core.LispSymbol, env core.Environment) (core.LispValue, error) {
@@ -121,49 +187,6 @@ func (e *Evaluator) evalSet(set *core.PythonicSet, env core.Environment) (core.L
 		newSet.Add(evalValue)
 	}
 	return newSet, nil
-}
-
-func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]core.LispValue, error) {
-	evaluated := make([]core.LispValue, len(args))
-	for i, arg := range args {
-		if symbol, ok := arg.(core.LispSymbol); ok {
-			if len(symbol) > 1 && symbol[0] == ':' {
-				// This is a keyword argument, don't evaluate it
-				evaluated[i] = arg
-			} else {
-				value, err := e.Eval(arg, env)
-				if err != nil {
-					return nil, err
-				}
-				evaluated[i] = value
-			}
-		} else {
-			value, err := e.Eval(arg, env)
-			if err != nil {
-				return nil, err
-			}
-			evaluated[i] = value
-		}
-	}
-	return evaluated, nil
-}
-
-func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	switch f := fn.(type) {
-	case core.BuiltinFunc:
-		return f(args, env)
-	case *core.Lambda:
-		return special_forms.ApplyLambda(e, f, args, env)
-	case core.LispList:
-		if len(f) > 0 && f[0] == core.LispSymbol("lambda") {
-			lambda, err := special_forms.EvalLambdaPython(e, f[1:], env)
-			if err != nil {
-				return nil, err
-			}
-			return special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
-		}
-	}
-	return nil, fmt.Errorf("not a function: %v", fn)
 }
 
 func (e *Evaluator) applyLambda(lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {

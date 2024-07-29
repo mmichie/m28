@@ -95,7 +95,9 @@ func (r *REPL) EvaluateString(input string) (core.LispValue, error) {
 		return nil, err
 	}
 
-	return r.evaluator.Eval(expr, r.env)
+	result, err := r.evaluator.Eval(expr, r.env)
+
+	return result, err
 }
 
 func (r *REPL) toggleKeybindings() {
