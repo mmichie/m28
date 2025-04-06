@@ -27,21 +27,13 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 	params := []core.LispSymbol{}
 	defaultValues := map[core.LispSymbol]core.LispValue{}
 
-	fmt.Printf("DEBUG: Function definition params: %v\n", funcDef[1:])
-
 	for _, param := range funcDef[1:] {
-		fmt.Printf("DEBUG: Processing parameter: %v (type %T)\n", param, param)
-		
 		// Check for string parameter (which could be a keyword argument)
 		if paramStr, isString := param.(string); isString {
-			fmt.Printf("DEBUG: Found string parameter: %s\n", paramStr)
-			
 			// Check if it has an equals sign for default value
 			if equalPos := strings.Index(paramStr, "="); equalPos > 0 {
 				name := core.LispSymbol(paramStr[:equalPos])
 				defaultValueStr := paramStr[equalPos+1:]
-				
-				fmt.Printf("DEBUG: Found default param %s = %s\n", name, defaultValueStr)
 				
 				// Parse the default value
 				var val core.LispValue
@@ -54,7 +46,7 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				} else if num, err := strconv.ParseFloat(defaultValueStr, 64); err == nil {
 					val = num
 				} else {
-					// Keep as string for other values
+					// If not a recognized value, keep as string
 					val = defaultValueStr
 				}
 				
@@ -70,15 +62,11 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		
 		// Handle core.LispSymbol parameter
 		if paramSymbol, isSymbol := param.(core.LispSymbol); isSymbol {
-			fmt.Printf("DEBUG: Found symbol parameter: %s\n", paramSymbol)
-			
 			// Check if symbol contains an equals sign
 			symbolStr := string(paramSymbol)
 			if equalPos := strings.Index(symbolStr, "="); equalPos > 0 {
 				name := core.LispSymbol(symbolStr[:equalPos])
 				defaultValueStr := symbolStr[equalPos+1:]
-				
-				fmt.Printf("DEBUG: Found default param from symbol %s = %s\n", name, defaultValueStr)
 				
 				// Parse the default value
 				var val core.LispValue
@@ -107,9 +95,6 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		// If we got here, it's not a valid parameter type
 		return nil, fmt.Errorf("function parameter must be a symbol or string, got %T", param)
 	}
-
-	fmt.Printf("DEBUG: Parsed params: %v\n", params)
-	fmt.Printf("DEBUG: Default values: %v\n", defaultValues)
 
 	body := core.LispList(args[1:])
 

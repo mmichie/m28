@@ -46,20 +46,13 @@ func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment)
 }
 
 func bindParams(lambda *core.Lambda, args []core.LispValue, env core.Environment) error {
-	fmt.Printf("DEBUG: Lambda params: %v\n", lambda.Params)
-	fmt.Printf("DEBUG: Lambda default values: %v\n", lambda.DefaultValues)
-	fmt.Printf("DEBUG: Args received: %v\n", args)
-	
 	// Extract any keyword arguments first
 	positionalArgs := []core.LispValue{}
 	keywordArgs := make(map[core.LispSymbol]core.LispValue)
 	
 	for i := 0; i < len(args); i++ {
-		fmt.Printf("DEBUG: Examining arg[%d]: %v (%T)\n", i, args[i], args[i])
-		
 		// Check if this is a keyword argument (e.g., "name=value")
 		if str, ok := args[i].(string); ok && strings.Contains(str, "=") {
-			fmt.Printf("DEBUG: Found potential keyword arg: %s\n", str)
 			parts := strings.SplitN(str, "=", 2)
 			if len(parts) == 2 {
 				paramName := core.LispSymbol(parts[0])
@@ -79,18 +72,13 @@ func bindParams(lambda *core.Lambda, args []core.LispValue, env core.Environment
 				}
 				
 				keywordArgs[paramName] = val
-				fmt.Printf("DEBUG: Added keyword arg %s = %v\n", paramName, val)
 				continue
 			}
 		}
 		
 		// If not a keyword arg, it's a positional arg
 		positionalArgs = append(positionalArgs, args[i])
-		fmt.Printf("DEBUG: Added positional arg: %v\n", args[i])
 	}
-	
-	fmt.Printf("DEBUG: Positional args: %v\n", positionalArgs)
-	fmt.Printf("DEBUG: Keyword args: %v\n", keywordArgs)
 	
 	// Now handle positional arguments
 	if len(positionalArgs) > len(lambda.Params) {
@@ -100,23 +88,19 @@ func bindParams(lambda *core.Lambda, args []core.LispValue, env core.Environment
 	// Set provided positional arguments
 	for i, arg := range positionalArgs {
 		env.Define(lambda.Params[i], arg)
-		fmt.Printf("DEBUG: Set positional param %s = %v\n", lambda.Params[i], arg)
 	}
 	
 	// Set values from keyword arguments and defaults for remaining params
 	for i := len(positionalArgs); i < len(lambda.Params); i++ {
 		param := lambda.Params[i]
-		fmt.Printf("DEBUG: Processing param %s\n", param)
 		
 		// Check if we have a keyword argument for this param
 		if val, hasKeyword := keywordArgs[param]; hasKeyword {
 			env.Define(param, val)
 			delete(keywordArgs, param)  // Mark as used
-			fmt.Printf("DEBUG: Set keyword param %s = %v\n", param, val)
 		} else if defaultVal, hasDefault := lambda.DefaultValues[param]; hasDefault {
 			// Use default value
 			env.Define(param, defaultVal)
-			fmt.Printf("DEBUG: Set default value param %s = %v\n", param, defaultVal)
 		} else {
 			// No positional, keyword, or default value
 			return fmt.Errorf("missing required argument: %s", param)
