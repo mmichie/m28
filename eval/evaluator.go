@@ -2,6 +2,7 @@ package eval
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/special_forms"
@@ -84,14 +85,31 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]core.LispValue, error) {
 	evaluated := make([]core.LispValue, len(args))
 	for i, arg := range args {
-		if symbol, ok := arg.(core.LispSymbol); ok && len(symbol) > 1 && symbol[0] == ':' {
-			// This is a keyword argument, don't evaluate it
-			evaluated[i] = arg
-		} else {
-			value, err := e.Eval(arg, env)
-			if err != nil {
-				return nil, err
+		// Check if arg is a symbol that represents a keyword argument
+		if symbol, ok := arg.(core.LispSymbol); ok {
+			symbolStr := string(symbol)
+			if len(symbolStr) > 0 && strings.Contains(symbolStr, "=") {
+				// This is a keyword argument in the form name=value
+				evaluated[i] = symbolStr // Pass it as a string for the lambda to process
+				continue
+			} else if len(symbol) > 1 && symbol[0] == ':' {
+				// This is a keyword argument, don't evaluate it
+				evaluated[i] = arg
+				continue
 			}
+		}
+		
+		// Otherwise evaluate normally
+		value, err := e.Eval(arg, env)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Check if the evaluated value contains a keyword format
+		if str, ok := value.(string); ok && strings.Contains(str, "=") {
+			// Preserve the string format for keyword detection in ApplyLambda
+			evaluated[i] = str
+		} else {
 			evaluated[i] = value
 		}
 	}
