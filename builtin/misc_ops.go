@@ -450,6 +450,55 @@ func sliceFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 	if len(args) < 1 || len(args) > 3 {
 		return nil, fmt.Errorf("slice() takes 1 to 3 arguments")
 	}
+
+	// Python-style list slicing
+	if list, ok := args[0].(core.LispList); ok {
+		// Handle slice(list, start, end)
+		if len(args) >= 2 {
+			start, ok := args[1].(float64)
+			if !ok {
+				return nil, fmt.Errorf("slice start index must be a number")
+			}
+			
+			startIdx := int(start)
+			if startIdx < 0 {
+				startIdx = len(list) + startIdx
+			}
+			if startIdx < 0 {
+				startIdx = 0
+			}
+			
+			if len(args) == 2 {
+				// slice(list, start) - return from start to end
+				if startIdx >= len(list) {
+					return core.LispList{}, nil
+				}
+				return list[startIdx:], nil
+			} else {
+				// slice(list, start, end)
+				end, ok := args[2].(float64)
+				if !ok {
+					return nil, fmt.Errorf("slice end index must be a number")
+				}
+				
+				endIdx := int(end)
+				if endIdx < 0 {
+					endIdx = len(list) + endIdx
+				}
+				if endIdx > len(list) {
+					endIdx = len(list)
+				}
+				
+				if startIdx >= len(list) || startIdx >= endIdx {
+					return core.LispList{}, nil
+				}
+				
+				return list[startIdx:endIdx], nil
+			}
+		}
+	}
+	
+	// Python's range-like slice functionality
 	var start, stop, step float64
 	switch len(args) {
 	case 1:

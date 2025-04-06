@@ -22,6 +22,7 @@ func RegisterIterableBuiltins() {
 	core.RegisterBuiltin("sorted", sortedFunc)
 	core.RegisterBuiltin("zip", zipFunc)
 	core.RegisterBuiltin("list", listFunc)
+	core.RegisterBuiltin("nth", nthFunc)
 }
 
 func allFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -175,3 +176,28 @@ func zipFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 func listFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	return core.LispList(args), nil
 }
+
+func nthFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Get: (nth list index)
+	if len(args) == 2 {
+		list, ok := args[0].(core.LispList)
+		if !ok {
+			return nil, fmt.Errorf("nth first argument must be a list")
+		}
+		
+		index, ok := args[1].(float64)
+		if !ok {
+			return nil, fmt.Errorf("nth second argument must be a number")
+		}
+		
+		i := int(index)
+		if i < 0 || i >= len(list) {
+			return nil, fmt.Errorf("index out of range: %d", i)
+		}
+		
+		return list[i], nil
+	}
+	
+	return nil, fmt.Errorf("nth requires exactly 2 arguments")
+}
+

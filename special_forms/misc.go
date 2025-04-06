@@ -26,6 +26,24 @@ func EvalWith(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 	return result, nil
 }
 
+func EvalBegin(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// 'begin' evaluates multiple expressions and returns the result of the last one
+	if len(args) == 0 {
+		return core.PythonicNone{}, nil
+	}
+
+	var result core.LispValue
+	var err error
+	for _, expr := range args {
+		result, err = e.Eval(expr, env)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
 func EvalReturn(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) > 1 {
 		return nil, fmt.Errorf("return takes at most one argument")

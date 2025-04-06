@@ -51,12 +51,35 @@ func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 		return result, nil
 	}
 
-	// If not strings, assume numbers
-	result := args[0].(float64)
-	for _, arg := range args[1:] {
-		result += arg.(float64)
+	// Check if we're dealing with lists (concatenation)
+	if list1, ok := args[0].(core.LispList); ok {
+		var result core.LispList
+		result = append(result, list1...)
+		
+		for _, arg := range args[1:] {
+			if list2, ok := arg.(core.LispList); ok {
+				result = append(result, list2...)
+			} else {
+				return nil, fmt.Errorf("+ cannot mix lists and non-lists")
+			}
+		}
+		return result, nil
 	}
-	return result, nil
+
+	// If not strings or lists, assume numbers
+	if num, ok := args[0].(float64); ok {
+		result := num
+		for _, arg := range args[1:] {
+			if val, ok := arg.(float64); ok {
+				result += val
+			} else {
+				return nil, fmt.Errorf("+ cannot mix numbers and non-numbers")
+			}
+		}
+		return result, nil
+	}
+
+	return nil, fmt.Errorf("+ operator not supported for %T", args[0])
 }
 
 func subtract(args []core.LispValue, _ core.Environment) (core.LispValue, error) {

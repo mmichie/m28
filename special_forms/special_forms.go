@@ -10,6 +10,8 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 	return map[core.LispSymbol]SpecialFormFunc{
 		// Control Flow
 		"if":       EvalIfPython,
+		"elif":     EvalElif,
+		"else":     EvalElse,
 		"for":      EvalFor,
 		"while":    EvalWhilePython,
 		"try":      EvalTry,
@@ -35,6 +37,7 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 
 		// Misc
 		"with":   EvalWith,
+		"begin":  EvalBegin,
 		"return": EvalReturn,
 		"yield":  EvalYield,
 		"del":    EvalDel,

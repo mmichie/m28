@@ -25,6 +25,33 @@ func EvalIfPython(e core.Evaluator, args []core.LispValue, env core.Environment)
 	return core.PythonicNone{}, nil
 }
 
+func EvalElif(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 || len(args) > 3 {
+		return nil, fmt.Errorf("elif requires 2 or 3 arguments")
+	}
+
+	condition, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	if core.IsTruthy(condition) {
+		return e.Eval(args[1], env)
+	} else if len(args) == 3 {
+		return e.Eval(args[2], env)
+	}
+
+	return core.PythonicNone{}, nil
+}
+
+func EvalElse(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("else requires exactly 1 argument")
+	}
+
+	return e.Eval(args[0], env)
+}
+
 func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) < 3 {
 		return nil, fmt.Errorf("for loop requires at least 3 arguments")
