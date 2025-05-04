@@ -1,0 +1,38 @@
+(print "Testing tree-contains?")
+
+(def (node-value node) 
+    (return (nth node 0)))
+
+(def (node-left node) 
+    (return (nth node 1)))
+
+(def (node-right node) 
+    (return (nth node 2)))
+
+(def (tree-has-value? tree value)
+    (if (== tree None)
+        (return False)
+        (if (== (node-value tree) value)
+            (return True)
+            (if (and (== (node-left tree) None) (== (node-right tree) None))
+                (return False)
+                (if (== (node-left tree) None)
+                    (return (tree-has-value? (node-right tree) value))
+                    (if (== (node-right tree) None)
+                        (return (tree-has-value? (node-left tree) value))
+                        (if (tree-has-value? (node-left tree) value)
+                            (return True)
+                            (return (tree-has-value? (node-right tree) value)))))))))
+
+(= leaf1 (list 1 None None))
+(= leaf4 (list 4 None None))
+(= node3 (list 3 leaf1 leaf4))
+
+(print "Node3:")
+(print node3)
+
+(print "Node3 contains 1?")
+(print (tree-has-value? node3 1))
+
+(print "Node3 contains 4?")
+(print (tree-has-value? node3 4))
