@@ -1,0 +1,28 @@
+# Dictionary functionality basic tests
+
+# Test empty dictionary creation
+(def d1 (dict))
+(print "Empty dict created, length:" (len d1))
+(assert (== (len d1) 0) "Dict should be empty")
+
+# Test Python-style dictionary literal
+(def d2 {"name": "John", "age": 30})
+(print "Dict from literal:" d2)
+(assert (== (len d2) 2) "Dict should have 2 entries")
+(assert (== (get d2 "name") "John") "Name should be John")
+(assert (== (get d2 "age") 30) "Age should be 30")
+
+# Test dictionary function with key-value pairs
+(def d3 (dict "name" "Jane" "age" 25))
+(print "Dict from function:" d3)
+(assert (== (get d3 "name") "Jane") "Name should be Jane")
+
+# Test get with default value
+(assert (== (get d3 "country" "Unknown") "Unknown") "Default value should work")
+
+# Test print with keyword args
+(print "Testing print with" "custom separator" {"sep": " -> "})
+(print "Testing print with" "custom end" {"end": "!\n"})
+(print "Testing both" "sep" "and" "end" {"sep": "|", "end": "✓\n"})
+
+(print "\nAll dictionary tests passed!")
