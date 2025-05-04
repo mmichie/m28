@@ -138,10 +138,19 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 
 // Helper function to resolve module paths
 func resolveModulePath(name string) (string, error) {
+	// Check if the name is a path itself (contains / or .)
+	if filepath.Ext(name) == ".m28" {
+		if _, err := ioutil.ReadFile(name); err == nil {
+			return name, nil
+		}
+	}
+
 	// Look for .m28 files in the current directory and predefined module paths
 	paths := []string{
 		".",
+		"./tests",
 		"./modules",
+		"./examples",
 		"/usr/local/lib/m28/modules",
 		"/usr/lib/m28/modules",
 	}

@@ -1,0 +1,56 @@
+(print "\n===== Control Flow Tests =====")
+
+(print "\n-- If Statement --")
+(= x 10)
+(= y (if (> x 5) "greater" "lesser"))
+(= z (if (< x 5) "lesser" "greater"))
+
+(print "y = ")
+(print y)
+(print "Expected: greater")
+
+(print "z = ")
+(print z)
+(print "Expected: greater")
+
+(print "\n-- If-Elif-Else --")
+(def (check-number x)
+  (if (< x 0)
+      "negative"
+      (elif (== x 0)
+            "zero"
+            "positive")))
+
+(print "check-number(-5) = ")
+(print (check-number -5))
+(print "Expected: negative")
+
+(print "check-number(0) = ")
+(print (check-number 0))
+(print "Expected: zero")
+
+(print "check-number(5) = ")
+(print (check-number 5))
+(print "Expected: positive")
+
+(print "\n-- For Loop --")
+(= sum 0)
+(for i (range 5)
+  (= sum (+ sum i)))
+
+(print "Sum of numbers 0 to 4: ")
+(print sum)
+(print "Expected: 10")
+
+(print "\n-- While Loop --")
+(= counter 0)
+(= sum 0)
+(while (< counter 5)
+  (= sum (+ sum counter))
+  (= counter (+ counter 1)))
+
+(print "Sum using while loop: ")
+(print sum)
+(print "Expected: 10")
+
+(print "\n===== Tests Complete =====")
