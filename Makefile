@@ -43,9 +43,15 @@ help:
 	@echo "  make clean  - Clean build artifacts."
 	@echo "  make deps   - Install and tidy up dependencies."
 	@echo "  make run    - Start the REPL."
+	@echo "  make fmt    - Format Go code using gofmt."
 	@echo "  make all    - Default, build the project."
 	@echo "  make help   - Display this help."
 
+# Format the code
+fmt:
+	@echo "Formatting Go code..."
+	@gofmt -w -s $(shell find . -name "*.go" -not -path "./vendor/*")
+
 # Special targets
-.PHONY: all build test clean deps run help
+.PHONY: all build test clean deps run help fmt
 
