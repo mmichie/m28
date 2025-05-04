@@ -44,9 +44,9 @@ func isFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("is() takes exactly two arguments")
 	}
-	
+
 	value := args[0]
-	
+
 	// Check if second argument is a function call that returns a type
 	typeFunc, isList := args[1].(core.LispList)
 	if isList && len(typeFunc) > 0 {
@@ -70,7 +70,7 @@ func isFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 			return core.PythonicBool(isBool), nil
 		}
 	}
-	
+
 	// Direct identity comparison
 	return core.PythonicBool(core.EqValues(value, args[1])), nil
 }

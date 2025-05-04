@@ -98,13 +98,13 @@ func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]cor
 				continue
 			}
 		}
-		
+
 		// Otherwise evaluate normally
 		value, err := e.Eval(arg, env)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Check if the evaluated value contains a keyword format
 		if str, ok := value.(string); ok && strings.Contains(str, "=") {
 			// Preserve the string format for keyword detection in ApplyLambda

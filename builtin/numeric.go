@@ -79,7 +79,7 @@ func intFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 	if len(args) < 1 || len(args) > 2 {
 		return nil, fmt.Errorf("int() takes 1 or 2 arguments")
 	}
-	
+
 	base := 10
 	if len(args) == 2 {
 		b, ok := args[1].(float64)
@@ -88,7 +88,7 @@ func intFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 		}
 		base = int(b)
 	}
-	
+
 	switch v := args[0].(type) {
 	case float64:
 		return float64(int(v)), nil

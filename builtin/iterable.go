@@ -184,20 +184,19 @@ func nthFunc(args []core.LispValue, env core.Environment) (core.LispValue, error
 		if !ok {
 			return nil, fmt.Errorf("nth first argument must be a list")
 		}
-		
+
 		index, ok := args[1].(float64)
 		if !ok {
 			return nil, fmt.Errorf("nth second argument must be a number")
 		}
-		
+
 		i := int(index)
 		if i < 0 || i >= len(list) {
 			return nil, fmt.Errorf("index out of range: %d", i)
 		}
-		
+
 		return list[i], nil
 	}
-	
+
 	return nil, fmt.Errorf("nth requires exactly 2 arguments")
 }
-

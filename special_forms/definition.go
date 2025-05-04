@@ -34,7 +34,7 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			if equalPos := strings.Index(paramStr, "="); equalPos > 0 {
 				name := core.LispSymbol(paramStr[:equalPos])
 				defaultValueStr := paramStr[equalPos+1:]
-				
+
 				// Parse the default value
 				var val core.LispValue
 				if defaultValueStr == "True" {
@@ -49,17 +49,17 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 					// If not a recognized value, keep as string
 					val = defaultValueStr
 				}
-				
+
 				params = append(params, name)
 				defaultValues[name] = val
 				continue
 			}
-			
+
 			// Regular parameter as string
 			params = append(params, core.LispSymbol(paramStr))
 			continue
 		}
-		
+
 		// Handle core.LispSymbol parameter
 		if paramSymbol, isSymbol := param.(core.LispSymbol); isSymbol {
 			// Check if symbol contains an equals sign
@@ -67,7 +67,7 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			if equalPos := strings.Index(symbolStr, "="); equalPos > 0 {
 				name := core.LispSymbol(symbolStr[:equalPos])
 				defaultValueStr := symbolStr[equalPos+1:]
-				
+
 				// Parse the default value
 				var val core.LispValue
 				if defaultValueStr == "True" {
@@ -81,17 +81,17 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				} else {
 					val = defaultValueStr
 				}
-				
+
 				params = append(params, name)
 				defaultValues[name] = val
 				continue
 			}
-			
+
 			// Regular parameter as symbol
 			params = append(params, paramSymbol)
 			continue
 		}
-		
+
 		// If we got here, it's not a valid parameter type
 		return nil, fmt.Errorf("function parameter must be a symbol or string, got %T", param)
 	}
@@ -99,9 +99,9 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 	body := core.LispList(args[1:])
 
 	function := &core.Lambda{
-		Params:        params, 
-		Body:          body, 
-		Env:           env, 
+		Params:        params,
+		Body:          body,
+		Env:           env,
 		Closure:       env,
 		DefaultValues: defaultValues,
 	}

@@ -65,7 +65,7 @@ func andFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 	if len(args) == 0 {
 		return core.PythonicBool(true), nil
 	}
-	
+
 	var result core.LispValue = core.PythonicBool(true)
 	for _, arg := range args {
 		if !core.IsTruthy(arg) {
@@ -81,7 +81,7 @@ func orFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	if len(args) == 0 {
 		return core.PythonicBool(false), nil
 	}
-	
+
 	for _, arg := range args {
 		if core.IsTruthy(arg) {
 			return arg, nil // Return the first truthy value encountered

@@ -31,12 +31,41 @@ func inputFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 }
 
 func printFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	for i, arg := range args {
+	// Default parameters (Python-like)
+	end := "\n"
+	sep := " "
+
+	// Extract keyword arguments if present
+	values := args
+	if len(args) > 0 {
+		if dict, ok := args[len(args)-1].(*core.PythonicDict); ok {
+			// Check for 'end' parameter
+			if endVal, found := dict.Get("end"); found {
+				if endStr, ok := endVal.(string); ok {
+					end = endStr
+					values = args[:len(args)-1]
+				}
+			}
+			// Check for 'sep' parameter
+			if sepVal, found := dict.Get("sep"); found {
+				if sepStr, ok := sepVal.(string); ok {
+					sep = sepStr
+					values = args[:len(args)-1]
+				}
+			}
+		}
+	}
+
+	// Print values with separator
+	for i, arg := range values {
 		if i > 0 {
-			fmt.Print(" ")
+			fmt.Print(sep)
 		}
 		fmt.Print(core.PrintValue(arg))
 	}
-	fmt.Println()
+
+	// Print end string
+	fmt.Print(end)
+
 	return core.PythonicNone{}, nil
 }

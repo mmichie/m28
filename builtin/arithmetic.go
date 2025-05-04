@@ -55,7 +55,7 @@ func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 	if list1, ok := args[0].(core.LispList); ok {
 		var result core.LispList
 		result = append(result, list1...)
-		
+
 		for _, arg := range args[1:] {
 			if list2, ok := arg.(core.LispList); ok {
 				result = append(result, list2...)

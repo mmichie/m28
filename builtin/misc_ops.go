@@ -459,7 +459,7 @@ func sliceFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 			if !ok {
 				return nil, fmt.Errorf("slice start index must be a number")
 			}
-			
+
 			startIdx := int(start)
 			if startIdx < 0 {
 				startIdx = len(list) + startIdx
@@ -467,7 +467,7 @@ func sliceFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 			if startIdx < 0 {
 				startIdx = 0
 			}
-			
+
 			if len(args) == 2 {
 				// slice(list, start) - return from start to end
 				if startIdx >= len(list) {
@@ -480,7 +480,7 @@ func sliceFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 				if !ok {
 					return nil, fmt.Errorf("slice end index must be a number")
 				}
-				
+
 				endIdx := int(end)
 				if endIdx < 0 {
 					endIdx = len(list) + endIdx
@@ -488,16 +488,16 @@ func sliceFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 				if endIdx > len(list) {
 					endIdx = len(list)
 				}
-				
+
 				if startIdx >= len(list) || startIdx >= endIdx {
 					return core.LispList{}, nil
 				}
-				
+
 				return list[startIdx:endIdx], nil
 			}
 		}
 	}
-	
+
 	// Python's range-like slice functionality
 	var start, stop, step float64
 	switch len(args) {
