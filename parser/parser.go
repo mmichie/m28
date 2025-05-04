@@ -35,7 +35,8 @@ func removeComments(input string) string {
 }
 
 func splitIntoRawTokens(input string) []string {
-	tokenRegex := regexp.MustCompile(`(\(|\)|'|` + "`" + `|,@|,|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s()]+)`)
+	// Updated regex to also recognize curly braces for dict literals
+	tokenRegex := regexp.MustCompile(`(\(|\)|{|}|'|` + "`" + `|,@|,|:|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s(){}:]+)`)
 	return tokenRegex.FindAllString(input, -1)
 }
 
@@ -69,6 +70,10 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 		return parseList(tokens, index)
 	case ")":
 		return nil, index, fmt.Errorf("unexpected closing parenthesis")
+	case "{":
+		return parseDict(tokens, index)
+	case "}":
+		return nil, index, fmt.Errorf("unexpected closing curly brace")
 	case "'":
 		return parseQuote(tokens, index)
 	case "`":
@@ -147,6 +152,52 @@ func parseUnquoteSplicing(tokens []string, index int) (core.LispValue, int, erro
 		return nil, newIndex, err
 	}
 	return core.UnquoteSplicing{Expr: expr}, newIndex, nil
+}
+
+// parseDict parses a Python-style dictionary literal: {"key": value, ...}
+func parseDict(tokens []string, index int) (core.LispValue, int, error) {
+	dict := core.NewPythonicDict()
+
+	// Handle empty dict
+	if index < len(tokens) && tokens[index] == "}" {
+		return dict, index + 1, nil
+	}
+
+	for index < len(tokens) && tokens[index] != "}" {
+		// Parse key
+		key, newIndex, err := parse(tokens, index)
+		if err != nil {
+			return nil, newIndex, err
+		}
+		index = newIndex
+
+		// Expect colon
+		if index >= len(tokens) || tokens[index] != ":" {
+			return nil, index, fmt.Errorf("expected ':' after dictionary key")
+		}
+		index++ // Skip colon
+
+		// Parse value
+		value, newIndex, err := parse(tokens, index)
+		if err != nil {
+			return nil, newIndex, err
+		}
+		index = newIndex
+
+		// Add key-value pair to dict
+		dict.Set(key, value)
+
+		// Skip comma if present
+		if index < len(tokens) && tokens[index] == "," {
+			index++
+		}
+	}
+
+	if index >= len(tokens) {
+		return nil, index, fmt.Errorf("missing closing curly brace for dictionary")
+	}
+
+	return dict, index + 1, nil
 }
 
 func parseAtom(token string) core.LispValue {

@@ -52,6 +52,8 @@ func init() {
 	core.RegisterBuiltin("symbolp", symbolpFunc)
 	core.RegisterBuiltin("symbol->string", symbolToStringFunc)
 	core.RegisterBuiltin("atom", atomFunc)
+	core.RegisterBuiltin("get", getFunc)
+	core.RegisterBuiltin("dict", dictFunc)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -354,26 +356,38 @@ func atomFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 }
 
 func dictFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) > 1 {
-		return nil, fmt.Errorf("dict() takes at most 1 argument")
-	}
+	dict := core.NewPythonicDict()
+
+	// Handle empty dict - no arguments
 	if len(args) == 0 {
-		return make(map[core.LispValue]core.LispValue), nil
-	}
-	switch arg := args[0].(type) {
-	case core.LispList:
-		dict := make(map[core.LispValue]core.LispValue)
-		for _, item := range arg {
-			pair, ok := item.(core.LispList)
-			if !ok || len(pair) != 2 {
-				return nil, fmt.Errorf("dict() requires an iterable of key/value pairs")
-			}
-			dict[pair[0]] = pair[1]
-		}
 		return dict, nil
-	default:
-		return nil, fmt.Errorf("dict() argument must be an iterable of key/value pairs")
 	}
+
+	// Handle a list of key-value pairs format: (dict (list (list k1 v1) (list k2 v2)))
+	if len(args) == 1 {
+		switch arg := args[0].(type) {
+		case core.LispList:
+			for _, item := range arg {
+				pair, ok := item.(core.LispList)
+				if !ok || len(pair) != 2 {
+					return nil, fmt.Errorf("dict() requires an iterable of key/value pairs")
+				}
+				dict.Set(pair[0], pair[1])
+			}
+			return dict, nil
+		}
+	}
+
+	// Handle direct key-value pairs format: (dict k1 v1 k2 v2)
+	if len(args)%2 != 0 {
+		return nil, fmt.Errorf("dict() key-value arguments must come in pairs")
+	}
+
+	for i := 0; i < len(args); i += 2 {
+		dict.Set(args[i], args[i+1])
+	}
+
+	return dict, nil
 }
 
 func frozensetFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -589,4 +603,49 @@ func mapFunc(args []core.LispValue, env core.Environment) (core.LispValue, error
 	}
 
 	return result, nil
+}
+
+// getFunc implements Python's get() function for dictionaries and other mappings
+func getFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) < 2 || len(args) > 3 {
+		return nil, fmt.Errorf("get() takes 2 or 3 arguments")
+	}
+
+	container := args[0]
+	key := args[1]
+	var defaultValue core.LispValue = core.PythonicNone{}
+
+	if len(args) == 3 {
+		defaultValue = args[2]
+	}
+
+	switch c := container.(type) {
+	case *core.PythonicDict:
+		value, found := c.Get(key)
+		if found {
+			return value, nil
+		}
+		return defaultValue, nil
+
+	case map[core.LispValue]core.LispValue:
+		value, found := c[key]
+		if found {
+			return value, nil
+		}
+		return defaultValue, nil
+
+	case core.LispList:
+		index, ok := key.(float64)
+		if !ok {
+			return nil, fmt.Errorf("list indices must be numbers")
+		}
+		idx := int(index)
+		if idx < 0 || idx >= len(c) {
+			return defaultValue, nil
+		}
+		return c[idx], nil
+
+	default:
+		return nil, fmt.Errorf("get() requires a mapping or sequence as first argument, got %T", container)
+	}
 }

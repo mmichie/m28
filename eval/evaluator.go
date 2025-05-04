@@ -28,6 +28,12 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 		return value, nil
 	case float64, int, string, core.PythonicBool, core.PythonicNone:
 		return v, nil
+	case *core.PythonicDict:
+		// Evaluate dictionary literals
+		return e.evalDict(v, env)
+	case *core.PythonicSet:
+		// Evaluate set literals
+		return e.evalSet(v, env)
 	case core.LispList:
 		if len(v) == 0 {
 			return core.LispList{}, nil

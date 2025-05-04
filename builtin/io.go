@@ -35,7 +35,7 @@ func printFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 	end := "\n"
 	sep := " "
 
-	// Extract keyword arguments if present
+	// Extract keyword arguments if present - look for a dictionary as the last argument
 	values := args
 	if len(args) > 0 {
 		if dict, ok := args[len(args)-1].(*core.PythonicDict); ok {
@@ -43,16 +43,16 @@ func printFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 			if endVal, found := dict.Get("end"); found {
 				if endStr, ok := endVal.(string); ok {
 					end = endStr
-					values = args[:len(args)-1]
 				}
 			}
 			// Check for 'sep' parameter
 			if sepVal, found := dict.Get("sep"); found {
 				if sepStr, ok := sepVal.(string); ok {
 					sep = sepStr
-					values = args[:len(args)-1]
 				}
 			}
+			// Only remove the last argument if it was used as kwargs
+			values = args[:len(args)-1]
 		}
 	}
 
