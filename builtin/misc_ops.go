@@ -54,6 +54,8 @@ func init() {
 	core.RegisterBuiltin("atom", atomFunc)
 	core.RegisterBuiltin("get", getFunc)
 	core.RegisterBuiltin("dict", dictFunc)
+	core.RegisterBuiltin("assert", assertFunc)
+	core.RegisterBuiltin("len", lenFunc)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -554,6 +556,10 @@ func lenFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 		return float64(len(v)), nil
 	case map[core.LispValue]bool:
 		return float64(len(v)), nil
+	case *core.PythonicDict:
+		return float64(v.Size()), nil
+	case *core.PythonicSet:
+		return float64(v.Size()), nil
 	default:
 		return nil, fmt.Errorf("object of type '%T' has no len()", v)
 	}
@@ -648,4 +654,28 @@ func getFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 	default:
 		return nil, fmt.Errorf("get() requires a mapping or sequence as first argument, got %T", container)
 	}
+}
+
+// assertFunc implements Python-style assertions
+func assertFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, fmt.Errorf("assert() takes 1 or 2 arguments")
+	}
+	
+	condition := core.IsTruthy(args[0])
+	
+	if !condition {
+		// Handle assertion failure
+		if len(args) == 2 {
+			// With custom message
+			message := core.PrintValue(args[1])
+			return nil, fmt.Errorf("AssertionError: %s", message)
+		} else {
+			// Default message
+			return nil, fmt.Errorf("AssertionError: assertion failed")
+		}
+	}
+	
+	// Assertion passed
+	return core.PythonicBool(true), nil
 }
