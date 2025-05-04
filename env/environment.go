@@ -8,6 +8,11 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// SymbolCollector is an interface for environments that can iterate over their symbols
+type SymbolCollector interface {
+	ForEachSymbol(func(symbol core.LispSymbol, value core.LispValue))
+}
+
 // Environment represents a Lisp environment
 type Environment struct {
 	vars  map[core.LispSymbol]core.LispValue
@@ -105,4 +110,11 @@ func (e *Environment) StringWithDepth(depth int) string {
 		}
 	}
 	return sb.String()
+}
+
+// ForEachSymbol calls the provided function for each symbol in the environment
+func (e *Environment) ForEachSymbol(fn func(symbol core.LispSymbol, value core.LispValue)) {
+	for symbol, value := range e.vars {
+		fn(symbol, value)
+	}
 }

@@ -123,15 +123,17 @@ M28 supports the following data types:
 (add_two_numbers 5 3)  # Returns: 8
 ```
 
-### Lambda Functions
-
+### Function Definition with Lambda
 ```lisp
-# Anonymous function
-(= square (lambda (x) (* x x)))
+# Function definition
+(def (square x)
+  (* x x))
 
 # Use it
 (square 5)  # Returns: 25
 ```
+
+Note: Lambda functions may be supported in future versions.
 
 ## Control Flow
 

@@ -65,21 +65,22 @@ One powerful feature of dictionaries is using them as keyword arguments for func
 ### Example 1: Student Records
 
 ```lisp
-(= students (list
-  {"name": "Alice", "grade": 95, "courses": (list "Math" "Science")},
-  {"name": "Bob", "grade": 87, "courses": (list "History" "English")},
-  {"name": "Charlie", "grade": 91, "courses": (list "Art" "Music")}
-))
+# Create individual student records
+(= alice {"name": "Alice", "grade": 95})
+(= bob {"name": "Bob", "grade": 87})
+(= charlie {"name": "Charlie", "grade": 91})
 
-# Print all student names
-(for student students
-  (print (get student "name")))
+# Create a list of students
+(= students (list alice bob charlie))
 
-# Calculate average grade
-(= total 0)
-(for student students
-  (= total (+ total (get student "grade"))))
-(print "Average grade:" (/ total (len students)))
+# Access student information
+(print "First student name:" (get (get students 0) "name"))  # Alice
+(print "Second student grade:" (get (get students 1) "grade"))  # 87
+
+# Note: The following loop syntax may vary based on implementation
+# In concept, iterating through student records would look like:
+# (for student students
+#   (print (get student "name")))
 ```
 
 ### Example 2: Configuring Function Behavior

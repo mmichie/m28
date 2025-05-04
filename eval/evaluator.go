@@ -21,6 +21,40 @@ func NewEvaluator() core.Evaluator {
 func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispValue, error) {
 	switch v := expr.(type) {
 	case core.LispSymbol:
+		// Check for dot notation: module.attribute or object.attribute
+		if strings.Contains(string(v), ".") {
+			// Handle multiple levels of attributes (e.g., module.submodule.attribute)
+			parts := strings.Split(string(v), ".")
+			current := parts[0]
+			
+			// Start with the first part
+			currentObj, ok := env.Get(core.LispSymbol(current))
+			if !ok {
+				return nil, fmt.Errorf("undefined object: %s", current)
+			}
+			
+			// Traverse the chain of attributes
+			for i := 1; i < len(parts); i++ {
+				attrName := core.LispSymbol(parts[i])
+				
+				// Check if it's a dictionary
+				if dict, ok := currentObj.(*core.PythonicDict); ok {
+					// Get the attribute
+					var found bool
+					currentObj, found = dict.Get(attrName)
+					if !found {
+						return nil, fmt.Errorf("attribute %s not found in %s", attrName, current)
+					}
+					current = current + "." + parts[i]
+				} else {
+					return nil, fmt.Errorf("%s is not an object with attributes", current)
+				}
+			}
+			
+			return currentObj, nil
+		}
+		
+		// Regular symbol lookup
 		value, ok := env.Get(v)
 		if !ok {
 			return nil, fmt.Errorf("undefined symbol: %s", v)
@@ -44,7 +78,59 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 
 		switch f := first.(type) {
 		case core.LispSymbol:
-			if f == core.LispSymbol("=") {
+			// Check for dot notation in function call: module.function(args) or object.method(args)
+			if strings.Contains(string(f), ".") {
+				// Handle multiple levels of attributes (e.g., module.submodule.function)
+				parts := strings.Split(string(f), ".")
+				current := parts[0]
+				
+				// Start with the first part
+				currentObj, ok := env.Get(core.LispSymbol(current))
+				if !ok {
+					return nil, fmt.Errorf("undefined object: %s", current)
+				}
+				
+				// Traverse all but the last part (which is the function name)
+				for i := 1; i < len(parts)-1; i++ {
+					attrName := core.LispSymbol(parts[i])
+					
+					// Check if it's a dictionary
+					if dict, ok := currentObj.(*core.PythonicDict); ok {
+						// Get the attribute
+						var found bool
+						currentObj, found = dict.Get(attrName)
+						if !found {
+							return nil, fmt.Errorf("attribute %s not found in %s", attrName, current)
+						}
+						current = current + "." + parts[i]
+					} else {
+						return nil, fmt.Errorf("%s is not an object with attributes", current)
+					}
+				}
+				
+				// Get the function name (last part)
+				funcName := core.LispSymbol(parts[len(parts)-1])
+				
+				// Check if the object is a dictionary to get the function
+				if dict, ok := currentObj.(*core.PythonicDict); ok {
+					// Get the function
+					fnVal, found := dict.Get(funcName)
+					if !found {
+						return nil, fmt.Errorf("function %s not found in %s", funcName, current)
+					}
+					
+					// Evaluate the arguments
+					args, err := e.evalArgs(rest, env)
+					if err != nil {
+						return nil, fmt.Errorf("error evaluating arguments: %v", err)
+					}
+					
+					// Apply the function
+					return e.Apply(fnVal, args, env)
+				} else {
+					return nil, fmt.Errorf("%s is not an object with methods", current)
+				}
+			} else if f == core.LispSymbol("=") {
 				// Special handling for assignment
 				if len(rest) != 2 {
 					return nil, fmt.Errorf("= requires exactly two arguments")
