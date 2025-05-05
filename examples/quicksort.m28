@@ -1,0 +1,47 @@
+# Quicksort implementation in M28
+# This demonstrates a classic divide-and-conquer sorting algorithm
+
+# Function to filter a list based on a predicate
+(def (filter pred lst)
+  (if (= lst [])
+      []
+      (if (pred (nth lst 0))
+          (+ [(nth lst 0)] (filter pred (slice lst 1)))
+          (filter pred (slice lst 1)))))
+
+# Quicksort implementation using filter and recursion
+(def (quicksort lst)
+  (if (= lst [])
+      []
+      (begin
+        # Take the first element as pivot
+        (= pivot (nth lst 0))
+        (= rest (slice lst 1))
+        
+        # Divide list into elements less than pivot and elements greater or equal
+        (= less (filter (lambda (x) (< x pivot)) rest))
+        (= greater (filter (lambda (x) (>= x pivot)) rest))
+        
+        # Combine sorted sublists with pivot in the middle
+        (+ (quicksort less) [pivot] (quicksort greater)))))
+
+# Test the quicksort function
+(= test-list [5, 2, 9, 1, 7, 6, 3])
+(print "Original list:")
+(print test-list)
+(print "Sorted list:")
+(print (quicksort test-list))
+
+# Test with other examples
+(= numbers [42, 13, 7, 1, 100, 56, 24, 37, 21])
+(print "\nSorting another list:")
+(print "Original:" numbers)
+(print "Sorted:" (quicksort numbers))
+
+# Test with edge cases
+(print "\nEdge cases:")
+(print "Empty list:" (quicksort []))
+(print "Single element:" (quicksort [42]))
+(print "Already sorted:" (quicksort [1, 2, 3, 4, 5]))
+(print "Reverse sorted:" (quicksort [5, 4, 3, 2, 1]))
+(print "Duplicates:" (quicksort [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]))

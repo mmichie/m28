@@ -1,0 +1,40 @@
+(define-macro delay
+  (lambda (expr)
+    `(lambda () ,expr)))
+
+(define force
+  (lambda (delayed-expr)
+    (delayed-expr)))
+
+(define cons-stream
+  (lambda (head tail)
+    (cons head (delay tail))))
+
+(define head car)
+(define tail
+  (lambda (stream)
+    (force (cdr stream))))
+
+(define take
+  (lambda (n stream)
+    (if (= n 0)
+        '()
+        (cons (head stream)
+              (take (- n 1) (tail stream))))))
+
+(define integers-from
+  (lambda (n)
+    (cons-stream n (integers-from (+ n 1)))))
+
+(print "First 10 integers:")
+(print (take 10 (integers-from 0)))
+
+(define fibs
+  (cons-stream 0
+               (cons-stream 1
+                            (map +
+                                 fibs
+                                 (tail fibs)))))
+
+(print "First 10 Fibonacci numbers:")
+(print (take 10 fibs))

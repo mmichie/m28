@@ -16,6 +16,15 @@ Or you can start the REPL and load an example:
 make run
 ```
 
+## Comprehensive Tutorials
+
+This directory includes several comprehensive tutorials to help you learn the language:
+
+- **counter_tutorial.m28**: A complete guide to implementing counters and state management
+- **closure_tutorial.m28**: Learn about closures, from basics to advanced patterns
+- **object_tutorial.m28**: Object-oriented programming techniques in M28
+- **dictionary_tutorial.m28**: Complete guide to dictionary operations
+
 ## Categories of Examples
 
 ### Basic Language Features
@@ -52,8 +61,10 @@ make run
 
 ### Algorithms
 
+- **quicksort.m28**: Quicksort implementation
 - **bubblesort.m28**: Bubble sort implementation
 - **tree_traversal.m28**: Tree traversal algorithms
+- **trie.m28**: Trie data structure implementation
 - **memoization.m28**: Function memoization pattern
 
 ## Learning Path
@@ -64,8 +75,9 @@ If you're new to M28, we recommend exploring the examples in this order:
 2. Move to **simple_add.m28** and **simple_function.m28** for basic operations
 3. Try **simple_list.m28** and **dict_operations_simple.m28** to learn about data structures
 4. Explore **simple_lambda.m28** for functional programming concepts
-5. Study **simple_objects.m28** and **working_closures.m28** for object-oriented patterns
-6. Look at **tree_traversal.m28** and other algorithm implementations for advanced usage
+5. Study the **counter_tutorial.m28** and **closure_tutorial.m28** to understand state management
+6. Progress to **object_tutorial.m28** for object-oriented patterns
+7. Examine the algorithm implementations like **quicksort.m28** and **trie.m28** for advanced usage
 
 ## Syntax Comparison
 
