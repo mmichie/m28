@@ -28,6 +28,9 @@ func init() {
 		"define": EvalDef, // Also add 'define' as an alias for 'def'
 		"class":  EvalClass,
 		"lambda": EvalLambdaPython,
+		
+		// Object Oriented Programming
+		".":      EvalDot, // Dot notation for method access
 
 		// Module Management
 		"import": EvalImport,
@@ -39,6 +42,7 @@ func init() {
 		// Variable Scope
 		"global":   EvalGlobal,
 		"nonlocal": EvalNonlocal,
+		"let":      EvalLet,
 
 		// Misc
 		"with":   EvalWith,

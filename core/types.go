@@ -12,6 +12,11 @@ import (
 // LispValue represents any Lisp value
 type LispValue interface{}
 
+// Applicable represents a value that can be applied to arguments (function-like)
+type Applicable interface {
+	Apply(Evaluator, []LispValue, Environment) (LispValue, error)
+}
+
 // LispSymbol represents a Lisp symbol
 type LispSymbol string
 
@@ -43,6 +48,45 @@ type PythonicBool bool
 // PythonicNone represents Python's None value
 type PythonicNone struct{}
 
+// Exception represents a base exception
+type Exception struct {
+	Message string
+	Type    string
+}
+
+// String returns the string representation of an exception
+func (e Exception) String() string {
+	return fmt.Sprintf("%s: %s", e.Type, e.Message)
+}
+
+// Error makes Exception implement the error interface
+func (e *Exception) Error() string {
+	return e.String()
+}
+
+// IsExceptionOfType checks if an error is an exception of the given type
+func IsExceptionOfType(err error, typeName string) bool {
+	if exception, ok := err.(*Exception); ok {
+		return exception.Type == typeName
+	}
+	return false
+}
+
+// StandardExceptions defines the standard exception types
+var StandardExceptions = map[string]*Exception{
+	"Exception":           {Type: "Exception", Message: ""},
+	"ValueError":          {Type: "ValueError", Message: ""},
+	"TypeError":           {Type: "TypeError", Message: ""},
+	"IndexError":          {Type: "IndexError", Message: ""},
+	"KeyError":            {Type: "KeyError", Message: ""},
+	"NameError":           {Type: "NameError", Message: ""},
+	"ZeroDivisionError":   {Type: "ZeroDivisionError", Message: ""},
+	"AssertionError":      {Type: "AssertionError", Message: ""},
+	"RuntimeError":        {Type: "RuntimeError", Message: ""},
+	"IOError":             {Type: "IOError", Message: ""},
+	"FileNotFoundError":   {Type: "FileNotFoundError", Message: ""},
+}
+
 // PythonicSet represents a Python-style set
 type PythonicSet struct {
 	data map[LispValue]struct{}
@@ -58,6 +102,22 @@ type Environment interface {
 	NewEnvironment(outer Environment) Environment
 	String() string
 	StringWithDepth(depth int) string
+}
+
+// ContextManager interface defines the methods for the context manager protocol
+type ContextManager interface {
+	Enter() (LispValue, error)     // __enter__ method
+	Exit(exc LispValue) error      // __exit__ method
+}
+
+// Generator represents a generator function that can be resumed and yield values
+type Generator struct {
+	Function     *Lambda     // Generator function
+	Args         []LispValue // Arguments to the generator function
+	State        Environment // Current state environment
+	IsDone       bool        // Flag indicating if the generator is exhausted
+	CurrentValue LispValue   // Last yielded value
+	IsStarted    bool        // Flag indicating if the generator has been started
 }
 
 // Evaluator interface defines the methods for evaluating Lisp expressions

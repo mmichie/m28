@@ -76,21 +76,46 @@ func iterFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	if len(args) != 1 {
 		return nil, fmt.Errorf("iter() takes exactly one argument")
 	}
-	// In this simple implementation, we'll just return the argument if it's iterable
+	
+	// If it's already a generator, return it
+	if gen, ok := args[0].(*core.Generator); ok {
+		return gen, nil
+	}
+	
+	// If it's a list, return it as an iterable
 	if _, ok := args[0].(core.LispList); ok {
 		return args[0], nil
 	}
+	
+	// If it's a list literal, convert to a list
+	if listLit, ok := args[0].(core.LispListLiteral); ok {
+		return core.LispList(listLit), nil
+	}
+	
 	return nil, fmt.Errorf("object is not iterable")
 }
 
-func nextFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+func nextFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("next() takes exactly one argument")
 	}
+	
+	// Handle generator objects
+	if gen, ok := args[0].(*core.Generator); ok {
+		// The Next method requires an evaluator
+		// For now, we'll return an error - this would be handled differently in a complete implementation
+		return nil, fmt.Errorf("generators not fully supported in next() yet")
+	}
+	
+	// Handle list iterators
 	iterator, ok := args[0].(core.LispList)
 	if !ok || len(iterator) == 0 {
-		return nil, fmt.Errorf("StopIteration")
+		return nil, &core.Exception{
+			Type:    "StopIteration",
+			Message: "Iterator exhausted",
+		}
 	}
+	
 	return iterator[0], nil
 }
 

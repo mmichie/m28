@@ -9,6 +9,7 @@ import (
 func RegisterIOBuiltins() {
 	core.RegisterBuiltin("input", inputFunc)
 	core.RegisterBuiltin("print", printFunc)
+	core.RegisterBuiltin("open", openFunc)
 }
 
 func inputFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -68,4 +69,34 @@ func printFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 	fmt.Print(end)
 
 	return core.PythonicNone{}, nil
+}
+
+// openFunc creates a file context manager for use with with statements
+func openFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) < 1 {
+		return nil, &core.Exception{
+			Type:    "TypeError",
+			Message: "open() requires at least a filename",
+		}
+	}
+
+	// Get the filename
+	filename, ok := args[0].(string)
+	if !ok {
+		return nil, &core.Exception{
+			Type:    "TypeError",
+			Message: "filename must be a string",
+		}
+	}
+
+	// Get the mode (default to "r")
+	mode := "r"
+	if len(args) >= 2 {
+		if modeArg, ok := args[1].(string); ok {
+			mode = modeArg
+		}
+	}
+
+	// Create and return a new file context manager
+	return core.NewFileContextManager(filename, mode), nil
 }
