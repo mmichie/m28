@@ -18,7 +18,8 @@
   (= current trie)
   
   # Traverse the trie character by character
-  (for (i (range (len word)))
+  (= i 0)
+  (while (< i (len word))
     (= char (nth word i))
     (= children (get current "children"))
     
@@ -30,15 +31,17 @@
       (begin
         (= child (make-trie-node char))
         # Add the new node to children
-        (= children (dict (+ (dict.items children) [[char, child]])))
+        (= new_children (dict))
+        (= new_children (dict char child))
         (= current (dict 
           "value" (get current "value")
-          "children" children
+          "children" new_children
           "is_end_of_word" (get current "is_end_of_word")))
       ))
     
     # Move to the child node
-    (= current child))
+    (= current child)
+    (= i (+ i 1)))
   
   # Mark the current node as the end of a word
   (= current (dict
@@ -54,14 +57,17 @@
   (= current trie)
   
   # Traverse the trie character by character
-  (for (i (range (len word)))
+  (= i 0)
+  (while (< i (len word))
     (= char (nth word i))
     (= children (get current "children"))
     (= current (get children char None))
     
     # If character not found, word doesn't exist
     (if (= current None)
-      (return False)))
+      (return False))
+    
+    (= i (+ i 1)))
   
   # Check if this is a complete word
   (get current "is_end_of_word"))
@@ -72,43 +78,46 @@
   (= current trie)
   
   # Traverse the trie character by character
-  (for (i (range (len prefix)))
+  (= i 0)
+  (while (< i (len prefix))
     (= char (nth prefix i))
     (= children (get current "children"))
     (= current (get children char None))
     
     # If character not found, prefix doesn't exist
     (if (= current None)
-      (return False)))
+      (return False))
+    
+    (= i (+ i 1)))
   
   # Reached the end of prefix
   True)
 
 # Test the trie implementation
-(= my-trie (make-trie))
-(= my-trie (trie-insert my-trie "hello"))
-(= my-trie (trie-insert my-trie "hell"))
-(= my-trie (trie-insert my-trie "heaven"))
-(= my-trie (trie-insert my-trie "hi"))
+(= my_trie (make-trie))
+(= my_trie (trie-insert my_trie "hello"))
+(= my_trie (trie-insert my_trie "hell"))
+(= my_trie (trie-insert my_trie "heaven"))
+(= my_trie (trie-insert my_trie "hi"))
 
 (print "==== Trie Test ====")
-(print "Search for 'hello':" (trie-search my-trie "hello"))
-(print "Search for 'hell':" (trie-search my-trie "hell"))
-(print "Search for 'help':" (trie-search my-trie "help"))
-(print "Search for 'hi':" (trie-search my-trie "hi"))
+(print "Search for 'hello':" (trie-search my_trie "hello"))
+(print "Search for 'hell':" (trie-search my_trie "hell"))
+(print "Search for 'help':" (trie-search my_trie "help"))
+(print "Search for 'hi':" (trie-search my_trie "hi"))
 
 (print "\nPrefix tests:")
-(print "Words starting with 'h':" (trie-starts-with my-trie "h"))
-(print "Words starting with 'he':" (trie-starts-with my-trie "he"))
-(print "Words starting with 'hel':" (trie-starts-with my-trie "hel"))
-(print "Words starting with 'hex':" (trie-starts-with my-trie "hex"))
+(print "Words starting with 'h':" (trie-starts-with my_trie "h"))
+(print "Words starting with 'he':" (trie-starts-with my_trie "he"))
+(print "Words starting with 'hel':" (trie-starts-with my_trie "hel"))
+(print "Words starting with 'hex':" (trie-starts-with my_trie "hex"))
 
 (print "\nAdding more words...")
-(= my-trie (trie-insert my-trie "world"))
-(= my-trie (trie-insert my-trie "work"))
-(= my-trie (trie-insert my-trie "word"))
+(= my_trie (trie-insert my_trie "world"))
+(= my_trie (trie-insert my_trie "work"))
+(= my_trie (trie-insert my_trie "word"))
 
-(print "Search for 'world':" (trie-search my-trie "world"))
-(print "Search for 'work':" (trie-search my-trie "work"))
-(print "Search for 'worm':" (trie-search my-trie "worm"))
-(print "Words starting with 'wo':" (trie-starts-with my-trie "wo"))
+(print "Search for 'world':" (trie-search my_trie "world"))
+(print "Search for 'work':" (trie-search my_trie "work"))
+(print "Search for 'worm':" (trie-search my_trie "worm"))
+(print "Words starting with 'wo':" (trie-starts-with my_trie "wo"))

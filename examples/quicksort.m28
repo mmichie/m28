@@ -2,12 +2,12 @@
 # This demonstrates a classic divide-and-conquer sorting algorithm
 
 # Function to filter a list based on a predicate
-(def (filter pred lst)
+(def (filter-list pred lst)
   (if (= lst [])
       []
       (if (pred (nth lst 0))
-          (+ [(nth lst 0)] (filter pred (slice lst 1)))
-          (filter pred (slice lst 1)))))
+          (+ [(nth lst 0)] (filter-list pred (slice lst 1)))
+          (filter-list pred (slice lst 1)))))
 
 # Quicksort implementation using filter and recursion
 (def (quicksort lst)
@@ -19,18 +19,18 @@
         (= rest (slice lst 1))
         
         # Divide list into elements less than pivot and elements greater or equal
-        (= less (filter (lambda (x) (< x pivot)) rest))
-        (= greater (filter (lambda (x) (>= x pivot)) rest))
+        (= less (filter-list (lambda (x) (< x pivot)) rest))
+        (= greater (filter-list (lambda (x) (>= x pivot)) rest))
         
         # Combine sorted sublists with pivot in the middle
         (+ (quicksort less) [pivot] (quicksort greater)))))
 
 # Test the quicksort function
-(= test-list [5, 2, 9, 1, 7, 6, 3])
+(= test_list [5, 2, 9, 1, 7, 6, 3])
 (print "Original list:")
-(print test-list)
+(print test_list)
 (print "Sorted list:")
-(print (quicksort test-list))
+(print (quicksort test_list))
 
 # Test with other examples
 (= numbers [42, 13, 7, 1, 100, 56, 24, 37, 21])
