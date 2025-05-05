@@ -1,0 +1,62 @@
+# Explicit object system
+# Using manual environment tracking for object state
+
+# Person factory with explicit environment
+(def (make-person name age)
+  # Create an environment dictionary
+  (= env (dict 
+    "name" name
+    "age" age
+    "birthdays" 0
+    "friends" []))
+  
+  # Return a dispatch function
+  (lambda (op)
+    (if (== op "name")
+      # Get name
+      (get env "name")
+      
+      (if (== op "age")
+        # Get age
+        (get env "age")
+        
+        (if (== op "birthday")
+          # Have a birthday
+          (begin
+            # Update environment
+            (= env (dict 
+              "name" (get env "name")
+              "age" (+ (get env "age") 1)
+              "birthdays" (+ (get env "birthdays") 1)
+              "friends" (get env "friends")))
+            # Return message
+            (+ (get env "name") " is now " (str (get env "age")) " years old!"))
+          
+          (if (== op "info")
+            # Get info
+            env
+            
+            "unknown"))))))
+
+# Create people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test operations
+(print "Alice's name: " (alice "name"))
+(print "Alice's age: " (alice "age"))
+(print "Bob's name: " (bob "name"))
+(print "Bob's age: " (bob "age"))
+
+# Test birthdays
+(print (alice "birthday"))
+(print (alice "birthday"))
+(print "Alice's age after birthdays: " (alice "age"))
+
+# Test bob's birthday
+(print (bob "birthday"))
+(print "Bob's age after birthday: " (bob "age"))
+
+# Get full info
+(print "Alice's info: " (alice "info"))
+(print "Bob's info: " (bob "info"))

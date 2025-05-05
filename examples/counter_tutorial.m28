@@ -1,0 +1,175 @@
+# Counter Tutorial
+# A progressive guide to implementing counters with closures in M28
+
+#####################################################
+# 1. Basic Counter - Simple State with Closures
+#####################################################
+
+(print "\n=== 1. Basic Counter ===")
+(print "A simple counter using closures for state")
+
+# Create a counter factory function
+(def (make-basic-counter)
+  # Private state
+  (= count 0)
+  
+  # Return function captures and modifies count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two counter instances
+(= basic1 (make-basic-counter))
+(= basic2 (make-basic-counter))
+
+# Test the counters
+(print "Counter 1, first call: " (basic1))
+(print "Counter 1, second call: " (basic1))
+(print "Counter 2, first call: " (basic2))
+(print "Counter 1, third call: " (basic1))
+
+(print "Note: Each counter has its own state, as they should!")
+
+#####################################################
+# 2. Counter with Multiple Operations
+#####################################################
+
+(print "\n=== 2. Counter with Multiple Operations ===")
+(print "A counter that supports multiple operations via a dispatch function")
+
+(def (make-multi-counter)
+  # Private state
+  (= count 0)
+  
+  # Return a dispatch function that handles different operations
+  (lambda (operation)
+    (if (= operation "increment")
+        (begin (= count (+ count 1)) count)
+        (if (= operation "decrement")
+            (begin (= count (- count 1)) count)
+            (if (= operation "reset")
+                (begin (= count 0) count)
+                (if (= operation "current")
+                    count
+                    (error (+ "Unknown operation: " operation))))))))
+
+# Create a counter
+(= multi1 (make-multi-counter))
+
+# Test the counter operations
+(print "Initial value: " (multi1 "current"))
+(print "After increment: " (multi1 "increment"))
+(print "After increment again: " (multi1 "increment"))
+(print "After decrement: " (multi1 "decrement"))
+(print "Current value: " (multi1 "current"))
+(print "After reset: " (multi1 "reset"))
+(print "Current value again: " (multi1 "current"))
+
+#####################################################
+# 3. Object-Style Counter (Dictionary of Methods)
+#####################################################
+
+(print "\n=== 3. Object-Style Counter ===")
+(print "A counter implemented as an object with methods in a dictionary")
+
+# Create a counter factory
+(def (make-counter-object)
+  # Private state
+  (= count 0)
+  
+  # Method to increment
+  (def (increment)
+    (= count (+ count 1))
+    count)
+  
+  # Method to decrement
+  (def (decrement)
+    (= count (- count 1))
+    count)
+  
+  # Method to reset
+  (def (reset)
+    (= count 0)
+    count)
+  
+  # Method to get current value
+  (def (current)
+    count)
+  
+  # Return a dictionary of methods
+  (dict "increment" increment
+       "decrement" decrement
+       "reset" reset
+       "current" current))
+
+# Create two counters
+(= counter1 (make-counter-object))
+(= counter2 (make-counter-object))
+
+# Test counter1
+(print "Counter 1 initial value: " ((get counter1 "current")))
+(print "Counter 1 increment: " ((get counter1 "increment")))
+(print "Counter 1 increment: " ((get counter1 "increment")))
+(print "Counter 1 current value: " ((get counter1 "current")))
+
+# Test counter2
+(print "Counter 2 initial value: " ((get counter2 "current")))
+(print "Counter 2 increment: " ((get counter2 "increment")))
+(print "Counter 2 decrement: " ((get counter2 "decrement")))
+(print "Counter 2 current value: " ((get counter2 "current")))
+
+# Test counter1 again to verify separate state
+(print "Counter 1 current value (still): " ((get counter1 "current")))
+
+#####################################################
+# 4. Advanced Counter with Custom Methods
+#####################################################
+
+(print "\n=== 4. Advanced Counter ===")
+(print "A counter with custom methods like increment-by")
+
+(def (make-advanced-counter)
+  # Private state
+  (= count 0)
+  
+  # Method to increment by a specific amount
+  (def (increment-by amount)
+    (= count (+ count amount))
+    count)
+  
+  # Method to increment
+  (def (increment)
+    (increment-by 1))
+  
+  # Method to decrement
+  (def (decrement)
+    (increment-by -1))
+  
+  # Method to multiply the current value
+  (def (multiply factor)
+    (= count (* count factor))
+    count)
+  
+  # Method to get current value
+  (def (current)
+    count)
+  
+  # Return a dictionary of methods
+  (dict "increment" increment
+       "decrement" decrement
+       "increment-by" increment-by
+       "multiply" multiply
+       "current" current))
+
+# Create a counter
+(= advanced (make-advanced-counter))
+
+# Test the advanced features
+(print "Initial value: " ((get advanced "current")))
+(print "After increment: " ((get advanced "increment")))
+(print "After increment-by 5: " ((get advanced "increment-by") 5))
+(print "After multiply by 2: " ((get advanced "multiply") 2))
+(print "After decrement: " ((get advanced "decrement")))
+(print "Final value: " ((get advanced "current")))
+
+(print "\n=== Counter Tutorial Complete ===")

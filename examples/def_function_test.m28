@@ -1,0 +1,27 @@
+# Test function definition with def
+
+# Define a simple function
+(define (add a b)
+  (+ a b))
+
+# Test the function
+(print "2 + 3 =")
+(print (add 2 3))
+
+# Define a function with multiple statements
+(def (greet name)
+  (= message (+ "Hello, " name "!"))
+  message)
+
+# Test the function
+(print (greet "World"))
+
+# Define a function with default parameters
+(def (power base exponent)
+  (^ base exponent))
+
+# Test with different arguments
+(print "2^3 =")
+(print (power 2 3))
+(print "3^2 =")
+(print (power 3 2))

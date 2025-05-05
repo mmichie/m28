@@ -1,6 +1,6 @@
 (print "Testing Lambda Functions")
 
-; Simple lambda syntax for Python version
+# Simple lambda syntax for Python version
 (= add (lambda (a b) (+ a b)))
 
 (print "2 + 3:")

@@ -1,0 +1,20 @@
+# Test simple lambdas with different operations
+(print "Testing lambda functions with different operations")
+
+# Addition lambda
+(= add-lambda (lambda (a b) (+ a b)))
+(print "Addition lambda (2 + 3):")
+(print (add-lambda 2 3))
+
+# String concatenation lambda
+(= concat-lambda (lambda (a b) (+ a b)))
+(print "String concat lambda (\"Hello, \" + \"World\"):")
+(print (concat-lambda "Hello, " "World"))
+
+# Direct addition
+(print "Direct addition:")
+(print (+ 2 3))
+
+# Direct string concatenation
+(print "Direct string concatenation:")
+(print (+ "Hello, " "World"))

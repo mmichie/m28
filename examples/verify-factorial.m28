@@ -1,0 +1,16 @@
+# Factorial function example from documentation
+(print "\n===== Testing Factorial Example =====\n")
+
+# Define the factorial function
+(def (factorial n)
+  (if (<= n 1)
+      1
+      (* n (factorial (- n 1)))))
+
+# Test with different values
+(print "factorial(0) =" (factorial 0))  # Should be 1
+(print "factorial(1) =" (factorial 1))  # Should be 1
+(print "factorial(5) =" (factorial 5))  # Should be 120
+(print "factorial(10) =" (factorial 10))  # Should be 3628800
+
+(print "\n===== Factorial Tests Complete =====\n")

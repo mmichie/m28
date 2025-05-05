@@ -1,0 +1,46 @@
+# Counter object example
+# This demonstrates closure and state-keeping in a clean way
+
+# Create a counter factory
+(def (make-counter)
+  # Private state
+  (= count 0)
+  
+  # Method to increment
+  (def (increment)
+    (= count (+ count 1))
+    count)
+  
+  # Method to decrement
+  (def (decrement)
+    (= count (- count 1))
+    count)
+  
+  # Method to get current value
+  (def (current)
+    count)
+  
+  # Return a dictionary of methods
+  (dict "increment" increment
+       "decrement" decrement
+       "current" current))
+
+# Create two counters
+(print "Creating counters...")
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+# Test counter1
+(print "Counter 1 initial value: " ((get counter1 "current")))
+(print "Counter 1 increment: " ((get counter1 "increment")))
+(print "Counter 1 increment: " ((get counter1 "increment")))
+(print "Counter 1 current value: " ((get counter1 "current")))
+
+# Test counter2
+(print "Counter 2 initial value: " ((get counter2 "current")))
+(print "Counter 2 increment: " ((get counter2 "increment")))
+(print "Counter 2 decrement: " ((get counter2 "decrement")))
+(print "Counter 2 current value: " ((get counter2 "current")))
+
+# Test counter1 again to verify separate state
+(print "Counter 1 current value: " ((get counter1 "current")))

@@ -1,0 +1,27 @@
+# Isolated counter example
+# Testing if we can get proper closure behavior
+
+# Function to create a counter
+(def (make-counter)
+  # Local state
+  (= count 0)
+  
+  # Return a function that closes over count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create and test first counter
+(= counter1 (make-counter))
+(print "Counter 1 call 1: " (counter1))
+(print "Counter 1 call 2: " (counter1))
+(print "Counter 1 call 3: " (counter1))
+
+# Create and test a second counter
+(= counter2 (make-counter))
+(print "Counter 2 call 1: " (counter2))
+(print "Counter 2 call 2: " (counter2))
+
+# Test first counter again
+(print "Counter 1 final call: " (counter1))
+(print "Done!")

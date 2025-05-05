@@ -1,0 +1,72 @@
+# Testing variable arguments in closures
+
+# A function that accepts an operation and any number of arguments
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  (= friends [])
+  
+  # Create a dispatcher that takes *exactly* one argument
+  # The argument is the operation name
+  (def (dispatch op)
+    (if (== op "name")
+      # Return the name
+      person-name
+      
+      (if (== op "age")
+        # Return the age
+        person-age
+        
+        (if (== op "birthday") 
+          # Have a birthday
+          (begin
+            (= person-age (+ person-age 1))
+            (+ person-name " is now " (str person-age) " years old!"))
+          
+          (if (== op "info")
+            # Return info dict
+            (dict "name" person-name "age" person-age)
+            
+            # Unknown operation
+            "unknown operation")))))
+  
+  # Return the dispatcher function
+  dispatch)
+
+# Testing with single-argument methods
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Testing basics
+(print "Alice name: " (alice "name"))
+(print "Alice age: " (alice "age"))
+(print "Bob name: " (bob "name"))
+(print "Bob age: " (bob "age"))
+
+# Testing birthday operation
+(print (alice "birthday"))
+(print (alice "birthday"))
+(print "Alice's age is now: " (alice "age"))
+
+# Testing info operation
+(print "Alice info: " (alice "info"))
+(print "Bob info: " (bob "info"))
+
+# Separate counter test to verify our closure fix works correctly
+(def (make-counter)
+  (= count 0)
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two counters
+(= c1 (make-counter))
+(= c2 (make-counter))
+
+# Test counters
+(print "Counter 1 first call: " (c1))
+(print "Counter 2 first call: " (c2))
+(print "Counter 1 second call: " (c1))
+(print "Counter 2 second call: " (c2))
+(print "Counter 1 third call: " (c1))

@@ -1,0 +1,36 @@
+# Closure test
+# Tests if closure state is properly maintained
+
+# Create a counter function
+(def (make-counter)
+  # Private state
+  (= count 0)
+  
+  # Return a function that keeps track of count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two counter instances
+(= c1 (make-counter))
+(= c2 (make-counter))
+
+# Test counters alternately to verify separate state
+(print "c1 call 1: " (c1))
+(print "c2 call 1: " (c2))
+(print "c1 call 2: " (c1))
+(print "c2 call 2: " (c2))
+(print "c1 call 3: " (c1))
+
+# The expected output should be:
+# c1 call 1: 1
+# c2 call 1: 1
+# c1 call 2: 2
+# c2 call 2: 2
+# c1 call 3: 3
+
+# Make another counter to test that the function definition still works
+(= c3 (make-counter))
+(print "c3 call 1: " (c3))
+
+# This should output: c3 call 1: 1

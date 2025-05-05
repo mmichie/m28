@@ -1,0 +1,77 @@
+# Simple objects implementation for M28
+# Using only the features that are reliably working
+
+# This example demonstrates how to create simple objects with state
+# using the closure capabilities that work well in M28
+
+# 1. COUNTER EXAMPLE
+# This is the simplest form of stateful object
+
+# Create a counter factory
+(def (make-counter)
+  # Private state
+  (= count 0)
+  
+  # Return a function that both increments and returns the count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two independent counters
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+# Test the counters
+(print "Counter 1 first call: " (counter1))   # Should return 1
+(print "Counter 1 second call: " (counter1))  # Should return 2
+(print "Counter 2 first call: " (counter2))   # Should return 1
+(print "Counter 1 third call: " (counter1))   # Should return 3
+
+# This works because:
+# 1. Each call to make-counter creates a new environment
+# 2. The lambda captures this environment and the count variable
+# 3. Subsequent calls to the lambda update and return count
+
+# 2. DATA CONTAINER EXAMPLE
+# For objects that need to store and retrieve multiple pieces of data
+
+# Create a person data container
+(def (make-person name age)
+  # This approach stores state in a dictionary
+  (= data (dict "name" name "age" age))
+  
+  # Return a reader function that gets data by key
+  (lambda (key)
+    (get data key)))
+
+# Create two people
+(= person1 (make-person "Alice" 30))
+(= person2 (make-person "Bob" 25))
+
+# Test data access
+(print "Person 1 name: " (person1 "name"))
+(print "Person 1 age: " (person1 "age"))
+(print "Person 2 name: " (person2 "name"))
+(print "Person 2 age: " (person2 "age"))
+
+# 3. SINGLE OPERATION EXAMPLE
+# For objects that need to perform one type of operation with state
+
+# Create a temperature converter
+(def (make-temperature-converter)
+  # Keep track of the last conversion
+  (= last-input 0)
+  (= last-output 0)
+  
+  # Return a function that does one thing
+  (lambda (fahrenheit)
+    (= last-input fahrenheit)
+    (= last-output (/ (* (- fahrenheit 32) 5) 9))
+    last-output))
+
+# Create a converter
+(= convert (make-temperature-converter))
+
+# Do some conversions
+(print "32°F in Celsius: " (convert 32))  # Should be 0
+(print "212°F in Celsius: " (convert 212))  # Should be 100

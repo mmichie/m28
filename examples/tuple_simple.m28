@@ -1,0 +1,16 @@
+# Simple tuple test
+(= empty_tuple ())
+(print "Empty tuple:" empty_tuple)
+
+(= single_element_tuple (1,))
+(print "Single element tuple:" single_element_tuple)
+
+(= simple_tuple (1, 2, 3))
+(print "Simple tuple:" simple_tuple)
+
+# Test tuple access
+(print "First element:" (nth simple_tuple 0))
+(print "Second element:" (nth simple_tuple 1))
+
+# Test tuple operations
+(print "Tuple length:" (len simple_tuple))

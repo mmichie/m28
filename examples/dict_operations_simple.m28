@@ -1,0 +1,40 @@
+# Example of using dictionary operations in M28 (simplified)
+(print "=== Dictionary Operations Example (Simplified) ===")
+
+# Creating dictionaries
+(print "\nCreating dictionaries:")
+(= empty_dict (dict))
+(= person (dict "name" "John" "age" 30 "city" "New York"))
+(= counts (dict "a" 1 "b" 2 "c" 3))
+
+(print "Empty dictionary:" empty_dict)
+(print "Person dictionary:" person)
+(print "Counts dictionary:" counts)
+
+# Basic dictionary operations
+(print "\nBasic operations:")
+(print "Size of person dict:" (len person))
+(print "person[\"name\"]:" (get person "name"))
+(print "Get with default:" (get person "country" "Unknown"))
+
+# Remove the more advanced methods section
+(print "\nDictionary content:")
+(print "Value for 'name':" (get person "name"))
+(print "Value for 'age':" (get person "age"))
+
+# Modifying dictionaries by reassignment
+(print "\nModifying dictionaries:")
+(= user (dict "username" "jsmith" "active" True))
+(print "Original user:" user)
+(= user (dict "username" "jsmith" "active" False "email" "jsmith@example.com"))
+(print "After update:" user)
+
+# Nested dictionaries
+(print "\nNested dictionaries:")
+(= config (dict
+  "server" (dict "host" "localhost" "port" 8080)
+  "database" (dict "host" "db.example.com" "port" 5432 "user" "admin")
+))
+(print "Config:" config)
+(print "Server host:" (get (get config "server") "host"))
+(print "Database port:" (get (get config "database") "port"))

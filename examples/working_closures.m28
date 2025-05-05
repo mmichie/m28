@@ -1,0 +1,71 @@
+# Working closures example
+# This demonstrates complex closures with proper method dispatch
+
+# A person factory that creates people with properties and methods
+(def (make-person name age)
+  # Private person state
+  (= birthdays 0)
+  (= friends [])
+  
+  # Method to have a birthday
+  (def (celebrate-birthday)
+    (= birthdays (+ birthdays 1))
+    (= age (+ age 1))
+    (+ name " is now " (str age) " years old!"))
+  
+  # Method to add a friend
+  (def (add-friend friend)
+    (= friends (+ friends [friend]))
+    (+ name " is now friends with " friend "!"))
+  
+  # Method to list all friends
+  (def (list-friends)
+    (if (== (len friends) 0)
+      (+ name " has no friends yet.")
+      (+ name "'s friends: " (str friends))))
+  
+  # Method to get person info
+  (def (get-info)
+    (= info (dict 
+      "name" name 
+      "age" age 
+      "birthdays" birthdays 
+      "friends_count" (len friends)))
+    info)
+  
+  # Return a dictionary with methods
+  (dict
+    "birthday" celebrate-birthday
+    "add-friend" add-friend
+    "friends" list-friends
+    "info" get-info))
+
+# Create a few people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+(= charlie (make-person "Charlie" 40))
+
+# Test methods - we need to retrieve and call the functions manually
+(print "Initial info:")
+(print "Alice: " ((get alice "info")))
+(print "Bob: " ((get bob "info")))
+
+# Have some birthdays
+(print ((get alice "birthday")))
+(print ((get alice "birthday")))
+(print ((get bob "birthday")))
+
+# Add some friends
+(print ((get alice "add-friend") "Bob"))
+(print ((get alice "add-friend") "Charlie"))
+(print ((get bob "add-friend") "Alice"))
+
+# Check updated info
+(print "Updated info:")
+(print "Alice: " ((get alice "info")))
+(print "Bob: " ((get bob "info")))
+
+# List friends
+(print ((get alice "friends")))
+(print ((get bob "friends")))
+(print ((get charlie "friends")))

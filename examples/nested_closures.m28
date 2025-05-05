@@ -1,0 +1,22 @@
+# Basic counter example
+(def (make-counter)
+  (= count 0)
+  (def (counter)
+    (= count (+ count 1))
+    (return count))
+  (return counter))
+
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+(print "Counter 1:")
+(print (counter1))
+(print (counter1))
+(print (counter1))
+
+(print "Counter 2:")
+(print (counter2))
+(print (counter2))
+
+(print "Counter 1 again:")
+(print (counter1))

@@ -1,0 +1,47 @@
+# Comprehensive tuple operations example
+
+# Basic tuple creation
+(print "\n=== Tuple Creation ===")
+(= empty_tuple ())
+(= single_tuple (1,))
+(= numbers_tuple (1, 2, 3, 4, 5))
+(= mixed_tuple (1, "two", 3.0, True, None))
+(= nested_tuple (1, (2, 3), [4, 5], {"key": "value"}))
+
+(print "Empty tuple:" empty_tuple)
+(print "Single element tuple:" single_tuple)
+(print "Numbers tuple:" numbers_tuple)
+(print "Mixed tuple:" mixed_tuple)
+(print "Nested tuple:" nested_tuple)
+
+# Tuple access
+(print "\n=== Tuple Access ===")
+(print "First element of numbers_tuple:" (nth numbers_tuple 0))
+(print "Second element of nested_tuple:" (nth nested_tuple 1))
+(print "Length of numbers_tuple:" (len numbers_tuple))
+
+# Tuple comparison
+(print "\n=== Tuple Comparison ===")
+(= tuple1 (1, 2, 3))
+(= tuple2 (1, 2, 3))
+(= tuple3 (4, 5, 6))
+(print "tuple1 == tuple2:" (eq? tuple1 tuple2))
+(print "tuple1 == tuple3:" (eq? tuple1 tuple3))
+(print "tuple1 < tuple3:" (< tuple1 tuple3))
+(print "tuple3 > tuple1:" (> tuple3 tuple1))
+
+# Tuple unpacking (if supported) - commented out
+# (print "\n=== Tuple Unpacking ===")
+# (= a, b, c (1, 2, 3))
+# (print "a:" a)
+# (print "b:" b)
+# (print "c:" c)
+
+# Tuple expressions
+(print "\n=== Tuple Expressions ===")
+(= calculated_tuple ((+ 1 2), (* 3 4), (/ 10 2)))
+(print "Calculated tuple:" calculated_tuple)
+
+# Tuple with function creation
+(= make_point (lambda (x y) (x, y)))
+(print "Point (3,4):" (make_point 3 4))

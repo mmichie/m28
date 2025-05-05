@@ -1,0 +1,11 @@
+(print "Simple list comprehension test")
+
+# Create a simple list
+(= numbers [1 2 3])
+(print "Original list:")
+(print numbers)
+
+# Try a simple comprehension with a plain variable reference
+(= doubled [x for x numbers])
+(print "Simple comprehension [x for x numbers]:")
+(print doubled)

@@ -1,0 +1,46 @@
+# Test basic tuple functionality
+
+# Define some tuples
+(= empty_tuple ())
+(= single_element_tuple (1,))
+(= simple_tuple (1, 2, 3))
+(= nested_tuple (1, (2, 3), [4, 5]))
+
+# Print tuples
+(print "Empty tuple:" empty_tuple)
+(print "Single element tuple:" single_element_tuple)
+(print "Simple tuple:" simple_tuple)
+(print "Nested tuple:" nested_tuple)
+
+# Test tuple elements
+(print "First element of simple_tuple:" (nth simple_tuple 0))
+(print "Second element of nested_tuple:" (nth nested_tuple 1))
+
+# Test tuple with expressions
+(= calculated_tuple ((+ 1 2), (* 3 4), (/ 10 2)))
+(print "Tuple with calculated elements:" calculated_tuple)
+
+# Test comparison
+(= tuple1 (1, 2, 3))
+(= tuple2 (1, 2, 3))
+(= tuple3 (4, 5, 6))
+(print "tuple1 == tuple2:" (eq? tuple1 tuple2))
+(print "tuple1 == tuple3:" (eq? tuple1 tuple3))
+
+# Test comparison operators with tuples
+(print "tuple1 < tuple3:" (< tuple1 tuple3))
+(print "tuple1 > tuple3:" (> tuple1 tuple3))
+
+# Define a function that returns a tuple
+(= make-tuple (lambda (a b c) (a, b, c)))
+(print "Tuple from function:" (make-tuple 10 20 30))
+
+# Test tuple length
+(print "Length of simple_tuple:" (len simple_tuple))
+(print "Length of empty_tuple:" (len empty_tuple))
+(print "Length of nested_tuple:" (len nested_tuple))
+
+# Test tuple unpacking (if implemented)
+# Uncomment if tuple unpacking is implemented
+# (= x, y, z (1, 2, 3))
+# (print "Unpacked values:" x y z)

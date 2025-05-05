@@ -1,0 +1,20 @@
+# Basic object test
+# This demonstrates a very simple object-like structure
+
+# Create a simple object with a few methods
+(= obj (dict))
+
+# Add a method directly
+(def (say-hello name)
+  (+ "Hello, " name "!"))
+
+# Add the method to the object
+(= obj (dict "greet" say-hello))
+
+# Test printing the object
+(print "Object: " obj)
+
+# Get the method from the object and call it
+(= greet-fn (get obj "greet"))
+(print "Method type: " (type greet-fn))
+(print "Result: " (greet-fn "World"))

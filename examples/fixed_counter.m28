@@ -1,0 +1,29 @@
+# Fixed counter example
+# Using plain lambdas to test closure state behavior
+
+# Function to create a counter
+(def (make-counter)
+  # Local state
+  (= count 0)
+  
+  # Return a function that closes over count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two counters
+(print "Creating counters...")
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+# Test counter1
+(print "Counter 1 call 1: " (counter1))
+(print "Counter 1 call 2: " (counter1))
+(print "Counter 1 call 3: " (counter1))
+
+# Test counter2
+(print "Counter 2 call 1: " (counter2))
+(print "Counter 2 call 2: " (counter2))
+
+# Test counter1 again
+(print "Counter 1 call 4: " (counter1))

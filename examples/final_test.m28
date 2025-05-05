@@ -1,0 +1,107 @@
+# Final test for closures and objects
+
+# Define a function that creates counter objects with a specified start value
+(def (make-counter start)
+  # Create a local counter variable initialized to the starting value
+  (= counter start)
+  
+  # Create an object with methods through a dispatch function
+  # This single function can handle different operations
+  (def (dispatch method)
+    (if (== method "increment")
+      # Increment method: increase and return counter
+      (begin
+        (= counter (+ counter 1))
+        counter)
+      
+      (if (== method "value")
+        # Value method: just return current counter value
+        counter
+        
+        (if (== method "decrement")
+          # Decrement method: decrease and return counter
+          (begin
+            (= counter (- counter 1))
+            counter)
+          
+          # Unknown method
+          "unknown method"))))
+  
+  # Return the dispatcher function, which acts as our object
+  dispatch)
+
+# Create two counter objects with different starting values
+(= counter1 (make-counter 0))
+(= counter2 (make-counter 100))
+
+# Test both counters
+(print "Counter1 initial: " (counter1 "value"))
+(print "Counter2 initial: " (counter2 "value"))
+
+# Increment counter1 twice
+(print "Counter1 increment: " (counter1 "increment"))
+(print "Counter1 increment again: " (counter1 "increment"))
+(print "Counter1 value now: " (counter1 "value"))
+
+# Increment counter2 once then decrement
+(print "Counter2 increment: " (counter2 "increment"))
+(print "Counter2 decrement: " (counter2 "decrement"))
+(print "Counter2 value now: " (counter2 "value"))
+
+# Check both counters again to show separate state
+(print "Counter1 final value: " (counter1 "value"))
+(print "Counter2 final value: " (counter2 "value"))
+
+# Create a person factory to demonstrate more complex objects
+(def (make-person name age)
+  # Private data for this person
+  (= person-name name)
+  (= person-age age)
+  (= birthdays 0)
+  
+  # Dispatch function to handle different operations
+  (def (dispatch op)
+    (if (== op "name")
+      # Return name
+      person-name
+      
+      (if (== op "age")
+        # Return age
+        person-age
+        
+        (if (== op "birthday")
+          # Have a birthday and return a message
+          (begin
+            (= birthdays (+ birthdays 1))
+            (= person-age (+ person-age 1))
+            (+ person-name " is now " (str person-age) " years old!"))
+          
+          (if (== op "info")
+            # Return a summary of the person
+            (+ person-name ", age " (str person-age) 
+               " has had " (str birthdays) " birthdays")
+            
+            # Unknown operation
+            "unknown operation")))))
+  
+  # Return the dispatch function as our person object
+  dispatch)
+
+# Create two people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test basic properties
+(print "Alice name: " (alice "name"))
+(print "Alice age: " (alice "age"))
+(print "Bob name: " (bob "name"))
+(print "Bob age: " (bob "age"))
+
+# Test birthdays
+(print (alice "birthday"))
+(print (alice "birthday"))
+(print (bob "birthday"))
+
+# Check final info
+(print "Alice info: " (alice "info"))
+(print "Bob info: " (bob "info"))

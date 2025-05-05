@@ -1,0 +1,49 @@
+# Fixed person example
+# Using direct function references instead of dictionary lookups
+
+# Create a person with a get-info function directly
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  (= friends [])
+  
+  # Function to get person info
+  (lambda ()
+    (= info (dict))
+    (= info (dict "name" person-name 
+                  "age" person-age 
+                  "friends" (len friends)))
+    
+    # Return the info dictionary
+    info))
+
+# Create people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Get info about people
+(print "Alice's info: " (alice))
+(print "Bob's info: " (bob))
+
+# Modified person with multiple operations
+(def (make-person2 name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  (= friends [])
+  
+  # Function to handle different operations
+  (lambda (op . args)
+    (if (== op "info")
+      # Return info
+      (dict "name" person-name "age" person-age "friends" (len friends))
+      
+      (if (== op "birthday")
+        # Have a birthday
+        (begin
+          (= person-age (+ person-age 1))
+          (+ person-name " is now " (str person-age) " years old!"))
+        
+        # Unknown operation
+        (+ "Unknown operation: " op)))))

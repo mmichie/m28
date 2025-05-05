@@ -1,0 +1,43 @@
+# Test nested dictionary access with modules
+(print "=== Testing Nested Access in Modules ===")
+
+# Import the module with nested dictionaries
+(print "Importing dict_module...")
+(import "modules/dict_module")
+
+# Debug the dict_module
+(print "\nDebugging dict_module:")
+(debug_module "dict_module")
+
+# Access nested configuration using module_get
+(print "\nAccessing nested configuration:")
+(print "dict_module keys: CONFIG, VERSION, etc...")
+(print "CONFIG value:" (module_get dict_module "CONFIG"))
+(print "CONFIG type:" (type (module_get dict_module "CONFIG")))
+
+# Access deeply nested values
+(print "\nAccessing deeply nested values:")
+(= config (module_get dict_module "CONFIG"))
+(= settings (get config "settings"))
+(print "Settings verbose:" (get settings "verbose"))
+
+(= paths (get settings "paths"))
+(print "Data path:" (get paths "data"))
+(print "Logs path:" (get paths "logs"))
+
+# Use module function that accesses nested values
+(print "\nUsing module function for nested access:")
+(= get_path (module_get dict_module "get_config_path"))
+(print "Data path via function:" (get_path "data"))
+(print "Logs path via function:" (get_path "logs"))
+
+# Access module API dictionary
+(print "\nAccessing module API dictionary:")
+(= api (module_get dict_module "API"))
+(print "API has VERSION:" (get api "VERSION"))
+
+# Print the full API contents
+(print "\nAPI contents:")
+(= api_config (get api "CONFIG"))
+(print "  CONFIG.version:" (get api_config "version"))
+(print "  CONFIG.author:" (get api_config "author"))

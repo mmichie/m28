@@ -1,0 +1,67 @@
+# Example of using dictionary operations in M28
+(print "=== Dictionary Operations Example ===")
+
+# Creating dictionaries
+(print "\nCreating dictionaries:")
+(= empty_dict (dict))
+(= person (dict "name" "John" "age" 30 "city" "New York"))
+(= counts (dict "a" 1 "b" 2 "c" 3))
+
+(print "Empty dictionary:" empty_dict)
+(print "Person dictionary:" person)
+(print "Counts dictionary:" counts)
+
+# Basic dictionary operations
+(print "\nBasic operations:")
+(print "Size of person dict:" (len person))
+(print "person[\"name\"]:" (get person "name"))
+(print "Get with default:" (dict.get person "country" "Unknown"))
+
+# Dictionary methods
+(print "\nDictionary methods:")
+(print "Keys:" (dict.keys person))
+(print "Values:" (dict.values person))
+(print "Items:" (dict.items person))
+
+# Modifying dictionaries
+(print "\nModifying dictionaries:")
+(= user (dict "username" "jsmith" "active" True))
+(print "Original user:" user)
+(dict.update user (dict "email" "jsmith@example.com" "active" False))
+(print "After update:" user)
+
+# Advanced methods
+(print "\nAdvanced methods:")
+(= settings (dict))
+(print "Empty settings:" settings)
+(= db_port (dict.setdefault settings "db_port" 5432))
+(print "After setdefault:" settings)
+(print "Returned value from setdefault:" db_port)
+
+# Dictionary operations
+(print "\nDictionary operations:")
+(= grades (dict "Alice" 95 "Bob" 87 "Charlie" 92))
+(print "Original grades:" grades)
+(= bob_grade (dict.pop grades "Bob"))
+(print "Bob's grade (popped):" bob_grade)
+(print "Grades after pop:" grades)
+
+# Copy
+(print "\nCopying dictionaries:")
+(= original (dict "a" 1 "b" 2))
+(= copy (dict.copy original))
+(print "Original:" original)
+(print "Copy:" copy)
+(dict.clear original)
+(print "Original after clear:" original)
+(print "Copy remains unchanged:" copy)
+
+# Nested dictionaries
+(print "\nNested dictionaries:")
+(= config (dict
+  "server" (dict "host" "localhost" "port" 8080)
+  "database" (dict "host" "db.example.com" "port" 5432 "user" "admin")
+))
+(print "Config:" config)
+(print "Server host:" (get (get config "server") "host"))
+(print "Database port:" (get (get config "database") "port"))

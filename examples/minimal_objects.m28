@@ -1,0 +1,39 @@
+# Minimal objects example
+# Simplest possible objects
+
+# Person factory with no arguments to methods
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  
+  # Return a dispatch function
+  (lambda (op)
+    (if (== op "name")
+      person-name
+      (if (== op "age")
+        person-age
+        (if (== op "birthday")
+          (begin
+            (= person-age (+ person-age 1))
+            (+ person-name " is now " (str person-age) " years old!"))
+          "unknown")))))
+
+# Create people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test operations
+(print "Alice's name: " (alice "name"))
+(print "Alice's age: " (alice "age"))
+(print "Bob's name: " (bob "name"))
+(print "Bob's age: " (bob "age"))
+
+# Test birthdays
+(print (alice "birthday"))
+(print (alice "birthday"))
+(print "Alice's age after birthdays: " (alice "age"))
+
+# Test bob's birthday
+(print (bob "birthday"))
+(print "Bob's age after birthday: " (bob "age"))

@@ -1,0 +1,76 @@
+# Working person object example
+# Using closures with proper state management
+
+# Function to create a person
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  (= birthdays 0)
+  (= friends [])
+  
+  # Methods dictionary
+  (= methods (dict))
+  
+  # Get name method
+  (def (get-name)
+    person-name)
+  
+  # Get age method
+  (def (get-age)
+    person-age)
+  
+  # Birthday method
+  (def (celebrate-birthday)
+    (= birthdays (+ birthdays 1))
+    (= person-age (+ person-age 1))
+    (+ person-name " is now " (str person-age) " years old!"))
+  
+  # Add friend method
+  (def (add-friend friend)
+    (= friends (+ friends [friend]))
+    (+ person-name " is now friends with " friend "!"))
+  
+  # List friends method
+  (def (list-friends)
+    (if (== (len friends) 0)
+      (+ person-name " has no friends yet.")
+      (+ person-name "'s friends: " (str friends))))
+  
+  # Store methods in the dictionary
+  (= methods (dict 
+    "name" get-name
+    "age" get-age
+    "birthday" celebrate-birthday
+    "add-friend" add-friend
+    "friends" list-friends))
+  
+  # Using dispatch function pattern
+  (lambda (method-name . args)
+    (= method (get methods method-name))
+    (if method
+      (apply method args)
+      (+ "Unknown method: " method-name))))
+
+# Create people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test methods using apply
+(print "Alice's name: " (alice "name"))
+(print "Alice's age: " (alice "age"))
+(print "Bob's name: " (bob "name"))
+(print "Bob's age: " (bob "age"))
+
+# Test birthday
+(print (alice "birthday"))
+(print (alice "birthday"))
+(print "Alice's age after birthdays: " (alice "age"))
+
+# Test friends
+(print (alice "add-friend" "Bob"))
+(print (bob "add-friend" "Alice"))
+(print (alice "friends"))
+(print (bob "friends"))
+
+(print "Done!")

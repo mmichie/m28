@@ -1,0 +1,28 @@
+# Counter Example
+# Demonstrates basic closures with state in M28
+
+# This is the simplest and most reliable pattern
+# for objects with state in M28
+
+# Create a counter factory function
+(def (make-counter)
+  # Private state
+  (= count 0)
+  
+  # Return function captures and modifies count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two counter instances
+(= c1 (make-counter))
+(= c2 (make-counter))
+
+# Test the counters
+(print "Counter 1, first call: " (c1))
+(print "Counter 1, second call: " (c1))
+(print "Counter 2, first call: " (c2))
+(print "Counter 1, third call: " (c1))
+
+# Each counter has its own state, as they should!
+# The change to one counter doesn't affect the other.

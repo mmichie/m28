@@ -1,0 +1,33 @@
+# Pure test case for isolated state
+
+# Test if a variable value is preserved in a closure
+(= global-var "global")
+
+# Create a lambda that returns the variable
+(def (test-fn)
+  (= local-var "local")
+  (lambda () local-var))
+
+# Create an anonymous lambda that returns a value
+(= anon-fn (lambda () "anonymous"))
+
+# Test accessing the variables
+(print "Return value from test-fn: " ((test-fn)))
+(print "Return value from anon-fn: " (anon-fn))
+
+# Create a counter function
+(def (make-counter initial)
+  (= count initial)
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two counter instances
+(= counter1 (make-counter 0))
+(= counter2 (make-counter 100))
+
+# Test the counters
+(print "Counter1 call 1: " (counter1))
+(print "Counter1 call 2: " (counter1))
+(print "Counter2 call 1: " (counter2))
+(print "Counter1 call 3: " (counter1))

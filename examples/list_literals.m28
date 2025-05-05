@@ -1,0 +1,66 @@
+(print "\n===== List Literal Tests =====")
+
+(print "\n-- List Literal Creation --")
+
+# Empty list with literal syntax
+(= empty [])
+(print "Empty list: ")
+(print empty)
+(print "Expected: []")
+
+# Simple list with literal syntax 
+(= numbers [1 2 3 4 5])
+(print "Numbers list: ")
+(print numbers)
+(print "Expected: [1, 2, 3, 4, 5]")
+
+# Mixed list with literal syntax
+(= mixed [1 "two" 3.0 True None])
+(print "Mixed list: ")
+(print mixed)
+(print "Expected: [1, \"two\", 3.0, True, None]")
+
+# Nested list with literal syntax
+(= nested [[1 2] [3 4] [5 6]])
+(print "Nested list: ")
+(print nested)
+(print "Expected: [[1, 2], [3, 4], [5, 6]]")
+
+# Without comma separators (should still work)
+(= simple [1 2 3])
+(print "Simple list without commas: ")
+(print simple)
+(print "Expected: [1, 2, 3]")
+
+# Mixed literal and function lists
+(= combined [1 2 3 (list 4 5 6)])
+(print "Combined list: ")
+(print combined)
+(print "Expected: [1, 2, 3, [4, 5, 6]]")
+
+# List access with literal syntax
+(= nums [10 20 30 40 50])
+(print "Access element (index 2): ")
+(print (nth nums 2))
+(print "Expected: 30")
+
+(print "\n-- List Operations with Literals --")
+
+# List concatenation
+(= list1 [1 2 3])
+(= list2 [4 5 6])
+(= combined (+ list1 list2))
+(print "Combined lists: ")
+(print combined)
+(print "Expected: [1, 2, 3, 4, 5, 6]")
+
+# List iteration
+(= sum 0)
+(= nums [1 2 3 4 5])
+(for num nums
+  (= sum (+ sum num)))
+(print "Sum of list elements: ")
+(print sum)
+(print "Expected: 15")
+
+(print "\n===== Tests Complete =====")

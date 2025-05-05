@@ -1,0 +1,236 @@
+# Object-Oriented Programming in M28
+# A tutorial on implementing object-like behavior with closures
+
+#####################################################
+# 1. Simple Object Pattern - Basic State Container
+#####################################################
+
+(print "\n=== 1. Simple Object Pattern ===")
+(print "Creating a simple object with state using closures")
+
+# Create a counter object
+(def (make-counter)
+  # Private state
+  (= count 0)
+  
+  # Return a function that both increments and returns the count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two independent counter objects
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+# Test the counters
+(print "Counter 1 first call: " (counter1))
+(print "Counter 1 second call: " (counter1))
+(print "Counter 2 first call: " (counter2))
+(print "Counter 1 third call: " (counter1))
+
+(print "Note: Each counter maintains separate state")
+
+#####################################################
+# 2. Data Object Pattern - Dictionary Accessor
+#####################################################
+
+(print "\n=== 2. Data Object Pattern ===")
+(print "Objects that store and return multiple data values")
+
+# Create a person data object
+(def (make-person name age)
+  # Store state in a dictionary
+  (= data (dict "name" name "age" age))
+  
+  # Return a function that accesses data by key
+  (lambda (key)
+    (get data key)))
+
+# Create two people
+(= person1 (make-person "Alice" 30))
+(= person2 (make-person "Bob" 25))
+
+# Test data access
+(print "Person 1 name: " (person1 "name"))
+(print "Person 1 age: " (person1 "age"))
+(print "Person 2 name: " (person2 "name"))
+(print "Person 2 age: " (person2 "age"))
+
+(print "Note: This pattern is good for immutable data objects")
+
+#####################################################
+# 3. Method Dispatch Pattern - Multiple Operations
+#####################################################
+
+(print "\n=== 3. Method Dispatch Pattern ===")
+(print "Objects that can perform multiple operations on their state")
+
+# Create a counter with multiple operations
+(def (make-counter-with-ops)
+  # Private state
+  (= count 0)
+  
+  # Return a dispatch function that handles different operations
+  (lambda (operation)
+    (if (= operation "get")
+        count
+        (if (= operation "increment")
+            (begin
+              (= count (+ count 1))
+              count)
+            (if (= operation "decrement")
+                (begin
+                  (= count (- count 1))
+                  count)
+                (if (= operation "reset")
+                    (begin
+                      (= count 0)
+                      count)
+                    "Unknown operation"))))))
+
+# Create a counter
+(= counter (make-counter-with-ops))
+
+# Test operations
+(print "Initial value: " (counter "get"))
+(print "After increment: " (counter "increment"))
+(print "After increment: " (counter "increment"))
+(print "Current value: " (counter "get"))
+(print "After decrement: " (counter "decrement"))
+(print "After reset: " (counter "reset"))
+(print "Final value: " (counter "get"))
+
+#####################################################
+# 4. Method Factory Pattern - Return Function References
+#####################################################
+
+(print "\n=== 4. Method Factory Pattern ===")
+(print "Objects that return method functions rather than direct results")
+
+# Create a bank account
+(def (make-bank-account initial-balance)
+  # Private state
+  (= balance initial-balance)
+  
+  # Method to get balance
+  (def (get-balance)
+    balance)
+  
+  # Method to deposit money
+  (def (deposit amount)
+    (= balance (+ balance amount))
+    balance)
+  
+  # Method to withdraw money
+  (def (withdraw amount)
+    (if (< balance amount)
+        "Insufficient funds"
+        (begin
+          (= balance (- balance amount))
+          balance)))
+  
+  # Return a function that returns method references
+  (lambda (operation)
+    (if (= operation "balance")
+        get-balance
+        (if (= operation "deposit")
+            deposit
+            (if (= operation "withdraw")
+                withdraw
+                (lambda () "Unknown operation"))))))
+
+# Create two accounts
+(= account1 (make-bank-account 100))
+(= account2 (make-bank-account 500))
+
+# Get account balances
+(print "Account 1 initial balance: " ((account1 "balance")))
+(print "Account 2 initial balance: " ((account2 "balance")))
+
+# Make deposits
+(print "Deposit 50 to account 1: " ((account1 "deposit") 50))
+(print "Deposit 100 to account 2: " ((account2 "deposit") 100))
+
+# Check balances again
+(print "Account 1 balance after deposit: " ((account1 "balance")))
+(print "Account 2 balance after deposit: " ((account2 "balance")))
+
+# Make withdrawals
+(print "Withdraw 30 from account 1: " ((account1 "withdraw") 30))
+(print "Withdraw 200 from account 2: " ((account1 "withdraw") 200))
+(print "Try to withdraw 500 from account 1: " ((account1 "withdraw") 500))
+
+(print "Note: Each method is returned as a function that can be called")
+
+#####################################################
+# 5. Dictionary of Methods Pattern - Full Object System
+#####################################################
+
+(print "\n=== 5. Dictionary of Methods Pattern ===")
+(print "Full object system using a dictionary of bound methods")
+
+# Create a person class
+(def (make-person name age)
+  # Private state
+  (= birthdays 0)
+  (= friends [])
+  
+  # Method to have a birthday
+  (def (celebrate-birthday)
+    (= birthdays (+ birthdays 1))
+    (= age (+ age 1))
+    (+ name " is now " (str age) " years old!"))
+  
+  # Method to add a friend
+  (def (add-friend friend)
+    (= friends (+ friends [friend]))
+    (+ name " is now friends with " friend "!"))
+  
+  # Method to list all friends
+  (def (list-friends)
+    (if (= (len friends) 0)
+        (+ name " has no friends yet.")
+        (+ name "'s friends: " (str friends))))
+  
+  # Method to get full profile
+  (def (get-profile)
+    (dict 
+      "name" name 
+      "age" age 
+      "birthdays" birthdays 
+      "friends" friends))
+  
+  # Return a dictionary of methods
+  (dict
+    "birthday" celebrate-birthday
+    "add-friend" add-friend
+    "friends" list-friends
+    "profile" get-profile))
+
+# Create people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test methods
+(print "Alice's profile: " ((get alice "profile")))
+(print "Bob's profile: " ((get bob "profile")))
+
+# Have birthdays
+(print ((get alice "birthday")))
+(print ((get bob "birthday")))
+
+# Add friends
+(print ((get alice "add-friend") "Bob"))
+(print ((get bob "add-friend") "Alice"))
+(print ((get bob "add-friend") "Charlie"))
+
+# List friends
+(print ((get alice "friends")))
+(print ((get bob "friends")))
+
+# Check updated profiles
+(print "Alice's updated profile: " ((get alice "profile")))
+(print "Bob's updated profile: " ((get bob "profile")))
+
+(print "\n=== Object Tutorial Complete ===")
+(print "These patterns demonstrate how to implement object-oriented programming concepts in M28")

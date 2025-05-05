@@ -1,0 +1,38 @@
+# Isolated methods example
+# Testing if a dictionary of methods works properly
+
+# Function to create a counter object with multiple methods
+(def (make-counter-obj)
+  # Local state
+  (= count 0)
+  
+  # Increment method
+  (def (increment)
+    (= count (+ count 1))
+    count)
+  
+  # Decrement method
+  (def (decrement)
+    (= count (- count 1))
+    count)
+  
+  # Get count method
+  (def (get-count)
+    count)
+  
+  # Return a dictionary with methods
+  (dict "inc" increment "dec" decrement "get" get-count))
+
+# Create a counter object
+(= counter (make-counter-obj))
+(print "Counter created")
+
+# Use the methods
+(print "Initial count: " ((get counter "get")))
+(print "After increment: " ((get counter "inc")))
+(print "After increment again: " ((get counter "inc")))
+(print "Current count: " ((get counter "get")))
+(print "After decrement: " ((get counter "dec")))
+(print "Final count: " ((get counter "get")))
+
+(print "All done!")

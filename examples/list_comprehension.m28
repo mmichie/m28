@@ -1,0 +1,55 @@
+(print "\n===== List Comprehension Tests =====")
+
+(print "\n-- Basic List Comprehension --")
+(= numbers [0 1 2 3 4 5 6 7 8 9])
+(print "Original list:")
+(print numbers)
+
+# Use a regular function multiplication
+(= squares [(* x x) for x numbers])
+(print "Squares using comprehension ([(* x x) for x numbers]):")
+(print squares)
+
+(print "\n-- List Comprehension with Filter --")
+# Use a compare function for equality check
+(= even_squares [(* x x) for x numbers if (eq? (% x 2) 0)])
+(print "Even squares ([(* x x) for x numbers if (eq? (% x 2) 0)]):")
+(print even_squares)
+
+(print "\n-- Nested List Comprehension --")
+(= matrix [[1 2 3] [4 5 6] [7 8 9]])
+(print "Matrix:")
+(print matrix)
+
+(= flattened (list))
+(for row matrix
+  (for x row
+    (= flattened (+ flattened [x]))))
+(print "Flattened matrix (using nested for loops):")
+(print flattened)
+
+(print "\n-- String List Comprehension --")
+(= greeting "Hello, World!")
+(= chars [c for c greeting])
+(print "String to character list ([c for c greeting]):")
+(print chars)
+
+(print "\n-- Complex Expressions --")
+(= complex_expr [(+ (* x 2) 1) for x [1 2 3 4 5]])
+(print "Complex expression ([(+ (* x 2) 1) for x [1 2 3 4 5]]):")
+(print complex_expr)
+
+(print "\n-- Expression Using Outside Variables --")
+(= multiplier 10)
+(= scaled [(* x multiplier) for x [1 2 3 4 5]])
+(print "Using outside variable ([(* x multiplier) for x [1 2 3 4 5]]), multiplier =" multiplier)
+(print scaled)
+
+(print "\n-- Combined Filter --")
+(= nums [0 1 2 3 4 5 6 7 8 9 10])
+# Fix the filter with and operator
+(= filtered [x for x nums if (and (> x 3) (< x 8))])
+(print "Combined filter ([x for x nums if (and (> x 3) (< x 8))]):")
+(print filtered)
+
+(print "\n===== Tests Complete =====")

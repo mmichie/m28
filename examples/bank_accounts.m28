@@ -1,0 +1,67 @@
+# Bank account implementation
+# A clean example of objects with state in M28
+
+# Create a bank account with initial balance
+(def (make-account balance)
+  # Private mutable state
+  (= account-balance balance)
+  
+  # Return a dispatch function that selects operations
+  (def (dispatch operation)
+    # Simple operations
+    (if (== operation "balance")
+      # Get the current balance
+      account-balance
+      
+      # Deposit operation returns a function that takes an amount
+      (if (== operation "deposit")
+        # Return a function that takes an amount
+        (lambda (amount)
+          (= account-balance (+ account-balance amount))
+          account-balance)
+        
+        # Withdraw operation
+        (if (== operation "withdraw")
+          # Return a function that takes an amount
+          (lambda (amount)
+            (if (>= account-balance amount)
+              # Sufficient funds
+              (begin
+                (= account-balance (- account-balance amount))
+                account-balance)
+              # Insufficient funds
+              "Insufficient funds"))
+          
+          # Unknown operation
+          "Unknown operation"))))
+  
+  # Return the dispatcher
+  dispatch)
+
+# Test bank accounts
+(= acct1 (make-account 100))
+(= acct2 (make-account 50))
+
+# Check initial balances
+(print "Account 1 initial balance: " (acct1 "balance"))
+(print "Account 2 initial balance: " (acct2 "balance"))
+
+# Make deposits
+(= deposit1 (acct1 "deposit"))
+(print "Deposit 50 to account 1: " (deposit1 50))  # Should be 150
+(= deposit2 (acct2 "deposit"))
+(print "Deposit 25 to account 2: " (deposit2 25))  # Should be 75
+
+# Check balances after deposits
+(print "Account 1 balance after deposit: " (acct1 "balance"))
+(print "Account 2 balance after deposit: " (acct2 "balance"))
+
+# Make withdrawals
+(= withdraw1 (acct1 "withdraw"))
+(print "Withdraw 70 from account 1: " (withdraw1 70))  # Should be 80
+(= withdraw2 (acct2 "withdraw"))
+(print "Withdraw 100 from account 2: " (withdraw2 100))  # Should be "Insufficient funds"
+
+# Check final balances
+(print "Account 1 final balance: " (acct1 "balance"))
+(print "Account 2 final balance: " (acct2 "balance"))

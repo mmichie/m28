@@ -1,0 +1,136 @@
+# Working Object System for M28
+
+# This example demonstrates how to create a proper object system
+# in M28 using patterns that reliably work with closures
+
+# ---------------------------------------------------------
+# Basic counter - the simplest case for testing closures
+# ---------------------------------------------------------
+(def (make-counter) 
+  (= count 0)
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create and test counters
+(= c1 (make-counter))
+(= c2 (make-counter))
+
+(print "\n=== COUNTER TEST ===")
+(print "Counter 1 first call: " (c1))   # 1
+(print "Counter 2 first call: " (c2))   # 1
+(print "Counter 1 second call: " (c1))  # 2
+(print "Counter 2 second call: " (c2))  # 2
+
+# ---------------------------------------------------------
+# Bank account using operation dispatcher
+# ---------------------------------------------------------
+(def (make-bank-account initial-balance)
+  # Private state
+  (= balance initial-balance)
+  
+  # Individual operation functions
+  (def (get-balance) balance)
+  
+  (def (deposit amount)
+    (= balance (+ balance amount))
+    balance)
+  
+  (def (withdraw amount)
+    (if (< balance amount)
+      "Insufficient funds"
+      (begin
+        (= balance (- balance amount))
+        balance)))
+  
+  # Return a function that dispatches based on operation name
+  (lambda (operation)
+    (if (== operation "balance")
+      get-balance
+      (if (== operation "deposit")
+        deposit
+        (if (== operation "withdraw")
+          withdraw
+          (lambda () "Unknown operation"))))))
+
+# Create two accounts
+(print "\n=== BANK ACCOUNT TEST ===")
+(= account1 (make-bank-account 100))
+(= account2 (make-bank-account 500))
+
+# Get account balances
+(print "Account 1 initial balance: " ((account1 "balance")))  # 100
+(print "Account 2 initial balance: " ((account2 "balance")))  # 500
+
+# Make deposits
+(print "Deposit 50 to account 1: " ((account1 "deposit") 50))  # 150
+(print "Deposit 100 to account 2: " ((account2 "deposit") 100))  # 600
+
+# Check balances again
+(print "Account 1 balance after deposit: " ((account1 "balance")))  # 150
+(print "Account 2 balance after deposit: " ((account2 "balance")))  # 600
+
+# Make withdrawals
+(print "Withdraw 30 from account 1: " ((account1 "withdraw") 30))  # 120
+(print "Withdraw 200 from account 2: " ((account2 "withdraw") 200))  # 400
+(print "Try to withdraw 500 from account 1: " ((account1 "withdraw") 500))  # "Insufficient funds"
+
+# Final balances
+(print "Account 1 final balance: " ((account1 "balance")))  # 120
+(print "Account 2 final balance: " ((account2 "balance")))  # 400
+
+# ---------------------------------------------------------
+# Person record with name and birthday tracking
+# ---------------------------------------------------------
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  (= birthdays 0)
+  
+  # Methods
+  (def (get-name) person-name)
+  (def (get-age) person-age)
+  
+  (def (birthday)
+    (= birthdays (+ birthdays 1))
+    (= person-age (+ person-age 1))
+    (+ person-name " is now " (str person-age) " years old!"))
+  
+  (def (info)
+    (+ person-name ", age " (str person-age) ", has had " 
+       (str birthdays) " birthdays since creation"))
+  
+  # Dispatcher
+  (lambda (op)
+    (if (== op "name")
+      get-name
+      (if (== op "age")
+        get-age
+        (if (== op "birthday")
+          birthday
+          (if (== op "info")
+            info
+            (lambda () "Unknown operation")))))))
+
+# Create people
+(print "\n=== PERSON TEST ===")
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Get attributes
+(print "Person 1 name: " ((alice "name")))
+(print "Person 1 age: " ((alice "age")))
+(print "Person 2 name: " ((bob "name")))
+(print "Person 2 age: " ((bob "age")))
+
+# Celebrate birthdays
+(print ((alice "birthday")))
+(print ((alice "birthday")))
+(print ((bob "birthday")))
+
+# Get final info
+(print "Person 1 info: " ((alice "info")))
+(print "Person 2 info: " ((bob "info")))
+
+(print "\nAll tests completed successfully!")

@@ -1,0 +1,23 @@
+# Basic closures test
+# Testing if closure instances are truly independent
+
+# Simple counter function
+(def (make-counter)
+  (= count 0)
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two counter instances
+(= c1 (make-counter))
+(= c2 (make-counter))
+
+# Test c1
+(print "Counter 1 first call: " (c1))
+(print "Counter 1 second call: " (c1))
+
+# Test c2 
+(print "Counter 2 first call: " (c2))
+
+# Test c1 again
+(print "Counter 1 third call: " (c1))

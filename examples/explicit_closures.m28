@@ -1,0 +1,30 @@
+# Explicit closures
+# Creating closures with manual environment passing
+
+# Very simple counter with explicit state
+(def (make-counter)
+  # Create an environment dictionary
+  (= env (dict "count" 0))
+  
+  # Return a function that uses the environment
+  (lambda ()
+    # Update count in the environment
+    (= env (dict "count" (+ (get env "count") 1)))
+    # Return current count
+    (get env "count")))
+
+# Create counters
+(= c1 (make-counter))
+(= c2 (make-counter))
+
+# Test counter 1
+(print "Counter 1 first call: " (c1))
+(print "Counter 1 second call: " (c1))
+(print "Counter 1 third call: " (c1))
+
+# Test counter 2
+(print "Counter 2 first call: " (c2))
+(print "Counter 2 second call: " (c2))
+
+# Verify counter 1 is unchanged by counter 2
+(print "Counter 1 fourth call: " (c1))

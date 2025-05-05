@@ -1,0 +1,23 @@
+# Test simple module import
+(print "=== Testing Simple Module Import ===")
+
+# Import module
+(print "Importing simple_module...")
+(import simple_module)
+(print "simple_module type:" (type simple_module))
+
+# Print module type
+(print "\nModule type:" (type simple_module))
+
+# Try to access the module's variables
+(print "\nAccessing module variables:")
+(= module_name (get simple_module "MODULE_NAME"))
+(print "MODULE_NAME =" module_name)
+
+# Try to access the module's dictionary
+(print "\nAccessing module dictionary:")
+(= config (get simple_module "CONFIG"))
+(print "CONFIG =" config "type:" (type config))
+(if config
+  (print "  version =" (get config "version"))
+  (print "  CONFIG is None or undefined"))

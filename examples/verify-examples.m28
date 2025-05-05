@@ -1,0 +1,63 @@
+# Verification of examples from the documentation
+(print "\n===== Testing Documentation Examples =====\n")
+
+# Basic arithmetic
+(print "Arithmetic operations:")
+(print "Addition:" (+ 1 2 3))           # 6
+(print "Subtraction:" (- 10 5))         # 5
+(print "Multiplication:" (* 2 3 4))     # 24
+(print "Division:" (/ 10 2))            # 5
+(print "Modulo:" (% 10 3))              # 1
+(print "Power:" (** 2 3))               # 8
+
+# Comparison
+(print "\nComparison operations:")
+(print "Equality:" (== 5 5))            # True
+(print "Inequality:" (!= 5 6))          # True
+(print "Greater than:" (> 5 3))         # True
+(print "Less than:" (< 3 5))            # True
+(print "Greater equal:" (>= 5 5))       # True
+(print "Less equal:" (<= 5 5))          # True
+
+# Logic operations
+(print "\nLogical operations:")
+(print "And:" (and True True))          # True
+(print "Or:" (or False True))           # True
+(print "Not:" (not False))              # True
+
+# Variable assignment
+(print "\nVariable assignment:")
+(= x 10)
+(= y "hello")
+(= z (+ x 5))
+(print "x =" x)                         # 10
+(print "y =" y)                         # hello
+(print "z = x + 5 =" z)                 # 15
+
+# Function definition - using def instead
+(print "\nFunction definition:")
+(def (add_numbers a b)
+  (+ a b))
+(print "add_numbers(5, 3) =" (add_numbers 5 3))  # 8
+
+# Conditionals
+(print "\nConditionals:")
+(= num 5)
+(print "if (> num 0):" 
+  (if (> num 0)
+      "positive"
+      "non-positive"))                  # positive
+
+# Lists
+(print "\nList operations:")
+(= numbers (list 1 2 3 4 5))
+(print "List:" numbers)                 # [1, 2, 3, 4, 5]
+(print "First element:" (get numbers 0)) # 1
+(print "Concatenated lists:" (+ (list 1 2) (list 3 4)))  # [1, 2, 3, 4]
+
+# Assert
+(print "\nAssert function:")
+(assert (> 5 3) "5 should be greater than 3")
+(print "Assert passed")
+
+(print "\n===== All Examples Tested Successfully =====\n")

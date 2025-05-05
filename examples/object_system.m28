@@ -1,0 +1,81 @@
+# Object system with dispatch
+# Final working example of object-oriented programming in M28
+
+# Person factory that creates people with properties and methods
+(def (make-person name age)
+  # Private person state
+  (= person-name name)
+  (= person-age age)
+  (= birthdays 0)
+  (= friends [])
+  
+  # Return a dispatch function
+  (lambda (op . args)
+    (if (== op "name")
+      # Get name
+      person-name
+      
+      (if (== op "age")
+        # Get age
+        person-age
+        
+        (if (== op "birthday")
+          # Have a birthday
+          (begin
+            (= birthdays (+ birthdays 1))
+            (= person-age (+ person-age 1))
+            (+ person-name " is now " (str person-age) " years old!"))
+          
+          (if (== op "add-friend")
+            # Add a friend (assumes first arg is friend name)
+            (if (> (len args) 0)
+              (begin
+                (= friend-name (car args))
+                (= friends (+ friends [friend-name]))
+                (+ person-name " is now friends with " friend-name "!"))
+              "Error: No friend name provided")
+            
+            (if (== op "friends")
+              # List friends
+              (if (== (len friends) 0)
+                (+ person-name " has no friends yet.")
+                (+ person-name "'s friends: " (str friends)))
+              
+              (if (== op "info")
+                # Get full info
+                (dict 
+                  "name" person-name
+                  "age" person-age
+                  "birthdays" birthdays
+                  "friends_count" (len friends)
+                  "friends" friends)
+                
+                # Unknown operation
+                (+ "Unknown operation: " op)))))))))
+
+# Create people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test basic operations
+(print "Alice's name: " (alice "name"))
+(print "Alice's age: " (alice "age"))
+(print "Bob's name: " (bob "name"))
+(print "Bob's age: " (bob "age"))
+
+# Celebrate birthdays
+(print (alice "birthday"))
+(print (alice "birthday"))
+(print "Alice's age after birthdays: " (alice "age"))
+
+# Add friends
+(print (alice "add-friend" "Bob"))
+(print (bob "add-friend" "Alice"))
+
+# List friends
+(print (alice "friends"))
+(print (bob "friends"))
+
+# Get info
+(print "Alice's info: " (alice "info"))
+(print "Bob's info: " (bob "info"))

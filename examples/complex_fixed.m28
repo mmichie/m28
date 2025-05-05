@@ -1,0 +1,71 @@
+# Complex object with methods (fixed version)
+# This demonstrates a more complex object with multiple methods
+
+# Create a person "class"
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  (= birthdays 0)
+  (= friends [])
+  
+  # Create methods
+  
+  # Get name method
+  (def (get-name)
+    person-name)
+  
+  # Get age method
+  (def (get-age)
+    person-age)
+  
+  # Birthday method
+  (def (celebrate-birthday)
+    (= birthdays (+ birthdays 1))
+    (= person-age (+ person-age 1))
+    (+ person-name " is now " (str person-age) " years old!"))
+  
+  # Add friend method
+  (def (add-friend friend)
+    (= friends (+ friends [friend]))
+    (+ person-name " is now friends with " friend "!"))
+  
+  # List friends method
+  (def (list-friends)
+    (if (== (len friends) 0)
+      (+ person-name " has no friends yet.")
+      (+ person-name "'s friends: " (str friends))))
+  
+  # Return object with methods as plain properties
+  (= person-obj (dict))
+  (= person-obj (dict 
+    "name" get-name
+    "age" get-age
+    "birthday" celebrate-birthday
+    "add-friend" add-friend
+    "friends" list-friends))
+  
+  person-obj)
+
+# Create some people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test the methods
+(print "Alice's name: " ((get alice "name")))
+(print "Alice's age: " ((get alice "age")))
+(print "Bob's name: " ((get bob "name")))
+(print "Bob's age: " ((get bob "age")))
+
+# Have some birthdays
+(print ((get alice "birthday")))
+(print ((get alice "birthday")))
+(print "Alice's age after birthdays: " ((get alice "age")))
+
+# Add friends
+(print ((get alice "add-friend") "Bob"))
+(print ((get bob "add-friend") "Alice"))
+
+# List friends
+(print ((get alice "friends")))
+(print ((get bob "friends")))

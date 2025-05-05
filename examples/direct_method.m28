@@ -1,0 +1,59 @@
+# Direct method example
+# Using functions directly (no dictionaries)
+
+# Function to create a counter with increment method
+(def (make-counter)
+  # Local state
+  (= count 0)
+  
+  # Return a function that closes over count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create counter instances
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+# Test counter1
+(print "Counter 1 call 1: " (counter1))
+(print "Counter 1 call 2: " (counter1))
+(print "Counter 1 call 3: " (counter1))
+
+# Test counter2
+(print "Counter 2 call 1: " (counter2))
+(print "Counter 2 call 2: " (counter2))
+
+# Test counter1 again
+(print "Counter 1 call 4: " (counter1))
+
+(print "Done!")
+
+# Now let's make a person with direct method access
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  
+  # Return a dictionary of lambdas
+  (= get-name (lambda () person-name))
+  (= get-age (lambda () person-age))
+  (= birthday (lambda () 
+    (= person-age (+ person-age 1))
+    (+ person-name " is now " (str person-age) " years old!")))
+  
+  # Return a dictionary of functions
+  (dict "name" get-name "age" get-age "birthday" birthday))
+
+# Create a person
+(= person (make-person "Charlie" 30))
+
+# Call methods manually (this should work)
+(= name-fn (get person "name"))
+(= age-fn (get person "age"))
+(= birthday-fn (get person "birthday"))
+
+(print "Name: " (name-fn))
+(print "Age: " (age-fn))
+(print "Birthday: " (birthday-fn))
+(print "Age after birthday: " (age-fn))

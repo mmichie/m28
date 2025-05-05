@@ -1,0 +1,9 @@
+# Hello World example using lambda syntax
+
+# Define a greeting function
+(= greet (lambda (name greeting)
+    (= message (+ greeting ", " name "!"))
+    message))
+
+# Call the greeting function
+(print (greet "Alice" "Hello"))

@@ -1,0 +1,31 @@
+# Very simple closures example
+# This demonstrates closures with minimal complexity
+
+# A counter factory that creates counter functions
+(def (counter-factory)
+  # Private state for each counter
+  (= count 0)
+  
+  # Function that increments and returns the count
+  (def (increment)
+    (= count (+ count 1))
+    count)
+  
+  # Return the increment function
+  increment)
+
+# Create counter instances
+(= counter1 (counter-factory))
+(= counter2 (counter-factory))
+
+# Test the counters
+(print "Counter 1 first call: " (counter1))  # Should be 1
+(print "Counter 1 second call: " (counter1)) # Should be 2
+(print "Counter 1 third call: " (counter1))  # Should be 3
+
+(print "Counter 2 first call: " (counter2))  # Should be 1
+(print "Counter 2 second call: " (counter2)) # Should be 2
+
+(print "Counter 1 fourth call: " (counter1)) # Should be 4
+
+# This proves each counter maintains its own state
