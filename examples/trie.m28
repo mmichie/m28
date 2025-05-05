@@ -10,7 +10,7 @@
 
 # Create a new trie with an empty root node
 (def (make-trie)
-  (make-trie-node None))
+  (make-trie-node "root"))
 
 # Insert a word into the trie
 (def (trie-insert trie word)

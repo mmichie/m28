@@ -26,11 +26,11 @@
         (+ (quicksort less) [pivot] (quicksort greater)))))
 
 # Test the quicksort function
-(= test_list [5, 2, 9, 1, 7, 6, 3])
+(= numbers1 [5, 2, 9, 1, 7, 6, 3])
 (print "Original list:")
-(print test_list)
+(print numbers1)
 (print "Sorted list:")
-(print (quicksort test_list))
+(print (quicksort numbers1))
 
 # Test with other examples
 (= numbers [42, 13, 7, 1, 100, 56, 24, 37, 21])
