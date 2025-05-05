@@ -35,8 +35,8 @@ func removeComments(input string) string {
 }
 
 func splitIntoRawTokens(input string) []string {
-	// Updated regex to also recognize curly braces for dict literals
-	tokenRegex := regexp.MustCompile(`(\(|\)|{|}|'|` + "`" + `|,@|,|:|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s(){}:]+)`)
+	// Updated regex to also recognize curly braces for dict literals, square brackets for list literals, and commas
+	tokenRegex := regexp.MustCompile(`(\(|\)|{|}|\[|\]|'|` + "`" + `|,@|,|:|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s(){}[\],:]+)`)
 	return tokenRegex.FindAllString(input, -1)
 }
 
@@ -74,6 +74,10 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 		return parseDict(tokens, index)
 	case "}":
 		return nil, index, fmt.Errorf("unexpected closing curly brace")
+	case "[":
+		return parseListLiteral(tokens, index)
+	case "]":
+		return nil, index, fmt.Errorf("unexpected closing square bracket")
 	case "'":
 		return parseQuote(tokens, index)
 	case "`":
@@ -198,6 +202,40 @@ func parseDict(tokens []string, index int) (core.LispValue, int, error) {
 	}
 
 	return dict, index + 1, nil
+}
+
+// parseListLiteral parses a Python-style list literal: [1 2 3 ...]
+func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
+	var list core.LispListLiteral
+
+	// Handle empty list
+	if index < len(tokens) && tokens[index] == "]" {
+		return list, index + 1, nil
+	}
+
+	for index < len(tokens) && tokens[index] != "]" {
+		// Skip commas between elements if present
+		if tokens[index] == "," {
+			index++
+			continue
+		}
+
+		// Parse list element
+		value, newIndex, err := parse(tokens, index)
+		if err != nil {
+			return nil, newIndex, err
+		}
+		index = newIndex
+
+		// Add value to list
+		list = append(list, value)
+	}
+
+	if index >= len(tokens) {
+		return nil, index, fmt.Errorf("missing closing square bracket for list")
+	}
+
+	return list, index + 1, nil
 }
 
 func parseAtom(token string) core.LispValue {

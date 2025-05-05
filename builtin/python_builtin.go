@@ -11,6 +11,9 @@ func RegisterPythonBuiltins() {
 	RegisterIOBuiltins()
 	RegisterMiscBuiltins()
 	RegisterComparisonBuiltins()
+	RegisterSetFunctions()  // Add set functions with dot notation
+	RegisterSetBuiltins()   // Add simple set operations without dot notation
+	RegisterDictFunctions() // Add dictionary functions with dot notation
 }
 
 func RegisterMiscBuiltins() {

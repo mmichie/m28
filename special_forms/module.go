@@ -62,7 +62,7 @@ func (r *ModuleRegistry) LoadModule(name string, e core.Evaluator) (*core.Python
 	if !ok {
 		return nil, fmt.Errorf("parsed content is not a LispList")
 	}
-	
+
 	// First pass: execute all expressions in the module file
 	for _, expr := range parsedList {
 		_, err := e.Eval(expr, moduleEnv)
@@ -70,7 +70,7 @@ func (r *ModuleRegistry) LoadModule(name string, e core.Evaluator) (*core.Python
 			return nil, fmt.Errorf("error executing module code: %v", err)
 		}
 	}
-	
+
 	// Second pass: collect all defined symbols from the module's environment
 	// This will capture both def and = assignments
 	// Use moduleEnv directly since it's already an *env.Environment
@@ -103,15 +103,15 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 			if err != nil {
 				return nil, fmt.Errorf("failed to import module %s: %v", moduleName, err)
 			}
-			
+
 			// Determine module name for environment binding
 			// Use the last part of the path for module name if there's a path separator
 			moduleNameParts := strings.Split(moduleName, "/")
 			moduleBaseName := moduleNameParts[len(moduleNameParts)-1]
-			
+
 			// Remove .m28 extension if present
 			moduleBaseName = strings.TrimSuffix(moduleBaseName, ".m28")
-			
+
 			// Define the module in the environment
 			env.Define(core.LispSymbol(moduleBaseName), module)
 
@@ -122,15 +122,15 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 			if err != nil {
 				return nil, fmt.Errorf("failed to import module %s: %v", modulePath, err)
 			}
-			
+
 			// Determine module name for environment binding
 			// Use the last part of the path for module name if there's a path separator
 			moduleNameParts := strings.Split(modulePath, "/")
 			moduleBaseName := moduleNameParts[len(moduleNameParts)-1]
-			
+
 			// Remove .m28 extension if present
 			moduleBaseName = strings.TrimSuffix(moduleBaseName, ".m28")
-			
+
 			// Define the module in the environment
 			env.Define(core.LispSymbol(moduleBaseName), module)
 

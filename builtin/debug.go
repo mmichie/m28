@@ -37,7 +37,7 @@ func DebugModuleFunc(args []core.LispValue, env core.Environment) (core.LispValu
 	// Print the module contents
 	fmt.Printf("Debug module %s (type: %T):\n", moduleName, moduleVal)
 	fmt.Printf("Module has %d symbols\n", moduleDict.Size())
-	
+
 	moduleDict.Iterate(func(key, value core.LispValue) error {
 		fmt.Printf("  %v = %v (type: %T)\n", key, value, value)
 		return nil

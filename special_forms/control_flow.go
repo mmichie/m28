@@ -67,17 +67,24 @@ func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		return nil, err
 	}
 
-	iter, ok := iterable.(core.LispList)
-	if !ok {
+	// Handle both regular lists and list literals
+	var iter core.LispList
+
+	if list, ok := iterable.(core.LispList); ok {
+		iter = list
+	} else if list, ok := iterable.(core.LispListLiteral); ok {
+		iter = core.LispList(list)
+	} else {
 		return nil, fmt.Errorf("for loop requires a list")
 	}
 
-	loopEnv := env.NewEnvironment(env)
+	// Use the parent environment directly instead of creating a nested environment
+	// This ensures variables updated in the loop affect the outer scope
 	var result core.LispValue
 	for _, item := range iter {
-		loopEnv.Set(iterVar, item)
+		env.Define(iterVar, item)
 		for _, expr := range args[2:] {
-			result, err = e.Eval(expr, loopEnv)
+			result, err = e.Eval(expr, env)
 			if err != nil {
 				return nil, err
 			}

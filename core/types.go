@@ -16,7 +16,12 @@ type LispValue interface{}
 type LispSymbol string
 
 // LispList represents a Lisp list
+// LispList represents a list of values
 type LispList []LispValue
+
+// LispListLiteral represents a list literal (created with [1 2 3] syntax)
+// This helps the evaluator distinguish between function calls and list literals
+type LispListLiteral []LispValue
 
 // BuiltinFunc represents a built-in function
 type BuiltinFunc func([]LispValue, Environment) (LispValue, error)
@@ -163,6 +168,8 @@ func IsTruthy(v LispValue) bool {
 		return v != ""
 	case LispList:
 		return len(v) > 0
+	case LispListLiteral:
+		return len(v) > 0
 	case *PythonicDict:
 		return len(v.data) > 0
 	case *PythonicSet:
@@ -176,16 +183,57 @@ func IsTruthy(v LispValue) bool {
 func EqualValues(a, b LispValue) bool {
 	switch va := a.(type) {
 	case LispList:
-		vb, ok := b.(LispList)
-		if !ok || len(va) != len(vb) {
-			return false
-		}
-		for i := range va {
-			if !EqualValues(va[i], vb[i]) {
+		// Check if b is a LispList
+		if vb, ok := b.(LispList); ok {
+			if len(va) != len(vb) {
 				return false
 			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
 		}
-		return true
+		// Check if b is a LispListLiteral
+		if vb, ok := b.(LispListLiteral); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	case LispListLiteral:
+		// Check if b is a LispList
+		if vb, ok := b.(LispList); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		// Check if b is also a LispListLiteral
+		if vb, ok := b.(LispListLiteral); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
 	case float64:
 		vb, ok := b.(float64)
 		if !ok {
@@ -265,6 +313,12 @@ func PrintValue(val LispValue) string {
 			elements[i] = PrintValue(elem)
 		}
 		return "[" + strings.Join(elements, ", ") + "]"
+	case LispListLiteral:
+		elements := make([]string, len(v))
+		for i, elem := range v {
+			elements[i] = PrintValue(elem)
+		}
+		return "[" + strings.Join(elements, ", ") + "]"
 	case PythonicBool:
 		if v {
 			return "True"
@@ -311,6 +365,14 @@ func EqValues(a, b LispValue) bool {
 	case PythonicNone:
 		_, ok := b.(PythonicNone)
 		return ok
+	case LispList:
+		// For a list, check if it's the same object
+		vb, ok := b.(LispList)
+		return ok && &va == &vb
+	case LispListLiteral:
+		// For a list literal, check if it's the same object
+		vb, ok := b.(LispListLiteral)
+		return ok && &va == &vb
 	case *PythonicDict:
 		vb, ok := b.(*PythonicDict)
 		return ok && va == vb
@@ -333,7 +395,8 @@ func PrintValueWithoutQuotes(val LispValue) string {
 // IsList checks if a value is a list
 func IsList(v LispValue) bool {
 	_, isList := v.(LispList)
-	return isList || v == nil
+	_, isListLiteral := v.(LispListLiteral)
+	return isList || isListLiteral || v == nil
 }
 
 // Compare compares two LispValues and returns an integer indicating their relative order.
@@ -377,6 +440,49 @@ func Compare(a, b LispValue) int {
 			if len(va) < len(vb) {
 				return -1
 			} else if len(va) > len(vb) {
+				return 1
+			}
+			return 0
+		} else if vb, ok := b.(LispListLiteral); ok {
+			// Convert LispListLiteral to LispList for comparison
+			vbList := LispList(vb)
+			for i := 0; i < len(va) && i < len(vbList); i++ {
+				if cmp := Compare(va[i], vbList[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(va) < len(vbList) {
+				return -1
+			} else if len(va) > len(vbList) {
+				return 1
+			}
+			return 0
+		}
+	case LispListLiteral:
+		// Convert LispListLiteral to LispList for comparison
+		vaList := LispList(va)
+		if vb, ok := b.(LispList); ok {
+			for i := 0; i < len(vaList) && i < len(vb); i++ {
+				if cmp := Compare(vaList[i], vb[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(vaList) < len(vb) {
+				return -1
+			} else if len(vaList) > len(vb) {
+				return 1
+			}
+			return 0
+		} else if vb, ok := b.(LispListLiteral); ok {
+			vbList := LispList(vb)
+			for i := 0; i < len(vaList) && i < len(vbList); i++ {
+				if cmp := Compare(vaList[i], vbList[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(vaList) < len(vbList) {
+				return -1
+			} else if len(vaList) > len(vbList) {
 				return 1
 			}
 			return 0

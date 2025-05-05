@@ -65,3 +65,8 @@ func (d *PythonicDict) sortedKeys() []LispValue {
 	})
 	return keys
 }
+
+// SortedKeys returns the dictionary keys in sorted order (exported version)
+func (d *PythonicDict) SortedKeys() []LispValue {
+	return d.sortedKeys()
+}

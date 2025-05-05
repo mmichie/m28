@@ -2,7 +2,7 @@ package builtin
 
 import (
 	"fmt"
-	
+
 	"github.com/mmichie/m28/core"
 )
 

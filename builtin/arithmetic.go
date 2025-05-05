@@ -59,6 +59,27 @@ func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 		for _, arg := range args[1:] {
 			if list2, ok := arg.(core.LispList); ok {
 				result = append(result, list2...)
+			} else if list2, ok := arg.(core.LispListLiteral); ok {
+				// Convert LispListLiteral to LispList
+				result = append(result, core.LispList(list2)...)
+			} else {
+				return nil, fmt.Errorf("+ cannot mix lists and non-lists")
+			}
+		}
+		return result, nil
+	}
+
+	// Also handle list literals
+	if list1, ok := args[0].(core.LispListLiteral); ok {
+		var result core.LispList
+		result = append(result, core.LispList(list1)...)
+
+		for _, arg := range args[1:] {
+			if list2, ok := arg.(core.LispList); ok {
+				result = append(result, list2...)
+			} else if list2, ok := arg.(core.LispListLiteral); ok {
+				// Convert LispListLiteral to LispList
+				result = append(result, core.LispList(list2)...)
 			} else {
 				return nil, fmt.Errorf("+ cannot mix lists and non-lists")
 			}

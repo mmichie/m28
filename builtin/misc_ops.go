@@ -661,9 +661,9 @@ func assertFunc(args []core.LispValue, _ core.Environment) (core.LispValue, erro
 	if len(args) < 1 || len(args) > 2 {
 		return nil, fmt.Errorf("assert() takes 1 or 2 arguments")
 	}
-	
+
 	condition := core.IsTruthy(args[0])
-	
+
 	if !condition {
 		// Handle assertion failure
 		if len(args) == 2 {
@@ -675,7 +675,7 @@ func assertFunc(args []core.LispValue, _ core.Environment) (core.LispValue, erro
 			return nil, fmt.Errorf("AssertionError: assertion failed")
 		}
 	}
-	
+
 	// Assertion passed
 	return core.PythonicBool(true), nil
 }

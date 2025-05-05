@@ -21,22 +21,34 @@ func NewEvaluator() core.Evaluator {
 func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispValue, error) {
 	switch v := expr.(type) {
 	case core.LispSymbol:
-		// Check for dot notation: module.attribute or object.attribute
+		// Check for dot notation: module.attribute, dict.method, or object.attribute
 		if strings.Contains(string(v), ".") {
-			// Handle multiple levels of attributes (e.g., module.submodule.attribute)
 			parts := strings.Split(string(v), ".")
+
+			// Special case for dict methods and set methods - look up directly in the environment
+			if parts[0] == "dict" || parts[0] == "set" {
+				// Functions like dict.keys, dict.update, set.intersection, etc.
+				// should be looked up directly in the environment
+				val, ok := env.Get(v)
+				if ok {
+					return val, nil
+				}
+				// Fall through to the module lookup if not found
+			}
+
+			// Handle multiple levels of attributes (e.g., module.submodule.attribute)
 			current := parts[0]
-			
+
 			// Start with the first part
 			currentObj, ok := env.Get(core.LispSymbol(current))
 			if !ok {
 				return nil, fmt.Errorf("undefined object: %s", current)
 			}
-			
+
 			// Traverse the chain of attributes
 			for i := 1; i < len(parts); i++ {
 				attrName := core.LispSymbol(parts[i])
-				
+
 				// Check if it's a dictionary
 				if dict, ok := currentObj.(*core.PythonicDict); ok {
 					// Get the attribute
@@ -50,10 +62,10 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					return nil, fmt.Errorf("%s is not an object with attributes", current)
 				}
 			}
-			
+
 			return currentObj, nil
 		}
-		
+
 		// Regular symbol lookup
 		value, ok := env.Get(v)
 		if !ok {
@@ -68,6 +80,17 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 	case *core.PythonicSet:
 		// Evaluate set literals
 		return e.evalSet(v, env)
+	case core.LispListLiteral:
+		// Evaluate list literal elements
+		result := make(core.LispList, len(v))
+		for i, elem := range v {
+			evalElem, err := e.Eval(elem, env)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating list element: %v", err)
+			}
+			result[i] = evalElem
+		}
+		return result, nil
 	case core.LispList:
 		if len(v) == 0 {
 			return core.LispList{}, nil
@@ -83,17 +106,17 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 				// Handle multiple levels of attributes (e.g., module.submodule.function)
 				parts := strings.Split(string(f), ".")
 				current := parts[0]
-				
+
 				// Start with the first part
 				currentObj, ok := env.Get(core.LispSymbol(current))
 				if !ok {
 					return nil, fmt.Errorf("undefined object: %s", current)
 				}
-				
+
 				// Traverse all but the last part (which is the function name)
 				for i := 1; i < len(parts)-1; i++ {
 					attrName := core.LispSymbol(parts[i])
-					
+
 					// Check if it's a dictionary
 					if dict, ok := currentObj.(*core.PythonicDict); ok {
 						// Get the attribute
@@ -107,10 +130,10 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 						return nil, fmt.Errorf("%s is not an object with attributes", current)
 					}
 				}
-				
+
 				// Get the function name (last part)
 				funcName := core.LispSymbol(parts[len(parts)-1])
-				
+
 				// Check if the object is a dictionary to get the function
 				if dict, ok := currentObj.(*core.PythonicDict); ok {
 					// Get the function
@@ -118,13 +141,13 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					if !found {
 						return nil, fmt.Errorf("function %s not found in %s", funcName, current)
 					}
-					
+
 					// Evaluate the arguments
 					args, err := e.evalArgs(rest, env)
 					if err != nil {
 						return nil, fmt.Errorf("error evaluating arguments: %v", err)
 					}
-					
+
 					// Apply the function
 					return e.Apply(fnVal, args, env)
 				} else {
