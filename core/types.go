@@ -75,6 +75,8 @@ type Lambda struct {
 	DefaultValues map[LispSymbol]LispValue
 	// Add a shared state environment for closures
 	SharedEnv     Environment
+	// Add a unique ID to identify each Lambda instance
+	InstanceID    int64
 }
 
 // OptionalParam represents an optional parameter in a Lambda

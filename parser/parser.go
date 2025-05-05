@@ -30,8 +30,34 @@ func tokenize(input string) []string {
 }
 
 func removeComments(input string) string {
-	commentRegex := regexp.MustCompile(`(?m)^#.*$|#.*`)
-	return commentRegex.ReplaceAllString(input, "")
+	// Process comments line-by-line to handle them more accurately
+	var result strings.Builder
+	lines := strings.Split(input, "\n")
+	
+	for _, line := range lines {
+		// Find the first "#" that's not inside a string literal
+		inString := false
+		commentPos := -1
+		
+		for i, ch := range line {
+			if ch == '"' && (i == 0 || line[i-1] != '\\') {
+				inString = !inString
+			} else if ch == '#' && !inString {
+				commentPos = i
+				break
+			}
+		}
+		
+		// If a comment was found, remove it
+		if commentPos >= 0 {
+			line = line[:commentPos]
+		}
+		
+		result.WriteString(line)
+		result.WriteString("\n")
+	}
+	
+	return result.String()
 }
 
 func splitIntoRawTokens(input string) []string {
@@ -43,17 +69,33 @@ func splitIntoRawTokens(input string) []string {
 func parseMultiple(tokens []string) (core.LispValue, error) {
 	var expressions core.LispList
 	index := 0
+	
+	// Skip whitespace and empty tokens
 	for index < len(tokens) {
+		if tokens[index] == "" || strings.TrimSpace(tokens[index]) == "" {
+			index++
+			continue
+		}
+		
 		expr, newIndex, err := parse(tokens, index)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse error at token %d (%s): %v", index, tokens[index], err)
 		}
 		expressions = append(expressions, expr)
 		index = newIndex
 	}
+	
+	// If we have exactly one expression, return just that
 	if len(expressions) == 1 {
 		return expressions[0], nil
 	}
+	
+	// If empty, return an empty list
+	if len(expressions) == 0 {
+		return core.LispList{}, nil
+	}
+	
+	// Otherwise return multiple expressions
 	return expressions, nil
 }
 
@@ -124,36 +166,46 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 
 func parseList(tokens []string, index int) (core.LispValue, int, error) {
 	var list core.LispList
+	startIndex := index
+	numOpenParens := 1  // We start with one open parenthesis
+	
 	for index < len(tokens) && tokens[index] != ")" {
+		if tokens[index] == "(" {
+			numOpenParens++
+		}
+		
 		if tokens[index] == "." {
 			// This is a dotted pair
 			index++
 			if index >= len(tokens) {
-				return nil, index, fmt.Errorf("unexpected end of input after dot")
+				return nil, index, fmt.Errorf("unexpected end of input after dot in list starting at token %d", startIndex)
 			}
 			lastElem, newIndex, err := parse(tokens, index)
 			if err != nil {
 				return nil, newIndex, err
 			}
 			if newIndex >= len(tokens) || tokens[newIndex] != ")" {
-				return nil, newIndex, fmt.Errorf("expected ) after dotted pair")
+				return nil, newIndex, fmt.Errorf("expected ) after dotted pair in list starting at token %d", startIndex)
 			}
 			if len(list) == 0 {
-				return nil, newIndex, fmt.Errorf("invalid dotted pair syntax")
+				return nil, newIndex, fmt.Errorf("invalid dotted pair syntax in list starting at token %d", startIndex)
 			}
 			return append(list, lastElem), newIndex + 1, nil
 		}
 
 		val, newIndex, err := parse(tokens, index)
 		if err != nil {
-			return nil, newIndex, err
+			return nil, newIndex, fmt.Errorf("error parsing list element at token %d: %v", index, err)
 		}
 		list = append(list, val)
 		index = newIndex
 	}
+	
 	if index >= len(tokens) {
-		return nil, index, fmt.Errorf("missing closing parenthesis")
+		return nil, index, fmt.Errorf("missing closing parenthesis for list starting at token %d (expected %d closing parentheses)", 
+			startIndex, numOpenParens)
 	}
+	
 	return list, index + 1, nil
 }
 

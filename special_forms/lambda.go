@@ -4,34 +4,69 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+	"math/rand"
 
 	"github.com/mmichie/m28/core"
 )
 
+// Global counter for generating unique instance IDs
+var (
+	instanceCounter int64 = 0
+	idMutex sync.Mutex
+	// Global map to store shared environments for each lambda instance
+	sharedEnvs = make(map[int64]core.Environment)
+	envMutex sync.RWMutex
+)
+
+func init() {
+	// Initialize random number generator
+	rand.Seed(time.Now().UnixNano())
+}
+
+// getNextInstanceID generates a unique ID for each lambda instance
+func getNextInstanceID() int64 {
+	idMutex.Lock()
+	defer idMutex.Unlock()
+	instanceCounter++
+	// Add some randomness to avoid collisions in case of concurrent use
+	return instanceCounter + rand.Int63n(1000)
+}
+
 func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	// Use the lambda's shared environment to maintain state across function calls
-	// This environment has the closure as its parent, and preserves state between calls
-	
-	// If SharedEnv is not initialized (backward compatibility), create it
-	if lambda.SharedEnv == nil {
-		lambda.SharedEnv = env.NewEnvironment(lambda.Closure)
-		
-		// In the initial call, register forms and builtins in the shared env too
-		registerSpecialFormsIn(lambda.SharedEnv)
-		registerBuiltinsIn(lambda.SharedEnv)
+	// Check if this lambda has a valid instance ID
+	if lambda.InstanceID == 0 {
+		// If not, assign a new unique ID
+		lambda.InstanceID = getNextInstanceID()
 	}
 	
-	// Use the shared environment directly for lambda execution
-	// This ensures state is maintained across calls
-	lambdaEnv := lambda.SharedEnv
+	// Get or create the shared environment for this lambda instance
+	envMutex.RLock()
+	sharedEnv, exists := sharedEnvs[lambda.InstanceID]
+	envMutex.RUnlock()
 	
-	// Bind parameters to arguments in this call's environment
-	if err := bindParams(lambda, args, lambdaEnv); err != nil {
+	if !exists {
+		// Create a new environment for this lambda instance
+		sharedEnv = env.NewEnvironment(lambda.Closure)
+		
+		// Register special forms and builtins
+		registerSpecialFormsIn(sharedEnv)
+		registerBuiltinsIn(sharedEnv)
+		
+		// Store it in our global map
+		envMutex.Lock()
+		sharedEnvs[lambda.InstanceID] = sharedEnv
+		envMutex.Unlock()
+	}
+	
+	// Bind parameters to arguments in this shared environment
+	if err := bindParams(lambda, args, sharedEnv); err != nil {
 		return nil, err
 	}
 
 	// Evaluate the lambda body in the shared environment
-	result, err := evalLambdaBody(e, lambda, lambdaEnv)
+	result, err := evalLambdaBody(e, lambda, sharedEnv)
 	if err != nil {
 		return nil, err
 	}

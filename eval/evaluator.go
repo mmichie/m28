@@ -258,6 +258,7 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 	case core.BuiltinFunc:
 		return f(args, env)
 	case *core.Lambda:
+		// Use the lambda directly - the instance ID mechanism ensures proper state isolation
 		return special_forms.ApplyLambda(e, f, args, env)
 	case core.LispList:
 		if len(f) > 0 && f[0] == core.LispSymbol("lambda") {

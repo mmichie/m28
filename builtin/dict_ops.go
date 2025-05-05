@@ -272,6 +272,31 @@ func dictCopyFunc(args []core.LispValue, _ core.Environment) (core.LispValue, er
 	return newDict, nil
 }
 
+// dictSetFunc implements dict.set() - sets a value in a dictionary
+func dictSetFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 3 {
+		return nil, fmt.Errorf("dict.set() requires exactly 3 arguments")
+	}
+
+	// First argument should be a dict
+	dict, ok := args[0].(*core.PythonicDict)
+	if !ok {
+		return nil, fmt.Errorf("dict.set() requires a dict as first argument, got %T", args[0])
+	}
+
+	// Second argument is the key
+	key := args[1]
+
+	// Third argument is the value
+	value := args[2]
+
+	// Set the key-value pair
+	dict.Set(key, value)
+
+	// Return None (Python's set-like methods return None)
+	return core.PythonicNone{}, nil
+}
+
 // Register all dictionary functions
 func RegisterDictFunctions() {
 	// Dictionary methods - using dot notation for method-like access
@@ -285,4 +310,10 @@ func RegisterDictFunctions() {
 	core.RegisterBuiltin("dict.update", dictUpdateFunc)
 	core.RegisterBuiltin("dict.clear", dictClearFunc)
 	core.RegisterBuiltin("dict.copy", dictCopyFunc)
+	core.RegisterBuiltin("dict.set", dictSetFunc)
+}
+
+// init function to ensure RegisterDictFunctions is called
+func init() {
+	RegisterDictFunctions()
 }

@@ -50,15 +50,17 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 	// Create function body from remaining arguments
 	body := core.LispList(args[1:])
 
-	// Create the Lambda function
+	// Create the Lambda function with a unique instance ID
 	function := &core.Lambda{
 		Params:        params,
 		Body:          body,
 		Env:           env,
 		Closure:       env,
 		DefaultValues: defaultValues,
-		// Create a new environment specifically for shared state across invocations
-		SharedEnv:     env.NewEnvironment(env),
+		// Set SharedEnv to nil - it will be created in ApplyLambda
+		SharedEnv:     nil,
+		// Assign a unique ID to this function instance
+		InstanceID:    getNextInstanceID(),
 	}
 	
 	// Define the function in the current environment
@@ -118,7 +120,15 @@ func EvalLambdaPython(e core.Evaluator, args []core.LispValue, env core.Environm
 		body = core.LispList{args[1]}
 	}
 
-	// Pass the current environment as both Env and Closure
-	// so the lambda can access variables from its creation context
-	return &core.Lambda{Params: paramSymbols, Body: body, Env: env, Closure: env}, nil
+	// Create a new Lambda with a unique instance ID for proper closure behavior
+	// Each lambda instance gets a unique ID to maintain separate state
+	return &core.Lambda{
+		Params:        paramSymbols, 
+		Body:          body, 
+		Env:           env, 
+		Closure:       env,
+		DefaultValues: make(map[core.LispSymbol]core.LispValue),
+		SharedEnv:     nil, // Will be initialized in ApplyLambda
+		InstanceID:    getNextInstanceID(), // Get a unique ID for this lambda
+	}, nil
 }
