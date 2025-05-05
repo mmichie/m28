@@ -16,6 +16,7 @@ func RegisterComparisonBuiltins() {
 	core.RegisterBuiltin("and", andFunc)
 	core.RegisterBuiltin("or", orFunc)
 	core.RegisterBuiltin("not", notFunc)
+	core.RegisterBuiltin("eq?", eqFunc) // Alternative equality function
 }
 
 func eqFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {

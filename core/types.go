@@ -23,6 +23,14 @@ type LispList []LispValue
 // This helps the evaluator distinguish between function calls and list literals
 type LispListLiteral []LispValue
 
+// LispComprehension represents a list comprehension (created with [expr for var in iterable if condition] syntax)
+type LispComprehension struct {
+	Expression LispValue  // The expression to evaluate for each item
+	Variable   LispSymbol // The iteration variable
+	Iterable   LispValue  // The iterable to loop over
+	Condition  LispValue  // Optional filter condition (nil if no condition)
+}
+
 // BuiltinFunc represents a built-in function
 type BuiltinFunc func([]LispValue, Environment) (LispValue, error)
 
@@ -319,6 +327,14 @@ func PrintValue(val LispValue) string {
 			elements[i] = PrintValue(elem)
 		}
 		return "[" + strings.Join(elements, ", ") + "]"
+	case LispComprehension:
+		// Format as [expr for var in iterable if condition]
+		result := "[" + PrintValue(v.Expression) + " for " + string(v.Variable) + " in " + PrintValue(v.Iterable)
+		if v.Condition != nil {
+			result += " if " + PrintValue(v.Condition)
+		}
+		result += "]"
+		return result
 	case PythonicBool:
 		if v {
 			return "True"

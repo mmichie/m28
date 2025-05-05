@@ -204,38 +204,123 @@ func parseDict(tokens []string, index int) (core.LispValue, int, error) {
 	return dict, index + 1, nil
 }
 
-// parseListLiteral parses a Python-style list literal: [1 2 3 ...]
+// parseListLiteral parses a Python-style list literal: [1 2 3 ...] or a list comprehension: [expr for var in iterable if condition]
 func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
-	var list core.LispListLiteral
-
 	// Handle empty list
 	if index < len(tokens) && tokens[index] == "]" {
+		return core.LispListLiteral{}, index + 1, nil
+	}
+
+	// Check if this might be a list comprehension
+	// First, save the starting position to backtrack if needed
+	startIndex := index
+
+	// Parse the first expression
+	expr, newIndex, err := parse(tokens, index)
+	if err != nil {
+		return nil, newIndex, err
+	}
+	index = newIndex
+
+	// Look for the "for" keyword that indicates a list comprehension
+	isComprehension := false
+	if index < len(tokens) && tokens[index] == "for" {
+		isComprehension = true
+	}
+
+	// If it's not a comprehension, parse as a regular list literal
+	if !isComprehension {
+		// Reset index to the beginning and parse as a normal list
+		index = startIndex
+		var list core.LispListLiteral
+
+		for index < len(tokens) && tokens[index] != "]" {
+			// Skip commas between elements if present
+			if tokens[index] == "," {
+				index++
+				continue
+			}
+
+			// Parse list element
+			value, newIndex, err := parse(tokens, index)
+			if err != nil {
+				return nil, newIndex, err
+			}
+			index = newIndex
+
+			// Add value to list
+			list = append(list, value)
+		}
+
+		if index >= len(tokens) {
+			return nil, index, fmt.Errorf("missing closing square bracket for list")
+		}
+
 		return list, index + 1, nil
 	}
 
-	for index < len(tokens) && tokens[index] != "]" {
-		// Skip commas between elements if present
-		if tokens[index] == "," {
-			index++
-			continue
+	// Parse the list comprehension
+
+	// Skip "for" keyword
+	index++
+
+	// Parse variable name
+	if index >= len(tokens) {
+		return nil, index, fmt.Errorf("expected variable name after 'for' in list comprehension")
+	}
+
+	varName, ok := parseAtom(tokens[index]).(core.LispSymbol)
+	if !ok {
+		return nil, index, fmt.Errorf("expected symbol as variable name in list comprehension, got %v", tokens[index])
+	}
+	index++
+
+	// The "in" keyword is optional in our syntax, but we'll skip it if it's there for compatibility
+	if index < len(tokens) && tokens[index] == "in" {
+		index++
+	}
+
+	// Parse iterable expression
+	if index >= len(tokens) {
+		return nil, index, fmt.Errorf("expected iterable expression in list comprehension")
+	}
+
+	iterable, newIndex, err := parse(tokens, index)
+	if err != nil {
+		return nil, newIndex, err
+	}
+	index = newIndex
+
+	// Check for optional "if" condition
+	var condition core.LispValue = nil
+	if index < len(tokens) && tokens[index] == "if" {
+		index++
+		if index >= len(tokens) {
+			return nil, index, fmt.Errorf("expected condition after 'if' in list comprehension")
 		}
 
-		// Parse list element
-		value, newIndex, err := parse(tokens, index)
+		condition, newIndex, err = parse(tokens, index)
 		if err != nil {
 			return nil, newIndex, err
 		}
 		index = newIndex
-
-		// Add value to list
-		list = append(list, value)
 	}
 
-	if index >= len(tokens) {
-		return nil, index, fmt.Errorf("missing closing square bracket for list")
+	// Expect closing bracket
+	if index >= len(tokens) || tokens[index] != "]" {
+		return nil, index, fmt.Errorf("missing closing square bracket for list comprehension")
+	}
+	index++
+
+	// Create the comprehension
+	comprehension := core.LispComprehension{
+		Expression: expr,
+		Variable:   varName,
+		Iterable:   iterable,
+		Condition:  condition,
 	}
 
-	return list, index + 1, nil
+	return comprehension, index, nil
 }
 
 func parseAtom(token string) core.LispValue {

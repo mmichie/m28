@@ -91,6 +91,8 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 			result[i] = evalElem
 		}
 		return result, nil
+	case core.LispComprehension:
+		return e.evalComprehension(v, env)
 	case core.LispList:
 		if len(v) == 0 {
 			return core.LispList{}, nil
@@ -340,4 +342,65 @@ func (e *Evaluator) evalSet(set *core.PythonicSet, env core.Environment) (core.L
 
 func (e *Evaluator) applyLambda(lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	return special_forms.ApplyLambda(e, lambda, args, env)
+}
+
+// evalComprehension evaluates a list comprehension: [expr for var in iterable if condition]
+func (e *Evaluator) evalComprehension(comp core.LispComprehension, env core.Environment) (core.LispValue, error) {
+	// Evaluate the iterable expression
+	iterableVal, err := e.Eval(comp.Iterable, env)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating iterable in list comprehension: %v", err)
+	}
+
+	// Convert the iterable to a list
+	var iterList core.LispList
+	switch v := iterableVal.(type) {
+	case core.LispList:
+		iterList = v
+	case core.LispListLiteral:
+		iterList = core.LispList(v)
+	case string:
+		// Handle strings by converting them to a list of characters
+		iterList = make(core.LispList, len(v))
+		for i, ch := range v {
+			iterList[i] = string(ch)
+		}
+	default:
+		return nil, fmt.Errorf("iterable in list comprehension must be a list or string, got %T", iterableVal)
+	}
+
+	// Create a result list
+	var result core.LispList
+
+	// Create a new environment for the loop
+	loopEnv := env.NewEnvironment(env)
+
+	// Iterate over the iterable
+	for _, item := range iterList {
+		// Bind the variable
+		loopEnv.Define(comp.Variable, item)
+
+		// Check the condition if there is one
+		if comp.Condition != nil {
+			condVal, err := e.Eval(comp.Condition, loopEnv)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating condition in list comprehension: %v", err)
+			}
+			// Skip this iteration if the condition is false
+			if !core.IsTruthy(condVal) {
+				continue
+			}
+		}
+
+		// Evaluate the expression
+		exprVal, err := e.Eval(comp.Expression, loopEnv)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating expression in list comprehension: %v", err)
+		}
+
+		// Add the result to our list
+		result = append(result, exprVal)
+	}
+
+	return result, nil
 }
