@@ -1,0 +1,11 @@
+(defun run-test (name test-func)
+  (princ name)
+  (princ ": ")
+  (if (funcall test-func)
+      (princ "Passed")
+      (princ "Failed"))
+  (terpri))
+
+(defun assert (condition)
+  (if (not condition)
+      (error "Assertion failed")))

@@ -1,0 +1,43 @@
+(print "\n===== Dictionary Tests =====")
+
+(print "\n-- Dictionary Creation --")
+# Dictionary with literal syntax
+(= dict1 {"name": "John", "age": 30})
+(print "Dictionary with literals:")
+(print dict1)
+(print "Expected: {\"name\": \"John\", \"age\": 30}")
+
+# Dictionary with dict function
+(= dict2 (dict "name" "Jane" "age" 25))
+(print "Dictionary with dict function:")
+(print dict2)
+(print "Expected: {\"name\": \"Jane\", \"age\": 25}")
+
+(print "\n-- Dictionary Access --")
+(print "Get person1 name:")
+(print (get dict1 "name"))
+(print "Expected: John")
+
+(print "Get person2 age:")
+(print (get dict2 "age"))
+(print "Expected: 25")
+
+(print "Get with default value:")
+(print (get dict1 "country" "Unknown"))
+(print "Expected: Unknown")
+
+(print "\n-- Dictionary as Keyword Args --")
+(print "Print with custom separator")
+(print "a" "b" "c" {"sep": "-"})
+(print "Expected: a-b-c")
+
+(print "Print with custom end")
+(print "Hello World" {"end": "!"})
+(print)
+(print "Expected: Hello World!")
+
+(print "Print with both custom separator and end")
+(print "a" "b" "c" {"sep": "|", "end": "✓\n"})
+(print "Expected: a|b|c✓")
+
+(print "\n===== Tests Complete =====")

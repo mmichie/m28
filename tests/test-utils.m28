@@ -1,0 +1,55 @@
+(def (assert condition message)
+  (if (not condition)
+      (begin
+        (print (+ "FAIL: " message))
+        False)
+      True))
+
+(def (run-test test-name test-fn)
+  (print (+ "Running test: " test-name))
+  (def result (test-fn))
+  (if result
+      (print (+ "PASS: " test-name))
+      (print (+ "FAIL: " test-name)))
+  result)
+
+(def (test-suite suite-name tests)
+  (print (+ "\n===== " suite-name " ====="))
+  (def passed 0)
+  (def total (len tests))
+  
+  (for test tests
+    (def test-name (first test))
+    (def test-fn (second test))
+    (if (run-test test-name test-fn)
+        (def passed (+ passed 1))))
+  
+  (print (+ "\nResults: " (str passed) "/" (str total) " tests passed"))
+  (== passed total))
+
+(def (eq-with-message a b message)
+  (if (== a b)
+      True
+      (begin
+        (print message)
+        (print (+ "Expected: " (str b)))
+        (print (+ "Got: " (str a)))
+        False)))
+
+(def (neq-with-message a b message)
+  (if (!= a b)
+      True
+      (begin
+        (print message)
+        (print (+ "Expected not: " (str b)))
+        (print (+ "Got: " (str a)))
+        False)))
+
+(def (approx-eq a b epsilon message)
+  (if (< (abs (- a b)) epsilon)
+      True
+      (begin
+        (print message)
+        (print (+ "Expected: " (str b) " ± " (str epsilon)))
+        (print (+ "Got: " (str a)))
+        False)))

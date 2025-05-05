@@ -1,0 +1,130 @@
+(import test-utils)
+
+(def (test-if-statement)
+  (def x 10)
+  (def y (if (> x 5) "greater" "lesser"))
+  (def z (if (< x 5) "lesser" "greater"))
+  
+  (and
+    (assert (== y "greater") "If statement with true condition failed")
+    (assert (== z "greater") "If statement with false condition failed")))
+
+(def (test-if-elif-else)
+  (def (check-number x)
+    (if (< x 0)
+        "negative"
+        (elif (== x 0)
+              "zero"
+              "positive")))
+  
+  (and
+    (assert (== (check-number -5) "negative") "If branch failed")
+    (assert (== (check-number 0) "zero") "Elif branch failed")
+    (assert (== (check-number 5) "positive") "Else branch failed")))
+
+(def (test-nested-if)
+  (def (categorize-number x)
+    (if (< x 0)
+        "negative"
+        (if (== x 0)
+            "zero"
+            "positive")))
+  
+  (and
+    (assert (== (categorize-number -5) "negative") "Outer if branch failed")
+    (assert (== (categorize-number 0) "zero") "Inner if branch failed")
+    (assert (== (categorize-number 5) "positive") "Inner else branch failed")))
+
+(def (test-boolean-expressions)
+  (def a True)
+  (def b False)
+  
+  (and
+    (assert (== (if a "yes" "no") "yes") "True boolean condition failed")
+    (assert (== (if b "yes" "no") "no") "False boolean condition failed")
+    (assert (== (if (and a (not b)) "yes" "no") "yes") "Complex boolean condition failed")))
+
+(def (test-for-loop)
+  (def sum 0)
+  (def elements (list))
+  
+  (for i (range 5)
+    (def sum (+ sum i))
+    (def elements (append elements i)))
+  
+  (and
+    (assert (== sum 10) "For loop sum calculation failed")
+    (assert (== elements (list 0 1 2 3 4)) "For loop list building failed")))
+
+(def (test-for-loop-list)
+  (def sum 0)
+  (def nums (list 1 2 3 4 5))
+  
+  (for num nums
+    (def sum (+ sum num)))
+  
+  (assert (== sum 15) "For loop over list failed"))
+
+(def (test-while-loop)
+  (def counter 0)
+  (def sum 0)
+  
+  (while (< counter 5)
+    (def sum (+ sum counter))
+    (def counter (+ counter 1)))
+  
+  (assert (== sum 10) "While loop sum calculation failed"))
+
+(def (test-break-statement)
+  (def sum 0)
+  
+  (for i (range 10)
+    (if (== i 5)
+        (break))
+    (def sum (+ sum i)))
+  
+  (assert (== sum 10) "Break statement in for loop failed"))
+
+(def (test-continue-statement)
+  (def sum 0)
+  
+  (for i (range 10)
+    (if (== (% i 2) 0)  ; Skip even numbers
+        (continue))
+    (def sum (+ sum i)))
+  
+  (assert (== sum 25) "Continue statement in for loop failed"))
+
+(def (test-loop-nested)
+  (def matrix (list))
+  
+  (for i (range 3)
+    (def row (list))
+    (for j (range 3)
+      (def row (append row (* i j))))
+    (def matrix (append matrix row)))
+  
+  (def expected (list 
+                  (list 0 0 0)
+                  (list 0 1 2)
+                  (list 0 2 4)))
+  
+  (assert (== matrix expected) "Nested loops failed"))
+
+(def control-flow-tests 
+  (list 
+    (list "If Statement" test-if-statement)
+    (list "If-Elif-Else" test-if-elif-else)
+    (list "Nested If" test-nested-if)
+    (list "Boolean Expressions" test-boolean-expressions)
+    (list "For Loop" test-for-loop)
+    (list "For Loop List" test-for-loop-list)
+    (list "While Loop" test-while-loop)
+    (list "Break Statement" test-break-statement)
+    (list "Continue Statement" test-continue-statement)
+    (list "Nested Loops" test-loop-nested)))
+
+(def (run-control-flow-tests)
+  (test-suite "Control Flow Tests" control-flow-tests))
+
+(run-control-flow-tests)

@@ -22,3 +22,5 @@ go.work
 go.work.sum
 
 bin/
+
+**/.claude/settings.local.json

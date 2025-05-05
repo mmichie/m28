@@ -435,8 +435,15 @@ func EvalDolist(e core.Evaluator, args []core.LispValue, env core.Environment) (
 		return nil, err
 	}
 
-	list, ok := listExpr.(core.LispList)
-	if !ok {
+	var list core.LispList
+
+	// Check if it's a regular list
+	if l, ok := listExpr.(core.LispList); ok {
+		list = l
+	} else if l, ok := listExpr.(core.LispListLiteral); ok {
+		// Convert list literal to regular list
+		list = core.LispList(l)
+	} else {
 		return nil, fmt.Errorf("dolist requires a list")
 	}
 

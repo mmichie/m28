@@ -1,0 +1,64 @@
+(print "\n===== Function Tests =====")
+
+(print "\n-- Basic Function Definition --")
+(def (add-two-numbers a b)
+  (+ a b))
+
+(print "add-two-numbers(2, 3) = ")
+(print (add-two-numbers 2 3))
+(print "Expected: 5")
+
+(print "add-two-numbers(-1, 1) = ")
+(print (add-two-numbers -1 1))
+(print "Expected: 0")
+
+(print "\n-- Recursive Functions --")
+(def (factorial n)
+  (if (== n 0)
+      1
+      (* n (factorial (- n 1)))))
+
+(print "factorial(0) = ")
+(print (factorial 0))
+(print "Expected: 1")
+
+(print "factorial(5) = ")
+(print (factorial 5))
+(print "Expected: 120")
+
+(print "\n-- Lambda Functions --")
+(= square (lambda (x) (* x x)))
+(= add (lambda (a b) (+ a b)))
+
+(print "square(5) = ")
+(print (square 5))
+(print "Expected: 25")
+
+(print "add(3, 4) = ")
+(print (add 3 4))
+(print "Expected: 7")
+
+(print "\n-- Higher-Order Functions --")
+(def (apply-twice fn x)
+  (fn (fn x)))
+
+(print "apply-twice(square, 3) = ")
+(print (apply-twice square 3))
+(print "Expected: 81")
+
+(print "\n-- Closures --")
+(def (make-adder n)
+  (lambda (x) (+ x n)))
+
+(def add5 (make-adder 5))
+(def add10 (make-adder 10))
+
+(print "add5(3) = ")
+(print (add5 3))
+(print "Expected: 8")
+
+(print "add10(3) = ")
+(print (add10 3))
+(print "Expected: 13")
+
+(print "\n===== Tests Complete =====")

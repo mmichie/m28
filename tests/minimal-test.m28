@@ -1,0 +1,6 @@
+;; Minimal test
+(def (test-func)
+  (print "Test function called")
+  True)
+
+(test-func)

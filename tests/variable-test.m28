@@ -1,0 +1,58 @@
+(print "\n===== Variable Tests =====")
+
+(print "\n-- Basic Assignment --")
+(= x 10)
+(= y 20)
+(= z (+ x y))
+
+(print "x = ")
+(print x)
+(print "Expected: 10")
+
+(print "y = ")
+(print y)
+(print "Expected: 20")
+
+(print "z = x + y = ")
+(print z)
+(print "Expected: 30")
+
+(print "\n-- Variable Reassignment --")
+(= x 100)
+(print "After x = 100, x = ")
+(print x)
+(print "Expected: 100")
+
+(print "\n-- Different Types --")
+(= a 10)
+(= b 3.14)
+(= c "hello")
+(= d True)
+(= e None)
+(= f (list 1 2 3))
+
+(print "a (integer) = ")
+(print a)
+(print "Expected: 10")
+
+(print "b (float) = ")
+(print b)
+(print "Expected: 3.14")
+
+(print "c (string) = ")
+(print c)
+(print "Expected: hello")
+
+(print "d (boolean) = ")
+(print d)
+(print "Expected: True")
+
+(print "e (None) = ")
+(print e)
+(print "Expected: None")
+
+(print "f (list) = ")
+(print f)
+(print "Expected: [1, 2, 3]")
+
+(print "\n===== Tests Complete =====")

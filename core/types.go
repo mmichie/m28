@@ -4,14 +4,10 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 )
-
-type Evaluator interface {
-	Eval(expr LispValue, env Environment) (LispValue, error)
-	Apply(fn LispValue, args []LispValue, env Environment) (LispValue, error)
-}
 
 // LispValue represents any Lisp value
 type LispValue interface{}
@@ -20,13 +16,38 @@ type LispValue interface{}
 type LispSymbol string
 
 // LispList represents a Lisp list
+// LispList represents a list of values
 type LispList []LispValue
+
+// LispListLiteral represents a list literal (created with [1 2 3] syntax)
+// This helps the evaluator distinguish between function calls and list literals
+type LispListLiteral []LispValue
+
+// LispComprehension represents a list comprehension (created with [expr for var in iterable if condition] syntax)
+type LispComprehension struct {
+	Expression LispValue  // The expression to evaluate for each item
+	Variable   LispSymbol // The iteration variable
+	Iterable   LispValue  // The iterable to loop over
+	Condition  LispValue  // Optional filter condition (nil if no condition)
+}
+
+// LispTuple represents a Python-style tuple (immutable sequence)
+type LispTuple []LispValue
 
 // BuiltinFunc represents a built-in function
 type BuiltinFunc func([]LispValue, Environment) (LispValue, error)
 
-// Nil represents the nil value in Lisp
-type Nil struct{}
+// PythonicBool represents a Python-style boolean
+type PythonicBool bool
+
+// PythonicNone represents Python's None value
+type PythonicNone struct{}
+
+// PythonicSet represents a Python-style set
+type PythonicSet struct {
+	data map[LispValue]struct{}
+	mu   sync.RWMutex
+}
 
 // Environment interface defines the methods for managing variable bindings
 type Environment interface {
@@ -35,26 +56,33 @@ type Environment interface {
 	Define(symbol LispSymbol, value LispValue)
 	SetMutable(symbol LispSymbol, value LispValue) bool
 	NewEnvironment(outer Environment) Environment
+	String() string
+	StringWithDepth(depth int) string
 }
 
-// Parser interface defines the method for parsing Lisp code
-type Parser interface {
-	Parse(input string) (LispValue, error)
+// Evaluator interface defines the methods for evaluating Lisp expressions
+type Evaluator interface {
+	Eval(expr LispValue, env Environment) (LispValue, error)
+	Apply(fn LispValue, args []LispValue, env Environment) (LispValue, error)
 }
 
+// Lambda represents a Python-like lambda function
+type Lambda struct {
+	Params        []LispSymbol
+	Body          LispValue
+	Env           Environment
+	Closure       Environment
+	DefaultValues map[LispSymbol]LispValue
+	// Add a shared state environment for closures
+	SharedEnv     Environment
+	// Add a unique ID to identify each Lambda instance
+	InstanceID    int64
+}
+
+// OptionalParam represents an optional parameter in a Lambda
 type OptionalParam struct {
 	Name         LispSymbol
 	DefaultValue LispValue
-}
-
-type Lambda struct {
-	Params    []LispSymbol
-	Optional  []OptionalParam
-	Rest      LispSymbol
-	KeyParams map[LispSymbol]LispValue
-	Body      LispValue
-	Env       Environment
-	Closure   Environment
 }
 
 // Macro represents a Lisp macro
@@ -74,6 +102,40 @@ type Unquote struct {
 	Expr LispValue
 }
 
+// SpecialFormMarker represents a special form registered in the environment
+type SpecialFormMarker struct {
+	Name LispSymbol
+}
+
+// IsBuiltinSpecialForm checks if a symbol is a built-in special form
+func IsBuiltinSpecialForm(symbol LispSymbol) bool {
+	// List of all special forms - maintain this in sync with special_forms/special_forms.go
+	specialForms := map[LispSymbol]bool{
+		// Control Flow
+		"if": true, "elif": true, "else": true,
+		"for": true, "while": true, "try": true,
+		"break": true, "continue": true, "pass": true,
+
+		// Function and Class Definition
+		"def": true, "define": true, "class": true, "lambda": true,
+
+		// Module Management
+		"import": true,
+
+		// Exception Handling
+		"raise": true, "assert": true,
+
+		// Variable Scope
+		"global": true, "nonlocal": true,
+
+		// Misc
+		"with": true, "begin": true, "return": true, "yield": true, "del": true,
+	}
+	
+	_, ok := specialForms[symbol]
+	return ok
+}
+
 // UnquoteSplicing represents an unquote-splicing expression
 type UnquoteSplicing struct {
 	Expr LispValue
@@ -87,19 +149,82 @@ func RegisterBuiltin(name string, fn BuiltinFunc) {
 	BuiltinFuncs[LispSymbol(name)] = fn
 }
 
-// IsTruthy determines if a value is considered true in Lisp
+// NewPythonicSet creates a new PythonicSet
+func NewPythonicSet() *PythonicSet {
+	return &PythonicSet{
+		data: make(map[LispValue]struct{}),
+	}
+}
+
+// Add adds an element to the PythonicSet
+func (s *PythonicSet) Add(value LispValue) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data[value] = struct{}{}
+}
+
+// Helper method for PythonicSet to get sorted elements
+func (s *PythonicSet) sortedElements() []LispValue {
+	elements := make([]LispValue, 0, len(s.data))
+	for elem := range s.data {
+		elements = append(elements, elem)
+	}
+	sort.Slice(elements, func(i, j int) bool {
+		return Compare(elements[i], elements[j]) < 0
+	})
+	return elements
+}
+
+// Add Size method to PythonicSet
+func (s *PythonicSet) Size() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.data)
+}
+
+// Contains checks if an element is in the PythonicSet
+func (s *PythonicSet) Contains(value LispValue) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.data[value]
+	return ok
+}
+
+// Remove removes an element from the PythonicSet
+func (s *PythonicSet) Remove(value LispValue) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.data, value)
+}
+
+// Data returns the underlying map of the PythonicSet
+func (s *PythonicSet) Data() map[LispValue]struct{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.data
+}
+
+// IsTruthy determines if a value is considered true in Pythonic Lisp
 func IsTruthy(v LispValue) bool {
 	switch v := v.(type) {
-	case nil, Nil:
+	case nil, PythonicNone:
 		return false
-	case bool:
-		return v
+	case PythonicBool:
+		return bool(v)
 	case float64:
 		return v != 0 && !math.IsNaN(v)
 	case string:
 		return v != ""
 	case LispList:
 		return len(v) > 0
+	case LispListLiteral:
+		return len(v) > 0
+	case LispTuple:
+		return len(v) > 0
+	case *PythonicDict:
+		return len(v.data) > 0
+	case *PythonicSet:
+		return len(v.data) > 0
 	default:
 		return true
 	}
@@ -109,20 +234,71 @@ func IsTruthy(v LispValue) bool {
 func EqualValues(a, b LispValue) bool {
 	switch va := a.(type) {
 	case LispList:
-		vb, ok := b.(LispList)
-		if !ok {
-			return false
-		}
-		if len(va) != len(vb) {
-			return false
-		}
-		for i := range va {
-			if !EqualValues(va[i], vb[i]) {
+		// Check if b is a LispList
+		if vb, ok := b.(LispList); ok {
+			if len(va) != len(vb) {
 				return false
 			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
 		}
-		return true
-
+		// Check if b is a LispListLiteral
+		if vb, ok := b.(LispListLiteral); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	case LispListLiteral:
+		// Check if b is a LispList
+		if vb, ok := b.(LispList); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		// Check if b is also a LispListLiteral
+		if vb, ok := b.(LispListLiteral); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	case LispTuple:
+		// Check if b is a LispTuple
+		if vb, ok := b.(LispTuple); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
 	case float64:
 		vb, ok := b.(float64)
 		if !ok {
@@ -138,42 +314,42 @@ func EqualValues(a, b LispValue) bool {
 			return true
 		}
 		return va == vb
-
 	case string:
 		vb, ok := b.(string)
-		if !ok {
-			return false
-		}
-		return va == vb
-
+		return ok && va == vb
 	case LispSymbol:
 		vb, ok := b.(LispSymbol)
-		if !ok {
+		return ok && va == vb
+	case PythonicBool:
+		vb, ok := b.(PythonicBool)
+		return ok && va == vb
+	case PythonicNone:
+		_, ok := b.(PythonicNone)
+		return ok
+	case *PythonicDict:
+		vb, ok := b.(*PythonicDict)
+		if !ok || len(va.data) != len(vb.data) {
 			return false
 		}
-		return va == vb
-
-	case bool:
-		vb, ok := b.(bool)
-		if !ok {
+		for k, v := range va.data {
+			vbv, ok := vb.Get(k)
+			if !ok || !EqualValues(v, vbv) {
+				return false
+			}
+		}
+		return true
+	case *PythonicSet:
+		vb, ok := b.(*PythonicSet)
+		if !ok || len(va.data) != len(vb.data) {
 			return false
 		}
-		return va == vb
-
-	case nil:
-		return b == nil
-
-	case Nil:
-		switch b.(type) {
-		case Nil:
-			return true
-		case LispList:
-			return len(b.(LispList)) == 0
-		default:
-			return false
+		for k := range va.data {
+			if !vb.Contains(k) {
+				return false
+			}
 		}
+		return true
 	default:
-		// For any other types, use reflect.DeepEqual as a fallback
 		return reflect.DeepEqual(a, b)
 	}
 }
@@ -185,122 +361,279 @@ func PrintValue(val LispValue) string {
 		return string(v)
 	case float64:
 		if math.IsNaN(v) {
-			return "+nan.0"
+			return "float('nan')"
 		}
 		if math.IsInf(v, 1) {
-			return "+inf.0"
+			return "float('inf')"
 		}
 		if math.IsInf(v, -1) {
-			return "-inf.0"
+			return "float('-inf')"
 		}
 		return fmt.Sprintf("%g", v)
 	case string:
 		return fmt.Sprintf("%q", v)
 	case LispList:
-		if len(v) == 0 {
-			return "nil"
+		elements := make([]string, len(v))
+		for i, elem := range v {
+			elements[i] = PrintValue(elem)
 		}
-		elements := make([]string, 0, len(v))
-		for _, elem := range v {
-			elements = append(elements, PrintValue(elem))
+		return "[" + strings.Join(elements, ", ") + "]"
+	case LispListLiteral:
+		elements := make([]string, len(v))
+		for i, elem := range v {
+			elements[i] = PrintValue(elem)
 		}
-		return "(" + strings.Join(elements, " ") + ")"
+		return "[" + strings.Join(elements, ", ") + "]"
+	case LispTuple:
+		elements := make([]string, len(v))
+		for i, elem := range v {
+			elements[i] = PrintValue(elem)
+		}
+		// Add trailing comma for single-element tuples to distinguish from parenthesized expressions
+		if len(v) == 1 {
+			return "(" + elements[0] + ",)"
+		}
+		return "(" + strings.Join(elements, ", ") + ")"
+	case LispComprehension:
+		// Format as [expr for var in iterable if condition]
+		result := "[" + PrintValue(v.Expression) + " for " + string(v.Variable) + " in " + PrintValue(v.Iterable)
+		if v.Condition != nil {
+			result += " if " + PrintValue(v.Condition)
+		}
+		result += "]"
+		return result
+	case PythonicBool:
+		if v {
+			return "True"
+		}
+		return "False"
+	case PythonicNone:
+		return "None"
+	case *PythonicDict:
+		pairs := make([]string, 0, len(v.data))
+		for k, val := range v.data {
+			pairs = append(pairs, fmt.Sprintf("%s: %s", PrintValue(k), PrintValue(val)))
+		}
+		return "{" + strings.Join(pairs, ", ") + "}"
+	case *PythonicSet:
+		elements := make([]string, 0, len(v.data))
+		for k := range v.data {
+			elements = append(elements, PrintValue(k))
+		}
+		return "{" + strings.Join(elements, ", ") + "}"
 	case BuiltinFunc:
 		return "#<builtin-function>"
 	case *Lambda:
 		return "#<lambda>"
-	case *LispHashTable:
-		return "#<HASH-TABLE>"
-	case bool:
-		if v {
-			return "t"
-		}
-		return "nil"
-	case Nil:
-		return "nil"
 	default:
 		return fmt.Sprintf("%v", v)
 	}
 }
 
-// Helper function to check if a value is a list
-func IsList(v LispValue) bool {
-	_, isList := v.(LispList)
-	return isList || v == nil || v == Nil{}
-}
-
-func PrintValueWithoutQuotes(val LispValue) string {
-	switch v := val.(type) {
-	case string:
-		return v
-	default:
-		return PrintValue(val)
-	}
-}
-
-// EqValues compares two Lisp values for equality (identity)
+// EqValues compares two Lisp values for identity equality
 func EqValues(a, b LispValue) bool {
 	switch va := a.(type) {
 	case LispSymbol:
-		if vb, ok := b.(LispSymbol); ok {
-			return va == vb
-		}
+		vb, ok := b.(LispSymbol)
+		return ok && va == vb
+	case float64:
+		vb, ok := b.(float64)
+		return ok && va == vb
+	case string:
+		vb, ok := b.(string)
+		return ok && va == vb
+	case PythonicBool:
+		vb, ok := b.(PythonicBool)
+		return ok && va == vb
+	case PythonicNone:
+		_, ok := b.(PythonicNone)
+		return ok
+	case LispList:
+		// For a list, check if it's the same object
+		vb, ok := b.(LispList)
+		return ok && &va == &vb
+	case LispListLiteral:
+		// For a list literal, check if it's the same object
+		vb, ok := b.(LispListLiteral)
+		return ok && &va == &vb
+	case LispTuple:
+		// For a tuple, check if it's the same object
+		vb, ok := b.(LispTuple)
+		return ok && &va == &vb
+	case *PythonicDict:
+		vb, ok := b.(*PythonicDict)
+		return ok && va == vb
+	case *PythonicSet:
+		vb, ok := b.(*PythonicSet)
+		return ok && va == vb
+	default:
+		return a == b
+	}
+}
+
+// PrintValueWithoutQuotes converts a LispValue to a string representation without quotes for strings
+func PrintValueWithoutQuotes(val LispValue) string {
+	if str, ok := val.(string); ok {
+		return str
+	}
+	return PrintValue(val)
+}
+
+// IsList checks if a value is a list
+func IsList(v LispValue) bool {
+	_, isList := v.(LispList)
+	_, isListLiteral := v.(LispListLiteral)
+	_, isTuple := v.(LispTuple)
+	return isList || isListLiteral || isTuple || v == nil
+}
+
+// Compare compares two LispValues and returns an integer indicating their relative order.
+// Returns -1 if a < b, 0 if a == b, and 1 if a > b.
+func Compare(a, b LispValue) int {
+	switch va := a.(type) {
 	case float64:
 		if vb, ok := b.(float64); ok {
-			return va == vb
+			if va < vb {
+				return -1
+			} else if va > vb {
+				return 1
+			}
+			return 0
 		}
 	case string:
 		if vb, ok := b.(string); ok {
-			return va == vb
+			return strings.Compare(va, vb)
 		}
-	case bool:
-		if vb, ok := b.(bool); ok {
-			return va == vb
+	case LispSymbol:
+		if vb, ok := b.(LispSymbol); ok {
+			return strings.Compare(string(va), string(vb))
 		}
-	case nil:
-		return b == nil
-	case Nil:
-		_, ok := b.(Nil)
-		return ok
+	case PythonicBool:
+		if vb, ok := b.(PythonicBool); ok {
+			if va == vb {
+				return 0
+			} else if va {
+				return 1
+			} else {
+				return -1
+			}
+		}
 	case LispList:
 		if vb, ok := b.(LispList); ok {
-			return &va == &vb // Compare pointers for lists
+			for i := 0; i < len(va) && i < len(vb); i++ {
+				if cmp := Compare(va[i], vb[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(va) < len(vb) {
+				return -1
+			} else if len(va) > len(vb) {
+				return 1
+			}
+			return 0
+		} else if vb, ok := b.(LispListLiteral); ok {
+			// Convert LispListLiteral to LispList for comparison
+			vbList := LispList(vb)
+			for i := 0; i < len(va) && i < len(vbList); i++ {
+				if cmp := Compare(va[i], vbList[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(va) < len(vbList) {
+				return -1
+			} else if len(va) > len(vbList) {
+				return 1
+			}
+			return 0
+		}
+	case LispListLiteral:
+		// Convert LispListLiteral to LispList for comparison
+		vaList := LispList(va)
+		if vb, ok := b.(LispList); ok {
+			for i := 0; i < len(vaList) && i < len(vb); i++ {
+				if cmp := Compare(vaList[i], vb[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(vaList) < len(vb) {
+				return -1
+			} else if len(vaList) > len(vb) {
+				return 1
+			}
+			return 0
+		} else if vb, ok := b.(LispListLiteral); ok {
+			vbList := LispList(vb)
+			for i := 0; i < len(vaList) && i < len(vbList); i++ {
+				if cmp := Compare(vaList[i], vbList[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(vaList) < len(vbList) {
+				return -1
+			} else if len(vaList) > len(vbList) {
+				return 1
+			}
+			return 0
+		}
+	case LispTuple:
+		if vb, ok := b.(LispTuple); ok {
+			for i := 0; i < len(va) && i < len(vb); i++ {
+				if cmp := Compare(va[i], vb[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(va) < len(vb) {
+				return -1
+			} else if len(va) > len(vb) {
+				return 1
+			}
+			return 0
+		}
+	case *PythonicDict:
+		if vb, ok := b.(*PythonicDict); ok {
+			if va.Size() != vb.Size() {
+				if va.Size() < vb.Size() {
+					return -1
+				}
+				return 1
+			}
+			// Compare keys in sorted order
+			aKeys := va.sortedKeys()
+			bKeys := vb.sortedKeys()
+			for i := 0; i < len(aKeys); i++ {
+				if cmp := Compare(aKeys[i], bKeys[i]); cmp != 0 {
+					return cmp
+				}
+				aVal, _ := va.Get(aKeys[i])
+				bVal, _ := vb.Get(bKeys[i])
+				if cmp := Compare(aVal, bVal); cmp != 0 {
+					return cmp
+				}
+			}
+			return 0
+		}
+	case *PythonicSet:
+		if vb, ok := b.(*PythonicSet); ok {
+			if va.Size() != vb.Size() {
+				if va.Size() < vb.Size() {
+					return -1
+				}
+				return 1
+			}
+			// Compare elements in sorted order
+			aElems := va.sortedElements()
+			bElems := vb.sortedElements()
+			for i := 0; i < len(aElems); i++ {
+				if cmp := Compare(aElems[i], bElems[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			return 0
 		}
 	}
-	return false
-}
 
-// LispHashTable represents a Lisp hash table
-type LispHashTable struct {
-	data map[LispValue]LispValue
-	mu   sync.RWMutex
-}
-
-// NewLispHashTable creates a new LispHashTable
-func NewLispHashTable() *LispHashTable {
-	return &LispHashTable{
-		data: make(map[LispValue]LispValue),
-	}
-}
-
-// Get retrieves a value from the hash table
-func (ht *LispHashTable) Get(key LispValue) (LispValue, bool) {
-	ht.mu.RLock()
-	defer ht.mu.RUnlock()
-	val, ok := ht.data[key]
-	return val, ok
-}
-
-// Set sets a value in the hash table
-func (ht *LispHashTable) Set(key, value LispValue) {
-	ht.mu.Lock()
-	defer ht.mu.Unlock()
-	ht.data[key] = value
-}
-
-// Delete removes a key-value pair from the hash table
-func (ht *LispHashTable) Delete(key LispValue) {
-	ht.mu.Lock()
-	defer ht.mu.Unlock()
-	delete(ht.data, key)
+	// For incomparable types, we'll use their string representations
+	sa := PrintValue(a)
+	sb := PrintValue(b)
+	return strings.Compare(sa, sb)
 }

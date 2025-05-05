@@ -1,0 +1,26 @@
+(print "\n===== Running Arithmetic Tests =====")
+
+(def a (+ 1 2))
+(print (+ "1 + 2 = " (str a)))
+(print (+ "Expected: 3, Got: " (str a)))
+(print (+ "Test result: " (if (== a 3) "PASS" "FAIL")))
+(print "")
+
+(def b (- 5 3))
+(print (+ "5 - 3 = " (str b)))
+(print (+ "Expected: 2, Got: " (str b)))
+(print (+ "Test result: " (if (== b 2) "PASS" "FAIL")))
+(print "")
+
+(def c (* 2 3))
+(print (+ "2 * 3 = " (str c)))
+(print (+ "Expected: 6, Got: " (str c)))
+(print (+ "Test result: " (if (== c 6) "PASS" "FAIL")))
+(print "")
+
+(def d (/ 6 2))
+(print (+ "6 / 2 = " (str d)))
+(print (+ "Expected: 3, Got: " (str d)))
+(print (+ "Test result: " (if (== d 3) "PASS" "FAIL")))
+
+(print "\n===== Tests Complete =====")

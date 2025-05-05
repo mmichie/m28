@@ -1,0 +1,97 @@
+(import test-utils)
+
+(def (test-basic-function-definition)
+  (def (add-two-numbers a b) (+ a b))
+  (and
+    (assert (== (add-two-numbers 2 3) 5) "Basic function call failed")
+    (assert (== (add-two-numbers -1 1) 0) "Function call with negative numbers failed")))
+
+(def (test-recursive-functions)
+  (def (factorial n)
+    (if (== n 0)
+        1
+        (* n (factorial (- n 1)))))
+  
+  (and
+    (assert (== (factorial 0) 1) "Factorial of 0 failed")
+    (assert (== (factorial 5) 120) "Factorial of 5 failed")
+    (assert (== (factorial 10) 3628800) "Factorial of 10 failed")))
+
+(def (test-lambda-functions)
+  (def square (lambda (x) (* x x)))
+  (def add (lambda (a b) (+ a b)))
+  (def compose (lambda (f g) (lambda (x) (f (g x)))))
+  
+  (and
+    (assert (== (square 5) 25) "Basic lambda call failed")
+    (assert (== (add 3 4) 7) "Multi-argument lambda call failed")
+    (assert (== ((compose square (lambda (x) (+ x 1))) 4) 25) "Lambda composition failed")))
+
+(def (test-higher-order-functions)
+  (def (apply-twice fn x) (fn (fn x)))
+  (def (apply-to-args fn a b) (fn a b))
+  
+  (and
+    (assert (== (apply-twice (lambda (x) (* x 2)) 3) 12) "Higher-order function with lambda failed")
+    (assert (== (apply-to-args + 5 3) 8) "Higher-order function with built-in failed")))
+
+(def (test-closures)
+  (def (make-adder n)
+    (lambda (x) (+ x n)))
+  
+  (def add5 (make-adder 5))
+  (def add10 (make-adder 10))
+  
+  (and
+    (assert (== (add5 3) 8) "Closure with captured value 5 failed")
+    (assert (== (add10 3) 13) "Closure with captured value 10 failed")))
+
+(def (test-default-arguments)
+  ; If the language supports default arguments
+  (def (greet name greeting)
+    (if (== greeting None)
+        (def greeting "Hello"))
+    (+ greeting ", " name))
+  
+  (and
+    (assert (== (greet "World" "Hi") "Hi, World") "Function call with all arguments failed")
+    (assert (== (greet "World" None) "Hello, World") "Function call with default argument failed")))
+
+(def (test-variadic-functions)
+  ; If the language supports variadic functions
+  (def (sum-all args)
+    (def total 0)
+    (for arg args
+      (def total (+ total arg)))
+    total)
+  
+  (and
+    (assert (== (sum-all (list 1 2 3 4 5)) 15) "Variadic function call failed")))
+
+(def (test-keyword-arguments)
+  ; If the language supports keyword arguments
+  (def (create-person name age country)
+    (dict (list "name" name "age" age "country" country)))
+  
+  (def person (create-person "John" 30 "USA"))
+  
+  (and
+    (assert (== (get person "name") "John") "Keyword argument 'name' failed")
+    (assert (== (get person "age") 30) "Keyword argument 'age' failed")
+    (assert (== (get person "country") "USA") "Keyword argument 'country' failed")))
+
+(def function-tests 
+  (list 
+    (list "Basic Function Definition" test-basic-function-definition)
+    (list "Recursive Functions" test-recursive-functions)
+    (list "Lambda Functions" test-lambda-functions)
+    (list "Higher-Order Functions" test-higher-order-functions)
+    (list "Closures" test-closures)
+    (list "Default Arguments" test-default-arguments)
+    (list "Variadic Functions" test-variadic-functions)
+    (list "Keyword Arguments" test-keyword-arguments)))
+
+(def (run-function-tests)
+  (test-suite "Function Tests" function-tests))
+
+(run-function-tests)

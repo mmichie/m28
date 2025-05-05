@@ -19,6 +19,11 @@ test:
 	@echo "Running tests..."
 	@go test $(PKG_DIRS)
 
+# Run m28 language tests
+m28-test:
+	@echo "Running m28 language tests..."
+	@./run-tests.sh
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning up..."
@@ -38,14 +43,21 @@ run: build
 # Help
 help:
 	@echo "Makefile commands:"
-	@echo "  make build  - Compile the project."
-	@echo "  make test   - Run tests."
-	@echo "  make clean  - Clean build artifacts."
-	@echo "  make deps   - Install and tidy up dependencies."
-	@echo "  make run    - Start the REPL."
-	@echo "  make all    - Default, build the project."
-	@echo "  make help   - Display this help."
+	@echo "  make build     - Compile the project."
+	@echo "  make test      - Run Go tests."
+	@echo "  make m28-test  - Run m28 language tests."
+	@echo "  make clean     - Clean build artifacts."
+	@echo "  make deps      - Install and tidy up dependencies."
+	@echo "  make run       - Start the REPL."
+	@echo "  make fmt       - Format Go code using gofmt."
+	@echo "  make all       - Default, build the project."
+	@echo "  make help      - Display this help."
+
+# Format the code
+fmt:
+	@echo "Formatting Go code..."
+	@gofmt -w -s $(shell find . -name "*.go" -not -path "./vendor/*")
 
 # Special targets
-.PHONY: all build test clean deps run help
+.PHONY: all build test m28-test clean deps run help fmt
 

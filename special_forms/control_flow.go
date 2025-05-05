@@ -6,7 +6,7 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-func EvalIf(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+func EvalIfPython(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, fmt.Errorf("if requires 2 or 3 arguments")
 	}
@@ -22,111 +22,158 @@ func EvalIf(e core.Evaluator, args []core.LispValue, env core.Environment) (core
 		return e.Eval(args[2], env)
 	}
 
-	return nil, nil
+	return core.PythonicNone{}, nil
 }
 
-func EvalCond(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	for _, clause := range args {
-		clauseList, ok := clause.(core.LispList)
-		if !ok || len(clauseList) < 2 {
-			return nil, fmt.Errorf("invalid cond clause")
-		}
-
-		if clauseList[0] == core.LispSymbol("else") {
-			return EvalProgn(e, clauseList[1:], env)
-		}
-
-		condition, err := e.Eval(clauseList[0], env)
-		if err != nil {
-			return nil, err
-		}
-
-		if core.IsTruthy(condition) {
-			return EvalProgn(e, clauseList[1:], env)
-		}
-	}
-	return nil, nil
-}
-
-func EvalCase(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("case requires at least 2 arguments")
+func EvalElif(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 || len(args) > 3 {
+		return nil, fmt.Errorf("elif requires 2 or 3 arguments")
 	}
 
-	key, err := e.Eval(args[0], env)
+	condition, err := e.Eval(args[0], env)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, clause := range args[1:] {
-		clauseList, ok := clause.(core.LispList)
-		if !ok || len(clauseList) < 2 {
-			return nil, fmt.Errorf("invalid case clause")
-		}
+	if core.IsTruthy(condition) {
+		return e.Eval(args[1], env)
+	} else if len(args) == 3 {
+		return e.Eval(args[2], env)
+	}
 
-		if clauseList[0] == core.LispSymbol("else") {
-			return EvalProgn(e, clauseList[1:], env)
-		}
+	return core.PythonicNone{}, nil
+}
 
-		for _, test := range clauseList[0].(core.LispList) {
-			if core.EqualValues(key, test) {
-				return EvalProgn(e, clauseList[1:], env)
+func EvalElse(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("else requires exactly 1 argument")
+	}
+
+	return e.Eval(args[0], env)
+}
+
+func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("for loop requires at least 3 arguments")
+	}
+
+	iterVar, ok := args[0].(core.LispSymbol)
+	if !ok {
+		return nil, fmt.Errorf("iteration variable must be a symbol")
+	}
+
+	iterable, err := e.Eval(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle both regular lists and list literals
+	var iter core.LispList
+
+	if list, ok := iterable.(core.LispList); ok {
+		iter = list
+	} else if list, ok := iterable.(core.LispListLiteral); ok {
+		iter = core.LispList(list)
+	} else {
+		return nil, fmt.Errorf("for loop requires a list")
+	}
+
+	// Use the parent environment directly instead of creating a nested environment
+	// This ensures variables updated in the loop affect the outer scope
+	var result core.LispValue
+	for _, item := range iter {
+		env.Define(iterVar, item)
+		for _, expr := range args[2:] {
+			result, err = e.Eval(expr, env)
+			if err != nil {
+				// Check if this is a return signal
+				if returnSig, ok := err.(ReturnSignal); ok {
+					return returnSig.Value, nil
+				}
+				return nil, err
 			}
 		}
 	}
 
-	return nil, nil
+	return result, nil
 }
 
-func EvalWhen(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+func EvalWhilePython(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) < 2 {
-		return nil, fmt.Errorf("when requires at least two arguments")
-	}
-	condition, err := e.Eval(args[0], env)
-	if err != nil {
-		return nil, err
-	}
-	if core.IsTruthy(condition) {
-		return EvalProgn(e, args[1:], env)
-	}
-	return nil, nil
-}
-
-func EvalUnless(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("unless requires at least two arguments")
-	}
-	condition, err := e.Eval(args[0], env)
-	if err != nil {
-		return nil, err
-	}
-	if !core.IsTruthy(condition) {
-		return EvalProgn(e, args[1:], env)
-	}
-	return nil, nil
-}
-
-func EvalProgn(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-
-	if len(args) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("while loop requires at least 2 arguments")
 	}
 
 	var result core.LispValue
-	var err error
 
-	// Skip the first element if it's the 'progn' symbol
-	startIndex := 0
-	if symbol, ok := args[0].(core.LispSymbol); ok && symbol == "progn" {
-		startIndex = 1
-	}
-
-	for i := startIndex; i < len(args); i++ {
-		result, err = e.Eval(args[i], env)
+	for {
+		condition, err := e.Eval(args[0], env)
 		if err != nil {
+			// Check if this is a return signal
+			if returnSig, ok := err.(ReturnSignal); ok {
+				return returnSig.Value, nil
+			}
 			return nil, err
+		}
+
+		if !core.IsTruthy(condition) {
+			break
+		}
+
+		for _, expr := range args[1:] {
+			result, err = e.Eval(expr, env)
+			if err != nil {
+				// Check if this is a return signal
+				if returnSig, ok := err.(ReturnSignal); ok {
+					return returnSig.Value, nil
+				}
+				return nil, err
+			}
 		}
 	}
 
 	return result, nil
+}
+
+func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("try requires at least a try block and an except block")
+	}
+
+	tryBlock := args[0]
+	exceptBlocks := args[1:]
+
+	result, err := e.Eval(tryBlock, env)
+	if err == nil {
+		return result, nil
+	}
+
+	for _, exceptBlock := range exceptBlocks {
+		exceptClause, ok := exceptBlock.(core.LispList)
+		if !ok || len(exceptClause) < 2 {
+			continue
+		}
+
+		exceptionType, ok := exceptClause[0].(core.LispSymbol)
+		if !ok {
+			continue
+		}
+
+		if string(exceptionType) == "except" {
+			return e.Eval(exceptClause[1], env)
+		}
+	}
+
+	return nil, err
+}
+
+func EvalBreak(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	return nil, fmt.Errorf("break encountered")
+}
+
+func EvalContinue(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	return nil, fmt.Errorf("continue encountered")
+}
+
+func EvalPass(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	return nil, nil
 }

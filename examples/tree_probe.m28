@@ -1,0 +1,43 @@
+(print "Debugging tree functions")
+
+(= leaf1 (list 1 None None))
+(print "Leaf node:")
+(print leaf1)
+
+(def (node-value node) 
+    (return (nth node 0)))
+
+(def (node-left node) 
+    (return (nth node 1)))
+
+(def (node-right node) 
+    (return (nth node 2)))
+
+(print "Value of leaf1:")
+(print (node-value leaf1))
+
+(print "Left of leaf1:")
+(print (node-left leaf1))
+
+(print "Right of leaf1:")
+(print (node-right leaf1))
+
+(def (tree-contains? tree value)
+    (if (== tree None)
+        (return False)
+        (if (== (node-value tree) value)
+            (return True)
+            (if (== (node-left tree) None)
+                (if (== (node-right tree) None)
+                    (return False)
+                    (return (tree-contains? (node-right tree) value)))
+                (if (== (node-right tree) None)
+                    (return (tree-contains? (node-left tree) value))
+                    (return (or (tree-contains? (node-left tree) value)
+                               (tree-contains? (node-right tree) value))))))))
+
+(print "Tree contains 1?")
+(print (tree-contains? leaf1 1))
+
+(print "Tree contains 2?")
+(print (tree-contains? leaf1 2))

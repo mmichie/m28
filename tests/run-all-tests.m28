@@ -1,0 +1,24 @@
+(print "\n====================================")
+(print "Running all test suites")
+(print "====================================\n")
+
+# List of tests to run
+(= tests (list
+  "arithmetic-test.m28"
+  "variable-test.m28"
+  "control-flow-test.m28"
+  "list-test.m28"
+  "basic-test.m28"
+  "dict-test.m28"
+))
+
+# Function to run a test (placeholder - we can't actually do this in m28)
+(= test-results (list))
+
+# Instead, just print which tests would be run
+(for test tests
+  (print (+ "Would run: tests/" test)))
+
+(print "\n====================================")
+(print "All tests completed")
+(print "====================================\n")
