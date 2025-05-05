@@ -73,6 +73,8 @@ type Lambda struct {
 	Env           Environment
 	Closure       Environment
 	DefaultValues map[LispSymbol]LispValue
+	// Add a shared state environment for closures
+	SharedEnv     Environment
 }
 
 // OptionalParam represents an optional parameter in a Lambda

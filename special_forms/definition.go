@@ -57,6 +57,8 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		Env:           env,
 		Closure:       env,
 		DefaultValues: defaultValues,
+		// Create a new environment specifically for shared state across invocations
+		SharedEnv:     env.NewEnvironment(env),
 	}
 	
 	// Define the function in the current environment

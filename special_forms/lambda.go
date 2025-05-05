@@ -9,24 +9,28 @@ import (
 )
 
 func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	// Create a new environment for the lambda execution
-	// Use the lambda's closure as the outer environment to support lexical closures
-	lambdaEnv := env.NewEnvironment(lambda.Closure)
+	// Use the lambda's shared environment to maintain state across function calls
+	// This environment has the closure as its parent, and preserves state between calls
 	
-	// Manually register special forms in the environment
-	// This ensures lambda bodies can recognize forms like "if"
-	registerSpecialFormsIn(lambdaEnv)
+	// If SharedEnv is not initialized (backward compatibility), create it
+	if lambda.SharedEnv == nil {
+		lambda.SharedEnv = env.NewEnvironment(lambda.Closure)
+		
+		// In the initial call, register forms and builtins in the shared env too
+		registerSpecialFormsIn(lambda.SharedEnv)
+		registerBuiltinsIn(lambda.SharedEnv)
+	}
 	
-	// Register built-in functions in the lambda environment
-	// This is needed because operators like + and - are registered as built-ins
-	registerBuiltinsIn(lambdaEnv)
+	// Use the shared environment directly for lambda execution
+	// This ensures state is maintained across calls
+	lambdaEnv := lambda.SharedEnv
 	
-	// Bind parameters to arguments
+	// Bind parameters to arguments in this call's environment
 	if err := bindParams(lambda, args, lambdaEnv); err != nil {
 		return nil, err
 	}
 
-	// Evaluate the lambda body in the newly created environment
+	// Evaluate the lambda body in the shared environment
 	result, err := evalLambdaBody(e, lambda, lambdaEnv)
 	if err != nil {
 		return nil, err

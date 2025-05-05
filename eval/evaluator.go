@@ -185,6 +185,15 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 			if specialForm, ok := e.specialForms[f]; ok {
 				return specialForm(e, rest, env)
 			}
+			
+			// Check for special form marker in the environment
+			if value, ok := env.Get(f); ok {
+				if marker, ok := value.(core.SpecialFormMarker); ok {
+					if specialForm, ok := e.specialForms[marker.Name]; ok {
+						return specialForm(e, rest, env)
+					}
+				}
+			}
 			fn, err := e.Eval(f, env)
 			if err != nil {
 				return nil, fmt.Errorf("error evaluating symbol %s: %v", f, err)
@@ -291,6 +300,15 @@ func (e *Evaluator) evalList(list core.LispList, env core.Environment) (core.Lis
 	case core.LispSymbol:
 		if specialForm, ok := e.specialForms[v]; ok {
 			return specialForm(e, rest, env)
+		}
+		
+		// Check for special form marker in the environment
+		if value, ok := env.Get(v); ok {
+			if marker, ok := value.(core.SpecialFormMarker); ok {
+				if specialForm, ok := e.specialForms[marker.Name]; ok {
+					return specialForm(e, rest, env)
+				}
+			}
 		}
 		fn, err := e.Eval(v, env)
 		if err != nil {
