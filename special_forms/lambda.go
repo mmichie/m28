@@ -9,34 +9,33 @@ import (
 )
 
 func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Create a new environment for the lambda execution
+	// Use the lambda's closure as the outer environment to support lexical closures
 	lambdaEnv := env.NewEnvironment(lambda.Closure)
 
+	// Bind parameters to arguments
 	if err := bindParams(lambda, args, lambdaEnv); err != nil {
 		return nil, err
 	}
 
+	// Evaluate the lambda body in the newly created environment
 	result, err := evalLambdaBody(e, lambda, lambdaEnv)
 	if err != nil {
 		return nil, err
 	}
 
-	// If the result is a literal value (like a number), return it directly
-	switch result.(type) {
-	case float64, int, string, core.PythonicBool, core.PythonicNone:
-		return result, nil
-	}
-
-	// Otherwise, evaluate the result
-	return e.Eval(result, lambdaEnv)
+	// Return the result directly
+	return result, nil
 }
 
 func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment) (core.LispValue, error) {
 	if list, ok := lambda.Body.(core.LispList); ok {
-		var result core.LispValue
+		var result core.LispValue = core.PythonicNone{}
 		var err error
 		for _, expr := range list {
 			result, err = e.Eval(expr, env)
 			if err != nil {
+				fmt.Printf("Error evaluating expression in lambda body: %v\n", err)
 				return nil, err
 			}
 		}

@@ -2,8 +2,6 @@ package special_forms
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/mmichie/m28/core"
 )
@@ -13,91 +11,46 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		return nil, fmt.Errorf("def requires at least a name and a body")
 	}
 
+	// Extract function name and parameters
+	var funcName core.LispSymbol
+	var params []core.LispSymbol
+	var defaultValues map[core.LispSymbol]core.LispValue = make(map[core.LispSymbol]core.LispValue)
+
+	// Check if first arg is a list (the function signature)
 	funcDef, ok := args[0].(core.LispList)
-	if !ok || len(funcDef) == 0 {
-		return nil, fmt.Errorf("invalid function definition")
-	}
-
-	funcName, ok := funcDef[0].(core.LispSymbol)
-	if !ok {
-		return nil, fmt.Errorf("function name must be a symbol")
-	}
-
-	// Parse params and default values
-	params := []core.LispSymbol{}
-	defaultValues := map[core.LispSymbol]core.LispValue{}
-
-	for _, param := range funcDef[1:] {
-		// Check for string parameter (which could be a keyword argument)
-		if paramStr, isString := param.(string); isString {
-			// Check if it has an equals sign for default value
-			if equalPos := strings.Index(paramStr, "="); equalPos > 0 {
-				name := core.LispSymbol(paramStr[:equalPos])
-				defaultValueStr := paramStr[equalPos+1:]
-
-				// Parse the default value
-				var val core.LispValue
-				if defaultValueStr == "True" {
-					val = core.PythonicBool(true)
-				} else if defaultValueStr == "False" {
-					val = core.PythonicBool(false)
-				} else if defaultValueStr == "None" {
-					val = core.PythonicNone{}
-				} else if num, err := strconv.ParseFloat(defaultValueStr, 64); err == nil {
-					val = num
-				} else {
-					// If not a recognized value, keep as string
-					val = defaultValueStr
-				}
-
-				params = append(params, name)
-				defaultValues[name] = val
-				continue
-			}
-
-			// Regular parameter as string
-			params = append(params, core.LispSymbol(paramStr))
-			continue
+	if ok && len(funcDef) > 0 {
+		// (def (name param1 param2) body...)
+		nameVal, ok := funcDef[0].(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("function name must be a symbol")
 		}
+		funcName = nameVal
 
-		// Handle core.LispSymbol parameter
-		if paramSymbol, isSymbol := param.(core.LispSymbol); isSymbol {
-			// Check if symbol contains an equals sign
-			symbolStr := string(paramSymbol)
-			if equalPos := strings.Index(symbolStr, "="); equalPos > 0 {
-				name := core.LispSymbol(symbolStr[:equalPos])
-				defaultValueStr := symbolStr[equalPos+1:]
-
-				// Parse the default value
-				var val core.LispValue
-				if defaultValueStr == "True" {
-					val = core.PythonicBool(true)
-				} else if defaultValueStr == "False" {
-					val = core.PythonicBool(false)
-				} else if defaultValueStr == "None" {
-					val = core.PythonicNone{}
-				} else if num, err := strconv.ParseFloat(defaultValueStr, 64); err == nil {
-					val = num
-				} else {
-					val = defaultValueStr
-				}
-
-				params = append(params, name)
-				defaultValues[name] = val
-				continue
+		// Extract parameters
+		for _, param := range funcDef[1:] {
+			// Handle symbol parameter
+			if paramSymbol, ok := param.(core.LispSymbol); ok {
+				params = append(params, paramSymbol)
+			} else if paramStr, ok := param.(string); ok {
+				params = append(params, core.LispSymbol(paramStr))
+			} else {
+				return nil, fmt.Errorf("function parameter must be a symbol, got %T", param)
 			}
-
-			// Regular parameter as symbol
-			params = append(params, paramSymbol)
-			continue
 		}
-
-		// If we got here, it's not a valid parameter type
-		return nil, fmt.Errorf("function parameter must be a symbol or string, got %T", param)
+	} else {
+		// Check if first arg is a symbol (simple named function)
+		nameVal, ok := args[0].(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("function name must be a symbol")
+		}
+		funcName = nameVal
+		// No parameters
 	}
 
+	// Create function body from remaining arguments
 	body := core.LispList(args[1:])
 
+	// Create the Lambda function
 	function := &core.Lambda{
 		Params:        params,
 		Body:          body,
@@ -105,6 +58,8 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		Closure:       env,
 		DefaultValues: defaultValues,
 	}
+	
+	// Define the function in the current environment
 	env.Define(funcName, function)
 	return function, nil
 }

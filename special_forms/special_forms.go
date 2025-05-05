@@ -21,6 +21,7 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 
 		// Function and Class Definition
 		"def":    EvalDef,
+		"define": EvalDef, // Also add 'define' as an alias for 'def'
 		"class":  EvalClass,
 		"lambda": EvalLambdaPython,
 
