@@ -86,6 +86,10 @@ func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		for _, expr := range args[2:] {
 			result, err = e.Eval(expr, env)
 			if err != nil {
+				// Check if this is a return signal
+				if returnSig, ok := err.(ReturnSignal); ok {
+					return returnSig.Value, nil
+				}
 				return nil, err
 			}
 		}
@@ -104,6 +108,10 @@ func EvalWhilePython(e core.Evaluator, args []core.LispValue, env core.Environme
 	for {
 		condition, err := e.Eval(args[0], env)
 		if err != nil {
+			// Check if this is a return signal
+			if returnSig, ok := err.(ReturnSignal); ok {
+				return returnSig.Value, nil
+			}
 			return nil, err
 		}
 
@@ -114,6 +122,10 @@ func EvalWhilePython(e core.Evaluator, args []core.LispValue, env core.Environme
 		for _, expr := range args[1:] {
 			result, err = e.Eval(expr, env)
 			if err != nil {
+				// Check if this is a return signal
+				if returnSig, ok := err.(ReturnSignal); ok {
+					return returnSig.Value, nil
+				}
 				return nil, err
 			}
 		}

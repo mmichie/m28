@@ -12,7 +12,15 @@ func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, e
 	// Create a new environment for the lambda execution
 	// Use the lambda's closure as the outer environment to support lexical closures
 	lambdaEnv := env.NewEnvironment(lambda.Closure)
-
+	
+	// Manually register special forms in the environment
+	// This ensures lambda bodies can recognize forms like "if"
+	registerSpecialFormsIn(lambdaEnv)
+	
+	// Register built-in functions in the lambda environment
+	// This is needed because operators like + and - are registered as built-ins
+	registerBuiltinsIn(lambdaEnv)
+	
 	// Bind parameters to arguments
 	if err := bindParams(lambda, args, lambdaEnv); err != nil {
 		return nil, err
@@ -28,20 +36,71 @@ func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, e
 	return result, nil
 }
 
+// registerSpecialFormsIn registers all special forms in the environment
+func registerSpecialFormsIn(env core.Environment) {
+	// Get all builtin special forms and register them
+	specialForms := GetSpecialForms()
+	for name := range specialForms {
+		env.Define(name, core.SpecialFormMarker{Name: name})
+	}
+}
+
+// registerBuiltinsIn registers all builtin functions in the environment
+func registerBuiltinsIn(env core.Environment) {
+	// Register all builtin functions (including arithmetic operators)
+	for name, fn := range core.BuiltinFuncs {
+		env.Define(name, fn)
+	}
+}
+
 func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment) (core.LispValue, error) {
+	// If the lambda body is a list, evaluate each expression in the list
+	// and return the result of the last expression
 	if list, ok := lambda.Body.(core.LispList); ok {
 		var result core.LispValue = core.PythonicNone{}
 		var err error
+		
+		// For a single expression that's a list (like (+ a b)), evaluate it as one unit
+		if len(list) == 1 {
+			if exprList, isList := list[0].(core.LispList); isList {
+				result, err = e.Eval(exprList, env)
+				if err != nil {
+					// Check if it's a return signal
+					if returnSig, ok := err.(ReturnSignal); ok {
+						return returnSig.Value, nil
+					}
+					return nil, err
+				}
+				return result, nil
+			}
+		}
+		
+		// Multiple expressions (e.g., from multiline lambda), evaluate each in sequence
 		for _, expr := range list {
 			result, err = e.Eval(expr, env)
 			if err != nil {
+				// Check if it's a return signal
+				if returnSig, ok := err.(ReturnSignal); ok {
+					return returnSig.Value, nil
+				}
+				
 				fmt.Printf("Error evaluating expression in lambda body: %v\n", err)
 				return nil, err
 			}
 		}
 		return result, nil
 	}
-	return e.Eval(lambda.Body, env)
+	
+	// If body is a single expression, just evaluate it
+	result, err := e.Eval(lambda.Body, env)
+	if err != nil {
+		// Check if it's a return signal
+		if returnSig, ok := err.(ReturnSignal); ok {
+			return returnSig.Value, nil
+		}
+		return nil, err
+	}
+	return result, nil
 }
 
 func bindParams(lambda *core.Lambda, args []core.LispValue, env core.Environment) error {

@@ -30,6 +30,10 @@ func NewEnvironment(outer core.Environment) *Environment {
 	env.Define(core.LispSymbol("True"), core.PythonicBool(true))
 	env.Define(core.LispSymbol("False"), core.PythonicBool(false))
 
+	// This is a reasonable default for most environment needs
+	// This ensures builtins are always available
+	env.SetupBuiltins()
+
 	return env
 }
 
@@ -79,6 +83,9 @@ func (e *Environment) SetupBuiltins() {
 	for name, fn := range core.BuiltinFuncs {
 		e.Set(core.LispSymbol(name), fn)
 	}
+	
+	// Register special form functions in builtins
+	// Removed direct special_forms dependency to avoid import cycle
 }
 
 func (e *Environment) String() string {

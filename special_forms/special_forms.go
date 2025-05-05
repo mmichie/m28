@@ -6,8 +6,12 @@ import (
 
 type SpecialFormFunc func(core.Evaluator, []core.LispValue, core.Environment) (core.LispValue, error)
 
-func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
-	return map[core.LispSymbol]SpecialFormFunc{
+// Map of special forms that should be registered in the evaluator
+var specialForms map[core.LispSymbol]SpecialFormFunc
+
+// Initialize the special forms map
+func init() {
+	specialForms = map[core.LispSymbol]SpecialFormFunc{
 		// Control Flow
 		"if":       EvalIfPython,
 		"elif":     EvalElif,
@@ -42,5 +46,20 @@ func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 		"return": EvalReturn,
 		"yield":  EvalYield,
 		"del":    EvalDel,
+	}
+}
+
+func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
+	return specialForms
+}
+
+// RegisterSpecialForms registers the special forms as special functions 
+// that will be recognized by the evaluator, even in lambda bodies
+func RegisterSpecialForms(env core.Environment) {
+	// Register special forms in the environment as special markers
+	for name, _ := range specialForms {
+		// We register a special marker to indicate this is a special form
+		// The actual implementation is in the evaluator
+		env.Define(name, core.SpecialFormMarker{Name: name})
 	}
 }

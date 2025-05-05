@@ -105,5 +105,18 @@ func EvalLambdaPython(e core.Evaluator, args []core.LispValue, env core.Environm
 		paramSymbols[i] = symbol
 	}
 
-	return &core.Lambda{Params: paramSymbols, Body: args[1], Env: env}, nil
+	// If there are multiple body expressions, combine them into a list
+	var body core.LispValue
+	if len(args) > 2 {
+		// Multiple expressions in the body
+		body = core.LispList(args[1:])
+	} else {
+		// Single expression in the body - but wrap it in a list to ensure 
+		// it's evaluated as a complete expression
+		body = core.LispList{args[1]}
+	}
+
+	// Pass the current environment as both Env and Closure
+	// so the lambda can access variables from its creation context
+	return &core.Lambda{Params: paramSymbols, Body: body, Env: env, Closure: env}, nil
 }

@@ -44,16 +44,33 @@ func EvalBegin(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 	return result, nil
 }
 
+// ReturnSignal is a custom error type that signals a return with a value
+type ReturnSignal struct {
+	Value core.LispValue
+}
+
+func (r ReturnSignal) Error() string {
+	return "return with value"
+}
+
 func EvalReturn(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) > 1 {
 		return nil, fmt.Errorf("return takes at most one argument")
 	}
 
+	// If no argument is provided, return None
 	if len(args) == 0 {
-		return nil, nil
+		return nil, ReturnSignal{Value: core.PythonicNone{}}
 	}
 
-	return e.Eval(args[0], env)
+	// Evaluate the return value
+	val, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return a special signal with the return value
+	return nil, ReturnSignal{Value: val}
 }
 
 func EvalYield(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {

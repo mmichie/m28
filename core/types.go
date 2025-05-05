@@ -98,6 +98,40 @@ type Unquote struct {
 	Expr LispValue
 }
 
+// SpecialFormMarker represents a special form registered in the environment
+type SpecialFormMarker struct {
+	Name LispSymbol
+}
+
+// IsBuiltinSpecialForm checks if a symbol is a built-in special form
+func IsBuiltinSpecialForm(symbol LispSymbol) bool {
+	// List of all special forms - maintain this in sync with special_forms/special_forms.go
+	specialForms := map[LispSymbol]bool{
+		// Control Flow
+		"if": true, "elif": true, "else": true,
+		"for": true, "while": true, "try": true,
+		"break": true, "continue": true, "pass": true,
+
+		// Function and Class Definition
+		"def": true, "define": true, "class": true, "lambda": true,
+
+		// Module Management
+		"import": true,
+
+		// Exception Handling
+		"raise": true, "assert": true,
+
+		// Variable Scope
+		"global": true, "nonlocal": true,
+
+		// Misc
+		"with": true, "begin": true, "return": true, "yield": true, "del": true,
+	}
+	
+	_, ok := specialForms[symbol]
+	return ok
+}
+
 // UnquoteSplicing represents an unquote-splicing expression
 type UnquoteSplicing struct {
 	Expr LispValue
