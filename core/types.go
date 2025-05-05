@@ -31,6 +31,9 @@ type LispComprehension struct {
 	Condition  LispValue  // Optional filter condition (nil if no condition)
 }
 
+// LispTuple represents a Python-style tuple (immutable sequence)
+type LispTuple []LispValue
+
 // BuiltinFunc represents a built-in function
 type BuiltinFunc func([]LispValue, Environment) (LispValue, error)
 
@@ -178,6 +181,8 @@ func IsTruthy(v LispValue) bool {
 		return len(v) > 0
 	case LispListLiteral:
 		return len(v) > 0
+	case LispTuple:
+		return len(v) > 0
 	case *PythonicDict:
 		return len(v.data) > 0
 	case *PythonicSet:
@@ -231,6 +236,20 @@ func EqualValues(a, b LispValue) bool {
 		}
 		// Check if b is also a LispListLiteral
 		if vb, ok := b.(LispListLiteral); ok {
+			if len(va) != len(vb) {
+				return false
+			}
+			for i := range va {
+				if !EqualValues(va[i], vb[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	case LispTuple:
+		// Check if b is a LispTuple
+		if vb, ok := b.(LispTuple); ok {
 			if len(va) != len(vb) {
 				return false
 			}
@@ -327,6 +346,16 @@ func PrintValue(val LispValue) string {
 			elements[i] = PrintValue(elem)
 		}
 		return "[" + strings.Join(elements, ", ") + "]"
+	case LispTuple:
+		elements := make([]string, len(v))
+		for i, elem := range v {
+			elements[i] = PrintValue(elem)
+		}
+		// Add trailing comma for single-element tuples to distinguish from parenthesized expressions
+		if len(v) == 1 {
+			return "(" + elements[0] + ",)"
+		}
+		return "(" + strings.Join(elements, ", ") + ")"
 	case LispComprehension:
 		// Format as [expr for var in iterable if condition]
 		result := "[" + PrintValue(v.Expression) + " for " + string(v.Variable) + " in " + PrintValue(v.Iterable)
@@ -389,6 +418,10 @@ func EqValues(a, b LispValue) bool {
 		// For a list literal, check if it's the same object
 		vb, ok := b.(LispListLiteral)
 		return ok && &va == &vb
+	case LispTuple:
+		// For a tuple, check if it's the same object
+		vb, ok := b.(LispTuple)
+		return ok && &va == &vb
 	case *PythonicDict:
 		vb, ok := b.(*PythonicDict)
 		return ok && va == vb
@@ -412,7 +445,8 @@ func PrintValueWithoutQuotes(val LispValue) string {
 func IsList(v LispValue) bool {
 	_, isList := v.(LispList)
 	_, isListLiteral := v.(LispListLiteral)
-	return isList || isListLiteral || v == nil
+	_, isTuple := v.(LispTuple)
+	return isList || isListLiteral || isTuple || v == nil
 }
 
 // Compare compares two LispValues and returns an integer indicating their relative order.
@@ -499,6 +533,20 @@ func Compare(a, b LispValue) int {
 			if len(vaList) < len(vbList) {
 				return -1
 			} else if len(vaList) > len(vbList) {
+				return 1
+			}
+			return 0
+		}
+	case LispTuple:
+		if vb, ok := b.(LispTuple); ok {
+			for i := 0; i < len(va) && i < len(vb); i++ {
+				if cmp := Compare(va[i], vb[i]); cmp != 0 {
+					return cmp
+				}
+			}
+			if len(va) < len(vb) {
+				return -1
+			} else if len(va) > len(vb) {
 				return 1
 			}
 			return 0

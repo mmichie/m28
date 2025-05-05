@@ -67,6 +67,37 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 
 	switch token {
 	case "(":
+		// Check if we might have a tuple by looking ahead for commas
+
+		// Special case for empty tuple/list: "()"
+		if index < len(tokens) && tokens[index] == ")" {
+			// Empty list
+			return core.LispList{}, index + 1, nil
+		}
+
+		// Check if there's a comma somewhere before the closing parenthesis
+		isTuple := false
+		searchIndex := index
+		parenDepth := 0
+		for searchIndex < len(tokens) {
+			if tokens[searchIndex] == ")" && parenDepth == 0 {
+				break
+			} else if tokens[searchIndex] == "(" {
+				parenDepth++
+			} else if tokens[searchIndex] == ")" {
+				parenDepth--
+			} else if tokens[searchIndex] == "," && parenDepth == 0 {
+				isTuple = true
+				break
+			}
+			searchIndex++
+		}
+
+		if isTuple {
+			return parseTuple(tokens, index)
+		}
+
+		// If no comma found at this level, parse as a regular list
 		return parseList(tokens, index)
 	case ")":
 		return nil, index, fmt.Errorf("unexpected closing parenthesis")
@@ -321,6 +352,46 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 	}
 
 	return comprehension, index, nil
+}
+
+// parseTuple parses a tuple of the form (elem1, elem2, ..., elemN)
+func parseTuple(tokens []string, index int) (core.LispValue, int, error) {
+	var elements []core.LispValue
+	hasComma := false
+
+	// Parse all elements until closing parenthesis
+	for index < len(tokens) && tokens[index] != ")" {
+		// Skip commas between elements
+		if tokens[index] == "," {
+			hasComma = true
+			index++
+			continue
+		}
+
+		// Parse tuple element
+		value, newIndex, err := parse(tokens, index)
+		if err != nil {
+			return nil, newIndex, err
+		}
+		elements = append(elements, value)
+		index = newIndex
+	}
+
+	if index >= len(tokens) {
+		return nil, index, fmt.Errorf("missing closing parenthesis for tuple")
+	}
+
+	// Handle special case for single-element tuple: (x,)
+	// It must have a comma to be a tuple, otherwise it's just a parenthesized expression
+	if len(elements) == 1 && !hasComma {
+		// If only one element and no comma, it's not a tuple but a parenthesized expression
+		return elements[0], index + 1, nil
+	}
+
+	// Skip closing parenthesis
+	index++
+
+	return core.LispTuple(elements), index, nil
 }
 
 func parseAtom(token string) core.LispValue {

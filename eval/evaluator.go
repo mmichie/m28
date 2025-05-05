@@ -91,6 +91,17 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 			result[i] = evalElem
 		}
 		return result, nil
+	case core.LispTuple:
+		// Evaluate tuple elements (similar to list literals)
+		result := make(core.LispTuple, len(v))
+		for i, elem := range v {
+			evalElem, err := e.Eval(elem, env)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating tuple element: %v", err)
+			}
+			result[i] = evalElem
+		}
+		return result, nil
 	case core.LispComprehension:
 		return e.evalComprehension(v, env)
 	case core.LispList:

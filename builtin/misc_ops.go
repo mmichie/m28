@@ -550,6 +550,10 @@ func lenFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 	switch v := args[0].(type) {
 	case core.LispList:
 		return float64(len(v)), nil
+	case core.LispListLiteral:
+		return float64(len(v)), nil
+	case core.LispTuple:
+		return float64(len(v)), nil
 	case string:
 		return float64(len(v)), nil
 	case map[core.LispValue]core.LispValue:

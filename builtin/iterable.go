@@ -178,24 +178,39 @@ func listFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 }
 
 func nthFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	// Get: (nth list index)
+	// Get: (nth sequence index)
 	if len(args) == 2 {
-		list, ok := args[0].(core.LispList)
-		if !ok {
-			return nil, fmt.Errorf("nth first argument must be a list")
-		}
-
 		index, ok := args[1].(float64)
 		if !ok {
 			return nil, fmt.Errorf("nth second argument must be a number")
 		}
 
 		i := int(index)
-		if i < 0 || i >= len(list) {
-			return nil, fmt.Errorf("index out of range: %d", i)
-		}
 
-		return list[i], nil
+		switch seq := args[0].(type) {
+		case core.LispList:
+			if i < 0 || i >= len(seq) {
+				return nil, fmt.Errorf("index out of range: %d", i)
+			}
+			return seq[i], nil
+		case core.LispListLiteral:
+			if i < 0 || i >= len(seq) {
+				return nil, fmt.Errorf("index out of range: %d", i)
+			}
+			return seq[i], nil
+		case core.LispTuple:
+			if i < 0 || i >= len(seq) {
+				return nil, fmt.Errorf("index out of range: %d", i)
+			}
+			return seq[i], nil
+		case string:
+			if i < 0 || i >= len(seq) {
+				return nil, fmt.Errorf("index out of range: %d", i)
+			}
+			return string(seq[i]), nil
+		default:
+			return nil, fmt.Errorf("nth first argument must be a sequence (list, tuple, or string), got %T", args[0])
+		}
 	}
 
 	return nil, fmt.Errorf("nth requires exactly 2 arguments")
