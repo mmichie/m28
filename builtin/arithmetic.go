@@ -29,13 +29,13 @@ func assignFunc(args []core.LispValue, env core.Environment) (core.LispValue, er
 		return nil, fmt.Errorf("first argument to = must be a symbol")
 	}
 	value := args[1]
-	
+
 	// First try to update an existing variable in any scope
 	if !env.SetMutable(symbol, value) {
 		// If the variable doesn't exist anywhere, define it in the current scope
 		env.Define(symbol, value)
 	}
-	
+
 	return value, nil
 }
 

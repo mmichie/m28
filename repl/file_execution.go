@@ -20,7 +20,7 @@ func (r *REPL) ExecuteFile(filename string) error {
 
 	// Process the entire file as a single unit to ensure proper parsing
 	content := string(fileContent)
-	
+
 	// Let the parser handle the entire file to properly manage nested expressions
 	_, err = r.EvaluateString(content)
 	if err != nil {

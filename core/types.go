@@ -74,17 +74,17 @@ func IsExceptionOfType(err error, typeName string) bool {
 
 // StandardExceptions defines the standard exception types
 var StandardExceptions = map[string]*Exception{
-	"Exception":           {Type: "Exception", Message: ""},
-	"ValueError":          {Type: "ValueError", Message: ""},
-	"TypeError":           {Type: "TypeError", Message: ""},
-	"IndexError":          {Type: "IndexError", Message: ""},
-	"KeyError":            {Type: "KeyError", Message: ""},
-	"NameError":           {Type: "NameError", Message: ""},
-	"ZeroDivisionError":   {Type: "ZeroDivisionError", Message: ""},
-	"AssertionError":      {Type: "AssertionError", Message: ""},
-	"RuntimeError":        {Type: "RuntimeError", Message: ""},
-	"IOError":             {Type: "IOError", Message: ""},
-	"FileNotFoundError":   {Type: "FileNotFoundError", Message: ""},
+	"Exception":         {Type: "Exception", Message: ""},
+	"ValueError":        {Type: "ValueError", Message: ""},
+	"TypeError":         {Type: "TypeError", Message: ""},
+	"IndexError":        {Type: "IndexError", Message: ""},
+	"KeyError":          {Type: "KeyError", Message: ""},
+	"NameError":         {Type: "NameError", Message: ""},
+	"ZeroDivisionError": {Type: "ZeroDivisionError", Message: ""},
+	"AssertionError":    {Type: "AssertionError", Message: ""},
+	"RuntimeError":      {Type: "RuntimeError", Message: ""},
+	"IOError":           {Type: "IOError", Message: ""},
+	"FileNotFoundError": {Type: "FileNotFoundError", Message: ""},
 }
 
 // PythonicSet represents a Python-style set
@@ -106,8 +106,8 @@ type Environment interface {
 
 // ContextManager interface defines the methods for the context manager protocol
 type ContextManager interface {
-	Enter() (LispValue, error)     // __enter__ method
-	Exit(exc LispValue) error      // __exit__ method
+	Enter() (LispValue, error) // __enter__ method
+	Exit(exc LispValue) error  // __exit__ method
 }
 
 // Generator represents a generator function that can be resumed and yield values
@@ -134,9 +134,9 @@ type Lambda struct {
 	Closure       Environment
 	DefaultValues map[LispSymbol]LispValue
 	// Add a shared state environment for closures
-	SharedEnv     Environment
+	SharedEnv Environment
 	// Add a unique ID to identify each Lambda instance
-	InstanceID    int64
+	InstanceID int64
 }
 
 // OptionalParam represents an optional parameter in a Lambda
@@ -191,7 +191,7 @@ func IsBuiltinSpecialForm(symbol LispSymbol) bool {
 		// Misc
 		"with": true, "begin": true, "return": true, "yield": true, "del": true,
 	}
-	
+
 	_, ok := specialForms[symbol]
 	return ok
 }

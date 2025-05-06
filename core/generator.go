@@ -4,6 +4,23 @@ import (
 	"fmt"
 )
 
+// Define the signal types for generator control flow
+type YieldSignal struct {
+	Value LispValue
+}
+
+func (y YieldSignal) Error() string {
+	return "generator yield"
+}
+
+type ReturnSignal struct {
+	Value LispValue
+}
+
+func (r ReturnSignal) Error() string {
+	return "generator return"
+}
+
 // NewGenerator creates a new generator from a function and arguments
 func NewGenerator(function *Lambda, args []LispValue) *Generator {
 	return &Generator{
@@ -17,7 +34,19 @@ func NewGenerator(function *Lambda, args []LispValue) *Generator {
 }
 
 // Next advances the generator to the next yield point
-func (g *Generator) Next(e Evaluator) (LispValue, error) {
+// For use with dot notation - simplified version that doesn't need evaluator
+func (g *Generator) Next() (LispValue, error) {
+	if g.IsDone {
+		return nil, &Exception{
+			Type:    "StopIteration",
+			Message: "Generator exhausted",
+		}
+	}
+	return nil, fmt.Errorf("generator.next requires an evaluator, use the 'next' built-in function instead")
+}
+
+// NextWithEval advances the generator to the next yield point using an evaluator
+func (g *Generator) NextWithEval(e Evaluator) (LispValue, error) {
 	// If generator is done, return StopIteration
 	if g.IsDone {
 		return nil, &Exception{
@@ -57,12 +86,12 @@ func (g *Generator) Next(e Evaluator) (LispValue, error) {
 	if err == nil || IsReturnSignal(err) {
 		// Generator is now done
 		g.IsDone = true
-		
+
 		// If it's a return, get the return value
 		if returnErr, ok := err.(ReturnSignal); ok {
 			return returnErr.Value, nil
 		}
-		
+
 		// Normal completion
 		return result, nil
 	}

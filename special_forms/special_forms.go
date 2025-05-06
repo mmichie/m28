@@ -28,9 +28,9 @@ func init() {
 		"define": EvalDef, // Also add 'define' as an alias for 'def'
 		"class":  EvalClass,
 		"lambda": EvalLambdaPython,
-		
+
 		// Object Oriented Programming
-		".":      EvalDot, // Dot notation for method access
+		// Dot notation forms are registered in RegisterDotForms
 
 		// Module Management
 		"import": EvalImport,
@@ -51,20 +51,20 @@ func init() {
 		"yield":  EvalYield,
 		"del":    EvalDel,
 	}
-	
-	// Register alternative special forms
-	Register(specialForms)
+
+	// Register alternative and dot notation special forms
+	RegisterDotForms(specialForms)
 }
 
 func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {
 	return specialForms
 }
 
-// RegisterSpecialForms registers the special forms as special functions 
+// RegisterSpecialForms registers the special forms as special functions
 // that will be recognized by the evaluator, even in lambda bodies
 func RegisterSpecialForms(env core.Environment) {
 	// Register special forms in the environment as special markers
-	for name, _ := range specialForms {
+	for name := range specialForms {
 		// We register a special marker to indicate this is a special form
 		// The actual implementation is in the evaluator
 		env.Define(name, core.SpecialFormMarker{Name: name})

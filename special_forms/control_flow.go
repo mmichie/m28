@@ -189,7 +189,7 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 
 	// Handle the exception by matching it with except blocks
 	exception, isException := tryErr.(*core.Exception)
-	
+
 	// Iterate through except blocks
 	for _, exceptBlock := range exceptBlocks {
 		exceptClause, ok := exceptBlock.(core.LispList)
@@ -219,16 +219,16 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				if len(exceptClause) == 3 {
 					return e.Eval(exceptClause[2], env)
 				}
-				
+
 				// Try to handle 'as' variable binding: (except ExceptionType as e ...)
 				if len(exceptClause) >= 5 && string(exceptClause[2].(core.LispSymbol)) == "as" {
 					varName := exceptClause[3].(core.LispSymbol)
 					exceptBody := exceptClause[4]
-					
+
 					// Create a new environment with the exception bound to the variable
 					exceptEnv := env.NewEnvironment(env)
 					exceptEnv.Define(varName, exception)
-					
+
 					return e.Eval(exceptBody, exceptEnv)
 				}
 			}

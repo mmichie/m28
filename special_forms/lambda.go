@@ -2,11 +2,11 @@ package special_forms
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"math/rand"
 
 	"github.com/mmichie/m28/core"
 )
@@ -14,10 +14,10 @@ import (
 // Global counter for generating unique instance IDs
 var (
 	instanceCounter int64 = 0
-	idMutex sync.Mutex
+	idMutex         sync.Mutex
 	// Global map to store shared environments for each lambda instance
 	sharedEnvs = make(map[int64]core.Environment)
-	envMutex sync.RWMutex
+	envMutex   sync.RWMutex
 )
 
 func init() {
@@ -40,26 +40,26 @@ func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, e
 		// If not, assign a new unique ID
 		lambda.InstanceID = getNextInstanceID()
 	}
-	
+
 	// Get or create the shared environment for this lambda instance
 	envMutex.RLock()
 	sharedEnv, exists := sharedEnvs[lambda.InstanceID]
 	envMutex.RUnlock()
-	
+
 	if !exists {
 		// Create a new environment for this lambda instance
 		sharedEnv = env.NewEnvironment(lambda.Closure)
-		
+
 		// Register special forms and builtins
 		registerSpecialFormsIn(sharedEnv)
 		registerBuiltinsIn(sharedEnv)
-		
+
 		// Store it in our global map
 		envMutex.Lock()
 		sharedEnvs[lambda.InstanceID] = sharedEnv
 		envMutex.Unlock()
 	}
-	
+
 	// Bind parameters to arguments in this shared environment
 	if err := bindParams(lambda, args, sharedEnv); err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment)
 	if list, ok := lambda.Body.(core.LispList); ok {
 		var result core.LispValue = core.PythonicNone{}
 		var err error
-		
+
 		// For a single expression that's a list (like (+ a b)), evaluate it as one unit
 		if len(list) == 1 {
 			if exprList, isList := list[0].(core.LispList); isList {
@@ -113,7 +113,7 @@ func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment)
 				return result, nil
 			}
 		}
-		
+
 		// Multiple expressions (e.g., from multiline lambda), evaluate each in sequence
 		for _, expr := range list {
 			result, err = e.Eval(expr, env)
@@ -122,14 +122,14 @@ func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment)
 				if returnSig, ok := err.(ReturnSignal); ok {
 					return returnSig.Value, nil
 				}
-				
+
 				fmt.Printf("Error evaluating expression in lambda body: %v\n", err)
 				return nil, err
 			}
 		}
 		return result, nil
 	}
-	
+
 	// If body is a single expression, just evaluate it
 	result, err := e.Eval(lambda.Body, env)
 	if err != nil {

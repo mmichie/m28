@@ -1,0 +1,20 @@
+# Test dict methods with dot notation
+
+# Create a dictionary
+(print "Creating a dictionary...")
+(= person (dict "name" "Alice" "age" 30))
+
+# Test dictionary get method
+(print "\nUsing dict.get method to retrieve name:")
+(print (dot person "get" "name"))
+(print "Expected: Alice")
+
+# Add a new key using set method
+(print "\nAdding new property with dict.set:")
+(dot person "set" "occupation" "Engineer")
+(print "Getting new property:")
+(print (get person "occupation"))
+(print "Expected: Engineer")
+
+# Test complete
+(print "\nTest complete!")

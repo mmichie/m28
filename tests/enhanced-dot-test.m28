@@ -1,0 +1,143 @@
+# Enhanced Dot Notation Test Suite
+# Tests for all aspects of dot notation including property access and method calls
+
+# Part 1: Basic property access
+
+(print "--- Part 1: Basic Dictionary Property Access ---")
+
+# Create a simple dictionary with properties
+(= person (dict "name" "Alice" "age" 30 "city" "Wonderland"))
+
+# Test direct property access using dot notation
+(print "Person's name (dot notation):")
+(print (. person "name"))
+(print "Expected: Alice")
+
+# Test property access using get method
+(print "\nPerson's age (using get):")
+(print (get person "age"))
+(print "Expected: 30")
+
+# Part 2: Dictionary Method Calls
+
+(print "\n--- Part 2: Dictionary Method Calls ---")
+
+# Test dictionary get method
+(print "\nUsing dict.get method:")
+(print (. person "get" "name"))
+(print "Expected: Alice")
+
+# Add a new key using set method
+(print "\nAdding new property with dict.set:")
+(= updated_person (. person "set" "occupation" "Engineer"))
+(print (. person "get" "occupation"))
+(print "Expected: Engineer")
+
+# Using keys method
+(print "\nListing all keys with dict.keys:")
+(print (. person "keys"))
+(print "Expected: A list of keys: age, city, name, occupation")
+
+# Using values method
+(print "\nListing all values with dict.values:")
+(print (. person "values"))
+(print "Expected: A list of values: 30, Wonderland, Alice, Engineer")
+
+# Part 3: Object-style programming
+
+(print "\n--- Part 3: Object-Style Programming ---")
+
+# Create a counter object with methods
+(def (make-counter initial)
+  (= count initial)
+  (= counter (dict))
+  
+  # Define increment method
+  (def (increment self amount)
+    (= count (+ count amount))
+    count)
+  
+  # Define get-count method
+  (def (get-count self)
+    count)
+  
+  # Register methods in the counter dictionary
+  (. counter "set" "increment" increment)
+  (. counter "set" "get-count" get-count)
+  
+  # Return the counter object
+  counter)
+
+# Create a counter instance
+(= my-counter (make-counter 10))
+
+# Test method calls with dot notation
+(print "\nInitial counter value:")
+(print (. my-counter "get-count"))
+(print "Expected: 10")
+
+(print "\nIncrement counter by 5:")
+(print (. my-counter "increment" 5))
+(print "Expected: 15")
+
+(print "\nCurrent counter value:")
+(print (. my-counter "get-count"))
+(print "Expected: 15")
+
+# Part 4: Method Chaining
+
+(print "\n--- Part 4: Method Chaining ---")
+
+# Create a new dictionary
+(= config (dict))
+
+# Chain multiple method calls
+(print "\nChaining multiple method calls:")
+(= result (. (. (. config "set" "host" "localhost") "set" "port" 8080) "set" "debug" True))
+
+# Verify values were set
+(print (. config "get" "host"))
+(print "Expected: localhost")
+(print (. config "get" "port"))
+(print "Expected: 8080")
+(print (. config "get" "debug"))
+(print "Expected: True")
+
+# Part 5: Generator Method Test
+
+(print "\n--- Part 5: Generator Methods ---")
+
+# Define a simple generator function
+(def (count-up-to n)
+  (= i 0)
+  (while (< i n)
+    (yield i)
+    (= i (+ i 1))))
+
+# Create a generator
+(= counter (count-up-to 3))
+
+# Use dot notation to call next on generator
+(print "\nGenerator values using .next:")
+(print (. counter "next"))
+(print "Expected: 0")
+(print (. counter "next"))
+(print "Expected: 1")
+(print (. counter "next"))
+(print "Expected: 2")
+
+# Part 6: Nested Properties (requires parser enhancement)
+
+(print "\n--- Part 6: Nested Properties ---")
+
+# Create nested dictionaries
+(= address (dict "street" "123 Main St" "city" "Metropolis"))
+(= employee (dict "name" "Bob" "address" address))
+
+# Try nested property access (if supported)
+(print "\nAccessing nested property:")
+(print (. (. employee "address") "city"))
+(print "Expected: Metropolis")
+
+# Tests complete
+(print "\n--- All Tests Complete ---")

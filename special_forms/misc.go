@@ -46,14 +46,14 @@ func EvalWith(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 				if len(contextList) < 2 {
 					return nil, fmt.Errorf("open requires at least a filename")
 				}
-				
+
 				// Evaluate the filename
 				filenameVal, err := e.Eval(contextList[1], env)
 				if err != nil {
 					return nil, err
 				}
 				filename := fmt.Sprintf("%v", filenameVal)
-				
+
 				// Determine the mode (default to "r")
 				mode := "r"
 				if len(contextList) >= 3 {
@@ -63,7 +63,7 @@ func EvalWith(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 					}
 					mode = fmt.Sprintf("%v", modeVal)
 				}
-				
+
 				contextManager = core.NewFileContextManager(filename, mode)
 			}
 		}
@@ -83,7 +83,7 @@ func EvalWith(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 
 	// Create a new environment for the with block
 	withEnv := env.NewEnvironment(env)
-	
+
 	// If using 'as', bind the context value to the variable
 	if varName != "" {
 		withEnv.Define(varName, contextValue)
@@ -92,7 +92,7 @@ func EvalWith(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 	// Execute the body
 	var result core.LispValue = core.PythonicNone{}
 	var bodyErr error
-	
+
 	for i := bodyStart; i < len(args); i++ {
 		result, bodyErr = e.Eval(args[i], withEnv)
 		if bodyErr != nil {
@@ -116,7 +116,7 @@ func EvalWith(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 	}
 
 	exitErr := cmInterface.Exit(exitException)
-	
+
 	// If body had an error and __exit__ didn't suppress it, propagate the body error
 	if bodyErr != nil && exitErr == nil {
 		return nil, bodyErr

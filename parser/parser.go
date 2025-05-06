@@ -26,21 +26,20 @@ func (p *Parser) Parse(input string) (core.LispValue, error) {
 
 func tokenize(input string) []string {
 	input = removeComments(input)
-	// Temporarily disable dot notation processing
-	return splitIntoRawTokens(input)
-	// return processDotNotation(splitIntoRawTokens(input))
+	// Enable dot notation processing
+	return processDotNotation(splitIntoRawTokens(input))
 }
 
 func removeComments(input string) string {
 	// Process comments line-by-line to handle them more accurately
 	var result strings.Builder
 	lines := strings.Split(input, "\n")
-	
+
 	for _, line := range lines {
 		// Find the first "#" that's not inside a string literal
 		inString := false
 		commentPos := -1
-		
+
 		for i, ch := range line {
 			if ch == '"' && (i == 0 || line[i-1] != '\\') {
 				inString = !inString
@@ -49,16 +48,16 @@ func removeComments(input string) string {
 				break
 			}
 		}
-		
+
 		// If a comment was found, remove it
 		if commentPos >= 0 {
 			line = line[:commentPos]
 		}
-		
+
 		result.WriteString(line)
 		result.WriteString("\n")
 	}
-	
+
 	return result.String()
 }
 
@@ -68,67 +67,90 @@ func splitIntoRawTokens(input string) []string {
 	return tokenRegex.FindAllString(input, -1)
 }
 
+// Helper function to check if a token is a numeric literal
+func isNumericLiteral(token string) bool {
+	// Check if it's a valid float (handles cases like 3.14)
+	if _, err := strconv.ParseFloat(token, 64); err == nil {
+		return true
+	}
+
+	// Check if it starts with a dot followed by a digit (like .5)
+	if token[0] == '.' && len(token) > 1 && token[1] >= '0' && token[1] <= '9' {
+		return true
+	}
+
+	return false
+}
+
 // processDotNotation transforms dot notation tokens into lisp expressions
 // For example: "object.method" becomes ["(" "." "object" "\"method\"" ")"]
+// Also handles nested properties like object.prop.method
 func processDotNotation(tokens []string) []string {
 	var result []string
-	
-	for _, token := range tokens {
+
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+
 		// Skip tokens that are not symbols or don't contain dots
 		if token == "." || len(token) <= 1 || !strings.Contains(token, ".") {
 			result = append(result, token)
 			continue
 		}
-		
-		// Don't process numeric literals with decimals (like 3.14)
-		if _, err := strconv.ParseFloat(token, 64); err == nil {
+
+		// Don't process numeric literals with decimals
+		if isNumericLiteral(token) {
 			result = append(result, token)
 			continue
 		}
-		
-		// Don't process special symbols starting with dot (like .5)
-		if token[0] == '.' {
-			if len(token) > 1 && token[1] >= '0' && token[1] <= '9' {
-				result = append(result, token)
-				continue
-			}
-		}
-		
+
 		// Split on dots
 		parts := strings.Split(token, ".")
 		if len(parts) < 2 {
 			result = append(result, token)
 			continue
 		}
-		
-		// Create a dot expression: object.method becomes (. object "method")
-		result = append(result, "(")
-		result = append(result, ".")
-		result = append(result, parts[0])
-		result = append(result, "\""+parts[1]+"\"")
-		result = append(result, ")")
-		
-		// If there are more parts, we'll handle them in a future update
-		// For now, we only support one level of dot notation
-		if len(parts) > 2 {
-			fmt.Println("Warning: Nested dot notation not fully supported yet.")
+
+		// Handle nested property access recursively
+		if len(parts) == 2 {
+			// Simple case: object.method becomes (. object "method")
+			result = append(result, "(")
+			result = append(result, ".")
+			result = append(result, parts[0])
+			result = append(result, "\""+parts[1]+"\"")
+			result = append(result, ")")
+		} else {
+			// Complex case: object.prop.method
+			// First handle object.prop
+			current := []string{"(", ".", parts[0], "\"" + parts[1] + "\"", ")"}
+
+			// Then handle the rest of the chain
+			for j := 2; j < len(parts); j++ {
+				// Create a temporary representation of the current expression
+				tempExpr := strings.Join(current, " ")
+
+				// Now create a new dot expression with the result of the previous one
+				current = []string{"(", ".", "(" + tempExpr + ")", "\"" + parts[j] + "\"", ")"}
+			}
+
+			// Add the final expression to the result
+			result = append(result, current...)
 		}
 	}
-	
+
 	return result
 }
 
 func parseMultiple(tokens []string) (core.LispValue, error) {
 	var expressions core.LispList
 	index := 0
-	
+
 	// Skip whitespace and empty tokens
 	for index < len(tokens) {
 		if tokens[index] == "" || strings.TrimSpace(tokens[index]) == "" {
 			index++
 			continue
 		}
-		
+
 		expr, newIndex, err := parse(tokens, index)
 		if err != nil {
 			return nil, fmt.Errorf("parse error at token %d (%s): %v", index, tokens[index], err)
@@ -136,17 +158,17 @@ func parseMultiple(tokens []string) (core.LispValue, error) {
 		expressions = append(expressions, expr)
 		index = newIndex
 	}
-	
+
 	// If we have exactly one expression, return just that
 	if len(expressions) == 1 {
 		return expressions[0], nil
 	}
-	
+
 	// If empty, return an empty list
 	if len(expressions) == 0 {
 		return core.LispList{}, nil
 	}
-	
+
 	// Otherwise return multiple expressions
 	return expressions, nil
 }
@@ -196,34 +218,34 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 		if index < len(tokens) && tokens[index] == "." {
 			// Skip the dot token
 			index++
-			
+
 			// This is a dot notation call
 			// Parse the object expression
 			if index >= len(tokens) {
 				return nil, index, fmt.Errorf("unexpected end of input after dot operator")
 			}
-			
+
 			obj, newIndex, err := parse(tokens, index)
 			if err != nil {
 				return nil, newIndex, err
 			}
 			index = newIndex
-			
+
 			// Parse the property/method name
 			if index >= len(tokens) {
 				return nil, index, fmt.Errorf("unexpected end of input after object in dot notation")
 			}
-			
+
 			// The property name could be a string literal or a symbol
 			propName, newIndex, err := parse(tokens, index)
 			if err != nil {
 				return nil, newIndex, err
 			}
 			index = newIndex
-			
+
 			// Create the base dot expression
 			dotExpr := core.LispList{core.LispSymbol("."), obj, propName}
-			
+
 			// Parse any arguments (for method calls)
 			// Collect all expressions until the closing parenthesis
 			for index < len(tokens) && tokens[index] != ")" {
@@ -234,14 +256,14 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 				dotExpr = append(dotExpr, arg)
 				index = newIndex
 			}
-			
+
 			// Skip the closing parenthesis
 			if index < len(tokens) && tokens[index] == ")" {
 				index++
 			} else {
 				return nil, index, fmt.Errorf("missing closing parenthesis for dot notation")
 			}
-			
+
 			return dotExpr, index, nil
 		}
 
@@ -277,20 +299,20 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 func parseList(tokens []string, index int) (core.LispValue, int, error) {
 	var list core.LispList
 	startIndex := index
-	numOpenParens := 1  // We start with one open parenthesis
-	
+	numOpenParens := 1 // We start with one open parenthesis
+
 	for index < len(tokens) && tokens[index] != ")" {
 		if tokens[index] == "(" {
 			numOpenParens++
 		}
-		
-		/* // Temporarily commenting out dot processing to debug
+
 		// Check if the current token is '.' and it's being used as a dot operator or dotted pair
 		if tokens[index] == "." {
 			// Check the context to determine if this is a dot notation or a dotted pair
-			// If we have elements in the list and the first element is not the dot operator,
-			// it could be a dotted pair or a regular dot notation call
-			if len(list) > 0 && list[0] != core.LispSymbol(".") {
+			if len(list) == 1 && tokens[index-1] == "(" {
+				// This is a dot notation call - the list only has "." as the first element
+				// Do nothing special, proceed to normal processing which adds the dot as a symbol
+			} else if len(list) > 0 {
 				// This is a dotted pair (traditional Lisp syntax)
 				index++
 				if index >= len(tokens) {
@@ -309,7 +331,6 @@ func parseList(tokens []string, index int) (core.LispValue, int, error) {
 				return append(list, lastElem), newIndex + 1, nil
 			}
 		}
-		*/
 
 		val, newIndex, err := parse(tokens, index)
 		if err != nil {
@@ -318,12 +339,12 @@ func parseList(tokens []string, index int) (core.LispValue, int, error) {
 		list = append(list, val)
 		index = newIndex
 	}
-	
+
 	if index >= len(tokens) {
-		return nil, index, fmt.Errorf("missing closing parenthesis for list starting at token %d (expected %d closing parentheses)", 
+		return nil, index, fmt.Errorf("missing closing parenthesis for list starting at token %d (expected %d closing parentheses)",
 			startIndex, numOpenParens)
 	}
-	
+
 	return list, index + 1, nil
 }
 

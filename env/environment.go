@@ -83,7 +83,7 @@ func (e *Environment) SetupBuiltins() {
 	for name, fn := range core.BuiltinFuncs {
 		e.Set(core.LispSymbol(name), fn)
 	}
-	
+
 	// Register special form functions in builtins
 	// Removed direct special_forms dependency to avoid import cycle
 }

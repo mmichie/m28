@@ -58,11 +58,11 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		Closure:       env,
 		DefaultValues: defaultValues,
 		// Set SharedEnv to nil - it will be created in ApplyLambda
-		SharedEnv:     nil,
+		SharedEnv: nil,
 		// Assign a unique ID to this function instance
-		InstanceID:    getNextInstanceID(),
+		InstanceID: getNextInstanceID(),
 	}
-	
+
 	// Define the function in the current environment
 	env.Define(funcName, function)
 	return function, nil
@@ -72,20 +72,20 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 	if len(args) < 2 {
 		return nil, fmt.Errorf("class definition requires at least a name and a body")
 	}
-	
+
 	// Extract class name
 	className, ok := args[0].(core.LispSymbol)
 	if !ok {
 		return nil, fmt.Errorf("class name must be a symbol")
 	}
-	
+
 	// Extract class body expressions
 	classBody := args[1:]
-	
+
 	// Analyze class body to identify instance variables and methods
 	instanceVars := make(map[core.LispSymbol]core.LispValue)
 	methods := []core.LispList{}
-	
+
 	for _, expr := range classBody {
 		// If expression is a list, analyze further
 		if exprList, ok := expr.(core.LispList); ok && len(exprList) >= 1 {
@@ -102,7 +102,7 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 						continue
 					}
 				}
-				
+
 				// Check for method definitions (def (method-name self ...) ...)
 				if firstSymbol == "def" && len(exprList) >= 2 {
 					if methodSig, ok := exprList[1].(core.LispList); ok && len(methodSig) >= 1 {
@@ -114,22 +114,22 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 			}
 		}
 	}
-	
+
 	// Generate a factory function that creates new instances
 	// The factory function follows the pattern of a closure-based object creator
-    // (def (ClassName arg1 arg2...)
-    //   (= state1 val1)
-    //   (= state2 val2)
-    //   (def (method1 self arg1...) ...)
-    //   (def (method2 self arg1...) ...)
-    //   (= obj (dict))
-    //   (= obj (dict "method1" method1 "method2" method2))
-    //   obj)
-	
+	// (def (ClassName arg1 arg2...)
+	//   (= state1 val1)
+	//   (= state2 val2)
+	//   (def (method1 self arg1...) ...)
+	//   (def (method2 self arg1...) ...)
+	//   (= obj (dict))
+	//   (= obj (dict "method1" method1 "method2" method2))
+	//   obj)
+
 	// First, determine constructor parameters
 	var constructorParams []core.LispSymbol
 	constructorFound := false
-	
+
 	for _, method := range methods {
 		if len(method) >= 2 {
 			if methodSig, ok := method[1].(core.LispList); ok && len(methodSig) >= 1 {
@@ -150,18 +150,18 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 			}
 		}
 	}
-	
+
 	// Create the factory function expression
 	factoryFuncExpr := core.LispList{
 		core.LispSymbol("def"),
 		core.LispList{className}, // Function name
 	}
-	
+
 	// Add constructor parameters
 	for _, param := range constructorParams {
 		factoryFuncExpr[1] = append(factoryFuncExpr[1].(core.LispList), param)
 	}
-	
+
 	// Add instance variable definitions with default values
 	for varName, defaultValue := range instanceVars {
 		varAssign := core.LispList{
@@ -171,7 +171,7 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 		}
 		factoryFuncExpr = append(factoryFuncExpr, varAssign)
 	}
-	
+
 	// Process constructor
 	if constructorFound {
 		for _, method := range methods {
@@ -189,7 +189,7 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 			}
 		}
 	}
-	
+
 	// Add method definitions
 	for _, method := range methods {
 		if len(method) >= 2 {
@@ -199,29 +199,29 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 				if methodName == "init" || methodName == "__init__" {
 					continue
 				}
-				
+
 				// Add the method definition directly
 				factoryFuncExpr = append(factoryFuncExpr, method)
 			}
 		}
 	}
-	
+
 	// Create the return object dictionary
-	factoryFuncExpr = append(factoryFuncExpr, 
+	factoryFuncExpr = append(factoryFuncExpr,
 		core.LispList{
 			core.LispSymbol("="),
 			core.LispSymbol("obj"),
 			core.LispList{core.LispSymbol("dict")},
 		},
 	)
-	
+
 	// Add methods to the return dictionary
 	methodAssignments := core.LispList{
 		core.LispSymbol("="),
 		core.LispSymbol("obj"),
 		core.LispList{core.LispSymbol("dict")},
 	}
-	
+
 	// Add each method to the dict literal
 	for _, method := range methods {
 		if len(method) >= 2 {
@@ -231,25 +231,25 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 				if methodName == "init" || methodName == "__init__" {
 					continue
 				}
-				
+
 				// Add method to the dict literal
 				methodAssignments = append(methodAssignments, string(methodName))
 				methodAssignments = append(methodAssignments, methodName)
 			}
 		}
 	}
-	
+
 	factoryFuncExpr = append(factoryFuncExpr, methodAssignments)
-	
+
 	// Return the object
 	factoryFuncExpr = append(factoryFuncExpr, core.LispSymbol("obj"))
-	
+
 	// Evaluate the factory function expression
 	result, err := e.Eval(factoryFuncExpr, env)
 	if err != nil {
 		return nil, fmt.Errorf("error defining class: %v", err)
 	}
-	
+
 	return result, nil
 }
 
@@ -278,7 +278,7 @@ func EvalLambdaPython(e core.Evaluator, args []core.LispValue, env core.Environm
 		// Multiple expressions in the body
 		body = core.LispList(args[1:])
 	} else {
-		// Single expression in the body - but wrap it in a list to ensure 
+		// Single expression in the body - but wrap it in a list to ensure
 		// it's evaluated as a complete expression
 		body = core.LispList{args[1]}
 	}
@@ -286,12 +286,12 @@ func EvalLambdaPython(e core.Evaluator, args []core.LispValue, env core.Environm
 	// Create a new Lambda with a unique instance ID for proper closure behavior
 	// Each lambda instance gets a unique ID to maintain separate state
 	return &core.Lambda{
-		Params:        paramSymbols, 
-		Body:          body, 
-		Env:           env, 
+		Params:        paramSymbols,
+		Body:          body,
+		Env:           env,
 		Closure:       env,
 		DefaultValues: make(map[core.LispSymbol]core.LispValue),
-		SharedEnv:     nil, // Will be initialized in ApplyLambda
+		SharedEnv:     nil,                 // Will be initialized in ApplyLambda
 		InstanceID:    getNextInstanceID(), // Get a unique ID for this lambda
 	}, nil
 }
