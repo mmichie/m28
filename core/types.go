@@ -12,6 +12,12 @@ import (
 // LispValue represents any Lisp value
 type LispValue interface{}
 
+// LocatedValue wraps a LispValue with source location information
+type LocatedValue struct {
+	Value    LispValue
+	Location Location
+}
+
 // Applicable represents a value that can be applied to arguments (function-like)
 type Applicable interface {
 	Apply(Evaluator, []LispValue, Environment) (LispValue, error)

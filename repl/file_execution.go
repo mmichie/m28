@@ -21,6 +21,9 @@ func (r *REPL) ExecuteFile(filename string) error {
 	// Process the entire file as a single unit to ensure proper parsing
 	content := string(fileContent)
 
+	// Set the current filename in the parser for better error reporting
+	r.parser.SetFilename(filename)
+
 	// Let the parser handle the entire file to properly manage nested expressions
 	_, err = r.EvaluateString(content)
 	if err != nil {

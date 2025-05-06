@@ -10,16 +10,90 @@ import (
 
 type Evaluator struct {
 	specialForms map[core.LispSymbol]special_forms.SpecialFormFunc
+	callStack    []core.TraceEntry // Track the current call stack
+	currentFunc  string            // Track the current function name
 }
 
 func NewEvaluator() core.Evaluator {
 	return &Evaluator{
 		specialForms: special_forms.GetSpecialForms(),
+		callStack:    make([]core.TraceEntry, 0),
+		currentFunc:  "<toplevel>",
 	}
 }
 
+// pushCallFrame adds a new call frame to the call stack
+func (e *Evaluator) pushCallFrame(funcName string, location core.Location, statement string) {
+	entry := core.TraceEntry{
+		Function:  funcName,
+		Location:  location,
+		Statement: statement,
+	}
+	e.callStack = append(e.callStack, entry)
+	e.currentFunc = funcName
+}
+
+// popCallFrame removes the last call frame from the call stack
+func (e *Evaluator) popCallFrame() {
+	if len(e.callStack) > 0 {
+		e.callStack = e.callStack[:len(e.callStack)-1]
+		if len(e.callStack) > 0 {
+			e.currentFunc = e.callStack[len(e.callStack)-1].Function
+		} else {
+			e.currentFunc = "<toplevel>"
+		}
+	}
+}
+
+// getCurrentTraceback returns the current traceback
+func (e *Evaluator) getCurrentTraceback() core.Traceback {
+	// Create a copy of the call stack
+	traceback := make(core.Traceback, len(e.callStack))
+	copy(traceback, e.callStack)
+	return traceback
+}
+
+// getLocationFromExpr extracts location information from an expression
+func (e *Evaluator) getLocationFromExpr(expr core.LispValue) core.Location {
+	if located, ok := expr.(core.LocatedValue); ok {
+		return located.Location
+	}
+	// Default location if no source information is available
+	return core.Location{
+		Filename: "<unknown>",
+		Line:     0,
+		Column:   0,
+	}
+}
+
+// unwrapLocatedValue extracts the value from a LocatedValue
+func (e *Evaluator) unwrapLocatedValue(expr core.LispValue) core.LispValue {
+	if located, ok := expr.(core.LocatedValue); ok {
+		return located.Value
+	}
+	return expr
+}
+
 func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispValue, error) {
-	switch v := expr.(type) {
+	// Extract location information if available
+	location := e.getLocationFromExpr(expr)
+
+	// Track current expression evaluation in call stack for top-level expressions
+	// Use a generic name for expressions, we'll update it if it's a function call
+	exprStr := "expression"
+	if list, ok := expr.(core.LispList); ok && len(list) > 0 {
+		if sym, ok := list[0].(core.LispSymbol); ok {
+			exprStr = string(sym)
+		}
+	}
+	e.pushCallFrame("<eval>", location, exprStr)
+	defer e.popCallFrame()
+
+	// Unwrap the LocatedValue if present
+	unwrappedExpr := e.unwrapLocatedValue(expr)
+
+	// We need to switch on the unwrapped expression
+	switch v := unwrappedExpr.(type) {
 	case core.LispSymbol:
 		// Check for dot notation: module.attribute, dict.method, or object.attribute
 		if strings.Contains(string(v), ".") {
@@ -42,7 +116,8 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 			// Start with the first part
 			currentObj, ok := env.Get(core.LispSymbol(current))
 			if !ok {
-				return nil, fmt.Errorf("undefined object: %s", current)
+				err := fmt.Errorf("undefined object: %s", current)
+				return nil, e.enrichErrorWithTraceback(err)
 			}
 
 			// Traverse the chain of attributes
@@ -55,11 +130,13 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					var found bool
 					currentObj, found = dict.Get(attrName)
 					if !found {
-						return nil, fmt.Errorf("attribute %s not found in %s", attrName, current)
+						err := fmt.Errorf("attribute %s not found in %s", attrName, current)
+						return nil, e.enrichErrorWithTraceback(err)
 					}
 					current = current + "." + parts[i]
 				} else {
-					return nil, fmt.Errorf("%s is not an object with attributes", current)
+					err := fmt.Errorf("%s is not an object with attributes", current)
+					return nil, e.enrichErrorWithTraceback(err)
 				}
 			}
 
@@ -69,24 +146,33 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 		// Regular symbol lookup
 		value, ok := env.Get(v)
 		if !ok {
-			return nil, fmt.Errorf("undefined symbol: %s", v)
+			err := fmt.Errorf("undefined symbol: %s", v)
+			return nil, e.enrichErrorWithTraceback(err)
 		}
 		return value, nil
 	case float64, int, string, core.PythonicBool, core.PythonicNone:
 		return v, nil
 	case *core.PythonicDict:
 		// Evaluate dictionary literals
-		return e.evalDict(v, env)
+		result, err := e.evalDict(v, env)
+		if err != nil {
+			return nil, e.enrichErrorWithTraceback(err)
+		}
+		return result, nil
 	case *core.PythonicSet:
 		// Evaluate set literals
-		return e.evalSet(v, env)
+		result, err := e.evalSet(v, env)
+		if err != nil {
+			return nil, e.enrichErrorWithTraceback(err)
+		}
+		return result, nil
 	case core.LispListLiteral:
 		// Evaluate list literal elements
 		result := make(core.LispList, len(v))
 		for i, elem := range v {
 			evalElem, err := e.Eval(elem, env)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating list element: %v", err)
+				return nil, e.enrichErrorWithTraceback(err)
 			}
 			result[i] = evalElem
 		}
@@ -97,13 +183,17 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 		for i, elem := range v {
 			evalElem, err := e.Eval(elem, env)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating tuple element: %v", err)
+				return nil, e.enrichErrorWithTraceback(err)
 			}
 			result[i] = evalElem
 		}
 		return result, nil
 	case core.LispComprehension:
-		return e.evalComprehension(v, env)
+		result, err := e.evalComprehension(v, env)
+		if err != nil {
+			return nil, e.enrichErrorWithTraceback(err)
+		}
+		return result, nil
 	case core.LispList:
 		if len(v) == 0 {
 			return core.LispList{}, nil
@@ -123,7 +213,8 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 				// Start with the first part
 				currentObj, ok := env.Get(core.LispSymbol(current))
 				if !ok {
-					return nil, fmt.Errorf("undefined object: %s", current)
+					err := fmt.Errorf("undefined object: %s", current)
+					return nil, e.enrichErrorWithTraceback(err)
 				}
 
 				// Traverse all but the last part (which is the function name)
@@ -136,11 +227,13 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 						var found bool
 						currentObj, found = dict.Get(attrName)
 						if !found {
-							return nil, fmt.Errorf("attribute %s not found in %s", attrName, current)
+							err := fmt.Errorf("attribute %s not found in %s", attrName, current)
+							return nil, e.enrichErrorWithTraceback(err)
 						}
 						current = current + "." + parts[i]
 					} else {
-						return nil, fmt.Errorf("%s is not an object with attributes", current)
+						err := fmt.Errorf("%s is not an object with attributes", current)
+						return nil, e.enrichErrorWithTraceback(err)
 					}
 				}
 
@@ -152,70 +245,83 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					// Get the function
 					fnVal, found := dict.Get(funcName)
 					if !found {
-						return nil, fmt.Errorf("function %s not found in %s", funcName, current)
+						err := fmt.Errorf("function %s not found in %s", funcName, current)
+						return nil, e.enrichErrorWithTraceback(err)
 					}
 
 					// Evaluate the arguments
 					args, err := e.evalArgs(rest, env)
 					if err != nil {
-						return nil, fmt.Errorf("error evaluating arguments: %v", err)
+						return nil, e.enrichErrorWithTraceback(err)
 					}
 
 					// Apply the function
 					return e.Apply(fnVal, args, env)
 				} else {
-					return nil, fmt.Errorf("%s is not an object with methods", current)
+					err := fmt.Errorf("%s is not an object with methods", current)
+					return nil, e.enrichErrorWithTraceback(err)
 				}
 			} else if f == core.LispSymbol("=") {
 				// Special handling for assignment
 				if len(rest) != 2 {
-					return nil, fmt.Errorf("= requires exactly two arguments")
+					err := fmt.Errorf("= requires exactly two arguments")
+					return nil, e.enrichErrorWithTraceback(err)
 				}
 				symbol, ok := rest[0].(core.LispSymbol)
 				if !ok {
-					return nil, fmt.Errorf("first argument to = must be a symbol")
+					err := fmt.Errorf("first argument to = must be a symbol")
+					return nil, e.enrichErrorWithTraceback(err)
 				}
 				value, err := e.Eval(rest[1], env)
 				if err != nil {
-					return nil, err
+					return nil, e.enrichErrorWithTraceback(err)
 				}
 				env.Define(symbol, value)
 				return value, nil
 			}
 			if specialForm, ok := e.specialForms[f]; ok {
-				return specialForm(e, rest, env)
+				result, err := specialForm(e, rest, env)
+				if err != nil {
+					return nil, e.enrichErrorWithTraceback(err)
+				}
+				return result, nil
 			}
 
 			// Check for special form marker in the environment
 			if value, ok := env.Get(f); ok {
 				if marker, ok := value.(core.SpecialFormMarker); ok {
 					if specialForm, ok := e.specialForms[marker.Name]; ok {
-						return specialForm(e, rest, env)
+						result, err := specialForm(e, rest, env)
+						if err != nil {
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+						return result, nil
 					}
 				}
 			}
 			fn, err := e.Eval(f, env)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating symbol %s: %v", f, err)
+				return nil, e.enrichErrorWithTraceback(err)
 			}
 			args, err := e.evalArgs(rest, env)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating arguments: %v", err)
+				return nil, e.enrichErrorWithTraceback(err)
 			}
 			return e.Apply(fn, args, env)
 		default:
 			fn, err := e.Eval(first, env)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating function: %v", err)
+				return nil, e.enrichErrorWithTraceback(err)
 			}
 			args, err := e.evalArgs(rest, env)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating arguments: %v", err)
+				return nil, e.enrichErrorWithTraceback(err)
 			}
 			return e.Apply(fn, args, env)
 		}
 	default:
-		return nil, fmt.Errorf("unknown expression type: %T", expr)
+		err := fmt.Errorf("unknown expression type: %T", expr)
+		return nil, e.enrichErrorWithTraceback(err)
 	}
 }
 
@@ -239,7 +345,7 @@ func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]cor
 		// Otherwise evaluate normally
 		value, err := e.Eval(arg, env)
 		if err != nil {
-			return nil, err
+			return nil, e.enrichErrorWithTraceback(err)
 		}
 
 		// Check if the evaluated value contains a keyword format
@@ -253,23 +359,109 @@ func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]cor
 	return evaluated, nil
 }
 
+// enrichErrorWithTraceback adds traceback information to errors
+func (e *Evaluator) enrichErrorWithTraceback(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// If it's already an exception with a traceback, return it as is
+	if ex, ok := err.(*core.Exception); ok && ex.Traceback != nil && len(ex.Traceback) > 0 {
+		return ex
+	}
+
+	// Create a new exception or enrich an existing one
+	var ex *core.Exception
+	if exErr, ok := err.(*core.Exception); ok {
+		ex = exErr
+	} else {
+		// Convert regular error to Exception
+		ex = core.NewException("RuntimeError", err.Error())
+	}
+
+	// Add current traceback if not present
+	if ex.Traceback == nil || len(ex.Traceback) == 0 {
+		ex.Traceback = e.getCurrentTraceback()
+	}
+
+	return ex
+}
+
 func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	switch f := fn.(type) {
+	// Unwrap the function if it's a LocatedValue
+	unwrappedFn := e.unwrapLocatedValue(fn)
+
+	// Extract location information if available
+	location := e.getLocationFromExpr(fn)
+
+	// Convert args to string for traceback
+	argsStr := "("
+	for i, arg := range args {
+		if i > 0 {
+			argsStr += ", "
+		}
+		// Limit the string representation for brevity
+		argStr := core.PrintValue(arg)
+		if len(argStr) > 20 {
+			argStr = argStr[:17] + "..."
+		}
+		argsStr += argStr
+	}
+	argsStr += ")"
+
+	// Function name for call stack
+	var funcName string
+	switch f := unwrappedFn.(type) {
 	case core.BuiltinFunc:
-		return f(args, env)
+		funcName = "<builtin>"
+	case *core.Lambda:
+		funcName = "<lambda>"
+	case core.LispSymbol:
+		funcName = string(f)
+	default:
+		funcName = "<anonymous>"
+	}
+
+	// Create a statement representation for the traceback
+	statement := funcName + argsStr
+
+	// Push a new call frame
+	e.pushCallFrame(funcName, location, statement)
+
+	// Defer popping the call frame to ensure it happens even on panic
+	defer e.popCallFrame()
+
+	var result core.LispValue
+	var err error
+
+	// Apply the function based on its type
+	switch f := unwrappedFn.(type) {
+	case core.BuiltinFunc:
+		result, err = f(args, env)
 	case *core.Lambda:
 		// Use the lambda directly - the instance ID mechanism ensures proper state isolation
-		return special_forms.ApplyLambda(e, f, args, env)
+		result, err = special_forms.ApplyLambda(e, f, args, env)
 	case core.LispList:
 		if len(f) > 0 && f[0] == core.LispSymbol("lambda") {
-			lambda, err := special_forms.EvalLambdaPython(e, f[1:], env)
-			if err != nil {
-				return nil, err
+			lambda, lambdaErr := special_forms.EvalLambdaPython(e, f[1:], env)
+			if lambdaErr != nil {
+				err = lambdaErr
+				break
 			}
-			return special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
+			result, err = special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
+		} else {
+			err = fmt.Errorf("not a function: %v", fn)
 		}
+	default:
+		err = fmt.Errorf("not a function: %v", fn)
 	}
-	return nil, fmt.Errorf("not a function: %v", fn)
+
+	// Enrich error with traceback if needed
+	if err != nil {
+		return nil, e.enrichErrorWithTraceback(err)
+	}
+
+	return result, nil
 }
 
 func evalSymbol(symbol core.LispSymbol, env core.Environment) (core.LispValue, error) {
@@ -300,34 +492,46 @@ func (e *Evaluator) evalList(list core.LispList, env core.Environment) (core.Lis
 	switch v := first.(type) {
 	case core.LispSymbol:
 		if specialForm, ok := e.specialForms[v]; ok {
-			return specialForm(e, rest, env)
+			result, err := specialForm(e, rest, env)
+			if err != nil {
+				return nil, e.enrichErrorWithTraceback(err)
+			}
+			return result, nil
 		}
 
 		// Check for special form marker in the environment
 		if value, ok := env.Get(v); ok {
 			if marker, ok := value.(core.SpecialFormMarker); ok {
 				if specialForm, ok := e.specialForms[marker.Name]; ok {
-					return specialForm(e, rest, env)
+					result, err := specialForm(e, rest, env)
+					if err != nil {
+						return nil, e.enrichErrorWithTraceback(err)
+					}
+					return result, nil
 				}
 			}
 		}
 		fn, err := e.Eval(v, env)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating symbol %s: %v", v, err)
+			err = fmt.Errorf("error evaluating symbol %s: %v", v, err)
+			return nil, e.enrichErrorWithTraceback(err)
 		}
 		args, err := e.evalArgs(rest, env)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating arguments: %v", err)
+			err = fmt.Errorf("error evaluating arguments: %v", err)
+			return nil, e.enrichErrorWithTraceback(err)
 		}
 		return e.Apply(fn, args, env)
 	default:
 		fn, err := e.Eval(first, env)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating function: %v", err)
+			err = fmt.Errorf("error evaluating function: %v", err)
+			return nil, e.enrichErrorWithTraceback(err)
 		}
 		args, err := e.evalArgs(rest, env)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating arguments: %v", err)
+			err = fmt.Errorf("error evaluating arguments: %v", err)
+			return nil, e.enrichErrorWithTraceback(err)
 		}
 		return e.Apply(fn, args, env)
 	}
@@ -340,11 +544,11 @@ func (e *Evaluator) evalDict(dict *core.PythonicDict, env core.Environment) (cor
 	keyFunc := func(key, value core.LispValue) error {
 		evaluatedKey, err := e.Eval(key, env)
 		if err != nil {
-			return err
+			return e.enrichErrorWithTraceback(err)
 		}
 		evaluatedValue, err := e.Eval(value, env)
 		if err != nil {
-			return err
+			return e.enrichErrorWithTraceback(err)
 		}
 		result.Set(evaluatedKey, evaluatedValue)
 		return nil
@@ -352,7 +556,7 @@ func (e *Evaluator) evalDict(dict *core.PythonicDict, env core.Environment) (cor
 
 	err := dict.Iterate(keyFunc)
 	if err != nil {
-		return nil, err
+		return nil, e.enrichErrorWithTraceback(err)
 	}
 
 	return result, nil
@@ -363,7 +567,7 @@ func (e *Evaluator) evalSet(set *core.PythonicSet, env core.Environment) (core.L
 	for v := range set.Data() {
 		evalValue, err := e.Eval(v, env)
 		if err != nil {
-			return nil, err
+			return nil, e.enrichErrorWithTraceback(err)
 		}
 		newSet.Add(evalValue)
 	}
@@ -371,7 +575,11 @@ func (e *Evaluator) evalSet(set *core.PythonicSet, env core.Environment) (core.L
 }
 
 func (e *Evaluator) applyLambda(lambda *core.Lambda, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	return special_forms.ApplyLambda(e, lambda, args, env)
+	result, err := special_forms.ApplyLambda(e, lambda, args, env)
+	if err != nil {
+		return nil, e.enrichErrorWithTraceback(err)
+	}
+	return result, nil
 }
 
 // evalComprehension evaluates a list comprehension: [expr for var in iterable if condition]
@@ -379,7 +587,8 @@ func (e *Evaluator) evalComprehension(comp core.LispComprehension, env core.Envi
 	// Evaluate the iterable expression
 	iterableVal, err := e.Eval(comp.Iterable, env)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating iterable in list comprehension: %v", err)
+		err = fmt.Errorf("error evaluating iterable in list comprehension: %v", err)
+		return nil, e.enrichErrorWithTraceback(err)
 	}
 
 	// Convert the iterable to a list
@@ -396,7 +605,8 @@ func (e *Evaluator) evalComprehension(comp core.LispComprehension, env core.Envi
 			iterList[i] = string(ch)
 		}
 	default:
-		return nil, fmt.Errorf("iterable in list comprehension must be a list or string, got %T", iterableVal)
+		err = fmt.Errorf("iterable in list comprehension must be a list or string, got %T", iterableVal)
+		return nil, e.enrichErrorWithTraceback(err)
 	}
 
 	// Create a result list
@@ -414,7 +624,8 @@ func (e *Evaluator) evalComprehension(comp core.LispComprehension, env core.Envi
 		if comp.Condition != nil {
 			condVal, err := e.Eval(comp.Condition, loopEnv)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating condition in list comprehension: %v", err)
+				err = fmt.Errorf("error evaluating condition in list comprehension: %v", err)
+				return nil, e.enrichErrorWithTraceback(err)
 			}
 			// Skip this iteration if the condition is false
 			if !core.IsTruthy(condVal) {
@@ -425,7 +636,8 @@ func (e *Evaluator) evalComprehension(comp core.LispComprehension, env core.Envi
 		// Evaluate the expression
 		exprVal, err := e.Eval(comp.Expression, loopEnv)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating expression in list comprehension: %v", err)
+			err = fmt.Errorf("error evaluating expression in list comprehension: %v", err)
+			return nil, e.enrichErrorWithTraceback(err)
 		}
 
 		// Add the result to our list

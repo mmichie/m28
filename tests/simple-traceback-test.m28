@@ -1,0 +1,18 @@
+# Simple test for exception tracebacks
+
+(print "Starting traceback test...")
+
+# Define a function that will cause an error
+(def (error-function)
+  (print "In error-function")
+  (/ 10 0))
+
+# Test try-except with traceback
+(try
+  (print "Calling error-function")
+  (error-function)
+  (except as e
+    (print "\nCaught exception with traceback:")
+    (print e)))
+
+(print "\nTest complete.")

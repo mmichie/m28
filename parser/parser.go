@@ -9,38 +9,75 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-type Parser struct{}
+// Token represents a token with its source location
+type Token struct {
+	Value  string
+	Line   int
+	Column int
+}
+
+// Parser represents a parser for the M28 language
+type Parser struct {
+	Filename string // Current file being parsed
+}
 
 func NewParser() *Parser {
 	return &Parser{}
 }
 
+// SetFilename sets the current filename for error reporting
+func (p *Parser) SetFilename(filename string) {
+	p.Filename = filename
+}
+
 func (p *Parser) Parse(input string) (core.LispValue, error) {
-	tokens := tokenize(input)
-	result, err := parseMultiple(tokens)
+	tokens, err := tokenize(input)
+	if err != nil {
+		return nil, err
+	}
+	result, err := p.parseMultiple(tokens)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func tokenize(input string) []string {
-	input = removeComments(input)
+func tokenize(input string) ([]Token, error) {
+	cleanedInput, lineMap := removeComments(input)
+	rawTokens := splitIntoRawTokens(cleanedInput)
+
+	// Compute line and column for each token
+	tokens := make([]Token, 0, len(rawTokens))
+	for _, match := range rawTokens {
+		line := lineMap[match.StartPos]
+		token := Token{
+			Value:  match.Value,
+			Line:   line,
+			Column: match.Column,
+		}
+		tokens = append(tokens, token)
+	}
+
 	// Enable dot notation processing
-	return processDotNotation(splitIntoRawTokens(input))
+	return processDotNotation(tokens)
 }
 
-func removeComments(input string) string {
+// removeComments removes comments and returns the cleaned input and a mapping from character positions to line numbers
+func removeComments(input string) (string, map[int]int) {
 	// Process comments line-by-line to handle them more accurately
 	var result strings.Builder
 	lines := strings.Split(input, "\n")
+	lineMap := make(map[int]int) // Maps character positions to line numbers
 
-	for _, line := range lines {
+	charPos := 0
+	for lineNum, line := range lines {
 		// Find the first "#" that's not inside a string literal
 		inString := false
 		commentPos := -1
 
 		for i, ch := range line {
+			lineMap[charPos+i] = lineNum + 1 // Store line mapping (1-based line numbers)
+
 			if ch == '"' && (i == 0 || line[i-1] != '\\') {
 				inString = !inString
 			} else if ch == '#' && !inString {
@@ -56,15 +93,46 @@ func removeComments(input string) string {
 
 		result.WriteString(line)
 		result.WriteString("\n")
+		charPos += len(line) + 1 // +1 for the newline
 	}
 
-	return result.String()
+	return result.String(), lineMap
 }
 
-func splitIntoRawTokens(input string) []string {
+type TokenMatch struct {
+	Value    string
+	StartPos int
+	Column   int
+}
+
+func splitIntoRawTokens(input string) []TokenMatch {
 	// Updated regex to also recognize curly braces for dict literals, square brackets for list literals, and commas
 	tokenRegex := regexp.MustCompile(`(\(|\)|{|}|\[|\]|'|` + "`" + `|,@|,|:|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s(){}[\],:]+)`)
-	return tokenRegex.FindAllString(input, -1)
+
+	matches := tokenRegex.FindAllStringSubmatchIndex(input, -1)
+	results := make([]TokenMatch, len(matches))
+
+	for i, match := range matches {
+		startPos := match[0]
+		value := input[match[0]:match[1]]
+
+		// Calculate column by finding the last newline before this token
+		lastNewline := strings.LastIndex(input[:startPos], "\n")
+		column := 0
+		if lastNewline >= 0 {
+			column = startPos - lastNewline
+		} else {
+			column = startPos + 1 // If no newline, column is position + 1
+		}
+
+		results[i] = TokenMatch{
+			Value:    value,
+			StartPos: startPos,
+			Column:   column,
+		}
+	}
+
+	return results
 }
 
 // Helper function to check if a token is a numeric literal
@@ -83,77 +151,115 @@ func isNumericLiteral(token string) bool {
 }
 
 // processDotNotation transforms dot notation tokens into lisp expressions
-// For example: "object.method" becomes ["(" "." "object" "\"method\"" ")"]
+// For example: "object.method" becomes tokens representing ["(" "." "object" "\"method\"" ")"]
 // Also handles nested properties like object.prop.method
-func processDotNotation(tokens []string) []string {
-	var result []string
+func processDotNotation(tokens []Token) ([]Token, error) {
+	var result []Token
 
 	for i := 0; i < len(tokens); i++ {
 		token := tokens[i]
 
 		// Skip tokens that are not symbols or don't contain dots
-		if token == "." || len(token) <= 1 || !strings.Contains(token, ".") {
+		if token.Value == "." || len(token.Value) <= 1 || !strings.Contains(token.Value, ".") {
 			result = append(result, token)
 			continue
 		}
 
 		// Don't process numeric literals with decimals
-		if isNumericLiteral(token) {
+		if isNumericLiteral(token.Value) {
 			result = append(result, token)
 			continue
 		}
 
 		// Split on dots
-		parts := strings.Split(token, ".")
+		parts := strings.Split(token.Value, ".")
 		if len(parts) < 2 {
 			result = append(result, token)
 			continue
 		}
 
 		// Handle nested property access recursively
+		line, column := token.Line, token.Column
+
+		// Create tokens for: (. object "method")
+		openParen := Token{Value: "(", Line: line, Column: column}
+		dotToken := Token{Value: ".", Line: line, Column: column + 1}
+		objToken := Token{Value: parts[0], Line: line, Column: column + 2}
+
+		// Handle nested property access recursively
 		if len(parts) == 2 {
 			// Simple case: object.method becomes (. object "method")
-			result = append(result, "(")
-			result = append(result, ".")
-			result = append(result, parts[0])
-			result = append(result, "\""+parts[1]+"\"")
-			result = append(result, ")")
+			methodToken := Token{Value: "\"" + parts[1] + "\"", Line: line, Column: column + 2 + len(parts[0]) + 1}
+			closeParen := Token{Value: ")", Line: line, Column: column + 2 + len(parts[0]) + 1 + len(parts[1]) + 2}
+
+			result = append(result, openParen, dotToken, objToken, methodToken, closeParen)
 		} else {
 			// Complex case: object.prop.method
 			// First handle object.prop
-			current := []string{"(", ".", parts[0], "\"" + parts[1] + "\"", ")"}
+			propToken := Token{Value: "\"" + parts[1] + "\"", Line: line, Column: column + 2 + len(parts[0]) + 1}
+			tempCloseParen := Token{Value: ")", Line: line, Column: column + 2 + len(parts[0]) + 1 + len(parts[1]) + 2}
+
+			// Add initial tokens
+			tempResult := []Token{openParen, dotToken, objToken, propToken, tempCloseParen}
 
 			// Then handle the rest of the chain
 			for j := 2; j < len(parts); j++ {
-				// Create a temporary representation of the current expression
-				tempExpr := strings.Join(current, " ")
+				// Create a new dot expression with the previous expression
+				// Update column positions based on the previous tokens
+				prevOpenParen := openParen
+				prevDotToken := Token{Value: ".", Line: line, Column: prevOpenParen.Column + 1}
 
-				// Now create a new dot expression with the result of the previous one
-				current = []string{"(", ".", "(" + tempExpr + ")", "\"" + parts[j] + "\"", ")"}
+				// For the object, we need to create a nested expression
+				nestedOpenParen := Token{Value: "(", Line: line, Column: prevDotToken.Column + 1}
+
+				// Add the tokens for the nested expression
+				innerExpr := append([]Token{}, tempResult...)
+
+				// Nested closing paren
+				nestedCloseParen := Token{Value: ")", Line: line, Column: innerExpr[len(innerExpr)-1].Column + 1}
+
+				// The property token
+				propToken := Token{Value: "\"" + parts[j] + "\"", Line: line, Column: nestedCloseParen.Column + 1}
+
+				// Final closing paren
+				outerCloseParen := Token{Value: ")", Line: line, Column: propToken.Column + len(parts[j]) + 2}
+
+				// Update tempResult for next iteration
+				tempResult = []Token{
+					prevOpenParen, prevDotToken, nestedOpenParen,
+				}
+				tempResult = append(tempResult, innerExpr...)
+				tempResult = append(tempResult, nestedCloseParen, propToken, outerCloseParen)
 			}
 
 			// Add the final expression to the result
-			result = append(result, current...)
+			result = append(result, tempResult...)
 		}
 	}
 
-	return result
+	return result, nil
 }
 
-func parseMultiple(tokens []string) (core.LispValue, error) {
+func (p *Parser) parseMultiple(tokens []Token) (core.LispValue, error) {
 	var expressions core.LispList
 	index := 0
 
 	// Skip whitespace and empty tokens
 	for index < len(tokens) {
-		if tokens[index] == "" || strings.TrimSpace(tokens[index]) == "" {
+		if tokens[index].Value == "" || strings.TrimSpace(tokens[index].Value) == "" {
 			index++
 			continue
 		}
 
-		expr, newIndex, err := parse(tokens, index)
+		expr, newIndex, err := p.parse(tokens, index)
 		if err != nil {
-			return nil, fmt.Errorf("parse error at token %d (%s): %v", index, tokens[index], err)
+			token := tokens[index]
+			location := core.Location{
+				Filename: p.Filename,
+				Line:     token.Line,
+				Column:   token.Column,
+			}
+			return nil, fmt.Errorf("parse error at %s (%s): %v", location.String(), token.Value, err)
 		}
 		expressions = append(expressions, expr)
 		index = newIndex
@@ -173,7 +279,7 @@ func parseMultiple(tokens []string) (core.LispValue, error) {
 	return expressions, nil
 }
 
-func parse(tokens []string, index int) (core.LispValue, int, error) {
+func (p *Parser) parse(tokens []Token, index int) (core.LispValue, int, error) {
 	if index >= len(tokens) {
 		return nil, index, fmt.Errorf("unexpected EOF")
 	}
@@ -181,14 +287,23 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 	token := tokens[index]
 	index++
 
-	switch token {
+	// Get source location for this token
+	location := core.Location{
+		Filename: p.Filename,
+		Line:     token.Line,
+		Column:   token.Column,
+	}
+
+	switch token.Value {
 	case "(":
 		// Check if we might have a tuple by looking ahead for commas
 
 		// Special case for empty tuple/list: "()"
-		if index < len(tokens) && tokens[index] == ")" {
+		if index < len(tokens) && tokens[index].Value == ")" {
 			// Empty list
-			return core.LispList{}, index + 1, nil
+			emptyList := core.LispList{}
+			// Wrap in LocatedValue
+			return core.LocatedValue{Value: emptyList, Location: location}, index + 1, nil
 		}
 
 		// Check if there's a comma somewhere before the closing parenthesis
@@ -196,13 +311,13 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 		searchIndex := index
 		parenDepth := 0
 		for searchIndex < len(tokens) {
-			if tokens[searchIndex] == ")" && parenDepth == 0 {
+			if tokens[searchIndex].Value == ")" && parenDepth == 0 {
 				break
-			} else if tokens[searchIndex] == "(" {
+			} else if tokens[searchIndex].Value == "(" {
 				parenDepth++
-			} else if tokens[searchIndex] == ")" {
+			} else if tokens[searchIndex].Value == ")" {
 				parenDepth--
-			} else if tokens[searchIndex] == "," && parenDepth == 0 {
+			} else if tokens[searchIndex].Value == "," && parenDepth == 0 {
 				isTuple = true
 				break
 			}
@@ -210,12 +325,12 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 		}
 
 		if isTuple {
-			return parseTuple(tokens, index)
+			return p.parseTuple(tokens, index, location)
 		}
 
 		// Check if this is a dot notation call
 		// Format: (. object property-or-method [args...])
-		if index < len(tokens) && tokens[index] == "." {
+		if index < len(tokens) && tokens[index].Value == "." {
 			// Skip the dot token
 			index++
 
@@ -225,7 +340,7 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 				return nil, index, fmt.Errorf("unexpected end of input after dot operator")
 			}
 
-			obj, newIndex, err := parse(tokens, index)
+			obj, newIndex, err := p.parse(tokens, index)
 			if err != nil {
 				return nil, newIndex, err
 			}
@@ -237,7 +352,7 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 			}
 
 			// The property name could be a string literal or a symbol
-			propName, newIndex, err := parse(tokens, index)
+			propName, newIndex, err := p.parse(tokens, index)
 			if err != nil {
 				return nil, newIndex, err
 			}
@@ -248,8 +363,8 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 
 			// Parse any arguments (for method calls)
 			// Collect all expressions until the closing parenthesis
-			for index < len(tokens) && tokens[index] != ")" {
-				arg, newIndex, err := parse(tokens, index)
+			for index < len(tokens) && tokens[index].Value != ")" {
+				arg, newIndex, err := p.parse(tokens, index)
 				if err != nil {
 					return nil, newIndex, err
 				}
@@ -258,153 +373,163 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 			}
 
 			// Skip the closing parenthesis
-			if index < len(tokens) && tokens[index] == ")" {
+			if index < len(tokens) && tokens[index].Value == ")" {
 				index++
 			} else {
 				return nil, index, fmt.Errorf("missing closing parenthesis for dot notation")
 			}
 
-			return dotExpr, index, nil
+			// Wrap the expression with location information
+			return core.LocatedValue{Value: dotExpr, Location: location}, index, nil
 		}
 
 		// If no comma found at this level, parse as a regular list
-		return parseList(tokens, index)
+		return p.parseList(tokens, index, location)
+
 	case ")":
 		return nil, index, fmt.Errorf("unexpected closing parenthesis")
 	case "{":
-		return parseDict(tokens, index)
+		return p.parseDict(tokens, index, location)
 	case "}":
 		return nil, index, fmt.Errorf("unexpected closing curly brace")
 	case "[":
-		return parseListLiteral(tokens, index)
+		return p.parseListLiteral(tokens, index, location)
 	case "]":
 		return nil, index, fmt.Errorf("unexpected closing square bracket")
 	case "'":
-		return parseQuote(tokens, index)
+		return p.parseQuote(tokens, index, location)
 	case "`":
-		return parseQuasiquote(tokens, index)
+		return p.parseQuasiquote(tokens, index, location)
 	case ",":
-		return parseUnquote(tokens, index)
+		return p.parseUnquote(tokens, index, location)
 	case ",@":
-		return parseUnquoteSplicing(tokens, index)
+		return p.parseUnquoteSplicing(tokens, index, location)
 	case ".":
 		// When dot appears outside of a list, it's likely a syntax error
 		// or part of a dot notation that's been broken up during tokenization
 		return nil, index, fmt.Errorf("unexpected dot operator outside of list context")
 	default:
-		return parseAtom(token), index, nil
+		// Parse the atom and wrap it with location information
+		atom := p.parseAtom(token.Value)
+		return core.LocatedValue{Value: atom, Location: location}, index, nil
 	}
 }
 
-func parseList(tokens []string, index int) (core.LispValue, int, error) {
+func (p *Parser) parseList(tokens []Token, index int, location core.Location) (core.LispValue, int, error) {
 	var list core.LispList
-	startIndex := index
 	numOpenParens := 1 // We start with one open parenthesis
 
-	for index < len(tokens) && tokens[index] != ")" {
-		if tokens[index] == "(" {
+	for index < len(tokens) && tokens[index].Value != ")" {
+		if tokens[index].Value == "(" {
 			numOpenParens++
 		}
 
 		// Check if the current token is '.' and it's being used as a dot operator or dotted pair
-		if tokens[index] == "." {
+		if tokens[index].Value == "." {
 			// Check the context to determine if this is a dot notation or a dotted pair
-			if len(list) == 1 && tokens[index-1] == "(" {
+			if len(list) == 1 && index > 0 && tokens[index-1].Value == "(" {
 				// This is a dot notation call - the list only has "." as the first element
 				// Do nothing special, proceed to normal processing which adds the dot as a symbol
 			} else if len(list) > 0 {
 				// This is a dotted pair (traditional Lisp syntax)
 				index++
 				if index >= len(tokens) {
-					return nil, index, fmt.Errorf("unexpected end of input after dot in list starting at token %d", startIndex)
+					return nil, index, fmt.Errorf("unexpected end of input after dot in list")
 				}
-				lastElem, newIndex, err := parse(tokens, index)
+				lastElem, newIndex, err := p.parse(tokens, index)
 				if err != nil {
 					return nil, newIndex, err
 				}
-				if newIndex >= len(tokens) || tokens[newIndex] != ")" {
-					return nil, newIndex, fmt.Errorf("expected ) after dotted pair in list starting at token %d", startIndex)
+				if newIndex >= len(tokens) || tokens[newIndex].Value != ")" {
+					return nil, newIndex, fmt.Errorf("expected ) after dotted pair in list")
 				}
 				if len(list) == 0 {
-					return nil, newIndex, fmt.Errorf("invalid dotted pair syntax in list starting at token %d", startIndex)
+					return nil, newIndex, fmt.Errorf("invalid dotted pair syntax in list")
 				}
-				return append(list, lastElem), newIndex + 1, nil
+				result := append(list, lastElem)
+				// Wrap the list with location information
+				return core.LocatedValue{Value: result, Location: location}, newIndex + 1, nil
 			}
 		}
 
-		val, newIndex, err := parse(tokens, index)
+		val, newIndex, err := p.parse(tokens, index)
 		if err != nil {
-			return nil, newIndex, fmt.Errorf("error parsing list element at token %d: %v", index, err)
+			return nil, newIndex, fmt.Errorf("error parsing list element: %v", err)
 		}
 		list = append(list, val)
 		index = newIndex
 	}
 
 	if index >= len(tokens) {
-		return nil, index, fmt.Errorf("missing closing parenthesis for list starting at token %d (expected %d closing parentheses)",
-			startIndex, numOpenParens)
+		return nil, index, fmt.Errorf("missing closing parenthesis for list (expected %d closing parentheses)",
+			numOpenParens)
 	}
 
-	return list, index + 1, nil
+	// Wrap the list with location information
+	return core.LocatedValue{Value: list, Location: location}, index + 1, nil
 }
 
-func parseQuote(tokens []string, index int) (core.LispValue, int, error) {
-	expr, newIndex, err := parse(tokens, index)
+func (p *Parser) parseQuote(tokens []Token, index int, location core.Location) (core.LispValue, int, error) {
+	expr, newIndex, err := p.parse(tokens, index)
 	if err != nil {
 		return nil, newIndex, err
 	}
-	return core.LispList{core.LispSymbol("quote"), expr}, newIndex, nil
+	quotedExpr := core.LispList{core.LispSymbol("quote"), expr}
+	return core.LocatedValue{Value: quotedExpr, Location: location}, newIndex, nil
 }
 
-func parseQuasiquote(tokens []string, index int) (core.LispValue, int, error) {
-	expr, newIndex, err := parse(tokens, index)
+func (p *Parser) parseQuasiquote(tokens []Token, index int, location core.Location) (core.LispValue, int, error) {
+	expr, newIndex, err := p.parse(tokens, index)
 	if err != nil {
 		return nil, newIndex, err
 	}
-	return core.Quasiquote{Expr: expr}, newIndex, nil
+	qqExpr := core.Quasiquote{Expr: expr}
+	return core.LocatedValue{Value: qqExpr, Location: location}, newIndex, nil
 }
 
-func parseUnquote(tokens []string, index int) (core.LispValue, int, error) {
-	expr, newIndex, err := parse(tokens, index)
+func (p *Parser) parseUnquote(tokens []Token, index int, location core.Location) (core.LispValue, int, error) {
+	expr, newIndex, err := p.parse(tokens, index)
 	if err != nil {
 		return nil, newIndex, err
 	}
-	return core.Unquote{Expr: expr}, newIndex, nil
+	unquoteExpr := core.Unquote{Expr: expr}
+	return core.LocatedValue{Value: unquoteExpr, Location: location}, newIndex, nil
 }
 
-func parseUnquoteSplicing(tokens []string, index int) (core.LispValue, int, error) {
-	expr, newIndex, err := parse(tokens, index)
+func (p *Parser) parseUnquoteSplicing(tokens []Token, index int, location core.Location) (core.LispValue, int, error) {
+	expr, newIndex, err := p.parse(tokens, index)
 	if err != nil {
 		return nil, newIndex, err
 	}
-	return core.UnquoteSplicing{Expr: expr}, newIndex, nil
+	spliceExpr := core.UnquoteSplicing{Expr: expr}
+	return core.LocatedValue{Value: spliceExpr, Location: location}, newIndex, nil
 }
 
 // parseDict parses a Python-style dictionary literal: {"key": value, ...}
-func parseDict(tokens []string, index int) (core.LispValue, int, error) {
+func (p *Parser) parseDict(tokens []Token, index int, location core.Location) (core.LispValue, int, error) {
 	dict := core.NewPythonicDict()
 
 	// Handle empty dict
-	if index < len(tokens) && tokens[index] == "}" {
-		return dict, index + 1, nil
+	if index < len(tokens) && tokens[index].Value == "}" {
+		return core.LocatedValue{Value: dict, Location: location}, index + 1, nil
 	}
 
-	for index < len(tokens) && tokens[index] != "}" {
+	for index < len(tokens) && tokens[index].Value != "}" {
 		// Parse key
-		key, newIndex, err := parse(tokens, index)
+		key, newIndex, err := p.parse(tokens, index)
 		if err != nil {
 			return nil, newIndex, err
 		}
 		index = newIndex
 
 		// Expect colon
-		if index >= len(tokens) || tokens[index] != ":" {
+		if index >= len(tokens) || tokens[index].Value != ":" {
 			return nil, index, fmt.Errorf("expected ':' after dictionary key")
 		}
 		index++ // Skip colon
 
 		// Parse value
-		value, newIndex, err := parse(tokens, index)
+		value, newIndex, err := p.parse(tokens, index)
 		if err != nil {
 			return nil, newIndex, err
 		}
@@ -414,7 +539,7 @@ func parseDict(tokens []string, index int) (core.LispValue, int, error) {
 		dict.Set(key, value)
 
 		// Skip comma if present
-		if index < len(tokens) && tokens[index] == "," {
+		if index < len(tokens) && tokens[index].Value == "," {
 			index++
 		}
 	}
@@ -423,14 +548,15 @@ func parseDict(tokens []string, index int) (core.LispValue, int, error) {
 		return nil, index, fmt.Errorf("missing closing curly brace for dictionary")
 	}
 
-	return dict, index + 1, nil
+	return core.LocatedValue{Value: dict, Location: location}, index + 1, nil
 }
 
 // parseListLiteral parses a Python-style list literal: [1 2 3 ...] or a list comprehension: [expr for var in iterable if condition]
-func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
+func (p *Parser) parseListLiteral(tokens []Token, index int, location core.Location) (core.LispValue, int, error) {
 	// Handle empty list
-	if index < len(tokens) && tokens[index] == "]" {
-		return core.LispListLiteral{}, index + 1, nil
+	if index < len(tokens) && tokens[index].Value == "]" {
+		emptyList := core.LispListLiteral{}
+		return core.LocatedValue{Value: emptyList, Location: location}, index + 1, nil
 	}
 
 	// Check if this might be a list comprehension
@@ -438,7 +564,7 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 	startIndex := index
 
 	// Parse the first expression
-	expr, newIndex, err := parse(tokens, index)
+	expr, newIndex, err := p.parse(tokens, index)
 	if err != nil {
 		return nil, newIndex, err
 	}
@@ -446,7 +572,7 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 
 	// Look for the "for" keyword that indicates a list comprehension
 	isComprehension := false
-	if index < len(tokens) && tokens[index] == "for" {
+	if index < len(tokens) && tokens[index].Value == "for" {
 		isComprehension = true
 	}
 
@@ -456,15 +582,15 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 		index = startIndex
 		var list core.LispListLiteral
 
-		for index < len(tokens) && tokens[index] != "]" {
+		for index < len(tokens) && tokens[index].Value != "]" {
 			// Skip commas between elements if present
-			if tokens[index] == "," {
+			if tokens[index].Value == "," {
 				index++
 				continue
 			}
 
 			// Parse list element
-			value, newIndex, err := parse(tokens, index)
+			value, newIndex, err := p.parse(tokens, index)
 			if err != nil {
 				return nil, newIndex, err
 			}
@@ -478,7 +604,7 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 			return nil, index, fmt.Errorf("missing closing square bracket for list")
 		}
 
-		return list, index + 1, nil
+		return core.LocatedValue{Value: list, Location: location}, index + 1, nil
 	}
 
 	// Parse the list comprehension
@@ -491,14 +617,15 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 		return nil, index, fmt.Errorf("expected variable name after 'for' in list comprehension")
 	}
 
-	varName, ok := parseAtom(tokens[index]).(core.LispSymbol)
+	varNameToken := tokens[index].Value
+	varName, ok := p.parseAtom(varNameToken).(core.LispSymbol)
 	if !ok {
-		return nil, index, fmt.Errorf("expected symbol as variable name in list comprehension, got %v", tokens[index])
+		return nil, index, fmt.Errorf("expected symbol as variable name in list comprehension, got %v", varNameToken)
 	}
 	index++
 
 	// The "in" keyword is optional in our syntax, but we'll skip it if it's there for compatibility
-	if index < len(tokens) && tokens[index] == "in" {
+	if index < len(tokens) && tokens[index].Value == "in" {
 		index++
 	}
 
@@ -507,7 +634,7 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 		return nil, index, fmt.Errorf("expected iterable expression in list comprehension")
 	}
 
-	iterable, newIndex, err := parse(tokens, index)
+	iterable, newIndex, err := p.parse(tokens, index)
 	if err != nil {
 		return nil, newIndex, err
 	}
@@ -515,13 +642,13 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 
 	// Check for optional "if" condition
 	var condition core.LispValue = nil
-	if index < len(tokens) && tokens[index] == "if" {
+	if index < len(tokens) && tokens[index].Value == "if" {
 		index++
 		if index >= len(tokens) {
 			return nil, index, fmt.Errorf("expected condition after 'if' in list comprehension")
 		}
 
-		condition, newIndex, err = parse(tokens, index)
+		condition, newIndex, err = p.parse(tokens, index)
 		if err != nil {
 			return nil, newIndex, err
 		}
@@ -529,7 +656,7 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 	}
 
 	// Expect closing bracket
-	if index >= len(tokens) || tokens[index] != "]" {
+	if index >= len(tokens) || tokens[index].Value != "]" {
 		return nil, index, fmt.Errorf("missing closing square bracket for list comprehension")
 	}
 	index++
@@ -542,25 +669,25 @@ func parseListLiteral(tokens []string, index int) (core.LispValue, int, error) {
 		Condition:  condition,
 	}
 
-	return comprehension, index, nil
+	return core.LocatedValue{Value: comprehension, Location: location}, index, nil
 }
 
 // parseTuple parses a tuple of the form (elem1, elem2, ..., elemN)
-func parseTuple(tokens []string, index int) (core.LispValue, int, error) {
+func (p *Parser) parseTuple(tokens []Token, index int, location core.Location) (core.LispValue, int, error) {
 	var elements []core.LispValue
 	hasComma := false
 
 	// Parse all elements until closing parenthesis
-	for index < len(tokens) && tokens[index] != ")" {
+	for index < len(tokens) && tokens[index].Value != ")" {
 		// Skip commas between elements
-		if tokens[index] == "," {
+		if tokens[index].Value == "," {
 			hasComma = true
 			index++
 			continue
 		}
 
 		// Parse tuple element
-		value, newIndex, err := parse(tokens, index)
+		value, newIndex, err := p.parse(tokens, index)
 		if err != nil {
 			return nil, newIndex, err
 		}
@@ -582,10 +709,11 @@ func parseTuple(tokens []string, index int) (core.LispValue, int, error) {
 	// Skip closing parenthesis
 	index++
 
-	return core.LispTuple(elements), index, nil
+	tupleValue := core.LispTuple(elements)
+	return core.LocatedValue{Value: tupleValue, Location: location}, index, nil
 }
 
-func parseAtom(token string) core.LispValue {
+func (p *Parser) parseAtom(token string) core.LispValue {
 	if num, err := strconv.ParseFloat(token, 64); err == nil {
 		return num
 	}

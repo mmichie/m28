@@ -1,0 +1,53 @@
+# Example of the enhanced exception system with tracebacks
+
+(print "Demonstrating exception traceback system")
+
+# Define some nested functions
+(def (level3)
+  (print "In level3 function")
+  (/ 10 0))  # This will raise a division by zero error
+
+(def (level2)
+  (print "In level2 function")
+  (level3))
+
+(def (level1)
+  (print "In level1 function")
+  (level2))
+
+# Test with a try/except block
+(print "\nTesting simple exception:")
+(try
+  (level1)
+  (except as e
+    (print "Caught exception:")
+    (print e)))
+
+# Custom exception with traceback
+(print "\nTesting custom exception with traceback:")
+(defexception ApplicationError Exception)
+
+(def (raise-custom-error)
+  (raise ApplicationError "Something went wrong"))
+
+(try
+  (raise-custom-error)
+  (except ApplicationError as e
+    (print "Caught custom exception:")
+    (print e)))
+
+# Exception chaining
+(print "\nTesting exception chaining:")
+(def (handle-database)
+  (try
+    (/ 10 0)  # Database error
+    (except as db-error
+      (raise ValueError "Invalid data" db-error))))
+
+(try
+  (handle-database)
+  (except ValueError as e
+    (print "Caught chained exception:")
+    (print e)))
+
+(print "\nTraceback demonstration complete")

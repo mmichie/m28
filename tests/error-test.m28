@@ -1,0 +1,11 @@
+# Test basic error handling
+
+(print "Starting error test...")
+
+# Cause a basic error
+(try
+  (/ 10 0)
+  (except
+    (print "Caught division by zero error")))
+
+(print "Test complete.")

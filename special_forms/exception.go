@@ -36,7 +36,7 @@ func EvalRaise(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 
 	typeName := string(exceptionType)
 	exception := core.NewException(typeName, fmt.Sprintf("%v", message))
-	
+
 	// Case 3: (raise ExceptionType "Error message" cause)
 	// This allows for chained exceptions
 	if len(args) == 3 {
@@ -44,13 +44,13 @@ func EvalRaise(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// If cause is an exception, set it as the cause of this exception
 		if causeException, ok := cause.(*core.Exception); ok {
 			exception.Cause = causeException
 		}
 	}
-	
+
 	return nil, exception
 }
 
@@ -60,16 +60,16 @@ func EvalDefException(e core.Evaluator, args []core.LispValue, env core.Environm
 	if len(args) < 1 || len(args) > 2 {
 		return nil, fmt.Errorf("defexception requires 1 or 2 arguments")
 	}
-	
+
 	// Get exception name
 	exceptionName, ok := args[0].(core.LispSymbol)
 	if !ok {
 		return nil, fmt.Errorf("exception name must be a symbol")
 	}
-	
+
 	// Default parent is Exception
 	parentName := "Exception"
-	
+
 	// If parent is specified, use it
 	if len(args) == 2 {
 		parentType, ok := args[1].(core.LispSymbol)
@@ -78,13 +78,13 @@ func EvalDefException(e core.Evaluator, args []core.LispValue, env core.Environm
 		}
 		parentName = string(parentType)
 	}
-	
+
 	// Define the new exception type
 	exception := core.DefineCustomException(string(exceptionName), parentName)
-	
+
 	// Register the exception type in the environment
 	env.Define(exceptionName, exception)
-	
+
 	return exception, nil
 }
 
