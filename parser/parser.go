@@ -26,7 +26,7 @@ func (p *Parser) Parse(input string) (core.LispValue, error) {
 
 func tokenize(input string) []string {
 	input = removeComments(input)
-	return splitIntoRawTokens(input)
+	return processDotNotation(splitIntoRawTokens(input))
 }
 
 func removeComments(input string) string {
@@ -64,6 +64,59 @@ func splitIntoRawTokens(input string) []string {
 	// Updated regex to also recognize curly braces for dict literals, square brackets for list literals, and commas
 	tokenRegex := regexp.MustCompile(`(\(|\)|{|}|\[|\]|'|` + "`" + `|,@|,|:|"(?:[^"\\]|\\.)*"|-?[0-9]*\.?[0-9]+|[^\s(){}[\],:]+)`)
 	return tokenRegex.FindAllString(input, -1)
+}
+
+// processDotNotation transforms dot notation tokens into lisp expressions
+// For example: "object.method" becomes ["(" "." "object" "\"method\"" ")"]
+func processDotNotation(tokens []string) []string {
+	var result []string
+	
+	for _, token := range tokens {
+		// Skip tokens that are not symbols or don't contain dots
+		if token == "." || len(token) <= 1 || !strings.Contains(token, ".") {
+			result = append(result, token)
+			continue
+		}
+		
+		// Don't process numeric literals with decimals (like 3.14)
+		if _, err := strconv.ParseFloat(token, 64); err == nil {
+			result = append(result, token)
+			continue
+		}
+		
+		// Don't process special symbols starting with dot (like .5)
+		if token[0] == '.' {
+			if len(token) > 1 && token[1] >= '0' && token[1] <= '9' {
+				result = append(result, token)
+				continue
+			}
+		}
+		
+		// Split on dots
+		parts := strings.Split(token, ".")
+		if len(parts) < 2 {
+			result = append(result, token)
+			continue
+		}
+		
+		// Build a nested expression for the dot notation
+		// For example: obj.prop.method becomes (. (. obj "prop") "method")
+		
+		// Start with the object name
+		expr := parts[0]
+		
+		// For each property/method, wrap in a dot expression
+		for i := 1; i < len(parts); i++ {
+			// Create (. expr "part")
+			expr = "( . " + expr + " \"" + parts[i] + "\" )"
+		}
+		
+		// Split the resulting expression into tokens
+		exprTokens := splitIntoRawTokens(expr)
+		result = append(result, exprTokens...)
+	}
+	
+	return result
 }
 
 func parseMultiple(tokens []string) (core.LispValue, error) {
@@ -159,6 +212,48 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 		return parseUnquote(tokens, index)
 	case ",@":
 		return parseUnquoteSplicing(tokens, index)
+	case ".":
+		// Handle dot notation: object.method transforms to (. object method)
+		if index >= len(tokens) {
+			return nil, index, fmt.Errorf("unexpected end of input after dot operator")
+		}
+		
+		// Get the attribute name
+		attrName, ok := parseAtom(tokens[index]).(core.LispSymbol)
+		if !ok {
+			return nil, index, fmt.Errorf("expected attribute name after dot, got %v", tokens[index])
+		}
+		index++
+		
+		// If we're at the end or the next token is not an open parenthesis,
+		// this is an attribute access, not a method call
+		if index >= len(tokens) || tokens[index] != "(" {
+			// Previous token should be the object
+			return core.LispList{
+				core.LispSymbol("."),
+				core.LispList{core.LispSymbol("quote"), attrName},
+			}, index, nil
+		}
+		
+		// Otherwise, it's a method call with arguments
+		// Parse the argument list
+		argList, newIndex, err := parseList(tokens, index+1) // Skip the opening parenthesis
+		if err != nil {
+			return nil, newIndex, err
+		}
+		
+		// Create the method call expression: (. object method args...)
+		methodCall := core.LispList{
+			core.LispSymbol("."),
+			core.LispList{core.LispSymbol("quote"), attrName},
+		}
+		
+		// Add arguments
+		for _, arg := range argList.(core.LispList) {
+			methodCall = append(methodCall, arg)
+		}
+		
+		return methodCall, newIndex, nil
 	default:
 		return parseAtom(token), index, nil
 	}

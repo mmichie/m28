@@ -1,0 +1,11 @@
+(print "\n===== Simple Dot Test =====")
+
+# Create a test dictionary
+(= person (dict "name" "John" "age" 30))
+
+# Test property access with the get function 
+(print "Access with get function:")
+(print (get person "name"))
+(print "Expected: John")
+
+(print "\n===== Test Complete =====")
