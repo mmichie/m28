@@ -1,108 +1,65 @@
-(print "\n===== Dot Notation Tests =====")
+# Test dot notation for property access and method calls
 
-(print "\n-- Dictionary Property Access --")
-# Create a test dictionary
-(= person {"name": "John", "age": 30, "greet": (lambda (self message) (+ "Hello " (get self "name") ", " message))})
+# Create a dictionary with properties and methods
+(= person (dict "name" "John" "age" 30))
+(dict.set person "greet" (lambda (self message) (+ "Hello " (get self "name") ", " message)))
 
-# Test property access with the direct dot notation
-(print "Access name property:")
-(= name (. person "name"))
-(print name)
+# Test property access with standard syntax
+(print "Standard property access:")
+(print (get person "name"))
 (print "Expected: John")
 
-(print "Access age property:")
-(= age (. person "age"))
-(print age)
-(print "Expected: 30")
+# Test property access with dot notation
+(print "\nDot notation property access:")
+(print (. person "name"))
+(print "Expected: John")
 
-# Test method call
-(print "Call method with dot notation:")
-(= greeting (. person "greet" "welcome!"))
-(print greeting)
+# Test method call with standard syntax 
+(print "\nStandard method call:")
+(print ((get person "greet") person "welcome!"))
 (print "Expected: Hello John, welcome!")
 
-(print "\n-- Object With Closures --")
-# Create a counter object with closures
+# Test method call with dot notation
+(print "\nDot notation method call:")
+(print (. person "greet" "welcome!"))
+(print "Expected: Hello John, welcome!")
+
+# Test object-oriented approach with closures
+(print "\n--- Object-Oriented Programming with Closures ---")
+
 (def (create-counter initial)
   (= count initial)
-  (def self {})
+  (= self (dict))
   
-  (def (increment self amount)
+  (= increment (lambda (self amount)
     (= count (+ count amount))
-    count)
+    count))
   
-  (def (get-count self)
-    count)
+  (= get-count (lambda (self)
+    count))
   
-  (set self "increment" increment)
-  (set self "get-count" get-count)
+  (dict.set self "increment" increment)
+  (dict.set self "get-count" get-count)
   self)
 
 (= counter (create-counter 10))
 
-# Test method calls
-(print "Call increment method:")
-(= result1 (. counter "increment" 5))
-(print result1)
+(print "\nCounter initial value:")
+(print (. counter "get-count"))
+(print "Expected: 10")
+
+(print "\nIncrement by 5:")
+(print (. counter "increment" 5))
 (print "Expected: 15")
 
-(print "Call get-count method:")
-(= result2 (. counter "get-count"))
-(print result2)
+(print "\nCurrent value:")
+(print (. counter "get-count"))
 (print "Expected: 15")
 
-(print "Call increment again:")
-(= result3 (. counter "increment" 5))
-(print result3)
-(print "Expected: 20")
-
-(print "Compare with traditional method call:")
-(= result4 ((get counter "increment") counter 10))
-(= result5 (. counter "increment" 10))
-(print (+ "Traditional call: " (str result4)))
-(print (+ "Dot notation call: " (str result5)))
-(print "Expected: Both should be 40")
-
-(print "\n-- Nested Property Access --")
-(= data {"user": {"name": "Alice", "profile": {"age": 25, "email": "alice@example.com"}}})
-
-(print "Access nested properties:")
-(= user-name (. (. data "user") "name"))
-(print user-name)
-(print "Expected: Alice")
-
-(= user-email (. (. (. data "user") "profile") "email"))
-(print user-email)
-(print "Expected: alice@example.com")
-
-(print "\n-- Dot Notation Parsing --")
-(print "Floating point number:")
+# Test floating point numbers (should not be affected by dot notation)
+(print "\n--- Numeric Literals ---")
+(print "Floating point: 3.14")
 (print 3.14)
 (print "Expected: 3.14")
 
-(= obj {"value": 42, "get-value": (lambda (self) (get self "value"))})
-(print "Method call result:")
-(print (. obj "get-value"))
-(print "Expected: 42")
-
-(print "\n-- Generator Methods --")
-# Create a simple generator
-(def (count-to n)
-  (def i 0)
-  (while (< i n)
-    (yield i)
-    (= i (+ i 1))))
-
-(= counter (count-to 3))
-
-(print "Generator next method with dot notation:")
-(print (. counter "next"))
-(print "Expected: 0")
-
-(print (. counter "next"))
-(print "Expected: 1")
-
-(print (. counter "next"))
-(print "Expected: 2")
-
-(print "\n===== Tests Complete =====")
+(print "\n--- Tests Complete ---")

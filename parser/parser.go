@@ -26,7 +26,9 @@ func (p *Parser) Parse(input string) (core.LispValue, error) {
 
 func tokenize(input string) []string {
 	input = removeComments(input)
-	return processDotNotation(splitIntoRawTokens(input))
+	// Temporarily disable dot notation processing
+	return splitIntoRawTokens(input)
+	// return processDotNotation(splitIntoRawTokens(input))
 }
 
 func removeComments(input string) string {
@@ -99,21 +101,18 @@ func processDotNotation(tokens []string) []string {
 			continue
 		}
 		
-		// Build a nested expression for the dot notation
-		// For example: obj.prop.method becomes (. (. obj "prop") "method")
+		// Create a dot expression: object.method becomes (. object "method")
+		result = append(result, "(")
+		result = append(result, ".")
+		result = append(result, parts[0])
+		result = append(result, "\""+parts[1]+"\"")
+		result = append(result, ")")
 		
-		// Start with the object name
-		expr := parts[0]
-		
-		// For each property/method, wrap in a dot expression
-		for i := 1; i < len(parts); i++ {
-			// Create (. expr "part")
-			expr = "( . " + expr + " \"" + parts[i] + "\" )"
+		// If there are more parts, we'll handle them in a future update
+		// For now, we only support one level of dot notation
+		if len(parts) > 2 {
+			fmt.Println("Warning: Nested dot notation not fully supported yet.")
 		}
-		
-		// Split the resulting expression into tokens
-		exprTokens := splitIntoRawTokens(expr)
-		result = append(result, exprTokens...)
 	}
 	
 	return result
@@ -192,6 +191,60 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 			return parseTuple(tokens, index)
 		}
 
+		// Check if this is a dot notation call
+		// Format: (. object property-or-method [args...])
+		if index < len(tokens) && tokens[index] == "." {
+			// Skip the dot token
+			index++
+			
+			// This is a dot notation call
+			// Parse the object expression
+			if index >= len(tokens) {
+				return nil, index, fmt.Errorf("unexpected end of input after dot operator")
+			}
+			
+			obj, newIndex, err := parse(tokens, index)
+			if err != nil {
+				return nil, newIndex, err
+			}
+			index = newIndex
+			
+			// Parse the property/method name
+			if index >= len(tokens) {
+				return nil, index, fmt.Errorf("unexpected end of input after object in dot notation")
+			}
+			
+			// The property name could be a string literal or a symbol
+			propName, newIndex, err := parse(tokens, index)
+			if err != nil {
+				return nil, newIndex, err
+			}
+			index = newIndex
+			
+			// Create the base dot expression
+			dotExpr := core.LispList{core.LispSymbol("."), obj, propName}
+			
+			// Parse any arguments (for method calls)
+			// Collect all expressions until the closing parenthesis
+			for index < len(tokens) && tokens[index] != ")" {
+				arg, newIndex, err := parse(tokens, index)
+				if err != nil {
+					return nil, newIndex, err
+				}
+				dotExpr = append(dotExpr, arg)
+				index = newIndex
+			}
+			
+			// Skip the closing parenthesis
+			if index < len(tokens) && tokens[index] == ")" {
+				index++
+			} else {
+				return nil, index, fmt.Errorf("missing closing parenthesis for dot notation")
+			}
+			
+			return dotExpr, index, nil
+		}
+
 		// If no comma found at this level, parse as a regular list
 		return parseList(tokens, index)
 	case ")":
@@ -213,47 +266,9 @@ func parse(tokens []string, index int) (core.LispValue, int, error) {
 	case ",@":
 		return parseUnquoteSplicing(tokens, index)
 	case ".":
-		// Handle dot notation: object.method transforms to (. object method)
-		if index >= len(tokens) {
-			return nil, index, fmt.Errorf("unexpected end of input after dot operator")
-		}
-		
-		// Get the attribute name
-		attrName, ok := parseAtom(tokens[index]).(core.LispSymbol)
-		if !ok {
-			return nil, index, fmt.Errorf("expected attribute name after dot, got %v", tokens[index])
-		}
-		index++
-		
-		// If we're at the end or the next token is not an open parenthesis,
-		// this is an attribute access, not a method call
-		if index >= len(tokens) || tokens[index] != "(" {
-			// Previous token should be the object
-			return core.LispList{
-				core.LispSymbol("."),
-				core.LispList{core.LispSymbol("quote"), attrName},
-			}, index, nil
-		}
-		
-		// Otherwise, it's a method call with arguments
-		// Parse the argument list
-		argList, newIndex, err := parseList(tokens, index+1) // Skip the opening parenthesis
-		if err != nil {
-			return nil, newIndex, err
-		}
-		
-		// Create the method call expression: (. object method args...)
-		methodCall := core.LispList{
-			core.LispSymbol("."),
-			core.LispList{core.LispSymbol("quote"), attrName},
-		}
-		
-		// Add arguments
-		for _, arg := range argList.(core.LispList) {
-			methodCall = append(methodCall, arg)
-		}
-		
-		return methodCall, newIndex, nil
+		// When dot appears outside of a list, it's likely a syntax error
+		// or part of a dot notation that's been broken up during tokenization
+		return nil, index, fmt.Errorf("unexpected dot operator outside of list context")
 	default:
 		return parseAtom(token), index, nil
 	}
@@ -269,24 +284,32 @@ func parseList(tokens []string, index int) (core.LispValue, int, error) {
 			numOpenParens++
 		}
 		
+		/* // Temporarily commenting out dot processing to debug
+		// Check if the current token is '.' and it's being used as a dot operator or dotted pair
 		if tokens[index] == "." {
-			// This is a dotted pair
-			index++
-			if index >= len(tokens) {
-				return nil, index, fmt.Errorf("unexpected end of input after dot in list starting at token %d", startIndex)
+			// Check the context to determine if this is a dot notation or a dotted pair
+			// If we have elements in the list and the first element is not the dot operator,
+			// it could be a dotted pair or a regular dot notation call
+			if len(list) > 0 && list[0] != core.LispSymbol(".") {
+				// This is a dotted pair (traditional Lisp syntax)
+				index++
+				if index >= len(tokens) {
+					return nil, index, fmt.Errorf("unexpected end of input after dot in list starting at token %d", startIndex)
+				}
+				lastElem, newIndex, err := parse(tokens, index)
+				if err != nil {
+					return nil, newIndex, err
+				}
+				if newIndex >= len(tokens) || tokens[newIndex] != ")" {
+					return nil, newIndex, fmt.Errorf("expected ) after dotted pair in list starting at token %d", startIndex)
+				}
+				if len(list) == 0 {
+					return nil, newIndex, fmt.Errorf("invalid dotted pair syntax in list starting at token %d", startIndex)
+				}
+				return append(list, lastElem), newIndex + 1, nil
 			}
-			lastElem, newIndex, err := parse(tokens, index)
-			if err != nil {
-				return nil, newIndex, err
-			}
-			if newIndex >= len(tokens) || tokens[newIndex] != ")" {
-				return nil, newIndex, fmt.Errorf("expected ) after dotted pair in list starting at token %d", startIndex)
-			}
-			if len(list) == 0 {
-				return nil, newIndex, fmt.Errorf("invalid dotted pair syntax in list starting at token %d", startIndex)
-			}
-			return append(list, lastElem), newIndex + 1, nil
 		}
+		*/
 
 		val, newIndex, err := parse(tokens, index)
 		if err != nil {

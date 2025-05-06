@@ -51,6 +51,9 @@ func init() {
 		"yield":  EvalYield,
 		"del":    EvalDel,
 	}
+	
+	// Register alternative special forms
+	Register(specialForms)
 }
 
 func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {

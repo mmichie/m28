@@ -1,0 +1,19 @@
+# Basic test of dot notation
+
+# Create a test dictionary
+(= obj (dict))
+
+# Add properties to it
+(dict.set obj "name" "Alice")
+(dict.set obj "age" 25)
+(dict.set obj "greet" (lambda (self) 
+  (+ "Hello, " (get self "name") "!")
+))
+
+# Standard property access
+(print "Standard property access:")
+(print (get obj "name"))
+
+# Test property access with dot syntax
+(print "\nDot notation property access:")
+(print (dot obj "name"))
