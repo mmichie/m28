@@ -1,0 +1,49 @@
+# Basic Class System Test
+
+# Define a simple class
+(class Person ()
+  # Class attribute
+  (= species "human")
+  
+  # Constructor method
+  (def (init self name age)
+    # Instance attributes
+    (dot self.attributes "set" "name" name)
+    (dot self.attributes "set" "age" age))
+  
+  # Regular method
+  (def (greet self)
+    (print (+ "Hello, my name is " (dot self.attributes "get" "name"))))
+  
+  # Method with arguments
+  (def (birthday self)
+    (= current-age (dot self.attributes "get" "age"))
+    (dot self.attributes "set" "age" (+ current-age 1))
+    (print (+ "Happy birthday! I am now " (+ (dot self.attributes "get" "age") " years old."))))
+)
+
+# Create a Person instance
+(def person1 (Person "Alice" 30))
+
+# Test accessing instance attributes
+(print "\nPerson attributes:")
+(print "Name:" (dot person1.attributes "get" "name"))
+(print "Age:" (dot person1.attributes "get" "age"))
+
+# Test method calls
+(print "\nTesting methods:")
+(dot person1 "greet")
+(dot person1 "birthday")
+
+# Verify attributes were changed
+(print "\nAfter birthday:")
+(print "Age:" (dot person1.attributes "get" "age"))
+
+# Create another Person instance
+(print "\nCreating another person:")
+(def person2 (Person "Bob" 25))
+(dot person2 "greet")
+
+# Verify the class attribute is shared
+(print "\nClass attribute access:")
+(print (+ "Person class species is: " (dot Person "get" "species")))

@@ -1,0 +1,73 @@
+# Class Inheritance Test
+
+# Base class
+(class Animal ()
+  # Class attribute
+  (= species "animal")
+  
+  # Constructor method
+  (def (init self name)
+    (dot self.attributes "set" "name" name))
+  
+  # Regular method
+  (def (speak self)
+    (print "Some generic animal sound"))
+  
+  # Method with arguments
+  (def (eat self food)
+    (print (+ (dot self.attributes "get" "name") " is eating " food)))
+)
+
+# Derived class
+(class Dog (Animal)
+  # Override class attribute
+  (= species "canine")
+  
+  # Override constructor to add breed
+  (def (init self name breed)
+    # Call parent constructor using super
+    (dot (super self) "init" name)
+    # Add additional attribute
+    (dot self.attributes "set" "breed" breed))
+  
+  # Override method
+  (def (speak self)
+    (print (+ (dot self.attributes "get" "name") " the " 
+              (dot self.attributes "get" "breed") " says Woof!")))
+  
+  # New method
+  (def (fetch self item)
+    (print (+ (dot self.attributes "get" "name") " fetches the " item)))
+)
+
+# Create an Animal instance
+(print "Creating a generic animal:")
+(def animal1 (Animal "Generic Animal"))
+(dot animal1 "speak")
+(dot animal1 "eat" "generic food")
+
+# Create a Dog instance
+(print "\nCreating a dog:")
+(def dog1 (Dog "Rex" "Golden Retriever"))
+
+# Test inherited method
+(print "\nInherited method:")
+(dot dog1 "eat" "dog food")
+
+# Test overridden method
+(print "\nOverridden method:")
+(dot dog1 "speak")
+
+# Test new method
+(print "\nDog-specific method:")
+(dot dog1 "fetch" "ball")
+
+# Verify attributes were set correctly
+(print "\nAttributes check:")
+(print "Name:" (dot dog1.attributes "get" "name"))
+(print "Breed:" (dot dog1.attributes "get" "breed"))
+
+# Check class attribute access
+(print "\nClass attributes:")
+(print "Animal species:" (dot Animal "get" "species"))
+(print "Dog species:" (dot Dog "get" "species"))

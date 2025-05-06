@@ -69,8 +69,8 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 }
 
 func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("class definition requires at least a name and a body")
+	if len(args) < 1 {
+		return nil, fmt.Errorf("class definition requires at least a name")
 	}
 
 	// Extract class name
@@ -79,35 +79,99 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 		return nil, fmt.Errorf("class name must be a symbol")
 	}
 
-	// Extract class body expressions
-	classBody := args[1:]
+	// Extract parent classes if specified
+	var parentClasses []*core.PythonicClass
+	var classBody []core.LispValue
 
-	// Analyze class body to identify instance variables and methods
-	instanceVars := make(map[core.LispSymbol]core.LispValue)
-	methods := []core.LispList{}
+	// Check if parent classes are specified
+	if len(args) > 1 {
+		if parentsList, ok := args[1].(core.LispList); ok {
+			// Process parent classes
+			for _, parent := range parentsList {
+				parentName, ok := parent.(core.LispSymbol)
+				if !ok {
+					return nil, fmt.Errorf("parent class name must be a symbol")
+				}
 
+				// Look up parent class in environment
+				parentValue, exists := env.Get(parentName)
+				if !exists {
+					return nil, fmt.Errorf("parent class '%s' not found", parentName)
+				}
+
+				parentClass, ok := parentValue.(*core.PythonicClass)
+				if !ok {
+					return nil, fmt.Errorf("'%s' is not a class", parentName)
+				}
+
+				parentClasses = append(parentClasses, parentClass)
+			}
+
+			// Class body starts after parents list
+			if len(args) > 2 {
+				classBody = args[2:]
+			}
+		} else {
+			// No parent classes specified, body starts at index 1
+			classBody = args[1:]
+		}
+	}
+
+	// Create the new class
+	newClass := core.NewPythonicClass(string(className), parentClasses)
+
+	// Analyze class body to identify class attributes and methods
 	for _, expr := range classBody {
 		// If expression is a list, analyze further
 		if exprList, ok := expr.(core.LispList); ok && len(exprList) >= 1 {
-			// Check for instance variable assignments (= var-name value)
+			// Check for class attribute assignments (= attr-name value)
 			if firstSymbol, ok := exprList[0].(core.LispSymbol); ok {
 				if firstSymbol == "=" && len(exprList) >= 3 {
-					if varName, ok := exprList[1].(core.LispSymbol); ok {
-						// Store the variable name and default value
-						defaultValue, err := e.Eval(exprList[2], env)
+					if attrName, ok := exprList[1].(core.LispSymbol); ok {
+						// Store the class attribute
+						attrValue, err := e.Eval(exprList[2], env)
 						if err != nil {
-							return nil, fmt.Errorf("error evaluating instance variable default value: %v", err)
+							return nil, fmt.Errorf("error evaluating class attribute value: %v", err)
 						}
-						instanceVars[varName] = defaultValue
+						newClass.AddAttribute(string(attrName), attrValue)
 						continue
 					}
 				}
 
 				// Check for method definitions (def (method-name self ...) ...)
 				if firstSymbol == "def" && len(exprList) >= 2 {
-					if methodSig, ok := exprList[1].(core.LispList); ok && len(methodSig) >= 1 {
-						// Capture the method definition for later processing
-						methods = append(methods, exprList)
+					if methodSig, ok := exprList[1].(core.LispList); ok && len(methodSig) >= 2 {
+						methodName, ok := methodSig[0].(core.LispSymbol)
+						if !ok {
+							return nil, fmt.Errorf("method name must be a symbol")
+						}
+
+						// Skip the method name in parameters
+						methodParams := make([]core.LispSymbol, 0, len(methodSig)-1)
+						for i := 1; i < len(methodSig); i++ {
+							if paramName, ok := methodSig[i].(core.LispSymbol); ok {
+								methodParams = append(methodParams, paramName)
+							} else {
+								return nil, fmt.Errorf("method parameter must be a symbol")
+							}
+						}
+
+						// Create method body
+						methodBody := core.LispList(exprList[2:])
+
+						// Create the method Lambda
+						method := &core.Lambda{
+							Params:        methodParams,
+							Body:          methodBody,
+							Env:           env,
+							Closure:       env,
+							DefaultValues: make(map[core.LispSymbol]core.LispValue),
+							SharedEnv:     nil,
+							InstanceID:    getNextInstanceID(),
+						}
+
+						// Add the method to the class
+						newClass.AddMethod(string(methodName), method)
 						continue
 					}
 				}
@@ -115,142 +179,179 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 		}
 	}
 
-	// Generate a factory function that creates new instances
-	// The factory function follows the pattern of a closure-based object creator
-	// (def (ClassName arg1 arg2...)
-	//   (= state1 val1)
-	//   (= state2 val2)
-	//   (def (method1 self arg1...) ...)
-	//   (def (method2 self arg1...) ...)
-	//   (= obj (dict))
-	//   (= obj (dict "method1" method1 "method2" method2))
-	//   obj)
-
-	// First, determine constructor parameters
-	var constructorParams []core.LispSymbol
-	constructorFound := false
-
-	for _, method := range methods {
-		if len(method) >= 2 {
-			if methodSig, ok := method[1].(core.LispList); ok && len(methodSig) >= 1 {
-				methodName, _ := methodSig[0].(core.LispSymbol)
-				if methodName == "init" || methodName == "__init__" {
-					constructorFound = true
-					// Skip method name and 'self'
-					if len(methodSig) > 2 {
-						constructorParams = make([]core.LispSymbol, 0, len(methodSig)-2)
-						for i := 2; i < len(methodSig); i++ {
-							if paramName, ok := methodSig[i].(core.LispSymbol); ok {
-								constructorParams = append(constructorParams, paramName)
-							}
-						}
-					}
-					break
-				}
-			}
-		}
-	}
-
-	// Create the factory function expression
-	factoryFuncExpr := core.LispList{
-		core.LispSymbol("def"),
-		core.LispList{className}, // Function name
-	}
-
-	// Add constructor parameters
-	for _, param := range constructorParams {
-		factoryFuncExpr[1] = append(factoryFuncExpr[1].(core.LispList), param)
-	}
-
-	// Add instance variable definitions with default values
-	for varName, defaultValue := range instanceVars {
-		varAssign := core.LispList{
-			core.LispSymbol("="),
-			varName,
-			defaultValue,
-		}
-		factoryFuncExpr = append(factoryFuncExpr, varAssign)
-	}
-
-	// Process constructor
-	if constructorFound {
-		for _, method := range methods {
-			if len(method) >= 2 {
-				if methodSig, ok := method[1].(core.LispList); ok && len(methodSig) >= 1 {
-					methodName, _ := methodSig[0].(core.LispSymbol)
-					if methodName == "init" || methodName == "__init__" {
-						// Inject constructor body directly (skip the def and signature)
-						for i := 2; i < len(method); i++ {
-							factoryFuncExpr = append(factoryFuncExpr, method[i])
-						}
-						break
-					}
-				}
-			}
-		}
-	}
-
-	// Add method definitions
-	for _, method := range methods {
-		if len(method) >= 2 {
-			if methodSig, ok := method[1].(core.LispList); ok && len(methodSig) >= 1 {
-				methodName, _ := methodSig[0].(core.LispSymbol)
-				// Skip constructor (already processed)
-				if methodName == "init" || methodName == "__init__" {
-					continue
-				}
-
-				// Add the method definition directly
-				factoryFuncExpr = append(factoryFuncExpr, method)
-			}
-		}
-	}
-
-	// Create the return object dictionary
-	factoryFuncExpr = append(factoryFuncExpr,
-		core.LispList{
-			core.LispSymbol("="),
-			core.LispSymbol("obj"),
-			core.LispList{core.LispSymbol("dict")},
+	// Define a constructor function for creating instances of this class
+	constructor := &core.Lambda{
+		Params: []core.LispSymbol{},
+		Body: core.LispList{
+			core.LispList{
+				core.LispSymbol("begin"),
+				core.LispList{
+					core.LispSymbol("def"),
+					core.LispList{core.LispSymbol("new-instance")},
+					core.LispList{
+						core.LispSymbol("NewPythonicObject"),
+						core.LispSymbol(string(className) + "_class"),
+					},
+				},
+				// Call __init__ if it exists
+				core.LispList{
+					core.LispSymbol("if"),
+					core.LispList{
+						core.LispSymbol("hasattr"),
+						core.LispSymbol("new-instance"),
+						core.LispSymbol("\"__init__\""),
+					},
+					core.LispList{
+						core.LispSymbol("apply"),
+						core.LispList{
+							core.LispSymbol("getattr"),
+							core.LispSymbol("new-instance"),
+							core.LispSymbol("\"__init__\""),
+						},
+						core.LispList{
+							core.LispSymbol("concat"),
+							core.LispList{core.LispSymbol("list"), core.LispSymbol("new-instance")},
+							core.LispSymbol("args"),
+						},
+					},
+					core.PythonicNone{},
+				},
+				core.LispSymbol("new-instance"),
+			},
 		},
-	)
-
-	// Add methods to the return dictionary
-	methodAssignments := core.LispList{
-		core.LispSymbol("="),
-		core.LispSymbol("obj"),
-		core.LispList{core.LispSymbol("dict")},
+		Env:           env,
+		Closure:       env,
+		DefaultValues: make(map[core.LispSymbol]core.LispValue),
+		// Allow variable arguments
+		SharedEnv:  nil,
+		InstanceID: getNextInstanceID(),
 	}
 
-	// Add each method to the dict literal
-	for _, method := range methods {
-		if len(method) >= 2 {
-			if methodSig, ok := method[1].(core.LispList); ok && len(methodSig) >= 1 {
-				methodName, _ := methodSig[0].(core.LispSymbol)
-				// Skip constructor in return dictionary
-				if methodName == "init" || methodName == "__init__" {
-					continue
-				}
+	// Register the class and its constructor in the environment
+	env.Define(className, newClass)
+	env.Define(core.LispSymbol(string(className)+"_class"), newClass)
 
-				// Add method to the dict literal
-				methodAssignments = append(methodAssignments, string(methodName))
-				methodAssignments = append(methodAssignments, methodName)
+	// Define builtins for class operations if they don't exist yet
+	if _, exists := env.Get("NewPythonicObject"); !exists {
+		env.Define("NewPythonicObject", core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("NewPythonicObject requires a class argument")
 			}
-		}
+			class, ok := args[0].(*core.PythonicClass)
+			if !ok {
+				return nil, fmt.Errorf("first argument to NewPythonicObject must be a class")
+			}
+			return core.NewPythonicObject(class), nil
+		}))
 	}
 
-	factoryFuncExpr = append(factoryFuncExpr, methodAssignments)
+	if _, exists := env.Get("hasattr"); !exists {
+		env.Define("hasattr", core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+			if len(args) != 2 {
+				return nil, fmt.Errorf("hasattr requires object and attribute name arguments")
+			}
 
-	// Return the object
-	factoryFuncExpr = append(factoryFuncExpr, core.LispSymbol("obj"))
+			// Get the object
+			obj, ok := args[0].(*core.PythonicObject)
+			if !ok {
+				return core.PythonicBool(false), nil
+			}
 
-	// Evaluate the factory function expression
-	result, err := e.Eval(factoryFuncExpr, env)
-	if err != nil {
-		return nil, fmt.Errorf("error defining class: %v", err)
+			// Get the attribute name
+			attrName, ok := args[1].(string)
+			if !ok {
+				if sym, ok := args[1].(core.LispSymbol); ok {
+					attrName = string(sym)
+				} else {
+					return nil, fmt.Errorf("attribute name must be a string or symbol")
+				}
+			}
+
+			// Check if the attribute exists
+			_, exists := obj.GetAttribute(attrName)
+			return core.PythonicBool(exists), nil
+		}))
 	}
 
-	return result, nil
+	if _, exists := env.Get("getattr"); !exists {
+		env.Define("getattr", core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+			if len(args) < 2 {
+				return nil, fmt.Errorf("getattr requires object and attribute name arguments")
+			}
+
+			// Get the object
+			obj, ok := args[0].(*core.PythonicObject)
+			if !ok {
+				return nil, fmt.Errorf("first argument to getattr must be an object")
+			}
+
+			// Get the attribute name
+			attrName, ok := args[1].(string)
+			if !ok {
+				if sym, ok := args[1].(core.LispSymbol); ok {
+					attrName = string(sym)
+				} else {
+					return nil, fmt.Errorf("attribute name must be a string or symbol")
+				}
+			}
+
+			// Get the attribute
+			attr, exists := obj.GetAttribute(attrName)
+			if !exists {
+				if len(args) > 2 {
+					// Return default value if provided
+					return args[2], nil
+				}
+				return nil, fmt.Errorf("object has no attribute '%s'", attrName)
+			}
+
+			return attr, nil
+		}))
+	}
+
+	if _, exists := env.Get("super"); !exists {
+		env.Define("super", core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("super requires at least a current object argument")
+			}
+
+			// Get the current object
+			obj, ok := args[0].(*core.PythonicObject)
+			if !ok {
+				return nil, fmt.Errorf("first argument to super must be an object")
+			}
+
+			// Create a super wrapper object that searches parent classes
+			superObj := &core.SuperObject{
+				Object: obj,
+			}
+
+			return superObj, nil
+		}))
+	}
+
+	if _, exists := env.Get("concat"); !exists {
+		env.Define("concat", core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+			var result core.LispList
+
+			for _, arg := range args {
+				switch v := arg.(type) {
+				case core.LispList:
+					result = append(result, v...)
+				case core.LispListLiteral:
+					result = append(result, core.LispList(v)...)
+				case core.LispTuple:
+					result = append(result, core.LispList(v)...)
+				default:
+					return nil, fmt.Errorf("concat expects list arguments, got %T", arg)
+				}
+			}
+
+			return result, nil
+		}))
+	}
+
+	return newClass, nil
 }
 
 func EvalLambdaPython(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
