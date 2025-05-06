@@ -1,0 +1,63 @@
+# Simpler class example to test our implementation
+
+# Use the existing manual object creation pattern first
+(def (make-counter initial-count)
+  # Private state
+  (= count initial-count)
+  
+  # Define methods
+  (def (get-count)
+    count)
+  
+  (def (increment)
+    (= count (+ count 1))
+    count)
+  
+  # Return dictionary with methods
+  (= counter-obj (dict))
+  (= counter-obj (dict 
+    "get-count" get-count
+    "increment" increment))
+  
+  counter-obj)
+
+# Create a counter instance
+(= counter1 (make-counter 0))
+
+# Call its methods
+(print "Initial count:" ((get counter1 "get-count")))
+(print "After increment:" ((get counter1 "increment")))
+(print "After another increment:" ((get counter1 "increment")))
+
+# Define a simpler Counter class
+(class Counter
+  # Instance variable with default value
+  (= count 0)
+  
+  # Constructor
+  (def (init self initial-count)
+    (= count initial-count))
+  
+  # Methods that don't use "self" parameter
+  (def (get-count self)
+    count)
+  
+  (def (increment self)
+    (= count (+ count 1))
+    count))
+
+# Create a counter instance
+(= counter2 (Counter 10))
+(print counter2)
+
+# Try calling with direct method access
+(print "Counter2 methods:" (dict.keys counter2))
+
+# Get actual method from the dictionary
+(= get-count-method (dict.get counter2 "get-count"))
+(= increment-method (dict.get counter2 "increment"))
+
+# Call methods directly
+(print "Counter2 initial count:" (get-count-method counter2))
+(print "Counter2 after increment:" (increment-method counter2))
+(print "Counter2 after another increment:" (increment-method counter2))

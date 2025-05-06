@@ -1,0 +1,77 @@
+# Exception Handling Examples
+# This file demonstrates the enhanced exception system
+
+# Basic exception handling
+(print "Basic exception handling:")
+(try
+    (/ 10 0)
+    (except
+        (print "Caught an exception")))
+
+# Typed exceptions
+(print "\nTyped exceptions:")
+(try
+    (raise ValueError "Invalid value")
+    (except ValueError
+        (print "Caught ValueError"))
+    (except
+        (print "Caught some other exception")))
+
+# Multiple except blocks with type matching
+(print "\nMultiple except blocks:")
+(try
+    (raise TypeError "Wrong type")
+    (except ValueError
+        (print "This is a ValueError"))
+    (except TypeError
+        (print "This is a TypeError"))
+    (except
+        (print "Unknown exception")))
+
+# Using 'as' to access the exception
+(print "\nAccessing the exception:")
+(try
+    (raise IndexError "Index out of range")
+    (except IndexError as e
+        (print "Caught exception:" e)))
+
+# Finally blocks
+(print "\nFinally blocks:")
+(try
+    (print "In try block")
+    (raise "An error occurred")
+    (except
+        (print "In except block"))
+    (finally
+        (print "In finally block")))
+
+# Finally without exception
+(print "\nFinally without exception:")
+(try
+    (print "In try block - no exception")
+    (except
+        (print "This won't execute"))
+    (finally
+        (print "Finally always executes")))
+
+# Nested exception handling
+(print "\nNested exception handling:")
+(try
+    (print "Outer try")
+    (try
+        (print "Inner try")
+        (raise "Inner exception")
+        (except
+            (print "Inner except")
+            (raise "Re-raised exception")))
+    (except
+        (print "Outer except")))
+
+# Custom exception types
+(print "\nCustom exception types:")
+(try
+    (raise DatabaseError "Connection failed")
+    (except DatabaseError
+        (print "Database error occurred"))
+    (except
+        (print "Other error")))

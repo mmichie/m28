@@ -1,0 +1,41 @@
+# Example of using context managers with the 'with' statement
+
+# Basic file operations using the context manager protocol
+(print "Basic file context manager example:")
+
+# Create a test file
+(with (open "test_file.txt" "w") as file
+    (print "Writing to test file...")
+    (file.write "Hello, World!\nThis is a test."))
+
+# Read from the test file
+(with (open "test_file.txt" "r") as file
+    (print "Reading from test file:")
+    (= content (file.read))
+    (print content))
+
+# Demonstrate error handling with context managers
+(print "\nError handling with context managers:")
+(try
+    (with (open "nonexistent_file.txt" "r") as file
+        (print "This won't execute - file doesn't exist"))
+    (except FileNotFoundError as e
+        (print "Caught file not found error:" e)))
+
+# Demonstrate that the file is properly closed even if an exception occurs
+(print "\nAutomatic cleanup with context managers:")
+(try
+    (with (open "test_file.txt" "r") as file
+        (print "File is open")
+        (print "First line:" (file.read))
+        (print "About to raise an exception...")
+        (raise "An error occurred"))
+    (except Exception as e
+        (print "Caught exception:" e)
+        (print "But the file was still closed automatically")))
+
+# Verify the file is closed by trying to use it after the with block
+(try
+    (print file)
+    (except NameError as e
+        (print "Verified file is out of scope:" e)))
