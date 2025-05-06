@@ -1,0 +1,71 @@
+(print "# Final Exception System Test")
+
+# Test 1: Basic exception catching
+(print "\n## Test 1: Basic exception catching")
+(try
+  (/ 10 0)
+  (except
+    (print "SUCCESS: Caught division by zero exception")))
+
+# Test 2: Typed exception catching
+(print "\n## Test 2: Typed exception catching")
+(try
+  (raise ValueError "Invalid value")
+  (except ValueError
+    (print "SUCCESS: Caught ValueError"))
+  (except
+    (print "FAIL: Should have caught ValueError")))
+
+# Test 3: Exception subtyping
+(print "\n## Test 3: Exception hierarchy")
+(try
+  (raise TypeError "Wrong type")
+  (except Exception
+    (print "SUCCESS: Base class caught derived exception")))
+
+# Test 4: Custom exceptions with defexception
+(print "\n## Test 4: Custom exceptions")
+(defexception CustomError Exception)
+(print "Custom exception defined")
+
+(try
+  (raise CustomError "This is a custom error")
+  (except CustomError
+    (print "SUCCESS: Caught CustomError"))
+  (except
+    (print "FAIL: Should have caught CustomError")))
+
+# Test 5: Inheritance for custom exceptions
+(print "\n## Test 5: Custom exception inheritance")
+(defexception AppError CustomError)
+(print "AppError defined as subclass of CustomError")
+
+(try
+  (raise AppError "Application error")
+  (except CustomError
+    (print "SUCCESS: Parent exception caught derived custom exception"))
+  (except
+    (print "FAIL: Should have caught AppError as CustomError")))
+
+# Test 6: Exception binding with 'as'
+(print "\n## Test 6: Exception binding with 'as'")
+(try
+  (raise ValueError "Access error")
+  (except ValueError as e
+    (print "SUCCESS: Caught exception with message:" (. e message))))
+
+# Test 7: finally blocks
+(print "\n## Test 7: Finally blocks")
+(def cleanup-ran False)
+(try
+  (print "In try block")
+  (raise "Error in try")
+  (except
+    (print "In except block"))
+  (finally
+    (set! cleanup-ran True)
+    (print "SUCCESS: Finally block executed")))
+
+(print "cleanup-ran =" cleanup-ran)
+
+(print "\n# Testing complete")

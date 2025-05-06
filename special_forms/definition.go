@@ -179,53 +179,7 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 		}
 	}
 
-	// Define a constructor function for creating instances of this class
-	constructor := &core.Lambda{
-		Params: []core.LispSymbol{},
-		Body: core.LispList{
-			core.LispList{
-				core.LispSymbol("begin"),
-				core.LispList{
-					core.LispSymbol("def"),
-					core.LispList{core.LispSymbol("new-instance")},
-					core.LispList{
-						core.LispSymbol("NewPythonicObject"),
-						core.LispSymbol(string(className) + "_class"),
-					},
-				},
-				// Call __init__ if it exists
-				core.LispList{
-					core.LispSymbol("if"),
-					core.LispList{
-						core.LispSymbol("hasattr"),
-						core.LispSymbol("new-instance"),
-						core.LispSymbol("\"__init__\""),
-					},
-					core.LispList{
-						core.LispSymbol("apply"),
-						core.LispList{
-							core.LispSymbol("getattr"),
-							core.LispSymbol("new-instance"),
-							core.LispSymbol("\"__init__\""),
-						},
-						core.LispList{
-							core.LispSymbol("concat"),
-							core.LispList{core.LispSymbol("list"), core.LispSymbol("new-instance")},
-							core.LispSymbol("args"),
-						},
-					},
-					core.PythonicNone{},
-				},
-				core.LispSymbol("new-instance"),
-			},
-		},
-		Env:           env,
-		Closure:       env,
-		DefaultValues: make(map[core.LispSymbol]core.LispValue),
-		// Allow variable arguments
-		SharedEnv:  nil,
-		InstanceID: getNextInstanceID(),
-	}
+	// Class initialization complete
 
 	// Register the class and its constructor in the environment
 	env.Define(className, newClass)

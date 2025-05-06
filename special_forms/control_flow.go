@@ -201,7 +201,7 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			continue
 		}
 
-		// Handle bare except
+		// Handle bare except - catches any exception
 		if len(exceptClause) == 2 {
 			return e.Eval(exceptClause[1], env)
 		}
@@ -213,8 +213,8 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				continue
 			}
 
-			// Check if exception type matches
-			if isException && exception.Type == string(exceptionType) {
+			// Check if exception type matches, using isSubclassOf to support inheritance
+			if isException && exception.IsSubclassOf(string(exceptionType)) {
 				// Simple except with type
 				if len(exceptClause) == 3 {
 					return e.Eval(exceptClause[2], env)

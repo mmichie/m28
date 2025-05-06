@@ -1,0 +1,27 @@
+# Debug defexception
+(print "Before defining CustomError")
+
+# Define a custom exception
+(defexception CustomError Exception)
+(print "After defining CustomError")
+
+# Test raising a built-in exception
+(try
+  (begin
+    (print "Raising ValueError...")
+    (raise ValueError "Test value error"))
+  (except ValueError
+    (print "Caught ValueError"))
+  (except
+    (print "Caught some other exception")))
+
+# Wait before trying to use the custom exception
+(print "\nWait before trying custom exception...")
+
+# Test raising the custom exception
+(try
+  (begin
+    (print "Raising CustomError...")
+    (raise CustomError "Custom error message"))
+  (except Exception
+    (print "Caught an exception of type:" (. e type))))

@@ -1,0 +1,19 @@
+# Basic Exception Test
+
+# Test built-in exceptions
+(print "Testing built-in exceptions...")
+
+# ValueError test
+(try
+  (raise ValueError "Invalid value")
+  (except ValueError
+    (print "Caught ValueError - Success!")))
+
+# Basic exception
+(print "\nTesting basic exception handling...")
+(try
+  (/ 10 0)  # Should raise a division by zero error
+  (except
+    (print "Caught an exception - Success!")))
+
+(print "\nTesting complete!")

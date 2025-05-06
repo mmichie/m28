@@ -48,45 +48,6 @@ type PythonicBool bool
 // PythonicNone represents Python's None value
 type PythonicNone struct{}
 
-// Exception represents a base exception
-type Exception struct {
-	Message string
-	Type    string
-}
-
-// String returns the string representation of an exception
-func (e Exception) String() string {
-	return fmt.Sprintf("%s: %s", e.Type, e.Message)
-}
-
-// Error makes Exception implement the error interface
-func (e *Exception) Error() string {
-	return e.String()
-}
-
-// IsExceptionOfType checks if an error is an exception of the given type
-func IsExceptionOfType(err error, typeName string) bool {
-	if exception, ok := err.(*Exception); ok {
-		return exception.Type == typeName
-	}
-	return false
-}
-
-// StandardExceptions defines the standard exception types
-var StandardExceptions = map[string]*Exception{
-	"Exception":         {Type: "Exception", Message: ""},
-	"ValueError":        {Type: "ValueError", Message: ""},
-	"TypeError":         {Type: "TypeError", Message: ""},
-	"IndexError":        {Type: "IndexError", Message: ""},
-	"KeyError":          {Type: "KeyError", Message: ""},
-	"NameError":         {Type: "NameError", Message: ""},
-	"ZeroDivisionError": {Type: "ZeroDivisionError", Message: ""},
-	"AssertionError":    {Type: "AssertionError", Message: ""},
-	"RuntimeError":      {Type: "RuntimeError", Message: ""},
-	"IOError":           {Type: "IOError", Message: ""},
-	"FileNotFoundError": {Type: "FileNotFoundError", Message: ""},
-}
-
 // PythonicSet represents a Python-style set
 type PythonicSet struct {
 	data map[LispValue]struct{}
@@ -183,7 +144,7 @@ func IsBuiltinSpecialForm(symbol LispSymbol) bool {
 		"import": true,
 
 		// Exception Handling
-		"raise": true, "assert": true,
+		"raise": true, "assert": true, "defexception": true,
 
 		// Variable Scope
 		"global": true, "nonlocal": true,

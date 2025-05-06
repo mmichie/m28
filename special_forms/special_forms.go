@@ -36,8 +36,9 @@ func init() {
 		"import": EvalImport,
 
 		// Exception Handling
-		"raise":  EvalRaise,
-		"assert": EvalAssert,
+		"raise":        EvalRaise,
+		"assert":       EvalAssert,
+		"defexception": EvalDefException,
 
 		// Variable Scope
 		"global":   EvalGlobal,

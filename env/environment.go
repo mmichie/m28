@@ -84,6 +84,11 @@ func (e *Environment) SetupBuiltins() {
 		e.Set(core.LispSymbol(name), fn)
 	}
 
+	// Register standard Python exceptions in the environment
+	for name, exception := range core.StandardExceptions {
+		e.Set(core.LispSymbol(name), exception)
+	}
+
 	// Register special form functions in builtins
 	// Removed direct special_forms dependency to avoid import cycle
 }
