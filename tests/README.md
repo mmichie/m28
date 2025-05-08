@@ -47,10 +47,3 @@ To run a specific test:
 ```bash
 ./bin/m28 tests/<test-file.m28>
 ```
-
-## Archive
-
-The `archive` directory contains:
-- Previous versions of tests
-- Debug files used during development
-- Original test files before consolidation
