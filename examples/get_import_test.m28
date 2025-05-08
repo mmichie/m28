@@ -1,0 +1,16 @@
+# Test importing a module and using get
+(print "=== Testing Module Import with Get ===")
+
+# Import module
+(print "Importing simple_module...")
+(import "modules/simple_module")
+(print "simple_module type:" (type simple_module))
+
+# Print module contents using get
+(print "\nAccessing module variables using get:")
+(print "MODULE_NAME =" (get simple_module "MODULE_NAME"))
+(print "VALUE =" (get simple_module "VALUE"))
+
+# Try to call a module function
+(print "\nCalling module function using apply:")
+(print "add(10, 20) =" (apply (get simple_module "add") [10 20]))

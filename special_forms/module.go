@@ -2,8 +2,7 @@ package special_forms
 
 import (
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
+	"os"
 	"strings"
 
 	"github.com/mmichie/m28/core"
@@ -11,45 +10,56 @@ import (
 	"github.com/mmichie/m28/parser"
 )
 
-// ModuleRegistry keeps track of loaded modules
-type ModuleRegistry struct {
-	modules map[string]*core.PythonicDict
+// ModuleLoaderImpl implements the core.ModuleLoader interface
+type ModuleLoaderImpl struct {
+	evaluator core.Evaluator
 }
 
-// NewModuleRegistry creates a new ModuleRegistry
-func NewModuleRegistry() *ModuleRegistry {
-	return &ModuleRegistry{
-		modules: make(map[string]*core.PythonicDict),
-	}
+// NewModuleLoader creates a new ModuleLoader
+func NewModuleLoader() *ModuleLoaderImpl {
+	return &ModuleLoaderImpl{}
 }
 
-// Global module registry
-var globalRegistry = NewModuleRegistry()
+// SetEvaluator sets the evaluator for the module loader
+func (m *ModuleLoaderImpl) SetEvaluator(e core.Evaluator) {
+	m.evaluator = e
+}
 
-// LoadModule loads a module and returns its environment
-func (r *ModuleRegistry) LoadModule(name string, e core.Evaluator) (*core.PythonicDict, error) {
+// GetEvaluator returns the evaluator for the module loader
+func (m *ModuleLoaderImpl) GetEvaluator() core.Evaluator {
+	return m.evaluator
+}
+
+// LoadModule loads a module and returns its contents
+func (m *ModuleLoaderImpl) LoadModule(name string, e core.Evaluator) (*core.PythonicDict, error) {
+	registry := core.GetModuleRegistry()
+	
 	// Check if the module is already loaded
-	if module, ok := r.modules[name]; ok {
+	if module, ok := registry.GetModule(name); ok {
 		return module, nil
 	}
 
 	// Resolve the module file path
-	modulePath, err := resolveModulePath(name)
+	modulePath, err := registry.ResolveModulePath(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve module path: %v", err)
+		return nil, fmt.Errorf("module not found: %s (searched in: %s)", 
+			name, strings.Join(registry.GetSearchPaths(), ", "))
 	}
 
+	// Track dependencies for this module
+	dependencies := []string{}
+
 	// Read the module file
-	content, err := ioutil.ReadFile(modulePath)
+	content, err := os.ReadFile(modulePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read module file: %v", err)
+		return nil, fmt.Errorf("failed to read module file %s: %v", modulePath, err)
 	}
 
 	// Parse the module content
 	p := parser.NewParser()
 	parsed, err := p.Parse(string(content))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse module content: %v", err)
+		return nil, fmt.Errorf("syntax error in module %s: %v", name, err)
 	}
 
 	// Create a new environment for the module
@@ -61,34 +71,115 @@ func (r *ModuleRegistry) LoadModule(name string, e core.Evaluator) (*core.Python
 
 	module := core.NewPythonicDict()
 
+	// Store module metadata in the module itself
+	module.Set("__name__", name)
+	module.Set("__file__", modulePath)
+
 	// Execute the module code
 	parsedList, ok := parsed.(core.LispList)
 	if !ok {
-		return nil, fmt.Errorf("parsed content is not a LispList")
+		return nil, fmt.Errorf("parsed content is not valid code in module %s", name)
 	}
 
 	// First pass: execute all expressions in the module file
 	for _, expr := range parsedList {
 		_, err := e.Eval(expr, moduleEnv)
 		if err != nil {
-			return nil, fmt.Errorf("error executing module code: %v", err)
+			return nil, fmt.Errorf("runtime error in module %s: %v", name, err)
 		}
 	}
 
 	// Second pass: collect all defined symbols from the module's environment
-	// This will capture both def and = assignments
-	// Use moduleEnv directly since it's already an *env.Environment
+	// Debug - print all symbols in the module's environment
+	fmt.Println("DEBUG: Module environment symbols:")
 	moduleEnv.ForEachSymbol(func(symbol core.LispSymbol, value core.LispValue) {
 		// Only add non-builtin symbols to the module dictionary
-		// This ensures we don't pollute the module with all the builtins
 		if !isBuiltinSymbol(symbol) {
+			fmt.Printf("DEBUG: Adding symbol '%s' to module, type: %T\n", symbol, value)
 			// Add to module dictionary - only user-defined symbols
 			module.Set(symbol, value)
 		}
 	})
 
-	// Store the loaded module
-	r.modules[name] = module
+	// Check if the module defined an __exports__ list
+	if exportsVal, ok := module.Get("__exports__"); ok {
+		// If __exports__ is defined, only export the symbols listed in it
+		if exportsList, ok := exportsVal.(core.LispList); ok {
+			// Create a new filtered module with only the exported symbols
+			filteredModule := core.NewPythonicDict()
+			
+			// Always include metadata
+			filteredModule.Set("__name__", name)
+			filteredModule.Set("__file__", modulePath)
+			filteredModule.Set("__exports__", exportsList)
+			
+			// Add the specifically exported symbols
+			for _, symbolVal := range exportsList {
+				var symbolName string
+				switch sym := symbolVal.(type) {
+				case core.LispSymbol:
+					symbolName = string(sym)
+				case string:
+					symbolName = sym
+				default:
+					continue // Skip non-symbol/string items
+				}
+				
+				if val, ok := module.Get(symbolName); ok {
+					filteredModule.Set(symbolName, val)
+				}
+			}
+			
+			module = filteredModule
+		}
+	}
+
+	// Debug - print the final module content
+	fmt.Println("DEBUG: Final module content:")
+	// Get the keys from the dictionary
+	items, _ := module.CallMethod("items", []core.LispValue{})
+	if itemsList, ok := items.(core.LispList); ok {
+		for _, item := range itemsList {
+			if pair, ok := item.(core.LispList); ok && len(pair) == 2 {
+				key := pair[0]
+				value := pair[1]
+				fmt.Printf("DEBUG: Module key '%v', value type: %T\n", key, value)
+			}
+		}
+	}
+
+	// Store the loaded module with its metadata
+	registry.StoreModule(name, module, modulePath, dependencies)
+
+	return module, nil
+}
+
+// LoadModule is a backward-compatible wrapper for the module loader
+func LoadModule(name string, e core.Evaluator) (*core.PythonicDict, error) {
+	// Get the global module loader, or create one if it doesn't exist
+	moduleLoader := core.GetModuleLoader()
+	if moduleLoader == nil {
+		return nil, fmt.Errorf("no module loader registered")
+	}
+
+	module, err := moduleLoader.LoadModule(name, e)
+	if err != nil {
+		return nil, err
+	}
+
+	// Debug - print the wrapper module content
+	fmt.Println("DEBUG: Module after LoadModule wrapper:")
+	// Get the keys from the dictionary
+	items, _ := module.CallMethod("items", []core.LispValue{})
+	if itemsList, ok := items.(core.LispList); ok {
+		for _, item := range itemsList {
+			if pair, ok := item.(core.LispList); ok && len(pair) == 2 {
+				key := pair[0]
+				value := pair[1]
+				fmt.Printf("DEBUG: Module wrapper key '%v', value type: %T\n", key, value)
+			}
+		}
+	}
 
 	return module, nil
 }
@@ -98,12 +189,18 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 		return nil, fmt.Errorf("import requires at least one argument")
 	}
 
+	// Get the module loader
+	moduleLoader := core.GetModuleLoader()
+	if moduleLoader == nil {
+		return nil, fmt.Errorf("no module loader registered")
+	}
+
 	for _, arg := range args {
 		switch importSpec := arg.(type) {
 		case core.LispSymbol:
 			// Simple import: import module
 			moduleName := string(importSpec)
-			module, err := globalRegistry.LoadModule(moduleName, e)
+			module, err := moduleLoader.LoadModule(moduleName, e)
 			if err != nil {
 				return nil, fmt.Errorf("failed to import module %s: %v", moduleName, err)
 			}
@@ -116,13 +213,31 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 			// Remove .m28 extension if present
 			moduleBaseName = strings.TrimSuffix(moduleBaseName, ".m28")
 
+			// Debug - print info before defining
+			fmt.Printf("DEBUG: Defining symbol module '%s' in environment\n", moduleBaseName)
+			
 			// Define the module in the environment
 			env.Define(core.LispSymbol(moduleBaseName), module)
+			
+			// Debug - verify it was added
+			if newValue, found := env.Get(core.LispSymbol(moduleBaseName)); found {
+				fmt.Printf("DEBUG: Symbol module '%s' defined as type: %T\n", moduleBaseName, newValue)
+				
+				// Check module content
+				if dict, ok := newValue.(*core.PythonicDict); ok {
+					items, _ := dict.CallMethod("items", []core.LispValue{})
+					if itemsList, ok := items.(core.LispList); ok {
+						fmt.Printf("DEBUG: Symbol module '%s' has %d items\n", moduleBaseName, len(itemsList))
+					}
+				}
+			} else {
+				fmt.Printf("DEBUG: Failed to define symbol module '%s' in environment\n", moduleBaseName)
+			}
 
 		case string:
 			// String literal module path: import "path/to/module"
 			modulePath := importSpec
-			module, err := globalRegistry.LoadModule(modulePath, e)
+			module, err := moduleLoader.LoadModule(modulePath, e)
 			if err != nil {
 				return nil, fmt.Errorf("failed to import module %s: %v", modulePath, err)
 			}
@@ -135,8 +250,26 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 			// Remove .m28 extension if present
 			moduleBaseName = strings.TrimSuffix(moduleBaseName, ".m28")
 
+			// Debug - print info before defining
+			fmt.Printf("DEBUG: Defining string module '%s' in environment\n", moduleBaseName)
+			
 			// Define the module in the environment
 			env.Define(core.LispSymbol(moduleBaseName), module)
+			
+			// Debug - verify it was added
+			if newValue, found := env.Get(core.LispSymbol(moduleBaseName)); found {
+				fmt.Printf("DEBUG: String module '%s' defined as type: %T\n", moduleBaseName, newValue)
+				
+				// Check module content
+				if dict, ok := newValue.(*core.PythonicDict); ok {
+					items, _ := dict.CallMethod("items", []core.LispValue{})
+					if itemsList, ok := items.(core.LispList); ok {
+						fmt.Printf("DEBUG: String module '%s' has %d items\n", moduleBaseName, len(itemsList))
+					}
+				}
+			} else {
+				fmt.Printf("DEBUG: Failed to define string module '%s' in environment\n", moduleBaseName)
+			}
 
 		case core.LispList:
 			// Complex import: from module import symbol1, symbol2
@@ -154,7 +287,7 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 				return nil, fmt.Errorf("module name must be a symbol or string")
 			}
 
-			module, err := globalRegistry.LoadModule(moduleName, e)
+			module, err := moduleLoader.LoadModule(moduleName, e)
 			if err != nil {
 				return nil, fmt.Errorf("failed to import module %s: %v", moduleName, err)
 			}
@@ -186,37 +319,8 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 	return core.PythonicNone{}, nil
 }
 
-// Helper function to resolve module paths
 // isBuiltinSymbol checks if a symbol is a builtin function or constant
 func isBuiltinSymbol(symbol core.LispSymbol) bool {
 	_, isBuiltin := core.BuiltinFuncs[symbol]
 	return isBuiltin || symbol == "None" || symbol == "True" || symbol == "False"
-}
-
-func resolveModulePath(name string) (string, error) {
-	// Check if the name is a path itself (contains / or .)
-	if filepath.Ext(name) == ".m28" {
-		if _, err := ioutil.ReadFile(name); err == nil {
-			return name, nil
-		}
-	}
-
-	// Look for .m28 files in the current directory and predefined module paths
-	paths := []string{
-		".",
-		"./tests",
-		"./modules",
-		"./examples",
-		"/usr/local/lib/m28/modules",
-		"/usr/lib/m28/modules",
-	}
-
-	for _, path := range paths {
-		fullPath := filepath.Join(path, name+".m28")
-		if _, err := ioutil.ReadFile(fullPath); err == nil {
-			return fullPath, nil
-		}
-	}
-
-	return "", fmt.Errorf("module %s not found", name)
 }

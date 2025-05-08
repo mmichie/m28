@@ -1,0 +1,8 @@
+# simple_module.m28
+# A very simple module for testing
+
+(def MODULE_NAME "SimpleModule")
+(def VALUE 42)
+
+(def (add x y)
+  (+ x y))

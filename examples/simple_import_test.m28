@@ -6,18 +6,18 @@
 (import simple_module)
 (print "simple_module type:" (type simple_module))
 
+# Print module contents
+(print "\nModule contents:")
+(print simple_module)
+
 # Print module type
 (print "\nModule type:" (type simple_module))
 
 # Try to access the module's variables
 (print "\nAccessing module variables:")
-(= module_name (get simple_module "MODULE_NAME"))
-(print "MODULE_NAME =" module_name)
+(print "MODULE_NAME =" simple_module.MODULE_NAME)
+(print "VALUE =" simple_module.VALUE)
 
-# Try to access the module's dictionary
-(print "\nAccessing module dictionary:")
-(= config (get simple_module "CONFIG"))
-(print "CONFIG =" config "type:" (type config))
-(if config
-  (print "  version =" (get config "version"))
-  (print "  CONFIG is None or undefined"))
+# Try to call a module function
+(print "\nCalling module function:")
+(print "add(10, 20) =" (simple_module.add 10 20))

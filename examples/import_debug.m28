@@ -1,0 +1,19 @@
+# Basic import test with debug prints
+(print "Importing simple_debug...")
+(import "simple_debug")
+
+# Print what we got
+(print "\nGot simple_debug object:" simple_debug)
+(print "Type:" (type simple_debug))
+(print "Dictionary keys:" (dict.keys simple_debug))
+
+# Try to access using different methods
+(print "\nUsing get:")
+(print "GREETING via get:" (get simple_debug "GREETING"))
+
+(print "\nUsing direct access:")
+(print "GREETING via direct:" simple_debug.GREETING)
+
+# Print all keys in the module
+(print "\nKeys in simple_debug:")
+(dict.keys simple_debug)

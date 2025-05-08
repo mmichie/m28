@@ -116,6 +116,20 @@ func EvalDotFixed(e core.Evaluator, args []core.LispValue, env core.Environment)
 		return nil, fmt.Errorf("function has no method '%s'", propertyName)
 
 	default:
+		// Handle modules - they may be represented as a different kind of object or map
+		// Try to use reflect to access properties if possible
+		if dict, ok := object.(*core.PythonicDict); ok {
+			// Check if it's a module by looking for __name__ attribute
+			if _, hasName := dict.Get("__name__"); hasName {
+				// This is likely a module
+				prop, ok := dict.Get(propertyName)
+				if !ok {
+					return nil, fmt.Errorf("module has no property '%s'", propertyName)
+				}
+				return prop, nil
+			}
+		}
+		
 		return nil, fmt.Errorf("object type %T does not support dot notation", object)
 	}
 }

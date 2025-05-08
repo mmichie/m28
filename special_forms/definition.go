@@ -11,11 +11,6 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		return nil, fmt.Errorf("def requires at least a name and a body")
 	}
 
-	// Extract function name and parameters
-	var funcName core.LispSymbol
-	var params []core.LispSymbol
-	var defaultValues map[core.LispSymbol]core.LispValue = make(map[core.LispSymbol]core.LispValue)
-
 	// Check if first arg is a list (the function signature)
 	firstArg := args[0]
 
@@ -24,9 +19,16 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		firstArg = located.Value
 	}
 
-	funcDef, ok := firstArg.(core.LispList)
-	if ok && len(funcDef) > 0 {
-		// (def (name param1 param2) body...)
+	// Check if we're defining a function or a variable
+	funcDef, isFuncDef := firstArg.(core.LispList)
+	
+	if isFuncDef && len(funcDef) > 0 {
+		// This is a function definition: (def (name param1 param2) body...)
+		// Extract function name and parameters
+		var funcName core.LispSymbol
+		var params []core.LispSymbol
+		var defaultValues map[core.LispSymbol]core.LispValue = make(map[core.LispSymbol]core.LispValue)
+		
 		nameVal := funcDef[0]
 
 		// Unwrap if it's a LocatedValue
@@ -57,35 +59,44 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				return nil, fmt.Errorf("function parameter must be a symbol, got %T", param)
 			}
 		}
+		
+		// Create function body from remaining arguments
+		body := core.LispList(args[1:])
+
+		// Create the Lambda function with a unique instance ID
+		function := &core.Lambda{
+			Params:        params,
+			Body:          body,
+			Env:           env,
+			Closure:       env,
+			DefaultValues: defaultValues,
+			// Set SharedEnv to nil - it will be created in ApplyLambda
+			SharedEnv: nil,
+			// Assign a unique ID to this function instance
+			InstanceID: getNextInstanceID(),
+		}
+
+		// Define the function in the current environment
+		env.Define(funcName, function)
+		return function, nil
 	} else {
-		// Check if first arg is a symbol (simple named function)
+		// This is a variable definition: (def name value)
+		// Extract variable name
 		nameVal, ok := firstArg.(core.LispSymbol)
 		if !ok {
-			return nil, fmt.Errorf("function name must be a symbol, got %T", firstArg)
+			return nil, fmt.Errorf("variable name must be a symbol, got %T", firstArg)
 		}
-		funcName = nameVal
-		// No parameters
+		
+		// Evaluate the value
+		value, err := e.Eval(args[1], env)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating variable value: %v", err)
+		}
+		
+		// Define the variable in the current environment
+		env.Define(nameVal, value)
+		return value, nil
 	}
-
-	// Create function body from remaining arguments
-	body := core.LispList(args[1:])
-
-	// Create the Lambda function with a unique instance ID
-	function := &core.Lambda{
-		Params:        params,
-		Body:          body,
-		Env:           env,
-		Closure:       env,
-		DefaultValues: defaultValues,
-		// Set SharedEnv to nil - it will be created in ApplyLambda
-		SharedEnv: nil,
-		// Assign a unique ID to this function instance
-		InstanceID: getNextInstanceID(),
-	}
-
-	// Define the function in the current environment
-	env.Define(funcName, function)
-	return function, nil
 }
 
 func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {

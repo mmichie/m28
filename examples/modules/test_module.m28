@@ -1,0 +1,29 @@
+# test_module.m28
+# This is a test module for demonstrating imports
+
+# Define module-level variables
+(def MODULE_NAME "TestModule")
+(def CALCULATED_VALUE (+ 10 15))
+
+# Define a function
+(def (add_numbers a b)
+  (+ a b))
+
+# Define a dictionary
+(def CONFIG {
+  "version": "1.0.0",
+  "debug": True,
+  "settings": {
+    "timeout": 30,
+    "retry": 3
+  }
+})
+
+# Define a list of exported symbols
+# When a module defines __exports__, only these symbols will be available to importers
+(def __exports__ [
+  "MODULE_NAME"
+  "CALCULATED_VALUE"
+  "add_numbers"
+  "CONFIG"
+])

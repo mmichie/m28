@@ -1,0 +1,22 @@
+# Enhanced module with export control
+
+# Define the exported symbols list first
+(def __exports__ ["GREETING" "add" "is_even"])
+
+# Define some variables
+(def GREETING "Hello from enhanced module!")
+(def INTERNAL_VALUE 42)  # This won't be exported
+
+# Define some functions
+(def (add x y)
+  (+ x y))
+
+(def (subtract x y)  # This won't be exported
+  (- x y))
+
+(def (is_even num)
+  (= (% num 2) 0))
+
+# Print a message when loaded
+(print "Enhanced module loaded successfully!")
+(print "Exported symbols:" __exports__)

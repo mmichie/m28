@@ -1,0 +1,22 @@
+# Simple module with direct variable definition
+(print "Debug module loading...")
+
+(def MODULE_NAME "DebugModule")
+(def VALUE 42)
+
+# Function to add two numbers
+(def (add x y)
+  (print "Adding" x "and" y)
+  (+ x y))
+
+# Add a dictionary to test dictionary access
+(= CONFIG {
+  "version": "1.0",
+  "debug": True
+})
+
+# Print values to confirm they're defined
+(print "MODULE_NAME in module:" MODULE_NAME)
+(print "VALUE in module:" VALUE)
+(print "CONFIG in module:" CONFIG)
+(print "add in module:" add)

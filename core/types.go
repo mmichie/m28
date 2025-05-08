@@ -93,6 +93,13 @@ type Evaluator interface {
 	Apply(fn LispValue, args []LispValue, env Environment) (LispValue, error)
 }
 
+// ModuleLoader interface defines methods for loading modules
+type ModuleLoader interface {
+	LoadModule(name string, e Evaluator) (*PythonicDict, error)
+	SetEvaluator(e Evaluator)
+	GetEvaluator() Evaluator
+}
+
 // Lambda represents a Python-like lambda function
 type Lambda struct {
 	Params        []LispSymbol

@@ -133,7 +133,7 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 			for i := 1; i < len(parts); i++ {
 				attrName := core.LispSymbol(parts[i])
 
-				// Check if it's a dictionary
+				// Check if it's a dictionary or a module (which is also a dictionary)
 				if dict, ok := currentObj.(*core.PythonicDict); ok {
 					// Get the attribute
 					var found bool
@@ -144,8 +144,21 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					}
 					current = current + "." + parts[i]
 				} else {
-					err := fmt.Errorf("%s is not an object with attributes", current)
-					return nil, e.enrichErrorWithTraceback(err)
+					// Try to access the attribute using the dot special form
+					dotArgs := []core.LispValue{currentObj, string(attrName)}
+					// Check if special_forms package is available
+					if dotFn, ok := e.specialForms[core.LispSymbol("dot")]; ok {
+						// Use the dot special form
+						result, err := dotFn(e, dotArgs, env)
+						if err != nil {
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+						currentObj = result
+						current = current + "." + parts[i]
+					} else {
+						err := fmt.Errorf("%s is not an object with attributes", current)
+						return nil, e.enrichErrorWithTraceback(err)
+					}
 				}
 			}
 

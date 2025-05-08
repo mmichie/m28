@@ -35,6 +35,11 @@ func NewREPL() *REPL {
 	// Set up the evaluator for builtins
 	builtin.SetEvaluator(evaluator)
 
+	// Create and register the module loader
+	moduleLoader := special_forms.NewModuleLoader()
+	moduleLoader.SetEvaluator(evaluator)
+	core.SetModuleLoader(moduleLoader)
+
 	// Register special forms in the environment
 	special_forms.RegisterSpecialForms(environment)
 
