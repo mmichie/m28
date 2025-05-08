@@ -1,0 +1,19 @@
+# Test file for module dot notation
+
+# Import a module for testing
+(import "examples/simple_module")
+
+# Inspect module properties
+(print "\n=== Module Properties ===")
+(print "Module __name__:" simple_module.__name__)
+(print "Module __file__:" simple_module.__file__)
+
+# Access module content
+(print "\n=== Module Content ===")
+(print "MODULE_NAME:" simple_module.MODULE_NAME)
+
+# Call module function
+(print "\n=== Module Function Call ===")
+(print "Result of add(3, 4):" (simple_module.add 3 4))
+
+(print "\n=== Test Completed Successfully! ===")

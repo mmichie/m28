@@ -106,57 +106,224 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 	case core.LispSymbol:
 		// Check for dot notation: module.attribute, dict.method, or object.attribute
 		if strings.Contains(string(v), ".") {
+			fmt.Printf("DEBUG: Dot notation detected in symbol: %s\n", string(v))
 			parts := strings.Split(string(v), ".")
+			fmt.Printf("DEBUG: Dot notation parts: %v\n", parts)
 
 			// Special case for dict methods and set methods - look up directly in the environment
 			if parts[0] == "dict" || parts[0] == "set" {
 				// Functions like dict.keys, dict.update, set.intersection, etc.
 				// should be looked up directly in the environment
+				fmt.Printf("DEBUG: Special case for dict/set methods: %s\n", string(v))
 				val, ok := env.Get(v)
 				if ok {
+					fmt.Printf("DEBUG: Found method directly: %T\n", val)
 					return val, nil
 				}
+				fmt.Printf("DEBUG: Method not found directly, falling through\n")
 				// Fall through to the module lookup if not found
 			}
 
 			// Handle multiple levels of attributes (e.g., module.submodule.attribute)
 			current := parts[0]
+			fmt.Printf("DEBUG: Looking up base object: %s\n", current)
 
 			// Start with the first part
 			currentObj, ok := env.Get(core.LispSymbol(current))
 			if !ok {
+				// Try checking the environment directly
+				fmt.Printf("DEBUG: Base object not found via Get: %s\n", current)
+				fmt.Printf("DEBUG: Checking environment directly for object\n")
+				
+				// Try looking for a dot handler for this object
+				dotHandlerName := core.LispSymbol(current + ".__dot__")
+				fmt.Printf("DEBUG: Looking for dot handler: %s\n", dotHandlerName)
+				if handler, ok := env.Get(dotHandlerName); ok {
+					// We found a dot handler, so use it to access the property
+					fmt.Printf("DEBUG: Found dot handler for %s\n", current)
+					
+					// This could be a more elegant solution with a ModuleRef interface,
+					// but for now we'll just handle it specially
+					if builtinFn, ok := handler.(core.BuiltinFunc); ok {
+						// We'll continue processing in the dot notation loop
+						fmt.Printf("DEBUG: Using dot handler to process dot notation\n")
+						
+						// Get the property name
+						if len(parts) < 2 {
+							err := fmt.Errorf(core.ErrDotMissingArgs)
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+						
+						propName := parts[1]
+						fmt.Printf("DEBUG: Accessing property: %s\n", propName)
+						
+						// Call the handler with the property name
+						result, err := builtinFn([]core.LispValue{propName}, env)
+						if err != nil {
+							fmt.Printf("DEBUG: Dot handler error: %v\n", err)
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+						
+						fmt.Printf("DEBUG: Dot handler result: %T\n", result)
+						
+						// If only one level, return directly
+						if len(parts) == 2 {
+							return result, nil
+						}
+						
+						// Otherwise start at the next level with the result
+						currentObj = result
+						current = fmt.Sprintf("%s.%s", current, propName)
+						
+						// Continue from position 2
+						for i := 2; i < len(parts); i++ {
+							attrName := parts[i]
+							fmt.Printf("DEBUG: Processing additional level: %s\n", attrName)
+							
+							// Check if the object implements DotAccessible interface
+							if dotAccessible, ok := currentObj.(core.DotAccessible); ok {
+								// Try to access the property
+								if dotAccessible.HasProperty(attrName) {
+									var found bool
+									currentObj, found = dotAccessible.GetProperty(attrName)
+									if !found {
+										err := core.ErrDotNoPropertyf(attrName)
+										return nil, e.enrichErrorWithTraceback(err)
+									}
+									current = fmt.Sprintf("%s.%s", current, attrName)
+								} else if dotAccessible.HasMethod(attrName) {
+									// Create a method reference
+									methodRef := core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+										return dotAccessible.CallMethod(attrName, args)
+									})
+									currentObj = methodRef
+									current = fmt.Sprintf("%s.%s", current, attrName)
+								} else {
+									err := core.ErrDotNoPropertyf(attrName)
+									return nil, e.enrichErrorWithTraceback(err)
+								}
+							} else if dict, ok := currentObj.(*core.PythonicDict); ok {
+								// Legacy path for dictionaries
+								currentObj, ok = dict.Get(attrName)
+								if !ok {
+									err := fmt.Errorf("attribute %s not found in %s", attrName, current)
+									return nil, e.enrichErrorWithTraceback(err)
+								}
+								current = fmt.Sprintf("%s.%s", current, attrName)
+							} else {
+								// Try to use the object's attributes
+								err := fmt.Errorf("cannot access attribute %s on non-dictionary %T", attrName, currentObj)
+								return nil, e.enrichErrorWithTraceback(err)
+							}
+						}
+						
+						return currentObj, nil
+					}
+				}
+				
+				// Print environment debug info
+				fmt.Printf("DEBUG: Environment: %s\n", env)
+				
 				err := fmt.Errorf("undefined object: %s", current)
 				return nil, e.enrichErrorWithTraceback(err)
 			}
+			fmt.Printf("DEBUG: Found base object: %s, type: %T\n", current, currentObj)
 
 			// Traverse the chain of attributes
 			for i := 1; i < len(parts); i++ {
 				attrName := core.LispSymbol(parts[i])
+				fmt.Printf("DEBUG: Looking up attribute: %s in %s\n", attrName, current)
 
-				// Check if it's a dictionary or a module (which is also a dictionary)
-				if dict, ok := currentObj.(*core.PythonicDict); ok {
+				// First check if the object implements DotAccessible interface
+				if dotAccessible, ok := currentObj.(core.DotAccessible); ok {
+					fmt.Printf("DEBUG: Object implements DotAccessible interface\n")
+					attrNameStr := string(attrName)
+					
+					// Check if it's a property access
+					if dotAccessible.HasProperty(attrNameStr) {
+						fmt.Printf("DEBUG: Found property %s via DotAccessible interface\n", attrNameStr)
+						var found bool
+						currentObj, found = dotAccessible.GetProperty(attrNameStr)
+						if !found {
+							err := fmt.Errorf("property %s not found in %s", attrName, current)
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+						current = current + "." + parts[i]
+					} else if dotAccessible.HasMethod(attrNameStr) {
+						// It's a method, but we're not calling it yet, just getting a reference
+						fmt.Printf("DEBUG: Found method %s via DotAccessible interface\n", attrNameStr)
+						// Create a method reference that can be called later
+						methodRef := core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+							return dotAccessible.CallMethod(attrNameStr, args)
+						})
+						currentObj = methodRef
+						current = current + "." + parts[i]
+					} else {
+						// Try special handling for modules if it's a PythonicDict
+						if dict, ok := currentObj.(*core.PythonicDict); ok {
+							if _, hasName := dict.Get("__name__"); hasName {
+								fmt.Printf("DEBUG: This appears to be a module (has __name__)\n")
+								// Extra debug for module contents
+								items, _ := dict.CallMethod("items", []core.LispValue{})
+								if itemsList, ok := items.(core.LispList); ok {
+									fmt.Printf("DEBUG: Module contents (%d items):\n", len(itemsList))
+									for _, item := range itemsList {
+										if pair, ok := item.(core.LispList); ok && len(pair) == 2 {
+											fmt.Printf("  - %v: %T\n", pair[0], pair[1])
+										}
+									}
+								}
+							}
+						}
+						err := fmt.Errorf("attribute %s not found in %s", attrName, current)
+						return nil, e.enrichErrorWithTraceback(err)
+					}
+				} else if dict, ok := currentObj.(*core.PythonicDict); ok {
+					// Legacy path for dictionaries that might not implement DotAccessible
+					fmt.Printf("DEBUG: Object is a PythonicDict (legacy path)\n")
 					// Get the attribute
 					var found bool
 					currentObj, found = dict.Get(attrName)
 					if !found {
+						fmt.Printf("DEBUG: Attribute %s not found in dict %s\n", attrName, current)
+						// Try special handling for modules
+						if _, hasName := dict.Get("__name__"); hasName {
+							fmt.Printf("DEBUG: This appears to be a module (has __name__)\n")
+							// Extra debug for module contents
+							items, _ := dict.CallMethod("items", []core.LispValue{})
+							if itemsList, ok := items.(core.LispList); ok {
+								fmt.Printf("DEBUG: Module contents (%d items):\n", len(itemsList))
+								for _, item := range itemsList {
+									if pair, ok := item.(core.LispList); ok && len(pair) == 2 {
+										fmt.Printf("  - %v: %T\n", pair[0], pair[1])
+									}
+								}
+							}
+						}
 						err := fmt.Errorf("attribute %s not found in %s", attrName, current)
 						return nil, e.enrichErrorWithTraceback(err)
 					}
+					fmt.Printf("DEBUG: Found attribute %s in dict, type: %T\n", attrName, currentObj)
 					current = current + "." + parts[i]
 				} else {
 					// Try to access the attribute using the dot special form
+					fmt.Printf("DEBUG: Not a dict, trying dot special form for %s.%s\n", current, attrName)
 					dotArgs := []core.LispValue{currentObj, string(attrName)}
 					// Check if special_forms package is available
 					if dotFn, ok := e.specialForms[core.LispSymbol("dot")]; ok {
+						fmt.Printf("DEBUG: Found dot special form, calling it\n")
 						// Use the dot special form
 						result, err := dotFn(e, dotArgs, env)
 						if err != nil {
+							fmt.Printf("DEBUG: Dot special form error: %v\n", err)
 							return nil, e.enrichErrorWithTraceback(err)
 						}
+						fmt.Printf("DEBUG: Dot special form succeeded, result type: %T\n", result)
 						currentObj = result
 						current = current + "." + parts[i]
 					} else {
-						err := fmt.Errorf("%s is not an object with attributes", current)
+						fmt.Printf("DEBUG: Dot special form not available\n")
+						err := fmt.Errorf("%s is not an object with attributes (does not implement DotAccessible)", current)
 						return nil, e.enrichErrorWithTraceback(err)
 					}
 				}
@@ -257,8 +424,35 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 				for i := 1; i < len(parts)-1; i++ {
 					attrName := core.LispSymbol(parts[i])
 
-					// Check if it's a dictionary
-					if dict, ok := currentObj.(*core.PythonicDict); ok {
+					// Check if the object implements DotAccessible interface
+					if dotAccessible, ok := currentObj.(core.DotAccessible); ok {
+						attrNameStr := string(attrName)
+						
+						// Check if it's a property access
+						if dotAccessible.HasProperty(attrNameStr) {
+							fmt.Printf("DEBUG: Found property %s via DotAccessible interface\n", attrNameStr)
+							var found bool
+							currentObj, found = dotAccessible.GetProperty(attrNameStr)
+							if !found {
+								err := core.ErrDotNoPropertyf(string(attrName))
+								return nil, e.enrichErrorWithTraceback(err)
+							}
+							current = current + "." + parts[i]
+						} else if dotAccessible.HasMethod(attrNameStr) {
+							// It's a method, but we're not calling it yet, just getting a reference
+							fmt.Printf("DEBUG: Found method %s via DotAccessible interface\n", attrNameStr)
+							// Create a method reference that can be called later
+							methodRef := core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+								return dotAccessible.CallMethod(attrNameStr, args)
+							})
+							currentObj = methodRef
+							current = current + "." + parts[i]
+						} else {
+							err := fmt.Errorf("attribute %s not found in %s", attrName, current)
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+					} else if dict, ok := currentObj.(*core.PythonicDict); ok {
+						// Legacy path for dictionaries
 						// Get the attribute
 						var found bool
 						currentObj, found = dict.Get(attrName)
@@ -268,7 +462,7 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 						}
 						current = current + "." + parts[i]
 					} else {
-						err := fmt.Errorf("%s is not an object with attributes", current)
+						err := fmt.Errorf("%s is not an object with attributes (does not implement DotAccessible)", current)
 						return nil, e.enrichErrorWithTraceback(err)
 					}
 				}
@@ -276,12 +470,50 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 				// Get the function name (last part)
 				funcName := core.LispSymbol(parts[len(parts)-1])
 
-				// Check if the object is a dictionary to get the function
-				if dict, ok := currentObj.(*core.PythonicDict); ok {
+				// First check if the object implements DotAccessible interface
+				if dotAccessible, ok := currentObj.(core.DotAccessible); ok {
+					funcNameStr := string(funcName)
+					
+					// Check if it's a method call
+					if dotAccessible.HasMethod(funcNameStr) {
+						fmt.Printf("DEBUG: Found method %s via DotAccessible interface\n", funcNameStr)
+						
+						// Evaluate the arguments
+						evalArgs, err := e.evalArgs(rest, env)
+						if err != nil {
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+						
+						// Call the method directly on the object
+						return dotAccessible.CallMethod(funcNameStr, evalArgs)
+					} else if dotAccessible.HasProperty(funcNameStr) {
+						// It's a property access followed by a function call
+						fmt.Printf("DEBUG: Found property %s via DotAccessible interface\n", funcNameStr)
+						
+						fnVal, found := dotAccessible.GetProperty(funcNameStr)
+						if !found {
+							err := core.ErrDotNoPropertyf(string(funcName))
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+						
+						// Evaluate the arguments
+						evalArgs, err := e.evalArgs(rest, env)
+						if err != nil {
+							return nil, e.enrichErrorWithTraceback(err)
+						}
+						
+						// Apply the function
+						return e.Apply(fnVal, evalArgs, env)
+					} else {
+						err := core.ErrDotNoMethodf(string(funcName))
+						return nil, e.enrichErrorWithTraceback(err)
+					}
+				} else if dict, ok := currentObj.(*core.PythonicDict); ok {
+					// Legacy path for dictionaries that might not implement DotAccessible
 					// Get the function
 					fnVal, found := dict.Get(funcName)
 					if !found {
-						err := fmt.Errorf("function %s not found in %s", funcName, current)
+						err := core.ErrDotNoPropertyf(string(funcName))
 						return nil, e.enrichErrorWithTraceback(err)
 					}
 
@@ -294,7 +526,7 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					// Apply the function
 					return e.Apply(fnVal, args, env)
 				} else {
-					err := fmt.Errorf("%s is not an object with methods", current)
+					err := core.ErrDotMissingInterfacef(currentObj)
 					return nil, e.enrichErrorWithTraceback(err)
 				}
 			} else if f == core.LispSymbol("=") {

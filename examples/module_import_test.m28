@@ -1,0 +1,46 @@
+# Test importing a module and using dot notation
+# This file demonstrates dot notation with imported modules
+
+(print "=== Module Import and Dot Notation Example ===")
+
+# Import our example module
+(import "examples/module_dot_example")
+
+(print "\n--- Module Metadata ---")
+# Access module metadata
+(print "Module name:" module_dot_example.__name__)
+(print "Module path:" module_dot_example.__file__)
+(print "Custom module name:" module_dot_example.MODULE_NAME)
+(print "Module version:" module_dot_example.VERSION)
+(print "Module authors:" module_dot_example.AUTHORS)
+
+(print "\n--- Module Methods ---")
+# Call module methods using dot notation
+(print "Initial counter:" module_dot_example.counter)
+(print "After increment(5):" (module_dot_example.increment 5))
+(print "After increment(10):" (module_dot_example.increment 10))
+
+(print "Multiply 7 * 6:" (module_dot_example.multiply 7 6))
+
+(print "\n--- Module Object Creation ---")
+# Create an object using the module's factory function
+(def alice (module_dot_example.make_user "Alice" 25))
+
+# Use methods on the created object
+(print "User greeting:" (alice.greet alice))
+(print "User age:" alice.age)
+(print "After birthday:" (alice.birthday alice))
+
+(print "\n--- Deep Property Access ---")
+# Access deeply nested properties
+(def treasure module_dot_example.nested_data.level1.level2.level3.value)
+(print "Nested value:" treasure)
+
+(print "\n--- Multiple Dot Operations ---")
+# Combining method calls and property access
+(def module_info (module_dot_example.get_module_info))
+(print "Module info name:" module_info.name)
+(print "Module info version:" module_info.version)
+(print "Module info counter:" module_info.counter)
+
+(print "\n=== Example Complete ===")

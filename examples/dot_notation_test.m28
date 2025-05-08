@@ -1,0 +1,150 @@
+# Comprehensive Dot Notation Test Suite
+# This file tests various aspects of dot notation across different object types
+
+(print "=== Dot Notation Test Suite ===")
+
+# Define test results collection
+(def tests_run 0)
+(def tests_passed 0)
+
+# Helper function to run a test case
+(def (test description test-function)
+  (print "\nTEST:" description)
+  (= tests_run (+ tests_run 1))
+  (def result (try 
+    (test-function)
+    (catch error
+      (print "❌ FAILED: Error -" error)
+      false)))
+  (if result
+    (do
+      (print "✅ PASSED")
+      (= tests_passed (+ tests_passed 1)))
+    (print "❌ FAILED"))
+  result)
+
+# Helper for assertions
+(def (assert condition message)
+  (if (not condition)
+    (do
+      (print "  Assert failed:" message)
+      false)
+    true))
+
+#------------------------------------------------------------
+# Dictionary Tests
+#------------------------------------------------------------
+(print "\n--- Dictionary Dot Notation Tests ---")
+
+(test "Basic dictionary property access" (lambda ()
+  (def dict1 {"name" "Test" "value" 42})
+  (and
+    (assert (= dict1.name "Test") "dict1.name should be 'Test'")
+    (assert (= dict1.value 42) "dict1.value should be 42"))))
+
+(test "Dictionary method call" (lambda ()
+  (def dict2 {"a" 1 "b" 2 "c" 3})
+  (and
+    (assert (= (len (dict2.keys)) 3) "dict2.keys should return 3 keys")
+    (assert (= (dict2.get "d" "default") "default") "dict2.get with default should work"))))
+
+(test "Setting dictionary properties" (lambda ()
+  (def dict3 {})
+  (= dict3.key "value")
+  (assert (= dict3.key "value") "dict3.key should be 'value'")))
+
+(test "Nested dictionary access" (lambda ()
+  (def dict4 {"user" {"profile" {"email" "test@example.com"}}})
+  (assert (= dict4.user.profile.email "test@example.com") "Nested property should be accessible")))
+
+(test "Method chaining" (lambda ()
+  (def dict5 {})
+  (def result ((dict5.set "a" 1).set "b" 2))
+  (and
+    (assert (= dict5.a 1) "dict5.a should be 1")
+    (assert (= dict5.b 2) "dict5.b should be 2"))))
+
+#------------------------------------------------------------
+# Module Tests
+#------------------------------------------------------------
+(print "\n--- Module Dot Notation Tests ---")
+
+(test "Basic module import" (lambda ()
+  (import "examples/module_dot_example")
+  (assert (not (= module_dot_example.__name__ nil)) "Module name should be defined")))
+
+(test "Module property access" (lambda ()
+  (assert (= module_dot_example.MODULE_NAME "DotExample") "MODULE_NAME should be accessible")))
+
+(test "Module method call" (lambda ()
+  (def result (module_dot_example.multiply 6 7))
+  (assert (= result 42) "Module method should be callable")))
+
+(test "Module state update" (lambda ()
+  (def initial module_dot_example.counter)
+  (module_dot_example.increment 5)
+  (assert (= module_dot_example.counter (+ initial 5)) "Module state should update")))
+
+#------------------------------------------------------------
+# Object Tests
+#------------------------------------------------------------
+(print "\n--- Object Dot Notation Tests ---")
+
+(test "Object creation and property access" (lambda ()
+  (def make-person (lambda (name age)
+    (dict "name" name "age" age)))
+  
+  (def person (make-person "Alice" 30))
+  (and
+    (assert (= person.name "Alice") "person.name should be 'Alice'")
+    (assert (= person.age 30) "person.age should be 30"))))
+
+(test "Object methods" (lambda ()
+  (def make-counter (lambda (initial)
+    (dict 
+      "count" initial
+      "increment" (lambda (self)
+        (= self.count (+ self.count 1))
+        self.count)
+      "decrement" (lambda (self)
+        (= self.count (- self.count 1))
+        self.count))))
+  
+  (def counter (make-counter 5))
+  (and
+    (assert (= (counter.increment counter) 6) "increment should return 6")
+    (assert (= counter.count 6) "count should be updated to 6")
+    (assert (= (counter.decrement counter) 5) "decrement should return 5"))))
+
+#------------------------------------------------------------
+# Functional Form Tests (.dot)
+#------------------------------------------------------------
+(print "\n--- Functional Dot Notation Tests ---")
+
+(test "Functional form with dot function" (lambda ()
+  (def obj {"prop" "value"})
+  (assert (= (. obj "prop") "value") "Functional dot should work")))
+
+(test "Computed property names" (lambda ()
+  (def obj {"name" "value"})
+  (def prop "name")
+  (assert (= (. obj prop) "value") "Computed property access should work")))
+
+(test "Nested functional dot" (lambda ()
+  (def obj {"a" {"b" {"c" 42}}})
+  (assert (= (. (. (. obj "a") "b") "c") 42) "Nested functional dot should work")))
+
+#------------------------------------------------------------
+# Print test results
+#------------------------------------------------------------
+(print "\n=== Test Results ===")
+(print "Tests run:" tests_run)
+(print "Tests passed:" tests_passed)
+(print "Success rate:" (* (/ tests_passed tests_run) 100) "%")
+
+(if (= tests_passed tests_run)
+  (print "All tests passed! ✅")
+  (print "Some tests failed. ❌"))
+
+# Return test results
+{"run" tests_run "passed" tests_passed}

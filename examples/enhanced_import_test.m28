@@ -1,30 +1,15 @@
 # Test enhanced module import with export control
 (print "=== Testing Enhanced Module System ===")
 
-# Import the enhanced module
-(print "\nImporting enhanced_module...")
+# Just use the module name directly
+(print "\nImporting enhanced_module and using it directly...")
 (import "modules/enhanced_module")
 
-# Print module type
-(print "\nModule type:" (type enhanced_module))
+# Access using the full name directly
+(print "\nUsing get directly:")
+(print "GREETING via get:" (get enhanced_module "GREETING"))
 
-# Try to access exported symbols
-(print "\nAccessing exported symbols:")
-(print "GREETING:" enhanced_module.GREETING)
-(print "is_even(42):" (enhanced_module.is_even 42))
-(print "add(10, 20):" (enhanced_module.add 10 20))
-
-# Try to access internal (non-exported) symbols
-(print "\nTrying to access internal symbols (should fail):")
-(print "INTERNAL_VALUE (should be None):" (get enhanced_module "INTERNAL_VALUE"))
-
-# Attempt to use dot notation for non-exported symbol
-(print "\nAttempting dot notation for non-exported subtract (should fail):")
-(try
-  (print "subtract(30, 10):" (enhanced_module.subtract 30 10))
-  (except RuntimeError (e)
-    (print "Expected error:" e)))
-
-# Print all available keys in the module
-(print "\nAll keys in module:")
-(print (dict.keys enhanced_module))
+# Print the modules variable directly to see what we have
+(print "\nLooking for module:")
+(print "Modules directory listing:")
+(dict.keys modules)

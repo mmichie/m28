@@ -1,175 +1,106 @@
-# Dot Notation Implementation Status
+# Dot Notation Implementation in M28
+
+This document describes the implementation of dot notation in M28, including the DotAccessible interface, property access, method calls, and nested property access.
 
 ## Overview
 
-This document describes the implementation of dot notation for method and property access in the M28 language. Dot notation allows for more Pythonic syntax when accessing object properties and methods.
+M28 supports Python-like dot notation for accessing properties and methods on objects. The implementation consists of several components:
 
-## Current Implementation
+1. **DotAccessible Interface**: A standardized interface for objects that support dot notation
+2. **Symbol-based Dot Notation**: Support for expressions like `object.property`
+3. **Functional Dot Notation**: Support for expressions like `(dot object "property")`
+4. **Method Calls**: Support for method invocation like `(object.method object arg1 arg2)`
+5. **Nested Property Access**: Support for accessing deep properties like `obj.a.b.c`
 
-1. **Special Form Registration**: 
-   - Implemented both `.` and `dot` special forms for method and property access
-   - Added `EvalDotFixed` function to handle property access and method calls
-   - Both forms now work with the same implementation
+## DotAccessible Interface
 
-2. **Dictionary Method Support**:
-   - Enhanced PythonicDict with a method table
-   - Implemented core dictionary methods (get, set, update, keys, values, items, etc.)
-   - Added a CallMethod mechanism to invoke dictionary methods
-   - Proper self parameter handling for method calls
+The core of the dot notation implementation is the `DotAccessible` interface, defined in `core/types.go`:
 
-3. **Parser Support**:
-   - Enabled dot notation processing in the parser
-   - Fixed nested property access (e.g., object.property.method)
-   - Added better handling for numeric literals with decimals
-   - Resolved conflicts with dotted pair notation
+```go
+type DotAccessible interface {
+    // HasProperty checks if the object has a property with the given name
+    HasProperty(name string) bool
+    
+    // GetProperty retrieves a property from the object by name
+    // Returns the property value and a boolean indicating if the property exists
+    GetProperty(name string) (LispValue, bool)
+    
+    // SetProperty sets a property on the object
+    // Returns an error if the property cannot be set (e.g., read-only object)
+    SetProperty(name string, value LispValue) error
+    
+    // HasMethod checks if the object has a method with the given name
+    HasMethod(name string) bool
+    
+    // CallMethod calls a method on the object with the given arguments
+    // Returns the result of the method call or an error
+    CallMethod(name string, args []LispValue) (LispValue, error)
+}
+```
 
-4. **Type-specific Handling**:
-   - Enhanced support for different object types
-   - Added special handling for dictionaries, generators, and lambdas
-   - Improved error messages for common issues
+This interface provides a standardized way for different object types to support dot notation, ensuring consistent behavior across the codebase.
 
-## Usage Examples
+## Symbol-Based Dot Notation
 
-### Property Access
+Symbol-based dot notation is handled in the evaluator's `Eval` method. When a symbol containing dots is encountered, it's parsed into components and the object's properties are accessed sequentially.
 
-There are two ways to access object properties:
+The implementation handles:
+- Basic property access (`object.property`)
+- Nested property access (`object.nested.property`)
+- Method references (`object.method`)
+- Special cases for builtins like `dict.keys`
 
-1. Using dot notation special form (recommended):
-   ```lisp
-   (dot person "name")
-   ```
+## Functional Dot Notation
 
-2. Using the get function:
-   ```lisp
-   (get person "name")
-   ```
-
-### Method Calls
-
-Dictionary methods can be called using the dot notation:
+Functional dot notation is implemented through the `dot` and `.` special forms, defined in `special_forms/dot_fixed.go`. These forms allow property access and method calls through a function-like syntax:
 
 ```lisp
-;; Get a property with default value
-(dot person "get" "country" "Unknown")
-
-;; Set a new property
-(dot person "set" "city" "New York")
-
-;; Get all keys
-(dot person "keys")
-
-;; Get all values
-(dot person "values")
-
-;; Get all items as key-value pairs
-(dot person "items")
-
-;; Update with another dictionary
-(dot person "update" other-dict)
+(dot object "property")
+(. object "property")
 ```
 
-### Object-style Programming
-
-The dot notation can be used to create and use objects with methods:
+The functional form is especially useful when the property name needs to be computed or for nested property access in a single expression:
 
 ```lisp
-;; Create a counter object
-(def (make-counter initial)
-  (= count initial)
-  (= counter (dict))
-  
-  ;; Define increment method
-  (def (increment self amount)
-    (= count (+ count amount))
-    count)
-  
-  ;; Define get-count method
-  (def (get-count self)
-    count)
-  
-  ;; Register methods in the counter dictionary
-  (dot counter "set" "increment" increment)
-  (dot counter "set" "get-count" get-count)
-  
-  ;; Return the counter object
-  counter)
-
-;; Create a counter instance
-(= my-counter (make-counter 10))
-
-;; Call methods on the counter
-(dot my-counter "get-count")  ;; Returns 10
-(dot my-counter "increment" 5)  ;; Returns 15
+(dot object prop1 prop2 prop3)  ; Access obj.prop1.prop2.prop3
 ```
 
-## Implementation Details
+## Method Calls
 
-### Dictionary Methods
+Method calls via dot notation involve two steps:
+1. Retrieving the method from the object
+2. Applying the method with the object as first argument
 
-The `PythonicDict` struct has been enhanced to include a method table and a `CallMethod` function:
+For objects implementing the DotAccessible interface, the `CallMethod` function handles method invocation. For other objects, type-specific handling is employed.
 
+## Module Dot Notation
+
+Modules are implemented as dictionaries with special handling. When a module is imported, a dot handler is registered to enable dot notation for accessing module attributes and functions.
+
+For example, in `special_forms/module.go`:
 ```go
-type PythonicDict struct {
-    data    map[LispValue]LispValue
-    mu      sync.RWMutex
-    methods map[string]DictMethod
-}
-
-// CallMethod calls a method on the dictionary
-func (d *PythonicDict) CallMethod(methodName string, args []LispValue) (LispValue, error) {
-    // Implementation details...
-}
+// Create a dot handler for the module to allow attribute access
+env.Define(core.LispSymbol(moduleBaseName+".__dot__"), core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+    // Handler implementation for module property access and method calls
+}))
 ```
 
-The following dictionary methods are supported:
-- `get`: Retrieves a value by key, with optional default value
-- `set`: Sets a key-value pair
-- `update`: Updates the dictionary with key-value pairs from another dictionary
-- `keys`: Returns all keys as a list
-- `values`: Returns all values as a list
-- `items`: Returns all key-value pairs as a list of pairs
-- `delete`: Removes a key-value pair
-- `clear`: Clears all key-value pairs
+## Error Handling
 
-### Dot Special Form
+Standardized error messages for dot notation operations are defined in `core/dot_errors.go`. This ensures consistent error reporting across different components of the dot notation implementation.
 
-The dot special form has been implemented to handle property access and method calls:
+## Testing
 
-```go
-// EvalDotFixed implements the dot notation for method access and property access
-func EvalDotFixed(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-    // Implementation details...
-}
-```
+Test cases for dot notation are provided in `tests/dot-notation-test.m28`. These tests verify:
+- Property access on dictionaries, modules, and custom objects
+- Method calls with and without arguments
+- Nested property access
+- Error handling
 
-### Parser Integration
+## Future Improvements
 
-The parser has been updated to process dot notation properly, transforming expressions like `object.property` into the appropriate special form call:
-
-```go
-// processDotNotation transforms dot notation tokens into lisp expressions
-// For example: "object.method" becomes ["(" "." "object" "\"method\"" ")"]
-func processDotNotation(tokens []string) []string {
-    // Implementation details...
-}
-```
-
-## Known Limitations
-
-1. Certain edge cases with nested properties may not be handled correctly yet.
-2. Parser conflicts with traditional Lisp dotted pairs can still occur in some contexts.
-3. Generator methods require an evaluator context, so using `.next` directly may not work as expected.
-4. There may be performance implications when using deeply nested property access.
-
-## Future Enhancements
-
-1. **Syntactic Sugar**: Add more syntactic sugar for object-oriented programming patterns.
-2. **Performance Optimization**: Improve the efficiency of dot notation parsing and evaluation.
-3. **Better Error Messages**: Enhance error messages for common dot notation mistakes.
-4. **Custom Object Protocol**: Implement a full object protocol similar to Python's `__getattr__` and `__setattr__`.
-
-## Conclusion
-
-The dot notation feature is now fully implemented, allowing both property access and method calls in a Pythonic style. This enhances the language's usability and makes it more accessible to Python programmers.
-
-Users can choose between the traditional `get` function or the more intuitive dot notation for accessing properties and methods. The feature has been thoroughly tested and is ready for use in M28 programs.
+Potential future improvements for the dot notation implementation:
+1. Implement a cleaner approach for binding method references (creating bound methods)
+2. Add support for operator overloading via dot notation
+3. Optimize nested property lookups
+4. Extend DotAccessible to more core types

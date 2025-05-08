@@ -199,3 +199,24 @@ func (d *PythonicDict) sortedKeys() []LispValue {
 func (d *PythonicDict) SortedKeys() []LispValue {
 	return d.sortedKeys()
 }
+
+// Implementation of DotAccessible interface
+
+// HasProperty checks if a property exists in the dictionary
+func (d *PythonicDict) HasProperty(name string) bool {
+	_, exists := d.Get(name)
+	return exists
+}
+
+// GetProperty retrieves a property from the dictionary
+// It is a wrapper around the Get method that takes a string name
+func (d *PythonicDict) GetProperty(name string) (LispValue, bool) {
+	return d.Get(name)
+}
+
+// SetProperty sets a property in the dictionary
+// It is a wrapper around the Set method that takes a string name
+func (d *PythonicDict) SetProperty(name string, value LispValue) error {
+	d.Set(name, value)
+	return nil
+}

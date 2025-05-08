@@ -1,0 +1,11 @@
+# Test the simplest access to module attributes
+(print "=== Simplest Test ===")
+
+# Import the module
+(import "examples/basic_module")
+
+# Print using direct symbol access
+(print "Using direct access:")
+(print basic_module.__name__)
+
+(print "=== Test Completed ===")

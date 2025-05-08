@@ -1,0 +1,7 @@
+# Simple test to verify dot notation
+(print "Starting simple test")
+# Create a dictionary for testing
+(def test_dict (dict))
+(test_dict.set "my_key" "my_value")
+(print "Dictionary value:" (test_dict.get "my_key"))
+(print "Test completed")

@@ -1,7 +1,0 @@
-# Hello World example with def special form
-
-(def (greet name greeting)
-    (= message (+ greeting ", " name "!"))
-    message)  # Last expression is automatically returned, no need for 'return'
-
-(print (greet "Alice" "Hello"))

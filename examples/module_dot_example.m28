@@ -1,0 +1,60 @@
+# Define a simple example module with properties and methods
+# This module will be imported by module_import_test.m28
+
+(print "Loading module_dot_example...")
+
+# Define some module properties
+(def MODULE_NAME "DotExample")
+(def VERSION "1.0.0") 
+(def AUTHORS ["Claude" "User"])
+
+# Define a simple counter (mutable state)
+(def counter 0)
+
+# Define module functions
+(def (increment amount)
+  (= counter (+ counter amount))
+  counter)
+
+(def (get_module_info)
+  (dict
+    "name" MODULE_NAME
+    "version" VERSION
+    "counter" counter
+  ))
+
+(def (multiply x y)
+  (* x y))
+
+# Create a user class example
+(def (make_user name age)
+  (def user (dict
+    "name" name
+    "age" age
+    "greet" (lambda (self)
+      (+ "Hello, my name is " self.name " and I am " self.age " years old"))
+    "birthday" (lambda (self)
+      (= self.age (+ self.age 1))
+      self.age)
+  ))
+  user)
+
+# Create a nested data structure
+(def nested_data (dict
+  "level1" (dict
+    "level2" (dict
+      "level3" (dict
+        "value" "You found the treasure!"
+      )
+    )
+  )
+))
+
+# Define the exports list (what's accessible to importers)
+(def __exports__ [
+  MODULE_NAME VERSION AUTHORS counter
+  increment get_module_info multiply
+  make_user nested_data
+])
+
+(print "module_dot_example loaded successfully!")

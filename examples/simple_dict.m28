@@ -1,0 +1,19 @@
+# Test basic dictionary creation
+(print "=== Testing Dictionary Creation ===")
+
+# Create a dictionary
+(def my_dict (dict))
+
+# Print it to verify
+(print "Created dictionary:" my_dict)
+
+# Add a value
+(dict.set my_dict "name" "Test Dictionary")
+
+# Print it again
+(print "Dictionary with value:" my_dict)
+
+# Try retrieving a value
+(print "Dictionary name:" (dict.get my_dict "name"))
+
+(print "=== Test Completed ===")

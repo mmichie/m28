@@ -1,0 +1,159 @@
+;; Dot notation test suite
+;; This file contains tests for dot notation on different object types
+
+(def test-results [])
+
+(def assert (lambda (condition message)
+  (if condition
+    (= test-results (+ test-results [["passed" message]]))
+    (= test-results (+ test-results [["FAILED" message]]))
+  )
+))
+
+;;
+;; Dictionary dot notation tests
+;;
+
+;; Test basic property access
+(def test-dict {"name" "test" "value" 42 "nested" {"inner" "value"}})
+(assert (= test-dict.name "test") "Dictionary property access with dot notation")
+(assert (= test-dict.value 42) "Dictionary numeric property access with dot notation")
+
+;; Test method access
+(assert (= (test-dict.get "name" "default") "test") "Dictionary method call with dot notation")
+(assert (= (test-dict.get "missing" "default") "default") "Dictionary method call with default argument")
+
+;; Test nested property access
+(assert (= test-dict.nested.inner "value") "Nested dictionary property access with dot notation")
+
+;; Test property setting
+(= test-dict.new_prop "new value")
+(assert (= test-dict.new_prop "new value") "Setting dictionary property with assignment")
+
+;; Test method chaining
+(def chained-dict (test-dict.set "chainable" "value").set "another" 123)
+(assert (= chained-dict.chainable "value") "Method chaining with dot notation (first value)")
+(assert (= chained-dict.another 123) "Method chaining with dot notation (second value)")
+
+;;
+;; Module dot notation tests
+;;
+
+;; Import a test module
+(import "examples/dict_operations")
+
+;; Test module property access
+(assert (= dict_operations.__name__ "examples/dict_operations") "Module property access")
+
+;; Test module function call
+(def test-module-dict {"a" 1 "b" 2})
+(def merged (dict_operations.merge test-module-dict {"c" 3}))
+(assert (= merged.c 3) "Module function call with dot notation")
+
+;;
+;; Class/Object dot notation tests
+;;
+
+;; Define a test class with properties and methods
+(def make-person (lambda (name age)
+  (def person {
+    "name" name
+    "age" age
+    "greet" (lambda (self)
+      (+ "Hello, my name is " self.name "!")
+    )
+    "birthday" (lambda (self)
+      (= self.age (+ self.age 1))
+      self.age
+    )
+  })
+  person
+))
+
+;; Create test person object
+(def person (make-person "Alice" 30))
+
+;; Test object property access
+(assert (= person.name "Alice") "Object property access with dot notation")
+(assert (= person.age 30) "Object numeric property access with dot notation")
+
+;; Test object method calls
+(assert (= (person.greet person) "Hello, my name is Alice!") "Object method call with dot notation")
+(assert (= (person.birthday person) 31) "Object method call with side effects")
+(assert (= person.age 31) "Verify property was updated by method call")
+
+;;
+;; Special case tests
+;;
+
+;; Test nested method call
+(def complex-obj {
+  "data" {
+    "items" [1 2 3 4 5]
+    "count" (lambda (self) (len self.items))
+  }
+})
+
+(assert (= (complex-obj.data.count complex-obj.data) 5) "Nested method call with dot notation")
+
+;; Test for custom error messages
+(def error-test (lambda ()
+  (try
+    (do 
+      (def empty-obj {})
+      empty-obj.missing_property
+    )
+    (catch error
+      (assert (not (= error nil)) "Error thrown for missing property")
+      error
+    )
+  )
+))
+
+(def error-result (error-test))
+(assert (not (= error-result nil)) "Error message for missing property is not nil")
+
+;;
+;; Functional style vs dot notation style comparison
+;;
+
+;; Functional style
+(def func-dict {"key" "value" "nested" {"inner" "secret"}})
+(def func-result (get (get func-dict "nested") "inner"))
+
+;; Dot notation style
+(def dot-result func-dict.nested.inner)
+
+;; Verify they produce the same result
+(assert (= func-result dot-result) "Functional and dot notation styles produce identical results")
+(assert (= func-result "secret") "Dot notation retrieves the correct deeply nested value")
+
+;;
+;; Print test results
+;;
+
+(def passed-tests (filter (lambda (result) (= (result 0) "passed")) test-results))
+(def failed-tests (filter (lambda (result) (= (result 0) "FAILED")) test-results))
+
+(print "=== Dot Notation Tests ===")
+(print (+ "Total tests: " (len test-results)))
+(print (+ "Passed: " (len passed-tests)))
+(print (+ "Failed: " (len failed-tests)))
+
+(if (> (len failed-tests) 0)
+  (do
+    (print "\nFailed tests:")
+    (for result failed-tests
+      (print (+ "- " (result 1)))
+    )
+  )
+  (print "\nAll tests passed!")
+)
+
+;; Return results for programmatic checking
+{
+  "total" (len test-results)
+  "passed" (len passed-tests)
+  "failed" (len failed-tests)
+  "results" test-results
+}

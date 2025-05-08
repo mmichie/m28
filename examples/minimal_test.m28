@@ -1,0 +1,4 @@
+# Minimal test program
+(import "examples/simple_module")
+(print "Module loaded successfully")
+(print "MODULE_NAME: " simple_module.MODULE_NAME)

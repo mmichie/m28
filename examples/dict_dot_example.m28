@@ -1,0 +1,58 @@
+# Dict Dot Notation Example
+# This file demonstrates the basic usage of dot notation with dictionaries
+
+(print "=== Dictionary Dot Notation Example ===")
+
+# Create a dictionary
+(def config (dict 
+  "name" "Configuration"
+  "version" 1.0
+  "enabled" true
+  "settings" (dict
+    "timeout" 30
+    "retry_count" 3
+    "debug" false
+  )
+))
+
+(print "\n--- Basic Property Access ---")
+# Access properties using dot notation
+(print "Name:" config.name)
+(print "Version:" config.version)
+(print "Enabled:" config.enabled)
+
+# Traditional way (for comparison)
+(print "\n--- Traditional Method (for comparison) ---")
+(print "Name:" (get config "name"))
+(print "Version:" (get config "version"))
+
+(print "\n--- Dictionary Methods ---")
+# Call dictionary methods using dot notation
+(print "Keys:" (config.keys))
+(print "Values:" (config.values))
+
+# Get with default value
+(print "Missing key with default:" (config.get "missing" "default value"))
+
+(print "\n--- Nested Properties ---")
+# Access nested dictionary properties
+(print "Timeout:" config.settings.timeout)
+(print "Retry count:" config.settings.retry_count)
+(print "Debug mode:" config.settings.debug)
+
+(print "\n--- Method Chaining ---")
+# Demonstrate method chaining
+(def result ((config.set "new_value" 42).get "new_value"))
+(print "Result of method chaining:" result)
+
+(print "\n--- Property Setting ---")
+# Set properties using dot notation
+(= config.counter 0)
+(= config.counter (+ config.counter 1))
+(print "Counter after increment:" config.counter)
+
+# Set nested property
+(= config.settings.debug true)
+(print "Debug mode after change:" config.settings.debug)
+
+(print "\n=== Example Complete ===")

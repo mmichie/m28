@@ -1,0 +1,32 @@
+# Super simple test to print details about dictionaries
+(print "=== Dictionary Debug Test ===")
+
+# Create a simple dictionary
+(= my_dict (dict))
+
+# Add some values
+(dict.set my_dict "name" "Test Dict")
+(dict.set my_dict "value" 42)
+
+# Print the dictionary
+(print "Dictionary contents:")
+(print my_dict)
+
+# Try to access directly with get
+(print "\nUsing dict.get:")
+(print "Name:" (dict.get my_dict "name"))
+(print "Value:" (dict.get my_dict "value"))
+
+# Experiment with other ways to possibly access
+(print "\nAdding our own dot handler:")
+(def (my_dot_handler dict prop)
+  (print "Dot handler called with prop:" prop)
+  (dict.get dict prop))
+
+(= my_dict.__dot__ my_dot_handler)
+
+(print "Testing our dot handler:")
+(= result (my_dict.__dot__ "name"))
+(print "Result:" result)
+
+(print "=== Test Completed ===")
