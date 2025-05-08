@@ -159,6 +159,12 @@ func processDotNotation(tokens []Token) ([]Token, error) {
 	for i := 0; i < len(tokens); i++ {
 		token := tokens[i]
 
+		// Skip tokens that are string literals (enclosed in quotes)
+		if strings.HasPrefix(token.Value, "\"") && strings.HasSuffix(token.Value, "\"") {
+			result = append(result, token)
+			continue
+		}
+
 		// Skip tokens that are not symbols or don't contain dots
 		if token.Value == "." || len(token.Value) <= 1 || !strings.Contains(token.Value, ".") {
 			result = append(result, token)
@@ -740,9 +746,11 @@ func (p *Parser) parseAtom(token string, location core.Location) core.LispValue 
 	} else if strings.HasPrefix(token, "\"") && strings.HasSuffix(token, "\"") {
 		unquoted, err := strconv.Unquote(token)
 		if err == nil {
+			// Successfully unquoted string becomes a string value
 			value = unquoted
 		} else {
 			// If unquoting fails, use the raw token as a symbol
+			// This should not happen with well-formed strings
 			value = core.LispSymbol(token)
 		}
 	} else {

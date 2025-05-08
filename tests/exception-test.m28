@@ -1,0 +1,101 @@
+# Consolidated Exception & Traceback Test Suite
+# Combines basic exception test suite and traceback test suite
+
+(print "===== Exception & Traceback Tests =====\n")
+
+# Section 1: Basic Exception Handling
+(print "-- Basic Exception Handling --")
+
+# Test 1: Basic try/except
+(print "\nTest 1.1: Basic try/except")
+(try
+  (print "Raising an exception")
+  (raise "Basic exception")
+  (except
+    (print "Exception caught successfully")))
+
+# Test 2: Try with finally
+(print "\nTest 1.2: Finally block")
+(try
+  (print "In try block")
+  (finally
+    (print "Finally block executed")))
+
+# Test 3: Exception and finally
+(print "\nTest 1.3: Exception and finally")
+(try
+  (print "Raising an exception with finally")
+  (raise "Another exception")
+  (except
+    (print "Exception caught"))
+  (finally
+    (print "Finally block always executes")))
+
+# Test 4: Runtime exception
+(print "\nTest 1.4: Runtime error")
+(try
+  (print "Dividing by zero")
+  (/ 10 0)
+  (except
+    (print "Division by zero caught")))
+
+# Test 5: Define custom exception
+(print "\nTest 1.5: Custom exception")
+(defexception CustomError)
+(print "Custom exception defined")
+
+# Section 2: Traceback Functionality
+(print "\n-- Traceback Functionality --")
+
+# Test 1: Simple function with error
+(print "\nTest 2.1: Simple function error")
+(def (simple_error)
+  (print "Function with division by zero")
+  (/ 1 0))
+
+(try
+  (simple_error)
+  (except
+    (print "Caught error from simple function")))
+
+# Test 2: Nested function calls with error
+(print "\nTest 2.2: Nested function calls")
+(def (inner_error)
+  (print "Inner function with error")
+  (/ 10 0))
+
+(def (middle_function)
+  (print "Middle function calling inner")
+  (inner_error))
+
+(def (outer_function)
+  (print "Outer function calling middle")
+  (middle_function))
+
+(try
+  (outer_function)
+  (except
+    (print "Caught error from nested functions")))
+
+# Test 3: Custom exception
+(print "\nTest 2.3: Custom exception with traceback")
+(defexception TestError)
+
+(def (raise_custom)
+  (print "Function raising custom exception")
+  (raise TestError "Test error message"))
+
+(try
+  (raise_custom)
+  (except
+    (print "Caught custom exception")))
+
+# Test 4: Empty dictionary at end (test for previous bug)
+(print "\nTest 2.4: Empty dictionary at end")
+(def (get_empty_dict)
+  {})
+
+(get_empty_dict)
+{}
+
+(print "\n===== Exception Tests Complete =====")

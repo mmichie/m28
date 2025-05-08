@@ -1,4 +1,0 @@
-# Simple dot notation test
-(= person (dict "name" "John" "age" 30))
-(print (get person "name"))
-(print (. person "name"))

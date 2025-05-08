@@ -1,0 +1,109 @@
+# Consolidated Data Structures Test Suite
+# Combines dictionary and list tests
+
+(print "===== Data Structures Tests =====\n")
+
+# Section 1: List Operations
+(print "-- List Operations --")
+
+# List Creation
+(print "\nTest 1.1: List Creation")
+(= empty-list (list))
+(= numbers (list 1 2 3 4 5))
+(= mixed (list 1 "two" 3.0 True None))
+
+(print "Empty list:")
+(print empty-list)
+(print "Expected: []")
+
+(print "Numbers list:")
+(print numbers)
+(print "Expected: [1, 2, 3, 4, 5]")
+
+(print "Mixed list:")
+(print mixed)
+(print "Expected: [1, \"two\", 3.0, True, None]")
+
+# List Access
+(print "\nTest 1.2: List Access")
+(= nums (list 10 20 30 40 50))
+
+(print "First element (index 0):")
+(print (nth nums 0))
+(print "Expected: 10")
+
+(print "Middle element (index 2):")
+(print (nth nums 2))
+(print "Expected: 30")
+
+(print "Last element (index 4):")
+(print (nth nums 4))
+(print "Expected: 50")
+
+# List Operations
+(print "\nTest 1.3: List Combination")
+(= list1 (list 1 2 3))
+(= list2 (list 4 5 6))
+(= combined (+ list1 list2))
+
+(print "Combined lists:")
+(print combined)
+(print "Expected: [1, 2, 3, 4, 5, 6]")
+
+# List Iteration
+(print "\nTest 1.4: List Iteration")
+(= sum 0)
+(= nums (list 1 2 3 4 5))
+(for num nums
+  (= sum (+ sum num)))
+
+(print "Sum of list elements:")
+(print sum)
+(print "Expected: 15")
+
+# Section 2: Dictionary Operations
+(print "\n-- Dictionary Operations --")
+
+# Dictionary Creation
+(print "\nTest 2.1: Dictionary Creation")
+(= empty_dict (dict))
+(print "Empty dictionary:")
+(print empty_dict)
+
+(= person1 (dict "name" "John" "age" 30))
+(print "Person dictionary:")
+(print person1)
+(print "Expected: {\"name\": \"John\", \"age\": 30}")
+
+# Dictionary Access
+(print "\nTest 2.2: Dictionary Access")
+(= person2 (dict "name" "Jane" "age" 25 "city" "New York"))
+
+(print "Get person1 name:")
+(print (get person1 "name"))
+(print "Expected: John")
+
+(print "Get person2 age:")
+(print (get person2 "age"))
+(print "Expected: 25")
+
+(print "Get with default value:")
+(print (get person1 "country" "Unknown"))
+(print "Expected: Unknown")
+
+# Dictionary as Keyword Args
+(print "\nTest 2.3: Dictionary as Keyword Args")
+(print "Print with custom separator:")
+(print "a" "b" "c" {"sep": "-"})
+(print "Expected: a-b-c")
+
+(print "Print with custom end:")
+(print "Hello World" {"end": "!"})
+(print)
+(print "Expected: Hello World!")
+
+(print "Print with both custom separator and end:")
+(print "a" "b" "c" {"sep": "|", "end": "✓\n"})
+(print "Expected: a|b|c✓")
+
+(print "\n===== Data Structures Tests Complete =====")

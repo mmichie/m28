@@ -1,5 +1,0 @@
-# Minimal dot notation test
-(= person (dict "name" "John"))
-(print "Property access with dot notation:")
-(print (dot person "name"))
-(print "Test complete")

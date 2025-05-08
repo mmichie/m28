@@ -1,9 +1,0 @@
-(print "\n===== Lambda Function Test =====")
-
-(def double (lambda (x) (* x 2)))
-
-(print "double(5) = ")
-(print (double 5))
-(print "Expected: 10")
-
-(print "\n===== Test Complete =====")

@@ -1,53 +1,56 @@
-# M28 Pythonic Lisp Test Suite
+# M28 Language Test Suite
 
-This directory contains a set of test files for the M28 Pythonic Lisp language. These tests are designed to verify the functionality of the interpreter by testing various language features.
+This directory contains a consolidated set of tests for the M28 language implementation. The tests are organized by functionality to make them more maintainable and easier to understand.
 
 ## Test Files
 
-1. **arithmetic-test.m28** - Tests arithmetic operations (+, -, *, /, %, **)
-2. **variable-test.m28** - Tests variable assignment and different data types
-3. **control-flow-test.m28** - Tests if/elif/else statements and loops
-4. **list-test.m28** - Tests list creation, access, and operations
+The test suite includes the following test files:
 
-## Running Tests
+1. **core-types-test.m28**: Tests basic types and arithmetic operations
+   - Variables and assignments
+   - Numeric operations (addition, subtraction, multiplication, division)
+   - Various data types (numbers, strings, booleans, etc.)
 
-You can run individual test files:
+2. **control-flow-test.m28**: Tests control flow structures
+   - Conditional statements (if, if-elif-else)
+   - Loop constructs (for, while)
+   - Early loop termination and skipping iterations
+
+3. **data-structures-test.m28**: Tests data structure operations
+   - List creation and manipulation
+   - Dictionary operations
+   - Collection iteration
+
+4. **function-test.m28**: Tests function definitions and usage
+   - Basic function definitions
+   - Recursive functions
+   - Higher-order functions
+   - Function parameters and return values
+
+5. **exception-test.m28**: Tests exception handling and traceback functionality
+   - Basic exception handling (try/except/finally)
+   - Custom exceptions
+   - Nested exception handling
+   - Traceback information for debugging
+
+## Running the Tests
+
+To run all tests:
 
 ```bash
-./bin/m28 tests/arithmetic-test.m28
+cd /Users/mim/src/m28
+./run-tests.sh
 ```
 
-Or run all tests at once using the provided script:
+To run a specific test:
 
 ```bash
-./run_tests.sh
+./bin/m28 tests/<test-file.m28>
 ```
 
-## Test Format
+## Archive
 
-Each test file follows a simple format:
-
-1. Test output is designed to be human-readable
-2. Each test prints what it's testing, the actual result, and the expected result
-3. Tests for each language feature are grouped together
-
-## Test Development Guidelines
-
-When developing new tests:
-
-1. Keep tests for different language features in separate files
-2. Make test output easy to read and verify
-3. Test both normal cases and edge cases
-4. Test complex combinations of language features
-
-## Common Test Patterns
-
-The test files demonstrate these common patterns:
-
-1. Testing simple expressions (`1 + 2`)
-2. Testing operator precedence and complex expressions
-3. Testing defined functions with various inputs
-4. Testing control structures and flow
-5. Testing data structures and operations
-
-These tests can be extended as the language evolves to incorporate new features or to provide more comprehensive testing of existing features.
+The `archive` directory contains:
+- Previous versions of tests
+- Debug files used during development
+- Original test files before consolidation
