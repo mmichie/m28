@@ -1,6 +1,7 @@
 package special_forms
 
 import (
+	"fmt"
 	"github.com/mmichie/m28/core"
 )
 
@@ -13,12 +14,20 @@ var specialForms map[core.LispSymbol]SpecialFormFunc
 func init() {
 	specialForms = map[core.LispSymbol]SpecialFormFunc{
 		// Control Flow
-		"if":       EvalIfPython,
-		"elif":     EvalElif,
-		"else":     EvalElse,
-		"for":      EvalFor,
-		"while":    EvalWhilePython,
-		"try":      EvalTry,
+		"if":    EvalIfPython,
+		"elif":  EvalElif,
+		"else":  EvalElse,
+		"for":   EvalFor,
+		"while": EvalWhilePython,
+		"try":   EvalTry, // Try/except/finally implementation
+		"except": func(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+			// This is just a placeholder - except blocks are handled by try
+			return nil, fmt.Errorf("except can only be used within a try block")
+		},
+		"finally": func(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+			// This is just a placeholder - finally blocks are handled by try
+			return nil, fmt.Errorf("finally can only be used within a try block")
+		},
 		"break":    EvalBreak,
 		"continue": EvalContinue,
 		"pass":     EvalPass,

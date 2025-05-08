@@ -1,0 +1,241 @@
+# M28 Exception Test Suite
+# Comprehensive tests for the exception handling system
+
+(print "=============================================")
+(print "Starting M28 Exception Handling Test Suite")
+(print "=============================================")
+
+# Define assertion helper
+(def (assert condition message)
+  (if (not condition)
+      (print (+ "FAIL: " message))
+      (print (+ "PASS: " message)))
+  condition)
+
+######################
+# BASIC TESTS
+######################
+
+(print "\n[Section 1: Basic Exception Handling]")
+
+# Basic try/except
+(print "\nTest 1.1: Basic try/except")
+(try
+  (print "  Raising an exception")
+  (raise "Basic exception")
+  (print "  This shouldn't print")
+  (except
+    (print "  Exception caught successfully")))
+
+# Try with finally
+(print "\nTest 1.2: Finally block")
+(try
+  (print "  In try block")
+  (finally
+    (print "  Finally block executed")))
+
+# Exception and finally
+(print "\nTest 1.3: Exception and finally")
+(try
+  (print "  Raising an exception in try with finally")
+  (raise "Another exception")
+  (print "  This shouldn't print")
+  (except
+    (print "  Exception caught"))
+  (finally
+    (print "  Finally block always executes")))
+
+# Nested try/except
+(print "\nTest 1.4: Nested try/except")
+(try
+  (print "  Outer try block")
+  (try
+    (print "  Inner try block raising exception")
+    (raise "Inner exception")
+    (print "  This shouldn't print")
+    (except
+      (print "  Exception caught in inner block")))
+  (print "  After inner try/except - no exception propagated"))
+
+# Try without exception
+(print "\nTest 1.5: Try without exception")
+(try
+  (print "  Try block with no exception")
+  (def result 42)
+  (print "  Try completed normally with result:" result)
+  (except
+    (print "  This shouldn't print")))
+
+# Runtime exception handling
+(print "\nTest 1.6: Runtime error handling")
+(try
+  (print "  Attempting division by zero")
+  (/ 10 0)
+  (print "  This shouldn't print")
+  (except
+    (print "  Runtime exception caught")))
+
+# Function raising exception
+(print "\nTest 1.7: Function that raises exception")
+(def (error_function)
+  (print "  Function that raises an exception")
+  (raise "Exception from function"))
+
+(try
+  (error_function)
+  (except
+    (print "  Caught exception from function")))
+
+######################
+# TYPED EXCEPTIONS
+######################
+
+(print "\n[Section 2: Typed Exceptions]")
+
+# Basic typed exception
+(print "\nTest 2.1: Basic typed exception")
+(assert
+  (try
+    (raise ValueError "Invalid value")
+    (except ValueError
+      True)
+    (except
+      False))
+  "ValueError catching")
+
+# Multiple exception types
+(print "\nTest 2.2: Multiple exception types")
+(assert
+  (try
+    (raise TypeError "Wrong type")
+    (except ValueError
+      False)
+    (except TypeError
+      True))
+  "TypeError specificity")
+
+# Exception hierarchy
+(print "\nTest 2.3: Exception hierarchy")
+(assert
+  (try
+    (raise ValueError "Test error")
+    (except Exception
+      True))
+  "Base class catches derived exception")
+
+######################
+# CUSTOM EXCEPTIONS
+######################
+
+(print "\n[Section 3: Custom Exceptions]")
+
+# Define custom exceptions
+(print "\nTest 3.1: Custom exception definition")
+(defexception CustomError Exception)
+(print "  CustomError defined")
+
+(defexception AppError CustomError)
+(print "  AppError defined as subclass of CustomError")
+
+(defexception ConfigError AppError)
+(print "  ConfigError defined as subclass of AppError")
+
+# Test custom exception raising and catching
+(print "\nTest 3.2: Custom exception catching")
+(assert
+  (try
+    (raise CustomError "Test error")
+    (except CustomError
+      True)
+    (except
+      False))
+  "Custom exception catching")
+
+# Test custom exception hierarchy
+(print "\nTest 3.3: Custom exception hierarchy")
+(assert
+  (try
+    (raise ConfigError "Config error")
+    (except AppError
+      True)
+    (except
+      False))
+  "Parent class catches derived custom exception")
+
+(assert
+  (try
+    (raise ConfigError "Config error")
+    (except CustomError
+      True)
+    (except
+      False))
+  "Grandparent class catches derived custom exception")
+
+######################
+# EXCEPTION BINDING
+######################
+
+(print "\n[Section 4: Exception Binding]")
+
+# Exception binding with 'as'
+(print "\nTest 4.1: Exception binding with 'as'")
+(try
+  (raise ValueError "Test message")
+  (except ValueError as e
+    (print "  Caught exception with type:" (. e type))
+    (print "  Exception message:" (. e message))
+    (assert (== (. e type) "ValueError") "Exception type checking")
+    (assert (== (. e message) "Test message") "Exception message checking")))
+
+######################
+# COMPLEX SCENARIOS
+######################
+
+(print "\n[Section 5: Complex Exception Scenarios]")
+
+# Nested exception reraising
+(print "\nTest 5.1: Nested exception reraising")
+(try
+  (try
+    (print "  Inner try raising exception")
+    (raise "Inner error")
+    (except
+      (print "  Caught inner exception, reraising new exception")
+      (raise "Outer error")))
+  (except
+    (print "  Caught outer exception")))
+
+# Exception cause chaining
+(print "\nTest 5.2: Exception cause chaining")
+(try
+  (try
+    (raise ValueError "Original error")
+    (except ValueError as original
+      (print "  Caught ValueError, raising TypeError with cause")
+      (raise TypeError "Wrapped error" original)))
+  (except TypeError as e
+    (print "  Caught TypeError with cause")
+    (assert (== (. e type) "TypeError") "Exception type is TypeError")
+    (assert (!= (. e cause) nil) "Exception has a cause")
+    (assert (== (. e cause type) "ValueError") "Cause is ValueError")))
+
+######################
+# EMPTY DICT AT END FIX
+######################
+
+(print "\n[Section 6: Empty Dictionary at End Fix]")
+
+# Empty dictionary at end to test fix
+(print "\nTest 6.1: Empty dictionary at end")
+(def (get_empty_dict)
+  {})
+
+# Call function and discard result
+(get_empty_dict)
+
+# Create a dictionary directly
+{}
+
+(print "\n=============================================")
+(print "Exception test suite completed successfully")
+(print "=============================================")

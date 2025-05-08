@@ -409,9 +409,9 @@ func (p *Parser) parse(tokens []Token, index int) (core.LispValue, int, error) {
 		// or part of a dot notation that's been broken up during tokenization
 		return nil, index, fmt.Errorf("unexpected dot operator outside of list context")
 	default:
-		// Parse the atom and wrap it with location information
-		atom := p.parseAtom(token.Value)
-		return core.LocatedValue{Value: atom, Location: location}, index, nil
+		// Parse the atom with location information
+		atom := p.parseAtom(token.Value, location)
+		return atom, index, nil
 	}
 }
 
@@ -617,10 +617,29 @@ func (p *Parser) parseListLiteral(tokens []Token, index int, location core.Locat
 		return nil, index, fmt.Errorf("expected variable name after 'for' in list comprehension")
 	}
 
-	varNameToken := tokens[index].Value
-	varName, ok := p.parseAtom(varNameToken).(core.LispSymbol)
+	// Get token and create location info
+	token := tokens[index]
+	tokenLocation := core.Location{
+		Filename: p.Filename,
+		Line:     token.Line,
+		Column:   token.Column,
+	}
+
+	// Parse with location information
+	atomValue := p.parseAtom(token.Value, tokenLocation)
+
+	// Extract symbol from LocatedValue if needed
+	var varValue core.LispValue
+	if located, isLocated := atomValue.(core.LocatedValue); isLocated {
+		varValue = located.Value
+	} else {
+		varValue = atomValue
+	}
+
+	// Check if it's a symbol
+	varName, ok := varValue.(core.LispSymbol)
 	if !ok {
-		return nil, index, fmt.Errorf("expected symbol as variable name in list comprehension, got %v", varNameToken)
+		return nil, index, fmt.Errorf("expected symbol as variable name in list comprehension, got %v", token.Value)
 	}
 	index++
 
@@ -713,23 +732,35 @@ func (p *Parser) parseTuple(tokens []Token, index int, location core.Location) (
 	return core.LocatedValue{Value: tupleValue, Location: location}, index, nil
 }
 
-func (p *Parser) parseAtom(token string) core.LispValue {
+func (p *Parser) parseAtom(token string, location core.Location) core.LispValue {
+	var value core.LispValue
+
 	if num, err := strconv.ParseFloat(token, 64); err == nil {
-		return num
-	}
-	if strings.HasPrefix(token, "\"") && strings.HasSuffix(token, "\"") {
+		value = num
+	} else if strings.HasPrefix(token, "\"") && strings.HasSuffix(token, "\"") {
 		unquoted, err := strconv.Unquote(token)
 		if err == nil {
-			return unquoted
+			value = unquoted
+		} else {
+			// If unquoting fails, use the raw token as a symbol
+			value = core.LispSymbol(token)
+		}
+	} else {
+		switch token {
+		case "True":
+			value = core.PythonicBool(true)
+		case "False":
+			value = core.PythonicBool(false)
+		case "None":
+			value = core.PythonicNone{}
+		default:
+			value = core.LispSymbol(token)
 		}
 	}
-	switch token {
-	case "True":
-		return core.PythonicBool(true)
-	case "False":
-		return core.PythonicBool(false)
-	case "None":
-		return core.PythonicNone{}
+
+	// Always wrap the value with location information
+	return core.LocatedValue{
+		Value:    value,
+		Location: location,
 	}
-	return core.LispSymbol(token)
 }

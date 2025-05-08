@@ -1,0 +1,48 @@
+# Simple Traceback Test Suite
+# Simplified version of the comprehensive traceback tests
+
+(print "Starting Simple Traceback Test Suite")
+
+# Simple traceback
+(print "\nTest 1: Simple function traceback")
+
+(def (simple_error)
+  (print "Function that will cause an error")
+  (/ 1 0))
+
+(try
+  (simple_error)
+  (except
+    (print "Caught exception from simple error")))
+
+# Nested function traceback
+(print "\nTest 2: Nested function traceback")
+
+(def (inner_error)
+  (print "Inner function with error")
+  (/ 10 0))
+
+(def (outer_function)
+  (print "Outer function calling inner")
+  (inner_error))
+
+(try
+  (outer_function)
+  (except
+    (print "Caught exception from nested calls")))
+
+# Traceback with custom exception
+(print "\nTest 3: Custom exception traceback")
+
+(defexception TestError)
+
+(def (raise_custom)
+  (print "Raising custom exception")
+  (raise TestError "Test error message"))
+
+(try
+  (raise_custom)
+  (except TestError
+    (print "Caught custom exception")))
+
+(print "Simple traceback test suite completed")

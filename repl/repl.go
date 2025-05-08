@@ -11,6 +11,7 @@ import (
 	"github.com/mmichie/m28/env"
 	"github.com/mmichie/m28/eval"
 	"github.com/mmichie/m28/parser"
+	"github.com/mmichie/m28/special_forms"
 )
 
 type REPL struct {
@@ -22,11 +23,22 @@ type REPL struct {
 }
 
 func NewREPL() *REPL {
+	// Initialize the environment
 	environment := env.NewEnvironment(nil)
+
+	// Set up builtins in the environment
 	environment.SetupBuiltins()
+
+	// Create the evaluator
 	evaluator := eval.NewEvaluator()
+
+	// Set up the evaluator for builtins
 	builtin.SetEvaluator(evaluator)
 
+	// Register special forms in the environment
+	special_forms.RegisterSpecialForms(environment)
+
+	// Set up readline for REPL
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          "m28> ",
 		HistoryFile:     "/tmp/m28_history",
@@ -92,11 +104,31 @@ func (r *REPL) Run() {
 func (r *REPL) EvaluateString(input string) (core.LispValue, error) {
 	expr, err := r.parser.Parse(input)
 	if err != nil {
-		return nil, err
+		// If it's a parse error, enrich it
+		return nil, fmt.Errorf("parse error: %v", err)
 	}
 
+	// Check if we got multiple expressions as a list
+	if exprList, ok := expr.(core.LispList); ok && len(exprList) > 0 {
+		// Execute each expression in the list
+		var result core.LispValue = core.PythonicNone{}
+
+		for _, subExpr := range exprList {
+			result, err = r.evaluator.Eval(subExpr, r.env)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Return the last result
+		return result, nil
+	}
+
+	// Single expression or empty list case
 	result, err := r.evaluator.Eval(expr, r.env)
 
+	// Return the result and error directly - don't rewrap errors
+	// This preserves exceptions, tracebacks, and control flow signals
 	return result, err
 }
 

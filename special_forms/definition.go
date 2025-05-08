@@ -17,17 +17,37 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 	var defaultValues map[core.LispSymbol]core.LispValue = make(map[core.LispSymbol]core.LispValue)
 
 	// Check if first arg is a list (the function signature)
-	funcDef, ok := args[0].(core.LispList)
+	firstArg := args[0]
+
+	// If it's a LocatedValue, unwrap it
+	if located, isLocated := firstArg.(core.LocatedValue); isLocated {
+		firstArg = located.Value
+	}
+
+	funcDef, ok := firstArg.(core.LispList)
 	if ok && len(funcDef) > 0 {
 		// (def (name param1 param2) body...)
-		nameVal, ok := funcDef[0].(core.LispSymbol)
-		if !ok {
-			return nil, fmt.Errorf("function name must be a symbol")
+		nameVal := funcDef[0]
+
+		// Unwrap if it's a LocatedValue
+		if located, isLocated := nameVal.(core.LocatedValue); isLocated {
+			nameVal = located.Value
 		}
-		funcName = nameVal
+
+		// Check if it's a symbol
+		nameSymbol, ok := nameVal.(core.LispSymbol)
+		if !ok {
+			return nil, fmt.Errorf("function name must be a symbol, got %T", nameVal)
+		}
+		funcName = nameSymbol
 
 		// Extract parameters
 		for _, param := range funcDef[1:] {
+			// Unwrap parameter if it's a LocatedValue
+			if located, isLocated := param.(core.LocatedValue); isLocated {
+				param = located.Value
+			}
+
 			// Handle symbol parameter
 			if paramSymbol, ok := param.(core.LispSymbol); ok {
 				params = append(params, paramSymbol)
@@ -39,9 +59,9 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		}
 	} else {
 		// Check if first arg is a symbol (simple named function)
-		nameVal, ok := args[0].(core.LispSymbol)
+		nameVal, ok := firstArg.(core.LispSymbol)
 		if !ok {
-			return nil, fmt.Errorf("function name must be a symbol")
+			return nil, fmt.Errorf("function name must be a symbol, got %T", firstArg)
 		}
 		funcName = nameVal
 		// No parameters

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/repl"
 )
 
@@ -20,7 +21,12 @@ func main() {
 			// Execute the file
 			err := r.ExecuteFile(filename)
 			if err != nil {
-				fmt.Println("Error executing file:", err)
+				// If it's an exception, print it properly - it may have traceback info
+				if ex, ok := err.(*core.Exception); ok {
+					fmt.Println(ex)
+				} else {
+					fmt.Println("Error executing file:", err)
+				}
 				os.Exit(1)
 			}
 		} else {

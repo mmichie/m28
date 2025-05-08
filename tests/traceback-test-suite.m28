@@ -1,0 +1,195 @@
+# M28 Traceback Test Suite
+# Comprehensive tests for exception traceback functionality
+
+(print "=============================================")
+(print "Starting M28 Traceback Test Suite")
+(print "=============================================")
+
+# Define assertion helper
+(def (assert condition message)
+  (if (not condition)
+      (print (+ "FAIL: " message))
+      (print (+ "PASS: " message)))
+  condition)
+
+######################
+# BASIC TRACEBACKS
+######################
+
+(print "\n[Section 1: Basic Tracebacks]")
+
+# Simple traceback
+(print "\nTest 1.1: Simple function traceback")
+
+(def (simple_error)
+  (print "  Function that will cause an error")
+  (/ 1 0))
+
+(try
+  (simple_error)
+  (except as e
+    (print "  Caught exception with traceback")
+    (print "  Exception type:" (. e type))
+    (assert (== (. e type) "ZeroDivisionError") "Exception type is ZeroDivisionError")
+    (assert (!= (. e traceback) nil) "Exception has traceback information")))
+
+# Direct exception traceback
+(print "\nTest 1.2: Direct exception traceback")
+
+(try
+  (print "  Raising an exception directly")
+  (raise TypeError "Type error message")
+  (except TypeError as e
+    (print "  Caught TypeError with traceback")
+    (assert (== (. e type) "TypeError") "Exception type is TypeError")
+    (assert (!= (. e traceback) nil) "Exception has traceback information")))
+
+######################
+# NESTED FUNCTION TRACEBACKS
+######################
+
+(print "\n[Section 2: Nested Function Tracebacks]")
+
+# Nested function traceback
+(print "\nTest 2.1: Nested function traceback")
+
+(def (inner_error)
+  (print "  Inner function with error")
+  (/ 10 0))
+
+(def (middle_function)
+  (print "  Middle function calling inner")
+  (inner_error))
+
+(def (outer_function)
+  (print "  Outer function calling middle")
+  (middle_function))
+
+(try
+  (outer_function)
+  (except as e
+    (print "  Caught exception from nested calls")
+    (assert (== (. e type) "ZeroDivisionError") "Exception type is ZeroDivisionError")
+    (assert (!= (. e traceback) nil) "Exception has traceback information")
+    (assert (> (len (. e traceback)) 2) "Traceback has multiple entries")))
+
+######################
+# CUSTOM EXCEPTION TRACEBACKS
+######################
+
+(print "\n[Section 3: Custom Exception Tracebacks]")
+
+# Traceback with custom exception
+(print "\nTest 3.1: Custom exception traceback")
+
+(defexception CustomError)
+
+(def (raise_custom)
+  (print "  Raising custom exception")
+  (raise CustomError "Custom error message"))
+
+(try
+  (raise_custom)
+  (except CustomError as e
+    (print "  Caught custom exception with traceback")
+    (assert (== (. e type) "CustomError") "Exception type is CustomError")
+    (assert (!= (. e traceback) nil) "Exception has traceback information")))
+
+# Nested custom exception with cause
+(print "\nTest 3.2: Nested custom exception with cause")
+
+(defexception DatabaseError)
+(defexception ConnectionError)
+
+(def (db_operation)
+  (print "  Database operation fails")
+  (raise DatabaseError "Database query failed"))
+
+(def (connect_to_db)
+  (print "  Trying to connect to database")
+  (try
+    (db_operation)
+    (except DatabaseError as db_err
+      (print "  Database error caught, wrapping with ConnectionError")
+      (raise ConnectionError "Failed to connect to database" db_err))))
+
+(try
+  (connect_to_db)
+  (except ConnectionError as e
+    (print "  Caught connection error with cause")
+    (assert (== (. e type) "ConnectionError") "Exception type is ConnectionError")
+    (assert (!= (. e cause) nil) "Exception has a cause")
+    (assert (== (. e cause type) "DatabaseError") "Cause is DatabaseError")
+    (assert (!= (. e traceback) nil) "Exception has traceback information")))
+
+######################
+# COMPLEX TRACEBACK SCENARIOS
+######################
+
+(print "\n[Section 4: Complex Traceback Scenarios]")
+
+# Deep call stack traceback
+(print "\nTest 4.1: Deep call stack traceback")
+
+(def (level3)
+  (print "  Level 3 function")
+  (/ 0 0))
+
+(def (level2)
+  (print "  Level 2 function calling level3")
+  (level3))
+
+(def (level1)
+  (print "  Level 1 function calling level2")
+  (level2))
+
+(def (start_deep_calls)
+  (print "  Starting deep call stack")
+  (level1))
+
+(try
+  (start_deep_calls)
+  (except as e
+    (print "  Caught exception from deep call stack")
+    (assert (== (. e type) "ZeroDivisionError") "Exception type is ZeroDivisionError")
+    (assert (!= (. e traceback) nil) "Exception has traceback information")
+    (assert (>= (len (. e traceback)) 3) "Traceback has at least 3 entries")))
+
+# Exception in exception handler
+(print "\nTest 4.2: Exception in exception handler")
+
+(try
+  (print "  Raising primary exception")
+  (raise ValueError "Primary error")
+  (except ValueError as e
+    (print "  In except block, raising another exception")
+    (/ 1 0)))
+(except as e2
+  (print "  Caught secondary exception in handler")
+  (assert (== (. e2 type) "ZeroDivisionError") "Exception type is ZeroDivisionError"))
+
+######################
+# TRACEBACK PRINTING
+######################
+
+(print "\n[Section 5: Traceback Printing]")
+
+# Print full traceback
+(print "\nTest 5.1: Print full traceback")
+
+(def (will_fail)
+  (print "  Function that will fail")
+  (+ "string" 42))
+
+(try
+  (will_fail)
+  (except as e
+    (print "  Full traceback string representation:")
+    (print "  ---")
+    (print e)
+    (print "  ---")
+    (assert (contains? (to-string e) "traceback") "Traceback string contains 'traceback' text")))
+
+(print "\n=============================================")
+(print "Traceback test suite completed successfully")
+(print "=============================================")

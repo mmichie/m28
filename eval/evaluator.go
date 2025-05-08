@@ -82,8 +82,17 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 	// Use a generic name for expressions, we'll update it if it's a function call
 	exprStr := "expression"
 	if list, ok := expr.(core.LispList); ok && len(list) > 0 {
-		if sym, ok := list[0].(core.LispSymbol); ok {
+		// Unwrap first element if it's a LocatedValue to check for symbol
+		firstElem := e.unwrapLocatedValue(list[0])
+		if sym, ok := firstElem.(core.LispSymbol); ok {
 			exprStr = string(sym)
+		}
+	} else if locatedList, ok := expr.(core.LocatedValue); ok {
+		if list, ok := locatedList.Value.(core.LispList); ok && len(list) > 0 {
+			firstElem := e.unwrapLocatedValue(list[0])
+			if sym, ok := firstElem.(core.LispSymbol); ok {
+				exprStr = string(sym)
+			}
 		}
 	}
 	e.pushCallFrame("<eval>", location, exprStr)
@@ -146,6 +155,19 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 		// Regular symbol lookup
 		value, ok := env.Get(v)
 		if !ok {
+			// Check if this is likely a special form that wasn't properly registered
+			if core.IsBuiltinSpecialForm(v) {
+				err := fmt.Errorf("special form '%s' not properly registered in environment - ensure special_forms.RegisterSpecialForms() is called during initialization", v)
+				return nil, e.enrichErrorWithTraceback(err)
+			}
+
+			// Check for typos in common symbols
+			suggestions := suggestSymbol(v, env)
+			if len(suggestions) > 0 {
+				err := fmt.Errorf("undefined symbol: %s (did you mean: %s?)", v, strings.Join(suggestions, ", "))
+				return nil, e.enrichErrorWithTraceback(err)
+			}
+
 			err := fmt.Errorf("undefined symbol: %s", v)
 			return nil, e.enrichErrorWithTraceback(err)
 		}
@@ -199,7 +221,8 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 			return core.LispList{}, nil
 		}
 
-		first := v[0]
+		// Ensure we unwrap the first element for special form and function lookup
+		first := e.unwrapLocatedValue(v[0])
 		rest := v[1:]
 
 		switch f := first.(type) {
@@ -267,7 +290,10 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					err := fmt.Errorf("= requires exactly two arguments")
 					return nil, e.enrichErrorWithTraceback(err)
 				}
-				symbol, ok := rest[0].(core.LispSymbol)
+
+				// Unwrap the symbol in assignment to ensure it's not a LocatedValue
+				unwrappedSymbol := e.unwrapLocatedValue(rest[0])
+				symbol, ok := unwrappedSymbol.(core.LispSymbol)
 				if !ok {
 					err := fmt.Errorf("first argument to = must be a symbol")
 					return nil, e.enrichErrorWithTraceback(err)
@@ -279,8 +305,15 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 				env.Define(symbol, value)
 				return value, nil
 			}
+
+			// Check for special form directly in our map
 			if specialForm, ok := e.specialForms[f]; ok {
-				result, err := specialForm(e, rest, env)
+				// Unwrap all arguments for special forms
+				unwrappedArgs := make([]core.LispValue, len(rest))
+				for i, arg := range rest {
+					unwrappedArgs[i] = e.unwrapLocatedValue(arg)
+				}
+				result, err := specialForm(e, unwrappedArgs, env)
 				if err != nil {
 					return nil, e.enrichErrorWithTraceback(err)
 				}
@@ -291,7 +324,12 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 			if value, ok := env.Get(f); ok {
 				if marker, ok := value.(core.SpecialFormMarker); ok {
 					if specialForm, ok := e.specialForms[marker.Name]; ok {
-						result, err := specialForm(e, rest, env)
+						// Unwrap all arguments for special forms
+						unwrappedArgs := make([]core.LispValue, len(rest))
+						for i, arg := range rest {
+							unwrappedArgs[i] = e.unwrapLocatedValue(arg)
+						}
+						result, err := specialForm(e, unwrappedArgs, env)
 						if err != nil {
 							return nil, e.enrichErrorWithTraceback(err)
 						}
@@ -299,7 +337,9 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					}
 				}
 			}
-			fn, err := e.Eval(f, env)
+
+			// Not a special form, evaluate as a regular function call
+			fn, err := e.Eval(v[0], env) // Use the original value with location info
 			if err != nil {
 				return nil, e.enrichErrorWithTraceback(err)
 			}
@@ -309,7 +349,7 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 			}
 			return e.Apply(fn, args, env)
 		default:
-			fn, err := e.Eval(first, env)
+			fn, err := e.Eval(v[0], env) // Use the original value with location info
 			if err != nil {
 				return nil, e.enrichErrorWithTraceback(err)
 			}
@@ -328,8 +368,11 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]core.LispValue, error) {
 	evaluated := make([]core.LispValue, len(args))
 	for i, arg := range args {
+		// First, unwrap LocatedValue if present to check for keyword arguments
+		unwrappedArg := e.unwrapLocatedValue(arg)
+
 		// Check if arg is a symbol that represents a keyword argument
-		if symbol, ok := arg.(core.LispSymbol); ok {
+		if symbol, ok := unwrappedArg.(core.LispSymbol); ok {
 			symbolStr := string(symbol)
 			if len(symbolStr) > 0 && strings.Contains(symbolStr, "=") {
 				// This is a keyword argument in the form name=value
@@ -337,19 +380,20 @@ func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]cor
 				continue
 			} else if len(symbol) > 1 && symbol[0] == ':' {
 				// This is a keyword argument, don't evaluate it
-				evaluated[i] = arg
+				evaluated[i] = unwrappedArg
 				continue
 			}
 		}
 
-		// Otherwise evaluate normally
+		// Otherwise evaluate normally, preserving location information where appropriate
 		value, err := e.Eval(arg, env)
 		if err != nil {
 			return nil, e.enrichErrorWithTraceback(err)
 		}
 
 		// Check if the evaluated value contains a keyword format
-		if str, ok := value.(string); ok && strings.Contains(str, "=") {
+		unwrappedValue := e.unwrapLocatedValue(value)
+		if str, ok := unwrappedValue.(string); ok && strings.Contains(str, "=") {
 			// Preserve the string format for keyword detection in ApplyLambda
 			evaluated[i] = str
 		} else {
@@ -363,6 +407,12 @@ func (e *Evaluator) evalArgs(args []core.LispValue, env core.Environment) ([]cor
 func (e *Evaluator) enrichErrorWithTraceback(err error) error {
 	if err == nil {
 		return nil
+	}
+
+	// Skip traceback for special control flow signals
+	switch err.(type) {
+	case special_forms.ReturnSignal, special_forms.YieldSignal:
+		return err // Control flow signals should pass through unchanged
 	}
 
 	// If it's already an exception with a traceback, return it as is
@@ -401,7 +451,7 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 			argsStr += ", "
 		}
 		// Limit the string representation for brevity
-		argStr := core.PrintValue(arg)
+		argStr := core.PrintValue(e.unwrapLocatedValue(arg))
 		if len(argStr) > 20 {
 			argStr = argStr[:17] + "..."
 		}
@@ -434,21 +484,41 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 	var result core.LispValue
 	var err error
 
+	// Unwrap arguments for built-in functions that might not handle LocatedValue
+	unwrappedArgs := make([]core.LispValue, len(args))
+	for i, arg := range args {
+		unwrappedArgs[i] = e.unwrapLocatedValue(arg)
+	}
+
 	// Apply the function based on its type
 	switch f := unwrappedFn.(type) {
 	case core.BuiltinFunc:
-		result, err = f(args, env)
+		// For built-in functions, always provide fully unwrapped arguments
+		result, err = f(unwrappedArgs, env)
 	case *core.Lambda:
 		// Use the lambda directly - the instance ID mechanism ensures proper state isolation
+		// Keep original args for lambdas as they might need the location information
 		result, err = special_forms.ApplyLambda(e, f, args, env)
 	case core.LispList:
-		if len(f) > 0 && f[0] == core.LispSymbol("lambda") {
-			lambda, lambdaErr := special_forms.EvalLambdaPython(e, f[1:], env)
-			if lambdaErr != nil {
-				err = lambdaErr
-				break
+		if len(f) > 0 {
+			// Unwrap the first element to check if it's a lambda
+			firstElem := e.unwrapLocatedValue(f[0])
+			if firstElem == core.LispSymbol("lambda") {
+				// For inline lambda definitions, unwrap all elements
+				unwrappedLambdaBody := make([]core.LispValue, len(f[1:]))
+				for i, item := range f[1:] {
+					unwrappedLambdaBody[i] = e.unwrapLocatedValue(item)
+				}
+
+				lambda, lambdaErr := special_forms.EvalLambdaPython(e, unwrappedLambdaBody, env)
+				if lambdaErr != nil {
+					err = lambdaErr
+					break
+				}
+				result, err = special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
+			} else {
+				err = fmt.Errorf("not a function: %v", fn)
 			}
-			result, err = special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
 		} else {
 			err = fmt.Errorf("not a function: %v", fn)
 		}
@@ -464,6 +534,113 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 	return result, nil
 }
 
+// levenshteinDistance calculates the edit distance between two strings
+func levenshteinDistance(s1, s2 string) int {
+	s1 = strings.ToLower(s1)
+	s2 = strings.ToLower(s2)
+
+	if len(s1) == 0 {
+		return len(s2)
+	}
+	if len(s2) == 0 {
+		return len(s1)
+	}
+
+	// Create a matrix with dimensions (len(s1)+1) x (len(s2)+1)
+	matrix := make([][]int, len(s1)+1)
+	for i := range matrix {
+		matrix[i] = make([]int, len(s2)+1)
+		matrix[i][0] = i
+	}
+	for j := range matrix[0] {
+		matrix[0][j] = j
+	}
+
+	// Fill in the matrix
+	for i := 1; i <= len(s1); i++ {
+		for j := 1; j <= len(s2); j++ {
+			cost := 1
+			if s1[i-1] == s2[j-1] {
+				cost = 0
+			}
+			matrix[i][j] = min(
+				matrix[i-1][j]+1,      // deletion
+				matrix[i][j-1]+1,      // insertion
+				matrix[i-1][j-1]+cost, // substitution
+			)
+		}
+	}
+
+	return matrix[len(s1)][len(s2)]
+}
+
+// min returns the minimum of three integers
+func min(a, b, c int) int {
+	if a < b {
+		if a < c {
+			return a
+		}
+		return c
+	}
+	if b < c {
+		return b
+	}
+	return c
+}
+
+// suggestSymbol provides suggestions for similar symbols in the environment
+func suggestSymbol(symbol core.LispSymbol, env core.Environment) []string {
+	// Maximum edit distance to consider a suggestion
+	const maxDistance = 2
+
+	// Common special forms and builtins to check against
+	commonSymbols := []string{
+		"def", "if", "else", "for", "while", "lambda", "class", "import",
+		"raise", "try", "with", "return", "yield", "None", "True", "False",
+		"print", "range", "len", "dict", "list", "set", "tuple",
+	}
+
+	symbolStr := string(symbol)
+	var suggestions []string
+
+	// Check environment for similar symbols
+	// Try to access ForEachSymbol if available on the environment
+	if envWithSymbols, ok := env.(interface {
+		ForEachSymbol(func(core.LispSymbol, core.LispValue))
+	}); ok {
+		envWithSymbols.ForEachSymbol(func(sym core.LispSymbol, _ core.LispValue) {
+			symStr := string(sym)
+			if distance := levenshteinDistance(symbolStr, symStr); distance <= maxDistance {
+				suggestions = append(suggestions, symStr)
+			}
+		})
+	}
+
+	// Also check common symbols not in environment
+	for _, common := range commonSymbols {
+		if distance := levenshteinDistance(symbolStr, common); distance <= maxDistance {
+			// Check if already in suggestions
+			found := false
+			for _, s := range suggestions {
+				if s == common {
+					found = true
+					break
+				}
+			}
+			if !found {
+				suggestions = append(suggestions, common)
+			}
+		}
+	}
+
+	// Limit to top 3 suggestions
+	if len(suggestions) > 3 {
+		suggestions = suggestions[:3]
+	}
+
+	return suggestions
+}
+
 func evalSymbol(symbol core.LispSymbol, env core.Environment) (core.LispValue, error) {
 	switch symbol {
 	case "None":
@@ -475,6 +652,11 @@ func evalSymbol(symbol core.LispSymbol, env core.Environment) (core.LispValue, e
 	default:
 		value, ok := env.Get(symbol)
 		if !ok {
+			// Check for potential suggestions
+			suggestions := suggestSymbol(symbol, env)
+			if len(suggestions) > 0 {
+				return nil, fmt.Errorf("undefined symbol: %s (did you mean: %s?)", symbol, strings.Join(suggestions, ", "))
+			}
 			return nil, fmt.Errorf("undefined symbol: %s", symbol)
 		}
 		return value, nil

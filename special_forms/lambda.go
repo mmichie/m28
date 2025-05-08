@@ -123,7 +123,7 @@ func evalLambdaBody(e core.Evaluator, lambda *core.Lambda, env core.Environment)
 					return returnSig.Value, nil
 				}
 
-				fmt.Printf("Error evaluating expression in lambda body: %v\n", err)
+				// It's a regular error to propagate
 				return nil, err
 			}
 		}

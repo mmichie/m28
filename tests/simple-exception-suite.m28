@@ -1,0 +1,61 @@
+# Simple Exception Test Suite
+# Simplified version of the comprehensive exception handling tests
+
+(print "Starting Simple Exception Test Suite")
+
+# Basic try/except
+(print "\nTest 1: Basic try/except")
+(try
+  (print "Raising an exception")
+  (raise "Basic exception")
+  (except
+    (print "Exception caught successfully")))
+
+# Try with finally
+(print "\nTest 2: Finally block")
+(try
+  (print "In try block")
+  (finally
+    (print "Finally block executed")))
+
+# Exception and finally
+(print "\nTest 3: Exception and finally")
+(try
+  (print "Raising an exception with finally")
+  (raise "Another exception")
+  (except
+    (print "Exception caught"))
+  (finally
+    (print "Finally block always executes")))
+
+# Runtime exception handling
+(print "\nTest 4: Runtime error handling")
+(try
+  (print "Attempting division by zero")
+  (/ 10 0)
+  (except
+    (print "Runtime exception caught")))
+
+# Custom exceptions
+(print "\nTest 5: Custom exceptions")
+(defexception CustomError)
+(print "CustomError defined")
+
+(try
+  (print "Raising custom exception")
+  (raise CustomError "Custom error message")
+  (except CustomError
+    (print "Caught custom exception")))
+
+# Empty dictionary at end to test fix
+(print "\nTest 6: Empty dictionary at end")
+(def (get_empty_dict)
+  {})
+
+# Call function and discard result
+(get_empty_dict)
+
+# Create a dictionary directly
+{}
+
+(print "Simple exception test suite completed")

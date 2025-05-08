@@ -55,6 +55,10 @@ func (r *ModuleRegistry) LoadModule(name string, e core.Evaluator) (*core.Python
 	// Create a new environment for the module
 	moduleEnv := env.NewEnvironment(nil)
 	moduleEnv.SetupBuiltins() // Set up builtin functions in the environment
+
+	// Register special forms in the module environment
+	RegisterSpecialForms(moduleEnv)
+
 	module := core.NewPythonicDict()
 
 	// Execute the module code

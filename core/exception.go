@@ -82,26 +82,32 @@ func (e *Exception) String() string {
 
 		// Format each traceback entry
 		for i, entry := range e.Traceback {
-			var entryStr string
 			if entry.Location.Filename != "" && entry.Location.Line > 0 {
-				entryStr = fmt.Sprintf("  File \"%s\", line %d, in %s\n    %s",
+				// Format with file, line, and function information
+				result.WriteString(fmt.Sprintf("  File \"%s\", line %d, in %s\n",
 					entry.Location.Filename,
 					entry.Location.Line,
-					entry.Function,
-					entry.Statement)
-			} else {
-				entryStr = fmt.Sprintf("  in %s: %s", entry.Function, entry.Statement)
-			}
-			result.WriteString(entryStr)
+					entry.Function))
 
-			// Add a newline for each entry except the last one
+				// Indent the code statement for readability
+				if entry.Statement != "" {
+					result.WriteString(fmt.Sprintf("    %s", entry.Statement))
+				} else {
+					result.WriteString("    <unknown code>")
+				}
+			} else {
+				// Basic format for entries without location info
+				result.WriteString(fmt.Sprintf("  in %s: %s", entry.Function, entry.Statement))
+			}
+
+			// Add a newline between entries
 			if i < len(e.Traceback)-1 {
 				result.WriteString("\n")
 			}
 		}
 
 		// Add a line break before the exception message
-		result.WriteString("\n")
+		result.WriteString("\n\n")
 	}
 
 	// Add exception type and message
