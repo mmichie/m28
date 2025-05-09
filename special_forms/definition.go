@@ -21,14 +21,14 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 
 	// Check if we're defining a function or a variable
 	funcDef, isFuncDef := firstArg.(core.LispList)
-	
+
 	if isFuncDef && len(funcDef) > 0 {
 		// This is a function definition: (def (name param1 param2) body...)
 		// Extract function name and parameters
 		var funcName core.LispSymbol
 		var params []core.LispSymbol
 		var defaultValues map[core.LispSymbol]core.LispValue = make(map[core.LispSymbol]core.LispValue)
-		
+
 		nameVal := funcDef[0]
 
 		// Unwrap if it's a LocatedValue
@@ -59,7 +59,7 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				return nil, fmt.Errorf("function parameter must be a symbol, got %T", param)
 			}
 		}
-		
+
 		// Create function body from remaining arguments
 		body := core.LispList(args[1:])
 
@@ -86,13 +86,13 @@ func EvalDef(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		if !ok {
 			return nil, fmt.Errorf("variable name must be a symbol, got %T", firstArg)
 		}
-		
+
 		// Evaluate the value
 		value, err := e.Eval(args[1], env)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating variable value: %v", err)
 		}
-		
+
 		// Define the variable in the current environment
 		env.Define(nameVal, value)
 		return value, nil

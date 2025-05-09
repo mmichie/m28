@@ -134,52 +134,52 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 				// Try checking the environment directly
 				fmt.Printf("DEBUG: Base object not found via Get: %s\n", current)
 				fmt.Printf("DEBUG: Checking environment directly for object\n")
-				
+
 				// Try looking for a dot handler for this object
 				dotHandlerName := core.LispSymbol(current + ".__dot__")
 				fmt.Printf("DEBUG: Looking for dot handler: %s\n", dotHandlerName)
 				if handler, ok := env.Get(dotHandlerName); ok {
 					// We found a dot handler, so use it to access the property
 					fmt.Printf("DEBUG: Found dot handler for %s\n", current)
-					
+
 					// This could be a more elegant solution with a ModuleRef interface,
 					// but for now we'll just handle it specially
 					if builtinFn, ok := handler.(core.BuiltinFunc); ok {
 						// We'll continue processing in the dot notation loop
 						fmt.Printf("DEBUG: Using dot handler to process dot notation\n")
-						
+
 						// Get the property name
 						if len(parts) < 2 {
 							err := fmt.Errorf(core.ErrDotMissingArgs)
 							return nil, e.enrichErrorWithTraceback(err)
 						}
-						
+
 						propName := parts[1]
 						fmt.Printf("DEBUG: Accessing property: %s\n", propName)
-						
+
 						// Call the handler with the property name
 						result, err := builtinFn([]core.LispValue{propName}, env)
 						if err != nil {
 							fmt.Printf("DEBUG: Dot handler error: %v\n", err)
 							return nil, e.enrichErrorWithTraceback(err)
 						}
-						
+
 						fmt.Printf("DEBUG: Dot handler result: %T\n", result)
-						
+
 						// If only one level, return directly
 						if len(parts) == 2 {
 							return result, nil
 						}
-						
+
 						// Otherwise start at the next level with the result
 						currentObj = result
 						current = fmt.Sprintf("%s.%s", current, propName)
-						
+
 						// Continue from position 2
 						for i := 2; i < len(parts); i++ {
 							attrName := parts[i]
 							fmt.Printf("DEBUG: Processing additional level: %s\n", attrName)
-							
+
 							// Check if the object implements DotAccessible interface
 							if dotAccessible, ok := currentObj.(core.DotAccessible); ok {
 								// Try to access the property
@@ -216,14 +216,14 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 								return nil, e.enrichErrorWithTraceback(err)
 							}
 						}
-						
+
 						return currentObj, nil
 					}
 				}
-				
+
 				// Print environment debug info
 				fmt.Printf("DEBUG: Environment: %s\n", env)
-				
+
 				err := fmt.Errorf("undefined object: %s", current)
 				return nil, e.enrichErrorWithTraceback(err)
 			}
@@ -238,7 +238,7 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 				if dotAccessible, ok := currentObj.(core.DotAccessible); ok {
 					fmt.Printf("DEBUG: Object implements DotAccessible interface\n")
 					attrNameStr := string(attrName)
-					
+
 					// Check if it's a property access
 					if dotAccessible.HasProperty(attrNameStr) {
 						fmt.Printf("DEBUG: Found property %s via DotAccessible interface\n", attrNameStr)
@@ -427,7 +427,7 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 					// Check if the object implements DotAccessible interface
 					if dotAccessible, ok := currentObj.(core.DotAccessible); ok {
 						attrNameStr := string(attrName)
-						
+
 						// Check if it's a property access
 						if dotAccessible.HasProperty(attrNameStr) {
 							fmt.Printf("DEBUG: Found property %s via DotAccessible interface\n", attrNameStr)
@@ -473,35 +473,35 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 				// First check if the object implements DotAccessible interface
 				if dotAccessible, ok := currentObj.(core.DotAccessible); ok {
 					funcNameStr := string(funcName)
-					
+
 					// Check if it's a method call
 					if dotAccessible.HasMethod(funcNameStr) {
 						fmt.Printf("DEBUG: Found method %s via DotAccessible interface\n", funcNameStr)
-						
+
 						// Evaluate the arguments
 						evalArgs, err := e.evalArgs(rest, env)
 						if err != nil {
 							return nil, e.enrichErrorWithTraceback(err)
 						}
-						
+
 						// Call the method directly on the object
 						return dotAccessible.CallMethod(funcNameStr, evalArgs)
 					} else if dotAccessible.HasProperty(funcNameStr) {
 						// It's a property access followed by a function call
 						fmt.Printf("DEBUG: Found property %s via DotAccessible interface\n", funcNameStr)
-						
+
 						fnVal, found := dotAccessible.GetProperty(funcNameStr)
 						if !found {
 							err := core.ErrDotNoPropertyf(string(funcName))
 							return nil, e.enrichErrorWithTraceback(err)
 						}
-						
+
 						// Evaluate the arguments
 						evalArgs, err := e.evalArgs(rest, env)
 						if err != nil {
 							return nil, e.enrichErrorWithTraceback(err)
 						}
-						
+
 						// Apply the function
 						return e.Apply(fnVal, evalArgs, env)
 					} else {

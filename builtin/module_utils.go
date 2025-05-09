@@ -86,7 +86,7 @@ func ModuleInfoFunc(args []core.LispValue, _ core.Environment) (core.LispValue, 
 	result.Set("name", moduleName)
 	result.Set("path", info.Path)
 	result.Set("load_time", info.LoadTime.String())
-	
+
 	// Add dependencies as a list
 	deps := make(core.LispList, len(info.Dependencies))
 	for i, dep := range info.Dependencies {

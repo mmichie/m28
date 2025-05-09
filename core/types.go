@@ -105,18 +105,18 @@ type ModuleLoader interface {
 type DotAccessible interface {
 	// HasProperty checks if the object has a property with the given name
 	HasProperty(name string) bool
-	
+
 	// GetProperty retrieves a property from the object by name
 	// Returns the property value and a boolean indicating if the property exists
 	GetProperty(name string) (LispValue, bool)
-	
+
 	// SetProperty sets a property on the object
 	// Returns an error if the property cannot be set (e.g., read-only object)
 	SetProperty(name string, value LispValue) error
-	
+
 	// HasMethod checks if the object has a method with the given name
 	HasMethod(name string) bool
-	
+
 	// CallMethod calls a method on the object with the given arguments
 	// Returns the result of the method call or an error
 	CallMethod(name string, args []LispValue) (LispValue, error)

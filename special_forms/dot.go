@@ -55,13 +55,13 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 	if len(args) > 2 && !isMethodCallWithArgs(args, 2) {
 		current := object
 		currentPath := fmt.Sprintf("%v.%s", args[0], propertyName)
-		
+
 		// Get the first property
 		current, err = accessProperty(current, propertyName)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Process each subsequent property in sequence
 		for i := 2; i < len(args); i++ {
 			// Get the next property name
@@ -77,7 +77,7 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				if err != nil {
 					return nil, fmt.Errorf(core.ErrDotPropertyEval, err)
 				}
-				
+
 				// Convert to string
 				switch ep := evalProp.(type) {
 				case string:
@@ -88,17 +88,17 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 					nextProp = fmt.Sprintf("%v", evalProp)
 				}
 			}
-			
+
 			// Access the next property
 			current, err = accessProperty(current, nextProp)
 			if err != nil {
 				return nil, core.ErrDotNestedAccessf(currentPath, nextProp, err)
 			}
-			
+
 			// Update current path for error reporting
 			currentPath += "." + nextProp
 		}
-		
+
 		return current, nil
 	}
 
@@ -201,14 +201,14 @@ func isMethodCallWithArgs(args []core.LispValue, idx int) bool {
 	if idx >= len(args) {
 		return false
 	}
-	
+
 	// If the next argument is a list or another complex structure,
 	// it's more likely to be method arguments than nested property access
 	switch args[idx].(type) {
 	case core.LispList, core.LispListLiteral, core.LispTuple:
 		return true
 	}
-	
+
 	// Default to not being a method call
 	return false
 }
@@ -222,7 +222,7 @@ func accessProperty(obj core.LispValue, propName string) (core.LispValue, error)
 			value, _ := dotObj.GetProperty(propName)
 			return value, nil
 		}
-		
+
 		// Check if it's a method (return a method reference)
 		if dotObj.HasMethod(propName) {
 			// Return a method reference (builtin function)
@@ -230,10 +230,10 @@ func accessProperty(obj core.LispValue, propName string) (core.LispValue, error)
 				return dotObj.CallMethod(propName, args)
 			}), nil
 		}
-		
+
 		return nil, core.ErrDotNoPropertyf(propName)
 	}
-	
+
 	// Handle special cases for non-DotAccessible objects
 	switch typedObj := obj.(type) {
 	case *core.PythonicDict:
@@ -243,19 +243,19 @@ func accessProperty(obj core.LispValue, propName string) (core.LispValue, error)
 			return nil, core.ErrDotNoPropertyf(propName)
 		}
 		return value, nil
-		
+
 	case *core.Generator:
 		if propName == "next" {
 			return nil, fmt.Errorf(core.ErrDotEvaluatorMissing, "next")
 		}
 		return nil, core.ErrDotNoPropertyf(propName)
-		
+
 	case *core.Lambda:
 		if propName == "call" {
 			return typedObj, nil // Return the lambda itself for later application
 		}
 		return nil, core.ErrDotNoPropertyf(propName)
-		
+
 	default:
 		return nil, core.ErrDotMissingInterfacef(obj)
 	}

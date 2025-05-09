@@ -153,9 +153,9 @@ func (r *ModuleRegistry) ReloadModule(name string) error {
 	if _, exists := r.modules[name]; !exists {
 		return fmt.Errorf("module %s is not loaded", name)
 	}
-	
+
 	// Remove the module from the registry
 	delete(r.modules, name)
-	
+
 	return nil
 }
