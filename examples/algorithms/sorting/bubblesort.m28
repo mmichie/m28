@@ -1,8 +1,64 @@
-(= original-list (list 3 1 4 1 5 9 2 6 5 3 5))
-(print "Original list:")
-(print original-list)
+# Bubblesort implementation in M28
+# This demonstrates the classic O(n²) sorting algorithm
 
-; Simple implementation: we'll use a library sort function
-(= sorted-list (sorted original-list))
+# Implementation of bubblesort algorithm
+(def (bubblesort lst)
+  # Create a copy of the list to avoid modifying the original
+  (= result (+ lst [])) # Concatenate with empty list to clone
+  (= n (len result))
+
+  # Outer loop - each pass places one more element in its final position
+  (= i 0)
+  (while (< i (- n 1))
+    # Inner loop - compare adjacent elements
+    (= j 0)
+    (while (< j (- n i 1))
+      # Compare and swap if needed
+      (if (> (nth result j) (nth result (+ j 1)))
+        (begin
+          # Swap elements
+          (= temp (nth result j))
+          (= result (set-nth result j (nth result (+ j 1))))
+          (= result (set-nth result (+ j 1) temp))
+        )
+      )
+      (= j (+ j 1))
+    )
+    (= i (+ i 1))
+  )
+
+  # Return the sorted list
+  result)
+
+# Helper function for setting value at specific index
+(def (set-nth lst index value)
+  (if (== index 0)
+    # If setting the first element
+    (+ [value] (slice lst 1))
+    # If setting any other element
+    (+ (slice lst 0 index) [value] (slice lst (+ index 1)))
+  )
+)
+
+# Test the bubblesort function
+(= numbers [5 2 9 1 7 6 3])
+(print "Original list:")
+(print numbers)
+
+(print "Sorting with bubblesort...")
+(= sorted-list (bubblesort numbers))
 (print "Sorted list:")
 (print sorted-list)
+
+# Test with another example
+(= mixed-numbers [3 1 4 1 5 9 2 6 5 3 5])
+(print "\nOriginal list:")
+(print mixed-numbers)
+(print "Sorted list:")
+(print (bubblesort mixed-numbers))
+
+# Test edge cases
+(print "\nEmpty list sorted:" (bubblesort []))
+(print "Single element list sorted:" (bubblesort [42]))
+(print "Already sorted list:" (bubblesort [1 2 3 4 5]))
+(print "Reverse sorted list:" (bubblesort [5 4 3 2 1]))

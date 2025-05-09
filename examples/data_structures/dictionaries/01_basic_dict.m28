@@ -21,8 +21,8 @@
 (def person (dict "name" "Alice" "age" 30))
 (print "Person dictionary:" person)
 
-# Alternative dictionary creation with JSON-like syntax (if supported)
-(= points {"x": 10, "y": 20})
+# Alternative dictionary creation with key-value pairs
+(= points (dict "x" 10 "y" 20))
 (print "Points dictionary:" points)
 
 #-----------------------------------------
@@ -31,11 +31,13 @@
 
 # Adding values to a dictionary
 (print "\n--- Adding Values ---")
-(dict.set empty_dict "language" "M28")
+
+# Setting by reassignment
+(= empty_dict (dict "language" "M28"))
 (print "Dictionary after adding value:" empty_dict)
 
 # Modify existing value
-(dict.set person "age" 31)
+(= person (dict "name" "Alice" "age" 31))
 (print "Person after updating age:" person)
 
 #-----------------------------------------
@@ -44,14 +46,14 @@
 
 # Getting values from a dictionary
 (print "\n--- Retrieving Values ---")
-(print "Person's name:" (dict.get person "name"))
-(print "Person's age:" (dict.get person "age"))
+(print "Person's name:" (get person "name"))
+(print "Person's age:" (get person "age"))
 
 # Getting values with default for missing keys
-(print "Person's city (missing key):" (dict.get person "city" "Unknown"))
+(print "Person's city (missing key):" (get person "city" "Unknown"))
 
-# Check if a key exists
-(= has_name (dict.contains? person "name"))
+# Check if a key exists using get with a default
+(= has_name (not (= (get person "name" None) None)))
 (print "Does person have 'name' key?:" has_name)
 
 #-----------------------------------------

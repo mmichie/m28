@@ -15,7 +15,8 @@
 # Format: (= function-name (lambda (arguments) body))
 
 # Simple addition function using lambda
-(= add (lambda (a b) (+ a b)))
+(= add (lambda (a b)
+  (+ a b)))
 
 # Test our function
 (print "Testing basic lambda function:")
@@ -67,8 +68,12 @@
 
 # Function to calculate power
 (def (power base exponent)
-  # The ^ operator calculates exponentiation
-  (^ base exponent))
+  # Use multiplication for a simple power function
+  (if (== exponent 0)
+    1
+    (if (== exponent 1)
+      base
+      (* base (power base (- exponent 1))))))
 
 # Test with different arguments
 (print "Testing mathematical function:")

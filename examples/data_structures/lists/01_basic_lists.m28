@@ -69,9 +69,9 @@
 # Length of a list
 (print "Length of combined list:" (len combined))
 
-# Checking if element is in list
-(print "Is 3 in list1?" (in? 3 list1))
-(print "Is 7 in list1?" (in? 7 list1))
+# Checking if element is in list - using other approaches
+(print "Is 3 in list1?" (filter (lambda (x) (== x 3)) list1))
+(print "Is 7 in list1?" (filter (lambda (x) (== x 7)) list1))
 
 # Adding an element to a list
 (= list1 (+ list1 [4]))

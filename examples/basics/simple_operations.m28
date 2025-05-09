@@ -1,5 +1,6 @@
-# Simple function test with lambda
-(= add-fn (lambda (a b) (+ a b)))
+# Simple function test with def
+(def (add-fn a b)
+  (+ a b))
 (print (add-fn 2 3))
 
 # Simple function test with def

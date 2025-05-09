@@ -18,9 +18,16 @@
         (= pivot (nth lst 0))
         (= rest (slice lst 1))
         
+        # Helper functions for filtering
+        (def (less-than-pivot x)
+          (< x pivot))
+
+        (def (greater-equal-pivot x)
+          (>= x pivot))
+
         # Divide list into elements less than pivot and elements greater or equal
-        (= less (filter-list (lambda (x) (< x pivot)) rest))
-        (= greater (filter-list (lambda (x) (>= x pivot)) rest))
+        (= less (filter-list less-than-pivot rest))
+        (= greater (filter-list greater-equal-pivot rest))
         
         # Combine sorted sublists with pivot in the middle
         (+ (quicksort less) [pivot] (quicksort greater)))))
