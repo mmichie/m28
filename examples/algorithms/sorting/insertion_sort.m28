@@ -1,0 +1,70 @@
+# Simple insertion sort implementation for M28
+# This is a simple, readable sorting algorithm that works well on small lists
+
+# Insertion sort implementation
+(def (insertion-sort lst)
+  # If list is empty or has only one element, it's already sorted
+  (if (<= (len lst) 1)
+    lst
+    (begin
+      # Start with the first element as our sorted list
+      (= sorted [(nth lst 0)])
+      
+      # Insert each element from the unsorted portion into the sorted portion
+      (= i 1)
+      (while (< i (len lst))
+        (= current (nth lst i))
+        (= inserted False)
+        
+        # Find the right position in sorted list
+        (= j 0)
+        (= sorted-len (len sorted))
+        
+        # Special case: if current is smaller than all elements in sorted
+        (if (< current (nth sorted 0))
+          (begin
+            (= sorted (+ [current] sorted))
+            (= inserted True))
+          (begin
+            # General case: find insertion point
+            (while (and (< j (- sorted-len 1)) (not inserted))
+              (if (and (>= current (nth sorted j)) 
+                       (< current (nth sorted (+ j 1))))
+                (begin
+                  (= sorted (+ (slice sorted 0 (+ j 1)) [current] (slice sorted (+ j 1))))
+                  (= inserted True))
+                (= j (+ j 1))))
+            
+            # If we reached the end and haven't inserted, it goes at the end
+            (if (not inserted)
+              (= sorted (+ sorted [current])))))
+        
+        (= i (+ i 1)))
+      
+      sorted)))
+
+# Test the insertion sort algorithm
+(= numbers [5 2 9 1 7 6 3])
+(print "Original list:")
+(print numbers)
+(print "Sorted list:")
+(print (insertion-sort numbers))
+
+# Test with other examples
+(= numbers2 [42 13 7 1 100 56 24 37 21])
+(print "\nSorting another list:")
+(print "Original:" numbers2)
+(print "Sorted:" (insertion-sort numbers2))
+
+# Test with duplicates
+(= dup_list [3 1 4 1 5 9 2 6 5 3 5])
+(print "\nSorting list with duplicates:")
+(print "Original:" dup_list)
+(print "Sorted:" (insertion-sort dup_list))
+
+# Test with edge cases
+(print "\nEdge cases:")
+(print "Empty list:" (insertion-sort []))
+(print "Single element:" (insertion-sort [42]))
+(print "Already sorted:" (insertion-sort [1 2 3 4 5]))
+(print "Reverse sorted:" (insertion-sort [5 4 3 2 1]))

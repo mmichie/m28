@@ -1,54 +1,56 @@
 # Quicksort implementation in M28
 # This demonstrates a classic divide-and-conquer sorting algorithm
 
-# Function to filter a list based on a predicate
-(def (filter-list pred lst)
-  (if (= lst [])
-      []
-      (if (pred (nth lst 0))
-          (+ [(nth lst 0)] (filter-list pred (slice lst 1)))
-          (filter-list pred (slice lst 1)))))
-
-# Quicksort implementation using filter and recursion
+# Quicksort with a simpler approach
 (def (quicksort lst)
-  (if (= lst [])
-      []
-      (begin
-        # Take the first element as pivot
-        (= pivot (nth lst 0))
-        (= rest (slice lst 1))
-        
-        # Helper functions for filtering
-        (def (less-than-pivot x)
-          (< x pivot))
-
-        (def (greater-equal-pivot x)
-          (>= x pivot))
-
-        # Divide list into elements less than pivot and elements greater or equal
-        (= less (filter-list less-than-pivot rest))
-        (= greater (filter-list greater-equal-pivot rest))
-        
-        # Combine sorted sublists with pivot in the middle
-        (+ (quicksort less) [pivot] (quicksort greater)))))
+  # Base case: empty or single-element list
+  (if (< (len lst) 2)
+    lst
+    (begin
+      # Choose first element as pivot
+      (= pivot (nth lst 0))
+      
+      # Create lists for elements less than, equal to, and greater than pivot
+      (= less [])
+      (= equal [])
+      (= greater [])
+      
+      # Partition the elements
+      (= i 0)
+      (while (< i (len lst))
+        (= current (nth lst i))
+        (if (< current pivot)
+          (= less (+ less [current]))
+          (if (== current pivot)
+            (= equal (+ equal [current]))
+            (= greater (+ greater [current]))))
+        (= i (+ i 1)))
+      
+      # Recursively sort and combine
+      (+ (quicksort less) equal (quicksort greater)))))
 
 # Test the quicksort function
-(= numbers1 [5, 2, 9, 1, 7, 6, 3])
+(= numbers [5 2 9 1 7 6 3])
 (print "Original list:")
-(print numbers1)
+(print numbers)
 (print "Sorted list:")
-(print (quicksort numbers1))
+(print (quicksort numbers))
 
 # Test with other examples
-(= numbers [42, 13, 7, 1, 100, 56, 24, 37, 21])
+(= numbers2 [42 13 7 1 100 56 24 37 21])
 (print "\nSorting another list:")
-(print "Original:" numbers)
-(print "Sorted:" (quicksort numbers))
+(print "Original:" numbers2)
+(print "Sorted:" (quicksort numbers2))
+
+# Test with duplicates
+(= dup_list [3 1 4 1 5 9 2 6 5 3 5])
+(print "\nSorting list with duplicates:")
+(print "Original:" dup_list)
+(print "Sorted:" (quicksort dup_list))
 
 # Test with edge cases
 (print "\nEdge cases:")
 (print "Empty list:" (quicksort []))
 (print "Single element:" (quicksort [42]))
-(print "Already sorted:" (quicksort [1, 2, 3, 4, 5]))
-(print "Reverse sorted:" (quicksort [5, 4, 3, 2, 1]))
-(print "Duplicates:" (quicksort [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]))
+(print "Already sorted:" (quicksort [1 2 3 4 5]))
+(print "Reverse sorted:" (quicksort [5 4 3 2 1]))
