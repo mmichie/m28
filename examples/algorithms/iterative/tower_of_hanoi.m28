@@ -1,0 +1,89 @@
+# Iterative Tower of Hanoi implementation in M28
+# This is a non-recursive implementation to solve the Tower of Hanoi problem
+
+# Function to print a move
+(def (print-move disk source target)
+  (print "Move disk " disk " from peg " source " to peg " target))
+
+# Iterative solution for the Tower of Hanoi puzzle
+(def (iterative-tower-of-hanoi num-disks)
+  # Calculate the total number of moves needed
+  (= total-moves (- (^ 2 num-disks) 1))
+  
+  # Source, auxiliary, and target pegs
+  (= src "A")
+  (= aux "B")
+  (= dst "C")
+  
+  # Solve differently for odd and even number of disks
+  (if (== (% num-disks 2) 0)
+    # For even number of disks, swap auxiliary and target
+    (begin
+      (= temp aux)
+      (= aux dst)
+      (= dst temp)))
+  
+  # Perform the moves
+  (= move 1)
+  (while (<= move total-moves)
+    # Determine which move to make based on pattern
+    (= remainder (% move 3))
+
+    (= disk-number (disk-to-move move))
+
+    (if (== remainder 1)
+      # Move between source and destination
+      (print-move disk-number src dst)
+      (if (== remainder 2)
+        # Move between source and auxiliary
+        (print-move disk-number src aux)
+        # Move between auxiliary and destination
+        (print-move disk-number aux dst)))
+    
+    (= move (+ move 1))))
+
+# Calculate which disk to move on a particular move
+(def (disk-to-move move)
+  # Count trailing zeros in the binary representation
+  (= disk 1)
+  (= m move)
+  
+  (while (== (% m 2) 0)
+    (= m (/ m 2))
+    (= disk (+ disk 1)))
+  
+  disk)
+
+# Helper function for exponentiation
+(def (^ base exponent)
+  (= result 1)
+  (= i 0)
+  (while (< i exponent)
+    (= result (* result base))
+    (= i (+ i 1)))
+  result)
+
+# Print instructions and explanation
+(print "Tower of Hanoi (Iterative Solution)")
+(print "=================================")
+(print "The Tower of Hanoi is a mathematical puzzle where we have three pegs")
+(print "and a number of disks of different sizes which can slide onto any peg.")
+(print "The objective is to move the entire stack to another peg, following these rules:")
+(print "1. Only one disk can be moved at a time.")
+(print "2. Each move consists of taking the upper disk from one stack")
+(print "   and placing it on top of another stack.")
+(print "3. No disk may be placed on top of a smaller disk.")
+
+# Solve for different numbers of disks
+(print "\n--- Solution for 2 disks ---")
+(iterative-tower-of-hanoi 2)
+
+(print "\n--- Solution for 3 disks ---")
+(iterative-tower-of-hanoi 3)
+
+# Print statistics
+(print "\nNumber of moves required for different disk counts:")
+(print "1 disk: " (- (^ 2 1) 1) " move")
+(print "2 disks: " (- (^ 2 2) 1) " moves")
+(print "3 disks: " (- (^ 2 3) 1) " moves")
+(print "4 disks: " (- (^ 2 4) 1) " moves")
