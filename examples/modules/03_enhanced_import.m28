@@ -1,0 +1,50 @@
+# Enhanced Module Import Example
+# This demonstrates features of the enhanced module system in M28
+
+(print "=== Enhanced Module Import Example ===")
+
+# Import a module with export control
+# The module specifies which symbols are exported via __exports__
+(print "\n1. Importing Enhanced Module:")
+(import "modules/enhanced_module")
+(print "Module imported successfully!")
+
+# Access exported variables directly using dot notation
+(print "\n2. Accessing Exported Variables:")
+(print "GREETING:" enhanced_module.GREETING)
+
+# Call exported functions with dot notation
+(print "\n3. Calling Exported Functions:")
+(print "add(3, 5):" (enhanced_module.add 3 5))
+(print "is_even(42):" (enhanced_module.is_even 42))
+(print "is_even(7):" (enhanced_module.is_even 7))
+
+# Try to access non-exported variables
+# The module defines INTERNAL_VALUE but it isn't in __exports__
+(print "\n4. Access Control (Non-Exported Variables):")
+(print "Attempting to access INTERNAL_VALUE:")
+(try
+  (print enhanced_module.INTERNAL_VALUE)
+  (catch e
+    (print "Error accessing non-exported variable:" e)))
+
+# Try to call non-exported functions
+# The module defines subtract() but it isn't in __exports__
+(print "\n5. Access Control (Non-Exported Functions):")
+(print "Attempting to call subtract():")
+(try
+  (print (enhanced_module.subtract 10 5))
+  (catch e
+    (print "Error calling non-exported function:" e)))
+
+# An alternative way to access module attributes is with the get function
+# This bypasses dot notation and __exports__ protection
+(print "\n6. Alternative Access Methods:")
+(print "Using get function:" (get enhanced_module "GREETING"))
+
+# Examining the module registry
+# The module system maintains a registry of all loaded modules
+(print "\n7. Module Registry:")
+(print "Available modules:" (dict.keys modules))
+
+(print "\n=== End of Enhanced Module Import Example ===")

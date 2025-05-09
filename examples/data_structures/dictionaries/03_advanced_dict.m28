@@ -1,0 +1,170 @@
+# 03_advanced_dict.m28
+#
+# This example demonstrates advanced dictionary features in M28:
+# - Nested dictionaries for complex data structures
+# - Dot notation for cleaner dictionary access
+# - Dictionary method chaining
+# - Dictionary as configuration storage
+# - Practical patterns for working with complex data
+
+(print "=== Advanced Dictionary Features ===")
+
+#-----------------------------------------
+# Nested Dictionaries
+#-----------------------------------------
+(print "\n--- Nested Dictionaries ---")
+
+# Create a nested dictionary structure
+(def config (dict
+  "app_name" "MyApp"
+  "version" "1.0.3"
+  "server" (dict
+    "host" "localhost"
+    "port" 8080
+    "debug" true
+  )
+  "database" (dict
+    "host" "db.example.com"
+    "port" 5432
+    "credentials" (dict
+      "username" "admin"
+      "password" "secure123"
+    )
+  )
+))
+
+(print "Configuration dictionary:" config)
+
+# Traditional nested access (verbose)
+(print "\n--- Traditional Nested Access ---")
+(print "Server host:" (dict.get (dict.get config "server") "host"))
+(print "DB username:" 
+  (dict.get 
+    (dict.get 
+      (dict.get config "database") 
+      "credentials"
+    ) 
+    "username"
+  )
+)
+
+#-----------------------------------------
+# Dot Notation for Dictionaries
+#-----------------------------------------
+(print "\n--- Dot Notation For Cleaner Access ---")
+
+# Access nested properties with dot notation
+(print "App name:" config.app_name)
+(print "Server port:" config.server.port)
+(print "Database username:" config.database.credentials.username)
+
+# Setting values with dot notation
+(= config.server.debug false)
+(print "Server debug mode after change:" config.server.debug)
+
+# Add new nested properties
+(= config.database.pool_size 10)
+(print "Database pool size (new property):" config.database.pool_size)
+
+#-----------------------------------------
+# Method Chaining with Dot Notation
+#-----------------------------------------
+(print "\n--- Method Chaining ---")
+
+# Create a user dictionary
+(def user (dict "name" "John" "role" "admin"))
+
+# Chain dictionary methods
+(= role_exists 
+  (user
+    .set "last_login" "2024-05-09"  # Set a value
+    .contains? "role")              # Check if key exists
+)
+
+(print "User after chaining:" user)
+(print "Does role exist?:" role_exists)
+
+# Another example of method chaining
+(= keys_count 
+  (user
+    .update (dict "active" true)    # Update the dictionary
+    .keys                           # Get the keys
+    .len)                           # Get length of keys
+)
+
+(print "Number of keys in user:" keys_count)
+
+#-----------------------------------------
+# Practical Dictionary Patterns
+#-----------------------------------------
+(print "\n--- Practical Dictionary Patterns ---")
+
+# Dictionary as a record/object
+(def person (dict
+  "name" "Alice"
+  "age" 28
+  "address" (dict
+    "street" "123 Main St"
+    "city" "Anytown"
+    "zip" 12345
+  )
+  "contact" (dict
+    "email" "alice@example.com"
+    "phone" (dict
+      "home" "555-1234"
+      "mobile" "555-5678"
+    )
+  )
+))
+
+# Dictionary as configuration
+(def app_config (dict
+  "name" "MyApp"
+  "env" "development"  # Or "production", "staging", etc.
+  "features" (dict
+    "dark_mode" true
+    "analytics" false
+    "premium" false
+  )
+))
+
+# Using dictionary as a feature flag system
+(def (is_feature_enabled? feature_name)
+  (dict.get app_config.features feature_name false))
+
+(print "Is dark mode enabled?:" (is_feature_enabled? "dark_mode"))
+(print "Is analytics enabled?:" (is_feature_enabled? "analytics"))
+(print "Is unknown feature enabled?:" (is_feature_enabled? "unknown_feature"))
+
+#-----------------------------------------
+# Transforming Dictionary Data
+#-----------------------------------------
+(print "\n--- Transforming Dictionary Data ---")
+
+# Example: Creating a function to format person info
+(def (format_person person)
+  (dict
+    "fullName" (+ person.name)
+    "contactInfo" (+ person.contact.email " / " person.contact.phone.mobile)
+    "location" (+ person.address.city ", " (str person.address.zip))
+  ))
+
+(= formatted (format_person person))
+(print "Formatted person:" formatted)
+
+#-----------------------------------------
+# Dictionary as Function Arguments
+#-----------------------------------------
+(print "\n--- Dictionary as Function Arguments ---")
+
+# Create a function that accepts configuration options
+(def (connect_database config)
+  (print "Connecting to database at:" config.host ":" config.port)
+  (print "Using credentials:" config.credentials.username)
+  (if config.debug
+      (print "Debug mode is enabled")))
+
+# Call function with nested dictionary value
+(connect_database config.database)
+
+(print "\n=== Advanced Dictionary Example Complete ===")

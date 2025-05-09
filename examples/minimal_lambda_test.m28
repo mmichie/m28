@@ -1,7 +1,0 @@
-# Minimal lambda test
-(print "Testing minimal lambda creation")
-
-# Try with a single parameter
-(= add1 (lambda x (+ x 1)))
-(print "add1(5) =")
-(print (add1 5))

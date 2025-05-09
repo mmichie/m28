@@ -1,0 +1,96 @@
+# 01_basic_closures.m28
+# Introduction to Closures in M28
+
+###############################################################################
+# WHAT ARE CLOSURES?
+###############################################################################
+# Closures are functions that "close over" their environment, capturing and
+# retaining access to variables from their enclosing scope, even after that
+# scope has completed execution.
+#
+# Key closure concepts:
+# 1. State encapsulation: Variables inside closure creators stay private
+# 2. Instance isolation: Each closure instance has its own separate state
+# 3. State persistence: The state persists between calls to the closure
+
+###############################################################################
+# SIMPLE COUNTER EXAMPLE
+###############################################################################
+
+# This function creates a counter with encapsulated state
+(def (make-counter)
+  # Private state - this variable is encapsulated within the closure
+  # and can't be accessed directly from outside
+  (= count 0)
+  
+  # Return an anonymous function that can access and modify count
+  (lambda ()
+    # This line accesses the 'count' variable from the enclosing scope
+    (= count (+ count 1))
+    count))
+
+# Create two independent counter instances
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+# Test counter1
+(print "Counter 1 first call: " (counter1))   # Should print 1
+(print "Counter 1 second call: " (counter1))  # Should print 2
+(print "Counter 1 third call: " (counter1))   # Should print 3
+
+# Test counter2 - notice it has its own separate count
+(print "Counter 2 first call: " (counter2))   # Should print 1
+(print "Counter 2 second call: " (counter2))  # Should print 2
+
+# Test counter1 again
+(print "Counter 1 fourth call: " (counter1))  # Should print 4
+
+###############################################################################
+# CLOSURE WITH NAMED FUNCTION
+###############################################################################
+
+# Another style using a named function instead of lambda
+(def (counter-factory)
+  # Private state for this closure
+  (= count 0)
+  
+  # Named internal function - also captures the enclosing environment
+  (def (increment)
+    (= count (+ count 1))
+    count)
+  
+  # Return the function - same behavior as the lambda example
+  increment)
+
+# Create a counter using the named function approach
+(= counter3 (counter-factory))
+
+# Test this counter
+(print "\nTesting named function counter:")
+(print "Counter 3 first call: " (counter3))   # Should print 1 
+(print "Counter 3 second call: " (counter3))  # Should print 2
+
+###############################################################################
+# CLOSURE WITH PARAMETERS
+###############################################################################
+
+# A more flexible counter that can count by any increment
+(def (make-stepper step-size)
+  # Private state
+  (= count 0)
+  
+  # Return a function that increments by step-size
+  (lambda ()
+    (= count (+ count step-size))
+    count))
+
+# Create counters with different step sizes
+(= counter-by-1 (make-stepper 1))
+(= counter-by-5 (make-stepper 5))
+(= counter-by-10 (make-stepper 10))
+
+# Test the different counters
+(print "\nTesting parametrized counters:")
+(print "By 1: " (counter-by-1) ", " (counter-by-1) ", " (counter-by-1))  # 1, 2, 3
+(print "By 5: " (counter-by-5) ", " (counter-by-5) ", " (counter-by-5))  # 5, 10, 15
+(print "By 10: " (counter-by-10) ", " (counter-by-10))                   # 10, 20

@@ -1,0 +1,153 @@
+# 02_tree_operations.m28
+# This file demonstrates common operations on binary trees in M28.
+# A tree is represented as a list with 3 elements: [value, left_child, right_child]
+# where left_child and right_child are themselves trees or None.
+
+# Define helper functions for accessing tree nodes
+(def (node-value node) 
+    (return (nth node 0)))
+
+(def (node-left node) 
+    (return (nth node 1)))
+
+(def (node-right node) 
+    (return (nth node 2)))
+
+# Create a binary tree for our examples:
+#
+#        5
+#       / \
+#      3   7
+#     / \  / \
+#    1  4 6   8
+
+# Build the tree from bottom up
+(= leaf1 (list 1 None None))
+(= leaf4 (list 4 None None))
+(= leaf6 (list 6 None None))
+(= leaf8 (list 8 None None))
+(= node3 (list 3 leaf1 leaf4))
+(= node7 (list 7 leaf6 leaf8))
+(= root (list 5 node3 node7))
+
+(print "Sample tree structure:")
+(print root)
+
+# Tree search operation - check if a value exists in the tree
+(def (tree-contains? tree value)
+    (if (== tree None)
+        (return False)  # Base case: empty tree doesn't contain the value
+        (if (== (node-value tree) value)
+            (return True)  # Found the value at current node
+            (if (and (== (node-left tree) None) (== (node-right tree) None))
+                (return False)  # Leaf node and value doesn't match
+                (if (== (node-left tree) None)
+                    (return (tree-contains? (node-right tree) value))  # Only check right subtree
+                    (if (== (node-right tree) None)
+                        (return (tree-contains? (node-left tree) value))  # Only check left subtree
+                        (return (or  # Check both subtrees
+                            (tree-contains? (node-left tree) value)
+                            (tree-contains? (node-right tree) value)))))))))
+
+(print "\nSearching for values in the tree:")
+(print "Tree contains 5? " (tree-contains? root 5))  # Should be True (root)
+(print "Tree contains 1? " (tree-contains? root 1))  # Should be True (leaf)
+(print "Tree contains 9? " (tree-contains? root 9))  # Should be False
+
+# Tree traversal - sum all values in the tree
+(def (tree-sum tree)
+    (if (== tree None)
+        (return 0)  # Base case: empty tree has sum 0
+        (begin
+            (= value (node-value tree))
+            (= left-sum (tree-sum (node-left tree)))
+            (= right-sum (tree-sum (node-right tree)))
+            (return (+ value left-sum right-sum)))))
+
+(print "\nTree sum:")
+(print "Sum of all values in the tree: " (tree-sum root))  # Should be 34 (5+3+7+1+4+6+8)
+
+# Tree depth/height calculation
+(def (tree-depth tree)
+    (if (== tree None)
+        (return 0)  # Base case: empty tree has depth 0
+        (begin
+            (= left-depth (tree-depth (node-left tree)))
+            (= right-depth (tree-depth (node-right tree)))
+            (if (>= left-depth right-depth)
+                (return (+ 1 left-depth))
+                (return (+ 1 right-depth))))))
+
+(print "\nTree depth:")
+(print "Depth of the tree: " (tree-depth root))  # Should be 3
+
+# Count number of nodes in the tree
+(def (count-nodes tree)
+    (if (== tree None)
+        (return 0)  # Base case: empty tree has 0 nodes
+        (begin
+            (= left-count (count-nodes (node-left tree)))
+            (= right-count (count-nodes (node-right tree)))
+            (return (+ 1 left-count right-count)))))
+
+(print "\nNode count:")
+(print "Number of nodes in the tree: " (count-nodes root))  # Should be 7
+
+# Check if tree is a leaf node
+(def (is-leaf? node)
+    (and (== (node-left node) None) (== (node-right node) None)))
+
+(print "\nLeaf check:")
+(print "Is leaf1 a leaf node? " (is-leaf? leaf1))  # Should be True
+(print "Is node3 a leaf node? " (is-leaf? node3))  # Should be False
+
+# Tree traversal operations
+# In-order traversal: visit left subtree, then root, then right subtree
+(def (in-order-values tree)
+    (if (== tree None)
+        (return (list))
+        (begin
+            (= left-values (in-order-values (node-left tree)))
+            (= value (node-value tree))
+            (= right-values (in-order-values (node-right tree)))
+            (return (concat left-values (list value) right-values)))))
+
+(print "\nTree traversals:")
+(print "In-order traversal: " (in-order-values root))  # Should be [1, 3, 4, 5, 6, 7, 8]
+
+# Find min and max values in the tree
+(def (min-value tree)
+    (if (== tree None)
+        (return None)
+        (begin
+            (= value (node-value tree))
+            (= left-min (min-value (node-left tree)))
+            (= right-min (min-value (node-right tree)))
+            (= current-min value)
+            (if (!= left-min None)
+                (if (< left-min current-min)
+                    (= current-min left-min)))
+            (if (!= right-min None)
+                (if (< right-min current-min)
+                    (= current-min right-min)))
+            (return current-min))))
+
+(def (max-value tree)
+    (if (== tree None)
+        (return None)
+        (begin
+            (= value (node-value tree))
+            (= left-max (max-value (node-left tree)))
+            (= right-max (max-value (node-right tree)))
+            (= current-max value)
+            (if (!= left-max None)
+                (if (> left-max current-max)
+                    (= current-max left-max)))
+            (if (!= right-max None)
+                (if (> right-max current-max)
+                    (= current-max right-max)))
+            (return current-max))))
+
+(print "\nTree min/max:")
+(print "Minimum value in the tree: " (min-value root))  # Should be 1
+(print "Maximum value in the tree: " (max-value root))  # Should be 8

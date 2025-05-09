@@ -1,0 +1,43 @@
+# Standard Module Import Example
+# This demonstrates more complete module import patterns with path specifications
+
+(print "=== Standard Module Import Example ===")
+
+# Import a module using an explicit path
+# This allows importing modules from specific locations
+(print "\n1. Importing Module with Path:")
+(import "modules/test_module")
+
+# Access module metadata
+(print "\n2. Module Metadata:")
+(print "Module type:" (type test_module))
+(print "Module name:" test_module.MODULE_NAME)
+
+# Access calculated values from the module
+# Modules can contain pre-computed values that are evaluated at module load time
+(print "\n3. Accessing Computed Module Variables:")
+(print "CALCULATED_VALUE:" test_module.CALCULATED_VALUE)
+
+# Call module functions
+# Module functions maintain access to the module's namespace
+(print "\n4. Calling Module Functions:")
+(print "add_numbers(5, 7):" (test_module.add_numbers 5 7))
+
+# Access complex data structures within modules
+# Modules can contain dictionaries, lists, or other complex data
+(print "\n5. Accessing Complex Module Data:")
+(print "CONFIG:" (get test_module "CONFIG"))
+(print "CONFIG type:" (type (get test_module "CONFIG")))
+
+# Access nested data using chained property access
+# You can access nested properties in module data structures
+(print "\n6. Accessing Nested Data:")
+(print "CONFIG.version:" (get (get test_module "CONFIG") "version"))
+(print "CONFIG.settings.timeout:" (get (get (get test_module "CONFIG") "settings") "timeout"))
+
+# Show module's export list 
+# Modules with __exports__ only expose listed symbols
+(print "\n7. Module Export Control:")
+(print "Exports list:" test_module.__exports__)
+
+(print "\n=== End of Standard Module Import Example ===")

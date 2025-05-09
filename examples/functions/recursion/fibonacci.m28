@@ -1,0 +1,13 @@
+# Fibonacci sequence example
+
+# Define the fibonacci function
+(def (fib n)
+  (if (< n 2)
+      n
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+# Print fibonacci sequence up to 10
+(print "Fibonacci sequence up to 10:")
+
+(for i (range 11)
+  (print (fib i)))

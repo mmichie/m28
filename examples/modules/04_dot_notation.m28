@@ -1,0 +1,92 @@
+# Dot Notation for Module Access Example
+# This demonstrates comprehensive dot notation for module imports and access
+
+(print "=== Dot Notation for Module Access Example ===")
+
+# Import our module that has various properties and methods
+# We'll use this to demonstrate all the dot notation features
+(print "\n1. Importing Module:")
+(import "modules/simple_module")
+
+# Access standard module metadata using dot notation
+(print "\n2. Module Metadata via Dot Notation:")
+(print "Module __name__:" simple_module.__name__)
+(print "Module __file__:" simple_module.__file__)
+(print "Module type:" (type simple_module))
+
+# Access module variables with dot notation
+(print "\n3. Module Variables via Dot Notation:")
+(print "MODULE_NAME:" simple_module.MODULE_NAME)
+(print "VALUE:" simple_module.VALUE)
+
+# Call module functions with dot notation
+(print "\n4. Calling Module Functions:")
+(print "add(3, 4):" (simple_module.add 3 4))
+
+# Now let's create a more complex example to show deeper dot notation
+# We'll define our own module inline for this purpose
+(print "\n5. Creating Complex Module for Advanced Dot Notation:")
+
+(def dot_example_module (dict
+  "MODULE_NAME" "DotExampleModule"
+  "VERSION" "1.0.0"
+  "counter" 0
+  
+  "increment" (lambda (amount)
+    (= dot_example_module.counter (+ dot_example_module.counter amount))
+    dot_example_module.counter)
+    
+  "nested_data" (dict
+    "level1" (dict
+      "level2" (dict
+        "level3" (dict
+          "value" "You found the treasure!"
+        )
+      )
+    )
+  )
+  
+  "make_user" (lambda (name age)
+    (dict
+      "name" name
+      "age" age
+      "greet" (lambda (self)
+        (+ "Hello, my name is " self.name " and I am " (str self.age) " years old"))
+      "birthday" (lambda (self)
+        (= self.age (+ self.age 1))
+        self.age)
+    ))
+))
+
+# Access properties in our module 
+(print "\n6. Accessing Module Properties:")
+(print "Module name:" dot_example_module.MODULE_NAME)
+(print "Module version:" dot_example_module.VERSION)
+(print "Initial counter:" dot_example_module.counter)
+
+# Call module methods
+(print "\n7. Calling Module Methods:")
+(print "After increment(5):" (dot_example_module.increment 5))
+(print "After increment(10):" (dot_example_module.increment 10))
+
+# Create an object using the module's factory function
+(print "\n8. Creating Objects via Module Methods:")
+(def bob (dot_example_module.make_user "Bob" 30))
+
+# Use methods on the created object with dot notation
+(print "\n9. Using Dot Notation on Created Objects:")
+(print "User name:" bob.name)
+(print "User age:" bob.age)
+(print "User greeting:" (bob.greet bob))
+(print "After birthday:" (bob.birthday bob))
+
+# Access deeply nested properties
+(print "\n10. Deep Property Access with Dot Notation:")
+(def treasure dot_example_module.nested_data.level1.level2.level3.value)
+(print "Nested value:" treasure)
+
+# Multiple dot operations in a single expression
+(print "\n11. Chaining Multiple Dot Operations:")
+(print "Direct nested access:" dot_example_module.nested_data.level1.level2.level3.value)
+
+(print "\n=== End of Dot Notation for Module Access Example ===")

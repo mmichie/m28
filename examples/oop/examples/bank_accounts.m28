@@ -1,0 +1,179 @@
+# Bank Account Object Example
+# A sophisticated example of objects with methods that return other functions
+
+# This example demonstrates:
+# 1. Encapsulated state using closures
+# 2. Methods that return functions (higher-order methods)
+# 3. Conditional logic within methods
+# 4. Transaction-based interface
+
+# Create a bank account with initial balance
+(def (make-account balance)
+  # Private mutable state
+  (= account-balance balance)
+  (= transaction-history [])
+  
+  # Record a transaction in history
+  (def (record-transaction type amount result)
+    (= transaction (dict
+      "type" type
+      "amount" amount
+      "result" result
+      "balance" account-balance))
+    (= transaction-history (+ transaction-history [transaction])))
+  
+  # Return a dispatch function that selects operations
+  (def (dispatch operation)
+    # Get the current balance
+    (if (== operation "balance")
+      account-balance
+      
+      # Get transaction history
+      (if (== operation "history")
+        transaction-history
+        
+        # Deposit operation returns a function that takes an amount
+        (if (== operation "deposit")
+          # Return a function that takes an amount
+          (lambda (amount)
+            (if (<= amount 0)
+              # Invalid deposit amount
+              (begin
+                (record-transaction "deposit-failed" amount "Invalid amount")
+                "Deposit amount must be positive")
+              # Valid deposit
+              (begin
+                (= account-balance (+ account-balance amount))
+                (record-transaction "deposit" amount "Success")
+                account-balance)))
+          
+          # Withdraw operation returns a function that takes an amount
+          (if (== operation "withdraw")
+            # Return a function that takes an amount
+            (lambda (amount)
+              (if (<= amount 0)
+                # Invalid withdrawal amount
+                (begin
+                  (record-transaction "withdraw-failed" amount "Invalid amount")
+                  "Withdrawal amount must be positive")
+                # Check sufficient funds
+                (if (>= account-balance amount)
+                  # Sufficient funds
+                  (begin
+                    (= account-balance (- account-balance amount))
+                    (record-transaction "withdraw" amount "Success")
+                    account-balance)
+                  # Insufficient funds
+                  (begin
+                    (record-transaction "withdraw-failed" amount "Insufficient funds")
+                    "Insufficient funds"))))
+            
+            # Transfer operation returns a function that takes target account and amount
+            (if (== operation "transfer")
+              (lambda (target-account amount)
+                (if (<= amount 0)
+                  # Invalid transfer amount
+                  (begin
+                    (record-transaction "transfer-failed" amount "Invalid amount")
+                    "Transfer amount must be positive")
+                  # Check sufficient funds
+                  (if (>= account-balance amount)
+                    # Sufficient funds, do the transfer
+                    (begin
+                      (= account-balance (- account-balance amount))
+                      (= deposit-fn (target-account "deposit"))
+                      (deposit-fn amount)
+                      (record-transaction "transfer" amount "Success")
+                      account-balance)
+                    # Insufficient funds
+                    (begin
+                      (record-transaction "transfer-failed" amount "Insufficient funds")
+                      "Insufficient funds"))))
+              
+              # Unknown operation
+              (begin
+                (record-transaction "invalid-operation" 0 operation)
+                "Unknown operation")))))))
+  
+  # Return the dispatcher
+  dispatch)
+
+# Create accounts
+(= checking (make-account 100))
+(= savings (make-account 500))
+
+# Check initial balances
+(print "\n--- INITIAL BALANCES ---")
+(print "Checking initial balance: " (checking "balance"))
+(print "Savings initial balance: " (savings "balance"))
+
+# Make deposits
+(print "\n--- DEPOSITS ---")
+(= deposit-checking (checking "deposit"))
+(print "Deposit 50 to checking: " (deposit-checking 50))
+(print "Try deposit -10 to checking: " (deposit-checking -10))
+(print "Checking balance after deposits: " (checking "balance"))
+
+# Make withdrawals
+(print "\n--- WITHDRAWALS ---")
+(= withdraw-savings (savings "withdraw"))
+(print "Withdraw 100 from savings: " (withdraw-savings 100))
+(print "Try withdraw 1000 from savings: " (withdraw-savings 1000))
+(print "Savings balance after withdrawals: " (savings "balance"))
+
+# Test transfers
+(print "\n--- TRANSFERS ---")
+(= transfer-to-savings (checking "transfer"))
+(print "Transfer 75 from checking to savings: " (transfer-to-savings savings 75))
+(print "Checking balance after transfer: " (checking "balance"))
+(print "Savings balance after transfer: " (savings "balance"))
+
+# Create a new account type with additional features
+(def (make-interest-account balance interest-rate)
+  # Create a basic account
+  (= base-account (make-account balance))
+  
+  # Private variables
+  (= rate interest-rate)
+  
+  # Add interest to the account
+  (def (add-interest)
+    (= current-balance (base-account "balance"))
+    (= interest-amount (* current-balance rate))
+    (= deposit-fn (base-account "deposit"))
+    (deposit-fn interest-amount)
+    (+ "Added interest: " (str interest-amount)))
+  
+  # Return a dispatcher that extends the base account
+  (lambda (operation)
+    (if (== operation "add-interest")
+      add-interest
+      (if (== operation "rate")
+        rate
+        (if (== operation "set-rate")
+          (lambda (new-rate)
+            (= rate new-rate)
+            (+ "New interest rate: " (str rate)))
+          # Fall back to base account methods
+          (base-account operation)))))
+)
+
+# Create an interest account
+(print "\n--- INTEREST ACCOUNT ---")
+(= interest-acct (make-interest-account 1000 0.05))
+(print "Initial balance: " (interest-acct "balance"))
+(print "Interest rate: " (interest-acct "rate"))
+
+# Test interest calculation
+(= add-interest (interest-acct "add-interest"))
+(print (add-interest))
+(print "Balance after interest: " (interest-acct "balance"))
+
+# Change interest rate
+(= set-rate (interest-acct "set-rate"))
+(print (set-rate 0.06))
+
+# Ensure regular account methods still work
+(= deposit-interest (interest-acct "deposit"))
+(print "Deposit 200: " (deposit-interest 200))
+(print "Final balance: " (interest-acct "balance"))

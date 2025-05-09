@@ -1,0 +1,319 @@
+# 04_inheritance.m28
+# Progressive OOP Example 4: Inheritance and Class Factories
+
+# This file demonstrates inheritance patterns in M28.
+# We'll explore two main approaches:
+# 1. Inheritance through factory functions
+# 2. Inheritance using the class syntax
+
+##############################################################
+# APPROACH 1: INHERITANCE THROUGH FACTORY FUNCTIONS
+##############################################################
+# Using factory functions to simulate inheritance
+
+# Base "class" for shapes
+(def (Shape name)
+  # Base properties
+  (= shape-name name)
+  (= type "generic")
+  
+  # Base methods
+  (def (get-name)
+    shape-name)
+    
+  (def (get-type)
+    type)
+    
+  (def (describe)
+    (+ "I am a " type " shape named " shape-name))
+    
+  (def (area)
+    0) # Default implementation returns 0
+  
+  # Create base object
+  (= base-obj (dict
+    "name" get-name
+    "type" get-type
+    "describe" describe
+    "area" area))
+  
+  # Return the base object
+  base-obj)
+
+# "Derived class" for circles
+(def (Circle name radius)
+  # Create a base shape object first
+  (= base (Shape name))
+  
+  # Override type
+  (= type "circle")
+  
+  # Add circle-specific data
+  (= circle-radius radius)
+  
+  # Override area method
+  (def (area)
+    (* 3.14159 circle-radius circle-radius))
+    
+  # Add radius method
+  (def (get-radius)
+    circle-radius)
+  
+  # Create a new object by extending the base
+  (= circle-obj (dict))
+  
+  # Copy all methods from base
+  (for key (dict.keys base)
+    (= circle-obj (dict.set circle-obj key (get base key))))
+  
+  # Override/add methods specific to circle
+  (= circle-obj (dict.set circle-obj "area" area))
+  (= circle-obj (dict.set circle-obj "radius" get-radius))
+  
+  # Return the extended object
+  circle-obj)
+
+# "Derived class" for rectangles
+(def (Rectangle name width height)
+  # Create a base shape
+  (= base (Shape name))
+  
+  # Override type
+  (= type "rectangle")
+  
+  # Add rectangle-specific data
+  (= rect-width width)
+  (= rect-height height)
+  
+  # Override area method
+  (def (area)
+    (* rect-width rect-height))
+    
+  # Add dimension methods
+  (def (get-width)
+    rect-width)
+    
+  (def (get-height)
+    rect-height)
+  
+  # Create a new object by extending the base
+  (= rect-obj (dict))
+  
+  # Copy all methods from base
+  (for key (dict.keys base)
+    (= rect-obj (dict.set rect-obj key (get base key))))
+  
+  # Override/add methods specific to rectangle
+  (= rect-obj (dict.set rect-obj "area" area))
+  (= rect-obj (dict.set rect-obj "width" get-width))
+  (= rect-obj (dict.set rect-obj "height" get-height))
+  
+  # Return the extended object
+  rect-obj)
+
+# Create instances
+(= generic-shape (Shape "Blob"))
+(= my-circle (Circle "Round One" 5))
+(= my-rectangle (Rectangle "Rectangle One" 4 6))
+
+# Test inherited and overridden methods
+(print "\n--- FACTORY INHERITANCE TESTS ---")
+(print "Generic shape description: " ((get generic-shape "describe")))
+(print "Generic shape area: " ((get generic-shape "area")))
+
+(print "Circle description: " ((get my-circle "describe")))
+(print "Circle area: " ((get my-circle "area")))
+(print "Circle radius: " ((get my-circle "radius")))
+
+(print "Rectangle description: " ((get my-rectangle "describe")))
+(print "Rectangle area: " ((get my-rectangle "area")))
+(print "Rectangle width: " ((get my-rectangle "width")))
+(print "Rectangle height: " ((get my-rectangle "height")))
+
+##############################################################
+# APPROACH 2: CLASS FACTORY WITH INHERITANCE HELPERS
+##############################################################
+# A more structured approach using helper functions for inheritance
+
+# Function to create a new class based on a parent
+(def (extend parent-class class-methods)
+  (lambda (. init-args)
+    # Create an instance of the parent
+    (= instance (apply parent-class init-args))
+    
+    # Add or override methods from class-methods
+    (for key (dict.keys class-methods)
+      (= instance (dict.set instance key (get class-methods key))))
+    
+    # Return the extended instance
+    instance))
+
+# Base Vehicle class
+(def (Vehicle type)
+  # Instance variables
+  (= vehicle-type type)
+  (= speed 0)
+  
+  # Methods
+  (def (get-type)
+    vehicle-type)
+    
+  (def (get-speed)
+    speed)
+    
+  (def (accelerate mph)
+    (= speed (+ speed mph))
+    (+ "Accelerating to " (str speed) " mph"))
+    
+  (def (brake)
+    (= speed 0)
+    "Stopped")
+    
+  (def (describe)
+    (+ "I am a " vehicle-type " moving at " (str speed) " mph"))
+  
+  # Return the object
+  (dict
+    "type" get-type
+    "speed" get-speed
+    "accelerate" accelerate
+    "brake" brake
+    "describe" describe))
+
+# Car class extending Vehicle
+(= Car (extend Vehicle (dict
+  # Override describe
+  "describe" (lambda ()
+    (+ "I am a car of type " (vehicle-type) " moving at " (str speed) " mph"))
+  
+  # Add new methods
+  "honk" (lambda ()
+    "Beep beep!")
+    
+  "start" (lambda ()
+    "Engine started"))))
+
+# Bicycle class extending Vehicle
+(= Bicycle (extend Vehicle (dict
+  # Override accelerate (bikes are slower)
+  "accelerate" (lambda (mph)
+    (= speed (+ speed (/ mph 2)))
+    (+ "Pedaling to " (str speed) " mph"))
+  
+  # Add new methods
+  "ring-bell" (lambda ()
+    "Ring ring!")
+    
+  "wheelie" (lambda ()
+    (if (> speed 5)
+      "Doing a wheelie!"
+      "Moving too slow for a wheelie")))))
+
+# Create instances
+(= sedan (Car "sedan"))
+(= mountain-bike (Bicycle "mountain"))
+
+# Test inheritance
+(print "\n--- CLASS FACTORY INHERITANCE TESTS ---")
+(print "Car type: " ((get sedan "type")))
+(print "Car start: " ((get sedan "start")))
+(print ((get sedan "accelerate") 30))
+(print "Car honk: " ((get sedan "honk")))
+(print "Car description: " ((get sedan "describe")))
+
+(print "Bike type: " ((get mountain-bike "type")))
+(print ((get mountain-bike "accelerate") 10))
+(print "Bike bell: " ((get mountain-bike "ring-bell")))
+(print "Bike wheelie: " ((get mountain-bike "wheelie")))
+(print "Bike description: " ((get mountain-bike "describe")))
+
+##############################################################
+# APPROACH 3: USING CLASS SYNTAX WITH INHERITANCE
+##############################################################
+# Using M28's built-in class syntax for inheritance
+
+# Base class
+(class Animal ()
+  # Class attributes
+  (= species "animal")
+  
+  # Constructor method
+  (def (init self name)
+    (dict.set self "name" name))
+  
+  # Regular method
+  (def (speak self)
+    "Some generic animal sound")
+  
+  # Method with arguments
+  (def (eat self food)
+    (+ (dict.get self "name") " is eating " food)))
+
+# Derived class
+(class Dog (Animal)
+  # Override class attribute
+  (= species "canine")
+  
+  # Override constructor to add breed
+  (def (init self name breed)
+    # Call parent constructor
+    (dot (super self) "init" name)
+    # Add additional attribute
+    (dict.set self "breed" breed))
+  
+  # Override method
+  (def (speak self)
+    (+ (dict.get self "name") " the " 
+       (dict.get self "breed") " says Woof!"))
+  
+  # New method
+  (def (fetch self item)
+    (+ (dict.get self "name") " fetches the " item)))
+
+# Create instances
+(= animal (Animal "Generic Animal"))
+(= dog (Dog "Rex" "Golden Retriever"))
+
+# Test inheritance
+(print "\n--- CLASS SYNTAX INHERITANCE TESTS ---")
+(print "Animal speak: " ((dict.get animal "speak") animal))
+(print "Animal eat: " ((dict.get animal "eat") animal "generic food"))
+
+(print "Dog speak: " ((dict.get dog "speak") dog))
+(print "Dog eat: " ((dict.get dog "eat") dog "dog food"))
+(print "Dog fetch: " ((dict.get dog "fetch") dog "ball"))
+
+# Another derived class
+(class Cat (Animal)
+  # Override class attribute
+  (= species "feline")
+  
+  # Override constructor
+  (def (init self name color)
+    # Call parent constructor
+    (dot (super self) "init" name)
+    # Add specific attribute
+    (dict.set self "color" color))
+  
+  # Override method
+  (def (speak self)
+    (+ (dict.get self "name") " the " 
+       (dict.get self "color") " cat says Meow!"))
+  
+  # New method
+  (def (purr self)
+    (+ (dict.get self "name") " purrs contentedly")))
+
+# Create cat instance
+(= cat (Cat "Whiskers" "orange"))
+
+# Test cat
+(print "\n--- SECOND DERIVED CLASS TESTS ---")
+(print "Cat speak: " ((dict.get cat "speak") cat))
+(print "Cat eat: " ((dict.get cat "eat") cat "fish"))
+(print "Cat purr: " ((dict.get cat "purr") cat))
+
+# Inheritance benefits:
+# 1. Code reuse - shared behavior defined once
+# 2. Polymorphism - objects of different classes can be used interchangeably
+# 3. Extensibility - new behaviors can be added without modifying base classes

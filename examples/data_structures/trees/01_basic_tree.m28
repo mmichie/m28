@@ -1,0 +1,83 @@
+# 01_basic_tree.m28
+# This file demonstrates basic tree creation and access patterns in M28.
+# A tree is represented as a list with 3 elements: [value, left_child, right_child]
+# where left_child and right_child are themselves trees or None.
+
+# Create a simple binary tree structure:
+#
+#        5
+#       / \
+#      3   7
+#     / \
+#    1   4
+
+# First, create some leaf nodes (nodes with no children)
+(print "Creating leaf nodes:")
+(= leaf1 (list 1 None None))  # Leaf with value 1
+(= leaf4 (list 4 None None))  # Leaf with value 4
+(= leaf7 (list 7 None None))  # Leaf with value 7
+(print leaf1)
+
+# Create internal nodes by combining leaf nodes
+(print "\nCreating internal nodes:")
+(= node3 (list 3 leaf1 leaf4))  # Node with value 3, left child leaf1, right child leaf4
+(print node3)
+
+# Create the root of the tree
+(print "\nCreating the complete tree:")
+(= tree (list 5 node3 leaf7))  # Root with value 5, left child node3, right child leaf7
+(print tree)
+
+# Accessing tree elements
+(print "\nAccessing tree elements:")
+
+# Define helper functions to make tree operations more readable
+(def (node-value node) 
+    (return (nth node 0)))
+
+(def (node-left node) 
+    (return (nth node 1)))
+
+(def (node-right node) 
+    (return (nth node 2)))
+
+# Access the root value
+(print "Root value:")
+(print (node-value tree))  # Should be 5
+
+# Access the left child of the root
+(print "\nLeft child of root:")
+(= left-child (node-left tree))
+(print left-child)  # Should be node3
+
+# Access the value of the left child
+(print "\nValue of left child:")
+(print (node-value left-child))  # Should be 3
+
+# Access the right child of the root
+(print "\nRight child of root:")
+(= right-child (node-right tree))
+(print right-child)  # Should be leaf7
+
+# Access the value of the right child
+(print "\nValue of right child:")
+(print (node-value right-child))  # Should be 7
+
+# Access leaf nodes through traversal
+(print "\nAccessing leaf nodes through traversal:")
+(print "Left leaf of left child:")
+(= left-leaf (node-left left-child))
+(print left-leaf)  # Should be leaf1
+(print "Value of left leaf:")
+(print (node-value left-leaf))  # Should be 1
+
+# Check if nodes are leaf nodes
+(print "\nChecking for leaf nodes:")
+(def (is-leaf? node)
+    (and (== (node-left node) None) (== (node-right node) None)))
+
+(print "Is leaf1 a leaf node?")
+(print (is-leaf? leaf1))  # Should be True
+
+(print "Is node3 a leaf node?")
+(print (is-leaf? node3))  # Should be False

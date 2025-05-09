@@ -1,0 +1,35 @@
+# Basic Module Import Example
+# This demonstrates the simplest form of module import in M28
+
+(print "=== Basic Module Import Example ===")
+
+# Import a module using the simple module name
+# The module must be in the module search path (relative to current directory)
+(print "\n1. Basic Import:")
+(import "modules/simple_module")
+
+# After importing, the module becomes available as a variable with the module name
+(print "Module imported successfully!")
+(print "Module type:" (type simple_module))
+
+# Display module content to see what it contains
+(print "\n2. Module Contents:")
+(print simple_module)
+
+# Access module variables using dot notation
+(print "\n3. Accessing Module Variables:")
+(print "MODULE_NAME =" simple_module.MODULE_NAME)
+(print "VALUE =" simple_module.VALUE)
+
+# Call module functions using dot notation
+(print "\n4. Calling Module Functions:")
+(print "add(10, 20) =" (simple_module.add 10 20))
+
+# The module's contents are effectively isolated from the current namespace
+# This helps prevent name collisions
+(print "\n5. Module Namespace Isolation:")
+(def MODULE_NAME "Local Module Name") # Define a local variable with the same name
+(print "Local MODULE_NAME:" MODULE_NAME)
+(print "Module MODULE_NAME:" simple_module.MODULE_NAME)
+
+(print "\n=== End of Basic Module Import Example ===")

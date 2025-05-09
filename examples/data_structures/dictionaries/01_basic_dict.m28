@@ -1,0 +1,65 @@
+# 01_basic_dict.m28
+# 
+# This example demonstrates basic dictionary operations in M28:
+# - Creating empty and populated dictionaries
+# - Adding values to dictionaries
+# - Retrieving values from dictionaries
+# - Using default values for missing keys
+
+(print "=== Basic Dictionary Creation and Usage ===")
+
+#-----------------------------------------
+# Dictionary Creation
+#-----------------------------------------
+
+# Create an empty dictionary
+(print "\n--- Creating Dictionaries ---")
+(def empty_dict (dict))
+(print "Empty dictionary:" empty_dict)
+
+# Create a dictionary with initial values
+(def person (dict "name" "Alice" "age" 30))
+(print "Person dictionary:" person)
+
+# Alternative dictionary creation with JSON-like syntax (if supported)
+(= points {"x": 10, "y": 20})
+(print "Points dictionary:" points)
+
+#-----------------------------------------
+# Basic Dictionary Operations
+#-----------------------------------------
+
+# Adding values to a dictionary
+(print "\n--- Adding Values ---")
+(dict.set empty_dict "language" "M28")
+(print "Dictionary after adding value:" empty_dict)
+
+# Modify existing value
+(dict.set person "age" 31)
+(print "Person after updating age:" person)
+
+#-----------------------------------------
+# Retrieving Values
+#-----------------------------------------
+
+# Getting values from a dictionary
+(print "\n--- Retrieving Values ---")
+(print "Person's name:" (dict.get person "name"))
+(print "Person's age:" (dict.get person "age"))
+
+# Getting values with default for missing keys
+(print "Person's city (missing key):" (dict.get person "city" "Unknown"))
+
+# Check if a key exists
+(= has_name (dict.contains? person "name"))
+(print "Does person have 'name' key?:" has_name)
+
+#-----------------------------------------
+# Dictionary Size
+#-----------------------------------------
+
+# Get dictionary size/length
+(print "\n--- Dictionary Size ---")
+(print "Person dictionary size:" (len person))
+
+(print "\n=== Basic Dictionary Example Complete ===")

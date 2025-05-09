@@ -1,0 +1,236 @@
+# 02_method_dispatch.m28
+# Progressive OOP Example 2: Method Dispatch Patterns
+
+# This file demonstrates different patterns for method dispatch in M28.
+# We'll explore three approaches:
+# 1. Simple dispatch function
+# 2. Dictionary with direct method access
+# 3. Advanced dispatch with variable arguments
+
+##############################################################
+# APPROACH 1: SIMPLE DISPATCH FUNCTION
+##############################################################
+# The simplest method dispatch uses if statements
+
+# Create a counter with operation dispatch
+(def (make-counter)
+  # Private state
+  (= count 0)
+  
+  # Return a function that handles different operations via dispatch
+  (lambda (operation)
+    (if (== operation "increment")
+      (begin
+        (= count (+ count 1))
+        count)
+      (if (== operation "decrement")
+        (begin
+          (= count (- count 1))
+          count)
+        (if (== operation "get")
+          count
+          "Unknown operation")))))
+
+# Create counters
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+# Test operations
+(print "\n--- SIMPLE DISPATCH TESTS ---")
+(print "Counter 1 initial: " (counter1 "get"))
+(print "Counter 1 increment: " (counter1 "increment"))
+(print "Counter 1 increment again: " (counter1 "increment"))
+(print "Counter 1 current: " (counter1 "get"))
+(print "Counter 1 decrement: " (counter1 "decrement"))
+(print "Counter 1 final: " (counter1 "get"))
+
+# Verify separate state
+(print "Counter 2 initial: " (counter2 "get"))
+(print "Counter 2 increment: " (counter2 "increment"))
+(print "Counter 2 current: " (counter2 "get"))
+
+# Pros of simple dispatch:
+# - Easy to understand and implement
+# - Everything is in one place
+# Cons:
+# - Gets unwieldy with many methods
+# - Hard to maintain as the object grows
+
+##############################################################
+# APPROACH 2: DICTIONARY WITH DIRECT METHOD ACCESS
+##############################################################
+# A more structured approach using dictionaries of methods
+
+# Create a person with direct method access
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  
+  # Define methods as separate functions that close over the state
+  (= get-name (lambda () person-name))
+  (= get-age (lambda () person-age))
+  (= birthday (lambda () 
+    (= person-age (+ person-age 1))
+    (+ person-name " is now " (str person-age) " years old!")))
+  
+  # Return a dictionary of method functions
+  (dict "name" get-name 
+        "age" get-age 
+        "birthday" birthday))
+
+# Create a person
+(= person (make-person "Charlie" 30))
+
+# Call methods manually
+(print "\n--- DICTIONARY METHOD ACCESS TESTS ---")
+(= name-fn (get person "name"))
+(= age-fn (get person "age"))
+(= birthday-fn (get person "birthday"))
+
+(print "Name: " (name-fn))
+(print "Age: " (age-fn))
+(print "Birthday: " (birthday-fn))
+(print "Age after birthday: " (age-fn))
+
+# Pros of dictionary method access:
+# - Clear separation of methods
+# - Easier to maintain with many methods
+# - Methods can be added/removed dynamically
+# Cons:
+# - Requires extracting methods before calling them
+# - Method calls are more verbose
+
+##############################################################
+# APPROACH 3: ADVANCED DISPATCH WITH ARGUMENTS
+##############################################################
+# A more sophisticated approach that supports method arguments
+
+# Temperature converter with method arguments
+(def (make-temp-converter)
+  # Private state
+  (= last-f 0)
+  (= last-c 0)
+  
+  # Define methods dictionary
+  (= methods (dict))
+  
+  # Convert F to C
+  (def (f-to-c temp)
+    (= last-f temp)
+    (= last-c (/ (* (- temp 32) 5) 9))
+    last-c)
+  
+  # Convert C to F
+  (def (c-to-f temp)
+    (= last-c temp)
+    (= last-f (+ (/ (* temp 9) 5) 32))
+    last-f)
+  
+  # Get last conversions
+  (def (get-last)
+    (dict "fahrenheit" last-f "celsius" last-c))
+  
+  # Populate methods dictionary
+  (= methods (dict
+    "f-to-c" f-to-c
+    "c-to-f" c-to-f
+    "last" get-last))
+  
+  # Return a dispatch function that supports arguments
+  (lambda (method-name . args)
+    (= method (get methods method-name))
+    (if method
+      (apply method args)
+      "Unknown method")))
+
+# Create converter
+(= converter (make-temp-converter))
+
+# Test with method arguments
+(print "\n--- ADVANCED DISPATCH TESTS ---")
+(print "32°F in Celsius: " (converter "f-to-c" 32))
+(print "100°C in Fahrenheit: " (converter "c-to-f" 100))
+(print "Last conversions: " (converter "last"))
+
+# Pros of advanced dispatch:
+# - Supports method arguments
+# - Maintains clean method organization
+# - Combines benefits of previous approaches
+# Cons:
+# - More complex implementation
+# - Requires understanding of apply and varargs
+
+##############################################################
+# APPROACH 4: UNIFORM METHOD INTERFACE
+##############################################################
+# A more OOP-like approach where all methods take 'self' as first argument
+
+(def (make-calculator)
+  # Private state
+  (= result 0)
+  (= operations [])
+  
+  # Define methods dictionary
+  (= methods (dict))
+  
+  # Add method - takes 'self' reference and number
+  (def (add self num)
+    (= operations (+ operations [(+ "add " (str num))]))
+    (= result (+ result num))
+    result)
+  
+  # Subtract method
+  (def (subtract self num)
+    (= operations (+ operations [(+ "subtract " (str num))]))
+    (= result (- result num))
+    result)
+  
+  # Clear method
+  (def (clear self)
+    (= operations (+ operations ["clear"]))
+    (= result 0)
+    result)
+  
+  # History method
+  (def (history self)
+    operations)
+  
+  # Populate methods dictionary
+  (= methods (dict
+    "add" add
+    "subtract" subtract
+    "clear" clear
+    "history" history))
+  
+  # The self-reference will be the dispatch function itself
+  # This creates a recursive definition where the object can reference itself
+  (= self nil) # Placeholder
+  (= dispatcher 
+    (lambda (method-name . args)
+      (= method (get methods method-name))
+      (if method
+        (apply method (+ [dispatcher] args))
+        "Unknown method")))
+  
+  # Return the dispatcher
+  dispatcher)
+
+# Create calculator
+(= calc (make-calculator))
+
+# Test calculator with self-reference pattern
+(print "\n--- UNIFORM METHOD INTERFACE TESTS ---")
+(print "Initial: " (calc "clear"))
+(print "Add 5: " (calc "add" 5))
+(print "Add 10: " (calc "add" 10))
+(print "Subtract 3: " (calc "subtract" 3))
+(print "Operations history: " (calc "history"))
+
+# Pros of uniform method interface:
+# - Methods can access other methods through self
+# - Similar to OOP patterns in other languages
+# - Self reference enables more complex behaviors
+# Cons:
+# - More boilerplate
+# - Requires understanding the self-reference pattern

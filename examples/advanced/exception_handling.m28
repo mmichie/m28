@@ -1,0 +1,195 @@
+# Advanced Exception Handling in M28
+# This file demonstrates comprehensive exception handling patterns
+
+# ========= 1. BASIC EXCEPTION HANDLING ==========
+
+(print "=== 1. BASIC EXCEPTION HANDLING ===\n")
+
+# Simple try-except
+(print "Basic try-except:")
+(try
+    (/ 10 0)  # Division by zero error
+    (except
+        (print "Caught a division by zero exception")))
+
+# Type-specific exception handling
+(print "\nTyped exceptions:")
+(try
+    (raise ValueError "Invalid value")
+    (except ValueError
+        (print "Caught ValueError"))
+    (except
+        (print "Caught some other exception")))
+
+# Multiple except blocks with type matching
+(print "\nMultiple except blocks:")
+(try
+    (raise TypeError "Wrong type")
+    (except ValueError
+        (print "This is a ValueError"))
+    (except TypeError
+        (print "This is a TypeError"))
+    (except
+        (print "Unknown exception")))
+
+# ========= 2. ACCESSING EXCEPTION OBJECTS ==========
+
+(print "\n=== 2. ACCESSING EXCEPTION OBJECTS ===\n")
+
+# Using 'as' to access the exception
+(print "Accessing exception with 'as':")
+(try
+    (raise IndexError "Index out of range")
+    (except IndexError as e
+        (print "Caught exception:" e)))
+
+# Alternative syntax using parameter list
+(print "\nAccessing exception with parameter list:")
+(try
+    (raise ValueError "This is a value error")
+    (except ValueError (e)
+        (print "Caught ValueError:" e)))
+
+# ========= 3. FINALLY BLOCKS ==========
+
+(print "\n=== 3. FINALLY BLOCKS ===\n")
+
+# Try-except-finally
+(print "Try-except-finally:")
+(try
+    (print "In try block")
+    (raise "An error occurred")
+    (except
+        (print "In except block"))
+    (finally
+        (print "In finally block - always executes")))
+
+# Finally without exception
+(print "\nFinally without exception:")
+(try
+    (print "In try block - no exception")
+    (except
+        (print "This won't execute"))
+    (finally
+        (print "Finally always executes")))
+
+# ========= 4. NESTED EXCEPTION HANDLING ==========
+
+(print "\n=== 4. NESTED EXCEPTION HANDLING ===\n")
+
+# Simple nested exception handling
+(print "Nested try-except:")
+(try
+    (print "Outer try")
+    (try
+        (print "Inner try")
+        (raise "Inner exception")
+        (except
+            (print "Inner except")
+            (raise "Re-raised exception")))
+    (except
+        (print "Outer except")))
+
+# Re-raising exceptions
+(print "\nRe-raising exceptions:")
+(try
+    (try
+        (raise ValueError "Original error")
+        (except ValueError (e)
+            (print "Caught in inner block:" e)
+            (raise)))  # Re-raise the same exception
+    (except
+        (print "Re-raised exception caught in outer block")))
+
+# ========= 5. CUSTOM EXCEPTIONS ==========
+
+(print "\n=== 5. CUSTOM EXCEPTIONS ===\n")
+
+# Define custom exceptions
+(defexception MyCustomError)
+(defexception DatabaseError)
+(defexception NetworkError)
+
+# Using a custom exception
+(print "Custom exception:")
+(try
+    (raise MyCustomError "This is a custom error")
+    (except MyCustomError (e)
+        (print "Caught MyCustomError:" e)))
+
+# Multiple custom exceptions
+(print "\nMultiple custom exceptions:")
+(try
+    (raise DatabaseError "Connection failed")
+    (except DatabaseError
+        (print "Database error occurred"))
+    (except NetworkError
+        (print "Network error occurred"))
+    (except
+        (print "Other error")))
+
+# ========= 6. EXCEPTION HIERARCHY ==========
+
+(print "\n=== 6. EXCEPTION HIERARCHY ===\n")
+
+# Define an exception hierarchy
+(defexception MyBaseError)
+(defexception MyDerivedError MyBaseError)
+
+# Base class catches derived exception
+(print "Exception hierarchy:")
+(try
+    (raise MyDerivedError "This is a derived error")
+    (except MyBaseError (e)
+        (print "Caught derived error through base:" e)))
+
+# ========= 7. TRACEBACK HANDLING ==========
+
+(print "\n=== 7. TRACEBACK HANDLING ===\n")
+
+# Function that causes recursively nested errors
+(def recursive_error (n)
+    (if (<= n 0)
+        # Cause an error by accessing undefined symbol
+        undefined_symbol
+        (recursive_error (- n 1))))
+
+# Catching and displaying traceback
+(print "Recursive error with traceback:")
+(try
+    (recursive_error 3)
+    (print "This should not be printed")
+    (except Exception as e
+        (print "Caught exception with traceback:")
+        (print e)))
+
+# ========= 8. PRACTICAL EXAMPLES ==========
+
+(print "\n=== 8. PRACTICAL EXAMPLES ===\n")
+
+# Resource cleanup example
+(print "Resource cleanup example:")
+(def cleanup ()
+    (print "Resource cleaned up"))
+
+(try
+    (print "Opening resource...")
+    (raise IOError "Failed to access resource")
+    (except IOError (e) 
+        (print "Error accessing resource:" e))
+    (finally
+        (cleanup)))
+
+# Controlled error handling
+(print "\nControlled error handling:")
+(def divide_safely (a b)
+    (try
+        (/ a b)
+        (except ZeroDivisionError
+            (print "Cannot divide by zero")
+            0)))  # Return a default value
+
+(print "Result 1:" (divide_safely 10 2))
+(print "Result 2:" (divide_safely 10 0))
+
+(print "\nAll exception handling patterns demonstrated successfully!")

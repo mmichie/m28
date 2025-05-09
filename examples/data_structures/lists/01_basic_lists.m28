@@ -1,0 +1,123 @@
+# 01_basic_lists.m28
+# Demonstrates basic list operations in m28
+# Shows list creation, access, manipulation, and iteration
+
+#######################################
+# 1. List Creation
+#######################################
+
+(print "\n=== List Creation ===")
+
+# Empty list using function syntax
+(= empty_list (list))
+(print "Empty list (function):" empty_list)
+
+# Empty list using literal syntax
+(= empty_literal [])
+(print "Empty list (literal):" empty_literal)
+
+# List with elements using function syntax
+(= numbers_func (list 1 2 3 4 5))
+(print "Numbers list (function):" numbers_func)
+
+# List with elements using literal syntax (preferred)
+(= numbers_literal [1 2 3 4 5])
+(print "Numbers list (literal):" numbers_literal)
+
+# Mixed data type list
+(= mixed [1 "two" 3.0 True None])
+(print "Mixed type list:" mixed)
+
+# Nested lists
+(= nested [[1 2] [3 4] [5 6]])
+(print "Nested list:" nested)
+
+# List with expressions
+(= combined [1 2 3 (list 4 5 6)])
+(print "Combined list:" combined)
+
+#######################################
+# 2. List Access and Indexing
+#######################################
+
+(print "\n=== List Access and Indexing ===")
+
+(= nums [10 20 30 40 50])
+(print "List:" nums)
+(print "First element (index 0):" (nth nums 0))
+(print "Third element (index 2):" (nth nums 2))
+(print "Last element (index 4):" (nth nums 4))
+
+# Accessing nested lists
+(print "First element of first nested list:" (nth (nth nested 0) 0))
+(print "Second element of third nested list:" (nth (nth nested 2) 1))
+
+#######################################
+# 3. List Operations
+#######################################
+
+(print "\n=== List Operations ===")
+
+# List concatenation
+(= list1 [1 2 3])
+(= list2 [4 5 6])
+(= combined (+ list1 list2))
+(print "List1:" list1)
+(print "List2:" list2)
+(print "Concatenated list:" combined)
+
+# Length of a list
+(print "Length of combined list:" (len combined))
+
+# Checking if element is in list
+(print "Is 3 in list1?" (in? 3 list1))
+(print "Is 7 in list1?" (in? 7 list1))
+
+# Adding an element to a list
+(= list1 (+ list1 [4]))
+(print "List1 after adding 4:" list1)
+
+#######################################
+# 4. List Iteration
+#######################################
+
+(print "\n=== List Iteration ===")
+
+# Summing elements
+(= sum 0)
+(= nums [1 2 3 4 5])
+(for num nums
+  (= sum (+ sum num)))
+(print "Sum of" nums "is:" sum)
+
+# Double each element in a list
+(= doubled [])
+(for n nums
+  (= doubled (+ doubled [(* 2 n)])))
+(print "Original list:" nums)
+(print "Doubled list:" doubled)
+
+#######################################
+# 5. List as Function Arguments
+#######################################
+
+(print "\n=== Lists as Function Arguments ===")
+
+# Define a function that takes a list and returns the sum
+(def sum-list (lst)
+  (= total 0)
+  (for item lst
+    (= total (+ total item)))
+  total)
+
+(print "Sum of [1, 2, 3, 4, 5]:" (sum-list [1 2 3 4 5]))
+(print "Sum of [10, 20, 30]:" (sum-list [10 20 30]))
+
+# Define a function that creates and returns a list
+(def make-range (start end)
+  (= result [])
+  (for i (range start end)
+    (= result (+ result [i])))
+  result)
+
+(print "Range from 1 to 5:" (make-range 1 6))

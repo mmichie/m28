@@ -1,0 +1,200 @@
+# Comprehensive Set Operations in M28
+# Shows various ways to create, manipulate and operate on sets
+
+(print "=== Comprehensive Set Operations ===")
+
+###################
+# Creating Sets
+###################
+(print "\n1. Creating Sets:")
+
+# Empty set
+(= empty_set (set))
+(print "Empty set:" empty_set)
+
+# From a list literal
+(= numbers (set [1 2 3 4 5]))
+(print "Numbers set from list literal:" numbers)
+
+# From a list variable
+(= vowel_list (list "a" "e" "i" "o" "u"))
+(= vowels (set vowel_list))
+(print "Vowels set from list variable:" vowels)
+
+# Other number sets for operations
+(= primes (set [2 3 5 7 11]))
+(= even (set [2 4 6 8 10]))
+(print "Prime numbers:" primes)
+(print "Even numbers:" even)
+
+# From a string (creates set of characters)
+(= char_set (set "hello"))
+(print "Set from string 'hello':" char_set)
+
+# From dictionary keys
+(= dict_key_set (set (dict "a" 1 "b" 2 "c" 3)))
+(print "Set from dictionary keys:" dict_key_set)
+
+###################
+# Basic Set Operations
+###################
+(print "\n2. Basic Set Operations:")
+
+# Size/Length
+(print "Size of numbers set:" (len numbers))
+
+# Membership testing
+(print "Is 3 in numbers? (set.contains):" (set.contains numbers 3))
+(print "Is 3 in numbers? (contains):" (contains numbers 3)) # Short form
+(print "Is 10 in numbers?:" (contains numbers 10))
+
+# Adding elements
+(print "Before adding 10:" numbers)
+(set.add numbers 10)
+(print "After adding 10:" numbers)
+
+# Removing elements
+(set.remove numbers 1)
+(print "After removing 1:" numbers)
+
+# Trying to remove non-existent element would raise an error
+# Uncomment to see:
+# (set.remove numbers 100)
+
+# Safe removal with discard (doesn't raise error if element not present)
+(set.discard numbers 100) # No error
+(print "After discarding 100 (which wasn't present):" numbers)
+
+###################
+# Set Operations
+###################
+(print "\n3. Set Operations:")
+
+# Union - combines all elements from both sets
+(= union1 (set.union numbers primes))
+(print "Union of numbers and primes (set.union):" union1)
+
+# Alternative union syntax
+(= union2 (union numbers primes))
+(print "Union of numbers and primes (union):" union2)
+
+# Intersection - elements that exist in both sets
+(= intersection1 (set.intersection numbers primes))
+(print "Intersection of numbers and primes (set.intersection):" intersection1)
+
+# Alternative intersection syntax
+(= intersection2 (intersection numbers primes))
+(print "Intersection of numbers and primes (intersection):" intersection2)
+
+# Difference - elements in first set but not in second
+(= difference1 (set.difference numbers primes))
+(print "Difference (numbers - primes) (set.difference):" difference1)
+
+# Alternative difference syntax
+(= difference2 (difference numbers primes))
+(print "Difference (numbers - primes) (difference):" difference2)
+
+# Symmetric difference - elements in either set but not in both
+(= sym_diff (set.symmetric_difference numbers primes))
+(print "Symmetric difference:" sym_diff)
+
+###################
+# Set Comparisons
+###################
+(print "\n4. Set Comparisons:")
+
+# Subset
+(= small_primes (set [2 3 5]))
+(print "small_primes:" small_primes)
+(print "primes:" primes)
+(print "small_primes is subset of primes?:" (set.issubset small_primes primes))
+
+# Superset
+(print "primes is superset of small_primes?:" (set.issuperset primes small_primes))
+
+# Disjoint (no common elements)
+(print "Are primes and even disjoint?:" (set.isdisjoint primes even))
+
+# Not disjoint
+(print "Are numbers and primes disjoint?:" (set.isdisjoint numbers primes))
+
+###################
+# In-place Operations
+###################
+(print "\n5. In-place Operations:")
+
+# Update (in-place union)
+(= s1 (set [1 2 3]))
+(= s2 (set [3 4 5]))
+(print "s1 before update:" s1)
+(print "s2:" s2)
+(set.update s1 s2)
+(print "s1 after update with s2 (in-place union):" s1)
+
+# Intersection update
+(= s3 (set [1 2 3 4 5]))
+(= s4 (set [4 5 6]))
+(print "s3 before intersection update:" s3)
+(print "s4:" s4)
+(set.intersection_update s3 s4)
+(print "s3 after intersection update with s4:" s3)
+
+# Difference update
+(= s5 (set [1 2 3 4 5]))
+(= s6 (set [4 5 6]))
+(print "s5 before difference update:" s5)
+(print "s6:" s6)
+(set.difference_update s5 s6)
+(print "s5 after difference update with s6:" s5)
+
+# Symmetric difference update
+(= s7 (set [1 2 3]))
+(= s8 (set [3 4 5]))
+(print "s7 before symmetric difference update:" s7)
+(print "s8:" s8)
+(set.symmetric_difference_update s7 s8)
+(print "s7 after symmetric difference update with s8:" s7)
+
+###################
+# Conversion
+###################
+(print "\n6. Converting Sets:")
+
+# Convert set to list
+(= vowel_list (list vowels))
+(print "Vowels as a list:" vowel_list)
+
+# Create a copy of a set
+(= numbers_copy (set.copy numbers))
+(print "Original numbers set:" numbers)
+(print "Copy of numbers set:" numbers_copy)
+(set.add numbers_copy 100)
+(print "Original set after adding to copy:" numbers)
+(print "Copy after adding 100:" numbers_copy)
+
+###################
+# Set Operations on Multiple Sets
+###################
+(print "\n7. Set Operations on Multiple Sets:")
+
+(= set_a (set [1 2 3]))
+(= set_b (set [3 4 5]))
+(= set_c (set [5 6 7]))
+
+(print "set_a:" set_a)
+(print "set_b:" set_b)
+(print "set_c:" set_c)
+
+# Union of multiple sets
+(= multi_union (set.union set_a set_b set_c))
+(print "Union of set_a, set_b, set_c:" multi_union)
+
+# Intersection of multiple sets
+(= multi_intersection (set.intersection set_a set_b set_c))
+(print "Intersection of set_a, set_b, set_c:" multi_intersection)
+
+# Update with multiple sets
+(= base_set (set [1 2]))
+(print "Base set before update:" base_set)
+(set.update base_set set_a set_b set_c)
+(print "Base set after update with set_a, set_b, set_c:" base_set)

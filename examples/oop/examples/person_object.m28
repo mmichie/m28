@@ -1,0 +1,185 @@
+# Person Object Example
+# A comprehensive implementation of a person object with properties and behaviors
+
+# This example demonstrates:
+# 1. Private, encapsulated state 
+# 2. Complex method implementations
+# 3. Method dispatch with arguments
+# 4. Data validation
+
+# Create a person factory function
+(def (make-person name age)
+  # Input validation
+  (if (not name)
+    (raise "Person name cannot be empty"))
+  
+  (if (or (< age 0) (> age 150))
+    (raise "Person age must be between 0 and 150"))
+  
+  # Private state (encapsulated within the closure)
+  (= person-name name)
+  (= person-age age)
+  (= friends [])
+  (= address nil)
+  (= occupation nil)
+  
+  # Dictionary for storing methods
+  (= methods (dict))
+  
+  # Basic getter methods
+  (def (get-name)
+    person-name)
+    
+  (def (get-age)
+    person-age)
+    
+  (def (get-friends)
+    friends)
+    
+  (def (get-address)
+    address)
+    
+  (def (get-occupation)
+    occupation)
+  
+  # Setter methods with validation
+  (def (set-name new-name)
+    (if (not new-name)
+      (raise "Name cannot be empty"))
+    (= person-name new-name)
+    person-name)
+    
+  (def (set-occupation new-occupation)
+    (= occupation new-occupation)
+    occupation)
+    
+  (def (set-address new-address)
+    (= address new-address)
+    address)
+  
+  # Behavior methods
+  (def (have-birthday)
+    (= person-age (+ person-age 1))
+    (+ person-name " is now " (str person-age) " years old!"))
+    
+  (def (add-friend friend-name)
+    # Don't add duplicate friends
+    (if (not (in friend-name friends))
+      (= friends (+ friends [friend-name])))
+    (+ person-name " is now friends with " friend-name))
+    
+  (def (remove-friend friend-name)
+    # Create a new list without the friend
+    (= new-friends [])
+    (for f friends
+      (if (!= f friend-name)
+        (= new-friends (+ new-friends [f]))))
+    (= friends new-friends)
+    (+ "Removed " friend-name " from friends list"))
+    
+  (def (list-friends)
+    (if (== (len friends) 0)
+      (+ person-name " has no friends yet")
+      (+ person-name "'s friends: " (str friends))))
+  
+  # Status and information methods
+  (def (get-info)
+    (= info (dict))
+    (= info (dict.set info "name" person-name))
+    (= info (dict.set info "age" person-age))
+    
+    (if address
+      (= info (dict.set info "address" address)))
+      
+    (if occupation
+      (= info (dict.set info "occupation" occupation)))
+      
+    (= info (dict.set info "friends" friends))
+    info)
+    
+  (def (describe)
+    (= desc (+ person-name " is " (str person-age) " years old"))
+    
+    (if occupation
+      (= desc (+ desc " and works as a " occupation)))
+      
+    (if address
+      (= desc (+ desc ", living at " address)))
+      
+    (if (> (len friends) 0)
+      (= desc (+ desc ", with " (str (len friends)) " friends")))
+      
+    desc)
+  
+  # Add all methods to the dictionary
+  (= methods (dict
+    # Getters
+    "name" get-name
+    "age" get-age
+    "friends" get-friends
+    "address" get-address
+    "occupation" get-occupation
+    
+    # Setters
+    "set-name" set-name
+    "set-occupation" set-occupation
+    "set-address" set-address
+    
+    # Behaviors
+    "birthday" have-birthday
+    "add-friend" add-friend
+    "remove-friend" remove-friend
+    "list-friends" list-friends
+    
+    # Status/info
+    "info" get-info
+    "describe" describe))
+  
+  # Return a dispatch function that supports method arguments
+  (lambda (method-name . args)
+    (= method (get methods method-name))
+    (if method
+      (apply method args)
+      (+ "Unknown method: " method-name))))
+
+# Create people
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test basic methods
+(print "\n--- BASIC PERSON METHODS ---")
+(print "Alice's name: " (alice "name"))
+(print "Alice's age: " (alice "age"))
+(print "Bob's name: " (bob "name"))
+(print "Bob's age: " (bob "age"))
+
+# Test behavior methods
+(print "\n--- BEHAVIOR METHODS ---")
+(print (alice "birthday"))
+(print "Alice's age after birthday: " (alice "age"))
+(print (alice "add-friend" "Bob"))
+(print (alice "add-friend" "Charlie"))
+(print (alice "list-friends"))
+(print (alice "remove-friend" "Charlie"))
+(print (alice "list-friends"))
+
+# Test setters
+(print "\n--- SETTER METHODS ---")
+(print (alice "set-occupation" "Software Developer"))
+(print (alice "set-address" "123 Main St"))
+(print "Alice's occupation: " (alice "occupation"))
+(print "Alice's address: " (alice "address"))
+
+# Test info methods
+(print "\n--- INFO METHODS ---")
+(print "Alice's info: " (alice "info"))
+(print "Alice's description: " (alice "describe"))
+(print "Bob's info: " (bob "info"))
+(print "Bob's description: " (bob "describe"))
+
+# Ensure separate state
+(print "\n--- VERIFY SEPARATE STATE ---")
+(print (bob "add-friend" "Alice"))
+(print (bob "add-friend" "David"))
+(print "Bob's friends: " (bob "friends"))
+(print "Alice's friends: " (alice "friends"))  # Should only have Bob

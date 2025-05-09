@@ -1,0 +1,188 @@
+# 02_counter_closures.m28
+# Comprehensive Counter Examples Using Closures
+
+###############################################################################
+# COUNTER IMPLEMENTATION PATTERNS
+###############################################################################
+# This file demonstrates various ways to implement counters using closures.
+# Each example builds on the previous, adding more capabilities.
+#
+# Key concepts explored:
+# 1. Basic counter with increment-only functionality
+# 2. Enhanced counter with multiple operations
+# 3. Configurable counter with initialization values
+# 4. Counter with multiple interface methods
+
+###############################################################################
+# BASIC COUNTER
+###############################################################################
+
+# Simple counter implementation
+(def (make-basic-counter)
+  # Private state
+  (= count 0)
+  
+  # Return a function that increments and returns the count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create and test two basic counters
+(= basic1 (make-basic-counter))
+(= basic2 (make-basic-counter))
+
+(print "Basic Counter Tests:")
+(print "Counter 1:", (basic1), (basic1), (basic1))  # Should print 1, 2, 3
+(print "Counter 2:", (basic2), (basic2))            # Should print 1, 2
+(print "Counter 1 again:", (basic1))                # Should print 4
+
+###############################################################################
+# ENHANCED COUNTER WITH OPERATIONS
+###############################################################################
+
+# A counter with increment, decrement, reset, and get operations
+(def (make-enhanced-counter)
+  # Private state
+  (= count 0)
+  
+  # Define a dispatch function that handles different operations
+  (lambda (operation)
+    (if (== operation "increment")
+        (= count (+ count 1))
+      (if (== operation "decrement")
+          (= count (- count 1))
+        (if (== operation "reset")
+            (= count 0)
+          (if (== operation "get")
+              count
+              (print "Unknown operation: " operation))))))
+)
+
+# Create an enhanced counter
+(= enhanced (make-enhanced-counter))
+
+(print "\nEnhanced Counter Tests:")
+(print "Initial get:", (enhanced "get"))                # Should print 0
+(print "After increment:", (enhanced "increment"))      # Should print 1
+(print "After increment:", (enhanced "increment"))      # Should print 2
+(print "After decrement:", (enhanced "decrement"))      # Should print 1
+(print "Get current value:", (enhanced "get"))          # Should print 1
+(print "After reset:", (enhanced "reset"))              # Should print 0
+(print "Get after reset:", (enhanced "get"))            # Should print 0
+
+###############################################################################
+# CONFIGURABLE COUNTER
+###############################################################################
+
+# A counter with configurable starting value and step size
+(def (make-configurable-counter start step)
+  # Private state initialized with parameters
+  (= count start)
+  
+  # Object with methods
+  (dict
+    # Increment method
+    "increment" (lambda ()
+                  (= count (+ count step))
+                  count)
+    
+    # Decrement method              
+    "decrement" (lambda ()
+                  (= count (- count step))
+                  count)
+    
+    # Reset to initial value               
+    "reset" (lambda ()
+              (= count start)
+              count)
+    
+    # Get current value              
+    "get" (lambda ()
+            count)
+            
+    # Set new step size
+    "set-step" (lambda (new-step)
+                 (= step new-step)
+                 step)))
+
+# Create a configurable counter starting at 10 with step size 5
+(= configurable (make-configurable-counter 10 5))
+
+(print "\nConfigurable Counter Tests:")
+(print "Initial value:", ((get configurable "get")))           # Should print 10
+(print "After increment:", ((get configurable "increment")))   # Should print 15
+(print "After increment:", ((get configurable "increment")))   # Should print 20
+(print "After decrement:", ((get configurable "decrement")))   # Should print 15
+(print "Change step to 10:")
+((get configurable "set-step") 10)
+(print "After increment with new step:", ((get configurable "increment")))  # Should print 25
+(print "After reset:", ((get configurable "reset")))           # Should print 10
+
+###############################################################################
+# COUNTER WITH LIMITS
+###############################################################################
+
+# A counter that respects minimum and maximum limits
+(def (make-bounded-counter min max)
+  # Validate parameters
+  (if (> min max)
+      (print "Error: min cannot be greater than max")
+      nil)
+  
+  # Private state
+  (= count min)  # Start at minimum value
+  
+  # Create methods dictionary
+  (dict
+    # Increment with upper bound check
+    "increment" (lambda ()
+                  (if (< count max)
+                      (= count (+ count 1))
+                      nil)
+                  count)
+    
+    # Decrement with lower bound check             
+    "decrement" (lambda ()
+                  (if (> count min)
+                      (= count (- count 1))
+                      nil)
+                  count)
+    
+    # Get current value              
+    "get" (lambda ()
+            count)
+            
+    # Check if at minimum value
+    "at-min?" (lambda ()
+                (== count min))
+                
+    # Check if at maximum value
+    "at-max?" (lambda ()
+                (== count max))))
+
+# Create a bounded counter with range 0-5
+(= bounded (make-bounded-counter 0 5))
+
+(print "\nBounded Counter Tests:")
+(print "Initial value:", ((get bounded "get")))  # Should print 0
+(print "At minimum?", ((get bounded "at-min?")))  # Should print True
+
+# Increment past the bounds
+(print "Incrementing multiple times:")
+(print ((get bounded "increment")))  # 1
+(print ((get bounded "increment")))  # 2
+(print ((get bounded "increment")))  # 3
+(print ((get bounded "increment")))  # 4
+(print ((get bounded "increment")))  # 5
+(print ((get bounded "increment")))  # Still 5 (at max)
+(print "At maximum?", ((get bounded "at-max?")))  # Should print True
+
+# Decrement back to minimum
+(print "Decrementing multiple times:")
+(print ((get bounded "decrement")))  # 4
+(print ((get bounded "decrement")))  # 3
+(print ((get bounded "decrement")))  # 2
+(print ((get bounded "decrement")))  # 1
+(print ((get bounded "decrement")))  # 0
+(print ((get bounded "decrement")))  # Still 0 (at min)
+(print "At minimum?", ((get bounded "at-min?")))  # Should print True

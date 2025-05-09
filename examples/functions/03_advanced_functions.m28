@@ -1,0 +1,181 @@
+# 03_advanced_functions.m28
+# Advanced function patterns and techniques in M28
+
+#############################################
+## SECTION 1: Early Returns
+#############################################
+
+# Functions can use the 'return' special form to exit early
+
+(print "ADVANCED FUNCTION PATTERNS")
+(print "=========================")
+(print)
+
+# Define a function with multiple return points
+(def (early-return x)
+  # First condition - exit early if true
+  (if (< x 5)
+      (return "Less than 5"))
+  
+  # Second condition - only checked if first condition is false
+  (if (< x 10)
+      (return "Less than 10"))
+  
+  # Default return value
+  (return "Greater than or equal to 10"))
+
+# Test the function with different values
+(print "Early return example:")
+(print "x = 3: " (early-return 3))
+(print "x = 7: " (early-return 7))
+(print "x = 15: " (early-return 15))
+(print)
+
+# Simple positive/negative check with return
+(def (check-positive n)
+  (if (< n 0)
+    (return "Negative number"))
+  (return "Positive number"))
+
+(print "Positive/negative check:")
+(print "n = -5: " (check-positive -5))
+(print "n = 10: " (check-positive 10))
+(print)
+
+
+#############################################
+## SECTION 2: Nested Functions
+#############################################
+
+# Functions can be defined inside other functions
+# Inner functions have access to outer function variables
+
+(def (outer x)
+  # Define an inner function
+  (def (inner y)
+    (if (< y 0)
+        (return "Negative"))
+    (return (+ "Inner: " (str y))))
+  
+  # Call the inner function
+  (= inner-result (inner x))
+  (print "Inner function result: " inner-result)
+  
+  # Return from outer function
+  (return (+ "Outer: " (str x))))
+
+(print "Nested functions example:")
+(print (outer -2))
+(print (outer 10))
+(print)
+
+
+#############################################
+## SECTION 3: Closures and State
+#############################################
+
+# Functions can capture and maintain state
+
+# Create a counter function
+(def (make-counter)
+  # Private state variable
+  (= count 0)
+  
+  # Return a function that increments and returns the count
+  (lambda ()
+    (= count (+ count 1))
+    count))
+
+# Create two independent counters
+(= counter1 (make-counter))
+(= counter2 (make-counter))
+
+# Test the counters
+(print "Closures with state:")
+(print "Counter 1 first call: " (counter1))
+(print "Counter 1 second call: " (counter1))
+(print "Counter 2 first call: " (counter2))
+(print "Counter 1 third call: " (counter1))
+(print)
+
+
+#############################################
+## SECTION 4: Dispatch Pattern
+#############################################
+
+# Functions can implement a dispatch pattern to create object-like behavior
+
+# Create a person "object" with methods
+(def (make-person name age)
+  # Private state
+  (= person-name name)
+  (= person-age age)
+  
+  # Create a dispatcher function that responds to different operations
+  (def (dispatch op)
+    (if (== op "name")
+      # Return the name
+      person-name
+      
+      (if (== op "age")
+        # Return the age
+        person-age
+        
+        (if (== op "birthday") 
+          # Have a birthday - modifies internal state
+          (begin
+            (= person-age (+ person-age 1))
+            (+ person-name " is now " (str person-age) " years old!"))
+          
+          (if (== op "info")
+            # Return info as a dictionary
+            (dict "name" person-name "age" person-age)
+            
+            # Unknown operation
+            "unknown operation")))))
+  
+  # Return the dispatcher function
+  dispatch)
+
+# Create person "objects"
+(= alice (make-person "Alice" 30))
+(= bob (make-person "Bob" 25))
+
+# Test the person objects and methods
+(print "Object dispatch pattern:")
+(print "Alice name: " (alice "name"))
+(print "Alice age: " (alice "age"))
+(print "Bob name: " (bob "name"))
+
+# Modifying state
+(print "Birthday for Alice: " (alice "birthday"))
+(print "Alice's age is now: " (alice "age"))
+
+# Getting info dictionary
+(print "Alice info: " (alice "info"))
+(print)
+
+
+#############################################
+## SECTION 5: Function Composition
+#############################################
+
+# Functions can be composed to create new functions
+
+# Define a function that composes two functions
+(def (compose f g)
+  (lambda (x)
+    (f (g x))))
+
+# Test functions to compose
+(def (double x) (* x 2))
+(def (increment x) (+ x 1))
+
+# Create composed functions
+(= double-then-increment (compose increment double))
+(= increment-then-double (compose double increment))
+
+# Test the composed functions
+(print "Function composition:")
+(print "double-then-increment(5): " (double-then-increment 5))
+(print "increment-then-double(5): " (increment-then-double 5))
