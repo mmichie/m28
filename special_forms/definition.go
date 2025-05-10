@@ -158,7 +158,11 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 			// Check for class attribute assignments (= attr-name value)
 			if firstSymbol, ok := exprList[0].(core.LispSymbol); ok {
 				if firstSymbol == "=" && len(exprList) >= 3 {
-					if attrName, ok := exprList[1].(core.LispSymbol); ok {
+					// Handle attribute assignment
+					attrExpr := exprList[1]
+
+					// Check if it's a regular attribute name (symbol)
+					if attrName, ok := attrExpr.(core.LispSymbol); ok {
 						// Store the class attribute
 						attrValue, err := e.Eval(exprList[2], env)
 						if err != nil {
@@ -166,6 +170,13 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 						}
 						newClass.AddAttribute(string(attrName), attrValue)
 						continue
+					}
+
+					// Check if it's a dot expression for initialization
+					if dotList, ok := attrExpr.(core.LispList); ok && len(dotList) >= 2 {
+						if dotSymbol, ok := dotList[0].(core.LispSymbol); ok && (dotSymbol == "dot" || dotSymbol == ".") {
+							return nil, fmt.Errorf("dot notation in class attribute initialization not supported yet")
+						}
 					}
 				}
 
@@ -190,10 +201,13 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 						// Create method body
 						methodBody := core.LispList(exprList[2:])
 
+						// Process method body to support self.attr assignments
+						processedBody := methodBody // No special processing needed with dot notation
+
 						// Create the method Lambda
 						method := &core.Lambda{
 							Params:        methodParams,
-							Body:          methodBody,
+							Body:          processedBody,
 							Env:           env,
 							Closure:       env,
 							DefaultValues: make(map[core.LispSymbol]core.LispValue),
@@ -210,10 +224,53 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 		}
 	}
 
+	// Create a constructor function for the class
+	// This allows us to create instances with: (ClassName args...)
+	constructorFunc := core.BuiltinFunc(func(args []core.LispValue, callEnv core.Environment) (core.LispValue, error) {
+		// Retrieve evaluator from environment if available
+		var evalCtx core.Evaluator
+		if evalVal, exists := callEnv.Get("EVALUATOR"); exists {
+			if eval, ok := evalVal.(core.Evaluator); ok {
+				evalCtx = eval
+			}
+		}
+
+		// Create a new instance with evaluator context
+		instance := core.NewPythonicObject(newClass, evalCtx)
+
+		// Call init method if it exists
+		if initMethod, exists := newClass.GetMethod("init"); exists {
+			// Use normal function application if we have evaluator
+			if evalCtx != nil {
+				// Prepare arguments with instance as first arg
+				initArgs := make([]core.LispValue, len(args)+1)
+				initArgs[0] = instance
+				copy(initArgs[1:], args)
+
+				// Call the init method with evaluator
+				_, err := evalCtx.Apply(initMethod, initArgs, callEnv)
+				if err != nil {
+					return nil, fmt.Errorf("error initializing instance: %v", err)
+				}
+			} else {
+				// Create a bound method manually
+				boundInit := core.NewBoundMethod(initMethod, instance, nil)
+
+				// Call the method
+				_, err := boundInit.Apply(nil, args, callEnv)
+				if err != nil {
+					return nil, fmt.Errorf("error initializing instance: %v", err)
+				}
+			}
+		}
+
+		return instance, nil
+	})
+
 	// Class initialization complete
 
 	// Register the class and its constructor in the environment
-	env.Define(className, newClass)
+	env.Define(className, constructorFunc)
 	env.Define(core.LispSymbol(string(className)+"_class"), newClass)
 
 	// Define builtins for class operations if they don't exist yet
@@ -226,7 +283,16 @@ func EvalClass(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 			if !ok {
 				return nil, fmt.Errorf("first argument to NewPythonicObject must be a class")
 			}
-			return core.NewPythonicObject(class), nil
+
+			// Get evaluator if available
+			var evalCtx core.Evaluator
+			if evalVal, exists := env.Get("EVALUATOR"); exists {
+				if eval, ok := evalVal.(core.Evaluator); ok {
+					evalCtx = eval
+				}
+			}
+
+			return core.NewPythonicObject(class, evalCtx), nil
 		}))
 	}
 

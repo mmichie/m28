@@ -151,3 +151,17 @@ func (r *REPL) toggleKeybindings() {
 func (r *REPL) Close() {
 	r.rl.Close()
 }
+
+// GetEvaluator returns the REPL's evaluator
+func (r *REPL) GetEvaluator() *eval.Evaluator {
+	if e, ok := r.evaluator.(*eval.Evaluator); ok {
+		return e
+	}
+	return nil
+}
+
+// StoreEvaluator stores the evaluator in the environment for object method calls
+func (r *REPL) StoreEvaluator() {
+	// Store the evaluator in the environment for class methods to access
+	r.env.Define("EVALUATOR", r.evaluator)
+}

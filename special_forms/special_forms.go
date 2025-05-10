@@ -34,8 +34,8 @@ func init() {
 
 		// Function and Class Definition
 		"def":    EvalDef,
-		"define": EvalDef, // Also add 'define' as an alias for 'def'
-		"class":  EvalClass,
+		"define": EvalDef,      // Also add 'define' as an alias for 'def'
+		"class":  EvalClassNew, // Class implementation from class_implementation.go
 		"lambda": EvalLambdaPython,
 
 		// Object Oriented Programming
@@ -62,8 +62,11 @@ func init() {
 		"del":    EvalDel,
 	}
 
-	// Register alternative and dot notation special forms
+	// Register the dot notation special forms
 	RegisterDotForms(specialForms)
+
+	// Register class forms from class_implementation.go
+	RegisterClassForms(specialForms)
 }
 
 func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {

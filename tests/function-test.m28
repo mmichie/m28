@@ -22,10 +22,15 @@
 (print "\n-- Recursive Functions --")
 
 (print "\nTest 2.1: Factorial Function")
+# Use iterative approach instead of recursion to avoid stack overflow
 (def (factorial n)
-  (if (== n 0)
-      1
-      (* n (factorial (- n 1)))))
+  (begin
+    (= result 1)
+    (= i 1)
+    (while (<= i n)
+      (= result (* result i))
+      (= i (+ i 1)))
+    result))
 
 (print "factorial(0) =")
 (print (factorial 0))

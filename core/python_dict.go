@@ -10,9 +10,10 @@ import (
 type DictMethod func(self *PythonicDict, args []LispValue) (LispValue, error)
 
 type PythonicDict struct {
-	data    map[LispValue]LispValue
-	mu      sync.RWMutex
-	methods map[string]DictMethod
+	data      map[LispValue]LispValue
+	mu        sync.RWMutex
+	methods   map[string]DictMethod
+	evaluator Evaluator // Store evaluator reference for method calls
 }
 
 func NewPythonicDict() *PythonicDict {
@@ -202,21 +203,69 @@ func (d *PythonicDict) SortedKeys() []LispValue {
 
 // Implementation of DotAccessible interface
 
-// HasProperty checks if a property exists in the dictionary
+// HasProperty checks if a property exists in the dictionary (legacy interface)
 func (d *PythonicDict) HasProperty(name string) bool {
 	_, exists := d.Get(name)
 	return exists
 }
 
-// GetProperty retrieves a property from the dictionary
-// It is a wrapper around the Get method that takes a string name
+// GetProperty retrieves a property from the dictionary (legacy interface)
 func (d *PythonicDict) GetProperty(name string) (LispValue, bool) {
 	return d.Get(name)
 }
 
-// SetProperty sets a property in the dictionary
-// It is a wrapper around the Set method that takes a string name
+// SetProperty sets a property in the dictionary (legacy interface)
 func (d *PythonicDict) SetProperty(name string, value LispValue) error {
+	d.Set(name, value)
+	return nil
+}
+
+// Ensure PythonicDict implements DotAccessible and EvaluatorAware
+var _ DotAccessible = (*PythonicDict)(nil)
+var _ EvaluatorAware = (*PythonicDict)(nil)
+
+// SetEvaluator stores a reference to the evaluator
+func (d *PythonicDict) SetEvaluator(eval Evaluator) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.evaluator = eval
+}
+
+// GetEvaluator retrieves the stored evaluator reference
+func (d *PythonicDict) GetEvaluator() Evaluator {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.evaluator
+}
+
+// GetMember implements the EvaluatorAware interface
+func (d *PythonicDict) GetMember(name string, eval Evaluator, env Environment) (LispValue, error) {
+	// Store evaluator reference
+	d.SetEvaluator(eval)
+
+	// First check for methods
+	if d.HasMethod(name) {
+		method, _ := d.methods[name]
+		// For method calls without arguments, wrap it to be called later
+		return BuiltinFunc(func(args []LispValue, callEnv Environment) (LispValue, error) {
+			return method(d, args)
+		}), nil
+	}
+
+	// Then check for attributes
+	if value, exists := d.Get(name); exists {
+		return value, nil
+	}
+
+	return nil, fmt.Errorf("dict has no attribute '%s'", name)
+}
+
+// SetMember implements the EvaluatorAware interface
+func (d *PythonicDict) SetMember(name string, value LispValue, eval Evaluator, env Environment) error {
+	// Store evaluator reference
+	d.SetEvaluator(eval)
+
+	// Set the attribute in the dictionary
 	d.Set(name, value)
 	return nil
 }

@@ -120,7 +120,12 @@ type DotAccessible interface {
 	// CallMethod calls a method on the object with the given arguments
 	// Returns the result of the method call or an error
 	CallMethod(name string, args []LispValue) (LispValue, error)
+
+	// These methods are deprecated and will be removed in a future version
+	// Use the GetMember/SetMember methods from the EvaluatorAware interface instead
 }
+
+// EvaluatorAware interface is now defined in types_interfaces.go
 
 // Lambda represents a Python-like lambda function
 type Lambda struct {

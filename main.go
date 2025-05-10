@@ -13,6 +13,9 @@ import (
 func main() {
 	r := repl.NewREPL()
 
+	// Store evaluator in global environment for object method calls
+	r.StoreEvaluator()
+
 	if len(os.Args) > 1 {
 		filename := os.Args[1]
 		ext := filepath.Ext(filename)

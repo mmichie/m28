@@ -1,46 +1,44 @@
 #!/bin/bash
-# Script to run all consolidated tests
+# Test runner for all M28 language tests
 
-echo "===== Running m28 tests ====="
+echo "===== Running M28 Tests ====="
 echo ""
 
-# Run consolidated tests
+# Array of tests to run
 TESTS=(
-  "core-types-test.m28"
-  "control-flow-test.m28"
-  "data-structures-test.m28"
-  "function-test.m28"
-  "exception-test.m28"
+    "core-types-test.m28"
+    "control-flow-test.m28"
+    "data-structures-test.m28"
+    "function-test.m28"
+    "exception-test.m28"
+    "dot-notation-test.m28"
 )
 
-failed_tests=()
+PASSED=0
+FAILED=0
 
+# Run each test
 for test in "${TESTS[@]}"; do
-  echo "Running tests/$test..."
-  if ./bin/m28 "tests/$test"; then
-    echo "PASSED: $test"
-  else
-    echo "FAILED: $test"
-    failed_tests+=("$test")
-  fi
-  echo "------------------------------------"
-  echo ""
+    echo "Running tests/$test..."
+    if ./bin/m28 "tests/$test"; then
+        echo -e "PASSED: $test\n------------------------------------\n"
+        PASSED=$((PASSED + 1))
+    else
+        echo -e "FAILED: $test\n------------------------------------\n"
+        FAILED=$((FAILED + 1))
+    fi
 done
 
 # Print summary
 echo "===== Test Summary ====="
-echo "Total tests: ${#TESTS[@]}"
-echo "Passed: $((${#TESTS[@]} - ${#failed_tests[@]}))"
-echo "Failed: ${#failed_tests[@]}"
+echo "Total tests: $((PASSED + FAILED))"
+echo "Passed: $PASSED"
+echo "Failed: $FAILED"
 
-if [ ${#failed_tests[@]} -gt 0 ]; then
-  echo "Failed tests:"
-  for test in "${failed_tests[@]}"; do
-    echo "- $test"
-  done
-  exit 1
+if [ $FAILED -eq 0 ]; then
+    echo -e "\nAll tests passed successfully!"
+    exit 0
 else
-  echo "All tests passed!"
+    echo -e "\nSome tests failed."
+    exit 1
 fi
-
-echo "===== All tests completed ====="
