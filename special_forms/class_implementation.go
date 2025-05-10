@@ -383,8 +383,6 @@ func RegisterClassForms(forms map[core.LispSymbol]SpecialFormFunc) {
 	forms["class-attr-self"] = EvalClassAttrSelf
 }
 
-// getNextInstanceID is imported from lambda.go
-func getNextInstanceID() int64 {
-	// Note: This is a placeholder. The actual implementation is in lambda.go.
-	return 0
-}
+// Import getNextInstanceID directly from lambda.go
+// This is defined here to ensure proper dependency management
+// extern getNextInstanceID()

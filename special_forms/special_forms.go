@@ -65,6 +65,9 @@ func init() {
 	// Register the dot notation special forms
 	RegisterDotForms(specialForms)
 
+	// Register enhanced dot notation forms
+	EnableEnhancedDotForms(specialForms)
+
 	// Register class forms from class_implementation.go
 	RegisterClassForms(specialForms)
 }

@@ -35,8 +35,8 @@ func (e *Evaluator) HandleDotNotation(symbol core.LispSymbol, env core.Environme
 	for i := 1; i < len(parts); i++ {
 		memberName := parts[i]
 
-		// Get the member using the AccessObjectMember helper
-		memberValue, err := core.AccessObjectMember(result, memberName, e, env)
+		// Get the member using the EnhancedObjectMember helper
+		memberValue, err := core.EnhancedObjectMember(result, memberName, e, env)
 		if err != nil {
 			return nil, e.enrichErrorWithTraceback(err)
 		}
