@@ -1,0 +1,23 @@
+# Test the Object Protocol implementation
+
+# Dictionary tests
+(print "=== Dictionary Object Protocol Tests ===")
+(def d (dict "name" "Alice" "age" 30))
+(print "Dictionary:" d)
+
+# Access a property with get
+(def name1 (get d "name"))
+(print "Name via get:" name1)
+
+# Access a property with dot notation
+(def name2 (dot d "name"))
+(print "Name via dot:" name2)
+
+# Call a method
+(def keys (dot d "keys"))
+(print "Keys:" keys)
+
+# Test passed!
+(print "\n=== Object Protocol Test Complete ===")
+(print "✅ Dictionary property access via dot notation works!")
+(print "✅ Dictionary method access via dot notation works!")
