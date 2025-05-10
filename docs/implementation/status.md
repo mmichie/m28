@@ -20,6 +20,9 @@ This document outlines the current implementation status of M28 features, highli
 | Dictionaries | ✅ Complete | Creation, access, methods |
 | Module Import | ✅ Complete | Basic `import` functionality |
 | Error Handling | ✅ Complete | Basic `try/except` structure |
+| Tail Call Optimization | ✅ Complete | Implemented in `eval/tail_call_optimization.go` |
+| Context Managers | ✅ Complete | Basic `with` statement implementation |
+| Generators | ✅ Complete | Basic `yield` functionality |
 
 ### Partially Implemented
 
@@ -27,7 +30,7 @@ This document outlines the current implementation status of M28 features, highli
 |---------|--------|-------|
 | Object System | ⚠️ Partial | Uses closure-based approach instead of Python-like class syntax |
 | Dot Notation | ⚠️ Partial | Property and method access works, but with some limitations |
-| Exception Handling | ⚠️ Partial | Basic functionality works, but missing advanced features |
+| Exception Handling | ⚠️ Partial | Basic structure works, but needs improved error reporting |
 | List Comprehensions | ⚠️ Partial | Supported but with slight syntax differences |
 | Module System | ⚠️ Partial | Basic functionality works, missing advanced features |
 
@@ -35,12 +38,12 @@ This document outlines the current implementation status of M28 features, highli
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Class System | 🔄 Planned | Class definition with inheritance |
-| Context Managers | 🔄 Planned | `with` statement for resource management |
-| Generators | 🔄 Planned | `yield` for creating iterators |
+| Class System Syntax | 🔄 Planned | Sugar for class definition with inheritance |
+| Advanced Context Managers | 🔄 Planned | More built-in context managers and improvements |
+| Advanced Generator Features | 🔄 Planned | Generator expressions and advanced methods |
 | Async/Await | 🔄 Planned | Support for asynchronous programming |
 | Extended Standard Library | 🔄 Planned | More built-in functions and utilities |
-| Tail Call Optimization | 🔄 Planned | For efficient recursion |
+| Type System | 🔄 Planned | Optional type hints and checking |
 
 ## Implementation Details
 
@@ -72,7 +75,7 @@ Future plans include adding syntactic sugar for a more Python-like class definit
 
 ### Exception Handling
 
-Basic exception handling is implemented, but with limited support for complex exception hierarchies:
+Exception handling is implemented with support for exception types and basic handling:
 
 ```lisp
 ; Current implementation
@@ -80,12 +83,55 @@ Basic exception handling is implemented, but with limited support for complex ex
   (/ 10 0)
   (except ZeroDivisionError
     (print "Cannot divide by zero")))
+
+; Exception with variable binding
+(try
+  (/ 10 0)
+  (except ZeroDivisionError as err
+    (print "Error:" err)))
 ```
 
-Future enhancements will include:
-- Full exception type hierarchy
-- Custom exception types
+Enhancements needed:
 - Better traceback information
+- Improved exception propagation
+- More comprehensive error messages
+
+### Context Managers
+
+Context managers are implemented via the `with` statement:
+
+```lisp
+; File operations with context manager
+(with (open "test.txt" "w") as file
+  (file.write "Hello, World!"))
+```
+
+Implementation includes:
+- Context manager protocol (`__enter__` and `__exit__` methods)
+- File context manager in `core/context_manager.go`
+- Example usage in `examples/advanced/context_managers.m28`
+
+### Generators
+
+Basic generator functionality is implemented:
+
+```lisp
+; Simple generator function
+(def (count-up-to n)
+  (= i 0)
+  (while (< i n)
+    (yield i)
+    (= i (+ i 1))))
+
+; Using the generator
+(for x (count-up-to 5)
+  (print x))
+```
+
+Implementation includes:
+- `yield` statement in `core/generator.go`
+- Generator protocol
+- Basic iteration support
 
 ### Module System
 
@@ -104,12 +150,12 @@ Planned enhancements:
 
 ## Performance Considerations
 
-The current M28 implementation focuses on correctness rather than performance. Future versions will address:
+While tail call optimization has been implemented, other performance improvements are still needed:
 
-1. Tail call optimization for recursive functions
-2. Bytecode compilation
-3. Memory usage optimization
-4. Faster dictionary and lookup operations
+1. More extensive testing of recursive functions
+2. Memory usage optimization
+3. Faster dictionary and lookup operations
+4. General interpreter performance improvements
 
 ## Compatibility Notes
 
@@ -122,4 +168,4 @@ M28 aims to provide a balance between Lisp's expressiveness and Python's readabi
 
 ## Contributing
 
-If you're interested in helping implement missing features, please see the [Contributing Guide](../contributing.md) for how to get started.
+If you're interested in helping implement missing features or improve existing ones, please see the [Contributing Guide](../contributing.md) for how to get started.
