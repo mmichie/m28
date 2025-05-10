@@ -75,22 +75,44 @@ func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 	} else if list, ok := iterable.(core.LispListLiteral); ok {
 		iter = core.LispList(list)
 	} else {
-		return nil, fmt.Errorf("for loop requires a list")
+		// Try to handle strings by treating them as character lists
+		if str, ok := iterable.(string); ok {
+			strList := make(core.LispList, len(str))
+			for i, ch := range str {
+				strList[i] = string(ch)
+			}
+			iter = strList
+		} else {
+			return nil, fmt.Errorf("for loop requires a list, list literal, or string; got %T", iterable)
+		}
 	}
 
-	// Use the parent environment directly instead of creating a nested environment
-	// This ensures variables updated in the loop affect the outer scope
-	var result core.LispValue
+	// We'll evaluate in the parent environment to allow access to variables
+	// This maintains expected semantics for variable updates
+	var result core.LispValue = core.PythonicNone{}
+
 	for _, item := range iter {
+		// Define the iterator variable in the parent environment
 		env.Define(iterVar, item)
+
+		// Execute each body expression
 		for _, expr := range args[2:] {
 			result, err = e.Eval(expr, env)
 			if err != nil {
-				// Check if this is a return signal
-				if returnSig, ok := err.(ReturnSignal); ok {
+				// Handle special control flow signals
+				if IsBreakSignal(err) {
+					// Break out of the loop
+					return result, nil
+				} else if IsContinueSignal(err) {
+					// Skip to the next iteration
+					break
+				} else if returnSig, ok := err.(ReturnSignal); ok {
+					// Return signal should propagate out of the loop
 					return returnSig.Value, nil
+				} else {
+					// Propagate other errors
+					return nil, err
 				}
-				return nil, err
 			}
 		}
 	}
@@ -103,30 +125,52 @@ func EvalWhilePython(e core.Evaluator, args []core.LispValue, env core.Environme
 		return nil, fmt.Errorf("while loop requires at least 2 arguments")
 	}
 
-	var result core.LispValue
+	// Use the parent environment for loop execution
+	// This allows modifying variables in the parent scope
+	var result core.LispValue = core.PythonicNone{}
 
 	for {
+		// Evaluate the loop condition
 		condition, err := e.Eval(args[0], env)
 		if err != nil {
-			// Check if this is a return signal
-			if returnSig, ok := err.(ReturnSignal); ok {
+			// Check if this is a control flow signal
+			if IsBreakSignal(err) {
+				// Break out of the loop immediately
+				return result, nil
+			} else if IsContinueSignal(err) {
+				// Skip to the next iteration (re-evaluate condition)
+				continue
+			} else if returnSig, ok := err.(ReturnSignal); ok {
+				// Return signal should propagate out of the loop
 				return returnSig.Value, nil
 			}
+			// Propagate other errors
 			return nil, err
 		}
 
+		// Exit loop if condition is false
 		if !core.IsTruthy(condition) {
 			break
 		}
 
+		// Execute the loop body
 		for _, expr := range args[1:] {
 			result, err = e.Eval(expr, env)
 			if err != nil {
-				// Check if this is a return signal
-				if returnSig, ok := err.(ReturnSignal); ok {
+				// Handle special control flow signals
+				if IsBreakSignal(err) {
+					// Break out of the loop
+					return result, nil
+				} else if IsContinueSignal(err) {
+					// Skip to the next iteration
+					break
+				} else if returnSig, ok := err.(ReturnSignal); ok {
+					// Return signal should propagate out of the loop
 					return returnSig.Value, nil
+				} else {
+					// Propagate other errors
+					return nil, err
 				}
-				return nil, err
 			}
 		}
 	}
@@ -137,12 +181,44 @@ func EvalWhilePython(e core.Evaluator, args []core.LispValue, env core.Environme
 // EvalTry is now defined in exception.go for better organization
 // It has been rewritten with comprehensive LocatedValue handling
 
+// BreakSignal is a special error type that signals a break from a loop
+type BreakSignal struct{}
+
+func (b BreakSignal) Error() string {
+	return "break"
+}
+
+// ContinueSignal is a special error type that signals a continue in a loop
+type ContinueSignal struct{}
+
+func (c ContinueSignal) Error() string {
+	return "continue"
+}
+
+// IsBreakSignal checks if an error is a BreakSignal
+func IsBreakSignal(err error) bool {
+	_, ok := err.(BreakSignal)
+	return ok
+}
+
+// IsContinueSignal checks if an error is a ContinueSignal
+func IsContinueSignal(err error) bool {
+	_, ok := err.(ContinueSignal)
+	return ok
+}
+
 func EvalBreak(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	return nil, fmt.Errorf("break encountered")
+	if len(args) > 0 {
+		return nil, fmt.Errorf("break does not take any arguments")
+	}
+	return nil, BreakSignal{}
 }
 
 func EvalContinue(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	return nil, fmt.Errorf("continue encountered")
+	if len(args) > 0 {
+		return nil, fmt.Errorf("continue does not take any arguments")
+	}
+	return nil, ContinueSignal{}
 }
 
 func EvalPass(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {

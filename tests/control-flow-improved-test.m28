@@ -1,0 +1,88 @@
+# Tests for improved control flow in loops with break/continue
+
+(print "\n=== Testing Improved Control Flow for Loops ===\n")
+
+# Test basic while loop with break
+(print "Testing while loop with break:")
+(= i 0)
+(while (< i 10)
+  (if (== i 5)
+    (break))
+  (print "i =" i)
+  (= i (+ i 1)))
+(print "After loop, i =" i)
+(print "Expected: i should be 5, loop breaks at i=5")
+
+# Test nested loops with break
+(print "\nTesting nested loops with break:")
+(= i 0)
+(while (< i 3)
+  (print "Outer loop i =" i)
+  (= j 0)
+  (while (< j 3)
+    (print "  Inner loop j =" j)
+    (if (== j 1)
+      (break))
+    (= j (+ j 1)))
+  (= i (+ i 1)))
+(print "Expected: Each outer loop iteration should only show j=0 and j=1 before breaking")
+
+# Test while loop with continue
+(print "\nTesting while loop with continue:")
+(= i 0)
+(while (< i 5)
+  (= i (+ i 1))
+  (if (== i 3)
+    (continue))
+  (print "i =" i))
+(print "Expected: Should print 1, 2, 4, 5 (skipping 3)")
+
+# Test for loop with break
+(print "\nTesting for loop with break:")
+(for n (list 0 1 2 3 4 5 6 7 8 9)
+  (if (== n 5)
+    (break))
+  (print "n =" n))
+(print "Expected: Should print 0, 1, 2, 3, 4")
+
+# Test for loop with continue
+(print "\nTesting for loop with continue:")
+(for n (list 0 1 2 3 4 5 6 7 8 9)
+  (if (== (% n 2) 0)
+    (continue))
+  (print "n =" n))
+(print "Expected: Should print only odd numbers: 1, 3, 5, 7, 9")
+
+# Test complex nested loops with break and continue
+(print "\nTesting complex nested loops:")
+(for i (list "a" "b" "c")
+  (print "Outer loop i =" i)
+  (for j (list 1 2 3 4 5)
+    (if (== j 2)
+      (continue))
+    (if (== j 4)
+      (break))
+    (print "  Inner loop j =" j)))
+(print "Expected: For each letter, should print j=1, skip j=2, print j=3, then break before j=4")
+
+# Test for loop with string iteration
+(print "\nTesting for loop with string iteration:")
+(for c "Hello"
+  (print "Character:" c))
+(print "Expected: Should print each character of 'Hello'")
+
+# Test for loop with nested break and continue in a simple pattern
+(print "\nTesting simple nested control flow:")
+(= count 0)
+(for i (list 1 2 3 4 5)
+  (for j (list 1 2 3 4 5)
+    (if (== j 3)
+      (continue))
+    (if (== j 5)
+      (break))
+    (= count (+ count 1))
+    (print "Processing i=" i "j=" j)))
+(print "Total count:" count)
+(print "Expected: Should process i=1-5 with j=1,2,4 (skipping j=3 and breaking at j=5)")
+
+(print "\n=== Control Flow Tests Completed ===")

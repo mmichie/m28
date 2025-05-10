@@ -656,7 +656,8 @@ func (e *Evaluator) enrichErrorWithTraceback(err error) error {
 
 	// Skip traceback for special control flow signals
 	switch err.(type) {
-	case special_forms.ReturnSignal, special_forms.YieldSignal:
+	case special_forms.ReturnSignal, special_forms.YieldSignal,
+		special_forms.BreakSignal, special_forms.ContinueSignal:
 		return err // Control flow signals should pass through unchanged
 	}
 
