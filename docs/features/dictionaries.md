@@ -1,12 +1,20 @@
 # Dictionaries in M28
 
-This guide explains how to work with dictionaries in the M28 language, including the newly added Python-style dictionary literals and keyword arguments.
+This guide explains how to work with dictionaries in the M28 language, including Python-style dictionary literals and dictionary operations.
+
+## Contents
+1. [Creating Dictionaries](#creating-dictionaries)
+2. [Accessing Dictionary Values](#accessing-dictionary-values)
+3. [Dictionary Operations](#dictionary-operations)
+4. [Dictionary as Keyword Arguments](#dictionary-as-keyword-arguments)
+5. [Examples](#examples)
+6. [Implementation Notes](#implementation-notes)
 
 ## Creating Dictionaries
 
 M28 supports two main methods for creating dictionaries:
 
-### 1. Dictionary Literals (Python-style)
+### Dictionary Literals (Python-style)
 
 ```lisp
 # Create a dictionary with key-value pairs
@@ -15,7 +23,7 @@ M28 supports two main methods for creating dictionaries:
 
 This syntax is similar to Python's dictionary literals, making it familiar to Python developers.
 
-### 2. Dict Function
+### Dict Function
 
 ```lisp
 # Create a dictionary with the dict function
@@ -36,6 +44,13 @@ Use the `get` function to access dictionary values:
 (get person "country" "Unknown")  # Returns: "Unknown" if "country" key doesn't exist
 ```
 
+With dot notation:
+
+```lisp
+# Dot notation (if supported)
+(print person.name)  # Returns: "John"
+```
+
 ## Dictionary Operations
 
 ### Checking Dictionary Size
@@ -45,7 +60,23 @@ Use the `get` function to access dictionary values:
 (len person)  # Returns: 3 for the example above
 ```
 
-### Dictionary as Keyword Arguments
+### Dictionary Methods
+
+```lisp
+# Get all keys
+(dict.keys person)  # Returns: ["name", "age", "city"]
+
+# Get all values
+(dict.values person)  # Returns: ["John", 30, "New York"]
+
+# Check if key exists
+(dict.has_key person "name")  # Returns: True
+
+# Update dictionary
+(dict.update person {"country": "USA"})
+```
+
+## Dictionary as Keyword Arguments
 
 One powerful feature of dictionaries is using them as keyword arguments for functions, similar to Python:
 
@@ -77,10 +108,9 @@ One powerful feature of dictionaries is using them as keyword arguments for func
 (print "First student name:" (get (get students 0) "name"))  # Alice
 (print "Second student grade:" (get (get students 1) "grade"))  # 87
 
-# Note: The following loop syntax may vary based on implementation
-# In concept, iterating through student records would look like:
-# (for student students
-#   (print (get student "name")))
+# Loop through students
+(for student students
+  (print (+ (get student "name") " earned a grade of " (get student "grade"))))
 ```
 
 ### Example 2: Configuring Function Behavior
@@ -103,20 +133,31 @@ One powerful feature of dictionaries is using them as keyword arguments for func
 (process_data other_data {"verbose": False})
 ```
 
-## Dictionary Conversion
-
-Convert between dictionaries and other data structures:
+### Example 3: Nested Dictionaries
 
 ```lisp
-# List of key-value pairs to dictionary
-(= pairs (list (list "a" 1) (list "b" 2)))
-(= d (dict pairs))
+# Create a nested dictionary structure
+(= config {
+  "server": {
+    "host": "localhost",
+    "port": 8080,
+    "debug": True
+  },
+  "database": {
+    "uri": "postgresql://user:pass@localhost/db",
+    "pool_size": 5,
+    "timeout": 30
+  },
+  "logging": {
+    "level": "info",
+    "file": "/var/log/app.log"
+  }
+})
 
-# Dictionary to list of keys
-(= keys (dict_keys d))
-
-# Dictionary to list of values
-(= values (dict_values d))
+# Access nested values
+(print "Server host:" (get (get config "server") "host"))
+# With dot notation
+(print "Database URI:" config.database.uri)
 ```
 
 ## Implementation Notes
@@ -126,7 +167,22 @@ Convert between dictionaries and other data structures:
 - Dictionaries maintain insertion order (like Python 3.7+)
 - When used as keyword arguments, dictionaries must be the last argument
 
-## Comparing with Python
+### Dictionary Methods
+
+M28 dictionaries support these methods (accessed via dot notation or dict functions):
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `keys` | Get list of keys | `(dict.keys my_dict)` |
+| `values` | Get list of values | `(dict.values my_dict)` |
+| `items` | Get key-value pairs | `(dict.items my_dict)` |
+| `get` | Get value with default | `(dict.get my_dict "key" "default")` |
+| `update` | Update with another dict | `(dict.update my_dict {"key": "value"})` |
+| `has_key` | Check if key exists | `(dict.has_key my_dict "key")` |
+| `pop` | Remove and return value | `(dict.pop my_dict "key")` |
+| `clear` | Remove all items | `(dict.clear my_dict)` |
+
+### Comparing with Python
 
 M28's dictionary implementation is designed to feel familiar to Python users:
 
