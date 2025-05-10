@@ -1,0 +1,99 @@
+# Recursion Tests for M28
+# Tests deep recursion with tail call optimization
+
+(print "===== Recursion Tests with Tail Call Optimization =====\n")
+
+# Section 1: Deep Recursion Test
+(print "-- Deep Recursion --")
+
+(print "\nTest 1.1: Count Down Function")
+(def (count-down n)
+  (if (<= n 0)
+      0  # Base case
+      (count-down (- n 1))))  # Tail-recursive call
+
+(print "count-down(5) =")
+(print (count-down 5))
+(print "Expected: 0")
+
+(print "count-down(100) =")
+(print (count-down 100))
+(print "Expected: 0")
+
+(print "count-down(1000) =")
+(print (count-down 1000))
+(print "Expected: 0")
+
+# Section 2: Factorial with Tail Call Optimization
+(print "\n-- Factorial with Tail Call Optimization --")
+
+(print "\nTest 2.1: Tail-Recursive Factorial")
+(def (factorial-tail n acc)
+  (if (== n 0)
+      acc
+      (factorial-tail (- n 1) (* n acc))))
+
+(def (factorial n)
+  (factorial-tail n 1))
+
+(print "factorial(5) =")
+(print (factorial 5))
+(print "Expected: 120")
+
+(print "factorial(10) =")
+(print (factorial 10))
+(print "Expected: 3628800")
+
+(print "factorial(20) =")
+(print (factorial 20))
+(print "Expected: 2432902008176640000")
+
+# Section 3: Fibonacci with Tail Call Optimization
+(print "\n-- Fibonacci with Tail Call Optimization --")
+
+(print "\nTest 3.1: Tail-Recursive Fibonacci")
+(def (fibonacci-tail n a b)
+  (if (== n 0)
+      a
+      (fibonacci-tail (- n 1) b (+ a b))))
+
+(def (fibonacci n)
+  (fibonacci-tail n 0 1))
+
+(print "fibonacci(10) =")
+(print (fibonacci 10))
+(print "Expected: 55")
+
+(print "fibonacci(20) =")
+(print (fibonacci 20))
+(print "Expected: 6765")
+
+(print "fibonacci(30) =")
+(print (fibonacci 30))
+(print "Expected: 832040")
+
+# Section 4: Tower of Hanoi (should now work with deep recursion)
+(print "\n-- Tower of Hanoi with Tail Call Optimization --")
+(print "\nTest 4.1: Testing Tower of Hanoi for higher disk counts")
+
+# Count moves without actually printing them
+(def (hanoi-count n src aux dst)
+  (if (== n 0)
+      0
+      (+ (hanoi-count (- n 1) src dst aux)
+         1  # Count the current move
+         (hanoi-count (- n 1) aux src dst))))
+
+(print "Number of moves for 5 disks:")
+(print (hanoi-count 5 "A" "B" "C"))
+(print "Expected: 31")
+
+(print "Number of moves for 10 disks:")
+(print (hanoi-count 10 "A" "B" "C"))
+(print "Expected: 1023")
+
+(print "Number of moves for 15 disks:")
+(print (hanoi-count 15 "A" "B" "C"))
+(print "Expected: 32767")
+
+(print "\n===== Recursion Tests Complete =====")

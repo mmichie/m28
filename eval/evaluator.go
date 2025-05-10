@@ -741,9 +741,21 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 		// For built-in functions, always provide fully unwrapped arguments
 		result, err = f(unwrappedArgs, env)
 	case *core.Lambda:
-		// Use the lambda directly - the instance ID mechanism ensures proper state isolation
-		// Keep original args for lambdas as they might need the location information
-		result, err = special_forms.ApplyLambda(e, f, args, env)
+		// Check for tail call optimization opportunity
+		if isTailCall := e.checkTailCallOptimization(); isTailCall {
+			// Create initial tail call
+			initialTailCall := &TailCall{
+				Function: f,
+				Args:     args,
+				Env:      env,
+			}
+			// Use trampoline to handle recursive calls without growing stack
+			result, err = e.trampoline(initialTailCall)
+		} else {
+			// Use the lambda directly - the instance ID mechanism ensures proper state isolation
+			// Keep original args for lambdas as they might need the location information
+			result, err = special_forms.ApplyLambda(e, f, args, env)
+		}
 	case core.LispList:
 		if len(f) > 0 {
 			// Unwrap the first element to check if it's a lambda
@@ -760,7 +772,20 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 					err = lambdaErr
 					break
 				}
-				result, err = special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
+
+				// Check for tail call optimization opportunity
+				if isTailCall := e.checkTailCallOptimization(); isTailCall {
+					// Create initial tail call
+					initialTailCall := &TailCall{
+						Function: lambda,
+						Args:     args,
+						Env:      env,
+					}
+					// Use trampoline to handle recursive calls without growing stack
+					result, err = e.trampoline(initialTailCall)
+				} else {
+					result, err = special_forms.ApplyLambda(e, lambda.(*core.Lambda), args, env)
+				}
 			} else {
 				err = fmt.Errorf("not a function: %v", fn)
 			}
@@ -777,6 +802,14 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 	}
 
 	return result, nil
+}
+
+// checkTailCallOptimization determines if we should use tail call optimization
+// For simplicity, we'll always return true to enable TCO for all recursive calls
+func (e *Evaluator) checkTailCallOptimization() bool {
+	// We can make this more sophisticated by checking the current stack depth
+	// or looking at the specific recursion pattern, but for now we'll enable it globally
+	return true
 }
 
 // levenshteinDistance calculates the edit distance between two strings
