@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,7 +39,7 @@ func main() {
 	defer rl.Close()
 
 	fmt.Println("M28 Shell - Type 'exit' to quit")
-	
+
 	// Main shell loop
 	for {
 		line, err := rl.Readline()

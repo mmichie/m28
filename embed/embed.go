@@ -69,7 +69,7 @@ func defaultShellExecutor(command string) (string, error) {
 // registerShellFunctions adds shell-specific functions to the environment
 func (m *M28Engine) registerShellFunctions() {
 	// Execute shell command and return output
-	m.env.Define("shell", core.NewBuiltinFunction("shell", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define(core.LispSymbol("shell"), core.NewBuiltinFunction("shell", func(args ...core.LispValue) (core.LispValue, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("shell: expected 1 argument, got %d", len(args))
 		}
@@ -90,7 +90,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Get environment variable
-	m.env.Define("getenv", core.NewBuiltinFunction("getenv", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define(core.LispSymbol("getenv"), core.NewBuiltinFunction("getenv", func(args ...core.LispValue) (core.LispValue, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("getenv: expected 1 argument, got %d", len(args))
 		}
@@ -105,7 +105,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Set environment variable
-	m.env.Define("setenv", core.NewBuiltinFunction("setenv", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define(core.LispSymbol("setenv"), core.NewBuiltinFunction("setenv", func(args ...core.LispValue) (core.LispValue, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("setenv: expected 2 arguments, got %d", len(args))
 		}
@@ -129,7 +129,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Get current working directory
-	m.env.Define("pwd", core.NewBuiltinFunction("pwd", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define(core.LispSymbol("pwd"), core.NewBuiltinFunction("pwd", func(args ...core.LispValue) (core.LispValue, error) {
 		if len(args) != 0 {
 			return nil, fmt.Errorf("pwd: expected 0 arguments, got %d", len(args))
 		}
@@ -143,7 +143,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Change directory
-	m.env.Define("cd", core.NewBuiltinFunction("cd", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define(core.LispSymbol("cd"), core.NewBuiltinFunction("cd", func(args ...core.LispValue) (core.LispValue, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("cd: expected 1 argument, got %d", len(args))
 		}
@@ -162,7 +162,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Exit with status code
-	m.env.Define("exit", core.NewBuiltinFunction("exit", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define(core.LispSymbol("exit"), core.NewBuiltinFunction("exit", func(args ...core.LispValue) (core.LispValue, error) {
 		code := 0
 		if len(args) > 0 {
 			if numVal, ok := args[0].(core.LispNumber); ok {
@@ -247,15 +247,15 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 
 // DefineValue defines a value in the M28 environment
 func (m *M28Engine) DefineValue(name string, value core.LispValue) {
-	m.env.Define(name, value)
+	m.env.Define(core.LispSymbol(name), value)
 }
 
 // DefineFunction defines a Go function in the M28 environment
 func (m *M28Engine) DefineFunction(name string, function func(args ...core.LispValue) (core.LispValue, error)) {
-	m.env.Define(name, core.NewBuiltinFunction(name, function))
+	m.env.Define(core.LispSymbol(name), core.NewBuiltinFunction(name, function))
 }
 
 // GetValue gets a value from the M28 environment
 func (m *M28Engine) GetValue(name string) (core.LispValue, bool) {
-	return m.env.Get(name)
+	return m.env.Get(core.LispSymbol(name))
 }
