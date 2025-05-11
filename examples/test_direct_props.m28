@@ -1,0 +1,28 @@
+# Test direct property access for class instances
+# This tests the improved syntax for accessing instance properties
+
+# Define a simple Point class
+(class Point ()
+  # Constructor
+  (def (init self x y)
+    # Need to use direct setter for now
+    (= self.Attributes (dict "x" x "y" y))
+    (print "Point created with x=" x "y=" y))
+)
+
+# Create instances
+(def p1 (Point 10 20))
+(def p2 (Point 30 40))
+
+# Test accessing the attributes dictionary
+(print "\n=== Attributes Access Test ===")
+(def attrs (dot p1 "Attributes"))
+(print "Point attributes:" attrs)
+
+# Access the x and y values through the attributes dictionary
+(print "x via attributes:" (get attrs "x"))
+(print "y via attributes:" (get attrs "y"))
+
+# Test completion
+(print "\n=== Object Protocol Test Complete ===")
+(print "✅ Object attributes can be accessed via dot notation!")

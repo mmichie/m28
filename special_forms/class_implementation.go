@@ -364,7 +364,17 @@ func EvalClassAttrSelf(e core.Evaluator, args []core.LispValue, env core.Environ
 		return nil, fmt.Errorf("error evaluating value in self attribute assignment: %v", err)
 	}
 
-	// Set the attribute on self
+	// Try setting via the new Object protocol first
+	if objVal, ok := self.(core.AdaptableLispValue); ok {
+		// Use the Object protocol
+		obj := objVal.AsObject()
+		err := obj.SetProp(attrName, value)
+		if err == nil {
+			return value, nil
+		}
+	}
+
+	// Fall back to the old interface
 	if selfObj, ok := self.(core.DotAccessible); ok {
 		err = selfObj.SetProperty(attrName, value)
 		if err != nil {

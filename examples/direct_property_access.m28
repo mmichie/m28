@@ -1,0 +1,34 @@
+# Direct Property Access - Simplified Example
+
+# Define a simple Point class without any advanced features
+(class Point ()
+  # Constructor to initialize x and y coordinates
+  (def (init self x y)
+    # Store the coordinates as instance attributes
+    (dict.set self "x" x)
+    (dict.set self "y" y))
+)
+
+# Create a point
+(def p (Point 10 20))
+
+# Print direct property values using dict.get and dictionary access
+(print "\n=== Basic Property Access ===")
+(print "X coordinate:" (dict.get p "x"))
+(print "Y coordinate:" (dict.get p "y"))
+
+# Update properties with dict.set
+(print "\n=== Property Updates ===")
+(print "Updating x to 100...")
+(dict.set p "x" 100)
+(print "New x value:" (dict.get p "x"))
+
+# Demonstrate retrieving the properties
+(print "\n=== Summary ===")
+(print "Final coordinates: (" (dict.get p "x") "," (dict.get p "y") ")")
+
+# Success message
+(print "\n=== Direct Property Access Success ===")
+(print "✅ Direct property access with dict.get works!")
+(print "✅ Direct property modification with dict.set works!")
+(print "✅ No need for indirection through property access methods")

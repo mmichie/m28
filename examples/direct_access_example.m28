@@ -1,0 +1,58 @@
+# M28 Direct Property Access Example
+
+# First, let's set up a class with different kinds of attributes 
+(class Person ()
+  # Constructor
+  (def (init self name age)
+    # Use SetProp on the object adapter directly
+    (set-prop self "name" name)   # Store name directly
+    (set-prop self "age" age)     # Store age directly
+    (print "Created person:" name ", age" age))
+  
+  # Method to get a greeting
+  (def (greet self)
+    (+ "Hello, my name is " (get-prop self "name")))
+  
+  # Method to have a birthday
+  (def (birthday self)
+    (set-prop self "age" (+ (get-prop self "age") 1))
+    (+ "Happy birthday! Now I'm " (get-prop self "age") " years old!"))
+)
+
+# Helper functions for direct property access
+(def (get-prop obj name)
+  (get obj.Attributes name))
+  
+(def (set-prop obj name value)
+  (= obj.Attributes (dict-set obj.Attributes name value)))
+  
+(def (dict-set dict key value)
+  # Helper to set a dictionary key without modifying it directly
+  # Returns a new dictionary with the key set
+  (def result (dict))
+  
+  # Just set the new key directly
+  # (We'll skip copying all keys for simplicity)
+      
+  # Set the new value
+  (= result.data (dict key value).data)
+  result)
+
+# Create a person
+(def alice (Person "Alice" 30))
+
+# Test property access
+(print "\n=== Property Access Test ===")
+(print "Direct name access:" (get-prop alice "name"))
+(print "Direct age access:" (get-prop alice "age"))
+
+# Call methods
+(print "\n=== Method Call Test ===")
+(print "Greeting:" ((dot alice "greet")))
+(print "Birthday:" ((dot alice "birthday")))
+(print "New age:" (get-prop alice "age"))
+
+# Demonstrate success
+(print "\n=== Direct Property Access Demonstration ===")
+(print "This example shows a pattern that could be used for")
+(print "implementing direct property access in classes.")

@@ -8,13 +8,13 @@ import "fmt"
 type ObjProtocol interface {
 	// GetProp retrieves a property value
 	GetProp(name string) (LispValue, bool)
-	
+
 	// SetProp sets a property value
 	SetProp(name string, value LispValue) error
-	
+
 	// HasMethodP checks if a method exists (P suffix to avoid name conflicts)
 	HasMethodP(name string) bool
-	
+
 	// CallMethodP calls a method with arguments (P suffix to avoid name conflicts)
 	CallMethodP(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error)
 }
@@ -40,17 +40,17 @@ func GetPropFrom(obj LispValue, name string) (LispValue, bool) {
 	if asObj, ok := obj.(ObjProtocol); ok {
 		return asObj.GetProp(name)
 	}
-	
+
 	// Then try adaptable values
 	if adaptable, ok := obj.(AdaptableLispValue); ok {
 		return adaptable.AsObject().GetProp(name)
 	}
-	
+
 	// Legacy handling for DotAccessible
 	if dotObj, ok := obj.(DotAccessible); ok {
 		return dotObj.GetProperty(name)
 	}
-	
+
 	// Special handling for PythonicDict
 	if dict, ok := obj.(*PythonicDict); ok {
 		// Check for method
@@ -61,13 +61,13 @@ func GetPropFrom(obj LispValue, name string) (LispValue, bool) {
 				return method(dict, args)
 			}), true
 		}
-		
+
 		// Check for property/attribute
 		if value, exists := dict.Get(name); exists {
 			return value, true
 		}
 	}
-	
+
 	// Special handling for PythonicObject
 	if pyObj, ok := obj.(*PythonicObject); ok {
 		// First check instance attributes
@@ -97,7 +97,7 @@ func GetPropFrom(obj LispValue, name string) (LispValue, bool) {
 		// Fall back to the standard method if nothing found
 		return pyObj.GetAttribute(name)
 	}
-	
+
 	// Handle generators
 	if gen, ok := obj.(*Generator); ok {
 		if name == "next" {
@@ -112,14 +112,14 @@ func GetPropFrom(obj LispValue, name string) (LispValue, bool) {
 			}), true
 		}
 	}
-	
+
 	// Handle lambdas
 	if lambda, ok := obj.(*Lambda); ok {
 		if name == "call" {
 			return lambda, true // Return the lambda itself for later application
 		}
 	}
-	
+
 	return nil, false
 }
 
@@ -130,28 +130,28 @@ func SetPropOn(obj LispValue, name string, value LispValue) error {
 	if asObj, ok := obj.(ObjProtocol); ok {
 		return asObj.SetProp(name, value)
 	}
-	
+
 	// Then try adaptable values
 	if adaptable, ok := obj.(AdaptableLispValue); ok {
 		return adaptable.AsObject().SetProp(name, value)
 	}
-	
+
 	// Legacy handling for DotAccessible
 	if dotObj, ok := obj.(DotAccessible); ok {
 		return dotObj.SetProperty(name, value)
 	}
-	
+
 	// Special handling for PythonicDict
 	if dict, ok := obj.(*PythonicDict); ok {
 		dict.Set(name, value)
 		return nil
 	}
-	
+
 	// Special handling for PythonicObject
 	if pyObj, ok := obj.(*PythonicObject); ok {
 		return pyObj.SetProperty(name, value)
 	}
-	
+
 	return ErrDotMissingInterfacef(obj)
 }
 
@@ -162,27 +162,27 @@ func HasMethodPOn(obj LispValue, name string) bool {
 	if asObj, ok := obj.(ObjProtocol); ok {
 		return asObj.HasMethodP(name)
 	}
-	
+
 	// Then try adaptable values
 	if adaptable, ok := obj.(AdaptableLispValue); ok {
 		return adaptable.AsObject().HasMethodP(name)
 	}
-	
+
 	// Legacy handling for DotAccessible
 	if dotObj, ok := obj.(DotAccessible); ok {
 		return dotObj.HasMethod(name)
 	}
-	
+
 	// Special handling for PythonicDict
 	if dict, ok := obj.(*PythonicDict); ok {
 		return dict.HasMethod(name)
 	}
-	
+
 	// Special handling for PythonicObject
 	if pyObj, ok := obj.(*PythonicObject); ok {
 		return pyObj.HasMethod(name)
 	}
-	
+
 	// Special handling for special types
 	switch obj.(type) {
 	case *Generator:
@@ -190,7 +190,7 @@ func HasMethodPOn(obj LispValue, name string) bool {
 	case *Lambda:
 		return name == "call"
 	}
-	
+
 	return false
 }
 
@@ -201,29 +201,29 @@ func CallMethodPOn(obj LispValue, name string, args []LispValue, eval Evaluator,
 	if asObj, ok := obj.(ObjProtocol); ok {
 		return asObj.CallMethodP(name, args, eval, env)
 	}
-	
+
 	// Then try adaptable values
 	if adaptable, ok := obj.(AdaptableLispValue); ok {
 		return adaptable.AsObject().CallMethodP(name, args, eval, env)
 	}
-	
+
 	// Legacy handling for DotAccessible
 	if dotObj, ok := obj.(DotAccessible); ok {
 		return dotObj.CallMethod(name, args)
 	}
-	
+
 	// Special handling for PythonicDict
 	if dict, ok := obj.(*PythonicDict); ok {
 		return dict.CallMethod(name, args)
 	}
-	
+
 	// Special handling for PythonicObject
 	if pyObj, ok := obj.(*PythonicObject); ok {
 		// Make sure evaluator is set
 		pyObj.SetEvaluator(eval)
 		return pyObj.CallMethod(name, args)
 	}
-	
+
 	// Special handling for special types
 	switch typedObj := obj.(type) {
 	case *Generator:
@@ -235,11 +235,50 @@ func CallMethodPOn(obj LispValue, name string, args []LispValue, eval Evaluator,
 			return eval.Apply(typedObj, args, env)
 		}
 	}
-	
+
 	return nil, ErrDotNoMethodf(name)
 }
 
 // ErrDotEvaluatorMissingf formats an error message for missing evaluator
 func ErrDotEvaluatorMissingf(methodName string) error {
 	return fmt.Errorf(ErrDotEvaluatorMissing, methodName)
+}
+
+// DirectGetProp is a helper function for direct property access on instances
+// It skips intermediate steps and directly accesses the object's attributes
+func DirectGetProp(obj LispValue, name string) (LispValue, bool) {
+	// Handle PythonicObject directly for better performance
+	if pyObj, ok := obj.(*PythonicObject); ok {
+		if pyObj.Attributes != nil {
+			if val, exists := pyObj.Attributes.Get(name); exists {
+				return val, true
+			}
+		}
+		return nil, false
+	}
+
+	// For all other types, fall back to the standard GetPropFrom
+	return GetPropFrom(obj, name)
+}
+
+// DirectSetProp is a helper function for direct property setting on instances
+// It skips intermediate steps and directly sets the object's attributes
+func DirectSetProp(obj LispValue, name string, value LispValue) error {
+	// Handle PythonicObject directly for better performance
+	if pyObj, ok := obj.(*PythonicObject); ok {
+		if pyObj.Attributes == nil {
+			pyObj.Attributes = NewPythonicDict()
+		}
+		pyObj.Attributes.Set(name, value)
+		return nil
+	}
+
+	// Handle PythonicDict directly
+	if dict, ok := obj.(*PythonicDict); ok {
+		dict.Set(name, value)
+		return nil
+	}
+
+	// For all other types, fall back to the standard SetPropOn
+	return SetPropOn(obj, name, value)
 }

@@ -10,6 +10,8 @@ import (
 func RegisterDotForms(forms map[core.LispSymbol]SpecialFormFunc) {
 	forms["dot"] = EvalDot
 	forms["."] = EvalDot
+	forms["set-prop"] = EvalSetProperty // Direct property setter
+	forms["get-prop"] = EvalGetProperty // Direct property getter
 }
 
 // EvalDot implements the dot notation for method access and property access
@@ -157,4 +159,106 @@ func isMethodCall(args []core.LispValue, idx int) bool {
 
 	// Default to assuming it's a method call if there are additional arguments
 	return true
+}
+
+// EvalGetProperty implements direct property access for objects
+// Usage: (get-prop object "property-name")
+func EvalGetProperty(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Validate arguments
+	if len(args) != 2 {
+		return nil, fmt.Errorf("get-prop requires exactly 2 arguments: object and property name")
+	}
+
+	// Get the object
+	object, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating object expression: %v", err)
+	}
+
+	// Get the property name
+	var propertyName string
+	switch prop := args[1].(type) {
+	case string:
+		propertyName = prop
+	case core.LispSymbol:
+		propertyName = string(prop)
+	default:
+		// Evaluate it if needed
+		evalProp, err := e.Eval(args[1], env)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating property name: %v", err)
+		}
+
+		// Convert to string
+		switch ep := evalProp.(type) {
+		case string:
+			propertyName = ep
+		case core.LispSymbol:
+			propertyName = string(ep)
+		default:
+			propertyName = fmt.Sprintf("%v", evalProp)
+		}
+	}
+
+	// Use the direct property access function
+	value, err := core.DirectPropertyAccess(object, propertyName)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
+}
+
+// EvalSetProperty implements direct property setting for objects
+// Usage: (set-prop object "property-name" value)
+func EvalSetProperty(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	// Validate arguments
+	if len(args) != 3 {
+		return nil, fmt.Errorf("set-prop requires exactly 3 arguments: object, property name, and value")
+	}
+
+	// Get the object
+	object, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating object expression: %v", err)
+	}
+
+	// Get the property name
+	var propertyName string
+	switch prop := args[1].(type) {
+	case string:
+		propertyName = prop
+	case core.LispSymbol:
+		propertyName = string(prop)
+	default:
+		// Evaluate it if needed
+		evalProp, err := e.Eval(args[1], env)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating property name: %v", err)
+		}
+
+		// Convert to string
+		switch ep := evalProp.(type) {
+		case string:
+			propertyName = ep
+		case core.LispSymbol:
+			propertyName = string(ep)
+		default:
+			propertyName = fmt.Sprintf("%v", evalProp)
+		}
+	}
+
+	// Evaluate the value to set
+	value, err := e.Eval(args[2], env)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating value: %v", err)
+	}
+
+	// Use the direct property setter
+	if err := core.DirectPropertySet(object, propertyName, value); err != nil {
+		return nil, err
+	}
+
+	// Return the set value
+	return value, nil
 }

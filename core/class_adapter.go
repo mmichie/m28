@@ -36,7 +36,7 @@ func (ca *ClassAdapter) CallMethodP(name string, args []LispValue, eval Evaluato
 	if !exists {
 		return nil, fmt.Errorf("method '%s' not found on class %s", name, ca.Class.Name)
 	}
-	
+
 	// Call the class method (static method)
 	return eval.Apply(method, args, env)
 }
@@ -97,7 +97,7 @@ func (oa *ObjectAdapter) HasMethodP(name string) bool {
 func (oa *ObjectAdapter) CallMethodP(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
 	// Update the evaluator reference
 	oa.Object.SetEvaluator(eval)
-	
+
 	return oa.Object.CallMethod(name, args)
 }
 

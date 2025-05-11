@@ -33,7 +33,7 @@ func (ma *ModuleAdapter) HasMethodP(name string) bool {
 	if ma.Module.HasMethod(name) {
 		return true
 	}
-	
+
 	// Then check if it's a callable property
 	if value, exists := ma.Module.Get(name); exists {
 		switch value.(type) {
@@ -41,7 +41,7 @@ func (ma *ModuleAdapter) HasMethodP(name string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -51,7 +51,7 @@ func (ma *ModuleAdapter) CallMethodP(name string, args []LispValue, eval Evaluat
 	if ma.Module.HasMethod(name) {
 		return ma.Module.CallMethod(name, args)
 	}
-	
+
 	// Otherwise, try to get and call the property as a function
 	if value, exists := ma.Module.Get(name); exists {
 		switch fn := value.(type) {
@@ -63,7 +63,7 @@ func (ma *ModuleAdapter) CallMethodP(name string, args []LispValue, eval Evaluat
 			return eval.Apply(fn, args, env)
 		}
 	}
-	
+
 	return nil, ErrDotNoMethodf(name)
 }
 
