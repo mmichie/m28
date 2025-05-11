@@ -1,0 +1,84 @@
+# M28 Shell RC File Example
+# Place this in your home directory as .m28rc
+
+# Define welcome message
+(def welcome-message "Welcome to M28 Shell!")
+(print welcome-message)
+
+# Define common shell commands as functions
+(def (ls) (shell "ls -la"))
+(def (ll) (shell "ls -l"))
+(def (la) (shell "ls -la"))
+
+# Git shortcuts
+(def (gs) (shell "git status"))
+(def (gb) (shell "git branch"))
+(def (gp) (shell "git pull"))
+(def (gc message) (shell (+ "git commit -m \"" message "\"")))
+
+# Function to show disk usage
+(def (disk-usage)
+  (print "Disk usage:")
+  (shell "df -h"))
+
+# Function to show system info
+(def (system-info)
+  (print "System information:")
+  (shell "uname -a")
+  (print "CPU info:")
+  (shell "cat /proc/cpuinfo | grep 'model name' | head -1"))
+
+# Define a better prompt
+(def (set-prompt)
+  (def (get-git-branch)
+    (try
+      (let ((branch (shell "git branch --show-current 2>/dev/null")))
+        (if (= branch "")
+          ""
+          (+ " [" (trim branch) "]")))
+      (except (e) "")))
+  
+  (def (get-current-dir)
+    (let ((path (pwd)))
+      (last (split "/" path))))
+  
+  # Format: username@directory [git-branch]>
+  (+ (getenv "USER") "@" (get-current-dir) (get-git-branch) "> "))
+
+# Helper function to find files
+(def (find-files pattern)
+  (shell (+ "find . -name \"" pattern "\" -type f")))
+
+# Helper function to edit file with preferred editor
+(def (edit file)
+  (let ((editor (or (getenv "EDITOR") "nano")))
+    (shell (+ editor " " file))))
+
+# Helper function to navigate directories with pushd/popd semantics
+(def directory-stack '())
+
+(def (pushd dir)
+  (set! directory-stack (cons (pwd) directory-stack))
+  (cd dir)
+  (print "Pushed to" dir))
+
+(def (popd)
+  (if (null? directory-stack)
+    (print "Directory stack is empty")
+    (let ((prev-dir (car directory-stack)))
+      (set! directory-stack (cdr directory-stack))
+      (cd prev-dir)
+      (print "Popped back to" prev-dir))))
+
+# Print working directory in a nicer format
+(def (pwd-pretty)
+  (let ((home (getenv "HOME"))
+        (current (pwd)))
+    (if (and (>= (length current) (length home))
+             (= (substring current 0 (length home)) home))
+      (+ "~" (substring current (length home)))
+      current)))
+
+# Print startup message
+(print "M28 Shell initialized with custom functions")
+(print "Type '(help)' for a list of available commands")

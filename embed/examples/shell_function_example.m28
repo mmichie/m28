@@ -1,0 +1,65 @@
+# Example M28 shell functions
+
+# Define a function to get file information
+(def (file-info path)
+  (print "File information for" path ":")
+  (shell (+ "ls -la " path)))
+
+# Function to search files
+(def (find-in-files pattern dir)
+  (print "Searching for" pattern "in" dir)
+  (shell (+ "grep -r \"" pattern "\" " dir)))
+
+# Create a function that combines multiple shell commands
+(def (git-status-and-branch)
+  (print "Current git branch:")
+  (shell "git branch --show-current")
+  (print "\nGit status:")
+  (shell "git status -s"))
+
+# Create a function to run a command and handle errors
+(def (try-command cmd)
+  (try
+    (shell cmd)
+    (except (e)
+      (print "Command failed:" cmd)
+      (print "Error:" e)
+      "ERROR")))
+
+# Create a simple build script
+(def (build-project)
+  (print "Building project...")
+  (let ((result (try-command "make build")))
+    (if (= result "ERROR")
+      (print "Build failed!")
+      (print "Build succeeded!"))))
+
+# Create a simple deployment function
+(def (deploy env)
+  (print "Deploying to" env "environment...")
+  (case env
+    ("dev" (shell "make deploy-dev"))
+    ("staging" (shell "make deploy-staging"))
+    ("prod" 
+      (print "Warning: Deploying to production!")
+      (let ((confirm (shell "read -p 'Are you sure? (y/n) ' && echo $REPLY")))
+        (if (= (trim confirm) "y")
+          (shell "make deploy-prod")
+          (print "Deployment cancelled."))))
+    (else (print "Unknown environment:" env))))
+
+# Example function that processes files
+(def (process-files pattern)
+  (let ((files (shell (+ "find . -name \"" pattern "\" -type f"))))
+    (for-each (lambda (file)
+                (print "Processing" file)
+                (shell (+ "cat " file " | wc -l")))
+              (split "\n" (trim files)))))
+
+# Example of a custom prompt
+(def (custom-prompt)
+  (let ((dir (last (split "/" (pwd))))
+        (git-branch (try-command "git branch --show-current")))
+    (if (= git-branch "ERROR")
+      (+ dir "> ")
+      (+ dir " (" (trim git-branch) ")> "))))
