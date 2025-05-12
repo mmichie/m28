@@ -55,8 +55,12 @@ func (m *ModuleLoaderImpl) LoadModule(name string, e core.Evaluator) (*core.Pyth
 		return nil, fmt.Errorf("failed to read module file %s: %v", modulePath, err)
 	}
 
+	// Register source code for better error reporting
+	core.RegisterSourceCode(modulePath, string(content))
+
 	// Parse the module content
 	p := parser.NewParser()
+	p.SetFilename(modulePath) // Set filename for better error reporting
 	parsed, err := p.Parse(string(content))
 	if err != nil {
 		return nil, fmt.Errorf("syntax error in module %s: %v", name, err)
@@ -90,30 +94,19 @@ func (m *ModuleLoaderImpl) LoadModule(name string, e core.Evaluator) (*core.Pyth
 	}
 
 	// Second pass: collect all defined symbols from the module's environment
-	// Debug - print all symbols in the module's environment
-	fmt.Println("DEBUG: Module environment symbols:")
 	moduleEnv.ForEachSymbol(func(symbol core.LispSymbol, value core.LispValue) {
 		// Only add non-builtin symbols to the module dictionary
 		if !isBuiltinSymbol(symbol) {
-			fmt.Printf("DEBUG: Adding symbol '%s' to module, type: %T\n", symbol, value)
 			// Add to module dictionary - only user-defined symbols
 			module.Set(symbol, value)
 		}
 	})
 
 	// Check if the module defined an __exports__ list
-	fmt.Printf("DEBUG: Checking for __exports__ in module\n")
 	exportsVal, hasExports := module.Get("__exports__")
 	if hasExports {
-		fmt.Printf("DEBUG: Module has __exports__: %v (type: %T)\n", exportsVal, exportsVal)
 		// If __exports__ is defined, only export the symbols listed in it
 		if exportsList, ok := exportsVal.(core.LispList); ok {
-			fmt.Printf("DEBUG: Exports list is valid with %d items\n", len(exportsList))
-
-			// CRITICAL BUGFIX: We need to operate directly in the original module
-			// rather than creating a new filtered module, to ensure all properties
-			// are correctly preserved for dot notation and dictionary operations
-
 			// First, build a list of keys to keep
 			keysToKeep := make(map[string]bool)
 
@@ -135,30 +128,18 @@ func (m *ModuleLoaderImpl) LoadModule(name string, e core.Evaluator) (*core.Pyth
 				case string:
 					symbolName = sym
 				default:
-					fmt.Printf("DEBUG: Skipping non-symbol export: %T %v\n", symbolVal, symbolVal)
 					continue // Skip non-symbol/string items
 				}
 
 				if _, ok := module.Get(symbolName); ok {
-					fmt.Printf("DEBUG: Adding '%s' to keys to keep\n", symbolName)
 					keysToKeep[symbolName] = true
-				} else {
-					fmt.Printf("DEBUG: Symbol '%s' in exports but not found in module\n", symbolName)
 				}
-			}
-
-			// DEBUG: Show all keys in the original module
-			items, _ := module.CallMethod("items", []core.LispValue{})
-			if itemsList, ok := items.(core.LispList); ok {
-				fmt.Printf("DEBUG: Original module has %d keys\n", len(itemsList))
 			}
 
 			// Create a list of user-defined keys to remove
 			var keysToRemove []string
 			keysList, err := module.CallMethod("keys", []core.LispValue{})
-			if err != nil {
-				fmt.Printf("DEBUG: Error getting keys: %v\n", err)
-			} else {
+			if err == nil {
 				if keyList, ok := keysList.(core.LispList); ok {
 					for _, keyVal := range keyList {
 						if keyStr, ok := keyVal.(string); ok {
@@ -176,25 +157,7 @@ func (m *ModuleLoaderImpl) LoadModule(name string, e core.Evaluator) (*core.Pyth
 
 			// Remove the user-defined keys that aren't in the export list
 			for _, key := range keysToRemove {
-				fmt.Printf("DEBUG: Removing unexported key '%s' from module\n", key)
-				_, err := module.CallMethod("delete", []core.LispValue{key})
-				if err != nil {
-					fmt.Printf("DEBUG: Error removing key '%s': %v\n", key, err)
-				}
-			}
-		}
-	}
-
-	// Debug - print the final module content
-	fmt.Println("DEBUG: Final module content:")
-	// Get the keys from the dictionary
-	items, _ := module.CallMethod("items", []core.LispValue{})
-	if itemsList, ok := items.(core.LispList); ok {
-		for _, item := range itemsList {
-			if pair, ok := item.(core.LispList); ok && len(pair) == 2 {
-				key := pair[0]
-				value := pair[1]
-				fmt.Printf("DEBUG: Module key '%v', value type: %T\n", key, value)
+				_, _ = module.CallMethod("delete", []core.LispValue{key})
 			}
 		}
 	}
@@ -218,21 +181,78 @@ func LoadModule(name string, e core.Evaluator) (*core.PythonicDict, error) {
 		return nil, err
 	}
 
-	// Debug - print the wrapper module content
-	fmt.Println("DEBUG: Module after LoadModule wrapper:")
-	// Get the keys from the dictionary
-	items, _ := module.CallMethod("items", []core.LispValue{})
-	if itemsList, ok := items.(core.LispList); ok {
-		for _, item := range itemsList {
-			if pair, ok := item.(core.LispList); ok && len(pair) == 2 {
-				key := pair[0]
-				value := pair[1]
-				fmt.Printf("DEBUG: Module wrapper key '%v', value type: %T\n", key, value)
+	return module, nil
+}
+
+// Helper function to register a module in the environment
+func registerModule(moduleName string, module *core.PythonicDict, e core.Evaluator, env core.Environment) error {
+	// Determine module name for environment binding
+	// Use the last part of the path for module name if there's a path separator
+	moduleNameParts := strings.Split(moduleName, "/")
+	moduleBaseName := moduleNameParts[len(moduleNameParts)-1]
+
+	// Remove .m28 extension if present
+	moduleBaseName = strings.TrimSuffix(moduleBaseName, ".m28")
+
+	// Define the module in the environment
+	env.Define(core.LispSymbol(moduleBaseName), module)
+
+	// Create a dot handler for the module to allow attribute access
+	env.Define(core.LispSymbol(moduleBaseName+".__dot__"), core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf(core.ErrDotMissingArgs)
+		}
+
+		// Get the property name
+		var propName string
+		switch prop := args[0].(type) {
+		case string:
+			propName = prop
+		case core.LispSymbol:
+			propName = string(prop)
+		default:
+			return nil, fmt.Errorf(core.ErrDotPropertyType, args[0])
+		}
+
+		// Get the property from the module
+		value, ok := module.Get(propName)
+		if !ok {
+			return nil, core.ErrDotModulePropertyf(moduleBaseName, propName)
+		}
+
+		// Check if additional arguments were provided (method call)
+		if len(args) > 1 {
+			// Extract the method arguments (skip the property name)
+			methodArgs := args[1:]
+
+			// Handle different callable types
+			switch fn := value.(type) {
+			case core.BuiltinFunc:
+				// Call the builtin function directly
+				return fn(methodArgs, env)
+			case *core.Lambda:
+				// Use evaluator to apply the lambda
+				// We need the evaluator to apply the lambda
+				if moduleLoader := core.GetModuleLoader(); moduleLoader != nil {
+					evaluator := moduleLoader.GetEvaluator()
+					return evaluator.Apply(fn, methodArgs, env)
+				}
+				return nil, fmt.Errorf(core.ErrDotEvaluatorMissing, propName)
+			case core.DotAccessible:
+				// Check if the object has a __call__ method
+				if fn.HasMethod("__call__") {
+					return fn.CallMethod("__call__", methodArgs)
+				}
+				return nil, core.ErrDotNoMethodf(propName)
+			default:
+				return nil, core.ErrDotNotCallablef(propName, value)
 			}
 		}
-	}
 
-	return module, nil
+		return value, nil
+	}))
+
+	return nil
 }
 
 func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
@@ -256,105 +276,9 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 				return nil, fmt.Errorf("failed to import module %s: %v", moduleName, err)
 			}
 
-			// Determine module name for environment binding
-			// Use the last part of the path for module name if there's a path separator
-			moduleNameParts := strings.Split(moduleName, "/")
-			moduleBaseName := moduleNameParts[len(moduleNameParts)-1]
-
-			// Remove .m28 extension if present
-			moduleBaseName = strings.TrimSuffix(moduleBaseName, ".m28")
-
-			// Debug - print info before defining
-			fmt.Printf("DEBUG: Defining symbol module '%s' in environment\n", moduleBaseName)
-
-			// Define the module in the environment
-			env.Define(core.LispSymbol(moduleBaseName), module)
-
-			// Create a dot handler for the module to allow attribute access
-			fmt.Printf("DEBUG: Creating dot handler for module '%s'\n", moduleBaseName)
-			env.Define(core.LispSymbol(moduleBaseName+".__dot__"), core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-				if len(args) < 1 {
-					return nil, fmt.Errorf(core.ErrDotMissingArgs)
-				}
-
-				// Get the property name
-				var propName string
-				switch prop := args[0].(type) {
-				case string:
-					propName = prop
-				case core.LispSymbol:
-					propName = string(prop)
-				default:
-					return nil, fmt.Errorf(core.ErrDotPropertyType, args[0])
-				}
-
-				fmt.Printf("DEBUG: Dot handler for %s accessing property: %s\n", moduleBaseName, propName)
-
-				// Get the property from the module
-				value, ok := module.Get(propName)
-				if !ok {
-					return nil, core.ErrDotModulePropertyf(moduleBaseName, propName)
-				}
-
-				fmt.Printf("DEBUG: Found property %s in module %s, type: %T\n", propName, moduleBaseName, value)
-
-				// Check if additional arguments were provided (method call)
-				if len(args) > 1 {
-					fmt.Printf("DEBUG: Method call detected with %d additional arguments\n", len(args)-1)
-
-					// Extract the method arguments (skip the property name)
-					methodArgs := args[1:]
-
-					// Handle different callable types
-					switch fn := value.(type) {
-					case core.BuiltinFunc:
-						// Call the builtin function directly
-						fmt.Printf("DEBUG: Calling builtin function %s\n", propName)
-						return fn(methodArgs, env)
-					case *core.Lambda:
-						// Use evaluator to apply the lambda
-						fmt.Printf("DEBUG: Calling lambda function %s\n", propName)
-						// We need the evaluator to apply the lambda
-						if moduleLoader := core.GetModuleLoader(); moduleLoader != nil {
-							evaluator := moduleLoader.GetEvaluator()
-							return evaluator.Apply(fn, methodArgs, env)
-						}
-						return nil, fmt.Errorf(core.ErrDotEvaluatorMissing, propName)
-					case core.DotAccessible:
-						// Check if the object has a __call__ method
-						if fn.HasMethod("__call__") {
-							fmt.Printf("DEBUG: Calling __call__ method on %s\n", propName)
-							return fn.CallMethod("__call__", methodArgs)
-						}
-						return nil, core.ErrDotNoMethodf(propName)
-					default:
-						return nil, core.ErrDotNotCallablef(propName, value)
-					}
-				}
-
-				return value, nil
-			}))
-
-			// Debug - verify it was added
-			if newValue, found := env.Get(core.LispSymbol(moduleBaseName)); found {
-				fmt.Printf("DEBUG: Symbol module '%s' defined as type: %T\n", moduleBaseName, newValue)
-
-				// Check module content
-				if dict, ok := newValue.(*core.PythonicDict); ok {
-					items, _ := dict.CallMethod("items", []core.LispValue{})
-					if itemsList, ok := items.(core.LispList); ok {
-						fmt.Printf("DEBUG: Symbol module '%s' has %d items\n", moduleBaseName, len(itemsList))
-					}
-				}
-
-				// Verify dot handler was registered
-				if handler, ok := env.Get(core.LispSymbol(moduleBaseName + ".__dot__")); ok {
-					fmt.Printf("DEBUG: Dot handler for '%s' registered successfully: %T\n", moduleBaseName, handler)
-				} else {
-					fmt.Printf("DEBUG: Failed to register dot handler for '%s'\n", moduleBaseName)
-				}
-			} else {
-				fmt.Printf("DEBUG: Failed to define symbol module '%s' in environment\n", moduleBaseName)
+			// Register the module in the environment
+			if err := registerModule(moduleName, module, e, env); err != nil {
+				return nil, err
 			}
 
 		case string:
@@ -365,105 +289,9 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 				return nil, fmt.Errorf("failed to import module %s: %v", modulePath, err)
 			}
 
-			// Determine module name for environment binding
-			// Use the last part of the path for module name if there's a path separator
-			moduleNameParts := strings.Split(modulePath, "/")
-			moduleBaseName := moduleNameParts[len(moduleNameParts)-1]
-
-			// Remove .m28 extension if present
-			moduleBaseName = strings.TrimSuffix(moduleBaseName, ".m28")
-
-			// Debug - print info before defining
-			fmt.Printf("DEBUG: Defining string module '%s' in environment\n", moduleBaseName)
-
-			// Define the module in the environment
-			env.Define(core.LispSymbol(moduleBaseName), module)
-
-			// Create a dot handler for the module to allow attribute access
-			fmt.Printf("DEBUG: Creating dot handler for module '%s'\n", moduleBaseName)
-			env.Define(core.LispSymbol(moduleBaseName+".__dot__"), core.BuiltinFunc(func(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-				if len(args) < 1 {
-					return nil, fmt.Errorf(core.ErrDotMissingArgs)
-				}
-
-				// Get the property name
-				var propName string
-				switch prop := args[0].(type) {
-				case string:
-					propName = prop
-				case core.LispSymbol:
-					propName = string(prop)
-				default:
-					return nil, fmt.Errorf(core.ErrDotPropertyType, args[0])
-				}
-
-				fmt.Printf("DEBUG: Dot handler for %s accessing property: %s\n", moduleBaseName, propName)
-
-				// Get the property from the module
-				value, ok := module.Get(propName)
-				if !ok {
-					return nil, core.ErrDotModulePropertyf(moduleBaseName, propName)
-				}
-
-				fmt.Printf("DEBUG: Found property %s in module %s, type: %T\n", propName, moduleBaseName, value)
-
-				// Check if additional arguments were provided (method call)
-				if len(args) > 1 {
-					fmt.Printf("DEBUG: Method call detected with %d additional arguments\n", len(args)-1)
-
-					// Extract the method arguments (skip the property name)
-					methodArgs := args[1:]
-
-					// Handle different callable types
-					switch fn := value.(type) {
-					case core.BuiltinFunc:
-						// Call the builtin function directly
-						fmt.Printf("DEBUG: Calling builtin function %s\n", propName)
-						return fn(methodArgs, env)
-					case *core.Lambda:
-						// Use evaluator to apply the lambda
-						fmt.Printf("DEBUG: Calling lambda function %s\n", propName)
-						// We need the evaluator to apply the lambda
-						if moduleLoader := core.GetModuleLoader(); moduleLoader != nil {
-							evaluator := moduleLoader.GetEvaluator()
-							return evaluator.Apply(fn, methodArgs, env)
-						}
-						return nil, fmt.Errorf(core.ErrDotEvaluatorMissing, propName)
-					case core.DotAccessible:
-						// Check if the object has a __call__ method
-						if fn.HasMethod("__call__") {
-							fmt.Printf("DEBUG: Calling __call__ method on %s\n", propName)
-							return fn.CallMethod("__call__", methodArgs)
-						}
-						return nil, core.ErrDotNoMethodf(propName)
-					default:
-						return nil, core.ErrDotNotCallablef(propName, value)
-					}
-				}
-
-				return value, nil
-			}))
-
-			// Debug - verify it was added
-			if newValue, found := env.Get(core.LispSymbol(moduleBaseName)); found {
-				fmt.Printf("DEBUG: String module '%s' defined as type: %T\n", moduleBaseName, newValue)
-
-				// Check module content
-				if dict, ok := newValue.(*core.PythonicDict); ok {
-					items, _ := dict.CallMethod("items", []core.LispValue{})
-					if itemsList, ok := items.(core.LispList); ok {
-						fmt.Printf("DEBUG: String module '%s' has %d items\n", moduleBaseName, len(itemsList))
-					}
-				}
-
-				// Verify dot handler was registered
-				if handler, ok := env.Get(core.LispSymbol(moduleBaseName + ".__dot__")); ok {
-					fmt.Printf("DEBUG: Dot handler for '%s' registered successfully: %T\n", moduleBaseName, handler)
-				} else {
-					fmt.Printf("DEBUG: Failed to register dot handler for '%s'\n", moduleBaseName)
-				}
-			} else {
-				fmt.Printf("DEBUG: Failed to define string module '%s' in environment\n", moduleBaseName)
+			// Register the module in the environment
+			if err := registerModule(modulePath, module, e, env); err != nil {
+				return nil, err
 			}
 
 		case core.LispList:

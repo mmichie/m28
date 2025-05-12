@@ -106,13 +106,36 @@ func (r *ModuleRegistry) GetModule(name string) (*PythonicDict, bool) {
 
 // ResolveModulePath resolves a module name to its file path
 func (r *ModuleRegistry) ResolveModulePath(name string) (string, error) {
-	// Check if the name is a path itself (contains / or .) with .m28 extension
+	// Handle case where name is already a valid file path
+	if _, err := os.Stat(name); err == nil {
+		// File exists with the exact path
+		absPath, err := filepath.Abs(name)
+		if err != nil {
+			return name, nil // Fall back to the original path if abs fails
+		}
+		return absPath, nil
+	}
+
+	// Check if it's a .m28 path that needs to be normalized
 	if filepath.Ext(name) == ".m28" {
-		if _, err := os.Stat(name); err == nil {
-			// File exists with the exact path
-			absPath, err := filepath.Abs(name)
+		// Try to resolve it both as a relative path and in the search paths
+		// First check if it's a relative path
+		if absPath, err := filepath.Abs(name); err == nil {
+			if _, err := os.Stat(absPath); err == nil {
+				return absPath, nil
+			}
+		}
+	}
+
+	// Try with .m28 extension added if not already present
+	nameWithExt := name
+	if filepath.Ext(name) != ".m28" {
+		nameWithExt = name + ".m28"
+		// Check if the name with extension is a valid path
+		if _, err := os.Stat(nameWithExt); err == nil {
+			absPath, err := filepath.Abs(nameWithExt)
 			if err != nil {
-				return name, nil // Fall back to the original path if abs fails
+				return nameWithExt, nil
 			}
 			return absPath, nil
 		}
@@ -121,7 +144,7 @@ func (r *ModuleRegistry) ResolveModulePath(name string) (string, error) {
 	// Look for the module in each of the search paths
 	for _, path := range r.searchPath {
 		// Try with .m28 extension
-		fullPath := filepath.Join(path, name+".m28")
+		fullPath := filepath.Join(path, nameWithExt)
 		if _, err := os.Stat(fullPath); err == nil {
 			// Found the file
 			absPath, err := filepath.Abs(fullPath)
@@ -129,6 +152,18 @@ func (r *ModuleRegistry) ResolveModulePath(name string) (string, error) {
 				return fullPath, nil // Fall back to the original path
 			}
 			return absPath, nil
+		}
+
+		// If we didn't find it with .m28 extension, try with original name
+		if nameWithExt != name {
+			fullPath = filepath.Join(path, name)
+			if _, err := os.Stat(fullPath); err == nil {
+				absPath, err := filepath.Abs(fullPath)
+				if err != nil {
+					return fullPath, nil
+				}
+				return absPath, nil
+			}
 		}
 
 		// Check if it's a directory with __init__.m28 (package)
