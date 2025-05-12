@@ -396,26 +396,18 @@ func (e *Evaluator) enrichErrorWithTraceback(err error) error {
 }
 
 // ApplyLambda applies a Lambda function to arguments with proper environment handling
-// TODO: Move more of this logic to Lambda.Apply
+// This delegates to the Lambda's Apply method for most of the logic
 func (e *Evaluator) ApplyLambda(lambda *core.Lambda, args []core.LispValue, callEnv core.Environment) (core.LispValue, error) {
-	// Create a new environment for the function call
-	lambdaEnv := callEnv.NewEnvironment(lambda.Env)
+	// Call the Lambda.Apply method to handle argument binding and evaluation
+	result, err := lambda.Apply(e, args, callEnv)
 
-	// Process keyword arguments
-	if !e.processLambdaArgs(lambda, args, lambdaEnv) {
-		return nil, fmt.Errorf("parameter mismatch in lambda call")
-	}
-
-	// Tail call optimization would be implemented here, but we'll skip it for now
-
-	// Evaluate the function body in the new environment
-	result, err := e.Eval(lambda.Body, lambdaEnv)
+	// Special handling for return statements (ReturnSignal)
 	if err != nil {
-		// Handle return statements
 		if ret, ok := err.(special_forms.ReturnSignal); ok {
 			// Return the value from the return statement
 			return ret.Value, nil
 		}
+		// Pass through other errors
 		return nil, err
 	}
 
@@ -423,6 +415,8 @@ func (e *Evaluator) ApplyLambda(lambda *core.Lambda, args []core.LispValue, call
 }
 
 // processLambdaArgs binds function arguments to parameters in the lambda environment
+// DEPRECATED: This function is kept for backward compatibility and will be removed in a future version.
+// Use core.processLambdaArgs instead, which has the same functionality.
 // Returns true if successful, false if there's a parameter mismatch
 func (e *Evaluator) processLambdaArgs(lambda *core.Lambda, args []core.LispValue, lambdaEnv core.Environment) bool {
 	// Extract keyword arguments and count positional arguments
@@ -638,7 +632,8 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 		// Call the builtin function directly
 		return fn(args, env)
 	case *core.Lambda:
-		// Apply lambda function
+		// Apply lambda function via lambda.Apply, but keeping return handling in ApplyLambda
+		// This allows us to properly handle return signals while using Lambda.Apply
 		return e.ApplyLambda(fn, args, env)
 	case *core.BoundMethod:
 		// Apply method with instance
