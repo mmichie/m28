@@ -24,10 +24,19 @@ func NewEvaluator() core.Evaluator {
 
 // pushCallFrame adds a new call frame to the call stack
 func (e *Evaluator) pushCallFrame(funcName string, location core.Location, statement string) {
+	// Enhance the statement by extracting more code context if available
+	enhancedStatement := statement
+
+	// If this is an expression, try to get more context from source code
+	if sourceCode, ok := core.GetSourceCode(location); ok && sourceCode != "" {
+		// Use the source code from the expression to provide better context
+		enhancedStatement = sourceCode
+	}
+
 	entry := core.TraceEntry{
 		Function:  funcName,
 		Location:  location,
-		Statement: statement,
+		Statement: enhancedStatement,
 	}
 	e.callStack = append(e.callStack, entry)
 	e.currentFunc = funcName
@@ -355,8 +364,27 @@ func (e *Evaluator) enrichErrorWithTraceback(err error) error {
 	if exErr, ok := err.(*core.Exception); ok {
 		ex = exErr
 	} else {
-		// Convert regular error to Exception
-		ex = core.NewException("RuntimeError", err.Error())
+		// Convert regular error to Exception and improve error message
+		errorMsg := err.Error()
+
+		// Enhance common error messages with more descriptive information
+		if strings.Contains(errorMsg, "undefined symbol") {
+			// Add suggestion to check variable names or import modules
+			symbol := strings.TrimPrefix(errorMsg, "undefined symbol: ")
+			errorMsg = fmt.Sprintf("undefined symbol: %s (did you forget to define the variable or import a module?)", symbol)
+		} else if strings.Contains(errorMsg, "cannot call non-function") {
+			// Add suggestion for calling non-callable values
+			errorMsg = fmt.Sprintf("%s (make sure you're calling a function, not a value)", errorMsg)
+		} else if strings.Contains(errorMsg, "index out of range") {
+			// Add suggestion for list index errors
+			errorMsg = fmt.Sprintf("%s (check your list indices and list length)", errorMsg)
+		} else if strings.Contains(errorMsg, "divide by zero") {
+			// Improve division by zero errors
+			errorMsg = "division by zero is not allowed"
+		}
+
+		// Create the enhanced exception
+		ex = core.NewException("RuntimeError", errorMsg)
 	}
 
 	// Add current traceback if not present

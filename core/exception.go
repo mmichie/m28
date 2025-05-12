@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -76,28 +77,40 @@ func (e *Exception) Error() string {
 func (e *Exception) String() string {
 	var result strings.Builder
 
+	// Color codes
+	cyan := getColorCode("\033[1;36m")
+	blue := getColorCode("\033[1;34m")
+	white := getColorCode("\033[37m")
+	red := getColorCode("\033[1;31m")
+	yellow := getColorCode("\033[1;33m")
+	bold := getColorCode("\033[1m")
+	reset := getColorCode("\033[0m")
+
 	// Add traceback if available
 	if e.Traceback != nil && len(e.Traceback) > 0 {
-		result.WriteString("Traceback (most recent call last):\n")
+		result.WriteString(fmt.Sprintf("%sTraceback (most recent call last):%s\n", cyan, reset))
 
 		// Format each traceback entry
 		for i, entry := range e.Traceback {
 			if entry.Location.Filename != "" && entry.Location.Line > 0 {
-				// Format with file, line, and function information
-				result.WriteString(fmt.Sprintf("  File \"%s\", line %d, in %s\n",
+				// Format with file, line, and function information with highlighting
+				result.WriteString(fmt.Sprintf("  %sFile \"%s\", line %d, in %s%s\n",
+					blue,
 					entry.Location.Filename,
 					entry.Location.Line,
-					entry.Function))
+					entry.Function,
+					reset))
 
 				// Indent the code statement for readability
 				if entry.Statement != "" {
-					result.WriteString(fmt.Sprintf("    %s", entry.Statement))
+					result.WriteString(fmt.Sprintf("    %s%s%s", white, entry.Statement, reset))
 				} else {
-					result.WriteString("    <unknown code>")
+					result.WriteString(fmt.Sprintf("    %s<unknown code>%s", white, reset))
 				}
 			} else {
 				// Basic format for entries without location info
-				result.WriteString(fmt.Sprintf("  in %s: %s", entry.Function, entry.Statement))
+				result.WriteString(fmt.Sprintf("  %sin %s:%s %s%s%s",
+					blue, entry.Function, reset, white, entry.Statement, reset))
 			}
 
 			// Add a newline between entries
@@ -110,12 +123,13 @@ func (e *Exception) String() string {
 		result.WriteString("\n\n")
 	}
 
-	// Add exception type and message
-	result.WriteString(fmt.Sprintf("%s: %s", e.Type, e.Message))
+	// Add exception type and message with highlighting
+	result.WriteString(fmt.Sprintf("%s%s:%s %s%s%s", red, e.Type, reset, bold, e.Message, reset))
 
 	// Add cause if available
 	if e.Cause != nil {
-		result.WriteString("\n\nThe above exception was the direct cause of the following exception:\n")
+		result.WriteString(fmt.Sprintf("\n\n%sThe above exception was the direct cause of the following exception:%s\n",
+			yellow, reset))
 		result.WriteString(e.Cause.String())
 	}
 
@@ -158,11 +172,69 @@ func NewException(typeName, message string) *Exception {
 	return exception
 }
 
+// SourceCodeCache maps filenames to source code for better error reporting
+var SourceCodeCache = make(map[string][]string)
+
+// RegisterSourceCode stores source code for a file in the cache
+func RegisterSourceCode(filename string, sourceCode string) {
+	lines := strings.Split(sourceCode, "\n")
+	SourceCodeCache[filename] = lines
+}
+
+// GetSourceCode attempts to get more context from the source code cache
+func GetSourceCode(location Location) (string, bool) {
+	if location.Filename == "" || location.Line <= 0 {
+		return "", false
+	}
+
+	lines, ok := SourceCodeCache[location.Filename]
+	if !ok || location.Line > len(lines) {
+		return "", false
+	}
+
+	// Get the line of code at the error location
+	sourceLine := lines[location.Line-1]
+	return strings.TrimSpace(sourceLine), true
+}
+
+// ColoredErrors determines whether to use colored error output
+var ColoredErrors = true
+
+// IsTerminal attempts to determine if the output is a terminal
+// where color would be useful
+func IsTerminal() bool {
+	fileInfo, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+}
+
+// DisableColors turns off colored error output
+func DisableColors() {
+	ColoredErrors = false
+}
+
+// EnableColors turns on colored error output
+func EnableColors() {
+	ColoredErrors = true
+}
+
+// getColorCode returns either the ANSI color code or empty string based on settings
+func getColorCode(code string) string {
+	if ColoredErrors && IsTerminal() {
+		return code
+	}
+	return ""
+}
+
 // StandardExceptions defines the standard exception types
 var StandardExceptions = map[string]*Exception{}
 
 // Initialize standard exceptions
 func init() {
+	// Auto-detect whether to use colors by default
+	ColoredErrors = IsTerminal()
 	// Base exception
 	baseException := &Exception{
 		Type:    "Exception",

@@ -212,6 +212,10 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 	}
 
 	content := string(fileContent)
+
+	// Register source code in cache for better error reporting
+	core.RegisterSourceCode(filename, content)
+
 	m.parser.SetFilename(filename)
 
 	expr, err := m.parser.Parse(content)

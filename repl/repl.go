@@ -68,6 +68,7 @@ func (r *REPL) Run() {
 	fmt.Println("Type 'exit' or 'quit' to exit the REPL.")
 	fmt.Println("Use Ctrl+C to interrupt.")
 	fmt.Println("Type ':toggle-keybindings' to switch between Emacs and VI keybindings.")
+	fmt.Println("Type ':toggle-colors' to enable/disable colored error output.")
 
 	for {
 		input, err := r.rl.Readline()
@@ -88,9 +89,12 @@ func (r *REPL) Run() {
 			return
 		}
 
-		if input == ":toggle-keybindings" {
-			r.toggleKeybindings()
-			continue
+		// Handle REPL commands
+		if strings.HasPrefix(input, ":") {
+			handled := r.handleCommand(input)
+			if handled {
+				continue
+			}
 		}
 
 		if input == "" {
@@ -99,14 +103,58 @@ func (r *REPL) Run() {
 
 		result, err := r.EvaluateString(input)
 		if err != nil {
-			fmt.Println("Error:", err)
+			// Print the detailed error message
+			if ex, ok := err.(*core.Exception); ok {
+				// Use the formatted exception output
+				fmt.Println(ex.String())
+			} else {
+				// Fall back to basic error display
+				fmt.Println("Error:", err)
+			}
 		} else {
 			fmt.Println("=>", core.PrintValue(result))
 		}
 	}
 }
 
+// handleCommand processes REPL commands that start with ':'
+func (r *REPL) handleCommand(cmd string) bool {
+	switch cmd {
+	case ":toggle-keybindings":
+		r.toggleKeybindings()
+		return true
+
+	case ":toggle-colors":
+		if core.ColoredErrors {
+			core.DisableColors()
+			fmt.Println("Colored error output disabled.")
+		} else {
+			core.EnableColors()
+			fmt.Println("Colored error output enabled.")
+		}
+		return true
+
+	case ":help":
+		fmt.Println("Available commands:")
+		fmt.Println("  :help                  - Show this help message")
+		fmt.Println("  :toggle-keybindings    - Switch between Emacs and VI keybindings")
+		fmt.Println("  :toggle-colors         - Enable/disable colored error output")
+		fmt.Println("  exit, quit             - Exit the REPL")
+		return true
+	}
+
+	// Command not recognized
+	return false
+}
+
 func (r *REPL) EvaluateString(input string) (core.LispValue, error) {
+	// Register the REPL input for better error reporting
+	replInputFile := "<repl>"
+	core.RegisterSourceCode(replInputFile, input)
+
+	// Set filename to special REPL indicator
+	r.parser.SetFilename(replInputFile)
+
 	expr, err := r.parser.Parse(input)
 	if err != nil {
 		// If it's a parse error, enrich it

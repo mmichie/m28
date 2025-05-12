@@ -23,6 +23,9 @@ func (r *REPL) ExecuteFile(filename string) error {
 	// Process the entire file as a single unit to ensure proper parsing
 	content := string(fileContent)
 
+	// Register source code in cache for better error reporting
+	core.RegisterSourceCode(filename, content)
+
 	// Set the current filename in the parser for better error reporting
 	r.parser.SetFilename(filename)
 
