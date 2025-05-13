@@ -1,0 +1,57 @@
+# Object Protocol Example
+#
+# This example demonstrates how the unified object protocol will work
+# once implemented. Currently this is a placeholder for future implementation.
+
+# Define a class using the proposed syntax (not yet implemented)
+(class Person ()
+  # Class attributes 
+  (= species "human")
+  
+  # Constructor
+  (def (init self name age)
+    # Instance attributes
+    (= self.name name)
+    (= self.age age))
+  
+  # Instance methods
+  (def (greet self)
+    (+ "Hello, my name is " self.name))
+  
+  (def (birthday self)
+    (= self.age (+ self.age 1))
+    (+ "Happy Birthday! " self.name " is now " (str self.age) " years old!")))
+
+# Inheritance example
+(class Employee (Person)
+  # Override constructor
+  (def (init self name age job)
+    # Call parent constructor
+    (super.init self name age)
+    # Add new attributes
+    (= self.job job))
+  
+  # Override method
+  (def (greet self)
+    (+ (super.greet self) " and I work as a " self.job)))
+
+# Usage examples (once implemented)
+#
+# Create instances
+# (= alice (Person "Alice" 30))
+# (= bob (Employee "Bob" 42 "Developer"))
+#
+# Access properties
+# (print alice.name)  # Alice
+# (print bob.job)     # Developer
+#
+# Call methods
+# (print (alice.greet))  # Hello, my name is Alice
+# (print (bob.greet))    # Hello, my name is Bob and I work as a Developer
+#
+# Class attributes
+# (print Person.species)  # human
+#
+# Method binding works correctly
+# (= greeting bob.greet)
+# (print (greeting))  # Hello, my name is Bob and I work as a Developer

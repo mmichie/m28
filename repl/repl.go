@@ -170,6 +170,11 @@ func (r *REPL) handleCommand(cmd string) bool {
 		return r.handleHistoryExecCommand(cmd)
 	}
 
+	// Handle :doc command for documentation lookup
+	if strings.HasPrefix(cmd, ":doc") {
+		return r.handleDocCommand(cmd)
+	}
+
 	switch cmd {
 	case ":toggle-keybindings":
 		r.toggleKeybindings()
@@ -195,6 +200,10 @@ func (r *REPL) handleCommand(cmd string) bool {
 		fmt.Println("  :history clear         - Clear command history")
 		fmt.Println("  :history search term   - Search history for term")
 		fmt.Println("  :!N                    - Execute history entry N")
+		fmt.Println("  :doc symbol            - Show documentation for a symbol")
+		fmt.Println("  :doc-builtins          - List all built-in functions")
+		fmt.Println("  :doc-special-forms     - List all special forms")
+		fmt.Println("  :doc-modules           - List all available modules")
 		fmt.Println("  exit, quit             - Exit the REPL")
 		fmt.Println("")
 		fmt.Println("Key bindings for history navigation (Emacs mode):")
@@ -336,6 +345,93 @@ func (r *REPL) handleHistoryExecCommand(cmd string) bool {
 		fmt.Println("=>", core.PrintValue(result))
 	}
 
+	return true
+}
+
+// handleDocCommand processes documentation lookup commands
+func (r *REPL) handleDocCommand(cmd string) bool {
+	parts := strings.Fields(cmd)
+
+	// Check if it's one of the special doc commands
+	if len(parts) == 1 {
+		switch parts[0] {
+		case ":doc-builtins":
+			return r.handleDocBuiltinsCommand()
+		case ":doc-special-forms":
+			return r.handleDocSpecialFormsCommand()
+		case ":doc-modules":
+			return r.handleDocModulesCommand()
+		case ":doc":
+			// Show help for doc command when used without arguments
+			fmt.Println("Usage: :doc <symbol>")
+			fmt.Println("  Look up documentation for a specific symbol")
+			fmt.Println("\nSee also:")
+			fmt.Println("  :doc-builtins       - List all built-in functions")
+			fmt.Println("  :doc-special-forms  - List all special forms")
+			fmt.Println("  :doc-modules        - List all available modules")
+			return true
+		}
+	}
+
+	// Handle :doc <symbol> command
+	if len(parts) >= 2 && parts[0] == ":doc" {
+		symbol := parts[1]
+		return r.showDocumentation(symbol)
+	}
+
+	// Command not recognized
+	return false
+}
+
+// handleDocBuiltinsCommand handles the :doc-builtins command
+func (r *REPL) handleDocBuiltinsCommand() bool {
+	entries := core.ListByType("builtin-function")
+	if len(entries) == 0 {
+		fmt.Println("No documentation available for built-in functions.")
+		return true
+	}
+
+	fmt.Println(core.FormatDocList(entries, "Built-in Functions"))
+	return true
+}
+
+// handleDocSpecialFormsCommand handles the :doc-special-forms command
+func (r *REPL) handleDocSpecialFormsCommand() bool {
+	entries := core.ListByType("special-form")
+	if len(entries) == 0 {
+		fmt.Println("No documentation available for special forms.")
+		return true
+	}
+
+	fmt.Println(core.FormatDocList(entries, "Special Forms"))
+	return true
+}
+
+// handleDocModulesCommand handles the :doc-modules command
+func (r *REPL) handleDocModulesCommand() bool {
+	modules := core.ListModules()
+	if len(modules) == 0 {
+		fmt.Println("No modules documented.")
+		return true
+	}
+
+	fmt.Println("=== Available Modules ===\n")
+	for _, module := range modules {
+		fmt.Println(module)
+	}
+
+	return true
+}
+
+// showDocumentation displays documentation for a symbol
+func (r *REPL) showDocumentation(symbol string) bool {
+	entry, found := core.GetDoc(symbol)
+	if !found {
+		fmt.Printf("No documentation available for '%s'.\n", symbol)
+		return true
+	}
+
+	fmt.Println(core.FormatDocEntry(entry))
 	return true
 }
 
