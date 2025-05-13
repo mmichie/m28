@@ -8,11 +8,13 @@ import (
 
 // CommandFlags holds the parsed command line arguments
 type CommandFlags struct {
-	ShowHelp    bool
-	EvalCode    string
-	Command     string
-	Filenames   []string
-	Interactive bool
+	ShowHelp      bool
+	EvalCode      string
+	Command       string
+	Filenames     []string
+	Interactive   bool
+	HistorySize   int
+	NoHistoryFile bool
 }
 
 // ParseFlags parses command line arguments and returns the configuration
@@ -28,6 +30,8 @@ func ParseFlags() *CommandFlags {
 	cmd := flagSet.String("c", "", "Execute single command (no printing of result)")
 	cmdLong := flagSet.String("command", "", "Execute single command (no printing of result)")
 	interactive := flagSet.Bool("i", false, "Enter interactive mode after executing commands/files")
+	historySize := flagSet.Int("history-size", 1000, "Maximum number of entries to store in history file")
+	noHistory := flagSet.Bool("no-history", false, "Disable history file")
 
 	// Set custom usage
 	flagSet.Usage = displayHelp
@@ -64,11 +68,13 @@ func ParseFlags() *CommandFlags {
 	}
 
 	return &CommandFlags{
-		ShowHelp:    showHelp,
-		EvalCode:    evalString,
-		Command:     cmdString,
-		Filenames:   filenames,
-		Interactive: *interactive,
+		ShowHelp:      showHelp,
+		EvalCode:      evalString,
+		Command:       cmdString,
+		Filenames:     filenames,
+		Interactive:   *interactive,
+		HistorySize:   *historySize,
+		NoHistoryFile: *noHistory,
 	}
 }
 
@@ -81,6 +87,8 @@ Options:
   -e, --eval CODE        Evaluate M28 expression and print result
   -c, --command CODE     Execute M28 command (no result printing)
   -i                     Enter interactive mode after executing commands/files
+  --history-size N       Maximum number of entries to store in history (default: 1000)
+  --no-history           Disable history file
 
 Examples:
   m28                    Start interactive REPL
@@ -88,6 +96,7 @@ Examples:
   m28 -e "(+ 2 3)"       Evaluate expression and print result
   m28 -c "(print \"Hello\")" Execute command without printing result
   m28 -i file.m28        Execute file then enter interactive mode
+  m28 --history-size 2000 Start REPL with increased history capacity
 
 M28 is a Lisp interpreter with Python-inspired syntax and features.
 `

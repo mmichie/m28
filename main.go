@@ -13,8 +13,8 @@ func main() {
 	// Parse command line flags
 	flags := repl.ParseFlags()
 
-	// Initialize the REPL
-	r := repl.NewREPL()
+	// Initialize the REPL with command flags
+	r := repl.NewREPL(flags)
 
 	// Store evaluator in global environment for object method calls
 	r.StoreEvaluator()

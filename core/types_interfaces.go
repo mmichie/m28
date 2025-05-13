@@ -58,6 +58,12 @@ type EvaluatorAware interface {
 	SetMember(name string, value LispValue, eval Evaluator, env Environment) error
 }
 
+// MappableEnvironment defines an interface for environments that can provide a map of their symbols
+type MappableEnvironment interface {
+	// GetSymbolMap returns a map of all symbols in the environment
+	GetSymbolMap() map[LispSymbol]LispValue
+}
+
 // EvaluatorProvider is a simple struct that can be embedded to provide
 // evaluator awareness to any struct
 type EvaluatorProvider struct {

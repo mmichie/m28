@@ -130,3 +130,13 @@ func (e *Environment) ForEachSymbol(fn func(symbol core.LispSymbol, value core.L
 		fn(symbol, value)
 	}
 }
+
+// GetSymbolMap returns a map of all symbols in the environment
+func (e *Environment) GetSymbolMap() map[core.LispSymbol]core.LispValue {
+	// Create a copy of the symbol map to prevent modification
+	symbolMap := make(map[core.LispSymbol]core.LispValue)
+	for symbol, value := range e.vars {
+		symbolMap[symbol] = value
+	}
+	return symbolMap
+}
