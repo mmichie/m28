@@ -398,6 +398,8 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 		errMsg += "  (import \"path/to/module\")     # Import a module by path\n"
 		errMsg += "  (import module1 module2)      # Import multiple modules\n"
 		errMsg += "  (import (from module import symbol1 symbol2))  # Import specific symbols\n"
+		errMsg += "  (import (module as alias))    # Import a module with an alias\n"
+		errMsg += "  (import (from module import (symbol as alias))) # Import a symbol with an alias\n"
 
 		return nil, core.NewException("ImportError", errMsg)
 	}
@@ -522,21 +524,62 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 				return nil, createImportError(moduleName, err)
 			}
 
-			for _, symbol := range importSpec[3:] {
+			// Process all symbols after "import"
+			for i := 3; i < len(importSpec); i++ {
+				// Check for individual symbol to import
 				var symName core.LispSymbol
+				var targetSymName core.LispSymbol
+				symbol := importSpec[i]
+
+				// Get the symbol name
 				switch s := symbol.(type) {
 				case core.LispSymbol:
 					symName = s
+					targetSymName = s
 				case string:
 					symName = core.LispSymbol(s)
+					targetSymName = symName
+				case core.LispList:
+					// Check for symbol aliasing within the import: (from module import (symbol as alias))
+					if len(s) == 3 && s[1] == core.LispSymbol("as") {
+						// Get the original symbol name
+						switch origSym := s[0].(type) {
+						case core.LispSymbol:
+							symName = origSym
+						case string:
+							symName = core.LispSymbol(origSym)
+						default:
+							errMsg := "Symbol name must be a symbol or string in aliased import\n\n"
+							errMsg += "For aliased symbols in from-import, use the format:\n"
+							errMsg += "  (import (from module import (symbol as alias) ...))"
+							return nil, core.NewException("ImportError", errMsg)
+						}
+
+						// Get the alias name
+						switch aliasSym := s[2].(type) {
+						case core.LispSymbol:
+							targetSymName = aliasSym
+						default:
+							errMsg := "Alias must be a symbol in aliased import\n\n"
+							errMsg += "The alias should be a valid identifier"
+							return nil, core.NewException("ImportError", errMsg)
+						}
+					} else {
+						errMsg := "Invalid symbol alias specification in from-import statement\n\n"
+						errMsg += "For aliased symbols, use the format:\n"
+						errMsg += "  (import (from module import (symbol as alias) ...))"
+						return nil, core.NewException("ImportError", errMsg)
+					}
 				default:
-					errMsg := "Imported symbol must be a symbol or string\n\n"
+					errMsg := "Imported symbol must be a symbol, string, or alias specification\n\n"
 					errMsg += "In a from-import statement:\n"
-					errMsg += "  (import (from module import symbol1 symbol2 ...))\n\n"
-					errMsg += "Each symbol after 'import' must be either a symbol or string literal."
+					errMsg += "  (import (from module import symbol1 symbol2 ...))\n"
+					errMsg += "  (import (from module import (symbol1 as alias1) symbol2 ...))\n\n"
+					errMsg += "Each symbol after 'import' must be either a symbol, string, or alias specification."
 					return nil, core.NewException("ImportError", errMsg)
 				}
 
+				// Look up the value in the module
 				value, ok := module.Get(symName)
 				if !ok {
 					errMsg := fmt.Sprintf("Symbol '%s' not found in module '%s'\n\n", symName, moduleName)
@@ -550,7 +593,8 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 					return nil, core.NewException("ImportError", errMsg)
 				}
 
-				env.Define(symName, value)
+				// Define the symbol in the environment with its original or aliased name
+				env.Define(targetSymName, value)
 			}
 
 		default:
