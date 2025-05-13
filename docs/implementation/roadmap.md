@@ -59,6 +59,12 @@ This document outlines the planned features and improvements for the M28 languag
 
 ### Object-Oriented Programming
 
+- **Unified Object Protocol**
+  - ⚠️ Implement new [Unified Object Protocol](./unified-object-protocol.md)
+  - ⚠️ Refactor type system to use single coherent interface
+  - ⚠️ Improve property access and method invocation
+  - ⚠️ Simplify dot notation implementation
+
 - **Class Syntax Sugar**
   - ⚠️ Add syntactic sugar for class definitions
   - ✅ Core closure-based object system implemented
@@ -96,10 +102,10 @@ This document outlines the planned features and improvements for the M28 languag
 ### Development Experience
 
 - **REPL Improvements**
-  - ⚠️ Add line editing and history
-  - ⚠️ Implement tab completion
-  - ⚠️ Add documentation lookup
-  - ⚠️ Support persistent history
+  - ✅ Add line editing and history
+  - ✅ Implement tab completion
+  - ✅ Add documentation lookup
+  - ✅ Support persistent history
 
 - **Error Reporting**
   - ⚠️ Enhance error messages with precise location information
