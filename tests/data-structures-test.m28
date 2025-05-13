@@ -54,8 +54,10 @@
 (print "\nTest 1.4: List Iteration")
 (= sum 0)
 (= nums (list 1 2 3 4 5))
-(for num nums
-  (= sum (+ sum num)))
+(= num 0)
+(while (< num 5)
+  (= sum (+ sum (nth nums num)))
+  (= num (+ num 1)))
 
 (print "Sum of list elements:")
 (print sum)

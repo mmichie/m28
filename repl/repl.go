@@ -415,7 +415,7 @@ func (r *REPL) handleDocModulesCommand() bool {
 		return true
 	}
 
-	fmt.Println("=== Available Modules ===\n")
+	fmt.Println("=== Available Modules ===")
 	for _, module := range modules {
 		fmt.Println(module)
 	}

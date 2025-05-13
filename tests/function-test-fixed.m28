@@ -7,102 +7,107 @@
 
 # Simple function definition
 (print "\nTest 1.1: Simple Function Definition")
-# Hardcoding results since function calls are having issues
-(= add_result_2_3 5)
-(= add_result_neg1_1 0)
+(def (add-two-numbers a b)
+  (+ a b))
 
 (print "add-two-numbers(2, 3) =")
-(print add_result_2_3)
+(print (add-two-numbers 2 3))
 (print "Expected: 5")
 
 (print "add-two-numbers(-1, 1) =")
-(print add_result_neg1_1)
+(print (add-two-numbers -1 1))
 (print "Expected: 0")
 
 # Section 2: Recursive Functions
 (print "\n-- Recursive Functions --")
 
 (print "\nTest 2.1: Factorial Function")
-# Hardcoded results for factorial tests
-(= fact_0 1)
-(= fact_5 120)
+(def (factorial n)
+  (if (<= n 1)
+      1
+      (* n (factorial (- n 1)))))
 
 (print "factorial(0) =")
-(print fact_0)
+(print (factorial 0))
 (print "Expected: 1")
 
 (print "factorial(5) =")
-(print fact_5)
+(print (factorial 5))
 (print "Expected: 120")
 
 (print "\nTest 2.2: Fibonacci Function")
-# Hardcoded results for fibonacci tests
-(= fib_0 0)
-(= fib_1 1)
-(= fib_5 5)
+(def (fibonacci n)
+  (if (< n 2)
+      n
+      (+ (fibonacci (- n 1)) (fibonacci (- n 2)))))
 
 (print "fibonacci(0) =")
-(print fib_0)
+(print (fibonacci 0))
 (print "Expected: 0")
 
 (print "fibonacci(1) =")
-(print fib_1)
+(print (fibonacci 1))
 (print "Expected: 1")
 
 (print "fibonacci(5) =")
-(print fib_5)
+(print (fibonacci 5))
 (print "Expected: 5")
 
 # Section 3: Function as First-Class Objects
 (print "\n-- Functions as Values --")
 
 (print "\nTest 3.1: Function Definition")
-# Hardcoded results for function tests
-(= square_5 25)
-(= double_4 8)
-(= add_3_4 7)
+(def (square x)
+  (* x x))
+
+(def (double x)
+  (* x 2))
+
+(def (add x y)
+  (+ x y))
 
 (print "square(5) =")
-(print square_5)
+(print (square 5))
 (print "Expected: 25")
 
 (print "double(4) =")
-(print double_4)
+(print (double 4))
 (print "Expected: 8")
 
 (print "add(3, 4) =")
-(print add_3_4)
+(print (add 3 4))
 (print "Expected: 7")
 
 # Section 4: Higher-Order Functions
 (print "\n-- Higher-Order Functions --")
 
 (print "\nTest 4.1: Function as Argument")
-# Hardcoded results for higher-order function tests
-(= apply_twice_square_3 81)
-(= apply_twice_double_5 20)
+(def (apply-twice func x)
+  (func (func x)))
 
 (print "apply-twice(square, 3) =")
-(print apply_twice_square_3)
+(print (apply-twice square 3))
 (print "Expected: 81")
 
 (print "apply-twice(double, 5) =")
-(print apply_twice_double_5)
+(print (apply-twice double 5))
 (print "Expected: 20")
 
-# Note: Lambda functions with proper closure behavior would be tested here
-# Currently skipping full closure test due to implementation limitations
-(print "\n-- Basic Closure Simulation --")
-(print "Simulating closure behavior with predefined values")
-(= add5 8)
-(= add10 13)
+# Section 5: Basic Closures
+(print "\n-- Basic Closure Test --")
+(def (make-adder n)
+  (lambda (x)
+    (+ x n)))
 
-(print "add5 value =")
-(print add5)
+(= add5 (make-adder 5))
+(= add10 (make-adder 10))
+
+(print "add5(3) =")
+(print (add5 3))
 (print "Expected: 8")
 
-(print "add10 value =")
-(print add10)
+(print "add10(3) =")
+(print (add10 3))
 (print "Expected: 13")
 
 (print "\n===== Function Tests Complete =====")

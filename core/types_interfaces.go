@@ -96,15 +96,29 @@ func (l *Lambda) Apply(e Evaluator, args []LispValue, callEnv Environment) (Lisp
 		return nil, fmt.Errorf("parameter mismatch in lambda call")
 	}
 
-	// Evaluate the function body in the new environment
-	result, err := e.Eval(l.Body, lambdaEnv)
-	if err != nil {
-		// Handle special flow control signals if implemented
-		// The actual logic depends on how flow control is implemented in the language
-		return nil, err
-	}
+	// Check if the body is a list of expressions
+	if bodyList, isList := l.Body.(LispList); isList {
+		// Execute each expression in the body, returning the result of the last one
+		var result LispValue = PythonicNone{}
+		var err error
 
-	return result, nil
+		for _, expr := range bodyList {
+			result, err = e.Eval(expr, lambdaEnv)
+			if err != nil {
+				// Handle special flow control signals if implemented
+				return nil, err
+			}
+		}
+
+		return result, nil
+	} else {
+		// Handle the case where body is not a list (should rarely happen)
+		result, err := e.Eval(l.Body, lambdaEnv)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
 }
 
 // processLambdaArgs binds function arguments to parameters in the lambda environment

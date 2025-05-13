@@ -108,9 +108,9 @@ This document outlines the planned features and improvements for the M28 languag
   - ✅ Support persistent history
 
 - **Error Reporting**
-  - ⚠️ Enhance error messages with precise location information
-  - ⚠️ Add suggestions for common errors
-  - ⚠️ Improve traceback formatting and readability
+  - ✅ Enhance error messages with precise location information
+  - ✅ Add suggestions for common errors
+  - ✅ Improve traceback formatting and readability
 
 ## Low Priority
 
