@@ -398,7 +398,9 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 		errMsg += "  (import \"path/to/module\")     # Import a module by path\n"
 		errMsg += "  (import module1 module2)      # Import multiple modules\n"
 		errMsg += "  (import (from module import symbol1 symbol2))  # Import specific symbols\n"
-		errMsg += "  (import (module as alias))    # Import a module with an alias\n"
+		errMsg += "  (import (from module import *))             # Import all symbols\n"
+		errMsg += "  (import (from module import * except sym1)) # Import all except excluded symbols\n"
+		errMsg += "  (import (module as alias))                 # Import a module with an alias\n"
 		errMsg += "  (import (from module import (symbol as alias))) # Import a symbol with an alias\n"
 
 		return nil, core.NewException("ImportError", errMsg)
@@ -415,6 +417,11 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 	}
 
 	for _, arg := range args {
+		// Unwrap LocatedValue if present
+		if locatedValue, ok := arg.(core.LocatedValue); ok {
+			arg = locatedValue.Value
+		}
+
 		switch importSpec := arg.(type) {
 		case core.LispSymbol:
 			// Simple import: import module
@@ -443,6 +450,13 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 			}
 
 		case core.LispList:
+			// Unwrap LocatedValue for all list elements
+			for i, item := range importSpec {
+				if locatedValue, ok := item.(core.LocatedValue); ok {
+					importSpec[i] = locatedValue.Value
+				}
+			}
+
 			// Check for aliased import syntax: (import (module as alias))
 			if len(importSpec) == 3 && importSpec[1] == core.LispSymbol("as") {
 				// Parse the module name and alias
@@ -490,24 +504,47 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 				continue
 			}
 
-			// Complex import: from module import symbol1, symbol2
+			// Complex import: from module import symbol1, symbol2 or wildcard import with filtering
+			// First check basic "from" structure
 			if len(importSpec) < 4 || importSpec[0] != core.LispSymbol("from") || importSpec[2] != core.LispSymbol("import") {
 				errMsg := fmt.Sprintf("Invalid import specification: %v\n\n", importSpec)
 				errMsg += "For 'from-import' statements, use the format:\n"
 				errMsg += "  (import (from module import symbol1 symbol2 ...))\n\n"
+				errMsg += "For wildcard imports, use the format:\n"
+				errMsg += "  (import (from module import *))\n\n"
+				errMsg += "For wildcard imports with filtering, use the format:\n"
+				errMsg += "  (import (from module import * except symbol1 symbol2 ...))\n\n"
 				errMsg += "For aliased imports, use the format:\n"
 				errMsg += "  (import (module as alias))\n\n"
 				errMsg += "Examples:\n"
 				errMsg += "  (import (from math import sin cos tan))\n"
 				errMsg += "  (import (from \"path/to/module\" import function1 function2))\n"
+				errMsg += "  (import (from math import *))\n"
+				errMsg += "  (import (from math import * except factorial gcd))\n"
 				errMsg += "  (import (math as m))"
 				return nil, core.NewException("ImportError", errMsg)
 			}
 
 			var moduleName string
+			var module *core.PythonicDict
+			var err error
+
+			// Get module name
 			switch mn := importSpec[1].(type) {
 			case core.LispSymbol:
 				moduleName = string(mn)
+				// Try to get it from environment first (for modules defined in the file)
+				if val, ok := env.Get(mn); ok {
+					if dict, ok := val.(*core.PythonicDict); ok {
+						module = dict
+					} else {
+						errMsg := fmt.Sprintf("Symbol '%s' is not a module (got %T)\n\n", mn, val)
+						errMsg += "In a from-import statement, the module must be either:\n"
+						errMsg += "  - A module name to import from filesystem\n"
+						errMsg += "  - A dictionary defined in the current scope\n"
+						return nil, core.NewException("ImportError", errMsg)
+					}
+				}
 			case string:
 				moduleName = mn
 			default:
@@ -519,90 +556,189 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 				return nil, core.NewException("ImportError", errMsg)
 			}
 
-			module, err := moduleLoader.LoadModule(moduleName, e)
-			if err != nil {
-				return nil, createImportError(moduleName, err)
+			// If we didn't find it in the environment, try loading it
+			if module == nil {
+				module, err = moduleLoader.LoadModule(moduleName, e)
+				if err != nil {
+					return nil, createImportError(moduleName, err)
+				}
 			}
 
-			// Process all symbols after "import"
-			for i := 3; i < len(importSpec); i++ {
-				// Check for individual symbol to import
-				var symName core.LispSymbol
-				var targetSymName core.LispSymbol
-				symbol := importSpec[i]
+			// Check for wildcard import: (from module import *)
+			if len(importSpec) >= 4 && importSpec[3] == core.LispSymbol("*") {
+				// Handle wildcard import with optional filtering
+				excludedSymbols := make(map[string]bool)
 
-				// Get the symbol name
-				switch s := symbol.(type) {
-				case core.LispSymbol:
-					symName = s
-					targetSymName = s
-				case string:
-					symName = core.LispSymbol(s)
-					targetSymName = symName
-				case core.LispList:
-					// Check for symbol aliasing within the import: (from module import (symbol as alias))
-					if len(s) == 3 && s[1] == core.LispSymbol("as") {
-						// Get the original symbol name
-						switch origSym := s[0].(type) {
+				// Check for except clause
+				if len(importSpec) > 5 && importSpec[4] == core.LispSymbol("except") {
+					// Process all symbols to exclude
+					for i := 5; i < len(importSpec); i++ {
+						var excludeName string
+						switch excl := importSpec[i].(type) {
 						case core.LispSymbol:
-							symName = origSym
+							excludeName = string(excl)
 						case string:
-							symName = core.LispSymbol(origSym)
+							excludeName = excl
 						default:
-							errMsg := "Symbol name must be a symbol or string in aliased import\n\n"
-							errMsg += "For aliased symbols in from-import, use the format:\n"
+							errMsg := "Excluded symbol names must be symbols or strings\n\n"
+							errMsg += "For wildcard imports with filtering, use the format:\n"
+							errMsg += "  (import (from module import * except symbol1 symbol2 ...))"
+							return nil, core.NewException("ImportError", errMsg)
+						}
+						excludedSymbols[excludeName] = true
+					}
+				} else if len(importSpec) > 4 {
+					errMsg := "Invalid wildcard import syntax\n\n"
+					errMsg += "For wildcard imports, use one of these formats:\n"
+					errMsg += "  (import (from module import *))\n"
+					errMsg += "  (import (from module import * except symbol1 symbol2 ...))"
+					return nil, core.NewException("ImportError", errMsg)
+				}
+
+				// Get all exported symbols from the module
+				exportsVal, hasExports := module.Get("__exports__")
+				var exportSet map[string]bool
+
+				if hasExports {
+					// If __exports__ is defined, only export the symbols listed in it
+					exportSet = make(map[string]bool)
+					if exportsList, ok := exportsVal.(core.LispList); ok {
+						for _, symbolVal := range exportsList {
+							var symbolName string
+							switch sym := symbolVal.(type) {
+							case core.LispSymbol:
+								symbolName = string(sym)
+							case string:
+								symbolName = sym
+							default:
+								continue // Skip non-symbol/string items
+							}
+							exportSet[symbolName] = true
+						}
+					}
+				}
+
+				// Get all keys from the module
+				keysList, err := module.CallMethod("keys", []core.LispValue{})
+				if err != nil {
+					return nil, core.NewException("ImportError", "Failed to get module symbols for wildcard import")
+				}
+
+				if keyList, ok := keysList.(core.LispList); ok {
+					for _, keyVal := range keyList {
+						var symName string
+						switch k := keyVal.(type) {
+						case string:
+							symName = k
+						default:
+							continue // Skip non-string keys
+						}
+
+						// Skip excluded symbols
+						if excludedSymbols[symName] {
+							continue
+						}
+
+						// Skip built-in symbols, special forms, dunder methods
+						if isBuiltinSymbol(core.LispSymbol(symName)) || strings.HasPrefix(symName, "__") {
+							continue
+						}
+
+						// Skip symbols not in __exports__ if __exports__ is defined
+						if hasExports && !exportSet[symName] {
+							continue
+						}
+
+						// Get the value and define it in the environment
+						value, ok := module.Get(symName)
+						if ok {
+							env.Define(core.LispSymbol(symName), value)
+						}
+					}
+				}
+			} else {
+				// Process specific symbols after "import"
+				for i := 3; i < len(importSpec); i++ {
+					// Check for individual symbol to import
+					var symName core.LispSymbol
+					var targetSymName core.LispSymbol
+					symbol := importSpec[i]
+
+					// Get the symbol name
+					switch s := symbol.(type) {
+					case core.LispSymbol:
+						symName = s
+						targetSymName = s
+					case string:
+						symName = core.LispSymbol(s)
+						targetSymName = symName
+					case core.LispList:
+						// Check for symbol aliasing within the import: (from module import (symbol as alias))
+						if len(s) == 3 && s[1] == core.LispSymbol("as") {
+							// Get the original symbol name
+							switch origSym := s[0].(type) {
+							case core.LispSymbol:
+								symName = origSym
+							case string:
+								symName = core.LispSymbol(origSym)
+							default:
+								errMsg := "Symbol name must be a symbol or string in aliased import\n\n"
+								errMsg += "For aliased symbols in from-import, use the format:\n"
+								errMsg += "  (import (from module import (symbol as alias) ...))"
+								return nil, core.NewException("ImportError", errMsg)
+							}
+
+							// Get the alias name
+							switch aliasSym := s[2].(type) {
+							case core.LispSymbol:
+								targetSymName = aliasSym
+							default:
+								errMsg := "Alias must be a symbol in aliased import\n\n"
+								errMsg += "The alias should be a valid identifier"
+								return nil, core.NewException("ImportError", errMsg)
+							}
+						} else {
+							errMsg := "Invalid symbol alias specification in from-import statement\n\n"
+							errMsg += "For aliased symbols, use the format:\n"
 							errMsg += "  (import (from module import (symbol as alias) ...))"
 							return nil, core.NewException("ImportError", errMsg)
 						}
-
-						// Get the alias name
-						switch aliasSym := s[2].(type) {
-						case core.LispSymbol:
-							targetSymName = aliasSym
-						default:
-							errMsg := "Alias must be a symbol in aliased import\n\n"
-							errMsg += "The alias should be a valid identifier"
-							return nil, core.NewException("ImportError", errMsg)
-						}
-					} else {
-						errMsg := "Invalid symbol alias specification in from-import statement\n\n"
-						errMsg += "For aliased symbols, use the format:\n"
-						errMsg += "  (import (from module import (symbol as alias) ...))"
+					default:
+						errMsg := "Imported symbol must be a symbol, string, or alias specification\n\n"
+						errMsg += "In a from-import statement:\n"
+						errMsg += "  (import (from module import symbol1 symbol2 ...))\n"
+						errMsg += "  (import (from module import (symbol1 as alias1) symbol2 ...))\n\n"
+						errMsg += "Each symbol after 'import' must be either a symbol, string, or alias specification."
 						return nil, core.NewException("ImportError", errMsg)
 					}
-				default:
-					errMsg := "Imported symbol must be a symbol, string, or alias specification\n\n"
-					errMsg += "In a from-import statement:\n"
-					errMsg += "  (import (from module import symbol1 symbol2 ...))\n"
-					errMsg += "  (import (from module import (symbol1 as alias1) symbol2 ...))\n\n"
-					errMsg += "Each symbol after 'import' must be either a symbol, string, or alias specification."
-					return nil, core.NewException("ImportError", errMsg)
-				}
 
-				// Look up the value in the module
-				value, ok := module.Get(symName)
-				if !ok {
-					errMsg := fmt.Sprintf("Symbol '%s' not found in module '%s'\n\n", symName, moduleName)
-					errMsg += "The symbol you are trying to import does not exist in the module.\n"
-					errMsg += "Possible reasons:\n"
-					errMsg += "  - The symbol name is misspelled\n"
-					errMsg += "  - The symbol is not defined in the module\n"
-					errMsg += "  - The symbol is defined but not exported (if the module uses __exports__)\n\n"
-					errMsg += "Available symbols in this module might include functions, variables, or classes\n"
-					errMsg += "defined in the module. Check the module source code or documentation."
-					return nil, core.NewException("ImportError", errMsg)
-				}
+					// Look up the value in the module
+					value, ok := module.Get(symName)
+					if !ok {
+						errMsg := fmt.Sprintf("Symbol '%s' not found in module '%s'\n\n", symName, moduleName)
+						errMsg += "The symbol you are trying to import does not exist in the module.\n"
+						errMsg += "Possible reasons:\n"
+						errMsg += "  - The symbol name is misspelled\n"
+						errMsg += "  - The symbol is not defined in the module\n"
+						errMsg += "  - The symbol is defined but not exported (if the module uses __exports__)\n\n"
+						errMsg += "Available symbols in this module might include functions, variables, or classes\n"
+						errMsg += "defined in the module. Check the module source code or documentation."
+						return nil, core.NewException("ImportError", errMsg)
+					}
 
-				// Define the symbol in the environment with its original or aliased name
-				env.Define(targetSymName, value)
+					// Define the symbol in the environment with its original or aliased name
+					env.Define(targetSymName, value)
+				}
 			}
 
 		default:
-			errMsg := fmt.Sprintf("Invalid import specification: %v\n\n", arg)
+			errMsg := fmt.Sprintf("Invalid import specification: %v (type: %T)\n\n", arg, arg)
 			errMsg += "Import arguments must be one of:\n"
 			errMsg += "  - A symbol (import module_name)\n"
 			errMsg += "  - A string (import \"path/to/module\")\n"
-			errMsg += "  - A from-import expression (import (from module import symbol1 symbol2))"
+			errMsg += "  - A from-import expression (import (from module import symbol1 symbol2))\n"
+			errMsg += "  - A wildcard import expression (import (from module import *))\n"
+			errMsg += "  - A filtered wildcard import (import (from module import * except symbol1 symbol2))"
 			return nil, core.NewException("ImportError", errMsg)
 		}
 	}

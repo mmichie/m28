@@ -1,0 +1,22 @@
+# Test wildcard import with export limiting
+
+# Create a module with exports list
+(def exports_list (list "public1" "public2"))
+(def test_module (dict
+  "public1" "Public item 1"
+  "public2" "Public item 2"
+  "internal1" "Internal item 1"
+  "internal2" "Internal item 2"
+  "__exports__" exports_list
+))
+
+# Import all symbols from the module
+(print "Importing from module with exports:")
+(import (from test_module import *))
+
+# Check that only the exported symbols are imported
+(print "public1 value:" public1)
+(print "public2 value:" public2)
+
+# Done
+(print "Test completed successfully!")
