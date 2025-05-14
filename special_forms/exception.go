@@ -154,6 +154,9 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 		exception = core.NewException("RuntimeError", tryError.Error())
 	}
 
+	// Store the active exception in the environment for potential re-raising
+	env.Define(core.LispSymbol("__active_exception__"), exception)
+
 	// Process except blocks to find a matching handler
 	for _, exceptBlock := range exceptBlocks {
 		// Handle bare except: (except body)
@@ -163,6 +166,10 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			// Unwrap the except body
 			exceptBody = unwrapValue(exceptBody)
 
+			// Create a new environment with the exception available for re-raising
+			exceptEnv := env.NewEnvironment(env)
+			exceptEnv.Define(core.LispSymbol("__active_exception__"), exception)
+
 			// The body might be a list of statements
 			if bodyList, isList := exceptBody.(core.LispList); isList {
 				var result core.LispValue = core.PythonicNone{}
@@ -170,8 +177,10 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 
 				// Evaluate each statement in the list
 				for _, stmt := range bodyList {
-					result, err = e.Eval(stmt, env)
+					result, err = e.Eval(stmt, exceptEnv)
 					if err != nil {
+						// If error happened in exception handler, propagate it while
+						// preserving its traceback information
 						return nil, err
 					}
 				}
@@ -179,7 +188,7 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			}
 
 			// If not a list, just evaluate the single statement
-			return e.Eval(exceptBody, env)
+			return e.Eval(exceptBody, exceptEnv)
 		}
 
 		// Handle typed except: (except ExceptionType body)
@@ -197,6 +206,10 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				// Unwrap the except body
 				exceptBody = unwrapValue(exceptBody)
 
+				// Create a new environment with the exception available for re-raising
+				exceptEnv := env.NewEnvironment(env)
+				exceptEnv.Define(core.LispSymbol("__active_exception__"), exception)
+
 				// The body might be a list of statements
 				if bodyList, isList := exceptBody.(core.LispList); isList {
 					var result core.LispValue = core.PythonicNone{}
@@ -204,7 +217,7 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 
 					// Evaluate each statement in the list
 					for _, stmt := range bodyList {
-						result, err = e.Eval(stmt, env)
+						result, err = e.Eval(stmt, exceptEnv)
 						if err != nil {
 							return nil, err
 						}
@@ -213,7 +226,7 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				}
 
 				// If not a list, just evaluate the single statement
-				return e.Eval(exceptBody, env)
+				return e.Eval(exceptBody, exceptEnv)
 			}
 		}
 
@@ -242,8 +255,10 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			// Check if exception matches the type
 			if exception.IsSubclassOf(string(exceptionType)) {
 				// Create a new environment with the exception bound to the variable
+				// and also available for re-raising
 				exceptEnv := env.NewEnvironment(env)
 				exceptEnv.Define(varName, exception)
+				exceptEnv.Define(core.LispSymbol("__active_exception__"), exception)
 
 				// Get the body
 				exceptBody := exceptBlock[4]
@@ -277,8 +292,25 @@ func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 }
 
 func EvalRaise(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 1 || len(args) > 3 {
-		return nil, fmt.Errorf("raise requires 1-3 arguments")
+	// Check for bare re-raise: (raise)
+	if len(args) == 0 {
+		// Get the most recent exception from the environment
+		activeException, ok := env.Get(core.LispSymbol("__active_exception__"))
+		if !ok {
+			return nil, fmt.Errorf("no active exception to re-raise")
+		}
+
+		// Return the active exception unchanged to maintain its traceback
+		if ex, ok := activeException.(*core.Exception); ok {
+			return nil, ex
+		}
+
+		// If somehow it's not an exception, create one
+		return nil, fmt.Errorf("cannot re-raise: __active_exception__ is not an Exception object")
+	}
+
+	if len(args) > 3 {
+		return nil, fmt.Errorf("raise requires 0-3 arguments")
 	}
 
 	// Case 1: (raise "Error message")

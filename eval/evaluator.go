@@ -354,45 +354,65 @@ func (e *Evaluator) enrichErrorWithTraceback(err error) error {
 		return err // Control flow signals should pass through unchanged
 	}
 
-	// If it's already an exception with a traceback, return it as is
-	if ex, ok := err.(*core.Exception); ok && ex.Traceback != nil && len(ex.Traceback) > 0 {
+	// Handle exceptions with existing traceback
+	if ex, ok := err.(*core.Exception); ok {
+		// If the exception already has a traceback, we need to merge it with the current traceback
+		// This ensures we don't lose context when exceptions propagate through nested calls
+		if ex.Traceback != nil && len(ex.Traceback) > 0 {
+			// We need to prepend the current traceback to the existing one
+			// but avoid duplicating entries from the same function call
+			currentTraceback := e.getCurrentTraceback()
+
+			// We'll only prepend entries that aren't already at the start of the exception traceback
+			// This avoids duplicate entries when an exception propagates through multiple evaluations
+			if len(currentTraceback) > 0 && (len(ex.Traceback) == 0 ||
+				!isSameTraceEntry(currentTraceback[len(currentTraceback)-1], ex.Traceback[0])) {
+				// Merge tracebacks
+				mergedTraceback := make(core.Traceback, 0, len(currentTraceback)+len(ex.Traceback))
+				mergedTraceback = append(mergedTraceback, currentTraceback...)
+				mergedTraceback = append(mergedTraceback, ex.Traceback...)
+				ex.Traceback = mergedTraceback
+			}
+			return ex
+		}
+
+		// If the exception doesn't have a traceback yet, add the current one
+		ex.Traceback = e.getCurrentTraceback()
 		return ex
 	}
 
-	// Create a new exception or enrich an existing one
-	var ex *core.Exception
-	if exErr, ok := err.(*core.Exception); ok {
-		ex = exErr
-	} else {
-		// Convert regular error to Exception and improve error message
-		errorMsg := err.Error()
+	// Create a new exception from a regular error
+	// Convert regular error to Exception and improve error message
+	errorMsg := err.Error()
 
-		// Enhance common error messages with more descriptive information
-		if strings.Contains(errorMsg, "undefined symbol") {
-			// Add suggestion to check variable names or import modules
-			symbol := strings.TrimPrefix(errorMsg, "undefined symbol: ")
-			errorMsg = fmt.Sprintf("undefined symbol: %s (did you forget to define the variable or import a module?)", symbol)
-		} else if strings.Contains(errorMsg, "cannot call non-function") {
-			// Add suggestion for calling non-callable values
-			errorMsg = fmt.Sprintf("%s (make sure you're calling a function, not a value)", errorMsg)
-		} else if strings.Contains(errorMsg, "index out of range") {
-			// Add suggestion for list index errors
-			errorMsg = fmt.Sprintf("%s (check your list indices and list length)", errorMsg)
-		} else if strings.Contains(errorMsg, "divide by zero") {
-			// Improve division by zero errors
-			errorMsg = "division by zero is not allowed"
-		}
-
-		// Create the enhanced exception
-		ex = core.NewException("RuntimeError", errorMsg)
+	// Enhance common error messages with more descriptive information
+	if strings.Contains(errorMsg, "undefined symbol") {
+		// Add suggestion to check variable names or import modules
+		symbol := strings.TrimPrefix(errorMsg, "undefined symbol: ")
+		errorMsg = fmt.Sprintf("undefined symbol: %s (did you forget to define the variable or import a module?)", symbol)
+	} else if strings.Contains(errorMsg, "cannot call non-function") {
+		// Add suggestion for calling non-callable values
+		errorMsg = fmt.Sprintf("%s (make sure you're calling a function, not a value)", errorMsg)
+	} else if strings.Contains(errorMsg, "index out of range") {
+		// Add suggestion for list index errors
+		errorMsg = fmt.Sprintf("%s (check your list indices and list length)", errorMsg)
+	} else if strings.Contains(errorMsg, "divide by zero") {
+		// Improve division by zero errors
+		errorMsg = "division by zero is not allowed"
 	}
 
-	// Add current traceback if not present
-	if ex.Traceback == nil || len(ex.Traceback) == 0 {
-		ex.Traceback = e.getCurrentTraceback()
-	}
-
+	// Create the enhanced exception with the current traceback
+	ex := core.NewException("RuntimeError", errorMsg)
+	ex.Traceback = e.getCurrentTraceback()
 	return ex
+}
+
+// isSameTraceEntry checks if two trace entries point to the same location/function
+func isSameTraceEntry(a, b core.TraceEntry) bool {
+	// Check if the entries refer to the same location and function
+	return a.Location.Filename == b.Location.Filename &&
+		a.Location.Line == b.Location.Line &&
+		a.Function == b.Function
 }
 
 // ApplyLambda applies a Lambda function to arguments with proper environment handling

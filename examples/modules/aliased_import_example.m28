@@ -1,0 +1,40 @@
+# Aliased Module Import Example
+# This demonstrates the aliased import feature in M28 module system
+
+(print "=== Aliased Module Import Example ===")
+
+# Import a module with an alias
+(print "\n1. Import a module with an alias:")
+(import (simple_module as sm))
+
+# Display that we can access the module through the alias
+(print "\n2. Accessing module through alias:")
+(print "Module type through alias:" (type sm))
+(print "Module variables through alias:" sm.MODULE_NAME sm.VALUE)
+
+# Display available module content via the alias
+(print "\n3. Available symbols through alias:")
+(dict.keys sm)
+
+# Demonstrate method calls through the alias
+(print "\n4. Calling methods through alias:")
+(print "sm.add(10, 20):" (sm.add 10 20))
+
+# Demonstrate importing a file-path based module with an alias
+(print "\n5. Import module with file path and alias:")
+(import ("modules/simple_module" as file_module))
+
+# Verify we can access it
+(print "\n6. Accessing through file path alias:")
+(print "Module name through file path alias:" file_module.MODULE_NAME)
+
+# Now demonstrate importing individual symbols with aliases
+(print "\n7. Importing individual symbols with aliases:")
+(import (from simple_module import (add as addition) (multiply as multiplication)))
+
+# Use the aliased symbols
+(print "\n8. Using aliased symbols:")
+(print "addition(5, 3):" (addition 5 3))
+(print "multiplication(4, 7):" (multiplication 4 7))
+
+(print "\n=== End of Aliased Module Import Example ===")

@@ -11,15 +11,60 @@ func EvalIfPython(e core.Evaluator, args []core.LispValue, env core.Environment)
 		return nil, fmt.Errorf("if requires 2 or 3 arguments")
 	}
 
+	// Evaluate the condition in the parent environment
+	// This ensures that variables from outer scopes are accessible
 	condition, err := e.Eval(args[0], env)
 	if err != nil {
+		// Special handling for control flow signals
+		if IsBreakSignal(err) || IsContinueSignal(err) {
+			return nil, err
+		}
+
+		// Handle early returns
+		if returnSig, ok := err.(ReturnSignal); ok {
+			return returnSig.Value, err
+		}
+
 		return nil, err
 	}
 
+	// We'll evaluate directly in the parent environment
+	// This allows variable assignments to propagate back to the parent
+	// while still properly handling nested contexts
 	if core.IsTruthy(condition) {
-		return e.Eval(args[1], env)
+		// Evaluate the true branch
+		result, err := e.Eval(args[1], env)
+		if err != nil {
+			// Control flow signals should propagate through if/else
+			if IsBreakSignal(err) || IsContinueSignal(err) {
+				return nil, err
+			}
+
+			// Handle return signals
+			if returnSig, ok := err.(ReturnSignal); ok {
+				return returnSig.Value, err
+			}
+
+			return nil, err
+		}
+		return result, nil
 	} else if len(args) == 3 {
-		return e.Eval(args[2], env)
+		// Evaluate the else branch
+		result, err := e.Eval(args[2], env)
+		if err != nil {
+			// Control flow signals should propagate through if/else
+			if IsBreakSignal(err) || IsContinueSignal(err) {
+				return nil, err
+			}
+
+			// Handle return signals
+			if returnSig, ok := err.(ReturnSignal); ok {
+				return returnSig.Value, err
+			}
+
+			return nil, err
+		}
+		return result, nil
 	}
 
 	return core.PythonicNone{}, nil
@@ -30,15 +75,56 @@ func EvalElif(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 		return nil, fmt.Errorf("elif requires 2 or 3 arguments")
 	}
 
+	// Evaluate the condition in the parent environment
 	condition, err := e.Eval(args[0], env)
 	if err != nil {
+		// Special handling for control flow signals
+		if IsBreakSignal(err) || IsContinueSignal(err) {
+			return nil, err
+		}
+
+		// Handle early returns
+		if returnSig, ok := err.(ReturnSignal); ok {
+			return returnSig.Value, err
+		}
+
 		return nil, err
 	}
 
 	if core.IsTruthy(condition) {
-		return e.Eval(args[1], env)
+		// Evaluate the true branch
+		result, err := e.Eval(args[1], env)
+		if err != nil {
+			// Control flow signals should propagate through elif
+			if IsBreakSignal(err) || IsContinueSignal(err) {
+				return nil, err
+			}
+
+			// Handle return signals
+			if returnSig, ok := err.(ReturnSignal); ok {
+				return returnSig.Value, err
+			}
+
+			return nil, err
+		}
+		return result, nil
 	} else if len(args) == 3 {
-		return e.Eval(args[2], env)
+		// Evaluate the else branch
+		result, err := e.Eval(args[2], env)
+		if err != nil {
+			// Control flow signals should propagate
+			if IsBreakSignal(err) || IsContinueSignal(err) {
+				return nil, err
+			}
+
+			// Handle return signals
+			if returnSig, ok := err.(ReturnSignal); ok {
+				return returnSig.Value, err
+			}
+
+			return nil, err
+		}
+		return result, nil
 	}
 
 	return core.PythonicNone{}, nil
@@ -49,7 +135,22 @@ func EvalElse(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 		return nil, fmt.Errorf("else requires exactly 1 argument")
 	}
 
-	return e.Eval(args[0], env)
+	// Evaluate the body directly in the parent environment
+	result, err := e.Eval(args[0], env)
+	if err != nil {
+		// Control flow signals should propagate through else
+		if IsBreakSignal(err) || IsContinueSignal(err) {
+			return nil, err
+		}
+
+		// Handle return signals
+		if returnSig, ok := err.(ReturnSignal); ok {
+			return returnSig.Value, err
+		}
+
+		return nil, err
+	}
+	return result, nil
 }
 
 func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {

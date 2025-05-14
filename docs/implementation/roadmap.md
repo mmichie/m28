@@ -9,12 +9,12 @@ This document outlines the planned features and improvements for the M28 languag
 - **Exception Handling Enhancements**
   - ✅ Basic exception hierarchy implemented in `core/exception.go`
   - ✅ Custom exception types support
-  - ⚠️ Improve traceback reporting and error formatting
-  - ⚠️ Enhance exception propagation for nested contexts
+  - ✅ Improve traceback reporting and error formatting
+  - ✅ Enhance exception propagation for nested contexts
 
 - **Control Flow Enhancements**
-  - ⚠️ Improve `if/else` behavior in nested contexts
-  - ⚠️ Enhance break/continue reliability in loops
+  - ✅ Improve `if/else` behavior in nested contexts
+  - ⚠️ Enhance break/continue reliability in loops (partially implemented but has issues with for loops)
   - ⚠️ Improve support for early returns in functions
 
 - **Recursion Optimization**
@@ -25,7 +25,7 @@ This document outlines the planned features and improvements for the M28 languag
 ### Module System Improvements
 
 - **Basic Module System**
-  - ⚠️ Replace deprecated `ioutil.ReadFile` with `os.ReadFile`
+  - ✅ Replace deprecated `ioutil.ReadFile` with `os.ReadFile`
   - ⚠️ Fix consistency issues in module symbol resolution
   - ⚠️ Implement proper error handling with detailed error messages
   - ⚠️ Add tests for edge cases in module loading
@@ -37,9 +37,9 @@ This document outlines the planned features and improvements for the M28 languag
   - ⚠️ Add namespace introspection utilities
 
 - **Import Enhancements**
-  - ⚠️ Add support for aliased imports (`import module as alias`)
-  - ⚠️ Implement multi-symbol imports (`from module import x, y, z`)
-  - ⚠️ Add wildcard imports with filtering
+  - ✅ Add support for aliased imports (`import module as alias`)
+  - ✅ Implement multi-symbol imports (`from module import x, y, z`)
+  - ✅ Add wildcard imports with filtering
   - ⚠️ Create an import hook system for extensibility
 
 ### Standard Library
@@ -156,6 +156,7 @@ This document outlines the planned features and improvements for the M28 languag
 - ✅ Basic control flow (if, for, while)
 - ✅ List operations and manipulation
 - ✅ Basic modules and import functionality
+- ✅ Enhanced module imports (aliased, multi-symbol, wildcard)
 - ✅ Dot notation for property and method access
 - ✅ Exception handling with try/except
 - ✅ Object representation via closures

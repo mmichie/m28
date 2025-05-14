@@ -1,0 +1,183 @@
+# Test cases for nested if/else contexts
+# This file attempts to identify issues with nested contexts in if/else blocks
+
+(print "===== Nested If/Else Context Tests =====\n")
+
+# Test 1: Basic nested if statements
+(print "Test 1: Basic nested if statements")
+
+(def (nested_if_test a b)
+  (if (> a 0)
+    (if (> b 0)
+      "a and b are positive"
+      "a is positive, b is not")
+    "a is not positive"))
+
+(print "nested_if_test(5, 10):" (nested_if_test 5 10))
+(print "Expected: a and b are positive")
+
+(print "nested_if_test(5, -10):" (nested_if_test 5 -10))
+(print "Expected: a is positive, b is not")
+
+(print "nested_if_test(-5, 10):" (nested_if_test -5 10))
+(print "Expected: a is not positive")
+
+# Test 2: Nested if with variable shadowing
+(print "\nTest 2: Nested if with variable shadowing")
+
+(def (shadowing_test x)
+  (= result "outer")
+  (if (> x 5)
+    (begin
+      (= result "inner if")
+      (print "Inside if, result =" result))
+    (begin
+      (= result "inner else")
+      (print "Inside else, result =" result)))
+  (print "After if/else, result =" result)
+  result)
+
+(print "shadowing_test(10):" (shadowing_test 10))
+(print "Expected: inner if")
+
+(print "shadowing_test(3):" (shadowing_test 3))
+(print "Expected: inner else")
+
+# Test 3: Nested if with multiple levels
+(print "\nTest 3: Nested if with multiple levels")
+
+(def (multi_level_test a b c)
+  (if (> a 0)
+    (if (> b 0)
+      (if (> c 0)
+        "all positive"
+        "a and b positive, c not positive")
+      "a positive, b not positive")
+    "a not positive"))
+
+(print "multi_level_test(1, 2, 3):" (multi_level_test 1 2 3))
+(print "Expected: all positive")
+
+(print "multi_level_test(1, 2, -3):" (multi_level_test 1 2 -3))
+(print "Expected: a and b positive, c not positive")
+
+(print "multi_level_test(1, -2, 3):" (multi_level_test 1 -2 3))
+(print "Expected: a positive, b not positive")
+
+(print "multi_level_test(-1, 2, 3):" (multi_level_test -1 2 3))
+(print "Expected: a not positive")
+
+# Test 4: Nested if with side effects
+(print "\nTest 4: Nested if with side effects")
+
+(def (side_effect_test x)
+  (= counter 0)
+  (if (> x 5)
+    (begin
+      (= counter (+ counter 1))
+      (if (> x 10)
+        (begin
+          (= counter (+ counter 1))
+          (print "x > 10, counter =" counter))
+        (begin
+          (= counter (+ counter 10))
+          (print "5 < x <= 10, counter =" counter))))
+    (begin
+      (= counter (+ counter 100))
+      (print "x <= 5, counter =" counter)))
+  counter)
+
+(print "side_effect_test(15):" (side_effect_test 15))
+(print "Expected: 2 (incremented twice)")
+
+(print "side_effect_test(7):" (side_effect_test 7))
+(print "Expected: 11 (incremented by 1+10)")
+
+(print "side_effect_test(3):" (side_effect_test 3))
+(print "Expected: 100")
+
+# Test 5: Nested if with early return simulation
+# Note: In M28, return is a signal that's caught only in function evaluation
+# so we'll simulate it with a variable assignment and breaks
+(print "\nTest 5: Conditional early exit")
+
+(def (conditional_exit_test x)
+  (= result "unset")
+  (if (< x 0)
+    (= result "negative")
+    (if (== x 0)
+      (= result "zero")
+      (if (< x 10)
+        (= result "small positive")
+        (= result "large positive"))))
+  result)
+
+(print "conditional_exit_test(-5):" (conditional_exit_test -5))
+(print "Expected: negative")
+
+(print "conditional_exit_test(0):" (conditional_exit_test 0))
+(print "Expected: zero")
+
+(print "conditional_exit_test(5):" (conditional_exit_test 5))
+(print "Expected: small positive")
+
+(print "conditional_exit_test(15):" (conditional_exit_test 15))
+(print "Expected: large positive")
+
+# Test 6: Nested if in a loop context
+(print "\nTest 6: Nested if in a loop context")
+
+(def (loop_if_test max)
+  (= result 0)
+  (= i 1)
+  (while (<= i 10)
+    (if (<= i max)
+      (if (== (% i 2) 0)
+        (begin
+          (= result (+ result i))
+          (print "Adding" i "to result:" result))
+        (print "Skipping odd number" i))
+      (begin
+        (print "Breaking loop at" i)
+        (break)))
+    (= i (+ i 1)))
+  result)
+
+(print "loop_if_test(5):" (loop_if_test 5))
+(print "Expected: 6 (2+4)")
+
+(print "loop_if_test(10):" (loop_if_test 10))
+(print "Expected: 30 (2+4+6+8+10)")
+
+# Test 7: Nested if with complex condition evaluation
+(print "\nTest 7: Nested if with complex condition evaluation")
+
+(def (complex_condition_test a b)
+  (= result "start")
+  (if (begin
+        (print "Evaluating outer condition")
+        (> a 0))
+    (if (begin
+          (print "Evaluating inner condition")
+          (> b 0))
+      (begin
+        (= result "both positive")
+        (print "Both conditions true"))
+      (begin
+        (= result "a positive, b not")
+        (print "Outer true, inner false")))
+    (begin
+      (= result "a not positive")
+      (print "Outer condition false")))
+  result)
+
+(print "complex_condition_test(5, 10):" (complex_condition_test 5 10))
+(print "Expected: both positive")
+
+(print "complex_condition_test(5, -10):" (complex_condition_test 5 -10))
+(print "Expected: a positive, b not")
+
+(print "complex_condition_test(-5, 10):" (complex_condition_test -5 10))
+(print "Expected: a not positive")
+
+(print "\n===== Nested If/Else Tests Complete =====")

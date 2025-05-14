@@ -1,0 +1,178 @@
+# Nested Exception Handling Test Suite
+# This file tests enhanced exception propagation for nested contexts
+
+(print "===== Nested Exception Handling Tests =====\n")
+
+# ========= 1. BASIC NESTED EXCEPTIONS ==========
+
+(print "-- Basic Nested Exceptions --")
+
+# Test 1: Nested try/except blocks with proper traceback propagation
+(print "\nTest 1.1: Nested try/except blocks")
+
+(def (nested_exception_test_1)
+  (try
+    (print "Outer try block")
+    (try
+      (print "Inner try block")
+      (raise "ValueError" "Inner exception")
+      (except
+        (print "Inner except block caught ValueError")
+        # This will be caught by the outer except block
+        (raise "TypeError" "Re-raised as TypeError")))
+    (except
+      (print "Outer except block caught TypeError"))))
+
+(nested_exception_test_1)
+
+# Test 2: Nested try blocks with exception propagation
+(print "\nTest 1.2: Exception propagation through nested blocks")
+
+(def (level3)
+  (print "Level 3 function")
+  (/ 1 0))
+
+(def (level2)
+  (print "Level 2 function calling level3")
+  (level3))
+
+(def (level1)
+  (print "Level 1 function calling level2")
+  (try
+    (level2)
+    (except
+      (print "Caught ZeroDivisionError with full traceback")
+      # The traceback should show the full call stack
+      (print "Error recovered at level 1"))))
+
+(level1)
+
+# ========= 2. EXCEPTION RE-RAISING ==========
+
+(print "\n-- Exception Re-raising --")
+
+# Test 1: Re-raising current exception
+(print "\nTest 2.1: Re-raising current exception")
+
+(def (catch_and_reraise)
+  (try
+    (print "Trying to access undefined variable")
+    undefined_variable  # This will raise a NameError
+    (except
+      (print "Caught exception, now re-raising")
+      (raise))))  # Re-raise the current exception
+
+(try
+  (catch_and_reraise)
+  (except
+    (print "Re-raised exception caught in outer handler")))
+
+# Test 2: Re-raising with enhanced exception
+(print "\nTest 2.2: Re-raising with different exception type")
+
+(def (convert_exception)
+  (try
+    (print "Raising ValueError")
+    (raise "ValueError" "Original error")
+    (except (e)
+      (print "Caught ValueError, converting to RuntimeError")
+      (raise "RuntimeError" "Converted error" e))))  # Pass original as cause
+
+(try
+  (convert_exception)
+  (except (e)
+    (print "Caught RuntimeError with original cause")))
+
+# ========= 3. FINALLY BLOCKS ==========
+
+(print "\n-- Finally Blocks with Exceptions --")
+
+# Test 1: Finally block with exception in try
+(print "\nTest 3.1: Finally with exception in try")
+
+(def (finally_with_exception)
+  (try
+    (print "In try block")
+    (raise "ValueError" "Error in try")
+    (except
+      (print "Caught ValueError")
+      (raise "TypeError" "Re-raised as TypeError"))
+    (finally
+      (print "Finally block executed regardless of exceptions"))))
+
+(try
+  (finally_with_exception)
+  (except
+    (print "Caught TypeError from re-raise")))
+
+# Test 2: Exception in finally block
+(print "\nTest 3.2: Exception in finally block")
+
+(def (exception_in_finally)
+  (try
+    (print "In try block - no exception")
+    (except
+      (print "This except block won't execute"))
+    (finally
+      (print "In finally block - raising exception")
+      (raise "Exception in finally"))))
+
+(try
+  (exception_in_finally)
+  (except
+    (print "Caught exception from finally block")))
+
+# ========= 4. COMPLEX SCENARIOS ==========
+
+(print "\n-- Complex Exception Scenarios --")
+
+# Test 1: Deep nesting with exception causes
+(print "\nTest 4.1: Deep nesting with exception causes")
+
+(defexception DatabaseError)
+(defexception NetworkError)
+
+(def (db_operation)
+  (print "Database operation")
+  (raise "DatabaseError" "Database connection failed"))
+
+(def (network_call)
+  (print "Network call")
+  (try
+    (db_operation)
+    (except (e)
+      (print "Database error during network call")
+      (raise "NetworkError" "Network operation failed due to database error" e))))
+
+(def (process_request)
+  (print "Processing request")
+  (try
+    (network_call)
+    (except (e)
+      (print "Request failed due to network error")
+      (print "Original cause tracked in exception chain"))))
+
+(process_request)
+
+# Test 2: Multiple exception handlers
+(print "\nTest 4.2: Multiple exception handlers with propagation")
+
+(def (test_multiple_handlers)
+  (try
+    (print "Outer try")
+    (try
+      (print "Middle try")
+      (try
+        (print "Inner try")
+        (print "Raising KeyError")
+        (raise "KeyError" "Missing key")
+        (except
+          (print "This won't execute - wrong except type")))
+      (except
+        (print "This won't execute - wrong except type")))
+    (except
+      (print "KeyError correctly propagated to outer handler"))))
+
+(test_multiple_handlers)
+
+(print "\n===== Nested Exception Tests Complete =====")

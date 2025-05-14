@@ -6,13 +6,15 @@ This document covers the control flow constructs in M28, including conditionals 
 1. [Conditionals](#conditionals)
    - [If Expressions](#if-expressions)
    - [Nested Conditionals](#nested-conditionals)
+   - [Variable Scoping](#variable-scoping)
    - [Boolean Operations](#boolean-operations)
 2. [Loops](#loops)
    - [For Loops](#for-loops)
    - [While Loops](#while-loops)
    - [Loop Control Statements](#loop-control-statements)
 3. [Exception Control Flow](#exception-control-flow)
-4. [Examples](#examples)
+4. [Early Returns](#early-returns)
+5. [Examples](#examples)
 
 ## Conditionals
 
@@ -67,6 +69,32 @@ Example:
             (if (>= score 60)
                 "D"
                 "F"))))
+```
+
+### Variable Scoping
+
+In M28, each if/else branch has its own lexical scope. Variables defined within a branch are only visible within that branch:
+
+```lisp
+(if (> x 0)
+    (begin
+      (= local_var "positive")  # local_var only exists in this branch
+      (print local_var))
+    (begin
+      (= local_var "negative")  # different local_var in else branch
+      (print local_var)))
+
+# local_var is not accessible here
+```
+
+To make variables available outside conditional blocks, define them in the parent scope:
+
+```lisp
+(= result "unknown")
+(if (> x 0)
+    (= result "positive")  # updates existing variable
+    (= result "negative"))
+# result is now updated based on the condition
 ```
 
 ### Boolean Operations
@@ -166,6 +194,25 @@ Exception handling can also affect control flow:
         (cleanup-operation)))
 ```
 
+## Early Returns
+
+M28 supports early returns from functions, which can be especially useful in nested conditionals:
+
+```lisp
+(def (check-number x)
+  (if (< x 0)
+      (return "negative"))  # Function returns immediately if x is negative
+  
+  (if (== x 0)
+      (return "zero"))      # Function returns immediately if x is zero
+  
+  (if (< x 10)
+      (return "small positive")
+      (return "large positive")))
+```
+
+Early returns work correctly even in deeply nested contexts, making complex conditional logic easier to express and understand.
+
 ## Examples
 
 ### Example 1: Finding Prime Numbers
@@ -243,5 +290,9 @@ M28's control flow follows these principles:
 1. **Expressions vs. Statements**: Most control structures are expressions that return values, not just statements
 2. **Short-Circuit Evaluation**: Logical operators (`and`, `or`) use short-circuit evaluation
 3. **Implicit Sequencing**: Multiple expressions in a body are implicitly wrapped in a `begin` block
-4. **Scope**: Variables defined within a block are visible only within that block and nested blocks
-5. **Truthiness**: M28 follows Python's rules for truthiness, where `False`, `None`, `0`, empty collections, and empty strings are considered falsy
+4. **Lexical Scoping**: Each control flow construct creates its own environment, ensuring proper variable scoping
+5. **Propagating Control Signals**: Break, continue, and return signals properly propagate through nested contexts
+6. **Truthiness**: M28 follows Python's rules for truthiness, where `False`, `None`, `0`, empty collections, and empty strings are considered falsy
+7. **Environment Isolation**: Variables defined within conditional blocks are properly isolated to maintain clean scoping
+
+M28 implements these control flow constructs as special forms in `special_forms/control_flow.go`, with careful attention to environment handling and control flow signal propagation.
