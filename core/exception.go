@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 )
@@ -33,9 +32,9 @@ type TraceEntry struct {
 func (t TraceEntry) String() string {
 	if t.Location.Filename != "" && t.Location.Line > 0 {
 		// Format with color codes if enabled
-		blue := getColorCode("\033[1;34m")
-		white := getColorCode("\033[37m")
-		reset := getColorCode("\033[0m")
+		blue := GetColorCode(ColorBlue)
+		white := GetColorCode(ColorWhite)
+		reset := GetColorCode(ColorReset)
 
 		return fmt.Sprintf("%sFile \"%s\", line %d, in %s%s%s",
 			blue,
@@ -100,13 +99,13 @@ func (e *Exception) String() string {
 	var result strings.Builder
 
 	// Color codes
-	cyan := getColorCode("\033[1;36m")
-	blue := getColorCode("\033[1;34m")
-	white := getColorCode("\033[37m")
-	red := getColorCode("\033[1;31m")
-	yellow := getColorCode("\033[1;33m")
-	bold := getColorCode("\033[1m")
-	reset := getColorCode("\033[0m")
+	cyan := GetColorCode(ColorCyan)
+	blue := GetColorCode(ColorBlue)
+	white := GetColorCode(ColorWhite)
+	red := GetColorCode(ColorRed)
+	yellow := GetColorCode(ColorYellow)
+	bold := GetColorCode(ColorBold)
+	reset := GetColorCode(ColorReset)
 
 	// Add traceback if available
 	if e.Traceback != nil && len(e.Traceback) > 0 {
@@ -288,44 +287,11 @@ func GetSourceContext(location Location, contextLines int) (string, bool) {
 	return sb.String(), true
 }
 
-// ColoredErrors determines whether to use colored error output
-var ColoredErrors = true
-
-// IsTerminal attempts to determine if the output is a terminal
-// where color would be useful
-func IsTerminal() bool {
-	fileInfo, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return (fileInfo.Mode() & os.ModeCharDevice) != 0
-}
-
-// DisableColors turns off colored error output
-func DisableColors() {
-	ColoredErrors = false
-}
-
-// EnableColors turns on colored error output
-func EnableColors() {
-	ColoredErrors = true
-}
-
-// getColorCode returns either the ANSI color code or empty string based on settings
-func getColorCode(code string) string {
-	if ColoredErrors && IsTerminal() {
-		return code
-	}
-	return ""
-}
-
 // StandardExceptions defines the standard exception types
 var StandardExceptions = map[string]*Exception{}
 
 // Initialize standard exceptions
 func init() {
-	// Auto-detect whether to use colors by default
-	ColoredErrors = IsTerminal()
 	// Base exception
 	baseException := &Exception{
 		Type:    "Exception",

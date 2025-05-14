@@ -76,10 +76,10 @@ func NewREPL(flags *CommandFlags) *REPL {
 
 	// Set up readline for REPL with improved history file location and tab completion
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:          "m28> ",
+		Prompt:          core.ColoredPrompt,
 		HistoryFile:     historyFilePath,
-		InterruptPrompt: "^C",
-		EOFPrompt:       "exit",
+		InterruptPrompt: core.GetColorCode(core.ColorRed) + "^C" + core.GetColorCode(core.ColorReset),
+		EOFPrompt:       core.GetColorCode(core.ColorYellow) + "exit" + core.GetColorCode(core.ColorReset),
 		HistoryLimit:    historySize,
 		AutoComplete:    newCompleter(replInstance),
 	})
@@ -101,12 +101,12 @@ func NewREPL(flags *CommandFlags) *REPL {
 }
 
 func (r *REPL) Run() {
-	fmt.Println("Welcome to the M28 Lisp REPL!")
-	fmt.Println("Type 'exit' or 'quit' to exit the REPL.")
-	fmt.Println("Use Ctrl+C to interrupt.")
-	fmt.Println("Type ':help' for a list of commands.")
-	fmt.Println("History navigation: Up/Down arrows, Ctrl+R for reverse search.")
-	fmt.Println("Type ':toggle-keybindings' to switch between Emacs and VI keybindings.")
+	fmt.Println(core.GetColorCode(core.ColorBold) + "Welcome to the M28 Lisp REPL!" + core.GetColorCode(core.ColorReset))
+	fmt.Println(core.GetColorCode(core.ColorGray) + "Type 'exit' or 'quit' to exit the REPL." + core.GetColorCode(core.ColorReset))
+	fmt.Println(core.GetColorCode(core.ColorGray) + "Use Ctrl+C to interrupt." + core.GetColorCode(core.ColorReset))
+	fmt.Println(core.GetColorCode(core.ColorGray) + "Type ':help' for a list of commands." + core.GetColorCode(core.ColorReset))
+	fmt.Println(core.GetColorCode(core.ColorGray) + "History navigation: Up/Down arrows, Ctrl+R for reverse search." + core.GetColorCode(core.ColorReset))
+	fmt.Println(core.GetColorCode(core.ColorGray) + "Type ':toggle-keybindings' to switch between Emacs and VI keybindings." + core.GetColorCode(core.ColorReset))
 
 	for {
 		input, err := r.rl.Readline()
@@ -114,16 +114,16 @@ func (r *REPL) Run() {
 			if err == readline.ErrInterrupt {
 				continue
 			} else if err == io.EOF {
-				fmt.Println("\nGoodbye!")
+				fmt.Println("\n" + core.GetColorCode(core.ColorGreen) + "Goodbye!" + core.GetColorCode(core.ColorReset))
 				return
 			}
-			fmt.Println("Error reading input:", err)
+			fmt.Printf("%sError reading input:%s %v\n", core.GetColorCode(core.ColorRed), core.GetColorCode(core.ColorReset), err)
 			continue
 		}
 
 		input = strings.TrimSpace(input)
 		if input == "exit" || input == "quit" {
-			fmt.Println("Goodbye!")
+			fmt.Println(core.GetColorCode(core.ColorGreen) + "Goodbye!" + core.GetColorCode(core.ColorReset))
 			return
 		}
 
@@ -150,10 +150,10 @@ func (r *REPL) Run() {
 				fmt.Println(ex.String())
 			} else {
 				// Fall back to basic error display
-				fmt.Println("Error:", err)
+				fmt.Printf("%sError:%s %v\n", core.GetColorCode(core.ColorRed), core.GetColorCode(core.ColorReset), err)
 			}
 		} else {
-			fmt.Println("=>", core.PrintValue(result))
+			fmt.Printf("%s=>%s %s\n", core.GetColorCode(core.ColorYellow), core.GetColorCode(core.ColorReset), core.ColorizeValue(result))
 		}
 	}
 }
@@ -181,20 +181,22 @@ func (r *REPL) handleCommand(cmd string) bool {
 		return true
 
 	case ":toggle-colors":
-		if core.ColoredErrors {
+		if core.ColorEnabled {
 			core.DisableColors()
-			fmt.Println("Colored error output disabled.")
+			r.rl.SetPrompt("m28> ")
+			fmt.Println("Colored output disabled.")
 		} else {
 			core.EnableColors()
-			fmt.Println("Colored error output enabled.")
+			r.rl.SetPrompt(core.ColoredPrompt)
+			fmt.Println("Colored output enabled.")
 		}
 		return true
 
 	case ":help":
-		fmt.Println("Available commands:")
+		fmt.Println(core.GetColorCode(core.ColorBold) + core.GetColorCode(core.ColorCyan) + "Available commands:" + core.GetColorCode(core.ColorReset))
 		fmt.Println("  :help                  - Show this help message")
 		fmt.Println("  :toggle-keybindings    - Switch between Emacs and VI keybindings")
-		fmt.Println("  :toggle-colors         - Enable/disable colored error output")
+		fmt.Println("  :toggle-colors         - Enable/disable colored output")
 		fmt.Println("  :history               - Show command history (last 10 commands)")
 		fmt.Println("  :history N             - Show last N history commands")
 		fmt.Println("  :history clear         - Clear command history")
@@ -339,10 +341,10 @@ func (r *REPL) handleHistoryExecCommand(cmd string) bool {
 			fmt.Println(ex.String())
 		} else {
 			// Fall back to basic error display
-			fmt.Println("Error:", err)
+			fmt.Printf("%sError:%s %v\n", core.GetColorCode(core.ColorRed), core.GetColorCode(core.ColorReset), err)
 		}
 	} else {
-		fmt.Println("=>", core.PrintValue(result))
+		fmt.Printf("%s=>%s %s\n", core.GetColorCode(core.ColorYellow), core.GetColorCode(core.ColorReset), core.ColorizeValue(result))
 	}
 
 	return true
