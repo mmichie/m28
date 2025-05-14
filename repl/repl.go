@@ -18,14 +18,19 @@ import (
 )
 
 type REPL struct {
-	env          core.Environment
-	evaluator    core.Evaluator
-	parser       *parser.Parser
-	rl           *readline.Instance
-	viMode       bool
-	history      []string
-	historyFile  string
-	historyLimit int
+	env            core.Environment
+	evaluator      core.Evaluator
+	parser         *parser.Parser
+	rl             *readline.Instance
+	viMode         bool
+	history        []string
+	historyFile    string
+	historyLimit   int
+	executionCount int                    // Track execution count for In/Out numbering
+	outputHistory  map[int]core.LispValue // Store output history for _N variables
+	lineBuffer     []string               // For multiline input
+	lineCount      int                    // Current line number in a multiline input
+	indentLevel    int                    // Current indentation level
 }
 
 func NewREPL(flags *CommandFlags) *REPL {
@@ -76,7 +81,7 @@ func NewREPL(flags *CommandFlags) *REPL {
 
 	// Set up readline for REPL with improved history file location and tab completion
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:          core.ColoredPrompt,
+		Prompt:          core.FormatIPythonPrompt(1), // Start with execution count 1
 		HistoryFile:     historyFilePath,
 		InterruptPrompt: core.GetColorCode(core.ColorRed) + "^C" + core.GetColorCode(core.ColorReset),
 		EOFPrompt:       core.GetColorCode(core.ColorYellow) + "exit" + core.GetColorCode(core.ColorReset),
@@ -89,14 +94,19 @@ func NewREPL(flags *CommandFlags) *REPL {
 
 	// Return the REPL with all settings
 	return &REPL{
-		env:          environment,
-		evaluator:    evaluator,
-		parser:       parser.NewParser(),
-		rl:           rl,
-		viMode:       false,
-		history:      replInstance.history,
-		historyFile:  historyFilePath,
-		historyLimit: historySize,
+		env:            environment,
+		evaluator:      evaluator,
+		parser:         parser.NewParser(),
+		rl:             rl,
+		viMode:         false,
+		history:        replInstance.history,
+		historyFile:    historyFilePath,
+		historyLimit:   historySize,
+		executionCount: 1, // Start at 1 like IPython
+		outputHistory:  make(map[int]core.LispValue),
+		lineBuffer:     []string{},
+		lineCount:      0,
+		indentLevel:    0,
 	}
 }
 
@@ -107,11 +117,31 @@ func (r *REPL) Run() {
 	fmt.Println(core.GetColorCode(core.ColorGray) + "Type ':help' for a list of commands." + core.GetColorCode(core.ColorReset))
 	fmt.Println(core.GetColorCode(core.ColorGray) + "History navigation: Up/Down arrows, Ctrl+R for reverse search." + core.GetColorCode(core.ColorReset))
 	fmt.Println(core.GetColorCode(core.ColorGray) + "Type ':toggle-keybindings' to switch between Emacs and VI keybindings." + core.GetColorCode(core.ColorReset))
+	fmt.Println(core.GetColorCode(core.ColorGray) + "Multi-line input: Open delimiters or backslash continue to next line." + core.GetColorCode(core.ColorReset))
+
+	// Set initial prompt
+	r.rl.SetPrompt(core.FormatIPythonPrompt(r.executionCount))
 
 	for {
+		// Determine which prompt to show based on multi-line state
+		if len(r.lineBuffer) > 0 {
+			// We're in multi-line input mode, use continuation prompt
+			// Calculate appropriate indentation based on lineCount
+			r.rl.SetPrompt(core.FormatIPythonContinuationPrompt(r.indentLevel))
+		} else {
+			// Standard prompt with execution count
+			r.rl.SetPrompt(core.FormatIPythonPrompt(r.executionCount))
+		}
+
+		// Read input
 		input, err := r.rl.Readline()
 		if err != nil {
 			if err == readline.ErrInterrupt {
+				// Clear line buffer and return to normal prompt on interrupt
+				r.lineBuffer = []string{}
+				r.lineCount = 0
+				r.indentLevel = 0
+				r.rl.SetPrompt(core.FormatIPythonPrompt(r.executionCount))
 				continue
 			} else if err == io.EOF {
 				fmt.Println("\n" + core.GetColorCode(core.ColorGreen) + "Goodbye!" + core.GetColorCode(core.ColorReset))
@@ -121,40 +151,126 @@ func (r *REPL) Run() {
 			continue
 		}
 
-		input = strings.TrimSpace(input)
-		if input == "exit" || input == "quit" {
+		// Check for exit commands
+		trimmedInput := strings.TrimSpace(input)
+		if trimmedInput == "exit" || trimmedInput == "quit" {
 			fmt.Println(core.GetColorCode(core.ColorGreen) + "Goodbye!" + core.GetColorCode(core.ColorReset))
 			return
 		}
 
-		// Handle REPL commands
-		if strings.HasPrefix(input, ":") {
-			handled := r.handleCommand(input)
+		// Handle REPL commands (only in single-line mode)
+		if len(r.lineBuffer) == 0 && strings.HasPrefix(trimmedInput, ":") {
+			handled := r.handleCommand(trimmedInput)
 			if handled {
 				continue
 			}
 		}
 
-		if input == "" {
+		// Check if multi-line input is needed
+		multilineNeeded := r.isMultilineModeNeeded(input)
+
+		// Handle multi-line input
+		if multilineNeeded {
+			// Add the current line to the buffer
+			r.lineBuffer = append(r.lineBuffer, input)
+			r.lineCount++
+
+			// Update indentation level based on line content
+			// This is a simple version - could be more sophisticated
+			for _, char := range input {
+				if char == '(' || char == '[' || char == '{' {
+					r.indentLevel += 2
+				} else if char == ')' || char == ']' || char == '}' {
+					r.indentLevel = max(0, r.indentLevel-2) // Prevent negative indentation
+				}
+			}
+
+			continue // Get the next line
+		}
+
+		// If we're in a multi-line input and this is an empty line,
+		// or we've reached balanced delimiters, evaluate the buffer
+		if len(r.lineBuffer) > 0 {
+			// Either this is an empty line signaling end of input,
+			// or we've detected balanced delimiters
+
+			// Add the final line to the buffer (unless it's just whitespace)
+			if trimmedInput != "" {
+				r.lineBuffer = append(r.lineBuffer, input)
+			}
+
+			// Join all lines for evaluation
+			fullInput := strings.Join(r.lineBuffer, "\n")
+
+			// Reset multi-line state
+			r.lineBuffer = []string{}
+			r.lineCount = 0
+			r.indentLevel = 0
+
+			// Add the combined input to our history
+			r.addToHistory(fullInput)
+
+			// Evaluate the full multi-line input
+			r.evaluateAndDisplayResult(fullInput)
+
+			continue
+		}
+
+		// For single-line input
+		if trimmedInput == "" {
 			continue
 		}
 
 		// Add the command to our history
 		r.addToHistory(input)
 
-		result, err := r.EvaluateString(input)
-		if err != nil {
-			// Print the detailed error message
-			if ex, ok := err.(*core.Exception); ok {
-				// Use the formatted exception output
-				fmt.Println(ex.String())
-			} else {
-				// Fall back to basic error display
-				fmt.Printf("%sError:%s %v\n", core.GetColorCode(core.ColorRed), core.GetColorCode(core.ColorReset), err)
-			}
+		// Evaluate single-line input
+		r.evaluateAndDisplayResult(input)
+	}
+}
+
+// evaluateAndDisplayResult evaluates the input and displays the result
+func (r *REPL) evaluateAndDisplayResult(input string) {
+	// Echo input with syntax highlighting (IPython-like behavior)
+	if core.ColorEnabled {
+		fmt.Printf("%s %s\n",
+			core.FormatIPythonPrompt(r.executionCount),
+			core.SyntaxHighlight(strings.TrimSpace(input)))
+	}
+	result, err := r.EvaluateString(input)
+	if err != nil {
+		// Print the detailed error message
+		if ex, ok := err.(*core.Exception); ok {
+			// Use the formatted exception output
+			fmt.Println(ex.String())
 		} else {
-			fmt.Printf("%s=>%s %s\n", core.GetColorCode(core.ColorYellow), core.GetColorCode(core.ColorReset), core.ColorizeValue(result))
+			// Fall back to basic error display
+			fmt.Printf("%sError:%s %v\n", core.GetColorCode(core.ColorRed), core.GetColorCode(core.ColorReset), err)
 		}
+	} else {
+		// Store result in output history if not nil or None
+		if !core.IsNilEquivalent(result) {
+			// Store in output history with current execution count
+			r.outputHistory[r.executionCount] = result
+
+			// Store in environment as _N variable (like IPython)
+			outVarName := fmt.Sprintf("_%d", r.executionCount)
+			r.env.Define(core.LispSymbol(outVarName), result)
+
+			// Also update _ to the most recent output (like IPython)
+			r.env.Define(core.LispSymbol("_"), result)
+
+			// Output with IPython-style formatting
+			fmt.Printf("%s %s\n",
+				core.FormatIPythonOutput(r.executionCount),
+				core.ColorizeValue(result))
+		}
+
+		// Increment execution count for next prompt
+		r.executionCount++
+
+		// Update prompt with new execution count
+		r.rl.SetPrompt(core.FormatIPythonPrompt(r.executionCount))
 	}
 }
 
@@ -344,7 +460,29 @@ func (r *REPL) handleHistoryExecCommand(cmd string) bool {
 			fmt.Printf("%sError:%s %v\n", core.GetColorCode(core.ColorRed), core.GetColorCode(core.ColorReset), err)
 		}
 	} else {
-		fmt.Printf("%s=>%s %s\n", core.GetColorCode(core.ColorYellow), core.GetColorCode(core.ColorReset), core.ColorizeValue(result))
+		// Store result in history
+		if !core.IsNilEquivalent(result) {
+			// Store in output history with current execution count
+			r.outputHistory[r.executionCount] = result
+
+			// Store in environment as _N variable (like IPython)
+			outVarName := fmt.Sprintf("_%d", r.executionCount)
+			r.env.Define(core.LispSymbol(outVarName), result)
+
+			// Also update _ to the most recent output (like IPython)
+			r.env.Define(core.LispSymbol("_"), result)
+
+			// Output with IPython-style formatting
+			fmt.Printf("%s %s\n",
+				core.FormatIPythonOutput(r.executionCount),
+				core.ColorizeValue(result))
+
+			// Increment execution count for next prompt
+			r.executionCount++
+
+			// Update prompt with new execution count
+			r.rl.SetPrompt(core.FormatIPythonPrompt(r.executionCount))
+		}
 	}
 
 	return true
@@ -496,6 +634,63 @@ func (r *REPL) EvaluateString(input string) (core.LispValue, error) {
 	// Return the result and error directly - don't rewrap errors
 	// This preserves exceptions, tracebacks, and control flow signals
 	return result, err
+}
+
+// isMultilineModeNeeded checks if the input requires multi-line mode
+func (r *REPL) isMultilineModeNeeded(input string) bool {
+	// If we're already in multi-line mode, continue until an empty line
+	if len(r.lineBuffer) > 0 {
+		return true
+	}
+
+	// Check for unbalanced delimiters
+	stack := []rune{}
+	for _, char := range input {
+		if char == '(' || char == '[' || char == '{' {
+			stack = append(stack, char)
+		} else if char == ')' {
+			if len(stack) == 0 || stack[len(stack)-1] != '(' {
+				return false // Mismatched closing delimiter
+			}
+			stack = stack[:len(stack)-1]
+		} else if char == ']' {
+			if len(stack) == 0 || stack[len(stack)-1] != '[' {
+				return false // Mismatched closing delimiter
+			}
+			stack = stack[:len(stack)-1]
+		} else if char == '}' {
+			if len(stack) == 0 || stack[len(stack)-1] != '{' {
+				return false // Mismatched closing delimiter
+			}
+			stack = stack[:len(stack)-1]
+		}
+	}
+
+	// Check if we have open delimiters
+	if len(stack) > 0 {
+		return true
+	}
+
+	// Check if line ends with a backslash
+	if len(input) > 0 && input[len(input)-1] == '\\' {
+		return true
+	}
+
+	// Check if line ends with a colon (Python-style block start)
+	trimmed := strings.TrimSpace(input)
+	if len(trimmed) > 0 && trimmed[len(trimmed)-1] == ':' {
+		return true
+	}
+
+	return false
+}
+
+// max returns the larger of x or y
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
 }
 
 func (r *REPL) toggleKeybindings() {
@@ -690,6 +885,7 @@ func (sc *symbolCompleter) getAttributesForObject(objName, attrPrefix string) []
 
 // getHistoryFilePath returns the path to the history file, creating the directory if needed
 // If noHistory is true, it returns an empty string to disable history
+
 func getHistoryFilePath(noHistory bool) string {
 	if noHistory {
 		return "" // Empty string disables history

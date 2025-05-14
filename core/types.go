@@ -265,6 +265,20 @@ func (s *PythonicSet) Data() map[LispValue]struct{} {
 	return s.data
 }
 
+// IsNilEquivalent checks if a value is nil or equivalent to nil (like None)
+func IsNilEquivalent(v LispValue) bool {
+	if v == nil {
+		return true
+	}
+
+	// Check for PythonicNone
+	if _, ok := v.(PythonicNone); ok {
+		return true
+	}
+
+	return false
+}
+
 // IsTruthy determines if a value is considered true in Pythonic Lisp
 func IsTruthy(v LispValue) bool {
 	switch v := v.(type) {
