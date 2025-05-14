@@ -199,65 +199,8 @@ func (m *ModuleLoaderImpl) LoadModule(name string, e core.Evaluator) (*core.Pyth
 		}
 	})
 
-	// Check if the module defined an __exports__ list
-	exportsVal, hasExports := module.Get("__exports__")
-	if hasExports {
-		// If __exports__ is defined, only export the symbols listed in it
-		if exportsList, ok := exportsVal.(core.LispList); ok {
-			// First, build a list of keys to keep
-			keysToKeep := make(map[string]bool)
-
-			// Always keep metadata
-			keysToKeep["__name__"] = true
-			keysToKeep["__file__"] = true
-			keysToKeep["__exports__"] = true
-
-			// Keep the dot notation special forms
-			keysToKeep["."] = true
-			keysToKeep["dot"] = true
-
-			// Keep all exported symbols
-			for _, symbolVal := range exportsList {
-				var symbolName string
-				switch sym := symbolVal.(type) {
-				case core.LispSymbol:
-					symbolName = string(sym)
-				case string:
-					symbolName = sym
-				default:
-					continue // Skip non-symbol/string items
-				}
-
-				if _, ok := module.Get(symbolName); ok {
-					keysToKeep[symbolName] = true
-				}
-			}
-
-			// Create a list of user-defined keys to remove
-			var keysToRemove []string
-			keysList, err := module.CallMethod("keys", []core.LispValue{})
-			if err == nil {
-				if keyList, ok := keysList.(core.LispList); ok {
-					for _, keyVal := range keyList {
-						if keyStr, ok := keyVal.(string); ok {
-							// If it's not in the keys to keep and isn't a builtin or special form
-							// (don't filter out the language constructs)
-							if !keysToKeep[keyStr] &&
-								!isBuiltinSymbol(core.LispSymbol(keyStr)) &&
-								!strings.HasPrefix(keyStr, "__") {
-								keysToRemove = append(keysToRemove, keyStr)
-							}
-						}
-					}
-				}
-			}
-
-			// Remove the user-defined keys that aren't in the export list
-			for _, key := range keysToRemove {
-				_, _ = module.CallMethod("delete", []core.LispValue{key})
-			}
-		}
-	}
+	// Apply module export filtering
+	filterModuleExports(module)
 
 	// Store the loaded module with its metadata
 	registry.StoreModule(name, module, modulePath, dependencies)
@@ -644,6 +587,11 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 							continue
 						}
 
+						// Skip private symbols (starting with _) unless explicitly exported
+						if isPrivateSymbol(symName) && !(hasExports && exportSet[symName]) {
+							continue
+						}
+
 						// Skip symbols not in __exports__ if __exports__ is defined
 						if hasExports && !exportSet[symName] {
 							continue
@@ -750,4 +698,96 @@ func EvalImport(e core.Evaluator, args []core.LispValue, env core.Environment) (
 func isBuiltinSymbol(symbol core.LispSymbol) bool {
 	_, isBuiltin := core.BuiltinFuncs[symbol]
 	return isBuiltin || symbol == "None" || symbol == "True" || symbol == "False"
+}
+
+// isPrivateSymbol checks if a symbol is considered private (starts with underscore)
+func isPrivateSymbol(symbolName string) bool {
+	return strings.HasPrefix(symbolName, "_") && !strings.HasPrefix(symbolName, "__")
+}
+
+// isMetadataSymbol checks if a symbol is module metadata (starts with double underscore)
+func isMetadataSymbol(symbolName string) bool {
+	return strings.HasPrefix(symbolName, "__")
+}
+
+// filterModuleExports applies the export filtering rules to a module
+// If __exports__ is defined, only the listed symbols will be accessible
+// Private symbols (prefixed with _) are automatically hidden unless explicitly exported
+func filterModuleExports(module *core.PythonicDict) {
+	// Check if the module defined an __exports__ list
+	exportsVal, hasExports := module.Get("__exports__")
+
+	// Create a set of symbols to keep
+	keysToKeep := make(map[string]bool)
+
+	// Always keep metadata
+	keysToKeep["__name__"] = true
+	keysToKeep["__file__"] = true
+	keysToKeep["__exports__"] = true
+
+	// Keep the dot notation special forms
+	keysToKeep["."] = true
+	keysToKeep["dot"] = true
+
+	// If __exports__ is defined, use it to filter what's exposed
+	if hasExports {
+		if exportsList, ok := exportsVal.(core.LispList); ok {
+			// Keep all exported symbols
+			for _, symbolVal := range exportsList {
+				var symbolName string
+				switch sym := symbolVal.(type) {
+				case core.LispSymbol:
+					symbolName = string(sym)
+				case string:
+					symbolName = sym
+				default:
+					continue // Skip non-symbol/string items
+				}
+
+				// Only keep the symbol if it actually exists in the module
+				if _, ok := module.Get(symbolName); ok {
+					keysToKeep[symbolName] = true
+				}
+			}
+		}
+	}
+
+	// Create a list of user-defined keys to remove
+	var keysToRemove []string
+	keysList, err := module.CallMethod("keys", []core.LispValue{})
+	if err == nil {
+		if keyList, ok := keysList.(core.LispList); ok {
+			for _, keyVal := range keyList {
+				if keyStr, ok := keyVal.(string); ok {
+					// Always keep metadata symbols
+					if isMetadataSymbol(keyStr) {
+						continue
+					}
+
+					// Skip language builtins and constructs
+					if isBuiltinSymbol(core.LispSymbol(keyStr)) {
+						continue
+					}
+
+					// If no __exports__ list, hide private symbols and keep everything else
+					if !hasExports {
+						if isPrivateSymbol(keyStr) {
+							keysToRemove = append(keysToRemove, keyStr)
+						}
+						continue
+					}
+
+					// With __exports__ list, remove everything not explicitly kept
+					if !keysToKeep[keyStr] {
+						keysToRemove = append(keysToRemove, keyStr)
+					}
+				}
+			}
+		}
+	}
+
+	// Remove the symbols that should not be exported
+	for _, key := range keysToRemove {
+		_, _ = module.CallMethod("delete", []core.LispValue{key})
+	}
 }
