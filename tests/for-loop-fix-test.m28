@@ -1,0 +1,52 @@
+# Test for the fixed for loop implementation
+
+(print "\n=== Testing Fixed For Loop Implementation ===\n")
+
+# Basic for loop test
+(print "1. Basic for loop with array literal:")
+(for x [1 2 3 4 5]
+  (print "  Value:" x))
+
+# For loop with list created using 'list' function
+(print "\n2. For loop with list function:")
+(for y (list 10 20 30)
+  (print "  Value:" y))
+
+# For loop with string (iterating characters)
+(print "\n3. For loop with string:")
+(for c "Hello"
+  (print "  Character:" c))
+
+# For loop with break
+(print "\n4. For loop with break:")
+(for i [1 2 3 4 5]
+  (print "  Pre-break value:" i)
+  (if (== i 3)
+    (break))
+  (print "  Post-break value:" i))
+(print "  Expected: Should break at 3")
+
+# For loop with continue
+(print "\n5. For loop with continue:")
+(for i [1 2 3 4 5]
+  (print "  Pre-continue value:" i)
+  (if (== i 3)
+    (continue))
+  (print "  Post-continue value:" i))
+(print "  Expected: Should skip post-continue for i=3")
+
+# For loop with variable updating
+(print "\n6. For loop with variable updating:")
+(= sum 0)
+(for i [1 2 3 4 5]
+  (= sum (+ sum i))
+  (print "  Running sum:" sum))
+
+# Nested for loops
+(print "\n7. Nested for loops:")
+(for x ["a" "b" "c"]
+  (print "  Outer loop x =" x)
+  (for y [1 2 3]
+    (print "    Inner loop y =" y)))
+
+(print "\n=== For Loop Tests Completed ===")

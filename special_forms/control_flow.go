@@ -153,14 +153,25 @@ func EvalElse(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 	return result, nil
 }
 
+// unwrapLocatedValue extracts the value from a LocatedValue
+func unwrapLocatedValue(expr core.LispValue) core.LispValue {
+	if located, ok := expr.(core.LocatedValue); ok {
+		return located.Value
+	}
+	return expr
+}
+
 func EvalFor(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) < 3 {
 		return nil, fmt.Errorf("for loop requires at least 3 arguments")
 	}
 
-	iterVar, ok := args[0].(core.LispSymbol)
+	// Unwrap the first argument in case it's wrapped in a LocatedValue
+	unwrappedArg := unwrapLocatedValue(args[0])
+
+	iterVar, ok := unwrappedArg.(core.LispSymbol)
 	if !ok {
-		return nil, fmt.Errorf("iteration variable must be a symbol")
+		return nil, fmt.Errorf("iteration variable must be a symbol, got %T", unwrappedArg)
 	}
 
 	iterable, err := e.Eval(args[1], env)

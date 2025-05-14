@@ -1,0 +1,4 @@
+# Simple for loop test
+(print "Basic for loop test:")
+(for x [1 2 3]
+  (print x))

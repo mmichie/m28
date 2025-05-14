@@ -33,16 +33,31 @@ func EvalLoop(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 
 func evalSimpleLoop(e core.Evaluator, body []core.LispValue, env core.Environment) (core.LispValue, error) {
 	loopEnv := env.NewEnvironment(env)
+	var result core.LispValue = core.PythonicNone{}
 	var err error
 
 	for {
 		for _, expr := range body {
-			_, err = e.Eval(expr, loopEnv)
+			result, err = e.Eval(expr, loopEnv)
 			if err != nil {
+				// Check if the error is a break signal
+				if IsBreakSignal(err) {
+					// Exit the loop completely
+					return result, nil
+				}
+
+				// Check if the error is a continue signal
+				if IsContinueSignal(err) {
+					// Skip to the next iteration of the outer loop
+					break
+				}
+
 				// Check if the error is a special return signal
 				if returnErr, ok := err.(returnError); ok {
 					return returnErr.value, nil
 				}
+
+				// Regular error - propagate it
 				return nil, err
 			}
 		}
@@ -63,10 +78,19 @@ func evalComplexLoop(e core.Evaluator, args []core.LispValue, env core.Environme
 	}
 
 	// Execute the loop
+	var result core.LispValue = core.PythonicNone{}
+
 	for {
 		if state.whileClause != nil {
 			condition, err := e.Eval(state.whileClause, state.env)
 			if err != nil {
+				// Handle break/continue in while condition
+				if IsBreakSignal(err) {
+					break
+				}
+				if IsContinueSignal(err) {
+					continue
+				}
 				return nil, err
 			}
 			if !core.IsTruthy(condition) {
@@ -77,6 +101,13 @@ func evalComplexLoop(e core.Evaluator, args []core.LispValue, env core.Environme
 		if state.untilClause != nil {
 			condition, err := e.Eval(state.untilClause, state.env)
 			if err != nil {
+				// Handle break/continue in until condition
+				if IsBreakSignal(err) {
+					break
+				}
+				if IsContinueSignal(err) {
+					continue
+				}
 				return nil, err
 			}
 			if core.IsTruthy(condition) {
@@ -85,8 +116,17 @@ func evalComplexLoop(e core.Evaluator, args []core.LispValue, env core.Environme
 		}
 
 		for _, doExpr := range state.doClause {
-			_, err := e.Eval(doExpr, state.env)
+			result, err = e.Eval(doExpr, state.env)
 			if err != nil {
+				// Handle special control flow signals
+				if IsBreakSignal(err) {
+					// Exit the loop completely
+					goto LoopExit
+				}
+				if IsContinueSignal(err) {
+					// Skip to the next iteration
+					break
+				}
 				if returnErr, ok := err.(returnError); ok {
 					return returnErr.value, nil
 				}
@@ -98,23 +138,34 @@ func evalComplexLoop(e core.Evaluator, args []core.LispValue, env core.Environme
 		for varName, updateExpr := range state.variables {
 			value, err := e.Eval(updateExpr, state.env)
 			if err != nil {
+				// Handle break/continue in variable updates
+				if IsBreakSignal(err) {
+					goto LoopExit
+				}
+				if IsContinueSignal(err) {
+					continue
+				}
 				return nil, err
 			}
 			state.env.Set(varName, value)
 		}
 	}
 
+LoopExit:
+
 	// Execute finally clause
 	if len(state.finallyClause) > 0 {
-		var result core.LispValue
+		var finalResult core.LispValue
 		var err error
 		for _, expr := range state.finallyClause {
-			result, err = e.Eval(expr, state.env)
+			finalResult, err = e.Eval(expr, state.env)
 			if err != nil {
+				// Don't handle break/continue in finally clause -
+				// they should propagate out to any enclosing loop
 				return nil, err
 			}
 		}
-		return result, nil
+		return finalResult, nil
 	}
 
 	// Return accumulated results
@@ -129,7 +180,7 @@ func evalComplexLoop(e core.Evaluator, args []core.LispValue, env core.Environme
 		return results, nil
 	}
 
-	return nil, nil
+	return result, nil // Return the last evaluated result
 }
 
 func parseLoopClauses(e core.Evaluator, args []core.LispValue, state *loopState) error {
@@ -444,11 +495,20 @@ func EvalDolist(e core.Evaluator, args []core.LispValue, env core.Environment) (
 		// Convert list literal to regular list
 		list = core.LispList(l)
 	} else {
-		return nil, fmt.Errorf("dolist requires a list")
+		// Try to handle strings by treating them as character lists
+		if str, ok := listExpr.(string); ok {
+			strList := make(core.LispList, len(str))
+			for i, ch := range str {
+				strList[i] = string(ch)
+			}
+			list = strList
+		} else {
+			return nil, fmt.Errorf("dolist requires a list, list literal, or string; got %T", listExpr)
+		}
 	}
 
 	loopEnv := env.NewEnvironment(env)
-	var result core.LispValue
+	var result core.LispValue = core.PythonicNone{}
 
 	for _, item := range list {
 		loopEnv.Set(varSymbol, item)
@@ -456,6 +516,20 @@ func EvalDolist(e core.Evaluator, args []core.LispValue, env core.Environment) (
 		for _, form := range args[1:] {
 			result, err = e.Eval(form, loopEnv)
 			if err != nil {
+				// Handle break and continue signals
+				if IsBreakSignal(err) {
+					// Break out of the loop completely
+					return result, nil
+				}
+				if IsContinueSignal(err) {
+					// Skip to the next iteration
+					break
+				}
+				// Handle explicit return
+				if returnErr, ok := err.(returnError); ok {
+					return returnErr.value, nil
+				}
+				// Any other error is propagated
 				return nil, err
 			}
 		}
@@ -499,7 +573,7 @@ func EvalDotimes(e core.Evaluator, args []core.LispValue, env core.Environment) 
 	}
 
 	loopEnv := env.NewEnvironment(env)
-	var result core.LispValue
+	var result core.LispValue = core.PythonicNone{}
 
 	for i := 0; i < int(count); i++ {
 		loopEnv.Set(varSymbol, float64(i))
@@ -507,6 +581,24 @@ func EvalDotimes(e core.Evaluator, args []core.LispValue, env core.Environment) 
 		for _, form := range args[1:] {
 			result, err = e.Eval(form, loopEnv)
 			if err != nil {
+				// Handle break signal
+				if IsBreakSignal(err) {
+					// Exit the loop completely
+					return result, nil
+				}
+
+				// Handle continue signal
+				if IsContinueSignal(err) {
+					// Skip to the next iteration
+					break
+				}
+
+				// Handle explicit return
+				if returnErr, ok := err.(returnError); ok {
+					return returnErr.value, nil
+				}
+
+				// Any other error is propagated
 				return nil, err
 			}
 		}
@@ -523,11 +615,19 @@ func EvalWhile(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 	condition := args[0]
 	body := args[1:]
 
-	var result core.LispValue
+	var result core.LispValue = core.PythonicNone{}
 
 	for {
 		condResult, err := e.Eval(condition, env)
 		if err != nil {
+			// Handle break in condition evaluation
+			if IsBreakSignal(err) {
+				return result, nil
+			}
+			// Handle continue in condition evaluation
+			if IsContinueSignal(err) {
+				continue
+			}
 			return nil, err
 		}
 
@@ -538,6 +638,22 @@ func EvalWhile(e core.Evaluator, args []core.LispValue, env core.Environment) (c
 		for _, expr := range body {
 			result, err = e.Eval(expr, env)
 			if err != nil {
+				// Handle break signal
+				if IsBreakSignal(err) {
+					return result, nil
+				}
+
+				// Handle continue signal
+				if IsContinueSignal(err) {
+					break // Break inner loop, continue outer loop
+				}
+
+				// Handle explicit return
+				if returnErr, ok := err.(returnError); ok {
+					return returnErr.value, nil
+				}
+
+				// Any other error is propagated
 				return nil, err
 			}
 		}
