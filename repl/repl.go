@@ -231,12 +231,7 @@ func (r *REPL) Run() {
 
 // evaluateAndDisplayResult evaluates the input and displays the result
 func (r *REPL) evaluateAndDisplayResult(input string) {
-	// Echo input with syntax highlighting (IPython-like behavior)
-	if core.ColorEnabled {
-		fmt.Printf("%s %s\n",
-			core.FormatIPythonPrompt(r.executionCount),
-			core.SyntaxHighlight(strings.TrimSpace(input)))
-	}
+	// Don't echo input again - true IPython behavior
 	result, err := r.EvaluateString(input)
 	if err != nil {
 		// Print the detailed error message
@@ -248,25 +243,39 @@ func (r *REPL) evaluateAndDisplayResult(input string) {
 			fmt.Printf("%sError:%s %v\n", core.GetColorCode(core.ColorRed), core.GetColorCode(core.ColorReset), err)
 		}
 	} else {
-		// Store result in output history if not nil or None
+		// Only track and display non-nil results (like IPython)
 		if !core.IsNilEquivalent(result) {
-			// Store in output history with current execution count
-			r.outputHistory[r.executionCount] = result
+			// Check if this is a print statement or other command with no meaningful return value
+			// In M28, print returns the string being printed, but in Python it returns None
+			// We need to detect if we're dealing with a print statement's return value
+			isPrintResult := false
+			if str, ok := result.(string); ok {
+				// If we get back the same string that was printed, don't show it again as output
+				if strings.HasPrefix(strings.TrimSpace(input), "(print") &&
+					strings.Contains(input, str) {
+					isPrintResult = true
+				}
+			}
 
-			// Store in environment as _N variable (like IPython)
-			outVarName := fmt.Sprintf("_%d", r.executionCount)
-			r.env.Define(core.LispSymbol(outVarName), result)
+			if !isPrintResult {
+				// Store in output history
+				r.outputHistory[r.executionCount] = result
 
-			// Also update _ to the most recent output (like IPython)
-			r.env.Define(core.LispSymbol("_"), result)
+				// Store in environment as _N variable (like IPython)
+				outVarName := fmt.Sprintf("_%d", r.executionCount)
+				r.env.Define(core.LispSymbol(outVarName), result)
 
-			// Output with IPython-style formatting
-			fmt.Printf("%s %s\n",
-				core.FormatIPythonOutput(r.executionCount),
-				core.ColorizeValue(result))
+				// Also update _ to the most recent output (like IPython)
+				r.env.Define(core.LispSymbol("_"), result)
+
+				// Output with IPython-style formatting
+				fmt.Printf("%s %s\n",
+					core.FormatIPythonOutput(r.executionCount),
+					core.ColorizeValue(result))
+			}
 		}
 
-		// Increment execution count for next prompt
+		// Always increment execution count for next prompt
 		r.executionCount++
 
 		// Update prompt with new execution count
