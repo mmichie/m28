@@ -10,5 +10,11 @@ func RegisterConcurrencyForms(specialForms map[core.LispSymbol]SpecialFormFunc) 
 	// Register the go special form
 	specialForms[core.LispSymbol("go")] = concurrency.EvalGo
 
-	// More concurrency forms will be registered here
+	// Register the select forms
+	specialForms[core.LispSymbol("select")] = concurrency.EvalSelect
+	specialForms[core.LispSymbol("select-timeout")] = concurrency.EvalSelectTimeout
+
+	// Register the mutex forms
+	specialForms[core.LispSymbol("with-mutex")] = concurrency.EvalWithMutex
+	specialForms[core.LispSymbol("with-rlock")] = concurrency.EvalWithRLock
 }

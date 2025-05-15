@@ -19,6 +19,27 @@ func init() {
 	core.RegisterBuiltin("try-recv", ChanTryRecv)
 	core.RegisterBuiltin("close-chan", ChanClose)
 	core.RegisterBuiltin("chan-closed?", ChanIsClosed)
+
+	// Mutex creation
+	core.RegisterBuiltin("mutex", concurrency.MakeMutex)
+	core.RegisterBuiltin("make-mutex", concurrency.MakeMutex)
+	core.RegisterBuiltin("rwmutex", concurrency.MakeRWMutex)
+	core.RegisterBuiltin("make-rwmutex", concurrency.MakeRWMutex)
+
+	// Mutex operations
+	core.RegisterBuiltin("mutex-lock", concurrency.MutexLock)
+	core.RegisterBuiltin("mutex-unlock", concurrency.MutexUnlock)
+	core.RegisterBuiltin("mutex-try-lock", concurrency.MutexTryLock)
+	core.RegisterBuiltin("rwmutex-rlock", concurrency.RWMutexRLock)
+	core.RegisterBuiltin("rwmutex-runlock", concurrency.RWMutexRUnlock)
+	core.RegisterBuiltin("rwmutex-try-rlock", concurrency.RWMutexTryRLock)
+
+	// WaitGroup creation and operations
+	core.RegisterBuiltin("waitgroup", concurrency.MakeWaitGroup)
+	core.RegisterBuiltin("make-waitgroup", concurrency.MakeWaitGroup)
+	core.RegisterBuiltin("waitgroup-add", concurrency.WaitGroupAdd)
+	core.RegisterBuiltin("waitgroup-done", concurrency.WaitGroupDone)
+	core.RegisterBuiltin("waitgroup-wait", concurrency.WaitGroupWait)
 }
 
 // MakeChan creates a new channel with an optional buffer size

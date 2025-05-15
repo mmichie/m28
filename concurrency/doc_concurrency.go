@@ -159,4 +159,295 @@ func init() {
 		Related:  []string{"chan", "close-chan"},
 		Module:   "concurrency",
 	})
+
+	// Documentation for the select special form
+	core.RegisterDoc(core.DocEntry{
+		Name:        "select",
+		Type:        "special-form",
+		Brief:       "Multiplex on multiple channel operations",
+		Description: "Performs a select operation across multiple channel operations. Chooses one case that is ready to proceed and executes its body. If multiple cases are ready, one is chosen randomly.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "cases",
+				Description: "One or more case clauses for channel operations",
+			},
+		},
+		Returns: "The result of executing the body of the selected case",
+		Examples: []string{
+			`(select
+  [(case :recv ch1) 
+    (print "Received from ch1:" select-value)
+    select-value]
+  [(case :send [ch2 42])
+    (print "Sent 42 to ch2")]
+  [(default) 
+    (print "No channel ready")])`,
+		},
+		Related: []string{"select-timeout", "go", "chan"},
+		Module:  "concurrency",
+	})
+
+	// Documentation for the select-timeout special form
+	core.RegisterDoc(core.DocEntry{
+		Name:        "select-timeout",
+		Type:        "special-form",
+		Brief:       "Multiplex on multiple channel operations with a timeout",
+		Description: "Like select, but with a timeout in milliseconds. If no channel operation is ready within the timeout, the timeout case is executed.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "timeout-ms",
+				Description: "Timeout in milliseconds",
+			},
+			{
+				Name:        "cases",
+				Description: "One or more case clauses for channel operations or timeout",
+			},
+		},
+		Returns: "The result of executing the body of the selected case",
+		Examples: []string{
+			`(select-timeout 1000
+  [(case :recv ch1) 
+    (print "Received from ch1:" select-value)
+    select-value]
+  [(case :send [ch2 42])
+    (print "Sent 42 to ch2")]
+  [(timeout) 
+    (print "Timed out after 1000ms")])`,
+		},
+		Related: []string{"select", "go", "chan"},
+		Module:  "concurrency",
+	})
+
+	// Documentation for mutex creation
+	core.RegisterDoc(core.DocEntry{
+		Name:        "mutex",
+		Type:        "builtin-function",
+		Brief:       "Create a new mutex",
+		Description: "Creates a new mutex for synchronizing access to shared resources.",
+		Params:      []core.ParamDoc{},
+		Returns:     "A new mutex",
+		Examples:    []string{`(= m (mutex))`},
+		Related:     []string{"mutex-lock", "mutex-unlock", "with-mutex"},
+		Module:      "concurrency",
+	})
+
+	// Documentation for rwmutex creation
+	core.RegisterDoc(core.DocEntry{
+		Name:        "rwmutex",
+		Type:        "builtin-function",
+		Brief:       "Create a new read-write mutex",
+		Description: "Creates a new read-write mutex that allows multiple readers or a single writer.",
+		Params:      []core.ParamDoc{},
+		Returns:     "A new read-write mutex",
+		Examples:    []string{`(= m (rwmutex))`},
+		Related:     []string{"rwmutex-rlock", "rwmutex-runlock", "with-rlock"},
+		Module:      "concurrency",
+	})
+
+	// Documentation for waitgroup creation
+	core.RegisterDoc(core.DocEntry{
+		Name:        "waitgroup",
+		Type:        "builtin-function",
+		Brief:       "Create a new wait group",
+		Description: "Creates a new wait group for waiting for a collection of goroutines to finish.",
+		Params:      []core.ParamDoc{},
+		Returns:     "A new wait group",
+		Examples:    []string{`(= wg (waitgroup))`},
+		Related:     []string{"waitgroup-add", "waitgroup-done", "waitgroup-wait"},
+		Module:      "concurrency",
+	})
+
+	// Documentation for mutex operations
+	core.RegisterDoc(core.DocEntry{
+		Name:        "mutex-lock",
+		Type:        "builtin-function",
+		Brief:       "Lock a mutex",
+		Description: "Locks a mutex. Blocks until the mutex is available.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "mutex",
+				Description: "The mutex to lock",
+			},
+		},
+		Returns:  "None",
+		Examples: []string{`(mutex-lock m)`},
+		Related:  []string{"mutex-unlock", "with-mutex"},
+		Module:   "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "mutex-unlock",
+		Type:        "builtin-function",
+		Brief:       "Unlock a mutex",
+		Description: "Unlocks a mutex.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "mutex",
+				Description: "The mutex to unlock",
+			},
+		},
+		Returns:  "None",
+		Examples: []string{`(mutex-unlock m)`},
+		Related:  []string{"mutex-lock", "with-mutex"},
+		Module:   "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "mutex-try-lock",
+		Type:        "builtin-function",
+		Brief:       "Try to lock a mutex without blocking",
+		Description: "Tries to lock a mutex without blocking. Returns true if the lock was acquired, false otherwise.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "mutex",
+				Description: "The mutex to try to lock",
+			},
+		},
+		Returns:  "Boolean indicating success (true if locked, false if mutex was already locked)",
+		Examples: []string{`(if (mutex-try-lock m) (print "Locked") (print "Already locked"))`},
+		Related:  []string{"mutex-lock", "mutex-unlock"},
+		Module:   "concurrency",
+	})
+
+	// Documentation for rwmutex operations
+	core.RegisterDoc(core.DocEntry{
+		Name:        "rwmutex-rlock",
+		Type:        "builtin-function",
+		Brief:       "Lock a read-write mutex for reading",
+		Description: "Locks a read-write mutex for reading. Multiple readers can hold the lock simultaneously.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "rwmutex",
+				Description: "The read-write mutex to lock for reading",
+			},
+		},
+		Returns:  "None",
+		Examples: []string{`(rwmutex-rlock m)`},
+		Related:  []string{"rwmutex-runlock", "with-rlock"},
+		Module:   "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "rwmutex-runlock",
+		Type:        "builtin-function",
+		Brief:       "Unlock a read-write mutex for reading",
+		Description: "Unlocks a read-write mutex previously locked for reading.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "rwmutex",
+				Description: "The read-write mutex to unlock",
+			},
+		},
+		Returns:  "None",
+		Examples: []string{`(rwmutex-runlock m)`},
+		Related:  []string{"rwmutex-rlock", "with-rlock"},
+		Module:   "concurrency",
+	})
+
+	// Documentation for waitgroup operations
+	core.RegisterDoc(core.DocEntry{
+		Name:        "waitgroup-add",
+		Type:        "builtin-function",
+		Brief:       "Add to a wait group counter",
+		Description: "Adds a delta to a wait group counter.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "waitgroup",
+				Description: "The wait group to modify",
+			},
+			{
+				Name:        "delta",
+				Description: "The delta to add to the counter",
+			},
+		},
+		Returns:  "None",
+		Examples: []string{`(waitgroup-add wg 1)`},
+		Related:  []string{"waitgroup-done", "waitgroup-wait"},
+		Module:   "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "waitgroup-done",
+		Type:        "builtin-function",
+		Brief:       "Decrement a wait group counter",
+		Description: "Decrements a wait group counter by one.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "waitgroup",
+				Description: "The wait group to decrement",
+			},
+		},
+		Returns:  "None",
+		Examples: []string{`(waitgroup-done wg)`},
+		Related:  []string{"waitgroup-add", "waitgroup-wait"},
+		Module:   "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "waitgroup-wait",
+		Type:        "builtin-function",
+		Brief:       "Wait for a wait group counter to reach zero",
+		Description: "Blocks until the wait group counter reaches zero.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "waitgroup",
+				Description: "The wait group to wait for",
+			},
+		},
+		Returns:  "None",
+		Examples: []string{`(waitgroup-wait wg)`},
+		Related:  []string{"waitgroup-add", "waitgroup-done"},
+		Module:   "concurrency",
+	})
+
+	// Documentation for special forms
+	core.RegisterDoc(core.DocEntry{
+		Name:        "with-mutex",
+		Type:        "special-form",
+		Brief:       "Evaluate expressions with a mutex locked",
+		Description: "Locks a mutex, evaluates the body expressions, and unlocks the mutex when done. The unlock happens even if an error occurs.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "mutex",
+				Description: "The mutex or rwmutex to lock",
+			},
+			{
+				Name:        "body",
+				Description: "One or more expressions to evaluate with the mutex locked",
+			},
+		},
+		Returns: "The result of the last body expression",
+		Examples: []string{
+			`(with-mutex m
+  (print "Critical section")
+  (update-shared-resource))`,
+		},
+		Related: []string{"mutex", "mutex-lock", "mutex-unlock"},
+		Module:  "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "with-rlock",
+		Type:        "special-form",
+		Brief:       "Evaluate expressions with a read lock",
+		Description: "Locks a read-write mutex for reading, evaluates the body expressions, and unlocks the mutex when done.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "rwmutex",
+				Description: "The read-write mutex to lock for reading",
+			},
+			{
+				Name:        "body",
+				Description: "One or more expressions to evaluate with the read lock",
+			},
+		},
+		Returns: "The result of the last body expression",
+		Examples: []string{
+			`(with-rlock m
+  (print "Read-only section")
+  (read-shared-resource))`,
+		},
+		Related: []string{"rwmutex", "rwmutex-rlock", "rwmutex-runlock"},
+		Module:  "concurrency",
+	})
 }

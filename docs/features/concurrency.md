@@ -185,12 +185,124 @@ Check if a channel is closed with `chan-closed?`:
    - The sender should close the channel when done sending
    - Multiple receivers can safely receive from the same channel
 
-5. **Use select for multiplexing** (coming soon)
-   - The `select` statement will allow you to wait on multiple channel operations
+5. **Use select for multiplexing**
+   - The `select` statement allows you to wait on multiple channel operations
+
+## Select Statement
+
+The `select` statement enables multiplexing on multiple channel operations. It's similar to Go's select statement.
+
+### Basic Select
+
+```lisp
+(select
+  [(case :recv ch1) 
+    (print "Received from ch1:" select-value)
+    select-value]
+  [(case :send [ch2 42])
+    (print "Sent 42 to ch2")]
+  [(default) 
+    (print "No channel ready")])
+```
+
+This will:
+- Try to receive from `ch1` and send `42` to `ch2`
+- If multiple operations are ready, one will be chosen randomly
+- If no operations are ready, the default case will be executed
+- For receive operations, the received value is bound to `select-value` and the channel status to `select-ok`
+
+### Select with Timeout
+
+```lisp
+(select-timeout 1000
+  [(case :recv ch1) 
+    (print "Received from ch1:" select-value)
+    select-value]
+  [(case :send [ch2 42])
+    (print "Sent 42 to ch2")]
+  [(timeout) 
+    (print "Timed out after 1000ms")])
+```
+
+This functions like the regular select, but with a timeout (in milliseconds):
+- If no channel operation is ready within the timeout, the timeout case is executed
+- The first argument is the timeout in milliseconds
+
+## Synchronization Primitives
+
+M28 provides synchronization primitives for coordinating goroutines and protecting shared resources.
+
+### Mutexes
+
+Mutexes provide exclusive access to shared resources:
+
+```lisp
+# Create a mutex
+(= m (mutex))
+
+# Using mutex explicitly
+(mutex-lock m)
+(print "Critical section")
+(mutex-unlock m)
+
+# Using with-mutex (automatically unlocks, even on errors)
+(with-mutex m
+  (print "Critical section")
+  (update-shared-resource))
+
+# Try to lock without blocking
+(if (mutex-try-lock m)
+  (try
+    (print "Got lock")
+    (finally (mutex-unlock m))))
+```
+
+### Read-Write Mutexes
+
+Read-write mutexes allow multiple readers or a single writer:
+
+```lisp
+# Create a read-write mutex
+(= m (rwmutex))
+
+# Read lock (multiple readers allowed)
+(with-rlock m
+  (print "Reading shared data")
+  (read-shared-resource))
+
+# Write lock (exclusive access)
+(with-mutex m
+  (print "Modifying shared data")
+  (write-shared-resource))
+```
+
+### WaitGroups
+
+WaitGroups allow waiting for a collection of goroutines to finish:
+
+```lisp
+# Create a wait group
+(= wg (waitgroup))
+
+# Launch multiple goroutines
+(for i (range 5)
+  # Increment counter before starting goroutine
+  (waitgroup-add wg 1)
+  (go
+    (try
+      (print "Worker" i "starting")
+      (sleep (/ i 10)) # Simulate work
+      (print "Worker" i "done")
+      (finally
+        # Decrement counter when done
+        (waitgroup-done wg)))))
+
+# Wait for all goroutines to finish
+(print "Waiting for workers to finish...")
+(waitgroup-wait wg)
+(print "All workers done")
+```
 
 ## Future Enhancements
 
-1. **Select Statement**: A `select` special form will be added to enable multiplexing on multiple channels
-2. **Mutex**: Synchronized access to shared resources
-3. **WaitGroup**: Wait for a collection of goroutines to finish
-4. **Context**: For propagating cancellation and deadlines
+1. **Context**: For propagating cancellation and deadlines
