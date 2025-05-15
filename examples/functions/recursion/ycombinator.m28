@@ -1,9 +1,9 @@
-; In this version we'll create a simplified Y combinator
-; and use simple recursive definitions
+# In this version we'll create a simplified Y combinator
+# and use simple recursive definitions
 
 (print "Y Combinator Example")
 
-; Define a recursive factorial function
+# Define a recursive factorial function
 (def (factorial n)
     (if (== n 0)
         (return 1)
@@ -12,7 +12,7 @@
 (print "Factorial of 5:")
 (print (factorial 5))
 
-; Define a recursive Fibonacci function
+# Define a recursive Fibonacci function
 (def (fibonacci n)
     (if (< n 2)
         (return n)

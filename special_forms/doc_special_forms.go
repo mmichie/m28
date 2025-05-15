@@ -87,4 +87,21 @@ func init() {
 		},
 		Related: []string{"while", "map", "filter"},
 	})
+
+	// Documentation for the go special form
+	core.RegisterDoc(core.DocEntry{
+		Name:        "go",
+		Type:        "special-form",
+		Brief:       "Evaluate an expression in a new goroutine",
+		Description: "Spawns a new goroutine and evaluates the given expression in that goroutine. Returns None immediately without waiting for the goroutine to complete.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "expr",
+				Description: "The expression to evaluate in the new goroutine",
+			},
+		},
+		Returns:  "None",
+		Examples: []string{`(go (println "Hello from goroutine"))`, `(go (sleep 1) (println "Delayed message"))`},
+		Related:  []string{"chan", "send", "recv"},
+	})
 }

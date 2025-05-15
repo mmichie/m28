@@ -1,0 +1,7 @@
+# This is a hash comment
+(print "This should be seen")
+
+# This is a semicolon comment
+(print "If semicolons are treated as regular characters, this should show")
+
+(print "End of test")

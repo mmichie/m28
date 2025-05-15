@@ -74,7 +74,8 @@ func tokenize(input string) ([]Token, error) {
 	return processDotNotation(tokens)
 }
 
-// removeComments removes comments and returns the cleaned input and a mapping from character positions to line numbers
+// removeComments removes comments (# for single-line comments) and returns the cleaned input
+// and a mapping from character positions to line numbers
 func removeComments(input string) (string, map[int]int) {
 	// Process comments line-by-line to handle them more accurately
 	var result strings.Builder
@@ -93,6 +94,8 @@ func removeComments(input string) (string, map[int]int) {
 			if ch == '"' && (i == 0 || line[i-1] != '\\') {
 				inString = !inString
 			} else if ch == '#' && !inString {
+				// Only # is recognized as a comment character
+				// Semicolons (;) are treated as regular characters
 				commentPos = i
 				break
 			}

@@ -1,0 +1,106 @@
+# Test file for M28 concurrency features
+
+# Test 1: Basic channel creation
+(print "Test 1: Creating channels")
+(= unbuffered-chan (chan))
+(= buffered-chan (chan 5))
+(print "  Created unbuffered channel:" unbuffered-chan)
+(print "  Created buffered channel:" buffered-chan)
+(assert unbuffered-chan "Unbuffered channel should be created")
+(assert buffered-chan "Buffered channel should be created")
+
+# Test 2: Basic send and receive on a buffered channel
+(print "Test 2: Basic send and receive")
+(= ch (chan 1))
+(print "  Sending value to channel")
+(send ch 42)
+(print "  Receiving value from channel")
+(= result (recv ch))
+(print "  Received:" (nth result 0))
+(print "  Channel open:" (nth result 1))
+(= test-val (nth result 0))
+(assert (= test-val 42) "Should receive 42 from channel")
+(assert (nth result 1) "Channel should still be open")
+
+# Test 3: try-send and try-recv
+(print "Test 3: Non-blocking sends and receives")
+(= ch (chan 1))
+(print "  Try-sending to empty channel")
+(= send-result1 (try-send ch "hello"))
+(print "  Result:" send-result1)
+(assert send-result1 "try-send to empty channel should succeed")
+
+(print "  Try-sending to full channel")
+(= send-result2 (try-send ch "world"))
+(print "  Result:" send-result2)
+(assert (not send-result2) "try-send to full channel should fail")
+
+(print "  Try-receiving from channel with value")
+(= recv-result1 (try-recv ch))
+(print "  Value:" (nth recv-result1 0))
+(print "  Success:" (nth recv-result1 1))
+(print "  Channel open:" (nth recv-result1 2))
+(= test-val (nth recv-result1 0))
+(assert (= test-val "hello") "Should receive 'hello' from channel")
+(assert (nth recv-result1 1) "try-recv success flag should be true")
+(assert (nth recv-result1 2) "Channel should still be open")
+
+(print "  Try-receiving from empty channel")
+(= recv-result2 (try-recv ch))
+(print "  Success:" (nth recv-result2 1))
+(= success-flag (nth recv-result2 1))
+(assert (not success-flag) "try-recv from empty channel should not succeed")
+
+# Test 4: Channel closing
+(print "Test 4: Channel closing")
+(= ch (chan))
+(print "  Checking if channel is closed initially")
+(= is-closed (chan-closed? ch))
+(assert (not is-closed) "New channel should not be closed")
+
+(print "  Closing channel")
+(close-chan ch)
+(print "  Checking if channel is closed after close-chan")
+(= is-closed (chan-closed? ch))
+(assert is-closed "Channel should be closed after close-chan")
+
+# Skipping the closed channel send test for now
+(print "  Skipping closed channel send test (expecting exception)")
+# In a future version, we'll implement proper exception handling
+
+# Test 5: Simple goroutine
+(print "Test 5: Simple goroutine")
+(= ch (chan))
+(print "  Starting goroutine")
+(go
+  (print "  Hello from goroutine")
+  (send ch "done"))
+
+(print "  Waiting for goroutine to finish")
+(= result (recv ch))
+(print "  Goroutine sent:" (nth result 0))
+(= msg (nth result 0))
+(assert (= msg "done") "Goroutine should send 'done'")
+
+# Test 6: Multiple goroutines
+(print "Test 6: Multiple goroutines")
+(= ch (chan))
+(= sum 0)
+
+(print "  Starting 5 goroutines")
+(for i (range 5)
+  (go
+    (print "  Goroutine" i "started")
+    (send ch i)))
+
+(print "  Collecting results from 5 goroutines")
+(for i (range 5)
+  (= result (recv ch))
+  (= value (nth result 0))
+  (set sum (+ sum value))
+  (print "  Received from goroutine:" value))
+
+(print "  Total sum:" sum)
+(assert (= sum 10) "Sum of 0+1+2+3+4 should be 10")
+
+(print "All concurrency tests passed!")

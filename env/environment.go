@@ -89,6 +89,9 @@ func (e *Environment) SetupBuiltins() {
 		e.Set(core.LispSymbol(name), exception)
 	}
 
+	// Register type constants in the environment
+	core.RegisterTypeConstants(e)
+
 	// Register special form functions in builtins
 	// Removed direct special_forms dependency to avoid import cycle
 }

@@ -11,6 +11,7 @@ type SpecialFormFunc func(core.Evaluator, []core.LispValue, core.Environment) (c
 var specialForms map[core.LispSymbol]SpecialFormFunc
 
 // Initialize the special forms map
+
 func init() {
 	specialForms = map[core.LispSymbol]SpecialFormFunc{
 		// Control Flow
@@ -70,6 +71,9 @@ func init() {
 
 	// Register class forms from class_implementation.go
 	RegisterClassForms(specialForms)
+
+	// Register concurrency forms
+	RegisterConcurrencyForms(specialForms)
 }
 
 func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {

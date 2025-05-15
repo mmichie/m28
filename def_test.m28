@@ -1,0 +1,11 @@
+# Test for def restriction
+# Function definition (should work)
+(def (add a b)
+  (+ a b))
+
+(print "Function definition: " (add 3 4))
+
+# Variable definition (should fail)
+(def x 10)
+
+(print "This line should not be reached")

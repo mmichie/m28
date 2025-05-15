@@ -64,6 +64,12 @@ type MappableEnvironment interface {
 	GetSymbolMap() map[LispSymbol]LispValue
 }
 
+// EnvironmentCollector defines an interface for environments that can enumerate their symbols
+type EnvironmentCollector interface {
+	// ForEachSymbol calls the provided function for each symbol in the environment
+	ForEachSymbol(func(symbol LispSymbol, value LispValue))
+}
+
 // EvaluatorProvider is a simple struct that can be embedded to provide
 // evaluator awareness to any struct
 type EvaluatorProvider struct {

@@ -1,47 +1,47 @@
-;; Test wildcard imports
+# Test wildcard imports
 
-;; First, create a module with some exports
+# First, create a module with some exports
 (define-module test-module
   (define value1 "Value 1")
   (define value2 "Value 2")
   (define value3 "Value 3")
   (define private-value "This is private")
   
-  ;; Export only some values
+  # Export only some values
   (define __exports__ '(value1 value2 value3))
 )
 
-;; Test basic wildcard import
+# Test basic wildcard import
 (import (from test-module import *))
 
-;; Test that all exported symbols are available
+# Test that all exported symbols are available
 (print "Basic wildcard import test:")
 (print "value1:" value1)
 (print "value2:" value2)
 (print "value3:" value3)
 
-;; Test that private symbols are not imported
+# Test that private symbols are not imported
 (try
   (print "private-value:" private-value)
   (catch e
     (print "Expected error: private-value is not accessible, as expected")))
 
-;; Create a module without explicit exports
+# Create a module without explicit exports
 (define-module test-module2
   (define public1 "Public 1")
   (define public2 "Public 2")
   (define public3 "Public 3")
 )
 
-;; Test filtered wildcard import
+# Test filtered wildcard import
 (import (from test-module2 import * except public2))
 
-;; Test that non-excluded symbols are available
+# Test that non-excluded symbols are available
 (print "\nFiltered wildcard import test:")
 (print "public1:" public1)
 (print "public3:" public3)
 
-;; Test that excluded symbols are not imported
+# Test that excluded symbols are not imported
 (try
   (print "public2:" public2)
   (catch e
