@@ -1,0 +1,115 @@
+# Test file for issubclass function
+# Tests complex inheritance scenarios
+
+# 1. Basic inheritance test
+(class Animal nil
+  (def __init__ (self name)
+    (set self.name name)))
+
+(print "Animal class created")
+
+(class Dog (Animal)
+  (def __init__ (self name breed)
+    (Animal.__init__ self name)
+    (set self.breed breed)))
+
+(print "Dog class created")
+
+(print "Basic inheritance:")
+(print "Dog issubclass of Animal:" (issubclass Dog Animal))
+(print "Animal issubclass of Dog:" (issubclass Animal Dog))
+(print "Dog issubclass of Dog:" (issubclass Dog Dog))
+
+# 2. Multiple inheritance test
+(class Mammal nil
+  (def __init__ (self)
+    (print "Mammal initialized"))
+  (def breathe (self)
+    (print "Breathing...")))
+
+(class Domesticated nil
+  (def __init__ (self)
+    (print "Domesticated initialized"))
+  (def live_with_humans (self)
+    (print "Living with humans")))
+
+# Using proper list syntax for parent classes
+(class Pet (Mammal Domesticated)
+  (def __init__ (self name)
+    (Mammal.__init__ self)
+    (Domesticated.__init__ self)
+    (set self.name name)))
+
+(print "\nMultiple inheritance:")
+(print "Pet issubclass of Mammal:" (issubclass Pet Mammal))
+(print "Pet issubclass of Domesticated:" (issubclass Pet Domesticated))
+(print "Pet issubclass of Animal:" (issubclass Pet Animal))
+
+# 3. Diamond inheritance pattern
+(class A nil
+  (def __init__ (self)
+    (print "A initialized"))
+  (def method_a (self)
+    (print "Method A")))
+
+(class B (A)
+  (def __init__ (self)
+    (A.__init__ self)
+    (print "B initialized"))
+  (def method_b (self)
+    (print "Method B")))
+
+(class C (A)
+  (def __init__ (self)
+    (A.__init__ self)
+    (print "C initialized"))
+  (def method_c (self)
+    (print "Method C")))
+
+(class D (B C)
+  (def __init__ (self)
+    (B.__init__ self)
+    (C.__init__ self)
+    (print "D initialized"))
+  (def method_d (self)
+    (print "Method D")))
+
+(print "\nDiamond inheritance:")
+(print "D issubclass of A:" (issubclass D A))
+(print "D issubclass of B:" (issubclass D B))
+(print "D issubclass of C:" (issubclass D C))
+
+# 4. Tests with built-in types
+(print "\nBuilt-in types:")
+(print "Dog issubclass of Dog:" (issubclass Dog Dog))
+
+# 5. Tests with isinstance
+(print "\nInstance checks:")
+(= fido (Dog "Fido" "Labrador"))
+(= generic_animal (Animal "Generic"))
+(= my_pet (Pet "Fluffy"))
+
+(print "fido isinstance of Dog:" (isinstance fido Dog))
+(print "fido isinstance of Animal:" (isinstance fido Animal))
+(print "generic_animal isinstance of Dog:" (isinstance generic_animal Dog))
+(print "my_pet isinstance of Pet:" (isinstance my_pet Pet))
+(print "my_pet isinstance of Mammal:" (isinstance my_pet Mammal))
+(print "my_pet isinstance of Domesticated:" (isinstance my_pet Domesticated))
+
+# 6. Error cases
+(print "\nError cases:")
+(try
+  (print "Invalid arg 1 (not a class):" (issubclass 123 Dog))
+  (catch e
+    (print "Error:" e.message)))
+
+(try
+  (print "Invalid arg 2 (not a class or tuple):" (issubclass Dog 123))
+  (catch e
+    (print "Error:" e.message)))
+
+# 7. Test list of classes for issubclass (uncomment if list of classes is supported)
+# (print "\nList of classes check:")
+# (print "D issubclass of (B C):" (issubclass D (list B C)))
+# (print "D issubclass of (A B):" (issubclass D (list A B)))
+# (print "D issubclass of (A B C):" (issubclass D (list A B C)))

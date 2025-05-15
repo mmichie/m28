@@ -32,15 +32,35 @@ func EvalClassNew(e core.Evaluator, args []core.LispValue, env core.Environment)
 
 	// Parse parent classes
 	var parents []*core.PythonicClass
-	if len(args) > 2 {
+	if len(args) > 1 {
+		// Extract parent argument and unwrap LocatedValue if needed
+		parentArg := args[1]
+		if located, ok := parentArg.(core.LocatedValue); ok {
+			parentArg = located.Value
+			fmt.Printf("DEBUG: Unwrapped LocatedValue, new parentArg: %v (type: %T)\n", parentArg, parentArg)
+		}
+
 		// Check if we have parent classes (second arg is a list)
-		if parentsList, ok := args[1].(core.LispList); ok {
-			for _, parentArg := range parentsList {
+		if parentsList, ok := parentArg.(core.LispList); ok {
+			fmt.Printf("DEBUG: Found parent list with %d elements for class %s\n", len(parentsList), className)
+			for i, parentItem := range parentsList {
+				// Unwrap LocatedValue if needed
+				if located, ok := parentItem.(core.LocatedValue); ok {
+					parentItem = located.Value
+					fmt.Printf("DEBUG: Unwrapped LocatedValue for parent %d: %v (type: %T)\n", i, parentItem, parentItem)
+				}
+				
+				// Print raw parent arg for debugging
+				fmt.Printf("DEBUG: Parent arg %d before eval: %v (type: %T)\n", i, parentItem, parentItem)
+				
 				// Evaluate parent class references
-				parentVal, err := e.Eval(parentArg, env)
+				parentVal, err := e.Eval(parentItem, env)
 				if err != nil {
 					return nil, fmt.Errorf("error evaluating parent class: %v", err)
 				}
+				
+				// Print evaluated parent for debugging
+				fmt.Printf("DEBUG: Parent arg %d after eval: %v (type: %T)\n", i, parentVal, parentVal)
 
 				// Ensure parent is a PythonicClass
 				parentClass, ok := parentVal.(*core.PythonicClass)
@@ -48,15 +68,42 @@ func EvalClassNew(e core.Evaluator, args []core.LispValue, env core.Environment)
 					return nil, fmt.Errorf("parent must be a class, got %T", parentVal)
 				}
 
+				fmt.Printf("DEBUG: Adding parent %s to class %s\n", parentClass.Name, className)
 				parents = append(parents, parentClass)
 			}
 			// Class body starts at index 2
 			args = args[2:]
+		} else if parentArg == core.LispSymbol("nil") {
+			// Special case for nil parent (no inheritance)
+			fmt.Printf("DEBUG: nil parent specified for class %s\n", className)
+			args = args[2:]
 		} else {
-			// No parent classes, class body starts at index 1
-			args = args[1:]
+			// Single parent case - not in a list
+			fmt.Printf("DEBUG: Single parent (not in list) for class %s: %v (type: %T)\n", className, parentArg, parentArg)
+			
+			// Evaluate the parent class
+			parentVal, err := e.Eval(parentArg, env)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating parent class: %v", err)
+			}
+			
+			// Print evaluated parent for debugging
+			fmt.Printf("DEBUG: Single parent after eval: %v (type: %T)\n", parentVal, parentVal)
+			
+			// Ensure parent is a PythonicClass
+			parentClass, ok := parentVal.(*core.PythonicClass)
+			if !ok {
+				return nil, fmt.Errorf("parent must be a class, got %T", parentVal)
+			}
+			
+			fmt.Printf("DEBUG: Adding single parent %s to class %s\n", parentClass.Name, className)
+			parents = append(parents, parentClass)
+			
+			// Skip the parent argument
+			args = args[2:]
 		}
 	} else {
+		fmt.Printf("DEBUG: Simple case for class %s, no parents (len(args)=%d)\n", className, len(args))
 		// Simple case: just class name and body
 		args = args[1:]
 	}
@@ -66,6 +113,12 @@ func EvalClassNew(e core.Evaluator, args []core.LispValue, env core.Environment)
 
 	// Process class body (process attribute assignments and method definitions)
 	processClassBody(newClass, args, e, env)
+
+	// Debug print
+	fmt.Printf("DEBUG: Class %s created with %d parents\n", className, len(parents))
+	for i, p := range parents {
+		fmt.Printf("DEBUG: Parent %d: %s\n", i, p.Name)
+	}
 
 	// Register class in environment
 	env.Define(core.LispSymbol(className), newClass)
@@ -124,24 +177,48 @@ func processClassBody(class *core.PythonicClass, body []core.LispValue, e core.E
 				}
 
 				// Get method signature
-				signature, ok := exprList[1].(core.LispList)
-				if !ok {
-					return fmt.Errorf("method signature must be a list")
+				// Get method signature and unwrap LocatedValue if needed
+				var signature core.LispList
+				var ok bool
+				
+				// Handle potential LocatedValue wrapping
+				sigArg := exprList[1]
+				if located, isLocated := sigArg.(core.LocatedValue); isLocated {
+					sigArg = located.Value
+					fmt.Printf("DEBUG: Unwrapped LocatedValue for method signature: %v (type: %T)\n", sigArg, sigArg)
 				}
+				
+				signature, ok = sigArg.(core.LispList)
+				if !ok {
+					return fmt.Errorf("method signature must be a list, got %T", sigArg)
+				}
+				
+				fmt.Printf("DEBUG: Processing method signature with %d elements\n", len(signature))
 
 				if len(signature) < 1 {
 					return fmt.Errorf("method signature requires a method name")
 				}
 
 				// Get method name
+				// Get method name and unwrap LocatedValue if needed
 				var methodName core.LispSymbol
-				switch name := signature[0].(type) {
+				
+				// Extract method name
+				methodArg := signature[0]
+				if located, isLocated := methodArg.(core.LocatedValue); isLocated {
+					methodArg = located.Value
+					fmt.Printf("DEBUG: Unwrapped LocatedValue for method name: %v (type: %T)\n", methodArg, methodArg)
+				}
+				
+				switch name := methodArg.(type) {
 				case core.LispSymbol:
 					methodName = name
+					fmt.Printf("DEBUG: Method name from symbol: %s\n", methodName)
 				case string:
 					methodName = core.LispSymbol(name)
+					fmt.Printf("DEBUG: Method name from string: %s\n", methodName)
 				default:
-					return fmt.Errorf("method name must be a symbol, got %T", signature[0])
+					return fmt.Errorf("method name must be a symbol, got %T", methodArg)
 				}
 
 				// Process method parameters
@@ -176,6 +253,9 @@ func processClassBody(class *core.PythonicClass, body []core.LispValue, e core.E
 					InstanceID:    getNextInstanceID(),
 				}
 
+				// Debug output
+				fmt.Printf("DEBUG: Adding method '%s' to class '%s'\n", methodName, class.Name)
+				
 				// Add the method to the class
 				class.AddMethod(string(methodName), method)
 

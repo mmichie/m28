@@ -1,0 +1,40 @@
+# Test file to debug issubclass parent relationship
+
+# 1. Basic Class Test
+(class Parent nil
+  (def test_method (self)
+    (print "Parent method")))
+
+(print "Parent class created")
+
+(class Child (Parent)
+  (def child_method (self)
+    (print "Child method")))
+
+(print "Child class created")
+
+# Manually check internals
+(= c (Child))
+(= method (c.child_method))
+(method)
+
+# Try to call parent method
+(= parent_method (c.test_method))
+
+# Is Child a subclass of Parent?
+(print "Is Child a subclass of Parent:" (issubclass Child Parent))
+
+# Let's test our implementations' inheritance tree traversal
+(print "\nManually tracing inheritance:")
+
+# Call isSubclassOf directly for debug purposes
+(class Debugger nil
+  (def test_inheritance (self class_a class_b)
+    (print "Testing if" class_a "is a subclass of" class_b)
+    (print "Class A ===" class_a)
+    (print "Class B ===" class_b)
+    (print "A == B?:" (= class_a class_b))
+    (print "Parent classes of A:" (Child.child_method))))
+
+(= d (Debugger))
+(d.test_inheritance Child Parent)
