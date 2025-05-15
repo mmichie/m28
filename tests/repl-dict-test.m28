@@ -1,0 +1,27 @@
+# Test script to verify dictionary literals work in REPL-like environment
+
+# Create and print an empty dictionary
+(print "Creating an empty dictionary...")
+(= empty {})
+(print "Empty dict:" empty)
+
+# Create and print a dictionary with string keys
+(print "Creating a dictionary with string keys...")
+(= person {"name": "Alice", "age": 30})
+(print "Person dict:" person)
+(print "Access person.name:" (get person "name"))
+
+# Create and print a dictionary with numeric keys
+(print "Creating a dictionary with numeric keys...")
+(= numbers {1: "one", 2: "two", 3: "three"})
+(print "Numbers dict:" numbers)
+(print "Access numbers[2]:" (get numbers 2))
+
+# Create and print a nested dictionary
+(print "Creating a nested dictionary...")
+(= nested {"user": {"profile": {"name": "Bob", "location": "New York"}}})
+(print "Nested dict:" nested)
+(print "Access nested.user.profile.name:" 
+       (get (get (get nested "user") "profile") "name"))
+
+(print "All tests completed successfully!")

@@ -1,0 +1,32 @@
+# Inline Dictionary Test - Using direct inline expressions
+
+# Test 1: Empty Dictionary
+(print "\n=== Test 1: Empty Dictionary ===")
+(print "Empty dictionary:" {})
+(print "Empty dictionary type:" (type {}))
+
+# Test 2: String Keys
+(print "\n=== Test 2: Dictionary with String Keys ===")
+(print "String key dictionary:" {"name": "Alice", "age": 30})
+(print "String key dict['name']:" (get {"name": "Alice", "age": 30} "name"))
+(print "String key dict['age']:" (get {"name": "Alice", "age": 30} "age"))
+
+# Test 3: Numeric Keys
+(print "\n=== Test 3: Dictionary with Numeric Keys ===")
+(print "Numeric key dictionary:" {1: "one", 2: "two"})
+(print "Numeric key dict[1]:" (get {1: "one", 2: "two"} 1))
+(print "Numeric key dict[2]:" (get {1: "one", 2: "two"} 2))
+
+# Test 4: Nested Dictionary
+(print "\n=== Test 4: Nested Dictionary ===")
+(print "Nested dictionary:" {"user": {"name": "Bob"}})
+(print "Nested dict['user']:" (get {"user": {"name": "Bob"}} "user"))
+(print "Nested dict['user']['name']:" (get (get {"user": {"name": "Bob"}} "user") "name"))
+
+# Test 5: Traditional Dictionary Creation
+(print "\n=== Test 5: Traditional Dictionary Creation ===")
+(print "Traditional dictionary:" (dict "name" "Charlie" "age" 25))
+(print "Traditional dict['name']:" (get (dict "name" "Charlie" "age" 25) "name"))
+(print "Traditional dict['age']:" (get (dict "name" "Charlie" "age" 25) "age"))
+
+(print "\n=== All Tests Complete ===")

@@ -98,8 +98,11 @@ func not(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 }
 
 func print(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	for _, arg := range args {
-		fmt.Print(core.PrintValue(arg), " ")
+	for i, arg := range args {
+		if i > 0 {
+			fmt.Print(" ")
+		}
+		fmt.Print(PrintValueOverride(arg))
 	}
 	fmt.Println()
 	return nil, nil

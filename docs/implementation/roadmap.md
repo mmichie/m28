@@ -31,9 +31,9 @@ This document outlines the planned features and improvements for the M28 languag
   - ⚠️ Add tests for edge cases in module loading
 
 - **Namespace Control**
-  - ⚠️ Implement a module-level `__exports__` mechanism
-  - ⚠️ Add support for private symbols (prefixed with underscore)
-  - ⚠️ Create clear separation between module-local and exported symbols
+  - ✅ Implement a module-level `__exports__` mechanism
+  - ✅ Add support for private symbols (prefixed with underscore)
+  - ✅ Create clear separation between module-local and exported symbols
   - ⚠️ Add namespace introspection utilities
 
 - **Import Enhancements**

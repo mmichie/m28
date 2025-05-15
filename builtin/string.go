@@ -72,5 +72,5 @@ func strFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 	if len(args) != 1 {
 		return nil, fmt.Errorf("str() takes exactly one argument")
 	}
-	return fmt.Sprintf("%v", args[0]), nil
+	return PrintValueOverride(args[0]), nil
 }

@@ -1,3 +1,4 @@
+// File: parser/parser.go
 package parser
 
 import (
@@ -49,11 +50,22 @@ func tokenize(input string) ([]Token, error) {
 	// Compute line and column for each token
 	tokens := make([]Token, 0, len(rawTokens))
 	for _, match := range rawTokens {
-		line := lineMap[match.StartPos]
+		startPos := match.StartPos
+		value := match.Value
+
+		// Calculate column by finding the last newline before this token
+		lastNewline := strings.LastIndex(input[:startPos], "\n")
+		column := 0
+		if lastNewline >= 0 {
+			column = startPos - lastNewline
+		} else {
+			column = startPos + 1 // If no newline, column is position + 1
+		}
+
 		token := Token{
-			Value:  match.Value,
-			Line:   line,
-			Column: match.Column,
+			Value:  value,
+			Line:   lineMap[startPos],
+			Column: column,
 		}
 		tokens = append(tokens, token)
 	}
@@ -528,6 +540,38 @@ func (p *Parser) parseDict(tokens []Token, index int, location core.Location) (c
 		}
 		index = newIndex
 
+		// We need to unwrap the key if it's a LocatedValue
+		// This is important because LocatedValue isn't hashable
+		if locatedKey, isLocated := key.(core.LocatedValue); isLocated {
+			key = locatedKey.Value
+		}
+
+		// Handle special case for single-quoted strings in dictionary keys
+		// If key is a quote expression like (quote a), convert it to a string "a"
+		if keyList, isList := key.(core.LispList); isList && len(keyList) == 2 {
+			if sym, isSymbol := keyList[0].(core.LispSymbol); isSymbol && sym == "quote" {
+				// Convert the quoted value to a string
+				if symbolValue, ok := keyList[1].(core.LispSymbol); ok {
+					key = string(symbolValue)
+				} else if strValue, ok := keyList[1].(string); ok {
+					key = strValue
+				} else {
+					// Convert any other types to strings for consistent handling
+					key = fmt.Sprintf("%v", keyList[1])
+				}
+			}
+		}
+
+		// Validate that the key is a valid hashable type (string, number, symbol)
+		// This is to prevent the panic with unhashable types like lists
+		switch key.(type) {
+		case string, float64, core.LispSymbol:
+			// These types are allowed as keys
+		default:
+			// Convert other types to strings for safety
+			key = fmt.Sprintf("%v", key)
+		}
+
 		// Expect colon
 		if index >= len(tokens) || tokens[index].Value != ":" {
 			return nil, index, fmt.Errorf("expected ':' after dictionary key")
@@ -540,6 +584,11 @@ func (p *Parser) parseDict(tokens []Token, index int, location core.Location) (c
 			return nil, newIndex, err
 		}
 		index = newIndex
+
+		// Also unwrap the value if it's a LocatedValue
+		if locatedValue, isLocated := value.(core.LocatedValue); isLocated {
+			value = locatedValue.Value
+		}
 
 		// Add key-value pair to dict
 		dict.Set(key, value)

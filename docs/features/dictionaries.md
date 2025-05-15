@@ -19,9 +19,24 @@ M28 supports two main methods for creating dictionaries:
 ```lisp
 # Create a dictionary with key-value pairs
 (= person {"name": "John", "age": 30, "city": "New York"})
+
+# Empty dictionary
+(= empty {})
+
+# Dictionary with numeric keys
+(= counts {1: "one", 2: "two", 3: "three"})
+
+# Dictionary with mixed value types
+(= mixed {"string": "text", "number": 42, "boolean": True, "null": None})
+
+# Nested dictionaries
+(= nested {"user": {"name": "Bob", "profile": {"age": 25}}})
+
+# Dictionary with list values
+(= with_lists {"colors": ["red", "green", "blue"], "numbers": [1, 2, 3]})
 ```
 
-This syntax is similar to Python's dictionary literals, making it familiar to Python developers.
+This syntax is identical to Python's dictionary literals, making it very familiar to Python developers.
 
 ### Dict Function
 

@@ -12,7 +12,10 @@ TESTS=(
     "function-test.m28"
     "exception-test.m28"
     "dot-notation-test.m28"
+    "dict-test.m28"
 )
+
+# No additional tests needed
 
 PASSED=0
 FAILED=0

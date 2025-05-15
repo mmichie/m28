@@ -62,7 +62,7 @@ func printFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error
 		if i > 0 {
 			fmt.Print(sep)
 		}
-		fmt.Print(core.PrintValue(arg))
+		fmt.Print(PrintValueOverride(arg))
 	}
 
 	// Print end string
