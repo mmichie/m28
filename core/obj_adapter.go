@@ -83,15 +83,22 @@ func EnsureAdapter(obj LispValue) ObjProtocol {
 
 // Adapter for PythonicDict
 func dictAdapter(dict *PythonicDict) ObjProtocol {
+	// Create a more robust adapter for dictionaries
 	return &ObjAdapter{
 		GetPropFn: func(name string) (LispValue, bool) {
-			// Check for method
+			// First, check for methods
 			if dict.HasMethod(name) {
 				method, _ := dict.methods[name]
 				// We wrap it in a BuiltinFunc for later calling
 				return BuiltinFunc(func(args []LispValue, callEnv Environment) (LispValue, error) {
 					return method(dict, args)
 				}), true
+			}
+
+			// For dictionaries, we also implement some pseudo-properties
+			switch name {
+			case "length", "len", "size", "count":
+				return float64(dict.Size()), true
 			}
 
 			// Check for property/attribute
@@ -104,10 +111,29 @@ func dictAdapter(dict *PythonicDict) ObjProtocol {
 		},
 
 		HasMethodPFn: func(name string) bool {
-			return dict.HasMethod(name)
+			// Dictionary methods
+			if dict.HasMethod(name) {
+				return true
+			}
+
+			// Length is also available as a method
+			if name == "length" || name == "len" || name == "size" || name == "count" {
+				return true
+			}
+
+			return false
 		},
 
 		CallMethodPFn: func(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
+			// For convenience, we also treat length/size as a method
+			if name == "length" || name == "len" || name == "size" || name == "count" {
+				if len(args) > 0 {
+					return nil, ErrTooManyArgumentsf("len", 0, len(args))
+				}
+				return float64(dict.Size()), nil
+			}
+
+			// Normal method call
 			return dict.CallMethod(name, args)
 		},
 	}

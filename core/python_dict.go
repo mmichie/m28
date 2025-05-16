@@ -220,9 +220,10 @@ func (d *PythonicDict) SetProperty(name string, value LispValue) error {
 	return nil
 }
 
-// Ensure PythonicDict implements DotAccessible and EvaluatorAware
+// Ensure PythonicDict implements DotAccessible, EvaluatorAware, and AdaptableLispValue
 var _ DotAccessible = (*PythonicDict)(nil)
 var _ EvaluatorAware = (*PythonicDict)(nil)
+var _ AdaptableLispValue = (*PythonicDict)(nil)
 
 // SetEvaluator stores a reference to the evaluator
 func (d *PythonicDict) SetEvaluator(eval Evaluator) {
@@ -252,6 +253,12 @@ func (d *PythonicDict) GetMember(name string, eval Evaluator, env Environment) (
 		}), nil
 	}
 
+	// Check for common dictionary pseudo-properties
+	switch name {
+	case "length", "len", "size", "count":
+		return float64(d.Size()), nil
+	}
+
 	// Then check for attributes
 	if value, exists := d.Get(name); exists {
 		return value, nil
@@ -259,6 +266,8 @@ func (d *PythonicDict) GetMember(name string, eval Evaluator, env Environment) (
 
 	return nil, fmt.Errorf("dict has no attribute '%s'", name)
 }
+
+// Note: PythonicDict already implements AsObject in module_adapter.go
 
 // SetMember implements the EvaluatorAware interface
 func (d *PythonicDict) SetMember(name string, value LispValue, eval Evaluator, env Environment) error {

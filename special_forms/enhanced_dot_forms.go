@@ -19,6 +19,11 @@ func EnhancedEvalDot(e core.Evaluator, args []core.LispValue, env core.Environme
 		return nil, fmt.Errorf(core.ErrDotObjectEval, err)
 	}
 
+	// If we have a nil object, return nil
+	if object == nil {
+		return nil, fmt.Errorf("cannot access properties of nil value")
+	}
+
 	// Get the property/method name
 	var propertyName string
 	switch prop := args[1].(type) {

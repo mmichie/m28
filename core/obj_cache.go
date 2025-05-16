@@ -128,6 +128,12 @@ func FastGetPropFrom(obj LispValue, name string) (LispValue, bool) {
 			}), true
 		}
 
+		// Add support for common pseudo-properties
+		switch name {
+		case "length", "len", "size", "count":
+			return float64(typedObj.Size()), true
+		}
+
 		// Check for property/attribute
 		return typedObj.Get(name)
 
@@ -167,10 +173,8 @@ func FastGetPropFrom(obj LispValue, name string) (LispValue, bool) {
 
 		// Check for common methods
 		switch name {
-		case "length", "len":
-			return BuiltinFunc(func(args []LispValue, env Environment) (LispValue, error) {
-				return float64(len(typedObj)), nil
-			}), true
+		case "length", "len", "size", "count":
+			return float64(len(typedObj)), true
 		}
 
 	case string:
@@ -181,10 +185,8 @@ func FastGetPropFrom(obj LispValue, name string) (LispValue, bool) {
 
 		// Check for common methods
 		switch name {
-		case "length", "len":
-			return BuiltinFunc(func(args []LispValue, env Environment) (LispValue, error) {
-				return float64(len(typedObj)), nil
-			}), true
+		case "length", "len", "size", "count":
+			return float64(len(typedObj)), true
 		}
 	}
 
@@ -229,11 +231,36 @@ func FastHasMethodPOn(obj LispValue, name string) bool {
 	switch typedObj := obj.(type) {
 	case *PythonicDict:
 		// Fast path for dictionaries
-		return typedObj.HasMethod(name)
+		if typedObj.HasMethod(name) {
+			return true
+		}
+
+		// Handle pseudo-methods
+		if name == "length" || name == "len" || name == "size" || name == "count" {
+			return true
+		}
+
+		return false
 
 	case *PythonicObject:
 		// Fast path for objects
 		return typedObj.HasMethod(name)
+
+	case LispList:
+		// Common list methods
+		switch name {
+		case "append", "extend", "pop", "remove", "length", "len", "size", "count",
+			"get", "set", "contains", "map", "filter", "reduce", "sort", "reverse":
+			return true
+		}
+
+	case string:
+		// Common string methods
+		switch name {
+		case "upper", "lower", "strip", "split", "join", "replace", "length", "len",
+			"contains", "startswith", "endswith", "find", "format":
+			return true
+		}
 	}
 
 	// Use the cached adapter for the general case
@@ -247,6 +274,16 @@ func FastCallMethodPOn(obj LispValue, name string, args []LispValue, eval Evalua
 	switch typedObj := obj.(type) {
 	case *PythonicDict:
 		// Fast path for dictionaries
+
+		// Handle pseudo-methods
+		if name == "length" || name == "len" || name == "size" || name == "count" {
+			if len(args) > 0 {
+				return nil, ErrTooManyArgumentsf(name, 0, len(args))
+			}
+			return float64(typedObj.Size()), nil
+		}
+
+		// Standard method call
 		return typedObj.CallMethod(name, args)
 
 	case *PythonicObject:

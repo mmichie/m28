@@ -16,6 +16,7 @@ const (
 	ErrDotNotCallable      = "Property '%s' is not callable (type: %T)"
 	ErrDotNestedAccess     = "Error accessing property %s.%s: %v"
 	ErrDotEvaluatorMissing = "No evaluator available for applying lambda method '%s'"
+	ErrTooManyArguments    = "Method '%s' takes %d arguments, got %d"
 )
 
 // Helper functions to generate error instances
@@ -45,4 +46,8 @@ func ErrDotNotCallablef(propName string, propType interface{}) error {
 
 func ErrDotNestedAccessf(path, prop string, err error) error {
 	return fmt.Errorf(ErrDotNestedAccess, path, prop, err)
+}
+
+func ErrTooManyArgumentsf(methodName string, expected, got int) error {
+	return fmt.Errorf(ErrTooManyArguments, methodName, expected, got)
 }
