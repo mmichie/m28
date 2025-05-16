@@ -399,3 +399,11 @@ func (s *SuperObject) GetEvaluator() Evaluator {
 // Ensure SuperObject implements required interfaces
 var _ DotAccessible = (*SuperObject)(nil)
 var _ EvaluatorAware = (*SuperObject)(nil)
+
+// AsObject implements the AdaptableLispValue interface for SuperObject
+func (s *SuperObject) AsObject() ObjProtocol {
+	return superObjectAdapter(s)
+}
+
+// Ensure SuperObject implements AdaptableLispValue
+var _ AdaptableLispValue = (*SuperObject)(nil)

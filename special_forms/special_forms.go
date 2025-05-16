@@ -63,11 +63,13 @@ func init() {
 		"del":    EvalDel,
 	}
 
-	// Register the dot notation special forms
-	RegisterDotForms(specialForms)
-
-	// Register enhanced dot notation forms
+	// Register only the enhanced dot notation special forms
+	// We no longer register the legacy dot forms first
 	EnableEnhancedDotForms(specialForms)
+	
+	// Register property access helpers (not replaced by EnableEnhancedDotForms)
+	specialForms["set-prop"] = EvalSetProperty 
+	specialForms["get-prop"] = EvalGetProperty
 
 	// Register class forms from class_implementation.go
 	RegisterClassForms(specialForms)

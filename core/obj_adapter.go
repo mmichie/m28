@@ -61,6 +61,8 @@ func EnsureAdapter(obj LispValue) ObjProtocol {
 		return dictAdapter(typedObj)
 	case *PythonicObject:
 		return objectAdapter(typedObj)
+	case *SuperObject:
+		return superObjectAdapter(typedObj)
 	case DotAccessible:
 		return dotAccessibleAdapter(typedObj)
 	}
@@ -152,6 +154,56 @@ func dotAccessibleAdapter(obj DotAccessible) ObjProtocol {
 
 		CallMethodPFn: func(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
 			return obj.CallMethod(name, args)
+		},
+	}
+}
+
+// Adapter for SuperObject
+func superObjectAdapter(obj *SuperObject) ObjProtocol {
+	return &ObjAdapter{
+		GetPropFn: func(name string) (LispValue, bool) {
+			// Check parent class methods directly to create proper bound methods
+			for _, parent := range obj.Object.Class.Parents {
+				if method, exists := parent.GetMethod(name); exists {
+					// Create a bound method with the original instance
+					boundMethod := NewBoundMethod(method, obj.Object, obj.Object.GetEvaluator())
+					return boundMethod, true
+				}
+			}
+
+			// Check parent class attributes
+			for _, parent := range obj.Object.Class.Parents {
+				if attr, exists := parent.GetAttribute(name); exists {
+					return attr, true
+				}
+			}
+
+			return nil, false
+		},
+
+		SetPropFn: func(name string, value LispValue) error {
+			return obj.SetProperty(name, value)
+		},
+
+		HasMethodPFn: func(name string) bool {
+			return obj.HasMethod(name)
+		},
+
+		CallMethodPFn: func(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
+			// Store evaluator in the super object
+			obj.SetEvaluator(eval)
+			
+			// Check parent class methods specifically to create bound methods with proper 'self'
+			for _, parent := range obj.Object.Class.Parents {
+				if method, exists := parent.GetMethod(name); exists {
+					// Create a bound method with the original instance
+					boundMethod := NewBoundMethod(method, obj.Object, eval)
+					// Apply with the evaluator passed to ensure context is maintained
+					return boundMethod.Apply(eval, args, env)
+				}
+			}
+			
+			return nil, ErrDotNoMethodf(name)
 		},
 	}
 }
