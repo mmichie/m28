@@ -15,7 +15,7 @@ func RegisterDotForms(forms map[core.LispSymbol]SpecialFormFunc) {
 }
 
 // EvalDot implements the dot notation for method access and property access
-// It supports objects that implement the DotAccessible interface and nested property access
+// It supports objects that implement various object access interfaces for property and method access
 func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	// Validate arguments
 	if len(args) < 2 {
@@ -26,6 +26,10 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 	object, err := e.Eval(args[0], env)
 	if err != nil {
 		return nil, fmt.Errorf(core.ErrDotObjectEval, err)
+	}
+
+	if object == nil {
+		return nil, fmt.Errorf("cannot access properties on nil")
 	}
 
 	// Get the property/method name
@@ -81,9 +85,13 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			case core.BuiltinFunc:
 				// If it's a builtin function, call it
 				return fn(methodArgs, env)
+			case core.ObjMethodImpl:
+				// If it's an object method implementation, call it
+				return fn.CallMethod(methodArgs, e, env)
+			// Removed Callable case as interface doesn't exist yet
 			default:
 				// Otherwise, it's not callable
-				return nil, fmt.Errorf("'%s' is not a callable method", propertyName)
+				return nil, fmt.Errorf("'%s' is not a callable method (type: %T)", propertyName, member)
 			}
 		} else {
 			// This is nested property access (multiple property names)
@@ -142,18 +150,27 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 }
 
 // Helper function to check if arguments represent a method call
-// Method calls are identified by having a callable object at the specified index
+// Method calls are identified by having arguments after the method name
 func isMethodCall(args []core.LispValue, idx int) bool {
-	// For now, we'll use a simple heuristic based on the number of args
-	// and their types. In the future, this could be more sophisticated.
+	// If there's no room for arguments, can't be a method call
 	if idx >= len(args) {
 		return false
+	}
+
+	// Check for empty argument list (no args but still a call)
+	if len(args) == idx {
+		return true
 	}
 
 	// If the next argument is a list or another complex structure,
 	// it's more likely to be method arguments than nested property access
 	switch args[idx].(type) {
 	case core.LispList, core.LispListLiteral, core.LispTuple:
+		return true
+	case core.LispSymbol:
+		// If this is a symbol that looks like a property name,
+		// it's likely a nested property access instead of a method call
+		// But we need some heuristic to decide...
 		return true
 	}
 
