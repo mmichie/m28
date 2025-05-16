@@ -24,6 +24,35 @@ func NewPythonicChannel(buffer int) *PythonicChannel {
 	}
 }
 
+// DummyChannelType represents the type for dummy channels
+type DummyChannelType string
+
+const (
+	// TypeDummyChannel is the type identifier for dummy channels
+	TypeDummyChannel DummyChannelType = "channel"
+)
+
+// DummyChannel is a simple struct that implements the necessary interfaces
+// to function as a channel placeholder until the real channel implementation is added
+type DummyChannel struct {
+	closed bool
+	name   string
+}
+
+// String returns a string representation of the dummy channel
+func (c *DummyChannel) String() string {
+	return fmt.Sprintf("<dummy channel: %s>", c.name)
+}
+
+// NewChannelFromGoChannel creates a dummy channel that represents a Go channel
+// This is a temporary implementation until the full channel system is implemented
+func NewChannelFromGoChannel(ch chan struct{}) *DummyChannel {
+	return &DummyChannel{
+		closed: false,
+		name:   "context.done",
+	}
+}
+
 // Send sends a value to the channel
 func (c *PythonicChannel) Send(value core.LispValue) error {
 	c.mu.RLock()

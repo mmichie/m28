@@ -5,6 +5,7 @@ import (
 	"math"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/mmichie/m28/core"
 )
@@ -56,6 +57,7 @@ func init() {
 	core.RegisterBuiltin("dict", dictFunc)
 	core.RegisterBuiltin("assert", assertFunc)
 	core.RegisterBuiltin("len", lenFunc)
+	core.RegisterBuiltin("time-sleep", timeSleepFunc)
 }
 
 func isNumber(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -685,4 +687,25 @@ func assertFunc(args []core.LispValue, _ core.Environment) (core.LispValue, erro
 
 	// Assertion passed
 	return core.PythonicBool(true), nil
+}
+
+// timeSleepFunc implements a function for sleeping a specified number of milliseconds
+func timeSleepFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("time-sleep requires exactly one argument (milliseconds)")
+	}
+
+	ms, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("time-sleep expected a number, got %T", args[0])
+	}
+
+	if ms < 0 {
+		return nil, fmt.Errorf("time-sleep requires a non-negative duration")
+	}
+
+	// Sleep for the specified duration
+	time.Sleep(time.Duration(ms) * time.Millisecond)
+
+	return core.PythonicNone{}, nil
 }

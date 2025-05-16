@@ -49,16 +49,16 @@ func EvalClassNew(e core.Evaluator, args []core.LispValue, env core.Environment)
 					parentItem = located.Value
 					fmt.Printf("DEBUG: Unwrapped LocatedValue for parent %d: %v (type: %T)\n", i, parentItem, parentItem)
 				}
-				
+
 				// Print raw parent arg for debugging
 				fmt.Printf("DEBUG: Parent arg %d before eval: %v (type: %T)\n", i, parentItem, parentItem)
-				
+
 				// Evaluate parent class references
 				parentVal, err := e.Eval(parentItem, env)
 				if err != nil {
 					return nil, fmt.Errorf("error evaluating parent class: %v", err)
 				}
-				
+
 				// Print evaluated parent for debugging
 				fmt.Printf("DEBUG: Parent arg %d after eval: %v (type: %T)\n", i, parentVal, parentVal)
 
@@ -80,25 +80,25 @@ func EvalClassNew(e core.Evaluator, args []core.LispValue, env core.Environment)
 		} else {
 			// Single parent case - not in a list
 			fmt.Printf("DEBUG: Single parent (not in list) for class %s: %v (type: %T)\n", className, parentArg, parentArg)
-			
+
 			// Evaluate the parent class
 			parentVal, err := e.Eval(parentArg, env)
 			if err != nil {
 				return nil, fmt.Errorf("error evaluating parent class: %v", err)
 			}
-			
+
 			// Print evaluated parent for debugging
 			fmt.Printf("DEBUG: Single parent after eval: %v (type: %T)\n", parentVal, parentVal)
-			
+
 			// Ensure parent is a PythonicClass
 			parentClass, ok := parentVal.(*core.PythonicClass)
 			if !ok {
 				return nil, fmt.Errorf("parent must be a class, got %T", parentVal)
 			}
-			
+
 			fmt.Printf("DEBUG: Adding single parent %s to class %s\n", parentClass.Name, className)
 			parents = append(parents, parentClass)
-			
+
 			// Skip the parent argument
 			args = args[2:]
 		}
@@ -180,19 +180,19 @@ func processClassBody(class *core.PythonicClass, body []core.LispValue, e core.E
 				// Get method signature and unwrap LocatedValue if needed
 				var signature core.LispList
 				var ok bool
-				
+
 				// Handle potential LocatedValue wrapping
 				sigArg := exprList[1]
 				if located, isLocated := sigArg.(core.LocatedValue); isLocated {
 					sigArg = located.Value
 					fmt.Printf("DEBUG: Unwrapped LocatedValue for method signature: %v (type: %T)\n", sigArg, sigArg)
 				}
-				
+
 				signature, ok = sigArg.(core.LispList)
 				if !ok {
 					return fmt.Errorf("method signature must be a list, got %T", sigArg)
 				}
-				
+
 				fmt.Printf("DEBUG: Processing method signature with %d elements\n", len(signature))
 
 				if len(signature) < 1 {
@@ -202,14 +202,14 @@ func processClassBody(class *core.PythonicClass, body []core.LispValue, e core.E
 				// Get method name
 				// Get method name and unwrap LocatedValue if needed
 				var methodName core.LispSymbol
-				
+
 				// Extract method name
 				methodArg := signature[0]
 				if located, isLocated := methodArg.(core.LocatedValue); isLocated {
 					methodArg = located.Value
 					fmt.Printf("DEBUG: Unwrapped LocatedValue for method name: %v (type: %T)\n", methodArg, methodArg)
 				}
-				
+
 				switch name := methodArg.(type) {
 				case core.LispSymbol:
 					methodName = name
@@ -255,7 +255,7 @@ func processClassBody(class *core.PythonicClass, body []core.LispValue, e core.E
 
 				// Debug output
 				fmt.Printf("DEBUG: Adding method '%s' to class '%s'\n", methodName, class.Name)
-				
+
 				// Add the method to the class
 				class.AddMethod(string(methodName), method)
 

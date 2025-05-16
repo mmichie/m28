@@ -72,8 +72,9 @@ func init() {
 	// Register class forms from class_implementation.go
 	RegisterClassForms(specialForms)
 
-	// Register concurrency forms
-	RegisterConcurrencyForms(specialForms)
+	// Call RegisterConcurrencyForms, but the actual handlers will be set later
+	// by the concurrency package to avoid import cycles
+	RegisterConcurrencyForms()
 }
 
 func GetSpecialForms() map[core.LispSymbol]SpecialFormFunc {

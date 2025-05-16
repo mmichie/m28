@@ -43,7 +43,7 @@ func isinstanceFunc(args []core.LispValue, env core.Environment) (core.LispValue
 					return nil, fmt.Errorf("error evaluating class in list: %v", err)
 				}
 			}
-			
+
 			result, err := checkInstanceOf(obj, classItem, env)
 			if err != nil {
 				return nil, err
@@ -141,24 +141,24 @@ func issubclassFunc(args []core.LispValue, env core.Environment) (core.LispValue
 		if !isTypeId {
 			return nil, fmt.Errorf("issubclass() first argument must be a class")
 		}
-		
+
 		// Handle built-in type identifiers for first argument
 		if typeId == core.TypeIdentifier("int") ||
-		   typeId == core.TypeIdentifier("float") ||
-		   typeId == core.TypeIdentifier("str") ||
-		   typeId == core.TypeIdentifier("list") ||
-		   typeId == core.TypeIdentifier("tuple") ||
-		   typeId == core.TypeIdentifier("dict") ||
-		   typeId == core.TypeIdentifier("bool") ||
-		   typeId == core.TypeIdentifier("function") ||
-		   typeId == core.TypeIdentifier("none") {
-			
+			typeId == core.TypeIdentifier("float") ||
+			typeId == core.TypeIdentifier("str") ||
+			typeId == core.TypeIdentifier("list") ||
+			typeId == core.TypeIdentifier("tuple") ||
+			typeId == core.TypeIdentifier("dict") ||
+			typeId == core.TypeIdentifier("bool") ||
+			typeId == core.TypeIdentifier("function") ||
+			typeId == core.TypeIdentifier("none") {
+
 			// For built-in types, the only valid issubclass relationship is with themselves
 			typeId2, isTypeId2 := args[1].(core.TypeIdentifier)
 			if isTypeId2 && typeId == typeId2 {
 				return core.PythonicBool(true), nil
 			}
-			
+
 			// Handle list of classes for second argument (Python's tuple equivalent)
 			if classes, isList := args[1].(core.LispList); isList {
 				for _, cls := range classes {
@@ -168,7 +168,7 @@ func issubclassFunc(args []core.LispValue, env core.Environment) (core.LispValue
 					}
 				}
 			}
-			
+
 			return core.PythonicBool(false), nil
 		}
 	}
@@ -194,13 +194,13 @@ func issubclassFunc(args []core.LispValue, env core.Environment) (core.LispValue
 				}
 				continue
 			}
-			
+
 			// Check if the class item is a TypeIdentifier
 			_, isTypeId := classItem.(core.TypeIdentifier)
 			if !isTypeId {
 				return nil, fmt.Errorf("issubclass() second argument list must contain only classes or type identifiers")
 			}
-			
+
 			// Built-in types cannot be base classes of custom classes
 			continue
 		}
@@ -226,7 +226,7 @@ func issubclassFunc(args []core.LispValue, env core.Environment) (core.LispValue
 // isSubclassOf checks if a class is a subclass of another class
 func isSubclassOf(class, checkClass *core.PythonicClass) bool {
 	fmt.Printf("DEBUG isSubclassOf: Checking if %s is a subclass of %s\n", class.Name, checkClass.Name)
-	
+
 	if class == nil || checkClass == nil {
 		fmt.Println("DEBUG isSubclassOf: One of the classes is nil")
 		return false
@@ -255,11 +255,11 @@ func isSubclassOf(class, checkClass *core.PythonicClass) bool {
 	// Check all parent classes recursively
 	for _, parent := range class.Parents {
 		if parent == checkClass {
-			fmt.Printf("DEBUG isSubclassOf: Found direct parent match: %s is a parent of %s\n", 
+			fmt.Printf("DEBUG isSubclassOf: Found direct parent match: %s is a parent of %s\n",
 				checkClass.Name, class.Name)
 			return true
 		}
-		
+
 		if isSubclassOf(parent, checkClass) {
 			fmt.Printf("DEBUG isSubclassOf: Found indirect parent match: %s is an ancestor of %s\n",
 				checkClass.Name, class.Name)
@@ -267,7 +267,7 @@ func isSubclassOf(class, checkClass *core.PythonicClass) bool {
 		}
 	}
 
-	fmt.Printf("DEBUG isSubclassOf: No match found - %s is NOT a subclass of %s\n", 
+	fmt.Printf("DEBUG isSubclassOf: No match found - %s is NOT a subclass of %s\n",
 		class.Name, checkClass.Name)
 	return false
 }

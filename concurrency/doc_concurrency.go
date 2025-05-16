@@ -6,6 +6,133 @@ import (
 
 // init registers documentation for concurrency-related forms and functions
 func init() {
+	// Documentation for context-related functions
+	core.RegisterDoc(core.DocEntry{
+		Name:        "context-background",
+		Type:        "builtin-function",
+		Brief:       "Create a new background context",
+		Description: "Creates a new background context that is never canceled. This is typically used as the root context for a request or operation.",
+		Params:      []core.ParamDoc{},
+		Returns:     "A new background context",
+		Examples:    []string{`(def ctx (context-background))`},
+		Related:     []string{"context-with-cancel", "context-with-timeout", "context-done", "context-canceled?", "context-error"},
+		Module:      "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "context-with-cancel",
+		Type:        "builtin-function",
+		Brief:       "Create a new cancellable context",
+		Description: "Creates a new context that can be canceled. Returns a list containing the context and a cancel function.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "parent",
+				Description: "The parent context",
+			},
+		},
+		Returns: "A list [ctx cancel-fn] where ctx is the new context and cancel-fn is a function to cancel it",
+		Examples: []string{
+			`(def result (context-with-cancel ctx))
+(def new-ctx (nth result 0))
+(def cancel-fn (nth result 1))
+# Later, to cancel:
+(cancel-fn)`,
+		},
+		Related: []string{"context-background", "context-with-timeout", "context-done", "context-canceled?"},
+		Module:  "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "context-with-timeout",
+		Type:        "builtin-function",
+		Brief:       "Create a new context with a timeout",
+		Description: "Creates a new context that will be automatically canceled after the specified timeout in milliseconds.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "parent",
+				Description: "The parent context",
+			},
+			{
+				Name:        "timeout-ms",
+				Description: "The timeout in milliseconds after which the context will be canceled",
+			},
+		},
+		Returns: "A list [ctx cancel-fn] where ctx is the new context and cancel-fn is a function to cancel it",
+		Examples: []string{
+			`(def result (context-with-timeout ctx 5000))  # 5 seconds
+(def timeout-ctx (nth result 0))
+(def cancel-fn (nth result 1))`,
+		},
+		Related: []string{"context-background", "context-with-cancel", "context-done"},
+		Module:  "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "context-done",
+		Type:        "builtin-function",
+		Brief:       "Get a channel that's closed when the context is done",
+		Description: "Returns a channel that's closed when the context is canceled or times out. This can be used with select to respond to context cancellation.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "context",
+				Description: "The context to get the done channel from",
+			},
+		},
+		Returns: "A channel that's closed when the context is canceled or times out",
+		Examples: []string{
+			`(def done-ch (context-done ctx))
+(select
+  [(case :recv done-ch)
+    (println "Context was canceled")]
+  [(case :recv work-ch)
+    (println "Received work")])`,
+		},
+		Related: []string{"context-canceled?", "context-error", "select"},
+		Module:  "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "context-canceled?",
+		Type:        "builtin-function",
+		Brief:       "Check if a context is canceled",
+		Description: "Returns true if the context is canceled or timed out, false otherwise.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "context",
+				Description: "The context to check",
+			},
+		},
+		Returns: "A boolean indicating if the context is canceled",
+		Examples: []string{
+			`(if (context-canceled? ctx)
+  (println "Context is canceled")
+  (println "Context is still active"))`,
+		},
+		Related: []string{"context-error", "context-done"},
+		Module:  "concurrency",
+	})
+
+	core.RegisterDoc(core.DocEntry{
+		Name:        "context-error",
+		Type:        "builtin-function",
+		Brief:       "Get the error message for a canceled context",
+		Description: "Returns the error message describing why the context was canceled, or None if the context is still active.",
+		Params: []core.ParamDoc{
+			{
+				Name:        "context",
+				Description: "The context to get the error from",
+			},
+		},
+		Returns: "A string with the error message, or None if the context is not canceled",
+		Examples: []string{
+			`(let [err (context-error ctx)]
+  (if (eq? err None)
+    (println "Context is still active")
+    (println "Context canceled because:" err)))`,
+		},
+		Related: []string{"context-canceled?", "context-done"},
+		Module:  "concurrency",
+	})
 	// Documentation for the go special form
 	core.RegisterDoc(core.DocEntry{
 		Name:        "go",

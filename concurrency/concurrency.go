@@ -1,5 +1,7 @@
 package concurrency
 
+import "github.com/mmichie/m28/core"
+
 // Documentation strings for concurrency forms
 var ConcurrencyDocs = map[string]string{
 	"go": `(go expr)
@@ -79,6 +81,61 @@ Example:
 (if (chan-closed? my-channel)
   (println "Channel is closed")
   (println "Channel is open"))`,
+
+	// Context system documentation
+	"context-background": `(context-background)
+	
+Creates a new background context that is never canceled.
+
+Example:
+(= bg (context-background))`,
+
+	"context-with-cancel": `(context-with-cancel parent-context)
+	
+Creates a new cancellable context as a child of the parent context.
+Returns a tuple of (context, cancel-function).
+
+Example:
+(= result (context-with-cancel bg))
+(= ctx (nth result 0))
+(= cancel-fn (nth result 1))`,
+
+	"context-with-timeout": `(context-with-timeout parent-context timeout-ms)
+	
+Creates a new context with a timeout in milliseconds.
+Returns a tuple of (context, cancel-function).
+
+Example:
+(= result (context-with-timeout bg 5000))  # 5 second timeout
+(= ctx (nth result 0))
+(= cancel-fn (nth result 1))`,
+
+	"context-done": `(context-done context)
+	
+Returns a channel that's closed when the context is done.
+
+Example:
+(= done-ch (context-done ctx))
+(= result (recv done-ch))  # Blocks until context is canceled`,
+
+	"context-canceled?": `(context-canceled? context)
+	
+Returns true if the context has been canceled, false otherwise.
+
+Example:
+(if (context-canceled? ctx)
+  (println "Context is canceled")
+  (println "Context is still active"))`,
+
+	"context-error": `(context-error context)
+	
+Returns the error describing why the context was canceled, or None if it hasn't been canceled.
+
+Example:
+(= err (context-error ctx))
+(if err
+  (println "Context canceled with error:" err)
+  (println "Context still active"))`,
 }
 
 // RegisterConcurrencyDocs registers documentation for concurrency forms and functions
@@ -86,4 +143,21 @@ func RegisterConcurrencyDocs(docRegistry map[string]string) {
 	for name, doc := range ConcurrencyDocs {
 		docRegistry[name] = doc
 	}
+}
+
+// InitConcurrency initializes all concurrency functionality
+func InitConcurrency() {
+	// Register only context functions for now
+	RegisterContextFunctions()
+
+	// Register documentation for concurrency functions
+	core.RegisterDocStrings(ConcurrencyDocs)
+
+	// These will be implemented later
+	// RegisterChannelFunctions()
+	// RegisterMutexFunctions()
+	// RegisterWaitGroupFunctions()
+
+	// Special forms will be registered in the initialize package to avoid import cycles
+	// special_forms.RegisterConcurrencyForms()
 }

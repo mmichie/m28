@@ -299,6 +299,20 @@ func FormatDocEntry(entry DocEntry) string {
 	return sb.String()
 }
 
+// RegisterDocStrings registers a map of symbol names to documentation strings
+func RegisterDocStrings(docs map[string]string) {
+	for name, docString := range docs {
+		// Simple doc entry from raw string
+		entry := DocEntry{
+			Name:        name,
+			Type:        "function",
+			Brief:       fmt.Sprintf("%s function", name),
+			Description: docString,
+		}
+		RegisterDoc(entry)
+	}
+}
+
 // FormatDocList formats a list of DocEntries as a table
 func FormatDocList(entries []DocEntry, title string) string {
 	var sb strings.Builder

@@ -303,6 +303,88 @@ WaitGroups allow waiting for a collection of goroutines to finish:
 (print "All workers done")
 ```
 
+## Context System
+
+The context system provides a way to carry deadlines, cancellation signals, and other request-scoped values across API boundaries and between goroutines.
+
+### Creating Contexts
+
+```lisp
+# Create a background context (never canceled)
+(= bg (context-background))
+
+# Create a cancellable context
+(= result (context-with-cancel bg))
+(= ctx (nth result 0))
+(= cancel-fn (nth result 1))
+
+# Create a context with a timeout (in milliseconds)
+(= result (context-with-timeout bg 5000))  # 5 second timeout
+(= timeout-ctx (nth result 0))
+(= cancel-timeout (nth result 1))
+```
+
+### Cancellation
+
+```lisp
+# Cancel a context directly
+(cancel-fn)
+
+# Cancel with a specific reason
+(cancel-fn "operation aborted by user")
+```
+
+### Using Context for Cancellation
+
+```lisp
+# Get a channel that's closed when the context is done
+(= done-ch (context-done ctx))
+
+# Check if a context is canceled
+(if (context-canceled? ctx)
+  (println "Context is canceled")
+  (println "Context is still active"))
+
+# Get the error describing why a context was canceled
+(= err (context-error ctx))
+```
+
+### Example: Worker with Cancellation
+
+```lisp
+(= bg (context-background))
+(= result (context-with-timeout bg 5000)) # 5 second timeout
+(= ctx (nth result 0))
+(= cancel (nth result 1))
+(= done-ch (context-done ctx))
+(= work-ch (chan))
+
+# Start a worker
+(go
+  (println "Worker: starting...")
+  (select
+    # Wait for work
+    [(case :recv work-ch)
+      (println "Worker: processing" select-value)]
+    # Or context cancellation
+    [(case :recv done-ch)
+      (println "Worker: stopping due to context cancellation")])
+  (println "Worker: done"))
+
+# Cancel the context
+(cancel "work no longer needed")
+```
+
+### Context Best Practices
+
+1. **Pass contexts explicitly**: Always pass contexts as the first parameter to functions that need them
+2. **Don't store contexts in structs**: Pass them through the call chain instead
+3. **Use context values sparingly**: Prefer explicit parameters for data that functions need
+4. **Cancel contexts when appropriate**: To free resources and stop ongoing operations
+5. **Create context chains**: Derive contexts from existing ones to form a tree of contexts
+
 ## Future Enhancements
 
-1. **Context**: For propagating cancellation and deadlines
+1. **Advanced Context Values**: Support for request-scoped values in contexts
+2. **Context Deadline Functions**: Add functions to check context deadlines and remaining time
+3. **Context Value Accessors**: Methods to store and retrieve values from contexts

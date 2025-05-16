@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/initialize"
 	"github.com/mmichie/m28/repl"
 )
 
@@ -18,6 +19,9 @@ func main() {
 
 	// Store evaluator in global environment for object method calls
 	r.StoreEvaluator()
+
+	// Initialize concurrency features
+	initialize.InitializeConcurrency()
 
 	// A flag to determine if we should enter interactive mode
 	enterRepl := flags.Interactive

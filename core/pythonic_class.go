@@ -34,7 +34,7 @@ func (c *PythonicClass) AddMethod(name string, method *Lambda) {
 // GetMethod gets a method from the class, checking parent classes if needed
 func (c *PythonicClass) GetMethod(name string) (*Lambda, bool) {
 	fmt.Printf("DEBUG GetMethod: Looking for method %s in class %s\n", name, c.Name)
-	
+
 	c.mu.RLock()
 	// Print all available methods for debugging
 	fmt.Printf("DEBUG GetMethod: Available methods in %s: ", c.Name)
@@ -42,7 +42,7 @@ func (c *PythonicClass) GetMethod(name string) (*Lambda, bool) {
 		fmt.Printf("%s ", methodName)
 	}
 	fmt.Println()
-	
+
 	method, exists := c.Methods[name]
 	c.mu.RUnlock()
 
@@ -249,13 +249,13 @@ func (c *PythonicClass) Invoke(args []LispValue, e Evaluator, env Environment) (
 	// Look for an init method to call - check for both init and __init__
 	var initMethod *Lambda
 	var exists bool
-	
+
 	// First try __init__ (Python style)
 	if initMethod, exists = c.GetMethod("__init__"); !exists {
 		// Then try init (original style)
 		initMethod, exists = c.GetMethod("init")
 	}
-	
+
 	if exists {
 		// Create a bound method for init
 		boundInit := NewBoundMethod(initMethod, instance, e)
