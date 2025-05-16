@@ -3,8 +3,8 @@ package core
 // EnhancedObjectMember provides unified access to object members
 // It integrates with both the new ObjProtocol and older interfaces
 func EnhancedObjectMember(obj LispValue, name string, eval Evaluator, env Environment) (LispValue, error) {
-	// Try to get the property or method using our helper
-	if val, exists := GetPropFrom(obj, name); exists {
+	// Try to get the property or method using our optimized helper
+	if val, exists := FastGetPropFrom(obj, name); exists {
 		return val, nil
 	}
 
@@ -15,20 +15,20 @@ func EnhancedObjectMember(obj LispValue, name string, eval Evaluator, env Enviro
 // EnhancedSetObjectMember provides unified setting of object members
 // It integrates with both the new ObjProtocol and older interfaces
 func EnhancedSetObjectMember(obj LispValue, name string, value LispValue, eval Evaluator, env Environment) error {
-	// Try to set the property using our helper
-	return SetPropOn(obj, name, value)
+	// Try to set the property using our optimized helper
+	return FastSetPropOn(obj, name, value)
 }
 
 // EnhancedCallObjectMethod provides unified method calling
 // It integrates with both the new ObjProtocol and older interfaces
 func EnhancedCallObjectMethod(obj LispValue, name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
 	// Make sure the method exists
-	if !HasMethodPOn(obj, name) {
+	if !FastHasMethodPOn(obj, name) {
 		return nil, ErrDotNoMethodf(name)
 	}
 
-	// Call the method using our helper
-	return CallMethodPOn(obj, name, args, eval, env)
+	// Call the method using our optimized helper
+	return FastCallMethodPOn(obj, name, args, eval, env)
 }
 
 // EnhancedGetNestedMember retrieves a member from a nested chain of objects
@@ -45,19 +45,19 @@ func EnhancedGetNestedMember(obj LispValue, path []string, eval Evaluator, env E
 	for i, part := range path {
 		currentPath = currentPath + "." + part
 
-		// Get the current part
-		next, err := EnhancedObjectMember(current, part, eval, env)
-		if err != nil {
-			return nil, ErrDotNestedAccessf(currentPath, part, err)
-		}
+		// Try to get the property or method using our optimized helper first
+		if val, exists := FastGetPropFrom(current, part); exists {
+			// If this is the last part, return it
+			if i == len(path)-1 {
+				return val, nil
+			}
 
-		// If this is the last part, return it
-		if i == len(path)-1 {
-			return next, nil
+			// Otherwise, continue to the next part
+			current = val
+		} else {
+			// Property or method not found
+			return nil, ErrDotNestedAccessf(currentPath, part, ErrDotNoPropertyf(part))
 		}
-
-		// Otherwise, continue to the next part
-		current = next
 	}
 
 	return current, nil
@@ -66,20 +66,38 @@ func EnhancedGetNestedMember(obj LispValue, path []string, eval Evaluator, env E
 // DirectPropertyAccess provides a more direct way to access instance properties
 // It's optimized for the common case of accessing attributes on class instances
 func DirectPropertyAccess(obj LispValue, name string) (LispValue, error) {
-	// Try direct instance property access first
-	if val, exists := DirectGetProp(obj, name); exists {
+	// Specialize for PythonicObject for fastest path
+	if pyObj, ok := obj.(*PythonicObject); ok {
+		if pyObj.Attributes != nil {
+			if val, exists := pyObj.Attributes.Get(name); exists {
+				return val, nil
+			}
+		}
+	}
+
+	// Fall back to optimized property access
+	if val, exists := FastGetPropFrom(obj, name); exists {
 		return val, nil
 	}
 
-	// Fall back to standard property access
+	// Nothing found
 	return nil, ErrDotNoPropertyf(name)
 }
 
 // DirectPropertySet provides a more direct way to set instance properties
 // It's optimized for the common case of setting attributes on class instances
 func DirectPropertySet(obj LispValue, name string, value LispValue) error {
-	// Use our direct property setter
-	return DirectSetProp(obj, name, value)
+	// Specialize for PythonicObject for fastest path
+	if pyObj, ok := obj.(*PythonicObject); ok {
+		if pyObj.Attributes == nil {
+			pyObj.Attributes = NewPythonicDict()
+		}
+		pyObj.Attributes.Set(name, value)
+		return nil
+	}
+
+	// Fall back to optimized property setting
+	return FastSetPropOn(obj, name, value)
 }
 
 // Note: We're removing this function since it conflicts with an existing

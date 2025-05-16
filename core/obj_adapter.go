@@ -63,6 +63,16 @@ func EnsureAdapter(obj LispValue) ObjProtocol {
 		return objectAdapter(typedObj)
 	case *SuperObject:
 		return superObjectAdapter(typedObj)
+	case LispList:
+		return &LispListAdapter{list: typedObj}
+	case LispListLiteral:
+		return &LispListAdapter{list: LispList(typedObj)}
+	case LispTuple:
+		return &LispTupleAdapter{tuple: typedObj}
+	case string:
+		return &StringAdapter{str: typedObj}
+	case *PythonicSet:
+		return &PythonicSetAdapter{set: typedObj}
 	case DotAccessible:
 		return dotAccessibleAdapter(typedObj)
 	}
@@ -192,7 +202,7 @@ func superObjectAdapter(obj *SuperObject) ObjProtocol {
 		CallMethodPFn: func(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
 			// Store evaluator in the super object
 			obj.SetEvaluator(eval)
-			
+
 			// Check parent class methods specifically to create bound methods with proper 'self'
 			for _, parent := range obj.Object.Class.Parents {
 				if method, exists := parent.GetMethod(name); exists {
@@ -202,7 +212,7 @@ func superObjectAdapter(obj *SuperObject) ObjProtocol {
 					return boundMethod.Apply(eval, args, env)
 				}
 			}
-			
+
 			return nil, ErrDotNoMethodf(name)
 		},
 	}

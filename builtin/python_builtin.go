@@ -22,9 +22,8 @@ func RegisterPythonBuiltins() {
 func RegisterMiscBuiltins() {
 	core.RegisterBuiltin("dict", dictFunc)
 	core.RegisterBuiltin("frozenset", frozensetFunc)
-	core.RegisterBuiltin("getattr", getattrFunc)
+	// Note: getattr/hasattr are now implemented in object_access.go
 	core.RegisterBuiltin("globals", globalsFunc)
-	core.RegisterBuiltin("hasattr", hasattrFunc)
 	core.RegisterBuiltin("hash", hashFunc)
 	core.RegisterBuiltin("id", idFunc)
 	core.RegisterBuiltin("locals", localsFunc)
