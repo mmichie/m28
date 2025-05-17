@@ -1,8 +1,0 @@
-(begin
-  (print "Testing error with color output")
-  (def x 10)
-  (def y 0)
-  (print "About to divide by zero...")
-  (/ x y)
-  (print "This line will not execute")
-)

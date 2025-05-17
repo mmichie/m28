@@ -1,9 +1,0 @@
-# Simple test using a list literal
-(= nums [1 2 3 4 5])
-(print "nums =")
-(print nums)
-
-# Create a basic for loop
-(print "Iterating with for:")
-(for x nums
-  (print "x =" x))
