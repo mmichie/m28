@@ -86,10 +86,11 @@ func (ep *EvaluatorProvider) GetEvaluator() Evaluator {
 	return ep.Eval
 }
 
-// DotAccessibleEx is an extended DotAccessible interface that includes evaluator context
+// DotAccessibleEx was an extended interface that included DotAccessible and EvaluatorAware
+// Now replaced by ObjProtocol + EvaluatorAware
 type DotAccessibleEx interface {
-	DotAccessible
 	EvaluatorAware
+	// Note: DotAccessible interface has been removed and replaced by ObjProtocol
 }
 
 // Make Lambda implement the Applicable interface

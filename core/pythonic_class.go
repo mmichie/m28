@@ -279,7 +279,7 @@ func (c *PythonicClass) Invoke(args []LispValue, e Evaluator, env Environment) (
 }
 
 // Ensure PythonicObject implements relevant interfaces
-var _ DotAccessible = (*PythonicObject)(nil)
+// Note: DotAccessible has been replaced by ObjProtocol
 var _ EvaluatorAware = (*PythonicObject)(nil)
 var _ Evaluable = (*PythonicObject)(nil)
 
@@ -397,7 +397,7 @@ func (s *SuperObject) GetEvaluator() Evaluator {
 }
 
 // Ensure SuperObject implements required interfaces
-var _ DotAccessible = (*SuperObject)(nil)
+// Note: DotAccessible has been replaced by ObjProtocol
 var _ EvaluatorAware = (*SuperObject)(nil)
 
 // AsObject implements the AdaptableLispValue interface for SuperObject

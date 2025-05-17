@@ -220,8 +220,8 @@ func (d *PythonicDict) SetProperty(name string, value LispValue) error {
 	return nil
 }
 
-// Ensure PythonicDict implements DotAccessible, EvaluatorAware, and AdaptableLispValue
-var _ DotAccessible = (*PythonicDict)(nil)
+// Ensure PythonicDict implements EvaluatorAware and AdaptableLispValue
+// Note: DotAccessible has been replaced by ObjProtocol
 var _ EvaluatorAware = (*PythonicDict)(nil)
 var _ AdaptableLispValue = (*PythonicDict)(nil)
 

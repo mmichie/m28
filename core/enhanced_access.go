@@ -66,16 +66,7 @@ func EnhancedGetNestedMember(obj LispValue, path []string, eval Evaluator, env E
 // DirectPropertyAccess provides a more direct way to access instance properties
 // It's optimized for the common case of accessing attributes on class instances
 func DirectPropertyAccess(obj LispValue, name string) (LispValue, error) {
-	// Specialize for PythonicObject for fastest path
-	if pyObj, ok := obj.(*PythonicObject); ok {
-		if pyObj.Attributes != nil {
-			if val, exists := pyObj.Attributes.Get(name); exists {
-				return val, nil
-			}
-		}
-	}
-
-	// Fall back to optimized property access
+	// Use the FastGetPropFrom that now handles all types consistently
 	if val, exists := FastGetPropFrom(obj, name); exists {
 		return val, nil
 	}
@@ -87,16 +78,7 @@ func DirectPropertyAccess(obj LispValue, name string) (LispValue, error) {
 // DirectPropertySet provides a more direct way to set instance properties
 // It's optimized for the common case of setting attributes on class instances
 func DirectPropertySet(obj LispValue, name string, value LispValue) error {
-	// Specialize for PythonicObject for fastest path
-	if pyObj, ok := obj.(*PythonicObject); ok {
-		if pyObj.Attributes == nil {
-			pyObj.Attributes = NewPythonicDict()
-		}
-		pyObj.Attributes.Set(name, value)
-		return nil
-	}
-
-	// Fall back to optimized property setting
+	// Use the FastSetPropOn that now handles all types consistently
 	return FastSetPropOn(obj, name, value)
 }
 

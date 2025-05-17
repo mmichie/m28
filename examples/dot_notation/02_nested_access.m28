@@ -1,0 +1,47 @@
+# Nested Dot Notation Access
+# This example demonstrates accessing nested properties with dot notation
+
+(print "=== Nested Dot Notation ===")
+
+# Create a nested dictionary structure
+(= user {
+  "name": "Bob",
+  "details": {
+    "address": {
+      "city": "Techville",
+      "street": "Coding Lane"
+    },
+    "contact": {
+      "email": "bob@example.com",
+      "phone": "555-1234"
+    }
+  }
+})
+
+(print "User data created successfully")
+
+# Access nested properties with chained dot calls
+(print "\n-- Chained Dot Access --")
+(= city (. (. (. user "details") "address") "city"))
+(print "City (chained dot calls):" city)
+
+# Multiple property paths in one call (more concise)
+(print "\n-- Multi-segment Path --")
+(= email (dot user "details" "contact" "email"))
+(print "Email (multi-segment path):" email)
+
+# Compare with traditional property access
+(print "\n-- Comparison with nested get --")
+(= phone_via_get (get (get (get user "details") "contact") "phone"))
+(print "Phone via nested get:" phone_via_get)
+(= phone_via_dot (dot user "details" "contact" "phone"))
+(print "Phone via dot:" phone_via_dot)
+
+# Error handling for invalid paths
+(print "\n-- Error Handling for Invalid Paths --")
+(try
+  (= invalid (dot user "details" "invalid" "property"))
+  (catch e
+    (print "Error accessing invalid path:" e)))
+
+(print "\n=== Nested Dot Notation Complete ===")

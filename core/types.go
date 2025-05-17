@@ -101,7 +101,8 @@ type ModuleLoader interface {
 }
 
 // DotAccessible defines an interface for objects that support dot notation
-// This allows consistent property access and method calling across different types
+// DEPRECATED: This interface is being phased out in favor of ObjProtocol,
+// but is kept temporarily for compatibility with existing code.
 type DotAccessible interface {
 	// HasProperty checks if the object has a property with the given name
 	HasProperty(name string) bool
@@ -120,9 +121,6 @@ type DotAccessible interface {
 	// CallMethod calls a method on the object with the given arguments
 	// Returns the result of the method call or an error
 	CallMethod(name string, args []LispValue) (LispValue, error)
-
-	// These methods are deprecated and will be removed in a future version
-	// Use the GetMember/SetMember methods from the EvaluatorAware interface instead
 }
 
 // EvaluatorAware interface is now defined in types_interfaces.go

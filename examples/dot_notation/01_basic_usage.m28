@@ -1,0 +1,36 @@
+# Basic Dot Notation Examples
+# This example demonstrates the basics of dot notation property access
+
+(print "=== Basic Dot Notation ===")
+
+# Create a dictionary
+(= person {"name": "Alice", "age": 30})
+(print "Person dictionary:" person)
+
+# Access properties using dot notation
+(print "\n-- Basic Property Access --")
+(= name (dot person "name"))
+(print "Name (using dot):" name)
+
+# Using the shorthand "." syntax
+(= age (. person "age"))
+(print "Age (using . shorthand):" age)
+
+# Compare with traditional property access
+(print "\n-- Comparison with get --")
+(= name_via_get (get person "name"))
+(print "Name via get:" name_via_get)
+(print "Name via dot:" name)
+(print "Are they equal?:" (= name name_via_get))
+
+# Default values for missing properties
+(print "\n-- Handling Missing Properties --")
+(= default_city (get person "city" "Unknown"))
+(print "City with default:" default_city)
+
+(try
+  (= missing (. person "nonexistent"))
+  (catch e
+    (print "Error accessing missing property:" e)))
+
+(print "\n=== Basic Dot Notation Complete ===")

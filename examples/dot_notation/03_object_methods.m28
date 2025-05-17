@@ -1,0 +1,63 @@
+# Object Methods with Dot Notation
+# This example demonstrates using dot notation with object methods
+
+(print "=== Object Methods with Dot Notation ===")
+
+# Create an object with methods
+(= counter {
+  "count": 0,
+  "increment": (lambda (self)
+    (= self.count (+ self.count 1))
+    self.count),
+  "decrement": (lambda (self)
+    (= self.count (- self.count 1))
+    self.count),
+  "reset": (lambda (self)
+    (= self.count 0))
+})
+
+(print "Counter object created with methods")
+(print "Initial count:" counter.count)
+
+# Call method using dot notation
+(print "\n-- Method Calls --")
+(print "After increment:" (counter.increment counter))
+(print "After increment again:" (counter.increment counter))
+(print "After decrement:" (counter.decrement counter))
+
+# Reset the counter
+(counter.reset counter)
+(print "After reset:" counter.count)
+
+# Create a person object with method
+(print "\n-- Person Object with Method --")
+(= person {
+  "name": "Charlie",
+  "age": 25,
+  "greet": (lambda (self message)
+    (+ message ", " self.name "! You are " (string self.age) " years old."))
+})
+
+# Call method with arguments
+(= greeting (person.greet person "Hello"))
+(print greeting)
+
+# Method chaining example
+(print "\n-- Method Chaining --")
+(= math_ops {
+  "value": 0,
+  "add": (lambda (self n)
+    (= self.value (+ self.value n))
+    self),
+  "multiply": (lambda (self n)
+    (= self.value (* self.value n))
+    self),
+  "result": (lambda (self)
+    self.value)
+})
+
+# Perform operations and get result
+(= calc_result (math_ops.add math_ops 5).multiply math_ops 2).result math_ops)
+(print "Calculation result:" calc_result)
+
+(print "\n=== Object Methods Complete ===")

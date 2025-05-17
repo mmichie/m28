@@ -73,8 +73,6 @@ func EnsureAdapter(obj LispValue) ObjProtocol {
 		return &StringAdapter{str: typedObj}
 	case *PythonicSet:
 		return &PythonicSetAdapter{set: typedObj}
-	case DotAccessible:
-		return dotAccessibleAdapter(typedObj)
 	}
 
 	// Default adapter with minimal functionality
@@ -161,38 +159,7 @@ func objectAdapter(obj *PythonicObject) ObjProtocol {
 	}
 }
 
-// Adapter for DotAccessible
-func dotAccessibleAdapter(obj DotAccessible) ObjProtocol {
-	return &ObjAdapter{
-		GetPropFn: func(name string) (LispValue, bool) {
-			// Check for property
-			if obj.HasProperty(name) {
-				return obj.GetProperty(name)
-			}
-
-			// Check for method
-			if obj.HasMethod(name) {
-				return BuiltinFunc(func(args []LispValue, callEnv Environment) (LispValue, error) {
-					return obj.CallMethod(name, args)
-				}), true
-			}
-
-			return nil, false
-		},
-
-		SetPropFn: func(name string, value LispValue) error {
-			return obj.SetProperty(name, value)
-		},
-
-		HasMethodPFn: func(name string) bool {
-			return obj.HasMethod(name)
-		},
-
-		CallMethodPFn: func(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
-			return obj.CallMethod(name, args)
-		},
-	}
-}
+// Note: Legacy DotAccessible adapter has been removed
 
 // Adapter for SuperObject
 func superObjectAdapter(obj *SuperObject) ObjProtocol {

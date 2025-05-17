@@ -46,11 +46,6 @@ func GetPropFrom(obj LispValue, name string) (LispValue, bool) {
 		return adaptable.AsObject().GetProp(name)
 	}
 
-	// Legacy handling for DotAccessible
-	if dotObj, ok := obj.(DotAccessible); ok {
-		return dotObj.GetProperty(name)
-	}
-
 	// Special handling for PythonicDict
 	if dict, ok := obj.(*PythonicDict); ok {
 		// Check for method
@@ -136,11 +131,6 @@ func SetPropOn(obj LispValue, name string, value LispValue) error {
 		return adaptable.AsObject().SetProp(name, value)
 	}
 
-	// Legacy handling for DotAccessible
-	if dotObj, ok := obj.(DotAccessible); ok {
-		return dotObj.SetProperty(name, value)
-	}
-
 	// Special handling for PythonicDict
 	if dict, ok := obj.(*PythonicDict); ok {
 		dict.Set(name, value)
@@ -166,11 +156,6 @@ func HasMethodPOn(obj LispValue, name string) bool {
 	// Then try adaptable values
 	if adaptable, ok := obj.(AdaptableLispValue); ok {
 		return adaptable.AsObject().HasMethodP(name)
-	}
-
-	// Legacy handling for DotAccessible
-	if dotObj, ok := obj.(DotAccessible); ok {
-		return dotObj.HasMethod(name)
 	}
 
 	// Special handling for PythonicDict
@@ -205,11 +190,6 @@ func CallMethodPOn(obj LispValue, name string, args []LispValue, eval Evaluator,
 	// Then try adaptable values
 	if adaptable, ok := obj.(AdaptableLispValue); ok {
 		return adaptable.AsObject().CallMethodP(name, args, eval, env)
-	}
-
-	// Legacy handling for DotAccessible
-	if dotObj, ok := obj.(DotAccessible); ok {
-		return dotObj.CallMethod(name, args)
 	}
 
 	// Special handling for PythonicDict
