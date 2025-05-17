@@ -1,0 +1,2 @@
+(print "Testing basic functionality")
+(+ 2 4)

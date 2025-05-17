@@ -15,7 +15,7 @@ type TypeAdapterCache struct {
 	// Cache maps type information to adapter factory functions
 	cache map[reflect.Type]AdapterFactory
 	mu    sync.RWMutex
-	
+
 	// Object pools for common adapter types to reduce GC pressure
 	listAdapterPool    sync.Pool
 	stringAdapterPool  sync.Pool
@@ -33,7 +33,7 @@ type AdapterFactory func(obj LispValue) ObjProtocol
 func NewTypeAdapterCache() *TypeAdapterCache {
 	cache := &TypeAdapterCache{
 		cache: make(map[reflect.Type]AdapterFactory),
-		
+
 		// Initialize object pools with appropriate constructor functions
 		listAdapterPool: sync.Pool{
 			New: func() interface{} {
@@ -71,14 +71,14 @@ func NewTypeAdapterCache() *TypeAdapterCache {
 			},
 		},
 	}
-	
+
 	// Pre-warm the pools with a few instances
 	for i := 0; i < 10; i++ {
 		cache.genericAdapterPool.Put(&ObjAdapter{})
 		cache.listAdapterPool.Put(&LispListAdapter{})
 		cache.stringAdapterPool.Put(&StringAdapter{})
 	}
-	
+
 	return cache
 }
 
@@ -501,7 +501,7 @@ func FastHasMethodPOn(obj LispValue, name string) bool {
 // isListMethod checks if the method name is a common list method
 func isListMethod(name string) bool {
 	switch name {
-	case "append", "extend", "pop", "remove", "get", "set", "contains", 
+	case "append", "extend", "pop", "remove", "get", "set", "contains",
 		"map", "filter", "reduce", "sort", "reverse", "join":
 		return true
 	}
@@ -511,7 +511,7 @@ func isListMethod(name string) bool {
 // isStringMethod checks if the method name is a common string method
 func isStringMethod(name string) bool {
 	switch name {
-	case "upper", "lower", "strip", "split", "join", "replace", 
+	case "upper", "lower", "strip", "split", "join", "replace",
 		"contains", "startswith", "endswith", "find", "format":
 		return true
 	}

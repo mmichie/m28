@@ -54,6 +54,9 @@ func NewREPL(flags *CommandFlags) *REPL {
 	// Register special forms in the environment
 	special_forms.RegisterSpecialForms(environment)
 
+	// Initialize all special forms including concurrency forms
+	special_forms.InitializeAllForms()
+
 	// Use command flags for history configuration or defaults if flags is nil
 	historySize := 1000
 	noHistory := false

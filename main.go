@@ -14,14 +14,14 @@ func main() {
 	// Parse command line flags
 	flags := repl.ParseFlags()
 
+	// Initialize concurrency features first
+	initialize.InitializeConcurrency()
+
 	// Initialize the REPL with command flags
 	r := repl.NewREPL(flags)
 
 	// Store evaluator in global environment for object method calls
 	r.StoreEvaluator()
-
-	// Initialize concurrency features
-	initialize.InitializeConcurrency()
 
 	// A flag to determine if we should enter interactive mode
 	enterRepl := flags.Interactive

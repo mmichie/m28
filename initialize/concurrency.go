@@ -11,6 +11,6 @@ func InitializeConcurrency() {
 	// Register concurrency builtin functions
 	concurrency.RegisterConcurrencyFunctions()
 
-	// Special form handlers will be registered here when they're implemented
-	// special_forms.RegisterConcurrencyFormHandlers(...)
+	// Register concurrency form handlers
+	RegisterConcurrencyFormHandlers()
 }

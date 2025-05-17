@@ -1,7 +1,6 @@
 package special_forms
 
 import (
-	"fmt"
 	"github.com/mmichie/m28/core"
 )
 
@@ -34,7 +33,7 @@ func RegisterConcurrencyFormHandlers(
 func RegisterConcurrencyForms() {
 	// Make sure the form handlers have been set
 	if EvalGoForm == nil {
-		fmt.Println("Warning: Concurrency form handlers not registered")
+		// Don't print a warning here, as this is expected during initialization
 		return
 	}
 

@@ -344,7 +344,7 @@ func EnableEnhancedDotForms(forms map[core.LispSymbol]SpecialFormFunc) {
 	forms["dot"] = EnhancedEvalDot
 	forms["."] = EnhancedEvalDot
 	forms["dot-assign"] = EnhancedEvalDotAssign
-	
+
 	// Also add the property access helpers
 	forms["get-prop"] = EnhancedEvalGetProperty
 	forms["set-prop"] = EnhancedEvalSetProperty
