@@ -1,0 +1,310 @@
+# Object Protocol Comprehensive Tests
+# Tests all features of the unified object protocol implementation
+
+(print "=== Object Protocol Test Suite ===\n")
+
+#---------------------------------------------
+# Test 1: Enhanced Dot Notation
+#---------------------------------------------
+(print "=== Test 1: Enhanced Dot Notation ===")
+
+(def test-dict {"name": "test", "value": 42, "nested": {"inner": "secret"}})
+
+# Test 1.1: Basic dot access on dict
+(print "\nTest 1.1: Basic dot access on dict")
+(def name-value (. test-dict name))
+(print "Name:" name-value)
+(if (= name-value "test")
+  (print "PASS: Basic dot access works")
+  (print "FAIL: Basic dot access doesn't work"))
+
+# Test 1.2: Nested dot access
+(print "\nTest 1.2: Nested dot access")
+(def inner-value (. (. test-dict nested) inner))
+(print "Inner value:" inner-value)
+(if (= inner-value "secret")
+  (print "PASS: Nested dot access works")
+  (print "FAIL: Nested dot access doesn't work"))
+
+# Test 1.3: Chained dot access
+(print "\nTest 1.3: Chained dot access")
+(def chained-value (.. test-dict nested inner))
+(print "Chained value:" chained-value)
+(if (= chained-value "secret")
+  (print "PASS: Chained dot access works")
+  (print "FAIL: Chained dot access doesn't work"))
+
+#---------------------------------------------
+# Test 2: Direct Property Access
+#---------------------------------------------
+(print "\n=== Test 2: Direct Property Access ===")
+
+# Test 2.1: getattr
+(print "\nTest 2.1: getattr function")
+(def getattr-value (getattr test-dict "name"))
+(print "getattr value:" getattr-value)
+(if (= getattr-value "test")
+  (print "PASS: getattr works")
+  (print "FAIL: getattr doesn't work"))
+
+# Test 2.2: setattr
+(print "\nTest 2.2: setattr function")
+(setattr test-dict "status" "active")
+(def status-value (. test-dict status))
+(print "setattr result:" status-value)
+(if (= status-value "active")
+  (print "PASS: setattr works")
+  (print "FAIL: setattr doesn't work"))
+
+# Test 2.3: hasattr
+(print "\nTest 2.3: hasattr function")
+(def has-name (hasattr test-dict "name"))
+(def has-missing (hasattr test-dict "missing"))
+(print "hasattr name:" has-name)
+(print "hasattr missing:" has-missing)
+(if (and has-name (not has-missing))
+  (print "PASS: hasattr works")
+  (print "FAIL: hasattr doesn't work"))
+
+# Test 2.4: getitem
+(print "\nTest 2.4: getitem function")
+(def getitem-value (getitem test-dict "name"))
+(print "getitem value:" getitem-value)
+(if (= getitem-value "test")
+  (print "PASS: getitem works")
+  (print "FAIL: getitem doesn't work"))
+
+# Test 2.5: setitem
+(print "\nTest 2.5: setitem function")
+(setitem test-dict "new_key" "new_value")
+(def new-value (. test-dict new_key))
+(print "setitem result:" new-value)
+(if (= new-value "new_value")
+  (print "PASS: setitem works")
+  (print "FAIL: setitem doesn't work"))
+
+#---------------------------------------------
+# Test 3: Method Binding and Calls
+#---------------------------------------------
+(print "\n=== Test 3: Method Binding and Calls ===")
+
+# Helper class for testing
+(class TestClass []
+  (def __init__ [self name]
+    (setattr self "name" name)
+    (setattr self "value" 100))
+    
+  (def get_name [self]
+    (. self name))
+    
+  (def get_value [self]
+    (. self value))
+    
+  (def set_value [self new_value]
+    (setattr self "value" new_value)
+    (. self value)))
+
+# Test 3.1: Method binding and calls
+(print "\nTest 3.1: Method binding and calls")
+(def test-obj (TestClass "test-object"))
+(def name-result (. test-obj get_name))
+(print "Method call result:" name-result)
+(if (= name-result "test-object")
+  (print "PASS: Method binding and calls work")
+  (print "FAIL: Method binding and calls don't work"))
+
+# Test 3.2: Method calls with arguments
+(print "\nTest 3.2: Method calls with arguments")
+(def value-result (. test-obj set_value 200))
+(print "Method call with args result:" value-result)
+(if (= value-result 200)
+  (print "PASS: Method calls with arguments work")
+  (print "FAIL: Method calls with arguments don't work"))
+
+#---------------------------------------------
+# Test 4: Inheritance and Super
+#---------------------------------------------
+(print "\n=== Test 4: Inheritance and Super ===")
+
+# Parent class
+(class Parent []
+  (def __init__ [self]
+    (setattr self "parent_value" 1000))
+    
+  (def get_value [self]
+    (. self parent_value))
+    
+  (def describe [self]
+    "Parent class"))
+
+# Child class that overrides methods
+(class Child [Parent]
+  (def __init__ [self]
+    (super.__init__ self)
+    (setattr self "child_value" 2000))
+    
+  (def get_child_value [self]
+    (. self child_value))
+    
+  (def get_both_values [self]
+    (+ (super.get_value self) (. self child_value)))
+    
+  (def describe [self]
+    (+ "Child class extending " (super.describe self))))
+
+# Test 4.1: Basic inheritance
+(print "\nTest 4.1: Basic inheritance")
+(def child-obj (Child))
+(def parent-value (. child-obj parent_value))
+(def child-value (. child-obj child_value))
+(print "Parent value from child object:" parent-value)
+(print "Child value:" child-value)
+(if (and (= parent-value 1000) (= child-value 2000))
+  (print "PASS: Basic inheritance works")
+  (print "FAIL: Basic inheritance doesn't work"))
+
+# Test 4.2: Super method calls
+(print "\nTest 4.2: Super method calls")
+(def both-values (. child-obj get_both_values))
+(print "Combined values:" both-values)
+(if (= both-values 3000)
+  (print "PASS: Super method calls work")
+  (print "FAIL: Super method calls don't work"))
+
+# Test 4.3: Super attribute access
+(print "\nTest 4.3: Super attribute and method overriding")
+(def describe-result (. child-obj describe))
+(print "Description:" describe-result)
+(if (= describe-result "Child class extending Parent class")
+  (print "PASS: Super attribute access works")
+  (print "FAIL: Super attribute access doesn't work"))
+
+#---------------------------------------------
+# Test 5: ObjProtocol on Built-in Types
+#---------------------------------------------
+(print "\n=== Test 5: ObjProtocol on Built-in Types ===")
+
+# Test 5.1: List methods
+(print "\nTest 5.1: List methods")
+(def test-list [1, 2, 3, 4, 5])
+(def list-length (. test-list length))
+(. test-list append 6)
+(def list-sum (. test-list sum))
+(print "List length:" list-length)
+(print "List after append:" test-list)
+(print "List sum:" list-sum)
+
+(if (and (= list-length 5) (= list-sum 21))
+  (print "PASS: List methods work")
+  (print "FAIL: List methods don't work"))
+
+# Test 5.2: String methods
+(print "\nTest 5.2: String methods")
+(def test-string "hello world")
+(def upper-string (. test-string upper))
+(def split-string (. test-string split " "))
+(def replaced-string (. test-string replace "world" "universe"))
+(print "Upper string:" upper-string)
+(print "Split string:" split-string)
+(print "Replaced string:" replaced-string)
+
+(if (and (= upper-string "HELLO WORLD") 
+         (= (get split-string 1) "world")
+         (= replaced-string "hello universe"))
+  (print "PASS: String methods work")
+  (print "FAIL: String methods don't work"))
+
+# Test 5.3: Dictionary methods
+(print "\nTest 5.3: Dictionary methods")
+(def test-dict2 {"a": 1, "b": 2, "c": 3})
+(def dict-keys (. test-dict2 keys))
+(def dict-values (. test-dict2 values))
+(def dict-items (. test-dict2 items))
+(def has-key-b (. test-dict2 contains "b"))
+(def has-key-z (. test-dict2 contains "z"))
+(print "Dict keys:" dict-keys)
+(print "Dict values:" dict-values)
+(print "Dict items:" dict-items)
+(print "Has key 'b':" has-key-b)
+(print "Has key 'z':" has-key-z)
+
+(if (and has-key-b (not has-key-z))
+  (print "PASS: Dictionary methods work")
+  (print "FAIL: Dictionary methods don't work"))
+
+# Test 5.4: Set methods
+(print "\nTest 5.4: Set methods")
+(def test-set (set [1, 2, 3, 4]))
+(. test-set add 5)
+(def has-three (. test-set contains 3))
+(def set-length (. test-set length))
+(print "Set after add:" test-set)
+(print "Set contains 3:" has-three)
+(print "Set length:" set-length)
+
+(if (and (= set-length 5) has-three)
+  (print "PASS: Set methods work")
+  (print "FAIL: Set methods don't work"))
+
+# Test 5.5: Tuple methods
+(print "\nTest 5.5: Tuple methods")
+(def test-tuple (tuple [1, 2, 3]))
+(def tuple-length (. test-tuple length))
+(def tuple-first (. test-tuple get 0))
+(def tuple-as-list (. test-tuple tolist))
+(print "Tuple length:" tuple-length)
+(print "Tuple first element:" tuple-first)
+(print "Tuple as list:" tuple-as-list)
+
+(if (and (= tuple-length 3) (= tuple-first 1))
+  (print "PASS: Tuple methods work")
+  (print "FAIL: Tuple methods don't work"))
+
+#---------------------------------------------
+# Test 6: Performance Optimizations
+#---------------------------------------------
+(print "\n=== Test 6: Performance Optimizations ===")
+
+# Test 6.1: Dict access performance test
+(print "\nTest 6.1: Dict access performance")
+(def perf-dict {})
+(for [i (range 100)]
+  (setitem perf-dict (str i) i))
+
+(def start-time (time))
+(for [i (range 100)]
+  (getitem perf-dict (str i)))
+(def end-time (time))
+(def access-time (- end-time start-time))
+
+(print "Time to access 100a dict items:" access-time "seconds")
+(print "PASS: Dict access performance test completed")
+
+# Test 6.2: Method call performance test
+(print "\nTest 6.2: Method call performance")
+(class PerfTest []
+  (def __init__ [self]
+    (setattr self "counter" 0))
+    
+  (def increment [self]
+    (setattr self "counter" (+ (. self counter) 1))
+    (. self counter)))
+
+(def perf-obj (PerfTest))
+(def start-time2 (time))
+(for [i (range 100)]
+  (. perf-obj increment))
+(def end-time2 (time))
+(def method-time (- end-time2 start-time2))
+
+(print "Time for 100 method calls:" method-time "seconds")
+(print "Final counter value:" (. perf-obj counter))
+(if (= (. perf-obj counter) 100)
+  (print "PASS: Method call performance test completed")
+  (print "FAIL: Method calls didn't complete correctly"))
+
+(print "\n=== Object Protocol Test Suite Complete ===")
+(print "All tests completed!")
+
+# Return success value
+{"status": "success"}

@@ -161,9 +161,33 @@ When working with modules, dot notation provides a clean way to access exported 
 
 ## Implementation Details
 
-### DotAccessible Interface
+### Object Interfaces
 
-The core of the dot notation implementation is the `DotAccessible` interface:
+M28 provides several interfaces for dot notation support:
+
+#### ObjProtocol Interface
+
+The modern unified interface for object property and method access:
+
+```go
+type ObjProtocol interface {
+    // GetProp retrieves a property value
+    GetProp(name string) (LispValue, bool)
+    
+    // SetProp sets a property value
+    SetProp(name string, value LispValue) error
+    
+    // HasMethodP checks if a method exists 
+    HasMethodP(name string) bool
+    
+    // CallMethodP calls a method with arguments
+    CallMethodP(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error)
+}
+```
+
+#### DotAccessible Interface (Legacy)
+
+This is the original interface for dot notation:
 
 ```go
 type DotAccessible interface {
@@ -187,7 +211,27 @@ type DotAccessible interface {
 }
 ```
 
-Objects that implement this interface can be used with dot notation. The M28 interpreter implements this interface for dictionaries, modules, and other built-in types.
+#### EvaluatorAware Interface
+
+This interface provides access to the evaluator for more complex operations:
+
+```go
+type EvaluatorAware interface {
+    // SetEvaluator provides the evaluator to the object
+    SetEvaluator(e Evaluator)
+    
+    // GetEvaluator retrieves the current evaluator
+    GetEvaluator() Evaluator
+    
+    // GetMember gets a member with evaluator context
+    GetMember(name string, eval Evaluator, env Environment) (LispValue, error)
+    
+    // SetMember sets a member value with evaluator context
+    SetMember(name string, value LispValue, eval Evaluator, env Environment) error
+}
+```
+
+The M28 interpreter implements these interfaces for dictionaries, modules, lists, and other built-in types. This layered approach allows both simple and complex object types to work with dot notation.
 
 ### Symbol-Based Vs. Functional Dot Notation
 

@@ -1,37 +1,97 @@
-# Minimal successful dot notation test
-# This file is guaranteed to pass the test runner
+# Comprehensive Dot Notation Test
+# This file tests all aspects of dot notation across different types
 
-(print "=== Dot Notation Test ===")
+(print "=== Dot Notation Comprehensive Test ===")
 
-(def test-dict (dict "name" "test" "value" 42 "nested" (dict "inner" "secret")))
+# Create test dictionary
+(def test-dict {"name": "test", "value": 42, "nested": {"inner": "secret"}})
 
-# Test 1: Basic dot access
+# Create test list
+(def test-list [1, 2, 3, 4, 5])
+
+# Create test object
+(def test-obj {
+  "count": 0,
+  "increment": (lambda [self] 
+    (setattr self "count" (+ (. self count) 1))
+    (. self count))
+})
+
+# Test 1: Basic dot access for dictionaries
 (print "\nTest 1: Basic dot access")
-(def name-value (dot test-dict "name"))
+(def name-value (. test-dict name))
+(def value-value (. test-dict value))
 (print "Name:" name-value)
-(if (= name-value "test")
+(print "Value:" value-value)
+(if (and (= name-value "test") (= value-value 42))
   (print "PASS: Basic dot access works")
   (print "FAIL: Basic dot access doesn't work"))
 
 # Test 2: Nested dot access
 (print "\nTest 2: Nested dot access")
-(def inner-value (dot (dot test-dict "nested") "inner"))
+(def inner-value (.. test-dict nested inner))
 (print "Inner value:" inner-value)
 (if (= inner-value "secret")
   (print "PASS: Nested dot access works")
   (print "FAIL: Nested dot access doesn't work"))
 
-# Test 3: Comparison with get
-(print "\nTest 3: Comparison with get")
-(def name-via-get (get test-dict "name"))
+# Test 3: List property access
+(print "\nTest 3: List property access")
+(def length-value (. test-list length))
+(def first-value (. test-list first))
+(def last-value (. test-list last))
+(print "Length:" length-value)
+(print "First:" first-value)
+(print "Last:" last-value)
+(if (and (= length-value 5) (= first-value 1) (= last-value 5))
+  (print "PASS: List property access works")
+  (print "FAIL: List property access doesn't work"))
+
+# Test 4: Object method call
+(print "\nTest 4: Object method call")
+(def result (. test-obj increment))
+(print "Method result:" result)
+(if (= result 1)
+  (print "PASS: Object method call works")
+  (print "FAIL: Object method call doesn't work"))
+
+# Test 5: Comparison with direct access
+(print "\nTest 5: Comparison with direct access")
+(def name-via-dot (. test-dict name))
+(def name-via-get (getattr test-dict "name"))
+(print "Name via dot:" name-via-dot)
 (print "Name via get:" name-via-get)
-(print "Name via dot:" name-value)
-(if (= name-via-get name-value)
-  (print "PASS: dot and get give same results")
-  (print "FAIL: dot and get give different results"))
+(if (= name-via-dot name-via-get)
+  (print "PASS: Dot and get give same results")
+  (print "FAIL: Dot and get give different results"))
+
+# Test 6: Error handling for null objects
+(print "\nTest 6: Error handling for null objects")
+(def success false)
+(try
+  (def null-obj None)
+  (def will-fail (. null-obj property))
+  (catch e
+    (print "Expected error:" e)
+    (= success true)))
+(if success
+  (print "PASS: Null object access properly handled")
+  (print "FAIL: Null object access not handled correctly"))
+
+# Test 7: Error handling for missing properties
+(print "\nTest 7: Error handling for missing properties")
+(def success false)
+(try
+  (def missing (. test-dict missing-property))
+  (catch e
+    (print "Expected error:" e)
+    (= success true)))
+(if success
+  (print "PASS: Missing property access properly handled")
+  (print "FAIL: Missing property access not handled correctly"))
 
 (print "\n=== Dot Notation Test Complete ===")
-(print "All tests passed!")
+(print "All tests complete!")
 
 # Return success value
-(dict "status" "success")
+{"status": "success"}

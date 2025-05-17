@@ -1,0 +1,208 @@
+# Super Method and Inheritance Tests
+# Tests the super() function and method inheritance with multiple levels
+
+(print "=== Super Method and Inheritance Test Suite ===\n")
+
+#---------------------------------------------
+# Test 1: Multi-level Inheritance
+#---------------------------------------------
+(print "=== Test 1: Multi-level Inheritance ===")
+
+# Base class
+(class Animal []
+  (def __init__ [self name]
+    (setattr self "name" name)
+    (setattr self "type" "animal"))
+    
+  (def make_sound [self]
+    "generic animal sound")
+    
+  (def describe [self]
+    (+ "I am " (. self name) ", a " (. self type))))
+
+# Level 1 inheritance
+(class Mammal [Animal]
+  (def __init__ [self name]
+    (super.__init__ self name)
+    (setattr self "type" "mammal"))
+    
+  (def make_sound [self]
+    "generic mammal sound")
+    
+  (def has_fur [self]
+    true))
+
+# Level 2 inheritance
+(class Dog [Mammal]
+  (def __init__ [self name breed]
+    (super.__init__ self name)
+    (setattr self "breed" breed)
+    (setattr self "type" "dog"))
+    
+  (def make_sound [self]
+    "woof woof")
+    
+  (def describe [self]
+    (+ (super.describe self) " of breed " (. self breed))))
+
+# Test 1.1: Object creation and attribute inheritance
+(print "\nTest 1.1: Object creation and attribute inheritance")
+(def dog (Dog "Buddy" "Golden Retriever"))
+(print "Name:" (. dog name))
+(print "Type:" (. dog type))
+(print "Breed:" (. dog breed))
+(print "Has fur:" (. dog has_fur))
+
+# Test 1.2: Method overriding
+(print "\nTest 1.2: Method overriding")
+(print "Dog sound:" (. dog make_sound))
+(def dog-describe (. dog describe))
+(print "Dog description:" dog-describe)
+(if (and (= (. dog make_sound) "woof woof")
+         (= dog-describe "I am Buddy, a dog of breed Golden Retriever"))
+  (print "PASS: Method overriding works")
+  (print "FAIL: Method overriding doesn't work"))
+
+#---------------------------------------------
+# Test 2: Method Resolution Order
+#---------------------------------------------
+(print "\n=== Test 2: Method Resolution Order ===")
+
+# Classes for testing method resolution
+(class A []
+  (def method [self]
+    "A method")
+    
+  (def shared [self]
+    "A shared"))
+
+(class B [A]
+  (def method [self]
+    "B method")
+    
+  (def shared [self]
+    "B shared"))
+
+(class C [A]
+  (def method [self]
+    "C method")
+    
+  (def shared [self]
+    "C shared"))
+
+(class D [B C]
+  (def method [self]
+    (+ "D method calls " (super.method self)))
+    
+  (def super_shared [self]
+    (super.shared self)))
+
+# Test 2.1: Method resolution in diamond inheritance
+(print "\nTest 2.1: Method resolution in diamond inheritance")
+(def d-obj (D))
+(print "D method result:" (. d-obj method))
+(print "Super shared result:" (. d-obj super_shared))
+
+(if (= (. d-obj method) "D method calls B method")
+  (print "PASS: Method resolution follows expected order")
+  (print "FAIL: Method resolution doesn't follow expected order"))
+
+#---------------------------------------------
+# Test 3: Super with Explicit Base
+#---------------------------------------------
+(print "\n=== Test 3: Super with Explicit Base ===")
+
+# Classes for testing super with explicit base
+(class Vehicle []
+  (def __init__ [self name]
+    (setattr self "name" name)
+    (setattr self "type" "vehicle"))
+    
+  (def get_info [self]
+    (+ "Vehicle: " (. self name))))
+
+(class Car [Vehicle]
+  (def __init__ [self name wheels]
+    (super.__init__ self name)
+    (setattr self "wheels" wheels)
+    (setattr self "type" "car"))
+    
+  (def get_info [self]
+    (+ (super.get_info self) ", Wheels: " (str (. self wheels)))))
+
+(class ElectricCar [Car]
+  (def __init__ [self name wheels battery]
+    (super.__init__ self name wheels)
+    (setattr self "battery" battery)
+    (setattr self "type" "electric car"))
+    
+  (def get_info [self]
+    (+ (super.get_info self) ", Battery: " (. self battery) "kWh")))
+
+# Test 3.1: Multi-level super calls
+(print "\nTest 3.1: Multi-level super calls")
+(def tesla (ElectricCar "Model S" 4 100))
+(def info (. tesla get_info))
+(print "Tesla info:" info)
+
+(if (= info "Vehicle: Model S, Wheels: 4, Battery: 100kWh")
+  (print "PASS: Multi-level super calls work")
+  (print "FAIL: Multi-level super calls don't work"))
+
+# Test 3.2: Attribute inheritance through multiple levels
+(print "\nTest 3.2: Attribute inheritance through multiple levels")
+(print "Name:" (. tesla name))
+(print "Type:" (. tesla type))
+(print "Wheels:" (. tesla wheels))
+(print "Battery:" (. tesla battery))
+
+(if (and (= (. tesla name) "Model S")
+         (= (. tesla wheels) 4)
+         (= (. tesla battery) 100))
+  (print "PASS: Attributes are properly inherited")
+  (print "FAIL: Attributes are not properly inherited"))
+
+#---------------------------------------------
+# Test 4: Super in Non-Method Contexts
+#---------------------------------------------
+(print "\n=== Test 4: Super in Non-Method Contexts ===")
+
+# Test 4.1: Super outside method (should fail gracefully)
+(print "\nTest 4.1: Super outside method")
+(try
+  (do
+    (def result (super))
+    (print "Got result (unexpected):" result))
+  (catch e
+    (print "Got expected error:" e)
+    (print "PASS: super() correctly fails outside method context")))
+
+# Class with lambda using super
+(class WithLambda []
+  (def method [self]
+    "base method")
+    
+  (def create_lambda [self]
+    (lambda []
+      (try
+        (do
+          (super.method self)
+          "unexpected success")
+        (catch e
+          (+ "expected error: " e))))))
+
+# Test 4.2: Super in lambda
+(print "\nTest 4.2: Super in lambda")
+(def wl (WithLambda))
+(def lambda-fn (. wl create_lambda))
+(def lambda-result (lambda-fn))
+(print "Lambda result:" lambda-result)
+(if (str.contains lambda-result "expected error")
+  (print "PASS: Super in lambda behaves as expected")
+  (print "FAIL: Super in lambda doesn't behave as expected"))
+
+(print "\n=== Super Method and Inheritance Test Suite Complete ===")
+(print "All tests completed!")
+
+# Return success value
+{"status": "success"}
