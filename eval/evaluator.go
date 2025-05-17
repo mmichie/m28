@@ -674,16 +674,28 @@ func (e *Evaluator) evalDict(dict *core.PythonicDict, env core.Environment) (*co
 
 	// Iterate over all entries and evaluate them
 	err := dict.Iterate(func(k, v core.LispValue) error {
-		evalKey, err := e.Eval(k, env)
-		if err != nil {
-			return err
+		// If key is already a string, we can use it as is
+		// This handles the common case of {"key": value} where the key is a string literal
+		var evalKey core.LispValue
+		var evalErr error
+		
+		if strKey, ok := k.(string); ok {
+			evalKey = strKey
+		} else {
+			// Otherwise, evaluate the key
+			evalKey, evalErr = e.Eval(k, env)
+			if evalErr != nil {
+				return evalErr
+			}
 		}
 
+		// Evaluate the value
 		evalVal, err := e.Eval(v, env)
 		if err != nil {
 			return err
 		}
 
+		// Add to the dictionary
 		result.Set(evalKey, evalVal)
 		return nil
 	})

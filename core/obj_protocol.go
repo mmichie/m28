@@ -34,7 +34,8 @@ type ObjMethodImpl interface {
 // Helper functions for the ObjProtocol interface
 
 // GetPropFrom is a helper function to get a property from any value
-// It handles both values implementing ObjProtocol and other special types
+// It uses the adapter system when needed for consistent property access
+// Prefer FastGetPropFrom for better performance in hot paths
 func GetPropFrom(obj LispValue, name string) (LispValue, bool) {
 	// First try direct ObjProtocol implementation
 	if asObj, ok := obj.(ObjProtocol); ok {
@@ -46,80 +47,20 @@ func GetPropFrom(obj LispValue, name string) (LispValue, bool) {
 		return adaptable.AsObject().GetProp(name)
 	}
 
-	// Special handling for PythonicDict
-	if dict, ok := obj.(*PythonicDict); ok {
-		// Check for method
-		if dict.HasMethod(name) {
-			method, _ := dict.methods[name]
-			// We wrap it in a BuiltinFunc for later calling
-			return BuiltinFunc(func(args []LispValue, callEnv Environment) (LispValue, error) {
-				return method(dict, args)
-			}), true
-		}
-
-		// Check for property/attribute
-		if value, exists := dict.Get(name); exists {
-			return value, true
-		}
-	}
-
-	// Special handling for PythonicObject
-	if pyObj, ok := obj.(*PythonicObject); ok {
-		// First check instance attributes
-		if pyObj.Attributes != nil {
-			if val, exists := pyObj.Attributes.Get(name); exists {
-				return val, true
-			}
-		}
-
-		// Then try class methods
-		if pyObj.Class != nil && pyObj.HasMethod(name) {
-			method, exists := pyObj.Class.GetMethod(name)
-			if exists {
-				// Create a bound method that includes the object instance
-				boundMethod := NewBoundMethod(method, pyObj, pyObj.evaluator)
-				return boundMethod, true
-			}
-		}
-
-		// Finally check class attributes
-		if pyObj.Class != nil {
-			if attr, exists := pyObj.Class.GetAttribute(name); exists {
-				return attr, true
-			}
-		}
-
-		// Fall back to the standard method if nothing found
-		return pyObj.GetAttribute(name)
-	}
-
-	// Handle generators
-	if gen, ok := obj.(*Generator); ok {
-		if name == "next" {
-			return BuiltinFunc(func(args []LispValue, callEnv Environment) (LispValue, error) {
-				// We need an evaluator for generators
-				if evalValue, exists := callEnv.Get("EVALUATOR"); exists {
-					if eval, ok := evalValue.(Evaluator); ok {
-						return gen.NextWithEval(eval)
-					}
-				}
-				return gen.Next() // Will return an error about needing evaluator
-			}), true
-		}
-	}
-
-	// Handle lambdas
-	if lambda, ok := obj.(*Lambda); ok {
-		if name == "call" {
-			return lambda, true // Return the lambda itself for later application
-		}
-	}
-
-	return nil, false
+	// For all other types, get an adapter from the cache
+	// This handles all special cases in a unified way
+	adapter := globalAdapterCache.GetAdapter(obj)
+	result, exists := adapter.GetProp(name)
+	
+	// Make sure to recycle the adapter if it came from a pool
+	globalAdapterCache.RecycleAdapter(adapter)
+	
+	return result, exists
 }
 
 // SetPropOn is a helper function to set a property on any value
-// It handles both values implementing ObjProtocol and other special types
+// It uses the adapter system when needed for consistent property setting
+// Prefer FastSetPropOn for better performance in hot paths
 func SetPropOn(obj LispValue, name string, value LispValue) error {
 	// First try direct ObjProtocol implementation
 	if asObj, ok := obj.(ObjProtocol); ok {
@@ -131,22 +72,20 @@ func SetPropOn(obj LispValue, name string, value LispValue) error {
 		return adaptable.AsObject().SetProp(name, value)
 	}
 
-	// Special handling for PythonicDict
-	if dict, ok := obj.(*PythonicDict); ok {
-		dict.Set(name, value)
-		return nil
-	}
-
-	// Special handling for PythonicObject
-	if pyObj, ok := obj.(*PythonicObject); ok {
-		return pyObj.SetProperty(name, value)
-	}
-
-	return ErrDotMissingInterfacef(obj)
+	// For all other types, get an adapter from the cache
+	// This handles all special cases in a unified way
+	adapter := globalAdapterCache.GetAdapter(obj)
+	err := adapter.SetProp(name, value)
+	
+	// Make sure to recycle the adapter if it came from a pool
+	globalAdapterCache.RecycleAdapter(adapter)
+	
+	return err
 }
 
 // HasMethodPOn is a helper function to check if a value has a method
-// It handles both values implementing ObjProtocol and other special types
+// It uses the adapter system when needed for consistent method checking
+// Prefer FastHasMethodPOn for better performance in hot paths
 func HasMethodPOn(obj LispValue, name string) bool {
 	// First try direct ObjProtocol implementation
 	if asObj, ok := obj.(ObjProtocol); ok {
@@ -158,29 +97,20 @@ func HasMethodPOn(obj LispValue, name string) bool {
 		return adaptable.AsObject().HasMethodP(name)
 	}
 
-	// Special handling for PythonicDict
-	if dict, ok := obj.(*PythonicDict); ok {
-		return dict.HasMethod(name)
-	}
-
-	// Special handling for PythonicObject
-	if pyObj, ok := obj.(*PythonicObject); ok {
-		return pyObj.HasMethod(name)
-	}
-
-	// Special handling for special types
-	switch obj.(type) {
-	case *Generator:
-		return name == "next"
-	case *Lambda:
-		return name == "call"
-	}
-
-	return false
+	// For all other types, get an adapter from the cache
+	// This handles all special cases in a unified way
+	adapter := globalAdapterCache.GetAdapter(obj)
+	result := adapter.HasMethodP(name)
+	
+	// Make sure to recycle the adapter if it came from a pool
+	globalAdapterCache.RecycleAdapter(adapter)
+	
+	return result
 }
 
 // CallMethodPOn is a helper function to call a method on any value
-// It handles both values implementing ObjProtocol and other special types
+// It uses the adapter system when needed for consistent method calling
+// Prefer FastCallMethodPOn for better performance in hot paths
 func CallMethodPOn(obj LispValue, name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
 	// First try direct ObjProtocol implementation
 	if asObj, ok := obj.(ObjProtocol); ok {
@@ -192,31 +122,15 @@ func CallMethodPOn(obj LispValue, name string, args []LispValue, eval Evaluator,
 		return adaptable.AsObject().CallMethodP(name, args, eval, env)
 	}
 
-	// Special handling for PythonicDict
-	if dict, ok := obj.(*PythonicDict); ok {
-		return dict.CallMethod(name, args)
-	}
-
-	// Special handling for PythonicObject
-	if pyObj, ok := obj.(*PythonicObject); ok {
-		// Make sure evaluator is set
-		pyObj.SetEvaluator(eval)
-		return pyObj.CallMethod(name, args)
-	}
-
-	// Special handling for special types
-	switch typedObj := obj.(type) {
-	case *Generator:
-		if name == "next" {
-			return typedObj.NextWithEval(eval)
-		}
-	case *Lambda:
-		if name == "call" {
-			return eval.Apply(typedObj, args, env)
-		}
-	}
-
-	return nil, ErrDotNoMethodf(name)
+	// For all other types, get an adapter from the cache
+	// This handles all special cases in a unified way
+	adapter := globalAdapterCache.GetAdapter(obj)
+	result, err := adapter.CallMethodP(name, args, eval, env)
+	
+	// Make sure to recycle the adapter if it came from a pool
+	globalAdapterCache.RecycleAdapter(adapter)
+	
+	return result, err
 }
 
 // ErrDotEvaluatorMissingf formats an error message for missing evaluator

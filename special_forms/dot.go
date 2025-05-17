@@ -71,10 +71,10 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 				methodArgs = append(methodArgs, evalArg)
 			}
 
-			// First get the member using the unified AccessObjectMember helper
-			member, err := core.AccessObjectMember(object, propertyName, e, env)
-			if err != nil {
-				return nil, err
+			// Use FastGetPropFrom to get the member
+			member, exists := core.FastGetPropFrom(object, propertyName)
+			if !exists {
+				return nil, fmt.Errorf("object has no property '%s'", propertyName)
 			}
 
 			// Call the method/function
@@ -88,8 +88,11 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			case core.ObjMethodImpl:
 				// If it's an object method implementation, call it
 				return fn.CallMethod(methodArgs, e, env)
-			// Removed Callable case as interface doesn't exist yet
 			default:
+				// Try to call method using CallMethodPOn
+				if core.FastHasMethodPOn(object, propertyName) {
+					return core.FastCallMethodPOn(object, propertyName, methodArgs, e, env)
+				}
 				// Otherwise, it's not callable
 				return nil, fmt.Errorf("'%s' is not a callable method (type: %T)", propertyName, member)
 			}
@@ -98,11 +101,12 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			current := object
 			currentPath := fmt.Sprintf("%v.%s", args[0], propertyName)
 
-			// Get the first property using the unified accessor
-			current, err = core.AccessObjectMember(current, propertyName, e, env)
-			if err != nil {
-				return nil, err
+			// Get the first property using FastGetPropFrom
+			val, exists := core.FastGetPropFrom(current, propertyName)
+			if !exists {
+				return nil, fmt.Errorf("object has no property '%s'", propertyName)
 			}
+			current = val
 
 			// Process each subsequent property in sequence
 			for i := 2; i < len(args); i++ {
@@ -131,11 +135,12 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 					}
 				}
 
-				// Access the next property using the unified accessor
-				current, err = core.AccessObjectMember(current, nextProp, e, env)
-				if err != nil {
-					return nil, core.ErrDotNestedAccessf(currentPath, nextProp, err)
+				// Access the next property using FastGetPropFrom
+				val, exists := core.FastGetPropFrom(current, nextProp)
+				if !exists {
+					return nil, core.ErrDotNestedAccessf(currentPath, nextProp, fmt.Errorf("object has no property '%s'", nextProp))
 				}
+				current = val
 
 				// Update current path for error reporting
 				currentPath += "." + nextProp
@@ -144,8 +149,12 @@ func EvalDot(e core.Evaluator, args []core.LispValue, env core.Environment) (cor
 			return current, nil
 		}
 	} else {
-		// Simple property access using the unified accessor
-		return core.AccessObjectMember(object, propertyName, e, env)
+		// Simple property access using FastGetPropFrom
+		val, exists := core.FastGetPropFrom(object, propertyName)
+		if !exists {
+			return nil, fmt.Errorf("object has no property '%s'", propertyName)
+		}
+		return val, nil
 	}
 }
 
@@ -217,10 +226,10 @@ func EvalGetProperty(e core.Evaluator, args []core.LispValue, env core.Environme
 		}
 	}
 
-	// Use the direct property access function
-	value, err := core.DirectPropertyAccess(object, propertyName)
-	if err != nil {
-		return nil, err
+	// Use FastGetPropFrom directly
+	value, exists := core.FastGetPropFrom(object, propertyName)
+	if !exists {
+		return nil, fmt.Errorf("object has no property '%s'", propertyName)
 	}
 
 	return value, nil
@@ -271,8 +280,8 @@ func EvalSetProperty(e core.Evaluator, args []core.LispValue, env core.Environme
 		return nil, fmt.Errorf("error evaluating value: %v", err)
 	}
 
-	// Use the direct property setter
-	if err := core.DirectPropertySet(object, propertyName, value); err != nil {
+	// Use FastSetPropOn directly
+	if err := core.FastSetPropOn(object, propertyName, value); err != nil {
 		return nil, err
 	}
 

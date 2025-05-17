@@ -287,13 +287,17 @@ func createModuleDotHandler(moduleName string, moduleBaseName string, module *co
 					return evaluator.Apply(fn, methodArgs, env)
 				}
 				return nil, fmt.Errorf(core.ErrDotEvaluatorMissing, propName)
-			case core.DotAccessible:
-				// Check if the object has a __call__ method
-				if fn.HasMethod("__call__") {
-					return fn.CallMethod("__call__", methodArgs)
-				}
-				return nil, core.ErrDotNoMethodf(propName)
 			default:
+				// Try to call any object that supports the unified object protocol
+				// Get evaluator for calling methods
+				var evaluator core.Evaluator
+				if moduleLoader := core.GetModuleLoader(); moduleLoader != nil {
+					evaluator = moduleLoader.GetEvaluator()
+				}
+				
+				if core.FastHasMethodPOn(fn, "__call__") {
+					return core.FastCallMethodPOn(fn, "__call__", methodArgs, evaluator, env)
+				}
 				return nil, core.ErrDotNotCallablef(propName, value)
 			}
 		}

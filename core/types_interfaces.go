@@ -20,6 +20,8 @@ type Invokable interface {
 }
 
 // ObjectMember represents a member (attribute or method) of an object
+// DEPRECATED: This interface is being phased out in favor of ObjProtocol.
+// Use ObjProtocol for new code instead.
 type ObjectMember interface {
 	// Get retrieves the member value
 	Get(obj LispValue, e Evaluator, env Environment) (LispValue, error)
@@ -32,7 +34,8 @@ type ObjectMember interface {
 }
 
 // MemberAccessor provides unified access to object members
-// This is a central protocol for accessing properties and methods
+// DEPRECATED: This interface is being phased out in favor of ObjProtocol.
+// Use ObjProtocol for new code instead.
 type MemberAccessor interface {
 	// GetMember gets a member by name
 	GetMember(name string, e Evaluator, env Environment) (ObjectMember, bool)
@@ -86,12 +89,8 @@ func (ep *EvaluatorProvider) GetEvaluator() Evaluator {
 	return ep.Eval
 }
 
-// DotAccessibleEx was an extended interface that included DotAccessible and EvaluatorAware
-// Now replaced by ObjProtocol + EvaluatorAware
-type DotAccessibleEx interface {
-	EvaluatorAware
-	// Note: DotAccessible interface has been removed and replaced by ObjProtocol
-}
+// Note: DotAccessibleEx interface has been removed.
+// Use ObjProtocol + EvaluatorAware instead for all object property and method access.
 
 // Make Lambda implement the Applicable interface
 func (l *Lambda) Apply(e Evaluator, args []LispValue, callEnv Environment) (LispValue, error) {

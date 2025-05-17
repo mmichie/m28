@@ -10,7 +10,6 @@ import (
 // HandleDotNotation processes dot notation in symbols
 // This is called from the Eval method when a symbol contains dots
 func (e *Evaluator) HandleDotNotation(symbol core.LispSymbol, env core.Environment) (core.LispValue, error) {
-	fmt.Printf("DEBUG: HandleDotNotation called with symbol: %s\n", symbol)
 	parts := strings.Split(string(symbol), ".")
 
 	// Special case for dict methods and set methods
@@ -35,14 +34,14 @@ func (e *Evaluator) HandleDotNotation(symbol core.LispSymbol, env core.Environme
 	for i := 1; i < len(parts); i++ {
 		memberName := parts[i]
 
-		// Get the member using the EnhancedObjectMember helper
-		memberValue, err := core.EnhancedObjectMember(result, memberName, e, env)
-		if err != nil {
-			return nil, e.enrichErrorWithTraceback(err)
+		// Get the member using FastGetPropFrom directly for optimized property access
+		if memberValue, exists := core.FastGetPropFrom(result, memberName); exists {
+			// Update the result for next iteration
+			result = memberValue
+		} else {
+			// Property not found
+			return nil, e.enrichErrorWithTraceback(fmt.Errorf("object has no property '%s'", memberName))
 		}
-
-		// Update the result for next iteration
-		result = memberValue
 	}
 
 	return result, nil

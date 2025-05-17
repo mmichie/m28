@@ -363,14 +363,10 @@ func EvalDotAssign(e core.Evaluator, args []core.LispValue, env core.Environment
 			}
 
 			// Get the next object in the chain
-			if dotObj, ok := targetObj.(core.DotAccessible); ok {
-				nextObj, exists := dotObj.GetProperty(currentAttr)
-				if !exists {
-					return nil, fmt.Errorf("attribute '%s' not found in path", currentAttr)
-				}
-				targetObj = nextObj
+			if val, exists := core.FastGetPropFrom(targetObj, currentAttr); exists {
+				targetObj = val
 			} else {
-				return nil, fmt.Errorf("cannot access attribute '%s' on non-object", currentAttr)
+				return nil, fmt.Errorf("attribute '%s' not found in path", currentAttr)
 			}
 		}
 
@@ -399,15 +395,11 @@ func EvalDotAssign(e core.Evaluator, args []core.LispValue, env core.Environment
 	}
 
 	// Set the attribute on the target object
-	if dotObj, ok := targetObj.(core.DotAccessible); ok {
-		err = dotObj.SetProperty(targetAttr, value)
-		if err != nil {
-			return nil, fmt.Errorf("error setting property '%s': %v", targetAttr, err)
-		}
-		return value, nil
+	err = core.FastSetPropOn(targetObj, targetAttr, value)
+	if err != nil {
+		return nil, fmt.Errorf("error setting property '%s': %v", targetAttr, err)
 	}
-
-	return nil, fmt.Errorf("cannot set attribute '%s' on non-object", targetAttr)
+	return value, nil
 }
 
 // EvalClassAttrSelf processes special syntax for class attribute assignment with self
@@ -444,26 +436,12 @@ func EvalClassAttrSelf(e core.Evaluator, args []core.LispValue, env core.Environ
 		return nil, fmt.Errorf("error evaluating value in self attribute assignment: %v", err)
 	}
 
-	// Try setting via the new Object protocol first
-	if objVal, ok := self.(core.AdaptableLispValue); ok {
-		// Use the Object protocol
-		obj := objVal.AsObject()
-		err := obj.SetProp(attrName, value)
-		if err == nil {
-			return value, nil
-		}
+	// Use the unified object protocol
+	err = core.FastSetPropOn(self, attrName, value)
+	if err != nil {
+		return nil, fmt.Errorf("error setting self.%s: %v", attrName, err)
 	}
-
-	// Fall back to the old interface
-	if selfObj, ok := self.(core.DotAccessible); ok {
-		err = selfObj.SetProperty(attrName, value)
-		if err != nil {
-			return nil, fmt.Errorf("error setting self.%s: %v", attrName, err)
-		}
-		return value, nil
-	}
-
-	return nil, fmt.Errorf("'self' is not a valid object")
+	return value, nil
 }
 
 // RegisterClassForms registers all class-related special forms

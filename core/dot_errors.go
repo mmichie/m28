@@ -7,7 +7,7 @@ const (
 	ErrDotMissingArgs      = "Dot notation requires both an object and a property/method name"
 	ErrDotObjectEval       = "Failed to evaluate object for dot notation: %v"
 	ErrDotPropertyEval     = "Failed to evaluate property name for dot notation: %v"
-	ErrDotNoInterface      = "Type %T doesn't support dot notation (doesn't implement DotAccessible interface)"
+	ErrDotNoInterface      = "Type %T doesn't support dot notation (doesn't implement ObjProtocol interface)"
 	ErrDotPropertyNotFound = "Object has no property '%s'"
 	ErrDotModuleNoProperty = "Module '%s' has no property '%s'"
 	ErrDotPropertyType     = "Property name must be a string or symbol, got %T"
