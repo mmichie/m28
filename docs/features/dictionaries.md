@@ -8,7 +8,8 @@ This guide explains how to work with dictionaries in the M28 language, including
 3. [Dictionary Operations](#dictionary-operations)
 4. [Dictionary as Keyword Arguments](#dictionary-as-keyword-arguments)
 5. [Examples](#examples)
-6. [Implementation Notes](#implementation-notes)
+6. [Dictionary Methods Reference](#dictionary-methods-reference)
+7. [Implementation Notes](#implementation-notes)
 
 ## Creating Dictionaries
 
@@ -59,11 +60,12 @@ Use the `get` function to access dictionary values:
 (get person "country" "Unknown")  # Returns: "Unknown" if "country" key doesn't exist
 ```
 
-With dot notation:
+Using dictionary methods:
 
 ```lisp
-# Dot notation (if supported)
-(print person.name)  # Returns: "John"
+# Using dict.get method
+(dict.get person "name")  # Returns: "John"
+(dict.get person "country" "Unknown")  # Returns: "Unknown" if "country" key doesn't exist
 ```
 
 ## Dictionary Operations
@@ -75,7 +77,7 @@ With dot notation:
 (len person)  # Returns: 3 for the example above
 ```
 
-### Dictionary Methods
+### Dictionary Keys and Values
 
 ```lisp
 # Get all keys
@@ -84,11 +86,41 @@ With dot notation:
 # Get all values
 (dict.values person)  # Returns: ["John", 30, "New York"]
 
+# Get key-value pairs
+(dict.items person)  # Returns: [["name", "John"], ["age", 30], ["city", "New York"]]
+```
+
+### Checking for Keys
+
+```lisp
 # Check if key exists
 (dict.has_key person "name")  # Returns: True
+(dict.contains? person "email")  # Returns: False
+```
 
-# Update dictionary
-(dict.update person {"country": "USA"})
+### Modifying Dictionaries
+
+```lisp
+# Set a value
+(dict.set person "email" "john@example.com")
+
+# Update with another dictionary
+(dict.update person {"country": "USA", "zip": "10001"})
+
+# Remove a key
+(dict.pop person "age")  # Removes the key and returns its value
+
+# Remove and return an arbitrary key-value pair
+(dict.popitem person)  # Returns something like ["name", "John"] and removes it from the dict
+
+# Set value only if key doesn't exist
+(dict.setdefault person "status" "active")
+
+# Clear all entries
+(dict.clear person)  # Removes all key-value pairs
+
+# Create a copy
+(= person_copy (dict.copy person))
 ```
 
 ## Dictionary as Keyword Arguments
@@ -171,41 +203,36 @@ One powerful feature of dictionaries is using them as keyword arguments for func
 
 # Access nested values
 (print "Server host:" (get (get config "server") "host"))
-# With dot notation
-(print "Database URI:" config.database.uri)
 ```
+
+## Dictionary Methods Reference
+
+Here's a complete reference of all dictionary methods available in M28:
+
+| Method | Description | Example | Return Value |
+|--------|-------------|---------|--------------|
+| `get` | Get value with optional default | `(dict.get d "key" "default")` | Value or default |
+| `set` | Set key to value | `(dict.set d "key" "value")` | Dictionary (for chaining) |
+| `keys` | Get all keys | `(dict.keys d)` | List of keys |
+| `values` | Get all values | `(dict.values d)` | List of values |
+| `items` | Get all key-value pairs | `(dict.items d)` | List of [key, value] lists |
+| `has_key` | Check if key exists | `(dict.has_key d "key")` | True or False |
+| `contains?` | Check if key exists (alias) | `(dict.contains? d "key")` | True or False |
+| `update` | Update with another dict | `(dict.update d other_dict)` | None |
+| `pop` | Remove key and return value | `(dict.pop d "key" "default")` | Value or default |
+| `popitem` | Remove and return a key-value pair | `(dict.popitem d)` | [key, value] list |
+| `setdefault` | Get value, set if not exists | `(dict.setdefault d "key" "default")` | Value or default |
+| `clear` | Remove all items | `(dict.clear d)` | None |
+| `copy` | Create a shallow copy | `(dict.copy d)` | New dictionary |
 
 ## Implementation Notes
 
-- Dictionary keys can be strings, numbers, or other immutable types
+- Dictionary keys can be strings, numbers, symbols, or any other hashable value
 - Dictionary values can be any valid M28 value
-- Dictionaries maintain insertion order (like Python 3.7+)
+- Dictionaries are implemented with thread-safe operations for concurrent access
+- Dictionary keys are sorted in a consistent order for iteration
+- Each dictionary has a strong reference to the evaluator, ensuring persistence
 - When used as keyword arguments, dictionaries must be the last argument
-
-### Dictionary Methods
-
-M28 dictionaries support these methods (accessed via dot notation or dict functions):
-
-| Method | Description | Example |
-|--------|-------------|---------|
-| `keys` | Get list of keys | `(dict.keys my_dict)` |
-| `values` | Get list of values | `(dict.values my_dict)` |
-| `items` | Get key-value pairs | `(dict.items my_dict)` |
-| `get` | Get value with default | `(dict.get my_dict "key" "default")` |
-| `update` | Update with another dict | `(dict.update my_dict {"key": "value"})` |
-| `has_key` | Check if key exists | `(dict.has_key my_dict "key")` |
-| `pop` | Remove and return value | `(dict.pop my_dict "key")` |
-| `clear` | Remove all items | `(dict.clear my_dict)` |
-
-### Comparing with Python
-
-M28's dictionary implementation is designed to feel familiar to Python users:
-
-| Python | M28 |
-|--------|-----|
-| `d = {"key": value}` | `(= d {"key": value})` |
-| `d = dict(key=value)` | `(= d (dict "key" value))` |
-| `d["key"]` | `(get d "key")` |
-| `d.get("key", default)` | `(get d "key" default)` |
-| `len(d)` | `(len d)` |
-| `print("a", "b", sep="-")` | `(print "a" "b" {"sep": "-"})` |
+- Dictionaries are implemented using the `PythonicDict` type in the M28 core
+- The object protocol integration allows using common properties like `len` and `size`
+- Dictionary string representation follows Python-style format: `{"key": value, ...}`

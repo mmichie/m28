@@ -294,7 +294,7 @@ func createModuleDotHandler(moduleName string, moduleBaseName string, module *co
 				if moduleLoader := core.GetModuleLoader(); moduleLoader != nil {
 					evaluator = moduleLoader.GetEvaluator()
 				}
-				
+
 				if core.FastHasMethodPOn(fn, "__call__") {
 					return core.FastCallMethodPOn(fn, "__call__", methodArgs, evaluator, env)
 				}

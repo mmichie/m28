@@ -143,9 +143,47 @@ func (d *PythonicDict) registerMethods() {
 			self.mu.Unlock()
 			return self, nil
 		},
+
+		"has_key": func(self *PythonicDict, args []LispValue) (LispValue, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("dict.has_key requires a key argument")
+			}
+
+			_, exists := self.Get(args[0])
+			return exists, nil
+		},
+
+		"contains?": func(self *PythonicDict, args []LispValue) (LispValue, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("dict.contains? requires a key argument")
+			}
+
+			_, exists := self.Get(args[0])
+			return exists, nil
+		},
+
+		"pop": func(self *PythonicDict, args []LispValue) (LispValue, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("dict.pop requires a key argument")
+			}
+
+			key := args[0]
+			value, exists := self.Get(key)
+
+			if !exists {
+				if len(args) > 1 {
+					return args[1], nil // Return default if provided
+				}
+				return nil, fmt.Errorf("KeyError: key %v not found", key)
+			}
+
+			self.Delete(key)
+			return value, nil
+		},
 	}
 }
 
+// Get retrieves a value from the dictionary by key
 func (d *PythonicDict) Get(key LispValue) (LispValue, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -153,93 +191,98 @@ func (d *PythonicDict) Get(key LispValue) (LispValue, bool) {
 	return value, ok
 }
 
+// Set sets a key-value pair in the dictionary
 func (d *PythonicDict) Set(key, value LispValue) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.data[key] = value
 }
 
+// Delete removes a key from the dictionary
 func (d *PythonicDict) Delete(key LispValue) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	delete(d.data, key)
 }
 
-// Add the Size method
+// HasKey checks if a key exists in the dictionary
+func (d *PythonicDict) HasKey(key LispValue) bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	_, exists := d.data[key]
+	return exists
+}
+
+// Contains is an alias for HasKey
+func (d *PythonicDict) Contains(key LispValue) bool {
+	return d.HasKey(key)
+}
+
+// Size returns the number of elements in the dictionary
 func (d *PythonicDict) Size() int {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return len(d.data)
 }
 
+// Iterate safely iterates over the dictionary's contents
 func (d *PythonicDict) Iterate(f func(key, value LispValue) error) error {
 	d.mu.RLock()
-	defer d.mu.RUnlock()
+	// Create a copy of the keys and values to iterate safely
+	keys := make([]LispValue, 0, len(d.data))
+	values := make([]LispValue, 0, len(d.data))
+
 	for k, v := range d.data {
-		if err := f(k, v); err != nil {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	d.mu.RUnlock()
+
+	// Now iterate using the copies
+	for i := range keys {
+		if err := f(keys[i], values[i]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Helper method for PythonicDict to get sorted keys
-func (d *PythonicDict) sortedKeys() []LispValue {
-	keys := make([]LispValue, 0, d.Size())
-	d.Iterate(func(k, v LispValue) error {
+// SortedKeys returns the dictionary keys in sorted order
+func (d *PythonicDict) SortedKeys() []LispValue {
+	d.mu.RLock()
+	keys := make([]LispValue, 0, len(d.data))
+	for k := range d.data {
 		keys = append(keys, k)
-		return nil
-	})
+	}
+	d.mu.RUnlock()
+
 	sort.Slice(keys, func(i, j int) bool {
 		return Compare(keys[i], keys[j]) < 0
 	})
 	return keys
 }
 
-// SortedKeys returns the dictionary keys in sorted order (exported version)
-func (d *PythonicDict) SortedKeys() []LispValue {
-	return d.sortedKeys()
-}
+// Implementation of ObjProtocol interface
 
-// Implementation of DotAccessible interface
+// HasMember checks if a property or method exists
+func (d *PythonicDict) HasMember(name string) bool {
+	// First check for methods
+	if d.HasMethod(name) {
+		return true
+	}
 
-// HasProperty checks if a property exists in the dictionary (legacy interface)
-func (d *PythonicDict) HasProperty(name string) bool {
+	// Then check for common dictionary pseudo-properties
+	switch name {
+	case "length", "len", "size", "count":
+		return true
+	}
+
+	// Finally check for attributes as keys
 	_, exists := d.Get(name)
 	return exists
 }
 
-// GetProperty retrieves a property from the dictionary (legacy interface)
-func (d *PythonicDict) GetProperty(name string) (LispValue, bool) {
-	return d.Get(name)
-}
-
-// SetProperty sets a property in the dictionary (legacy interface)
-func (d *PythonicDict) SetProperty(name string, value LispValue) error {
-	d.Set(name, value)
-	return nil
-}
-
-// Ensure PythonicDict implements EvaluatorAware and AdaptableLispValue
-// Note: DotAccessible has been replaced by ObjProtocol
-var _ EvaluatorAware = (*PythonicDict)(nil)
-var _ AdaptableLispValue = (*PythonicDict)(nil)
-
-// SetEvaluator stores a reference to the evaluator
-func (d *PythonicDict) SetEvaluator(eval Evaluator) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.evaluator = eval
-}
-
-// GetEvaluator retrieves the stored evaluator reference
-func (d *PythonicDict) GetEvaluator() Evaluator {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return d.evaluator
-}
-
-// GetMember implements the EvaluatorAware interface
+// GetMember implements the ObjProtocol interface
 func (d *PythonicDict) GetMember(name string, eval Evaluator, env Environment) (LispValue, error) {
 	// Store evaluator reference
 	d.SetEvaluator(eval)
@@ -267,9 +310,7 @@ func (d *PythonicDict) GetMember(name string, eval Evaluator, env Environment) (
 	return nil, fmt.Errorf("dict has no attribute '%s'", name)
 }
 
-// Note: PythonicDict already implements AsObject in module_adapter.go
-
-// SetMember implements the EvaluatorAware interface
+// SetMember implements the ObjProtocol interface
 func (d *PythonicDict) SetMember(name string, value LispValue, eval Evaluator, env Environment) error {
 	// Store evaluator reference
 	d.SetEvaluator(eval)
@@ -277,4 +318,56 @@ func (d *PythonicDict) SetMember(name string, value LispValue, eval Evaluator, e
 	// Set the attribute in the dictionary
 	d.Set(name, value)
 	return nil
+}
+
+// Ensure PythonicDict implements EvaluatorAware and ObjProtocol
+var _ EvaluatorAware = (*PythonicDict)(nil)
+var _ ObjProtocol = (*PythonicDict)(nil)
+
+// SetEvaluator stores a reference to the evaluator
+func (d *PythonicDict) SetEvaluator(eval Evaluator) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.evaluator = eval
+}
+
+// GetEvaluator retrieves the stored evaluator reference
+func (d *PythonicDict) GetEvaluator() Evaluator {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.evaluator
+}
+
+// AsObject implementation for obj protocol
+func (d *PythonicDict) AsObject() ObjProtocol {
+	return d
+}
+
+// String implements the fmt.Stringer interface for proper dictionary representation
+func (d *PythonicDict) String() string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	if len(d.data) == 0 {
+		return "{}"
+	}
+
+	keys := d.SortedKeys()
+	result := "{"
+
+	for i, key := range keys {
+		value, _ := d.data[key]
+		result += fmt.Sprintf("%v: %v", key, value)
+		if i < len(keys)-1 {
+			result += ", "
+		}
+	}
+
+	result += "}"
+	return result
+}
+
+// Make sure dictionaries are properly printed by the print function
+func (d *PythonicDict) PrintValue() string {
+	return d.String()
 }

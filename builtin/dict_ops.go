@@ -48,13 +48,14 @@ func dictItemsFunc(args []core.LispValue, _ core.Environment) (core.LispValue, e
 		return nil, fmt.Errorf("dict.items() requires a dict as argument, got %T", args[0])
 	}
 
-	// Create a list of key-value pairs
-	var items core.LispList
-	dict.Iterate(func(key, value core.LispValue) error {
-		item := core.LispList{key, value}
-		items = append(items, item)
-		return nil
-	})
+	// Get sorted keys for consistent ordering
+	keys := dict.SortedKeys()
+	items := make(core.LispList, len(keys))
+
+	for i, key := range keys {
+		value, _ := dict.Get(key)
+		items[i] = core.LispList{key, value}
+	}
 
 	return items, nil
 }
@@ -87,12 +88,14 @@ func dictValuesFunc(args []core.LispValue, _ core.Environment) (core.LispValue, 
 		return nil, fmt.Errorf("dict.values() requires a dict as argument, got %T", args[0])
 	}
 
-	// Create a list of values
-	var values core.LispList
-	dict.Iterate(func(_, value core.LispValue) error {
-		values = append(values, value)
-		return nil
-	})
+	// Get sorted keys for consistent ordering
+	keys := dict.SortedKeys()
+	values := make(core.LispList, len(keys))
+
+	for i, key := range keys {
+		value, _ := dict.Get(key)
+		values[i] = value
+	}
 
 	return values, nil
 }
@@ -198,14 +201,19 @@ func dictSetDefaultFunc(args []core.LispValue, _ core.Environment) (core.LispVal
 
 // dictUpdateFunc implements dict.update() - updates the dictionary with another dictionary
 func dictUpdateFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("dict.update() requires at least 2 arguments")
+	if len(args) < 1 {
+		return nil, fmt.Errorf("dict.update() requires at least 1 argument")
 	}
 
 	// First argument should be a dict
 	dict, ok := args[0].(*core.PythonicDict)
 	if !ok {
 		return nil, fmt.Errorf("dict.update() requires a dict as first argument, got %T", args[0])
+	}
+
+	// If only one argument, return the dictionary unchanged
+	if len(args) == 1 {
+		return core.PythonicNone{}, nil
 	}
 
 	// Update with each additional dictionary
@@ -238,13 +246,10 @@ func dictClearFunc(args []core.LispValue, _ core.Environment) (core.LispValue, e
 		return nil, fmt.Errorf("dict.clear() requires a dict as argument, got %T", args[0])
 	}
 
-	// We need to replace the map since we can't just clear it
-	// Create a new empty map
-	newDict := core.NewPythonicDict()
-
-	// Replace the original map's data with the new one
-	// This is a bit hacky, but it works for now
-	*dict = *newDict
+	// Clear the dictionary in place
+	dict.mu.Lock()
+	dict.data = make(map[core.LispValue]core.LispValue)
+	dict.mu.Unlock()
 
 	// Return None (Python's clear method returns None)
 	return core.PythonicNone{}, nil
@@ -297,6 +302,47 @@ func dictSetFunc(args []core.LispValue, _ core.Environment) (core.LispValue, err
 	return core.PythonicNone{}, nil
 }
 
+// dictHasKeyFunc implements dict.has_key() - checks if a key exists in a dictionary
+func dictHasKeyFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("dict.has_key() requires exactly 2 arguments")
+	}
+
+	// First argument should be a dict
+	dict, ok := args[0].(*core.PythonicDict)
+	if !ok {
+		return nil, fmt.Errorf("dict.has_key() requires a dict as first argument, got %T", args[0])
+	}
+
+	// Second argument is the key
+	key := args[1]
+
+	// Check if the key exists
+	_, exists := dict.Get(key)
+	return exists, nil
+}
+
+// dictContainsFunc implements dict.contains?() - checks if a key exists in a dictionary
+// This is an alias for has_key with a more pythonic name
+func dictContainsFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("dict.contains?() requires exactly 2 arguments")
+	}
+
+	// First argument should be a dict
+	dict, ok := args[0].(*core.PythonicDict)
+	if !ok {
+		return nil, fmt.Errorf("dict.contains?() requires a dict as first argument, got %T", args[0])
+	}
+
+	// Second argument is the key
+	key := args[1]
+
+	// Check if the key exists
+	_, exists := dict.Get(key)
+	return exists, nil
+}
+
 // Register all dictionary functions
 func RegisterDictFunctions() {
 	// Dictionary methods - using dot notation for method-like access
@@ -311,6 +357,8 @@ func RegisterDictFunctions() {
 	core.RegisterBuiltin("dict.clear", dictClearFunc)
 	core.RegisterBuiltin("dict.copy", dictCopyFunc)
 	core.RegisterBuiltin("dict.set", dictSetFunc)
+	core.RegisterBuiltin("dict.has_key", dictHasKeyFunc)
+	core.RegisterBuiltin("dict.contains?", dictContainsFunc)
 }
 
 // init function to ensure RegisterDictFunctions is called

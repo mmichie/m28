@@ -368,6 +368,138 @@ func HandleClassDefinition(args []LispValue, eval Evaluator, env Environment) (L
 - **Easier Maintenance**: Cleaner code organization and less duplication
 - **Future Extensibility**: Solid foundation for adding advanced features like decorators and metaclasses
 
-## 10. Conclusion
+## 10. Dictionary Implementation Issues and Solutions
 
-The proposed redesign eliminates the current confusion and inconsistency in M28's object system by implementing a single, unified protocol. This will make the codebase more maintainable, improve performance, and provide a better foundation for future enhancements.
+### Current Dictionary Issues
+
+During testing, we identified several specific issues with the dictionary implementation:
+
+1. **Dictionary Variable Persistence**: Dictionary literals created with `{}` can't be reliably accessed in subsequent expressions, suggesting environment persistence issues.
+
+2. **Dictionary Function vs. Literals Inconsistency**: The `dict` function and `{}` literals have inconsistent behavior.
+
+3. **Object Protocol Implementation Gaps**: Some aspects of the object protocol aren't correctly implemented for dictionaries.
+
+4. **Evaluator Reference Missing**: Dictionaries aren't always properly initialized with evaluator references.
+
+### Specific Solutions
+
+#### Fix Dictionary Evaluation
+
+In `evalDict` function, ensure dictionaries are properly registered with the evaluator:
+
+```go
+func (e *Evaluator) evalDict(dict *core.PythonicDict, env core.Environment) (*core.PythonicDict, error) {
+    result := core.NewPythonicDict()
+    
+    // Ensure the dictionary has a reference to the evaluator
+    result.SetEvaluator(e)
+    
+    // Evaluate dictionary contents
+    err := dict.Iterate(func(k, v core.LispValue) error {
+        // [existing key/value evaluation logic]
+        return nil
+    })
+    
+    if err != nil {
+        return nil, err
+    }
+    
+    return result, nil
+}
+```
+
+#### Improve Environment-Evaluator Linkage
+
+Enhance the environment to properly handle complex types:
+
+```go
+// Update Environment to maintain evaluator reference
+type Environment struct {
+    vars      map[core.LispSymbol]core.LispValue
+    outer     core.Environment
+    evaluator core.Evaluator 
+}
+
+// Set properly handles evaluator-aware types
+func (e *Environment) Set(symbol core.LispSymbol, value core.LispValue) {
+    // Special handling for evaluator-aware types
+    if evalAware, ok := value.(core.EvaluatorAware); ok && e.evaluator != nil {
+        evalAware.SetEvaluator(e.evaluator)
+    }
+    
+    e.vars[symbol] = value
+}
+```
+
+#### Fix Dictionary Method Access
+
+Ensure dictionary methods are properly bound:
+
+```go
+// Ensure method binding works properly
+func (d *PythonicDict) GetMember(name string, eval Evaluator, env Environment) (LispValue, error) {
+    // Store evaluator for future use
+    d.SetEvaluator(eval)
+    
+    // Check for methods first
+    if d.HasMethod(name) {
+        // Wrap method in a properly bound function
+        method, _ := d.methods[name]
+        return BuiltinFunc(func(args []LispValue, callEnv Environment) (LispValue, error) {
+            return method(d, args)
+        }), nil
+    }
+    
+    // Check for pseudo-properties
+    switch name {
+    case "length", "len", "size", "count":
+        return float64(d.Size()), nil
+    }
+    
+    // Check for attributes
+    if value, exists := d.Get(name); exists {
+        return value, nil
+    }
+    
+    return nil, fmt.Errorf("dict has no attribute '%s'", name)
+}
+```
+
+#### Initialization Sequence Improvements
+
+Fix initialization sequence to ensure dependencies are properly set up:
+
+```go
+// Initialize in the correct order
+func initialize() {
+    // 1. Create evaluator
+    evaluator := eval.NewEvaluator()
+    
+    // 2. Create environment with evaluator
+    environment := env.NewEnvironment(nil)
+    environment.SetEvaluator(evaluator)
+    
+    // 3. Register builtins with environment
+    environment.SetupBuiltins()
+    
+    // 4. Register special forms
+    special_forms.RegisterSpecialForms(environment)
+    
+    // 5. Initialize REPL with properly set up components
+    repl := repl.NewREPL(environment, evaluator)
+}
+```
+
+### Integration with Unified Object Protocol
+
+The dictionary-specific fixes will be incorporated into the broader unified object protocol implementation. This ensures:
+
+1. All objects (including dictionaries) follow the same property access and method dispatch patterns
+2. Evaluator references are consistently maintained across all object types
+3. Variable assignment correctly preserves evaluator references
+4. Method dispatch works consistently for all object types
+
+## 11. Conclusion
+
+The proposed redesign eliminates the current confusion and inconsistency in M28's object system by implementing a single, unified protocol. This will make the codebase more maintainable, improve performance, and provide a better foundation for future enhancements. The specific solutions for dictionary implementation issues will ensure robust dictionary behavior in the language.

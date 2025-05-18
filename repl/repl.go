@@ -37,11 +37,14 @@ func NewREPL(flags *CommandFlags) *REPL {
 	// Initialize the environment
 	environment := env.NewEnvironment(nil)
 
-	// Set up builtins in the environment
-	environment.SetupBuiltins()
-
 	// Create the evaluator
 	evaluator := eval.NewEvaluator()
+
+	// Set the evaluator in the environment
+	environment.SetEvaluator(evaluator)
+
+	// Set up builtins in the environment
+	environment.SetupBuiltins()
 
 	// Set up the evaluator for builtins
 	builtin.SetEvaluator(evaluator)
@@ -56,6 +59,9 @@ func NewREPL(flags *CommandFlags) *REPL {
 
 	// Initialize all special forms including concurrency forms
 	special_forms.InitializeAllForms()
+
+	// Register dict function directly for testing
+	environment.Define(core.LispSymbol("dict"), core.BuiltinFunc(builtin.DictCreateFunc))
 
 	// Use command flags for history configuration or defaults if flags is nil
 	historySize := 1000

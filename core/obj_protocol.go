@@ -51,10 +51,10 @@ func GetPropFrom(obj LispValue, name string) (LispValue, bool) {
 	// This handles all special cases in a unified way
 	adapter := globalAdapterCache.GetAdapter(obj)
 	result, exists := adapter.GetProp(name)
-	
+
 	// Make sure to recycle the adapter if it came from a pool
 	globalAdapterCache.RecycleAdapter(adapter)
-	
+
 	return result, exists
 }
 
@@ -76,10 +76,10 @@ func SetPropOn(obj LispValue, name string, value LispValue) error {
 	// This handles all special cases in a unified way
 	adapter := globalAdapterCache.GetAdapter(obj)
 	err := adapter.SetProp(name, value)
-	
+
 	// Make sure to recycle the adapter if it came from a pool
 	globalAdapterCache.RecycleAdapter(adapter)
-	
+
 	return err
 }
 
@@ -101,10 +101,10 @@ func HasMethodPOn(obj LispValue, name string) bool {
 	// This handles all special cases in a unified way
 	adapter := globalAdapterCache.GetAdapter(obj)
 	result := adapter.HasMethodP(name)
-	
+
 	// Make sure to recycle the adapter if it came from a pool
 	globalAdapterCache.RecycleAdapter(adapter)
-	
+
 	return result
 }
 
@@ -126,10 +126,10 @@ func CallMethodPOn(obj LispValue, name string, args []LispValue, eval Evaluator,
 	// This handles all special cases in a unified way
 	adapter := globalAdapterCache.GetAdapter(obj)
 	result, err := adapter.CallMethodP(name, args, eval, env)
-	
+
 	// Make sure to recycle the adapter if it came from a pool
 	globalAdapterCache.RecycleAdapter(adapter)
-	
+
 	return result, err
 }
 

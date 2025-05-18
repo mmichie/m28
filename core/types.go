@@ -67,6 +67,8 @@ type Environment interface {
 	Define(symbol LispSymbol, value LispValue)
 	SetMutable(symbol LispSymbol, value LispValue) bool
 	NewEnvironment(outer Environment) Environment
+	SetEvaluator(eval Evaluator)
+	GetEvaluator() Evaluator
 	String() string
 	StringWithDepth(depth int) string
 }
@@ -409,6 +411,11 @@ func EqualValues(a, b LispValue) bool {
 
 // PrintValue converts a LispValue to a string representation
 func PrintValue(val LispValue) string {
+	// First check if the value implements the PrintValueProvider interface
+	if provider, ok := val.(PrintValueProvider); ok {
+		return provider.PrintValue()
+	}
+
 	switch v := val.(type) {
 	case LispSymbol:
 		return string(v)

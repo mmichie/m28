@@ -20,7 +20,7 @@ func RegisterPythonBuiltins() {
 }
 
 func RegisterMiscBuiltins() {
-	core.RegisterBuiltin("dict", dictFunc)
+	core.RegisterBuiltin("dict", DictCreateFunc)
 	core.RegisterBuiltin("frozenset", frozensetFunc)
 	// Note: getattr/hasattr are now implemented in object_access.go
 	core.RegisterBuiltin("globals", globalsFunc)
