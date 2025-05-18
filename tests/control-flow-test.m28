@@ -21,9 +21,9 @@
 
 # If-Elif-Else Construct
 (print "\nTest 1.2: If-Elif-Else")
-(def check-number-negative "negative")
-(def check-number-zero "zero")
-(def check-number-positive "positive")
+(= check-number-negative "negative")
+(= check-number-zero "zero")
+(= check-number-positive "positive")
 
 (print "check-number(-5) =")
 (print check-number-negative)

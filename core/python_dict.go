@@ -338,9 +338,52 @@ func (d *PythonicDict) GetEvaluator() Evaluator {
 	return d.evaluator
 }
 
-// AsObject implementation for obj protocol
-func (d *PythonicDict) AsObject() ObjProtocol {
-	return d
+// GetProp implements the ObjProtocol.GetProp method
+func (d *PythonicDict) GetProp(name string) (LispValue, bool) {
+	// First check for methods
+	if d.HasMethod(name) {
+		// Return a bound method
+		method, _ := d.methods[name]
+		fn := BuiltinFunc(func(args []LispValue, env Environment) (LispValue, error) {
+			return method(d, args)
+		})
+		return fn, true
+	}
+
+	// Check for common dictionary pseudo-properties
+	switch name {
+	case "length", "len", "size", "count":
+		return float64(d.Size()), true
+	}
+
+	// Then check for attributes as keys
+	return d.Get(name)
+}
+
+// SetProp implements the ObjProtocol.SetProp method
+func (d *PythonicDict) SetProp(name string, value LispValue) error {
+	// Set the attribute in the dictionary
+	d.Set(name, value)
+	return nil
+}
+
+// HasMethodP implements the ObjProtocol.HasMethodP method
+func (d *PythonicDict) HasMethodP(name string) bool {
+	// Check for methods
+	return d.HasMethod(name)
+}
+
+// CallMethodP implements the ObjProtocol.CallMethodP method
+func (d *PythonicDict) CallMethodP(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
+	// Store evaluator reference
+	d.SetEvaluator(eval)
+	
+	// Call the method if it exists
+	if d.HasMethod(name) {
+		return d.CallMethod(name, args)
+	}
+	
+	return nil, fmt.Errorf("dictionary has no method '%s'", name)
 }
 
 // String implements the fmt.Stringer interface for proper dictionary representation

@@ -166,7 +166,17 @@ func (e *Environment) SetupBuiltins() {
 	}
 
 	// Register type constants in the environment
-	core.RegisterTypeConstants(e)
+	// We need to keep track of any type constants that shadow builtins
+	// and store them in a different name
+	for name, value := range core.TypeConstants {
+		// Skip 'list' as it conflicts with the built-in list function
+		if name == "list" {
+			// Register as 'type_list' instead
+			e.Set(core.LispSymbol("type_list"), value)
+		} else {
+			e.Set(core.LispSymbol(name), value)
+		}
+	}
 
 	// Register special form functions in builtins
 	// Removed direct special_forms dependency to avoid import cycle

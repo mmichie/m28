@@ -92,7 +92,7 @@
 
 # Test 4: Empty dictionary at end (test for previous bug)
 (print "\nTest 2.4: Empty dictionary at end")
-(def empty {})
+(= empty {})
 (print "Empty dictionary:" empty)
 
 (print "\n===== Exception Tests Complete =====")

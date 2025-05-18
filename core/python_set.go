@@ -210,7 +210,7 @@ func (s *PythonicSet) SymmetricDifferenceUpdate(other *PythonicSet) {
 
 // ToList converts the set to a sorted list
 func (s *PythonicSet) ToList() LispList {
-	elements := s.sortedElements()
+	elements := s.SortedElements()
 	result := make(LispList, len(elements))
 	for i, elem := range elements {
 		result[i] = elem
@@ -269,6 +269,22 @@ func (s *PythonicSet) Items() []LispValue {
 		result = append(result, elem)
 	}
 	return result
+}
+
+// SortedElements returns all elements in the set sorted by their natural ordering
+func (s *PythonicSet) SortedElements() []LispValue {
+	s.mu.RLock()
+	elements := make([]LispValue, 0, len(s.data))
+	for elem := range s.data {
+		elements = append(elements, elem)
+	}
+	s.mu.RUnlock()
+
+	// Sort the elements
+	sort.Slice(elements, func(i, j int) bool {
+		return Compare(elements[i], elements[j]) < 0
+	})
+	return elements
 }
 
 // String returns a string representation of the set

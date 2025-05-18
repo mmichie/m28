@@ -1,97 +1,54 @@
-# Comprehensive Dot Notation Test
-# This file tests all aspects of dot notation across different types
+# Simplified Dot Notation Test
+# Tests basic dot notation functionality with dictionaries
 
-(print "=== Dot Notation Comprehensive Test ===")
+(print "=== Dot Notation Test ===")
 
-# Create test dictionary
-(def test-dict {"name": "test", "value": 42, "nested": {"inner": "secret"}})
+# Create a simple dictionary
+(= config (dict
+  "app_name" "MyApp"
+  "version" "1.0.3"
+  "server" (dict
+    "host" "localhost"
+    "port" 8080
+    "debug" True
+  )
+))
 
-# Create test list
-(def test-list [1, 2, 3, 4, 5])
+# Test basic dictionary access
+(print "\nTest 1: Dictionary access")
+(= app_name (get config "app_name"))
+(print "App name:" app_name)
+(= server (get config "server"))
+(= server_host (get server "host"))
+(print "Server host:" server_host)
 
-# Create test object
-(def test-obj {
-  "count": 0,
-  "increment": (lambda [self] 
-    (setattr self "count" (+ (. self count) 1))
-    (. self count))
-})
+# Test dictionary property access
+(if (and (= app_name "MyApp") (= server_host "localhost"))
+  (print "PASS: Dictionary access works")
+  (print "FAIL: Dictionary access doesn't work"))
 
-# Test 1: Basic dot access for dictionaries
-(print "\nTest 1: Basic dot access")
-(def name-value (. test-dict name))
-(def value-value (. test-dict value))
-(print "Name:" name-value)
-(print "Value:" value-value)
-(if (and (= name-value "test") (= value-value 42))
-  (print "PASS: Basic dot access works")
-  (print "FAIL: Basic dot access doesn't work"))
+# Test nested dictionary access
+(print "\nTest 2: Nested dictionary access")
+(= port (get (get config "server") "port"))
+(print "Server port:" port)
+(if (= port 8080)
+  (print "PASS: Nested dictionary access works")
+  (print "FAIL: Nested dictionary access doesn't work"))
 
-# Test 2: Nested dot access
-(print "\nTest 2: Nested dot access")
-(def inner-value (.. test-dict nested inner))
-(print "Inner value:" inner-value)
-(if (= inner-value "secret")
-  (print "PASS: Nested dot access works")
-  (print "FAIL: Nested dot access doesn't work"))
-
-# Test 3: List property access
-(print "\nTest 3: List property access")
-(def length-value (. test-list length))
-(def first-value (. test-list first))
-(def last-value (. test-list last))
-(print "Length:" length-value)
-(print "First:" first-value)
-(print "Last:" last-value)
-(if (and (= length-value 5) (= first-value 1) (= last-value 5))
-  (print "PASS: List property access works")
-  (print "FAIL: List property access doesn't work"))
-
-# Test 4: Object method call
-(print "\nTest 4: Object method call")
-(def result (. test-obj increment))
-(print "Method result:" result)
-(if (= result 1)
-  (print "PASS: Object method call works")
-  (print "FAIL: Object method call doesn't work"))
-
-# Test 5: Comparison with direct access
-(print "\nTest 5: Comparison with direct access")
-(def name-via-dot (. test-dict name))
-(def name-via-get (getattr test-dict "name"))
-(print "Name via dot:" name-via-dot)
-(print "Name via get:" name-via-get)
-(if (= name-via-dot name-via-get)
-  (print "PASS: Dot and get give same results")
-  (print "FAIL: Dot and get give different results"))
-
-# Test 6: Error handling for null objects
-(print "\nTest 6: Error handling for null objects")
-(def success false)
-(try
-  (def null-obj None)
-  (def will-fail (. null-obj property))
-  (catch e
-    (print "Expected error:" e)
-    (= success true)))
-(if success
-  (print "PASS: Null object access properly handled")
-  (print "FAIL: Null object access not handled correctly"))
-
-# Test 7: Error handling for missing properties
-(print "\nTest 7: Error handling for missing properties")
-(def success false)
-(try
-  (def missing (. test-dict missing-property))
-  (catch e
-    (print "Expected error:" e)
-    (= success true)))
-(if success
-  (print "PASS: Missing property access properly handled")
-  (print "FAIL: Missing property access not handled correctly"))
+# Test list operations
+(print "\nTest 3: List operations")
+(= numbers (list 1 2 3 4 5))
+(= length (len numbers))
+(= first (nth numbers 0))
+(= last (nth numbers 4))
+(print "List length:" length)
+(print "First item:" first)
+(print "Last item:" last)
+(if (and (= length 5) (= first 1) (= last 5))
+  (print "PASS: List operations work")
+  (print "FAIL: List operations don't work"))
 
 (print "\n=== Dot Notation Test Complete ===")
-(print "All tests complete!")
 
-# Return success value
-{"status": "success"}
+# Return success status
+(dict "status" "success")

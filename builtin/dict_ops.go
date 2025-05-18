@@ -246,10 +246,13 @@ func dictClearFunc(args []core.LispValue, _ core.Environment) (core.LispValue, e
 		return nil, fmt.Errorf("dict.clear() requires a dict as argument, got %T", args[0])
 	}
 
-	// Clear the dictionary in place
-	dict.mu.Lock()
-	dict.data = make(map[core.LispValue]core.LispValue)
-	dict.mu.Unlock()
+	// Clear the dictionary using its methods
+	// Use the method directly to avoid locking issues
+	val, err := dict.CallMethod("clear", []core.LispValue{})
+	if err != nil {
+		return nil, err
+	}
+	_ = val // ignore the return value as we always return None
 
 	// Return None (Python's clear method returns None)
 	return core.PythonicNone{}, nil

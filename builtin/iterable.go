@@ -198,7 +198,12 @@ func zipFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) 
 }
 
 func listFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	return core.LispList(args), nil
+	// Create a new list from the given arguments
+	result := make(core.LispList, len(args))
+	for i, arg := range args {
+		result[i] = arg
+	}
+	return result, nil
 }
 
 func nthFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {

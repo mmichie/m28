@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -204,16 +203,9 @@ func (s *PythonicSet) Add(value LispValue) {
 	s.data[value] = struct{}{}
 }
 
-// Helper method for PythonicSet to get sorted elements
+// DEPRECATED: use SortedElements instead
 func (s *PythonicSet) sortedElements() []LispValue {
-	elements := make([]LispValue, 0, len(s.data))
-	for elem := range s.data {
-		elements = append(elements, elem)
-	}
-	sort.Slice(elements, func(i, j int) bool {
-		return Compare(elements[i], elements[j]) < 0
-	})
-	return elements
+	return s.SortedElements()
 }
 
 // Add Size method to PythonicSet
@@ -658,8 +650,8 @@ func Compare(a, b LispValue) int {
 				return 1
 			}
 			// Compare keys in sorted order
-			aKeys := va.sortedKeys()
-			bKeys := vb.sortedKeys()
+			aKeys := va.SortedKeys()
+			bKeys := vb.SortedKeys()
 			for i := 0; i < len(aKeys); i++ {
 				if cmp := Compare(aKeys[i], bKeys[i]); cmp != 0 {
 					return cmp
@@ -681,8 +673,8 @@ func Compare(a, b LispValue) int {
 				return 1
 			}
 			// Compare elements in sorted order
-			aElems := va.sortedElements()
-			bElems := vb.sortedElements()
+			aElems := va.SortedElements()
+			bElems := vb.SortedElements()
 			for i := 0; i < len(aElems); i++ {
 				if cmp := Compare(aElems[i], bElems[i]); cmp != 0 {
 					return cmp
