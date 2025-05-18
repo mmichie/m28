@@ -321,10 +321,12 @@ func (p *Parser) parse(tokens []Token, index int) (core.LispValue, int, error) {
 
 		// Special case for empty tuple/list: "()"
 		if index < len(tokens) && tokens[index].Value == ")" {
-			// Empty list
-			emptyList := core.LispList{}
+			// In Pythonic syntax, an empty tuple is represented as just "()"
+			// Default to empty tuple for "()". This makes empty parentheses create tuples by default
+			// which is more Pythonic and consistent with the tuple syntax elsewhere
+			emptyTuple := core.LispTuple{}
 			// Wrap in LocatedValue
-			return core.LocatedValue{Value: emptyList, Location: location}, index + 1, nil
+			return core.LocatedValue{Value: emptyTuple, Location: location}, index + 1, nil
 		}
 
 		// Check if there's a comma somewhere before the closing parenthesis

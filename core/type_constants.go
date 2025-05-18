@@ -9,16 +9,16 @@ type TypeIdentifier string
 
 // Type constants that will be accessible from M28 code
 var TypeConstants = map[string]LispValue{
-	"int":      TypeIdentifier("int"),
-	"float":    TypeIdentifier("float"),
-	"str":      TypeIdentifier("str"),
-	"list":     TypeIdentifier("list"),
-	"tuple":    TypeIdentifier("tuple"),
-	"dict":     TypeIdentifier("dict"),
-	"bool":     TypeIdentifier("bool"),
-	"function": TypeIdentifier("function"),
-	"none":     TypeIdentifier("none"),
-	"set":      TypeIdentifier("set"),
+	"int":      "int",
+	"float":    "float",
+	"str":      "str",
+	"list":     "list",
+	"tuple":    "tuple",
+	"dict":     "dict",
+	"bool":     "bool",
+	"function": "function",
+	"none":     "none",
+	"set":      "set",
 }
 
 // String representation of TypeIdentifier

@@ -6,12 +6,61 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-func RegisterConversionBuiltins() {
+func init() {
 	core.RegisterBuiltin("bin", binFunc)
 	core.RegisterBuiltin("bool", boolFunc)
 	core.RegisterBuiltin("complex", complexFunc)
 	core.RegisterBuiltin("hex", hexFunc)
 	core.RegisterBuiltin("oct", octFunc)
+	core.RegisterBuiltin("tuple", tupleFunc)
+}
+
+// tupleFunc creates a tuple from its arguments
+// Usage: (tuple arg1 arg2 ...) or (tuple collection)
+func tupleFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	// If no arguments, return an empty tuple
+	if len(args) == 0 {
+		return core.LispTuple{}, nil
+	}
+
+	// Single argument might be a collection we need to convert
+	if len(args) == 1 {
+		switch arg := args[0].(type) {
+		case core.LispList:
+			// Convert list to tuple
+			tuple := make(core.LispTuple, len(arg))
+			for i, item := range arg {
+				tuple[i] = item
+			}
+			return tuple, nil
+		case core.LispListLiteral:
+			// Convert list literal to tuple
+			tuple := make(core.LispTuple, len(arg))
+			for i, item := range arg {
+				tuple[i] = item
+			}
+			return tuple, nil
+		case core.LispTuple:
+			// If already a tuple, just return a copy
+			tuple := make(core.LispTuple, len(arg))
+			copy(tuple, arg)
+			return tuple, nil
+		case string:
+			// Convert string characters to tuple
+			tuple := make(core.LispTuple, len(arg))
+			for i, char := range arg {
+				tuple[i] = string(char)
+			}
+			return tuple, nil
+		}
+	}
+
+	// Multiple arguments - create a tuple with the arguments as elements
+	result := make(core.LispTuple, len(args))
+	for i, arg := range args {
+		result[i] = arg
+	}
+	return result, nil
 }
 
 func binFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {

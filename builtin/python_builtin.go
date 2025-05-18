@@ -5,7 +5,7 @@ import "github.com/mmichie/m28/core"
 func RegisterPythonBuiltins() {
 	RegisterNumericBuiltins()
 	RegisterStringBuiltins()
-	RegisterConversionBuiltins()
+	// Conversion builtins are now registered in conversion.go init()
 	RegisterIterableBuiltins()
 	RegisterTypeBuiltins()
 	RegisterIOBuiltins()
