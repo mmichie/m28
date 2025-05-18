@@ -15,6 +15,7 @@ type CommandFlags struct {
 	Interactive   bool
 	HistorySize   int
 	NoHistoryFile bool
+	Debug         bool
 }
 
 // ParseFlags parses command line arguments and returns the configuration
@@ -32,6 +33,7 @@ func ParseFlags() *CommandFlags {
 	interactive := flagSet.Bool("i", false, "Enter interactive mode after executing commands/files")
 	historySize := flagSet.Int("history-size", 1000, "Maximum number of entries to store in history file")
 	noHistory := flagSet.Bool("no-history", false, "Disable history file")
+	debug := flagSet.Bool("debug", false, "Enable debug mode (verbose output)")
 
 	// Set custom usage
 	flagSet.Usage = displayHelp
@@ -75,6 +77,7 @@ func ParseFlags() *CommandFlags {
 		Interactive:   *interactive,
 		HistorySize:   *historySize,
 		NoHistoryFile: *noHistory,
+		Debug:         *debug,
 	}
 }
 
@@ -89,6 +92,7 @@ Options:
   -i                     Enter interactive mode after executing commands/files
   --history-size N       Maximum number of entries to store in history (default: 1000)
   --no-history           Disable history file
+  --debug                Enable debug mode (verbose output)
 
 Examples:
   m28                    Start interactive REPL

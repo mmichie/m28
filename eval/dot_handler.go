@@ -11,7 +11,9 @@ import (
 // This is called from the Eval method when a symbol contains dots
 func (e *Evaluator) HandleDotNotation(symbol core.LispSymbol, env core.Environment) (core.LispValue, error) {
 	// Add debug output
-	fmt.Printf("DEBUG HandleDotNotation: Processing '%s'\n", symbol)
+	if core.Debug {
+		fmt.Printf("DEBUG HandleDotNotation: Processing '%s'\n", symbol)
+	}
 
 	parts := strings.Split(string(symbol), ".")
 
@@ -21,36 +23,50 @@ func (e *Evaluator) HandleDotNotation(symbol core.LispSymbol, env core.Environme
 		// should be looked up directly in the environment
 		val, ok := env.Get(symbol)
 		if ok {
-			fmt.Printf("DEBUG HandleDotNotation: Found direct method '%s' in environment\n", symbol)
+			if core.Debug {
+				fmt.Printf("DEBUG HandleDotNotation: Found direct method '%s' in environment\n", symbol)
+			}
 			return val, nil
 		}
 	}
 
 	// Get the base object
 	baseSymbol := core.LispSymbol(parts[0])
-	fmt.Printf("DEBUG HandleDotNotation: Looking up base symbol '%s'\n", baseSymbol)
+	if core.Debug {
+		fmt.Printf("DEBUG HandleDotNotation: Looking up base symbol '%s'\n", baseSymbol)
+	}
 	baseObj, err := e.Eval(baseSymbol, env)
 	if err != nil {
-		fmt.Printf("DEBUG HandleDotNotation: Error evaluating base symbol '%s': %v\n", baseSymbol, err)
+		if core.Debug {
+			fmt.Printf("DEBUG HandleDotNotation: Error evaluating base symbol '%s': %v\n", baseSymbol, err)
+		}
 		return nil, e.enrichErrorWithTraceback(err)
 	}
 
-	fmt.Printf("DEBUG HandleDotNotation: Found base object of type %T\n", baseObj)
+	if core.Debug {
+		fmt.Printf("DEBUG HandleDotNotation: Found base object of type %T\n", baseObj)
+	}
 
 	// Special handling for dictionaries
 	if dict, isDictionary := baseObj.(*core.PythonicDict); isDictionary {
 		// Make sure the dictionary has an evaluator reference
-		fmt.Printf("DEBUG HandleDotNotation: Setting evaluator on dictionary\n")
+		if core.Debug {
+			fmt.Printf("DEBUG HandleDotNotation: Setting evaluator on dictionary\n")
+		}
 		dict.SetEvaluator(e)
 
 		// If we're accessing a method, handle it specially
 		if len(parts) > 1 {
 			methodName := parts[1]
-			fmt.Printf("DEBUG HandleDotNotation: Checking for dictionary method '%s'\n", methodName)
+			if core.Debug {
+				fmt.Printf("DEBUG HandleDotNotation: Checking for dictionary method '%s'\n", methodName)
+			}
 
 			// Check if we have this as a dictionary method
 			if dict.HasMethod(methodName) {
-				fmt.Printf("DEBUG HandleDotNotation: Found dictionary method '%s'\n", methodName)
+				if core.Debug {
+					fmt.Printf("DEBUG HandleDotNotation: Found dictionary method '%s'\n", methodName)
+				}
 				// Return a function that, when called, will call the method on the dictionary
 				return core.BuiltinFunc(func(args []core.LispValue, callEnv core.Environment) (core.LispValue, error) {
 					return dict.CallMethod(methodName, args)
@@ -63,16 +79,22 @@ func (e *Evaluator) HandleDotNotation(symbol core.LispSymbol, env core.Environme
 	result := baseObj
 	for i := 1; i < len(parts); i++ {
 		memberName := parts[i]
-		fmt.Printf("DEBUG HandleDotNotation: Accessing member '%s' in chain\n", memberName)
+		if core.Debug {
+			fmt.Printf("DEBUG HandleDotNotation: Accessing member '%s' in chain\n", memberName)
+		}
 
 		// Get the member using FastGetPropFrom directly for optimized property access
 		if memberValue, exists := core.FastGetPropFrom(result, memberName); exists {
 			// Update the result for next iteration
 			result = memberValue
-			fmt.Printf("DEBUG HandleDotNotation: Found member '%s', result type: %T\n", memberName, result)
+			if core.Debug {
+				fmt.Printf("DEBUG HandleDotNotation: Found member '%s', result type: %T\n", memberName, result)
+			}
 		} else {
 			// Property not found
-			fmt.Printf("DEBUG HandleDotNotation: Property '%s' not found\n", memberName)
+			if core.Debug {
+				fmt.Printf("DEBUG HandleDotNotation: Property '%s' not found\n", memberName)
+			}
 			return nil, e.enrichErrorWithTraceback(fmt.Errorf("object has no property '%s'", memberName))
 		}
 	}

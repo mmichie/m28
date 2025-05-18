@@ -49,25 +49,35 @@ func NewEnvironment(outer core.Environment) *Environment {
 // Get retrieves a value from the environment
 func (e *Environment) Get(symbol core.LispSymbol) (core.LispValue, bool) {
 	// Debug the lookup
-	fmt.Printf("DEBUG Get: Looking up symbol '%s' in environment %p\n", symbol, e)
+	if core.Debug {
+		fmt.Printf("DEBUG Get: Looking up symbol '%s' in environment %p\n", symbol, e)
+	}
 
 	value, ok := e.vars[symbol]
 	if !ok && e.outer != nil {
 		// Look in outer environment if not found in current
-		fmt.Printf("DEBUG Get: Symbol '%s' not found in current environment, checking outer\n", symbol)
+		if core.Debug {
+			fmt.Printf("DEBUG Get: Symbol '%s' not found in current environment, checking outer\n", symbol)
+		}
 		return e.outer.Get(symbol)
 	}
 
 	if ok {
-		fmt.Printf("DEBUG Get: Found symbol '%s' = %v (type %T)\n", symbol, value, value)
+		if core.Debug {
+			fmt.Printf("DEBUG Get: Found symbol '%s' = %v (type %T)\n", symbol, value, value)
+		}
 
 		// Special handling for dictionaries to ensure evaluator is set
 		if dict, isDictionary := value.(*core.PythonicDict); isDictionary && e.evaluator != nil {
-			fmt.Printf("DEBUG Get: Setting evaluator on dictionary for symbol '%s'\n", symbol)
+			if core.Debug {
+				fmt.Printf("DEBUG Get: Setting evaluator on dictionary for symbol '%s'\n", symbol)
+			}
 			dict.SetEvaluator(e.evaluator)
 		}
 	} else {
-		fmt.Printf("DEBUG Get: Symbol '%s' not found\n", symbol)
+		if core.Debug {
+			fmt.Printf("DEBUG Get: Symbol '%s' not found\n", symbol)
+		}
 	}
 
 	return value, ok
@@ -75,27 +85,35 @@ func (e *Environment) Get(symbol core.LispSymbol) (core.LispValue, bool) {
 
 // Set sets a value in the environment
 func (e *Environment) Set(symbol core.LispSymbol, value core.LispValue) {
-	fmt.Printf("DEBUG Set: Setting symbol '%s' = %v (type %T) in environment %p\n", symbol, value, value, e)
+	if core.Debug {
+		fmt.Printf("DEBUG Set: Setting symbol '%s' = %v (type %T) in environment %p\n", symbol, value, value, e)
+	}
 
 	// Special handling for evaluator-aware types
 	if evalAware, ok := value.(core.EvaluatorAware); ok && e.evaluator != nil {
-		fmt.Printf("DEBUG Set: Value is EvaluatorAware, setting evaluator for '%s'\n", symbol)
+		if core.Debug {
+			fmt.Printf("DEBUG Set: Value is EvaluatorAware, setting evaluator for '%s'\n", symbol)
+		}
 		evalAware.SetEvaluator(e.evaluator)
 	}
 
 	// Special handling for dictionaries to ensure they get the evaluator
 	if dict, ok := value.(*core.PythonicDict); ok && e.evaluator != nil {
-		fmt.Printf("DEBUG Set: Dictionary detected for symbol '%s', ensuring evaluator is set\n", symbol)
+		if core.Debug {
+			fmt.Printf("DEBUG Set: Dictionary detected for symbol '%s', ensuring evaluator is set\n", symbol)
+		}
 		dict.SetEvaluator(e.evaluator)
 	}
 
 	e.vars[symbol] = value
 
 	// Verification
-	if storedValue, exists := e.vars[symbol]; exists {
-		fmt.Printf("DEBUG Set: Verified symbol '%s' exists after setting, value: %v\n", symbol, storedValue)
-	} else {
-		fmt.Printf("DEBUG Set: CRITICAL - Symbol '%s' not found after setting\n", symbol)
+	if core.Debug {
+		if storedValue, exists := e.vars[symbol]; exists {
+			fmt.Printf("DEBUG Set: Verified symbol '%s' exists after setting, value: %v\n", symbol, storedValue)
+		} else {
+			fmt.Printf("DEBUG Set: CRITICAL - Symbol '%s' not found after setting\n", symbol)
+		}
 	}
 }
 
@@ -111,27 +129,35 @@ func (e *Environment) GetEvaluator() core.Evaluator {
 
 // Define creates a new binding in the current environment
 func (e *Environment) Define(symbol core.LispSymbol, value core.LispValue) {
-	fmt.Printf("DEBUG Define: Defining symbol '%s' = %v (type %T) in environment %p\n", symbol, value, value, e)
+	if core.Debug {
+		fmt.Printf("DEBUG Define: Defining symbol '%s' = %v (type %T) in environment %p\n", symbol, value, value, e)
+	}
 
 	// Special handling for evaluator-aware types
 	if evalAware, ok := value.(core.EvaluatorAware); ok && e.evaluator != nil {
-		fmt.Printf("DEBUG Define: Value is EvaluatorAware, setting evaluator for '%s'\n", symbol)
+		if core.Debug {
+			fmt.Printf("DEBUG Define: Value is EvaluatorAware, setting evaluator for '%s'\n", symbol)
+		}
 		evalAware.SetEvaluator(e.evaluator)
 	}
 
 	// Special handling for dictionaries to ensure they get the evaluator
 	if dict, ok := value.(*core.PythonicDict); ok && e.evaluator != nil {
-		fmt.Printf("DEBUG Define: Dictionary detected for symbol '%s', ensuring evaluator is set\n", symbol)
+		if core.Debug {
+			fmt.Printf("DEBUG Define: Dictionary detected for symbol '%s', ensuring evaluator is set\n", symbol)
+		}
 		dict.SetEvaluator(e.evaluator)
 	}
 
 	e.vars[symbol] = value
 
 	// Verification
-	if storedValue, exists := e.vars[symbol]; exists {
-		fmt.Printf("DEBUG Define: Verified symbol '%s' exists after defining, value: %v\n", symbol, storedValue)
-	} else {
-		fmt.Printf("DEBUG Define: CRITICAL - Symbol '%s' not found after defining\n", symbol)
+	if core.Debug {
+		if storedValue, exists := e.vars[symbol]; exists {
+			fmt.Printf("DEBUG Define: Verified symbol '%s' exists after defining, value: %v\n", symbol, storedValue)
+		} else {
+			fmt.Printf("DEBUG Define: CRITICAL - Symbol '%s' not found after defining\n", symbol)
+		}
 	}
 }
 

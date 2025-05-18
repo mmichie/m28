@@ -118,7 +118,9 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 		// Check for dot notation: module.attribute, dict.method, or object.attribute
 		if strings.Contains(string(v), ".") {
 			// Use our dedicated dot notation handler
-			fmt.Printf("DEBUG: Dot notation detected in evaluator: %s\n", string(v))
+			if core.Debug {
+				fmt.Printf("DEBUG: Dot notation detected in evaluator: %s\n", string(v))
+			}
 			return e.HandleDotNotation(v, env)
 		}
 
@@ -228,13 +230,17 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 
 				// Ensure evaluator is set on evaluator-aware values
 				if evalAware, ok := value.(core.EvaluatorAware); ok {
-					fmt.Println("DEBUG: Setting evaluator on", value)
+					if core.Debug {
+						fmt.Println("DEBUG: Setting evaluator on", value)
+					}
 					evalAware.SetEvaluator(e)
 				}
 
 				// Special handling for PythonicDict to ensure it has the evaluator
 				if dict, ok := value.(*core.PythonicDict); ok {
-					fmt.Println("DEBUG: Ensuring dictionary has evaluator:", dict)
+					if core.Debug {
+						fmt.Println("DEBUG: Ensuring dictionary has evaluator:", dict)
+					}
 					dict.SetEvaluator(e)
 				}
 
@@ -248,7 +254,9 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 
 						// Additional debug for dictionary assignment
 						if dict, ok := value.(*core.PythonicDict); ok {
-							fmt.Println("DEBUG: Assigned dictionary to global variable", globalSymbol, ":", dict)
+							if core.Debug {
+								fmt.Println("DEBUG: Assigned dictionary to global variable", globalSymbol, ":", dict)
+							}
 						}
 					} else {
 						// Normal assignment
@@ -256,13 +264,15 @@ func (e *Evaluator) Eval(expr core.LispValue, env core.Environment) (core.LispVa
 
 						// Additional debug for dictionary assignment
 						if dict, ok := value.(*core.PythonicDict); ok {
-							fmt.Println("DEBUG: Assigned dictionary to variable", lhsSymbol, ":", dict)
+							if core.Debug {
+								fmt.Println("DEBUG: Assigned dictionary to variable", lhsSymbol, ":", dict)
 
-							// Verify assignment immediately
-							if val, found := env.Get(lhsSymbol); found {
-								fmt.Println("DEBUG: Verified assignment of", lhsSymbol, ":", val)
-							} else {
-								fmt.Println("DEBUG: CRITICAL - Assignment verification failed for", lhsSymbol)
+								// Verify assignment immediately
+								if val, found := env.Get(lhsSymbol); found {
+									fmt.Println("DEBUG: Verified assignment of", lhsSymbol, ":", val)
+								} else {
+									fmt.Println("DEBUG: CRITICAL - Assignment verification failed for", lhsSymbol)
+								}
 							}
 						}
 					}
@@ -712,7 +722,9 @@ func (e *Evaluator) Apply(fn core.LispValue, args []core.LispValue, env core.Env
 // evalDict evaluates dictionary literals by evaluating all keys and values
 func (e *Evaluator) evalDict(dict *core.PythonicDict, env core.Environment) (*core.PythonicDict, error) {
 	// Debug output
-	fmt.Println("DEBUG evalDict: Processing dictionary literal")
+	if core.Debug {
+		fmt.Println("DEBUG evalDict: Processing dictionary literal")
+	}
 
 	result := core.NewPythonicDict()
 
@@ -757,7 +769,9 @@ func (e *Evaluator) evalDict(dict *core.PythonicDict, env core.Environment) (*co
 		return nil, err
 	}
 
-	fmt.Println("DEBUG evalDict: Completed dictionary literal evaluation, result:", result)
+	if core.Debug {
+		fmt.Println("DEBUG evalDict: Completed dictionary literal evaluation, result:", result)
+	}
 	return result, nil
 }
 

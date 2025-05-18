@@ -1,0 +1,21 @@
+# Dictionary literal test
+
+# Create an empty dictionary
+(= empty-dict {})
+(print "Empty dictionary:" empty-dict)
+
+# Create a dictionary with initial values
+(= person {"name": "Alice", "age": 30})
+(print "Person dictionary:" person)
+
+# Test accessing values
+(print "Name:" (get person "name"))
+(print "Age:" (get person "age"))
+
+# Test dot access
+(print "Name via dot:" (. person name))
+(print "Age via dot:" (. person age))
+
+# Test dictionary methods
+(print "Size:" (. person length))
+(print "Get method:" (. person get "name"))

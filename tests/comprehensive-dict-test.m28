@@ -1,0 +1,194 @@
+# Comprehensive Dictionary Test Suite
+# Tests all aspects of dictionary implementation and methods
+
+# Test helper to print test results
+(= assert-equal (fn [expected actual test-name]
+  (print (if (= expected actual)
+           (+ "✓ PASS: " test-name)
+           (+ "✗ FAIL: " test-name " (Expected: " expected ", Got: " actual ")")))))
+
+(print "\n===== Dictionary Implementation Tests =====\n")
+
+# =========== Section 1: Basic Dictionary Operations ===========
+(print "\n--- Section 1: Basic Dictionary Operations ---")
+
+# Test 1.1: Creating empty dictionary
+(= empty-dict {})
+(assert-equal 0 (length empty-dict) "Empty dict has 0 length")
+
+# Test 1.2: Dictionary with string keys
+(= string-dict {"name": "Alice", "age": 30})
+(assert-equal "Alice" (get string-dict "name") "String key access works")
+(assert-equal 30 (get string-dict "age") "Numeric value access works")
+
+# Test 1.3: Dictionary with numeric keys
+(= num-dict {1: "one", 2: "two", 3: "three"})
+(assert-equal "one" (get num-dict 1) "Numeric key access works")
+(assert-equal "two" (get num-dict 2) "Numeric key access works")
+
+# Test 1.4: Mixed keys and values
+(= mixed-dict {1: "one", "two": 2, 3.5: true, false: "bool"})
+(assert-equal "one" (get mixed-dict 1) "Integer key access works")
+(assert-equal 2 (get mixed-dict "two") "String key to int value works")
+(assert-equal true (get mixed-dict 3.5) "Float key access works")
+(assert-equal "bool" (get mixed-dict false) "Boolean key access works")
+
+# Test 1.5: Nested dictionaries
+(= nested-dict {"user": {"name": "Bob", "profile": {"age": 25, "city": "New York"}}})
+(assert-equal "Bob" (get (get nested-dict "user") "name") "Nested dict access works")
+(assert-equal 25 (get (get (get nested-dict "user") "profile") "age") "Deep nested dict access works")
+
+# =========== Section 2: Dictionary Method Tests ===========
+(print "\n--- Section 2: Dictionary Method Tests ---")
+
+# Test 2.1: Dict.get method
+(= user {"name": "John", "age": 30})
+(assert-equal "John" (dict.get user "name") "dict.get basic usage works")
+(assert-equal "unknown" (dict.get user "email" "unknown") "dict.get with default works")
+(assert-equal nil (dict.get user "country") "dict.get missing key returns nil")
+
+# Test 2.2: Dict.set method
+(= person {})
+(dict.set person "name" "Sarah")
+(dict.set person "age" 28)
+(assert-equal "Sarah" (get person "name") "dict.set adds new key-value pair")
+(assert-equal 28 (get person "age") "dict.set works with numeric value")
+
+# Test 2.3: Dict.keys method
+(= colors {"red": "#FF0000", "green": "#00FF00", "blue": "#0000FF"})
+(= keys (dict.keys colors))
+(assert-equal 3 (length keys) "dict.keys returns all keys")
+
+# Test 2.4: Dict.values method
+(= values (dict.values colors))
+(assert-equal 3 (length values) "dict.values returns all values")
+
+# Test 2.5: Dict.items method
+(= simple-dict {"a": 1, "b": 2})
+(= items (dict.items simple-dict))
+(assert-equal 2 (length items) "dict.items has correct length")
+
+# Test 2.6: Dict.update method
+(= dict1 {"a": 1, "b": 2})
+(= dict2 {"b": 3, "c": 4})
+(dict.update dict1 dict2)
+(assert-equal 3 (get dict1 "b") "dict.update overwrites existing keys")
+(assert-equal 4 (get dict1 "c") "dict.update adds new keys")
+(assert-equal 3 (length dict1) "dict.update results in correct length")
+
+# Test 2.7: Dict.pop method
+(= pop-dict {"a": 1, "b": 2, "c": 3})
+(= pop-value (dict.pop pop-dict "b"))
+(assert-equal 2 pop-value "dict.pop returns the correct value")
+(assert-equal 2 (length pop-dict) "dict.pop removes the key-value pair")
+(assert-equal "default" (dict.pop pop-dict "d" "default") "dict.pop with default works")
+
+# Test 2.8: Dict.popitem method
+(= popitem-dict {"x": 10, "y": 20, "z": 30})
+(= item (dict.popitem popitem-dict))
+(assert-equal 2 (length item) "popitem returns a key-value pair")
+(assert-equal 2 (length popitem-dict) "popitem reduces dict size by 1")
+
+# Test 2.9: Dict.setdefault method
+(= defaults {"a": 1, "b": 2})
+(= a-value (dict.setdefault defaults "a" 100))
+(= c-value (dict.setdefault defaults "c" 3))
+(assert-equal 1 a-value "setdefault returns existing value for existing key")
+(assert-equal 3 c-value "setdefault returns default for new key")
+(assert-equal 3 (get defaults "c") "setdefault adds new key-value")
+
+# Test 2.10: Dict.clear method
+(= clear-dict {"a": 1, "b": 2})
+(dict.clear clear-dict)
+(assert-equal 0 (length clear-dict) "clear removes all items")
+
+# Test 2.11: Dict.copy method
+(= original {"a": 1, "b": 2, "c": {"nested": "value"}})
+(= copied (dict.copy original))
+(assert-equal 3 (length copied) "copy has same length as original")
+(assert-equal 1 (get copied "a") "copy has same values")
+# Modify original to verify copy is independent
+(dict.set original "a" 100)
+(assert-equal 1 (get copied "a") "copy is independent from original for basic values")
+
+# Test 2.12: Dict.has_key method
+(= has-key-dict {"name": "test", "value": 42})
+(assert-equal true (dict.has_key has-key-dict "name") "has_key returns true for existing key")
+(assert-equal false (dict.has_key has-key-dict "missing") "has_key returns false for missing key")
+
+# Test 2.13: Dict.contains? method
+(= contains-dict {"name": "test", "value": 42})
+(assert-equal true (dict.contains? contains-dict "name") "contains? returns true for existing key")
+(assert-equal false (dict.contains? contains-dict "missing") "contains? returns false for missing key")
+
+# =========== Section 3: Dictionary Protocol Tests ===========
+(print "\n--- Section 3: Dictionary Protocol Tests ---")
+
+# Test 3.1: Length property
+(= len-dict {"a": 1, "b": 2, "c": 3})
+(assert-equal 3 (length len-dict) "length property works")
+(assert-equal 3 (len len-dict) "len function works on dictionaries")
+
+# Test 3.2: Method access
+(= method-dict {"a": 1, "b": 2})
+(= keys-result (dict.keys method-dict))
+(assert-equal 2 (length keys-result) "Method access works")
+
+# Test 3.3: Property access
+(= prop-dict {"name": "Jane", "age": 25})
+(assert-equal "Jane" (get prop-dict "name") "Property access works")
+(assert-equal 25 (get prop-dict "age") "Property access works for numbers")
+
+# =========== Section 4: Dictionary Persistence Tests ===========
+(print "\n--- Section 4: Dictionary Persistence Tests ---")
+
+# Test 4.1: Dictionary persistence across statements
+(= persist-dict {})
+(dict.set persist-dict "count" 0)
+(assert-equal 0 (get persist-dict "count") "Initial value set correctly")
+
+# Increment the counter multiple times
+(dict.set persist-dict "count" (+ (get persist-dict "count") 1))
+(dict.set persist-dict "count" (+ (get persist-dict "count") 1))
+(dict.set persist-dict "count" (+ (get persist-dict "count") 1))
+(assert-equal 3 (get persist-dict "count") "Value persists and increments correctly")
+
+# Test 4.2: Dictionary mutations in loops
+(= counter {})
+(dict.set counter "value" 0)
+(for [i 0 10]
+  (dict.set counter "value" (+ (get counter "value") i)))
+(assert-equal 45 (get counter "value") "Dictionary updates correctly in loops")
+
+# =========== Section 5: Edge Cases ===========
+(print "\n--- Section 5: Edge Cases ---")
+
+# Test 5.1: Empty dictionary operations
+(= empty {})
+(assert-equal nil (dict.pop empty "missing" nil) "pop on empty dict with default")
+(assert-equal 0 (length empty) "empty dict length is 0")
+
+# Test 5.2: Error handling for missing keys
+(= error-dict {})
+(assert-equal nil (dict.get error-dict "missing") "get with missing key returns nil")
+
+# Test 5.3: Large dictionary
+(= large-dict {})
+(for [i 0 100]
+  (dict.set large-dict i (* i i)))
+(assert-equal 101 (length large-dict) "Large dictionary has correct length")
+(assert-equal 25 (get large-dict 5) "Large dictionary access works")
+
+# Test 5.4: Dictionary with complex values
+(= complex-dict {})
+(dict.set complex-dict "list" [1, 2, 3])
+(dict.set complex-dict "dict" {"nested": true})
+(dict.set complex-dict "function" (fn [x] (* x x)))
+(assert-equal 3 (length (get complex-dict "list")) "Dictionary with list value")
+(assert-equal true (get (get complex-dict "dict") "nested") "Dictionary with nested dict")
+
+# =========== Section 6: Thread Safety Tests ===========
+# Note: These tests would require concurrency support to fully validate
+
+(print "\n===== Dictionary Tests Complete =====")
+(print "All tests have been executed!")

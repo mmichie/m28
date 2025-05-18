@@ -37,12 +37,16 @@ func EvalClassNew(e core.Evaluator, args []core.LispValue, env core.Environment)
 		parentArg := args[1]
 		if located, ok := parentArg.(core.LocatedValue); ok {
 			parentArg = located.Value
-			fmt.Printf("DEBUG: Unwrapped LocatedValue, new parentArg: %v (type: %T)\n", parentArg, parentArg)
+			if core.Debug {
+				fmt.Printf("DEBUG: Unwrapped LocatedValue, new parentArg: %v (type: %T)\n", parentArg, parentArg)
+			}
 		}
 
 		// Check if we have parent classes (second arg is a list)
 		if parentsList, ok := parentArg.(core.LispList); ok {
-			fmt.Printf("DEBUG: Found parent list with %d elements for class %s\n", len(parentsList), className)
+			if core.Debug {
+				fmt.Printf("DEBUG: Found parent list with %d elements for class %s\n", len(parentsList), className)
+			}
 			for i, parentItem := range parentsList {
 				// Unwrap LocatedValue if needed
 				if located, ok := parentItem.(core.LocatedValue); ok {

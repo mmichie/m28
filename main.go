@@ -17,6 +17,11 @@ func main() {
 	// Initialize concurrency features first
 	initialize.InitializeConcurrency()
 
+	// Enable debug mode if requested
+	if flags.Debug {
+		initialize.EnableDebugMode()
+	}
+
 	// Initialize the REPL with command flags
 	r := repl.NewREPL(flags)
 

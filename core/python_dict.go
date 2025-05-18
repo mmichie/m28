@@ -377,12 +377,12 @@ func (d *PythonicDict) HasMethodP(name string) bool {
 func (d *PythonicDict) CallMethodP(name string, args []LispValue, eval Evaluator, env Environment) (LispValue, error) {
 	// Store evaluator reference
 	d.SetEvaluator(eval)
-	
+
 	// Call the method if it exists
 	if d.HasMethod(name) {
 		return d.CallMethod(name, args)
 	}
-	
+
 	return nil, fmt.Errorf("dictionary has no method '%s'", name)
 }
 
