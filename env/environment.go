@@ -39,6 +39,9 @@ func NewEnvironment(outer core.Environment) *Environment {
 	env.Define(core.LispSymbol("True"), core.PythonicBool(true))
 	env.Define(core.LispSymbol("False"), core.PythonicBool(false))
 
+	// Register type constants in the environment
+	core.RegisterTypeConstants(env)
+
 	// This is a reasonable default for most environment needs
 	// This ensures builtins are always available
 	env.SetupBuiltins()

@@ -81,6 +81,34 @@ func isinstanceFunc(args []core.LispValue, env core.Environment) (core.LispValue
 		return core.PythonicBool(false), nil
 	}
 
+	// Handle list literal of classes - isinstance(obj, [class1, class2, ...])
+	if classes, isListLit := classArg.(core.LispListLiteral); isListLit {
+		for _, class := range classes {
+			result, err := checkInstanceOf(obj, class, env)
+			if err != nil {
+				return nil, err
+			}
+			if result == core.PythonicBool(true) {
+				return core.PythonicBool(true), nil
+			}
+		}
+		return core.PythonicBool(false), nil
+	}
+
+	// Handle tuple of classes - isinstance(obj, (class1, class2, ...))
+	if classes, isTuple := classArg.(core.LispTuple); isTuple {
+		for _, class := range classes {
+			result, err := checkInstanceOf(obj, class, env)
+			if err != nil {
+				return nil, err
+			}
+			if result == core.PythonicBool(true) {
+				return core.PythonicBool(true), nil
+			}
+		}
+		return core.PythonicBool(false), nil
+	}
+
 	// Single class check
 	return checkInstanceOf(obj, classArg, env)
 }
@@ -219,8 +247,29 @@ func issubclassFunc(args []core.LispValue, env core.Environment) (core.LispValue
 		return nil, fmt.Errorf("issubclass() first argument must be a class")
 	}
 
-	// Handle list of classes for second argument (Python's tuple equivalent)
+	// Handle list of classes for second argument
 	if classes, isList := args[1].(core.LispList); isList {
+		for _, cls := range classes {
+			// Check if the class item is a PythonicClass
+			checkClass, isCheckClass := cls.(*core.PythonicClass)
+			if isCheckClass {
+				if isSubclassOf(class, checkClass) {
+					return core.PythonicBool(true), nil
+				}
+				continue
+			}
+
+			// Custom classes cannot be subclasses of built-in types represented as strings
+			_, isString := cls.(string)
+			if isString {
+				continue
+			}
+		}
+		return core.PythonicBool(false), nil
+	}
+
+	// Handle tuple of classes for second argument (Python's tuple)
+	if classes, isTuple := args[1].(core.LispTuple); isTuple {
 		for _, cls := range classes {
 			// Check if the class item is a PythonicClass
 			checkClass, isCheckClass := cls.(*core.PythonicClass)
@@ -301,13 +350,25 @@ func typeFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 		return "dict", nil
 	}
 
+	// Special handling for sets
+	if _, isSet := args[0].(*core.PythonicSet); isSet {
+		return "set", nil
+	}
+
+	// Special handling for numbers - distinguish between int and float
+	if num, isNum := args[0].(float64); isNum {
+		// Check if it's an integer (no decimal part)
+		if num == float64(int(num)) {
+			return "int", nil
+		}
+		return "float", nil
+	}
+
 	// Default to Go's type system
 	typeName := reflect.TypeOf(args[0]).String()
 
 	// Map Go types to Python-like type names
 	switch typeName {
-	case "float64":
-		return "float", nil
 	case "string":
 		return "str", nil
 	case "core.PythonicBool":

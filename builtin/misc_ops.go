@@ -709,3 +709,23 @@ func timeSleepFunc(args []core.LispValue, _ core.Environment) (core.LispValue, e
 
 	return core.PythonicNone{}, nil
 }
+
+// definedFunc checks if a symbol is defined in the current environment
+func definedFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("defined expects exactly 1 argument")
+	}
+
+	var symbol core.LispSymbol
+	switch arg := args[0].(type) {
+	case core.LispSymbol:
+		symbol = arg
+	case string:
+		symbol = core.LispSymbol(arg)
+	default:
+		return nil, fmt.Errorf("defined expects a symbol, got %T", args[0])
+	}
+
+	_, exists := env.Get(symbol)
+	return core.PythonicBool(exists), nil
+}

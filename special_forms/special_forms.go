@@ -18,6 +18,7 @@ func init() {
 		"if":    EvalIfPython,
 		"for":   EvalFor,
 		"while": EvalWhilePython,
+		"in":    EvalIn,
 		"try":   EvalTry, // Try/except/finally implementation
 		"except": func(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
 			// This is just a placeholder - except blocks are handled by try

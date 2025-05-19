@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 )
@@ -17,6 +18,7 @@ func RegisterComparisonBuiltins() {
 	core.RegisterBuiltin("or", orFunc)
 	core.RegisterBuiltin("not", notFunc)
 	core.RegisterBuiltin("eq?", eqFunc) // Alternative equality function
+	core.RegisterBuiltin("in", inFunc)  // Python-like 'in' operator
 }
 
 func eqFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
@@ -148,4 +150,79 @@ func compareValues(a, b core.LispValue, comparator func(float64, float64) bool) 
 	}
 
 	return nil, fmt.Errorf("cannot compare values of different types")
+}
+
+// inFunc implements the Python-like 'in' operator to check if a value is in a collection
+func inFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("in requires exactly two arguments")
+	}
+
+	item := args[0]
+	container := args[1]
+
+	switch c := container.(type) {
+	case string:
+		// Check if item is in a string
+		s, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf("string contains check requires string item, got %T", item)
+		}
+		// Check if s is a substring of c
+		return core.PythonicBool(len(s) > 0 && strings.Contains(c, s)), nil
+
+	case core.LispList:
+		// Check if item is in a list
+		for _, val := range c {
+			if core.EqualValues(val, item) {
+				return core.PythonicBool(true), nil
+			}
+		}
+		return core.PythonicBool(false), nil
+
+	case core.LispListLiteral:
+		// Check if item is in a list literal
+		for _, val := range c {
+			if core.EqualValues(val, item) {
+				return core.PythonicBool(true), nil
+			}
+		}
+		return core.PythonicBool(false), nil
+
+	case core.LispTuple:
+		// Check if item is in a tuple
+		for _, val := range c {
+			if core.EqualValues(val, item) {
+				return core.PythonicBool(true), nil
+			}
+		}
+		return core.PythonicBool(false), nil
+
+	case *core.PythonicDict:
+		// Check if key is in a dictionary
+		_, found := c.Get(item)
+		return core.PythonicBool(found), nil
+
+	case *core.PythonicSet:
+		// Check if item is in a set
+		return core.PythonicBool(c.Contains(item)), nil
+
+	case core.Environment:
+		// Check if symbol is defined in environment
+		// This handles the 'defined' test case
+		symbol, ok := item.(core.LispSymbol)
+		if !ok {
+			// Try to convert string to symbol
+			if str, isStr := item.(string); isStr {
+				symbol = core.LispSymbol(str)
+			} else {
+				return nil, fmt.Errorf("environment lookup requires a symbol, got %T", item)
+			}
+		}
+		_, found := c.Get(symbol)
+		return core.PythonicBool(found), nil
+
+	default:
+		return nil, fmt.Errorf("'in' not supported for container type %T", container)
+	}
 }

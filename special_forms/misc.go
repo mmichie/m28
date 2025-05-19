@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/mmichie/m28/core"
@@ -187,4 +188,85 @@ func EvalPass(e core.Evaluator, args []core.LispValue, env core.Environment) (co
 
 	// Just return None
 	return core.PythonicNone{}, nil
+}
+
+// EvalIn implements the 'in' operator (item in container) for Python-like membership testing
+func EvalIn(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("in operator requires exactly two arguments")
+	}
+
+	// Evaluate both arguments
+	item, err := e.Eval(args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	container, err := e.Eval(args[1], env)
+	if err != nil {
+		return nil, err
+	}
+
+	switch c := container.(type) {
+	case string:
+		// Check if item is in a string
+		s, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf("string contains check requires string item, got %T", item)
+		}
+		return core.PythonicBool(len(s) > 0 && strings.Contains(c, s)), nil
+
+	case core.LispList:
+		// Check if item is in a list
+		for _, val := range c {
+			if core.EqualValues(val, item) {
+				return core.PythonicBool(true), nil
+			}
+		}
+		return core.PythonicBool(false), nil
+
+	case core.LispListLiteral:
+		// Check if item is in a list literal
+		for _, val := range c {
+			if core.EqualValues(val, item) {
+				return core.PythonicBool(true), nil
+			}
+		}
+		return core.PythonicBool(false), nil
+
+	case core.LispTuple:
+		// Check if item is in a tuple
+		for _, val := range c {
+			if core.EqualValues(val, item) {
+				return core.PythonicBool(true), nil
+			}
+		}
+		return core.PythonicBool(false), nil
+
+	case *core.PythonicDict:
+		// Check if key is in a dictionary
+		_, found := c.Get(item)
+		return core.PythonicBool(found), nil
+
+	case *core.PythonicSet:
+		// Check if item is in a set
+		return core.PythonicBool(c.Contains(item)), nil
+
+	case core.Environment:
+		// Check if symbol is defined in environment
+		symbol, ok := item.(core.LispSymbol)
+		if !ok {
+			// Try to convert string to symbol
+			if str, isStr := item.(string); isStr {
+				symbol = core.LispSymbol(str)
+			} else {
+				return nil, fmt.Errorf("environment lookup requires a symbol, got %T", item)
+			}
+		}
+		_, found := c.Get(symbol)
+		return core.PythonicBool(found), nil
+
+	default:
+		return nil, fmt.Errorf("'in' not supported for container type %T", container)
+	}
 }
