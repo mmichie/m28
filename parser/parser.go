@@ -800,8 +800,8 @@ func (p *Parser) parseAtom(token string, location core.Location) core.LispValue 
 	} else if strings.HasPrefix(token, "\"") && strings.HasSuffix(token, "\"") {
 		unquoted, err := strconv.Unquote(token)
 		if err == nil {
-			// Successfully unquoted string becomes a string value
-			value = unquoted
+			// Successfully unquoted string becomes a string value with processed escape sequences
+			value = core.ProcessEscapeSequences(unquoted)
 		} else {
 			// If unquoting fails, use the raw token as a symbol
 			// This should not happen with well-formed strings

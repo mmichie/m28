@@ -15,6 +15,11 @@ func PrintValueOverride(val core.LispValue) string {
 		val = locatedVal.Value
 	}
 
+	// Process escape sequences in string values
+	if str, ok := val.(string); ok {
+		return core.ProcessEscapeSequences(str)
+	}
+
 	// Special handling for dictionaries
 	if dict, ok := val.(*core.PythonicDict); ok {
 		// Get all keys from dictionary
@@ -40,7 +45,13 @@ func PrintValueOverride(val core.LispValue) string {
 				}
 			}
 
-			pairs = append(pairs, fmt.Sprintf("%s: %s", keyStr, core.PrintValue(v)))
+			// Process values for escape sequences
+			valueStr := core.PrintValue(v)
+			if valueStrStr, ok := v.(string); ok {
+				valueStr = core.ProcessEscapeSequences(valueStrStr)
+			}
+
+			pairs = append(pairs, fmt.Sprintf("%s: %s", keyStr, valueStr))
 		}
 
 		return "{" + strings.Join(pairs, ", ") + "}"

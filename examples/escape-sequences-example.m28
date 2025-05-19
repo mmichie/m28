@@ -1,0 +1,32 @@
+# Escape Sequences Example
+# This example demonstrates how to use escape sequences in strings
+
+# Newline escape sequence
+(print "Lines with newlines can be created using \\n:")
+(print "First line\nSecond line\nThird line")
+
+# Tab escape sequence
+(print "\nTabs can be used for alignment:\nColumn1\tColumn2\tColumn3\nData1\tData2\tData3")
+
+# Other common escape sequences
+(print "\nOther escape sequences:")
+(print " - Backslash: C:\\Program Files\\App")
+(print " - Quotes: She said, \"Hello\" and he replied, 'Hi'")
+(print " - Single quote: It's a nice day")
+
+# Using escape sequences in multiline output
+(print "\nFormatted output example:")
+(print "Name:\tJohn Smith\nAge:\t30\nEmail:\tjohn@example.com\nPhone:\t555-1234")
+
+# Storing strings with escape sequences in variables
+(= formatted_address "123 Main St.\nApt 4B\nNew York, NY 10001")
+(print "\nFormatted address:")
+(print formatted_address)
+
+# Using escape sequences in dictionary values
+(print "\nUser information:")
+(print "Name: Jane Doe")
+(print "Contact: Phone: 555-5678\nEmail: jane@example.com")
+(print "Notes: Meeting scheduled on:\n  - Monday at 10am\n  - Wednesday at 2pm")
+
+(print "\nEscape sequences can be used to make output more readable!")
