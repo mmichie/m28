@@ -162,7 +162,7 @@ func multiply(args []core.LispValue, env core.Environment) (core.LispValue, erro
 	return result, nil
 }
 
-// New multiply function with tuple repetition support
+// New multiply function with sequence repetition support (tuples and lists)
 func multiplyWithTupleSupport(args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("* requires at least two arguments")
@@ -185,6 +185,40 @@ func multiplyWithTupleSupport(args []core.LispValue, env core.Environment) (core
 		return nil, fmt.Errorf("cannot multiply tuple by non-number: %T", args[1])
 	}
 
+	// If first arg is a list and second is a number, handle repetition
+	if list, isList := args[0].(core.LispList); isList && len(args) == 2 {
+		if num, isNum := args[1].(float64); isNum {
+			count := int(num)
+			if float64(count) != num || count < 0 {
+				return nil, fmt.Errorf("list repetition requires a non-negative integer, got %v", num)
+			}
+
+			result := make(core.LispList, 0, len(list)*count)
+			for i := 0; i < count; i++ {
+				result = append(result, list...)
+			}
+			return result, nil
+		}
+		return nil, fmt.Errorf("cannot multiply list by non-number: %T", args[1])
+	}
+
+	// If first arg is a list literal and second is a number, handle repetition
+	if list, isList := args[0].(core.LispListLiteral); isList && len(args) == 2 {
+		if num, isNum := args[1].(float64); isNum {
+			count := int(num)
+			if float64(count) != num || count < 0 {
+				return nil, fmt.Errorf("list repetition requires a non-negative integer, got %v", num)
+			}
+
+			result := make(core.LispListLiteral, 0, len(list)*count)
+			for i := 0; i < count; i++ {
+				result = append(result, list...)
+			}
+			return result, nil
+		}
+		return nil, fmt.Errorf("cannot multiply list by non-number: %T", args[1])
+	}
+
 	// If first arg is a number and second is a tuple, handle repetition
 	if num, isNum := args[0].(float64); isNum && len(args) == 2 {
 		if tuple, isTuple := args[1].(core.LispTuple); isTuple {
@@ -196,6 +230,34 @@ func multiplyWithTupleSupport(args []core.LispValue, env core.Environment) (core
 			result := make(core.LispTuple, 0, len(tuple)*count)
 			for i := 0; i < count; i++ {
 				result = append(result, tuple...)
+			}
+			return result, nil
+		}
+
+		// If first arg is a number and second is a list, handle repetition
+		if list, isList := args[1].(core.LispList); isList {
+			count := int(num)
+			if float64(count) != num || count < 0 {
+				return nil, fmt.Errorf("list repetition requires a non-negative integer, got %v", num)
+			}
+
+			result := make(core.LispList, 0, len(list)*count)
+			for i := 0; i < count; i++ {
+				result = append(result, list...)
+			}
+			return result, nil
+		}
+
+		// If first arg is a number and second is a list literal, handle repetition
+		if list, isList := args[1].(core.LispListLiteral); isList {
+			count := int(num)
+			if float64(count) != num || count < 0 {
+				return nil, fmt.Errorf("list repetition requires a non-negative integer, got %v", num)
+			}
+
+			result := make(core.LispListLiteral, 0, len(list)*count)
+			for i := 0; i < count; i++ {
+				result = append(result, list...)
 			}
 			return result, nil
 		}
