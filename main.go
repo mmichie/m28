@@ -1,99 +1,88 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-
-	"github.com/mmichie/m28/core"
-	"github.com/mmichie/m28/initialize"
-	"github.com/mmichie/m28/repl"
+	
+	"m28/core"
+	"m28/repl"
 )
+
+// Command line flags
+var (
+	evalExpr   = flag.String("e", "", "Evaluate expression")
+	showHelp   = flag.Bool("help", false, "Show help")
+	showVersion = flag.Bool("version", false, "Show version")
+)
+
+const version = "0.1.0-fresh-start"
 
 func main() {
 	// Parse command line flags
-	flags := repl.ParseFlags()
-
-	// Initialize concurrency features first
-	initialize.InitializeConcurrency()
-
-	// Enable debug mode if requested
-	if flags.Debug {
-		initialize.EnableDebugMode()
+	flag.Parse()
+	
+	// Show help
+	if *showHelp {
+		printHelp()
+		return
 	}
-
-	// Initialize the REPL with command flags
-	r := repl.NewREPL(flags)
-
-	// Store evaluator in global environment for object method calls
-	r.StoreEvaluator()
-
-	// A flag to determine if we should enter interactive mode
-	enterRepl := flags.Interactive
-
-	// Handle the evaluation flag (-e/--eval)
-	if flags.EvalCode != "" {
-		result, err := r.EvaluateString(flags.EvalCode)
-		if err != nil {
-			printError(err)
-			os.Exit(1)
-		}
-		fmt.Println(core.PrintValue(result))
-
-		// Exit after evaluation unless interactive mode is requested
-		if !enterRepl {
-			return
-		}
+	
+	// Show version
+	if *showVersion {
+		fmt.Printf("M28 version %s\n", version)
+		return
 	}
-
-	// Handle the command flag (-c/--command)
-	if flags.Command != "" {
-		_, err := r.EvaluateString(flags.Command)
-		if err != nil {
-			printError(err)
-			os.Exit(1)
-		}
-
-		// Exit after command execution unless interactive mode is requested
-		if !enterRepl {
-			return
-		}
+	
+	// Create the global context
+	globalCtx := core.NewContext(nil)
+	
+	// Initialize the global context with built-in values and functions
+	initializeGlobalContext(globalCtx)
+	
+	// Evaluate an expression
+	if *evalExpr != "" {
+		// TODO: Implement expression evaluation
+		fmt.Println("Expression evaluation not implemented yet")
+		return
 	}
-
-	// Handle file arguments
-	for _, filename := range flags.Filenames {
-		ext := filepath.Ext(filename)
-
-		if ext == ".lisp" || ext == ".m28" {
-			// Execute the file
-			err := r.ExecuteFile(filename)
-			if err != nil {
-				printError(err)
-				os.Exit(1)
-			}
-		} else {
-			// Treat as code to evaluate
-			result, err := r.EvaluateString(filename)
-			if err != nil {
-				printError(err)
-				os.Exit(1)
-			}
-			fmt.Println(core.PrintValue(result))
-		}
+	
+	// Get the file to execute from positional arguments
+	args := flag.Args()
+	if len(args) > 0 {
+		// TODO: Implement file execution
+		fmt.Println("File execution not implemented yet")
+		return
 	}
-
-	// Start the REPL if no arguments were provided or interactive mode was requested
-	if len(flags.Filenames) == 0 && flags.EvalCode == "" && flags.Command == "" || enterRepl {
-		r.Run()
-	}
+	
+	// No file or expression provided, start the REPL
+	repl := repl.NewREPL(globalCtx)
+	repl.Start()
 }
 
-// printError formats and prints errors with special handling for exceptions
-func printError(err error) {
-	if ex, ok := err.(*core.Exception); ok {
-		// Print exception with traceback if available
-		fmt.Println(ex)
-	} else {
-		fmt.Println("Error:", err)
-	}
+// printHelp prints the usage instructions
+func printHelp() {
+	fmt.Println("Usage: m28 [options] [file]")
+	fmt.Println("Options:")
+	flag.PrintDefaults()
+}
+
+// initializeGlobalContext sets up the global context with built-in values and functions
+func initializeGlobalContext(ctx *core.Context) {
+	// Add built-in values
+	ctx.Define("true", core.True)
+	ctx.Define("false", core.False)
+	ctx.Define("nil", core.Nil)
+	
+	// Add built-in functions
+	ctx.Define("print", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		for i, arg := range args {
+			if i > 0 {
+				fmt.Print(" ")
+			}
+			fmt.Print(arg.String())
+		}
+		fmt.Println()
+		return core.Nil, nil
+	}))
 }
