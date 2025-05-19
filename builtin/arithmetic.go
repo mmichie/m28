@@ -68,6 +68,9 @@ func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 			} else if list2, ok := arg.(core.LispListLiteral); ok {
 				// Convert LispListLiteral to LispList
 				result = append(result, core.LispList(list2)...)
+			} else if tuple, ok := arg.(core.LispTuple); ok {
+				// Convert LispTuple to LispList for append
+				result = append(result, core.LispList(tuple)...)
 			} else {
 				return nil, fmt.Errorf("+ cannot mix lists and non-lists")
 			}
@@ -86,6 +89,9 @@ func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 			} else if list2, ok := arg.(core.LispListLiteral); ok {
 				// Convert LispListLiteral to LispList
 				result = append(result, core.LispList(list2)...)
+			} else if tuple, ok := arg.(core.LispTuple); ok {
+				// Convert LispTuple to LispList for append
+				result = append(result, core.LispList(tuple)...)
 			} else {
 				return nil, fmt.Errorf("+ cannot mix lists and non-lists")
 			}
@@ -93,7 +99,28 @@ func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
 		return result, nil
 	}
 
-	// If not strings or lists, assume numbers
+	// Handle tuples (concatenation to new tuple)
+	if tuple1, ok := args[0].(core.LispTuple); ok {
+		var result core.LispTuple
+		result = append(result, tuple1...)
+
+		for _, arg := range args[1:] {
+			if tuple2, ok := arg.(core.LispTuple); ok {
+				result = append(result, tuple2...)
+			} else if list, ok := arg.(core.LispList); ok {
+				// Convert LispList to tuple elements
+				result = append(result, core.LispTuple(list)...)
+			} else if list, ok := arg.(core.LispListLiteral); ok {
+				// Convert LispListLiteral to tuple elements
+				result = append(result, core.LispTuple(list)...)
+			} else {
+				return nil, fmt.Errorf("+ cannot mix tuples and non-sequences")
+			}
+		}
+		return result, nil
+	}
+
+	// If not strings, lists, or tuples, assume numbers
 	if num, ok := args[0].(float64); ok {
 		result := num
 		for _, arg := range args[1:] {
