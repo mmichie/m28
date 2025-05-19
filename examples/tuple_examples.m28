@@ -1,0 +1,89 @@
+# M28 Tuple Examples
+
+# This file demonstrates the tuple features in M28
+
+# Empty tuples with ()
+(= empty_tuple ())
+(print "Empty tuple:" empty_tuple)
+(print "Type of empty tuple:" (type empty_tuple))
+(print "Is empty tuple a tuple?" (isinstance empty_tuple "tuple"))
+
+# Single-element tuples with trailing comma
+(= single_tuple (1,))
+(print "\nSingle-element tuple:" single_tuple)
+(print "Type of single_tuple:" (type single_tuple))
+(print "Length of single_tuple:" (len single_tuple))
+
+# Multi-element tuples
+(= multi_tuple (1, 2, 3, "a", "b"))
+(print "\nMulti-element tuple:" multi_tuple)
+(print "Type of multi_tuple:" (type multi_tuple))
+(print "Length of multi_tuple:" (len multi_tuple))
+(print "First element:" (nth multi_tuple 0))
+(print "Last element:" (nth multi_tuple 4))
+
+# Nested tuples
+(= nested_tuple (1, (2, 3), (4, 5, 6)))
+(print "\nNested tuple:" nested_tuple)
+(print "Second element:" (nth nested_tuple 1))
+(print "Type of second element:" (type (nth nested_tuple 1)))
+
+# Type checking with Python-style syntax
+(print "\nType checking:")
+(print "empty_tuple is tuple?" (isinstance empty_tuple "tuple"))
+(print "single_tuple is tuple?" (isinstance single_tuple "tuple"))
+(print "multi_tuple is tuple?" (isinstance multi_tuple "tuple"))
+(print "nested_tuple is tuple?" (isinstance nested_tuple "tuple"))
+
+# Immutability
+(print "\nImmutability test:")
+(try
+  (= (nth multi_tuple 0) 99)  # This should fail
+  (print "Test failed: Tuple was modified")
+  (except Exception e
+    (print "Test passed: Tuples are immutable" e)))
+
+# Create tuple in function
+(def (make_point x y)
+  (x, y))
+(= point (make_point 10 20))
+(print "\nPoint:" point)
+(print "Type of point:" (type point))
+
+# Return multiple values as a tuple
+(def (get_stats numbers)
+  (= min_val (apply min numbers))
+  (= max_val (apply max numbers))
+  (= avg (/ (apply + numbers) (len numbers)))
+  (min_val, max_val, avg))
+
+(= stats (get_stats (list 1 2 3 4 5)))
+(print "\nStats tuple:" stats)
+(print "Min:" (nth stats 0))
+(print "Max:" (nth stats 1))
+(print "Avg:" (nth stats 2))
+
+# Tuple unpacking (when implemented)
+# (= (x, y) point)
+# (print "\nUnpacked point - x:" x "y:" y)
+
+# Comparison and equality
+(= tuple1 (1, 2, 3))
+(= tuple2 (1, 2, 3))
+(= tuple3 (1, 2, 4))
+(print "\nComparison operations:")
+(print "tuple1 == tuple2:" (== tuple1 tuple2))
+(print "tuple1 == tuple3:" (== tuple1 tuple3))
+(print "tuple1 < tuple3:" (< tuple1 tuple3))
+
+# Converting list to tuple and back
+(= my_list (list 1 2 3 4))
+(= from_list (tuple my_list))
+(print "\nConversion operations:")
+(print "Original list:" my_list)
+(print "As tuple:" from_list)
+(print "Type of from_list:" (type from_list))
+
+(= back_to_list (list from_list))
+(print "Back to list:" back_to_list)
+(print "Type of back_to_list:" (type back_to_list))
