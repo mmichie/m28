@@ -1,333 +1,423 @@
-// File: builtin/arithmetic.go
-
+// Package builtin provides standard library functions for the M28 language.
 package builtin
 
 import (
 	"fmt"
 	"math"
-
-	"github.com/mmichie/m28/core"
+	
+	"m28/core"
 )
 
-func RegisterArithmeticFuncs() {
-	core.RegisterBuiltin("+", add)
-	core.RegisterBuiltin("-", subtract)
-	core.RegisterBuiltin("*", multiplyWithTupleSupport) // Use the new multiply func
-	core.RegisterBuiltin("/", divide)
-	core.RegisterBuiltin("%", modulo)
-	core.RegisterBuiltin("//", floorDivide)
-	core.RegisterBuiltin("**", power)
-	core.RegisterBuiltin("=", assignFunc)
+// RegisterArithmeticFunctions registers arithmetic functions in the global context
+func RegisterArithmeticFunctions(ctx *core.Context) {
+	// Basic arithmetic operations
+	ctx.Define("+", core.NewBuiltinFunction(AddFunc))
+	ctx.Define("-", core.NewBuiltinFunction(SubtractFunc))
+	ctx.Define("*", core.NewBuiltinFunction(MultiplyFunc))
+	ctx.Define("/", core.NewBuiltinFunction(DivideFunc))
+	ctx.Define("%", core.NewBuiltinFunction(ModuloFunc))
+	
+	// Math functions
+	ctx.Define("abs", core.NewBuiltinFunction(AbsFunc))
+	ctx.Define("sqrt", core.NewBuiltinFunction(SqrtFunc))
+	ctx.Define("pow", core.NewBuiltinFunction(PowFunc))
+	ctx.Define("max", core.NewBuiltinFunction(MaxFunc))
+	ctx.Define("min", core.NewBuiltinFunction(MinFunc))
+	ctx.Define("round", core.NewBuiltinFunction(RoundFunc))
+	ctx.Define("floor", core.NewBuiltinFunction(FloorFunc))
+	ctx.Define("ceil", core.NewBuiltinFunction(CeilFunc))
 }
 
-func assignFunc(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("= requires exactly two arguments")
+// AddFunc implements the + operation
+func AddFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return core.NumberValue(0), nil
 	}
-	symbol, ok := args[0].(core.LispSymbol)
-	if !ok {
-		return nil, fmt.Errorf("first argument to = must be a symbol")
+	
+	switch first := args[0].(type) {
+	case core.NumberValue:
+		// Number addition
+		result := float64(first)
+		for _, arg := range args[1:] {
+			if num, ok := arg.(core.NumberValue); ok {
+				result += float64(num)
+			} else {
+				return nil, fmt.Errorf("cannot add %s to number", arg.Type().Name())
+			}
+		}
+		return core.NumberValue(result), nil
+		
+	case core.StringValue:
+		// String concatenation
+		result := string(first)
+		for _, arg := range args[1:] {
+			if str, ok := arg.(core.StringValue); ok {
+				result += string(str)
+			} else {
+				return nil, fmt.Errorf("cannot concatenate %s to string", arg.Type().Name())
+			}
+		}
+		return core.StringValue(result), nil
+		
+	case core.ListValue:
+		// List concatenation
+		result := make(core.ListValue, len(first))
+		copy(result, first)
+		for _, arg := range args[1:] {
+			if list, ok := arg.(core.ListValue); ok {
+				result = append(result, list...)
+			} else {
+				return nil, fmt.Errorf("cannot concatenate %s to list", arg.Type().Name())
+			}
+		}
+		return result, nil
+		
+	default:
+		return nil, fmt.Errorf("cannot apply + to %s", first.Type().Name())
 	}
-	value := args[1]
-
-	// First try to update an existing variable in any scope
-	if !env.SetMutable(symbol, value) {
-		// If the variable doesn't exist anywhere, define it in the current scope
-		env.Define(symbol, value)
-	}
-
-	return value, nil
 }
 
-func add(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("+ requires at least two arguments")
-	}
-
-	// Check if we're dealing with strings
-	if _, ok := args[0].(string); ok {
-		result := ""
-		for _, arg := range args {
-			s, ok := arg.(string)
-			if !ok {
-				return nil, fmt.Errorf("+ cannot mix strings and non-strings")
-			}
-			result += s
-		}
-		return result, nil
-	}
-
-	// Check if we're dealing with lists (concatenation)
-	if list1, ok := args[0].(core.LispList); ok {
-		var result core.LispList
-		result = append(result, list1...)
-
-		for _, arg := range args[1:] {
-			if list2, ok := arg.(core.LispList); ok {
-				result = append(result, list2...)
-			} else if list2, ok := arg.(core.LispListLiteral); ok {
-				// Convert LispListLiteral to LispList
-				result = append(result, core.LispList(list2)...)
-			} else if tuple, ok := arg.(core.LispTuple); ok {
-				// Convert LispTuple to LispList for append
-				result = append(result, core.LispList(tuple)...)
-			} else {
-				return nil, fmt.Errorf("+ cannot mix lists and non-lists")
-			}
-		}
-		return result, nil
-	}
-
-	// Also handle list literals
-	if list1, ok := args[0].(core.LispListLiteral); ok {
-		var result core.LispList
-		result = append(result, core.LispList(list1)...)
-
-		for _, arg := range args[1:] {
-			if list2, ok := arg.(core.LispList); ok {
-				result = append(result, list2...)
-			} else if list2, ok := arg.(core.LispListLiteral); ok {
-				// Convert LispListLiteral to LispList
-				result = append(result, core.LispList(list2)...)
-			} else if tuple, ok := arg.(core.LispTuple); ok {
-				// Convert LispTuple to LispList for append
-				result = append(result, core.LispList(tuple)...)
-			} else {
-				return nil, fmt.Errorf("+ cannot mix lists and non-lists")
-			}
-		}
-		return result, nil
-	}
-
-	// Handle tuples (concatenation to new tuple)
-	if tuple1, ok := args[0].(core.LispTuple); ok {
-		var result core.LispTuple
-		result = append(result, tuple1...)
-
-		for _, arg := range args[1:] {
-			if tuple2, ok := arg.(core.LispTuple); ok {
-				result = append(result, tuple2...)
-			} else if list, ok := arg.(core.LispList); ok {
-				// Convert LispList to tuple elements
-				result = append(result, core.LispTuple(list)...)
-			} else if list, ok := arg.(core.LispListLiteral); ok {
-				// Convert LispListLiteral to tuple elements
-				result = append(result, core.LispTuple(list)...)
-			} else {
-				return nil, fmt.Errorf("+ cannot mix tuples and non-sequences")
-			}
-		}
-		return result, nil
-	}
-
-	// If not strings, lists, or tuples, assume numbers
-	if num, ok := args[0].(float64); ok {
-		result := num
-		for _, arg := range args[1:] {
-			if val, ok := arg.(float64); ok {
-				result += val
-			} else {
-				return nil, fmt.Errorf("+ cannot mix numbers and non-numbers")
-			}
-		}
-		return result, nil
-	}
-
-	return nil, fmt.Errorf("+ operator not supported for %T", args[0])
-}
-
-func subtract(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) < 1 {
+// SubtractFunc implements the - operation
+func SubtractFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
 		return nil, fmt.Errorf("- requires at least one argument")
 	}
+	
 	if len(args) == 1 {
-		return -args[0].(float64), nil
-	}
-	result := args[0].(float64)
-	for _, arg := range args[1:] {
-		result -= arg.(float64)
-	}
-	return result, nil
-}
-
-// Original multiply function (keep for reference)
-func multiply(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("* requires at least two arguments")
-	}
-	result := args[0].(float64)
-	for _, arg := range args[1:] {
-		result *= arg.(float64)
-	}
-	return result, nil
-}
-
-// New multiply function with sequence repetition support (tuples and lists)
-func multiplyWithTupleSupport(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("* requires at least two arguments")
-	}
-
-	// If first arg is a tuple and second is a number, handle repetition
-	if tuple, isTuple := args[0].(core.LispTuple); isTuple && len(args) == 2 {
-		if num, isNum := args[1].(float64); isNum {
-			count := int(num)
-			if float64(count) != num || count < 0 {
-				return nil, fmt.Errorf("tuple repetition requires a non-negative integer, got %v", num)
-			}
-
-			result := make(core.LispTuple, 0, len(tuple)*count)
-			for i := 0; i < count; i++ {
-				result = append(result, tuple...)
-			}
-			return result, nil
+		// Unary negation
+		if num, ok := args[0].(core.NumberValue); ok {
+			return core.NumberValue(-float64(num)), nil
 		}
-		return nil, fmt.Errorf("cannot multiply tuple by non-number: %T", args[1])
+		return nil, fmt.Errorf("cannot negate %s", args[0].Type().Name())
 	}
-
-	// If first arg is a list and second is a number, handle repetition
-	if list, isList := args[0].(core.LispList); isList && len(args) == 2 {
-		if num, isNum := args[1].(float64); isNum {
-			count := int(num)
-			if float64(count) != num || count < 0 {
-				return nil, fmt.Errorf("list repetition requires a non-negative integer, got %v", num)
-			}
-
-			result := make(core.LispList, 0, len(list)*count)
-			for i := 0; i < count; i++ {
-				result = append(result, list...)
-			}
-			return result, nil
-		}
-		return nil, fmt.Errorf("cannot multiply list by non-number: %T", args[1])
-	}
-
-	// If first arg is a list literal and second is a number, handle repetition
-	if list, isList := args[0].(core.LispListLiteral); isList && len(args) == 2 {
-		if num, isNum := args[1].(float64); isNum {
-			count := int(num)
-			if float64(count) != num || count < 0 {
-				return nil, fmt.Errorf("list repetition requires a non-negative integer, got %v", num)
-			}
-
-			result := make(core.LispListLiteral, 0, len(list)*count)
-			for i := 0; i < count; i++ {
-				result = append(result, list...)
-			}
-			return result, nil
-		}
-		return nil, fmt.Errorf("cannot multiply list by non-number: %T", args[1])
-	}
-
-	// If first arg is a number and second is a tuple, handle repetition
-	if num, isNum := args[0].(float64); isNum && len(args) == 2 {
-		if tuple, isTuple := args[1].(core.LispTuple); isTuple {
-			count := int(num)
-			if float64(count) != num || count < 0 {
-				return nil, fmt.Errorf("tuple repetition requires a non-negative integer, got %v", num)
-			}
-
-			result := make(core.LispTuple, 0, len(tuple)*count)
-			for i := 0; i < count; i++ {
-				result = append(result, tuple...)
-			}
-			return result, nil
-		}
-
-		// If first arg is a number and second is a list, handle repetition
-		if list, isList := args[1].(core.LispList); isList {
-			count := int(num)
-			if float64(count) != num || count < 0 {
-				return nil, fmt.Errorf("list repetition requires a non-negative integer, got %v", num)
-			}
-
-			result := make(core.LispList, 0, len(list)*count)
-			for i := 0; i < count; i++ {
-				result = append(result, list...)
-			}
-			return result, nil
-		}
-
-		// If first arg is a number and second is a list literal, handle repetition
-		if list, isList := args[1].(core.LispListLiteral); isList {
-			count := int(num)
-			if float64(count) != num || count < 0 {
-				return nil, fmt.Errorf("list repetition requires a non-negative integer, got %v", num)
-			}
-
-			result := make(core.LispListLiteral, 0, len(list)*count)
-			for i := 0; i < count; i++ {
-				result = append(result, list...)
-			}
-			return result, nil
-		}
-	}
-
-	// Otherwise, treat as regular numeric multiplication
-	allNums := true
-	for _, arg := range args {
-		_, isNum := arg.(float64)
-		if !isNum {
-			allNums = false
-			break
-		}
-	}
-
-	if allNums {
-		num1, _ := args[0].(float64)
-		result := num1
+	
+	// Binary subtraction
+	if first, ok := args[0].(core.NumberValue); ok {
+		result := float64(first)
 		for _, arg := range args[1:] {
-			num2, _ := arg.(float64)
-			result *= num2
+			if num, ok := arg.(core.NumberValue); ok {
+				result -= float64(num)
+			} else {
+				return nil, fmt.Errorf("cannot subtract %s from number", arg.Type().Name())
+			}
 		}
-		return result, nil
+		return core.NumberValue(result), nil
 	}
-
-	// If we get here, we don't know how to handle these args
-	types := make([]string, len(args))
-	for i, arg := range args {
-		types[i] = fmt.Sprintf("%T", arg)
-	}
-	return nil, fmt.Errorf("* not supported for types: %v", types)
+	
+	return nil, fmt.Errorf("cannot apply - to %s", args[0].Type().Name())
 }
 
-func divide(args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("/ requires exactly two arguments")
+// MultiplyFunc implements the * operation
+func MultiplyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return core.NumberValue(1), nil
 	}
-	dividend, divisor := args[0].(float64), args[1].(float64)
-	if divisor == 0 {
-		return nil, fmt.Errorf("division by zero")
+	
+	switch first := args[0].(type) {
+	case core.NumberValue:
+		// Number multiplication
+		result := float64(first)
+		for _, arg := range args[1:] {
+			if num, ok := arg.(core.NumberValue); ok {
+				result *= float64(num)
+			} else {
+				return nil, fmt.Errorf("cannot multiply number by %s", arg.Type().Name())
+			}
+		}
+		return core.NumberValue(result), nil
+		
+	case core.StringValue:
+		// String repetition (only with one number)
+		if len(args) != 2 {
+			return nil, fmt.Errorf("string repetition requires exactly one number")
+		}
+		if count, ok := args[1].(core.NumberValue); ok {
+			n := int(count)
+			if n < 0 {
+				return nil, fmt.Errorf("cannot repeat string a negative number of times")
+			}
+			result := ""
+			for i := 0; i < n; i++ {
+				result += string(first)
+			}
+			return core.StringValue(result), nil
+		}
+		return nil, fmt.Errorf("cannot multiply string by %s", args[1].Type().Name())
+		
+	case core.ListValue:
+		// List repetition (only with one number)
+		if len(args) != 2 {
+			return nil, fmt.Errorf("list repetition requires exactly one number")
+		}
+		if count, ok := args[1].(core.NumberValue); ok {
+			n := int(count)
+			if n < 0 {
+				return nil, fmt.Errorf("cannot repeat list a negative number of times")
+			}
+			result := make(core.ListValue, 0, len(first)*n)
+			for i := 0; i < n; i++ {
+				result = append(result, first...)
+			}
+			return result, nil
+		}
+		return nil, fmt.Errorf("cannot multiply list by %s", args[1].Type().Name())
+		
+	default:
+		return nil, fmt.Errorf("cannot apply * to %s", first.Type().Name())
 	}
-	return dividend / divisor, nil
 }
 
-func modulo(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("%% requires exactly two arguments")
+// DivideFunc implements the / operation
+func DivideFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("/ requires at least one argument")
 	}
-	a, b := args[0].(float64), args[1].(float64)
-	if b == 0 {
-		return nil, fmt.Errorf("modulo by zero")
+	
+	if len(args) == 1 {
+		// Reciprocal
+		if num, ok := args[0].(core.NumberValue); ok {
+			if float64(num) == 0 {
+				return nil, fmt.Errorf("division by zero")
+			}
+			return core.NumberValue(1 / float64(num)), nil
+		}
+		return nil, fmt.Errorf("cannot take reciprocal of %s", args[0].Type().Name())
 	}
-	return math.Mod(a, b), nil
+	
+	// Division
+	if first, ok := args[0].(core.NumberValue); ok {
+		result := float64(first)
+		for _, arg := range args[1:] {
+			if num, ok := arg.(core.NumberValue); ok {
+				if float64(num) == 0 {
+					return nil, fmt.Errorf("division by zero")
+				}
+				result /= float64(num)
+			} else {
+				return nil, fmt.Errorf("cannot divide number by %s", arg.Type().Name())
+			}
+		}
+		return core.NumberValue(result), nil
+	}
+	
+	return nil, fmt.Errorf("cannot apply / to %s", args[0].Type().Name())
 }
 
-func floorDivide(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+// ModuloFunc implements the % operation
+func ModuloFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("// requires exactly two arguments")
+		return nil, fmt.Errorf("%% requires exactly 2 arguments")
 	}
-	a, b := args[0].(float64), args[1].(float64)
-	if b == 0 {
-		return nil, fmt.Errorf("floor division by zero")
+	
+	if a, ok := args[0].(core.NumberValue); ok {
+		if b, ok := args[1].(core.NumberValue); ok {
+			if float64(b) == 0 {
+				return nil, fmt.Errorf("modulo by zero")
+			}
+			return core.NumberValue(math.Mod(float64(a), float64(b))), nil
+		}
+		return nil, fmt.Errorf("cannot calculate modulo with %s", args[1].Type().Name())
 	}
-	return math.Floor(a / b), nil
+	
+	return nil, fmt.Errorf("cannot apply %% to %s", args[0].Type().Name())
 }
 
-func power(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("** requires exactly two arguments")
+// AbsFunc implements the abs function
+func AbsFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("abs requires exactly 1 argument")
 	}
-	base, exponent := args[0].(float64), args[1].(float64)
-	return math.Pow(base, exponent), nil
+	
+	if num, ok := args[0].(core.NumberValue); ok {
+		return core.NumberValue(math.Abs(float64(num))), nil
+	}
+	
+	return nil, fmt.Errorf("cannot calculate absolute value of %s", args[0].Type().Name())
+}
+
+// SqrtFunc implements the sqrt function
+func SqrtFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("sqrt requires exactly 1 argument")
+	}
+	
+	if num, ok := args[0].(core.NumberValue); ok {
+		if float64(num) < 0 {
+			return nil, fmt.Errorf("cannot calculate square root of negative number")
+		}
+		return core.NumberValue(math.Sqrt(float64(num))), nil
+	}
+	
+	return nil, fmt.Errorf("cannot calculate square root of %s", args[0].Type().Name())
+}
+
+// PowFunc implements the pow function
+func PowFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("pow requires exactly 2 arguments")
+	}
+	
+	if base, ok := args[0].(core.NumberValue); ok {
+		if exp, ok := args[1].(core.NumberValue); ok {
+			return core.NumberValue(math.Pow(float64(base), float64(exp))), nil
+		}
+		return nil, fmt.Errorf("exponent must be a number, got %s", args[1].Type().Name())
+	}
+	
+	return nil, fmt.Errorf("base must be a number, got %s", args[0].Type().Name())
+}
+
+// MaxFunc implements the max function
+func MaxFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("max requires at least 1 argument")
+	}
+	
+	if len(args) == 1 {
+		if list, ok := args[0].(core.ListValue); ok {
+			if len(list) == 0 {
+				return nil, fmt.Errorf("cannot calculate max of empty list")
+			}
+			return maxList(list)
+		}
+		return args[0], nil
+	}
+	
+	return maxList(args)
+}
+
+// maxList finds the maximum value in a list
+func maxList(list []core.Value) (core.Value, error) {
+	if len(list) == 0 {
+		return nil, fmt.Errorf("cannot calculate max of empty list")
+	}
+	
+	// Check if all elements are numbers
+	if _, ok := list[0].(core.NumberValue); ok {
+		max := float64(list[0].(core.NumberValue))
+		for _, v := range list[1:] {
+			if num, ok := v.(core.NumberValue); ok {
+				if float64(num) > max {
+					max = float64(num)
+				}
+			} else {
+				return nil, fmt.Errorf("all arguments to max must be numbers, got %s", v.Type().Name())
+			}
+		}
+		return core.NumberValue(max), nil
+	}
+	
+	// Check if all elements are strings
+	if _, ok := list[0].(core.StringValue); ok {
+		max := string(list[0].(core.StringValue))
+		for _, v := range list[1:] {
+			if str, ok := v.(core.StringValue); ok {
+				if string(str) > max {
+					max = string(str)
+				}
+			} else {
+				return nil, fmt.Errorf("all arguments to max must be strings, got %s", v.Type().Name())
+			}
+		}
+		return core.StringValue(max), nil
+	}
+	
+	return nil, fmt.Errorf("cannot calculate max of %s", list[0].Type().Name())
+}
+
+// MinFunc implements the min function
+func MinFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("min requires at least 1 argument")
+	}
+	
+	if len(args) == 1 {
+		if list, ok := args[0].(core.ListValue); ok {
+			if len(list) == 0 {
+				return nil, fmt.Errorf("cannot calculate min of empty list")
+			}
+			return minList(list)
+		}
+		return args[0], nil
+	}
+	
+	return minList(args)
+}
+
+// minList finds the minimum value in a list
+func minList(list []core.Value) (core.Value, error) {
+	if len(list) == 0 {
+		return nil, fmt.Errorf("cannot calculate min of empty list")
+	}
+	
+	// Check if all elements are numbers
+	if _, ok := list[0].(core.NumberValue); ok {
+		min := float64(list[0].(core.NumberValue))
+		for _, v := range list[1:] {
+			if num, ok := v.(core.NumberValue); ok {
+				if float64(num) < min {
+					min = float64(num)
+				}
+			} else {
+				return nil, fmt.Errorf("all arguments to min must be numbers, got %s", v.Type().Name())
+			}
+		}
+		return core.NumberValue(min), nil
+	}
+	
+	// Check if all elements are strings
+	if _, ok := list[0].(core.StringValue); ok {
+		min := string(list[0].(core.StringValue))
+		for _, v := range list[1:] {
+			if str, ok := v.(core.StringValue); ok {
+				if string(str) < min {
+					min = string(str)
+				}
+			} else {
+				return nil, fmt.Errorf("all arguments to min must be strings, got %s", v.Type().Name())
+			}
+		}
+		return core.StringValue(min), nil
+	}
+	
+	return nil, fmt.Errorf("cannot calculate min of %s", list[0].Type().Name())
+}
+
+// RoundFunc implements the round function
+func RoundFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("round requires exactly 1 argument")
+	}
+	
+	if num, ok := args[0].(core.NumberValue); ok {
+		return core.NumberValue(math.Round(float64(num))), nil
+	}
+	
+	return nil, fmt.Errorf("cannot round %s", args[0].Type().Name())
+}
+
+// FloorFunc implements the floor function
+func FloorFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("floor requires exactly 1 argument")
+	}
+	
+	if num, ok := args[0].(core.NumberValue); ok {
+		return core.NumberValue(math.Floor(float64(num))), nil
+	}
+	
+	return nil, fmt.Errorf("cannot floor %s", args[0].Type().Name())
+}
+
+// CeilFunc implements the ceil function
+func CeilFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("ceil requires exactly 1 argument")
+	}
+	
+	if num, ok := args[0].(core.NumberValue); ok {
+		return core.NumberValue(math.Ceil(float64(num))), nil
+	}
+	
+	return nil, fmt.Errorf("cannot ceil %s", args[0].Type().Name())
 }

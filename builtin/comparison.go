@@ -1,228 +1,295 @@
+// Package builtin implements built-in functions for the language.
 package builtin
 
 import (
 	"fmt"
-	"strings"
-
-	"github.com/mmichie/m28/core"
+	
+	"m28/core"
 )
 
-func RegisterComparisonBuiltins() {
-	core.RegisterBuiltin("==", eqFunc)
-	core.RegisterBuiltin("!=", neFunc)
-	core.RegisterBuiltin("<", ltFunc)
-	core.RegisterBuiltin("<=", leFunc)
-	core.RegisterBuiltin(">", gtFunc)
-	core.RegisterBuiltin(">=", geFunc)
-	core.RegisterBuiltin("and", andFunc)
-	core.RegisterBuiltin("or", orFunc)
-	core.RegisterBuiltin("not", notFunc)
-	core.RegisterBuiltin("eq?", eqFunc) // Alternative equality function
-	core.RegisterBuiltin("in", inFunc)  // Python-like 'in' operator
+// RegisterComparisonFunctions registers comparison functions in the global context
+func RegisterComparisonFunctions(ctx *core.Context) {
+	// Comparison operators
+	ctx.Define("==", core.NewBuiltinFunction(EqualFunc))
+	ctx.Define("!=", core.NewBuiltinFunction(NotEqualFunc))
+	ctx.Define("<", core.NewBuiltinFunction(LessThanFunc))
+	ctx.Define("<=", core.NewBuiltinFunction(LessEqualFunc))
+	ctx.Define(">", core.NewBuiltinFunction(GreaterThanFunc))
+	ctx.Define(">=", core.NewBuiltinFunction(GreaterEqualFunc))
+	
+	// Logical operators
+	ctx.Define("not", core.NewBuiltinFunction(NotFunc))
+	ctx.Define("and", core.NewBuiltinFunction(AndFunc))
+	ctx.Define("or", core.NewBuiltinFunction(OrFunc))
 }
 
-func eqFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+// EqualFunc implements the == operator
+func EqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("== requires exactly two arguments")
+		return nil, fmt.Errorf("== requires exactly 2 arguments")
 	}
-	return core.PythonicBool(core.EqualValues(args[0], args[1])), nil
-}
-
-func neFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("!= requires exactly two arguments")
-	}
-	return core.PythonicBool(!core.EqualValues(args[0], args[1])), nil
-}
-
-func ltFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("< requires exactly two arguments")
-	}
-	return compareValues(args[0], args[1], func(a, b float64) bool { return a < b })
-}
-
-func leFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("<= requires exactly two arguments")
-	}
-	return compareValues(args[0], args[1], func(a, b float64) bool { return a <= b })
-}
-
-func gtFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("> requires exactly two arguments")
-	}
-	return compareValues(args[0], args[1], func(a, b float64) bool { return a > b })
-}
-
-func geFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf(">= requires exactly two arguments")
-	}
-	return compareValues(args[0], args[1], func(a, b float64) bool { return a >= b })
-}
-
-func andFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	// Python-like and function with short-circuit evaluation
-	if len(args) == 0 {
-		return core.PythonicBool(true), nil
-	}
-
-	var result core.LispValue = core.PythonicBool(true)
-	for _, arg := range args {
-		if !core.IsTruthy(arg) {
-			return arg, nil // Return the first falsy value encountered
+	
+	// Compare based on type
+	switch a := args[0].(type) {
+	case core.NumberValue:
+		if b, ok := args[1].(core.NumberValue); ok {
+			return core.BoolValue(a == b), nil
 		}
-		result = arg // Keep track of the most recent value
-	}
-	return result, nil // Return the last value evaluated
-}
-
-func orFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	// Python-like or function with short-circuit evaluation
-	if len(args) == 0 {
-		return core.PythonicBool(false), nil
-	}
-
-	for _, arg := range args {
-		if core.IsTruthy(arg) {
-			return arg, nil // Return the first truthy value encountered
+		return core.False, nil
+		
+	case core.StringValue:
+		if b, ok := args[1].(core.StringValue); ok {
+			return core.BoolValue(a == b), nil
 		}
-	}
-	return args[len(args)-1], nil // Return the last value if all are falsy
-}
-
-func notFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("not requires exactly one argument")
-	}
-	return core.PythonicBool(!core.IsTruthy(args[0])), nil
-}
-
-func compareValues(a, b core.LispValue, comparator func(float64, float64) bool) (core.LispValue, error) {
-	// Check if we can use the generic Compare function
-	_, isComplex1 := a.(core.LispList)
-	_, isComplex2 := a.(core.LispListLiteral)
-	_, isComplex3 := a.(core.LispTuple)
-	_, isComplex4 := a.(*core.PythonicDict)
-	_, isComplex5 := a.(*core.PythonicSet)
-
-	_, isComplex6 := b.(core.LispList)
-	_, isComplex7 := b.(core.LispListLiteral)
-	_, isComplex8 := b.(core.LispTuple)
-	_, isComplex9 := b.(*core.PythonicDict)
-	_, isComplex10 := b.(*core.PythonicSet)
-
-	// If either value is a complex type, use the Compare function
-	if isComplex1 || isComplex2 || isComplex3 || isComplex4 || isComplex5 ||
-		isComplex6 || isComplex7 || isComplex8 || isComplex9 || isComplex10 {
-		result := core.Compare(a, b)
-
-		// lt: < 0
-		if comparator(0, 1) && !comparator(1, 0) {
-			return core.PythonicBool(result < 0), nil
+		return core.False, nil
+		
+	case core.BoolValue:
+		if b, ok := args[1].(core.BoolValue); ok {
+			return core.BoolValue(a == b), nil
 		}
-		// gt: > 0
-		if !comparator(0, 1) && comparator(1, 0) {
-			return core.PythonicBool(result > 0), nil
-		}
-		// le: <= 0
-		if comparator(0, 0) && comparator(0, 1) {
-			return core.PythonicBool(result <= 0), nil
-		}
-		// ge: >= 0
-		if comparator(0, 0) && comparator(1, 0) {
-			return core.PythonicBool(result >= 0), nil
-		}
-	}
-
-	// For simple numeric types, use the provided comparator directly
-	switch v1 := a.(type) {
-	case float64:
-		if v2, ok := b.(float64); ok {
-			return core.PythonicBool(comparator(v1, v2)), nil
-		}
-	case string:
-		if v2, ok := b.(string); ok {
-			return core.PythonicBool(comparator(float64(len(v1)), float64(len(v2)))), nil
-		}
-	}
-
-	return nil, fmt.Errorf("cannot compare values of different types")
-}
-
-// inFunc implements the Python-like 'in' operator to check if a value is in a collection
-func inFunc(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("in requires exactly two arguments")
-	}
-
-	item := args[0]
-	container := args[1]
-
-	switch c := container.(type) {
-	case string:
-		// Check if item is in a string
-		s, ok := item.(string)
-		if !ok {
-			return nil, fmt.Errorf("string contains check requires string item, got %T", item)
-		}
-		// Check if s is a substring of c
-		return core.PythonicBool(len(s) > 0 && strings.Contains(c, s)), nil
-
-	case core.LispList:
-		// Check if item is in a list
-		for _, val := range c {
-			if core.EqualValues(val, item) {
-				return core.PythonicBool(true), nil
+		return core.False, nil
+		
+	case core.NilValue:
+		_, isNil := args[1].(core.NilValue)
+		return core.BoolValue(isNil), nil
+		
+	case core.ListValue:
+		if b, ok := args[1].(core.ListValue); ok {
+			if len(a) != len(b) {
+				return core.False, nil
 			}
-		}
-		return core.PythonicBool(false), nil
-
-	case core.LispListLiteral:
-		// Check if item is in a list literal
-		for _, val := range c {
-			if core.EqualValues(val, item) {
-				return core.PythonicBool(true), nil
+			for i := range a {
+				result, err := EqualFunc([]core.Value{a[i], b[i]}, ctx)
+				if err != nil {
+					return nil, err
+				}
+				if result == core.False {
+					return core.False, nil
+				}
 			}
+			return core.True, nil
 		}
-		return core.PythonicBool(false), nil
-
-	case core.LispTuple:
-		// Check if item is in a tuple
-		for _, val := range c {
-			if core.EqualValues(val, item) {
-				return core.PythonicBool(true), nil
-			}
-		}
-		return core.PythonicBool(false), nil
-
-	case *core.PythonicDict:
-		// Check if key is in a dictionary
-		_, found := c.Get(item)
-		return core.PythonicBool(found), nil
-
-	case *core.PythonicSet:
-		// Check if item is in a set
-		return core.PythonicBool(c.Contains(item)), nil
-
-	case core.Environment:
-		// Check if symbol is defined in environment
-		// This handles the 'defined' test case
-		symbol, ok := item.(core.LispSymbol)
-		if !ok {
-			// Try to convert string to symbol
-			if str, isStr := item.(string); isStr {
-				symbol = core.LispSymbol(str)
-			} else {
-				return nil, fmt.Errorf("environment lookup requires a symbol, got %T", item)
-			}
-		}
-		_, found := c.Get(symbol)
-		return core.PythonicBool(found), nil
-
+		return core.False, nil
+		
 	default:
-		return nil, fmt.Errorf("'in' not supported for container type %T", container)
+		// For other types, just check if they're the same object
+		return core.BoolValue(args[0] == args[1]), nil
 	}
+}
+
+// NotEqualFunc implements the != operator
+func NotEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("!= requires exactly 2 arguments")
+	}
+	
+	result, err := EqualFunc(args, ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	if result == core.True {
+		return core.False, nil
+	}
+	return core.True, nil
+}
+
+// LessThanFunc implements the < operator
+func LessThanFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("< requires exactly 2 arguments")
+	}
+	
+	// Compare based on type
+	switch a := args[0].(type) {
+	case core.NumberValue:
+		if b, ok := args[1].(core.NumberValue); ok {
+			return core.BoolValue(a < b), nil
+		}
+		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type().Name())
+		
+	case core.StringValue:
+		if b, ok := args[1].(core.StringValue); ok {
+			return core.BoolValue(a < b), nil
+		}
+		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type().Name())
+		
+	default:
+		return nil, fmt.Errorf("< not supported for %s", a.Type().Name())
+	}
+}
+
+// LessEqualFunc implements the <= operator
+func LessEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("<= requires exactly 2 arguments")
+	}
+	
+	// Compare based on type
+	switch a := args[0].(type) {
+	case core.NumberValue:
+		if b, ok := args[1].(core.NumberValue); ok {
+			return core.BoolValue(a <= b), nil
+		}
+		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type().Name())
+		
+	case core.StringValue:
+		if b, ok := args[1].(core.StringValue); ok {
+			return core.BoolValue(a <= b), nil
+		}
+		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type().Name())
+		
+	default:
+		return nil, fmt.Errorf("<= not supported for %s", a.Type().Name())
+	}
+}
+
+// GreaterThanFunc implements the > operator
+func GreaterThanFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("> requires exactly 2 arguments")
+	}
+	
+	// Compare based on type
+	switch a := args[0].(type) {
+	case core.NumberValue:
+		if b, ok := args[1].(core.NumberValue); ok {
+			return core.BoolValue(a > b), nil
+		}
+		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type().Name())
+		
+	case core.StringValue:
+		if b, ok := args[1].(core.StringValue); ok {
+			return core.BoolValue(a > b), nil
+		}
+		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type().Name())
+		
+	default:
+		return nil, fmt.Errorf("> not supported for %s", a.Type().Name())
+	}
+}
+
+// GreaterEqualFunc implements the >= operator
+func GreaterEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf(">= requires exactly 2 arguments")
+	}
+	
+	// Compare based on type
+	switch a := args[0].(type) {
+	case core.NumberValue:
+		if b, ok := args[1].(core.NumberValue); ok {
+			return core.BoolValue(a >= b), nil
+		}
+		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type().Name())
+		
+	case core.StringValue:
+		if b, ok := args[1].(core.StringValue); ok {
+			return core.BoolValue(a >= b), nil
+		}
+		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type().Name())
+		
+	default:
+		return nil, fmt.Errorf(">= not supported for %s", a.Type().Name())
+	}
+}
+
+// NotFunc implements the not operator
+func NotFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("not requires exactly 1 argument")
+	}
+	
+	// Convert to boolean
+	var isTruthy bool
+	switch v := args[0].(type) {
+	case core.BoolValue:
+		isTruthy = bool(v)
+	case core.NilValue:
+		isTruthy = false
+	case core.NumberValue:
+		isTruthy = float64(v) != 0
+	case core.StringValue:
+		isTruthy = string(v) != ""
+	case core.ListValue:
+		isTruthy = len(v) > 0
+	case core.TupleValue:
+		isTruthy = len(v) > 0
+	default:
+		isTruthy = true
+	}
+	
+	return core.BoolValue(!isTruthy), nil
+}
+
+// AndFunc implements the and operator
+func AndFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return core.True, nil
+	}
+	
+	var result core.Value = core.True
+	for _, arg := range args {
+		// Convert to boolean
+		var isTruthy bool
+		switch v := arg.(type) {
+		case core.BoolValue:
+			isTruthy = bool(v)
+		case core.NilValue:
+			isTruthy = false
+		case core.NumberValue:
+			isTruthy = float64(v) != 0
+		case core.StringValue:
+			isTruthy = string(v) != ""
+		case core.ListValue:
+			isTruthy = len(v) > 0
+		case core.TupleValue:
+			isTruthy = len(v) > 0
+		default:
+			isTruthy = true
+		}
+		
+		if !isTruthy {
+			return arg, nil // Return the first falsy value
+		}
+		result = arg
+	}
+	
+	// All values were truthy, return the last one
+	return result, nil
+}
+
+// OrFunc implements the or operator
+func OrFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return core.False, nil
+	}
+	
+	for _, arg := range args {
+		// Convert to boolean
+		var isTruthy bool
+		switch v := arg.(type) {
+		case core.BoolValue:
+			isTruthy = bool(v)
+		case core.NilValue:
+			isTruthy = false
+		case core.NumberValue:
+			isTruthy = float64(v) != 0
+		case core.StringValue:
+			isTruthy = string(v) != ""
+		case core.ListValue:
+			isTruthy = len(v) > 0
+		case core.TupleValue:
+			isTruthy = len(v) > 0
+		default:
+			isTruthy = true
+		}
+		
+		if isTruthy {
+			return arg, nil // Return the first truthy value
+		}
+	}
+	
+	// All values were falsy, return the last one
+	return args[len(args)-1], nil
 }
