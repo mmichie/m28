@@ -38,9 +38,9 @@ func RegisterConcurrencyForms() {
 	}
 
 	// Register the forms
-	specialForms[core.LispSymbol("go")] = EvalGoForm
-	specialForms[core.LispSymbol("select")] = EvalSelectForm
-	specialForms[core.LispSymbol("select-timeout")] = EvalSelectTimeoutForm
-	specialForms[core.LispSymbol("with-mutex")] = EvalWithMutexForm
-	specialForms[core.LispSymbol("with-rlock")] = EvalWithRLockForm
+	SpecialForms[core.LispSymbol("go")] = EvalGoForm
+	SpecialForms[core.LispSymbol("select")] = EvalSelectForm
+	SpecialForms[core.LispSymbol("select-timeout")] = EvalSelectTimeoutForm
+	SpecialForms[core.LispSymbol("with-mutex")] = EvalWithMutexForm
+	SpecialForms[core.LispSymbol("with-rlock")] = EvalWithRLockForm
 }

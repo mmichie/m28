@@ -217,3 +217,30 @@ func (tuple LispTuple) AsObject() ObjProtocol {
 
 // Ensure LispTuple implements AdaptableLispValue
 var _ AdaptableLispValue = (LispTuple)(nil)
+
+// Hash implements the Hashable interface for LispTuple
+// This makes tuples usable as dictionary keys
+func (tuple LispTuple) Hash() uint32 {
+	// Use FNV-1a algorithm
+	h := uint32(2166136261)
+
+	// Combine hash of all elements in the tuple
+	for _, item := range tuple {
+		// Recursively hash tuple elements if they implement Hashable
+		if hashable, ok := item.(Hashable); ok {
+			elemHash := hashable.Hash()
+			h = (h * 16777619) ^ elemHash
+		} else {
+			// For non-hashable elements, hash their string representation
+			itemStr := PrintValue(item)
+			for i := 0; i < len(itemStr); i++ {
+				h = (h * 16777619) ^ uint32(itemStr[i])
+			}
+		}
+	}
+
+	return h
+}
+
+// Ensure LispTuple implements Hashable interface
+var _ Hashable = (LispTuple)(nil)

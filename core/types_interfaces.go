@@ -204,3 +204,9 @@ func hasVariadicParam(params []LispSymbol) bool {
 	}
 	return false
 }
+
+// Hashable defines an interface for values that can be used as dictionary keys
+type Hashable interface {
+	// Hash returns a hash code for the value
+	Hash() uint32
+}

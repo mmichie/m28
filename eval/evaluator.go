@@ -15,8 +15,14 @@ type Evaluator struct {
 }
 
 func NewEvaluator() core.Evaluator {
+	// Use the exported SpecialForms map
+	forms := make(map[core.LispSymbol]special_forms.SpecialFormFunc)
+	for name, form := range special_forms.SpecialForms {
+		forms[name] = form
+	}
+
 	return &Evaluator{
-		specialForms: special_forms.GetSpecialForms(),
+		specialForms: forms,
 		callStack:    make([]core.TraceEntry, 0),
 		currentFunc:  "<toplevel>",
 	}

@@ -26,10 +26,17 @@ func DictCreateFunc(args []core.LispValue, env core.Environment) (core.LispValue
 	// If the first argument is already a dict, create a copy
 	if inputDict, ok := args[0].(*core.PythonicDict); ok && len(args) == 1 {
 		// Create a copy
+		var copyErr error
 		inputDict.Iterate(func(k, v core.LispValue) error {
-			dict.Set(k, v)
+			if err := dict.Set(k, v); err != nil {
+				copyErr = err
+				return err
+			}
 			return nil
 		})
+		if copyErr != nil {
+			return nil, copyErr
+		}
 		return dict, nil
 	}
 
@@ -41,7 +48,9 @@ func DictCreateFunc(args []core.LispValue, env core.Environment) (core.LispValue
 	for i := 0; i < len(args); i += 2 {
 		key := args[i]
 		value := args[i+1]
-		dict.Set(key, value)
+		if err := dict.Set(key, value); err != nil {
+			return nil, err
+		}
 	}
 
 	return dict, nil

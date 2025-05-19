@@ -12,7 +12,7 @@ import (
 func RegisterArithmeticFuncs() {
 	core.RegisterBuiltin("+", add)
 	core.RegisterBuiltin("-", subtract)
-	core.RegisterBuiltin("*", multiply)
+	core.RegisterBuiltin("*", multiplyWithTupleSupport) // Use the new multiply func
 	core.RegisterBuiltin("/", divide)
 	core.RegisterBuiltin("%", modulo)
 	core.RegisterBuiltin("//", floorDivide)
@@ -150,7 +150,8 @@ func subtract(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	return result, nil
 }
 
-func multiply(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+// Original multiply function (keep for reference)
+func multiply(args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("* requires at least two arguments")
 	}
@@ -161,7 +162,74 @@ func multiply(args []core.LispValue, _ core.Environment) (core.LispValue, error)
 	return result, nil
 }
 
-func divide(args []core.LispValue, _ core.Environment) (core.LispValue, error) {
+// New multiply function with tuple repetition support
+func multiplyWithTupleSupport(args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("* requires at least two arguments")
+	}
+
+	// If first arg is a tuple and second is a number, handle repetition
+	if tuple, isTuple := args[0].(core.LispTuple); isTuple && len(args) == 2 {
+		if num, isNum := args[1].(float64); isNum {
+			count := int(num)
+			if float64(count) != num || count < 0 {
+				return nil, fmt.Errorf("tuple repetition requires a non-negative integer, got %v", num)
+			}
+
+			result := make(core.LispTuple, 0, len(tuple)*count)
+			for i := 0; i < count; i++ {
+				result = append(result, tuple...)
+			}
+			return result, nil
+		}
+		return nil, fmt.Errorf("cannot multiply tuple by non-number: %T", args[1])
+	}
+
+	// If first arg is a number and second is a tuple, handle repetition
+	if num, isNum := args[0].(float64); isNum && len(args) == 2 {
+		if tuple, isTuple := args[1].(core.LispTuple); isTuple {
+			count := int(num)
+			if float64(count) != num || count < 0 {
+				return nil, fmt.Errorf("tuple repetition requires a non-negative integer, got %v", num)
+			}
+
+			result := make(core.LispTuple, 0, len(tuple)*count)
+			for i := 0; i < count; i++ {
+				result = append(result, tuple...)
+			}
+			return result, nil
+		}
+	}
+
+	// Otherwise, treat as regular numeric multiplication
+	allNums := true
+	for _, arg := range args {
+		_, isNum := arg.(float64)
+		if !isNum {
+			allNums = false
+			break
+		}
+	}
+
+	if allNums {
+		num1, _ := args[0].(float64)
+		result := num1
+		for _, arg := range args[1:] {
+			num2, _ := arg.(float64)
+			result *= num2
+		}
+		return result, nil
+	}
+
+	// If we get here, we don't know how to handle these args
+	types := make([]string, len(args))
+	for i, arg := range args {
+		types[i] = fmt.Sprintf("%T", arg)
+	}
+	return nil, fmt.Errorf("* not supported for types: %v", types)
+}
+
+func divide(args []core.LispValue, env core.Environment) (core.LispValue, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("/ requires exactly two arguments")
 	}

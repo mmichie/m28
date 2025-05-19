@@ -269,9 +269,9 @@ func IsTruthy(v LispValue) bool {
 	case LispTuple:
 		return len(v) > 0
 	case *PythonicDict:
-		return len(v.data) > 0
+		return v.Size() > 0
 	case *PythonicSet:
-		return len(v.data) > 0
+		return v.Size() > 0
 	default:
 		return true
 	}
@@ -375,19 +375,22 @@ func EqualValues(a, b LispValue) bool {
 		return ok
 	case *PythonicDict:
 		vb, ok := b.(*PythonicDict)
-		if !ok || len(va.data) != len(vb.data) {
+		if !ok || va.Size() != vb.Size() {
 			return false
 		}
-		for k, v := range va.data {
+		var result = true
+		va.Iterate(func(k, v LispValue) error {
 			vbv, ok := vb.Get(k)
 			if !ok || !EqualValues(v, vbv) {
-				return false
+				result = false
+				return fmt.Errorf("key not found or values not equal")
 			}
-		}
-		return true
+			return nil
+		})
+		return result
 	case *PythonicSet:
 		vb, ok := b.(*PythonicSet)
-		if !ok || len(va.data) != len(vb.data) {
+		if !ok || va.Size() != vb.Size() {
 			return false
 		}
 		for k := range va.data {
@@ -462,17 +465,20 @@ func PrintValue(val LispValue) string {
 	case PythonicNone:
 		return "None"
 	case *PythonicDict:
-		pairs := make([]string, 0, len(v.data))
-		for k, val := range v.data {
+		pairs := make([]string, 0, v.Size())
+		keys := v.SortedKeys()
+		for _, k := range keys {
+			val, _ := v.Get(k)
 			pairs = append(pairs, fmt.Sprintf("%s: %s", PrintValue(k), PrintValue(val)))
 		}
 		return "{" + strings.Join(pairs, ", ") + "}"
 	case *PythonicSet:
-		elements := make([]string, 0, len(v.data))
-		for k := range v.data {
-			elements = append(elements, PrintValue(k))
+		result := make([]string, 0, v.Size())
+		elements := v.SortedElements()
+		for _, k := range elements {
+			result = append(result, PrintValue(k))
 		}
-		return "{" + strings.Join(elements, ", ") + "}"
+		return "{" + strings.Join(result, ", ") + "}"
 	case BuiltinFunc:
 		return "#<builtin-function>"
 	case *Lambda:

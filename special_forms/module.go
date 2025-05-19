@@ -129,7 +129,7 @@ func (m *ModuleLoaderImpl) LoadModule(name string, e core.Evaluator) (*core.Pyth
 	moduleEnv.SetupBuiltins() // Set up builtin functions in the environment
 
 	// Register special forms in the module environment
-	RegisterSpecialForms(moduleEnv)
+	registerSpecialFormsIn(moduleEnv)
 
 	module := core.NewPythonicDict()
 

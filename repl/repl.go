@@ -55,7 +55,9 @@ func NewREPL(flags *CommandFlags) *REPL {
 	core.SetModuleLoader(moduleLoader)
 
 	// Register special forms in the environment
-	special_forms.RegisterSpecialForms(environment)
+	for name := range special_forms.SpecialForms {
+		environment.Define(name, core.SpecialFormMarker{Name: name})
+	}
 
 	// Initialize all special forms including concurrency forms
 	special_forms.InitializeAllForms()

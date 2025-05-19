@@ -9,8 +9,9 @@ import (
 // DictMethod represents a method function for dictionaries
 type DictMethod func(self *PythonicDict, args []LispValue) (LispValue, error)
 
+// PythonicDict is a Python-style dictionary
 type PythonicDict struct {
-	data      map[LispValue]LispValue
+	data      *DictDataStore // Our custom store with proper equality semantics
 	mu        sync.RWMutex
 	methods   map[string]DictMethod
 	evaluator Evaluator // Store evaluator reference for method calls
@@ -18,7 +19,7 @@ type PythonicDict struct {
 
 func NewPythonicDict() *PythonicDict {
 	dict := &PythonicDict{
-		data:    make(map[LispValue]LispValue),
+		data:    NewDictDataStore(),
 		methods: make(map[string]DictMethod),
 	}
 	dict.registerMethods()
@@ -76,7 +77,9 @@ func (d *PythonicDict) registerMethods() {
 			key := args[0]
 			value := args[1]
 
-			self.Set(key, value)
+			if err := self.Set(key, value); err != nil {
+				return nil, err
+			}
 			return self, nil // Return the dict for method chaining
 		},
 
@@ -91,7 +94,9 @@ func (d *PythonicDict) registerMethods() {
 			}
 
 			otherDict.Iterate(func(k, v LispValue) error {
-				self.Set(k, v)
+				if err := self.Set(k, v); err != nil {
+					return err
+				}
 				return nil
 			})
 
@@ -139,7 +144,7 @@ func (d *PythonicDict) registerMethods() {
 
 		"clear": func(self *PythonicDict, args []LispValue) (LispValue, error) {
 			self.mu.Lock()
-			self.data = make(map[LispValue]LispValue)
+			self.data.Clear()
 			self.mu.Unlock()
 			return self, nil
 		},
@@ -187,30 +192,33 @@ func (d *PythonicDict) registerMethods() {
 func (d *PythonicDict) Get(key LispValue) (LispValue, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	value, ok := d.data[key]
-	return value, ok
+
+	return d.data.Get(key)
 }
 
 // Set sets a key-value pair in the dictionary
-func (d *PythonicDict) Set(key, value LispValue) {
+func (d *PythonicDict) Set(key, value LispValue) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.data[key] = value
+
+	d.data.Set(key, value)
+	return nil
 }
 
 // Delete removes a key from the dictionary
 func (d *PythonicDict) Delete(key LispValue) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	delete(d.data, key)
+
+	d.data.Delete(key)
 }
 
 // HasKey checks if a key exists in the dictionary
 func (d *PythonicDict) HasKey(key LispValue) bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	_, exists := d.data[key]
-	return exists
+
+	return d.data.Contains(key)
 }
 
 // Contains is an alias for HasKey
@@ -222,38 +230,21 @@ func (d *PythonicDict) Contains(key LispValue) bool {
 func (d *PythonicDict) Size() int {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return len(d.data)
+	return d.data.Size()
 }
 
 // Iterate safely iterates over the dictionary's contents
 func (d *PythonicDict) Iterate(f func(key, value LispValue) error) error {
 	d.mu.RLock()
-	// Create a copy of the keys and values to iterate safely
-	keys := make([]LispValue, 0, len(d.data))
-	values := make([]LispValue, 0, len(d.data))
+	defer d.mu.RUnlock()
 
-	for k, v := range d.data {
-		keys = append(keys, k)
-		values = append(values, v)
-	}
-	d.mu.RUnlock()
-
-	// Now iterate using the copies
-	for i := range keys {
-		if err := f(keys[i], values[i]); err != nil {
-			return err
-		}
-	}
-	return nil
+	return d.data.Iterate(f)
 }
 
 // SortedKeys returns the dictionary keys in sorted order
 func (d *PythonicDict) SortedKeys() []LispValue {
 	d.mu.RLock()
-	keys := make([]LispValue, 0, len(d.data))
-	for k := range d.data {
-		keys = append(keys, k)
-	}
+	keys := d.data.Keys()
 	d.mu.RUnlock()
 
 	sort.Slice(keys, func(i, j int) bool {
@@ -316,8 +307,7 @@ func (d *PythonicDict) SetMember(name string, value LispValue, eval Evaluator, e
 	d.SetEvaluator(eval)
 
 	// Set the attribute in the dictionary
-	d.Set(name, value)
-	return nil
+	return d.Set(name, value)
 }
 
 // Ensure PythonicDict implements EvaluatorAware and ObjProtocol
@@ -363,8 +353,7 @@ func (d *PythonicDict) GetProp(name string) (LispValue, bool) {
 // SetProp implements the ObjProtocol.SetProp method
 func (d *PythonicDict) SetProp(name string, value LispValue) error {
 	// Set the attribute in the dictionary
-	d.Set(name, value)
-	return nil
+	return d.Set(name, value)
 }
 
 // HasMethodP implements the ObjProtocol.HasMethodP method
@@ -391,7 +380,7 @@ func (d *PythonicDict) String() string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	if len(d.data) == 0 {
+	if d.data.Size() == 0 {
 		return "{}"
 	}
 
@@ -399,7 +388,8 @@ func (d *PythonicDict) String() string {
 	result := "{"
 
 	for i, key := range keys {
-		value, _ := d.data[key]
+		// Use Get to retrieve the value for the key
+		value, _ := d.Get(key)
 		result += fmt.Sprintf("%v: %v", key, value)
 		if i < len(keys)-1 {
 			result += ", "

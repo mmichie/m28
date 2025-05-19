@@ -219,8 +219,7 @@ func SetItem(obj LispValue, key LispValue, value LispValue) error {
 
 	case *PythonicDict:
 		// For dictionaries, use the Set method
-		container.Set(key, value)
-		return nil
+		return container.Set(key, value)
 
 	default:
 		// Try to use the __setitem__ method if available
@@ -280,10 +279,12 @@ func Dir(obj LispValue) ([]string, error) {
 	switch typedObj := obj.(type) {
 	case *PythonicDict:
 		// For dictionaries, return all keys and methods
-		keys := make([]string, 0, len(typedObj.data))
+		// Use the Size method instead of direct data access
+		keys := make([]string, 0, typedObj.Size())
 
-		// Add all dictionary keys
-		for k := range typedObj.data {
+		// Add all dictionary keys using proper accessor method
+		dictKeys := typedObj.SortedKeys()
+		for _, k := range dictKeys {
 			if strKey, ok := k.(string); ok {
 				keys = append(keys, strKey)
 			} else {
@@ -305,7 +306,9 @@ func Dir(obj LispValue) ([]string, error) {
 
 		// Add instance attributes
 		if typedObj.Attributes != nil {
-			for k := range typedObj.Attributes.data {
+			// Use proper accessor methods instead of direct data access
+			attrKeys := typedObj.Attributes.SortedKeys()
+			for _, k := range attrKeys {
 				if strKey, ok := k.(string); ok {
 					attrs = append(attrs, strKey)
 				}

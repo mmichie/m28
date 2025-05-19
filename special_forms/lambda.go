@@ -78,9 +78,9 @@ func ApplyLambda(e core.Evaluator, lambda *core.Lambda, args []core.LispValue, e
 // registerSpecialFormsIn registers all special forms in the environment
 func registerSpecialFormsIn(env core.Environment) {
 	// Get all builtin special forms and register them
-	specialForms := GetSpecialForms()
-	for name := range specialForms {
-		env.Define(name, core.SpecialFormMarker{Name: name})
+	specialForms := GetAllSpecialForms()
+	for _, name := range specialForms {
+		env.Define(core.LispSymbol(name), core.SpecialFormMarker{Name: core.LispSymbol(name)})
 	}
 }
 

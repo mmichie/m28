@@ -6,73 +6,86 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-// EvalLet evaluates a let expression
-// (let ((var1 val1) (var2 val2) ...) body)
-func EvalLet(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("let requires bindings and a body")
-	}
-
-	bindings, ok := args[0].(core.LispList)
-	if !ok {
-		return nil, fmt.Errorf("let bindings must be a list")
-	}
-
-	// Create a new environment for the let bindings
-	letEnv := env.NewEnvironment(env)
-
-	// Evaluate each binding and add it to the let environment
-	for _, binding := range bindings {
-		bindingList, ok := binding.(core.LispList)
-		if !ok || len(bindingList) != 2 {
-			return nil, fmt.Errorf("let binding must be a list of form (name value)")
-		}
-
-		name, ok := bindingList[0].(core.LispSymbol)
-		if !ok {
-			return nil, fmt.Errorf("binding name must be a symbol")
-		}
-
-		value, err := e.Eval(bindingList[1], env)
-		if err != nil {
-			return nil, err
-		}
-
-		letEnv.Define(name, value)
-	}
-
-	// Evaluate the body expressions in the let environment
-	var result core.LispValue = core.PythonicNone{}
-	for _, expr := range args[1:] {
-		var err error
-		result, err = e.Eval(expr, letEnv)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
-}
-
+// EvalGlobal handles global variable declarations
 func EvalGlobal(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("global requires at least one variable name")
+	}
+
+	// For each argument, mark it as global
 	for _, arg := range args {
 		symbol, ok := arg.(core.LispSymbol)
 		if !ok {
-			return nil, fmt.Errorf("global arguments must be symbols")
+			return nil, fmt.Errorf("global arguments must be symbols, got %T", arg)
 		}
-		env.Define(symbol, nil)
+
+		// Find the variable in the environment chain
+		// and mark it as global
+		if markGlobalVar, ok := env.(interface {
+			MarkGlobal(sym core.LispSymbol)
+		}); ok {
+			markGlobalVar.MarkGlobal(symbol)
+		} else {
+			return nil, fmt.Errorf("environment doesn't support global variables")
+		}
 	}
+
 	return core.PythonicNone{}, nil
 }
 
+// EvalNonlocal handles nonlocal variable declarations
 func EvalNonlocal(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	// Simplified implementation without true nonlocal behavior
+	if len(args) < 1 {
+		return nil, fmt.Errorf("nonlocal requires at least one variable name")
+	}
+
+	// For each argument, mark it as nonlocal
 	for _, arg := range args {
 		symbol, ok := arg.(core.LispSymbol)
 		if !ok {
-			return nil, fmt.Errorf("nonlocal arguments must be symbols")
+			return nil, fmt.Errorf("nonlocal arguments must be symbols, got %T", arg)
 		}
-		env.Define(symbol, nil)
+
+		// Find the variable in the environment chain
+		// and mark it as nonlocal
+		if markNonlocalVar, ok := env.(interface {
+			MarkNonlocal(sym core.LispSymbol)
+		}); ok {
+			markNonlocalVar.MarkNonlocal(symbol)
+		} else {
+			return nil, fmt.Errorf("environment doesn't support nonlocal variables")
+		}
 	}
+
+	return core.PythonicNone{}, nil
+}
+
+// EvalDel deletes a variable from the environment
+func EvalDel(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("del requires at least one argument")
+	}
+
+	// Handle each argument
+	for _, arg := range args {
+		// If it's a symbol, delete the variable
+		if symbol, ok := arg.(core.LispSymbol); ok {
+			// Use environment interface if available
+			if deleter, ok := env.(interface {
+				Delete(sym core.LispSymbol) error
+			}); ok {
+				if err := deleter.Delete(symbol); err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, fmt.Errorf("environment doesn't support deleting variables")
+			}
+		} else {
+			// Try to evaluate as an item access (like del a[0] or del d["key"])
+			// This would require modification to the evaluator to support this
+			return nil, fmt.Errorf("del of non-symbol arguments not implemented yet")
+		}
+	}
+
 	return core.PythonicNone{}, nil
 }
