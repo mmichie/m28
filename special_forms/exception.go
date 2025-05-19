@@ -1,437 +1,177 @@
+// Package special_forms provides special form implementations for the M28 language.
 package special_forms
 
 import (
 	"fmt"
-
-	"github.com/mmichie/m28/core"
+	
+	"m28/core"
+	"m28/eval"
 )
 
-// Helper function to unwrap LocatedValue if present
-func unwrapValue(val core.LispValue) core.LispValue {
-	if located, ok := val.(core.LocatedValue); ok {
-		return located.Value
-	}
-	return val
+// RegisterExceptionForms registers exception-handling special forms
+func RegisterExceptionForms() {
+	registerSpecialForm("try", TryForm)
+	registerSpecialForm("raise", RaiseForm)
 }
 
-// Helper function to unwrap a list of values
-func unwrapList(list core.LispList) core.LispList {
-	result := make(core.LispList, len(list))
-	for i, val := range list {
-		result[i] = unwrapValue(val)
-	}
-	return result
-}
-
-// identifyBlockType examines a block and determines if it's an except or finally block
-func identifyBlockType(block core.LispValue) (string, core.LispList, bool) {
-	// Unwrap if it's a LocatedValue
-	block = unwrapValue(block)
-
-	// Ensure it's a list
-	blockList, ok := block.(core.LispList)
-	if !ok || len(blockList) < 1 {
-		return "", nil, false
-	}
-
-	// Unwrap the first element (should be the block type symbol)
-	blockTypeVal := unwrapValue(blockList[0])
-
-	// Ensure first element is a symbol
-	blockType, ok := blockTypeVal.(core.LispSymbol)
-	if !ok {
-		return "", blockList, false
-	}
-
-	return string(blockType), blockList, true
-}
-
-// EvalTry implements the 'try' special form for exception handling with
-// except and finally blocks.
-func EvalTry(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
+// TryForm implements the try-except-finally special form
+// Syntax: (try body... (except [type var] handler...)... (finally cleanup...))
+func TryForm(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 {
-		return nil, fmt.Errorf("try requires at least one argument")
+		return nil, fmt.Errorf("try requires at least a body")
 	}
-
-	// Extract the try body - all statements before the first except or finally block
-	var tryBodyStatements []core.LispValue
-
-	// Find indices of except/finally blocks to separate try body from handlers
-	exceptStartIdx := -1
-	tryBodyStatements = []core.LispValue{}
-
-	// All expressions before the first except/finally are part of the try body
+	
+	// Find except and finally clauses
+	bodyEnd := len(args)
+	var exceptClauses []core.Value
+	var finallyClause core.Value
+	
 	for i := 0; i < len(args); i++ {
-		blockType, _, isBlock := identifyBlockType(args[i])
-		if isBlock && (blockType == "except" || blockType == "finally") {
-			exceptStartIdx = i
-			break
-		}
-		// If not a special block, it's part of the try body
-		tryBodyStatements = append(tryBodyStatements, args[i])
-	}
-
-	// If we didn't find any except/finally blocks, all args are part of the try body
-	if exceptStartIdx == -1 {
-		exceptStartIdx = len(args)
-	}
-
-	// Find the except and finally blocks starting at exceptStartIdx
-	exceptBlocks := []core.LispList{}
-	var finallyBlock []core.LispValue // Store as a slice of statements
-
-	// Look for except and finally blocks starting from exceptStartIdx
-	for i := exceptStartIdx; i < len(args); i++ {
-		blockType, blockContents, ok := identifyBlockType(args[i])
-		if !ok {
-			// If not a valid block, treat it as part of the try body
-			continue
-		}
-
-		if blockType == "finally" {
-			if finallyBlock != nil {
-				return nil, fmt.Errorf("multiple finally blocks not allowed")
+		if list, ok := args[i].(core.ListValue); ok && len(list) > 0 {
+			if sym, ok := list[0].(core.SymbolValue); ok {
+				if sym == "except" {
+					bodyEnd = i
+					exceptClauses = append(exceptClauses, args[i])
+				} else if sym == "finally" {
+					if bodyEnd == len(args) {
+						bodyEnd = i
+					}
+					finallyClause = args[i]
+				}
 			}
-			if len(blockContents) > 1 {
-				// Store all statements after the "finally" symbol
-				finallyBlock = blockContents[1:]
-			}
-		} else if blockType == "except" {
-			exceptBlocks = append(exceptBlocks, blockContents)
 		}
 	}
-
-	// Execute try body statements in sequence and capture any errors
-	var tryResult core.LispValue = core.PythonicNone{}
-	var tryError error
-
-	for _, stmt := range tryBodyStatements {
-		tryResult, tryError = e.Eval(stmt, env)
-		if tryError != nil {
+	
+	// Execute the body in a try block
+	body := args[:bodyEnd]
+	var result core.Value = core.Nil
+	var err error
+	
+	// Try to execute the body
+	for _, expr := range body {
+		result, err = eval.Eval(expr, ctx)
+		if err != nil {
 			break
 		}
 	}
-
-	// If we have a finally block, ensure it gets executed
-	if finallyBlock != nil {
-		var finallyError error
-
-		// Execute each statement in the finally block
-		for _, stmt := range finallyBlock {
-			_, finallyError = e.Eval(stmt, env)
-			if finallyError != nil {
+	
+	// If an error occurred, try to handle it
+	if err != nil {
+		// Check if it's an exception we can handle
+		var exceptionHandled bool
+		
+		if ex, ok := err.(*core.ExceptionValue); ok {
+			// Try to match with an except clause
+			for _, clause := range exceptClauses {
+				exceptList := clause.(core.ListValue)
+				
+				// Check except clause format: (except [type var] handler...)
+				if len(exceptList) < 2 {
+					continue
+				}
+				
+				binding, ok := exceptList[1].(core.ListValue)
+				if !ok || len(binding) != 2 {
+					continue
+				}
+				
+				// Match exception type
+				exType, ok := binding[0].(core.SymbolValue)
+				if !ok {
+					continue
+				}
+				
+				// Skip if the exception type doesn't match
+				if string(exType) != "exception" && ex.Type().Name() != string(exType) {
+					continue
+				}
+				
+				// Get exception variable name
+				exVar, ok := binding[1].(core.SymbolValue)
+				if !ok {
+					continue
+				}
+				
+				// Create a new environment for the handler
+				handlerEnv := core.NewContext(ctx)
+				handlerEnv.Define(string(exVar), ex)
+				
+				// Execute the handler
+				handlers := exceptList[2:]
+				result = core.Nil
+				
+				for _, handler := range handlers {
+					result, err = eval.Eval(handler, handlerEnv)
+					if err != nil {
+						break
+					}
+				}
+				
+				exceptionHandled = true
 				break
 			}
 		}
-
-		// If try succeeded but finally failed, propagate the finally error
-		if tryError == nil && finallyError != nil {
-			return nil, finallyError
-		}
-
-		// If both try and finally succeeded, return try's result
-		if tryError == nil {
-			return tryResult, nil
+		
+		// If the exception wasn't handled, we'll re-throw it after finally
+		if !exceptionHandled {
+			// Execute finally clause if present
+			if finallyClause != nil {
+				finallyList := finallyClause.(core.ListValue)
+				for _, cleanup := range finallyList[1:] {
+					_, finallyErr := eval.Eval(cleanup, ctx)
+					if finallyErr != nil {
+						// If finally has an error, it takes precedence
+						return nil, finallyErr
+					}
+				}
+			}
+			
+			// Re-throw the original exception
+			return nil, err
 		}
 	}
-
-	// If no error in try block, return its result
-	if tryError == nil {
-		return tryResult, nil
+	
+	// Execute finally clause if present
+	if finallyClause != nil {
+		finallyList := finallyClause.(core.ListValue)
+		for _, cleanup := range finallyList[1:] {
+			finallyResult, finallyErr := eval.Eval(cleanup, ctx)
+			if finallyErr != nil {
+				// If finally has an error, it takes precedence
+				return nil, finallyErr
+			}
+			// Last value from finally becomes the result if there was no exception
+			result = finallyResult
+		}
 	}
+	
+	return result, nil
+}
 
-	// Convert the error to an Exception if it's not already one
-	var exception *core.Exception
-	if ex, ok := tryError.(*core.Exception); ok {
-		exception = ex
+// RaiseForm implements the raise special form
+// Syntax: (raise exception)
+func RaiseForm(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("raise requires exactly 1 argument")
+	}
+	
+	exception, err := eval.Eval(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	// If it's already an exception, raise it
+	if ex, ok := exception.(*core.ExceptionValue); ok {
+		return nil, ex
+	}
+	
+	// Otherwise, create a new exception
+	var message string
+	if str, ok := exception.(core.StringValue); ok {
+		message = string(str)
 	} else {
-		// Special handling for ReturnSignal and other special error types
-		if _, isReturnSignal := tryError.(ReturnSignal); isReturnSignal {
-			return nil, tryError // Pass through without converting
-		}
-
-		// Otherwise convert to a RuntimeError
-		exception = core.NewException("RuntimeError", tryError.Error())
+		message = exception.String()
 	}
-
-	// Store the active exception in the environment for potential re-raising
-	env.Define(core.LispSymbol("__active_exception__"), exception)
-
-	// Process except blocks to find a matching handler
-	for _, exceptBlock := range exceptBlocks {
-		// Handle bare except: (except body)
-		if len(exceptBlock) == 2 {
-			exceptBody := exceptBlock[1]
-
-			// Unwrap the except body
-			exceptBody = unwrapValue(exceptBody)
-
-			// Create a new environment with the exception available for re-raising
-			exceptEnv := env.NewEnvironment(env)
-			exceptEnv.Define(core.LispSymbol("__active_exception__"), exception)
-
-			// The body might be a list of statements
-			if bodyList, isList := exceptBody.(core.LispList); isList {
-				var result core.LispValue = core.PythonicNone{}
-				var err error
-
-				// Evaluate each statement in the list
-				for _, stmt := range bodyList {
-					result, err = e.Eval(stmt, exceptEnv)
-					if err != nil {
-						// If error happened in exception handler, propagate it while
-						// preserving its traceback information
-						return nil, err
-					}
-				}
-				return result, nil
-			}
-
-			// If not a list, just evaluate the single statement
-			return e.Eval(exceptBody, exceptEnv)
-		}
-
-		// Handle typed except: (except ExceptionType body)
-		if len(exceptBlock) == 3 {
-			exceptionTypeVal := unwrapValue(exceptBlock[1])
-			exceptionType, ok := exceptionTypeVal.(core.LispSymbol)
-			if !ok {
-				continue // Skip this handler if not a valid type
-			}
-
-			// Check if exception matches the type
-			if exception.IsSubclassOf(string(exceptionType)) {
-				exceptBody := exceptBlock[2]
-
-				// Unwrap the except body
-				exceptBody = unwrapValue(exceptBody)
-
-				// Create a new environment with the exception available for re-raising
-				exceptEnv := env.NewEnvironment(env)
-				exceptEnv.Define(core.LispSymbol("__active_exception__"), exception)
-
-				// The body might be a list of statements
-				if bodyList, isList := exceptBody.(core.LispList); isList {
-					var result core.LispValue = core.PythonicNone{}
-					var err error
-
-					// Evaluate each statement in the list
-					for _, stmt := range bodyList {
-						result, err = e.Eval(stmt, exceptEnv)
-						if err != nil {
-							return nil, err
-						}
-					}
-					return result, nil
-				}
-
-				// If not a list, just evaluate the single statement
-				return e.Eval(exceptBody, exceptEnv)
-			}
-		}
-
-		// Handle except with binding: (except ExceptionType as var body)
-		if len(exceptBlock) >= 5 {
-			exceptionTypeVal := unwrapValue(exceptBlock[1])
-			exceptionType, ok := exceptionTypeVal.(core.LispSymbol)
-			if !ok {
-				continue
-			}
-
-			// Check for "as" keyword
-			asKeywordVal := unwrapValue(exceptBlock[2])
-			asKeyword, ok := asKeywordVal.(core.LispSymbol)
-			if !ok || string(asKeyword) != "as" {
-				continue
-			}
-
-			// Get variable name
-			varNameVal := unwrapValue(exceptBlock[3])
-			varName, ok := varNameVal.(core.LispSymbol)
-			if !ok {
-				continue
-			}
-
-			// Check if exception matches the type
-			if exception.IsSubclassOf(string(exceptionType)) {
-				// Create a new environment with the exception bound to the variable
-				// and also available for re-raising
-				exceptEnv := env.NewEnvironment(env)
-				exceptEnv.Define(varName, exception)
-				exceptEnv.Define(core.LispSymbol("__active_exception__"), exception)
-
-				// Get the body
-				exceptBody := exceptBlock[4]
-
-				// Unwrap the except body
-				exceptBody = unwrapValue(exceptBody)
-
-				// The body might be a list of statements
-				if bodyList, isList := exceptBody.(core.LispList); isList {
-					var result core.LispValue = core.PythonicNone{}
-					var err error
-
-					// Evaluate each statement in the list
-					for _, stmt := range bodyList {
-						result, err = e.Eval(stmt, exceptEnv)
-						if err != nil {
-							return nil, err
-						}
-					}
-					return result, nil
-				}
-
-				// If not a list, just evaluate the single statement
-				return e.Eval(exceptBody, exceptEnv)
-			}
-		}
-	}
-
-	// No matching except block found, propagate the exception
-	return nil, exception
-}
-
-func EvalRaise(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	// Check for bare re-raise: (raise)
-	if len(args) == 0 {
-		// Get the most recent exception from the environment
-		activeException, ok := env.Get(core.LispSymbol("__active_exception__"))
-		if !ok {
-			return nil, fmt.Errorf("no active exception to re-raise")
-		}
-
-		// Return the active exception unchanged to maintain its traceback
-		if ex, ok := activeException.(*core.Exception); ok {
-			return nil, ex
-		}
-
-		// If somehow it's not an exception, create one
-		return nil, fmt.Errorf("cannot re-raise: __active_exception__ is not an Exception object")
-	}
-
-	if len(args) > 3 {
-		return nil, fmt.Errorf("raise requires 0-3 arguments")
-	}
-
-	// Case 1: (raise "Error message")
-	if len(args) == 1 {
-		message, err := e.Eval(args[0], env)
-		if err != nil {
-			return nil, err
-		}
-
-		// Create a generic exception with the message
-		exception := core.NewException("Exception", fmt.Sprintf("%v", message))
-		return nil, exception
-	}
-
-	// Unwrap exception type if it's a LocatedValue
-	exTypeVal := args[0]
-	if located, ok := exTypeVal.(core.LocatedValue); ok {
-		exTypeVal = located.Value
-	}
-
-	// Case 2: (raise ExceptionType "Error message")
-	exceptionType, ok := exTypeVal.(core.LispSymbol)
-	if !ok {
-		return nil, fmt.Errorf("first argument to raise must be a symbol")
-	}
-
-	message, err := e.Eval(args[1], env)
-	if err != nil {
-		return nil, err
-	}
-
-	typeName := string(exceptionType)
-	exception := core.NewException(typeName, fmt.Sprintf("%v", message))
-
-	// Case 3: (raise ExceptionType "Error message" cause)
-	// This allows for chained exceptions
-	if len(args) == 3 {
-		cause, err := e.Eval(args[2], env)
-		if err != nil {
-			return nil, err
-		}
-
-		// If cause is an exception, set it as the cause of this exception
-		if causeException, ok := cause.(*core.Exception); ok {
-			exception.Cause = causeException
-		}
-	}
-
-	return nil, exception
-}
-
-// EvalDefException implements the 'defexception' special form to define new exception types
-// Syntax: (defexception ExceptionName ParentException)
-func EvalDefException(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 1 || len(args) > 2 {
-		return nil, fmt.Errorf("defexception requires 1 or 2 arguments")
-	}
-
-	// Unwrap exception name if it's a LocatedValue
-	exNameVal := args[0]
-	if located, ok := exNameVal.(core.LocatedValue); ok {
-		exNameVal = located.Value
-	}
-
-	// Get exception name
-	exceptionName, ok := exNameVal.(core.LispSymbol)
-	if !ok {
-		return nil, fmt.Errorf("exception name must be a symbol")
-	}
-
-	// Default parent is Exception
-	parentName := "Exception"
-
-	// If parent is specified, get it
-	if len(args) == 2 {
-		// Unwrap parent type if it's a LocatedValue
-		parentVal := args[1]
-		if located, ok := parentVal.(core.LocatedValue); ok {
-			parentVal = located.Value
-		}
-
-		parentType, ok := parentVal.(core.LispSymbol)
-		if !ok {
-			return nil, fmt.Errorf("parent exception name must be a symbol")
-		}
-		parentName = string(parentType)
-	}
-
-	// Define the new exception type
-	exception := core.DefineCustomException(string(exceptionName), parentName)
-
-	// Register the exception type in the environment
-	env.Define(exceptionName, exception)
-
-	return exception, nil
-}
-
-func EvalAssert(e core.Evaluator, args []core.LispValue, env core.Environment) (core.LispValue, error) {
-	if len(args) < 1 || len(args) > 2 {
-		return nil, fmt.Errorf("assert takes 1 or 2 arguments")
-	}
-
-	condition, err := e.Eval(args[0], env)
-	if err != nil {
-		return nil, err
-	}
-
-	if !core.IsTruthy(condition) {
-		message := "Assertion failed"
-		if len(args) == 2 {
-			messageVal, err := e.Eval(args[1], env)
-			if err != nil {
-				return nil, err
-			}
-			message = fmt.Sprintf("%v", messageVal)
-		}
-
-		// Create an AssertionError exception
-		exception := core.NewException("AssertionError", message)
-		return nil, exception
-	}
-
-	return core.PythonicNone{}, nil
+	
+	return nil, core.NewException(core.ExceptionType, message, exception, ctx)
 }
