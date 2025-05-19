@@ -1,0 +1,120 @@
+package core
+
+import (
+	"fmt"
+)
+
+// TraceEntry represents a single entry in a stack trace
+type TraceEntry struct {
+	Function string
+	File     string
+	Line     int
+	Column   int
+}
+
+// Context holds the execution context for evaluation
+type Context struct {
+	// Variables in the current scope
+	Vars map[string]Value
+	
+	// Parent scope
+	Outer *Context
+	
+	// Global scope for module-level variables
+	Global *Context
+	
+	// Call stack for debugging and error reporting
+	CallStack []TraceEntry
+	
+	// Current function name for error reporting
+	CurrentFunction string
+}
+
+// NewContext creates a new evaluation context
+func NewContext(outer *Context) *Context {
+	ctx := &Context{
+		Vars:      make(map[string]Value),
+		Outer:     outer,
+		CallStack: make([]TraceEntry, 0),
+	}
+	
+	// If this is the global context, set Global to self
+	if outer == nil {
+		ctx.Global = ctx
+	} else {
+		// Otherwise, inherit global from parent
+		ctx.Global = outer.Global
+	}
+	
+	return ctx
+}
+
+// Define defines a new variable in the current scope
+func (c *Context) Define(name string, value Value) {
+	c.Vars[name] = value
+}
+
+// Set updates an existing variable in the nearest scope where it's defined
+func (c *Context) Set(name string, value Value) error {
+	// Check current scope
+	if _, ok := c.Vars[name]; ok {
+		c.Vars[name] = value
+		return nil
+	}
+	
+	// Check outer scopes
+	if c.Outer != nil {
+		return c.Outer.Set(name, value)
+	}
+	
+	return fmt.Errorf("variable not defined: %s", name)
+}
+
+// Lookup finds a variable in the current or outer scopes
+func (c *Context) Lookup(name string) (Value, error) {
+	// Check current scope
+	if val, ok := c.Vars[name]; ok {
+		return val, nil
+	}
+	
+	// Check outer scopes
+	if c.Outer != nil {
+		return c.Outer.Lookup(name)
+	}
+	
+	return nil, fmt.Errorf("undefined variable: %s", name)
+}
+
+// PushStack adds a new entry to the call stack
+func (c *Context) PushStack(function, file string, line, column int) {
+	c.CallStack = append(c.CallStack, TraceEntry{
+		Function: function,
+		File:     file,
+		Line:     line,
+		Column:   column,
+	})
+	c.CurrentFunction = function
+}
+
+// PopStack removes the most recent entry from the call stack
+func (c *Context) PopStack() {
+	if len(c.CallStack) > 0 {
+		c.CallStack = c.CallStack[:len(c.CallStack)-1]
+		if len(c.CallStack) > 0 {
+			c.CurrentFunction = c.CallStack[len(c.CallStack)-1].Function
+		} else {
+			c.CurrentFunction = ""
+		}
+	}
+}
+
+// FormatStackTrace returns a formatted stack trace for error reporting
+func (c *Context) FormatStackTrace() string {
+	trace := "Traceback (most recent call last):\n"
+	for i := len(c.CallStack) - 1; i >= 0; i-- {
+		entry := c.CallStack[i]
+		trace += fmt.Sprintf("  File \"%s\", line %d, in %s\n", 
+			entry.File, entry.Line, entry.Function)
+	}
+	return trace
+}
