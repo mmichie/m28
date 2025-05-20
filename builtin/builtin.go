@@ -23,7 +23,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	registerIOBuiltins(ctx)
 	
 	// Register list functions
-	registerListBuiltins(ctx)
+	RegisterListFunctions(ctx)
 	
 	// Register dictionary functions
 	registerDictBuiltins(ctx)
@@ -208,64 +208,7 @@ func registerIOBuiltins(ctx *core.Context) {
 	}))
 }
 
-// registerListBuiltins registers list manipulation functions
-func registerListBuiltins(ctx *core.Context) {
-	// List length: (len lst)
-	ctx.Define("len", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("len requires 1 argument")
-		}
-		
-		switch v := args[0].(type) {
-		case core.ListValue:
-			return core.NumberValue(len(v)), nil
-		case core.TupleValue:
-			return core.NumberValue(len(v)), nil
-		case core.StringValue:
-			return core.NumberValue(len(v)), nil
-		case *core.DictValue:
-			return core.NumberValue(v.Size()), nil
-		default:
-			return nil, fmt.Errorf("len expects a collection, got %v", args[0].Type())
-		}
-	}))
-	
-	// nth: (nth lst idx)
-	ctx.Define("nth", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("nth requires 2 arguments")
-		}
-		
-		// Check second argument is an index (number)
-		var idx int
-		if num, ok := args[1].(core.NumberValue); ok {
-			idx = int(num)
-		} else {
-			return nil, fmt.Errorf("nth index must be a number")
-		}
-		
-		// Access by index based on type
-		switch v := args[0].(type) {
-		case core.ListValue:
-			if idx < 0 || idx >= len(v) {
-				return nil, fmt.Errorf("index out of bounds: %d", idx)
-			}
-			return v[idx], nil
-		case core.TupleValue:
-			if idx < 0 || idx >= len(v) {
-				return nil, fmt.Errorf("index out of bounds: %d", idx)
-			}
-			return v[idx], nil
-		case core.StringValue:
-			if idx < 0 || idx >= len(v) {
-				return nil, fmt.Errorf("index out of bounds: %d", idx)
-			}
-			return core.StringValue(string(v)[idx : idx+1]), nil
-		default:
-			return nil, fmt.Errorf("nth expects a sequence, got %v", args[0].Type())
-		}
-	}))
-}
+// List functions are now in list.go
 
 // registerDictBuiltins registers dictionary manipulation functions
 func registerDictBuiltins(ctx *core.Context) {
