@@ -26,7 +26,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterListFunctions(ctx)
 	
 	// Register dictionary functions
-	registerDictBuiltins(ctx)
+	RegisterDictFunctions(ctx)
 	
 	// Register type functions
 	registerTypeBuiltins(ctx)
@@ -210,38 +210,7 @@ func registerIOBuiltins(ctx *core.Context) {
 
 // List functions are now in list.go
 
-// registerDictBuiltins registers dictionary manipulation functions
-func registerDictBuiltins(ctx *core.Context) {
-	// Get: (get dict key [default])
-	ctx.Define("get", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 2 || len(args) > 3 {
-			return nil, fmt.Errorf("get requires 2 or 3 arguments")
-		}
-		
-		dict, ok := args[0].(*core.DictValue)
-		if !ok {
-			return nil, fmt.Errorf("get expects a dictionary as first argument")
-		}
-		
-		key, ok := args[1].(core.StringValue)
-		if !ok {
-			return nil, fmt.Errorf("get expects a string key as second argument")
-		}
-		
-		// Try to get the value
-		if val, ok := dict.Get(string(key)); ok {
-			return val, nil
-		}
-		
-		// Return default if provided
-		if len(args) > 2 {
-			return args[2], nil
-		}
-		
-		// Otherwise return nil
-		return core.Nil, nil
-	}))
-}
+// Dictionary functions are now in dict.go
 
 // registerTypeBuiltins registers type-related functions
 func registerTypeBuiltins(ctx *core.Context) {
