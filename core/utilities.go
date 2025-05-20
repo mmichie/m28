@@ -94,6 +94,11 @@ func Compare(a, b Value) int {
 
 // IsTruthy determines if a value is truthy
 func IsTruthy(v Value) bool {
+	// Nil checks
+	if v == nil {
+		return false
+	}
+
 	switch val := v.(type) {
 	case BoolValue:
 		return bool(val)
@@ -107,7 +112,20 @@ func IsTruthy(v Value) bool {
 		return len(val) > 0
 	case NilValue:
 		return false
+	case *DictValue:
+		// Dictionary is truthy if it has at least one entry
+		if val == nil {
+			return false
+		}
+		return val.Size() > 0
+	case *SetValue:
+		// Set is truthy if it has at least one element
+		if val == nil {
+			return false
+		}
+		return val.Size() > 0
 	default:
+		// For other object types, we consider them truthy if they exist
 		return true
 	}
 }

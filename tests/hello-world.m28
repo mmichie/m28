@@ -1,0 +1,32 @@
+# Basic hello world test
+# This tests the minimal functionality of the interpreter
+
+# Define a variable
+(def message "Hello, world!")
+
+# Output the message
+(print message)
+
+# Define a function
+(def greet (name)
+  (print "Hello," name "!"))
+
+# Call the function
+(greet "User")
+
+# Test basic arithmetic
+(print "2 + 3 =" (+ 2 3))
+(print "5 - 2 =" (- 5 2))
+(print "4 * 5 =" (* 4 5))
+(print "10 / 2 =" (/ 10 2))
+
+# Test a simple if statement
+(if (< 2 3)
+    (print "2 is less than 3")
+    (print "This should not print"))
+
+# Test a simple assert
+(assert (= (+ 2 3) 5) "Addition is not working correctly")
+
+# Print success message
+(print "Hello world test completed successfully")

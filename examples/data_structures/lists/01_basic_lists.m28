@@ -21,19 +21,19 @@
 (print "Numbers list (function):" numbers_func)
 
 # List with elements using literal syntax (preferred)
-(= numbers_literal [1 2 3 4 5])
+(= numbers_literal [1, 2, 3, 4, 5])
 (print "Numbers list (literal):" numbers_literal)
 
 # Mixed data type list
-(= mixed [1 "two" 3.0 True None])
+(= mixed [1, "two", 3.0, True, None])
 (print "Mixed type list:" mixed)
 
 # Nested lists
-(= nested [[1 2] [3 4] [5 6]])
+(= nested [[1, 2], [3, 4], [5, 6]])
 (print "Nested list:" nested)
 
 # List with expressions
-(= combined [1 2 3 (list 4 5 6)])
+(= combined [1, 2, 3, (list 4 5 6)])
 (print "Combined list:" combined)
 
 #######################################
@@ -42,7 +42,7 @@
 
 (print "\n=== List Access and Indexing ===")
 
-(= nums [10 20 30 40 50])
+(= nums [10, 20, 30, 40, 50])
 (print "List:" nums)
 (print "First element (index 0):" (nth nums 0))
 (print "Third element (index 2):" (nth nums 2))
@@ -59,8 +59,8 @@
 (print "\n=== List Operations ===")
 
 # List concatenation
-(= list1 [1 2 3])
-(= list2 [4 5 6])
+(= list1 [1, 2, 3])
+(= list2 [4, 5, 6])
 (= combined (+ list1 list2))
 (print "List1:" list1)
 (print "List2:" list2)
@@ -85,7 +85,7 @@
 
 # Summing elements
 (= sum 0)
-(= nums [1 2 3 4 5])
+(= nums [1, 2, 3, 4, 5])
 (for num nums
   (= sum (+ sum num)))
 (print "Sum of" nums "is:" sum)
@@ -110,8 +110,8 @@
     (= total (+ total item)))
   total)
 
-(print "Sum of [1, 2, 3, 4, 5]:" (sum-list [1 2 3 4 5]))
-(print "Sum of [10, 20, 30]:" (sum-list [10 20 30]))
+(print "Sum of [1, 2, 3, 4, 5]:" (sum-list [1, 2, 3, 4, 5]))
+(print "Sum of [10, 20, 30]:" (sum-list [10, 20, 30]))
 
 # Define a function that creates and returns a list
 (def make-range (start end)

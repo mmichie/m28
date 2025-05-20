@@ -1,8 +1,8 @@
 # Test lists and dictionaries
 (print "Starting list test")
 
-# Simple list without commas
-(= nums [1 2 3])
+# Simple list with commas
+(= nums [1, 2, 3])
 (print "List:" nums)
 
 # Empty dictionary

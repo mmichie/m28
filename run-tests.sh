@@ -13,9 +13,13 @@ TESTS=(
     "exception-test.m28"
     "dot-notation-test.m28"
     "dict-test.m28"
+    "basic-module-test.m28"
+    "module-import-test.m28"
+    "repl-test.m28"
 )
 
-# No additional tests needed
+# Make sure the app is built first
+make build
 
 PASSED=0
 FAILED=0

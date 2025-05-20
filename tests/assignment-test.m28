@@ -1,0 +1,39 @@
+# Test for assignment operations in M28
+# This tests various forms of variable assignment
+
+(print "=== Testing Assignment Operations ===\n")
+
+(print "--- Testing = vs def ---")
+# This is directly from the builtins
+(= a 10)
+(print "a (defined with =):" a)
+
+# This should now work with the new = special form
+(= b 20)
+(print "b (defined with =):" b)
+
+(print "\n--- Testing list assignment ---")
+(= my-list [1, 2, 3, 4, 5])
+(print "my-list:" my-list)
+
+(print "\n--- Testing reassignment ---")
+(= c 100)
+(print "c (before):" c)
+(= c 200) 
+(print "c (after):" c)
+
+(print "\n--- Testing complex values ---")
+(= nested-list [[1, 2], [3, 4]])
+(print "nested-list:" nested-list)
+
+(= mixed-list [1, "two", 3.0, True])
+(print "mixed-list:" mixed-list)
+
+(print "\n--- Testing expressions ---")
+(= d (+ 10 20))
+(print "d = (+ 10 20):" d)
+
+(= e (nth my-list 2))
+(print "e = (nth my-list 2):" e)
+
+(print "\n=== Assignment Tests Complete ===")
