@@ -17,7 +17,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterComparisonFunctions(ctx)
 	
 	// Register string functions
-	registerStringBuiltins(ctx)
+	RegisterStringFunctions(ctx)
 	
 	// Register IO functions
 	registerIOBuiltins(ctx)
@@ -165,32 +165,8 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 	}))
 }
 
-// registerStringBuiltins registers string manipulation functions
-func registerStringBuiltins(ctx *core.Context) {
-	// String length: (str-len str)
-	ctx.Define("str-len", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("str-len requires 1 argument")
-		}
-		
-		if str, ok := args[0].(core.StringValue); ok {
-			return core.NumberValue(len(str)), nil
-		}
-		
-		return nil, fmt.Errorf("str-len expects a string, got %v", args[0].Type())
-	}))
-	
-	// String concatenation: (str-concat a b c ...)
-	ctx.Define("str-concat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		var sb strings.Builder
-		
-		for _, arg := range args {
-			sb.WriteString(core.PrintValueWithoutQuotes(arg))
-		}
-		
-		return core.StringValue(sb.String()), nil
-	}))
-}
+// Note: String functions have been moved to string.go
+// and are registered via RegisterStringFunctions
 
 // registerIOBuiltins registers IO functions
 func registerIOBuiltins(ctx *core.Context) {

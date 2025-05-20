@@ -11,13 +11,11 @@ import (
 	"github.com/mmichie/m28/env"
 	"github.com/mmichie/m28/eval"
 	"github.com/mmichie/m28/parser"
-	"github.com/mmichie/m28/special_forms"
 )
 
 // M28Engine provides the main interface for embedding M28 in other applications
 type M28Engine struct {
-	env       core.Environment
-	evaluator core.Evaluator
+	env       *env.Environment
 	parser    *parser.Parser
 	// Callback for shell commands
 	ShellExecutor func(string) (string, error)
@@ -31,23 +29,15 @@ func NewM28Engine() *M28Engine {
 	// Set up builtins in the environment
 	environment.SetupBuiltins()
 
-	// Create the evaluator
-	evaluator := eval.NewEvaluator()
+	// Register built-in functions to a core.Context
+	ctx := &core.Context{
+		Vars: make(map[string]core.Value),
+	}
+	builtin.RegisterAllBuiltins(ctx)
 
-	// Set up the evaluator for builtins
-	builtin.SetEvaluator(evaluator)
-
-	// Create and register the module loader
-	moduleLoader := special_forms.NewModuleLoader()
-	moduleLoader.SetEvaluator(evaluator)
-	core.SetModuleLoader(moduleLoader)
-
-	// Register special forms in the environment
-	special_forms.RegisterSpecialForms(environment)
-
+	// Create the engine
 	engine := &M28Engine{
 		env:       environment,
-		evaluator: evaluator,
 		parser:    parser.NewParser(),
 		// Default shell executor uses os/exec
 		ShellExecutor: defaultShellExecutor,
@@ -69,12 +59,12 @@ func defaultShellExecutor(command string) (string, error) {
 // registerShellFunctions adds shell-specific functions to the environment
 func (m *M28Engine) registerShellFunctions() {
 	// Execute shell command and return output
-	m.env.Define(core.LispSymbol("shell"), core.NewBuiltinFunction("shell", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define("shell", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("shell: expected 1 argument, got %d", len(args))
 		}
 
-		commandStr, ok := args[0].(core.LispString)
+		commandStr, ok := args[0].(core.StringValue)
 		if !ok {
 			return nil, fmt.Errorf("shell: expected string argument, got %T", args[0])
 		}
@@ -86,36 +76,36 @@ func (m *M28Engine) registerShellFunctions() {
 
 		// Remove trailing newline if present
 		output = strings.TrimSuffix(output, "\n")
-		return core.LispString(output), nil
+		return core.StringValue(output), nil
 	}))
 
 	// Get environment variable
-	m.env.Define(core.LispSymbol("getenv"), core.NewBuiltinFunction("getenv", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define("getenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("getenv: expected 1 argument, got %d", len(args))
 		}
 
-		varName, ok := args[0].(core.LispString)
+		varName, ok := args[0].(core.StringValue)
 		if !ok {
 			return nil, fmt.Errorf("getenv: expected string argument, got %T", args[0])
 		}
 
 		value := os.Getenv(string(varName))
-		return core.LispString(value), nil
+		return core.StringValue(value), nil
 	}))
 
 	// Set environment variable
-	m.env.Define(core.LispSymbol("setenv"), core.NewBuiltinFunction("setenv", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define("setenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("setenv: expected 2 arguments, got %d", len(args))
 		}
 
-		varName, ok := args[0].(core.LispString)
+		varName, ok := args[0].(core.StringValue)
 		if !ok {
 			return nil, fmt.Errorf("setenv: expected string for variable name, got %T", args[0])
 		}
 
-		varValue, ok := args[1].(core.LispString)
+		varValue, ok := args[1].(core.StringValue)
 		if !ok {
 			return nil, fmt.Errorf("setenv: expected string for value, got %T", args[1])
 		}
@@ -125,11 +115,11 @@ func (m *M28Engine) registerShellFunctions() {
 			return nil, fmt.Errorf("setenv error: %v", err)
 		}
 
-		return core.PythonicNone{}, nil
+		return core.Nil, nil
 	}))
 
 	// Get current working directory
-	m.env.Define(core.LispSymbol("pwd"), core.NewBuiltinFunction("pwd", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define("pwd", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 0 {
 			return nil, fmt.Errorf("pwd: expected 0 arguments, got %d", len(args))
 		}
@@ -139,16 +129,16 @@ func (m *M28Engine) registerShellFunctions() {
 			return nil, fmt.Errorf("pwd error: %v", err)
 		}
 
-		return core.LispString(dir), nil
+		return core.StringValue(dir), nil
 	}))
 
 	// Change directory
-	m.env.Define(core.LispSymbol("cd"), core.NewBuiltinFunction("cd", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define("cd", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("cd: expected 1 argument, got %d", len(args))
 		}
 
-		dirStr, ok := args[0].(core.LispString)
+		dirStr, ok := args[0].(core.StringValue)
 		if !ok {
 			return nil, fmt.Errorf("cd: expected string argument, got %T", args[0])
 		}
@@ -158,14 +148,14 @@ func (m *M28Engine) registerShellFunctions() {
 			return nil, fmt.Errorf("cd error: %v", err)
 		}
 
-		return core.PythonicNone{}, nil
+		return core.Nil, nil
 	}))
 
 	// Exit with status code
-	m.env.Define(core.LispSymbol("exit"), core.NewBuiltinFunction("exit", func(args ...core.LispValue) (core.LispValue, error) {
+	m.env.Define("exit", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		code := 0
 		if len(args) > 0 {
-			if numVal, ok := args[0].(core.LispNumber); ok {
+			if numVal, ok := args[0].(core.NumberValue); ok {
 				code = int(numVal)
 			} else {
 				return nil, fmt.Errorf("exit: expected number argument, got %T", args[0])
@@ -173,24 +163,29 @@ func (m *M28Engine) registerShellFunctions() {
 		}
 
 		os.Exit(code)
-		return core.PythonicNone{}, nil // Never reached
+		return core.Nil, nil // Never reached
 	}))
 }
 
 // Evaluate evaluates M28 code and returns the result
-func (m *M28Engine) Evaluate(code string) (core.LispValue, error) {
+func (m *M28Engine) Evaluate(code string) (core.Value, error) {
 	expr, err := m.parser.Parse(code)
 	if err != nil {
 		return nil, fmt.Errorf("parse error: %v", err)
 	}
 
+	// Create context
+	ctx := &core.Context{
+		Vars: make(map[string]core.Value),
+	}
+
 	// Check if we got multiple expressions as a list
-	if exprList, ok := expr.(core.LispList); ok && len(exprList) > 0 {
+	if exprList, ok := expr.(core.ListValue); ok && len(exprList) > 0 {
 		// Execute each expression in the list
-		var result core.LispValue = core.PythonicNone{}
+		var result core.Value = core.Nil
 
 		for _, subExpr := range exprList {
-			result, err = m.evaluator.Eval(subExpr, m.env)
+			result, err = eval.Eval(subExpr, ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -201,7 +196,7 @@ func (m *M28Engine) Evaluate(code string) (core.LispValue, error) {
 	}
 
 	// Single expression or empty list case
-	return m.evaluator.Eval(expr, m.env)
+	return eval.Eval(expr, ctx)
 }
 
 // ExecuteFile executes an M28 file
@@ -213,9 +208,7 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 
 	content := string(fileContent)
 
-	// Register source code in cache for better error reporting
-	core.RegisterSourceCode(filename, content)
-
+	// Set filename for parser
 	m.parser.SetFilename(filename)
 
 	expr, err := m.parser.Parse(content)
@@ -223,14 +216,16 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 		return fmt.Errorf("parse error: %v", err)
 	}
 
+	// Create context
+	ctx := &core.Context{
+		Vars: make(map[string]core.Value),
+	}
+
 	// Check if we got multiple expressions as a list
-	if exprList, ok := expr.(core.LispList); ok {
+	if exprList, ok := expr.(core.ListValue); ok {
 		for _, subExpr := range exprList {
-			_, err = m.evaluator.Eval(subExpr, m.env)
+			_, err = eval.Eval(subExpr, ctx)
 			if err != nil {
-				if ex, ok := err.(*core.Exception); ok {
-					return ex
-				}
 				return fmt.Errorf("error executing file: %v", err)
 			}
 		}
@@ -238,11 +233,8 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 	}
 
 	// Single expression case
-	_, err = m.evaluator.Eval(expr, m.env)
+	_, err = eval.Eval(expr, ctx)
 	if err != nil {
-		if ex, ok := err.(*core.Exception); ok {
-			return ex
-		}
 		return fmt.Errorf("error executing file: %v", err)
 	}
 
@@ -250,16 +242,16 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 }
 
 // DefineValue defines a value in the M28 environment
-func (m *M28Engine) DefineValue(name string, value core.LispValue) {
-	m.env.Define(core.LispSymbol(name), value)
+func (m *M28Engine) DefineValue(name string, value core.Value) {
+	m.env.Define(name, value)
 }
 
 // DefineFunction defines a Go function in the M28 environment
-func (m *M28Engine) DefineFunction(name string, function func(args ...core.LispValue) (core.LispValue, error)) {
-	m.env.Define(core.LispSymbol(name), core.NewBuiltinFunction(name, function))
+func (m *M28Engine) DefineFunction(name string, function func(args []core.Value, ctx *core.Context) (core.Value, error)) {
+	m.env.Define(name, core.NewBuiltinFunction(function))
 }
 
 // GetValue gets a value from the M28 environment
-func (m *M28Engine) GetValue(name string) (core.LispValue, bool) {
-	return m.env.Get(core.LispSymbol(name))
+func (m *M28Engine) GetValue(name string) (core.Value, bool) {
+	return m.env.Get(name)
 }

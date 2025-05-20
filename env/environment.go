@@ -8,39 +8,39 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// Debug flag for verbose logging
+var Debug bool = false
+
 // SymbolCollector is an interface for environments that can iterate over their symbols
 type SymbolCollector interface {
-	ForEachSymbol(func(symbol core.LispSymbol, value core.LispValue))
+	ForEachSymbol(func(symbol string, value core.Value))
 }
 
 // Environment represents a Lisp environment
 type Environment struct {
-	vars      map[core.LispSymbol]core.LispValue
-	outer     core.Environment
-	evaluator core.Evaluator // Added evaluator reference for evaluator-aware objects
+	vars      map[string]core.Value
+	outer     *Environment
+	evaluator interface{} // Added evaluator reference for evaluator-aware objects
 }
 
 // NewEnvironment creates a new environment
-func NewEnvironment(outer core.Environment) *Environment {
+func NewEnvironment(outer *Environment) *Environment {
 	env := &Environment{
-		vars:      make(map[core.LispSymbol]core.LispValue),
+		vars:      make(map[string]core.Value),
 		outer:     outer,
 		evaluator: nil,
 	}
 
 	// Inherit evaluator from outer environment if available
-	if outer != nil {
-		if outerEnv, ok := outer.(*Environment); ok && outerEnv.evaluator != nil {
-			env.evaluator = outerEnv.evaluator
-		}
+	if outer != nil && outer.evaluator != nil {
+		env.evaluator = outer.evaluator
 	}
 
-	env.Define(core.LispSymbol("None"), core.PythonicNone{})
-	env.Define(core.LispSymbol("True"), core.PythonicBool(true))
-	env.Define(core.LispSymbol("False"), core.PythonicBool(false))
+	env.Define("None", core.Nil)
+	env.Define("True", core.BoolValue(true))
+	env.Define("False", core.BoolValue(false))
 
-	// Register type constants in the environment
-	core.RegisterTypeConstants(env)
+	// No need to register type constants in this version
 
 	// This is a reasonable default for most environment needs
 	// This ensures builtins are always available
@@ -50,35 +50,29 @@ func NewEnvironment(outer core.Environment) *Environment {
 }
 
 // Get retrieves a value from the environment
-func (e *Environment) Get(symbol core.LispSymbol) (core.LispValue, bool) {
+func (e *Environment) Get(symbol string) (core.Value, bool) {
 	// Debug the lookup
-	if core.Debug {
+	if Debug {
 		fmt.Printf("DEBUG Get: Looking up symbol '%s' in environment %p\n", symbol, e)
 	}
 
 	value, ok := e.vars[symbol]
 	if !ok && e.outer != nil {
 		// Look in outer environment if not found in current
-		if core.Debug {
+		if Debug {
 			fmt.Printf("DEBUG Get: Symbol '%s' not found in current environment, checking outer\n", symbol)
 		}
 		return e.outer.Get(symbol)
 	}
 
 	if ok {
-		if core.Debug {
+		if Debug {
 			fmt.Printf("DEBUG Get: Found symbol '%s' = %v (type %T)\n", symbol, value, value)
 		}
 
-		// Special handling for dictionaries to ensure evaluator is set
-		if dict, isDictionary := value.(*core.PythonicDict); isDictionary && e.evaluator != nil {
-			if core.Debug {
-				fmt.Printf("DEBUG Get: Setting evaluator on dictionary for symbol '%s'\n", symbol)
-			}
-			dict.SetEvaluator(e.evaluator)
-		}
+		// No special handling needed for now
 	} else {
-		if core.Debug {
+		if Debug {
 			fmt.Printf("DEBUG Get: Symbol '%s' not found\n", symbol)
 		}
 	}
@@ -87,31 +81,17 @@ func (e *Environment) Get(symbol core.LispSymbol) (core.LispValue, bool) {
 }
 
 // Set sets a value in the environment
-func (e *Environment) Set(symbol core.LispSymbol, value core.LispValue) {
-	if core.Debug {
+func (e *Environment) Set(symbol string, value core.Value) {
+	if Debug {
 		fmt.Printf("DEBUG Set: Setting symbol '%s' = %v (type %T) in environment %p\n", symbol, value, value, e)
 	}
 
-	// Special handling for evaluator-aware types
-	if evalAware, ok := value.(core.EvaluatorAware); ok && e.evaluator != nil {
-		if core.Debug {
-			fmt.Printf("DEBUG Set: Value is EvaluatorAware, setting evaluator for '%s'\n", symbol)
-		}
-		evalAware.SetEvaluator(e.evaluator)
-	}
-
-	// Special handling for dictionaries to ensure they get the evaluator
-	if dict, ok := value.(*core.PythonicDict); ok && e.evaluator != nil {
-		if core.Debug {
-			fmt.Printf("DEBUG Set: Dictionary detected for symbol '%s', ensuring evaluator is set\n", symbol)
-		}
-		dict.SetEvaluator(e.evaluator)
-	}
+	// No special handling needed for now
 
 	e.vars[symbol] = value
 
 	// Verification
-	if core.Debug {
+	if Debug {
 		if storedValue, exists := e.vars[symbol]; exists {
 			fmt.Printf("DEBUG Set: Verified symbol '%s' exists after setting, value: %v\n", symbol, storedValue)
 		} else {
@@ -121,41 +101,32 @@ func (e *Environment) Set(symbol core.LispSymbol, value core.LispValue) {
 }
 
 // SetEvaluator sets the evaluator for this environment
-func (e *Environment) SetEvaluator(eval core.Evaluator) {
+func (e *Environment) SetEvaluator(eval interface{}) {
 	e.evaluator = eval
 }
 
+// GetOuter returns the outer environment
+func (e *Environment) GetOuter() *Environment {
+	return e.outer
+}
+
 // GetEvaluator gets the current evaluator
-func (e *Environment) GetEvaluator() core.Evaluator {
+func (e *Environment) GetEvaluator() interface{} {
 	return e.evaluator
 }
 
 // Define creates a new binding in the current environment
-func (e *Environment) Define(symbol core.LispSymbol, value core.LispValue) {
-	if core.Debug {
+func (e *Environment) Define(symbol string, value core.Value) {
+	if Debug {
 		fmt.Printf("DEBUG Define: Defining symbol '%s' = %v (type %T) in environment %p\n", symbol, value, value, e)
 	}
 
-	// Special handling for evaluator-aware types
-	if evalAware, ok := value.(core.EvaluatorAware); ok && e.evaluator != nil {
-		if core.Debug {
-			fmt.Printf("DEBUG Define: Value is EvaluatorAware, setting evaluator for '%s'\n", symbol)
-		}
-		evalAware.SetEvaluator(e.evaluator)
-	}
-
-	// Special handling for dictionaries to ensure they get the evaluator
-	if dict, ok := value.(*core.PythonicDict); ok && e.evaluator != nil {
-		if core.Debug {
-			fmt.Printf("DEBUG Define: Dictionary detected for symbol '%s', ensuring evaluator is set\n", symbol)
-		}
-		dict.SetEvaluator(e.evaluator)
-	}
+	// No special handling needed for now
 
 	e.vars[symbol] = value
 
 	// Verification
-	if core.Debug {
+	if Debug {
 		if storedValue, exists := e.vars[symbol]; exists {
 			fmt.Printf("DEBUG Define: Verified symbol '%s' exists after defining, value: %v\n", symbol, storedValue)
 		} else {
@@ -165,7 +136,7 @@ func (e *Environment) Define(symbol core.LispSymbol, value core.LispValue) {
 }
 
 // SetMutable sets a value in the environment, searching up the chain
-func (e *Environment) SetMutable(symbol core.LispSymbol, value core.LispValue) bool {
+func (e *Environment) SetMutable(symbol string, value core.Value) bool {
 	if _, ok := e.vars[symbol]; ok {
 		e.vars[symbol] = value
 		return true
@@ -176,36 +147,18 @@ func (e *Environment) SetMutable(symbol core.LispSymbol, value core.LispValue) b
 	return false
 }
 
-func (e *Environment) NewEnvironment(outer core.Environment) core.Environment {
+func (e *Environment) NewEnvironment(outer *Environment) *Environment {
 	newEnv := NewEnvironment(outer)
 	return newEnv
 }
 
 // SetupBuiltins initializes the environment with builtin functions
 func (e *Environment) SetupBuiltins() {
-	builtin.RegisterArithmeticFuncs()
-	builtin.RegisterPythonBuiltins()
-	for name, fn := range core.BuiltinFuncs {
-		e.Set(core.LispSymbol(name), fn)
-	}
+	// Register builtin functions by calling the main registry function
+	builtin.RegisterAllBuiltins(&core.Context{Vars: make(map[string]core.Value)})
 
-	// Register standard Python exceptions in the environment
-	for name, exception := range core.StandardExceptions {
-		e.Set(core.LispSymbol(name), exception)
-	}
-
-	// Register type constants in the environment
-	// We need to keep track of any type constants that shadow builtins
-	// and store them in a different name
-	for name, value := range core.TypeConstants {
-		// Skip 'list' as it conflicts with the built-in list function
-		if name == "list" {
-			// Register as 'type_list' instead
-			e.Set(core.LispSymbol("type_list"), value)
-		} else {
-			e.Set(core.LispSymbol(name), value)
-		}
-	}
+	// Standard exceptions and type constants would be registered here
+	// but they're now handled by the core.Context system
 
 	// Register special form functions in builtins
 	// Removed direct special_forms dependency to avoid import cycle
@@ -233,26 +186,22 @@ func (e *Environment) StringWithDepth(depth int) string {
 	}
 	if e.outer != nil {
 		sb.WriteString(fmt.Sprintf("%sOuter environment:\n", strings.Repeat("  ", depth)))
-		if outerEnv, ok := e.outer.(*Environment); ok {
-			sb.WriteString(outerEnv.StringWithDepth(depth + 1))
-		} else {
-			sb.WriteString("<non-Environment outer>\n")
-		}
+		sb.WriteString(e.outer.StringWithDepth(depth + 1))
 	}
 	return sb.String()
 }
 
 // ForEachSymbol calls the provided function for each symbol in the environment
-func (e *Environment) ForEachSymbol(fn func(symbol core.LispSymbol, value core.LispValue)) {
+func (e *Environment) ForEachSymbol(fn func(symbol string, value core.Value)) {
 	for symbol, value := range e.vars {
 		fn(symbol, value)
 	}
 }
 
 // GetSymbolMap returns a map of all symbols in the environment
-func (e *Environment) GetSymbolMap() map[core.LispSymbol]core.LispValue {
+func (e *Environment) GetSymbolMap() map[string]core.Value {
 	// Create a copy of the symbol map to prevent modification
-	symbolMap := make(map[core.LispSymbol]core.LispValue)
+	symbolMap := make(map[string]core.Value)
 	for symbol, value := range e.vars {
 		symbolMap[symbol] = value
 	}

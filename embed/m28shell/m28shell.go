@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -72,9 +73,9 @@ func main() {
 		result, err := engine.Evaluate(line)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
-		} else if _, ok := result.(core.PythonicNone); !ok {
+		} else if _, ok := result.(core.NilValue); !ok {
 			// Only print the result if it's not None
-			fmt.Println(core.PrintValue(result))
+			fmt.Println(result.String())
 		}
 	}
 }
@@ -84,8 +85,10 @@ func executeShellCommand(command string) (string, error) {
 	// Process special shell built-ins here if needed
 	// For example: cd, etc.
 
-	// For standard commands, use the default executor
-	return embed.DefaultShellExecutor(command)
+	// For standard commands, use a standard shell executor
+	cmd := exec.Command("sh", "-c", command)
+	output, err := cmd.CombinedOutput()
+	return string(output), err
 }
 
 // loadRCFile attempts to load the user's RC file
