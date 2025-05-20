@@ -53,9 +53,14 @@ func GetFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("get requires 2 or 3 arguments: dict, key[, default]")
 	}
 	
-	// Get the dictionary
-	dict, ok := args[0].(*core.DictValue)
+	// Get the dictionary (ensure it's an Object with GetAttr capability)
+	obj, ok := args[0].(core.Object)
 	if !ok {
+		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
+	}
+	
+	// Make sure it's a dictionary
+	if args[0].Type() != core.DictType {
 		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
 	}
 	
@@ -66,7 +71,7 @@ func GetFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 	
 	// Try to get the value
-	value, found := dict.Get(string(key))
+	value, found := obj.GetAttr(string(key))
 	if found {
 		return value, nil
 	}
@@ -86,9 +91,14 @@ func SetFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("set requires 3 arguments: dict, key, value")
 	}
 	
-	// Get the dictionary
-	dict, ok := args[0].(*core.DictValue)
+	// Get the dictionary (ensure it's an Object with SetAttr capability)
+	obj, ok := args[0].(core.Object)
 	if !ok {
+		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
+	}
+	
+	// Make sure it's a dictionary
+	if args[0].Type() != core.DictType {
 		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
 	}
 	
@@ -99,10 +109,13 @@ func SetFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 	
 	// Set the value
-	dict.Set(string(key), args[2])
+	err := obj.SetAttr(string(key), args[2])
+	if err != nil {
+		return nil, err
+	}
 	
 	// Return the dictionary
-	return dict, nil
+	return args[0], nil
 }
 
 // DeleteFunc removes a key-value pair from a dictionary
@@ -123,7 +136,7 @@ func DeleteFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("key must be a string, got %s", args[1].Type())
 	}
 	
-	// Delete the key
+	// Delete the key - we need to use the direct method since Object interface doesn't have Delete
 	dict.Delete(string(key))
 	
 	// Return the dictionary
@@ -136,9 +149,14 @@ func HasKeyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("has-key requires 2 arguments: dict, key")
 	}
 	
-	// Get the dictionary
-	dict, ok := args[0].(*core.DictValue)
+	// Get the dictionary (ensure it's an Object with GetAttr capability)
+	obj, ok := args[0].(core.Object)
 	if !ok {
+		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
+	}
+	
+	// Make sure it's a dictionary
+	if args[0].Type() != core.DictType {
 		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
 	}
 	
@@ -148,8 +166,8 @@ func HasKeyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("key must be a string, got %s", args[1].Type())
 	}
 	
-	// Check if the key exists
-	_, found := dict.Get(string(key))
+	// Check if the attribute exists
+	_, found := obj.GetAttr(string(key))
 	
 	// Return a boolean
 	return core.BoolValue(found), nil
@@ -162,21 +180,29 @@ func KeysFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 	
 	// Get the dictionary
-	dict, ok := args[0].(*core.DictValue)
+	obj, ok := args[0].(core.Object)
 	if !ok {
 		return nil, fmt.Errorf("argument must be a dictionary, got %s", args[0].Type())
 	}
 	
-	// Get the keys
-	keys := dict.Keys()
-	
-	// Convert to a list of StringValues
-	result := make(core.ListValue, len(keys))
-	for i, key := range keys {
-		result[i] = core.StringValue(key)
+	// Make sure it's a dictionary
+	if args[0].Type() != core.DictType {
+		return nil, fmt.Errorf("argument must be a dictionary, got %s", args[0].Type())
 	}
 	
-	return result, nil
+	// Call the keys method using the object protocol
+	keysMethod, found := obj.GetAttr("keys")
+	if !found {
+		return nil, fmt.Errorf("dictionary does not have keys method")
+	}
+	
+	// Call the method
+	callable, ok := keysMethod.(core.Callable)
+	if !ok {
+		return nil, fmt.Errorf("keys is not callable")
+	}
+	
+	return callable.Call([]core.Value{}, ctx)
 }
 
 // ValuesFunc returns a list of all values in a dictionary
@@ -186,22 +212,29 @@ func ValuesFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 	
 	// Get the dictionary
-	dict, ok := args[0].(*core.DictValue)
+	obj, ok := args[0].(core.Object)
 	if !ok {
 		return nil, fmt.Errorf("argument must be a dictionary, got %s", args[0].Type())
 	}
 	
-	// Get the keys
-	keys := dict.Keys()
-	
-	// Convert to a list of values
-	result := make(core.ListValue, len(keys))
-	for i, key := range keys {
-		val, _ := dict.Get(key) // We know these keys exist
-		result[i] = val
+	// Make sure it's a dictionary
+	if args[0].Type() != core.DictType {
+		return nil, fmt.Errorf("argument must be a dictionary, got %s", args[0].Type())
 	}
 	
-	return result, nil
+	// Call the values method using the object protocol
+	valuesMethod, found := obj.GetAttr("values")
+	if !found {
+		return nil, fmt.Errorf("dictionary does not have values method")
+	}
+	
+	// Call the method
+	callable, ok := valuesMethod.(core.Callable)
+	if !ok {
+		return nil, fmt.Errorf("values is not callable")
+	}
+	
+	return callable.Call([]core.Value{}, ctx)
 }
 
 // ItemsFunc returns a list of key-value pairs from a dictionary
@@ -211,22 +244,29 @@ func ItemsFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 	
 	// Get the dictionary
-	dict, ok := args[0].(*core.DictValue)
+	obj, ok := args[0].(core.Object)
 	if !ok {
 		return nil, fmt.Errorf("argument must be a dictionary, got %s", args[0].Type())
 	}
 	
-	// Get the keys
-	keys := dict.Keys()
-	
-	// Convert to a list of [key, value] pairs
-	result := make(core.ListValue, len(keys))
-	for i, key := range keys {
-		val, _ := dict.Get(key) // We know these keys exist
-		result[i] = core.ListValue{core.StringValue(key), val}
+	// Make sure it's a dictionary
+	if args[0].Type() != core.DictType {
+		return nil, fmt.Errorf("argument must be a dictionary, got %s", args[0].Type())
 	}
 	
-	return result, nil
+	// Call the items method using the object protocol
+	itemsMethod, found := obj.GetAttr("items")
+	if !found {
+		return nil, fmt.Errorf("dictionary does not have items method")
+	}
+	
+	// Call the method
+	callable, ok := itemsMethod.(core.Callable)
+	if !ok {
+		return nil, fmt.Errorf("items is not callable")
+	}
+	
+	return callable.Call([]core.Value{}, ctx)
 }
 
 // MergeFunc merges two or more dictionaries
@@ -237,8 +277,12 @@ func MergeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	
 	// Check that all arguments are dictionaries
 	for i, arg := range args {
-		if _, ok := arg.(*core.DictValue); !ok {
+		if arg.Type() != core.DictType {
 			return nil, fmt.Errorf("argument %d must be a dictionary, got %s", i+1, arg.Type())
+		}
+		
+		if _, ok := arg.(core.Object); !ok {
+			return nil, fmt.Errorf("argument %d must be a dictionary object, got %s", i+1, arg.Type())
 		}
 	}
 	
@@ -247,12 +291,42 @@ func MergeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	
 	// Merge all dictionaries
 	for _, arg := range args {
-		dict := arg.(*core.DictValue)
-		keys := dict.Keys()
+		dict := arg.(core.Object)
 		
-		for _, key := range keys {
-			val, _ := dict.Get(key) // We know these keys exist
-			result.Set(key, val)
+		// Get the keys
+		keysMethod, found := dict.GetAttr("keys")
+		if !found {
+			return nil, fmt.Errorf("dictionary does not have keys method")
+		}
+		
+		// Call the keys method
+		callable, ok := keysMethod.(core.Callable)
+		if !ok {
+			return nil, fmt.Errorf("keys is not callable")
+		}
+		
+		keysList, err := callable.Call([]core.Value{}, ctx)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Iterate over the keys
+		keys, ok := keysList.(core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("keys did not return a list")
+		}
+		
+		for _, keyVal := range keys {
+			keyStr, ok := keyVal.(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("key is not a string")
+			}
+			
+			// Get the value for this key
+			value, found := dict.GetAttr(string(keyStr))
+			if found {
+				result.Set(string(keyStr), value)
+			}
 		}
 	}
 	
