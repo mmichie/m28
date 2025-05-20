@@ -7,13 +7,25 @@ import (
 )
 
 // Type represents a type in the language
-type Type interface {
-	// Name returns the type's name
-	Name() string
-	
-	// IsSubtypeOf checks if this type is a subtype of another
-	IsSubtypeOf(other Type) bool
-}
+type Type string
+
+// Predefined type constants
+const (
+	NumberType    Type = "number"
+	StringType    Type = "string"
+	BoolType      Type = "bool"
+	NilType       Type = "nil"
+	SymbolType    Type = "symbol"
+	ListType      Type = "list"
+	DictType      Type = "dict"
+	TupleType     Type = "tuple"
+	SetType       Type = "set"
+	FunctionType  Type = "function"
+	MethodType    Type = "method"
+	ModuleType    Type = "module"
+	ClassType     Type = "class"
+	ExceptionType Type = "exception"
+)
 
 // Value is the base interface for all values in the language
 type Value interface {
@@ -22,90 +34,6 @@ type Value interface {
 	
 	// String returns a string representation
 	String() string
-}
-
-// TypeDescriptor holds metadata about a type
-type TypeDescriptor struct {
-	name       string
-	methods    map[string]Method
-	properties map[string]Property
-	bases      []Type
-}
-
-// NewTypeDescriptor creates a new type descriptor
-func NewTypeDescriptor(name string, bases ...Type) *TypeDescriptor {
-	return &TypeDescriptor{
-		name:       name,
-		methods:    make(map[string]Method),
-		properties: make(map[string]Property),
-		bases:      bases,
-	}
-}
-
-// Name returns the type's name
-func (t *TypeDescriptor) Name() string {
-	return t.name
-}
-
-// IsSubtypeOf checks if this type is a subtype of another
-func (t *TypeDescriptor) IsSubtypeOf(other Type) bool {
-	if t == other {
-		return true
-	}
-	
-	for _, base := range t.bases {
-		if base.IsSubtypeOf(other) {
-			return true
-		}
-	}
-	
-	return false
-}
-
-// Common predefined types
-var (
-	// Core types
-	TypeType      = NewTypeDescriptor("type")
-	ObjectType    = NewTypeDescriptor("object")
-	NumberType    = NewTypeDescriptor("number", ObjectType)
-	StringType    = NewTypeDescriptor("string", ObjectType)
-	BoolType      = NewTypeDescriptor("bool", ObjectType)
-	NilType       = NewTypeDescriptor("nil", ObjectType)
-	SymbolType    = NewTypeDescriptor("symbol", ObjectType)
-	
-	// Container types
-	ListType      = NewTypeDescriptor("list", ObjectType)
-	DictType      = NewTypeDescriptor("dict", ObjectType)
-	TupleType     = NewTypeDescriptor("tuple", ObjectType)
-	SetType       = NewTypeDescriptor("set", ObjectType)
-	
-	// Function types
-	CallableType  = NewTypeDescriptor("callable", ObjectType)
-	FunctionType  = NewTypeDescriptor("function", CallableType)
-	MethodType    = NewTypeDescriptor("method", CallableType)
-	
-	// Other types
-	ModuleType    = NewTypeDescriptor("module", ObjectType)
-	ClassType     = NewTypeDescriptor("class", ObjectType)
-	ExceptionType = NewTypeDescriptor("exception", ObjectType)
-)
-
-// Method represents a callable method
-type Method interface {
-	// Call the method with arguments in a context
-	Call(receiver Value, args []Value, ctx *Context) (Value, error)
-	
-	// Bind creates a bound method for a specific receiver
-	Bind(receiver Value) Value
-}
-
-// Property represents a property with custom getter/setter
-type Property interface {
-	// Get the property value
-	Get(receiver Value) (Value, bool)
-	
-	// Set the property value
-	Set(receiver Value, value Value) error
 }
 
 // Object represents any value that can have attributes and methods
@@ -130,29 +58,54 @@ type Callable interface {
 	Call(args []Value, ctx *Context) (Value, error)
 }
 
+// Method represents a method that can be bound to an instance
+type Method interface {
+	Callable
+	
+	// Bind binds the method to a receiver object
+	Bind(receiver Value) Value
+}
+
+// Iterable represents any value that can be iterated over
+type Iterable interface {
+	Value
+	
+	// Iterator returns an iterator over the elements
+	Iterator() Iterator
+}
+
+// Iterator represents an iterator over a collection
+type Iterator interface {
+	// Next advances the iterator and returns the next value
+	Next() (Value, bool)
+	
+	// Reset resets the iterator to the beginning
+	Reset()
+}
+
 // BaseObject provides a standard implementation of Object
 type BaseObject struct {
-	attrs    map[string]Value
-	typeDesc *TypeDescriptor
-	mu       sync.RWMutex // For thread safety
+	attrs map[string]Value
+	typ   Type
+	mu    sync.RWMutex // For thread safety
 }
 
 // NewBaseObject creates a new base object
-func NewBaseObject(typeDesc *TypeDescriptor) *BaseObject {
+func NewBaseObject(typ Type) *BaseObject {
 	return &BaseObject{
-		attrs:    make(map[string]Value),
-		typeDesc: typeDesc,
+		attrs: make(map[string]Value),
+		typ:   typ,
 	}
 }
 
 // Type implements Value.Type
 func (o *BaseObject) Type() Type {
-	return o.typeDesc
+	return o.typ
 }
 
 // String implements Value.String
 func (o *BaseObject) String() string {
-	return fmt.Sprintf("<%s object>", o.typeDesc.Name())
+	return fmt.Sprintf("<%s object>", o.typ)
 }
 
 // GetAttr implements Object.GetAttr
@@ -165,16 +118,6 @@ func (o *BaseObject) GetAttr(name string) (Value, bool) {
 		return val, true
 	}
 	
-	// Check type for methods
-	if method, ok := o.typeDesc.methods[name]; ok {
-		return method.Bind(o), true
-	}
-	
-	// Check type for properties
-	if prop, ok := o.typeDesc.properties[name]; ok {
-		return prop.Get(o)
-	}
-	
 	return nil, false
 }
 
@@ -182,11 +125,6 @@ func (o *BaseObject) GetAttr(name string) (Value, bool) {
 func (o *BaseObject) SetAttr(name string, value Value) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	
-	// Check if there's a property with a setter
-	if prop, ok := o.typeDesc.properties[name]; ok {
-		return prop.Set(o, value)
-	}
 	
 	// Normal attribute
 	o.attrs[name] = value

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	
-	"m28/core"
+	"github.com/mmichie/m28/core"
 )
 
 // RegisterArithmeticFunctions registers arithmetic functions in the global context
@@ -42,7 +42,7 @@ func AddFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if num, ok := arg.(core.NumberValue); ok {
 				result += float64(num)
 			} else {
-				return nil, fmt.Errorf("cannot add %s to number", arg.Type().Name())
+				return nil, fmt.Errorf("cannot add %s to number", arg.Type())
 			}
 		}
 		return core.NumberValue(result), nil
@@ -54,7 +54,7 @@ func AddFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if str, ok := arg.(core.StringValue); ok {
 				result += string(str)
 			} else {
-				return nil, fmt.Errorf("cannot concatenate %s to string", arg.Type().Name())
+				return nil, fmt.Errorf("cannot concatenate %s to string", arg.Type())
 			}
 		}
 		return core.StringValue(result), nil
@@ -67,13 +67,13 @@ func AddFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if list, ok := arg.(core.ListValue); ok {
 				result = append(result, list...)
 			} else {
-				return nil, fmt.Errorf("cannot concatenate %s to list", arg.Type().Name())
+				return nil, fmt.Errorf("cannot concatenate %s to list", arg.Type())
 			}
 		}
 		return result, nil
 		
 	default:
-		return nil, fmt.Errorf("cannot apply + to %s", first.Type().Name())
+		return nil, fmt.Errorf("cannot apply + to %s", first.Type())
 	}
 }
 
@@ -88,7 +88,7 @@ func SubtractFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if num, ok := args[0].(core.NumberValue); ok {
 			return core.NumberValue(-float64(num)), nil
 		}
-		return nil, fmt.Errorf("cannot negate %s", args[0].Type().Name())
+		return nil, fmt.Errorf("cannot negate %s", args[0].Type())
 	}
 	
 	// Binary subtraction
@@ -98,13 +98,13 @@ func SubtractFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if num, ok := arg.(core.NumberValue); ok {
 				result -= float64(num)
 			} else {
-				return nil, fmt.Errorf("cannot subtract %s from number", arg.Type().Name())
+				return nil, fmt.Errorf("cannot subtract %s from number", arg.Type())
 			}
 		}
 		return core.NumberValue(result), nil
 	}
 	
-	return nil, fmt.Errorf("cannot apply - to %s", args[0].Type().Name())
+	return nil, fmt.Errorf("cannot apply - to %s", args[0].Type())
 }
 
 // MultiplyFunc implements the * operation
@@ -121,7 +121,7 @@ func MultiplyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if num, ok := arg.(core.NumberValue); ok {
 				result *= float64(num)
 			} else {
-				return nil, fmt.Errorf("cannot multiply number by %s", arg.Type().Name())
+				return nil, fmt.Errorf("cannot multiply number by %s", arg.Type())
 			}
 		}
 		return core.NumberValue(result), nil
@@ -142,7 +142,7 @@ func MultiplyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 			return core.StringValue(result), nil
 		}
-		return nil, fmt.Errorf("cannot multiply string by %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot multiply string by %s", args[1].Type())
 		
 	case core.ListValue:
 		// List repetition (only with one number)
@@ -160,10 +160,10 @@ func MultiplyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 			return result, nil
 		}
-		return nil, fmt.Errorf("cannot multiply list by %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot multiply list by %s", args[1].Type())
 		
 	default:
-		return nil, fmt.Errorf("cannot apply * to %s", first.Type().Name())
+		return nil, fmt.Errorf("cannot apply * to %s", first.Type())
 	}
 }
 
@@ -181,7 +181,7 @@ func DivideFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 			return core.NumberValue(1 / float64(num)), nil
 		}
-		return nil, fmt.Errorf("cannot take reciprocal of %s", args[0].Type().Name())
+		return nil, fmt.Errorf("cannot take reciprocal of %s", args[0].Type())
 	}
 	
 	// Division
@@ -194,13 +194,13 @@ func DivideFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 				}
 				result /= float64(num)
 			} else {
-				return nil, fmt.Errorf("cannot divide number by %s", arg.Type().Name())
+				return nil, fmt.Errorf("cannot divide number by %s", arg.Type())
 			}
 		}
 		return core.NumberValue(result), nil
 	}
 	
-	return nil, fmt.Errorf("cannot apply / to %s", args[0].Type().Name())
+	return nil, fmt.Errorf("cannot apply / to %s", args[0].Type())
 }
 
 // ModuloFunc implements the % operation
@@ -216,10 +216,10 @@ func ModuloFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 			return core.NumberValue(math.Mod(float64(a), float64(b))), nil
 		}
-		return nil, fmt.Errorf("cannot calculate modulo with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot calculate modulo with %s", args[1].Type())
 	}
 	
-	return nil, fmt.Errorf("cannot apply %% to %s", args[0].Type().Name())
+	return nil, fmt.Errorf("cannot apply %% to %s", args[0].Type())
 }
 
 // AbsFunc implements the abs function
@@ -232,7 +232,7 @@ func AbsFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(math.Abs(float64(num))), nil
 	}
 	
-	return nil, fmt.Errorf("cannot calculate absolute value of %s", args[0].Type().Name())
+	return nil, fmt.Errorf("cannot calculate absolute value of %s", args[0].Type())
 }
 
 // SqrtFunc implements the sqrt function
@@ -248,7 +248,7 @@ func SqrtFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(math.Sqrt(float64(num))), nil
 	}
 	
-	return nil, fmt.Errorf("cannot calculate square root of %s", args[0].Type().Name())
+	return nil, fmt.Errorf("cannot calculate square root of %s", args[0].Type())
 }
 
 // PowFunc implements the pow function
@@ -261,10 +261,10 @@ func PowFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if exp, ok := args[1].(core.NumberValue); ok {
 			return core.NumberValue(math.Pow(float64(base), float64(exp))), nil
 		}
-		return nil, fmt.Errorf("exponent must be a number, got %s", args[1].Type().Name())
+		return nil, fmt.Errorf("exponent must be a number, got %s", args[1].Type())
 	}
 	
-	return nil, fmt.Errorf("base must be a number, got %s", args[0].Type().Name())
+	return nil, fmt.Errorf("base must be a number, got %s", args[0].Type())
 }
 
 // MaxFunc implements the max function
@@ -301,7 +301,7 @@ func maxList(list []core.Value) (core.Value, error) {
 					max = float64(num)
 				}
 			} else {
-				return nil, fmt.Errorf("all arguments to max must be numbers, got %s", v.Type().Name())
+				return nil, fmt.Errorf("all arguments to max must be numbers, got %s", v.Type())
 			}
 		}
 		return core.NumberValue(max), nil
@@ -316,13 +316,13 @@ func maxList(list []core.Value) (core.Value, error) {
 					max = string(str)
 				}
 			} else {
-				return nil, fmt.Errorf("all arguments to max must be strings, got %s", v.Type().Name())
+				return nil, fmt.Errorf("all arguments to max must be strings, got %s", v.Type())
 			}
 		}
 		return core.StringValue(max), nil
 	}
 	
-	return nil, fmt.Errorf("cannot calculate max of %s", list[0].Type().Name())
+	return nil, fmt.Errorf("cannot calculate max of %s", list[0].Type())
 }
 
 // MinFunc implements the min function
@@ -359,7 +359,7 @@ func minList(list []core.Value) (core.Value, error) {
 					min = float64(num)
 				}
 			} else {
-				return nil, fmt.Errorf("all arguments to min must be numbers, got %s", v.Type().Name())
+				return nil, fmt.Errorf("all arguments to min must be numbers, got %s", v.Type())
 			}
 		}
 		return core.NumberValue(min), nil
@@ -374,13 +374,13 @@ func minList(list []core.Value) (core.Value, error) {
 					min = string(str)
 				}
 			} else {
-				return nil, fmt.Errorf("all arguments to min must be strings, got %s", v.Type().Name())
+				return nil, fmt.Errorf("all arguments to min must be strings, got %s", v.Type())
 			}
 		}
 		return core.StringValue(min), nil
 	}
 	
-	return nil, fmt.Errorf("cannot calculate min of %s", list[0].Type().Name())
+	return nil, fmt.Errorf("cannot calculate min of %s", list[0].Type())
 }
 
 // RoundFunc implements the round function
@@ -393,7 +393,7 @@ func RoundFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(math.Round(float64(num))), nil
 	}
 	
-	return nil, fmt.Errorf("cannot round %s", args[0].Type().Name())
+	return nil, fmt.Errorf("cannot round %s", args[0].Type())
 }
 
 // FloorFunc implements the floor function
@@ -406,7 +406,7 @@ func FloorFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(math.Floor(float64(num))), nil
 	}
 	
-	return nil, fmt.Errorf("cannot floor %s", args[0].Type().Name())
+	return nil, fmt.Errorf("cannot floor %s", args[0].Type())
 }
 
 // CeilFunc implements the ceil function
@@ -419,5 +419,5 @@ func CeilFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(math.Ceil(float64(num))), nil
 	}
 	
-	return nil, fmt.Errorf("cannot ceil %s", args[0].Type().Name())
+	return nil, fmt.Errorf("cannot ceil %s", args[0].Type())
 }

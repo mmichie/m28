@@ -21,6 +21,26 @@ func (n NumberValue) String() string {
 	return s
 }
 
+// GetAttr implements basic number methods
+func (n NumberValue) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "abs":
+		return &BuiltinMethod{
+			BaseObject: *NewBaseObject(MethodType),
+			fn: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				num := float64(receiver.(NumberValue))
+				if num < 0 {
+					return NumberValue(-num), nil
+				}
+				return receiver, nil
+			},
+			receiver: n,
+		}, true
+	default:
+		return nil, false
+	}
+}
+
 // StringValue represents a string value
 type StringValue string
 
@@ -31,7 +51,7 @@ func (s StringValue) Type() Type {
 
 // String implements Value.String
 func (s StringValue) String() string {
-	return string(s)
+	return fmt.Sprintf("%q", string(s))
 }
 
 // GetAttr implements basic string methods
@@ -41,15 +61,19 @@ func (s StringValue) GetAttr(name string) (Value, bool) {
 		return NumberValue(len(s)), true
 	case "upper":
 		return &BuiltinMethod{
+			BaseObject: *NewBaseObject(MethodType),
 			fn: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				return StringValue(strings.ToUpper(string(s))), nil
+				return StringValue(strings.ToUpper(string(receiver.(StringValue)))), nil
 			},
+			receiver: s,
 		}, true
 	case "lower":
 		return &BuiltinMethod{
+			BaseObject: *NewBaseObject(MethodType),
 			fn: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				return StringValue(strings.ToLower(string(s))), nil
+				return StringValue(strings.ToLower(string(receiver.(StringValue)))), nil
 			},
+			receiver: s,
 		}, true
 	default:
 		return nil, false
@@ -140,6 +164,11 @@ type BuiltinMethod struct {
 	receiver Value
 }
 
+// Type implements Value.Type
+func (m *BuiltinMethod) Type() Type {
+	return MethodType
+}
+
 // Bind implements Method.Bind
 func (m *BuiltinMethod) Bind(receiver Value) Value {
 	return &BuiltinMethod{
@@ -156,5 +185,5 @@ func (m *BuiltinMethod) Call(args []Value, ctx *Context) (Value, error) {
 
 // String implements Value.String
 func (m *BuiltinMethod) String() string {
-	return fmt.Sprintf("<builtin method of %v>", m.receiver.Type().Name())
+	return "<builtin method>"
 }

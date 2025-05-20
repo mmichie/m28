@@ -4,7 +4,7 @@ package builtin
 import (
 	"fmt"
 	
-	"m28/core"
+	"github.com/mmichie/m28/core"
 )
 
 // RegisterComparisonFunctions registers comparison functions in the global context
@@ -106,16 +106,16 @@ func LessThanFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if b, ok := args[1].(core.NumberValue); ok {
 			return core.BoolValue(a < b), nil
 		}
-		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type())
 		
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a < b), nil
 		}
-		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type())
 		
 	default:
-		return nil, fmt.Errorf("< not supported for %s", a.Type().Name())
+		return nil, fmt.Errorf("< not supported for %s", a.Type())
 	}
 }
 
@@ -131,16 +131,16 @@ func LessEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if b, ok := args[1].(core.NumberValue); ok {
 			return core.BoolValue(a <= b), nil
 		}
-		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type())
 		
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a <= b), nil
 		}
-		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type())
 		
 	default:
-		return nil, fmt.Errorf("<= not supported for %s", a.Type().Name())
+		return nil, fmt.Errorf("<= not supported for %s", a.Type())
 	}
 }
 
@@ -156,16 +156,16 @@ func GreaterThanFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if b, ok := args[1].(core.NumberValue); ok {
 			return core.BoolValue(a > b), nil
 		}
-		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type())
 		
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a > b), nil
 		}
-		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type())
 		
 	default:
-		return nil, fmt.Errorf("> not supported for %s", a.Type().Name())
+		return nil, fmt.Errorf("> not supported for %s", a.Type())
 	}
 }
 
@@ -181,16 +181,16 @@ func GreaterEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) 
 		if b, ok := args[1].(core.NumberValue); ok {
 			return core.BoolValue(a >= b), nil
 		}
-		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type())
 		
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a >= b), nil
 		}
-		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type().Name())
+		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type())
 		
 	default:
-		return nil, fmt.Errorf(">= not supported for %s", a.Type().Name())
+		return nil, fmt.Errorf(">= not supported for %s", a.Type())
 	}
 }
 

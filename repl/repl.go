@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 	
-	"m28/core"
-	"m28/eval"
-	"m28/parser"
+	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/eval"
+	"github.com/mmichie/m28/parser"
 )
 
 // REPL represents a read-eval-print loop
@@ -73,21 +73,15 @@ func (r *REPL) Start() {
 		}
 		
 		// Parse the input
-		expr, err := parser.Parse(line)
+		p := parser.NewParser()
+		expr, err := p.Parse(line)
 		if err != nil {
 			fmt.Fprintf(r.writer, "Parse error: %s\n", err)
 			continue
 		}
 		
-		// Convert parser output to core.Value
-		value, err := convertToValue(expr)
-		if err != nil {
-			fmt.Fprintf(r.writer, "Conversion error: %s\n", err)
-			continue
-		}
-		
 		// Evaluate the expression
-		result, err := eval.Eval(value, r.ctx)
+		result, err := eval.Eval(expr, r.ctx)
 		if err != nil {
 			fmt.Fprintf(r.writer, "Evaluation error: %s\n", err)
 			continue
@@ -111,42 +105,4 @@ func printHelp(w io.Writer) {
 	fmt.Fprintln(w, "  Function:  (def add (a b) (+ a b))")
 	fmt.Fprintln(w, "  Call:      (add 1 2)")
 	fmt.Fprintln(w)
-}
-
-// convertToValue converts parser output to core.Value
-func convertToValue(expr interface{}) (core.Value, error) {
-	switch v := expr.(type) {
-	case float64:
-		return core.NumberValue(v), nil
-	case string:
-		return core.StringValue(v), nil
-	case bool:
-		return core.BoolValue(v), nil
-	case nil:
-		return core.Nil, nil
-	case []interface{}:
-		// Convert to a list
-		result := make(core.ListValue, len(v))
-		for i, item := range v {
-			val, err := convertToValue(item)
-			if err != nil {
-				return nil, err
-			}
-			result[i] = val
-		}
-		return result, nil
-	case map[string]interface{}:
-		// Convert to a dictionary
-		dict := core.NewDict()
-		for key, value := range v {
-			val, err := convertToValue(value)
-			if err != nil {
-				return nil, err
-			}
-			dict.Set(key, val)
-		}
-		return dict, nil
-	default:
-		return nil, fmt.Errorf("unsupported type: %T", v)
-	}
 }

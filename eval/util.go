@@ -1,53 +1,13 @@
-// Package eval provides the evaluation system for M28 expressions.
 package eval
 
 import (
-	"fmt"
-	"os"
-	
-	"m28/core"
+	"github.com/mmichie/m28/core"
 )
 
-// ReadFile reads a file and returns its contents as a string
-func ReadFile(filename string) (string, error) {
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		return "", err
-	}
-	return string(content), nil
-}
-
-// EvalString parses and evaluates a string as M28 code
-func EvalString(code string, ctx *core.Context) (core.Value, error) {
-	// For now, we need to use a placeholder function
-	// In a real implementation, this would parse the string into expressions
-	// and evaluate them
-	return core.Nil, fmt.Errorf("EvalString not implemented yet")
-}
-
-// EvalDo implements the do special form for evaluating a block of expressions
-func EvalDo(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) == 0 {
-		return core.Nil, nil
-	}
-	
-	var result core.Value = core.Nil
-	var err error
-	
-	for _, expr := range args {
-		result, err = Eval(expr, ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
-	
-	return result, nil
-}
-
-// EvalIf implements the if special form
-func EvalIf(args []core.Value, ctx *core.Context) (core.Value, error) {
+// IfForm provides the implementation of the if special form
+func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 || len(args) > 3 {
-		return nil, fmt.Errorf("if requires 2 or 3 arguments")
+		return nil, ErrArgCount("if requires 2 or 3 arguments")
 	}
 	
 	// Evaluate the condition
@@ -57,26 +17,7 @@ func EvalIf(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 	
 	// Check if condition is truthy
-	var isTruthy bool
-	switch v := condition.(type) {
-	case core.BoolValue:
-		isTruthy = bool(v)
-	case core.NilValue:
-		isTruthy = false
-	case core.NumberValue:
-		isTruthy = float64(v) != 0
-	case core.StringValue:
-		isTruthy = string(v) != ""
-	case core.ListValue:
-		isTruthy = len(v) > 0
-	case core.TupleValue:
-		isTruthy = len(v) > 0
-	default:
-		isTruthy = true
-	}
-	
-	// Choose which branch to evaluate
-	if isTruthy {
+	if core.IsTruthy(condition) {
 		return Eval(args[1], ctx)
 	} else if len(args) > 2 {
 		return Eval(args[2], ctx)
@@ -86,50 +27,87 @@ func EvalIf(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.Nil, nil
 }
 
-// EvalDef implements the def special form for function/variable definition
-func EvalDef(args []core.Value, ctx *core.Context) (core.Value, error) {
+// DoForm provides the implementation of the do special form
+func DoForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return core.Nil, nil
+	}
+	
+	// Evaluate all expressions in sequence
+	var result core.Value = core.Nil
+	var err error
+	
+	for _, expr := range args {
+		result, err = Eval(expr, ctx)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Check for return value
+		if ret, ok := result.(*ReturnValue); ok {
+			return ret.Value, nil
+		}
+	}
+	
+	// Return the value of the last expression
+	return result, nil
+}
+
+// DefForm provides the implementation of the def special form
+func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {
-		return nil, fmt.Errorf("def requires at least 2 arguments")
+		return nil, ErrArgCount("def requires at least 2 arguments")
 	}
 	
 	// Get the name
 	name, ok := args[0].(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("def: first argument must be a symbol")
+		return nil, TypeError{Expected: "symbol", Got: args[0].Type()}
 	}
 	
-	// Check if it's a function definition
-	if list, ok := args[1].(core.ListValue); ok {
-		// It's a function definition: (def name (args...) body...)
-		if len(args) < 3 {
-			return nil, fmt.Errorf("function definition requires a body")
-		}
-		
-		// Parse parameter list
-		params := make([]core.SymbolValue, 0, len(list))
-		for _, param := range list {
-			if sym, ok := param.(core.SymbolValue); ok {
-				params = append(params, sym)
-			} else {
-				return nil, fmt.Errorf("parameters must be symbols")
+	// Check different definition forms
+	if len(args) >= 3 {
+		// Check for function definition: (def name (params) body...)
+		// First form: (def name (arg1 arg2...) body...)
+		if paramList, ok := args[1].(core.ListValue); ok {
+			// It's a function definition with parameter list
+			
+			// Parse parameter list
+			params := make([]core.SymbolValue, 0, len(paramList))
+			for _, param := range paramList {
+				if sym, ok := param.(core.SymbolValue); ok {
+					params = append(params, sym)
+				} else {
+					return nil, TypeError{Expected: "symbol", Got: param.Type()}
+				}
 			}
+			
+			// Create function body (implicit do)
+			body := args[2:]
+			var functionBody core.Value
+			
+			if len(body) == 1 {
+				// Single expression body
+				functionBody = body[0]
+			} else {
+				// Multi-expression body, wrap in do
+				functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+			}
+			
+			function := &UserFunction{
+				BaseObject: *core.NewBaseObject(core.FunctionType),
+				params:     params,
+				body:       functionBody,
+				env:        ctx,
+			}
+			
+			ctx.Define(string(name), function)
+			return function, nil
 		}
-		
-		// Create function body (implicit do)
-		body := args[2:]
-		
-		function := &UserFunction{
-			BaseObject: *core.NewBaseObject(core.FunctionType),
-			params:     params,
-			body:       body,
-			env:        ctx,
-		}
-		
-		ctx.Define(string(name), function)
-		return function, nil
 	}
 	
-	// Otherwise, it's a variable definition
+	// Second form: (def name value)
+	// It's a variable definition
 	value, err := Eval(args[1], ctx)
 	if err != nil {
 		return nil, err
@@ -139,10 +117,10 @@ func EvalDef(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return value, nil
 }
 
-// EvalAssign implements the = special form for assignment
-func EvalAssign(args []core.Value, ctx *core.Context) (core.Value, error) {
+// AssignForm provides the implementation of the = special form
+func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("= requires 2 arguments")
+		return nil, ErrArgCount("= requires 2 arguments")
 	}
 	
 	// Get the target
@@ -165,96 +143,70 @@ func EvalAssign(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return value, nil
 		
 	default:
-		return nil, fmt.Errorf("invalid assignment target: %v", target)
+		return nil, TypeError{Expected: "symbol", Got: target.Type()}
 	}
 }
 
-// EvalQuote implements the quote special form
-func EvalQuote(args []core.Value, ctx *core.Context) (core.Value, error) {
+// QuoteForm provides the implementation of the quote special form
+func QuoteForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("quote requires 1 argument")
+		return nil, ErrArgCount("quote requires 1 argument")
 	}
 	
 	// Return the argument unevaluated
 	return args[0], nil
 }
 
-// EvalLambda implements the lambda special form for anonymous functions
-func EvalLambda(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("lambda requires at least 2 arguments")
+// ReturnForm provides the implementation of the return special form
+func ReturnForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) > 1 {
+		return nil, ErrArgCount("return takes at most 1 argument")
 	}
 	
-	// Get parameter list
-	paramList, ok := args[0].(core.ListValue)
-	if !ok {
-		return nil, fmt.Errorf("lambda: first argument must be a parameter list")
-	}
+	var value core.Value = core.Nil
+	var err error
 	
-	// Parse parameters
-	params := make([]core.SymbolValue, 0, len(paramList))
-	for _, param := range paramList {
-		if sym, ok := param.(core.SymbolValue); ok {
-			params = append(params, sym)
-		} else {
-			return nil, fmt.Errorf("parameters must be symbols")
+	if len(args) == 1 {
+		value, err = Eval(args[0], ctx)
+		if err != nil {
+			return nil, err
 		}
 	}
 	
-	// Create function body (implicit do)
-	body := args[1:]
-	
-	function := &UserFunction{
-		BaseObject: *core.NewBaseObject(core.FunctionType),
-		params:     params,
-		body:       body,
-		env:        ctx,
-	}
-	
-	return function, nil
+	return &ReturnValue{Value: value}, nil
 }
 
-// UserFunction represents a user-defined function
-type UserFunction struct {
-	core.BaseObject
-	params []core.SymbolValue
-	body   []core.Value
-	env    *core.Context
-}
-
-// Type implements Value.Type
-func (f *UserFunction) Type() core.Type {
-	return core.FunctionType
-}
-
-// String implements Value.String
-func (f *UserFunction) String() string {
-	if len(f.params) == 0 {
-		return "<function ()>"
+// ImportForm provides the implementation of the import special form
+func ImportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, ErrArgCount("import requires 1 argument")
 	}
 	
-	return fmt.Sprintf("<function (%s)>", f.params[0])
-}
-
-// Call implements Callable.Call
-func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
-	// Create a new environment with the function's environment as parent
-	funcEnv := core.NewContext(f.env)
-	
-	// Bind arguments to parameters
-	if len(args) != len(f.params) {
-		return nil, fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
+	// Get the module name
+	var moduleName string
+	switch name := args[0].(type) {
+	case core.StringValue:
+		moduleName = string(name)
+	case core.SymbolValue:
+		moduleName = string(name)
+	default:
+		return nil, TypeError{Expected: "string or symbol", Got: args[0].Type()}
 	}
 	
-	for i, param := range f.params {
-		funcEnv.Define(string(param), args[i])
+	// Get the module loader
+	loader := core.GetModuleLoader()
+	if loader == nil {
+		return nil, ArgumentError{"no module loader registered"}
 	}
 	
-	// Evaluate the body in the new environment
-	if len(f.body) == 1 {
-		return Eval(f.body[0], funcEnv)
+	// Load the module
+	module, err := loader.LoadModule(moduleName, ctx)
+	if err != nil {
+		return nil, err
 	}
 	
-	// Implicit do for multiple expressions
-	return EvalDo(f.body, funcEnv)
+	// Store module in the context
+	ctx.Define(moduleName, module)
+	
+	return module, nil
 }

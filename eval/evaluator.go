@@ -4,7 +4,7 @@ package eval
 import (
 	"fmt"
 	
-	"m28/core"
+	"github.com/mmichie/m28/core"
 )
 
 // Eval evaluates an expression in a context
@@ -71,13 +71,30 @@ func evalFunctionCall(expr core.ListValue, ctx *core.Context) (core.Value, error
 type SpecialFormHandler func(args core.ListValue, ctx *core.Context) (core.Value, error)
 
 // specialForms maps special form names to their handlers
-var specialForms = map[string]SpecialFormHandler{
-	"if":    ifForm,
-	"def":   defForm,
-	"=":     assignForm,
-	"quote": quoteForm,
-	"do":    doForm,
-	// Other special forms will be added here
+var specialForms map[string]SpecialFormHandler
+
+func init() {
+	specialForms = map[string]SpecialFormHandler{
+		// Control flow
+		"if":      ifForm,
+		"do":      doForm,
+		"return":  returnForm,
+		
+		// Definitions
+		"def":     defForm,
+		"=":       assignForm,
+		"quote":   quoteForm,
+		
+		// Module system
+		"import":  importForm,
+		
+		// Other special forms will be added through RegisterSpecialForm
+	}
+}
+
+// RegisterSpecialForm registers a special form
+func RegisterSpecialForm(name string, handler SpecialFormHandler) {
+	specialForms[name] = handler
 }
 
 // ifForm implements the if special form
@@ -93,24 +110,7 @@ func ifForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 	
 	// Check if condition is truthy
-	isTruthy := true
-	switch v := condition.(type) {
-	case core.BoolValue:
-		isTruthy = bool(v)
-	case core.NilValue:
-		isTruthy = false
-	case core.NumberValue:
-		isTruthy = float64(v) != 0
-	case core.StringValue:
-		isTruthy = string(v) != ""
-	case core.ListValue:
-		isTruthy = len(v) > 0
-	case core.TupleValue:
-		isTruthy = len(v) > 0
-	}
-	
-	// Choose which branch to evaluate
-	if isTruthy {
+	if core.IsTruthy(condition) {
 		return Eval(args[1], ctx)
 	} else if len(args) > 2 {
 		return Eval(args[2], ctx)
@@ -126,22 +126,17 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("def requires at least 2 arguments")
 	}
 	
-	// Get the name
-	name, ok := args[0].(core.SymbolValue)
-	if !ok {
-		return nil, fmt.Errorf("def: first argument must be a symbol")
-	}
-	
-	// Check if it's a function definition
-	if list, ok := args[1].(core.ListValue); ok {
-		// It's a function definition: (def name (args...) body...)
-		if len(args) < 3 {
-			return nil, fmt.Errorf("function definition requires a body")
+	// Check for alternative function definition form: (def (name args...) body...)
+	if fnDef, ok := args[0].(core.ListValue); ok && len(fnDef) > 0 {
+		// Get function name from the first element of the list
+		name, ok := fnDef[0].(core.SymbolValue)
+		if !ok {
+			return nil, fmt.Errorf("def: function name must be a symbol")
 		}
 		
-		// Parse parameter list
-		params := make([]core.SymbolValue, 0, len(list))
-		for _, param := range list {
+		// Get parameter list (the rest of the elements after the name)
+		params := make([]core.SymbolValue, 0, len(fnDef)-1)
+		for _, param := range fnDef[1:] {
 			if sym, ok := param.(core.SymbolValue); ok {
 				params = append(params, sym)
 			} else {
@@ -150,23 +145,67 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 		
 		// Create function body (implicit do)
-		body := args[2:]
+		body := args[1:]
+		var functionBody core.Value
+		
 		if len(body) == 1 {
 			// Single expression body
-			function := &UserFunction{
-				params: params,
-				body:   body[0],
-				env:    ctx,
-			}
-			
-			ctx.Define(string(name), function)
-			return function, nil
+			functionBody = body[0]
 		} else {
 			// Multi-expression body, wrap in do
+			functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+		}
+		
+		function := &UserFunction{
+			BaseObject: *core.NewBaseObject(core.FunctionType),
+			params:     params,
+			body:       functionBody,
+			env:        ctx,
+		}
+		
+		ctx.Define(string(name), function)
+		return function, nil
+	}
+	
+	// Standard form: (def name ...)
+	name, ok := args[0].(core.SymbolValue)
+	if !ok {
+		return nil, fmt.Errorf("def: first argument must be a symbol")
+	}
+	
+	// Check different definition forms
+	if len(args) >= 3 {
+		// Check for function definition: (def name (params) body...)
+		if paramList, ok := args[1].(core.ListValue); ok {
+			// It's a function definition with parameter list
+			
+			// Parse parameter list
+			params := make([]core.SymbolValue, 0, len(paramList))
+			for _, param := range paramList {
+				if sym, ok := param.(core.SymbolValue); ok {
+					params = append(params, sym)
+				} else {
+					return nil, fmt.Errorf("parameters must be symbols")
+				}
+			}
+			
+			// Create function body (implicit do)
+			body := args[2:]
+			var functionBody core.Value
+			
+			if len(body) == 1 {
+				// Single expression body
+				functionBody = body[0]
+			} else {
+				// Multi-expression body, wrap in do
+				functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+			}
+			
 			function := &UserFunction{
-				params: params,
-				body:   core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...)),
-				env:    ctx,
+				BaseObject: *core.NewBaseObject(core.FunctionType),
+				params:     params,
+				body:       functionBody,
+				env:        ctx,
 			}
 			
 			ctx.Define(string(name), function)
@@ -174,7 +213,7 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 	
-	// Otherwise, it's a variable definition
+	// Variable definition: (def name value)
 	value, err := Eval(args[1], ctx)
 	if err != nil {
 		return nil, err
@@ -202,10 +241,12 @@ func assignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Handle different assignment targets
 	switch t := target.(type) {
 	case core.SymbolValue:
-		// Variable assignment
-		err := ctx.Set(string(t), value)
+		// Variable assignment - first try setting an existing variable
+		symName := string(t)
+		err := ctx.Set(symName, value)
 		if err != nil {
-			return nil, err
+			// If the variable doesn't exist, define it in the current scope
+			ctx.Define(symName, value)
 		}
 		return value, nil
 		
@@ -239,10 +280,84 @@ func doForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		if err != nil {
 			return nil, err
 		}
+		
+		// Check for return value
+		if ret, ok := result.(*ReturnValue); ok {
+			return ret.Value, nil
+		}
 	}
 	
 	// Return the value of the last expression
 	return result, nil
+}
+
+// returnForm implements the return special form
+func returnForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) > 1 {
+		return nil, fmt.Errorf("return takes at most 1 argument")
+	}
+	
+	var value core.Value = core.Nil
+	var err error
+	
+	if len(args) == 1 {
+		value, err = Eval(args[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	
+	return &ReturnValue{Value: value}, nil
+}
+
+// importForm implements the import special form
+func importForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("import requires 1 argument")
+	}
+	
+	// Get the module name
+	var moduleName string
+	switch name := args[0].(type) {
+	case core.StringValue:
+		moduleName = string(name)
+	case core.SymbolValue:
+		moduleName = string(name)
+	default:
+		return nil, fmt.Errorf("import: argument must be a string or symbol")
+	}
+	
+	// Get the module loader
+	loader := core.GetModuleLoader()
+	if loader == nil {
+		return nil, fmt.Errorf("no module loader registered")
+	}
+	
+	// Load the module
+	module, err := loader.LoadModule(moduleName, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to import module %s: %v", moduleName, err)
+	}
+	
+	// Store module in the context
+	ctx.Define(moduleName, module)
+	
+	return module, nil
+}
+
+// ReturnValue represents a return value from a function
+type ReturnValue struct {
+	Value core.Value
+}
+
+// Type implements Value.Type
+func (r *ReturnValue) Type() core.Type {
+	return "return"
+}
+
+// String implements Value.String
+func (r *ReturnValue) String() string {
+	return fmt.Sprintf("<return %v>", r.Value)
 }
 
 // UserFunction represents a user-defined function
@@ -268,12 +383,17 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	}
 	
 	// Evaluate the body in the new environment
-	return Eval(f.body, funcEnv)
-}
-
-// Type implements Value.Type
-func (f *UserFunction) Type() core.Type {
-	return core.FunctionType
+	result, err := Eval(f.body, funcEnv)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Handle return values
+	if ret, ok := result.(*ReturnValue); ok {
+		return ret.Value, nil
+	}
+	
+	return result, nil
 }
 
 // String implements Value.String
