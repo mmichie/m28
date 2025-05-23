@@ -9,6 +9,48 @@ import (
 
 // InitializeTypeRegistry sets up type descriptors for all built-in types
 func InitializeTypeRegistry() {
+	// Register generator type
+	RegisterType(&TypeDescriptor{
+		Name:       "generator",
+		PythonName: "generator",
+		BaseType:   Type("generator"),
+		Methods: map[string]*MethodDescriptor{
+			"__next__": {
+				Name:    "__next__",
+				Arity:   0,
+				Doc:     "Retrieve the next value from the generator",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					gen := receiver.(*Generator)
+					return gen.Next()
+				},
+			},
+			"send": {
+				Name:    "send",
+				Arity:   1,
+				Doc:     "Send a value into the generator",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					if len(args) != 1 {
+						return nil, fmt.Errorf("send() takes exactly one argument")
+					}
+					gen := receiver.(*Generator)
+					return gen.Send(args[0])
+				},
+			},
+			"close": {
+				Name:    "close",
+				Arity:   0,
+				Doc:     "Close the generator",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					gen := receiver.(*Generator)
+					return gen.Close()
+				},
+			},
+		},
+	})
+
 	// Register class type
 	RegisterType(&TypeDescriptor{
 		Name:       "class",

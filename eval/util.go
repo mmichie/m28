@@ -128,6 +128,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				params:     params,
 				body:       functionBody,
 				env:        ctx,
+				name:       string(name),
 			}
 
 			ctx.Define(string(name), function)
