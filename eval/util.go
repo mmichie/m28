@@ -4,26 +4,55 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-// IfForm provides the implementation of the if special form
+// IfForm provides the implementation of the if special form with elif support
 func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 || len(args) > 3 {
-		return nil, ErrArgCount("if requires 2 or 3 arguments")
+	if len(args) < 2 {
+		return nil, ErrArgCount("if requires at least 2 arguments")
 	}
 
-	// Evaluate the condition
-	condition, err := Eval(args[0], ctx)
-	if err != nil {
-		return nil, err
+	// Handle simple if or if-else (2 or 3 args)
+	if len(args) == 2 || len(args) == 3 {
+		// Evaluate the condition
+		condition, err := Eval(args[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if condition is truthy
+		if core.IsTruthy(condition) {
+			return Eval(args[1], ctx)
+		} else if len(args) > 2 {
+			return Eval(args[2], ctx)
+		}
+
+		// No else clause, return nil
+		return core.Nil, nil
 	}
 
-	// Check if condition is truthy
-	if core.IsTruthy(condition) {
-		return Eval(args[1], ctx)
-	} else if len(args) > 2 {
-		return Eval(args[2], ctx)
+	// Handle if-elif-else chain
+	// Must have pairs of condition-expr, optionally with final else
+	i := 0
+	for i < len(args)-1 {
+		// Evaluate condition
+		condition, err := Eval(args[i], ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// If truthy, evaluate and return the corresponding expression
+		if core.IsTruthy(condition) {
+			return Eval(args[i+1], ctx)
+		}
+
+		i += 2
 	}
 
-	// No else clause, return nil
+	// If we have one remaining arg, it's the else clause
+	if i < len(args) {
+		return Eval(args[i], ctx)
+	}
+
+	// No condition matched and no else clause
 	return core.Nil, nil
 }
 

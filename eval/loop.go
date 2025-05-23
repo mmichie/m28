@@ -2,7 +2,6 @@
 package eval
 
 import (
-	"fmt"
 	"github.com/mmichie/m28/core"
 )
 
@@ -311,8 +310,5 @@ func BreakFormHandler(args core.ListValue, ctx *core.Context) (core.Value, error
 
 // External function to expose ContinueForm for registration
 func ContinueFormHandler(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	// Add debugging to verify we're creating the right value
-	result, err := ContinueForm(args, ctx)
-	fmt.Printf("DEBUG: ContinueForm returned %v of type %T\n", result, result)
-	return result, err
+	return ContinueForm(args, ctx)
 }

@@ -125,27 +125,10 @@ func RegisterSpecialForm(name string, handler SpecialFormHandler) {
 	specialForms[name] = handler
 }
 
-// ifForm implements the if special form
+// ifForm delegates to IfForm in util.go
 func ifForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 || len(args) > 3 {
-		return nil, fmt.Errorf("if requires 2 or 3 arguments")
-	}
-
-	// Evaluate the condition
-	condition, err := Eval(args[0], ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if condition is truthy
-	if core.IsTruthy(condition) {
-		return Eval(args[1], ctx)
-	} else if len(args) > 2 {
-		return Eval(args[2], ctx)
-	}
-
-	// No else clause, return nil
-	return core.Nil, nil
+	// Delegate to util.go implementation which supports elif
+	return IfForm(args, ctx)
 }
 
 // defForm implements the def special form to define functions and variables
