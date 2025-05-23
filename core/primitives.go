@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"strconv"
-	"strings"
 )
 
 // NumberValue represents a numeric value
@@ -21,24 +20,16 @@ func (n NumberValue) String() string {
 	return s
 }
 
-// GetAttr implements basic number methods
+// GetAttr implements basic number methods using TypeDescriptor
 func (n NumberValue) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "abs":
-		return &BuiltinMethod{
-			BaseObject: *NewBaseObject(MethodType),
-			fn: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				num := float64(receiver.(NumberValue))
-				if num < 0 {
-					return NumberValue(-num), nil
-				}
-				return receiver, nil
-			},
-			receiver: n,
-		}, true
-	default:
-		return nil, false
+	desc := GetTypeDescriptor(NumberType)
+	if desc != nil {
+		val, err := desc.GetAttribute(n, name)
+		if err == nil {
+			return val, true
+		}
 	}
+	return nil, false
 }
 
 // StringValue represents a string value
@@ -54,30 +45,16 @@ func (s StringValue) String() string {
 	return fmt.Sprintf("%q", string(s))
 }
 
-// GetAttr implements basic string methods
+// GetAttr implements basic string methods using TypeDescriptor
 func (s StringValue) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "length":
-		return NumberValue(len(s)), true
-	case "upper":
-		return &BuiltinMethod{
-			BaseObject: *NewBaseObject(MethodType),
-			fn: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				return StringValue(strings.ToUpper(string(receiver.(StringValue)))), nil
-			},
-			receiver: s,
-		}, true
-	case "lower":
-		return &BuiltinMethod{
-			BaseObject: *NewBaseObject(MethodType),
-			fn: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				return StringValue(strings.ToLower(string(receiver.(StringValue)))), nil
-			},
-			receiver: s,
-		}, true
-	default:
-		return nil, false
+	desc := GetTypeDescriptor(StringType)
+	if desc != nil {
+		val, err := desc.GetAttribute(s, name)
+		if err == nil {
+			return val, true
+		}
 	}
+	return nil, false
 }
 
 // BoolValue represents a boolean value

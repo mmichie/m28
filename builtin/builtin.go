@@ -191,14 +191,22 @@ func registerIOBuiltins(ctx *core.Context) {
 
 // registerTypeBuiltins registers type-related functions
 func registerTypeBuiltins(ctx *core.Context) {
-	// Type: (type val)
+	// Type: (type val) - returns type object
 	ctx.Define("type", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("type requires 1 argument")
 		}
 
-		typeName := args[0].Type()
-		return core.StringValue(string(typeName)), nil
+		// Get type descriptor
+		desc := core.GetTypeDescriptorForValue(args[0])
+		if desc == nil {
+			// Fallback for types without descriptors
+			typeName := args[0].Type()
+			return core.StringValue(fmt.Sprintf("<type '%s'>", string(typeName))), nil
+		}
+
+		// Return a string representation of the type
+		return core.StringValue(fmt.Sprintf("<type '%s'>", desc.PythonName)), nil
 	}))
 
 	// Python-style type checking functions
@@ -276,5 +284,84 @@ func registerTypeBuiltins(ctx *core.Context) {
 			return nil, fmt.Errorf("bool expects 1 argument, got %d", len(args))
 		}
 		return core.BoolValue(core.IsTruthy(args[0])), nil
+	}))
+
+	// dir - list attributes of an object
+	ctx.Define("dir", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("dir expects 1 argument, got %d", len(args))
+		}
+
+		desc := core.GetTypeDescriptorForValue(args[0])
+		if desc == nil {
+			// Return empty list for types without descriptors
+			return core.EmptyList, nil
+		}
+
+		// Get all attribute names
+		names := desc.GetAttributeNames()
+		result := make(core.ListValue, len(names))
+		for i, name := range names {
+			result[i] = core.StringValue(name)
+		}
+
+		return result, nil
+	}))
+
+	// hasattr - check if object has attribute
+	ctx.Define("hasattr", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("hasattr expects 2 arguments, got %d", len(args))
+		}
+
+		attrName, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("hasattr attribute name must be a string")
+		}
+
+		// Try to get the attribute
+		if obj, ok := args[0].(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			_, found := obj.GetAttr(string(attrName))
+			return core.BoolValue(found), nil
+		}
+
+		return core.False, nil
+	}))
+
+	// getattr - get attribute from object
+	ctx.Define("getattr", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 || len(args) > 3 {
+			return nil, fmt.Errorf("getattr expects 2 or 3 arguments, got %d", len(args))
+		}
+
+		attrName, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("getattr attribute name must be a string")
+		}
+
+		// Try to get the attribute
+		if obj, ok := args[0].(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			val, found := obj.GetAttr(string(attrName))
+			if found {
+				return val, nil
+			}
+		}
+
+		// Return default if provided
+		if len(args) == 3 {
+			return args[2], nil
+		}
+
+		// Otherwise, attribute error
+		desc := core.GetTypeDescriptorForValue(args[0])
+		typeName := "object"
+		if desc != nil {
+			typeName = desc.PythonName
+		}
+		return nil, fmt.Errorf("'%s' object has no attribute '%s'", typeName, string(attrName))
 	}))
 }
