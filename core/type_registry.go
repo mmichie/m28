@@ -9,6 +9,53 @@ import (
 
 // InitializeTypeRegistry sets up type descriptors for all built-in types
 func InitializeTypeRegistry() {
+	// Register module type
+	RegisterType(&TypeDescriptor{
+		Name:       "module",
+		PythonName: "module",
+		BaseType:   Type("module"),
+		Methods: map[string]*MethodDescriptor{
+			"__getattr__": {
+				Name:    "__getattr__",
+				Arity:   1,
+				Doc:     "Get an attribute from the module",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					module := receiver.(*Module)
+					if len(args) != 1 {
+						return nil, fmt.Errorf("__getattr__ expects 1 argument")
+					}
+					
+					name, ok := args[0].(StringValue)
+					if !ok {
+						return nil, fmt.Errorf("attribute name must be a string")
+					}
+					
+					if val, ok := module.GetExport(string(name)); ok {
+						return val, nil
+					}
+					
+					return nil, fmt.Errorf("module '%s' has no attribute '%s'", module.Name, string(name))
+				},
+			},
+			"__dir__": {
+				Name:    "__dir__",
+				Arity:   0,
+				Doc:     "List all exported names",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					module := receiver.(*Module)
+					exports := module.GetAllExports()
+					result := make(ListValue, len(exports))
+					for i, name := range exports {
+						result[i] = StringValue(name)
+					}
+					return result, nil
+				},
+			},
+		},
+	})
+
 	// Register number type
 	RegisterType(&TypeDescriptor{
 		Name:       "number",

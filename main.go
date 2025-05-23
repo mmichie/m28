@@ -91,6 +91,13 @@ func initializeGlobalContext(ctx *core.Context) {
 
 	// Register all built-in functions
 	builtin.RegisterAllBuiltins(ctx)
+	
+	// Initialize module loader
+	moduleLoader := core.NewDefaultModuleLoader(ctx, eval.Eval, func(code string) (core.Value, error) {
+		p := parser.NewParser()
+		return p.Parse(code)
+	})
+	core.SetModuleLoader(moduleLoader)
 }
 
 // executeFile executes a file with the given context

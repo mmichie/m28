@@ -113,8 +113,8 @@ func init() {
 		"lambda": lambdaForm,
 		"fn":     lambdaForm, // Alias for lambda
 
-		// Module system
-		"import": importForm,
+		// Module system (will be overridden by enhanced version)
+		// "import": importForm,
 
 		// Exception handling
 		"try":   tryForm,
@@ -125,6 +125,9 @@ func init() {
 
 		// Other special forms will be added through RegisterSpecialForm
 	}
+	
+	// Register enhanced module forms
+	RegisterModuleForms()
 }
 
 // RegisterSpecialForm registers a special form
