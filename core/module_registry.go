@@ -2,8 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 )
@@ -25,19 +23,9 @@ type ModuleRegistry struct {
 
 // NewModuleRegistry creates a new ModuleRegistry
 func NewModuleRegistry() *ModuleRegistry {
-	// Default search paths
-	defaultPaths := []string{
-		".",
-		"./tests",
-		"./modules",
-		"./examples",
-		"/usr/local/lib/m28/modules",
-		"/usr/lib/m28/modules",
-	}
-
 	return &ModuleRegistry{
 		modules:    make(map[string]ModuleInfo),
-		searchPath: defaultPaths,
+		searchPath: []string{}, // Will be set by SetModulePaths
 	}
 }
 
@@ -138,80 +126,13 @@ func (r *ModuleRegistry) ResolveModulePath(name string) (string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	// Handle case where name is already a valid file path
-	if _, err := os.Stat(name); err == nil {
-		// File exists with the exact path
-		absPath, err := filepath.Abs(name)
-		if err != nil {
-			return name, nil // Fall back to the original path if abs fails
-		}
-		return absPath, nil
+	// Use the centralized FindModule function
+	path, err := FindModule(name)
+	if err != nil {
+		return "", fmt.Errorf("module %s not found", name)
 	}
-
-	// Check if it's a .m28 path that needs to be normalized
-	if filepath.Ext(name) == ".m28" {
-		// Try to resolve it both as a relative path and in the search paths
-		// First check if it's a relative path
-		if absPath, err := filepath.Abs(name); err == nil {
-			if _, err := os.Stat(absPath); err == nil {
-				return absPath, nil
-			}
-		}
-	}
-
-	// Try with .m28 extension added if not already present
-	nameWithExt := name
-	if filepath.Ext(name) != ".m28" {
-		nameWithExt = name + ".m28"
-		// Check if the name with extension is a valid path
-		if _, err := os.Stat(nameWithExt); err == nil {
-			absPath, err := filepath.Abs(nameWithExt)
-			if err != nil {
-				return nameWithExt, nil
-			}
-			return absPath, nil
-		}
-	}
-
-	// Look for the module in each of the search paths
-	for _, path := range r.searchPath {
-		// Try with .m28 extension
-		fullPath := filepath.Join(path, nameWithExt)
-		if _, err := os.Stat(fullPath); err == nil {
-			// Found the file
-			absPath, err := filepath.Abs(fullPath)
-			if err != nil {
-				return fullPath, nil // Fall back to the original path
-			}
-			return absPath, nil
-		}
-
-		// If we didn't find it with .m28 extension, try with original name
-		if nameWithExt != name {
-			fullPath = filepath.Join(path, name)
-			if _, err := os.Stat(fullPath); err == nil {
-				absPath, err := filepath.Abs(fullPath)
-				if err != nil {
-					return fullPath, nil
-				}
-				return absPath, nil
-			}
-		}
-
-		// Check if it's a directory with __init__.m28 (package)
-		initPath := filepath.Join(path, name, "__init__.m28")
-		if _, err := os.Stat(initPath); err == nil {
-			// Found a package
-			absPath, err := filepath.Abs(initPath)
-			if err != nil {
-				return initPath, nil
-			}
-			return absPath, nil
-		}
-	}
-
-	// Module not found in any of the search paths
-	return "", fmt.Errorf("module %s not found", name)
+	
+	return path, nil
 }
 
 // ReloadModule removes a module from the registry so it will be reloaded on next import

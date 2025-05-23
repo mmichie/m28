@@ -15,17 +15,23 @@ import (
 
 // REPL represents a read-eval-print loop
 type REPL struct {
-	ctx    *core.Context
-	reader *bufio.Reader
-	writer io.Writer
+	ctx        *core.Context
+	reader     *bufio.Reader
+	writer     io.Writer
+	history    *History
+	completer  *Completer
+	helpSystem *HelpSystem
 }
 
 // NewREPL creates a new REPL with the given context
 func NewREPL(globalCtx *core.Context) *REPL {
 	return &REPL{
-		ctx:    globalCtx,
-		reader: bufio.NewReader(os.Stdin),
-		writer: os.Stdout,
+		ctx:        globalCtx,
+		reader:     bufio.NewReader(os.Stdin),
+		writer:     os.Stdout,
+		history:    NewHistory(1000),
+		completer:  NewCompleter(globalCtx),
+		helpSystem: NewHelpSystem(globalCtx),
 	}
 }
 
@@ -62,19 +68,37 @@ func (r *REPL) Start() {
 			continue
 		}
 
+		// Add to history
+		r.history.Add(line)
+
 		// Handle special commands
-		switch line {
-		case "exit", "quit":
+		switch {
+		case line == "exit" || line == "quit":
 			fmt.Fprintln(r.writer, "Exiting...")
 			return
-		case "help":
-			printHelp(r.writer)
+		case line == "help":
+			r.helpSystem.ShowHelp("", r.writer)
 			continue
+		case strings.HasPrefix(line, "help "):
+			topic := strings.TrimSpace(line[5:])
+			r.helpSystem.ShowHelp(topic, r.writer)
+			continue
+		}
+
+		// Check for incomplete input (multi-line)
+		fullInput := line
+		if isIncomplete(line) {
+			multiLine, err := r.readMultilineInput(line)
+			if err != nil {
+				fmt.Fprintf(r.writer, "Error: %s\n", err)
+				continue
+			}
+			fullInput = multiLine
 		}
 
 		// Parse the input
 		p := parser.NewParser()
-		expr, err := p.Parse(line)
+		expr, err := p.Parse(fullInput)
 		if err != nil {
 			fmt.Fprintf(r.writer, "Parse error: %s\n", err)
 			continue

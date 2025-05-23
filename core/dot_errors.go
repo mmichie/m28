@@ -51,3 +51,94 @@ func ErrDotNestedAccessf(path, prop string, err error) error {
 func ErrTooManyArgumentsf(methodName string, expected, got int) error {
 	return fmt.Errorf(ErrTooManyArguments, methodName, expected, got)
 }
+
+// NameError is raised when a name is not found
+type NameError struct {
+	Name string
+}
+
+func (e *NameError) Error() string {
+	return fmt.Sprintf("name error: name '%s' is not defined", e.Name)
+}
+
+// TypeError is raised when a type error occurs
+type TypeError struct {
+	Message  string
+	Expected string
+	Got      string
+}
+
+func (e *TypeError) Error() string {
+	return e.Message
+}
+
+// EvalError is raised during evaluation with context
+type EvalError struct {
+	Type       string
+	Message    string
+	File       string
+	Line       int
+	Column     int
+	Suggestion string
+	Wrapped    error
+}
+
+func (e *EvalError) Error() string {
+	return fmt.Sprintf("%s: %s", e.Type, e.Message)
+}
+
+// IndexError represents an index out of bounds error
+type IndexError struct {
+	Index  int
+	Length int
+}
+
+func (e *IndexError) Error() string {
+	return fmt.Sprintf("list index out of range (index %d, length %d)", e.Index, e.Length)
+}
+
+// KeyError represents a missing dictionary key
+type KeyError struct {
+	Key Value
+}
+
+func (e *KeyError) Error() string {
+	return fmt.Sprintf("key not found: %s", PrintValue(e.Key))
+}
+
+// ZeroDivisionError represents division by zero
+type ZeroDivisionError struct{}
+
+func (e *ZeroDivisionError) Error() string {
+	return "division by zero"
+}
+
+// NewTypeError creates a new type error
+func NewTypeError(expected string, got Value, context string) *TypeError {
+	gotType := string(got.Type())
+	
+	// Use TypeDescriptor for better type names
+	if desc := GetTypeDescriptorForValue(got); desc != nil {
+		gotType = desc.PythonName
+	}
+	
+	return &TypeError{
+		Expected: expected,
+		Got:      gotType,
+		Message:  fmt.Sprintf("%s: expected %s, got %s", context, expected, gotType),
+	}
+}
+
+// WrapEvalError wraps an existing error with evaluation context
+func WrapEvalError(err error, message string, ctx *Context) *EvalError {
+	if evalErr, ok := err.(*EvalError); ok {
+		// Don't double-wrap eval errors
+		return evalErr
+	}
+	
+	return &EvalError{
+		Type:    "EvalError",
+		Message: message,
+		Wrapped: err,
+	}
+}
