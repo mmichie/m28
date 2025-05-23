@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 // EqualValues compares two values for equality
 func EqualValues(a, b Value) bool {
 	// Equal if identical
@@ -51,6 +53,23 @@ func EqualValues(a, b Value) bool {
 	}
 
 	return false
+}
+
+// ValueToKey converts a value to a string key for use in sets and dicts
+func ValueToKey(v Value) string {
+	switch val := v.(type) {
+	case NumberValue:
+		return fmt.Sprintf("n:%g", float64(val))
+	case StringValue:
+		return fmt.Sprintf("s:%s", string(val))
+	case BoolValue:
+		return fmt.Sprintf("b:%t", bool(val))
+	case NilValue:
+		return "nil"
+	default:
+		// For non-hashable types, use pointer address
+		return fmt.Sprintf("p:%p", v)
+	}
 }
 
 // Compare compares two values and returns:

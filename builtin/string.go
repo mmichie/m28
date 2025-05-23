@@ -23,6 +23,9 @@ func RegisterStringFunctions(ctx *core.Context) {
 	ctx.Define("upper", core.NewBuiltinFunction(UpperFunc))
 	ctx.Define("lower", core.NewBuiltinFunction(LowerFunc))
 	ctx.Define("trim", core.NewBuiltinFunction(TrimFunc))
+	ctx.Define("strip", core.NewBuiltinFunction(StripFunc))
+	ctx.Define("lstrip", core.NewBuiltinFunction(LStripFunc))
+	ctx.Define("rstrip", core.NewBuiltinFunction(RStripFunc))
 	ctx.Define("replace", core.NewBuiltinFunction(ReplaceFunc))
 	ctx.Define("split", core.NewBuiltinFunction(SplitFunc))
 	ctx.Define("join", core.NewBuiltinFunction(JoinFunc))
@@ -31,6 +34,8 @@ func RegisterStringFunctions(ctx *core.Context) {
 	ctx.Define("starts-with", core.NewBuiltinFunction(StartsWithFunc))
 	ctx.Define("ends-with", core.NewBuiltinFunction(EndsWithFunc))
 	ctx.Define("substring", core.NewBuiltinFunction(SubstringFunc))
+	ctx.Define("find", core.NewBuiltinFunction(FindFunc))
+	ctx.Define("count", core.NewBuiltinFunction(CountFunc))
 }
 
 // StrFunc converts a value to a string
@@ -376,4 +381,95 @@ func StrConcatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	return core.StringValue(sb.String()), nil
+}
+
+// StripFunc removes whitespace from both ends (Python-style)
+func StripFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return TrimFunc(args, ctx) // strip is alias for trim
+}
+
+// LStripFunc removes whitespace from the left side
+func LStripFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, fmt.Errorf("lstrip requires 1 or 2 arguments: string[, chars]")
+	}
+
+	str, ok := args[0].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("first argument must be a string, got %s", args[0].Type())
+	}
+
+	if len(args) == 1 {
+		return core.StringValue(strings.TrimLeft(string(str), " \t\n\r")), nil
+	}
+
+	cutset, ok := args[1].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("second argument must be a string, got %s", args[1].Type())
+	}
+
+	return core.StringValue(strings.TrimLeft(string(str), string(cutset))), nil
+}
+
+// RStripFunc removes whitespace from the right side
+func RStripFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, fmt.Errorf("rstrip requires 1 or 2 arguments: string[, chars]")
+	}
+
+	str, ok := args[0].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("first argument must be a string, got %s", args[0].Type())
+	}
+
+	if len(args) == 1 {
+		return core.StringValue(strings.TrimRight(string(str), " \t\n\r")), nil
+	}
+
+	cutset, ok := args[1].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("second argument must be a string, got %s", args[1].Type())
+	}
+
+	return core.StringValue(strings.TrimRight(string(str), string(cutset))), nil
+}
+
+// FindFunc finds the index of a substring
+func FindFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("find requires 2 arguments: string, substring")
+	}
+
+	str, ok := args[0].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("first argument must be a string, got %s", args[0].Type())
+	}
+
+	substr, ok := args[1].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("second argument must be a string, got %s", args[1].Type())
+	}
+
+	index := strings.Index(string(str), string(substr))
+	return core.NumberValue(index), nil
+}
+
+// CountFunc counts occurrences of a substring
+func CountFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("count requires 2 arguments: string, substring")
+	}
+
+	str, ok := args[0].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("first argument must be a string, got %s", args[0].Type())
+	}
+
+	substr, ok := args[1].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("second argument must be a string, got %s", args[1].Type())
+	}
+
+	count := strings.Count(string(str), string(substr))
+	return core.NumberValue(count), nil
 }

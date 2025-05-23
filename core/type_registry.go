@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 )
 
@@ -252,7 +253,7 @@ func InitializeTypeRegistry() {
 		Doc:  "symbol(name) -> symbol\n\nCreate a symbol from a string.",
 	})
 
-	// Register list type (basic for now)
+	// Register list type with comprehensive methods
 	RegisterType(&TypeDescriptor{
 		Name:       "list",
 		PythonName: "list",
@@ -261,15 +262,151 @@ func InitializeTypeRegistry() {
 			"append": {
 				Name:    "append",
 				Arity:   1,
-				Doc:     "Append an element to the list",
+				Doc:     "Append an element to the list (returns new list)",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					// For now, lists are immutable in the functional style
-					// This returns a new list with the element appended
 					list := receiver.(ListValue)
 					newList := make(ListValue, len(list)+1)
 					copy(newList, list)
 					newList[len(list)] = args[0]
+					return newList, nil
+				},
+			},
+			"extend": {
+				Name:    "extend",
+				Arity:   1,
+				Doc:     "Extend list by appending elements from another list",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					other, ok := args[0].(ListValue)
+					if !ok {
+						return nil, fmt.Errorf("extend expects a list, got %s", args[0].Type())
+					}
+					newList := make(ListValue, len(list)+len(other))
+					copy(newList, list)
+					copy(newList[len(list):], other)
+					return newList, nil
+				},
+			},
+			"insert": {
+				Name:    "insert",
+				Arity:   2,
+				Doc:     "Insert element at index",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					index, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, fmt.Errorf("insert expects index as first argument")
+					}
+					idx := int(index)
+					if idx < 0 {
+						idx = len(list) + idx + 1
+					}
+					if idx < 0 {
+						idx = 0
+					}
+					if idx > len(list) {
+						idx = len(list)
+					}
+					
+					newList := make(ListValue, len(list)+1)
+					copy(newList[:idx], list[:idx])
+					newList[idx] = args[1]
+					copy(newList[idx+1:], list[idx:])
+					return newList, nil
+				},
+			},
+			"pop": {
+				Name:    "pop",
+				Arity:   -1, // 0 or 1 args
+				Doc:     "Remove and return element at index (default last)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					if len(list) == 0 {
+						return nil, fmt.Errorf("pop from empty list")
+					}
+					
+					idx := len(list) - 1
+					if len(args) > 0 {
+						index, ok := args[0].(NumberValue)
+						if !ok {
+							return nil, fmt.Errorf("pop expects index as argument")
+						}
+						idx = int(index)
+						if idx < 0 {
+							idx = len(list) + idx
+						}
+					}
+					
+					if idx < 0 || idx >= len(list) {
+						return nil, &IndexError{Index: idx, Length: len(list)}
+					}
+					
+					return list[idx], nil
+				},
+			},
+			"index": {
+				Name:    "index",
+				Arity:   1,
+				Doc:     "Return index of first occurrence of value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					for i, item := range list {
+						if EqualValues(item, args[0]) {
+							return NumberValue(i), nil
+						}
+					}
+					return nil, fmt.Errorf("value not found in list")
+				},
+			},
+			"count": {
+				Name:    "count",
+				Arity:   1,
+				Doc:     "Return number of occurrences of value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					count := 0
+					for _, item := range list {
+						if EqualValues(item, args[0]) {
+							count++
+						}
+					}
+					return NumberValue(count), nil
+				},
+			},
+			"reverse": {
+				Name:    "reverse",
+				Arity:   0,
+				Doc:     "Return reversed list",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					newList := make(ListValue, len(list))
+					for i, j := 0, len(list)-1; i < len(list); i, j = i+1, j-1 {
+						newList[i] = list[j]
+					}
+					return newList, nil
+				},
+			},
+			"sort": {
+				Name:    "sort",
+				Arity:   0,
+				Doc:     "Return sorted list",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					newList := make(ListValue, len(list))
+					copy(newList, list)
+					// Simple sort for numbers and strings
+					sort.Slice(newList, func(i, j int) bool {
+						return Compare(newList[i], newList[j]) < 0
+					})
 					return newList, nil
 				},
 			},
@@ -281,6 +418,60 @@ func InitializeTypeRegistry() {
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					list := receiver.(ListValue)
 					return NumberValue(len(list)), nil
+				},
+			},
+			"__getitem__": {
+				Name:    "__getitem__",
+				Arity:   1,
+				Doc:     "Get item by index",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					index, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, fmt.Errorf("list indices must be integers")
+					}
+					return list.GetItem(int(index))
+				},
+			},
+			"__setitem__": {
+				Name:    "__setitem__",
+				Arity:   2,
+				Doc:     "Set item by index",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					index, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, fmt.Errorf("list indices must be integers")
+					}
+					// Since lists are immutable, return a new list
+					idx := int(index)
+					if idx < 0 {
+						idx = len(list) + idx
+					}
+					if idx < 0 || idx >= len(list) {
+						return nil, &IndexError{Index: idx, Length: len(list)}
+					}
+					newList := make(ListValue, len(list))
+					copy(newList, list)
+					newList[idx] = args[1]
+					return newList, nil
+				},
+			},
+			"__contains__": {
+				Name:    "__contains__",
+				Arity:   1,
+				Doc:     "Check if value is in list",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					list := receiver.(ListValue)
+					for _, item := range list {
+						if EqualValues(item, args[0]) {
+							return True, nil
+						}
+					}
+					return False, nil
 				},
 			},
 		},
@@ -296,12 +487,375 @@ func InitializeTypeRegistry() {
 			},
 		},
 		Constructor: func(args []Value, ctx *Context) (Value, error) {
+			if len(args) == 0 {
+				return EmptyList, nil
+			}
+			if len(args) == 1 {
+				// Try to convert from iterable
+				if iter, ok := args[0].(Iterable); ok {
+					result := make(ListValue, 0)
+					it := iter.Iterator()
+					for {
+						val, ok := it.Next()
+						if !ok {
+							break
+						}
+						result = append(result, val)
+					}
+					return result, nil
+				}
+			}
 			// Create list from arguments
 			return ListValue(args), nil
 		},
 		Repr: defaultRepr,
 		Str:  defaultStr,
 		Doc:  "list() -> new empty list\nlist(iterable) -> new list initialized from iterable's items",
+	})
+
+	// Register dict type
+	RegisterType(&TypeDescriptor{
+		Name:       "dict",
+		PythonName: "dict",
+		BaseType:   DictType,
+		Methods: map[string]*MethodDescriptor{
+			"get": {
+				Name:    "get",
+				Arity:   -1, // 1 or 2 args
+				Doc:     "Get value by key, with optional default",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					dict := receiver.(*DictValue)
+					if len(args) < 1 || len(args) > 2 {
+						return nil, fmt.Errorf("get expects 1 or 2 arguments")
+					}
+					
+					key, ok := args[0].(StringValue)
+					if !ok {
+						return nil, fmt.Errorf("dict key must be a string")
+					}
+					
+					val, found := dict.Get(string(key))
+					if found {
+						return val, nil
+					}
+					
+					if len(args) > 1 {
+						return args[1], nil
+					}
+					return None, nil
+				},
+			},
+			"set": {
+				Name:    "set",
+				Arity:   2,
+				Doc:     "Set value by key (returns new dict)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					dict := receiver.(*DictValue)
+					key, ok := args[0].(StringValue)
+					if !ok {
+						return nil, fmt.Errorf("dict key must be a string")
+					}
+					
+					// Create new dict with the update
+					newDict := NewDict()
+					for _, k := range dict.Keys() {
+						v, _ := dict.Get(k)
+						newDict.Set(k, v)
+					}
+					newDict.Set(string(key), args[1])
+					return newDict, nil
+				},
+			},
+			"keys": {
+				Name:    "keys",
+				Arity:   0,
+				Doc:     "Return list of keys",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					dict := receiver.(*DictValue)
+					keys := dict.Keys()
+					result := make(ListValue, len(keys))
+					for i, k := range keys {
+						result[i] = StringValue(k)
+					}
+					return result, nil
+				},
+			},
+			"values": {
+				Name:    "values",
+				Arity:   0,
+				Doc:     "Return list of values",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					dict := receiver.(*DictValue)
+					keys := dict.Keys()
+					result := make(ListValue, len(keys))
+					for i, k := range keys {
+						v, _ := dict.Get(k)
+						result[i] = v
+					}
+					return result, nil
+				},
+			},
+			"items": {
+				Name:    "items",
+				Arity:   0,
+				Doc:     "Return list of (key, value) tuples",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					dict := receiver.(*DictValue)
+					keys := dict.Keys()
+					result := make(ListValue, len(keys))
+					for i, k := range keys {
+						v, _ := dict.Get(k)
+						result[i] = TupleValue{StringValue(k), v}
+					}
+					return result, nil
+				},
+			},
+			"__len__": {
+				Name:    "__len__",
+				Arity:   0,
+				Doc:     "Return number of items",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					dict := receiver.(*DictValue)
+					return NumberValue(len(dict.Keys())), nil
+				},
+			},
+			"__contains__": {
+				Name:    "__contains__",
+				Arity:   1,
+				Doc:     "Check if key exists",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					dict := receiver.(*DictValue)
+					key, ok := args[0].(StringValue)
+					if !ok {
+						return False, nil
+					}
+					_, found := dict.Get(string(key))
+					return BoolValue(found), nil
+				},
+			},
+		},
+		Constructor: func(args []Value, ctx *Context) (Value, error) {
+			dict := NewDict()
+			// TODO: Support initialization from pairs
+			return dict, nil
+		},
+		Repr: defaultRepr,
+		Str:  defaultStr,
+		Doc:  "dict() -> new empty dictionary",
+	})
+
+	// Register tuple type
+	RegisterType(&TypeDescriptor{
+		Name:       "tuple",
+		PythonName: "tuple",
+		BaseType:   TupleType,
+		Methods: map[string]*MethodDescriptor{
+			"count": {
+				Name:    "count",
+				Arity:   1,
+				Doc:     "Return number of occurrences of value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					tuple := receiver.(TupleValue)
+					count := 0
+					for _, item := range tuple {
+						if EqualValues(item, args[0]) {
+							count++
+						}
+					}
+					return NumberValue(count), nil
+				},
+			},
+			"index": {
+				Name:    "index",
+				Arity:   1,
+				Doc:     "Return index of first occurrence of value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					tuple := receiver.(TupleValue)
+					for i, item := range tuple {
+						if EqualValues(item, args[0]) {
+							return NumberValue(i), nil
+						}
+					}
+					return nil, fmt.Errorf("value not found in tuple")
+				},
+			},
+			"__len__": {
+				Name:    "__len__",
+				Arity:   0,
+				Doc:     "Return the length of the tuple",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					tuple := receiver.(TupleValue)
+					return NumberValue(len(tuple)), nil
+				},
+			},
+			"__getitem__": {
+				Name:    "__getitem__",
+				Arity:   1,
+				Doc:     "Get item by index",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					tuple := receiver.(TupleValue)
+					index, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, fmt.Errorf("tuple indices must be integers")
+					}
+					return tuple.GetItem(int(index))
+				},
+			},
+		},
+		Properties: map[string]*PropertyDescriptor{
+			"length": {
+				Name:     "length",
+				ReadOnly: true,
+				Doc:      "The length of the tuple",
+				Getter: func(v Value) (Value, error) {
+					tuple := v.(TupleValue)
+					return NumberValue(len(tuple)), nil
+				},
+			},
+		},
+		Constructor: func(args []Value, ctx *Context) (Value, error) {
+			if len(args) == 0 {
+				return EmptyTuple, nil
+			}
+			if len(args) == 1 {
+				// Try to convert from iterable
+				if iter, ok := args[0].(Iterable); ok {
+					result := make(TupleValue, 0)
+					it := iter.Iterator()
+					for {
+						val, ok := it.Next()
+						if !ok {
+							break
+						}
+						result = append(result, val)
+					}
+					return result, nil
+				}
+			}
+			return TupleValue(args), nil
+		},
+		Repr: defaultRepr,
+		Str:  defaultStr,
+		Doc:  "tuple() -> empty tuple\ntuple(iterable) -> tuple initialized from iterable's items",
+	})
+
+	// Register set type
+	RegisterType(&TypeDescriptor{
+		Name:       "set",
+		PythonName: "set",
+		BaseType:   SetType,
+		Methods: map[string]*MethodDescriptor{
+			"add": {
+				Name:    "add",
+				Arity:   1,
+				Doc:     "Add element to set (returns new set)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					set := receiver.(*SetValue)
+					newSet := NewSet()
+					// Copy existing items
+					for k, v := range set.items {
+						newSet.items[k] = v
+					}
+					newSet.Add(args[0])
+					return newSet, nil
+				},
+			},
+			"remove": {
+				Name:    "remove",
+				Arity:   1,
+				Doc:     "Remove element from set",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					set := receiver.(*SetValue)
+					if !set.Contains(args[0]) {
+						return nil, &KeyError{Key: args[0]}
+					}
+					newSet := NewSet()
+					// Copy without the removed item
+					key := PrintValue(args[0])
+					for k, v := range set.items {
+						if k != key {
+							newSet.items[k] = v
+						}
+					}
+					return newSet, nil
+				},
+			},
+			"discard": {
+				Name:    "discard",
+				Arity:   1,
+				Doc:     "Remove element if present",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					set := receiver.(*SetValue)
+					newSet := NewSet()
+					key := PrintValue(args[0])
+					for k, v := range set.items {
+						if k != key {
+							newSet.items[k] = v
+						}
+					}
+					return newSet, nil
+				},
+			},
+			"__len__": {
+				Name:    "__len__",
+				Arity:   0,
+				Doc:     "Return number of elements",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					set := receiver.(*SetValue)
+					return NumberValue(set.Size()), nil
+				},
+			},
+			"__contains__": {
+				Name:    "__contains__",
+				Arity:   1,
+				Doc:     "Check if value is in set",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					set := receiver.(*SetValue)
+					return BoolValue(set.Contains(args[0])), nil
+				},
+			},
+		},
+		Constructor: func(args []Value, ctx *Context) (Value, error) {
+			set := NewSet()
+			if len(args) == 1 {
+				// Try to convert from iterable
+				if iter, ok := args[0].(Iterable); ok {
+					it := iter.Iterator()
+					for {
+						val, ok := it.Next()
+						if !ok {
+							break
+						}
+						set.Add(val)
+					}
+					return set, nil
+				}
+			}
+			// Add all arguments
+			for _, arg := range args {
+				set.Add(arg)
+			}
+			return set, nil
+		},
+		Repr: defaultRepr,
+		Str:  defaultStr,
+		Doc:  "set() -> new empty set\nset(iterable) -> new set object",
 	})
 }
 

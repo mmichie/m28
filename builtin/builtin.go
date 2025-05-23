@@ -31,6 +31,12 @@ func RegisterAllBuiltins(ctx *core.Context) {
 
 	// Register type functions
 	registerTypeBuiltins(ctx)
+	
+	// Register mathematical functions
+	RegisterMathFunctions(ctx)
+	
+	// Register utility functions
+	RegisterUtilityFunctions(ctx)
 }
 
 // registerArithmeticBuiltins registers arithmetic functions
@@ -363,5 +369,160 @@ func registerTypeBuiltins(ctx *core.Context) {
 			typeName = desc.PythonName
 		}
 		return nil, fmt.Errorf("'%s' object has no attribute '%s'", typeName, string(attrName))
+	}))
+
+	// Collection constructors
+	// list - create a new list
+	ctx.Define("list", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.EmptyList, nil
+		}
+		if len(args) == 1 {
+			// Convert iterable to list
+			switch v := args[0].(type) {
+			case core.ListValue:
+				// Copy the list
+				result := make(core.ListValue, len(v))
+				copy(result, v)
+				return result, nil
+			case core.TupleValue:
+				// Convert tuple to list
+				result := make(core.ListValue, len(v))
+				copy(result, v)
+				return result, nil
+			case core.StringValue:
+				// Convert string to list of characters
+				str := string(v)
+				result := make(core.ListValue, len(str))
+				for i, ch := range str {
+					result[i] = core.StringValue(string(ch))
+				}
+				return result, nil
+			default:
+				return nil, fmt.Errorf("list() argument must be an iterable, not '%s'", v.Type())
+			}
+		}
+		return nil, fmt.Errorf("list() takes at most 1 argument (%d given)", len(args))
+	}))
+
+	// dict - create a new dictionary
+	ctx.Define("dict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.NewDict(), nil
+		}
+		// TODO: Add support for dict(key=value) syntax later
+		return nil, fmt.Errorf("dict() with arguments not yet implemented")
+	}))
+
+	// tuple - create a new tuple
+	ctx.Define("tuple", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.EmptyTuple, nil
+		}
+		if len(args) == 1 {
+			// Convert iterable to tuple
+			switch v := args[0].(type) {
+			case core.TupleValue:
+				// Copy the tuple
+				result := make(core.TupleValue, len(v))
+				copy(result, v)
+				return result, nil
+			case core.ListValue:
+				// Convert list to tuple
+				result := make(core.TupleValue, len(v))
+				copy(result, v)
+				return result, nil
+			case core.StringValue:
+				// Convert string to tuple of characters
+				str := string(v)
+				result := make(core.TupleValue, len(str))
+				for i, ch := range str {
+					result[i] = core.StringValue(string(ch))
+				}
+				return result, nil
+			default:
+				return nil, fmt.Errorf("tuple() argument must be an iterable, not '%s'", v.Type())
+			}
+		}
+		return nil, fmt.Errorf("tuple() takes at most 1 argument (%d given)", len(args))
+	}))
+
+	// len - get length of collection
+	ctx.Define("len", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("len() takes exactly one argument (%d given)", len(args))
+		}
+
+		// Try to get __len__ method
+		if obj, ok := args[0].(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			if lenMethod, found := obj.GetAttr("__len__"); found {
+				// Call the __len__ method
+				if callable, ok := lenMethod.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Ensure it returns a number
+					if num, ok := result.(core.NumberValue); ok {
+						return num, nil
+					}
+					return nil, fmt.Errorf("__len__ should return an integer")
+				}
+			}
+		}
+
+		// Fallback for types without __len__
+		switch v := args[0].(type) {
+		case core.StringValue:
+			return core.NumberValue(len(string(v))), nil
+		case core.ListValue:
+			return core.NumberValue(len(v)), nil
+		case core.TupleValue:
+			return core.NumberValue(len(v)), nil
+		case *core.DictValue:
+			return core.NumberValue(v.Size()), nil
+		case *core.SetValue:
+			return core.NumberValue(v.Size()), nil
+		default:
+			return nil, fmt.Errorf("object of type '%s' has no len()", v.Type())
+		}
+	}))
+
+	// set - create a new set
+	ctx.Define("set", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.NewSet(), nil
+		}
+		if len(args) == 1 {
+			// Convert iterable to set
+			set := core.NewSet()
+			switch v := args[0].(type) {
+			case core.ListValue:
+				for _, elem := range v {
+					set.Add(elem)
+				}
+				return set, nil
+			case core.TupleValue:
+				for _, elem := range v {
+					set.Add(elem)
+				}
+				return set, nil
+			case core.StringValue:
+				// Convert string to set of characters
+				str := string(v)
+				for _, ch := range str {
+					charVal := core.StringValue(string(ch))
+					set.Add(charVal)
+				}
+				return set, nil
+			default:
+				return nil, fmt.Errorf("set() argument must be an iterable, not '%s'", v.Type())
+			}
+		}
+		return nil, fmt.Errorf("set() takes at most 1 argument (%d given)", len(args))
 	}))
 }
