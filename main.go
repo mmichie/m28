@@ -10,6 +10,7 @@ import (
 	"github.com/mmichie/m28/eval"
 	"github.com/mmichie/m28/parser"
 	"github.com/mmichie/m28/repl"
+	"github.com/mmichie/m28/special_forms"
 )
 
 // Command line flags
@@ -43,6 +44,9 @@ func main() {
 	
 	// Initialize the global context with built-in values and functions
 	initializeGlobalContext(globalCtx)
+	
+	// Register all special forms
+	special_forms.RegisterAllForms()
 	
 	// Evaluate an expression
 	if *evalExpr != "" {
