@@ -177,7 +177,7 @@ func DivideFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Reciprocal
 		if num, ok := args[0].(core.NumberValue); ok {
 			if float64(num) == 0 {
-				return nil, fmt.Errorf("division by zero")
+				return nil, &core.ZeroDivisionError{}
 			}
 			return core.NumberValue(1 / float64(num)), nil
 		}
@@ -190,7 +190,7 @@ func DivideFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		for _, arg := range args[1:] {
 			if num, ok := arg.(core.NumberValue); ok {
 				if float64(num) == 0 {
-					return nil, fmt.Errorf("division by zero")
+					return nil, &core.ZeroDivisionError{}
 				}
 				result /= float64(num)
 			} else {

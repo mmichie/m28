@@ -116,6 +116,10 @@ func init() {
 		// Module system
 		"import": importForm,
 
+		// Exception handling
+		"try":   tryForm,
+		"raise": raiseForm,
+
 		// Other special forms will be added through RegisterSpecialForm
 	}
 }
@@ -451,4 +455,284 @@ func lambdaForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	return fn, nil
+}
+
+// Exception represents a raised exception
+type Exception struct {
+	Type    string
+	Message string
+	Value   core.Value
+}
+
+func (e *Exception) Error() string {
+	if e.Message != "" {
+		return fmt.Sprintf("%s: %s", e.Type, e.Message)
+	}
+	return e.Type
+}
+
+// tryForm implements the try/except/finally special form
+// Forms:
+//
+//	(try body)
+//	(try body (except type handler))
+//	(try body (except type as var handler))
+//	(try body (except handler)) ; catch all
+//	(try body ... (finally cleanup))
+func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("try requires at least a body")
+	}
+
+	var tryBody []core.Value
+	var exceptClauses []core.ListValue
+	var finallyClause core.ListValue
+
+	// Parse the try form
+	for i, arg := range args {
+		if list, ok := arg.(core.ListValue); ok && len(list) > 0 {
+			if sym, ok := list[0].(core.SymbolValue); ok {
+				switch string(sym) {
+				case "except":
+					if i == 0 {
+						return nil, fmt.Errorf("try must have a body before except")
+					}
+					exceptClauses = append(exceptClauses, list)
+					continue
+				case "finally":
+					if i == 0 {
+						return nil, fmt.Errorf("try must have a body before finally")
+					}
+					finallyClause = list
+					continue
+				}
+			}
+		}
+
+		// If we haven't seen except or finally yet, it's part of the try body
+		if len(exceptClauses) == 0 && len(finallyClause) == 0 {
+			tryBody = append(tryBody, arg)
+		}
+	}
+
+	// Helper to run finally clause
+	runFinally := func() error {
+		if len(finallyClause) > 1 {
+			for _, expr := range finallyClause[1:] {
+				_, err := Eval(expr, ctx)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	// Execute try body
+	var result core.Value = core.Nil
+	var tryErr error
+
+	for _, expr := range tryBody {
+		result, tryErr = Eval(expr, ctx)
+		if tryErr != nil {
+			break
+		}
+	}
+
+	// If no error, run finally and return
+	if tryErr == nil {
+		if err := runFinally(); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	// Handle the exception
+	handled := false
+
+	for _, exceptClause := range exceptClauses {
+		if len(exceptClause) < 2 {
+			continue
+		}
+
+		// Parse except clause
+		// Forms: (except handler), (except type handler), (except type as var handler)
+		var excType string
+		var excVar string
+		var handlerStart int = 1
+
+		if len(exceptClause) > 1 {
+			// Check if second element is a type (symbol or string)
+			switch t := exceptClause[1].(type) {
+			case core.SymbolValue:
+				excType = string(t)
+				handlerStart = 2
+
+				// Check for "as var" syntax
+				if len(exceptClause) > 3 {
+					if as, ok := exceptClause[2].(core.SymbolValue); ok && string(as) == "as" {
+						if varSym, ok := exceptClause[3].(core.SymbolValue); ok {
+							excVar = string(varSym)
+							handlerStart = 4
+						}
+					}
+				}
+			case core.StringValue:
+				excType = string(t)
+				handlerStart = 2
+			}
+		}
+
+		// Check if this except matches
+		matches := false
+		if excType == "" {
+			// Catch-all
+			matches = true
+		} else {
+			// Check exception type
+			if exc, ok := tryErr.(*Exception); ok {
+				matches = exc.Type == excType
+			} else {
+				// Check if it's wrapped in EvalError
+				var baseErr error = tryErr
+				if evalErr, ok := tryErr.(*core.EvalError); ok && evalErr.Wrapped != nil {
+					baseErr = evalErr.Wrapped
+				}
+
+				// Match built-in error types
+				switch baseErr.(type) {
+				case *core.NameError:
+					matches = excType == "NameError"
+				case *core.TypeError:
+					matches = excType == "TypeError"
+				case *core.ZeroDivisionError:
+					matches = excType == "ZeroDivisionError"
+				case *core.KeyError:
+					matches = excType == "KeyError"
+				case *core.IndexError:
+					matches = excType == "IndexError"
+				default:
+					// Check if it's our custom Exception type
+					if exc, ok := baseErr.(*Exception); ok {
+						matches = exc.Type == excType
+					} else {
+						matches = excType == "Exception" || excType == "Error"
+					}
+				}
+			}
+		}
+
+		if matches {
+			// Create new context for handler
+			handlerCtx := core.NewContext(ctx)
+
+			// Bind exception variable if specified
+			if excVar != "" {
+				// Create exception value
+				var excValue core.Value
+
+				// Check what kind of error we have
+				if exc, ok := tryErr.(*Exception); ok {
+					if exc.Value != nil {
+						excValue = exc.Value
+					} else {
+						excValue = core.StringValue(exc.Error())
+					}
+				} else if evalErr, ok := tryErr.(*core.EvalError); ok {
+					// Extract the message without the stack trace
+					if evalErr.Wrapped != nil {
+						excValue = core.StringValue(evalErr.Wrapped.Error())
+					} else {
+						excValue = core.StringValue(evalErr.Message)
+					}
+				} else {
+					excValue = core.StringValue(tryErr.Error())
+				}
+
+				handlerCtx.Define(excVar, excValue)
+			}
+
+			// Execute handler
+			for i := handlerStart; i < len(exceptClause); i++ {
+				result, tryErr = Eval(exceptClause[i], handlerCtx)
+				if tryErr != nil {
+					break
+				}
+			}
+
+			handled = true
+			break
+		}
+	}
+
+	// Run finally clause
+	if err := runFinally(); err != nil {
+		return nil, err
+	}
+
+	// If exception wasn't handled, re-raise it
+	if !handled && tryErr != nil {
+		return nil, tryErr
+	}
+
+	return result, tryErr
+}
+
+// raiseForm implements the raise special form
+// Forms:
+//
+//	(raise "message")
+//	(raise ExceptionType)
+//	(raise ExceptionType "message")
+func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("raise requires at least 1 argument")
+	}
+
+	// Single string argument - generic exception with message
+	if len(args) == 1 {
+		if msg, ok := args[0].(core.StringValue); ok {
+			return nil, &Exception{
+				Type:    "Exception",
+				Message: string(msg),
+			}
+		}
+
+		// Single symbol - exception type with no message
+		if typ, ok := args[0].(core.SymbolValue); ok {
+			return nil, &Exception{
+				Type: string(typ),
+			}
+		}
+	}
+
+	// Two arguments - type and message
+	if len(args) == 2 {
+		var excType string
+		var excMsg string
+
+		// Get exception type
+		switch t := args[0].(type) {
+		case core.SymbolValue:
+			excType = string(t)
+		case core.StringValue:
+			excType = string(t)
+		default:
+			return nil, fmt.Errorf("raise: exception type must be a symbol or string")
+		}
+
+		// Get message
+		if msg, ok := args[1].(core.StringValue); ok {
+			excMsg = string(msg)
+		} else {
+			excMsg = core.PrintValueWithoutQuotes(args[1])
+		}
+
+		return nil, &Exception{
+			Type:    excType,
+			Message: excMsg,
+		}
+	}
+
+	return nil, fmt.Errorf("raise: too many arguments")
 }
