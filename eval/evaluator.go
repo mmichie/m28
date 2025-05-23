@@ -3,6 +3,7 @@ package eval
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 )
@@ -16,7 +17,11 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 
 	case core.SymbolValue:
 		// Variable lookup
-		return ctx.Lookup(string(v))
+		val, err := ctx.Lookup(string(v))
+		if err != nil {
+			return nil, core.WrapEvalError(err, "name error", ctx)
+		}
+		return val, nil
 
 	case core.ListValue:
 		// Empty list evaluates to itself
@@ -61,10 +66,31 @@ func evalFunctionCall(expr core.ListValue, ctx *core.Context) (core.Value, error
 	// Call the function
 	callable, ok := fn.(core.Callable)
 	if !ok {
-		return nil, fmt.Errorf("not callable: %v", fn)
+		return nil, core.NewTypeError("callable", fn, "function call")
 	}
 
-	return callable.Call(args, ctx)
+	// Add function name to call stack if available
+	var funcName string
+	switch f := fn.(type) {
+	case core.SymbolValue:
+		funcName = string(f)
+	case *core.BuiltinFunction:
+		funcName = "<builtin>"
+	case *core.BoundMethod:
+		funcName = fmt.Sprintf("%s.%s", f.TypeDesc.PythonName, f.Method.Name)
+	default:
+		funcName = "<anonymous>"
+	}
+
+	ctx.PushStack(funcName, "", 0, 0)
+	defer ctx.PopStack()
+
+	result, err := callable.Call(args, ctx)
+	if err != nil {
+		return nil, core.WrapEvalError(err, fmt.Sprintf("error in %s", funcName), ctx)
+	}
+
+	return result, nil
 }
 
 // SpecialFormHandler handles special forms like if, def, etc.
@@ -81,9 +107,11 @@ func init() {
 		"return": returnForm,
 
 		// Definitions
-		"def":   defForm,
-		"=":     assignForm,
-		"quote": quoteForm,
+		"def":    defForm,
+		"=":      assignForm,
+		"quote":  quoteForm,
+		"lambda": lambdaForm,
+		"fn":     lambdaForm, // Alias for lambda
 
 		// Module system
 		"import": importForm,
@@ -397,5 +425,47 @@ func (f *UserFunction) String() string {
 	for i, param := range f.params {
 		params[i] = string(param)
 	}
-	return fmt.Sprintf("<function (%s)>", params)
+	return fmt.Sprintf("<function (%s)>", strings.Join(params, " "))
+}
+
+// lambdaForm implements the lambda special form
+func lambdaForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("lambda requires at least 2 arguments: parameters and body")
+	}
+
+	// Get the parameter list
+	paramList, ok := args[0].(core.ListValue)
+	if !ok {
+		return nil, fmt.Errorf("lambda: parameters must be a list")
+	}
+
+	// Convert parameters to symbols
+	params := make([]core.SymbolValue, 0, len(paramList))
+	for _, p := range paramList {
+		sym, ok := p.(core.SymbolValue)
+		if !ok {
+			return nil, fmt.Errorf("lambda: parameters must be symbols")
+		}
+		params = append(params, sym)
+	}
+
+	// The body is the rest of the expressions wrapped in a do form
+	var body core.Value
+	if len(args) == 2 {
+		body = args[1]
+	} else {
+		// Multiple expressions - wrap in do
+		body = core.ListValue(append([]core.Value{core.SymbolValue("do")}, args[1:]...))
+	}
+
+	// Create the function
+	fn := &UserFunction{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		params:     params,
+		body:       body,
+		env:        ctx, // Capture current environment
+	}
+
+	return fn, nil
 }

@@ -82,7 +82,7 @@ func (c *Context) Lookup(name string) (Value, error) {
 		return c.Outer.Lookup(name)
 	}
 
-	return nil, fmt.Errorf("undefined variable: %s", name)
+	return nil, &NameError{Name: name}
 }
 
 // PushStack adds a new entry to the call stack
