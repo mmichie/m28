@@ -134,6 +134,9 @@ func init() {
 	
 	// Register generator forms
 	RegisterGeneratorForms()
+	
+	// Register context manager forms
+	RegisterContextForms()
 }
 
 // RegisterSpecialForm registers a special form

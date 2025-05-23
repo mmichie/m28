@@ -136,8 +136,14 @@ This document tracks the implementation progress of the M28 radical simplificati
   - ✅ StopIteration exception for exhausted generators
   - ✅ Basic yield expression evaluation
   - ⚠️ Full suspension/resumption requires evaluator changes
-- [ ] **Day 2**: Implement context managers
-  - ❌ Not yet implemented
+- [x] **Day 2**: Implement context managers
+  - ✅ With statement: (with expr body...) and (with expr as var body...)
+  - ✅ Context manager protocol with Enter/Exit methods
+  - ✅ __enter__ and __exit__ special methods
+  - ✅ Exception handling with proper cleanup
+  - ✅ File context manager example (open function)
+  - ✅ Support for custom context managers
+  - ✅ Proper exception suppression handling
 - [ ] **Day 3**: Create concurrency features (go, channels, select)
   - ❌ Removed in simplification
 - [ ] **Days 4-5**: Build REPL and file execution system
