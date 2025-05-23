@@ -128,6 +128,9 @@ func init() {
 	
 	// Register enhanced module forms
 	RegisterModuleForms()
+	
+	// Register class forms
+	RegisterClassForms()
 }
 
 // RegisterSpecialForm registers a special form
@@ -382,6 +385,7 @@ type UserFunction struct {
 	params []core.SymbolValue
 	body   core.Value
 	env    *core.Context
+	name   string  // Optional function name
 }
 
 // Call implements Callable.Call
@@ -417,6 +421,9 @@ func (f *UserFunction) String() string {
 	params := make([]string, len(f.params))
 	for i, param := range f.params {
 		params[i] = string(param)
+	}
+	if f.name != "" {
+		return fmt.Sprintf("<function %s(%s)>", f.name, strings.Join(params, " "))
 	}
 	return fmt.Sprintf("<function (%s)>", strings.Join(params, " "))
 }

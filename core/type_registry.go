@@ -9,6 +9,35 @@ import (
 
 // InitializeTypeRegistry sets up type descriptors for all built-in types
 func InitializeTypeRegistry() {
+	// Register class type
+	RegisterType(&TypeDescriptor{
+		Name:       "class",
+		PythonName: "type",
+		BaseType:   Type("class"),
+		Methods: map[string]*MethodDescriptor{
+			"__call__": {
+				Name:    "__call__",
+				Arity:   -1, // Variable args
+				Doc:     "Create an instance of the class",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					class := receiver.(*Class)
+					return class.Call(args, ctx)
+				},
+			},
+			"__name__": {
+				Name:    "__name__",
+				Arity:   0,
+				Doc:     "Get the class name",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					class := receiver.(*Class)
+					return StringValue(class.Name), nil
+				},
+			},
+		},
+	})
+
 	// Register module type
 	RegisterType(&TypeDescriptor{
 		Name:       "module",
