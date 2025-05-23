@@ -3,8 +3,9 @@ package builtin
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
-	
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -12,22 +13,22 @@ import (
 func RegisterAllBuiltins(ctx *core.Context) {
 	// Register arithmetic functions
 	RegisterArithmeticFunctions(ctx)
-	
+
 	// Register comparison functions
 	RegisterComparisonFunctions(ctx)
-	
+
 	// Register string functions
 	RegisterStringFunctions(ctx)
-	
+
 	// Register IO functions
 	registerIOBuiltins(ctx)
-	
+
 	// Register list functions
 	RegisterListFunctions(ctx)
-	
+
 	// Register dictionary functions
 	RegisterDictFunctions(ctx)
-	
+
 	// Register type functions
 	registerTypeBuiltins(ctx)
 }
@@ -39,12 +40,12 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 		if len(args) == 0 {
 			return core.NumberValue(0), nil
 		}
-		
+
 		// Check if we're adding strings (string concatenation)
 		if str, ok := args[0].(core.StringValue); ok {
 			var sb strings.Builder
 			sb.WriteString(string(str))
-			
+
 			for _, arg := range args[1:] {
 				if str, ok := arg.(core.StringValue); ok {
 					sb.WriteString(string(str))
@@ -52,10 +53,10 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 					sb.WriteString(core.PrintValueWithoutQuotes(arg))
 				}
 			}
-			
+
 			return core.StringValue(sb.String()), nil
 		}
-		
+
 		// Numeric addition
 		var sum float64
 		for _, arg := range args {
@@ -65,16 +66,16 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 				return nil, fmt.Errorf("+ expects numbers, got %v", arg.Type())
 			}
 		}
-		
+
 		return core.NumberValue(sum), nil
 	}))
-	
+
 	// Subtraction: (- a b c ...)
 	ctx.Define("-", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return nil, fmt.Errorf("- requires at least one argument")
 		}
-		
+
 		if len(args) == 1 {
 			// Unary negation
 			if num, ok := args[0].(core.NumberValue); ok {
@@ -82,7 +83,7 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 			}
 			return nil, fmt.Errorf("- expects a number, got %v", args[0].Type())
 		}
-		
+
 		// Start with the first number
 		var result float64
 		if num, ok := args[0].(core.NumberValue); ok {
@@ -90,7 +91,7 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 		} else {
 			return nil, fmt.Errorf("- expects numbers, got %v", args[0].Type())
 		}
-		
+
 		// Subtract the rest
 		for _, arg := range args[1:] {
 			if num, ok := arg.(core.NumberValue); ok {
@@ -99,19 +100,19 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 				return nil, fmt.Errorf("- expects numbers, got %v", arg.Type())
 			}
 		}
-		
+
 		return core.NumberValue(result), nil
 	}))
-	
+
 	// Multiplication: (* a b c ...)
 	ctx.Define("*", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.NumberValue(1), nil
 		}
-		
+
 		// Start with 1
 		var product float64 = 1
-		
+
 		// Multiply by each argument
 		for _, arg := range args {
 			if num, ok := arg.(core.NumberValue); ok {
@@ -120,16 +121,16 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 				return nil, fmt.Errorf("* expects numbers, got %v", arg.Type())
 			}
 		}
-		
+
 		return core.NumberValue(product), nil
 	}))
-	
+
 	// Division: (/ a b c ...)
 	ctx.Define("/", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return nil, fmt.Errorf("/ requires at least one argument")
 		}
-		
+
 		if len(args) == 1 {
 			// Reciprocal
 			if num, ok := args[0].(core.NumberValue); ok {
@@ -140,7 +141,7 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 			}
 			return nil, fmt.Errorf("/ expects a number, got %v", args[0].Type())
 		}
-		
+
 		// Start with the first number
 		var result float64
 		if num, ok := args[0].(core.NumberValue); ok {
@@ -148,7 +149,7 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 		} else {
 			return nil, fmt.Errorf("/ expects numbers, got %v", args[0].Type())
 		}
-		
+
 		// Divide by the rest
 		for _, arg := range args[1:] {
 			if num, ok := arg.(core.NumberValue); ok {
@@ -160,7 +161,7 @@ func registerArithmeticBuiltins(ctx *core.Context) {
 				return nil, fmt.Errorf("/ expects numbers, got %v", arg.Type())
 			}
 		}
-		
+
 		return core.NumberValue(result), nil
 	}))
 }
@@ -179,7 +180,7 @@ func registerIOBuiltins(ctx *core.Context) {
 			fmt.Print(core.PrintValueWithoutQuotes(arg))
 		}
 		fmt.Println()
-		
+
 		return core.Nil, nil
 	}))
 }
@@ -195,8 +196,85 @@ func registerTypeBuiltins(ctx *core.Context) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("type requires 1 argument")
 		}
-		
+
 		typeName := args[0].Type()
 		return core.StringValue(string(typeName)), nil
+	}))
+
+	// Python-style type checking functions
+	// is_none - check if value is None/nil
+	ctx.Define("is_none", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("is_none expects 1 argument, got %d", len(args))
+		}
+		_, isNil := args[0].(core.NilValue)
+		return core.BoolValue(isNil), nil
+	}))
+
+	// isinstance for type checking (simplified version)
+	ctx.Define("isinstance", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("isinstance expects 2 arguments, got %d", len(args))
+		}
+
+		// Get the type name to check
+		typeName, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("isinstance second argument must be a string type name")
+		}
+
+		actualType := string(args[0].Type())
+		expectedType := string(typeName)
+
+		// Handle Python type name aliases
+		switch expectedType {
+		case "int", "float":
+			return core.BoolValue(actualType == "number"), nil
+		case "str":
+			return core.BoolValue(actualType == "string"), nil
+		case "bool":
+			return core.BoolValue(actualType == "bool"), nil
+		case "NoneType":
+			return core.BoolValue(actualType == "nil"), nil
+		default:
+			return core.BoolValue(actualType == expectedType), nil
+		}
+	}))
+
+	// Python-style type conversion functions
+	// int/float - convert to number
+	ctx.Define("int", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("int expects 1 argument, got %d", len(args))
+		}
+
+		switch v := args[0].(type) {
+		case core.NumberValue:
+			return core.NumberValue(int(v)), nil
+		case core.StringValue:
+			f, err := strconv.ParseFloat(string(v), 64)
+			if err != nil {
+				return nil, fmt.Errorf("cannot convert %q to int", string(v))
+			}
+			return core.NumberValue(int(f)), nil
+		default:
+			return nil, fmt.Errorf("cannot convert %v to int", v.Type())
+		}
+	}))
+
+	// str - convert to string
+	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("str expects 1 argument, got %d", len(args))
+		}
+		return core.StringValue(core.PrintValueWithoutQuotes(args[0])), nil
+	}))
+
+	// bool - convert to boolean
+	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("bool expects 1 argument, got %d", len(args))
+		}
+		return core.BoolValue(core.IsTruthy(args[0])), nil
 	}))
 }

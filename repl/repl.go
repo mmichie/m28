@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
-	
+
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/eval"
 	"github.com/mmichie/m28/parser"
@@ -43,10 +43,10 @@ func (r *REPL) SetOutput(writer io.Writer) {
 func (r *REPL) Start() {
 	fmt.Fprintln(r.writer, "M28 REPL (New Implementation)")
 	fmt.Fprintln(r.writer, "Type 'exit' to quit, 'help' for more information")
-	
+
 	for {
 		fmt.Fprint(r.writer, "> ")
-		
+
 		line, err := r.reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
@@ -56,12 +56,12 @@ func (r *REPL) Start() {
 			fmt.Fprintf(r.writer, "Error reading input: %s\n", err)
 			continue
 		}
-		
+
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		// Handle special commands
 		switch line {
 		case "exit", "quit":
@@ -71,7 +71,7 @@ func (r *REPL) Start() {
 			printHelp(r.writer)
 			continue
 		}
-		
+
 		// Parse the input
 		p := parser.NewParser()
 		expr, err := p.Parse(line)
@@ -79,14 +79,14 @@ func (r *REPL) Start() {
 			fmt.Fprintf(r.writer, "Parse error: %s\n", err)
 			continue
 		}
-		
+
 		// Evaluate the expression
 		result, err := eval.Eval(expr, r.ctx)
 		if err != nil {
 			fmt.Fprintf(r.writer, "Evaluation error: %s\n", err)
 			continue
 		}
-		
+
 		// Print the result
 		fmt.Fprintln(r.writer, result.String())
 	}

@@ -10,13 +10,13 @@ import (
 func EvalString(input string, ctx *core.Context) (core.Value, error) {
 	// Create a new parser
 	p := parser.NewParser()
-	
+
 	// Parse the input
 	expr, err := p.Parse(input)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Evaluate the parsed expression
 	return Eval(expr, ctx)
 }
@@ -39,23 +39,23 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterBuiltin(ctx, "-", SubtractFunction)
 	RegisterBuiltin(ctx, "*", MultiplyFunction)
 	RegisterBuiltin(ctx, "/", DivideFunction)
-	
+
 	// Register comparison operations
-	RegisterBuiltin(ctx, "=", EqualFunction)
+	RegisterBuiltin(ctx, "==", EqualFunction)
 	RegisterBuiltin(ctx, "<", LessThanFunction)
 	RegisterBuiltin(ctx, ">", GreaterThanFunction)
 	RegisterBuiltin(ctx, "<=", LessEqualFunction)
 	RegisterBuiltin(ctx, ">=", GreaterEqualFunction)
-	
+
 	// Register list operations
 	RegisterBuiltin(ctx, "list", ListFunction)
 	RegisterBuiltin(ctx, "first", FirstFunction)
 	RegisterBuiltin(ctx, "rest", RestFunction)
 	RegisterBuiltin(ctx, "cons", ConsFunction)
-	
+
 	// Register IO operations
 	RegisterBuiltin(ctx, "print", PrintFunction)
-	
+
 	// Register type operations
 	RegisterBuiltin(ctx, "type", TypeFunction)
 }
@@ -72,7 +72,7 @@ func AddFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return core.NumberValue(0), nil
 	}
-	
+
 	// Check if first arg is a number or string (for concatenation)
 	switch first := args[0].(type) {
 	case core.NumberValue:
@@ -86,7 +86,7 @@ func AddFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 		}
 		return core.NumberValue(sum), nil
-		
+
 	case core.StringValue:
 		// String concatenation
 		result := string(first)
@@ -98,7 +98,7 @@ func AddFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 		}
 		return core.StringValue(result), nil
-		
+
 	default:
 		return nil, ErrType("number or string", args[0])
 	}
@@ -109,7 +109,7 @@ func SubtractFunction(args []core.Value, ctx *core.Context) (core.Value, error) 
 	if len(args) == 0 {
 		return nil, ErrArgCount("- requires at least one argument")
 	}
-	
+
 	if len(args) == 1 {
 		// Unary negation
 		if num, ok := args[0].(core.NumberValue); ok {
@@ -117,13 +117,13 @@ func SubtractFunction(args []core.Value, ctx *core.Context) (core.Value, error) 
 		}
 		return nil, ErrType("number", args[0])
 	}
-	
+
 	// Binary/variadic subtraction
 	first, ok := args[0].(core.NumberValue)
 	if !ok {
 		return nil, ErrType("number", args[0])
 	}
-	
+
 	result := float64(first)
 	for _, arg := range args[1:] {
 		if num, ok := arg.(core.NumberValue); ok {
@@ -132,7 +132,7 @@ func SubtractFunction(args []core.Value, ctx *core.Context) (core.Value, error) 
 			return nil, ErrType("number", arg)
 		}
 	}
-	
+
 	return core.NumberValue(result), nil
 }
 
@@ -141,7 +141,7 @@ func MultiplyFunction(args []core.Value, ctx *core.Context) (core.Value, error) 
 	if len(args) == 0 {
 		return core.NumberValue(1), nil
 	}
-	
+
 	result := 1.0
 	for _, arg := range args {
 		if num, ok := arg.(core.NumberValue); ok {
@@ -150,7 +150,7 @@ func MultiplyFunction(args []core.Value, ctx *core.Context) (core.Value, error) 
 			return nil, ErrType("number", arg)
 		}
 	}
-	
+
 	return core.NumberValue(result), nil
 }
 
@@ -159,7 +159,7 @@ func DivideFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return nil, ErrArgCount("/ requires at least one argument")
 	}
-	
+
 	if len(args) == 1 {
 		// Unary division (reciprocal)
 		if num, ok := args[0].(core.NumberValue); ok {
@@ -170,13 +170,13 @@ func DivideFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 		}
 		return nil, ErrType("number", args[0])
 	}
-	
+
 	// Binary/variadic division
 	first, ok := args[0].(core.NumberValue)
 	if !ok {
 		return nil, ErrType("number", args[0])
 	}
-	
+
 	result := float64(first)
 	for _, arg := range args[1:] {
 		if num, ok := arg.(core.NumberValue); ok {
@@ -188,7 +188,7 @@ func DivideFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return nil, ErrType("number", arg)
 		}
 	}
-	
+
 	return core.NumberValue(result), nil
 }
 
@@ -197,13 +197,13 @@ func EqualFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {
 		return nil, ErrArgCount("= requires at least two arguments")
 	}
-	
+
 	for i := 1; i < len(args); i++ {
 		if !core.EqualValues(args[0], args[i]) {
 			return core.False, nil
 		}
 	}
-	
+
 	return core.True, nil
 }
 
@@ -212,13 +212,13 @@ func LessThanFunction(args []core.Value, ctx *core.Context) (core.Value, error) 
 	if len(args) < 2 {
 		return nil, ErrArgCount("< requires at least two arguments")
 	}
-	
+
 	for i := 1; i < len(args); i++ {
 		if core.Compare(args[i-1], args[i]) >= 0 {
 			return core.False, nil
 		}
 	}
-	
+
 	return core.True, nil
 }
 
@@ -227,13 +227,13 @@ func GreaterThanFunction(args []core.Value, ctx *core.Context) (core.Value, erro
 	if len(args) < 2 {
 		return nil, ErrArgCount("> requires at least two arguments")
 	}
-	
+
 	for i := 1; i < len(args); i++ {
 		if core.Compare(args[i-1], args[i]) <= 0 {
 			return core.False, nil
 		}
 	}
-	
+
 	return core.True, nil
 }
 
@@ -242,13 +242,13 @@ func LessEqualFunction(args []core.Value, ctx *core.Context) (core.Value, error)
 	if len(args) < 2 {
 		return nil, ErrArgCount("<= requires at least two arguments")
 	}
-	
+
 	for i := 1; i < len(args); i++ {
 		if core.Compare(args[i-1], args[i]) > 0 {
 			return core.False, nil
 		}
 	}
-	
+
 	return core.True, nil
 }
 
@@ -257,13 +257,13 @@ func GreaterEqualFunction(args []core.Value, ctx *core.Context) (core.Value, err
 	if len(args) < 2 {
 		return nil, ErrArgCount(">= requires at least two arguments")
 	}
-	
+
 	for i := 1; i < len(args); i++ {
 		if core.Compare(args[i-1], args[i]) < 0 {
 			return core.False, nil
 		}
 	}
-	
+
 	return core.True, nil
 }
 
@@ -277,7 +277,7 @@ func FirstFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, ErrArgCount("first requires exactly one argument")
 	}
-	
+
 	switch list := args[0].(type) {
 	case core.ListValue:
 		if len(list) == 0 {
@@ -299,7 +299,7 @@ func RestFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, ErrArgCount("rest requires exactly one argument")
 	}
-	
+
 	switch list := args[0].(type) {
 	case core.ListValue:
 		if len(list) <= 1 {
@@ -321,7 +321,7 @@ func ConsFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, ErrArgCount("cons requires exactly two arguments")
 	}
-	
+
 	switch list := args[1].(type) {
 	case core.ListValue:
 		return core.ListValue(append([]core.Value{args[0]}, list...)), nil
@@ -349,7 +349,7 @@ func TypeFunction(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, ErrArgCount("type requires exactly one argument")
 	}
-	
+
 	return core.StringValue(string(args[0].Type())), nil
 }
 

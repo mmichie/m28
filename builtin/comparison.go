@@ -3,7 +3,7 @@ package builtin
 
 import (
 	"fmt"
-	
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -16,7 +16,7 @@ func RegisterComparisonFunctions(ctx *core.Context) {
 	ctx.Define("<=", core.NewBuiltinFunction(LessEqualFunc))
 	ctx.Define(">", core.NewBuiltinFunction(GreaterThanFunc))
 	ctx.Define(">=", core.NewBuiltinFunction(GreaterEqualFunc))
-	
+
 	// Logical operators
 	ctx.Define("not", core.NewBuiltinFunction(NotFunc))
 	ctx.Define("and", core.NewBuiltinFunction(AndFunc))
@@ -28,7 +28,7 @@ func EqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("== requires exactly 2 arguments")
 	}
-	
+
 	// Compare based on type
 	switch a := args[0].(type) {
 	case core.NumberValue:
@@ -36,23 +36,23 @@ func EqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(a == b), nil
 		}
 		return core.False, nil
-		
+
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a == b), nil
 		}
 		return core.False, nil
-		
+
 	case core.BoolValue:
 		if b, ok := args[1].(core.BoolValue); ok {
 			return core.BoolValue(a == b), nil
 		}
 		return core.False, nil
-		
+
 	case core.NilValue:
 		_, isNil := args[1].(core.NilValue)
 		return core.BoolValue(isNil), nil
-		
+
 	case core.ListValue:
 		if b, ok := args[1].(core.ListValue); ok {
 			if len(a) != len(b) {
@@ -70,7 +70,7 @@ func EqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.True, nil
 		}
 		return core.False, nil
-		
+
 	default:
 		// For other types, just check if they're the same object
 		return core.BoolValue(args[0] == args[1]), nil
@@ -82,12 +82,12 @@ func NotEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("!= requires exactly 2 arguments")
 	}
-	
+
 	result, err := EqualFunc(args, ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if result == core.True {
 		return core.False, nil
 	}
@@ -99,7 +99,7 @@ func LessThanFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("< requires exactly 2 arguments")
 	}
-	
+
 	// Compare based on type
 	switch a := args[0].(type) {
 	case core.NumberValue:
@@ -107,13 +107,13 @@ func LessThanFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(a < b), nil
 		}
 		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type())
-		
+
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a < b), nil
 		}
 		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type())
-		
+
 	default:
 		return nil, fmt.Errorf("< not supported for %s", a.Type())
 	}
@@ -124,7 +124,7 @@ func LessEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("<= requires exactly 2 arguments")
 	}
-	
+
 	// Compare based on type
 	switch a := args[0].(type) {
 	case core.NumberValue:
@@ -132,13 +132,13 @@ func LessEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(a <= b), nil
 		}
 		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type())
-		
+
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a <= b), nil
 		}
 		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type())
-		
+
 	default:
 		return nil, fmt.Errorf("<= not supported for %s", a.Type())
 	}
@@ -149,7 +149,7 @@ func GreaterThanFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("> requires exactly 2 arguments")
 	}
-	
+
 	// Compare based on type
 	switch a := args[0].(type) {
 	case core.NumberValue:
@@ -157,13 +157,13 @@ func GreaterThanFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(a > b), nil
 		}
 		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type())
-		
+
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a > b), nil
 		}
 		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type())
-		
+
 	default:
 		return nil, fmt.Errorf("> not supported for %s", a.Type())
 	}
@@ -174,7 +174,7 @@ func GreaterEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) 
 	if len(args) != 2 {
 		return nil, fmt.Errorf(">= requires exactly 2 arguments")
 	}
-	
+
 	// Compare based on type
 	switch a := args[0].(type) {
 	case core.NumberValue:
@@ -182,13 +182,13 @@ func GreaterEqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) 
 			return core.BoolValue(a >= b), nil
 		}
 		return nil, fmt.Errorf("cannot compare number with %s", args[1].Type())
-		
+
 	case core.StringValue:
 		if b, ok := args[1].(core.StringValue); ok {
 			return core.BoolValue(a >= b), nil
 		}
 		return nil, fmt.Errorf("cannot compare string with %s", args[1].Type())
-		
+
 	default:
 		return nil, fmt.Errorf(">= not supported for %s", a.Type())
 	}
@@ -199,7 +199,7 @@ func NotFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("not requires exactly 1 argument")
 	}
-	
+
 	// Convert to boolean
 	var isTruthy bool
 	switch v := args[0].(type) {
@@ -218,7 +218,7 @@ func NotFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	default:
 		isTruthy = true
 	}
-	
+
 	return core.BoolValue(!isTruthy), nil
 }
 
@@ -227,7 +227,7 @@ func AndFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return core.True, nil
 	}
-	
+
 	var result core.Value = core.True
 	for _, arg := range args {
 		// Convert to boolean
@@ -248,13 +248,13 @@ func AndFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		default:
 			isTruthy = true
 		}
-		
+
 		if !isTruthy {
 			return arg, nil // Return the first falsy value
 		}
 		result = arg
 	}
-	
+
 	// All values were truthy, return the last one
 	return result, nil
 }
@@ -264,7 +264,7 @@ func OrFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return core.False, nil
 	}
-	
+
 	for _, arg := range args {
 		// Convert to boolean
 		var isTruthy bool
@@ -284,12 +284,12 @@ func OrFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		default:
 			isTruthy = true
 		}
-		
+
 		if isTruthy {
 			return arg, nil // Return the first truthy value
 		}
 	}
-	
+
 	// All values were falsy, return the last one
 	return args[len(args)-1], nil
 }

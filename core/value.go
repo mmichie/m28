@@ -31,7 +31,7 @@ const (
 type Value interface {
 	// Type returns the value's type
 	Type() Type
-	
+
 	// String returns a string representation
 	String() string
 }
@@ -39,13 +39,13 @@ type Value interface {
 // Object represents any value that can have attributes and methods
 type Object interface {
 	Value
-	
+
 	// GetAttr retrieves an attribute by name
 	GetAttr(name string) (Value, bool)
-	
+
 	// SetAttr sets an attribute value
 	SetAttr(name string, value Value) error
-	
+
 	// CallMethod calls a method with arguments in a context
 	CallMethod(name string, args []Value, ctx *Context) (Value, error)
 }
@@ -53,7 +53,7 @@ type Object interface {
 // Callable represents any value that can be called as a function
 type Callable interface {
 	Value
-	
+
 	// Call invokes the callable with arguments in a context
 	Call(args []Value, ctx *Context) (Value, error)
 }
@@ -61,7 +61,7 @@ type Callable interface {
 // Method represents a method that can be bound to an instance
 type Method interface {
 	Callable
-	
+
 	// Bind binds the method to a receiver object
 	Bind(receiver Value) Value
 }
@@ -69,7 +69,7 @@ type Method interface {
 // Iterable represents any value that can be iterated over
 type Iterable interface {
 	Value
-	
+
 	// Iterator returns an iterator over the elements
 	Iterator() Iterator
 }
@@ -78,7 +78,7 @@ type Iterable interface {
 type Iterator interface {
 	// Next advances the iterator and returns the next value
 	Next() (Value, bool)
-	
+
 	// Reset resets the iterator to the beginning
 	Reset()
 }
@@ -112,12 +112,12 @@ func (o *BaseObject) String() string {
 func (o *BaseObject) GetAttr(name string) (Value, bool) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	// Check local attributes
 	if val, ok := o.attrs[name]; ok {
 		return val, true
 	}
-	
+
 	return nil, false
 }
 
@@ -125,7 +125,7 @@ func (o *BaseObject) GetAttr(name string) (Value, bool) {
 func (o *BaseObject) SetAttr(name string, value Value) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	
+
 	// Normal attribute
 	o.attrs[name] = value
 	return nil
@@ -137,11 +137,11 @@ func (o *BaseObject) CallMethod(name string, args []Value, ctx *Context) (Value,
 	if !ok {
 		return nil, fmt.Errorf("no method named %s", name)
 	}
-	
+
 	callable, ok := method.(Callable)
 	if !ok {
 		return nil, fmt.Errorf("%s is not callable", name)
 	}
-	
+
 	return callable.Call(args, ctx)
 }

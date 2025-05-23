@@ -91,9 +91,9 @@ func (b BoolValue) Type() Type {
 // String implements Value.String
 func (b BoolValue) String() string {
 	if b {
-		return "true"
+		return "True"
 	}
-	return "false"
+	return "False"
 }
 
 // Pre-defined boolean constants
@@ -125,12 +125,13 @@ func (n NilValue) Type() Type {
 
 // String implements Value.String
 func (n NilValue) String() string {
-	return "nil"
+	return "None"
 }
 
 // Predefined nil value
 var (
-	Nil = NilValue{}
+	Nil  = NilValue{}
+	None = NilValue{} // Python-style alias
 )
 
 // BuiltinFunction represents a Go function that can be called from M28

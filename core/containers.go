@@ -47,13 +47,13 @@ func (l ListValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 1 {
 					return nil, fmt.Errorf("extend expects 1 argument, got %d", len(args))
 				}
-				
+
 				list := receiver.(ListValue)
 				other, ok := args[0].(ListValue)
 				if !ok {
 					return nil, fmt.Errorf("extend expects a list, got %s", args[0].Type())
 				}
-				
+
 				return ListValue(append(list, other...)), nil
 			},
 			receiver: l,
@@ -65,15 +65,15 @@ func (l ListValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 1 {
 					return nil, fmt.Errorf("map expects 1 argument, got %d", len(args))
 				}
-				
+
 				fn, ok := args[0].(Callable)
 				if !ok {
 					return nil, fmt.Errorf("map expects a callable, got %s", args[0].Type())
 				}
-				
+
 				list := receiver.(ListValue)
 				result := make(ListValue, len(list))
-				
+
 				for i, item := range list {
 					mappedValue, err := fn.Call([]Value{item}, ctx)
 					if err != nil {
@@ -81,7 +81,7 @@ func (l ListValue) GetAttr(name string) (Value, bool) {
 					}
 					result[i] = mappedValue
 				}
-				
+
 				return result, nil
 			},
 			receiver: l,
@@ -93,26 +93,26 @@ func (l ListValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 1 {
 					return nil, fmt.Errorf("filter expects 1 argument, got %d", len(args))
 				}
-				
+
 				fn, ok := args[0].(Callable)
 				if !ok {
 					return nil, fmt.Errorf("filter expects a callable, got %s", args[0].Type())
 				}
-				
+
 				list := receiver.(ListValue)
 				result := make(ListValue, 0, len(list))
-				
+
 				for _, item := range list {
 					pred, err := fn.Call([]Value{item}, ctx)
 					if err != nil {
 						return nil, err
 					}
-					
+
 					if IsTruthy(pred) {
 						result = append(result, item)
 					}
 				}
-				
+
 				return result, nil
 			},
 			receiver: l,
@@ -133,12 +133,12 @@ func (l ListValue) CallMethod(name string, args []Value, ctx *Context) (Value, e
 	if !ok {
 		return nil, fmt.Errorf("list has no method named %s", name)
 	}
-	
+
 	callable, ok := method.(Callable)
 	if !ok {
 		return nil, fmt.Errorf("%s is not callable", name)
 	}
-	
+
 	return callable.Call(args, ctx)
 }
 
@@ -202,20 +202,20 @@ func (d *DictValue) String() string {
 	if len(d.entries) == 0 {
 		return "{}"
 	}
-	
+
 	// Get sorted keys for consistent output
 	keys := make([]string, 0, len(d.entries))
 	for k := range d.entries {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	
+
 	// Build the string representation
 	pairs := make([]string, len(keys))
 	for i, k := range keys {
 		pairs[i] = fmt.Sprintf("%q: %s", k, PrintValue(d.entries[k]))
 	}
-	
+
 	return "{" + strings.Join(pairs, ", ") + "}"
 }
 
@@ -230,22 +230,22 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 				if len(args) < 1 || len(args) > 2 {
 					return nil, fmt.Errorf("get expects 1 or 2 arguments, got %d", len(args))
 				}
-				
+
 				dict := receiver.(*DictValue)
 				keyStr, ok := args[0].(StringValue)
 				if !ok {
 					return nil, fmt.Errorf("key must be a string, got %s", args[0].Type())
 				}
-				
+
 				if value, ok := dict.Get(string(keyStr)); ok {
 					return value, nil
 				}
-				
+
 				// Return default value if provided
 				if len(args) > 1 {
 					return args[1], nil
 				}
-				
+
 				return Nil, nil
 			},
 			receiver: d,
@@ -257,15 +257,15 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 0 {
 					return nil, fmt.Errorf("keys expects 0 arguments, got %d", len(args))
 				}
-				
+
 				dict := receiver.(*DictValue)
 				keys := dict.Keys()
-				
+
 				keyList := make(ListValue, len(keys))
 				for i, k := range keys {
 					keyList[i] = StringValue(k)
 				}
-				
+
 				return keyList, nil
 			},
 			receiver: d,
@@ -277,14 +277,14 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 0 {
 					return nil, fmt.Errorf("values expects 0 arguments, got %d", len(args))
 				}
-				
+
 				dict := receiver.(*DictValue)
-				
+
 				values := make(ListValue, 0, len(dict.entries))
 				for _, v := range dict.entries {
 					values = append(values, v)
 				}
-				
+
 				return values, nil
 			},
 			receiver: d,
@@ -296,14 +296,14 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 0 {
 					return nil, fmt.Errorf("items expects 0 arguments, got %d", len(args))
 				}
-				
+
 				dict := receiver.(*DictValue)
-				
+
 				items := make(ListValue, 0, len(dict.entries))
 				for k, v := range dict.entries {
 					items = append(items, ListValue{StringValue(k), v})
 				}
-				
+
 				return items, nil
 			},
 			receiver: d,
@@ -316,7 +316,7 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 0 {
 					return nil, fmt.Errorf("size expects 0 arguments, got %d", len(args))
 				}
-				
+
 				dict := receiver.(*DictValue)
 				return NumberValue(dict.Size()), nil
 			},
@@ -327,7 +327,7 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 		if value, ok := d.Get(name); ok {
 			return value, true
 		}
-		
+
 		// Finally check the BaseObject attributes
 		return d.BaseObject.GetAttr(name)
 	}
@@ -372,12 +372,12 @@ func (t TupleValue) CallMethod(name string, args []Value, ctx *Context) (Value, 
 	if !ok {
 		return nil, fmt.Errorf("tuple has no method named %s", name)
 	}
-	
+
 	callable, ok := method.(Callable)
 	if !ok {
 		return nil, fmt.Errorf("%s is not callable", name)
 	}
-	
+
 	return callable.Call(args, ctx)
 }
 
@@ -400,24 +400,24 @@ func (s *SetValue) String() string {
 	if len(s.elements) == 0 {
 		return "{}"
 	}
-	
+
 	// Get elements and sort them
 	elements := make([]Value, 0, len(s.elements))
 	for _, v := range s.elements {
 		elements = append(elements, v)
 	}
-	
+
 	// Sort elements for consistent output
 	sort.Slice(elements, func(i, j int) bool {
 		return Compare(elements[i], elements[j]) < 0
 	})
-	
+
 	// Build the string representation
 	elemStrings := make([]string, len(elements))
 	for i, elem := range elements {
 		elemStrings[i] = PrintValue(elem)
 	}
-	
+
 	return "{" + strings.Join(elemStrings, ", ") + "}"
 }
 
@@ -468,7 +468,7 @@ func (s *SetValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 1 {
 					return nil, fmt.Errorf("add expects 1 argument, got %d", len(args))
 				}
-				
+
 				set := receiver.(*SetValue)
 				set.Add(args[0])
 				return set, nil
@@ -482,14 +482,14 @@ func (s *SetValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 1 {
 					return nil, fmt.Errorf("remove expects 1 argument, got %d", len(args))
 				}
-				
+
 				set := receiver.(*SetValue)
 				success := set.Remove(args[0])
-				
+
 				if !success {
 					return nil, fmt.Errorf("element not found in set")
 				}
-				
+
 				return set, nil
 			},
 			receiver: s,
@@ -501,7 +501,7 @@ func (s *SetValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 1 {
 					return nil, fmt.Errorf("contains expects 1 argument, got %d", len(args))
 				}
-				
+
 				set := receiver.(*SetValue)
 				return BoolValue(set.Contains(args[0])), nil
 			},
@@ -515,7 +515,7 @@ func (s *SetValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 0 {
 					return nil, fmt.Errorf("size expects 0 arguments, got %d", len(args))
 				}
-				
+
 				set := receiver.(*SetValue)
 				return NumberValue(set.Size()), nil
 			},
@@ -528,7 +528,7 @@ func (s *SetValue) GetAttr(name string) (Value, bool) {
 				if len(args) != 0 {
 					return nil, fmt.Errorf("elements expects 0 arguments, got %d", len(args))
 				}
-				
+
 				set := receiver.(*SetValue)
 				return ListValue(set.Elements()), nil
 			},

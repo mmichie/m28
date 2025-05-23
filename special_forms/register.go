@@ -9,10 +9,10 @@ import (
 func RegisterAllForms() {
 	// Register basic control flow forms
 	registerControlFlowForms()
-	
+
 	// Register definition forms
 	registerDefinitionForms()
-	
+
 	// Register module forms
 	registerModuleForms()
 }
@@ -21,16 +21,16 @@ func RegisterAllForms() {
 func registerControlFlowForms() {
 	// if: Conditional execution
 	eval.RegisterSpecialForm("if", ifForm)
-	
+
 	// do: Sequential execution
 	eval.RegisterSpecialForm("do", doForm)
-	
+
 	// begin: Same as do
 	eval.RegisterSpecialForm("begin", doForm)
-	
+
 	// return: Return from a function
 	eval.RegisterSpecialForm("return", returnForm)
-	
+
 	// Loop forms
 	eval.RegisterSpecialForm("while", whileForm)
 	eval.RegisterSpecialForm("for", forForm)
@@ -42,10 +42,10 @@ func registerControlFlowForms() {
 func registerDefinitionForms() {
 	// def: Define variables and functions
 	eval.RegisterSpecialForm("def", defForm)
-	
+
 	// =: Assignment
 	eval.RegisterSpecialForm("=", assignForm)
-	
+
 	// quote: Quote an expression
 	eval.RegisterSpecialForm("quote", quoteForm)
 }

@@ -6,7 +6,7 @@ func EqualValues(a, b Value) bool {
 	if a == b {
 		return true
 	}
-	
+
 	// Check by type
 	switch aVal := a.(type) {
 	case NumberValue:
@@ -49,7 +49,7 @@ func EqualValues(a, b Value) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -81,7 +81,7 @@ func Compare(a, b Value) int {
 			return 0
 		}
 	}
-	
+
 	// Fall back to string comparison for different types
 	as, bs := a.String(), b.String()
 	if as < bs {

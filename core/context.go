@@ -16,16 +16,16 @@ type TraceEntry struct {
 type Context struct {
 	// Variables in the current scope
 	Vars map[string]Value
-	
+
 	// Parent scope
 	Outer *Context
-	
+
 	// Global scope for module-level variables
 	Global *Context
-	
+
 	// Call stack for debugging and error reporting
 	CallStack []TraceEntry
-	
+
 	// Current function name for error reporting
 	CurrentFunction string
 }
@@ -37,7 +37,7 @@ func NewContext(outer *Context) *Context {
 		Outer:     outer,
 		CallStack: make([]TraceEntry, 0),
 	}
-	
+
 	// If this is the global context, set Global to self
 	if outer == nil {
 		ctx.Global = ctx
@@ -45,7 +45,7 @@ func NewContext(outer *Context) *Context {
 		// Otherwise, inherit global from parent
 		ctx.Global = outer.Global
 	}
-	
+
 	return ctx
 }
 
@@ -61,12 +61,12 @@ func (c *Context) Set(name string, value Value) error {
 		c.Vars[name] = value
 		return nil
 	}
-	
+
 	// Check outer scopes
 	if c.Outer != nil {
 		return c.Outer.Set(name, value)
 	}
-	
+
 	return fmt.Errorf("variable not defined: %s", name)
 }
 
@@ -76,12 +76,12 @@ func (c *Context) Lookup(name string) (Value, error) {
 	if val, ok := c.Vars[name]; ok {
 		return val, nil
 	}
-	
+
 	// Check outer scopes
 	if c.Outer != nil {
 		return c.Outer.Lookup(name)
 	}
-	
+
 	return nil, fmt.Errorf("undefined variable: %s", name)
 }
 
@@ -113,7 +113,7 @@ func (c *Context) FormatStackTrace() string {
 	trace := "Traceback (most recent call last):\n"
 	for i := len(c.CallStack) - 1; i >= 0; i-- {
 		entry := c.CallStack[i]
-		trace += fmt.Sprintf("  File \"%s\", line %d, in %s\n", 
+		trace += fmt.Sprintf("  File \"%s\", line %d, in %s\n",
 			entry.File, entry.Line, entry.Function)
 	}
 	return trace

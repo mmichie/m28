@@ -2,7 +2,7 @@ package builtin
 
 import (
 	"fmt"
-	
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -13,7 +13,7 @@ func RegisterAssertBuiltins(ctx *core.Context) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("assert requires at least 1 argument")
 		}
-		
+
 		// Convert the first argument to a boolean
 		var condition bool
 		switch arg := args[0].(type) {
@@ -25,7 +25,7 @@ func RegisterAssertBuiltins(ctx *core.Context) {
 			// In most languages, any non-nil, non-zero, non-empty value is considered true
 			condition = true
 		}
-		
+
 		if !condition {
 			var message string
 			if len(args) > 1 {
@@ -36,7 +36,7 @@ func RegisterAssertBuiltins(ctx *core.Context) {
 			}
 			return nil, fmt.Errorf(message)
 		}
-		
+
 		return core.Nil, nil
 	}))
 }

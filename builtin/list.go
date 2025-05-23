@@ -3,7 +3,7 @@ package builtin
 
 import (
 	"fmt"
-	
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -12,7 +12,7 @@ func RegisterListFunctions(ctx *core.Context) {
 	// List creation and conversion
 	ctx.Define("list", core.NewBuiltinFunction(ListFunc))
 	ctx.Define("range", core.NewBuiltinFunction(RangeFunc))
-	
+
 	// List operations
 	ctx.Define("first", core.NewBuiltinFunction(FirstFunc))
 	ctx.Define("rest", core.NewBuiltinFunction(RestFunc))
@@ -35,9 +35,9 @@ func RangeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 || len(args) > 3 {
 		return nil, fmt.Errorf("range requires 1-3 arguments: end or start, end[, step]")
 	}
-	
+
 	var start, end, step float64 = 0, 0, 1
-	
+
 	// Parse arguments
 	switch len(args) {
 	case 1:
@@ -80,10 +80,10 @@ func RangeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return nil, fmt.Errorf("step must be a number")
 		}
 	}
-	
+
 	// Create the list
 	result := make(core.ListValue, 0)
-	
+
 	// Handle positive and negative steps properly
 	if step > 0 {
 		for i := start; i < end; i += step {
@@ -94,7 +94,7 @@ func RangeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			result = append(result, core.NumberValue(i))
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -103,7 +103,7 @@ func FirstFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("first requires 1 argument")
 	}
-	
+
 	switch v := args[0].(type) {
 	case core.ListValue:
 		if len(v) == 0 {
@@ -130,7 +130,7 @@ func RestFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("rest requires 1 argument")
 	}
-	
+
 	switch v := args[0].(type) {
 	case core.ListValue:
 		if len(v) <= 1 {
@@ -157,7 +157,7 @@ func NthFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("nth requires 2 arguments")
 	}
-	
+
 	// Get the index
 	var idx int
 	if num, ok := args[1].(core.NumberValue); ok {
@@ -168,7 +168,7 @@ func NthFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	} else {
 		return nil, fmt.Errorf("index must be a number")
 	}
-	
+
 	// Get the nth element based on the sequence type
 	switch v := args[0].(type) {
 	case core.ListValue:
@@ -196,7 +196,7 @@ func AppendFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("append requires at least 2 arguments")
 	}
-	
+
 	switch list := args[0].(type) {
 	case core.ListValue:
 		return core.ListValue(append(list, args[1:]...)), nil
@@ -212,14 +212,14 @@ func ConcatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("concat requires at least 1 argument")
 	}
-	
+
 	// Determine the type of the first argument
 	switch first := args[0].(type) {
 	case core.ListValue:
 		// Concatenate lists
 		result := make(core.ListValue, len(first))
 		copy(result, first)
-		
+
 		for _, arg := range args[1:] {
 			if list, ok := arg.(core.ListValue); ok {
 				result = append(result, list...)
@@ -228,12 +228,12 @@ func ConcatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 		}
 		return result, nil
-		
+
 	case core.TupleValue:
 		// Concatenate tuples
 		result := make(core.TupleValue, len(first))
 		copy(result, first)
-		
+
 		for _, arg := range args[1:] {
 			if tuple, ok := arg.(core.TupleValue); ok {
 				result = append(result, tuple...)
@@ -242,7 +242,7 @@ func ConcatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 		}
 		return result, nil
-		
+
 	case core.StringValue:
 		// Concatenate strings
 		result := string(first)
@@ -254,7 +254,7 @@ func ConcatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 		}
 		return core.StringValue(result), nil
-		
+
 	default:
 		return nil, fmt.Errorf("concat expects a sequence, got %s", first.Type())
 	}
@@ -265,7 +265,7 @@ func LengthFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("length requires 1 argument")
 	}
-	
+
 	switch v := args[0].(type) {
 	case core.ListValue:
 		return core.NumberValue(len(v)), nil
@@ -287,13 +287,13 @@ func MapFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("map requires 2 arguments")
 	}
-	
+
 	// Get the function
 	fn, ok := args[0].(core.Callable)
 	if !ok {
 		return nil, fmt.Errorf("first argument must be callable")
 	}
-	
+
 	// Apply the function to each element based on collection type
 	switch coll := args[1].(type) {
 	case core.ListValue:
@@ -306,7 +306,7 @@ func MapFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			result[i] = mappedVal
 		}
 		return result, nil
-		
+
 	case core.TupleValue:
 		result := make(core.TupleValue, len(coll))
 		for i, item := range coll {
@@ -317,7 +317,7 @@ func MapFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			result[i] = mappedVal
 		}
 		return result, nil
-		
+
 	default:
 		return nil, fmt.Errorf("map expects a list or tuple, got %s", coll.Type())
 	}
@@ -328,13 +328,13 @@ func FilterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("filter requires 2 arguments")
 	}
-	
+
 	// Get the predicate function
 	pred, ok := args[0].(core.Callable)
 	if !ok {
 		return nil, fmt.Errorf("first argument must be callable")
 	}
-	
+
 	// Filter elements based on collection type
 	switch coll := args[1].(type) {
 	case core.ListValue:
@@ -344,13 +344,13 @@ func FilterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if err != nil {
 				return nil, fmt.Errorf("error applying predicate: %v", err)
 			}
-			
+
 			if core.IsTruthy(testResult) {
 				result = append(result, item)
 			}
 		}
 		return result, nil
-		
+
 	case core.TupleValue:
 		result := make(core.TupleValue, 0)
 		for _, item := range coll {
@@ -358,13 +358,13 @@ func FilterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if err != nil {
 				return nil, fmt.Errorf("error applying predicate: %v", err)
 			}
-			
+
 			if core.IsTruthy(testResult) {
 				result = append(result, item)
 			}
 		}
 		return result, nil
-		
+
 	default:
 		return nil, fmt.Errorf("filter expects a list or tuple, got %s", coll.Type())
 	}
@@ -375,13 +375,13 @@ func ReduceFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, fmt.Errorf("reduce requires 2 or 3 arguments")
 	}
-	
+
 	// Get the reducing function
 	fn, ok := args[0].(core.Callable)
 	if !ok {
 		return nil, fmt.Errorf("first argument must be callable")
 	}
-	
+
 	// Get the collection
 	var coll interface{}
 	switch c := args[1].(type) {
@@ -392,11 +392,11 @@ func ReduceFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	default:
 		return nil, fmt.Errorf("reduce expects a list or tuple, got %s", args[1].Type())
 	}
-	
+
 	// Get initial value and first element index
 	var result core.Value
 	var startIdx int
-	
+
 	if len(args) == 3 {
 		// Initial value provided
 		result = args[2]
@@ -417,7 +417,7 @@ func ReduceFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		}
 		startIdx = 1
 	}
-	
+
 	// Reduce the collection
 	var err error
 	switch c := coll.(type) {
@@ -436,6 +436,6 @@ func ReduceFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 		}
 	}
-	
+
 	return result, nil
 }

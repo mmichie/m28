@@ -15,8 +15,8 @@ import (
 
 // M28Engine provides the main interface for embedding M28 in other applications
 type M28Engine struct {
-	env       *env.Environment
-	parser    *parser.Parser
+	env    *env.Environment
+	parser *parser.Parser
 	// Callback for shell commands
 	ShellExecutor func(string) (string, error)
 }
@@ -37,8 +37,8 @@ func NewM28Engine() *M28Engine {
 
 	// Create the engine
 	engine := &M28Engine{
-		env:       environment,
-		parser:    parser.NewParser(),
+		env:    environment,
+		parser: parser.NewParser(),
 		// Default shell executor uses os/exec
 		ShellExecutor: defaultShellExecutor,
 	}

@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	
+
 	"github.com/mmichie/m28/builtin"
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/eval"
@@ -26,28 +26,28 @@ const version = "0.1.0-fresh-start"
 func main() {
 	// Parse command line flags
 	flag.Parse()
-	
+
 	// Show help
 	if *showHelp {
 		printHelp()
 		return
 	}
-	
+
 	// Show version
 	if *showVersion {
 		fmt.Printf("M28 version %s\n", version)
 		return
 	}
-	
+
 	// Create the global context
 	globalCtx := core.NewContext(nil)
-	
+
 	// Initialize the global context with built-in values and functions
 	initializeGlobalContext(globalCtx)
-	
+
 	// Register all special forms
 	special_forms.RegisterAllForms()
-	
+
 	// Evaluate an expression
 	if *evalExpr != "" {
 		result, err := eval.EvalString(*evalExpr, globalCtx)
@@ -58,7 +58,7 @@ func main() {
 		fmt.Println(core.PrintValue(result))
 		return
 	}
-	
+
 	// Get the file to execute from positional arguments
 	args := flag.Args()
 	if len(args) > 0 {
@@ -69,7 +69,7 @@ func main() {
 		}
 		return
 	}
-	
+
 	// No file or expression provided, start the REPL
 	r := repl.NewREPL(globalCtx)
 	r.Start()
@@ -88,7 +88,7 @@ func initializeGlobalContext(ctx *core.Context) {
 	ctx.Define("true", core.BoolValue(true))
 	ctx.Define("false", core.BoolValue(false))
 	ctx.Define("nil", core.NilValue{})
-	
+
 	// Register all built-in functions
 	builtin.RegisterAllBuiltins(ctx)
 }
@@ -100,22 +100,22 @@ func executeFile(filename string, ctx *core.Context) error {
 	if err != nil {
 		return fmt.Errorf("error reading file: %v", err)
 	}
-	
+
 	// Create a parser
 	p := parser.NewParser()
 	p.SetFilename(filename)
-	
+
 	// Parse the content
 	expr, err := p.Parse(string(content))
 	if err != nil {
 		return fmt.Errorf("parse error: %v", err)
 	}
-	
+
 	// Evaluate the expressions
 	_, err = eval.Eval(expr, ctx)
 	if err != nil {
 		return fmt.Errorf("evaluation error: %v", err)
 	}
-	
+
 	return nil
 }
