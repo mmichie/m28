@@ -1,0 +1,75 @@
+; Test loop control flow forms
+
+; Test while loop
+(do
+  (def counter 0)
+  (def result nil)
+  
+  (print "Testing while loop...")
+  
+  (while (< counter 5)
+    (= result (+ counter 1))
+    (= counter (+ counter 1))
+    (print "Counter:" counter "Result:" result))
+  
+  (if (= counter 5)
+    (print "PASS: while loop iterated 5 times as expected")
+    (print "FAIL: while loop failed, counter =" counter))
+)
+
+; Test for loop with a list
+(do
+  (def numbers [1 2 3 4 5])
+  (def sum 0)
+  
+  (print "Testing for loop with list...")
+  
+  (for (num numbers)
+    (= sum (+ sum num))
+    (print "Number:" num "Running sum:" sum))
+  
+  (if (= sum 15)
+    (print "PASS: for loop correctly summed list to 15")
+    (print "FAIL: for loop sum =" sum))
+)
+
+; Test break in while loop
+(do
+  (def counter 0)
+  
+  (print "Testing break in while loop...")
+  
+  (while true
+    (= counter (+ counter 1))
+    (print "Counter:" counter)
+    (if (>= counter 3)
+      (break))
+  )
+  
+  (if (= counter 3)
+    (print "PASS: break correctly exited the loop after 3 iterations")
+    (print "FAIL: break failed, counter =" counter))
+)
+
+; Test continue in while loop
+(do
+  (def counter 0)
+  (def evens 0)
+  
+  (print "Testing continue in while loop...")
+  
+  (while (< counter 5)
+    (= counter (+ counter 1))
+    ; Check if counter is odd using a simpler approach: 1, 3, 5 = odd
+    (if (or (= counter 1) (= counter 3) (= counter 5))
+      (continue))
+    (= evens (+ evens 1))
+    (print "Found even number:" counter))
+  
+  (if (= evens 2)
+    (print "PASS: continue correctly skipped odd numbers")
+    (print "FAIL: continue failed, evens =" evens))
+)
+
+; All tests passed message
+(print "All loop tests completed.")

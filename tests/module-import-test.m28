@@ -1,0 +1,26 @@
+# Module import test
+# Tests importing and using modules
+
+# Import the basic module test
+(import "tests/basic-module-test" as basic)
+
+# Test that we can access the exported functions
+(assert (= (basic.add 10 20) 30) "Failed to call imported function")
+
+# Test that we can access the exported variables
+(assert (= basic.test_value 42) "Failed to access imported variable")
+(assert (= basic.test_string "Hello, world!") "Failed to access imported string")
+
+# Test from-import
+(from "tests/basic-module-test" import add test_value)
+
+# Verify that the imported symbols are available in the current scope
+(assert (= (add 5 5) 10) "Failed to use directly imported function")
+(assert (= test_value 42) "Failed to use directly imported variable")
+
+# Test alias in from-import
+(from "tests/basic-module-test" import test_string as greeting)
+(assert (= greeting "Hello, world!") "Failed to use aliased imported string")
+
+# Print successful completion
+(print "Module import test completed successfully")

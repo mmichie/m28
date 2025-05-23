@@ -1,0 +1,48 @@
+# List and Tuple Concatenation Example
+# This example demonstrates the use of the + operator for concatenating lists and tuples
+
+# List concatenation
+(= list1 [1 2 3])
+(= list2 [4 5 6])
+
+# Concatenate two lists
+(= combined_list (+ list1 list2))
+(print "List1 + List2 =")
+(print combined_list)  # Should output [1, 2, 3, 4, 5, 6]
+
+# Tuple concatenation
+(= tuple1 (1, 2, 3))
+(= tuple2 (4, 5, 6))
+
+# Concatenate two tuples
+(= combined_tuple (+ tuple1 tuple2))
+(print "\nTuple1 + Tuple2 =")
+(print combined_tuple)  # Should output (1, 2, 3, 4, 5, 6)
+
+# Mixed concatenation
+(= combined_list_tuple (+ list1 tuple2))
+(print "\nList1 + Tuple2 =")
+(print combined_list_tuple)  # Should output [1, 2, 3, 4, 5, 6]
+
+(= combined_tuple_list (+ tuple1 list2))
+(print "\nTuple1 + List2 =")
+(print combined_tuple_list)  # Should output (1, 2, 3, 4, 5, 6)
+
+# Multiple concatenation
+(= multi_list (+ list1 list2 [7 8 9]))
+(print "\nList1 + List2 + [7 8 9] =")
+(print multi_list)  # Should output [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+(= multi_tuple (+ tuple1 tuple2 (7, 8, 9)))
+(print "\nTuple1 + Tuple2 + (7 8 9) =")
+(print multi_tuple)  # Should output (1, 2, 3, 4, 5, 6, 7, 8, 9)
+
+# Mix of list literals and variables
+(= mixed_list (+ [0] list1 [4 5] list2 [7 8 9]))
+(print "\nMixed list concatenation =")
+(print mixed_list)  # Should output [0, 1, 2, 3, 4, 5, 4, 5, 6, 7, 8, 9]
+
+# Mix of tuple literals and variables
+(= mixed_tuple (+ (0,) tuple1 (4, 5) tuple2 (7, 8, 9)))
+(print "\nMixed tuple concatenation =")
+(print mixed_tuple)  # Should output (0, 1, 2, 3, 4, 5, 4, 5, 6, 7, 8, 9)

@@ -1,0 +1,64 @@
+# Comprehensive test file for tuples
+# Tests tuple creation, access, comparison, and type checking
+
+# Test empty tuple
+(print "Testing empty tuple:")
+(= empty_tuple ())
+(print "Empty tuple:" empty_tuple)
+(print "Type of empty tuple:" (type empty_tuple))
+(print "Length of empty tuple:" (len empty_tuple))
+(print "Is empty tuple a tuple?" (isinstance empty_tuple "tuple"))
+
+# Test single-element tuple
+(print "\nTesting single-element tuple:")
+(= single_tuple (1,))
+(print "Single-element tuple:" single_tuple)
+(print "Type of single-element tuple:" (type single_tuple))
+(print "Length of single-element tuple:" (len single_tuple))
+(print "First element of single-element tuple:" (nth single_tuple 0))
+
+# Test multi-element tuple
+(print "\nTesting multi-element tuple:")
+(= multi_tuple (1, 2, 3, "four", 5.0))
+(print "Multi-element tuple:" multi_tuple)
+(print "Type of multi-element tuple:" (type multi_tuple))
+(print "Length of multi-element tuple:" (len multi_tuple))
+(print "Elements of multi-element tuple:")
+(for i (range 0 (len multi_tuple))
+  (print "Element" i ":" (nth multi_tuple i)))
+
+# Test nested tuples
+(print "\nTesting nested tuples:")
+(= nested_tuple (1, (2, 3), (4, (5, 6))))
+(print "Nested tuple:" nested_tuple)
+(print "Type of nested tuple:" (type nested_tuple))
+(print "Length of nested tuple:" (len nested_tuple))
+(print "Type of second element:" (type (nth nested_tuple 1)))
+(print "Value of nested element:" (nth (nth nested_tuple 1) 1))
+
+# Skip tuple conversion - not available in this version
+(print "\nSkipping tuple conversion - not available in this version.")
+
+# Test tuple comparison
+(print "\nTesting tuple comparison:")
+(= tuple1 (1, 2, 3))
+(= tuple2 (1, 2, 3))
+(= tuple3 (1, 2, 4))
+(print "tuple1 == tuple2:" (== tuple1 tuple2))
+(print "tuple1 == tuple3:" (== tuple1 tuple3))
+(print "tuple1 < tuple3:" (< tuple1 tuple3))
+(print "tuple3 > tuple1:" (> tuple3 tuple1))
+
+# Test tuple immutability
+(print "\nTesting tuple immutability:")
+(= tuple_test (1, 2, 3))
+(print "Original tuple:" tuple_test)
+(print "Trying to access tuple element:" (nth tuple_test 0))
+(print "Note: Tuples are immutable - elements cannot be changed once created")
+
+# Test empty tuple
+(print "\nTesting empty tuples:")
+(= empty_tuple ())
+(print "Empty tuple:" empty_tuple)
+(print "Type of empty tuple:" (type empty_tuple))
+(print "Is empty tuple a tuple?" (isinstance empty_tuple "tuple"))

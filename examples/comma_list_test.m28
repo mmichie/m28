@@ -1,0 +1,37 @@
+# Test for comma-separated list syntax
+# This tests assigning and using lists with comma separators
+
+(print "Testing comma-separated list syntax")
+
+# Simple list assignment 
+(= nums [1, 2, 3, 4, 5])
+
+(print "nums =" nums)
+
+# Test nested lists
+(= nested [[1, 2], [3, 4], [5, 6]])
+
+(print "nested =" nested)
+
+# Test mixed element types
+(= mixed [1, "two", 3.0, True, None])
+
+(print "mixed =" mixed)
+
+# Test accessing elements
+(print "First element:" (nth nums 0))
+(print "Third element:" (nth nums 2))
+
+# Test list concatenation
+(= combined (+ nums [6, 7, 8]))
+
+(print "combined =" combined)
+
+# Test using lists in expressions
+(= doubled [])
+(for n nums
+  (= doubled (+ doubled [(* 2 n)])))
+
+(print "doubled =" doubled)
+
+(print "All tests completed successfully!")

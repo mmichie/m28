@@ -1,0 +1,45 @@
+# tuple-repetition-debug.m28
+# A simple test file for debugging tuple repetition
+
+(print "=== Tuple Repetition Debugging ===")
+
+# Create a simple tuple
+(= my-tuple (1, 2))
+(print "Original tuple:" my-tuple)
+
+# Print the type for debugging
+(print "Type of tuple:" (type my-tuple))
+
+# First try a tuple and number directly
+(print "Trying direct multiplication with literal tuple (1, 2) * 3")
+(try
+  (= result1 (* (1, 2) 3))
+  (print "Result 1:" result1)
+  (except Exception as e
+    (print "Error with direct multiplication:" e)))
+
+# Try a variable tuple and literal number
+(print "\nTrying variable tuple * 3")
+(try
+  (= result2 (* my-tuple 3))
+  (print "Result 2:" result2)
+  (except Exception as e
+    (print "Error with tuple variable multiplication:" e)))
+
+# Try the tuple as the second argument
+(print "\nTrying number * tuple (reversed order)")
+(try
+  (= result3 (* 3 my-tuple))
+  (print "Result 3:" result3)
+  (except Exception as e
+    (print "Error with reversed multiplication:" e)))
+
+# Print debug types for debugging
+(print "\nDebugging types:")
+(define (debug-types x)
+  (print "Type of" x "is" (type x)))
+
+(debug-types my-tuple)
+(debug-types 3)
+
+(print "=== Debugging Complete ===")

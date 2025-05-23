@@ -1,0 +1,285 @@
+# performance-benchmark.m28
+#
+# Comprehensive benchmarks for M28 performance
+# Tests execution time and memory usage for various language operations
+
+(print "===== Performance Benchmarks =====\n")
+
+# -- Utility Functions --
+
+# Simple timer function for benchmarking
+(def (benchmark label func)
+  (print "\n-- Benchmarking:" label "--")
+  (= start-time (time))
+  (= result (func))
+  (= end-time (time))
+  (= elapsed (* (- end-time start-time) 1000))  # Convert to milliseconds
+  (print "Time elapsed:" elapsed "ms")
+  (list result elapsed))
+
+# -- Arithmetic Operations Benchmark --
+
+(print "\n-- Arithmetic Operations --")
+
+# Test basic arithmetic speed
+(def (arithmetic-benchmark iterations)
+  (= result 0)
+  (for i (range iterations)
+    (= result (+ result 1))
+    (= result (- result 0.5))
+    (= result (* result 2))
+    (= result (/ result 2))
+    (= result (% (+ result 10) 10)))
+  result)
+
+(= arithmetic-result (benchmark "Arithmetic Operations (100,000 iterations)" 
+                               (lambda () (arithmetic-benchmark 100000))))
+(print "Final result:" (get arithmetic-result 0))
+(print "Operations per second:" (/ 400000 (/ (get arithmetic-result 1) 1000)))  # 4 ops per iteration
+
+# -- Function Call Benchmark --
+
+(print "\n-- Function Calls --")
+
+# Test function call overhead
+(def (empty-function)
+  None)
+
+(def (function-call-benchmark iterations)
+  (for i (range iterations)
+    (empty-function)))
+
+(= function-result (benchmark "Function Calls (100,000 iterations)" 
+                             (lambda () (function-call-benchmark 100000))))
+(print "Calls per second:" (/ 100000 (/ (get function-result 1) 1000)))
+
+# -- Recursion Benchmark --
+
+(print "\n-- Recursion --")
+
+# Test recursion performance (with TCO if implemented)
+(def (recursive-sum n acc)
+  (if (== n 0)
+      acc
+      (recursive-sum (- n 1) (+ acc 1))))
+
+(def (recursion-benchmark depth)
+  (recursive-sum depth 0))
+
+(= recursion-result (benchmark "Recursive Sum (depth 10,000)" 
+                              (lambda () (recursion-benchmark 10000))))
+(print "Recursion result:" (get recursion-result 0))
+(assert (== (get recursion-result 0) 10000) "Recursive sum should equal 10000")
+
+# -- Object Property Access Benchmark --
+
+(print "\n-- Object Property Access --")
+
+# Test object property access speed
+(def (create-test-object)
+  (= obj (dict))
+  (= obj.prop1 1)
+  (= obj.prop2 2)
+  (= obj.prop3 3)
+  (= obj.prop4 4)
+  (= obj.prop5 5)
+  obj)
+
+(def (object-access-benchmark iterations)
+  (= obj (create-test-object))
+  (= sum 0)
+  (for i (range iterations)
+    (= sum (+ sum obj.prop1))
+    (= sum (+ sum obj.prop2))
+    (= sum (+ sum obj.prop3))
+    (= sum (+ sum obj.prop4))
+    (= sum (+ sum obj.prop5)))
+  sum)
+
+(= object-result (benchmark "Object Property Access (20,000 iterations)" 
+                           (lambda () (object-access-benchmark 20000))))
+(print "Property access result:" (get object-result 0))
+(print "Property accesses per second:" (/ 100000 (/ (get object-result 1) 1000)))  # 5 props per iteration
+
+# -- Dictionary Operation Benchmark --
+
+(print "\n-- Dictionary Operations --")
+
+# Test dictionary operations speed
+(def (dict-benchmark iterations)
+  (= d (dict))
+  (for i (range iterations)
+    (= d.i (* i i)))
+  (= sum 0)
+  (for i (range iterations)
+    (= sum (+ sum (get d i 0))))
+  sum)
+
+(= dict-result (benchmark "Dictionary Operations (10,000 iterations)" 
+                         (lambda () (dict-benchmark 10000))))
+(print "Dictionary sum result:" (get dict-result 0))
+(print "Dictionary operations per second:" (/ 20000 (/ (get dict-result 1) 1000)))  # set + get per iteration
+
+# -- List Operations Benchmark --
+
+(print "\n-- List Operations --")
+
+# Test list operations speed
+(def (list-create-benchmark size)
+  (= l (list))
+  (for i (range size)
+    (append l i))
+  l)
+
+(= list-create-result (benchmark "List Creation (100,000 elements)" 
+                                (lambda () (list-create-benchmark 100000))))
+(print "List size:" (len (get list-create-result 0)))
+(print "List appends per second:" (/ 100000 (/ (get list-create-result 1) 1000)))
+
+# Test list random access
+(def (list-access-benchmark iterations list-data)
+  (= sum 0)
+  (= size (len list-data))
+  (for i (range iterations)
+    (= index (% i size))
+    (= sum (+ sum (get list-data index))))
+  sum)
+
+(= list-access-result (benchmark "List Random Access (100,000 accesses)" 
+                                (lambda () (list-access-benchmark 100000 (get list-create-result 0)))))
+(print "List access sum:" (get list-access-result 0))
+(print "List accesses per second:" (/ 100000 (/ (get list-access-result 1) 1000)))
+
+# -- String Operations Benchmark --
+
+(print "\n-- String Operations --")
+
+# Test string manipulation speed
+(def (string-benchmark iterations)
+  (= s "")
+  (for i (range iterations)
+    (= s (+ s "a"))
+  (len s)))
+
+(= string-result (benchmark "String Concatenation (10,000 iterations)" 
+                           (lambda () (string-benchmark 10000))))
+(print "Final string length:" (get string-result 0))
+(print "String concatenations per second:" (/ 10000 (/ (get string-result 1) 1000)))
+
+# -- Fibonacci Benchmark --
+
+(print "\n-- Fibonacci Benchmark --")
+
+# Classic recursive Fibonacci (inefficient, good stress test)
+(def (fibonacci n)
+  (if (< n 2)
+      n
+      (+ (fibonacci (- n 1)) (fibonacci (- n 2)))))
+
+(= fib-result (benchmark "Recursive Fibonacci (n=30)" 
+                        (lambda () (fibonacci 30))))
+(print "Fibonacci(30):" (get fib-result 0))
+(assert (== (get fib-result 0) 832040) "Fibonacci(30) should equal 832040")
+
+# -- Algorithmic Benchmark --
+
+(print "\n-- QuickSort Benchmark --")
+
+# Quicksort implementation
+(def (quicksort lst)
+  (if (< (len lst) 2)
+      lst
+      (do
+        (= pivot (get lst 0))
+        (= lesser (filter (lambda (x) (< x pivot)) (slice lst 1)))
+        (= greater (filter (lambda (x) (>= x pivot)) (slice lst 1)))
+        (+ (quicksort lesser) (list pivot) (quicksort greater)))))
+
+# Create a list to sort
+(def (create-random-list size)
+  (= lst (list))
+  (for i (range size)
+    (append lst (% (* i 1237) size)))
+  lst)
+
+(= lst-to-sort (create-random-list 1000))
+(= sort-result (benchmark "QuickSort (1000 elements)" 
+                         (lambda () (quicksort lst-to-sort))))
+(print "Sorted list length:" (len (get sort-result 0)))
+
+# -- Concurrency Benchmark --
+
+(print "\n-- Concurrency Benchmark --")
+
+# Test goroutine creation and channel communication
+(def (concurrency-benchmark num-goroutines)
+  (= ch (channel))
+  (= sum 0)
+  
+  (def (worker id)
+    (ch <- id))
+  
+  (for i (range num-goroutines)
+    (go (worker i)))
+  
+  (for i (range num-goroutines)
+    (= sum (+ sum (<- ch))))
+  
+  sum)
+
+(= concurrency-result (benchmark "Goroutine Creation and Communication (1000 goroutines)" 
+                                (lambda () (concurrency-benchmark 1000))))
+(print "Sum of all worker IDs:" (get concurrency-result 0))
+(print "Goroutines per second:" (/ 1000 (/ (get concurrency-result 1) 1000)))
+
+# -- Summary Table --
+
+(print "\n===== Performance Summary =====")
+(print "Operation                          | Time (ms) | Units per second")
+(print "-----------------------------------|-----------|----------------")
+(print (+ "Arithmetic (100k iterations)         | " 
+        (str (get arithmetic-result 1)) 
+        " | " 
+        (str (/ 400000 (/ (get arithmetic-result 1) 1000)))))
+(print (+ "Function Calls (100k calls)          | " 
+        (str (get function-result 1)) 
+        " | " 
+        (str (/ 100000 (/ (get function-result 1) 1000)))))
+(print (+ "Recursion (depth 10k)                | " 
+        (str (get recursion-result 1)) 
+        " | " 
+        (str (/ 10000 (/ (get recursion-result 1) 1000)))))
+(print (+ "Object Property Access (20k iters)   | " 
+        (str (get object-result 1)) 
+        " | " 
+        (str (/ 100000 (/ (get object-result 1) 1000)))))
+(print (+ "Dictionary Operations (10k ops)      | " 
+        (str (get dict-result 1)) 
+        " | " 
+        (str (/ 20000 (/ (get dict-result 1) 1000)))))
+(print (+ "List Creation (100k elements)        | " 
+        (str (get list-create-result 1)) 
+        " | " 
+        (str (/ 100000 (/ (get list-create-result 1) 1000)))))
+(print (+ "List Random Access (100k accesses)   | " 
+        (str (get list-access-result 1)) 
+        " | " 
+        (str (/ 100000 (/ (get list-access-result 1) 1000)))))
+(print (+ "String Concatenation (10k ops)       | " 
+        (str (get string-result 1)) 
+        " | " 
+        (str (/ 10000 (/ (get string-result 1) 1000)))))
+(print (+ "Recursive Fibonacci (n=30)           | " 
+        (str (get fib-result 1)) 
+        " | " 
+        "N/A"))
+(print (+ "QuickSort (1000 elements)            | " 
+        (str (get sort-result 1)) 
+        " | " 
+        "N/A"))
+(print (+ "Concurrency (1000 goroutines)        | " 
+        (str (get concurrency-result 1)) 
+        " | " 
+        (str (/ 1000 (/ (get concurrency-result 1) 1000)))))
+
+(print "\n===== Performance Benchmarks Complete =====")

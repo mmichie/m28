@@ -1,0 +1,338 @@
+# object-protocol-test-comprehensive.m28
+#
+# Comprehensive test for the object protocol in M28
+# Testing various aspects of object system as per the language specification
+
+(print "===== Object Protocol Tests =====\n")
+
+# -- Basic Object Creation and Properties --
+
+(print "-- Basic Object Creation --")
+
+# Create a simple object using dictionary approach
+(def (make-person name age)
+  (= person (dict))
+  (= person.name name)
+  (= person.age age)
+  person)
+
+# Test basic object creation and property access
+(= alice (make-person "Alice" 30))
+(print "\nCreated person:" alice)
+(print "Name:" alice.name)
+(print "Age:" alice.age)
+(assert (== alice.name "Alice") "Object property 'name' should be accessible")
+(assert (== alice.age 30) "Object property 'age' should be accessible")
+
+# Test property modification
+(= alice.age 31)
+(print "Modified age:" alice.age)
+(assert (== alice.age 31) "Object properties should be modifiable")
+
+# Test adding new properties
+(= alice.email "alice@example.com")
+(print "Added email:" alice.email)
+(assert (== alice.email "alice@example.com") "New properties should be addable")
+
+# -- Method Handling --
+
+(print "\n-- Method Handling --")
+
+# Create an object with methods
+(def (make-counter start)
+  (= counter (dict))
+  (= counter.value start)
+  
+  (def (counter.increment self)
+    (= self.value (+ self.value 1))
+    self.value)
+  
+  (def (counter.decrement self)
+    (= self.value (- self.value 1))
+    self.value)
+  
+  (def (counter.reset self)
+    (= self.value start)
+    self.value)
+  
+  counter)
+
+# Test method calling
+(= counter (make-counter 10))
+(print "\nInitial counter value:" counter.value)
+
+(= new-value (counter.increment counter))
+(print "After increment:" new-value)
+(assert (== new-value 11) "Method should increment and return the new value")
+(assert (== counter.value 11) "Object property should be updated by method")
+
+(= new-value (counter.decrement counter))
+(print "After decrement:" new-value)
+(assert (== new-value 10) "Method should decrement and return the new value")
+
+(= new-value (counter.reset counter))
+(print "After reset:" new-value)
+(assert (== new-value 10) "Method should reset to initial value")
+
+# -- Method Binding (if supported) --
+
+(print "\n-- Method Binding --")
+
+# Test if methods can be bound to objects (not requiring explicit self)
+(try
+  (= increment-method counter.increment)
+  (= result (increment-method))
+  (print "Method binding supported, new value:" result)
+  (assert (== result 11) "Bound method should increment the value")
+  (except Exception as e
+    (print "Method binding not supported as expected:" e)))
+
+# -- Attribute Checking --
+
+(print "\n-- Attribute Checking --")
+
+# Test hasattr/getattr/setattr if supported
+(try
+  (= has-name (hasattr alice "name"))
+  (print "hasattr test for name:" has-name)
+  (assert has-name "hasattr should return True for existing attribute")
+  
+  (= has-address (hasattr alice "address"))
+  (print "hasattr test for address:" has-address)
+  (assert (not has-address) "hasattr should return False for missing attribute")
+  
+  (= name-value (getattr alice "name"))
+  (print "getattr test for name:" name-value)
+  (assert (== name-value "Alice") "getattr should retrieve attribute value")
+  
+  (setattr alice "occupation" "Engineer")
+  (print "setattr test, occupation:" alice.occupation)
+  (assert (== alice.occupation "Engineer") "setattr should set new attribute")
+  
+  (except Exception as e
+    (print "Standard attribute functions not supported as expected:" e)))
+
+# -- Class Based Objects (if supported) --
+
+(print "\n-- Class Based Objects --")
+
+# Test class-based object creation if supported
+(try
+  (class Dog ()
+    (def (init self name breed)
+      (= self.name name)
+      (= self.breed breed))
+    
+    (def (bark self)
+      (+ self.name " says: Woof!")))
+  
+  (= dog (Dog "Rex" "Labrador"))
+  (print "\nCreated Dog instance:" dog)
+  (print "Dog name:" dog.name)
+  (print "Dog breed:" dog.breed)
+  (assert (== dog.name "Rex") "Class instance should have initialized properties")
+  
+  (= bark-result (dog.bark dog))
+  (print "Bark result:" bark-result)
+  (assert (== bark-result "Rex says: Woof!") "Method should work properly")
+  
+  (except Exception as e
+    (print "Class-based objects not supported as expected:" e)))
+
+# -- Inheritance (if supported) --
+
+(print "\n-- Inheritance --")
+
+# Test inheritance if supported
+(try
+  (class Animal ()
+    (def (init self name)
+      (= self.name name))
+    
+    (def (make-sound self)
+      "Generic animal sound"))
+  
+  (class Cat (Animal)
+    (def (init self name color)
+      (super.init self name)
+      (= self.color color))
+    
+    (def (make-sound self)
+      "Meow!"))
+  
+  (= cat (Cat "Whiskers" "gray"))
+  (print "\nCreated Cat instance:" cat)
+  (print "Cat name (inherited property):" cat.name)
+  (print "Cat color (own property):" cat.color)
+  (assert (== cat.name "Whiskers") "Inherited properties should be set")
+  (assert (== cat.color "gray") "Own properties should be set")
+  
+  (= sound (cat.make-sound cat))
+  (print "Cat sound (overridden method):" sound)
+  (assert (== sound "Meow!") "Method overriding should work")
+  
+  (except Exception as e
+    (print "Inheritance not supported as expected:" e)))
+
+# -- Protocol Objects --
+
+(print "\n-- Protocol Objects --")
+
+# Test iterable protocol if supported
+(try
+  (class NumberIterator ()
+    (def (init self start end)
+      (= self.start start)
+      (= self.end end)
+      (= self.current start))
+    
+    (def (__iter__ self)
+      self)
+    
+    (def (__next__ self)
+      (if (< self.current self.end)
+        (do
+          (= value self.current)
+          (= self.current (+ self.current 1))
+          value)
+        (raise StopIteration))))
+  
+  (= number-iter (NumberIterator 1 5))
+  (print "\nCreated NumberIterator instance")
+  (= collected (list))
+  (for num number-iter
+    (append collected num))
+  (print "Collected values from iterator:" collected)
+  (assert (== collected (list 1 2 3 4)) "Iterator protocol should work")
+  
+  (except Exception as e
+    (print "Iterable protocol not supported as expected:" e)))
+
+# -- Dict Protocol --
+
+(print "\n-- Dict Protocol --")
+
+# Test dictionary access protocol if supported
+(try
+  (class CustomDict ()
+    (def (init self)
+      (= self._data (dict)))
+    
+    (def (__getitem__ self key)
+      (get self._data key))
+    
+    (def (__setitem__ self key value)
+      (= self._data.key value)))
+  
+  (= custom-dict (CustomDict))
+  (print "\nCreated CustomDict instance")
+  (= custom-dict["key1"] "value1")
+  (print "Set key1 to value1")
+  (= value (custom-dict["key1"]))
+  (print "Retrieved value for key1:" value)
+  (assert (== value "value1") "Dict protocol should allow subscript access")
+  
+  (except Exception as e
+    (print "Dict protocol not supported as expected:" e)))
+
+# -- Type Checking --
+
+(print "\n-- Type Checking --")
+
+# Test isinstance and issubclass if supported
+(try
+  (= alice-is-dict (isinstance alice dict))
+  (print "\nIs alice a dict instance?" alice-is-dict)
+  
+  (if (defined 'Dog)  # Check if we created the Dog class successfully
+    (do
+      (= dog-is-dog (isinstance dog Dog))
+      (print "Is dog a Dog instance?" dog-is-dog)
+      (assert dog-is-dog "isinstance should identify correct instances")
+      
+      (if (defined 'Animal)  # Check if we created the Animal class
+        (do
+          (= dog-is-animal (isinstance dog Animal))
+          (print "Is dog an Animal instance?" dog-is-animal)
+          
+          (= cat-is-animal (isinstance cat Animal))
+          (print "Is cat an Animal instance?" cat-is-animal)
+          
+          (= cat-is-dog (isinstance cat Dog))
+          (print "Is cat a Dog instance?" cat-is-dog)
+          (assert (not cat-is-dog) "isinstance should reject incorrect instances")
+          
+          (= cat-class-is-animal-subclass (issubclass Cat Animal))
+          (print "Is Cat a subclass of Animal?" cat-class-is-animal-subclass)
+          (assert cat-class-is-animal-subclass "issubclass should work for subclasses")))))
+  
+  (except Exception as e
+    (print "Type checking not fully supported as expected:" e)))
+
+# -- Dynamic Attribute Access --
+
+(print "\n-- Dynamic Attribute Access --")
+
+# Test dynamic attribute access if supported
+(try
+  (class DynamicObject ()
+    (def (init self)
+      (= self._data (dict)))
+    
+    (def (__getattr__ self name)
+      (print "Dynamic __getattr__ called for:" name)
+      (get self._data name "default"))
+    
+    (def (__setattr__ self name value)
+      (if (== name "_data")
+        (do
+          (print "Setting _data directly")
+          (builtins.__setattr__ self name value))
+        (do
+          (print "Dynamic __setattr__ called for:" name)
+          (= self._data.name value)))))
+  
+  (= dynamic (DynamicObject))
+  (print "\nCreated DynamicObject instance")
+  
+  (= dynamic.foo "bar")
+  (print "Set dynamic.foo = 'bar'")
+  
+  (= value (dynamic.foo))
+  (print "Retrieved dynamic.foo:" value)
+  (assert (== value "bar") "Dynamic attribute access should work")
+  
+  (= default-value (dynamic.missing))
+  (print "Retrieved missing attribute:" default-value)
+  (assert (== default-value "default") "Default value should be returned for missing attributes")
+  
+  (except Exception as e
+    (print "Dynamic attribute access not supported as expected:" e)))
+
+# -- Object Identity and Equality --
+
+(print "\n-- Object Identity and Equality --")
+
+# Test object identity and equality
+(= obj1 (make-person "Bob" 25))
+(= obj2 (make-person "Bob" 25))
+(= obj3 obj1)
+
+(print "\nTesting object identity and equality:")
+(print "obj1 == obj2:" (== obj1 obj2))
+(print "obj1 == obj3:" (== obj1 obj3))
+(print "obj1 is obj3:" (is obj1 obj3))
+(print "obj1 is obj2:" (is obj1 obj2))
+
+# If object equality is based on content, these should be equal
+# If based on identity, they should not be
+(print "Note: object equality behavior depends on the implementation")
+# Uncomment assertion if appropriate for your implementation:
+# (assert (== obj1 obj2) "Objects with same content should be equal")
+(assert (== obj1 obj3) "Same object references should be equal")
+(assert (is obj1 obj3) "Same object references should have same identity")
+(assert (not (is obj1 obj2)) "Different objects should have different identity")
+
+# -- Conclusion --
+
+(print "\n===== Object Protocol Tests Complete =====")

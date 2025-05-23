@@ -1,0 +1,42 @@
+# module_usage.m28
+# Example of using the module system
+
+# Basic import
+(import "examples/modules/simple_module")
+
+# Use the module
+(print "Module name:" simple_module.MODULE_NAME)
+(print "Version:" simple_module.VERSION)
+(print "2 + 3 =" (simple_module.add 2 3))
+
+# Import with alias
+(import "examples/modules/simple_module" as math)
+
+# Use the aliased module
+(print "Using alias - PI value:" math.PI)
+(print "5 * 6 =" (math.multiply 5 6))
+
+# Create a circle using the imported class
+(def my_circle (math.Circle 5))
+(print "Circle area:" (my_circle.area))
+(print "Circle circumference:" (my_circle.circumference))
+
+# From-import specific symbols
+(from "examples/modules/simple_module" import add subtract PI)
+
+# Use directly imported symbols
+(print "Direct import - 10 - 4 =" (subtract 10 4))
+(print "Direct import - PI value:" PI)
+
+# Import with alias
+(from "examples/modules/simple_module" import Circle as Shape VALUE as MAGIC_NUMBER)
+
+# Use aliased imports
+(def shape (Shape 10))
+(print "Shape area using aliased import:" (shape.area))
+(print "Magic number:" MAGIC_NUMBER)
+
+# Private functions are not accessible
+(print "Trying to access _square should fail with:")
+(print "  1. simple_module._square - should be undefined")
+(print "  2. From import _square - should fail if attempted")

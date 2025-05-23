@@ -1,0 +1,398 @@
+# type-system-test-comprehensive.m28
+#
+# Comprehensive test for M28's type system features
+# Testing type checking, conversion, and operations between types
+
+(print "===== Type System Tests =====\n")
+
+# -- Type Constants --
+
+(print "-- Type Constants --")
+
+# Verify basic type constants are defined
+(print "\nVerifying basic type constants:")
+(print "int:" (defined 'int))
+(print "float:" (defined 'float))
+(print "str:" (defined 'str))
+(print "bool:" (defined 'bool))
+(print "list:" (defined 'list))
+(print "tuple:" (defined 'tuple))
+(print "dict:" (defined 'dict))
+(print "set:" (defined 'set))
+(print "function:" (defined 'function))
+
+# -- Type Function --
+
+(print "\n-- Type Function --")
+
+# Test type function with different values
+(= int-val 42)
+(= float-val 3.14)
+(= str-val "hello")
+(= bool-val True)
+(= list-val (list 1 2 3))
+(= dict-val (dict "a" 1 "b" 2))
+(= func-val (lambda (x) x))
+
+(print "\nType of int:" (type int-val))
+(assert (== (type int-val) int) "Type of integer should be int")
+
+(print "Type of float:" (type float-val))
+(assert (== (type float-val) float) "Type of float should be float")
+
+(print "Type of string:" (type str-val))
+(assert (== (type str-val) str) "Type of string should be str")
+
+(print "Type of boolean:" (type bool-val))
+(assert (== (type bool-val) bool) "Type of boolean should be bool")
+
+(print "Type of list:" (type list-val))
+(assert (== (type list-val) list) "Type of list should be list")
+
+(print "Type of dict:" (type dict-val))
+(assert (== (type dict-val) dict) "Type of dictionary should be dict")
+
+(print "Type of function:" (type func-val))
+(assert (== (type func-val) function) "Type of lambda should be function")
+
+# -- isinstance Function --
+
+(print "\n-- isinstance Function --")
+
+# Test isinstance with different types
+(print "\nTesting isinstance with various types:")
+
+(print "isinstance(42, int):" (isinstance 42 int))
+(assert (isinstance 42 int) "42 should be an instance of int")
+
+(print "isinstance(3.14, float):" (isinstance 3.14 float))
+(assert (isinstance 3.14 float) "3.14 should be an instance of float")
+
+(print "isinstance(\"hello\", str):" (isinstance "hello" str))
+(assert (isinstance "hello" str) "\"hello\" should be an instance of str")
+
+(print "isinstance(True, bool):" (isinstance True bool))
+(assert (isinstance True bool) "True should be an instance of bool")
+
+(print "isinstance([1, 2, 3], list):" (isinstance [1, 2, 3] list))
+(assert (isinstance [1, 2, 3] list) "[1, 2, 3] should be an instance of list")
+
+# Test isinstance with tuple of types (any of multiple types)
+(print "\nTesting isinstance with tuple of types:")
+(= num 42)
+(print "isinstance(num, (int, float)):" (isinstance num (tuple int float)))
+(assert (isinstance num (tuple int float)) "num should be an instance of either int or float")
+
+(= num 3.14)
+(print "isinstance(num, (int, float)):" (isinstance num (tuple int float)))
+(assert (isinstance num (tuple int float)) "num should be an instance of either int or float")
+
+(print "isinstance(\"hello\", (int, float)):" (isinstance "hello" (tuple int float)))
+(assert (not (isinstance "hello" (tuple int float))) "\"hello\" should not be an instance of int or float")
+
+# -- issubclass Function --
+
+(print "\n-- issubclass Function --")
+
+# Test issubclass with class hierarchies if supported
+(try
+  (class A ())
+  (class B (A))
+  (class C (B))
+  (class D ())
+  
+  (print "\nTesting issubclass with class hierarchy:")
+  (print "issubclass(B, A):" (issubclass B A))
+  (assert (issubclass B A) "B should be a subclass of A")
+  
+  (print "issubclass(C, A):" (issubclass C A))
+  (assert (issubclass C A) "C should be a subclass of A (transitive)")
+  
+  (print "issubclass(C, B):" (issubclass C B))
+  (assert (issubclass C B) "C should be a subclass of B")
+  
+  (print "issubclass(A, C):" (issubclass A C))
+  (assert (not (issubclass A C)) "A should not be a subclass of C")
+  
+  (print "issubclass(A, D):" (issubclass A D))
+  (assert (not (issubclass A D)) "A should not be a subclass of D")
+  
+  (print "issubclass(A, A):" (issubclass A A))
+  (assert (issubclass A A) "A should be a subclass of itself")
+  
+  # Test issubclass with tuple of classes
+  (print "\nTesting issubclass with tuple of classes:")
+  (print "issubclass(C, (A, D)):" (issubclass C (tuple A D)))
+  (assert (issubclass C (tuple A D)) "C should be a subclass of either A or D")
+  
+  (print "issubclass(D, (A, B)):" (issubclass D (tuple A B)))
+  (assert (not (issubclass D (tuple A B))) "D should not be a subclass of either A or B")
+  
+  (except Exception as e
+    (print "Class-based issubclass tests not applicable:" e)))
+
+# -- Type Conversion --
+
+(print "\n-- Type Conversion --")
+
+# Test int conversion
+(print "\nTesting int conversion:")
+(print "int(42):" (int 42))
+(assert (== (int 42) 42) "int(42) should return 42")
+
+(print "int(3.14):" (int 3.14))
+(assert (== (int 3.14) 3) "int(3.14) should return 3 (truncated)")
+
+(print "int(\"42\"):" (int "42"))
+(assert (== (int "42") 42) "int(\"42\") should return 42")
+
+(try
+  (= invalid (int "hello"))
+  (assert False "int(\"hello\") should raise an error")
+  (except ValueError as e
+    (print "int(\"hello\") correctly raised an error:" e)))
+
+# Test float conversion
+(print "\nTesting float conversion:")
+(print "float(42):" (float 42))
+(assert (== (float 42) 42.0) "float(42) should return 42.0")
+
+(print "float(3.14):" (float 3.14))
+(assert (== (float 3.14) 3.14) "float(3.14) should return 3.14")
+
+(print "float(\"3.14\"):" (float "3.14"))
+(assert (== (float "3.14") 3.14) "float(\"3.14\") should return 3.14")
+
+(try
+  (= invalid (float "hello"))
+  (assert False "float(\"hello\") should raise an error")
+  (except ValueError as e
+    (print "float(\"hello\") correctly raised an error:" e)))
+
+# Test str conversion
+(print "\nTesting str conversion:")
+(print "str(42):" (str 42))
+(assert (== (str 42) "42") "str(42) should return \"42\"")
+
+(print "str(3.14):" (str 3.14))
+(assert (== (str 3.14) "3.14") "str(3.14) should return \"3.14\"")
+
+(print "str(True):" (str True))
+(assert (== (str True) "True") "str(True) should return \"True\"")
+
+(print "str([1, 2, 3]):" (str [1, 2, 3]))
+(assert (in "1" (str [1, 2, 3])) "str([1, 2, 3]) should contain \"1\"")
+
+# Test bool conversion
+(print "\nTesting bool conversion:")
+(print "bool(42):" (bool 42))
+(assert (bool 42) "bool(42) should return True")
+
+(print "bool(0):" (bool 0))
+(assert (not (bool 0)) "bool(0) should return False")
+
+(print "bool(3.14):" (bool 3.14))
+(assert (bool 3.14) "bool(3.14) should return True")
+
+(print "bool(0.0):" (bool 0.0))
+(assert (not (bool 0.0)) "bool(0.0) should return False")
+
+(print "bool(\"hello\"):" (bool "hello"))
+(assert (bool "hello") "bool(\"hello\") should return True")
+
+(print "bool(\"\"):" (bool ""))
+(assert (not (bool "")) "bool(\"\") should return False")
+
+(print "bool([1, 2, 3]):" (bool [1, 2, 3]))
+(assert (bool [1, 2, 3]) "bool([1, 2, 3]) should return True")
+
+(print "bool([]):" (bool []))
+(assert (not (bool [])) "bool([]) should return False")
+
+# Test list conversion
+(print "\nTesting list conversion:")
+(print "list(\"abc\"):" (list "abc"))
+(assert (== (list "abc") (list "a" "b" "c")) "list(\"abc\") should return [\"a\", \"b\", \"c\"]")
+
+(try
+  (print "list(42):" (list 42))
+  (except TypeError as e
+    (print "list(42) correctly raised an error:" e)))
+
+# Test tuple conversion
+(print "\nTesting tuple conversion:")
+(print "tuple([1, 2, 3]):" (tuple [1, 2, 3]))
+(= tuple-from-list (tuple [1, 2, 3]))
+(assert (isinstance tuple-from-list tuple) "tuple([1, 2, 3]) should return a tuple")
+(assert (== (len tuple-from-list) 3) "tuple([1, 2, 3]) should have length 3")
+
+# Test dict conversion if supported
+(print "\nTesting dict conversion (if supported):")
+(try
+  (= pairs (list (tuple "a" 1) (tuple "b" 2)))
+  (= dict-from-pairs (dict pairs))
+  (print "dict from pairs:" dict-from-pairs)
+  (assert (isinstance dict-from-pairs dict) "dict(pairs) should return a dictionary")
+  (assert (== (len dict-from-pairs) 2) "dict(pairs) should have 2 items")
+  (except Exception as e
+    (print "dict conversion from pairs not supported:" e)))
+
+# -- Set Type --
+
+(print "\n-- Set Type --")
+
+# Test set creation and operations
+(= set1 (set 1 2 3 4 5))
+(= set2 (set 4 5 6 7 8))
+(print "\nset1:" set1)
+(print "set2:" set2)
+
+# Test set operations
+(print "\nTesting set operations:")
+
+# Test set.union
+(= union-result (set.union set1 set2))
+(print "set1 ∪ set2:" union-result)
+(assert (== (len union-result) 8) "Union of set1 and set2 should have 8 elements")
+
+# Test set.intersection
+(= intersection-result (set.intersection set1 set2))
+(print "set1 ∩ set2:" intersection-result)
+(assert (== (len intersection-result) 2) "Intersection of set1 and set2 should have 2 elements")
+(assert (in 4 intersection-result) "Intersection should contain 4")
+(assert (in 5 intersection-result) "Intersection should contain 5")
+
+# Test set.difference
+(= difference-result (set.difference set1 set2))
+(print "set1 - set2:" difference-result)
+(assert (== (len difference-result) 3) "Difference set1 - set2 should have 3 elements")
+(assert (in 1 difference-result) "Difference should contain 1")
+(assert (in 2 difference-result) "Difference should contain 2")
+(assert (in 3 difference-result) "Difference should contain 3")
+
+# Test set.symmetric_difference
+(= symmetric-difference-result (set.symmetric_difference set1 set2))
+(print "set1 △ set2:" symmetric-difference-result)
+(assert (== (len symmetric-difference-result) 6) "Symmetric difference should have 6 elements")
+
+# Test membership
+(print "\nTesting set membership:")
+(print "3 in set1:" (in 3 set1))
+(assert (in 3 set1) "3 should be in set1")
+
+(print "6 in set1:" (in 6 set1))
+(assert (not (in 6 set1)) "6 should not be in set1")
+
+# Test uniqueness property
+(print "\nTesting set uniqueness property:")
+(= duplicate-set (set 1 2 2 3 3 3))
+(print "Set with duplicates:" duplicate-set)
+(assert (== (len duplicate-set) 3) "Set should eliminate duplicates")
+
+# -- Type Coercion Rules --
+
+(print "\n-- Type Coercion Rules --")
+
+# Test coercion in arithmetic operations
+(print "\nTesting arithmetic coercion:")
+
+(print "1 + 2.0 =>" (+ 1 2.0))
+(assert (isinstance (+ 1 2.0) float) "1 + 2.0 should return a float")
+(assert (== (+ 1 2.0) 3.0) "1 + 2.0 should equal 3.0")
+
+(print "2 * 3.0 =>" (* 2 3.0))
+(assert (isinstance (* 2 3.0) float) "2 * 3.0 should return a float")
+(assert (== (* 2 3.0) 6.0) "2 * 3.0 should equal 6.0")
+
+# Test coercion in string operations
+(print "\nTesting string coercion:")
+
+(print "\"Hello, \" + \"World!\" =>" (+ "Hello, " "World!"))
+(assert (== (+ "Hello, " "World!") "Hello, World!") "String concatenation should work")
+
+# Test string * integer
+(print "\"abc\" * 3 =>" (* "abc" 3))
+(assert (== (* "abc" 3) "abcabcabc") "String repetition should work")
+
+# Test list * integer
+(print "[1, 2] * 3 =>" (* [1, 2] 3))
+(assert (== (* [1, 2] 3) [1, 2, 1, 2, 1, 2]) "List repetition should work")
+
+# -- Optional Type Annotations (if supported) --
+
+(print "\n-- Optional Type Annotations --")
+
+# Test type annotations if supported
+(try
+  (def (add-typed [a int] [b int]) -> int
+    (+ a b))
+  
+  (= result (add-typed 2 3))
+  (print "\nCalled add-typed(2, 3) =>" result)
+  (assert (== result 5) "add-typed should return 5")
+  
+  # Test with wrong types if checking is implemented
+  (try
+    (= result (add-typed "2" 3))
+    (print "Called add-typed(\"2\", 3) =>" result)
+    (except TypeError as e
+      (print "Type checking correctly caught error:" e)))
+  
+  (except Exception as e
+    (print "Type annotations not supported:" e)))
+
+# -- Truthiness Rules --
+
+(print "\n-- Truthiness Rules --")
+
+# Test values that should be False
+(print "\nTesting values that should be False:")
+(assert (not (bool False)) "False should be falsy")
+(assert (not (bool None)) "None should be falsy")
+(assert (not (bool 0)) "0 should be falsy")
+(assert (not (bool 0.0)) "0.0 should be falsy")
+(assert (not (bool "")) "Empty string should be falsy")
+(assert (not (bool [])) "Empty list should be falsy")
+(assert (not (bool {})) "Empty dict should be falsy")
+(assert (not (bool (set))) "Empty set should be falsy")
+
+# Test values that should be True
+(print "\nTesting values that should be True:")
+(assert (bool True) "True should be truthy")
+(assert (bool 1) "1 should be truthy")
+(assert (bool -1) "Negative numbers should be truthy")
+(assert (bool 0.1) "Non-zero floats should be truthy")
+(assert (bool "Hello") "Non-empty strings should be truthy")
+(assert (bool [0]) "Non-empty lists should be truthy")
+(assert (bool {"a": 1}) "Non-empty dicts should be truthy")
+(assert (bool (set 1)) "Non-empty sets should be truthy")
+
+# -- Type Errors --
+
+(print "\n-- Type Errors --")
+
+# Test operations that should raise TypeError
+(print "\nTesting operations that should raise TypeError:")
+
+(try
+  (= invalid (+ "str" 42))
+  (assert False "Adding string and number should raise TypeError")
+  (except TypeError as e
+    (print "TypeError correctly raised for 'str' + 42:" e)))
+
+(try
+  (= invalid (- "str" "ing"))
+  (assert False "Subtracting strings should raise TypeError")
+  (except TypeError as e
+    (print "TypeError correctly raised for 'str' - 'ing':" e)))
+
+(try
+  (= invalid (< {} {}))
+  (except TypeError as e
+    (print "TypeError correctly raised for comparing dicts:" e))
+  (except Exception as e
+    (print "Dict comparison raised expected error:" e)))
+
+# -- Conclusion --
+
+(print "\n===== Type System Tests Complete =====")

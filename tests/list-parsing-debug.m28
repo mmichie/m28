@@ -1,0 +1,43 @@
+;; List parsing debug tests
+;; Different ways to define lists
+
+;; Basic list operations
+(println "Testing basic list assignments...")
+
+;; Standard Lisp list notation
+(def standard-list '(1 2 3))
+(println "Standard list:" standard-list)
+
+;; Square bracket notation with spaces
+(def a [1 2 3])
+(println "Square bracket with spaces:" a)
+
+;; Square bracket notation with commas
+(def b [1,2,3])
+(println "Square bracket with commas:" b)
+
+;; Mixed elements
+(def c [1, "two", 3.0])
+(println "Mixed elements:" c)
+
+;; Nested lists
+(def d [1, [2, 3], 4])
+(println "Nested list:" d)
+
+;; Assignment with = instead of def
+(= e [1,2,3])
+(println "Assigned with =:" e)
+
+;; Testing different formats of assignment
+(println "\nTesting different assignment formats...")
+(def f 1)
+(println "f:" f)
+
+(= g 1)
+(println "g:" g)
+
+(def h "string")
+(println "h:" h)
+
+(= i "string")
+(println "i:" i)

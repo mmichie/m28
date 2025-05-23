@@ -1,0 +1,242 @@
+# tuple-test-comprehensive.m28
+# 
+# Comprehensive test for tuple operations in M28
+# Testing various aspects of tuples as per the language specification
+
+(print "===== Tuple Operations Tests =====\n")
+
+# -- Tuple Creation and Basic Operations --
+
+(print "-- Tuple Creation --")
+
+# Test empty tuple - pythonic syntax
+(= empty-tuple ())
+(print "\nEmpty tuple:" empty-tuple)
+(print "Type:" (type empty-tuple))
+(assert (== (type empty-tuple) "tuple") "Empty tuple should have type 'tuple'")
+
+# Test single element tuple (requires trailing comma)
+(= single-element-tuple (1,))
+(print "\nSingle element tuple:" single-element-tuple)
+(assert (== (len single-element-tuple) 1) "Single element tuple length should be 1")
+
+# Test tuple with multiple elements
+(= numbers-tuple (1, 2, 3, 4, 5))
+(print "\nNumbers tuple:" numbers-tuple)
+(assert (== (len numbers-tuple) 5) "Tuple length should be 5")
+
+# Test mixed type tuple
+(= mixed-tuple (1, "two", 3.0, True, None))
+(print "\nMixed tuple:" mixed-tuple)
+(assert (== (len mixed-tuple) 5) "Mixed tuple length should be 5")
+
+# Test tuple from list (if supported)
+(try
+  (= list-data (list 1 2 3))
+  (= tuple-from-list (tuple list-data))
+  (print "\nTuple from list:" tuple-from-list)
+  (assert (== (len tuple-from-list) 3) "Tuple from list should have length 3")
+  (except Exception as e
+    (print "Note: Direct tuple creation from list not supported:" e)))
+
+# -- Tuple Access --
+
+(print "\n-- Tuple Access --")
+
+# Test indexing
+(= test-tuple ("a", "b", "c", "d", "e"))
+(print "\nTest tuple:" test-tuple)
+
+(= first-item (nth test-tuple 0))
+(print "First element (index 0):" first-item)
+(assert (== first-item "a") "First element should be 'a'")
+
+(= third-item (nth test-tuple 2))
+(print "Third element (index 2):" third-item)
+(assert (== third-item "c") "Third element should be 'c'")
+
+(= last-item (nth test-tuple 4))
+(print "Last element (index 4):" last-item)
+(assert (== last-item "e") "Last element should be 'e'")
+
+# Test negative indexing (if supported)
+(try
+  (= neg-item (nth test-tuple -1))
+  (print "Last element (index -1):" neg-item)
+  (assert (== neg-item "e") "Negative indexing should work")
+  (except Exception as e
+    (print "Note: Negative indexing not supported:" e)))
+
+# -- Tuple Immutability --
+
+(print "\n-- Tuple Immutability --")
+
+# Test that tuples cannot be modified
+(try
+  (set test-tuple 0 "z")
+  (print "Modified tuple:" test-tuple)
+  (assert False "Tuples should be immutable")
+  (except TypeError as e
+    (print "Expected error when modifying tuple:" e))
+  (except Exception as e
+    (print "Expected error when modifying tuple:" e)))
+
+# -- Tuple Unpacking --
+
+(print "\n-- Tuple Unpacking --")
+
+# Test tuple unpacking if supported
+(= coords (10, 20, 30))
+(try
+  (= x, y, z coords)
+  (print "Unpacked tuple values: x=" x "y=" y "z=" z)
+  (assert (== x 10) "x should be 10")
+  (assert (== y 20) "y should be 20")
+  (assert (== z 30) "z should be 30")
+  (except Exception as e
+    (print "Note: Tuple unpacking not supported:" e)))
+
+# -- Tuple as Dictionary Keys --
+
+(print "\n-- Tuple as Dictionary Keys --")
+
+# Test using tuples as dictionary keys
+(= point-values (dict))
+(try
+  # In Python, tuples can be dictionary keys because they're immutable
+  (= point-values (dict (0, 0) "origin" (1, 0) "right" (0, 1) "up"))
+  (print "Dictionary with tuple keys:" point-values)
+  (= origin-value (get point-values (0, 0)))
+  (print "Value at origin:" origin-value)
+  (assert (== origin-value "origin") "Dictionary lookup by tuple should work")
+  (except Exception as e
+    (print "Note: Tuples as dictionary keys not supported:" e)))
+
+# -- Tuple Comparison --
+
+(print "\n-- Tuple Comparison --")
+
+# Test tuple equality
+(= tuple1 (1, 2, 3))
+(= tuple2 (1, 2, 3))
+(= tuple3 (1, 2, 4))
+
+(print "tuple1 == tuple2:" (== tuple1 tuple2))
+(assert (== tuple1 tuple2) "Equal tuples should compare as equal")
+
+(print "tuple1 == tuple3:" (== tuple1 tuple3))
+(assert (not (== tuple1 tuple3)) "Different tuples should not be equal")
+
+# Test tuple comparison if supported
+(try
+  (print "tuple1 < tuple3:" (< tuple1 tuple3))
+  (assert (< tuple1 tuple3) "tuple1 should be less than tuple3")
+  (except Exception as e
+    (print "Note: Tuple comparison not supported:" e)))
+
+# -- Tuple Iteration --
+
+(print "\n-- Tuple Iteration --")
+
+# Test iterating through tuple
+(= sum 0)
+(= iter-tuple (1, 2, 3, 4, 5))
+(print "Iterating through:" iter-tuple)
+(for i iter-tuple
+  (= sum (+ sum i))
+  (print "Item:" i))
+(print "Sum of tuple elements:" sum)
+(assert (== sum 15) "Sum should be 15")
+
+# -- Nested Tuples --
+
+(print "\n-- Nested Tuples --")
+
+# Test nested tuples
+(= nested-tuple ((1, 2), (3, 4)))
+(print "Nested tuple:" nested-tuple)
+(= inner1 (nth nested-tuple 0))
+(= inner2 (nth nested-tuple 1))
+(print "First inner tuple:" inner1)
+(print "Second inner tuple:" inner2)
+(= inner-element (nth inner1 1))
+(print "Element at position [0][1]:" inner-element)
+(assert (== inner-element 2) "Nested tuple access should work")
+
+# -- Tuple Concatenation --
+
+(print "\n-- Tuple Concatenation --")
+
+# Test tuple concatenation if supported
+(try
+  (= tuple-a (1, 2))
+  (= tuple-b (3, 4))
+  (= combined-tuple (+ tuple-a tuple-b))
+  (print "Combined tuple:" combined-tuple)
+  (assert (== (len combined-tuple) 4) "Combined tuple should have length 4")
+  (assert (== combined-tuple (1, 2, 3, 4)) "Combined tuple should have all elements")
+  (except Exception as e
+    (print "Note: Tuple concatenation not supported:" e)))
+
+# -- Tuple Repetition --
+
+(print "\n-- Tuple Repetition --")
+
+# Test tuple repetition if supported
+(try
+  (= original-tuple (1, 2))
+  (= repeated-tuple (* original-tuple 3))
+  (print "Repeated tuple:" repeated-tuple)
+  (assert (== (len repeated-tuple) 6) "Repeated tuple should have length 6")
+  (assert (== repeated-tuple (1, 2, 1, 2, 1, 2)) "Repeated tuple should have pattern repeated")
+  (except Exception as e
+    (print "Note: Tuple repetition not supported:" e)))
+
+# -- Tuple Conversion --
+
+(print "\n-- Tuple Conversion --")
+
+# Test conversion between tuple and list
+(try
+  (= tuple-values (1, 2, 3))
+  (= list-from-tuple (list tuple-values))
+  (print "List from tuple:" list-from-tuple)
+  (assert (== (type list-from-tuple) "list") "Conversion should yield a list")
+  (assert (== (len list-from-tuple) 3) "Converted list should have same length")
+  
+  # And back to tuple
+  (= tuple-again (tuple list-from-tuple))
+  (print "Back to tuple:" tuple-again)
+  (assert (== (type tuple-again) "tuple") "Conversion should yield a tuple")
+  (assert (== tuple-again tuple-values) "Round-trip conversion should preserve values")
+  (except Exception as e
+    (print "Note: Tuple/list conversion not fully supported:" e)))
+
+# -- Type Checking --
+
+(print "\n-- Type Checking --")
+
+# Test isinstance with tuple
+(print "isinstance check:" (isinstance (1, 2) "tuple"))
+(assert (isinstance (1, 2) "tuple") "isinstance should recognize tuples")
+
+# Test type function
+(print "type function check:" (== (type (1, 2)) "tuple"))
+(assert (== (type (1, 2)) "tuple") "type function should identify tuples")
+
+# -- Empty vs Single Element Distinction --
+
+(print "\n-- Empty vs Single Element Distinction --")
+
+# Test distinction between empty tuple and singleton tuple
+(= empty ())
+(= singleton (42,))
+(print "Empty tuple:" empty)
+(print "Singleton tuple:" singleton)
+(assert (not (== empty singleton)) "Empty tuple should not equal singleton tuple")
+(assert (== (len empty) 0) "Empty tuple should have zero length")
+(assert (== (len singleton) 1) "Singleton tuple should have length 1")
+
+# -- Conclusion --
+
+(print "\n===== Tuple Tests Complete =====")

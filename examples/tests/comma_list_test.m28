@@ -1,0 +1,51 @@
+# Tests for comma-separated list syntax
+# This test validates that comma-separated list syntax works correctly
+
+(print "=== Comma-Separated List Tests ===")
+
+# Basic list creation
+(= empty [])
+(print "Empty list:" empty)
+
+(= simple_list [1, 2, 3, 4, 5])
+(print "Simple list:" simple_list)
+
+# Mixed type list
+(= mixed [1, "two", 3.0, True, None])
+(print "Mixed type list:" mixed)
+
+# Nested lists
+(= nested [[1, 2], [3, 4], [5, 6]])
+(print "Nested list:" nested)
+
+# Define a different variable for this test
+(= numbers [1, 2, 3, 4, 5])
+# Access and validate
+(print "First element:" (nth numbers 0))
+(print "Last element:" (nth numbers 4))
+(print "Length:" (len numbers))
+
+# Lists with expressions
+(= expr_list [1, (+ 2 3), (* 2 3), 7])
+(print "List with expressions:" expr_list)
+
+# List comprehension with comma-separated results
+(= squares [x for x [1, 2, 3, 4, 5]])
+(print "List comprehension:" squares)
+
+# List operations
+(= list1 [1, 2, 3])
+(= list2 [4, 5, 6])
+(= combined (+ list1 list2))
+(print "Concatenated list:" combined)
+
+# Function with list argument
+(def sum-list (lst)
+  (= total 0)
+  (for item lst
+    (= total (+ total item)))
+  total)
+
+(print "Sum of list:" (sum-list [10, 20, 30]))
+
+(print "=== All tests completed successfully ===")
