@@ -9,6 +9,95 @@ import (
 
 // InitializeTypeRegistry sets up type descriptors for all built-in types
 func InitializeTypeRegistry() {
+	// Register task type
+	RegisterType(&TypeDescriptor{
+		Name:       "task",
+		PythonName: "Task",
+		BaseType:   Type("task"),
+		Methods: map[string]*MethodDescriptor{
+			"result": {
+				Name:    "result",
+				Arity:   0,
+				Doc:     "Get the result of the task (blocks until complete)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					task := receiver.(*Task)
+					return task.Wait()
+				},
+			},
+			"done": {
+				Name:    "done",
+				Arity:   0,
+				Doc:     "Check if the task is finished",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					task := receiver.(*Task)
+					return BoolValue(task.IsFinished()), nil
+				},
+			},
+		},
+	})
+
+	// Register channel type
+	RegisterType(&TypeDescriptor{
+		Name:       "channel",
+		PythonName: "Channel",
+		BaseType:   Type("channel"),
+		Methods: map[string]*MethodDescriptor{
+			"send": {
+				Name:    "send",
+				Arity:   1,
+				Doc:     "Send a value to the channel",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					if len(args) != 1 {
+						return nil, fmt.Errorf("send() takes exactly one argument")
+					}
+					ch := receiver.(*Channel)
+					err := ch.Send(args[0])
+					if err != nil {
+						return nil, err
+					}
+					return Nil, nil
+				},
+			},
+			"receive": {
+				Name:    "receive",
+				Arity:   0,
+				Doc:     "Receive a value from the channel",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					ch := receiver.(*Channel)
+					return ch.Receive()
+				},
+			},
+			"close": {
+				Name:    "close",
+				Arity:   0,
+				Doc:     "Close the channel",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					ch := receiver.(*Channel)
+					err := ch.Close()
+					if err != nil {
+						return nil, err
+					}
+					return Nil, nil
+				},
+			},
+			"__len__": {
+				Name:    "__len__",
+				Arity:   0,
+				Doc:     "Get the number of values in the channel buffer",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					ch := receiver.(*Channel)
+					return NumberValue(len(ch.GetChan())), nil
+				},
+			},
+		},
+	})
+
 	// Register generator type
 	RegisterType(&TypeDescriptor{
 		Name:       "generator",

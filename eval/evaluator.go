@@ -137,6 +137,9 @@ func init() {
 	
 	// Register context manager forms
 	RegisterContextForms()
+	
+	// Register async/concurrent forms
+	RegisterAsyncForms()
 }
 
 // RegisterSpecialForm registers a special form

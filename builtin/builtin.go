@@ -37,6 +37,9 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	
 	// Register utility functions
 	RegisterUtilityFunctions(ctx)
+	
+	// Register async/concurrent functions
+	RegisterAsyncBuiltins(ctx)
 }
 
 // registerArithmeticBuiltins registers arithmetic functions
