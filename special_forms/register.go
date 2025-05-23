@@ -30,6 +30,12 @@ func registerControlFlowForms() {
 	
 	// return: Return from a function
 	eval.RegisterSpecialForm("return", returnForm)
+	
+	// Loop forms
+	eval.RegisterSpecialForm("while", whileForm)
+	eval.RegisterSpecialForm("for", forForm)
+	eval.RegisterSpecialForm("break", breakForm)
+	eval.RegisterSpecialForm("continue", continueForm)
 }
 
 // registerDefinitionForms registers special forms for definitions
@@ -83,4 +89,24 @@ func importForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // returnForm implements the 'return' special form
 func returnForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.ReturnForm(args, ctx)
+}
+
+// whileForm implements the 'while' special form
+func whileForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.WhileFormHandler(args, ctx)
+}
+
+// forForm implements the 'for' special form
+func forForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.ForFormHandler(args, ctx)
+}
+
+// breakForm implements the 'break' special form
+func breakForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.BreakFormHandler(args, ctx)
+}
+
+// continueForm implements the 'continue' special form
+func continueForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.ContinueFormHandler(args, ctx)
 }

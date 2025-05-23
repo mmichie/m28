@@ -120,6 +120,8 @@ func ifForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return core.Nil, nil
 }
 
+
+
 // defForm implements the def special form to define functions and variables
 func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {
@@ -223,6 +225,7 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return value, nil
 }
 
+
 // assignForm implements the = special form for assignment
 func assignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
@@ -254,6 +257,7 @@ func assignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("invalid assignment target: %v", target)
 	}
 }
+
 
 // quoteForm implements the quote special form
 func quoteForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
@@ -291,6 +295,8 @@ func doForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return result, nil
 }
 
+
+
 // returnForm implements the return special form
 func returnForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) > 1 {
@@ -309,6 +315,7 @@ func returnForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	
 	return &ReturnValue{Value: value}, nil
 }
+
 
 // importForm implements the import special form
 func importForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
