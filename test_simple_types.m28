@@ -1,4 +1,0 @@
-; Simple type test
-(print "Testing...")
-(= x 10)
-(print x)
