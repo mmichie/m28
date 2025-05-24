@@ -36,6 +36,15 @@ Based on testing the examples, here are the language features that need to be im
 - ✓ Dot notation for dict access: `(. dict "key")`
 - ✓ Comments with `;` (but `#` doesn't work)
 
+## Additional Working Features Found
+- ✓ String concatenation with `+`
+- ✓ Comparison operators: `<=`, `>=`, `!=`
+- ✓ Built-in functions: `min`, `max`, `sum`
+- ✓ `return` statement
+- ✓ `begin` blocks
+- ✓ `with` statement (but no context managers)
+- ✓ `mod` operator (but not `%`)
+
 ## Features That Need Implementation/Fixes
 
 ### 1. Indexing and Slicing
@@ -71,16 +80,70 @@ Based on testing the examples, here are the language features that need to be im
 - [ ] Multiple variable unpacking: `(for ((k v) dict.items()) ...)`
 - [ ] Enumerate: `(for ((i val) (enumerate list)) ...)`
 
+### 7. Exception Handling
+- [ ] `try/except` blocks don't work (gives "name error" or "error in builtin")
+- [ ] Multiple except clauses: `(except ZeroDivisionError e ...)`
+- [ ] Finally clause
+
+### 8. Advanced Operators
+- [ ] Power operator `**` (gives "name error")
+- [ ] Modulo operator `%` (gives "name error", only `mod` works)
+- [ ] Augmented assignment: `+=`, `-=`, etc. (gives "name error")
+
+### 9. Data Structure Literals
+- [ ] Set literals `{1, 2, 3}` - parser thinks it's a dict
+- [ ] Tuple literals `(1, 2, 3)` - gives "name error"
+- [ ] List comprehensions `[x*2 for x in seq]` - treated as literal list
+
+### 10. Control Flow
+- [ ] `cond` statement gives "name error"
+- [ ] `elif` in if statements needs testing
+
+### 11. Module System
+- [ ] `import` gives "module not found" even for standard modules
+- [ ] No standard library modules available
+
+### 12. Function Features
+- [ ] `*args` and `**kwargs` give "name error"
+- [ ] Keyword arguments in function calls
+- [ ] Default parameter values
+
+### 13. Built-in Functions Missing
+- [ ] `abs` - absolute value
+- [ ] `sorted` - sort a sequence
+- [ ] `reversed` - reverse a sequence
+- [ ] `enumerate` - get index/value pairs
+- [ ] `zip` - combine sequences
+- [ ] `map`, `filter`, `reduce` - functional operations
+- [ ] `isinstance`, `issubclass` - type checking
+- [ ] `getattr`, `setattr`, `hasattr` - attribute manipulation
+- [ ] `all`, `any` - boolean operations on sequences
+- [ ] `round`, `int`, `float`, `str` - type conversions
+
+### 14. Object Protocol
+- [ ] `__name__ == "__main__"` idiom
+- [ ] Magic methods beyond `__init__`
+- [ ] Property decorators
+- [ ] Static methods, class methods
+
+### 15. File I/O
+- [ ] `open` function doesn't support context manager protocol
+- [ ] No file object methods like `.read()`, `.write()`, etc.
+
 ## Implementation Priority
 
 Based on testing, the most critical features to implement first are:
 
 1. **Comment syntax** - Switch from `;` to `#`
 2. **F-strings** - Essential for many examples
-3. **List/dict indexing** - Need a way to access elements
-4. **Classes** - Currently broken
-5. **For loop syntax** - Consider supporting both `(for (i seq))` and `(for i seq)`
+3. **List/dict indexing** - Need a way to access elements (maybe `nth` function?)
+4. **Classes** - Currently broken with "parent class 'def' not found"
+5. **Basic operators**: `**` for power, `%` for modulo
 6. **in operator** - Common operation
+7. **try/except** - Exception handling
+8. **Built-in functions** - `abs`, `sorted`, `enumerate`, etc.
+9. **List comprehensions** - Currently parsed as literal lists
+10. **For loop syntax** - Consider supporting `(for i seq)` without extra parens
 
 ## Notes on Syntax Differences
 
