@@ -1,0 +1,82 @@
+# Basic Functions in M28
+# Use def ONLY for functions (never for variables)
+
+# Simple function with no parameters
+(def say_hello ()
+  (print "Hello from a function!"))
+
+# Call the function
+(say_hello)
+
+# Function with parameters
+(def greet (name)
+  (print f"Hello, {name}!"))
+
+(greet "Alice")
+(greet "Bob")
+
+# Function with return value
+(def add (a b)
+  (+ a b))
+
+(= result (add 5 3))
+(print "5 + 3 =" result)
+
+# Function with multiple parameters
+(def introduce (name age city)
+  (print f"{name} is {age} years old and lives in {city}"))
+
+(introduce "Charlie" 25 "New York")
+
+# Function with default parameters
+(def greet_with_default (name="World")
+  (print f"Hello, {name}!"))
+
+(greet_with_default)          # Uses default
+(greet_with_default "Python") # Override default
+
+# Function with multiple return values
+(def calculate (a b)
+  ((+ a b), (- a b), (* a b), (/ a b)))
+
+(= (sum_val, diff, prod, quot) (calculate 10 2))
+(print "\nCalculations for 10 and 2:")
+(print "Sum:" sum_val)
+(print "Difference:" diff)
+(print "Product:" prod)
+(print "Quotient:" quot)
+
+# Function with docstring (convention)
+(def factorial (n)
+  # Calculate factorial of n recursively
+  (if (<= n 1)
+      1
+      (* n (factorial (- n 1)))))
+
+(print "\nFactorials:")
+(print "5! =" (factorial 5))
+(print "10! =" (factorial 10))
+
+# Functions are first-class values
+(= my_func add)
+(print "\nFunction as value:")
+(print "my_func(7, 3) =" (my_func 7 3))
+
+# Nested functions
+(def outer (x)
+  (def inner (y)
+    (+ x y))
+  inner)  # Return the inner function
+
+(= add_5 (outer 5))
+(print "\nNested function (closure):")
+(print "add_5(3) =" (add_5 3))
+(print "add_5(10) =" (add_5 10))
+
+# Variadic functions (variable arguments)
+(def sum_all (*args)
+  (reduce + args 0))
+
+(print "\nVariadic function:")
+(print "sum_all(1, 2, 3) =" (sum_all 1 2 3))
+(print "sum_all(1, 2, 3, 4, 5) =" (sum_all 1 2 3 4 5))

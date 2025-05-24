@@ -1,0 +1,150 @@
+# Advanced File Operations in M28
+# File manipulation, directory operations, and path handling
+
+(import os)
+(import shutil)
+(import pathlib)
+
+# File existence and properties
+(def file_info (filepath)
+  (if (os.path.exists filepath)
+    (begin
+      (print f"File: {filepath}")
+      (print f"Size: {os.path.getsize filepath} bytes")
+      (print f"Is file: {os.path.isfile filepath}")
+      (print f"Is directory: {os.path.isdir filepath}")
+      (print f"Last modified: {os.path.getmtime filepath}"))
+    (print f"File does not exist: {filepath}")))
+
+(file_info "example.txt")
+
+# Working with paths
+(= current_dir (os.getcwd))
+(print f"Current directory: {current_dir}")
+
+# Join paths properly
+(= data_dir (os.path.join current_dir "data"))
+(= file_path (os.path.join data_dir "myfile.txt"))
+(print f"Full path: {file_path}")
+
+# Path manipulation with pathlib
+(= path (pathlib.Path "data/files/document.txt"))
+(print f"Name: {path.name}")          # document.txt
+(print f"Stem: {path.stem}")          # document
+(print f"Suffix: {path.suffix}")      # .txt
+(print f"Parent: {path.parent}")      # data/files
+
+# Create directories
+(def create_directory (dirpath)
+  (try
+    (os.makedirs dirpath exist_ok=True)
+    (print f"Created directory: {dirpath}")
+    (except Exception e
+      (print f"Error creating directory: {e}"))))
+
+(create_directory "output/reports/2024")
+
+# List directory contents
+(def list_files (directory pattern="*")
+  (= path (pathlib.Path directory))
+  (if (path.exists)
+    (for file (path.glob pattern)
+      (print f"  {file.name} ({'dir' if file.is_dir else 'file'})"))
+    (print f"Directory not found: {directory}")))
+
+(print "\nFiles in current directory:")
+(list_files ".")
+
+(print "\nPython files only:")
+(list_files "." "*.py")
+
+# Copy files
+(def copy_file (source dest)
+  (try
+    (shutil.copy2 source dest)  # copy2 preserves metadata
+    (print f"Copied {source} to {dest}")
+    (except Exception e
+      (print f"Error copying file: {e}"))))
+
+# Move/rename files
+(def move_file (source dest)
+  (try
+    (shutil.move source dest)
+    (print f"Moved {source} to {dest}")
+    (except Exception e
+      (print f"Error moving file: {e}"))))
+
+# Delete files and directories
+(def delete_file (filepath)
+  (try
+    (if (os.path.isfile filepath)
+      (begin
+        (os.remove filepath)
+        (print f"Deleted file: {filepath}"))
+      (if (os.path.isdir filepath)
+        (begin
+          (shutil.rmtree filepath)
+          (print f"Deleted directory: {filepath}"))
+        (print f"Path not found: {filepath}")))
+    (except Exception e
+      (print f"Error deleting: {e}"))))
+
+# File searching
+(def find_files (directory pattern)
+  (= matches [])
+  (= path (pathlib.Path directory))
+  (for file (path.rglob pattern)  # recursive glob
+    (matches.append str file))
+  (return matches))
+
+# Find all .m28 files
+(= m28_files (find_files "." "*.m28"))
+(print f"\nFound {len m28_files} M28 files")
+
+# Temporary files
+(import tempfile)
+
+(def work_with_temp_file ()
+  # Create temporary file
+  (with (tempfile.NamedTemporaryFile mode="w" delete=False) as tmp
+    (= temp_name tmp.name)
+    (tmp.write "Temporary data\n")
+    (print f"Created temp file: {temp_name}"))
+  
+  # Use the temp file
+  (with (open temp_name "r") as f
+    (print f"Temp file contents: {f.read}"))
+  
+  # Clean up
+  (os.unlink temp_name)
+  (print "Temp file deleted"))
+
+(work_with_temp_file)
+
+# Watch for file changes (simple version)
+(def watch_file (filepath interval=1)
+  (= last_modified 0)
+  (print f"Watching {filepath} for changes...")
+  (while True
+    (if (os.path.exists filepath)
+      (begin
+        (= current_modified (os.path.getmtime filepath))
+        (if (!= current_modified last_modified)
+          (begin
+            (print f"File changed at {current_modified}")
+            (= last_modified current_modified)))))
+    (time.sleep interval)))
+
+# File compression
+(import zipfile)
+
+(def create_zip (zip_name files)
+  (with (zipfile.ZipFile zip_name "w") as zf
+    (for file files
+      (zf.write file)
+      (print f"Added {file} to {zip_name}"))))
+
+(def extract_zip (zip_name extract_to=".")
+  (with (zipfile.ZipFile zip_name "r") as zf
+    (zf.extractall extract_to)
+    (print f"Extracted {zip_name} to {extract_to}")))

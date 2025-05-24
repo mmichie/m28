@@ -1,0 +1,116 @@
+# Conditional Statements in M28
+
+# Simple if statement
+(= age 18)
+(if (>= age 18)
+    (print "You are an adult"))
+
+# if-else
+(= score 75)
+(if (>= score 60)
+    (print "Pass")
+    (print "Fail"))
+
+# if-elif-else chain
+(= grade 85)
+(if (>= grade 90)
+    (print "Grade: A")
+    (elif (>= grade 80)
+        (print "Grade: B")
+        (elif (>= grade 70)
+            (print "Grade: C")
+            (elif (>= grade 60)
+                (print "Grade: D")
+                (print "Grade: F")))))
+
+# Conditional expression (ternary-like)
+(= status (if (>= age 18) "adult" "minor"))
+(print f"\nStatus: {status}")
+
+# Multiple conditions with and/or
+(= temperature 22)
+(= is_raining False)
+
+(if (and (>= temperature 20) (not is_raining))
+    (print "\nNice weather for a walk!"))
+
+(if (or (< temperature 0) (> temperature 35))
+    (print "Extreme temperature!")
+    (print "Temperature is moderate"))
+
+# Nested conditionals
+(= user_type "member")
+(= years_member 3)
+
+(if (== user_type "member")
+    (if (>= years_member 5)
+        (print "\nGold member benefits")
+        (elif (>= years_member 2)
+            (print "\nSilver member benefits")
+            (print "\nBasic member benefits")))
+    (print "\nGuest access only"))
+
+# Checking multiple values
+(= day "Saturday")
+(if (or (== day "Saturday") (== day "Sunday"))
+    (print "\nIt's the weekend!")
+    (print "\nIt's a weekday"))
+
+# Using in for membership testing
+(= valid_colors ["red", "green", "blue"])
+(= chosen_color "green")
+
+(if (in chosen_color valid_colors)
+    (print f"\n{chosen_color} is a valid color")
+    (print f"\n{chosen_color} is not valid"))
+
+# Truthiness testing
+(= items [])
+(if items
+    (print "\nList has items")
+    (print "\nList is empty"))
+
+(= name "")
+(if name
+    (print f"Hello, {name}")
+    (print "Name is not set"))
+
+# Pattern-like matching with elif
+(= command "start")
+
+(if (== command "start")
+    (print "\nStarting the system...")
+    (elif (== command "stop")
+        (print "\nStopping the system...")
+        (elif (== command "restart")
+            (print "\nRestarting the system...")
+            (print "\nUnknown command"))))
+
+# Conditional with early return
+(def check_password (password)
+  (if (< (len password) 8)
+      (return "Password too short"))
+  (if (not (any (lambda (c) (in c "0123456789")) password))
+      (return "Password must contain a number"))
+  (if (not (any (lambda (c) (in c "ABCDEFGHIJKLMNOPQRSTUVWXYZ")) password))
+      (return "Password must contain an uppercase letter"))
+  "Password is valid")
+
+(print "\nPassword validation:")
+(print (check_password "abc"))
+(print (check_password "abcdefgh"))
+(print (check_password "abcdefgh1"))
+(print (check_password "Abcdefgh1"))
+
+# Conditional dictionary lookup
+(= responses {
+  "yes": "Great! Let's proceed.",
+  "no": "Maybe next time.",
+  "maybe": "Take your time to decide."
+})
+
+(= user_input "yes")
+(= response (if (in user_input responses)
+                responses.user_input
+                "I don't understand your response"))
+(print f"\nResponse: {response}")

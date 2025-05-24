@@ -1,0 +1,106 @@
+# Advanced Class Features in M28
+# Static methods, class methods, properties, and operator overloading
+
+# Class with various method types
+(class BankAccount
+  # Class variable
+  (= total_accounts 0)
+  
+  (def __init__ (self owner balance=0)
+    (= self.owner owner)
+    (= self._balance balance)  # Convention: _ for private
+    (= BankAccount.total_accounts (+ BankAccount.total_accounts 1))
+    (= self.account_number BankAccount.total_accounts))
+  
+  # Property getter
+  (def balance (self)
+    (return self._balance))
+  
+  # Property setter
+  (def set_balance (self value)
+    (if (< value 0)
+      (raise ValueError "Balance cannot be negative")
+      (= self._balance value)))
+  
+  # Regular method
+  (def deposit (self amount)
+    (if (> amount 0)
+      (begin
+        (= self._balance (+ self._balance amount))
+        (print f"Deposited ${amount}. New balance: ${self._balance}"))
+      (print "Amount must be positive")))
+  
+  # Static method
+  (def validate_amount (amount)
+    (return (> amount 0)))
+  
+  # Class method
+  (def get_total_accounts ()
+    (return BankAccount.total_accounts))
+  
+  # String representation
+  (def __str__ (self)
+    (return f"Account #{self.account_number} ({self.owner}): ${self._balance}")))
+
+# Create accounts
+(= acc1 (BankAccount "Alice" 1000))
+(= acc2 (BankAccount "Bob"))
+
+(print acc1)  # "Account #1 (Alice): $1000"
+(print acc2)  # "Account #2 (Bob): $0"
+
+# Use methods
+(acc1.deposit 500)   # "Deposited $500. New balance: $1500"
+(acc2.deposit 250)   # "Deposited $250. New balance: $250"
+
+# Access property
+(print f"Alice's balance: ${acc1.balance}")
+
+# Use static method
+(if (BankAccount.validate_amount 100)
+  (print "Valid amount")
+  (print "Invalid amount"))
+
+# Use class method
+(print f"Total accounts: {BankAccount.get_total_accounts}")
+
+# Operator overloading example
+(class Vector
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y))
+  
+  # Addition
+  (def __add__ (self other)
+    (return (Vector (+ self.x other.x) (+ self.y other.y))))
+  
+  # Subtraction
+  (def __sub__ (self other)
+    (return (Vector (- self.x other.x) (- self.y other.y))))
+  
+  # Multiplication (scalar)
+  (def __mul__ (self scalar)
+    (return (Vector (* self.x scalar) (* self.y scalar))))
+  
+  # Equality
+  (def __eq__ (self other)
+    (return (and (== self.x other.x) (== self.y other.y))))
+  
+  # String representation
+  (def __str__ (self)
+    (return f"Vector({self.x}, {self.y})"))
+  
+  # Length/magnitude
+  (def magnitude (self)
+    (return (sqrt (+ (* self.x self.x) (* self.y self.y))))))
+
+# Use operator overloading
+(= v1 (Vector 3 4))
+(= v2 (Vector 1 2))
+
+(print v1)                # "Vector(3, 4)"
+(print (+ v1 v2))        # "Vector(4, 6)"
+(print (- v1 v2))        # "Vector(2, 2)"
+(print (* v1 2))         # "Vector(6, 8)"
+(print (== v1 v2))       # False
+(print f"Magnitude: {v1.magnitude}")  # "Magnitude: 5.0"

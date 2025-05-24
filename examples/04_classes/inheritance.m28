@@ -1,0 +1,80 @@
+# Inheritance in M28
+# Demonstrates class inheritance and method overriding
+
+# Base class
+(class Animal
+  (def __init__ (self name species)
+    (= self.name name)
+    (= self.species species))
+  
+  (def speak (self)
+    (print f"{self.name} makes a sound"))
+  
+  (def info (self)
+    (print f"{self.name} is a {self.species}")))
+
+# Derived class - Dog
+(class Dog (Animal)
+  (def __init__ (self name breed)
+    # Call parent constructor
+    (super.__init__ name "Dog")
+    (= self.breed breed))
+  
+  # Override speak method
+  (def speak (self)
+    (print f"{self.name} barks: Woof!"))
+  
+  # New method
+  (def fetch (self item)
+    (print f"{self.name} fetches the {item}")))
+
+# Another derived class - Cat
+(class Cat (Animal)
+  (def __init__ (self name color)
+    (super.__init__ name "Cat")
+    (= self.color color))
+  
+  (def speak (self)
+    (print f"{self.name} meows: Meow!"))
+  
+  (def purr (self)
+    (print f"{self.name} is purring")))
+
+# Create instances
+(= dog (Dog "Buddy" "Golden Retriever"))
+(= cat (Cat "Whiskers" "Orange"))
+
+# Test inheritance
+(dog.info)    # "Buddy is a Dog"
+(cat.info)    # "Whiskers is a Cat"
+
+# Test overridden methods
+(dog.speak)   # "Buddy barks: Woof!"
+(cat.speak)   # "Whiskers meows: Meow!"
+
+# Test new methods
+(dog.fetch "ball")  # "Buddy fetches the ball"
+(cat.purr)          # "Whiskers is purring"
+
+# Multiple inheritance example
+(class Flyable
+  (def fly (self)
+    (print f"{self.name} is flying")))
+
+(class Swimmable
+  (def swim (self)
+    (print f"{self.name} is swimming")))
+
+# Duck inherits from Animal, Flyable, and Swimmable
+(class Duck (Animal Flyable Swimmable)
+  (def __init__ (self name)
+    (super.__init__ name "Duck"))
+  
+  (def speak (self)
+    (print f"{self.name} quacks: Quack!")))
+
+(= duck (Duck "Donald"))
+(duck.speak)  # "Donald quacks: Quack!"
+(duck.fly)    # "Donald is flying"
+(duck.swim)   # "Donald is swimming"
+(duck.info)   # "Donald is a Duck"

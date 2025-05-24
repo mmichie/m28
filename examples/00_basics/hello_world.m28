@@ -1,0 +1,15 @@
+# The classic first program
+
+(print "Hello, World!")
+
+# You can also print multiple values
+(print "Hello," "World!")
+
+# Using variables
+(= greeting "Hello")
+(= name "M28")
+(print greeting name)
+
+# String formatting
+(= user "Alice")
+(print f"Hello, {user}! Welcome to M28.")

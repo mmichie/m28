@@ -1,0 +1,85 @@
+# Lambda Functions in M28
+# Anonymous functions for simple operations
+
+# Basic lambda
+(= square (lambda (x) (* x x)))
+(print "Square of 5:" (square 5))
+
+# Lambda with multiple parameters
+(= add (lambda (x y) (+ x y)))
+(print "3 + 4 =" (add 3 4))
+
+# Inline lambda usage
+(print "\nUsing lambda directly:")
+(print "Result:" ((lambda (x) (* x 2)) 10))
+
+# Lambda in map
+(= numbers [1, 2, 3, 4, 5])
+(= doubled (map (lambda (x) (* x 2)) numbers))
+(print "\nOriginal:" numbers)
+(print "Doubled:" doubled)
+
+# Lambda in filter
+(= evens (filter (lambda (x) (== (% x 2) 0)) numbers))
+(print "\nEven numbers:" evens)
+
+# Lambda in reduce
+(= sum (reduce (lambda (acc x) (+ acc x)) numbers 0))
+(= product (reduce (lambda (acc x) (* acc x)) numbers 1))
+(print "\nSum:" sum)
+(print "Product:" product)
+
+# Lambda returning lambda (currying)
+(= make_adder (lambda (n)
+  (lambda (x) (+ x n))))
+
+(= add_10 (make_adder 10))
+(= add_5 (make_adder 5))
+
+(print "\nCurried functions:")
+(print "add_10(7) =" (add_10 7))
+(print "add_5(7) =" (add_5 7))
+
+# Complex lambda
+(= calculator (lambda (op)
+  (if (== op "+")
+      (lambda (x y) (+ x y))
+      (elif (== op "-")
+          (lambda (x y) (- x y))
+          (elif (== op "*")
+              (lambda (x y) (* x y))
+              (lambda (x y) (/ x y)))))))
+
+(= adder (calculator "+"))
+(= multiplier (calculator "*"))
+
+(print "\nCalculator lambdas:")
+(print "adder(5, 3) =" (adder 5 3))
+(print "multiplier(5, 3) =" (multiplier 5 3))
+
+# Lambda with conditional
+(= abs_val (lambda (x) (if (< x 0) (- x) x)))
+(print "\nAbsolute values:")
+(print "abs(-5) =" (abs_val -5))
+(print "abs(5) =" (abs_val 5))
+
+# Sorting with lambda
+(= people [
+  {"name": "Alice", "age": 30},
+  {"name": "Bob", "age": 25},
+  {"name": "Charlie", "age": 35}
+])
+
+# Sort by age
+(= sorted_by_age (sort people (lambda (p) p.age)))
+(print "\nSorted by age:")
+(for person in sorted_by_age
+  (print f"{person.name}: {person.age}"))
+
+# Practical example: temperature converter
+(= celsius_to_fahrenheit (lambda (c) (+ (* c 1.8) 32)))
+(= fahrenheit_to_celsius (lambda (f) (/ (- f 32) 1.8)))
+
+(print "\nTemperature conversion:")
+(print "20°C in Fahrenheit:" (celsius_to_fahrenheit 20))
+(print "68°F in Celsius:" (fahrenheit_to_celsius 68))

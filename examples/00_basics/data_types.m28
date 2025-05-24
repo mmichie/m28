@@ -1,0 +1,79 @@
+# Data Types in M28
+
+# Numbers (unified type like Python)
+(= integer 42)
+(= decimal 3.14)
+(= negative -17)
+(= scientific 1.23e-4)
+(= big_number 1_000_000)  # Underscores for readability
+
+(print "Numbers:")
+(print integer decimal negative scientific big_number)
+
+# Strings
+(= simple "Hello")
+(= with_quotes "She said \"Hi!\"")
+(= with_newline "First line\nSecond line")
+(= formatted f"The answer is {integer}")
+
+(print "\nStrings:")
+(print simple)
+(print with_quotes)
+(print with_newline)
+(print formatted)
+
+# Lists (mutable, ordered)
+(= empty_list [])
+(= numbers [1, 2, 3, 4, 5])
+(= mixed [1, "two", 3.14, True, [5, 6]])
+
+(print "\nLists:")
+(print "Empty:" empty_list)
+(print "Numbers:" numbers)
+(print "Mixed:" mixed)
+(print "First element:" numbers.0)
+(print "Last element:" numbers.4)
+
+# Dictionaries (key-value pairs)
+(= empty_dict {})
+(= person {"name": "Bob", "age": 30, "city": "NYC"})
+(= nested {"user": {"id": 123, "email": "bob@example.com"}})
+
+(print "\nDictionaries:")
+(print "Empty:" empty_dict)
+(print "Person:" person)
+(print "Name:" person.name)
+(print "Nested:" nested)
+(print "Email:" nested.user.email)
+
+# Sets (unique values, unordered)
+(= empty_set (set))
+(= numbers_set {1, 2, 3, 3, 2, 1})  # Duplicates removed
+(= from_list (set [1, 2, 2, 3, 3, 3]))
+
+(print "\nSets:")
+(print "Empty:" empty_set)
+(print "Numbers:" numbers_set)
+(print "From list:" from_list)
+
+# Tuples (immutable sequences)
+(= empty_tuple ())
+(= coordinates (10, 20))
+(= single (42,))  # Note the comma for single element
+(= rgb (255, 128, 0))
+
+(print "\nTuples:")
+(print "Empty:" empty_tuple)
+(print "Coordinates:" coordinates)
+(print "Single:" single)
+(print "RGB:" rgb)
+(print "X coordinate:" coordinates.0)
+
+# Type checking
+(print "\nType checking:")
+(print "Type of 42:" (type 42))
+(print "Type of 'hello':" (type "hello"))
+(print "Type of [1,2,3]:" (type [1, 2, 3]))
+(print "Type of {}:" (type {}))
+(print "Is 42 a number?" (isinstance 42 "number"))
+(print "Is 'hello' a string?" (isinstance "hello" "string"))

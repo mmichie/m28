@@ -1,0 +1,137 @@
+# Higher-Order Functions in M28
+# Functions that take or return other functions
+
+# Function that takes a function as argument
+(def apply_twice (f x)
+  (f (f x)))
+
+(def double (x)
+  (* x 2))
+
+(print "Apply double twice to 5:" (apply_twice double 5))  # 20
+
+# Function composition
+(def compose (f g)
+  (lambda (x) (f (g x))))
+
+(def add_one (x)
+  (+ x 1))
+
+(def square (x)
+  (* x x))
+
+(= square_then_add_one (compose add_one square))
+(= add_one_then_square (compose square add_one))
+
+(print "\nFunction composition:")
+(print "square(5) then add 1:" (square_then_add_one 5))  # 26
+(print "add 1 to 5 then square:" (add_one_then_square 5))  # 36
+
+# Partial application
+(def partial (f *args)
+  (lambda (*more_args)
+    (apply f (+ args more_args))))
+
+(def add_three (a b c)
+  (+ a b c))
+
+(= add_10_and (partial add_three 10))
+(= add_10_20 (partial add_three 10 20))
+
+(print "\nPartial application:")
+(print "add_10_and(5, 7):" (add_10_and 5 7))  # 22
+(print "add_10_20(5):" (add_10_20 5))  # 35
+
+# Custom map implementation
+(def my_map (f lst)
+  (if (== (len lst) 0)
+      []
+      (cons (f (first lst)) (my_map f (rest lst)))))
+
+(print "\nCustom map:")
+(print (my_map (lambda (x) (* x x)) [1, 2, 3, 4]))
+
+# Custom filter implementation
+(def my_filter (pred lst)
+  (if (== (len lst) 0)
+      []
+      (if (pred (first lst))
+          (cons (first lst) (my_filter pred (rest lst)))
+          (my_filter pred (rest lst)))))
+
+(print "\nCustom filter:")
+(print (my_filter (lambda (x) (> x 2)) [1, 2, 3, 4, 5]))
+
+# Function decorator pattern
+(def with_logging (f)
+  (lambda (*args)
+    (print f"Calling function with args: {args}")
+    (= result (apply f args))
+    (print f"Result: {result}")
+    result))
+
+(def multiply (a b)
+  (* a b))
+
+(= logged_multiply (with_logging multiply))
+
+(print "\nFunction with logging:")
+(logged_multiply 5 3)
+
+# Memoization decorator
+(def memoize (f)
+  (= cache {})
+  (lambda (*args)
+    (= key (str args))
+    (if (in key cache)
+        (do
+          (print f"Cache hit for {args}")
+          (get cache key))
+        (do
+          (print f"Computing for {args}")
+          (= result (apply f args))
+          (set cache key result)
+          result))))
+
+(def slow_fibonacci (n)
+  (if (<= n 1)
+      n
+      (+ (slow_fibonacci (- n 1))
+         (slow_fibonacci (- n 2)))))
+
+(= fast_fibonacci (memoize slow_fibonacci))
+
+(print "\nMemoized Fibonacci:")
+(print "fib(10):" (fast_fibonacci 10))
+(print "fib(10) again:" (fast_fibonacci 10))  # From cache
+
+# Pipeline function
+(def pipeline (*funcs)
+  (lambda (x)
+    (reduce (lambda (acc f) (f acc)) funcs x)))
+
+(= process (pipeline
+  (lambda (x) (* x 2))      # Double
+  (lambda (x) (+ x 10))     # Add 10
+  (lambda (x) (/ x 3))))    # Divide by 3
+
+(print "\nPipeline example:")
+(print "Process 5:" (process 5))  # ((5 * 2) + 10) / 3 = 6.67
+
+# Predicate combinators
+(def both (pred1 pred2)
+  (lambda (x) (and (pred1 x) (pred2 x))))
+
+(def either (pred1 pred2)
+  (lambda (x) (or (pred1 x) (pred2 x))))
+
+(= is_positive (lambda (x) (> x 0)))
+(= is_even (lambda (x) (== (% x 2) 0)))
+
+(= positive_and_even (both is_positive is_even))
+(= positive_or_even (either is_positive is_even))
+
+(print "\nPredicate combinators:")
+(= test_values [-2, -1, 0, 1, 2, 3, 4])
+(print "Positive AND even:" (filter positive_and_even test_values))
+(print "Positive OR even:" (filter positive_or_even test_values))

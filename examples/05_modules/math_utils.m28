@@ -1,0 +1,68 @@
+# math_utils.m28
+# A simple math utilities module
+
+# Constants
+(= PI 3.14159265359)
+(= E 2.71828182846)
+(= GOLDEN_RATIO 1.61803398875)
+
+# Functions for circles
+(def circle_area (radius)
+  "Calculate the area of a circle"
+  (return (* PI radius radius)))
+
+(def circle_circumference (radius)
+  "Calculate the circumference of a circle"
+  (return (* 2 PI radius)))
+
+# Functions for temperature conversion
+(def celsius_to_fahrenheit (celsius)
+  "Convert Celsius to Fahrenheit"
+  (return (+ (* celsius 1.8) 32)))
+
+(def fahrenheit_to_celsius (fahrenheit)
+  "Convert Fahrenheit to Celsius"
+  (return (/ (- fahrenheit 32) 1.8)))
+
+# Statistical functions
+(def mean (numbers)
+  "Calculate the arithmetic mean"
+  (return (/ (sum numbers) (len numbers))))
+
+(def median (numbers)
+  "Calculate the median value"
+  (= sorted_nums (sorted numbers))
+  (= n (len sorted_nums))
+  (if (== (% n 2) 0)
+    # Even number of elements
+    (return (/ (+ (sorted_nums (- (/ n 2) 1)) 
+                  (sorted_nums (/ n 2))) 
+               2))
+    # Odd number of elements
+    (return (sorted_nums (// n 2)))))
+
+# Geometric functions
+(def distance (x1 y1 x2 y2)
+  "Calculate Euclidean distance between two points"
+  (return (sqrt (+ (** (- x2 x1) 2) 
+                   (** (- y2 y1) 2)))))
+
+# Factorial function
+(def factorial (n)
+  "Calculate factorial of n"
+  (if (<= n 1)
+    (return 1)
+    (return (* n (factorial (- n 1))))))
+
+# Prime number checker
+(def is_prime (n)
+  "Check if a number is prime"
+  (if (<= n 1)
+    (return False)
+    (for i (range 2 (int (+ (sqrt n) 1)))
+      (if (== (% n i) 0)
+        (return False))))
+  (return True))
+
+# Module initialization message
+(print "math_utils module loaded")

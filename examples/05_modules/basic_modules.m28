@@ -1,0 +1,51 @@
+# Basic Module Usage in M28
+# Demonstrates importing and using modules
+
+# Import entire module
+(import math)
+
+# Use module functions
+(print (math.sqrt 16))      # 4.0
+(print (math.pi))           # 3.14159...
+(print (math.sin math.pi))  # ~0
+
+# Import with alias
+(import math as m)
+(print (m.cos 0))           # 1.0
+
+# Import specific functions
+(from math import sqrt pi)
+(print (sqrt 25))           # 5.0
+(print pi)                  # 3.14159...
+
+# Import multiple items
+(from math import (sin cos tan))
+(print (sin 0))             # 0
+(print (cos 0))             # 1
+(print (tan 0))             # 0
+
+# Import custom module (assuming we have one)
+# (import mymodule)
+# (mymodule.my_function)
+
+# Module-level code example
+# When a module is imported, its top-level code runs once
+
+# Example of what might be in a module:
+# # math_utils.m28
+# (= PI 3.14159265359)
+# 
+# (def circle_area (radius)
+#   (return (* PI radius radius)))
+# 
+# (def circle_circumference (radius)
+#   (return (* 2 PI radius)))
+
+# Then you could use it:
+# (import math_utils)
+# (print (math_utils.circle_area 5))
+
+# Import all (use sparingly)
+# (from math import *)
+# Now all math functions are available directly
+# (print (floor 3.7))  # 3

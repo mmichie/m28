@@ -1,0 +1,169 @@
+# Lists in M28
+# Mutable, ordered sequences
+
+# Creating lists
+(= empty [])
+(= numbers [1, 2, 3, 4, 5])
+(= mixed [1, "two", 3.14, True, [5, 6]])
+(= from_range (list (range 5)))
+
+(print "Empty list:" empty)
+(print "Numbers:" numbers)
+(print "Mixed types:" mixed)
+(print "From range:" from_range)
+
+# Accessing elements
+(print "\nAccessing elements:")
+(print "First element:" numbers.0)
+(print "Last element:" numbers.4)
+(print "Third element:" (nth numbers 2))
+
+# Negative indexing
+(print "Last with negative index:" numbers.-1)
+(print "Second to last:" numbers.-2)
+
+# Slicing
+(print "\nSlicing:")
+(= letters ["a", "b", "c", "d", "e"])
+(print "Original:" letters)
+(print "First three:" (slice letters 0 3))
+(print "Last two:" (slice letters -2))
+(print "Middle:" (slice letters 1 4))
+(print "Every other:" (slice letters 0 nil 2))
+
+# Modifying lists
+(print "\nModifying lists:")
+(= fruits ["apple", "banana", "orange"])
+(print "Original:" fruits)
+
+# Append single element
+(append fruits "grape")
+(print "After append:" fruits)
+
+# Extend with multiple elements
+(extend fruits ["mango", "kiwi"])
+(print "After extend:" fruits)
+
+# Insert at specific position
+(insert fruits 1 "pear")
+(print "After insert at 1:" fruits)
+
+# Remove element
+(remove fruits "banana")
+(print "After remove banana:" fruits)
+
+# Pop element
+(= last_fruit (pop fruits))
+(print f"Popped: {last_fruit}, remaining: {fruits}")
+
+# Update by index
+(= fruits.0 "strawberry")
+(print "After update first:" fruits)
+
+# List operations
+(print "\nList operations:")
+(= nums1 [1, 2, 3])
+(= nums2 [4, 5, 6])
+
+(print "Concatenation:" (+ nums1 nums2))
+(print "Repetition:" (* [0] 5))
+(print "Length:" (len nums1))
+(print "Sum:" (sum nums1))
+(print "Min:" (min nums1))
+(print "Max:" (max nums1))
+
+# Membership testing
+(print "\nMembership testing:")
+(print "3 in nums1?" (in 3 nums1))
+(print "7 in nums1?" (in 7 nums1))
+
+# Sorting
+(print "\nSorting:")
+(= unsorted [3, 1, 4, 1, 5, 9, 2, 6])
+(= sorted_list (sort unsorted))
+(print "Original:" unsorted)
+(print "Sorted:" sorted_list)
+(print "Reverse sorted:" (sort unsorted reverse=True))
+
+# List comprehensions
+(print "\nList comprehensions:")
+(= squares [x**2 for x in (range 10)])
+(print "Squares:" squares)
+
+(= evens [x for x in (range 20) if (== (% x 2) 0)])
+(print "Even numbers:" evens)
+
+(= pairs [(x, y) for x in (range 3) for y in (range 3)])
+(print "Coordinate pairs:" pairs)
+
+# Nested lists
+(print "\nNested lists (2D matrix):")
+(= matrix [
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9]
+])
+
+(print "Matrix:")
+(for row in matrix
+  (print row))
+
+(print "Element at [1][2]:" matrix.1.2)
+
+# Flattening nested lists
+(= flattened [item for row in matrix for item in row])
+(print "Flattened:" flattened)
+
+# Common list patterns
+(print "\nCommon patterns:")
+
+# Stack (LIFO)
+(= stack [])
+(append stack "first")
+(append stack "second")
+(append stack "third")
+(print "Stack:" stack)
+(print "Pop from stack:" (pop stack))
+(print "Stack after pop:" stack)
+
+# Queue (FIFO)
+(= queue [])
+(append queue "first")
+(append queue "second")
+(append queue "third")
+(print "\nQueue:" queue)
+(print "Dequeue:" (pop queue 0))
+(print "Queue after dequeue:" queue)
+
+# Finding elements
+(= names ["Alice", "Bob", "Charlie", "David"])
+(print "\nFinding elements:")
+(print "Index of Charlie:" (index names "Charlie"))
+(print "Count of Alice:" (count names "Alice"))
+
+# Filtering
+(= numbers [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+(= odds (filter (lambda (x) (== (% x 2) 1)) numbers))
+(print "\nOdd numbers:" odds)
+
+# Mapping
+(= doubled (map (lambda (x) (* x 2)) numbers))
+(print "Doubled:" doubled)
+
+# Reducing
+(= product (reduce (lambda (acc x) (* acc x)) numbers 1))
+(print "Product of all:" product)
+
+# List as a mutable object
+(print "\nMutability demonstration:")
+(= original [1, 2, 3])
+(= reference original)  # Not a copy!
+(append reference 4)
+(print "Original:" original)  # Also changed!
+(print "Reference:" reference)
+
+# Creating a copy
+(= copy (list original))  # Or original[:]
+(append copy 5)
+(print "Original after copy append:" original)
+(print "Copy:" copy)

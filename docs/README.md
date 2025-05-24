@@ -1,64 +1,80 @@
-# M28 Language Documentation
+# M28 Documentation
 
-## Core Documentation
+Welcome to the M28 documentation! M28 is a Lispy-Pythonic programming language that combines s-expression syntax with Python semantics.
 
-The following documents represent the official specification and documentation for the M28 language:
+## Documentation Structure
 
-### Language Specification and Implementation
+### Core Documentation
+- [Language Guide](language-guide.md) - Comprehensive language reference
+- [Tutorial](tutorial.md) - Step-by-step introduction to M28
+- [Quick Reference](quick-reference.md) - Quick syntax reference
 
-- [**Language Specification**](/docs/specification/language-specification.md) - Complete language definition and semantics
-- [**Implementation Roadmap**](/docs/specification/implementation-roadmap.md) - Development plan and timeline
-- [**Testing Strategy**](/docs/specification/test-strategy.md) - Approach to testing the language implementation
+### Feature Guides
+- [Functions](features/functions.md) - Function definition and usage
+- [Data Types](features/data-types.md) - Built-in data types
+- [Control Flow](features/control-flow.md) - Conditionals and loops
+- [Exception Handling](features/exception-handling.md) - Try/except/raise
+- [Classes](features/classes.md) - Object-oriented programming
+- [Modules](features/modules.md) - Module system and imports
 
-## Legacy Documentation
+### Advanced Topics
+- [Functional Programming](advanced/functional.md) - Higher-order functions, composition
+- [Generators](advanced/generators.md) - Yield and generator expressions
+- [Context Managers](advanced/context-managers.md) - With statements
+- [Concurrency](advanced/concurrency.md) - Async/await and goroutines
 
-The following documents are maintained for historical purposes and may contain outdated information. They will be gradually migrated to the specification documents.
+### Reference
+- [Built-in Functions](reference/builtins.md) - All built-in functions
+- [Standard Library](reference/stdlib.md) - Standard library modules
+- [Python Interop](reference/python-interop.md) - Using Python libraries
 
-### Implementation Status
+## Key Concepts
 
-- [Implementation Status](/docs/implementation/status.md) - Current status of language features
-- [Implementation Roadmap (Legacy)](/docs/implementation/roadmap.md) - Previous roadmap (superseded)
+### Syntax Rules
+1. **Comments**: Always use `#` (never `;`)
+2. **Variables**: Always use `=` (never `def`)
+3. **Functions**: Only use `def` for functions
+4. **Expressions**: Everything is prefix notation `(function arg1 arg2)`
 
-### Feature Documentation
+### Example
+```lisp
+# This is a comment (always use #)
 
-- [Language Guide](/docs/language-guide.md) - Earlier guide to M28 features
-- [Module Imports](/docs/module-import.md) - Working with the module system
-- [Enhanced Module System](/docs/enhanced-module-system.md) - Advanced module features
-- [Module Exports](/docs/module-exports.md) - Controlling symbol exports
-- [Dot Notation](/docs/dot-notation-changes.md) - Property and method access
-- [Class Syntax](/docs/class-syntax.md) - Working with classes
-- [Direct Property Access](/docs/direct-property-access.md) - Low-level property access
-- [Object Protocol](/docs/object-protocol-implementation.md) - Object system implementation
-- [Tuple Implementation](/docs/tuple-implementation.md) - Tuple data structure
+# Variables use =
+(= name "Alice")
+(= age 30)
 
-### Implementation Details
+# Functions use def
+(def greet (person)
+  (print f"Hello, {person}!"))
 
-- [Unified Object Protocol Design](/docs/implementation/unified-object-protocol.md) - Object system design
-- [For Loop Fix](/docs/implementation/for-loop-fix.md) - Loop implementation details
-- [REPL Documentation Lookup](/docs/implementation/repl-documentation-lookup.md) - REPL features
+# Call the function
+(greet name)
 
-## Feature Guides
+# Data structures
+(= numbers [1, 2, 3, 4, 5])
+(= person {"name": "Bob", "age": 25})
 
-- [Control Flow](/docs/features/control-flow.md) - If/else, loops
-- [Data Types](/docs/features/data-types.md) - Core data types
-- [Dictionaries](/docs/features/dictionaries.md) - Working with dictionaries
-- [Dot Notation Features](/docs/features/dot-notation.md) - Property/method access
-- [Exception Handling](/docs/features/exception-handling.md) - Error handling
-- [Functions](/docs/features/functions.md) - Defining and using functions
-- [Python-Style Dictionaries](/docs/features/python-style-dicts.md) - Dictionary literal syntax
+# Control flow
+(if (> age 18)
+    (print "Adult")
+    (print "Minor"))
 
-## Examples
+# Functional programming
+(= doubled (map (lambda (x) (* x 2)) numbers))
+```
 
-See the `/examples` directory for code examples.
+## Getting Started
 
-## Contributing
+1. Read the [Tutorial](tutorial.md) for a gentle introduction
+2. Reference the [Language Guide](language-guide.md) for comprehensive details
+3. Check the [Quick Reference](quick-reference.md) for syntax reminders
+4. Explore the [Examples](../examples/) directory for real code
 
-If you're interested in contributing to the M28 documentation:
+## Design Philosophy
 
-1. Focus on the specification documents in `/docs/specification/` as they are the source of truth
-2. Suggest updates through pull requests
-3. Help migrate useful content from legacy docs to the specification
-
-## Document Status
-
-The documentation is being migrated to follow the new specification. Please refer to the [Language Specification](/docs/specification/language-specification.md) for the most accurate and up-to-date information.
+M28 combines:
+- **Lisp's homoiconicity**: Code is data, enabling powerful metaprogramming
+- **Python's pragmatism**: Familiar keywords, clear semantics, extensive ecosystem
+- **Modern features**: Type hints, async/await, pattern matching (planned)
+- **Simplicity**: One way to do things, clear and consistent

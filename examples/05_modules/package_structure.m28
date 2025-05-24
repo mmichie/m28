@@ -1,0 +1,83 @@
+# Package Structure in M28
+# This file demonstrates how to organize modules into packages
+
+# Package structure example:
+# mypackage/
+#   __init__.m28
+#   core.m28
+#   utils.m28
+#   subpackage/
+#     __init__.m28
+#     helpers.m28
+
+# Import from package
+# (import mypackage)
+# (import mypackage.core)
+# (from mypackage.utils import some_function)
+# (from mypackage.subpackage import helpers)
+
+# Example __init__.m28 content:
+# # mypackage/__init__.m28
+# (print "Initializing mypackage")
+# 
+# # Import key functions to make them available at package level
+# (from mypackage.core import main_function)
+# (from mypackage.utils import utility_function)
+# 
+# # Define package-level constants
+# (= VERSION "1.0.0")
+# (= AUTHOR "Your Name")
+
+# Then users can do:
+# (import mypackage)
+# (mypackage.main_function)  # Available due to __init__.m28
+# (print mypackage.VERSION)   # Package constant
+
+# Relative imports within a package:
+# # In mypackage/core.m28
+# (from . import utils)          # Import sibling module
+# (from ..otherpackage import something)  # Import from parent
+
+# Example of a well-structured package:
+
+# geometry/
+#   __init__.m28
+#   shapes/
+#     __init__.m28
+#     circle.m28
+#     rectangle.m28
+#     triangle.m28
+#   calculations/
+#     __init__.m28
+#     area.m28
+#     perimeter.m28
+#   utils/
+#     __init__.m28
+#     validators.m28
+#     converters.m28
+
+# Usage:
+# (import geometry)
+# (from geometry.shapes import Circle)
+# (from geometry.calculations import calculate_area)
+# 
+# (= c (Circle 5))
+# (print (calculate_area c))
+
+# Best practices:
+# 1. Use __init__.m28 to control what's exposed at package level
+# 2. Keep related functionality together
+# 3. Use clear, descriptive module names
+# 4. Avoid circular imports
+# 5. Document your modules and packages
+
+# Module search path
+# M28 searches for modules in:
+# 1. Current directory
+# 2. PYTHONPATH directories
+# 3. Standard library location
+# 4. Site-packages
+
+# You can check the module search path:
+# (import sys)
+# (print sys.path)

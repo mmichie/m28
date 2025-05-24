@@ -1,0 +1,73 @@
+# Operators in M28
+# All operators use prefix notation (operator first)
+
+# Arithmetic operators
+(print "Arithmetic:")
+(print "2 + 3 =" (+ 2 3))
+(print "10 - 4 =" (- 10 4))
+(print "3 * 4 =" (* 3 4))
+(print "15 / 3 =" (/ 15 3))
+(print "17 % 5 =" (% 17 5))        # Modulo
+(print "2 ** 8 =" (** 2 8))        # Exponentiation
+
+# Multiple arguments
+(print "\nMultiple arguments:")
+(print "1 + 2 + 3 + 4 =" (+ 1 2 3 4))
+(print "100 - 10 - 5 - 3 =" (- 100 10 5 3))
+(print "2 * 3 * 4 =" (* 2 3 4))
+
+# Comparison operators
+(print "\nComparisons:")
+(print "5 == 5:" (== 5 5))
+(print "5 != 6:" (!= 5 6))
+(print "3 < 5:" (< 3 5))
+(print "5 > 3:" (> 5 3))
+(print "5 <= 5:" (<= 5 5))
+(print "5 >= 4:" (>= 5 4))
+
+# Logical operators
+(print "\nLogical operators:")
+(print "True and True:" (and True True))
+(print "True and False:" (and True False))
+(print "True or False:" (or True False))
+(print "False or False:" (or False False))
+(print "not True:" (not True))
+(print "not False:" (not False))
+
+# Truthy and falsy values
+(print "\nTruthy/Falsy:")
+(print "Empty list is falsy:" (not []))
+(print "Non-empty list is truthy:" (not (not [1, 2, 3])))
+(print "0 is falsy:" (not 0))
+(print "1 is truthy:" (not (not 1)))
+(print "Empty string is falsy:" (not ""))
+(print "Non-empty string is truthy:" (not (not "hello")))
+
+# String operations
+(print "\nString operations:")
+(print "Concatenation:" (+ "Hello, " "World!"))
+(print "Repetition:" (* "Ha" 3))
+(print "Length:" (len "Hello"))
+(print "Uppercase:" (upper "hello"))
+(print "Lowercase:" (lower "HELLO"))
+
+# List operations
+(= nums [1, 2, 3])
+(print "\nList operations:")
+(print "Original list:" nums)
+(print "Length:" (len nums))
+(print "Concatenation:" (+ nums [4, 5]))
+(print "Repetition:" (* [0] 5))
+
+# Membership testing
+(print "\nMembership (in operator):")
+(print "3 in [1,2,3,4]:" (in 3 [1, 2, 3, 4]))
+(print "5 in [1,2,3,4]:" (in 5 [1, 2, 3, 4]))
+(print "'e' in 'hello':" (in "e" "hello"))
+(print "'key' in dict:" (in "key" {"key": "value", "other": 42}))
+
+# Operator precedence (handled by s-expressions)
+(print "\nNo precedence issues with s-expressions:")
+(print "2 + 3 * 4 would be ambiguous, but:")
+(print "(+ 2 (* 3 4)) =" (+ 2 (* 3 4)))  # 2 + (3 * 4) = 14
+(print "(* (+ 2 3) 4) =" (* (+ 2 3) 4))  # (2 + 3) * 4 = 20

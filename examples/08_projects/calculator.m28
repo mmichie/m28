@@ -1,0 +1,261 @@
+# Scientific Calculator in M28
+# A complete calculator with basic and scientific functions
+
+(import math)
+
+# Calculator class
+(class Calculator
+  (def __init__ (self)
+    (= self.memory 0)
+    (= self.last_result 0)
+    (= self.history [])
+    (= self.constants {
+      "pi": math.pi,
+      "e": math.e,
+      "tau": (* 2 math.pi),
+      "phi": 1.618033988749895  # Golden ratio
+    }))
+  
+  # Basic operations
+  (def add (self a b)
+    (= result (+ a b))
+    (self._record_operation f"{a} + {b}" result)
+    (return result))
+  
+  (def subtract (self a b)
+    (= result (- a b))
+    (self._record_operation f"{a} - {b}" result)
+    (return result))
+  
+  (def multiply (self a b)
+    (= result (* a b))
+    (self._record_operation f"{a} × {b}" result)
+    (return result))
+  
+  (def divide (self a b)
+    (if (== b 0)
+      (raise ValueError "Division by zero"))
+    (= result (/ a b))
+    (self._record_operation f"{a} ÷ {b}" result)
+    (return result))
+  
+  (def power (self base exponent)
+    (= result (** base exponent))
+    (self._record_operation f"{base}^{exponent}" result)
+    (return result))
+  
+  # Scientific functions
+  (def sqrt (self x)
+    (if (< x 0)
+      (raise ValueError "Cannot take square root of negative number"))
+    (= result (math.sqrt x))
+    (self._record_operation f"√{x}" result)
+    (return result))
+  
+  (def sin (self x)
+    (= result (math.sin x))
+    (self._record_operation f"sin({x})" result)
+    (return result))
+  
+  (def cos (self x)
+    (= result (math.cos x))
+    (self._record_operation f"cos({x})" result)
+    (return result))
+  
+  (def tan (self x)
+    (= result (math.tan x))
+    (self._record_operation f"tan({x})" result)
+    (return result))
+  
+  (def log (self x base=10)
+    (if (<= x 0)
+      (raise ValueError "Logarithm undefined for non-positive numbers"))
+    (= result (if (== base 10) (math.log10 x) (math.log x base)))
+    (self._record_operation f"log{base}({x})" result)
+    (return result))
+  
+  (def ln (self x)
+    (if (<= x 0)
+      (raise ValueError "Natural log undefined for non-positive numbers"))
+    (= result (math.log x))
+    (self._record_operation f"ln({x})" result)
+    (return result))
+  
+  (def factorial (self n)
+    (if (or (< n 0) (!= n (int n)))
+      (raise ValueError "Factorial only defined for non-negative integers"))
+    (= result (math.factorial (int n)))
+    (self._record_operation f"{n}!" result)
+    (return result))
+  
+  # Memory operations
+  (def memory_store (self value=None)
+    (= self.memory (or value self.last_result))
+    (print f"Stored in memory: {self.memory}"))
+  
+  (def memory_recall (self)
+    (return self.memory))
+  
+  (def memory_clear (self)
+    (= self.memory 0)
+    (print "Memory cleared"))
+  
+  (def memory_add (self value)
+    (= self.memory (+ self.memory value))
+    (print f"Memory: {self.memory}"))
+  
+  # History management
+  (def _record_operation (self expression result)
+    (= self.last_result result)
+    (self.history.append {
+      "expression": expression,
+      "result": result,
+      "timestamp": (datetime.datetime.now)
+    })
+    (if (> (len self.history) 100)  # Keep last 100 operations
+      (= self.history (slice self.history -100))))
+  
+  (def show_history (self n=10)
+    (print f"\n=== Last {n} calculations ===")
+    (for entry (slice self.history (- n))
+      (print f"{entry['expression']} = {entry['result']}")))
+  
+  (def clear_history (self)
+    (= self.history [])
+    (print "History cleared"))
+  
+  # Advanced operations
+  (def percentage (self value percent)
+    (= result (* value (/ percent 100)))
+    (self._record_operation f"{percent}% of {value}" result)
+    (return result))
+  
+  (def degrees_to_radians (self degrees)
+    (return (* degrees (/ math.pi 180))))
+  
+  (def radians_to_degrees (self radians)
+    (return (* radians (/ 180 math.pi)))))
+
+# Expression parser and evaluator
+(class ExpressionEvaluator
+  (def __init__ (self calculator)
+    (= self.calc calculator)
+    (= self.operators {
+      "+": self.calc.add,
+      "-": self.calc.subtract,
+      "*": self.calc.multiply,
+      "/": self.calc.divide,
+      "^": self.calc.power
+    })
+    (= self.functions {
+      "sin": self.calc.sin,
+      "cos": self.calc.cos,
+      "tan": self.calc.tan,
+      "sqrt": self.calc.sqrt,
+      "log": self.calc.log,
+      "ln": self.calc.ln,
+      "fact": self.calc.factorial
+    }))
+  
+  (def evaluate (self expression)
+    "Simple expression evaluator"
+    # Replace constants
+    (for name value self.calc.constants.items
+      (= expression (expression.replace name (str value))))
+    
+    # Handle special case of last result
+    (= expression (expression.replace "ans" (str self.calc.last_result)))
+    
+    # For this example, we'll use Python's eval with safety measures
+    # In production, use a proper expression parser
+    (try
+      # Create safe namespace
+      (= safe_dict {
+        "__builtins__": {},
+        "sin": math.sin,
+        "cos": math.cos,
+        "tan": math.tan,
+        "sqrt": math.sqrt,
+        "log": math.log10,
+        "ln": math.log,
+        "abs": abs,
+        "round": round,
+        "pi": math.pi,
+        "e": math.e
+      })
+      (= result (eval expression safe_dict))
+      (self.calc._record_operation expression result)
+      (return result)
+      (except Exception e
+        (raise ValueError f"Invalid expression: {e}")))))
+
+# Main calculator interface
+(def main ()
+  (= calc (Calculator))
+  (= evaluator (ExpressionEvaluator calc))
+  
+  (def show_help ()
+    (print "\n=== Scientific Calculator ===")
+    (print "Basic operations: +, -, *, /, ^ (power)")
+    (print "Functions: sin, cos, tan, sqrt, log, ln")
+    (print "Constants: pi, e, tau, phi")
+    (print "Memory: MS (store), MR (recall), MC (clear), M+ (add)")
+    (print "Special: ans (last result), % (percentage)")
+    (print "Commands: help, history, clear, quit")
+    (print "\nExamples:")
+    (print "  2 + 3 * 4")
+    (print "  sin(pi/2)")
+    (print "  sqrt(16) + log(100)")
+    (print "  ans * 2"))
+  
+  (print "M28 Scientific Calculator")
+  (print "Type 'help' for instructions")
+  
+  (while True
+    (= input_line (input "\ncalc> ").strip.lower)
+    
+    (if (not input_line)
+      (continue))
+    
+    (cond
+      ((== input_line "quit")
+       (print "Goodbye!")
+       (break))
+      
+      ((== input_line "help")
+       (show_help))
+      
+      ((== input_line "history")
+       (calc.show_history))
+      
+      ((== input_line "clear")
+       (calc.clear_history))
+      
+      ((== input_line "mc")
+       (calc.memory_clear))
+      
+      ((== input_line "mr")
+       (print f"Memory: {calc.memory_recall}"))
+      
+      ((== input_line "ms")
+       (calc.memory_store))
+      
+      ((input_line.startswith "m+")
+       (try
+         (= value (float (slice input_line 2).strip))
+         (calc.memory_add value)
+         (except ValueError
+           (print "Usage: M+ <number>"))))
+      
+      (else
+       (try
+         (= result (evaluator.evaluate input_line))
+         (print f"= {result}")
+         (except ValueError e
+           (print f"Error: {e}"))
+         (except Exception e
+           (print f"Calculation error: {e}")))))))
+
+# Run calculator
+(if (== __name__ "__main__")
+  (main))

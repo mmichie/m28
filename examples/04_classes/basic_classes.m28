@@ -1,0 +1,59 @@
+# Basic Classes in M28
+# Classes use Python-style syntax with S-expressions
+
+# Define a simple class
+(class Person
+  # Constructor
+  (def __init__ (self name age)
+    (= self.name name)
+    (= self.age age))
+  
+  # String representation
+  (def __str__ (self)
+    (return f"Person(name={self.name}, age={self.age})"))
+  
+  # Method
+  (def greet (self)
+    (print f"{self.name} says hello!"))
+  
+  # Method with parameter
+  (def introduce_to (self other)
+    (print f"Hi {other}, I'm {self.name}")))
+
+# Create instances
+(= alice (Person "Alice" 30))
+(= bob (Person "Bob" 25))
+
+# Access properties with dot notation
+(print alice.name)  # "Alice"
+(print bob.age)     # 25
+
+# Call methods
+(alice.greet)                # "Alice says hello!"
+(bob.introduce_to "Charlie")  # "Hi Charlie, I'm Bob"
+
+# Print object
+(print alice)  # "Person(name=Alice, age=30)"
+
+# Modify properties
+(= alice.age 31)
+(print f"{alice.name} is now {alice.age}")
+
+# Class with default values
+(class Book
+  (def __init__ (self title author="Unknown")
+    (= self.title title)
+    (= self.author author)
+    (= self.pages 0))
+  
+  (def add_pages (self count)
+    (= self.pages (+ self.pages count))
+    (print f"Book now has {self.pages} pages")))
+
+(= book1 (Book "1984" "George Orwell"))
+(= book2 (Book "Anonymous"))  # Uses default author
+
+(print book1.author)  # "George Orwell"
+(print book2.author)  # "Unknown"
+
+(book1.add_pages 328)  # "Book now has 328 pages"

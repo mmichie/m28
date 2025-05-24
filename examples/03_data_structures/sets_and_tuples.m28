@@ -1,0 +1,206 @@
+# Sets and Tuples in M28
+
+# SETS - Unordered collections of unique elements
+
+(print "=== SETS ===")
+
+# Creating sets
+(= empty_set (set))
+(= numbers {1, 2, 3, 4, 5})
+(= duplicates {1, 2, 2, 3, 3, 3})  # Duplicates removed
+(= from_list (set [1, 2, 2, 3, 3, 3]))
+
+(print "Empty set:" empty_set)
+(print "Numbers set:" numbers)
+(print "With duplicates:" duplicates)
+(print "From list:" from_list)
+
+# Set operations
+(print "\nSet operations:")
+(= a {1, 2, 3, 4})
+(= b {3, 4, 5, 6})
+
+(print "Set A:" a)
+(print "Set B:" b)
+(print "Union (A | B):" (union a b))
+(print "Intersection (A & B):" (intersection a b))
+(print "Difference (A - B):" (difference a b))
+(print "Symmetric difference (A ^ B):" (symmetric_difference a b))
+
+# Subset and superset
+(= small {1, 2})
+(= large {1, 2, 3, 4})
+(print "\nSubset/Superset:")
+(print f"{small} subset of {large}?" (is_subset small large))
+(print f"{large} superset of {small}?" (is_superset large small))
+
+# Adding and removing elements
+(print "\nModifying sets:")
+(= fruits {"apple", "banana"})
+(print "Original:" fruits)
+
+(add fruits "orange")
+(print "After add:" fruits)
+
+(remove fruits "banana")
+(print "After remove:" fruits)
+
+# Membership testing
+(print "\nMembership:")
+(print "'apple' in fruits?" (in "apple" fruits))
+(print "'grape' in fruits?" (in "grape" fruits))
+
+# Set comprehensions
+(print "\nSet comprehensions:")
+(= squares {x**2 for x in (range 10)})
+(print "Squares:" squares)
+
+(= evens {x for x in (range 20) if (== (% x 2) 0)})
+(print "Even numbers:" evens)
+
+# Practical set examples
+(print "\nPractical examples:")
+
+# Remove duplicates from list
+(= list_with_dupes [1, 2, 2, 3, 3, 3, 4, 4, 4, 4])
+(= unique_list (list (set list_with_dupes)))
+(print "Original list:" list_with_dupes)
+(print "Unique elements:" unique_list)
+
+# Find common elements
+(= skills_alice {"Python", "JavaScript", "SQL"}
+(= skills_bob {"Python", "Java", "SQL", "C++"}
+(= common_skills (intersection skills_alice skills_bob))
+(print f"\nAlice's skills: {skills_alice}")
+(print f"Bob's skills: {skills_bob}")
+(print f"Common skills: {common_skills}")
+
+# Find unique elements
+(= all_skills (union skills_alice skills_bob))
+(print f"All skills: {all_skills}")
+
+# TUPLES - Immutable sequences
+
+(print "\n\n=== TUPLES ===")
+
+# Creating tuples
+(= empty_tuple ())
+(= single (42,))  # Note the comma!
+(= coordinates (10, 20))
+(= rgb (255, 128, 0))
+(= mixed (1, "hello", 3.14, True))
+
+(print "Empty tuple:" empty_tuple)
+(print "Single element:" single)
+(print "Coordinates:" coordinates)
+(print "RGB color:" rgb)
+(print "Mixed types:" mixed)
+
+# Accessing tuple elements
+(print "\nAccessing elements:")
+(print "X coordinate:" coordinates.0)
+(print "Y coordinate:" coordinates.1)
+(print "Red value:" rgb.0)
+
+# Tuple unpacking
+(print "\nTuple unpacking:")
+(= (x, y) coordinates)
+(print f"x = {x}, y = {y}")
+
+(= (r, g, b) rgb)
+(print f"Red: {r}, Green: {g}, Blue: {b}")
+
+# Multiple assignment
+(= (a, b, c) (1, 2, 3))
+(print f"a={a}, b={b}, c={c}")
+
+# Swapping values
+(= (a, b) (b, a))
+(print f"After swap: a={a}, b={b}")
+
+# Functions returning tuples
+(print "\nFunctions with tuple returns:")
+
+(def get_min_max (numbers)
+  ((min numbers), (max numbers)))
+
+(= data [5, 2, 8, 1, 9, 3])
+(= (minimum, maximum) (get_min_max data))
+(print f"Data: {data}")
+(print f"Min: {minimum}, Max: {maximum}")
+
+(def divmod (a b)
+  ((// a b), (% a b)))
+
+(= (quotient, remainder) (divmod 17 5))
+(print f"17 ÷ 5 = {quotient} remainder {remainder}")
+
+# Tuples as dictionary keys
+(print "\nTuples as dictionary keys:")
+(= board {})
+(= board.(0, 0) "X")
+(= board.(1, 1) "O")
+(= board.(2, 2) "X")
+
+(print "Tic-tac-toe board positions:")
+(for (pos, mark) in (items board)
+  (print f"  Position {pos}: {mark}"))
+
+# Named tuples (using dictionaries to simulate)
+(print "\nSimulating named tuples:")
+
+(def Point (x y)
+  {"x": x, "y": y, "_type": "Point"})
+
+(def Color (r g b)
+  {"r": r, "g": g, "b": b, "_type": "Color"})
+
+(= p1 (Point 10 20))
+(= p2 (Point 30 40))
+(= red (Color 255 0 0))
+
+(print f"Point 1: ({p1.x}, {p1.y})")
+(print f"Point 2: ({p2.x}, {p2.y})")
+(print f"Red color: RGB({red.r}, {red.g}, {red.b})")
+
+# Tuple vs List
+(print "\nTuple vs List:")
+(= list_example [1, 2, 3])
+(= tuple_example (1, 2, 3))
+
+(print "List (mutable):" list_example)
+(append list_example 4)
+(print "After append:" list_example)
+
+(print "\nTuple (immutable):" tuple_example)
+# This would fail: (append tuple_example 4)
+(print "Tuples cannot be modified")
+
+# Practical examples
+(print "\nPractical examples:")
+
+# Database records
+(= employees [
+  (1, "Alice", "Engineering", 100000),
+  (2, "Bob", "Sales", 80000),
+  (3, "Charlie", "Marketing", 90000)
+])
+
+(print "Employee records:")
+(for (id, name, dept, salary) in employees
+  (print f"  {id}: {name} - {dept} (${salary})"))
+
+# Returning multiple values with status
+(def parse_number (s)
+  (try
+    (= num (int s))
+    (True, num)
+    (except ValueError
+      (False, None))))
+
+(print "\nParsing numbers:")
+(for test in ["123", "abc", "456"]
+  (= (success, value) (parse_number test))
+  (if success
+      (print f"'{test}' -> {value}")
+      (print f"'{test}' -> Failed to parse")))

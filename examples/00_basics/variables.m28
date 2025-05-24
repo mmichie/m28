@@ -1,0 +1,53 @@
+# Variables in M28
+# Always use = for variables (never def)
+
+# Numbers
+(= age 25)
+(= pi 3.14159)
+(= temperature -10.5)
+
+(print "Age:" age)
+(print "Pi:" pi)
+(print "Temperature:" temperature)
+
+# Strings
+(= name "Alice")
+(= message "Welcome to M28!")
+(= multiline "Line 1\nLine 2\nLine 3")
+
+(print "\nStrings:")
+(print name)
+(print message)
+(print multiline)
+
+# Booleans
+(= is_ready True)
+(= is_done False)
+
+(print "\nBooleans:")
+(print "Ready?" is_ready)
+(print "Done?" is_done)
+
+# None/nil
+(= nothing None)
+(= also_nothing nil)  # Both work
+
+(print "\nNone values:")
+(print nothing)
+(print also_nothing)
+
+# Variable reassignment
+(= count 0)
+(print "\nInitial count:" count)
+
+(= count 10)
+(print "Updated count:" count)
+
+(= count (+ count 1))
+(print "Incremented count:" count)
+
+# Multiple variables (tuple unpacking)
+(= (x, y) (10, 20))
+(print "\nCoordinates:")
+(print "x =" x)
+(print "y =" y)

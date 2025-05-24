@@ -1,0 +1,244 @@
+# Todo List Application in M28
+# A complete command-line todo list manager
+
+(import json)
+(import os)
+(import datetime)
+
+# Todo item class
+(class TodoItem
+  (def __init__ (self title description="" priority="medium")
+    (= self.id (datetime.datetime.now.timestamp))
+    (= self.title title)
+    (= self.description description)
+    (= self.priority priority)
+    (= self.completed False)
+    (= self.created_at (datetime.datetime.now))
+    (= self.completed_at None))
+  
+  (def complete (self)
+    (= self.completed True)
+    (= self.completed_at (datetime.datetime.now)))
+  
+  (def to_dict (self)
+    (return {
+      "id": self.id,
+      "title": self.title,
+      "description": self.description,
+      "priority": self.priority,
+      "completed": self.completed,
+      "created_at": (str self.created_at),
+      "completed_at": (str self.completed_at) if self.completed_at else None
+    }))
+  
+  (def __str__ (self)
+    (= status (if self.completed "✓" "○"))
+    (= priority_symbol {"high": "!", "medium": "-", "low": "·"})
+    (return f"{status} [{priority_symbol[self.priority]}] {self.title}")))
+
+# Todo list manager
+(class TodoList
+  (def __init__ (self filename="todos.json")
+    (= self.filename filename)
+    (= self.todos [])
+    (self.load))
+  
+  (def load (self)
+    "Load todos from file"
+    (if (os.path.exists self.filename)
+      (try
+        (with (open self.filename "r") as f
+          (= data (json.load f))
+          (= self.todos [])
+          (for item data
+            (= todo (TodoItem item["title"] item["description"] item["priority"]))
+            (= todo.id item["id"])
+            (= todo.completed item["completed"])
+            (= todo.created_at item["created_at"])
+            (= todo.completed_at item["completed_at"])
+            (self.todos.append todo)))
+        (except Exception e
+          (print f"Error loading todos: {e}")
+          (= self.todos [])))
+      (= self.todos [])))
+  
+  (def save (self)
+    "Save todos to file"
+    (try
+      (with (open self.filename "w") as f
+        (= data (map (lambda (t) (t.to_dict)) self.todos))
+        (json.dump (list data) f indent=2))
+      (except Exception e
+        (print f"Error saving todos: {e}"))))
+  
+  (def add (self title description="" priority="medium")
+    "Add a new todo"
+    (= todo (TodoItem title description priority))
+    (self.todos.append todo)
+    (self.save)
+    (print f"Added: {todo}")
+    (return todo))
+  
+  (def complete (self todo_id)
+    "Mark a todo as completed"
+    (for todo self.todos
+      (if (== todo.id todo_id)
+        (begin
+          (todo.complete)
+          (self.save)
+          (print f"Completed: {todo}")
+          (return True))))
+    (print "Todo not found")
+    (return False))
+  
+  (def delete (self todo_id)
+    "Delete a todo"
+    (= original_length (len self.todos))
+    (= self.todos (filter (lambda (t) (!= t.id todo_id)) self.todos))
+    (if (< (len self.todos) original_length)
+      (begin
+        (self.save)
+        (print "Todo deleted")
+        (return True))
+      (begin
+        (print "Todo not found")
+        (return False))))
+  
+  (def list_todos (self show_completed=True)
+    "List all todos"
+    (= todos_to_show 
+      (if show_completed 
+        self.todos
+        (filter (lambda (t) (not t.completed)) self.todos)))
+    
+    (if (not todos_to_show)
+      (print "No todos found")
+      (begin
+        (print "\n=== TODO LIST ===")
+        (for priority ["high", "medium", "low"]
+          (= priority_todos (filter (lambda (t) (== t.priority priority)) todos_to_show))
+          (if priority_todos
+            (begin
+              (print f"\n{priority.upper} PRIORITY:")
+              (for todo priority_todos
+                (print f"  {todo}")
+                (if todo.description
+                  (print f"    {todo.description}")))))))))
+  
+  (def search (self query)
+    "Search todos by title or description"
+    (= query_lower (query.lower))
+    (= matches (filter 
+      (lambda (t) 
+        (or (in query_lower (t.title.lower))
+            (in query_lower (t.description.lower))))
+      self.todos))
+    (if matches
+      (begin
+        (print f"\nSearch results for '{query}':")
+        (for todo matches
+          (print f"  {todo}")))
+      (print f"No todos matching '{query}'")))
+  
+  (def stats (self)
+    "Show statistics"
+    (= total (len self.todos))
+    (= completed (len (filter (lambda (t) t.completed) self.todos)))
+    (= pending (- total completed))
+    
+    (print "\n=== STATISTICS ===")
+    (print f"Total todos: {total}")
+    (print f"Completed: {completed}")
+    (print f"Pending: {pending}")
+    
+    (if pending
+      (begin
+        (= by_priority {"high": 0, "medium": 0, "low": 0})
+        (for todo (filter (lambda (t) (not t.completed)) self.todos)
+          (= by_priority[todo.priority] (+ by_priority[todo.priority] 1)))
+        (print "\nPending by priority:")
+        (for priority count by_priority.items
+          (print f"  {priority}: {count}"))))))
+
+# Command-line interface
+(def main ()
+  (= todo_list (TodoList))
+  
+  (def show_help ()
+    (print "\nTodo List Commands:")
+    (print "  add <title> [description] [priority] - Add a new todo")
+    (print "  list - Show all todos")
+    (print "  complete <id> - Mark todo as completed")
+    (print "  delete <id> - Delete a todo")
+    (print "  search <query> - Search todos")
+    (print "  stats - Show statistics")
+    (print "  help - Show this help")
+    (print "  quit - Exit"))
+  
+  (print "Welcome to M28 Todo List!")
+  (show_help)
+  
+  (while True
+    (= input_line (input "\ntodo> ").strip)
+    (if (not input_line)
+      (continue))
+    
+    (= parts (input_line.split))
+    (= command (parts[0].lower))
+    
+    (cond
+      ((== command "quit")
+       (print "Goodbye!")
+       (break))
+      
+      ((== command "help")
+       (show_help))
+      
+      ((== command "add")
+       (if (< (len parts) 2)
+         (print "Usage: add <title> [description] [priority]")
+         (begin
+           (= title (parts[1]))
+           (= description (if (>= (len parts) 3) (parts[2]) ""))
+           (= priority (if (>= (len parts) 4) (parts[3]) "medium"))
+           (if (not (in priority ["high", "medium", "low"]))
+             (print "Priority must be: high, medium, or low")
+             (todo_list.add title description priority)))))
+      
+      ((== command "list")
+       (todo_list.list_todos))
+      
+      ((== command "complete")
+       (if (< (len parts) 2)
+         (print "Usage: complete <id>")
+         (try
+           (= todo_id (float (parts[1])))
+           (todo_list.complete todo_id)
+           (except ValueError
+             (print "Invalid todo ID")))))
+      
+      ((== command "delete")
+       (if (< (len parts) 2)
+         (print "Usage: delete <id>")
+         (try
+           (= todo_id (float (parts[1])))
+           (todo_list.delete todo_id)
+           (except ValueError
+             (print "Invalid todo ID")))))
+      
+      ((== command "search")
+       (if (< (len parts) 2)
+         (print "Usage: search <query>")
+         (= query (join " " (slice parts 1)))
+         (todo_list.search query)))
+      
+      ((== command "stats")
+       (todo_list.stats))
+      
+      (else
+       (print f"Unknown command: {command}")
+       (print "Type 'help' for available commands")))))
+
+# Run the application
+(if (== __name__ "__main__")
+  (main))

@@ -1,0 +1,156 @@
+# Functional Programming Basics in M28
+# First-class functions, higher-order functions, and functional patterns
+
+# Functions are first-class values
+(def greet (name)
+  (return f"Hello, {name}!"))
+
+# Assign function to variable
+(= say_hello greet)
+(print (say_hello "Alice"))  # "Hello, Alice!"
+
+# Store functions in data structures
+(= operations {
+  "add": (lambda (x y) (+ x y)),
+  "subtract": (lambda (x y) (- x y)),
+  "multiply": (lambda (x y) (* x y)),
+  "divide": (lambda (x y) (/ x y))
+})
+
+(print (operations["add"] 10 5))      # 15
+(print (operations["multiply"] 3 4))  # 12
+
+# Higher-order functions - functions that take/return functions
+(def apply_twice (f x)
+  "Apply function f to x twice"
+  (return (f (f x))))
+
+(def increment (x) (+ x 1))
+(print (apply_twice increment 5))  # 7
+
+# Function composition
+(def compose (f g)
+  "Return a new function that is the composition of f and g"
+  (return (lambda (x) (f (g x)))))
+
+(def double (x) (* x 2))
+(def add_one (x) (+ x 1))
+
+(= double_then_add (compose add_one double))
+(print (double_then_add 5))  # 11 (5*2 + 1)
+
+# Map - apply function to each element
+(= numbers [1, 2, 3, 4, 5])
+(= squared (map (lambda (x) (* x x)) numbers))
+(print squared)  # [1, 4, 9, 16, 25]
+
+# Filter - keep elements that satisfy predicate
+(= evens (filter (lambda (x) (== (% x 2) 0)) numbers))
+(print evens)  # [2, 4]
+
+# Reduce - fold a list into a single value
+(def reduce (f initial lst)
+  (= result initial)
+  (for item lst
+    (= result (f result item)))
+  (return result))
+
+(= sum_all (reduce + 0 numbers))
+(print sum_all)  # 15
+
+(= product (reduce * 1 numbers))
+(print product)  # 120
+
+# Partial application / Currying
+(def curry (f)
+  "Convert a 2-argument function to curried form"
+  (return (lambda (x) (lambda (y) (f x y)))))
+
+(= add_curried (curry +))
+(= add5 (add_curried 5))
+(print (add5 3))  # 8
+
+# More practical partial application
+(def partial (f *args)
+  "Partially apply function with given arguments"
+  (return (lambda (*more_args) 
+    (apply f (concat args more_args)))))
+
+(= multiply_by_2 (partial * 2))
+(print (multiply_by_2 10))  # 20
+
+# Function decorators
+(def timer (f)
+  "Decorator to time function execution"
+  (def wrapper (*args **kwargs)
+    (= start (time.time))
+    (= result (apply f args kwargs))
+    (= end (time.time))
+    (print f"{f.__name__} took {- end start} seconds")
+    (return result))
+  (return wrapper))
+
+(def memoize (f)
+  "Decorator to cache function results"
+  (= cache {})
+  (def wrapper (*args)
+    (= key (str args))
+    (if (not (in key cache))
+      (= cache[key] (apply f args)))
+    (return cache[key]))
+  (return wrapper))
+
+# Use decorators
+(= slow_function 
+  (timer 
+    (lambda (n)
+      (time.sleep 0.1)
+      (* n n))))
+
+(print (slow_function 5))  # Prints timing info and result
+
+# Lazy evaluation with generators
+(def lazy_range (start end)
+  "Generate numbers lazily"
+  (= current start)
+  (while (< current end)
+    (yield current)
+    (= current (+ current 1))))
+
+# Infinite sequences
+(def fibonacci ()
+  "Generate Fibonacci numbers infinitely"
+  (= a 0)
+  (= b 1)
+  (while True
+    (yield a)
+    (= a b (+ a b))))
+
+# Take first n elements from generator
+(def take (n gen)
+  (= result [])
+  (for i (range n)
+    (result.append (next gen)))
+  (return result))
+
+(= fib_gen (fibonacci))
+(print (take 10 fib_gen))  # First 10 Fibonacci numbers
+
+# Function pipeline
+(def pipeline (*functions)
+  "Create a pipeline of functions"
+  (def pipe (x)
+    (for f functions
+      (= x (f x)))
+    (return x))
+  (return pipe))
+
+# Example pipeline
+(= process_data 
+  (pipeline
+    (lambda (x) (filter (lambda (n) (> n 0)) x))  # Keep positive
+    (lambda (x) (map (lambda (n) (* n 2)) x))     # Double
+    (lambda (x) (sorted x reverse=True))))         # Sort descending
+
+(= data [-5, 3, -2, 8, 1, -4, 6])
+(print (process_data data))  # [16, 12, 6, 2]

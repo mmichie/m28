@@ -1,5 +1,0 @@
-(def (greet name greeting)
-    (= message (+ greeting ", " name "!"))
-    (return message))
-
-(print (greet "Alice" "Hello"))

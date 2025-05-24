@@ -1,90 +1,113 @@
 # M28 Examples
 
-This directory contains example programs that demonstrate the features and capabilities of the M28 programming language, a Python-inspired Lisp dialect. The examples are now organized by category for easier navigation and learning.
+Welcome to the M28 examples collection! These examples demonstrate the Lispy-Pythonic nature of M28, combining S-expressions with Python semantics.
 
-## Directory Structure
+## Quick Start
 
-- **basics/** - Simple examples to get started with M28
-  - Hello world, simple operations, printing
+```lisp
+# Run an example
+./bin/m28 examples/00_basics/hello_world.m28
 
-- **functions/** - Function definition and usage
-  - Basic functions, lambda functions, advanced patterns
-  - **recursion/** - Recursive function examples (factorial, fibonacci, Y-combinator)
-
-- **data_structures/** - Working with various data structures
-  - **lists/** - List operations and comprehensions
-  - **dictionaries/** - Dictionary creation and manipulation
-  - **sets/** - Set operations
-  - **tuples/** - Tuple operations
-  - **trees/** - Tree data structures and algorithms
-
-- **algorithms/** - Implementation of algorithms
-  - **sorting/** - Sorting algorithms like bubblesort and quicksort
-  - Memoization and other optimization techniques
-
-- **closures/** - Closure patterns for state management
-  - Basic closures, counter implementations, advanced patterns
-
-- **oop/** - Object-oriented programming patterns
-  - Simple objects, method dispatch, class patterns, inheritance
-  - **examples/** - Real-world object examples (counter, person, bank accounts)
-
-- **modules/** - Module system and imports
-  - **modules/** - Sample modules
-  - Import patterns, enhanced modules, dot notation
-
-- **advanced/** - Advanced language features
-  - Exception handling, generators, context managers
-
-- **tutorials/** - Step-by-step tutorials
-  - Closures, objects, counter implementations
-
-## Getting Started
-
-To run any example, use the M28 interpreter:
-
-```bash
-./bin/m28 examples/basics/hello_world.m28
+# Or from the REPL
+(load "examples/00_basics/hello_world.m28")
 ```
 
-Or you can start the REPL and load an example:
+## Organization
 
-```bash
-make run
+Examples are organized by topic and complexity:
+
+- **00_basics/** - Start here! Basic syntax and operations
+- **01_functions/** - Functions, lambdas, and functional concepts
+- **02_control_flow/** - Conditionals, loops, and exceptions
+- **03_data_structures/** - Lists, dictionaries, sets, and tuples
+- **04_classes/** - Object-oriented programming
+- **05_modules/** - Module system and code organization
+- **06_file_io/** - File operations and I/O
+- **07_functional/** - Advanced functional programming
+- **08_projects/** - Complete example applications
+
+See [index.md](index.md) for a detailed listing of all examples.
+
+## M28 Syntax Reminder
+
+```lisp
+# Comments use # (not ;)
+# This is a comment
+
+# Variables use = (not def)
+(= name "M28")
+(= number 42)
+
+# Functions use def
+(def greet (name)
+  (print f"Hello, {name}!"))
+
+# Everything is prefix notation
+(+ 1 2 3)           # 6
+(print "Hello")     # Hello
 ```
+
+## Featured Examples
+
+### Hello World (00_basics/hello_world.m28)
+```lisp
+# The classic first program
+(print "Hello, World!")
+```
+
+### Functions (01_functions/basic_functions.m28)
+```lisp
+# Define a function
+(def factorial (n)
+  (if (<= n 1)
+    1
+    (* n (factorial (- n 1)))))
+
+(print (factorial 5))  # 120
+```
+
+### Classes (04_classes/basic_classes.m28)
+```lisp
+# Define a class
+(class Person
+  (def __init__ (self name)
+    (= self.name name))
+  
+  (def greet (self)
+    (print f"Hello, I'm {self.name}")))
+
+(= alice (Person "Alice"))
+(alice.greet)  # "Hello, I'm Alice"
+```
+
+### List Comprehension (03_data_structures/lists.m28)
+```lisp
+# List comprehension
+(= squares [x**2 for x in (range 10)])
+(print squares)  # [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+```
+
+## Projects
+
+Check out the complete projects in `08_projects/`:
+
+- **todo_app.m28** - A full-featured command-line todo list manager
+- **calculator.m28** - Scientific calculator with expression evaluation
+- **text_adventure.m28** - Text-based adventure game engine
 
 ## Learning Path
 
-If you're new to M28, we recommend exploring the examples in this order:
+1. Start with `00_basics/hello_world.m28`
+2. Work through each directory in order
+3. Try modifying examples to experiment
+4. Build your own programs using these as templates
 
-1. Start with **basics/hello_world.m28** to understand basic syntax
-2. Move to **basics/simple_operations.m28** and **functions/01_basic_functions.m28**
-3. Try **data_structures/lists/01_basic_lists.m28** and **data_structures/dictionaries/01_basic_dict.m28**
-4. Explore **functions/02_lambda_functions.m28** for functional programming concepts
-5. Study the tutorial files in **tutorials/** to understand state management
-6. Progress to **oop/01_simple_objects.m28** and subsequent OOP examples
-7. Examine the algorithm implementations in the **algorithms/** directory for advanced usage
+## Contributing
 
-## Syntax Comparison
+When adding new examples:
+1. Follow the M28 syntax rules (# for comments, = for variables)
+2. Place in the appropriate directory
+3. Include helpful comments
+4. Test before committing
 
-M28 combines Python-inspired semantics with Lisp syntax:
-
-```lisp
-# Python-style function definition with Lisp syntax
-(def (greet name)
-    (print (+ "Hello, " name "!")))
-
-# Lambda functions
-(= add (lambda (a b) (+ a b)))
-
-# Lists and iterations
-(for (i [1, 2, 3, 4, 5])
-    (print i))
-
-# Dictionary operations
-(= person (dict "name" "John" "age" 30))
-(print (get person "name"))
-
-# Tuples
-(= point (1, 2))
-```
+Happy coding with M28!

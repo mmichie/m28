@@ -1,0 +1,188 @@
+# Dictionaries in M28
+# Key-value mappings (hash tables)
+
+# Creating dictionaries
+(= empty {})
+(= person {"name": "Alice", "age": 30, "city": "New York"})
+(= scores {"math": 95, "science": 87, "english": 92})
+(= nested {"user": {"id": 123, "details": {"email": "alice@example.com"}}})
+
+(print "Empty dict:" empty)
+(print "Person:" person)
+(print "Scores:" scores)
+(print "Nested:" nested)
+
+# Accessing values
+(print "\nAccessing values:")
+(print "Name (dot notation):" person.name)
+(print "Age (get function):" (get person "age"))
+(print "City with default:" (get person "city" "Unknown"))
+(print "Country with default:" (get person "country" "USA"))
+(print "Nested access:" nested.user.details.email)
+
+# Modifying dictionaries
+(print "\nModifying dictionaries:")
+(= student {"name": "Bob", "grade": 10})
+(print "Original:" student)
+
+# Add/update using dot notation
+(= student.age 16)
+(= student.grade 11)
+(print "After updates:" student)
+
+# Add/update using set function
+(set student "school" "High School")
+(print "After set:" student)
+
+# Delete a key
+(delete student "grade")
+(print "After delete:" student)
+
+# Dictionary methods
+(print "\nDictionary methods:")
+(= data {"a": 1, "b": 2, "c": 3})
+
+(print "Keys:" (keys data))
+(print "Values:" (values data))
+(print "Items:" (items data))
+(print "Length:" (len data))
+
+# Check if key exists
+(print "\nChecking keys:")
+(print "Has 'a'?" (has_key data "a"))
+(print "Has 'd'?" (has_key data "d"))
+(print "'b' in data?" (in "b" data))
+
+# Iterating over dictionaries
+(print "\nIterating:")
+(= inventory {"apples": 5, "bananas": 3, "oranges": 7})
+
+(print "Keys only:")
+(for key in (keys inventory)
+  (print f"  {key}"))
+
+(print "Values only:")
+(for value in (values inventory)
+  (print f"  {value}"))
+
+(print "Key-value pairs:")
+(for (item, count) in (items inventory)
+  (print f"  {item}: {count}"))
+
+# Dictionary comprehensions
+(print "\nDictionary comprehensions:")
+(= squares {x: x**2 for x in (range 5)})
+(print "Squares:" squares)
+
+(= uppercase {k: (upper v) for (k, v) in (items {"a": "apple", "b": "banana"})})
+(print "Uppercase values:" uppercase)
+
+# Filtering dictionary
+(= high_scores {name: score for (name, score) in (items scores) if (>= score 90)})
+(print "High scores only:" high_scores)
+
+# Merging dictionaries
+(print "\nMerging dictionaries:")
+(= defaults {"color": "blue", "size": "medium", "quantity": 1})
+(= custom {"color": "red", "quantity": 5})
+(= merged (merge defaults custom))
+(print "Defaults:" defaults)
+(print "Custom:" custom)
+(print "Merged:" merged)
+
+# Nested dictionary operations
+(print "\nWorking with nested dictionaries:")
+(= company {
+  "employees": {
+    "alice": {"dept": "engineering", "salary": 100000},
+    "bob": {"dept": "sales", "salary": 80000},
+    "charlie": {"dept": "engineering", "salary": 95000}
+  },
+  "departments": ["engineering", "sales", "hr"]
+})
+
+(print "Alice's department:" company.employees.alice.dept)
+(print "Bob's salary:" company.employees.bob.salary)
+
+# Update nested value
+(= company.employees.alice.salary 110000)
+(print "Alice's new salary:" company.employees.alice.salary)
+
+# Dictionary as a data structure
+(print "\nPractical examples:")
+
+# Counter pattern
+(= text "hello world hello python world")
+(= word_count {})
+(for word in (split text " ")
+  (= word_count.word (+ (get word_count word 0) 1)))
+(print "Word count:" word_count)
+
+# Grouping pattern
+(= students [
+  {"name": "Alice", "grade": "A"},
+  {"name": "Bob", "grade": "B"},
+  {"name": "Charlie", "grade": "A"},
+  {"name": "David", "grade": "B"}
+])
+
+(= by_grade {})
+(for student in students
+  (= grade student.grade)
+  (if (not (in grade by_grade))
+      (= by_grade.grade []))
+  (append by_grade.grade student.name))
+(print "\nStudents by grade:" by_grade)
+
+# Configuration pattern
+(= config {
+  "debug": False,
+  "port": 8080,
+  "host": "localhost",
+  "database": {
+    "engine": "postgresql",
+    "name": "myapp",
+    "user": "admin"
+  }
+})
+
+(def get_config (path default=None)
+  # Get nested config value by dot-separated path
+  (= parts (split path "."))
+  (= value config)
+  (for part in parts
+    (= value (get value part None))
+    (if (== value None)
+        (return default)))
+  value)
+
+(print "\nConfiguration access:")
+(print "Port:" (get_config "port"))
+(print "DB engine:" (get_config "database.engine"))
+(print "Missing value:" (get_config "database.password" "secret"))
+
+# Using dict as a switch/case
+(= operations {
+  "+": (lambda (a b) (+ a b)),
+  "-": (lambda (a b) (- a b)),
+  "*": (lambda (a b) (* a b)),
+  "/": (lambda (a b) (/ a b))
+})
+
+(= op "+")
+(= result ((get operations op) 10 5))
+(print f"\n10 {op} 5 = {result}")
+
+# Dictionary with mixed value types
+(= record {
+  "id": 12345,
+  "active": True,
+  "tags": ["python", "programming"],
+  "metadata": {"created": "2024-01-01", "updated": "2024-01-15"}
+})
+
+(print "\nMixed type dictionary:")
+(print f"ID: {record.id} (type: {(type record.id)})")
+(print f"Active: {record.active} (type: {(type record.active)})")
+(print f"Tags: {record.tags} (type: {(type record.tags)})")
+(print f"Metadata: {record.metadata}")

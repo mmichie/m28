@@ -1,0 +1,104 @@
+# Reading Files in M28
+# Various ways to read from files
+
+# Basic file reading
+(= filename "example.txt")
+
+# Method 1: Using with statement (recommended)
+(with (open filename "r") as f
+  (= content (f.read))
+  (print "File contents:")
+  (print content))
+
+# Method 2: Read entire file at once
+(= f (open filename "r"))
+(= content (f.read))
+(f.close)
+(print content)
+
+# Method 3: Read line by line
+(print "\nReading line by line:")
+(with (open filename "r") as f
+  (for line f
+    (print f"Line: {line.strip}")))
+
+# Method 4: Read all lines into a list
+(with (open filename "r") as f
+  (= lines (f.readlines))
+  (print f"\nFile has {len lines} lines"))
+
+# Method 5: Read with specific encoding
+(with (open filename "r" encoding="utf-8") as f
+  (= content (f.read))
+  (print "UTF-8 encoded content read"))
+
+# Reading binary files
+(= binary_file "image.png")
+(with (open binary_file "rb") as f
+  (= data (f.read 100))  # Read first 100 bytes
+  (print f"First 100 bytes: {len data}"))
+
+# Safe file reading with error handling
+(def read_file_safely (filename)
+  (try
+    (with (open filename "r") as f
+      (return (f.read)))
+    (except FileNotFoundError e
+      (print f"File not found: {filename}")
+      (return None))
+    (except PermissionError e
+      (print f"Permission denied: {filename}")
+      (return None))
+    (except Exception e
+      (print f"Error reading file: {e}")
+      (return None))))
+
+# Example usage
+(= content (read_file_safely "myfile.txt"))
+(if content
+  (print "File read successfully")
+  (print "Failed to read file"))
+
+# Reading JSON files
+(import json)
+
+(def read_json_file (filename)
+  (with (open filename "r") as f
+    (return (json.load f))))
+
+# Example: Read configuration
+# (= config (read_json_file "config.json"))
+# (print config["setting1"])
+
+# Reading CSV files
+(def read_csv_simple (filename)
+  (= rows [])
+  (with (open filename "r") as f
+    (for line f
+      (= row (line.strip.split ","))
+      (rows.append row)))
+  (return rows))
+
+# Process large files efficiently
+(def process_large_file (filename chunk_size=1024)
+  (with (open filename "r") as f
+    (while True
+      (= chunk (f.read chunk_size))
+      (if (not chunk)
+        (break))
+      # Process chunk here
+      (print f"Processing {len chunk} characters"))))
+
+# Read specific lines
+(def read_lines (filename start end)
+  (= lines [])
+  (with (open filename "r") as f
+    (for i line (enumerate f)
+      (if (and (>= i start) (< i end))
+        (lines.append line.strip))
+      (if (>= i end)
+        (break))))
+  (return lines))
+
+# Example: Read lines 5-10
+# (= some_lines (read_lines "bigfile.txt" 5 10))

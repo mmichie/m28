@@ -1,0 +1,160 @@
+# Map, Filter, and Reduce in M28
+# Core functional programming operations
+
+# MAP - Transform each element
+(print "=== MAP Examples ===")
+
+# Basic map
+(= numbers [1, 2, 3, 4, 5])
+(= doubled (map (lambda (x) (* x 2)) numbers))
+(print f"Original: {numbers}")
+(print f"Doubled: {doubled}")
+
+# Map with named function
+(def celsius_to_fahrenheit (c)
+  (+ (* c 9/5) 32))
+
+(= temps_c [0, 10, 20, 30, 40])
+(= temps_f (map celsius_to_fahrenheit temps_c))
+(print f"Celsius: {temps_c}")
+(print f"Fahrenheit: {temps_f}")
+
+# Map on strings
+(= words ["hello", "world", "m28"])
+(= uppercase (map (lambda (s) (s.upper)) words))
+(= lengths (map len words))
+(print f"Words: {words}")
+(print f"Uppercase: {uppercase}")
+(print f"Lengths: {lengths}")
+
+# Map with multiple lists (zip and map)
+(= list1 [1, 2, 3])
+(= list2 [4, 5, 6])
+(= sums (map (lambda (pair) (+ (pair 0) (pair 1))) 
+              (zip list1 list2)))
+(print f"Pairwise sums: {sums}")
+
+# FILTER - Select elements
+(print "\n=== FILTER Examples ===")
+
+# Basic filter
+(= numbers (range 1 11))
+(= evens (filter (lambda (x) (== (% x 2) 0)) numbers))
+(= odds (filter (lambda (x) (== (% x 2) 1)) numbers))
+(print f"Numbers: {list numbers}")
+(print f"Evens: {evens}")
+(print f"Odds: {odds}")
+
+# Filter with complex condition
+(= people [
+  {"name": "Alice", "age": 25},
+  {"name": "Bob", "age": 17},
+  {"name": "Charlie", "age": 30},
+  {"name": "David", "age": 16}
+])
+
+(= adults (filter (lambda (p) (>= p["age"] 18)) people))
+(print "Adults:")
+(for person adults
+  (print f"  {person['name']} ({person['age']})")
+
+# Filter strings
+(= words ["apple", "banana", "apricot", "cherry", "avocado"])
+(= a_words (filter (lambda (w) (w.startswith "a")) words))
+(print f"Words starting with 'a': {a_words}")
+
+# REDUCE - Aggregate to single value
+(print "\n=== REDUCE Examples ===")
+
+# Sum using reduce
+(= numbers [1, 2, 3, 4, 5])
+(= total (reduce + 0 numbers))
+(print f"Sum of {numbers}: {total}")
+
+# Product using reduce
+(= product (reduce * 1 numbers))
+(print f"Product of {numbers}: {product}")
+
+# Find maximum
+(def max_reducer (acc x)
+  (if (> x acc) x acc))
+
+(= maximum (reduce max_reducer (- infinity) numbers))
+(print f"Maximum of {numbers}: {maximum}")
+
+# String concatenation
+(= words ["M28", "is", "awesome"])
+(= sentence (reduce (lambda (acc w) f"{acc} {w}") "" words))
+(print f"Sentence: {sentence.strip}")
+
+# Build dictionary
+(= pairs [["a", 1], ["b", 2], ["c", 3]])
+(= dict_result 
+  (reduce 
+    (lambda (acc pair) 
+      (begin 
+        (= acc[pair[0]] pair[1])
+        acc))
+    {}
+    pairs))
+(print f"Dictionary: {dict_result}")
+
+# COMBINING MAP, FILTER, REDUCE
+(print "\n=== Combining Operations ===")
+
+# Example 1: Sum of squares of even numbers
+(= numbers (range 1 11))
+(= result 
+  (reduce + 0
+    (map (lambda (x) (* x x))
+      (filter (lambda (x) (== (% x 2) 0)) numbers))))
+(print f"Sum of squares of even numbers 1-10: {result}")
+
+# Example 2: Average of positive numbers
+(= data [-5, 3, -2, 8, 0, -1, 7, 4])
+(= positives (filter (lambda (x) (> x 0)) data))
+(= average (/ (reduce + 0 positives) (len positives)))
+(print f"Average of positive numbers: {average}")
+
+# Example 3: Word frequency counter
+(= text "the quick brown fox jumps over the lazy dog the fox")
+(= words (text.split))
+(= word_count 
+  (reduce
+    (lambda (acc word)
+      (begin
+        (= acc[word] (+ (acc.get word 0) 1))
+        acc))
+    {}
+    words))
+(print f"Word frequencies: {word_count}")
+
+# Custom implementations
+(def my_map (f lst)
+  "Custom map implementation"
+  (= result [])
+  (for item lst
+    (result.append (f item)))
+  (return result))
+
+(def my_filter (pred lst)
+  "Custom filter implementation"
+  (= result [])
+  (for item lst
+    (if (pred item)
+      (result.append item)))
+  (return result))
+
+(def my_reduce (f init lst)
+  "Custom reduce implementation"
+  (= acc init)
+  (for item lst
+    (= acc (f acc item)))
+  (return acc))
+
+# Test custom implementations
+(print "\n=== Custom Implementations ===")
+(= nums [1, 2, 3, 4])
+(print f"my_map double: {my_map (lambda (x) (* x 2)) nums}")
+(print f"my_filter even: {my_filter (lambda (x) (== (% x 2) 0)) nums}")
+(print f"my_reduce sum: {my_reduce + 0 nums}")

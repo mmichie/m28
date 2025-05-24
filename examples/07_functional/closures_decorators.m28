@@ -1,0 +1,209 @@
+# Closures and Decorators in M28
+# Advanced functional programming patterns
+
+# CLOSURES - Functions that capture their environment
+(print "=== CLOSURES ===")
+
+# Basic closure
+(def make_counter ()
+  "Create a counter function with private state"
+  (= count 0)
+  (def counter ()
+    (= count (+ count 1))
+    (return count))
+  (return counter))
+
+(= counter1 (make_counter))
+(= counter2 (make_counter))
+
+(print (counter1))  # 1
+(print (counter1))  # 2
+(print (counter2))  # 1 (independent counter)
+(print (counter1))  # 3
+
+# Closure with parameters
+(def make_multiplier (factor)
+  "Create a function that multiplies by factor"
+  (def multiplier (x)
+    (return (* x factor)))
+  (return multiplier))
+
+(= times2 (make_multiplier 2))
+(= times5 (make_multiplier 5))
+
+(print (times2 10))  # 20
+(print (times5 10))  # 50
+
+# More complex closure - bank account
+(def make_account (initial_balance)
+  (= balance initial_balance)
+  
+  (def deposit (amount)
+    (= balance (+ balance amount))
+    (return balance))
+  
+  (def withdraw (amount)
+    (if (>= balance amount)
+      (begin
+        (= balance (- balance amount))
+        (return balance))
+      (raise ValueError "Insufficient funds")))
+  
+  (def get_balance ()
+    (return balance))
+  
+  # Return dictionary of methods
+  (return {
+    "deposit": deposit,
+    "withdraw": withdraw,
+    "balance": get_balance
+  }))
+
+(= account (make_account 100))
+(print f"Initial: {account['balance']}")      # 100
+(print f"After deposit: {account['deposit'] 50}")  # 150
+(print f"After withdraw: {account['withdraw'] 30}") # 120
+
+# DECORATORS - Functions that modify other functions
+(print "\n=== DECORATORS ===")
+
+# Simple logging decorator
+(def logger (func)
+  "Log function calls"
+  (def wrapper (*args **kwargs)
+    (print f"Calling {func.__name__} with args={args}")
+    (= result (apply func args kwargs))
+    (print f"{func.__name__} returned {result}")
+    (return result))
+  (return wrapper))
+
+(def add (a b)
+  (return (+ a b)))
+
+(= logged_add (logger add))
+(logged_add 5 3)
+
+# Timing decorator
+(def timer (func)
+  "Time function execution"
+  (import time)
+  (def wrapper (*args **kwargs)
+    (= start (time.time))
+    (= result (apply func args kwargs))
+    (= end (time.time))
+    (print f"{func.__name__} took {- end start:.4f} seconds")
+    (return result))
+  (return wrapper))
+
+# Memoization decorator
+(def memoize (func)
+  "Cache function results"
+  (= cache {})
+  (def wrapper (*args)
+    (= key (str args))
+    (if (in key cache)
+      (begin
+        (print f"Cache hit for {key}")
+        (return cache[key]))
+      (begin
+        (print f"Cache miss for {key}")
+        (= result (apply func args))
+        (= cache[key] result)
+        (return result))))
+  (return wrapper))
+
+# Example: Fibonacci with memoization
+(def fibonacci (n)
+  (if (<= n 1)
+    (return n)
+    (return (+ (fibonacci (- n 1)) 
+               (fibonacci (- n 2))))))
+
+(= fib_memoized (memoize fibonacci))
+
+(print "\nFibonacci with memoization:")
+(print (fib_memoized 10))  # First call - many cache misses
+(print (fib_memoized 10))  # Second call - cache hit
+
+# Decorator with parameters
+(def repeat (times)
+  "Decorator factory - repeat function call n times"
+  (def decorator (func)
+    (def wrapper (*args **kwargs)
+      (for i (range times)
+        (= result (apply func args kwargs)))
+      (return result))
+    (return wrapper))
+  (return decorator))
+
+(= say_hello (repeat 3) (lambda () (print "Hello!")))
+(say_hello)  # Prints "Hello!" three times
+
+# Access control decorator
+(def requires_auth (func)
+  "Check if user is authenticated"
+  (def wrapper (*args **kwargs)
+    # Simulate auth check
+    (= is_authenticated True)  # In real code, check actual auth
+    (if is_authenticated
+      (return (apply func args kwargs))
+      (raise PermissionError "Authentication required")))
+  (return wrapper))
+
+# Type checking decorator
+(def type_check (*expected_types)
+  "Decorator to check argument types"
+  (def decorator (func)
+    (def wrapper (*args **kwargs)
+      (for i arg (enumerate args)
+        (if (< i (len expected_types))
+          (if (not (isinstance arg expected_types[i]))
+            (raise TypeError 
+              f"Argument {i} must be {expected_types[i].__name__}"))))
+      (return (apply func args kwargs)))
+    (return wrapper))
+  (return decorator))
+
+(= safe_divide 
+  (type_check int int)
+  (lambda (a b) (/ a b)))
+
+# Chaining decorators
+(def debug (func)
+  "Debug decorator"
+  (def wrapper (*args **kwargs)
+    (print f"DEBUG: Entering {func.__name__}")
+    (= result (apply func args kwargs))
+    (print f"DEBUG: Exiting {func.__name__}")
+    (return result))
+  (return wrapper))
+
+# Apply multiple decorators
+(= complex_function
+  (timer
+    (logger
+      (debug
+        (lambda (x) 
+          (time.sleep 0.1)
+          (* x x))))))
+
+(print "\nChained decorators:")
+(complex_function 5)
+
+# Stateful decorators using closures
+(def count_calls (func)
+  "Count how many times function is called"
+  (= calls 0)
+  (def wrapper (*args **kwargs)
+    (= calls (+ calls 1))
+    (print f"{func.__name__} called {calls} times")
+    (return (apply func args kwargs)))
+  # Add attribute to access count
+  (= wrapper.call_count (lambda () calls))
+  (return wrapper))
+
+(= greet (count_calls (lambda (name) (print f"Hello, {name}!"))))
+(greet "Alice")
+(greet "Bob")
+(greet "Charlie")
+(print f"Total calls: {greet.call_count}")

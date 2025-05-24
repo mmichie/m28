@@ -1,0 +1,131 @@
+# Writing Files in M28
+# Various ways to write to files
+
+# Basic file writing
+(= filename "output.txt")
+
+# Method 1: Write string to file
+(with (open filename "w") as f
+  (f.write "Hello, M28!\n")
+  (f.write "This is a test file.\n"))
+
+# Method 2: Write multiple lines
+(= lines ["Line 1", "Line 2", "Line 3"])
+(with (open filename "w") as f
+  (for line lines
+    (f.write f"{line}\n")))
+
+# Method 3: Using writelines
+(= lines_with_newlines ["First line\n", "Second line\n", "Third line\n"])
+(with (open filename "w") as f
+  (f.writelines lines_with_newlines))
+
+# Append to existing file
+(with (open filename "a") as f
+  (f.write "\nAppended line"))
+
+# Write with specific encoding
+(with (open "unicode.txt" "w" encoding="utf-8") as f
+  (f.write "Hello 世界! 🌍\n")
+  (f.write "Unicode text works fine"))
+
+# Writing binary data
+(= binary_data (bytes [72, 101, 108, 108, 111]))  # "Hello" in bytes
+(with (open "binary.dat" "wb") as f
+  (f.write binary_data))
+
+# Safe file writing with error handling
+(def write_file_safely (filename content)
+  (try
+    (with (open filename "w") as f
+      (f.write content)
+      (return True))
+    (except PermissionError e
+      (print f"Permission denied: {filename}")
+      (return False))
+    (except Exception e
+      (print f"Error writing file: {e}")
+      (return False))))
+
+# Write JSON data
+(import json)
+
+(def write_json_file (filename data)
+  (with (open filename "w") as f
+    (json.dump data f indent=2)))
+
+# Example data
+(= config {
+  "name": "M28 App",
+  "version": "1.0.0",
+  "settings": {
+    "debug": True,
+    "port": 8080
+  }
+})
+
+(write_json_file "config.json" config)
+
+# Write CSV data
+(def write_csv_simple (filename rows)
+  (with (open filename "w") as f
+    (for row rows
+      (= line (join "," (map str row)))
+      (f.write f"{line}\n"))))
+
+# Example CSV data
+(= data [
+  ["Name", "Age", "City"],
+  ["Alice", 30, "New York"],
+  ["Bob", 25, "London"],
+  ["Charlie", 35, "Tokyo"]
+])
+
+(write_csv_simple "people.csv" data)
+
+# Create a log file
+(def log_message (logfile message)
+  (import datetime)
+  (= timestamp (datetime.datetime.now))
+  (with (open logfile "a") as f
+    (f.write f"[{timestamp}] {message}\n")))
+
+# Usage
+(log_message "app.log" "Application started")
+(log_message "app.log" "Processing data...")
+
+# Write formatted output
+(def write_report (filename title data)
+  (with (open filename "w") as f
+    # Write header
+    (f.write f"{'=' * 50}\n")
+    (f.write f"{title.center 50}\n")
+    (f.write f"{'=' * 50}\n\n")
+    
+    # Write data
+    (for key value data.items
+      (f.write f"{key}: {value}\n"))
+    
+    # Write footer
+    (f.write f"\n{'=' * 50}\n")
+    (f.write f"Report generated at: {datetime.now}\n")))
+
+# Atomic file writing (write to temp, then rename)
+(import os)
+(import tempfile)
+
+(def atomic_write (filename content)
+  # Create temporary file
+  (= temp_fd temp_name (tempfile.mkstemp))
+  (try
+    # Write to temporary file
+    (with (os.fdopen temp_fd "w") as f
+      (f.write content))
+    # Atomic rename
+    (os.rename temp_name filename)
+    (except Exception e
+      # Clean up on error
+      (os.unlink temp_name)
+      (raise e))))
+
+# This ensures the file is either fully written or not at all

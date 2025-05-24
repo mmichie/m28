@@ -1,394 +1,577 @@
 # M28 Language Guide
 
-M28 is a Lisp interpreter with Python-inspired syntax and features, combining the expressiveness of Lisp with familiar Python semantics. This guide provides a comprehensive overview of the language.
+## Table of Contents
+1. [Core Concepts](#core-concepts)
+2. [Basic Syntax](#basic-syntax)
+3. [Data Types](#data-types)
+4. [Variables and Functions](#variables-and-functions)
+5. [Control Flow](#control-flow)
+6. [Data Structures](#data-structures)
+7. [Object-Oriented Programming](#object-oriented-programming)
+8. [Functional Programming](#functional-programming)
+9. [Exception Handling](#exception-handling)
+10. [Modules and Imports](#modules-and-imports)
+11. [Advanced Features](#advanced-features)
 
-## Contents
-1. [Introduction](#introduction)
-2. [Installation](#installation)
-3. [Usage](#usage)
-4. [Core Features](#core-features)
-5. [Data Types](#data-types)
-6. [Variables and Functions](#variables-and-functions)
-7. [Control Flow](#control-flow)
-8. [Collections](#collections)
-9. [Modules](#modules)
-10. [Object-Oriented Programming](#object-oriented-programming)
-11. [Error Handling](#error-handling)
-12. [Advanced Features](#advanced-features)
+## Core Concepts
 
-## Introduction
+M28 is a Lispy-Pythonic language that combines:
+- **S-expressions**: Everything is an expression in prefix notation
+- **Python semantics**: Familiar keywords, operators, and idioms
+- **Homoiconicity**: Code is data, data is code
+- **Dynamic typing**: Variables don't have fixed types
 
-M28 blends Lisp's parenthesized syntax with Python's semantics and naming conventions. It features a REPL (Read-Eval-Print Loop) for interactive use and executes code from files.
+### Key Principles
+1. All function calls use prefix notation: `(function arg1 arg2)`
+2. Comments use `#` (Python-style, not `;`)
+3. `def` is only for functions, `=` is only for variables
+4. Python keywords and built-ins are preferred
 
-### Key Differences from Standard Lisp
+## Basic Syntax
 
-1. **Python-like Names**: Functions use `snake_case` rather than `kebab-case`
-2. **Assignment**: Uses `=` instead of `set!` or `define`
-3. **Truthiness**: Follows Python's truthiness rules (`0`, `""`, `None`, empty lists are falsy)
-4. **Data Types**: Includes Python types like dictionaries and sets
-5. **Boolean Syntax**: Uses `True` and `False` instead of `#t` and `#f`
-
-## Installation
-
-To use M28, follow these steps:
-
-1. Ensure you have Go installed on your system
-2. Clone the repository: `git clone https://github.com/mmichie/m28.git`
-3. Navigate to the project directory: `cd m28`
-4. Build the project: `make build`
-
-## Usage
-
-### REPL Mode
-
-To start the interactive REPL:
-
-```bash
-make run
-# or
-./bin/m28
+### Comments
+```lisp
+# This is a comment
+# Comments always use # (Python-style)
 ```
 
-### Execute a File
-
-To run a script:
-
-```bash
-./bin/m28 path/to/your/file.m28
+### Expressions
+Everything in M28 is an expression:
+```lisp
+(+ 1 2)              # Returns 3
+(print "Hello")      # Returns None, prints Hello
+(if (> x 0) x 0)     # Returns x if positive, else 0
 ```
 
-### Run Tests
-
-To execute the test suite:
-
-```bash
-make test
-```
-
-## Core Features
-
-M28 supports these fundamental operations:
-
-### Arithmetic
-- Addition: `(+ 1 2 3)` → `6`
-- Subtraction: `(- 10 5)` → `5`
-- Multiplication: `(* 2 3 4)` → `24`
-- Division: `(/ 10 2)` → `5`
-- Modulo: `(% 10 3)` → `1`
-- Power: `(** 2 3)` → `8`
-
-### Comparison
-- Equality: `(== 5 5)` → `True`
-- Inequality: `(!= 5 6)` → `True`
-- Greater/Less: `(> 5 3)`, `(< 3 5)` → `True`
-- Greater/Less Equal: `(>= 5 5)`, `(<= 5 5)` → `True`
-
-### Logical Operations
-- And: `(and condition1 condition2)`
-- Or: `(or condition1 condition2)`
-- Not: `(not condition)`
+### Naming Conventions
+- Variables: `snake_case`
+- Functions: `snake_case`
+- Classes: `PascalCase`
+- Constants: `UPPER_SNAKE_CASE`
+- Private: `_leading_underscore`
 
 ## Data Types
 
-M28 supports the following data types:
+### Numbers
+```lisp
+(= integer 42)
+(= float 3.14)
+(= negative -10)
+(= scientific 1.23e-4)
+```
 
-### Primitive Types
-- **Numbers**: `42`, `3.14`
-- **Strings**: `"Hello, World!"`
-- **Symbols**: `variable_name`
-- **Booleans**: `True`, `False`
-- **None**: `None`
+### Strings
+```lisp
+(= simple "Hello, World!")
+(= multi-line "Line 1\nLine 2")
+(= escaped "She said \"Hi\"")
+(= formatted f"The answer is {answer}")
+```
 
-### Collection Types
-- **Lists**: `(list 1 2 3 4)`
-- **Dictionaries**: `{"key": value, "key2": value2}`
-- **Sets**: `(set 1 2 3 4)`
-- **Tuples**: `(tuple 1 2 3 4)`
+### Booleans
+```lisp
+(= yes True)    # or true
+(= no False)    # or false
+```
+
+### None/Nil
+```lisp
+(= nothing None)    # or nil
+```
 
 ## Variables and Functions
 
 ### Variable Assignment
-
 ```lisp
-(= x 10)              # Assign 10 to x
-(= y "hello")         # Assign "hello" to y
-(= z (+ x 5))         # Assign the result of (+ x 5) to z
+# Use = for ALL variable assignments
+(= x 10)
+(= name "Alice")
+(= numbers [1, 2, 3])
+
+# Multiple assignment
+(= (x, y) (10, 20))
 ```
 
 ### Function Definition
-
 ```lisp
-# Define a function to add two numbers
-(def (add_two_numbers a b)
-  (+ a b))
+# def is ONLY for functions
+(def greet (name)
+  (print f"Hello, {name}!"))
 
-# Call the function
-(add_two_numbers 5 3)  # Returns: 8
+# With default arguments
+(def greet (name="World")
+  (print f"Hello, {name}!"))
+
+# With multiple return values
+(def divmod (a b)
+  ((// a b), (% a b)))
+
+# Variadic functions
+(def sum (*args)
+  (reduce + args 0))
+
+# Keyword arguments
+(def configure (**kwargs)
+  (print kwargs))
 ```
 
 ### Lambda Functions
-
 ```lisp
-# Anonymous function
-(def square (lambda (x) (* x x)))
+(= square (lambda (x) (* x x)))
+(= add (lambda (x y) (+ x y)))
 
-# Use it
-(square 5)  # Returns: 25
-
-# Or inline
-((lambda (x) (* x x)) 5)  # Returns: 25
+# Using lambdas with higher-order functions
+(map (lambda (x) (* x 2)) [1, 2, 3])
 ```
 
 ## Control Flow
 
 ### Conditionals
-
 ```lisp
 # Simple if
-(if condition
-    true_expression
-    false_expression)
+(if (> x 0)
+    (print "positive"))
 
-# If-elif-else pattern
-(if condition1
-    result1
-    (if condition2
-        result2
-        result3))
+# if-else
+(if (> x 0)
+    (print "positive")
+    (print "non-positive"))
+
+# if-elif-else
+(if (> x 0)
+    (print "positive")
+    (elif (< x 0)
+        (print "negative")
+        (print "zero")))
+
+# Conditional expression
+(= result (if (> x 0) "positive" "non-positive"))
 ```
 
 ### Loops
 
+#### While Loop
 ```lisp
-# For loop
-(for item items
-  (print item))
+(= i 0)
+(while (< i 10)
+  (print i)
+  (= i (+ i 1)))
 
-# While loop
-(while condition
-  expression1
-  expression2)
+# With break and continue
+(while True
+  (= x (input "Enter number: "))
+  (if (== x "quit")
+      (break))
+  (if (< x 0)
+      (continue))
+  (print (* x x)))
+```
 
-# Break and continue
-(for i (range 10)
-  (if (== i 5)
-    (continue))
-  (if (== i 8)
-    (break))
+#### For Loop
+```lisp
+# Iterate over list
+(for x in [1, 2, 3]
+  (print x))
+
+# With range
+(for i in (range 10)
   (print i))
+
+# Dictionary iteration
+(for (k, v) in (items dict)
+  (print f"{k}: {v}"))
+
+# With enumerate
+(for (i, val) in (enumerate list)
+  (print f"{i}: {val}"))
 ```
 
-## Collections
+## Data Structures
 
-### List Operations
-
+### Lists
 ```lisp
-# Create a list
-(= numbers (list 1 2 3 4 5))
+# Creation
+(= empty [])
+(= numbers [1, 2, 3, 4, 5])
+(= mixed [1, "two", 3.0, [4, 5]])
 
-# Get list element by index
-(get numbers 0)  # Returns: 1
+# Access
+(print numbers.0)        # First element (dot notation)
+(print (nth numbers 2))  # Third element
 
-# Concatenate lists
-(+ (list 1 2) (list 3 4))  # Returns: (1 2 3 4)
+# Modification
+(append numbers 6)
+(= numbers.0 10)        # Update first element
+
+# List comprehensions
+(= squares [x**2 for x in (range 10)])
+(= evens [x for x in numbers if (== (% x 2) 0)])
 ```
 
-### Dictionary Operations
-
+### Dictionaries
 ```lisp
-# Create a dictionary
-(= person {"name": "John", "age": 30})
+# Creation
+(= empty {})
+(= person {"name": "Alice", "age": 30, "city": "NYC"})
 
-# Dictionary with dict function
-(= person2 (dict "name" "Jane" "age" 25))
+# Access
+(print person.name)              # Dot notation
+(print (get person "age"))       # get function
+(print (get person "job" None))  # With default
 
-# Access dictionary values
-(get person "name")  # Returns: "John"
+# Modification
+(= person.age 31)
+(= person.job "Engineer")
 
-# With default value for missing keys
-(get person "address" "Unknown")  # Returns: "Unknown"
+# Dictionary comprehensions
+(= squares {x: x**2 for x in (range 5)})
+
+# Methods
+(print (keys person))
+(print (values person))
+(print (items person))
 ```
 
-### Dictionary as Keyword Arguments
-
+### Sets
 ```lisp
-# Print with custom parameters
-(print "Hello" "World" {"sep": "-", "end": "!"})
-# Prints: Hello-World!
-```
+# Creation
+(= empty (set))
+(= numbers {1, 2, 3})
+(= from_list (set [1, 2, 2, 3, 3]))  # {1, 2, 3}
 
-### Set Operations
-
-```lisp
-# Create a set
-(= s (set 1 2 3 4))
-
-# Check membership
-(in 2 s)  # Returns: True
+# Operations
+(add numbers 4)
+(remove numbers 2)
+(print (in 3 numbers))  # True
 
 # Set operations
-(= a (set 1 2 3))
-(= b (set 2 3 4))
-(set_union a b)      # Returns: (1 2 3 4)
-(set_intersection a b)  # Returns: (2 3)
-(set_difference a b)    # Returns: (1)
+(= a {1, 2, 3})
+(= b {2, 3, 4})
+(print (union a b))        # {1, 2, 3, 4}
+(print (intersection a b)) # {2, 3}
+(print (difference a b))   # {1}
 ```
 
-## Modules
-
-### Importing Modules
-
+### Tuples
 ```lisp
-# Import entire module
-(import "math")
-(print math.pi)  # Access module attribute
+# Creation
+(= empty ())
+(= point (10, 20))
+(= single (42,))  # Single element tuple
 
-# Import specific module
-(import "examples/modules/simple_module")
-(print (simple_module.add 5 3))  # Call module function
-```
+# Access (immutable)
+(print point.0)   # 10
+(print point.1)   # 20
 
-### Creating Modules
-
-Modules are simply M28 files with function and variable definitions:
-
-```lisp
-# In math_utils.m28
-(def PI 3.14159)
-
-(def (square x)
-  (* x x))
-
-(def (cube x)
-  (* x x x))
-```
-
-These can then be imported:
-
-```lisp
-(import "math_utils")
-(print math_utils.PI)
-(print (math_utils.square 5))
+# Unpacking
+(= (x, y) point)
 ```
 
 ## Object-Oriented Programming
 
-M28 implements objects using a closure-based approach:
-
-### Creating Objects with Methods
-
+### Classes
 ```lisp
-(def make-counter (lambda (initial-value)
-  (= count initial-value)
+# Basic class
+(class Animal
+  (def __init__ (self name)
+    (= self.name name))
   
-  (def (get-count)
-    count)
-    
-  (def (increment)
-    (= count (+ count 1))
-    count)
-    
-  (def (decrement)
-    (= count (- count 1))
-    count)
-    
-  (dict 
-    "get-count" get-count
-    "increment" increment
-    "decrement" decrement)))
+  (def speak (self)
+    (print f"{self.name} makes a sound")))
 
-# Create an instance
-(= counter (make-counter 0))
+# Inheritance
+(class Dog (Animal)
+  (def __init__ (self name breed)
+    (super.__init__ name)
+    (= self.breed breed))
+  
+  (def speak (self)
+    (print f"{self.name} barks!"))
+  
+  (def fetch (self)
+    (print f"{self.name} fetches the ball")))
 
-# Call methods
-(print ((get counter "get-count")))  # 0
-(print ((get counter "increment")))  # 1
-(print ((get counter "increment")))  # 2
-(print ((get counter "decrement")))  # 1
+# Usage
+(= rex (Dog "Rex" "Labrador"))
+(rex.speak)       # Rex barks!
+(rex.fetch)       # Rex fetches the ball
 ```
 
-### Using Dot Notation
-
-With M28's dot notation support:
-
+### Properties and Methods
 ```lisp
-(= counter (make-counter 0))
-(print (counter.get-count counter))  # 0
-(print (counter.increment counter))  # 1
+(class Person
+  (def __init__ (self name age)
+    (= self.name name)
+    (= self._age age))  # Private by convention
+  
+  # Property getter
+  (def age (self)
+    self._age)
+  
+  # Property setter
+  (def set_age (self value)
+    (if (>= value 0)
+        (= self._age value)
+        (raise (ValueError "Age must be non-negative"))))
+  
+  # Class method
+  (classmethod
+  (def from_birth_year (cls name birth_year)
+    (= age (- (current_year) birth_year))
+    (cls name age)))
+  
+  # Static method  
+  (staticmethod
+  (def is_adult (age)
+    (>= age 18))))
 ```
 
-## Error Handling
+## Functional Programming
 
+### Higher-Order Functions
 ```lisp
-# Basic try-except
-(try
-  (/ 10 0)
-  (except ZeroDivisionError
-    (print "Cannot divide by zero")))
+# map
+(= numbers [1, 2, 3, 4, 5])
+(= doubled (map (lambda (x) (* x 2)) numbers))
 
-# With exception variable
-(try
-  (/ 10 0)
-  (except ZeroDivisionError as err
-    (print "Error:" err)))
+# filter
+(= evens (filter (lambda (x) (== (% x 2) 0)) numbers))
 
-# With finally
+# reduce
+(= sum (reduce + numbers))
+(= product (reduce * numbers 1))
+
+# Custom higher-order function
+(def apply_twice (f x)
+  (f (f x)))
+
+(print (apply_twice (lambda (x) (* x 2)) 5))  # 20
+```
+
+### Function Composition
+```lisp
+(def compose (f g)
+  (lambda (x) (f (g x))))
+
+(= add1 (lambda (x) (+ x 1)))
+(= double (lambda (x) (* x 2)))
+(= add1_then_double (compose double add1))
+
+(print (add1_then_double 5))  # 12
+```
+
+### Partial Application
+```lisp
+(def partial (f *args)
+  (lambda (*more_args)
+    (apply f (+ args more_args))))
+
+(= add (lambda (x y) (+ x y)))
+(= add5 (partial add 5))
+(print (add5 10))  # 15
+```
+
+## Exception Handling
+
+### Try-Except
+```lisp
 (try
-  (print "Attempting operation")
-  (except Exception
-    (print "Handling error"))
+  (= result (/ 10 0))
+  (except ZeroDivisionError as e
+    (print f"Error: {e}")
+    (= result 0)))
+
+# Multiple exception types
+(try
+  (risky_operation)
+  (except (ValueError, TypeError) as e
+    (print f"Value or Type error: {e}"))
+  (except Exception as e
+    (print f"Unexpected error: {e}")))
+
+# With else and finally
+(try
+  (= f (open "data.txt"))
+  (= data (read f))
+  (except IOError
+    (print "Could not read file"))
+  (else
+    (print "File read successfully"))
   (finally
-    (print "Cleanup code")))
+    (if (exists f) (close f))))
+```
 
-# Assertions
-(assert (> x 0) "x must be positive")
+### Raising Exceptions
+```lisp
+(def divide (a b)
+  (if (== b 0)
+      (raise (ValueError "Cannot divide by zero"))
+      (/ a b)))
+
+# Custom exceptions
+(class CustomError (Exception)
+  (def __init__ (self message)
+    (= self.message message)))
+
+(raise (CustomError "Something went wrong"))
+```
+
+## Modules and Imports
+
+### Importing Modules
+```lisp
+# Import entire module
+(import math)
+(print (math.sqrt 16))
+
+# Import with alias
+(import numpy as np)
+(= arr (np.array [1, 2, 3]))
+
+# Import specific items
+(from math import (sqrt, pi))
+(print (sqrt 16))
+
+# Import all (use sparingly)
+(from math import *)
+```
+
+### Creating Modules
+```lisp
+# In my_module.m28
+(def public_function (x)
+  (* x 2))
+
+(def _private_function (x)
+  (* x 3))
+
+(class MyClass
+  (def __init__ (self)
+    (= self.value 42)))
+
+# Module-level code
+(print "Module loaded")
+
+# Export specific items
+(= __all__ ["public_function", "MyClass"])
 ```
 
 ## Advanced Features
 
-### List Comprehensions
-
+### Generators
 ```lisp
-# Create a list of squares
-(= squares 
-  (for (x (range 10))
-    (* x x)))
+(def fibonacci ()
+  (= (a, b) (0, 1))
+  (while True
+    (yield a)
+    (= (a, b) (b, (+ a b)))))
+
+(= fib (fibonacci))
+(for _ in (range 10)
+  (print (next fib)))
 ```
 
-### Higher-Order Functions
-
+### Context Managers
 ```lisp
-# Map
-(map (lambda (x) (* x 2)) (list 1 2 3 4))  # Returns: (2 4 6 8)
+# Using with statement
+(with (open "file.txt" "r") as f
+  (for line in f
+    (print (strip line))))
 
-# Filter
-(filter (lambda (x) (> x 5)) (list 1 8 3 6 2 9))  # Returns: (8 6 9)
+# Custom context manager
+(class Timer
+  (def __enter__ (self)
+    (= self.start (time))
+    self)
+  
+  (def __exit__ (self exc_type exc_val exc_tb)
+    (= self.end (time))
+    (print f"Elapsed: {(- self.end self.start)}s")))
 
-# Reduce
-(reduce + (list 1 2 3 4 5))  # Returns: 15
+(with (Timer) as timer
+  (sleep 1))
 ```
 
-### Context Managers (When Implemented)
-
+### Decorators (Future)
 ```lisp
-# File I/O with context manager
-(with (open "example.txt" "r") as file
-  (print (file.read)))
+(def memoize (f)
+  (= cache {})
+  (lambda (*args)
+    (if (in args cache)
+        cache.args
+        (do
+          (= result (f *args))
+          (= cache.args result)
+          result))))
+
+(@memoize
+(def fibonacci (n)
+  (if (<= n 1)
+      n
+      (+ (fibonacci (- n 1)) (fibonacci (- n 2))))))
 ```
 
-### Generators (When Implemented)
-
+### Async/Await (Future)
 ```lisp
-(def (count-up-to n)
-  (= i 0)
-  (while (< i n)
-    (yield i)
-    (= i (+ i 1))))
+(async def fetch_data (url)
+  (= response (await (http.get url)))
+  response.json)
 
-(for x (count-up-to 5)
-  (print x))
+(async def main ()
+  (= data (await (fetch_data "https://api.example.com")))
+  (print data))
+
+(run (main))
 ```
 
----
+## Best Practices
 
-For detailed examples and more advanced usage, see the example files in the `/examples` directory.
+1. **Use Python idioms**: Write code that feels Pythonic despite the s-expressions
+2. **Prefer immutability**: Use tuples over lists when data won't change
+3. **Keep functions small**: Each function should do one thing well
+4. **Use descriptive names**: `calculate_total` not `calc` or `ct`
+5. **Handle errors gracefully**: Use try-except for expected failures
+6. **Document your code**: Use docstrings for functions and classes
+7. **Follow PEP 8 spirit**: Even in s-expression syntax, maintain readability
+
+## Common Patterns
+
+### Builder Pattern
+```lisp
+(class QueryBuilder
+  (def __init__ (self)
+    (= self.query ""))
+  
+  (def select (self *fields)
+    (= self.query (+ "SELECT " (join fields ", ")))
+    self)
+  
+  (def from (self table)
+    (= self.query (+ self.query f" FROM {table}"))
+    self)
+  
+  (def where (self condition)
+    (= self.query (+ self.query f" WHERE {condition}"))
+    self)
+  
+  (def build (self)
+    self.query))
+
+(= query ((QueryBuilder)
+          .select("name", "age")
+          .from("users")
+          .where("age > 18")
+          .build))
+```
+
+### Factory Pattern
+```lisp
+(def create_shape (shape_type **kwargs)
+  (if (== shape_type "circle")
+      (Circle kwargs.radius)
+      (elif (== shape_type "rectangle")
+          (Rectangle kwargs.width kwargs.height)
+          (raise (ValueError f"Unknown shape: {shape_type}")))))
+```
+
+This guide covers the essential aspects of M28. For more examples and patterns, see the [examples directory](../examples/).

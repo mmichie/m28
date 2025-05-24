@@ -1,0 +1,315 @@
+# Text Adventure Game in M28
+# A simple text-based adventure game framework
+
+(import random)
+
+# Base classes for game objects
+(class GameObject
+  (def __init__ (self name description)
+    (= self.name name)
+    (= self.description description))
+  
+  (def __str__ (self)
+    (return self.name)))
+
+(class Item (GameObject)
+  (def __init__ (self name description portable=True)
+    (super.__init__ name description)
+    (= self.portable portable))
+  
+  (def use (self player)
+    (print f"You can't use the {self.name} here.")))
+
+(class Room (GameObject)
+  (def __init__ (self name description)
+    (super.__init__ name description)
+    (= self.exits {})
+    (= self.items [])
+    (= self.visited False))
+  
+  (def add_exit (self direction room)
+    (= self.exits[direction] room))
+  
+  (def add_item (self item)
+    (self.items.append item))
+  
+  (def remove_item (self item)
+    (if (in item self.items)
+      (self.items.remove item)))
+  
+  (def get_full_description (self)
+    (= desc self.description)
+    (if self.items
+      (begin
+        (= desc (+ desc "\n\nYou can see:"))
+        (for item self.items
+          (= desc (+ desc f"\n  - {item.name}")))))
+    (if self.exits
+      (begin
+        (= desc (+ desc "\n\nExits:"))
+        (for direction self.exits.keys
+          (= desc (+ desc f"\n  - {direction}")))))
+    (return desc)))
+
+(class Player
+  (def __init__ (self name)
+    (= self.name name)
+    (= self.inventory [])
+    (= self.current_room None)
+    (= self.score 0))
+  
+  (def take_item (self item)
+    (if (not item.portable)
+      (print f"You can't take the {item.name}.")
+      (begin
+        (self.inventory.append item)
+        (self.current_room.remove_item item)
+        (print f"You take the {item.name}.")
+        (= self.score (+ self.score 10)))))
+  
+  (def drop_item (self item_name)
+    (for item self.inventory
+      (if (== item.name.lower item_name.lower)
+        (begin
+          (self.inventory.remove item)
+          (self.current_room.add_item item)
+          (print f"You drop the {item.name}.")
+          (return))))
+    (print "You don't have that item."))
+  
+  (def show_inventory (self)
+    (if (not self.inventory)
+      (print "You're not carrying anything.")
+      (begin
+        (print "You are carrying:")
+        (for item self.inventory
+          (print f"  - {item.name}")))))
+  
+  (def move (self direction)
+    (if (in direction self.current_room.exits)
+      (begin
+        (= self.current_room self.current_room.exits[direction])
+        (if (not self.current_room.visited)
+          (begin
+            (= self.current_room.visited True)
+            (= self.score (+ self.score 5))))
+        (return True))
+      (begin
+        (print "You can't go that way.")
+        (return False)))))
+
+# Game class
+(class Game
+  (def __init__ (self)
+    (= self.player None)
+    (= self.rooms {})
+    (= self.game_over False)
+    (= self.victory False)
+    (self._create_world))
+  
+  (def _create_world (self)
+    # Create rooms
+    (= entrance (Room "Entrance Hall" 
+      "You are in a grand entrance hall with a high ceiling. Dust motes dance in the light filtering through tall windows."))
+    (= library (Room "Library"
+      "The library is filled with ancient books. The smell of old paper fills the air."))
+    (= garden (Room "Garden"
+      "You are in a beautiful garden. Flowers bloom in every direction and birds sing in the trees."))
+    (= study (Room "Study"
+      "A cozy study with a large desk and comfortable chair. Papers are scattered about."))
+    (= cellar (Room "Cellar"
+      "A dark, damp cellar. You can hear water dripping somewhere in the darkness."))
+    (= treasure_room (Room "Treasure Room"
+      "You've found the treasure room! Gold and jewels sparkle in the torchlight."))
+    
+    # Connect rooms
+    (entrance.add_exit "north" library)
+    (entrance.add_exit "east" garden)
+    (entrance.add_exit "down" cellar)
+    
+    (library.add_exit "south" entrance)
+    (library.add_exit "east" study)
+    
+    (garden.add_exit "west" entrance)
+    
+    (study.add_exit "west" library)
+    
+    (cellar.add_exit "up" entrance)
+    (cellar.add_exit "north" treasure_room)
+    
+    (treasure_room.add_exit "south" cellar)
+    
+    # Create items
+    (= key (Item "key" "A small brass key with intricate engravings."))
+    (= book (Item "book" "An ancient leather-bound book with mysterious symbols."))
+    (= torch (Item "torch" "A wooden torch that provides light."))
+    (= treasure (Item "treasure" "A chest full of gold coins and precious gems." False))
+    
+    # Place items
+    (garden.add_item key)
+    (library.add_item book)
+    (entrance.add_item torch)
+    (treasure_room.add_item treasure)
+    
+    # Store rooms
+    (= self.rooms {
+      "entrance": entrance,
+      "library": library,
+      "garden": garden,
+      "study": study,
+      "cellar": cellar,
+      "treasure_room": treasure_room
+    }))
+  
+  (def start (self)
+    (print "\n=== THE MYSTERIOUS MANSION ===")
+    (print "\nYou stand before a mysterious mansion.")
+    (print "Legend says great treasure lies within...")
+    (print "\nWhat is your name, adventurer?")
+    
+    (= name (input "> ").strip)
+    (= self.player (Player name or "Adventurer"))
+    (= self.player.current_room self.rooms["entrance"])
+    
+    (print f"\nWelcome, {self.player.name}!")
+    (print "Type 'help' for a list of commands.\n")
+    
+    (self.game_loop))
+  
+  (def game_loop (self)
+    (while (not self.game_over)
+      # Show current room
+      (print f"\n=== {self.player.current_room.name} ===")
+      (print self.player.current_room.get_full_description)
+      
+      # Get and process command
+      (= command (input "\n> ").strip.lower)
+      (self.process_command command)
+      
+      # Check win condition
+      (if (and (== self.player.current_room self.rooms["treasure_room"])
+               (in "treasure" (map (lambda (i) i.name) self.player.inventory)))
+        (begin
+          (= self.victory True)
+          (= self.game_over True))))
+    
+    # Game over
+    (if self.victory
+      (begin
+        (print "\n=== VICTORY! ===")
+        (print f"Congratulations, {self.player.name}!")
+        (print "You've found the treasure and escaped the mansion!")
+        (print f"Final score: {self.player.score}"))
+      (begin
+        (print "\n=== GAME OVER ===")
+        (print f"Thanks for playing, {self.player.name}!")
+        (print f"Final score: {self.player.score}"))))
+  
+  (def process_command (self command)
+    (= parts (command.split))
+    (if (not parts)
+      (return))
+    
+    (= action (parts[0]))
+    
+    (cond
+      # Movement
+      ((in action ["north", "south", "east", "west", "up", "down"])
+       (self.player.move action))
+      
+      ((in action ["n", "s", "e", "w", "u", "d"])
+       (= directions {"n": "north", "s": "south", "e": "east", 
+                       "w": "west", "u": "up", "d": "down"})
+       (self.player.move directions[action]))
+      
+      # Look
+      ((== action "look")
+       (print self.player.current_room.get_full_description))
+      
+      # Take
+      ((== action "take")
+       (if (< (len parts) 2)
+         (print "Take what?")
+         (begin
+           (= item_name (join " " (slice parts 1)))
+           (= found False)
+           (for item self.player.current_room.items
+             (if (== item.name.lower item_name)
+               (begin
+                 (self.player.take_item item)
+                 (= found True)
+                 (break))))
+           (if (not found)
+             (print "You don't see that here.")))))
+      
+      # Drop
+      ((== action "drop")
+       (if (< (len parts) 2)
+         (print "Drop what?")
+         (begin
+           (= item_name (join " " (slice parts 1)))
+           (self.player.drop_item item_name))))
+      
+      # Inventory
+      ((in action ["inventory", "inv", "i"])
+       (self.player.show_inventory))
+      
+      # Examine
+      ((== action "examine")
+       (if (< (len parts) 2)
+         (print "Examine what?")
+         (begin
+           (= item_name (join " " (slice parts 1)))
+           (= found False)
+           # Check room items
+           (for item self.player.current_room.items
+             (if (== item.name.lower item_name)
+               (begin
+                 (print item.description)
+                 (= found True)
+                 (break))))
+           # Check inventory
+           (if (not found)
+             (for item self.player.inventory
+               (if (== item.name.lower item_name)
+                 (begin
+                   (print item.description)
+                   (= found True)
+                   (break)))))
+           (if (not found)
+             (print "You don't see that here.")))))
+      
+      # Score
+      ((== action "score")
+       (print f"Current score: {self.player.score}"))
+      
+      # Help
+      ((== action "help")
+       (print "\nAvailable commands:")
+       (print "  north/south/east/west/up/down (or n/s/e/w/u/d) - Move")
+       (print "  look - Look around")
+       (print "  take <item> - Take an item")
+       (print "  drop <item> - Drop an item")
+       (print "  inventory (or inv, i) - Show inventory")
+       (print "  examine <item> - Examine an item")
+       (print "  score - Show current score")
+       (print "  quit - Quit the game")
+       (print "  help - Show this help"))
+      
+      # Quit
+      ((== action "quit")
+       (print "Are you sure you want to quit? (yes/no)")
+       (= confirm (input "> ").strip.lower)
+       (if (in confirm ["yes", "y"])
+         (= self.game_over True)))
+      
+      (else
+       (print "I don't understand that command. Type 'help' for a list of commands.")))))
+
+# Run the game
+(def main ()
+  (= game (Game))
+  (game.start))
+
+(if (== __name__ "__main__")
+  (main))
