@@ -1,0 +1,186 @@
+; Performance benchmarks for M28
+
+(import "test_framework" as test)
+
+; Timing utility
+(def time-it (lambda (name iterations fn)
+  (print (+ "\nBenchmark: " name))
+  (print (+ "Iterations: " (str iterations)))
+  
+  ; Warm up
+  (for i in (range 10) (fn))
+  
+  ; Time the actual run
+  (def start (current-time-millis))
+  (for i in (range iterations) (fn))
+  (def end (current-time-millis))
+  
+  (def total-ms (- end start))
+  (def per-iter (/ total-ms iterations))
+  
+  (print (+ "Total time: " (str total-ms) "ms"))
+  (print (+ "Per iteration: " (str per-iter) "ms"))
+  (print (+ "Operations/sec: " (str (round (/ 1000 per-iter)))))
+  total-ms))
+
+; Helper to get current time in milliseconds
+(def current-time-millis (lambda ()
+  ; This would need to be implemented as a builtin
+  ; For now, we'll use a counter
+  0))
+
+; Benchmarks
+(def run-benchmarks (lambda ()
+  (print "=== M28 Performance Benchmarks ===")
+  
+  ; Arithmetic operations
+  (print "\n## Arithmetic Operations")
+  
+  (time-it "Integer addition" 100000 (lambda ()
+    (def sum 0)
+    (for i in (range 100)
+      (set! sum (+ sum i)))))
+  
+  (time-it "Float multiplication" 100000 (lambda ()
+    (def product 1.0)
+    (for i in (range 1 21)
+      (set! product (* product 1.1)))))
+  
+  ; List operations
+  (print "\n## List Operations")
+  
+  (time-it "List append" 10000 (lambda ()
+    (def lst [])
+    (for i in (range 100)
+      (set! lst (append lst i)))))
+  
+  (time-it "List indexing" 100000 (lambda ()
+    (def lst (range 100))
+    (def sum 0)
+    (for i in (range 100)
+      (set! sum (+ sum (nth lst i))))))
+  
+  ; Dictionary operations
+  (print "\n## Dictionary Operations")
+  
+  (time-it "Dict insert" 10000 (lambda ()
+    (def d {})
+    (for i in (range 100)
+      (set! d (assoc d (str i) i)))))
+  
+  (time-it "Dict lookup" 100000 (lambda ()
+    (def d {})
+    (for i in (range 100)
+      (set! d (assoc d (str i) i)))
+    (def sum 0)
+    (for i in (range 100)
+      (set! sum (+ sum (get d (str i)))))))
+  
+  ; Function calls
+  (print "\n## Function Calls")
+  
+  (def fib (lambda (n)
+    (if (<= n 1)
+      n
+      (+ (fib (- n 1)) (fib (- n 2))))))
+  
+  (time-it "Recursive fibonacci(20)" 100 (lambda ()
+    (fib 20)))
+  
+  (def fact-iter (lambda (n)
+    (def result 1)
+    (for i in (range 1 (+ n 1))
+      (set! result (* result i)))
+    result))
+  
+  (time-it "Iterative factorial(100)" 10000 (lambda ()
+    (fact-iter 100)))
+  
+  ; String operations
+  (print "\n## String Operations")
+  
+  (time-it "String concatenation" 10000 (lambda ()
+    (def s "")
+    (for i in (range 50)
+      (set! s (+ s "x")))))
+  
+  (time-it "String methods" 10000 (lambda ()
+    (def s "Hello, World! This is a test string.")
+    (upper s)
+    (lower s)
+    (replace s "test" "benchmark")
+    (split s " ")))
+  
+  ; Higher-order functions
+  (print "\n## Higher-Order Functions")
+  
+  (time-it "Map operation" 1000 (lambda ()
+    (map (lambda (x) (* x x)) (range 1000))))
+  
+  (time-it "Filter operation" 1000 (lambda ()
+    (filter (lambda (x) (= (% x 2) 0)) (range 1000))))
+  
+  (time-it "Reduce operation" 1000 (lambda ()
+    (reduce + (range 1000) 0)))
+  
+  ; Object operations
+  (print "\n## Object Operations")
+  
+  (class Point Object
+    (def __init__ (self x y)
+      (setattr self "x" x)
+      (setattr self "y" y))
+    
+    (def distance (self other)
+      (def dx (- other.x self.x))
+      (def dy (- other.y self.y))
+      (sqrt (+ (* dx dx) (* dy dy)))))
+  
+  (time-it "Object creation" 10000 (lambda ()
+    (for i in (range 100)
+      (Point i (* i 2)))))
+  
+  (def p1 (Point 0 0))
+  (def p2 (Point 3 4))
+  
+  (time-it "Method calls" 100000 (lambda ()
+    (p1.distance p2)))
+  
+  ; Async operations (if supported)
+  (print "\n## Async Operations")
+  
+  (time-it "Task creation" 1000 (lambda ()
+    (def tasks [])
+    (for i in (range 10)
+      (set! tasks (append tasks (create_task (lambda () i)))))
+    (gather . tasks)))
+  
+  (print "\n=== Benchmarks Complete ===")))
+
+; Memory usage test
+(def memory-test (lambda ()
+  (print "\n=== Memory Usage Test ===")
+  
+  ; Create large data structures
+  (print "Creating large list...")
+  (def big-list (range 10000))
+  (print (+ "List created with " (str (len big-list)) " elements"))
+  
+  (print "Creating large dict...")
+  (def big-dict {})
+  (for i in (range 5000)
+    (set! big-dict (assoc big-dict (str i) i)))
+  (print (+ "Dict created with " (str (len big-dict)) " entries"))
+  
+  (print "Creating many objects...")
+  (def objects [])
+  (for i in (range 1000)
+    (set! objects (append objects {"id": i, "data": (range 10)})))
+  (print (+ "Created " (str (len objects)) " objects"))
+  
+  (print "Memory test complete")))
+
+; Export benchmarks
+(export run-benchmarks)
+(export memory-test)
+(export time-it)

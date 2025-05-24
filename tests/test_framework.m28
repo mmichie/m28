@@ -1,0 +1,137 @@
+; M28 Test Framework
+; A simple but effective testing framework
+
+; Test statistics
+(def test-count 0)
+(def pass-count 0)
+(def fail-count 0)
+(def current-suite "")
+(def test-results [])
+
+; ANSI color codes
+(def GREEN "\033[32m")
+(def RED "\033[31m")
+(def YELLOW "\033[33m")
+(def RESET "\033[0m")
+
+; Test assertion functions
+(def assert (lambda (condition message)
+  (set! test-count (+ test-count 1))
+  (if condition
+    (do
+      (set! pass-count (+ pass-count 1))
+      (print (+ GREEN "✓ " RESET message)))
+    (do
+      (set! fail-count (+ fail-count 1))
+      (print (+ RED "✗ " RESET message))
+      (set! test-results (append test-results
+        [(dict "suite" current-suite "test" message "passed" false)])))))
+
+(def assert-eq (lambda (expected actual message)
+  (assert (= expected actual)
+    (+ message " (expected: " (str expected) ", actual: " (str actual) ")"))))
+
+(def assert-neq (lambda (expected actual message)
+  (assert (not (= expected actual))
+    (+ message " (should not equal: " (str expected) ")"))))
+
+(def assert-true (lambda (value message)
+  (assert (= value true) message)))
+
+(def assert-false (lambda (value message)
+  (assert (= value false) message)))
+
+(def assert-nil (lambda (value message)
+  (assert (= value nil) message)))
+
+(def assert-not-nil (lambda (value message)
+  (assert (not (= value nil)) message)))
+
+(def assert-type (lambda (value expected-type message)
+  (assert (= (type value) expected-type)
+    (+ message " (expected type: " expected-type ", actual: " (type value) ")"))))
+
+(def assert-error (lambda (thunk error-type message)
+  (def caught false)
+  (def error-msg "")
+  (try
+    (thunk)
+    (except Exception e
+      (set! caught true)
+      (set! error-msg (str e))))
+  (assert caught (+ message " (expected error: " error-type ")"))))
+
+(def assert-no-error (lambda (thunk message)
+  (def success true)
+  (def error-msg "")
+  (try
+    (thunk)
+    (except Exception e
+      (set! success false)
+      (set! error-msg (str e))))
+  (assert success (+ message " (unexpected error: " error-msg ")"))))
+
+; Test suite functions
+(def test-suite (lambda (name tests)
+  (print (+ "\n" YELLOW "Test Suite: " name RESET))
+  (set! current-suite name)
+  (def suite-start-count test-count)
+  (def suite-start-pass pass-count)
+  (tests)
+  (def suite-tests (- test-count suite-start-count))
+  (def suite-pass (- pass-count suite-start-pass))
+  (print (+ "  Suite Result: " (str suite-pass) "/" (str suite-tests) " passed\n"))))
+
+(def run-test (lambda (name test-fn)
+  (print (+ "  " name ": "))
+  (test-fn)))
+
+; Test runner
+(def run-all-tests (lambda ()
+  (print (+ YELLOW "\n=== M28 Test Suite ===" RESET))
+  (set! test-count 0)
+  (set! pass-count 0)
+  (set! fail-count 0)
+  (set! test-results [])
+  
+  ; Run all test modules (will be imported)
+  (if (try test-core (except NameError e false))
+    (test-core))
+  (if (try test-builtins (except NameError e false))
+    (test-builtins))
+  (if (try test-special-forms (except NameError e false))
+    (test-special-forms))
+  (if (try test-advanced (except NameError e false))
+    (test-advanced))
+  
+  ; Print summary
+  (print (+ "\n" YELLOW "=== Test Summary ===" RESET))
+  (print (+ "Total Tests: " (str test-count)))
+  (print (+ GREEN "Passed: " (str pass-count) RESET))
+  (print (+ RED "Failed: " (str fail-count) RESET))
+  
+  (if (= fail-count 0)
+    (print (+ "\n" GREEN "All tests passed! 🎉" RESET))
+    (do
+      (print (+ "\n" RED "Some tests failed:" RESET))
+      (for result in test-results
+        (if (not (get result "passed"))
+          (print (+ "  - " (get result "suite") ": " (get result "test")))))))
+  
+  ; Return success/failure
+  (= fail-count 0)))
+
+; Export test framework
+(export assert)
+(export assert-eq)
+(export assert-neq)
+(export assert-true)
+(export assert-false)
+(export assert-nil)
+(export assert-not-nil)
+(export assert-type)
+(export assert-error)
+(export assert-no-error)
+(export test-suite)
+(export run-test)
+(export run-all-tests)

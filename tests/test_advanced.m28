@@ -1,0 +1,247 @@
+; Advanced features tests
+
+(import "test_framework" as test)
+
+(def test-advanced (lambda ()
+  
+  ; Test module system
+  (test/test-suite "Module System" (lambda ()
+    
+    (test/run-test "Import" (lambda ()
+      ; We already imported test_framework
+      (test/assert-not-nil test/assert "Import with alias works")
+      (test/assert-type test/assert "function" "Imported function type")))
+    
+    (test/run-test "Module Creation" (lambda ()
+      ; Create a simple module in memory
+      (def my-module (dict
+        "version" "1.0"
+        "add" (lambda (a b) (+ a b))
+        "PI" 3.14159))
+      (test/assert-eq "1.0" (get my-module "version") "Module attribute")
+      (test/assert-eq 7 ((get my-module "add") 3 4) "Module function"))))
+  
+  ; Test class system
+  (test/test-suite "Class System" (lambda ()
+    
+    (test/run-test "Class Definition" (lambda ()
+      (class Point Object
+        (def __init__ (self x y)
+          (setattr self "x" x)
+          (setattr self "y" y))
+        
+        (def distance (self)
+          (sqrt (+ (* self.x self.x) (* self.y self.y)))))
+      
+      (def p (Point 3 4))
+      (test/assert-eq 3 p.x "Instance attribute x")
+      (test/assert-eq 4 p.y "Instance attribute y")
+      (test/assert-eq 5 (p.distance) "Instance method")))
+    
+    (test/run-test "Inheritance" (lambda ()
+      (class Animal Object
+        (def __init__ (self name)
+          (setattr self "name" name))
+        
+        (def speak (self)
+          "Some sound"))
+      
+      (class Dog Animal
+        (def speak (self)
+          "Woof!")
+        
+        (def wag (self)
+          "Wagging tail"))
+      
+      (def dog (Dog "Buddy"))
+      (test/assert-eq "Buddy" dog.name "Inherited attribute")
+      (test/assert-eq "Woof!" (dog.speak) "Overridden method")
+      (test/assert-eq "Wagging tail" (dog.wag) "New method")))
+    
+    (test/run-test "Instance Checking" (lambda ()
+      (class Base Object)
+      (class Derived Base)
+      
+      (def b (Base))
+      (def d (Derived))
+      
+      (test/assert-true (isinstance b Base) "Direct instance")
+      (test/assert-true (isinstance d Derived) "Derived instance")
+      (test/assert-true (isinstance d Base) "Instance of parent")
+      (test/assert-false (isinstance b Derived) "Not instance of child")))
+    
+    (test/run-test "Super" (lambda ()
+      (class Parent Object
+        (def greet (self)
+          "Hello from Parent"))
+      
+      (class Child Parent
+        (def greet (self)
+          (+ (super greet) " and Child")))
+      
+      (def c (Child))
+      (test/assert-eq "Hello from Parent and Child" (c.greet) "Super call"))))
+  
+  ; Test generators
+  (test/test-suite "Generators" (lambda ()
+    
+    (test/run-test "Basic Generator" (lambda ()
+      (def count-gen (lambda (n)
+        (def i 0)
+        (while (< i n)
+          (yield i)
+          (set! i (+ i 1)))))
+      
+      (def g (count-gen 3))
+      (test/assert-eq 0 (next g) "First yield")
+      (test/assert-eq 1 (next g) "Second yield")
+      (test/assert-eq 2 (next g) "Third yield")))
+    
+    (test/run-test "Generator in For" (lambda ()
+      (def squares (lambda (n)
+        (for i in (range n)
+          (yield (* i i)))))
+      
+      (def result [])
+      (for sq in (squares 4)
+        (set! result (append result sq)))
+      (test/assert-eq [0, 1, 4, 9] result "Generator in for loop")))
+    
+    (test/run-test "Generator State" (lambda ()
+      (def stateful (lambda ()
+        (def total 0)
+        (while true
+          (def val (yield total))
+          (if val
+            (set! total (+ total val))))))
+      
+      (def g (stateful))
+      (test/assert-eq 0 (next g) "Initial state")
+      (test/assert-eq 0 (send g 5) "Send value")
+      (test/assert-eq 5 (next g) "Updated state"))))
+  
+  ; Test context managers
+  (test/test-suite "Context Managers" (lambda ()
+    
+    (test/run-test "Basic With" (lambda ()
+      (def MockFile (lambda (name)
+        (def obj {"name": name, "closed": false})
+        (setattr obj "__enter__" (lambda () obj))
+        (setattr obj "__exit__" (lambda (exc-type exc-val exc-tb) 
+          (set! obj.closed true)
+          false))
+        obj))
+      
+      (def f (MockFile "test.txt"))
+      (test/assert-false f.closed "File initially open")
+      
+      (with f as file
+        (test/assert-eq f file "With binding"))
+      
+      (test/assert-true f.closed "File closed after with")))
+    
+    (test/run-test "With Exception" (lambda ()
+      (def cleanup-run false)
+      
+      (def Manager (lambda ()
+        (def obj {})
+        (setattr obj "__enter__" (lambda () obj))
+        (setattr obj "__exit__" (lambda (exc-type exc-val exc-tb)
+          (set! cleanup-run true)
+          false))
+        obj))
+      
+      (try
+        (with (Manager) as m
+          (raise "Test error"))
+        (except Exception e nil))
+      
+      (test/assert-true cleanup-run "Cleanup on exception"))))
+  
+  ; Test async/concurrent features
+  (test/test-suite "Async/Concurrent" (lambda ()
+    
+    (test/run-test "Async Function" (lambda ()
+      (def async-add (async (lambda (a b)
+        (+ a b))))
+      
+      (def result (run_async (async-add 5 7)))
+      (test/assert-eq 12 result "Async function result")))
+    
+    (test/run-test "Tasks" (lambda ()
+      (def task1 (create_task (lambda () 10)))
+      (def task2 (create_task (lambda () 20)))
+      
+      (def results (gather task1 task2))
+      (test/assert-eq [10, 20] results "Gather results")))
+    
+    (test/run-test "Channels" (lambda ()
+      (def ch (Channel 1))
+      (send! ch "hello")
+      (def msg (recv! ch))
+      (test/assert-eq "hello" msg "Channel send/receive")))
+    
+    (test/run-test "Go Form" (lambda ()
+      (def ch (Channel))
+      (def task (go (send! ch "from goroutine")))
+      (def msg (recv! ch))
+      (test/assert-eq "from goroutine" msg "Go form communication"))))
+  
+  ; Test object protocol
+  (test/test-suite "Object Protocol" (lambda ()
+    
+    (test/run-test "Getattr/Setattr" (lambda ()
+      (def obj {})
+      (setattr obj "x" 10)
+      (test/assert-eq 10 (getattr obj "x") "Set and get attr")
+      (test/assert-eq 99 (getattr obj "y" 99) "Get with default")
+      (test/assert-true (hasattr obj "x") "Has attr")
+      (test/assert-false (hasattr obj "y") "No attr")))
+    
+    (test/run-test "Dict Protocol" (lambda ()
+      (def d {"a": 1, "b": 2})
+      (test/assert-eq 1 d.a "Dict dot access")
+      (set! d.c 3)
+      (test/assert-eq 3 (get d "c") "Dict dot assignment")
+      (test/assert-eq 2 (len d.keys) "Dict methods")))
+    
+    (test/run-test "List Protocol" (lambda ()
+      (def lst [1, 2, 3])
+      (test/assert-eq 3 lst.length "List length property")
+      (lst.append 4)
+      (test/assert-eq [1, 2, 3, 4] lst "List method call")
+      (test/assert-eq 1 lst.0 "List index access")))
+    
+    (test/run-test "String Methods" (lambda ()
+      (def s "hello")
+      (test/assert-eq "HELLO" (s.upper) "String method")
+      (test/assert-eq 5 s.length "String length")
+      (test/assert-true (s.startswith "hel") "String predicate"))))
+  
+  ; Test advanced list operations
+  (test/test-suite "Advanced Collections" (lambda ()
+    
+    (test/run-test "List Comprehension Style" (lambda ()
+      (def squares (map (lambda (x) (* x x)) (range 5)))
+      (test/assert-eq [0, 1, 4, 9, 16] squares "Map squares")
+      
+      (def evens (filter (lambda (x) (= (% x 2) 0)) (range 10)))
+      (test/assert-eq [0, 2, 4, 6, 8] evens "Filter evens")))
+    
+    (test/run-test "Nested Structures" (lambda ()
+      (def matrix [[1, 2], [3, 4], [5, 6]])
+      (def flat (reduce (lambda (acc row) (+ acc row)) matrix []))
+      (test/assert-eq [1, 2, 3, 4, 5, 6] flat "Flatten matrix")
+      
+      (def nested {"users": [{"name": "Alice", "age": 30},
+                             {"name": "Bob", "age": 25}]})
+      (test/assert-eq "Alice" nested.users.0.name "Deep access")))
+    
+    (test/run-test "Set Operations" (lambda ()
+      (def s1 #{1, 2, 3})
+      (def s2 #{2, 3, 4})
+      (test/assert-eq #{1, 2, 3, 4} (union s1 s2) "Set union")
+      (test/assert-eq #{2, 3} (intersection s1 s2) "Set intersection")
+      (test/assert-eq #{1} (difference s1 s2) "Set difference"))))
+  
+  )))

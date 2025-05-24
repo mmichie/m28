@@ -1,0 +1,22 @@
+; Main test runner script
+
+; Import test framework
+(import "test_framework")
+
+; Import test modules
+(import "test_core")
+(import "test_builtins") 
+(import "test_special_forms")
+(import "test_advanced")
+
+; Run all tests
+(def success (test_framework/run-all-tests))
+
+; Exit with appropriate code
+(if success
+  (do
+    (print "\nAll tests passed successfully!")
+    (exit 0))
+  (do
+    (print "\nSome tests failed!")
+    (exit 1)))

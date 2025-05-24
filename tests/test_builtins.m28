@@ -1,0 +1,164 @@
+; Built-in functions tests
+
+(import "test_framework" as test)
+
+(def test-builtins (lambda ()
+  ; Test arithmetic functions
+  (test/test-suite "Arithmetic Functions" (lambda ()
+    
+    (test/run-test "Basic Math" (lambda ()
+      (test/assert-eq 5 (abs -5) "Absolute value negative")
+      (test/assert-eq 5 (abs 5) "Absolute value positive")
+      (test/assert-eq 2 (min 5 2 8 3) "Minimum")
+      (test/assert-eq 8 (max 5 2 8 3) "Maximum")
+      (test/assert-eq 18 (sum [5, 2, 8, 3]) "Sum")
+      (test/assert-eq 3 (round 3.4) "Round down")
+      (test/assert-eq 4 (round 3.6) "Round up")
+      (test/assert-eq 8 (pow 2 3) "Power")
+      (test/assert-eq 5 (sqrt 25) "Square root")
+      (test/assert-eq 3 (floor 3.9) "Floor")
+      (test/assert-eq 4 (ceil 3.1) "Ceil")))
+    
+    (test/run-test "Modulo" (lambda ()
+      (test/assert-eq 1 (% 10 3) "Modulo positive")
+      (test/assert-eq 2 (% 17 5) "Modulo"))))
+  
+  ; Test string functions
+  (test/test-suite "String Functions" (lambda ()
+    
+    (test/run-test "Case Conversion" (lambda ()
+      (test/assert-eq "HELLO" (upper "hello") "Uppercase")
+      (test/assert-eq "world" (lower "WORLD") "Lowercase")))
+    
+    (test/run-test "String Manipulation" (lambda ()
+      (test/assert-eq "hello" (strip "  hello  ") "Strip both")
+      (test/assert-eq "hello  " (lstrip "  hello  ") "Strip left")
+      (test/assert-eq "  hello" (rstrip "  hello  ") "Strip right")
+      (test/assert-eq "hXllo" (replace "hello" "e" "X") "Replace")
+      (test/assert-eq ["hello", "world"] (split "hello world" " ") "Split")
+      (test/assert-eq "a,b,c" (join "," ["a", "b", "c"]) "Join")))
+    
+    (test/run-test "String Search" (lambda ()
+      (test/assert-eq 2 (find "hello" "ll") "Find substring")
+      (test/assert-eq -1 (find "hello" "xyz") "Find not found")
+      (test/assert-eq 2 (count "hello world" "l") "Count occurrences"))))
+  
+  ; Test type functions
+  (test/test-suite "Type Functions" (lambda ()
+    
+    (test/run-test "Type Checking" (lambda ()
+      (test/assert-eq "number" (type 42) "Number type")
+      (test/assert-eq "string" (type "hello") "String type")
+      (test/assert-eq "list" (type [1, 2]) "List type")
+      (test/assert-eq "dict" (type {}) "Dict type")
+      (test/assert-eq "function" (type (lambda () 1)) "Function type")))
+    
+    (test/run-test "Type Conversion" (lambda ()
+      (test/assert-eq "42" (str 42) "Number to string")
+      (test/assert-eq "[1, 2, 3]" (str [1, 2, 3]) "List to string")
+      (test/assert-eq [1, 2, 3] (list 1 2 3) "Create list")
+      (test/assert-eq {"a": 1} (dict "a" 1) "Create dict")
+      (test/assert-eq #{1, 2, 3} (set [1, 2, 3, 2]) "Create set"))))
+  
+  ; Test sequence functions
+  (test/test-suite "Sequence Functions" (lambda ()
+    
+    (test/run-test "Range" (lambda ()
+      (test/assert-eq [0, 1, 2, 3, 4] (range 5) "Range single arg")
+      (test/assert-eq [2, 3, 4] (range 2 5) "Range start end")
+      (test/assert-eq [0, 2, 4] (range 0 6 2) "Range with step")))
+    
+    (test/run-test "Enumerate" (lambda ()
+      (def result [])
+      (for pair in (enumerate ["a", "b", "c"])
+        (set! result (append result pair)))
+      (test/assert-eq [[0, "a"], [1, "b"], [2, "c"]] result "Enumerate")))
+    
+    (test/run-test "Zip" (lambda ()
+      (test/assert-eq [[1, "a"], [2, "b"], [3, "c"]] 
+        (zip [1, 2, 3] ["a", "b", "c"]) "Zip equal length")
+      (test/assert-eq [[1, "a"], [2, "b"]]
+        (zip [1, 2] ["a", "b", "c"]) "Zip different length"))))
+  
+  ; Test functional programming
+  (test/test-suite "Functional Programming" (lambda ()
+    
+    (test/run-test "Map" (lambda ()
+      (test/assert-eq [2, 4, 6] 
+        (map (lambda (x) (* x 2)) [1, 2, 3]) "Map double")
+      (test/assert-eq ["1", "2", "3"]
+        (map str [1, 2, 3]) "Map str")))
+    
+    (test/run-test "Filter" (lambda ()
+      (test/assert-eq [2, 4] 
+        (filter (lambda (x) (= (% x 2) 0)) [1, 2, 3, 4]) "Filter even")
+      (test/assert-eq [3, 4, 5]
+        (filter (lambda (x) (> x 2)) [1, 2, 3, 4, 5]) "Filter greater")))
+    
+    (test/run-test "Reduce" (lambda ()
+      (test/assert-eq 10
+        (reduce (lambda (a b) (+ a b)) [1, 2, 3, 4] 0) "Reduce sum")
+      (test/assert-eq 24
+        (reduce (lambda (a b) (* a b)) [1, 2, 3, 4] 1) "Reduce product")))
+    
+    (test/run-test "All/Any" (lambda ()
+      (test/assert-true (all [true, true, true]) "All true")
+      (test/assert-false (all [true, false, true]) "All with false")
+      (test/assert-true (any [false, true, false]) "Any with true")
+      (test/assert-false (any [false, false, false]) "Any all false"))))
+  
+  ; Test I/O functions (basic)
+  (test/test-suite "I/O Functions" (lambda ()
+    
+    (test/run-test "Print" (lambda ()
+      (test/assert-no-error 
+        (lambda () (print "Test output"))
+        "Print works")))
+    
+    (test/run-test "String Representation" (lambda ()
+      (test/assert-eq "42" (repr 42) "Repr number")
+      (test/assert-eq "\"hello\"" (repr "hello") "Repr string")
+      (test/assert-eq "[1, 2, 3]" (repr [1, 2, 3]) "Repr list"))))
+  
+  ; Test list operations
+  (test/test-suite "List Operations" (lambda ()
+    
+    (test/run-test "List Manipulation" (lambda ()
+      (test/assert-eq 1 (first [1, 2, 3]) "First element")
+      (test/assert-eq [2, 3] (rest [1, 2, 3]) "Rest of list")
+      (test/assert-eq 3 (last [1, 2, 3]) "Last element")
+      (test/assert-eq 2 (nth [1, 2, 3] 1) "Nth element")
+      (test/assert-eq [1, 2, 3, 4] (append [1, 2, 3] 4) "Append element")
+      (test/assert-eq [0, 1, 2, 3] (cons 0 [1, 2, 3]) "Cons element")))
+    
+    (test/run-test "List Predicates" (lambda ()
+      (test/assert-true (empty? []) "Empty list")
+      (test/assert-false (empty? [1]) "Non-empty list")
+      (test/assert-true (contains [1, 2, 3] 2) "Contains element")
+      (test/assert-false (contains [1, 2, 3] 4) "Not contains"))))
+  
+  ; Test dictionary operations
+  (test/test-suite "Dictionary Operations" (lambda ()
+    
+    (test/run-test "Dict Access" (lambda ()
+      (def d {"a": 1, "b": 2, "c": 3})
+      (test/assert-eq 2 (get d "b") "Get existing key")
+      (test/assert-nil (get d "x") "Get missing key")
+      (test/assert-eq 99 (get d "x" 99) "Get with default")))
+    
+    (test/run-test "Dict Modification" (lambda ()
+      (def d {"a": 1})
+      (def d2 (assoc d "b" 2))
+      (test/assert-eq 2 (get d2 "b") "Assoc adds key")
+      (test/assert-eq 1 (len d) "Original unchanged")
+      (def d3 (dissoc d2 "a"))
+      (test/assert-false (has-key d3 "a") "Dissoc removes key")))
+    
+    (test/run-test "Dict Info" (lambda ()
+      (def d {"x": 10, "y": 20})
+      (test/assert-eq ["x", "y"] (sort (keys d)) "Dict keys")
+      (test/assert-eq [10, 20] (sort (values d)) "Dict values")
+      (test/assert-true (has-key d "x") "Has key")
+      (test/assert-false (has-key d "z") "Missing key"))))
+  
+  )))
