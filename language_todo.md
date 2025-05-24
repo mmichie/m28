@@ -81,10 +81,13 @@ Based on testing the examples, here are the language features that need to be im
 - [ ] Multiple variable unpacking: `(for ((k v) dict.items()) ...)`
 - [ ] Enumerate: `(for ((i val) (enumerate list)) ...)`
 
-### 7. Exception Handling
-- [ ] `try/except` blocks don't work (gives "name error" or "error in builtin")
-- [ ] Multiple except clauses: `(except ZeroDivisionError e ...)`
-- [ ] Finally clause
+### 7. Exception Handling ✅ DONE
+- [x] `try/except` blocks work with multiple syntaxes
+- [x] Multiple except clauses: `(except ZeroDivisionError e ...)`
+- [x] Finally clause works
+- [x] Catch-all: `(except handler)` or `(except e handler)`
+- [x] Type-specific: `(except Type handler)` or `(except Type e handler)`
+- [ ] `raise` statement for re-raising exceptions
 
 ### 8. Advanced Operators ✅ PARTIALLY DONE
 - [x] Power operator `**` - DONE (added as alias for pow)
@@ -109,13 +112,13 @@ Based on testing the examples, here are the language features that need to be im
 - [ ] Keyword arguments in function calls
 - [ ] Default parameter values
 
-### 13. Built-in Functions Missing
-- [ ] `abs` - absolute value
-- [ ] `sorted` - sort a sequence
-- [ ] `reversed` - reverse a sequence
-- [ ] `enumerate` - get index/value pairs
-- [ ] `zip` - combine sequences
-- [ ] `map`, `filter`, `reduce` - functional operations
+### 13. Built-in Functions ✅ PARTIALLY DONE
+- [x] `abs` - absolute value (in math.go)
+- [x] `sorted` - sort a sequence (added to list.go)
+- [x] `reversed` - reverse a sequence (added to list.go)
+- [x] `enumerate` - get index/value pairs (in utilities.go)
+- [x] `zip` - combine sequences (in utilities.go)
+- [x] `map`, `filter`, `reduce` - functional operations (in list.go)
 - [ ] `isinstance`, `issubclass` - type checking
 - [ ] `getattr`, `setattr`, `hasattr` - attribute manipulation
 - [ ] `all`, `any` - boolean operations on sequences
@@ -140,15 +143,17 @@ Critical features completed ✅:
 4. ✅ **Classes** - Fixed parser logic
 5. ✅ **Basic operators**: `**` for power, `%` for modulo
 6. ✅ **in operator** - Works for lists, strings, dicts
+7. ✅ **try/except/finally** - Exception handling with Python-style syntax
+8. ✅ **Core built-ins** - `abs`, `sorted`, `reversed`, `enumerate`, `zip`
 
 Next priorities:
-1. **try/except** - Exception handling
-2. **Built-in functions** - `abs`, `sorted`, `enumerate`, etc.
-3. **List comprehensions** - Currently parsed as literal lists
-4. **Property/method access** - `obj.method()` syntax
-5. **Augmented assignment** - `+=`, `-=`, etc.
-6. **Set and tuple literals**
-7. **String/list methods** - `.append()`, `.split()`, etc.
+1. **List comprehensions** - Currently parsed as literal lists
+2. **Property/method access** - `obj.method()` syntax
+3. **Augmented assignment** - `+=`, `-=`, etc.
+4. **Set and tuple literals**
+5. **String/list methods** - `.append()`, `.split()`, etc.
+6. **Type checking** - `isinstance`, `type` improvements
+7. **More built-ins** - `all`, `any`, `round`, type conversions
 
 ## Notes on Syntax Differences
 

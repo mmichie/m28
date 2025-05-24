@@ -23,6 +23,8 @@ func RegisterListFunctions(ctx *core.Context) {
 	ctx.Define("map", core.NewBuiltinFunction(MapFunc))
 	ctx.Define("filter", core.NewBuiltinFunction(FilterFunc))
 	ctx.Define("reduce", core.NewBuiltinFunction(ReduceFunc))
+	ctx.Define("sorted", core.NewBuiltinFunction(SortedFunc))
+	ctx.Define("reversed", core.NewBuiltinFunction(ReversedFunc))
 }
 
 // ListFunc creates a list from the given arguments
@@ -438,4 +440,112 @@ func ReduceFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	return result, nil
+}
+// SortedFunc returns a sorted copy of a list
+func SortedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, fmt.Errorf("sorted requires 1 or 2 arguments")
+	}
+	
+	// Get the sequence to sort
+	var items []core.Value
+	switch v := args[0].(type) {
+	case core.ListValue:
+		// Make a copy
+		items = make([]core.Value, len(v))
+		copy(items, v)
+	case core.TupleValue:
+		// Convert to list
+		items = make([]core.Value, len(v))
+		copy(items, v)
+	case core.StringValue:
+		// Convert string to list of characters
+		items = make([]core.Value, 0, len(v))
+		for _, ch := range string(v) {
+			items = append(items, core.StringValue(string(ch)))
+		}
+	default:
+		return nil, fmt.Errorf("sorted expects a sequence, got %s", v.Type())
+	}
+	
+	// Check for reverse parameter
+	reverse := false
+	if len(args) == 2 {
+		// For now, assume second arg is reverse=True/False
+		if b, ok := args[1].(core.BoolValue); ok {
+			reverse = bool(b)
+		}
+	}
+	
+	// Sort using a simple comparison
+	// TODO: This is a basic implementation, should handle custom key functions
+	n := len(items)
+	for i := 0; i < n-1; i++ {
+		for j := 0; j < n-i-1; j++ {
+			shouldSwap := false
+			
+			// Compare based on type
+			switch a := items[j].(type) {
+			case core.NumberValue:
+				if b, ok := items[j+1].(core.NumberValue); ok {
+					if reverse {
+						shouldSwap = a < b
+					} else {
+						shouldSwap = a > b
+					}
+				}
+			case core.StringValue:
+				if b, ok := items[j+1].(core.StringValue); ok {
+					if reverse {
+						shouldSwap = string(a) < string(b)
+					} else {
+						shouldSwap = string(a) > string(b)
+					}
+				}
+			}
+			
+			if shouldSwap {
+				items[j], items[j+1] = items[j+1], items[j]
+			}
+		}
+	}
+	
+	// Return as a list
+	return core.ListValue(items), nil
+}
+
+// ReversedFunc returns a reversed copy of a sequence
+func ReversedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("reversed requires 1 argument")
+	}
+	
+	switch v := args[0].(type) {
+	case core.ListValue:
+		// Create reversed copy
+		result := make(core.ListValue, len(v))
+		for i := 0; i < len(v); i++ {
+			result[i] = v[len(v)-1-i]
+		}
+		return result, nil
+		
+	case core.TupleValue:
+		// Return reversed as list
+		result := make(core.ListValue, len(v))
+		for i := 0; i < len(v); i++ {
+			result[i] = v[len(v)-1-i]
+		}
+		return result, nil
+		
+	case core.StringValue:
+		// Reverse string
+		runes := []rune(string(v))
+		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+			runes[i], runes[j] = runes[j], runes[i]
+		}
+		return core.StringValue(string(runes)), nil
+		
+	default:
+		return nil, fmt.Errorf("reversed expects a sequence, got %s", v.Type())
+	}
 }

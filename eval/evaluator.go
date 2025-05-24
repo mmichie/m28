@@ -493,13 +493,33 @@ func (e *Exception) Error() string {
 	return e.Type
 }
 
+// isExceptionType checks if a string is a known exception type
+func isExceptionType(name string) bool {
+	knownTypes := map[string]bool{
+		"Exception":           true,
+		"Error":              true,
+		"NameError":          true,
+		"TypeError":          true,
+		"ValueError":         true,
+		"ZeroDivisionError":  true,
+		"KeyError":           true,
+		"IndexError":         true,
+		"AttributeError":     true,
+		"RuntimeError":       true,
+		"FileNotFoundError":  true,
+		"PermissionError":    true,
+	}
+	return knownTypes[name]
+}
+
 // tryForm implements the try/except/finally special form
 // Forms:
 //
 //	(try body)
-//	(try body (except type handler))
-//	(try body (except type as var handler))
 //	(try body (except handler)) ; catch all
+//	(try body (except var handler)) ; catch all with variable
+//	(try body (except Type handler)) ; catch specific type
+//	(try body (except Type var handler)) ; catch specific type with variable
 //	(try body ... (finally cleanup))
 func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
@@ -578,30 +598,40 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Parse except clause
-		// Forms: (except handler), (except type handler), (except type as var handler)
+		// Forms: 
+		// (except handler...) - catch all
+		// (except var handler...) - catch all with variable binding
+		// (except Type handler...) - catch specific type
+		// (except Type var handler...) - catch specific type with variable
 		var excType string
 		var excVar string
 		var handlerStart int = 1
 
 		if len(exceptClause) > 1 {
-			// Check if second element is a type (symbol or string)
-			switch t := exceptClause[1].(type) {
-			case core.SymbolValue:
-				excType = string(t)
-				handlerStart = 2
-
-				// Check for "as var" syntax
-				if len(exceptClause) > 3 {
-					if as, ok := exceptClause[2].(core.SymbolValue); ok && string(as) == "as" {
-						if varSym, ok := exceptClause[3].(core.SymbolValue); ok {
-							excVar = string(varSym)
-							handlerStart = 4
+			// Check if second element is a symbol
+			if sym, ok := exceptClause[1].(core.SymbolValue); ok {
+				symStr := string(sym)
+				
+				// Check if it's a known exception type or starts with capital letter (class convention)
+				if isExceptionType(symStr) || (len(symStr) > 0 && symStr[0] >= 'A' && symStr[0] <= 'Z') {
+					excType = symStr
+					handlerStart = 2
+					
+					// Check if next element is a variable name (lowercase)
+					if len(exceptClause) > 2 {
+						if varSym, ok := exceptClause[2].(core.SymbolValue); ok {
+							varStr := string(varSym)
+							if len(varStr) > 0 && varStr[0] >= 'a' && varStr[0] <= 'z' {
+								excVar = varStr
+								handlerStart = 3
+							}
 						}
 					}
+				} else {
+					// It's a variable name for catch-all
+					excVar = symStr
+					handlerStart = 2
 				}
-			case core.StringValue:
-				excType = string(t)
-				handlerStart = 2
 			}
 		}
 
