@@ -1,37 +1,37 @@
-# Tests for escape sequences in strings
+; Tests for escape sequences in strings
 
-# Test \n (newline)
+; Test \n (newline)
 (print "Testing newline: line1\\nline2")
 
-# Test \t (tab)
+; Test \t (tab)
 (print "Testing tab:\\tTabbed text")
 
-# Test \r (carriage return)
+; Test \r (carriage return)
 (print "Testing carriage return: before\\rafter")
 
-# Test \\ (backslash)
+; Test \\ (backslash)
 (print "Testing backslash: C:\\\\path\\\\to\\\\file")
 
-# Test \" (double quote)
+; Test \" (double quote)
 (print "Testing double quote: \\\"quoted text\\\"")
 
-# Test \' (single quote)
+; Test \' (single quote)
 (print "Testing single quote: It\\'s working")
 
-# Test multiple escape sequences
+; Test multiple escape sequences
 (print "Multiple\\nEscape\\nSequences\\n\\tIndented line")
 
-# Test unrecognized escape sequence (should remain as is)
+; Test unrecognized escape sequence (should remain as is)
 (print "Unrecognized escape: \\z should keep backslash")
 
-# Test escape sequences in dictionary values 
+; Test escape sequences in dictionary values 
 (print {"key1": "value with \\n newline", "key2": "value with \\t tab"})
 
-# Test with variables
+; Test with variables
 (= newline_var "text with \\n newline")
 (= tab_var "text with \\t tab")
 (print newline_var)
 (print tab_var)
 
-# Should pass all tests successfully
+; Should pass all tests successfully
 (print "All escape sequence tests completed successfully")

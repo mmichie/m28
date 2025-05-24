@@ -1,45 +1,45 @@
-# generator-test-comprehensive.m28
-#
-# Comprehensive test for generators in M28
-# Testing various aspects of generators as per the language specification
+; generator-test-comprehensive.m28
+;
+; Comprehensive test for generators in M28
+; Testing various aspects of generators as per the language specification
 
 (print "===== Generator Tests =====\n")
 
-# -- Basic Generator Function --
+; -- Basic Generator Function --
 
 (print "-- Basic Generator Function --")
 
-# Define a simple generator that yields values from 0 to n-1
+; Define a simple generator that yields values from 0 to n-1
 (def (count-up-to n)
   (= i 0)
   (while (< i n)
     (yield i)
     (= i (+ i 1))))
 
-# Test basic generator usage
+; Test basic generator usage
 (print "\nTesting basic generator:")
 (= gen (count-up-to 5))
 (print "Type of generator:" (type gen))
 
-# Collect values from generator
+; Collect values from generator
 (= values (list))
 (for value gen
   (append values value))
 (print "Generated values:" values)
 (assert (== values (list 0 1 2 3 4)) "Generator should yield values 0 through 4")
 
-# Test that generator is exhausted after iteration
+; Test that generator is exhausted after iteration
 (= more-values (list))
 (for value gen
   (append more-values value))
 (print "Values after exhaustion:" more-values)
 (assert (== more-values (list)) "Generator should be exhausted after first iteration")
 
-# -- Generator State Preservation --
+; -- Generator State Preservation --
 
 (print "\n-- Generator State Preservation --")
 
-# Define a generator that demonstrates state preservation
+; Define a generator that demonstrates state preservation
 (def (stateful-generator)
   (= count 0)
   (yield count)
@@ -48,7 +48,7 @@
   (= count (+ count 1))
   (yield count))
 
-# Test state preservation in generator
+; Test state preservation in generator
 (print "\nTesting state preservation:")
 (= state-gen (stateful-generator))
 (= state-values (list))
@@ -57,11 +57,11 @@
 (print "Generated values with state:" state-values)
 (assert (== state-values (list 0 1 2)) "Generator should preserve state between yields")
 
-# -- Recursive Generator --
+; -- Recursive Generator --
 
 (print "\n-- Recursive Generator --")
 
-# Define a recursive generator that yields Fibonacci numbers
+; Define a recursive generator that yields Fibonacci numbers
 (def (fibonacci-gen n)
   (= a 0)
   (= b 1)
@@ -73,7 +73,7 @@
     (= b temp)
     (= count (+ count 1))))
 
-# Test recursive generator
+; Test recursive generator
 (print "\nTesting Fibonacci generator:")
 (= fib-values (list))
 (for value (fibonacci-gen 7)
@@ -81,11 +81,11 @@
 (print "First 7 Fibonacci numbers:" fib-values)
 (assert (== fib-values (list 0 1 1 2 3 5 8)) "Should generate correct Fibonacci sequence")
 
-# -- Generator with Exception Handling --
+; -- Generator with Exception Handling --
 
 (print "\n-- Generator with Exception Handling --")
 
-# Define a generator that handles exceptions
+; Define a generator that handles exceptions
 (def (exception-generator)
   (try
     (yield 1)
@@ -96,7 +96,7 @@
       (yield "Error caught")
       (yield 4))))
 
-# Test generator with exception
+; Test generator with exception
 (print "\nTesting generator with exception handling:")
 (= exception-gen (exception-generator))
 (= exception-values (list))
@@ -107,16 +107,16 @@
     (print "Exception escaped generator:" e)))
 (print "Values from exception generator:" exception-values)
 
-# -- Nested Generators --
+; -- Nested Generators --
 
 (print "\n-- Nested Generators --")
 
-# Define a generator that uses another generator
+; Define a generator that uses another generator
 (def (nested-generator n)
   (for i (count-up-to n)
     (yield (* i i))))
 
-# Test nested generator
+; Test nested generator
 (print "\nTesting nested generator:")
 (= nested-values (list))
 (for value (nested-generator 5)
@@ -124,11 +124,11 @@
 (print "Squared values from nested generator:" nested-values)
 (assert (== nested-values (list 0 1 4 9 16)) "Nested generator should yield squared values")
 
-# -- Generator with Parameters --
+; -- Generator with Parameters --
 
 (print "\n-- Generator with Parameters --")
 
-# Define a generator that takes and uses parameters
+; Define a generator that takes and uses parameters
 (def (sequence-generator start step count)
   (= value start)
   (= i 0)
@@ -137,7 +137,7 @@
     (= value (+ value step))
     (= i (+ i 1))))
 
-# Test generator with parameters
+; Test generator with parameters
 (print "\nTesting generator with parameters:")
 (= seq-values (list))
 (for value (sequence-generator 10 5 4)
@@ -145,11 +145,11 @@
 (print "Sequence values:" seq-values)
 (assert (== seq-values (list 10 15 20 25)) "Generator should use parameters correctly")
 
-# -- Generator Methods (if supported) --
+; -- Generator Methods (if supported) --
 
 (print "\n-- Generator Methods --")
 
-# Define a generator that might support send/throw/close
+; Define a generator that might support send/throw/close
 (def (echo-generator)
   (= received (yield "Ready"))
   (while True
@@ -159,7 +159,7 @@
         (yield (+ "Error: " (str e)))
         (break)))))
 
-# Test generator methods if supported
+; Test generator methods if supported
 (print "\nTesting generator methods (if supported):")
 (try
   (= echo-gen (echo-generator))
@@ -194,11 +194,11 @@
   (except Exception as e
     (print "Advanced generator methods not supported:" e)))
 
-# -- Generator Expressions (if supported) --
+; -- Generator Expressions (if supported) --
 
 (print "\n-- Generator Expressions --")
 
-# Test generator expressions if supported
+; Test generator expressions if supported
 (try
   (= squares-gen (for (x (range 5)) (* x x)))
   (= squares-list (list))
@@ -209,6 +209,6 @@
   (except Exception as e
     (print "Generator expressions not supported:" e)))
 
-# -- Conclusion --
+; -- Conclusion --
 
 (print "\n===== Generator Tests Complete =====")

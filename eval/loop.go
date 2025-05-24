@@ -143,19 +143,16 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Get body expressions
 	body := args[1:]
 
-	// Create a new context for the loop variables
-	loopCtx := core.NewContext(ctx)
-
-	// Create a body function that evaluates all expressions in the loop context
+	// Create a body function that evaluates all expressions
 	bodyFunc := func(item core.Value) (core.Value, error) {
-		// Bind the current item to the variable
-		loopCtx.Define(string(varName), item)
+		// Bind the current item to the variable in the current context
+		ctx.Define(string(varName), item)
 
 		var result core.Value = core.Nil
 		var err error
 
 		for _, expr := range body {
-			result, err = Eval(expr, loopCtx)
+			result, err = Eval(expr, ctx)
 			if err != nil {
 				return nil, err
 			}

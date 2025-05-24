@@ -1,10 +1,10 @@
-# Comprehensive test for module exports functionality
-# This file tests the __exports__ mechanism and private symbol handling in M28
+; Comprehensive test for module exports functionality
+; This file tests the __exports__ mechanism and private symbol handling in M28
 
-# ----- PART 1: Create Test Module -----
+; ----- PART 1: Create Test Module -----
 (print "Creating test module...")
 
-# Create a test module file with both public and private symbols
+; Create a test module file with both public and private symbols
 (= module_content "# Test module with exports
 (= PUBLIC_VAR 42)
 (= _PRIVATE_VAR \"should not be exported\")
@@ -16,26 +16,26 @@
 (def (_private_function)
   \"This is a private function\")
 
-# Define exports
+; Define exports
 (= __exports__ (list
   \"PUBLIC_VAR\"
   \"public_function\"
 ))
 ")
 
-# Write the content to a file
+; Write the content to a file
 (os.write_file \"./tests/test_export_module.m28\" module_content)
 
-# ----- PART 2: Regular Module Import -----
+; ----- PART 2: Regular Module Import -----
 (print "\nTesting regular module import...")
 (import "./tests/test_export_module.m28")
 
-# Test accessing exported symbols (should work)
+; Test accessing exported symbols (should work)
 (print "- Accessing exported symbols:")
 (print "  PUBLIC_VAR =" test_export_module.PUBLIC_VAR)
 (print "  public_function(21) =" (test_export_module.public_function 21))
 
-# Test accessing non-exported symbols (should fail)
+; Test accessing non-exported symbols (should fail)
 (print "\n- Testing private symbol protection:")
 (try
   (do
@@ -51,7 +51,7 @@
   (catch e
     (print "  SUCCESS: Could not access _private_function")))
 
-# Test accessing non-exported public symbols (should fail with __exports__)
+; Test accessing non-exported public symbols (should fail with __exports__)
 (try
   (do
     (= val test_export_module.ANOTHER_PUBLIC_VAR)
@@ -59,16 +59,16 @@
   (catch e
     (print "  SUCCESS: Could not access ANOTHER_PUBLIC_VAR (not in __exports__)")))
 
-# ----- PART 3: Wildcard Import -----
+; ----- PART 3: Wildcard Import -----
 (print "\nTesting wildcard import...")
 (import (from "./tests/test_export_module.m28" import *))
 
-# Test direct access to exported symbols (should work)
+; Test direct access to exported symbols (should work)
 (print "- Accessing exported symbols directly:")
 (print "  PUBLIC_VAR =" PUBLIC_VAR)
 (print "  public_function(21) =" (public_function 21))
 
-# Test direct access to private symbols (should fail)
+; Test direct access to private symbols (should fail)
 (print "\n- Testing protection of private symbols in wildcard import:")
 (try
   (do
@@ -84,7 +84,7 @@
   (catch e
     (print "  SUCCESS: Could not access _private_function directly")))
 
-# Test direct access to non-exported public symbols (should fail with __exports__)
+; Test direct access to non-exported public symbols (should fail with __exports__)
 (try
   (do
     (= val ANOTHER_PUBLIC_VAR)
@@ -92,10 +92,10 @@
   (catch e
     (print "  SUCCESS: Could not access ANOTHER_PUBLIC_VAR directly (not in __exports__)")))
 
-# ----- PART 4: Test with No __exports__ -----
+; ----- PART 4: Test with No __exports__ -----
 (print "\nTesting module with no __exports__ list (only private symbol convention)...")
 
-# Create a test module without __exports__
+; Create a test module without __exports__
 (= no_exports_content "# Test module without exports list
 (= PUBLIC_VAR 100)
 (= _PRIVATE_VAR \"should be hidden\")
@@ -107,18 +107,18 @@
   \"This should be hidden\")
 ")
 
-# Write the content to a file
+; Write the content to a file
 (os.write_file \"./tests/test_no_exports_module.m28\" no_exports_content)
 
-# Import the module
+; Import the module
 (import "./tests/test_no_exports_module.m28")
 
-# Test accessing public symbols (should work)
+; Test accessing public symbols (should work)
 (print "- Accessing public symbols in module without __exports__:")
 (print "  PUBLIC_VAR =" test_no_exports_module.PUBLIC_VAR)
 (print "  public_function(10) =" (test_no_exports_module.public_function 10))
 
-# Test accessing private symbols (should fail)
+; Test accessing private symbols (should fail)
 (print "\n- Testing private symbol protection in module without __exports__:")
 (try
   (do
@@ -134,10 +134,10 @@
   (catch e
     (print "  SUCCESS: Could not access _private_function")))
 
-# ----- PART 5: Test with Private Symbol in __exports__ -----
+; ----- PART 5: Test with Private Symbol in __exports__ -----
 (print "\nTesting with private symbol explicitly exported...")
 
-# Create a test module with private symbol in exports
+; Create a test module with private symbol in exports
 (= private_exported_content "# Test module with private symbol in exports
 (= PUBLIC_VAR 200)
 (= _PRIVATE_VAR \"should be accessible because it's exported\")
@@ -148,7 +148,7 @@
 (def (_private_function)
   \"This should be accessible\")
 
-# Define exports including private symbol
+; Define exports including private symbol
 (= __exports__ (list
   \"PUBLIC_VAR\"
   \"_PRIVATE_VAR\"
@@ -156,22 +156,22 @@
 ))
 ")
 
-# Write the content to a file
+; Write the content to a file
 (os.write_file \"./tests/test_private_exported_module.m28\" private_exported_content)
 
-# Import the module
+; Import the module
 (import "./tests/test_private_exported_module.m28")
 
-# Test accessing all symbols (all should work)
+; Test accessing all symbols (all should work)
 (print "- Accessing symbols in module with exported private symbols:")
 (print "  PUBLIC_VAR =" test_private_exported_module.PUBLIC_VAR)
 (print "  _PRIVATE_VAR =" test_private_exported_module._PRIVATE_VAR)
 (print "  _private_function() =" (test_private_exported_module._private_function))
 
-# ----- PART 6: Test with Wildcard Import and except Clause -----
+; ----- PART 6: Test with Wildcard Import and except Clause -----
 (print "\nTesting wildcard import with except clause...")
 
-# Create a module for testing filtered wildcard import
+; Create a module for testing filtered wildcard import
 (= wildcards_content "# Test module for wildcard imports with filtering
 (= ITEM1 \"Value 1\")
 (= ITEM2 \"Value 2\")
@@ -179,24 +179,24 @@
 (= ITEM4 \"Value 4\")
 (= ITEM5 \"Value 5\")
 
-# Export all items
+; Export all items
 (= __exports__ (list \"ITEM1\" \"ITEM2\" \"ITEM3\" \"ITEM4\" \"ITEM5\"))
 ")
 
-# Write the content to a file
+; Write the content to a file
 (os.write_file \"./tests/test_wildcards_module.m28\" wildcards_content)
 
-# Import with filtering
+; Import with filtering
 (print "- Importing with except clause that excludes ITEM3 and ITEM5")
 (import (from "./tests/test_wildcards_module.m28" import * except ITEM3 ITEM5))
 
-# Test accessing wildcard imported symbols
+; Test accessing wildcard imported symbols
 (print "- Testing access to imported and excluded symbols:")
 (try (print "  ITEM1 =" ITEM1) (catch e (print "  ERROR: Could not access ITEM1")))
 (try (print "  ITEM2 =" ITEM2) (catch e (print "  ERROR: Could not access ITEM2")))
 (try (print "  ITEM4 =" ITEM4) (catch e (print "  ERROR: Could not access ITEM4")))
 
-# Test accessing excluded symbols (should fail)
+; Test accessing excluded symbols (should fail)
 (try
   (print "  ITEM3 =" ITEM3)
   (catch e (print "  SUCCESS: Could not access excluded ITEM3")))

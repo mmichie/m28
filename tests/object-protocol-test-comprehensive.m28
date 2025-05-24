@@ -1,22 +1,22 @@
-# object-protocol-test-comprehensive.m28
-#
-# Comprehensive test for the object protocol in M28
-# Testing various aspects of object system as per the language specification
+; object-protocol-test-comprehensive.m28
+;
+; Comprehensive test for the object protocol in M28
+; Testing various aspects of object system as per the language specification
 
 (print "===== Object Protocol Tests =====\n")
 
-# -- Basic Object Creation and Properties --
+; -- Basic Object Creation and Properties --
 
 (print "-- Basic Object Creation --")
 
-# Create a simple object using dictionary approach
+; Create a simple object using dictionary approach
 (def (make-person name age)
   (= person (dict))
   (= person.name name)
   (= person.age age)
   person)
 
-# Test basic object creation and property access
+; Test basic object creation and property access
 (= alice (make-person "Alice" 30))
 (print "\nCreated person:" alice)
 (print "Name:" alice.name)
@@ -24,21 +24,21 @@
 (assert (== alice.name "Alice") "Object property 'name' should be accessible")
 (assert (== alice.age 30) "Object property 'age' should be accessible")
 
-# Test property modification
+; Test property modification
 (= alice.age 31)
 (print "Modified age:" alice.age)
 (assert (== alice.age 31) "Object properties should be modifiable")
 
-# Test adding new properties
+; Test adding new properties
 (= alice.email "alice@example.com")
 (print "Added email:" alice.email)
 (assert (== alice.email "alice@example.com") "New properties should be addable")
 
-# -- Method Handling --
+; -- Method Handling --
 
 (print "\n-- Method Handling --")
 
-# Create an object with methods
+; Create an object with methods
 (def (make-counter start)
   (= counter (dict))
   (= counter.value start)
@@ -57,7 +57,7 @@
   
   counter)
 
-# Test method calling
+; Test method calling
 (= counter (make-counter 10))
 (print "\nInitial counter value:" counter.value)
 
@@ -74,11 +74,11 @@
 (print "After reset:" new-value)
 (assert (== new-value 10) "Method should reset to initial value")
 
-# -- Method Binding (if supported) --
+; -- Method Binding (if supported) --
 
 (print "\n-- Method Binding --")
 
-# Test if methods can be bound to objects (not requiring explicit self)
+; Test if methods can be bound to objects (not requiring explicit self)
 (try
   (= increment-method counter.increment)
   (= result (increment-method))
@@ -87,11 +87,11 @@
   (except Exception as e
     (print "Method binding not supported as expected:" e)))
 
-# -- Attribute Checking --
+; -- Attribute Checking --
 
 (print "\n-- Attribute Checking --")
 
-# Test hasattr/getattr/setattr if supported
+; Test hasattr/getattr/setattr if supported
 (try
   (= has-name (hasattr alice "name"))
   (print "hasattr test for name:" has-name)
@@ -112,11 +112,11 @@
   (except Exception as e
     (print "Standard attribute functions not supported as expected:" e)))
 
-# -- Class Based Objects (if supported) --
+; -- Class Based Objects (if supported) --
 
 (print "\n-- Class Based Objects --")
 
-# Test class-based object creation if supported
+; Test class-based object creation if supported
 (try
   (class Dog ()
     (def (init self name breed)
@@ -139,11 +139,11 @@
   (except Exception as e
     (print "Class-based objects not supported as expected:" e)))
 
-# -- Inheritance (if supported) --
+; -- Inheritance (if supported) --
 
 (print "\n-- Inheritance --")
 
-# Test inheritance if supported
+; Test inheritance if supported
 (try
   (class Animal ()
     (def (init self name)
@@ -174,11 +174,11 @@
   (except Exception as e
     (print "Inheritance not supported as expected:" e)))
 
-# -- Protocol Objects --
+; -- Protocol Objects --
 
 (print "\n-- Protocol Objects --")
 
-# Test iterable protocol if supported
+; Test iterable protocol if supported
 (try
   (class NumberIterator ()
     (def (init self start end)
@@ -208,11 +208,11 @@
   (except Exception as e
     (print "Iterable protocol not supported as expected:" e)))
 
-# -- Dict Protocol --
+; -- Dict Protocol --
 
 (print "\n-- Dict Protocol --")
 
-# Test dictionary access protocol if supported
+; Test dictionary access protocol if supported
 (try
   (class CustomDict ()
     (def (init self)
@@ -235,11 +235,11 @@
   (except Exception as e
     (print "Dict protocol not supported as expected:" e)))
 
-# -- Type Checking --
+; -- Type Checking --
 
 (print "\n-- Type Checking --")
 
-# Test isinstance and issubclass if supported
+; Test isinstance and issubclass if supported
 (try
   (= alice-is-dict (isinstance alice dict))
   (print "\nIs alice a dict instance?" alice-is-dict)
@@ -269,11 +269,11 @@
   (except Exception as e
     (print "Type checking not fully supported as expected:" e)))
 
-# -- Dynamic Attribute Access --
+; -- Dynamic Attribute Access --
 
 (print "\n-- Dynamic Attribute Access --")
 
-# Test dynamic attribute access if supported
+; Test dynamic attribute access if supported
 (try
   (class DynamicObject ()
     (def (init self)
@@ -309,11 +309,11 @@
   (except Exception as e
     (print "Dynamic attribute access not supported as expected:" e)))
 
-# -- Object Identity and Equality --
+; -- Object Identity and Equality --
 
 (print "\n-- Object Identity and Equality --")
 
-# Test object identity and equality
+; Test object identity and equality
 (= obj1 (make-person "Bob" 25))
 (= obj2 (make-person "Bob" 25))
 (= obj3 obj1)
@@ -324,15 +324,15 @@
 (print "obj1 is obj3:" (is obj1 obj3))
 (print "obj1 is obj2:" (is obj1 obj2))
 
-# If object equality is based on content, these should be equal
-# If based on identity, they should not be
+; If object equality is based on content, these should be equal
+; If based on identity, they should not be
 (print "Note: object equality behavior depends on the implementation")
-# Uncomment assertion if appropriate for your implementation:
-# (assert (== obj1 obj2) "Objects with same content should be equal")
+; Uncomment assertion if appropriate for your implementation:
+; (assert (== obj1 obj2) "Objects with same content should be equal")
 (assert (== obj1 obj3) "Same object references should be equal")
 (assert (is obj1 obj3) "Same object references should have same identity")
 (assert (not (is obj1 obj2)) "Different objects should have different identity")
 
-# -- Conclusion --
+; -- Conclusion --
 
 (print "\n===== Object Protocol Tests Complete =====")

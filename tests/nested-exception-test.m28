@@ -1,13 +1,13 @@
-# Nested Exception Handling Test Suite
-# This file tests enhanced exception propagation for nested contexts
+; Nested Exception Handling Test Suite
+; This file tests enhanced exception propagation for nested contexts
 
 (print "===== Nested Exception Handling Tests =====\n")
 
-# ========= 1. BASIC NESTED EXCEPTIONS ==========
+; ========= 1. BASIC NESTED EXCEPTIONS ==========
 
 (print "-- Basic Nested Exceptions --")
 
-# Test 1: Nested try/except blocks with proper traceback propagation
+; Test 1: Nested try/except blocks with proper traceback propagation
 (print "\nTest 1.1: Nested try/except blocks")
 
 (def (nested_exception_test_1)
@@ -25,7 +25,7 @@
 
 (nested_exception_test_1)
 
-# Test 2: Nested try blocks with exception propagation
+; Test 2: Nested try blocks with exception propagation
 (print "\nTest 1.2: Exception propagation through nested blocks")
 
 (def (level3)
@@ -47,11 +47,11 @@
 
 (level1)
 
-# ========= 2. EXCEPTION RE-RAISING ==========
+; ========= 2. EXCEPTION RE-RAISING ==========
 
 (print "\n-- Exception Re-raising --")
 
-# Test 1: Re-raising current exception
+; Test 1: Re-raising current exception
 (print "\nTest 2.1: Re-raising current exception")
 
 (def (catch_and_reraise)
@@ -67,7 +67,7 @@
   (except
     (print "Re-raised exception caught in outer handler")))
 
-# Test 2: Re-raising with enhanced exception
+; Test 2: Re-raising with enhanced exception
 (print "\nTest 2.2: Re-raising with different exception type")
 
 (def (convert_exception)
@@ -83,11 +83,11 @@
   (except (e)
     (print "Caught RuntimeError with original cause")))
 
-# ========= 3. FINALLY BLOCKS ==========
+; ========= 3. FINALLY BLOCKS ==========
 
 (print "\n-- Finally Blocks with Exceptions --")
 
-# Test 1: Finally block with exception in try
+; Test 1: Finally block with exception in try
 (print "\nTest 3.1: Finally with exception in try")
 
 (def (finally_with_exception)
@@ -105,7 +105,7 @@
   (except
     (print "Caught TypeError from re-raise")))
 
-# Test 2: Exception in finally block
+; Test 2: Exception in finally block
 (print "\nTest 3.2: Exception in finally block")
 
 (def (exception_in_finally)
@@ -122,11 +122,11 @@
   (except
     (print "Caught exception from finally block")))
 
-# ========= 4. COMPLEX SCENARIOS ==========
+; ========= 4. COMPLEX SCENARIOS ==========
 
 (print "\n-- Complex Exception Scenarios --")
 
-# Test 1: Deep nesting with exception causes
+; Test 1: Deep nesting with exception causes
 (print "\nTest 4.1: Deep nesting with exception causes")
 
 (defexception DatabaseError)
@@ -154,7 +154,7 @@
 
 (process_request)
 
-# Test 2: Multiple exception handlers
+; Test 2: Multiple exception handlers
 (print "\nTest 4.2: Multiple exception handlers with propagation")
 
 (def (test_multiple_handlers)

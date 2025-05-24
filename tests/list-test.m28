@@ -1,10 +1,10 @@
-# Test lists and dictionaries
+; Test lists and dictionaries
 (print "Starting list test")
 
-# Simple list with commas
+; Simple list with commas
 (= nums [1, 2, 3])
 (print "List:" nums)
 
-# Empty dictionary
+; Empty dictionary
 (= d {})
 (print "Dict:" d)

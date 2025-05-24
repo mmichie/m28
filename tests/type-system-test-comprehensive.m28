@@ -1,15 +1,15 @@
-# type-system-test-comprehensive.m28
-#
-# Comprehensive test for M28's type system features
-# Testing type checking, conversion, and operations between types
+; type-system-test-comprehensive.m28
+;
+; Comprehensive test for M28's type system features
+; Testing type checking, conversion, and operations between types
 
 (print "===== Type System Tests =====\n")
 
-# -- Type Constants --
+; -- Type Constants --
 
 (print "-- Type Constants --")
 
-# Verify basic type constants are defined
+; Verify basic type constants are defined
 (print "\nVerifying basic type constants:")
 (print "int:" (defined 'int))
 (print "float:" (defined 'float))
@@ -21,11 +21,11 @@
 (print "set:" (defined 'set))
 (print "function:" (defined 'function))
 
-# -- Type Function --
+; -- Type Function --
 
 (print "\n-- Type Function --")
 
-# Test type function with different values
+; Test type function with different values
 (= int-val 42)
 (= float-val 3.14)
 (= str-val "hello")
@@ -55,11 +55,11 @@
 (print "Type of function:" (type func-val))
 (assert (== (type func-val) function) "Type of lambda should be function")
 
-# -- isinstance Function --
+; -- isinstance Function --
 
 (print "\n-- isinstance Function --")
 
-# Test isinstance with different types
+; Test isinstance with different types
 (print "\nTesting isinstance with various types:")
 
 (print "isinstance(42, int):" (isinstance 42 int))
@@ -77,7 +77,7 @@
 (print "isinstance([1, 2, 3], list):" (isinstance [1, 2, 3] list))
 (assert (isinstance [1, 2, 3] list) "[1, 2, 3] should be an instance of list")
 
-# Test isinstance with tuple of types (any of multiple types)
+; Test isinstance with tuple of types (any of multiple types)
 (print "\nTesting isinstance with tuple of types:")
 (= num 42)
 (print "isinstance(num, (int, float)):" (isinstance num (tuple int float)))
@@ -90,11 +90,11 @@
 (print "isinstance(\"hello\", (int, float)):" (isinstance "hello" (tuple int float)))
 (assert (not (isinstance "hello" (tuple int float))) "\"hello\" should not be an instance of int or float")
 
-# -- issubclass Function --
+; -- issubclass Function --
 
 (print "\n-- issubclass Function --")
 
-# Test issubclass with class hierarchies if supported
+; Test issubclass with class hierarchies if supported
 (try
   (class A ())
   (class B (A))
@@ -131,11 +131,11 @@
   (except Exception as e
     (print "Class-based issubclass tests not applicable:" e)))
 
-# -- Type Conversion --
+; -- Type Conversion --
 
 (print "\n-- Type Conversion --")
 
-# Test int conversion
+; Test int conversion
 (print "\nTesting int conversion:")
 (print "int(42):" (int 42))
 (assert (== (int 42) 42) "int(42) should return 42")
@@ -152,7 +152,7 @@
   (except ValueError as e
     (print "int(\"hello\") correctly raised an error:" e)))
 
-# Test float conversion
+; Test float conversion
 (print "\nTesting float conversion:")
 (print "float(42):" (float 42))
 (assert (== (float 42) 42.0) "float(42) should return 42.0")
@@ -169,7 +169,7 @@
   (except ValueError as e
     (print "float(\"hello\") correctly raised an error:" e)))
 
-# Test str conversion
+; Test str conversion
 (print "\nTesting str conversion:")
 (print "str(42):" (str 42))
 (assert (== (str 42) "42") "str(42) should return \"42\"")
@@ -183,7 +183,7 @@
 (print "str([1, 2, 3]):" (str [1, 2, 3]))
 (assert (in "1" (str [1, 2, 3])) "str([1, 2, 3]) should contain \"1\"")
 
-# Test bool conversion
+; Test bool conversion
 (print "\nTesting bool conversion:")
 (print "bool(42):" (bool 42))
 (assert (bool 42) "bool(42) should return True")
@@ -209,7 +209,7 @@
 (print "bool([]):" (bool []))
 (assert (not (bool [])) "bool([]) should return False")
 
-# Test list conversion
+; Test list conversion
 (print "\nTesting list conversion:")
 (print "list(\"abc\"):" (list "abc"))
 (assert (== (list "abc") (list "a" "b" "c")) "list(\"abc\") should return [\"a\", \"b\", \"c\"]")
@@ -219,14 +219,14 @@
   (except TypeError as e
     (print "list(42) correctly raised an error:" e)))
 
-# Test tuple conversion
+; Test tuple conversion
 (print "\nTesting tuple conversion:")
 (print "tuple([1, 2, 3]):" (tuple [1, 2, 3]))
 (= tuple-from-list (tuple [1, 2, 3]))
 (assert (isinstance tuple-from-list tuple) "tuple([1, 2, 3]) should return a tuple")
 (assert (== (len tuple-from-list) 3) "tuple([1, 2, 3]) should have length 3")
 
-# Test dict conversion if supported
+; Test dict conversion if supported
 (print "\nTesting dict conversion (if supported):")
 (try
   (= pairs (list (tuple "a" 1) (tuple "b" 2)))
@@ -237,32 +237,32 @@
   (except Exception as e
     (print "dict conversion from pairs not supported:" e)))
 
-# -- Set Type --
+; -- Set Type --
 
 (print "\n-- Set Type --")
 
-# Test set creation and operations
+; Test set creation and operations
 (= set1 (set 1 2 3 4 5))
 (= set2 (set 4 5 6 7 8))
 (print "\nset1:" set1)
 (print "set2:" set2)
 
-# Test set operations
+; Test set operations
 (print "\nTesting set operations:")
 
-# Test set.union
+; Test set.union
 (= union-result (set.union set1 set2))
 (print "set1 ∪ set2:" union-result)
 (assert (== (len union-result) 8) "Union of set1 and set2 should have 8 elements")
 
-# Test set.intersection
+; Test set.intersection
 (= intersection-result (set.intersection set1 set2))
 (print "set1 ∩ set2:" intersection-result)
 (assert (== (len intersection-result) 2) "Intersection of set1 and set2 should have 2 elements")
 (assert (in 4 intersection-result) "Intersection should contain 4")
 (assert (in 5 intersection-result) "Intersection should contain 5")
 
-# Test set.difference
+; Test set.difference
 (= difference-result (set.difference set1 set2))
 (print "set1 - set2:" difference-result)
 (assert (== (len difference-result) 3) "Difference set1 - set2 should have 3 elements")
@@ -270,12 +270,12 @@
 (assert (in 2 difference-result) "Difference should contain 2")
 (assert (in 3 difference-result) "Difference should contain 3")
 
-# Test set.symmetric_difference
+; Test set.symmetric_difference
 (= symmetric-difference-result (set.symmetric_difference set1 set2))
 (print "set1 △ set2:" symmetric-difference-result)
 (assert (== (len symmetric-difference-result) 6) "Symmetric difference should have 6 elements")
 
-# Test membership
+; Test membership
 (print "\nTesting set membership:")
 (print "3 in set1:" (in 3 set1))
 (assert (in 3 set1) "3 should be in set1")
@@ -283,17 +283,17 @@
 (print "6 in set1:" (in 6 set1))
 (assert (not (in 6 set1)) "6 should not be in set1")
 
-# Test uniqueness property
+; Test uniqueness property
 (print "\nTesting set uniqueness property:")
 (= duplicate-set (set 1 2 2 3 3 3))
 (print "Set with duplicates:" duplicate-set)
 (assert (== (len duplicate-set) 3) "Set should eliminate duplicates")
 
-# -- Type Coercion Rules --
+; -- Type Coercion Rules --
 
 (print "\n-- Type Coercion Rules --")
 
-# Test coercion in arithmetic operations
+; Test coercion in arithmetic operations
 (print "\nTesting arithmetic coercion:")
 
 (print "1 + 2.0 =>" (+ 1 2.0))
@@ -304,25 +304,25 @@
 (assert (isinstance (* 2 3.0) float) "2 * 3.0 should return a float")
 (assert (== (* 2 3.0) 6.0) "2 * 3.0 should equal 6.0")
 
-# Test coercion in string operations
+; Test coercion in string operations
 (print "\nTesting string coercion:")
 
 (print "\"Hello, \" + \"World!\" =>" (+ "Hello, " "World!"))
 (assert (== (+ "Hello, " "World!") "Hello, World!") "String concatenation should work")
 
-# Test string * integer
+; Test string * integer
 (print "\"abc\" * 3 =>" (* "abc" 3))
 (assert (== (* "abc" 3) "abcabcabc") "String repetition should work")
 
-# Test list * integer
+; Test list * integer
 (print "[1, 2] * 3 =>" (* [1, 2] 3))
 (assert (== (* [1, 2] 3) [1, 2, 1, 2, 1, 2]) "List repetition should work")
 
-# -- Optional Type Annotations (if supported) --
+; -- Optional Type Annotations (if supported) --
 
 (print "\n-- Optional Type Annotations --")
 
-# Test type annotations if supported
+; Test type annotations if supported
 (try
   (def (add-typed [a int] [b int]) -> int
     (+ a b))
@@ -341,11 +341,11 @@
   (except Exception as e
     (print "Type annotations not supported:" e)))
 
-# -- Truthiness Rules --
+; -- Truthiness Rules --
 
 (print "\n-- Truthiness Rules --")
 
-# Test values that should be False
+; Test values that should be False
 (print "\nTesting values that should be False:")
 (assert (not (bool False)) "False should be falsy")
 (assert (not (bool None)) "None should be falsy")
@@ -356,7 +356,7 @@
 (assert (not (bool {})) "Empty dict should be falsy")
 (assert (not (bool (set))) "Empty set should be falsy")
 
-# Test values that should be True
+; Test values that should be True
 (print "\nTesting values that should be True:")
 (assert (bool True) "True should be truthy")
 (assert (bool 1) "1 should be truthy")
@@ -367,11 +367,11 @@
 (assert (bool {"a": 1}) "Non-empty dicts should be truthy")
 (assert (bool (set 1)) "Non-empty sets should be truthy")
 
-# -- Type Errors --
+; -- Type Errors --
 
 (print "\n-- Type Errors --")
 
-# Test operations that should raise TypeError
+; Test operations that should raise TypeError
 (print "\nTesting operations that should raise TypeError:")
 
 (try
@@ -393,6 +393,6 @@
   (except Exception as e
     (print "Dict comparison raised expected error:" e)))
 
-# -- Conclusion --
+; -- Conclusion --
 
 (print "\n===== Type System Tests Complete =====")

@@ -1,6 +1,6 @@
-# Robust test file for M28 concurrency features
+; Robust test file for M28 concurrency features
 
-# Test 1: Basic channel creation
+; Test 1: Basic channel creation
 (print "Test 1: Creating channels")
 (= unbuffered-chan (chan))
 (= buffered-chan (chan 5))
@@ -9,7 +9,7 @@
 (assert unbuffered-chan "Unbuffered channel should be created")
 (assert buffered-chan "Buffered channel should be created")
 
-# Test 2: Basic send and receive on a buffered channel
+; Test 2: Basic send and receive on a buffered channel
 (print "Test 2: Basic send and receive")
 (= ch (chan 1))
 (print "  Sending value to channel")
@@ -22,7 +22,7 @@
 (assert (= test-val 42) "Should receive 42 from channel")
 (assert (nth result 1) "Channel should still be open")
 
-# Test 3: try-send and try-recv
+; Test 3: try-send and try-recv
 (print "Test 3: Non-blocking sends and receives")
 (= ch (chan 1))
 (print "  Try-sending to empty channel")
@@ -51,7 +51,7 @@
 (= success-flag (nth recv-result2 1))
 (assert (not success-flag) "try-recv from empty channel should not succeed")
 
-# Test 4: Channel closing
+; Test 4: Channel closing
 (print "Test 4: Channel closing")
 (= ch (chan))
 (print "  Checking if channel is closed initially")
@@ -64,10 +64,10 @@
 (= is-closed (chan-closed? ch))
 (assert is-closed "Channel should be closed after close-chan")
 
-# Skipping the closed channel send test
+; Skipping the closed channel send test
 (print "  Skipping closed channel send test (expecting exception)")
 
-# Test 5: Simple goroutine with waitgroup
+; Test 5: Simple goroutine with waitgroup
 (print "Test 5: Simple goroutine with waitgroup")
 (= ch (chan 1))  # Use buffered channel to avoid blocking
 (= wg (waitgroup))
@@ -80,17 +80,17 @@
     (send ch "done")
     (finally (waitgroup-done wg))))
 
-# Wait for goroutine to finish
+; Wait for goroutine to finish
 (waitgroup-wait wg)
 (print "  Goroutine finished")
 
-# Now receive the value
+; Now receive the value
 (= result (recv ch))
 (print "  Goroutine sent:" (nth result 0))
 (= msg (nth result 0))
 (assert (= msg "done") "Goroutine should send 'done'")
 
-# Test 6: Multiple goroutines with waitgroup
+; Test 6: Multiple goroutines with waitgroup
 (print "Test 6: Multiple goroutines with waitgroup")
 (= ch (chan 5))  # Buffered channel with capacity for all results
 (= sum 0)
@@ -105,7 +105,7 @@
       (send ch i)
       (finally (waitgroup-done wg)))))
 
-# Wait for all goroutines to finish
+; Wait for all goroutines to finish
 (print "  Waiting for goroutines to finish")
 (waitgroup-wait wg)
 (print "  All goroutines finished")
@@ -120,15 +120,15 @@
 (print "  Total sum:" sum)
 (assert (= sum 10) "Sum of 0+1+2+3+4 should be 10")
 
-# Test 7: Select statement
+; Test 7: Select statement
 (print "Test 7: Select statement")
 (= ch1 (chan 1))
 (= ch2 (chan 1))
 
-# Send to first channel only
+; Send to first channel only
 (send ch1 "from ch1")
 
-# Now select should pick the first channel
+; Now select should pick the first channel
 (= result (select
   [(case :recv ch1)
     (print "  Received from ch1:" select-value)
@@ -143,7 +143,7 @@
 (print "  Select result:" result)
 (assert (= result "ch1") "Select should choose ch1 since it has data")
 
-# Test 8: Select with timeout
+; Test 8: Select with timeout
 (print "Test 8: Select with timeout")
 (= ch (chan))  # Empty channel
 (= result (select-timeout 100

@@ -1,0 +1,2 @@
+Hello from M28!
+Dot notation makes code cleaner.

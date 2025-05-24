@@ -1,20 +1,20 @@
-# Simple Object Protocol Test
+; Simple Object Protocol Test
 
 (print "=== Basic Object Protocol Test ===")
 
-# Test simple dictionary
+; Test simple dictionary
 (= test-dict {"name": "test", "value": 42})
 (print "Dictionary:" test-dict)
 
-# Test dot notation
+; Test dot notation
 (= name-value (. test-dict name))
 (print "Name value:" name-value)
 
-# Test getattr
+; Test getattr
 (= value-attr (getattr test-dict "value"))
 (print "Value attribute:" value-attr)
 
-# Test class
+; Test class
 (class TestClass []
   (def __init__ [self]
     (setattr self "hello" "world"))

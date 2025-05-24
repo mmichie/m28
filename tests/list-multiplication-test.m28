@@ -1,13 +1,13 @@
-# list-multiplication-test.m28
-# A focused test for list multiplication
+; list-multiplication-test.m28
+; A focused test for list multiplication
 
 (print "Testing list multiplication (* operation)")
 
-# Test list repetition
+; Test list repetition
 (print "\n[1 2] * 3 => " (* [1 2] 3))
 (assert (== (* [1 2] 3) [1 2 1 2 1 2]) "List repetition should work")
 
-# Test list repetition with integer on left
+; Test list repetition with integer on left
 (print "3 * [1 2] => " (* 3 [1 2]))
 (assert (== (* 3 [1 2]) [1 2 1 2 1 2]) "List repetition with integer on left should work")
 

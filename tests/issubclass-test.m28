@@ -1,7 +1,7 @@
-# Test file for issubclass function
-# Tests complex inheritance scenarios
+; Test file for issubclass function
+; Tests complex inheritance scenarios
 
-# 1. Basic inheritance test
+; 1. Basic inheritance test
 (class Animal nil
   (def __init__ (self name)
     (set self.name name)))
@@ -20,7 +20,7 @@
 (print "Animal issubclass of Dog:" (issubclass Animal Dog))
 (print "Dog issubclass of Dog:" (issubclass Dog Dog))
 
-# 2. Multiple inheritance test
+; 2. Multiple inheritance test
 (class Mammal nil
   (def __init__ (self)
     (print "Mammal initialized"))
@@ -33,7 +33,7 @@
   (def live_with_humans (self)
     (print "Living with humans")))
 
-# Using proper list syntax for parent classes
+; Using proper list syntax for parent classes
 (class Pet (Mammal Domesticated)
   (def __init__ (self name)
     (Mammal.__init__ self)
@@ -45,7 +45,7 @@
 (print "Pet issubclass of Domesticated:" (issubclass Pet Domesticated))
 (print "Pet issubclass of Animal:" (issubclass Pet Animal))
 
-# 3. Diamond inheritance pattern
+; 3. Diamond inheritance pattern
 (class A nil
   (def __init__ (self)
     (print "A initialized"))
@@ -79,11 +79,11 @@
 (print "D issubclass of B:" (issubclass D B))
 (print "D issubclass of C:" (issubclass D C))
 
-# 4. Tests with built-in types
+; 4. Tests with built-in types
 (print "\nBuilt-in types:")
 (print "Dog issubclass of Dog:" (issubclass Dog Dog))
 
-# 5. Tests with isinstance
+; 5. Tests with isinstance
 (print "\nInstance checks:")
 (= fido (Dog "Fido" "Labrador"))
 (= generic_animal (Animal "Generic"))
@@ -96,7 +96,7 @@
 (print "my_pet isinstance of Mammal:" (isinstance my_pet Mammal))
 (print "my_pet isinstance of Domesticated:" (isinstance my_pet Domesticated))
 
-# 6. Error cases
+; 6. Error cases
 (print "\nError cases:")
 (try
   (print "Invalid arg 1 (not a class):" (issubclass 123 Dog))
@@ -108,8 +108,8 @@
   (catch e
     (print "Error:" e.message)))
 
-# 7. Test list of classes for issubclass (uncomment if list of classes is supported)
-# (print "\nList of classes check:")
-# (print "D issubclass of (B C):" (issubclass D (list B C)))
-# (print "D issubclass of (A B):" (issubclass D (list A B)))
-# (print "D issubclass of (A B C):" (issubclass D (list A B C)))
+; 7. Test list of classes for issubclass (uncomment if list of classes is supported)
+; (print "\nList of classes check:")
+; (print "D issubclass of (B C):" (issubclass D (list B C)))
+; (print "D issubclass of (A B):" (issubclass D (list A B)))
+; (print "D issubclass of (A B C):" (issubclass D (list A B C)))

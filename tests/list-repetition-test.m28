@@ -1,9 +1,9 @@
-# list-repetition-test.m28
-# Testing list repetition functionality
+; list-repetition-test.m28
+; Testing list repetition functionality
 
 (print "===== List Repetition Tests =====\n")
 
-# Test list repetition with list on the left
+; Test list repetition with list on the left
 (print "-- List * Integer --")
 (= list1 [1 2])
 (= repeated (* list1 3))
@@ -11,7 +11,7 @@
 (print "[1 2] * 3 =>" repeated)
 (assert (== repeated [1 2 1 2 1 2]) "List repetition should work")
 
-# Test list repetition with integer on the left
+; Test list repetition with integer on the left
 (print "\n-- Integer * List --")
 (= list2 [3 4])
 (= repeated2 (* 2 list2))
@@ -19,33 +19,33 @@
 (print "2 * [3 4] =>" repeated2)
 (assert (== repeated2 [3 4 3 4]) "List repetition with integer on left should work")
 
-# Test list repetition with list literal on the left
+; Test list repetition with list literal on the left
 (print "\n-- List Literal * Integer --")
 (= repeated3 (* [5 6] 2))
 (print "[5 6] * 2 =>" repeated3)
 (assert (== repeated3 [5 6 5 6]) "List literal repetition should work")
 
-# Test list repetition with integer on the left and list literal on the right
+; Test list repetition with integer on the left and list literal on the right
 (print "\n-- Integer * List Literal --")
 (= repeated4 (* 3 [7 8]))
 (print "3 * [7 8] =>" repeated4)
 (assert (== repeated4 [7 8 7 8 7 8]) "List literal repetition with integer on left should work")
 
-# Test edge cases
+; Test edge cases
 (print "\n-- Edge Cases --")
 
-# Empty list
+; Empty list
 (= empty_list [])
 (= repeated_empty (* empty_list 5))
 (print "[] * 5 =>" repeated_empty)
 (assert (== repeated_empty []) "Empty list repetition should result in empty list")
 
-# Repeat 0 times
+; Repeat 0 times
 (= zero_repeat (* [1 2 3] 0))
 (print "[1 2 3] * 0 =>" zero_repeat)
 (assert (== zero_repeat []) "List * 0 should result in empty list")
 
-# Nested lists
+; Nested lists
 (= nested_list [[1 2] [3 4]])
 (= repeated_nested (* nested_list 2))
 (print "[[1 2] [3 4]] * 2 =>" repeated_nested)

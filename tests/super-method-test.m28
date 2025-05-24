@@ -1,14 +1,14 @@
-# Super Method and Inheritance Tests
-# Tests the super() function and method inheritance with multiple levels
+; Super Method and Inheritance Tests
+; Tests the super() function and method inheritance with multiple levels
 
 (print "=== Super Method and Inheritance Test Suite ===\n")
 
-#---------------------------------------------
-# Test 1: Multi-level Inheritance
-#---------------------------------------------
+;---------------------------------------------
+; Test 1: Multi-level Inheritance
+;---------------------------------------------
 (print "=== Test 1: Multi-level Inheritance ===")
 
-# Base class
+; Base class
 (class Animal []
   (def __init__ [self name]
     (setattr self "name" name)
@@ -20,7 +20,7 @@
   (def describe [self]
     (+ "I am " (. self name) ", a " (. self type))))
 
-# Level 1 inheritance
+; Level 1 inheritance
 (class Mammal [Animal]
   (def __init__ [self name]
     (super.__init__ self name)
@@ -32,7 +32,7 @@
   (def has_fur [self]
     true))
 
-# Level 2 inheritance
+; Level 2 inheritance
 (class Dog [Mammal]
   (def __init__ [self name breed]
     (super.__init__ self name)
@@ -45,7 +45,7 @@
   (def describe [self]
     (+ (super.describe self) " of breed " (. self breed))))
 
-# Test 1.1: Object creation and attribute inheritance
+; Test 1.1: Object creation and attribute inheritance
 (print "\nTest 1.1: Object creation and attribute inheritance")
 (def dog (Dog "Buddy" "Golden Retriever"))
 (print "Name:" (. dog name))
@@ -53,7 +53,7 @@
 (print "Breed:" (. dog breed))
 (print "Has fur:" (. dog has_fur))
 
-# Test 1.2: Method overriding
+; Test 1.2: Method overriding
 (print "\nTest 1.2: Method overriding")
 (print "Dog sound:" (. dog make_sound))
 (def dog-describe (. dog describe))
@@ -63,12 +63,12 @@
   (print "PASS: Method overriding works")
   (print "FAIL: Method overriding doesn't work"))
 
-#---------------------------------------------
-# Test 2: Method Resolution Order
-#---------------------------------------------
+;---------------------------------------------
+; Test 2: Method Resolution Order
+;---------------------------------------------
 (print "\n=== Test 2: Method Resolution Order ===")
 
-# Classes for testing method resolution
+; Classes for testing method resolution
 (class A []
   (def method [self]
     "A method")
@@ -97,7 +97,7 @@
   (def super_shared [self]
     (super.shared self)))
 
-# Test 2.1: Method resolution in diamond inheritance
+; Test 2.1: Method resolution in diamond inheritance
 (print "\nTest 2.1: Method resolution in diamond inheritance")
 (def d-obj (D))
 (print "D method result:" (. d-obj method))
@@ -107,12 +107,12 @@
   (print "PASS: Method resolution follows expected order")
   (print "FAIL: Method resolution doesn't follow expected order"))
 
-#---------------------------------------------
-# Test 3: Super with Explicit Base
-#---------------------------------------------
+;---------------------------------------------
+; Test 3: Super with Explicit Base
+;---------------------------------------------
 (print "\n=== Test 3: Super with Explicit Base ===")
 
-# Classes for testing super with explicit base
+; Classes for testing super with explicit base
 (class Vehicle []
   (def __init__ [self name]
     (setattr self "name" name)
@@ -139,7 +139,7 @@
   (def get_info [self]
     (+ (super.get_info self) ", Battery: " (. self battery) "kWh")))
 
-# Test 3.1: Multi-level super calls
+; Test 3.1: Multi-level super calls
 (print "\nTest 3.1: Multi-level super calls")
 (def tesla (ElectricCar "Model S" 4 100))
 (def info (. tesla get_info))
@@ -149,7 +149,7 @@
   (print "PASS: Multi-level super calls work")
   (print "FAIL: Multi-level super calls don't work"))
 
-# Test 3.2: Attribute inheritance through multiple levels
+; Test 3.2: Attribute inheritance through multiple levels
 (print "\nTest 3.2: Attribute inheritance through multiple levels")
 (print "Name:" (. tesla name))
 (print "Type:" (. tesla type))
@@ -162,12 +162,12 @@
   (print "PASS: Attributes are properly inherited")
   (print "FAIL: Attributes are not properly inherited"))
 
-#---------------------------------------------
-# Test 4: Super in Non-Method Contexts
-#---------------------------------------------
+;---------------------------------------------
+; Test 4: Super in Non-Method Contexts
+;---------------------------------------------
 (print "\n=== Test 4: Super in Non-Method Contexts ===")
 
-# Test 4.1: Super outside method (should fail gracefully)
+; Test 4.1: Super outside method (should fail gracefully)
 (print "\nTest 4.1: Super outside method")
 (try
   (do
@@ -177,7 +177,7 @@
     (print "Got expected error:" e)
     (print "PASS: super() correctly fails outside method context")))
 
-# Class with lambda using super
+; Class with lambda using super
 (class WithLambda []
   (def method [self]
     "base method")
@@ -191,7 +191,7 @@
         (catch e
           (+ "expected error: " e))))))
 
-# Test 4.2: Super in lambda
+; Test 4.2: Super in lambda
 (print "\nTest 4.2: Super in lambda")
 (def wl (WithLambda))
 (def lambda-fn (. wl create_lambda))
@@ -204,5 +204,5 @@
 (print "\n=== Super Method and Inheritance Test Suite Complete ===")
 (print "All tests completed!")
 
-# Return success value
+; Return success value
 {"status": "success"}

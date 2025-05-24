@@ -1,9 +1,9 @@
-# Advanced For Loop Testing
-# This test covers advanced for loop cases with the fixed implementation
+; Advanced For Loop Testing
+; This test covers advanced for loop cases with the fixed implementation
 
 (print "\n=== Advanced For Loop Testing ===\n")
 
-# Nested for loops with break in outer loop
+; Nested for loops with break in outer loop
 (print "1. Nested for loops with break in outer loop:")
 (for i [1 2 3 4 5]
   (print "  Outer loop i =" i)
@@ -13,7 +13,7 @@
     (print "    Inner loop j =" j)))
 (print "  Expected: Should break in outer loop at i=3")
 
-# Nested for loops with break in inner loop and continue in outer loop
+; Nested for loops with break in inner loop and continue in outer loop
 (print "\n2. Complex nested loop control flow:")
 (for i [1 2 3 4]
   (print "  Outer loop i =" i)
@@ -26,7 +26,7 @@
     (print "    After j =" j)))
 (print "  Expected: Should skip inner loop for i=2, break after j=20 for others")
 
-# For loop with nested for loop (simpler version)
+; For loop with nested for loop (simpler version)
 (print "\n3. For loop with nested for loops:")
 (= outer ["A" "B" "C"])
 (= inner [1 2 3])
@@ -36,7 +36,7 @@
   (for y inner
     (print "    Inner loop y =" y)))
 
-# For loop with manual search
+; For loop with manual search
 (print "\n4. For loop with search algorithm:")
 
 (= searchTerm "B") 
@@ -51,7 +51,7 @@
   (print "  Item not found"))
 (print "  Search result:" found)
 
-# Try searching for a non-existent item
+; Try searching for a non-existent item
 (= searchTerm "Z")
 (= found False) 
 (for x outer
@@ -64,7 +64,7 @@
   (print "  Item not found"))
 (print "  Search result:" found)
 
-# For loop with loop counter
+; For loop with loop counter
 (print "\n5. For loop with manual index tracking:")
 (= index 0)
 (for item ["apple" "banana" "cherry" "date"]

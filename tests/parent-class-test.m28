@@ -1,33 +1,33 @@
-# Test different ways to specify parent classes
+; Test different ways to specify parent classes
 
-# 1. Create a base class
+; 1. Create a base class
 (class BaseA nil) 
 (print "BaseA created")
 
-# 2. Try different ways to create derived classes
+; 2. Try different ways to create derived classes
 (print "\nTrying different parent specifications:")
 
-# Option 1: Single parent directly
+; Option 1: Single parent directly
 (class DerivedA1 BaseA)
 (print "DerivedA1 created")
 
-# Option 2: Single parent as a list 
+; Option 2: Single parent as a list 
 (class DerivedA2 (BaseA))
 (print "DerivedA2 created")
 
-# Option 3: nil parent (should result in no parent)
+; Option 3: nil parent (should result in no parent)
 (class DerivedA3 nil)
 (print "DerivedA3 created")
 
-# Create second base class for multiple inheritance test
+; Create second base class for multiple inheritance test
 (class BaseB nil)
 (print "BaseB created")
 
-# Option 4: Multiple parents in a list
+; Option 4: Multiple parents in a list
 (class MultiDerived (BaseA BaseB))
 (print "MultiDerived created")
 
-# Test issubclass with these different variations
+; Test issubclass with these different variations
 (print "\nTesting inheritance relationships:")
 (print "DerivedA1 issubclass of BaseA:" (issubclass DerivedA1 BaseA))
 (print "DerivedA2 issubclass of BaseA:" (issubclass DerivedA2 BaseA))

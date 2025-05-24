@@ -1,0 +1,86 @@
+; Quick sanity test for M28 v2.0
+
+(print "\n=== M28 v2.0 Quick Sanity Test ===\n")
+
+; 1. Basic types and operations
+(print "1. Basic Types:")
+(= num 42)
+(= str "hello")
+(= lst [1, 2, 3])
+(= dct {"a": 1, "b": 2})
+(print "  Number: " num)
+(print "  String: " str)
+(print "  List: " lst)
+(print "  Dict: " dct)
+(print "  ✓ Basic types work")
+
+; 2. Arithmetic
+(print "\n2. Arithmetic:")
+(= result (+ 10 20))
+(print "  10 + 20 = " result)
+(assert (= result 30) "Addition failed")
+(print "  ✓ Arithmetic works")
+
+; 3. Functions
+(print "\n3. Functions:")
+(def square (x) (* x x))
+(= sq (square 5))
+(print "  square(5) = " sq)
+(assert (= sq 25) "Function failed")
+(print "  ✓ Functions work")
+
+; 4. Control flow
+(print "\n4. Control Flow:")
+(= x 0)
+(if (> 10 5)
+    (= x 1)
+    (= x 2))
+(print "  if (10 > 5) result: " x)
+(assert (= x 1) "If statement failed")
+(print "  ✓ Control flow works")
+
+; 5. Loops
+(print "\n5. Loops:")
+(= sum 0)
+(= nums [1, 2, 3, 4, 5])
+(for (i nums)
+    (= sum (+ sum i)))
+(print "  Sum of [1,2,3,4,5]: " sum)
+(assert (= sum 15) "For loop failed")
+(print "  ✓ Loops work")
+
+; 6. Dot notation
+(print "\n6. Dot Notation:")
+(= person {"name": "Alice", "age": 30})
+(print "  person.name: " person.name)
+(print "  lst[0]: " lst.0)
+(= person.age 31)
+(print "  After assignment, person.age: " person.age)
+(assert (= person.age 31) "Dot assignment failed")
+(print "  ✓ Dot notation works")
+
+; 7. Exceptions
+(print "\n7. Exception Handling:")
+(= result 
+    (try
+        (do
+            (raise ValueError "test error")
+            "not caught")
+        (except ValueError
+            "caught")))
+(assert (= result "caught") "Exception not caught")
+(print "  ✓ Exceptions work")
+
+; 8. File I/O
+(print "\n8. File I/O:")
+(= f (open "test_temp.txt" "w"))
+(f.write "M28 v2.0")
+(f.close)
+(= f2 (open "test_temp.txt" "r"))
+(= content (f2.read))
+(f2.close)
+(assert (= content "M28 v2.0") "File I/O failed")
+(print "  Written and read: " content)
+(print "  ✓ File I/O works")
+
+(print "\n=== All tests passed! M28 v2.0 is working correctly ===\n")

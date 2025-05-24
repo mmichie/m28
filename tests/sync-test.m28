@@ -1,6 +1,6 @@
-# Test file for M28 synchronization primitives
+; Test file for M28 synchronization primitives
 
-# Test 1: Basic mutex operations
+; Test 1: Basic mutex operations
 (print "Test 1: Basic mutex operations")
 (= m (mutex))
 (print "  Created mutex:" m)
@@ -13,7 +13,7 @@
 (print "  Global value:" global-value)
 (assert (= global-value 42) "Global value should be 42")
 
-# Test 2: with-mutex special form
+; Test 2: with-mutex special form
 (print "Test 2: with-mutex special form")
 (= m (mutex))
 (= result (with-mutex m
@@ -25,26 +25,26 @@
 (assert (= global-value 100) "Global value should be 100")
 (assert (= result "with-mutex result") "with-mutex should return result of last expression")
 
-# Test 3: mutex-try-lock
+; Test 3: mutex-try-lock
 (print "Test 3: mutex-try-lock")
 (= m (mutex))
 (= success1 (mutex-try-lock m))
 (print "  First try-lock result:" success1)
 (assert success1 "First try-lock should succeed")
 
-# Second try-lock should fail because mutex is already locked
+; Second try-lock should fail because mutex is already locked
 (= success2 (mutex-try-lock m))
 (print "  Second try-lock result:" success2)
 (assert (not success2) "Second try-lock should fail")
 
-# Unlock and try again
+; Unlock and try again
 (mutex-unlock m)
 (= success3 (mutex-try-lock m))
 (print "  Try-lock after unlock result:" success3)
 (assert success3 "Try-lock after unlock should succeed")
 (mutex-unlock m)
 
-# Test 4: Basic rwmutex operations
+; Test 4: Basic rwmutex operations
 (print "Test 4: Basic rwmutex operations")
 (= m (rwmutex))
 (print "  Created rwmutex:" m)
@@ -55,7 +55,7 @@
 (rwmutex-runlock m)
 (print "  Read-unlocked rwmutex")
 
-# Now try a write lock
+; Now try a write lock
 (mutex-lock m)
 (print "  Write-locked rwmutex")
 (= global-value 200)
@@ -64,7 +64,7 @@
 (print "  Global value after write:" global-value)
 (assert (= global-value 200) "Global value should be 200")
 
-# Test 5: with-rlock special form
+; Test 5: with-rlock special form
 (print "Test 5: with-rlock special form")
 (= m (rwmutex))
 (= result (with-rlock m
@@ -74,27 +74,27 @@
 (print "  Result:" result)
 (assert (= result 200) "with-rlock should return result of last expression")
 
-# Test 6: Basic waitgroup operations
+; Test 6: Basic waitgroup operations
 (print "Test 6: Basic waitgroup operations")
 (= wg (waitgroup))
 (print "  Created waitgroup:" wg)
 (waitgroup-add wg 1)
 (print "  Added 1 to waitgroup")
 
-# This would block: (waitgroup-wait wg)
-# So instead, we'll complete the waitgroup
+; This would block: (waitgroup-wait wg)
+; So instead, we'll complete the waitgroup
 (waitgroup-done wg)
 (print "  Done with waitgroup")
 (waitgroup-wait wg)
 (print "  Wait completed")
 
-# Test 7: Waitgroup with goroutines
+; Test 7: Waitgroup with goroutines
 (print "Test 7: Waitgroup with goroutines")
 (= wg (waitgroup))
 (= result-ch (chan))
 (= sum 0)
 
-# Launch 5 goroutines
+; Launch 5 goroutines
 (for i (range 5)
   (waitgroup-add wg 1)
   (go
@@ -102,11 +102,11 @@
     (send result-ch i)
     (waitgroup-done wg)))
 
-# Wait for all goroutines to finish
+; Wait for all goroutines to finish
 (waitgroup-wait wg)
 (print "  All goroutines finished")
 
-# Now collect results
+; Now collect results
 (for i (range 5)
   (= result (recv result-ch))
   (= value (nth result 0))

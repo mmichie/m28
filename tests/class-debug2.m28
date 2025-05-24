@@ -1,6 +1,6 @@
-# Debugging class methods
+; Debugging class methods
 
-# Define a simple class with a special method
+; Define a simple class with a special method
 (print "Defining class TestClass2")
 (class TestClass2 nil
   (print "Inside class body")
@@ -9,15 +9,15 @@
 
 (print "TestClass2 created")
 
-# Print the class structure 
+; Print the class structure 
 (print "Class methods:" TestClass2.Methods)
 
-# Try to call the method
+; Try to call the method
 (= obj2 (TestClass2))
 (print "Object2 created:" obj2)
 
-# Manually get the method and call it
-# This will print an error if the method is not found
+; Manually get the method and call it
+; This will print an error if the method is not found
 (try
   (= method (obj2.test_method))
   (method)

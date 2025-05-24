@@ -1,27 +1,27 @@
-# Test for comma-separated list syntax in the REPL
-# This tests using comma-separated lists with assignment
+; Test for comma-separated list syntax in the REPL
+; This tests using comma-separated lists with assignment
 
-# Test scalar assignment
+; Test scalar assignment
 (= a 10)
 (print "a =" a)
 
-# Test list assignment with commas
+; Test list assignment with commas
 (= b [1, 2, 3])
 (print "b =" b)
 
-# Test nested list assignment
+; Test nested list assignment
 (= c [[1, 2], [3, 4]])
 (print "c =" c)
 
-# Test using the assigned list
+; Test using the assigned list
 (print "First element of b:" (nth b 0))
 (print "Last element of b:" (nth b 2))
 
-# Test list operations
+; Test list operations
 (= d (+ b [4, 5, 6]))
 (print "d = b + [4, 5, 6] =" d)
 
-# Test mixed element types
+; Test mixed element types
 (= e [1, "two", 3.0, True])
 (print "e =" e)
 

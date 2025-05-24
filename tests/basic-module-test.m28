@@ -1,23 +1,23 @@
-# Basic module test
-# Tests the core functionality of the module system
+; Basic module test
+; Tests the core functionality of the module system
 
-# Define a function to test module exports
+; Define a function to test module exports
 (def add (a b)
   (+ a b))
 
-# Test basic arithmetic
+; Test basic arithmetic
 (assert (= (add 2 3) 5) "Addition is not working correctly")
 
-# Define some variables for export
+; Define some variables for export
 (def test_value 42)
 (def test_string "Hello, world!")
 
-# Export the symbols
+; Export the symbols
 (def __exports__ {
   "add": add,
   "test_value": test_value,
   "test_string": test_string
 })
 
-# Print successful completion
+; Print successful completion
 (print "Basic module test completed successfully")

@@ -1,14 +1,14 @@
-# Built-in Type Protocol Tests
-# Tests the object protocol implementation for all built-in types
+; Built-in Type Protocol Tests
+; Tests the object protocol implementation for all built-in types
 
 (print "=== Built-in Type Protocol Test Suite ===\n")
 
-#---------------------------------------------
-# Test 1: List Protocol
-#---------------------------------------------
+;---------------------------------------------
+; Test 1: List Protocol
+;---------------------------------------------
 (print "=== Test 1: List Protocol ===")
 
-# Test 1.1: List basic operations
+; Test 1.1: List basic operations
 (print "\nTest 1.1: List basic operations")
 (def test-list [1, 2, 3, 4, 5])
 (def list-length (. test-list length))
@@ -21,7 +21,7 @@
   (print "PASS: List basic operations work")
   (print "FAIL: List basic operations don't work"))
 
-# Test 1.2: List append and extend
+; Test 1.2: List append and extend
 (print "\nTest 1.2: List append and extend")
 (. test-list append 6)
 (print "List after append:" test-list)
@@ -32,7 +32,7 @@
   (print "PASS: List append and extend work")
   (print "FAIL: List append and extend don't work"))
 
-# Test 1.3: List insert and remove
+; Test 1.3: List insert and remove
 (print "\nTest 1.3: List insert and remove")
 (. test-list insert 0 0)  # Insert 0 at index 0
 (print "List after insert:" test-list)
@@ -44,7 +44,7 @@
   (print "PASS: List insert and remove work")
   (print "FAIL: List insert and remove don't work"))
 
-# Test 1.4: List pop
+; Test 1.4: List pop
 (print "\nTest 1.4: List pop")
 (def popped-value (. test-list pop))
 (print "Popped value:" popped-value)
@@ -56,7 +56,7 @@
   (print "PASS: List pop works")
   (print "FAIL: List pop doesn't work"))
 
-# Test 1.5: List map and filter
+; Test 1.5: List map and filter
 (print "\nTest 1.5: List map and filter")
 (def doubled (. test-list map (lambda [x] (* x 2))))
 (print "Doubled list:" doubled)
@@ -66,12 +66,12 @@
   (print "PASS: List map and filter work")
   (print "FAIL: List map and filter don't work"))
 
-#---------------------------------------------
-# Test 2: String Protocol
-#---------------------------------------------
+;---------------------------------------------
+; Test 2: String Protocol
+;---------------------------------------------
 (print "\n=== Test 2: String Protocol ===")
 
-# Test 2.1: String basic operations
+; Test 2.1: String basic operations
 (print "\nTest 2.1: String basic operations")
 (def test-string "hello world")
 (def str-length (. test-string length))
@@ -84,7 +84,7 @@
   (print "PASS: String basic operations work")
   (print "FAIL: String basic operations don't work"))
 
-# Test 2.2: String split and join
+; Test 2.2: String split and join
 (print "\nTest 2.2: String split and join")
 (def split-string (. test-string split " "))
 (print "Split string:" split-string)
@@ -94,7 +94,7 @@
   (print "PASS: String split and join work")
   (print "FAIL: String split and join don't work"))
 
-# Test 2.3: String replace and strip
+; Test 2.3: String replace and strip
 (print "\nTest 2.3: String replace and strip")
 (def replaced-string (. test-string replace "world" "universe"))
 (print "Replaced string:" replaced-string)
@@ -105,7 +105,7 @@
   (print "PASS: String replace and strip work")
   (print "FAIL: String replace and strip don't work"))
 
-# Test 2.4: String starts/ends with
+; Test 2.4: String starts/ends with
 (print "\nTest 2.4: String starts/ends with")
 (def starts-with-hello (. test-string startswith "hello"))
 (def ends-with-world (. test-string endswith "world"))
@@ -115,7 +115,7 @@
   (print "PASS: String starts/ends with work")
   (print "FAIL: String starts/ends with don't work"))
 
-# Test 2.5: String contains and find
+; Test 2.5: String contains and find
 (print "\nTest 2.5: String contains and find")
 (def contains-world (. test-string contains "world"))
 (def find-world (. test-string find "world"))
@@ -125,12 +125,12 @@
   (print "PASS: String contains and find work")
   (print "FAIL: String contains and find don't work"))
 
-#---------------------------------------------
-# Test 3: Dictionary Protocol
-#---------------------------------------------
+;---------------------------------------------
+; Test 3: Dictionary Protocol
+;---------------------------------------------
 (print "\n=== Test 3: Dictionary Protocol ===")
 
-# Test 3.1: Dict basic operations
+; Test 3.1: Dict basic operations
 (print "\nTest 3.1: Dict basic operations")
 (def test-dict {"a": 1, "b": 2, "c": 3})
 (def dict-length (. test-dict length))
@@ -143,7 +143,7 @@
   (print "PASS: Dict basic operations work")
   (print "FAIL: Dict basic operations don't work"))
 
-# Test 3.2: Dict keys, values, items
+; Test 3.2: Dict keys, values, items
 (print "\nTest 3.2: Dict keys, values, items")
 (def dict-keys (. test-dict keys))
 (def dict-values (. test-dict values))
@@ -155,7 +155,7 @@
   (print "PASS: Dict keys, values, items work")
   (print "FAIL: Dict keys, values, items don't work"))
 
-# Test 3.3: Dict contains, set, delete
+; Test 3.3: Dict contains, set, delete
 (print "\nTest 3.3: Dict contains, set, delete")
 (def contains-b (. test-dict contains "b"))
 (. test-dict set "d" 4)
@@ -168,7 +168,7 @@
   (print "PASS: Dict contains, set, delete work")
   (print "FAIL: Dict contains, set, delete don't work"))
 
-# Test 3.4: Dict update and clear
+; Test 3.4: Dict update and clear
 (print "\nTest 3.4: Dict update and clear")
 (. test-dict update {"d": 4, "e": 5})
 (print "Dict after update:" test-dict)
@@ -183,12 +183,12 @@
   (print "PASS: Dict update and clear work")
   (print "FAIL: Dict update and clear don't work"))
 
-#---------------------------------------------
-# Test 4: Set Protocol
-#---------------------------------------------
+;---------------------------------------------
+; Test 4: Set Protocol
+;---------------------------------------------
 (print "\n=== Test 4: Set Protocol ===")
 
-# Test 4.1: Set basic operations
+; Test 4.1: Set basic operations
 (print "\nTest 4.1: Set basic operations")
 (def test-set (set [1, 2, 3, 4, 5]))
 (def set-length (. test-set length))
@@ -201,7 +201,7 @@
   (print "PASS: Set basic operations work")
   (print "FAIL: Set basic operations don't work"))
 
-# Test 4.2: Set add and remove
+; Test 4.2: Set add and remove
 (print "\nTest 4.2: Set add and remove")
 (. test-set add 6)
 (print "Set after add:" test-set)
@@ -213,7 +213,7 @@
   (print "PASS: Set add and remove work")
   (print "FAIL: Set add and remove don't work"))
 
-# Test 4.3: Set operations
+; Test 4.3: Set operations
 (print "\nTest 4.3: Set operations")
 (def set-a (set [1, 2, 3, 4]))
 (def set-b (set [3, 4, 5, 6]))
@@ -229,12 +229,12 @@
   (print "PASS: Set operations work")
   (print "FAIL: Set operations don't work"))
 
-#---------------------------------------------
-# Test 5: Tuple Protocol
-#---------------------------------------------
+;---------------------------------------------
+; Test 5: Tuple Protocol
+;---------------------------------------------
 (print "\n=== Test 5: Tuple Protocol ===")
 
-# Test 5.1: Tuple basic operations
+; Test 5.1: Tuple basic operations
 (print "\nTest 5.1: Tuple basic operations")
 (def test-tuple (tuple [1, 2, 3, 4, 5]))
 (def tuple-length (. test-tuple length))
@@ -247,7 +247,7 @@
   (print "PASS: Tuple basic operations work")
   (print "FAIL: Tuple basic operations don't work"))
 
-# Test 5.2: Tuple conversion
+; Test 5.2: Tuple conversion
 (print "\nTest 5.2: Tuple conversion")
 (def tuple-as-list (. test-tuple tolist))
 (print "Tuple as list:" tuple-as-list)
@@ -259,7 +259,7 @@
   (print "PASS: Tuple conversion works")
   (print "FAIL: Tuple conversion doesn't work"))
 
-# Test 5.3: Tuple immutability
+; Test 5.3: Tuple immutability
 (print "\nTest 5.3: Tuple immutability")
 (try
   (do
@@ -272,5 +272,5 @@
 (print "\n=== Built-in Type Protocol Test Suite Complete ===")
 (print "All tests completed!")
 
-# Return success value
+; Return success value
 {"status": "success"}

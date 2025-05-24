@@ -1,6 +1,6 @@
-# Test file for M28 concurrency features
+; Test file for M28 concurrency features
 
-# Test 1: Basic channel creation
+; Test 1: Basic channel creation
 (print "Test 1: Creating channels")
 (= unbuffered-chan (chan))
 (= buffered-chan (chan 5))
@@ -9,7 +9,7 @@
 (assert unbuffered-chan "Unbuffered channel should be created")
 (assert buffered-chan "Buffered channel should be created")
 
-# Test 2: Basic send and receive on a buffered channel
+; Test 2: Basic send and receive on a buffered channel
 (print "Test 2: Basic send and receive")
 (= ch (chan 1))
 (print "  Sending value to channel")
@@ -22,7 +22,7 @@
 (assert (= test-val 42) "Should receive 42 from channel")
 (assert (nth result 1) "Channel should still be open")
 
-# Test 3: try-send and try-recv
+; Test 3: try-send and try-recv
 (print "Test 3: Non-blocking sends and receives")
 (= ch (chan 1))
 (print "  Try-sending to empty channel")
@@ -51,7 +51,7 @@
 (= success-flag (nth recv-result2 1))
 (assert (not success-flag) "try-recv from empty channel should not succeed")
 
-# Test 4: Channel closing
+; Test 4: Channel closing
 (print "Test 4: Channel closing")
 (= ch (chan))
 (print "  Checking if channel is closed initially")
@@ -64,11 +64,11 @@
 (= is-closed (chan-closed? ch))
 (assert is-closed "Channel should be closed after close-chan")
 
-# Skipping the closed channel send test for now
+; Skipping the closed channel send test for now
 (print "  Skipping closed channel send test (expecting exception)")
-# In a future version, we'll implement proper exception handling
+; In a future version, we'll implement proper exception handling
 
-# Test 5: Simple goroutine
+; Test 5: Simple goroutine
 (print "Test 5: Simple goroutine")
 (= ch (chan))
 (print "  Starting goroutine")
@@ -82,7 +82,7 @@
 (= msg (nth result 0))
 (assert (= msg "done") "Goroutine should send 'done'")
 
-# Test 6: Multiple goroutines
+; Test 6: Multiple goroutines
 (print "Test 6: Multiple goroutines")
 (= ch (chan))
 (= sum 0)
