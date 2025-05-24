@@ -172,7 +172,12 @@ func (d *DictValue) Size() int {
 
 // GetAttr implements Object interface using TypeDescriptor
 func (d *DictValue) GetAttr(name string) (Value, bool) {
-	// First check TypeDescriptor for methods
+	// First check dictionary entries (for key access)
+	if val, exists := d.Get(name); exists {
+		return val, true
+	}
+	
+	// Then check TypeDescriptor for methods
 	desc := GetTypeDescriptor(DictType)
 	if desc != nil {
 		val, err := desc.GetAttribute(d, name)
@@ -181,8 +186,15 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 		}
 	}
 	
-	// Then check dictionary entries
+	// Finally check BaseObject
 	return d.BaseObject.GetAttr(name)
+}
+
+// SetAttr implements Object.SetAttr for dictionary key assignment
+func (d *DictValue) SetAttr(name string, value Value) error {
+	// Set as dictionary entry
+	d.Set(name, value)
+	return nil
 }
 
 // TupleValue represents an immutable sequence

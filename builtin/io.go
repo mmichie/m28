@@ -58,7 +58,7 @@ func printFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if i > 0 {
 			fmt.Print(" ")
 		}
-		fmt.Print(core.PrintValue(arg))
+		fmt.Print(core.PrintValueWithoutQuotes(arg))
 	}
 	fmt.Println()
 	

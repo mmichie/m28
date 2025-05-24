@@ -48,6 +48,12 @@ func registerDefinitionForms() {
 
 	// quote: Quote an expression
 	eval.RegisterSpecialForm("quote", quoteForm)
+	
+	// .: Dot notation for property access
+	eval.RegisterSpecialForm(".", dotForm)
+	
+	// dict-literal: Dictionary literal construction
+	eval.RegisterSpecialForm("dict-literal", dictLiteralForm)
 }
 
 // registerModuleForms registers special forms for module management
@@ -109,4 +115,14 @@ func breakForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // continueForm implements the 'continue' special form
 func continueForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.ContinueFormHandler(args, ctx)
+}
+
+// dotForm implements the '.' special form for property access
+func dotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.DotForm(args, ctx)
+}
+
+// dictLiteralForm implements the 'dict-literal' special form for dictionary construction
+func dictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.DictLiteralForm(args, ctx)
 }

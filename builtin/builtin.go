@@ -20,8 +20,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	// Register string functions
 	RegisterStringFunctions(ctx)
 
-	// Register IO functions
-	registerIOBuiltins(ctx)
+	// Don't call registerIOBuiltins as RegisterIOFunctions handles it
 
 	// Register list functions
 	RegisterListFunctions(ctx)
@@ -378,13 +377,13 @@ func registerTypeBuiltins(ctx *core.Context) {
 	}))
 
 	// Collection constructors
-	// list - create a new list
+	// list - create a new list (overrides the one from RegisterListFunctions)
 	ctx.Define("list", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.EmptyList, nil
 		}
 		if len(args) == 1 {
-			// Convert iterable to list
+			// Python-style: Convert iterable to list
 			switch v := args[0].(type) {
 			case core.ListValue:
 				// Copy the list
@@ -405,10 +404,12 @@ func registerTypeBuiltins(ctx *core.Context) {
 				}
 				return result, nil
 			default:
-				return nil, fmt.Errorf("list() argument must be an iterable, not '%s'", v.Type())
+				// If it's not an iterable, just create a list with this one element
+				return core.ListValue{v}, nil
 			}
 		}
-		return nil, fmt.Errorf("list() takes at most 1 argument (%d given)", len(args))
+		// Multiple arguments: create a list from all arguments
+		return core.ListValue(args), nil
 	}))
 
 	// dict - create a new dictionary

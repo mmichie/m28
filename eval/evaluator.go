@@ -119,9 +119,6 @@ func init() {
 		// Exception handling
 		"try":   tryForm,
 		"raise": raiseForm,
-		
-		// Object access
-		".": dotForm,
 
 		// Other special forms will be added through RegisterSpecialForm
 	}
@@ -140,6 +137,9 @@ func init() {
 	
 	// Register async/concurrent forms
 	RegisterAsyncForms()
+	
+	// Register dot notation
+	RegisterDotNotation()
 }
 
 // RegisterSpecialForm registers a special form
@@ -757,41 +757,4 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	return nil, fmt.Errorf("raise: too many arguments")
-}
-
-// dotForm implements dot notation for attribute access
-func dotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("dot notation requires exactly 2 arguments: object and attribute")
-	}
-
-	// Evaluate the object
-	obj, err := Eval(args[0], ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the attribute name
-	attrName, ok := args[1].(core.SymbolValue)
-	if !ok {
-		return nil, fmt.Errorf("attribute name must be a symbol")
-	}
-
-	// Try to get the attribute
-	if objWithAttrs, ok := obj.(interface {
-		GetAttr(string) (core.Value, bool)
-	}); ok {
-		val, found := objWithAttrs.GetAttr(string(attrName))
-		if found {
-			return val, nil
-		}
-	}
-
-	// Otherwise, attribute not found
-	desc := core.GetTypeDescriptorForValue(obj)
-	typeName := "object"
-	if desc != nil {
-		typeName = desc.PythonName
-	}
-	return nil, fmt.Errorf("'%s' object has no attribute '%s'", typeName, string(attrName))
 }

@@ -70,6 +70,23 @@ func (p *Parser) Parse(input string) (core.Value, error) {
 
 // parseExpr parses a single expression
 func (p *Parser) parseExpr() (core.Value, error) {
+	expr, err := p.parseAtom()
+	if err != nil {
+		return nil, err
+	}
+	
+	// Check for dot notation
+	if dotExpr, isDot, err := p.tryParseDotNotation(expr); err != nil {
+		return nil, err
+	} else if isDot {
+		return dotExpr, nil
+	}
+	
+	return expr, nil
+}
+
+// parseAtom parses a single atomic expression (without dot notation)
+func (p *Parser) parseAtom() (core.Value, error) {
 	p.skipWhitespaceAndComments()
 
 	// Check for end of input
@@ -87,6 +104,10 @@ func (p *Parser) parseExpr() (core.Value, error) {
 		return p.parseVectorLiteral()
 	case '{':
 		return p.parseDictLiteral()
+	case '.':
+		// Special handling for dot symbol
+		p.advance()
+		return core.SymbolValue("."), nil
 	case '+', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		if p.isNumberStart(p.input[p.pos]) {
 			return p.parseNumber()
@@ -149,6 +170,12 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
+		
+		// Check for comma separator
+		if p.pos < len(p.input) && p.input[p.pos] == ',' {
+			p.advance() // consume comma
+			p.skipWhitespaceAndComments()
+		}
 	}
 
 	// Check for unclosed vector
@@ -159,8 +186,11 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 	// Skip closing bracket
 	p.advance()
 
-	// A vector literal is represented as a list with special marker
-	return core.ListValue(elements), nil
+	// Return a quoted list so it's not evaluated as a function call
+	return core.ListValue{
+		core.SymbolValue("quote"),
+		elements,
+	}, nil
 }
 
 // parseDictLiteral parses a dictionary literal {...}
@@ -168,8 +198,8 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 	// Skip opening brace
 	p.advance()
 
-	// Create a new dictionary
-	dict := core.NewDict()
+	// Build a dict construction form: (dict key1 val1 key2 val2 ...)
+	elements := []core.Value{core.SymbolValue("dict-literal")}
 
 	// Skip whitespace after the opening brace
 	p.skipWhitespaceAndComments()
@@ -182,16 +212,8 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 			return nil, err
 		}
 
-		// Convert key to string
-		var keyStr string
-		switch k := key.(type) {
-		case core.StringValue:
-			keyStr = string(k)
-		case core.SymbolValue:
-			keyStr = string(k)
-		default:
-			return nil, fmt.Errorf("dict keys must be strings or symbols")
-		}
+		// Add key to elements
+		elements = append(elements, key)
 
 		// Skip whitespace after the key
 		p.skipWhitespaceAndComments()
@@ -211,8 +233,8 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 			return nil, err
 		}
 
-		// Add the key-value pair to the dictionary
-		dict.Set(keyStr, value)
+		// Add value to elements
+		elements = append(elements, value)
 
 		// Skip whitespace after the value
 		p.skipWhitespaceAndComments()
@@ -232,7 +254,7 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 	// Skip closing brace
 	p.advance()
 
-	return dict, nil
+	return core.ListValue(elements), nil
 }
 
 // parseString parses a string literal "..."
@@ -319,15 +341,7 @@ func (p *Parser) parseNumber() (core.Value, error) {
 
 // parseSymbolOrKeyword parses a symbol or keyword
 func (p *Parser) parseSymbolOrKeyword() (core.Value, error) {
-	start := p.pos
-
-	// Parse symbol characters
-	for p.pos < len(p.input) && isSymbolChar(p.input[p.pos]) {
-		p.advance()
-	}
-
-	// Get the symbol name
-	name := p.input[start:p.pos]
+	name := p.parseSymbolName()
 
 	// Check for keywords (Python-style)
 	switch name {
@@ -340,6 +354,19 @@ func (p *Parser) parseSymbolOrKeyword() (core.Value, error) {
 	default:
 		return core.SymbolValue(name), nil
 	}
+}
+
+// parseSymbolName parses just the name part of a symbol
+func (p *Parser) parseSymbolName() string {
+	start := p.pos
+
+	// Parse symbol characters
+	for p.pos < len(p.input) && isSymbolChar(p.input[p.pos]) {
+		p.advance()
+	}
+
+	// Get the symbol name
+	return p.input[start:p.pos]
 }
 
 // skipWhitespaceAndComments skips whitespace and comments
@@ -383,6 +410,11 @@ func isDigit(ch byte) bool {
 	return ch >= '0' && ch <= '9'
 }
 
+// isLetter checks if a character is a letter
+func isLetter(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+}
+
 // isNumberStart checks if a character can start a number
 func (p *Parser) isNumberStart(ch byte) bool {
 	// Check if it's a digit
@@ -405,5 +437,10 @@ func isSymbolChar(ch byte) bool {
 		ch != '[' && ch != ']' &&
 		ch != '{' && ch != '}' &&
 		ch != '"' && ch != ';' &&
-		ch != ':'
+		ch != ':' && ch != '.'  // dot is not valid in symbols (used for dot notation)
+}
+
+// error creates a parser error with current position info
+func (p *Parser) error(msg string) error {
+	return fmt.Errorf("%s at line %d, column %d", msg, p.line, p.col)
 }

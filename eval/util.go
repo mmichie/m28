@@ -1,6 +1,8 @@
 package eval
 
 import (
+	"fmt"
+	
 	"github.com/mmichie/m28/core"
 )
 
@@ -147,6 +149,48 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return value, nil
 }
 
+// DictLiteralForm provides the implementation of the dict-literal special form
+func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Arguments should be key-value pairs
+	if len(args)%2 != 0 {
+		return nil, fmt.Errorf("dict-literal requires an even number of arguments (key-value pairs)")
+	}
+	
+	// Create a new dictionary
+	dict := core.NewDict()
+	
+	// Process key-value pairs
+	for i := 0; i < len(args); i += 2 {
+		// Evaluate the key
+		key, err := Eval(args[i], ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating dict key: %v", err)
+		}
+		
+		// Convert key to string
+		var keyStr string
+		switch k := key.(type) {
+		case core.StringValue:
+			keyStr = string(k)
+		case core.SymbolValue:
+			keyStr = string(k)
+		default:
+			return nil, fmt.Errorf("dict keys must be strings or symbols, got %v", key.Type())
+		}
+		
+		// Evaluate the value
+		value, err := Eval(args[i+1], ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating dict value for key %q: %v", keyStr, err)
+		}
+		
+		// Set the key-value pair
+		dict.Set(keyStr, value)
+	}
+	
+	return dict, nil
+}
+
 // AssignForm provides the implementation of the = special form
 func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
@@ -168,10 +212,51 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Variable assignment - define in current scope
 		ctx.Define(string(t), value)
 		return value, nil
+		
+	case core.ListValue:
+		// Check if it's a dot notation expression
+		if len(t) >= 3 {
+			if dotSym, ok := t[0].(core.SymbolValue); ok && string(dotSym) == "." {
+				// Dot notation assignment: (. obj prop) = value
+				// Evaluate the object
+				obj, err := Eval(t[1], ctx)
+				if err != nil {
+					return nil, err
+				}
+				
+				// Get the property name
+				propName, ok := t[2].(core.StringValue)
+				if !ok {
+					return nil, TypeError{Expected: "string property name", Got: t[2].Type()}
+				}
+				
+				// Set the attribute
+				if objWithAttrs, ok := obj.(interface {
+					SetAttr(string, core.Value) error
+				}); ok {
+					err := objWithAttrs.SetAttr(string(propName), value)
+					if err != nil {
+						return nil, err
+					}
+					return value, nil
+				}
+				
+				// Special handling for dicts
+				if dict, ok := obj.(*core.DictValue); ok {
+					dict.Set(string(propName), value)
+					return value, nil
+				}
+				
+				return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+			}
+		}
+		// Fall through to error
 
 	default:
-		return nil, TypeError{Expected: "symbol", Got: target.Type()}
+		return nil, TypeError{Expected: "symbol or dot notation", Got: target.Type()}
 	}
+	
+	return nil, TypeError{Expected: "symbol or dot notation", Got: target.Type()}
 }
 
 // QuoteForm provides the implementation of the quote special form
