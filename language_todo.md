@@ -4,14 +4,15 @@ Based on testing the examples, here are the language features that need to be im
 
 ## Critical - Syntax Changes
 
-### 1. Comment Syntax
-- [ ] Implement `#` for comments (currently causes "name error")
-- [ ] Disable `;` comments (currently still work)
-- [ ] Support `#` at beginning of line and inline
+### 1. Comment Syntax ✅ DONE
+- [x] Implement `#` for comments
+- [x] Disable `;` comments (note: `;` as bare symbol causes timeout - needs investigation)
+- [x] Support `#` at beginning of line and inline
 
-### 2. String Formatting
-- [ ] Implement f-strings: `f"Hello, {name}!"`
-- [ ] Support expressions in f-string braces
+### 2. String Formatting ✅ DONE
+- [x] Implement f-strings: `f"Hello, {name}!"`
+- [x] Support expressions in f-string braces
+- [x] Escape sequences work: `\{` and `\}`
 
 ### 3. Restrict `def` to Functions Only
 - [ ] Make `def` work ONLY for function definitions
@@ -47,10 +48,10 @@ Based on testing the examples, here are the language features that need to be im
 
 ## Features That Need Implementation/Fixes
 
-### 1. Indexing and Slicing
-- [ ] List indexing: `(list 0)` currently fails with "expected callable, got list"
-- [ ] Direct dictionary access: `(dict "key")` likely fails similarly
-- [ ] Need an index/get function for lists: `(nth list 0)` or similar
+### 1. Indexing and Slicing ✅ PARTIALLY DONE
+- [x] List indexing: Use `(nth list 0)` function
+- [x] Dictionary access: Use `(get dict "key")` or `(. dict "key")`
+- [ ] Direct indexing syntax: `(list 0)` still doesn't work
 - [ ] Slicing syntax: `list[1:3]` or `(slice list 1 3)`
 
 ### 2. Property Access
@@ -58,12 +59,12 @@ Based on testing the examples, here are the language features that need to be im
 - [ ] Method calls: `obj.method(args)`
 - [ ] Setting properties: `(= obj.property value)`
 
-### 3. Classes
-- [ ] Class definition syntax - currently errors with "parent class 'def' not found"
-- [ ] Method definitions inside classes
-- [ ] Constructor `__init__`
-- [ ] Inheritance syntax
-- [ ] `super` calls
+### 3. Classes ✅ DONE
+- [x] Class definition syntax - fixed parser logic
+- [x] Method definitions inside classes
+- [x] Constructor `__init__`
+- [x] Inheritance syntax: `(class Dog (Animal) ...)`
+- [x] Method overriding works
 
 ### 4. String Operations
 - [ ] String methods: `.upper()`, `.lower()`, `.split()`, etc.
@@ -73,7 +74,7 @@ Based on testing the examples, here are the language features that need to be im
 ### 5. List Operations  
 - [ ] List methods: `.append()`, `.extend()`, `.pop()`, etc.
 - [ ] List comprehensions: `[x*2 for x in range(10)]`
-- [ ] `in` operator for membership testing (currently "name error")
+- [x] `in` operator for membership testing - DONE
 - [ ] `getattr` doesn't work for list indexing
 
 ### 6. For Loop Variations
@@ -85,9 +86,9 @@ Based on testing the examples, here are the language features that need to be im
 - [ ] Multiple except clauses: `(except ZeroDivisionError e ...)`
 - [ ] Finally clause
 
-### 8. Advanced Operators
-- [ ] Power operator `**` (gives "name error")
-- [ ] Modulo operator `%` (gives "name error", only `mod` works)
+### 8. Advanced Operators ✅ PARTIALLY DONE
+- [x] Power operator `**` - DONE (added as alias for pow)
+- [x] Modulo operator `%` - DONE (was already implemented)
 - [ ] Augmented assignment: `+=`, `-=`, etc. (gives "name error")
 
 ### 9. Data Structure Literals
@@ -132,18 +133,22 @@ Based on testing the examples, here are the language features that need to be im
 
 ## Implementation Priority
 
-Based on testing, the most critical features to implement first are:
+Critical features completed ✅:
+1. ✅ **Comment syntax** - Switched from `;` to `#`
+2. ✅ **F-strings** - Implemented with `{expression}` syntax
+3. ✅ **List/dict indexing** - Using `nth` and `get` functions
+4. ✅ **Classes** - Fixed parser logic
+5. ✅ **Basic operators**: `**` for power, `%` for modulo
+6. ✅ **in operator** - Works for lists, strings, dicts
 
-1. **Comment syntax** - Switch from `;` to `#`
-2. **F-strings** - Essential for many examples
-3. **List/dict indexing** - Need a way to access elements (maybe `nth` function?)
-4. **Classes** - Currently broken with "parent class 'def' not found"
-5. **Basic operators**: `**` for power, `%` for modulo
-6. **in operator** - Common operation
-7. **try/except** - Exception handling
-8. **Built-in functions** - `abs`, `sorted`, `enumerate`, etc.
-9. **List comprehensions** - Currently parsed as literal lists
-10. **For loop syntax** - Consider supporting `(for i seq)` without extra parens
+Next priorities:
+1. **try/except** - Exception handling
+2. **Built-in functions** - `abs`, `sorted`, `enumerate`, etc.
+3. **List comprehensions** - Currently parsed as literal lists
+4. **Property/method access** - `obj.method()` syntax
+5. **Augmented assignment** - `+=`, `-=`, etc.
+6. **Set and tuple literals**
+7. **String/list methods** - `.append()`, `.split()`, etc.
 
 ## Notes on Syntax Differences
 

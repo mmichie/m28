@@ -28,28 +28,43 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	if len(args) > 1 {
 		// Check if second argument is parent class specification
+		// Parent class spec is a list that either:
+		// - Is empty: ()
+		// - Contains a single symbol: (ParentClass)
+		// - Does NOT start with a special form like "def"
 		if parentList, ok := args[1].(core.ListValue); ok {
-			bodyStart = 2
+			isParentSpec := false
 			
-			// Get parent class if specified
-			if len(parentList) > 0 {
-				parentName, ok := parentList[0].(core.SymbolValue)
-				if !ok {
-					return nil, fmt.Errorf("parent class must be a symbol")
+			if len(parentList) == 0 {
+				// Empty list means no parent but still a parent spec
+				isParentSpec = true
+			} else if len(parentList) == 1 {
+				// Single element list - check if it's a symbol (parent class name)
+				if _, ok := parentList[0].(core.SymbolValue); ok {
+					isParentSpec = true
 				}
+			}
+			
+			if isParentSpec {
+				bodyStart = 2
 				
-				// Look up parent class
-				parentVal, err := ctx.Lookup(string(parentName))
-				if err != nil {
-					return nil, fmt.Errorf("parent class '%s' not found", string(parentName))
+				// Get parent class if specified
+				if len(parentList) > 0 {
+					parentName := parentList[0].(core.SymbolValue)
+					
+					// Look up parent class
+					parentVal, err := ctx.Lookup(string(parentName))
+					if err != nil {
+						return nil, fmt.Errorf("parent class '%s' not found", string(parentName))
+					}
+					
+					parent, ok := parentVal.(*core.Class)
+					if !ok {
+						return nil, fmt.Errorf("'%s' is not a class", string(parentName))
+					}
+					
+					parentClass = parent
 				}
-				
-				parent, ok := parentVal.(*core.Class)
-				if !ok {
-					return nil, fmt.Errorf("'%s' is not a class", string(parentName))
-				}
-				
-				parentClass = parent
 			}
 		}
 	}

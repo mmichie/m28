@@ -14,6 +14,7 @@ func RegisterStringFunctions(ctx *core.Context) {
 	// String creation and conversion
 	ctx.Define("str", core.NewBuiltinFunction(StrFunc))
 	ctx.Define("format", core.NewBuiltinFunction(FormatFunc))
+	ctx.Define("str-format", core.NewBuiltinFunction(StrFormatFunc))
 
 	// String properties
 	ctx.Define("length", core.NewBuiltinFunction(LengthFunc))  // This function is already in list.go
@@ -46,6 +47,25 @@ func StrFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Use the PrintValue function to convert to string
 	return core.StringValue(core.PrintValueWithoutQuotes(args[0])), nil
+}
+
+// StrFormatFunc concatenates strings and values for f-string formatting
+func StrFormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return core.StringValue(""), nil
+	}
+	
+	var result strings.Builder
+	for _, arg := range args {
+		switch v := arg.(type) {
+		case core.StringValue:
+			result.WriteString(string(v))
+		default:
+			result.WriteString(core.PrintValueWithoutQuotes(arg))
+		}
+	}
+	
+	return core.StringValue(result.String()), nil
 }
 
 // FormatFunc formats a string with placeholders

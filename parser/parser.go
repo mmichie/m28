@@ -94,6 +94,11 @@ func (p *Parser) parseAtom() (core.Value, error) {
 		return nil, fmt.Errorf("unexpected end of input")
 	}
 
+	// Check for f-string
+	if p.pos+1 < len(p.input) && p.input[p.pos] == 'f' && p.input[p.pos+1] == '"' {
+		return p.parseFString()
+	}
+
 	// Check what kind of expression we have
 	switch p.input[p.pos] {
 	case '(':
@@ -305,6 +310,101 @@ func (p *Parser) parseString() (core.Value, error) {
 	return nil, fmt.Errorf("unclosed string")
 }
 
+// parseFString parses an f-string literal
+func (p *Parser) parseFString() (core.Value, error) {
+	// Skip 'f' and opening quote
+	p.advance() // skip 'f'
+	p.advance() // skip '"'
+
+	var parts []core.Value
+	var currentString strings.Builder
+	escaped := false
+	
+	// Parse characters until closing quote
+	for p.pos < len(p.input) {
+		ch := p.input[p.pos]
+		
+		if escaped {
+			// Handle escaped characters
+			switch ch {
+			case 'n':
+				currentString.WriteByte('\n')
+			case 't':
+				currentString.WriteByte('\t')
+			case 'r':
+				currentString.WriteByte('\r')
+			case '"':
+				currentString.WriteByte('"')
+			case '\\':
+				currentString.WriteByte('\\')
+			case '{':
+				currentString.WriteByte('{')
+			case '}':
+				currentString.WriteByte('}')
+			default:
+				return nil, fmt.Errorf("invalid escape sequence: \\%c", ch)
+			}
+			escaped = false
+			p.advance()
+		} else if ch == '\\' {
+			escaped = true
+			p.advance()
+		} else if ch == '"' {
+			// End of f-string
+			if currentString.Len() > 0 {
+				parts = append(parts, core.StringValue(currentString.String()))
+			}
+			p.advance()
+			
+			// Return a format expression
+			if len(parts) == 0 {
+				return core.StringValue(""), nil
+			} else if len(parts) == 1 {
+				return parts[0], nil
+			}
+			
+			// Create (str-format part1 part2 ...)
+			formatExpr := make(core.ListValue, 0, len(parts)+1)
+			formatExpr = append(formatExpr, core.SymbolValue("str-format"))
+			formatExpr = append(formatExpr, parts...)
+			return formatExpr, nil
+		} else if ch == '{' {
+			// Start of expression
+			if currentString.Len() > 0 {
+				parts = append(parts, core.StringValue(currentString.String()))
+				currentString.Reset()
+			}
+			
+			// Skip '{'
+			p.advance()
+			
+			// Parse expression until '}'
+			expr, err := p.parseExpr()
+			if err != nil {
+				return nil, fmt.Errorf("error parsing f-string expression: %v", err)
+			}
+			
+			// Skip whitespace before '}'
+			p.skipWhitespaceAndComments()
+			
+			if p.pos >= len(p.input) || p.input[p.pos] != '}' {
+				return nil, fmt.Errorf("unclosed f-string expression")
+			}
+			
+			// Skip '}'
+			p.advance()
+			
+			// Add expression to parts
+			parts = append(parts, expr)
+		} else {
+			currentString.WriteByte(ch)
+			p.advance()
+		}
+	}
+	
+	return nil, fmt.Errorf("unclosed f-string")
+}
+
 // parseNumber parses a numeric literal
 func (p *Parser) parseNumber() (core.Value, error) {
 	start := p.pos
@@ -381,7 +481,7 @@ func (p *Parser) skipWhitespaceAndComments() {
 				p.col++
 			}
 			p.pos++
-		} else if p.pos+1 < len(p.input) && p.input[p.pos] == ';' {
+		} else if p.pos < len(p.input) && p.input[p.pos] == '#' {
 			// Skip comment to end of line
 			for p.pos < len(p.input) && p.input[p.pos] != '\n' {
 				p.pos++

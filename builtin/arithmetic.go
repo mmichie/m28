@@ -16,6 +16,7 @@ func RegisterArithmeticFunctions(ctx *core.Context) {
 	ctx.Define("*", core.NewBuiltinFunction(MultiplyFunc))
 	ctx.Define("/", core.NewBuiltinFunction(DivideFunc))
 	ctx.Define("%", core.NewBuiltinFunction(ModuloFunc))
+	ctx.Define("**", core.NewBuiltinFunction(PowFunc)) // Power operator
 
 	// Math functions
 	ctx.Define("abs", core.NewBuiltinFunction(AbsFunc))
