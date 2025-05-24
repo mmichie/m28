@@ -54,6 +54,9 @@ func registerDefinitionForms() {
 	
 	// dict-literal: Dictionary literal construction
 	eval.RegisterSpecialForm("dict-literal", dictLiteralForm)
+	
+	// list-comp: List comprehension
+	eval.RegisterSpecialForm("list-comp", listCompForm)
 }
 
 // registerModuleForms registers special forms for module management
@@ -125,4 +128,9 @@ func dotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // dictLiteralForm implements the 'dict-literal' special form for dictionary construction
 func dictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.DictLiteralForm(args, ctx)
+}
+
+// listCompForm implements the 'list-comp' special form for list comprehensions
+func listCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.ListCompForm(args, ctx)
 }

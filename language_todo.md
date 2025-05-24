@@ -73,7 +73,7 @@ Based on testing the examples, here are the language features that need to be im
 
 ### 5. List Operations  
 - [ ] List methods: `.append()`, `.extend()`, `.pop()`, etc.
-- [ ] List comprehensions: `[x*2 for x in range(10)]`
+- [x] List comprehensions: `[x*2 for x in range(10)]` - DONE
 - [x] `in` operator for membership testing - DONE
 - [ ] `getattr` doesn't work for list indexing
 
@@ -97,7 +97,7 @@ Based on testing the examples, here are the language features that need to be im
 ### 9. Data Structure Literals
 - [ ] Set literals `{1, 2, 3}` - parser thinks it's a dict
 - [ ] Tuple literals `(1, 2, 3)` - gives "name error"
-- [ ] List comprehensions `[x*2 for x in seq]` - treated as literal list
+- [x] List comprehensions `[x*2 for x in seq]` - DONE
 
 ### 10. Control Flow
 - [ ] `cond` statement gives "name error"
@@ -145,9 +145,9 @@ Critical features completed ✅:
 6. ✅ **in operator** - Works for lists, strings, dicts
 7. ✅ **try/except/finally** - Exception handling with Python-style syntax
 8. ✅ **Core built-ins** - `abs`, `sorted`, `reversed`, `enumerate`, `zip`
+9. ✅ **List comprehensions** - Implemented with `[expr for var in iterable if condition]` syntax
 
 Next priorities:
-1. **List comprehensions** - Currently parsed as literal lists
 2. **Property/method access** - `obj.method()` syntax
 3. **Augmented assignment** - `+=`, `-=`, etc.
 4. **Set and tuple literals**

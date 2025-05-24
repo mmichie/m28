@@ -119,6 +119,9 @@ func init() {
 		// Exception handling
 		"try":   tryForm,
 		"raise": raiseForm,
+		
+		// List comprehension
+		"list-comp": ListCompForm,
 
 		// Other special forms will be added through RegisterSpecialForm
 	}
@@ -787,4 +790,81 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	return nil, fmt.Errorf("raise: too many arguments")
+}
+
+// listCompForm implements list comprehensions
+// Forms:
+//   (list-comp expr var iterable)
+//   (list-comp expr var iterable condition)
+func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 3 || len(args) > 4 {
+		return nil, fmt.Errorf("list-comp requires 3 or 4 arguments")
+	}
+	
+	// Get the variable name
+	varSym, ok := args[1].(core.SymbolValue)
+	if !ok {
+		return nil, fmt.Errorf("list comprehension variable must be a symbol")
+	}
+	varName := string(varSym)
+	
+	// Evaluate the iterable
+	iterable, err := Eval(args[2], ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating iterable: %v", err)
+	}
+	
+	// Convert iterable to a sequence we can iterate over
+	var items []core.Value
+	switch v := iterable.(type) {
+	case core.ListValue:
+		items = v
+	case core.TupleValue:
+		items = v
+	case core.StringValue:
+		// Convert string to list of characters
+		for _, ch := range string(v) {
+			items = append(items, core.StringValue(string(ch)))
+		}
+	default:
+		// Try to call iter() on it if it has that method
+		// For now, just error
+		return nil, fmt.Errorf("list comprehension iterable must be a sequence, got %s", v.Type())
+	}
+	
+	// Create result list
+	result := make(core.ListValue, 0)
+	
+	// Create a new context for the loop variable
+	loopCtx := core.NewContext(ctx)
+	
+	// Iterate over items
+	for _, item := range items {
+		// Bind the loop variable
+		loopCtx.Define(varName, item)
+		
+		// Check condition if present
+		if len(args) == 4 {
+			condResult, err := Eval(args[3], loopCtx)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating condition: %v", err)
+			}
+			
+			// Skip if condition is falsy
+			if !core.IsTruthy(condResult) {
+				continue
+			}
+		}
+		
+		// Evaluate the expression
+		exprResult, err := Eval(args[0], loopCtx)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating expression: %v", err)
+		}
+		
+		// Add to result
+		result = append(result, exprResult)
+	}
+	
+	return result, nil
 }

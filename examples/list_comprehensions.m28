@@ -1,0 +1,21 @@
+# List Comprehension Examples
+
+# Basic comprehension
+(print "Squares:" [(* x x) for x in (range 10)])
+
+# With condition
+(print "Even squares:" [(* x x) for x in (range 10) if (== (% x 2) 0)])
+
+# String comprehension
+(print "Uppercase:" [(upper c) for c in "hello world" if (!= c " ")])
+
+# Working with lists
+(= numbers [1, 2, 3, 4, 5])
+(print "Tripled:" [(* x 3) for x in numbers])
+
+# Function application
+(= double (fn (x) (* x 2)))
+(print "Doubled:" [(double x) for x in (range 5)])
+
+# Complex expression
+(print "Complex:" [(+ (* x 2) 1) for x in (range 5) if (> x 2)])
