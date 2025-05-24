@@ -173,44 +173,9 @@ func executeBody(body []core.Value, ctx *core.Context) (core.Value, error) {
 	return result, nil
 }
 
-// openForm creates a file context manager
-func openForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 || len(args) > 2 {
-		return nil, fmt.Errorf("open() takes 1 or 2 arguments")
-	}
-
-	// Get filename
-	filename, err := Eval(args[0], ctx)
-	if err != nil {
-		return nil, err
-	}
-	
-	filenameStr, ok := filename.(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("filename must be a string")
-	}
-
-	// Get mode (default to "r")
-	mode := "r"
-	if len(args) == 2 {
-		modeVal, err := Eval(args[1], ctx)
-		if err != nil {
-			return nil, err
-		}
-		
-		if modeStr, ok := modeVal.(core.StringValue); ok {
-			mode = string(modeStr)
-		} else {
-			return nil, fmt.Errorf("mode must be a string")
-		}
-	}
-
-	// Create file context manager
-	return core.NewFileContextManager(string(filenameStr), mode), nil
-}
 
 // RegisterContextForms registers context manager related forms
 func RegisterContextForms() {
 	RegisterSpecialForm("with", withForm)
-	RegisterSpecialForm("open", openForm)
+	// open is now a builtin function, not a special form
 }

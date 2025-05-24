@@ -1,0 +1,108 @@
+; File I/O tests
+
+(import "test_framework" as test)
+
+(def test-file-io (lambda ()
+  
+  (test/test-suite "File I/O" (lambda ()
+    
+    (test/run-test "Basic file operations" (lambda ()
+      ; Write to file
+      (def f (open "test_io.txt" "w"))
+      (test/assert-eq 14 ((getattr f "write") "Hello, World!\n") "Write returns bytes")
+      ((getattr f "close"))
+      
+      ; Read from file
+      (def f (open "test_io.txt" "r"))
+      (def content ((getattr f "read")))
+      (test/assert-eq "Hello, World!\n" content "Read content matches")
+      ((getattr f "close"))
+      
+      ; File cleanup would go here)
+    
+    (test/run-test "File attributes" (lambda ()
+      (def f (open "test_attrs.txt" "w"))
+      (test/assert-eq "test_attrs.txt" (getattr f "name") "File name")
+      (test/assert-eq "w" (getattr f "mode") "File mode")
+      (test/assert-false (getattr f "closed") "File not closed")
+      ((getattr f "close"))
+      (test/assert-true (getattr f "closed") "File closed")
+      
+      ; File cleanup would go here))
+    
+    (test/run-test "Context manager" (lambda ()
+      ; Test with statement
+      (with (open "test_with.txt" "w") as f
+        ((getattr f "write") "Line 1\n")
+        ((getattr f "write") "Line 2\n"))
+      
+      ; File should be closed automatically
+      (def content nil)
+      (with (open "test_with.txt" "r") as f
+        (set! content ((getattr f "read"))))
+      
+      (test/assert-eq "Line 1\nLine 2\n" content "With statement content")
+      
+      ; File cleanup would go here))
+    
+    (test/run-test "Read methods" (lambda ()
+      ; Create test file
+      (with (open "test_lines.txt" "w") as f
+        ((getattr f "write") "First line\n")
+        ((getattr f "write") "Second line\n")
+        ((getattr f "write") "Third line\n"))
+      
+      ; Test readline
+      (def f (open "test_lines.txt" "r"))
+      (test/assert-eq "First line\n" ((getattr f "readline")) "First line")
+      (test/assert-eq "Second line\n" ((getattr f "readline")) "Second line")
+      ((getattr f "close"))
+      
+      ; Test readlines
+      (def f (open "test_lines.txt" "r"))
+      (def lines ((getattr f "readlines")))
+      (test/assert-eq 3 (len lines) "Number of lines")
+      (test/assert-eq "First line\n" (nth lines 0) "First line from readlines")
+      ((getattr f "close"))
+      
+      ; File cleanup would go here))
+    
+    (test/run-test "Append mode" (lambda ()
+      ; Create initial file
+      (with (open "test_append.txt" "w") as f
+        ((getattr f "write") "Initial content\n"))
+      
+      ; Append to file
+      (with (open "test_append.txt" "a") as f
+        ((getattr f "write") "Appended content\n"))
+      
+      ; Read and verify
+      (def content nil)
+      (with (open "test_append.txt" "r") as f
+        (set! content ((getattr f "read"))))
+      
+      (test/assert-eq "Initial content\nAppended content\n" content "Append mode")
+      
+      ; File cleanup would go here))
+    
+    (test/run-test "Error handling" (lambda ()
+      ; Try to read non-existent file
+      (test/assert-error 
+        (lambda () (open "non_existent_file.txt" "r"))
+        "Error"
+        "Opening non-existent file should error")
+      
+      ; Try to write to closed file
+      (def f (open "test_closed.txt" "w"))
+      ((getattr f "close"))
+      (test/assert-error
+        (lambda () ((getattr f "write") "test"))
+        "Error"
+        "Writing to closed file should error")
+      
+      ; File cleanup would go here))
+    
+  )))
+
+; Export test function
+(export test-file-io)
