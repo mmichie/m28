@@ -3,7 +3,6 @@ package builtin
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/mmichie/m28/core"
@@ -30,6 +29,9 @@ func RegisterAllBuiltins(ctx *core.Context) {
 
 	// Register type functions
 	registerTypeBuiltins(ctx)
+	
+	// Register type checking functions (isinstance, issubclass, type conversions)
+	registerTypeCheckingBuiltins(ctx)
 	
 	// Register mathematical functions
 	RegisterMathFunctions(ctx)
@@ -233,72 +235,7 @@ func registerTypeBuiltins(ctx *core.Context) {
 		return core.BoolValue(isNil), nil
 	}))
 
-	// isinstance for type checking (simplified version)
-	ctx.Define("isinstance", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("isinstance expects 2 arguments, got %d", len(args))
-		}
-
-		// Get the type name to check
-		typeName, ok := args[1].(core.StringValue)
-		if !ok {
-			return nil, fmt.Errorf("isinstance second argument must be a string type name")
-		}
-
-		actualType := string(args[0].Type())
-		expectedType := string(typeName)
-
-		// Handle Python type name aliases
-		switch expectedType {
-		case "int", "float":
-			return core.BoolValue(actualType == "number"), nil
-		case "str":
-			return core.BoolValue(actualType == "string"), nil
-		case "bool":
-			return core.BoolValue(actualType == "bool"), nil
-		case "NoneType":
-			return core.BoolValue(actualType == "nil"), nil
-		default:
-			return core.BoolValue(actualType == expectedType), nil
-		}
-	}))
-
-	// Python-style type conversion functions
-	// int/float - convert to number
-	ctx.Define("int", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("int expects 1 argument, got %d", len(args))
-		}
-
-		switch v := args[0].(type) {
-		case core.NumberValue:
-			return core.NumberValue(int(v)), nil
-		case core.StringValue:
-			f, err := strconv.ParseFloat(string(v), 64)
-			if err != nil {
-				return nil, fmt.Errorf("cannot convert %q to int", string(v))
-			}
-			return core.NumberValue(int(f)), nil
-		default:
-			return nil, fmt.Errorf("cannot convert %v to int", v.Type())
-		}
-	}))
-
-	// str - convert to string
-	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("str expects 1 argument, got %d", len(args))
-		}
-		return core.StringValue(core.PrintValueWithoutQuotes(args[0])), nil
-	}))
-
-	// bool - convert to boolean
-	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("bool expects 1 argument, got %d", len(args))
-		}
-		return core.BoolValue(core.IsTruthy(args[0])), nil
-	}))
+	// NOTE: isinstance, issubclass, int, float, str, bool are now in type_checking.go
 
 	// dir - list attributes of an object
 	ctx.Define("dir", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

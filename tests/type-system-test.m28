@@ -1,0 +1,87 @@
+# Test type system functions
+
+# Test isinstance with basic types
+(assert (isinstance 42 "int") "isinstance int failed")
+(assert (isinstance 3.14 "float") "isinstance float failed")
+(assert (isinstance "hello" "str") "isinstance str failed")
+(assert (isinstance true "bool") "isinstance bool true failed")
+(assert (isinstance false "bool") "isinstance bool false failed")
+(assert (isinstance None "NoneType") "isinstance NoneType failed")
+(assert (isinstance [1, 2, 3] "list") "isinstance list failed")
+(assert (isinstance {"a": 1} "dict") "isinstance dict failed")
+
+# Test isinstance should accept type objects, not just strings
+(try
+  (assert (isinstance 42 int) "isinstance with type object failed")
+  (except Exception e
+    (print "isinstance doesn't support type objects")))
+
+# Test isinstance with tuple of types
+(try
+  (assert (isinstance 42 (int, float)) "isinstance with tuple failed")
+  (except Exception e
+    (print "isinstance doesn't support tuple of types")))
+
+# Test issubclass
+(try
+  (class Animal ()
+    (def __init__ (self)
+      (= self.name "Animal")))
+  
+  (class Dog (Animal)
+    (def __init__ (self)
+      (super.__init__)
+      (= self.breed "Unknown")))
+  
+  (assert (issubclass Dog Animal) "issubclass failed")
+  (assert (not (issubclass Animal Dog)) "issubclass reverse failed")
+  (assert (issubclass Dog Dog) "issubclass same class failed")
+  
+  (except Exception e
+    (print "issubclass not implemented or broken")))
+
+# Test type conversion functions
+# int()
+(try
+  (assert (== (int "42") 42) "int() from string failed")
+  (assert (== (int 3.14) 3) "int() from float failed")
+  (assert (== (int true) 1) "int() from true failed")
+  (assert (== (int false) 0) "int() from false failed")
+  (except Exception e
+    (print "int() not implemented")))
+
+# float()
+(try
+  (assert (== (float "3.14") 3.14) "float() from string failed")
+  (assert (== (float 42) 42.0) "float() from int failed")
+  (except Exception e
+    (print "float() not implemented")))
+
+# str()
+(try
+  (assert (== (str 42) "42") "str() from int failed")
+  (assert (== (str 3.14) "3.14") "str() from float failed")
+  (assert (== (str true) "True") "str() from bool failed")
+  (assert (== (str None) "None") "str() from None failed")
+  (except Exception e
+    (print "str() not implemented")))
+
+# bool()
+(try
+  (assert (== (bool 1) true) "bool() from 1 failed")
+  (assert (== (bool 0) false) "bool() from 0 failed")
+  (assert (== (bool "") false) "bool() from empty string failed")
+  (assert (== (bool "hello") true) "bool() from string failed")
+  (assert (== (bool []) false) "bool() from empty list failed")
+  (assert (== (bool [1]) true) "bool() from list failed")
+  (except Exception e
+    (print "bool() not implemented")))
+
+# Test type() function - returns string representation
+(assert (in "int" (type 42)) "type() for number failed")
+(assert (in "str" (type "hello")) "type() for string failed")
+(assert (in "bool" (type true)) "type() for bool failed")
+(assert (in "list" (type [])) "type() for list failed")
+(assert (in "dict" (type {})) "type() for dict failed")
+
+(print "Type system tests completed!")

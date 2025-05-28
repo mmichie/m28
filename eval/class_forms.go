@@ -221,12 +221,40 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 		return nil, err
 	}
 
+	// Handle string type names
+	if typeName, ok := classVal.(core.StringValue); ok {
+		actualType := string(obj.Type())
+		expectedType := string(typeName)
+		
+		// Handle Python type name aliases
+		switch expectedType {
+		case "int", "float":
+			return core.BoolValue(actualType == "number"), nil
+		case "str":
+			return core.BoolValue(actualType == "string"), nil
+		case "bool":
+			return core.BoolValue(actualType == "bool"), nil
+		case "NoneType":
+			return core.BoolValue(actualType == "nil"), nil
+		case "list":
+			return core.BoolValue(actualType == "list"), nil
+		case "dict":
+			return core.BoolValue(actualType == "dict"), nil
+		case "tuple":
+			return core.BoolValue(actualType == "tuple"), nil
+		case "set":
+			return core.BoolValue(actualType == "set"), nil
+		default:
+			return core.BoolValue(actualType == expectedType), nil
+		}
+	}
+	
 	// Check if obj is an instance and classVal is a class
 	instance, isInst := obj.(*core.Instance)
 	class, isClass := classVal.(*core.Class)
 
 	if !isClass {
-		return nil, fmt.Errorf("isinstance second argument must be a class")
+		return nil, fmt.Errorf("isinstance second argument must be a class or string type name")
 	}
 
 	if !isInst {
@@ -237,9 +265,47 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 	return core.BoolValue(core.IsInstanceOf(instance, class)), nil
 }
 
+// issubclassForm checks if a class is a subclass of another
+func issubclassForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("issubclass requires 2 arguments")
+	}
+
+	// Evaluate both arguments
+	subClassVal, err := Eval(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	baseClassVal, err := Eval(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Both must be classes
+	subClass, ok1 := subClassVal.(*core.Class)
+	baseClass, ok2 := baseClassVal.(*core.Class)
+
+	if !ok1 || !ok2 {
+		return nil, fmt.Errorf("issubclass arguments must be classes")
+	}
+
+	// Check inheritance chain
+	current := subClass
+	for current != nil {
+		if current == baseClass {
+			return core.True, nil
+		}
+		current = current.Parent
+	}
+
+	return core.False, nil
+}
+
 // RegisterClassForms registers class-related special forms
 func RegisterClassForms() {
 	RegisterSpecialForm("class", classForm)
 	RegisterSpecialForm("super", superForm)
 	RegisterSpecialForm("isinstance", isinstanceForm)
+	RegisterSpecialForm("issubclass", issubclassForm)
 }

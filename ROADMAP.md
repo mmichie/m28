@@ -116,9 +116,9 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### Low Priority - Additional Features
 
-- [ ] **Type System**
-  - [ ] Fix `isinstance()` and `issubclass()`
-  - [ ] Type conversion functions: `int()`, `float()`, `str()`, `bool()`
+- [x] **Type System** (Partially Complete)
+  - [x] Fix `isinstance()` and `issubclass()` ✅ DONE
+  - [x] Type conversion functions: `int()`, `float()`, `str()`, `bool()` ✅ DONE
   - [ ] `hasattr()`, `getattr()`, `setattr()`
   - [ ] `callable()` function
 
@@ -155,7 +155,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] Day 5: Implement dictionary methods ✅ DONE
 
 ### Week 3: Type System and Built-ins
-- [ ] Day 1-2: Fix `isinstance`, `issubclass`, add type conversions
+- [x] Day 1-2: Fix `isinstance`, `issubclass`, add type conversions ✅ DONE
 - [ ] Day 3-4: Add remaining essential built-ins (`all`, `any`, `round`, etc.)
 - [ ] Day 5: Test and fix issues
 

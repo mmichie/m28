@@ -1,0 +1,12 @@
+# Test isinstance with string type names
+
+(print "Testing isinstance with string type names:")
+(print (isinstance 42 "int"))
+(print (isinstance 3.14 "float"))
+(print (isinstance "hello" "str"))
+(print (isinstance true "bool"))
+(print (isinstance None "NoneType"))
+(print (isinstance [1, 2, 3] "list"))
+(print (isinstance {"a": 1} "dict"))
+
+(print "\nAll tests completed!")
