@@ -119,12 +119,12 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] **Type System** (Partially Complete)
   - [x] Fix `isinstance()` and `issubclass()` ✅ DONE
   - [x] Type conversion functions: `int()`, `float()`, `str()`, `bool()` ✅ DONE
-  - [ ] `hasattr()`, `getattr()`, `setattr()`
-  - [ ] `callable()` function
+  - [x] `hasattr()`, `getattr()`, `setattr()` ✅ DONE
+  - [x] `callable()` function ✅ DONE
 
-- [ ] **More Built-ins**
-  - [ ] Boolean operations: `all()`, `any()`
-  - [ ] Math functions: `round()`, `divmod()`
+- [x] **More Built-ins** (Partially Complete)
+  - [x] Boolean operations: `all()`, `any()` ✅ DONE
+  - [x] Math functions: `round()`, `divmod()` ✅ DONE
   - [ ] Iterator functions: `next()`, `iter()`
   - [ ] `eval()` and `exec()`
 
@@ -156,7 +156,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### Week 3: Type System and Built-ins
 - [x] Day 1-2: Fix `isinstance`, `issubclass`, add type conversions ✅ DONE
-- [ ] Day 3-4: Add remaining essential built-ins (`all`, `any`, `round`, etc.)
+- [x] Day 3-4: Add remaining essential built-ins (`all`, `any`, `round`, etc.) ✅ DONE
 - [ ] Day 5: Test and fix issues
 
 ### Week 4: Polish and Testing
