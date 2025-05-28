@@ -83,8 +83,17 @@ func (p *Parser) parseExpr() (core.Value, error) {
 // parsePostfix handles postfix operations like dot notation, function calls, etc.
 func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 	for {
+		// Save current position to check if we moved past whitespace
+		startPos := p.pos
 		p.skipWhitespaceAndComments()
+		
 		if p.pos >= len(p.input) {
+			return base, nil
+		}
+		
+		// If we skipped any whitespace/comments, no postfix operators
+		// This ensures "x [" is not treated as "x["
+		if p.pos > startPos {
 			return base, nil
 		}
 		
@@ -117,13 +126,14 @@ func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 		// 		return nil, err
 		// 	}
 			
-		// Note: Index access to be implemented later
-		// case '[':
-		// 	// Index access
-		// 	base, err = p.parseIndexAccess(base)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
+		case '[':
+			// Index access
+			p.pos++ // consume '['
+			var err error
+			base, err = p.parseIndexAccess(base)
+			if err != nil {
+				return nil, err
+			}
 			
 		default:
 			return base, nil

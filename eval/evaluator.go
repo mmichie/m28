@@ -143,6 +143,9 @@ func init() {
 	
 	// Register dot notation
 	RegisterDotNotation()
+	
+	// Register indexing
+	RegisterIndexing()
 }
 
 // RegisterSpecialForm registers a special form

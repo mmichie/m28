@@ -73,8 +73,8 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] Chained access: `obj.prop.method().value`
   - [ ] Property assignment: `obj.prop = value`
 
-- [ ] **Indexing and Slicing**
-  - [ ] Direct indexing: `list[0]`, `dict["key"]`
+- [x] **Indexing and Slicing**
+  - [x] Direct indexing: `list[0]`, `dict["key"]`
   - [ ] Slice syntax: `list[1:3]` or `(slice list 1 3)`
   - [ ] Index assignment: `list[0] = value`
 
@@ -143,7 +143,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### Week 1: Fix Core Syntax Issues
 - [x] Day 1-2: Fix dot notation for method calls (`obj.method()`) ✅ DONE
-- [ ] Day 3: Add direct indexing (`list[0]`, `dict["key"]`)
+- [x] Day 3: Add direct indexing (`list[0]`, `dict["key"]`) ✅ DONE
 - [ ] Day 4: Implement augmented assignment (`+=`, `-=`, etc.)
 - [ ] Day 5: Restrict `def` to functions only
 
