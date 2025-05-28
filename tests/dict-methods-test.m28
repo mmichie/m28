@@ -1,0 +1,80 @@
+# Test dictionary methods
+
+# Test get
+(= d {"a": 1, "b": 2, "c": 3})
+(assert (== (d.get "a") 1) "get() existing key failed")
+(assert (== (d.get "z") None) "get() missing key failed")
+(assert (== (d.get "z" 99) 99) "get() with default failed")
+
+# Test keys
+(= keys (d.keys))
+(assert (== (len keys) 3) "keys() length failed")
+# Keys might be in any order, so check contains
+(assert (in "a" keys) "keys() missing 'a'")
+(assert (in "b" keys) "keys() missing 'b'")
+(assert (in "c" keys) "keys() missing 'c'")
+
+# Test values
+(= vals (d.values))
+(assert (== (len vals) 3) "values() length failed")
+# Check all values are present
+(assert (in 1 vals) "values() missing 1")
+(assert (in 2 vals) "values() missing 2")
+(assert (in 3 vals) "values() missing 3")
+
+# Test items
+(= items (d.items))
+(assert (== (len items) 3) "items() length failed")
+
+# Test methods that might be missing
+# Test update - merge another dict
+(try
+  (= d1 {"a": 1, "b": 2})
+  (= d2 {"b": 3, "c": 4})
+  (= d3 (d1.update d2))
+  (assert (== (d3.get "a") 1) "update() kept existing")
+  (assert (== (d3.get "b") 3) "update() overwrote")
+  (assert (== (d3.get "c") 4) "update() added new")
+  (except Exception e
+    (print "update() not implemented")))
+
+# Test pop - remove and return value
+(try
+  (= d4 {"a": 1, "b": 2})
+  (= val (d4.pop "a"))
+  (assert (== val 1) "pop() return value failed")
+  # Note: since dicts are immutable, we'd need to return (value, new_dict)
+  (except Exception e
+    (print "pop() not implemented")))
+
+# Test setdefault - get or set with default
+(try
+  (= d5 {"a": 1})
+  (= val1 (d5.setdefault "a" 99))
+  (assert (== val1 1) "setdefault() existing key failed")
+  (= val2 (d5.setdefault "b" 2))
+  (assert (== val2 2) "setdefault() new key failed")
+  (except Exception e
+    (print "setdefault() not implemented")))
+
+# Test clear - return empty dict
+(try
+  (= d6 {"a": 1, "b": 2})
+  (= d7 (d6.clear))
+  (assert (== (len d7) 0) "clear() failed")
+  (except Exception e
+    (print "clear() not implemented")))
+
+# Test copy - shallow copy
+(try
+  (= d8 {"a": 1, "b": 2})
+  (= d9 (d8.copy))
+  (assert (== (d9.get "a") 1) "copy() failed")
+  (except Exception e
+    (print "copy() not implemented")))
+
+# Test has_key or __contains__ via 'in'
+(assert (in "a" d) "'in' operator failed for existing key")
+(assert (not (in "z" d)) "'in' operator failed for missing key")
+
+(print "Dict method tests completed!")

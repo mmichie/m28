@@ -103,10 +103,11 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] In-place operations: `.sort()`, `.reverse()`
   - [x] Additional methods: `.clear()`, `.copy()`
 
-- [ ] **Dictionary Methods**
-  - [ ] Access methods: `.keys()`, `.values()`, `.items()`
-  - [ ] Update methods: `.update()`, `.pop()`, `.setdefault()`
-  - [ ] View methods: proper dict views instead of lists
+- [x] **Dictionary Methods** ✅ DONE
+  - [x] Access methods: `.keys()`, `.values()`, `.items()`
+  - [x] Update methods: `.update()`, `.pop()`, `.setdefault()`
+  - [x] Additional methods: `.get()`, `.clear()`, `.copy()`
+  - [ ] View methods: proper dict views instead of lists (future enhancement)
 
 - [ ] **Set Methods**
   - [ ] Set operations: `.union()`, `.intersection()`, `.difference()`
@@ -151,7 +152,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 ### Week 2: Essential Built-in Methods
 - [x] Day 1-2: Implement string methods ✅ DONE
 - [x] Day 3-4: Implement list methods ✅ DONE
-- [ ] Day 5: Implement dictionary methods
+- [x] Day 5: Implement dictionary methods ✅ DONE
 
 ### Week 3: Type System and Built-ins
 - [ ] Day 1-2: Fix `isinstance`, `issubclass`, add type conversions

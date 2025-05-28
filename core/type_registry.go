@@ -1135,4 +1135,6 @@ func init() {
 	InitStringMethods()
 	// Add additional list methods after types are registered
 	InitListMethods()
+	// Add additional dict methods after types are registered
+	InitDictMethods()
 }
