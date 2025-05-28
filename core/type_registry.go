@@ -1133,4 +1133,6 @@ func init() {
 	InitializeTypeRegistry()
 	// Add additional string methods after types are registered
 	InitStringMethods()
+	// Add additional list methods after types are registered
+	InitListMethods()
 }

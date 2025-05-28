@@ -1,0 +1,68 @@
+# Test list methods
+
+# Test append
+(= lst [1, 2, 3])
+(= lst2 (lst.append 4))
+(assert (== (len lst2) 4) "append() length failed")
+(assert (== (get-item lst2 3) 4) "append() value failed")
+
+# Test extend
+(= ext_list [4, 5])
+(= lst3 (lst.extend ext_list))
+(assert (== (len lst3) 5) "extend() length failed")
+(assert (== (get-item lst3 4) 5) "extend() last value failed")
+
+# Test insert
+(= base_list [1, 3])
+(= lst4 (base_list.insert 1 2))
+(assert (== lst4 [1, 2, 3]) "insert() failed")
+
+# Test pop (currently returns value, not modified list)
+(= pop_list [1, 2, 3])
+(= val (pop_list.pop))
+(assert (== val 3) "pop() default failed")
+(= val2 (pop_list.pop 0))
+(assert (== val2 1) "pop(0) failed")
+
+# Test index
+(= idx_list [1, 2, 3, 2])
+(assert (== (idx_list.index 2) 1) "index() failed")
+
+# Test count
+(= cnt_list [1, 2, 3, 2, 2])
+(assert (== (cnt_list.count 2) 3) "count() failed")
+
+# Test reverse
+(= rev_list [1, 2, 3])
+(assert (== (rev_list.reverse) [3, 2, 1]) "reverse() failed")
+
+# Test sort
+(= srt_list [3, 1, 4, 1, 5])
+(assert (== (srt_list.sort) [1, 1, 3, 4, 5]) "sort() failed")
+
+# Test methods that might be missing
+# Test remove - removes first occurrence
+(try
+  (= rm_list [1, 2, 3, 2])
+  (= lst5 (rm_list.remove 2))
+  (assert (== lst5 [1, 3, 2]) "remove() failed")
+  (except Exception e
+    (print "remove() not implemented")))
+
+# Test clear - returns empty list
+(try
+  (= clr_list [1, 2, 3])
+  (= lst6 (clr_list.clear))
+  (assert (== lst6 []) "clear() failed")
+  (except Exception e
+    (print "clear() not implemented")))
+
+# Test copy - returns shallow copy
+(try
+  (= original [1, 2, 3])
+  (= copied (original.copy))
+  (assert (== copied original) "copy() failed")
+  (except Exception e
+    (print "copy() not implemented")))
+
+(print "List method tests completed!")

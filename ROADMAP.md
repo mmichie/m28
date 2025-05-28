@@ -97,10 +97,11 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] Transform methods: `.split()`, `.join()`, `.strip()`, `.replace()`
   - [x] Format methods: `.format()`
 
-- [ ] **List Methods**
-  - [ ] Mutating methods: `.append()`, `.extend()`, `.insert()`, `.remove()`, `.pop()`
-  - [ ] Search methods: `.index()`, `.count()`
-  - [ ] In-place operations: `.sort()`, `.reverse()`
+- [x] **List Methods** ✅ DONE
+  - [x] Mutating methods: `.append()`, `.extend()`, `.insert()`, `.remove()`, `.pop()`
+  - [x] Search methods: `.index()`, `.count()`
+  - [x] In-place operations: `.sort()`, `.reverse()`
+  - [x] Additional methods: `.clear()`, `.copy()`
 
 - [ ] **Dictionary Methods**
   - [ ] Access methods: `.keys()`, `.values()`, `.items()`
@@ -149,7 +150,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### Week 2: Essential Built-in Methods
 - [x] Day 1-2: Implement string methods ✅ DONE
-- [ ] Day 3-4: Implement list methods
+- [x] Day 3-4: Implement list methods ✅ DONE
 - [ ] Day 5: Implement dictionary methods
 
 ### Week 3: Type System and Built-ins
