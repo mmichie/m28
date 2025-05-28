@@ -28,18 +28,15 @@
 
 (introduce "Charlie" 25 "New York")
 
-# Function with default parameters
-(def greet_with_default (name="World")
-  (print f"Hello, {name}!"))
-
-(greet_with_default)          # Uses default
-(greet_with_default "Python") # Override default
-
 # Function with multiple return values
 (def calculate (a b)
-  ((+ a b), (- a b), (* a b), (/ a b)))
+  (list (+ a b) (- a b) (* a b) (/ a b)))
 
-(= (sum_val, diff, prod, quot) (calculate 10 2))
+(= results (calculate 10 2))
+(= sum_val (get-item results 0))
+(= diff (get-item results 1))
+(= prod (get-item results 2))
+(= quot (get-item results 3))
 (print "\nCalculations for 10 and 2:")
 (print "Sum:" sum_val)
 (print "Difference:" diff)
@@ -73,10 +70,3 @@
 (print "add_5(3) =" (add_5 3))
 (print "add_5(10) =" (add_5 10))
 
-# Variadic functions (variable arguments)
-(def sum_all (*args)
-  (reduce + args 0))
-
-(print "\nVariadic function:")
-(print "sum_all(1, 2, 3) =" (sum_all 1 2 3))
-(print "sum_all(1, 2, 3, 4, 5) =" (sum_all 1 2 3 4 5))

@@ -4,8 +4,8 @@
 (= integer 42)
 (= decimal 3.14)
 (= negative -17)
-(= scientific 1.23e-4)
-(= big_number 1_000_000)  # Underscores for readability
+(= scientific 0.000123)  # Scientific notation not supported yet
+(= big_number 1000000)  # Note: underscores in numbers not supported yet
 
 (print "Numbers:")
 (print integer decimal negative scientific big_number)
@@ -24,20 +24,20 @@
 
 # Lists (mutable, ordered)
 (= empty_list [])
-(= numbers [1, 2, 3, 4, 5])
-(= mixed [1, "two", 3.14, True, [5, 6]])
+(= numbers [1 , 2 , 3 , 4 , 5])
+(= mixed [1 , "two" , 3.14 , True , [5 , 6]])
 
 (print "\nLists:")
 (print "Empty:" empty_list)
 (print "Numbers:" numbers)
 (print "Mixed:" mixed)
-(print "First element:" numbers.0)
-(print "Last element:" numbers.4)
+(print "First element:" (get-item numbers 0))
+(print "Last element:" (get-item numbers 4))
 
 # Dictionaries (key-value pairs)
 (= empty_dict {})
-(= person {"name": "Bob", "age": 30, "city": "NYC"})
-(= nested {"user": {"id": 123, "email": "bob@example.com"}})
+(= person {"name": "Bob" , "age": 30 , "city": "NYC"})
+(= nested {"user": {"id": 123 , "email": "bob@example.com"}})
 
 (print "\nDictionaries:")
 (print "Empty:" empty_dict)
@@ -48,8 +48,8 @@
 
 # Sets (unique values, unordered)
 (= empty_set (set))
-(= numbers_set {1, 2, 3, 3, 2, 1})  # Duplicates removed
-(= from_list (set [1, 2, 2, 3, 3, 3]))
+(= numbers_set (set [1 , 2 , 3 , 3 , 2 , 1]))  # Duplicates removed
+(= from_list (set [1 , 2 , 2 , 3 , 3 , 3]))
 
 (print "\nSets:")
 (print "Empty:" empty_set)
@@ -57,23 +57,23 @@
 (print "From list:" from_list)
 
 # Tuples (immutable sequences)
-(= empty_tuple ())
-(= coordinates (10, 20))
-(= single (42,))  # Note the comma for single element
-(= rgb (255, 128, 0))
+(= empty_tuple (tuple []))
+(= coordinates (tuple [10 , 20]))
+(= single (tuple [42]))  # Single element tuple
+(= rgb (tuple [255 , 128 , 0]))
 
 (print "\nTuples:")
 (print "Empty:" empty_tuple)
 (print "Coordinates:" coordinates)
 (print "Single:" single)
 (print "RGB:" rgb)
-(print "X coordinate:" coordinates.0)
+(print "X coordinate:" (get-item coordinates 0))
 
 # Type checking
 (print "\nType checking:")
 (print "Type of 42:" (type 42))
 (print "Type of 'hello':" (type "hello"))
-(print "Type of [1,2,3]:" (type [1, 2, 3]))
+(print "Type of [1,2,3]:" (type [1 , 2 , 3]))
 (print "Type of {}:" (type {}))
-(print "Is 42 a number?" (isinstance 42 "number"))
-(print "Is 'hello' a string?" (isinstance "hello" "string"))
+(print "Is 42 a number?" (isinstance 42 "int"))
+(print "Is 'hello' a string?" (isinstance "hello" "str"))
