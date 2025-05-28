@@ -157,7 +157,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 ### Week 3: Type System and Built-ins
 - [x] Day 1-2: Fix `isinstance`, `issubclass`, add type conversions ✅ DONE
 - [x] Day 3-4: Add remaining essential built-ins (`all`, `any`, `round`, etc.) ✅ DONE
-- [ ] Day 5: Test and fix issues
+- [x] Day 5: Test and fix issues ✅ DONE
 
 ### Week 4: Polish and Testing
 - [ ] Day 1-3: Run all example files and fix failures
