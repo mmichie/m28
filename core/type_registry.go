@@ -1131,4 +1131,6 @@ func InitializeTypeRegistry() {
 // Helper to initialize types on startup
 func init() {
 	InitializeTypeRegistry()
+	// Add additional string methods after types are registered
+	InitStringMethods()
 }

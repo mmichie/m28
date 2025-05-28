@@ -91,11 +91,11 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### Medium Priority - Built-in Methods
 
-- [ ] **String Methods**
-  - [ ] Case methods: `.upper()`, `.lower()`, `.capitalize()`
-  - [ ] Search methods: `.find()`, `.startswith()`, `.endswith()`
-  - [ ] Transform methods: `.split()`, `.join()`, `.strip()`, `.replace()`
-  - [ ] Format methods: `.format()`
+- [x] **String Methods** ✅ DONE
+  - [x] Case methods: `.upper()`, `.lower()`, `.capitalize()`
+  - [x] Search methods: `.find()`, `.startswith()`, `.endswith()`
+  - [x] Transform methods: `.split()`, `.join()`, `.strip()`, `.replace()`
+  - [x] Format methods: `.format()`
 
 - [ ] **List Methods**
   - [ ] Mutating methods: `.append()`, `.extend()`, `.insert()`, `.remove()`, `.pop()`
@@ -148,7 +148,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] Day 5: Restrict `def` to functions only ✅ DONE
 
 ### Week 2: Essential Built-in Methods
-- [ ] Day 1-2: Implement string methods
+- [x] Day 1-2: Implement string methods ✅ DONE
 - [ ] Day 3-4: Implement list methods
 - [ ] Day 5: Implement dictionary methods
 
