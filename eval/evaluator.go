@@ -146,6 +146,9 @@ func init() {
 	
 	// Register indexing
 	RegisterIndexing()
+	
+	// Register augmented assignment
+	RegisterAugmentedAssignment()
 }
 
 // RegisterSpecialForm registers a special form

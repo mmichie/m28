@@ -78,10 +78,10 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [ ] Slice syntax: `list[1:3]` or `(slice list 1 3)`
   - [ ] Index assignment: `list[0] = value`
 
-- [ ] **Operators**
-  - [ ] Augmented assignment: `+=`, `-=`, `*=`, `/=`, etc.
-  - [ ] String repetition: `"a" * 3`
-  - [ ] List repetition: `[1, 2] * 3`
+- [x] **Operators**
+  - [x] Augmented assignment: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`
+  - [x] String repetition: `"a" * 3` (already working)
+  - [x] List repetition: `[1, 2] * 3` (already working)
 
 - [ ] **Function Features**
   - [ ] Restrict `def` to functions only (currently works for variables)
@@ -144,7 +144,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 ### Week 1: Fix Core Syntax Issues
 - [x] Day 1-2: Fix dot notation for method calls (`obj.method()`) ✅ DONE
 - [x] Day 3: Add direct indexing (`list[0]`, `dict["key"]`) ✅ DONE
-- [ ] Day 4: Implement augmented assignment (`+=`, `-=`, etc.)
+- [x] Day 4: Implement augmented assignment (`+=`, `-=`, etc.) ✅ DONE
 - [ ] Day 5: Restrict `def` to functions only
 
 ### Week 2: Essential Built-in Methods
