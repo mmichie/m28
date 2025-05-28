@@ -70,19 +70,65 @@ func (p *Parser) Parse(input string) (core.Value, error) {
 
 // parseExpr parses a single expression
 func (p *Parser) parseExpr() (core.Value, error) {
-	expr, err := p.parseAtom()
+	// Parse the primary expression (atom, list, etc.)
+	base, err := p.parseAtom()
 	if err != nil {
 		return nil, err
 	}
 	
-	// Check for dot notation
-	if dotExpr, isDot, err := p.tryParseDotNotation(expr); err != nil {
-		return nil, err
-	} else if isDot {
-		return dotExpr, nil
+	// Now handle postfix operations (dots, calls, indexing)
+	return p.parsePostfix(base)
+}
+
+// parsePostfix handles postfix operations like dot notation, function calls, etc.
+func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
+	for {
+		p.skipWhitespaceAndComments()
+		if p.pos >= len(p.input) {
+			return base, nil
+		}
+		
+		switch p.input[p.pos] {
+		case '.':
+			// Check if it's a float continuation
+			if num, ok := base.(core.NumberValue); ok {
+				// This could be a decimal number continuation
+				if p.pos+1 < len(p.input) && isDigit(p.input[p.pos+1]) {
+					// This is actually a decimal number, not dot notation
+					return base, nil
+				}
+				// Numbers can't have properties
+				return nil, p.error(fmt.Sprintf("number %v has no properties", num))
+			}
+			
+			// Property access or method call
+			p.pos++ // consume '.'
+			var err error
+			base, err = p.parseDotAccess(base)
+			if err != nil {
+				return nil, err
+			}
+			
+		// Note: Direct function calls on expressions not yet supported
+		// case '(':
+		// 	// Direct function call on the result
+		// 	base, err = p.parseFunctionCall(base)
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+			
+		// Note: Index access to be implemented later
+		// case '[':
+		// 	// Index access
+		// 	base, err = p.parseIndexAccess(base)
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+			
+		default:
+			return base, nil
+		}
 	}
-	
-	return expr, nil
 }
 
 // parseAtom parses a single atomic expression (without dot notation)

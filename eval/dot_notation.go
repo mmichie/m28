@@ -15,6 +15,7 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("dot notation requires at least 2 arguments, got %d", len(args))
 	}
 	
+	
 	// Evaluate the object
 	obj, err := Eval(args[0], ctx)
 	if err != nil {
@@ -41,8 +42,16 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			return nil, fmt.Errorf("%s has no attribute '%s'", obj.Type(), string(propName))
 		}
 		
-		// If there are more arguments, it's a method call
+		// If there are more arguments (even if just __call__ marker), it's a method call
 		if len(args) > 2 {
+			// Check if it's just the __call__ marker (method with no args)
+			hasCallMarker := false
+			if len(args) == 3 {
+				if sym, ok := args[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+					hasCallMarker = true
+				}
+			}
+			
 			// Method call
 			method, ok := value.(interface {
 				Call([]core.Value, *core.Context) (core.Value, error)
@@ -50,12 +59,17 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			if !ok {
 				// Check if it's a bound method
 				if bm, ok := value.(*core.BoundMethod); ok {
-					// Evaluate the arguments
-					evalArgs := make([]core.Value, len(args)-2)
-					for i, arg := range args[2:] {
-						evalArgs[i], err = Eval(arg, ctx)
-						if err != nil {
-							return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
+					// Evaluate the arguments (skip __call__ marker if present)
+					var evalArgs []core.Value
+					if hasCallMarker {
+						evalArgs = []core.Value{} // No args
+					} else {
+						evalArgs = make([]core.Value, len(args)-2)
+						for i, arg := range args[2:] {
+							evalArgs[i], err = Eval(arg, ctx)
+							if err != nil {
+								return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
+							}
 						}
 					}
 					return bm.Call(evalArgs, ctx)
@@ -63,12 +77,17 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("'%s' is not callable", string(propName))
 			}
 			
-			// Evaluate the arguments
-			evalArgs := make([]core.Value, len(args)-2)
-			for i, arg := range args[2:] {
-				evalArgs[i], err = Eval(arg, ctx)
-				if err != nil {
-					return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
+			// Evaluate the arguments (skip __call__ marker if present)
+			var evalArgs []core.Value
+			if hasCallMarker {
+				evalArgs = []core.Value{} // No args
+			} else {
+				evalArgs = make([]core.Value, len(args)-2)
+				for i, arg := range args[2:] {
+					evalArgs[i], err = Eval(arg, ctx)
+					if err != nil {
+						return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
+					}
 				}
 			}
 			
@@ -80,13 +99,25 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 	
 	// Special handling for basic types that don't implement Object
+	// Check if it's a method call (has args or __call__ marker)
+	isMethodCall := len(args) > 2
+	methodArgs := args[2:]
+	
+	// Check for __call__ marker
+	if isMethodCall && len(args) == 3 {
+		if sym, ok := args[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+			// It's a method call with no args
+			methodArgs = core.ListValue{}
+		}
+	}
+	
 	switch v := obj.(type) {
 	case core.ListValue:
-		return getListAttr(v, string(propName), len(args) > 2, args[2:], ctx)
+		return getListAttr(v, string(propName), isMethodCall, methodArgs, ctx)
 	case core.StringValue:
-		return getStringAttr(v, string(propName), len(args) > 2, args[2:], ctx)
+		return getStringAttr(v, string(propName), isMethodCall, methodArgs, ctx)
 	case *core.DictValue:
-		return getDictAttr(v, string(propName), len(args) > 2, args[2:], ctx)
+		return getDictAttr(v, string(propName), isMethodCall, methodArgs, ctx)
 	default:
 		return nil, fmt.Errorf("%s does not support attribute access", obj.Type())
 	}

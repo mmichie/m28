@@ -68,9 +68,9 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### High Priority - Language Core
 
-- [ ] **Property/Method Access**
-  - [ ] Direct dot notation: `obj.method()` instead of `(. obj method)`
-  - [ ] Chained access: `obj.prop.method().value`
+- [x] **Property/Method Access**
+  - [x] Direct dot notation: `obj.method()` instead of `(. obj method)`
+  - [x] Chained access: `obj.prop.method().value`
   - [ ] Property assignment: `obj.prop = value`
 
 - [ ] **Indexing and Slicing**
@@ -142,7 +142,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 ## Implementation Plan
 
 ### Week 1: Fix Core Syntax Issues
-- [ ] Day 1-2: Fix dot notation for method calls (`obj.method()`)
+- [x] Day 1-2: Fix dot notation for method calls (`obj.method()`) ✅ DONE
 - [ ] Day 3: Add direct indexing (`list[0]`, `dict["key"]`)
 - [ ] Day 4: Implement augmented assignment (`+=`, `-=`, etc.)
 - [ ] Day 5: Restrict `def` to functions only
