@@ -139,13 +139,24 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Second form: (def name value)
-	// It's a variable definition
+	// Check if it's a lambda/function value
 	value, err := Eval(args[1], ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	ctx.Define(string(name), value)
+	
+	// Only allow def for functions
+	switch value.(type) {
+	case *UserFunction:
+		// It's a function, allow it
+		ctx.Define(string(name), value)
+	case core.Callable:
+		// It's some other callable (builtin function, etc), allow it
+		ctx.Define(string(name), value)
+	default:
+		// Not a function, error
+		return nil, fmt.Errorf("def can only be used to define functions, not %s values. Use = for variable assignment", value.Type())
+	}
 	return value, nil
 }
 

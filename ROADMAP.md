@@ -83,8 +83,8 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] String repetition: `"a" * 3` (already working)
   - [x] List repetition: `[1, 2] * 3` (already working)
 
-- [ ] **Function Features**
-  - [ ] Restrict `def` to functions only (currently works for variables)
+- [x] **Function Features**
+  - [x] Restrict `def` to functions only ✅ (now gives clear error for non-functions)
   - [ ] Keyword arguments: `func(a=1, b=2)`
   - [ ] Default parameters: `(def func (a b=10) ...)`
   - [ ] `*args` and `**kwargs`
@@ -145,7 +145,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] Day 1-2: Fix dot notation for method calls (`obj.method()`) ✅ DONE
 - [x] Day 3: Add direct indexing (`list[0]`, `dict["key"]`) ✅ DONE
 - [x] Day 4: Implement augmented assignment (`+=`, `-=`, etc.) ✅ DONE
-- [ ] Day 5: Restrict `def` to functions only
+- [x] Day 5: Restrict `def` to functions only ✅ DONE
 
 ### Week 2: Essential Built-in Methods
 - [ ] Day 1-2: Implement string methods
