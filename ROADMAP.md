@@ -57,8 +57,6 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ## 🚧 In Progress / Partially Working
 
-- [ ] **Dot Notation** - Works with special form `(. obj prop)` but not `obj.prop`
-- [ ] **Direct Indexing** - Must use `(nth list 0)` instead of `list[0]`
 - [ ] **Module System** - Basic imports work, but missing:
   - [ ] `from module import symbol`
   - [ ] `import module as alias`
@@ -68,15 +66,15 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### High Priority - Language Core
 
-- [x] **Property/Method Access**
+- [x] **Property/Method Access** ✅ COMPLETE
   - [x] Direct dot notation: `obj.method()` instead of `(. obj method)`
   - [x] Chained access: `obj.prop.method().value`
-  - [ ] Property assignment: `obj.prop = value`
+  - [x] Property assignment: `obj.prop = value` ✅ DONE
 
-- [x] **Indexing and Slicing**
+- [x] **Indexing and Slicing** (Mostly Complete)
   - [x] Direct indexing: `list[0]`, `dict["key"]`
   - [ ] Slice syntax: `list[1:3]` or `(slice list 1 3)`
-  - [ ] Index assignment: `list[0] = value`
+  - [x] Index assignment: `list[0] = value` ✅ DONE
 
 - [x] **Operators**
   - [x] Augmented assignment: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`

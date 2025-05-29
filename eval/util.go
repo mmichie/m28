@@ -260,6 +260,16 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				
 				return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
 			}
+			
+			// Check if it's an index expression
+			if len(t) == 3 {
+				if getItemSym, ok := t[0].(core.SymbolValue); ok && string(getItemSym) == "get-item" {
+					// Index assignment: (get-item obj index) = value
+					// Convert to (set-item obj index value)
+					setItemArgs := core.ListValue{t[1], t[2], value}
+					return SetItemForm(setItemArgs, ctx)
+				}
+			}
 		}
 		// Fall through to error
 

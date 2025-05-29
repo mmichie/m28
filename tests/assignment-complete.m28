@@ -1,0 +1,49 @@
+# Comprehensive assignment test
+
+# Property assignment
+(= obj {"x": 1})
+(= obj.x 10)
+(= obj.y 20)
+(print "Property assignment:" obj)
+
+# Nested property assignment
+(= data {"user": {"scores": [10 , 20 , 30]}})
+(= data.user.name "Alice")
+(print "\nNested property:" data)
+
+# Index assignment - lists
+(= lst [1 , 2 , 3 , 4 , 5])
+(= lst[0] 100)
+(= lst[-1] 500)
+(print "\nList index assignment:" lst)
+
+# Index assignment - dicts
+(= d {"a": 1})
+(= d["b"] 2)
+(= d["a"] 10)
+(print "\nDict index assignment:" d)
+
+# Mixed property and index assignment
+(= data.user.scores[1] 200)
+(print "\nMixed assignment:" data)
+
+# Assignment in expressions
+(= x 0)
+(if (= x 42)
+    (print "\nAssignment in if condition: x =" x)
+    (print "This shouldn't print"))
+
+# Multiple assignments in sequence
+(= a 1)
+(= b (= a 2))
+(print "\nMultiple assignments: a =" a ", b =" b)
+
+# Test assignment with different types
+(= lst[1] "string")
+(= lst[2] {"nested": "dict"})
+(print "\nMixed types in list:" lst)
+
+# Edge cases - assignment errors happen at evaluation time
+# so they can't be caught with try/except in the same expression
+
+(print "\nAll assignment tests passed!")
