@@ -37,7 +37,7 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Otherwise it's a function call
-		return evalFunctionCall(v, ctx)
+		return evalFunctionCallWithKeywords(v, ctx)
 
 	default:
 		// Other values evaluate to themselves

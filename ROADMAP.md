@@ -81,11 +81,11 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] String repetition: `"a" * 3` (already working)
   - [x] List repetition: `[1, 2] * 3` (already working)
 
-- [x] **Function Features**
+- [x] **Function Features** ✅ COMPLETE
   - [x] Restrict `def` to functions only ✅ (now gives clear error for non-functions)
-  - [ ] Keyword arguments: `func(a=1, b=2)`
+  - [x] Keyword arguments: `func(a=1, b=2)` ✅ DONE
   - [x] Default parameters: `(def func (a (b 10)) ...)` ✅ DONE
-  - [ ] `*args` and `**kwargs`
+  - [x] `*args` and `**kwargs` ✅ DONE
 
 ### Medium Priority - Built-in Methods
 

@@ -1,0 +1,64 @@
+# Test keyword arguments
+
+# Function with all optional parameters
+(def greet (name (greeting "Hello") (punctuation "!"))
+  (print greeting name punctuation))
+
+(print "Testing keyword arguments:")
+
+# All positional
+(greet "Alice")                          # Hello Alice!
+(greet "Bob" "Hi")                       # Hi Bob!  
+(greet "Charlie" "Hey" "?")              # Hey Charlie?
+
+# With keyword arguments
+(print "\nWith keyword arguments:")
+(greet "David" greeting = "Howdy")       # Howdy David!
+(greet "Eve" punctuation = "...")        # Hello Eve...
+(greet "Frank" greeting = "Hi" punctuation = "?")  # Hi Frank?
+
+# Keywords can be in any order
+(print "\nKeywords in different order:")
+(greet "Grace" punctuation = "." greeting = "Greetings")  # Greetings Grace.
+
+# Function with mix of required and optional
+(def create_user (username email (role "user") (active True))
+  (print "Creating user:")
+  (print "  Username:" username)
+  (print "  Email:" email)
+  (print "  Role:" role)
+  (print "  Active:" active))
+
+(print "\nTesting mixed parameters:")
+(create_user "alice" "alice@example.com")
+(create_user "bob" "bob@example.com" "admin")
+(create_user "charlie" "charlie@example.com" role = "moderator")
+(create_user "david" "david@example.com" active = False)
+(create_user "eve" "eve@example.com" active = False role = "admin")
+
+# Error cases
+(print "\nTesting error cases:")
+
+# Duplicate keyword argument
+(try
+  (greet "Test" greeting = "Hi" greeting = "Hello")
+  (print "ERROR: Should have caught duplicate keyword")
+  (except Exception e
+    (print "Correctly caught:" e)))
+
+# Unknown keyword argument
+(def simple (a (b 1))
+  (print "a =" a "b =" b))
+
+(try
+  (simple 10 c = 20)
+  (print "ERROR: Should have caught unknown keyword") 
+  (except Exception e
+    (print "Correctly caught:" e)))
+
+# Positional after keyword
+(try
+  (greet "Test" greeting = "Hi" "!")
+  (print "ERROR: Should have caught positional after keyword")
+  (except Exception e
+    (print "Correctly caught:" e)))

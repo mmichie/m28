@@ -1,0 +1,75 @@
+# Test *args and **kwargs
+
+# Function with *args
+(def print_all (*args)
+  (print "Args:" args)
+  (for arg args
+    (print "  -" arg)))
+
+(print "Testing *args:")
+(print_all)
+(print_all 1)
+(print_all 1 2 3)
+(print_all "a" "b" "c" "d")
+
+# Function with both regular and *args
+(def format_message (prefix *messages)
+  (print prefix ":" messages))
+
+(print "\nTesting regular params with *args:")
+(format_message "[INFO]")
+(format_message "[INFO]" "Starting server")
+(format_message "[ERROR]" "Connection failed" "on port 8080")
+
+# Function with **kwargs
+(def print_config (**kwargs)
+  (print "Config:" kwargs)
+  (for key (kwargs.keys)
+    (print "  " key "=" (kwargs.get key))))
+
+(print "\nTesting **kwargs:")
+(print_config)
+(print_config host = "localhost")
+(print_config host = "localhost" port = 8080 debug = True)
+
+# Function with positional and **kwargs
+(def connect (host (port 80) **options)
+  (print "Connecting to" host ":" port)
+  (print "Options:" options))
+
+(print "\nTesting positional with **kwargs:")
+(connect "example.com")
+(connect "example.com" 443)
+(connect "example.com" timeout = 30)
+(connect "example.com" 443 timeout = 30 retry = 3)
+
+# Function with *args and **kwargs
+(def flexible_func (required *args **kwargs)
+  (print "Required:" required)
+  (print "Args:" args)
+  (print "Kwargs:" kwargs))
+
+(print "\nTesting *args and **kwargs together:")
+(flexible_func "must-have")
+(flexible_func "must-have" 1 2 3)
+(flexible_func "must-have" opt1 = "a" opt2 = "b")
+(flexible_func "must-have" 1 2 3 opt1 = "a" opt2 = "b")
+
+# Complex example: building SQL-like query
+(def query (table *columns **conditions)
+  (print "SELECT" (if (> (len columns) 0) columns "*") 
+         "FROM" table)
+  (if (> (len conditions) 0)
+    (do
+      (= where_parts [])
+      (for key (conditions.keys)
+        (= value (conditions.get key))
+        (= clause (+ key " = " (str value)))
+        (= where_parts (where_parts.append clause)))
+      (print "WHERE" where_parts))))
+
+(print "\nTesting complex example:")
+(query "users")
+(query "users" "id" "name" "email")
+(query "users" "id" "name" active = True)
+(query "users" active = True role = "admin")
