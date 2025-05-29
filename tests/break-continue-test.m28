@@ -1,9 +1,9 @@
-; Tests for break/continue functionality in different loop structures
-; This test specifically focuses on the fixes for break/continue reliability
+# Tests for break/continue functionality in different loop structures
+# This test specifically focuses on the fixes for break/continue reliability
 
 (print "\n=== Testing Break/Continue in Different Loop Types ===\n")
 
-; Test for loop with break
+# Test for loop with break
 (print "1. Testing 'for' loop with break at middle:")
 (def break-result 
   (for x [1 2 3 4 5]
@@ -14,7 +14,7 @@
 (print "  Break-result:" break-result)
 (print "  Expected: Loop should process items 1-3, breaking at 3")
 
-; Test for loop with continue
+# Test for loop with continue
 (print "\n2. Testing 'for' loop with continue:")
 (def continue-result 
   (for x [1 2 3 4 5]
@@ -25,7 +25,7 @@
 (print "  Continue-result:" continue-result)
 (print "  Expected: Should only show 'Processing even item' for 2 and 4")
 
-; Test nested for loops with break
+# Test nested for loops with break
 (print "\n3. Testing nested 'for' loops with break in inner loop:")
 (def nested-break-result 
   (for x ["a" "b" "c"]
@@ -38,7 +38,7 @@
 (print "  Nested-break-result:" nested-break-result)
 (print "  Expected: Inner loop should only process y=1,2,3 for each x, breaking at y=3")
 
-; Test nested for loops with continue
+# Test nested for loops with continue
 (print "\n4. Testing nested 'for' loops with continue in inner loop:")
 (def nested-continue-result 
   (for x ["a" "b" "c"]
@@ -51,7 +51,7 @@
 (print "  Nested-continue-result:" nested-continue-result)
 (print "  Expected: Inner loop should skip 'After inner y = 2' for each x")
 
-; Test break from complex condition
+# Test break from complex condition
 (print "\n5. Testing break from complex condition:")
 (def complex-break-result 
   (for item [1 2 3 4 5]
@@ -63,7 +63,7 @@
 (print "  Complex-break-result:" complex-break-result)
 (print "  Expected: Loop should break at item 3")
 
-; Test continue from complex condition
+# Test continue from complex condition
 (print "\n6. Testing continue from complex condition:")
 (def complex-continue-result 
   (for item [1 2 3 4 5]
@@ -76,9 +76,9 @@
 (print "  Complex-continue-result:" complex-continue-result)
 (print "  Expected: 'After item: 3' should be skipped")
 
-; Test while loop with break
+# Test while loop with break
 (print "\n7. Testing while loop with break:")
-(def i 0)
+(= i 0)
 (def while-break-result
   (while (< i 10)
     (print "  i =" i)
@@ -89,7 +89,7 @@
 (print "  While-break-result:" while-break-result)
 (print "  Expected: Loop should break at i=5")
 
-; Test while loop with continue
+# Test while loop with continue
 (print "\n8. Testing while loop with continue:")
 (= i 0)
 (def while-continue-result
@@ -102,7 +102,7 @@
 (print "  While-continue-result:" while-continue-result)
 (print "  Expected: 'After i = 3' should be skipped")
 
-; Test direct for loop with break on strings
+# Test direct for loop with break on strings
 (print "\n9. Testing direct for loop with break on strings:")
 (def dolist-break-result
   (for item ["a" "b" "c" "d" "e"]
@@ -113,7 +113,7 @@
 (print "  Dolist-break-result:" dolist-break-result)
 (print "  Expected: Loop should break at item c")
 
-; Test direct for loop with continue on strings
+# Test direct for loop with continue on strings
 (print "\n10. Testing direct for loop with continue on strings:")
 (def dolist-continue-result
   (for item ["a" "b" "c" "d" "e"]
@@ -124,7 +124,7 @@
 (print "  Dolist-continue-result:" dolist-continue-result)
 (print "  Expected: 'Completed item: c' should be skipped")
 
-; Test manual loop with break (similar to dotimes)
+# Test manual loop with break (similar to dotimes)
 (print "\n11. Testing manual loop with break:")
 (def dotimes-break-result
   (begin
@@ -140,7 +140,7 @@
 (print "  Manual-loop-break-result:" dotimes-break-result)
 (print "  Expected: Loop should break at i=3")
 
-; Test manual loop with continue
+# Test manual loop with continue
 (print "\n12. Testing manual loop with continue:")
 (def dotimes-continue-result
   (begin

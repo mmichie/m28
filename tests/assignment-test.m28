@@ -1,14 +1,14 @@
-; Test for assignment operations in M28
-; This tests various forms of variable assignment
+# Test for assignment operations in M28
+# This tests various forms of variable assignment
 
 (print "=== Testing Assignment Operations ===\n")
 
 (print "--- Testing = vs def ---")
-; This is directly from the builtins
+# This is directly from the builtins
 (= a 10)
 (print "a (defined with =):" a)
 
-; This should now work with the new = special form
+# This should now work with the new = special form
 (= b 20)
 (print "b (defined with =):" b)
 

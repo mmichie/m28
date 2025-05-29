@@ -1,4 +1,4 @@
-; Core functionality tests
+# Core functionality tests
 
 (import "test_framework" as test)
 
@@ -49,7 +49,7 @@
       (test/assert-type () "tuple" "Empty tuple type")))
     
     (test/run-test "Dictionaries" (lambda ()
-      (def d {"a": 1, "b": 2})
+      (= d {"a": 1, "b": 2})
       (test/assert-eq 1 (get d "a") "Dict get")
       (test/assert-eq 2 (len d) "Dict length")
       (test/assert-true (has-key d "a") "Dict has-key")
@@ -57,7 +57,7 @@
       (test/assert-type {} "dict" "Empty dict type")))
     
     (test/run-test "Sets" (lambda ()
-      (def s #{1, 2, 3})
+      (= s #{1, 2, 3})
       (test/assert-eq 3 (len s) "Set length")
       (test/assert-true (contains s 2) "Set contains")
       (test/assert-false (contains s 4) "Set not contains")
@@ -67,13 +67,13 @@
   (test/test-suite "Variables and Functions" (lambda ()
     
     (test/run-test "Variable Definition" (lambda ()
-      (def x 10)
+      (= x 10)
       (test/assert-eq 10 x "Simple variable")
       (def y (+ x 5))
       (test/assert-eq 15 y "Computed variable")))
     
     (test/run-test "Variable Update" (lambda ()
-      (def x 10)
+      (= x 10)
       (set! x 20)
       (test/assert-eq 20 x "Variable update")))
     
@@ -93,7 +93,7 @@
     
     (test/run-test "Closures" (lambda ()
       (def make-counter (lambda ()
-        (def count 0)
+        (= count 0)
         (lambda ()
           (set! count (+ count 1))
           count)))
@@ -132,7 +132,7 @@
       (test/assert-eq 3 (or 3 5) "Or returns first")))
     
     (test/run-test "Let Binding" (lambda ()
-      (def x 10)
+      (= x 10)
       (test/assert-eq 25 
         (let ((x 20) (y 5))
           (+ x y))
@@ -143,26 +143,26 @@
   (test/test-suite "Loops" (lambda ()
     
     (test/run-test "For Loop" (lambda ()
-      (def sum 0)
+      (= sum 0)
       (for x in [1, 2, 3, 4, 5]
         (set! sum (+ sum x)))
       (test/assert-eq 15 sum "For loop sum")
       
-      (def squares [])
+      (= squares [])
       (for x in (range 5)
         (set! squares (append squares (* x x))))
       (test/assert-eq [0, 1, 4, 9, 16] squares "For with range")))
     
     (test/run-test "While Loop" (lambda ()
-      (def x 0)
-      (def sum 0)
+      (= x 0)
+      (= sum 0)
       (while (< x 5)
         (set! sum (+ sum x))
         (set! x (+ x 1)))
       (test/assert-eq 10 sum "While loop sum")))
     
     (test/run-test "Break/Continue" (lambda ()
-      (def result [])
+      (= result [])
       (for x in (range 10)
         (if (= x 5) (break))
         (if (= (% x 2) 0) (continue))

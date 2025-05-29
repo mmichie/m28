@@ -1,17 +1,17 @@
-; Tuple Verification Test Suite
-; This file verifies that tuples are implemented according to specification
+# Tuple Verification Test Suite
+# This file verifies that tuples are implemented according to specification
 
-; 1. Basic tuple verification
+# 1. Basic tuple verification
 (print "=== Basic Tuple Verification ===")
 
-; Empty tuple
+# Empty tuple
 (= empty_tuple ())
 (print "Empty tuple:" empty_tuple)
 (print "Type of empty tuple:" (type empty_tuple))
 (assert (== (type empty_tuple) "tuple") "Empty tuple should have type 'tuple'")
 (assert (== (len empty_tuple) 0) "Empty tuple should have length 0")
 
-; Single-element tuple
+# Single-element tuple
 (= single_tuple (1,))
 (print "Single-element tuple:" single_tuple)
 (print "Type of single-element tuple:" (type single_tuple))
@@ -19,13 +19,13 @@
 (assert (== (len single_tuple) 1) "Single-element tuple should have length 1")
 (assert (== (nth single_tuple 0) 1) "First element of single-element tuple should be 1")
 
-; Multi-element tuple
+# Multi-element tuple
 (= multi_tuple (1, 2, 3, "four", 5.0))
 (print "Multi-element tuple:" multi_tuple)
 (assert (== (type multi_tuple) "tuple") "Multi-element tuple should have type 'tuple'")
 (assert (== (len multi_tuple) 5) "Multi-element tuple should have length 5")
 
-; 2. Nested tuple verification
+# 2. Nested tuple verification
 (print "\n=== Nested Tuple Verification ===")
 (= nested_tuple (1, (2, 3), (4, (5, 6))))
 (print "Nested tuple:" nested_tuple)
@@ -33,7 +33,7 @@
 (assert (== (type (nth nested_tuple 1)) "tuple") "Nested element should have type 'tuple'")
 (assert (== (nth (nth nested_tuple 1) 1) 3) "Nested access should retrieve correct elements")
 
-; 3. Tuple comparison verification
+# 3. Tuple comparison verification
 (print "\n=== Tuple Comparison Verification ===")
 (= tuple1 (1, 2, 3))
 (= tuple2 (1, 2, 3)) 
@@ -43,17 +43,17 @@
 (assert (< tuple1 tuple3) "Tuple comparison should work correctly")
 (assert (> tuple3 tuple1) "Tuple comparison should work correctly")
 
-; 4. Tuple type checking verification
+# 4. Tuple type checking verification
 (print "\n=== Tuple Type Checking Verification ===")
 (assert (isinstance empty_tuple "tuple") "isinstance should recognize empty tuples")
 (assert (isinstance single_tuple "tuple") "isinstance should recognize single-element tuples")
 (assert (isinstance multi_tuple "tuple") "isinstance should recognize multi-element tuples")
 (assert (isinstance nested_tuple "tuple") "isinstance should recognize nested tuples")
 
-; 5. Skip function verification section (syntax varies)
+# 5. Skip function verification section (syntax varies)
 (print "\n=== Tuple Functionality Complete ===")
 (print "Function syntax varies by implementation - skipping function test")
 
-; Success message
+# Success message
 (print "\n=== All Tuple Tests Passed! ===")
 (print "Tuples are now implemented according to specification.")

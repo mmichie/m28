@@ -1,16 +1,16 @@
-; Object Protocol Comprehensive Tests
-; Tests all features of the unified object protocol implementation
+# Object Protocol Comprehensive Tests
+# Tests all features of the unified object protocol implementation
 
 (print "=== Object Protocol Test Suite ===\n")
 
-;---------------------------------------------
-; Test 1: Enhanced Dot Notation
-;---------------------------------------------
+#---------------------------------------------
+# Test 1: Enhanced Dot Notation
+#---------------------------------------------
 (print "=== Test 1: Enhanced Dot Notation ===")
 
 (def test-dict {"name": "test", "value": 42, "nested": {"inner": "secret"}})
 
-; Test 1.1: Basic dot access on dict
+# Test 1.1: Basic dot access on dict
 (print "\nTest 1.1: Basic dot access on dict")
 (def name-value (. test-dict name))
 (print "Name:" name-value)
@@ -18,7 +18,7 @@
   (print "PASS: Basic dot access works")
   (print "FAIL: Basic dot access doesn't work"))
 
-; Test 1.2: Nested dot access
+# Test 1.2: Nested dot access
 (print "\nTest 1.2: Nested dot access")
 (def inner-value (. (. test-dict nested) inner))
 (print "Inner value:" inner-value)
@@ -26,7 +26,7 @@
   (print "PASS: Nested dot access works")
   (print "FAIL: Nested dot access doesn't work"))
 
-; Test 1.3: Chained dot access
+# Test 1.3: Chained dot access
 (print "\nTest 1.3: Chained dot access")
 (def chained-value (.. test-dict nested inner))
 (print "Chained value:" chained-value)
@@ -34,12 +34,12 @@
   (print "PASS: Chained dot access works")
   (print "FAIL: Chained dot access doesn't work"))
 
-;---------------------------------------------
-; Test 2: Direct Property Access
-;---------------------------------------------
+#---------------------------------------------
+# Test 2: Direct Property Access
+#---------------------------------------------
 (print "\n=== Test 2: Direct Property Access ===")
 
-; Test 2.1: getattr
+# Test 2.1: getattr
 (print "\nTest 2.1: getattr function")
 (def getattr-value (getattr test-dict "name"))
 (print "getattr value:" getattr-value)
@@ -47,7 +47,7 @@
   (print "PASS: getattr works")
   (print "FAIL: getattr doesn't work"))
 
-; Test 2.2: setattr
+# Test 2.2: setattr
 (print "\nTest 2.2: setattr function")
 (setattr test-dict "status" "active")
 (def status-value (. test-dict status))
@@ -56,7 +56,7 @@
   (print "PASS: setattr works")
   (print "FAIL: setattr doesn't work"))
 
-; Test 2.3: hasattr
+# Test 2.3: hasattr
 (print "\nTest 2.3: hasattr function")
 (def has-name (hasattr test-dict "name"))
 (def has-missing (hasattr test-dict "missing"))
@@ -66,7 +66,7 @@
   (print "PASS: hasattr works")
   (print "FAIL: hasattr doesn't work"))
 
-; Test 2.4: getitem
+# Test 2.4: getitem
 (print "\nTest 2.4: getitem function")
 (def getitem-value (getitem test-dict "name"))
 (print "getitem value:" getitem-value)
@@ -74,7 +74,7 @@
   (print "PASS: getitem works")
   (print "FAIL: getitem doesn't work"))
 
-; Test 2.5: setitem
+# Test 2.5: setitem
 (print "\nTest 2.5: setitem function")
 (setitem test-dict "new_key" "new_value")
 (def new-value (. test-dict new_key))
@@ -83,12 +83,12 @@
   (print "PASS: setitem works")
   (print "FAIL: setitem doesn't work"))
 
-;---------------------------------------------
-; Test 3: Method Binding and Calls
-;---------------------------------------------
+#---------------------------------------------
+# Test 3: Method Binding and Calls
+#---------------------------------------------
 (print "\n=== Test 3: Method Binding and Calls ===")
 
-; Helper class for testing
+# Helper class for testing
 (class TestClass []
   (def __init__ [self name]
     (setattr self "name" name)
@@ -104,7 +104,7 @@
     (setattr self "value" new_value)
     (. self value)))
 
-; Test 3.1: Method binding and calls
+# Test 3.1: Method binding and calls
 (print "\nTest 3.1: Method binding and calls")
 (def test-obj (TestClass "test-object"))
 (def name-result (. test-obj get_name))
@@ -113,7 +113,7 @@
   (print "PASS: Method binding and calls work")
   (print "FAIL: Method binding and calls don't work"))
 
-; Test 3.2: Method calls with arguments
+# Test 3.2: Method calls with arguments
 (print "\nTest 3.2: Method calls with arguments")
 (def value-result (. test-obj set_value 200))
 (print "Method call with args result:" value-result)
@@ -121,12 +121,12 @@
   (print "PASS: Method calls with arguments work")
   (print "FAIL: Method calls with arguments don't work"))
 
-;---------------------------------------------
-; Test 4: Inheritance and Super
-;---------------------------------------------
+#---------------------------------------------
+# Test 4: Inheritance and Super
+#---------------------------------------------
 (print "\n=== Test 4: Inheritance and Super ===")
 
-; Parent class
+# Parent class
 (class Parent []
   (def __init__ [self]
     (setattr self "parent_value" 1000))
@@ -137,7 +137,7 @@
   (def describe [self]
     "Parent class"))
 
-; Child class that overrides methods
+# Child class that overrides methods
 (class Child [Parent]
   (def __init__ [self]
     (super.__init__ self)
@@ -152,7 +152,7 @@
   (def describe [self]
     (+ "Child class extending " (super.describe self))))
 
-; Test 4.1: Basic inheritance
+# Test 4.1: Basic inheritance
 (print "\nTest 4.1: Basic inheritance")
 (def child-obj (Child))
 (def parent-value (. child-obj parent_value))
@@ -163,7 +163,7 @@
   (print "PASS: Basic inheritance works")
   (print "FAIL: Basic inheritance doesn't work"))
 
-; Test 4.2: Super method calls
+# Test 4.2: Super method calls
 (print "\nTest 4.2: Super method calls")
 (def both-values (. child-obj get_both_values))
 (print "Combined values:" both-values)
@@ -171,7 +171,7 @@
   (print "PASS: Super method calls work")
   (print "FAIL: Super method calls don't work"))
 
-; Test 4.3: Super attribute access
+# Test 4.3: Super attribute access
 (print "\nTest 4.3: Super attribute and method overriding")
 (def describe-result (. child-obj describe))
 (print "Description:" describe-result)
@@ -179,12 +179,12 @@
   (print "PASS: Super attribute access works")
   (print "FAIL: Super attribute access doesn't work"))
 
-;---------------------------------------------
-; Test 5: ObjProtocol on Built-in Types
-;---------------------------------------------
+#---------------------------------------------
+# Test 5: ObjProtocol on Built-in Types
+#---------------------------------------------
 (print "\n=== Test 5: ObjProtocol on Built-in Types ===")
 
-; Test 5.1: List methods
+# Test 5.1: List methods
 (print "\nTest 5.1: List methods")
 (def test-list [1, 2, 3, 4, 5])
 (def list-length (. test-list length))
@@ -198,7 +198,7 @@
   (print "PASS: List methods work")
   (print "FAIL: List methods don't work"))
 
-; Test 5.2: String methods
+# Test 5.2: String methods
 (print "\nTest 5.2: String methods")
 (def test-string "hello world")
 (def upper-string (. test-string upper))
@@ -214,7 +214,7 @@
   (print "PASS: String methods work")
   (print "FAIL: String methods don't work"))
 
-; Test 5.3: Dictionary methods
+# Test 5.3: Dictionary methods
 (print "\nTest 5.3: Dictionary methods")
 (def test-dict2 {"a": 1, "b": 2, "c": 3})
 (def dict-keys (. test-dict2 keys))
@@ -232,7 +232,7 @@
   (print "PASS: Dictionary methods work")
   (print "FAIL: Dictionary methods don't work"))
 
-; Test 5.4: Set methods
+# Test 5.4: Set methods
 (print "\nTest 5.4: Set methods")
 (def test-set (set [1, 2, 3, 4]))
 (. test-set add 5)
@@ -246,7 +246,7 @@
   (print "PASS: Set methods work")
   (print "FAIL: Set methods don't work"))
 
-; Test 5.5: Tuple methods
+# Test 5.5: Tuple methods
 (print "\nTest 5.5: Tuple methods")
 (def test-tuple (tuple [1, 2, 3]))
 (def tuple-length (. test-tuple length))
@@ -260,12 +260,12 @@
   (print "PASS: Tuple methods work")
   (print "FAIL: Tuple methods don't work"))
 
-;---------------------------------------------
-; Test 6: Performance Optimizations
-;---------------------------------------------
+#---------------------------------------------
+# Test 6: Performance Optimizations
+#---------------------------------------------
 (print "\n=== Test 6: Performance Optimizations ===")
 
-; Test 6.1: Dict access performance test
+# Test 6.1: Dict access performance test
 (print "\nTest 6.1: Dict access performance")
 (def perf-dict {})
 (for [i (range 100)]
@@ -280,7 +280,7 @@
 (print "Time to access 100a dict items:" access-time "seconds")
 (print "PASS: Dict access performance test completed")
 
-; Test 6.2: Method call performance test
+# Test 6.2: Method call performance test
 (print "\nTest 6.2: Method call performance")
 (class PerfTest []
   (def __init__ [self]
@@ -306,5 +306,5 @@
 (print "\n=== Object Protocol Test Suite Complete ===")
 (print "All tests completed!")
 
-; Return success value
+# Return success value
 {"status": "success"}

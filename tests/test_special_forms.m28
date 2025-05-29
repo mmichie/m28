@@ -1,4 +1,4 @@
-; Special forms tests
+# Special forms tests
 
 (import "test_framework" as test)
 
@@ -8,7 +8,7 @@
   (test/test-suite "Definition Forms" (lambda ()
     
     (test/run-test "Def Form" (lambda ()
-      (def x 42)
+      (= x 42)
       (test/assert-eq 42 x "Simple def")
       (def y (+ x 8))
       (test/assert-eq 50 y "Def with expression")
@@ -23,10 +23,10 @@
       (test/assert-eq "Hello, World!" (greet "World") "String function")))
     
     (test/run-test "Set! Form" (lambda ()
-      (def x 10)
+      (= x 10)
       (set! x 20)
       (test/assert-eq 20 x "Set! updates value")
-      (def y [1, 2, 3])
+      (= y [1, 2, 3])
       (set! y (append y 4))
       (test/assert-eq [1, 2, 3, 4] y "Set! with expression"))))
   
@@ -40,7 +40,7 @@
     
     (test/run-test "Eval" (lambda ()
       (test/assert-eq 3 (eval '(+ 1 2)) "Eval expression")
-      (def code '(* 5 6))
+      (= code '(* 5 6))
       (test/assert-eq 30 (eval code) "Eval variable"))))
   
   ; Test control flow forms
@@ -75,11 +75,11 @@
     
     (test/run-test "Do Form" (lambda ()
       (def result (do
-        (def x 1)
-        (def y 2)
+        (= x 1)
+        (= y 2)
         (+ x y)))
       (test/assert-eq 3 result "Do returns last")
-      (def counter 0)
+      (= counter 0)
       (do
         (set! counter (+ counter 1))
         (set! counter (+ counter 1)))
@@ -89,7 +89,7 @@
   (test/test-suite "Let Forms" (lambda ()
     
     (test/run-test "Let" (lambda ()
-      (def x 10)
+      (= x 10)
       (def result (let ((x 20) (y 5))
         (+ x y)))
       (test/assert-eq 25 result "Let binding")
@@ -104,27 +104,27 @@
   (test/test-suite "Loop Forms" (lambda ()
     
     (test/run-test "For Loop" (lambda ()
-      (def sum 0)
+      (= sum 0)
       (for i in [1, 2, 3, 4, 5]
         (set! sum (+ sum i)))
       (test/assert-eq 15 sum "For loop")
       
-      (def pairs [])
+      (= pairs [])
       (for x in ["a", "b"]
         (for y in [1, 2]
           (set! pairs (append pairs [x, y]))))
       (test/assert-eq [["a", 1], ["a", 2], ["b", 1], ["b", 2]] pairs "Nested for")))
     
     (test/run-test "While Loop" (lambda ()
-      (def n 0)
-      (def sum 0)
+      (= n 0)
+      (= sum 0)
       (while (< n 5)
         (set! sum (+ sum n))
         (set! n (+ n 1)))
       (test/assert-eq 10 sum "While loop")))
     
     (test/run-test "Loop Control" (lambda ()
-      (def result [])
+      (= result [])
       (for i in (range 10)
         (if (= i 5) (break))
         (set! result (append result i)))
@@ -151,7 +151,7 @@
       (test/assert-eq "div-zero" result "Try catch error")))
     
     (test/run-test "Try/Finally" (lambda ()
-      (def cleanup false)
+      (= cleanup false)
       (try
         (/ 10 2)
         (finally (set! cleanup true)))
@@ -166,7 +166,7 @@
       (test/assert-true cleanup "Finally runs on error")))
     
     (test/run-test "Raise" (lambda ()
-      (def caught false)
+      (= caught false)
       (try
         (raise "Custom error")
         (except Exception e

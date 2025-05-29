@@ -1,39 +1,39 @@
-;; Test dictionary operations with new object protocol
+# Test dictionary operations with new object protocol
 (print "Dictionary test starting...")
 
-;; Create dictionary
+# Create dictionary
 (= my-dict (dict "name" "John" "age" 30))
 (print "Dictionary:" my-dict)
 
-;; Get value
+# Get value
 (= name (get my-dict "name"))
 (print "Name:" name)
 
-;; Set value
+# Set value
 (set my-dict "location" "New York")
 (print "Updated dictionary:" my-dict)
 
-;; Check if key exists
+# Check if key exists
 (= has-age (has-key my-dict "age"))
 (print "Has age key:" has-age)
 
-;; Get keys
+# Get keys
 (= keys (keys my-dict))
 (print "Keys:" keys)
 
-;; Get values 
+# Get values 
 (= values (values my-dict))
 (print "Values:" values)
 
-;; Get items
+# Get items
 (= items (items my-dict))
 (print "Items:" items)
 
-;; Create second dictionary
+# Create second dictionary
 (= dict2 (dict "job" "Engineer" "salary" 100000))
 (print "Second dictionary:" dict2)
 
-;; Merge dictionaries
+# Merge dictionaries
 (= merged (merge my-dict dict2))
 (print "Merged dictionary:" merged)
 

@@ -1,44 +1,44 @@
-; REPL integration test
-; Tests the REPL's ability to evaluate expressions and maintain state
+# REPL integration test
+# Tests the REPL's ability to evaluate expressions and maintain state
 
-; Define a variable
-(def x 10)
+# Define a variable
+(= x 10)
 
-; Test that variable assignment works
+# Test that variable assignment works
 (= x 20)
 
-; Test that the updated value is correct
+# Test that the updated value is correct
 (assert (= x 20) "Variable assignment failed")
 
-; Define a function that uses closures
+# Define a function that uses closures
 (def make-counter ()
-  (def count 0)
+  (= count 0)
   (def increment ()
     (= count (+ count 1))
     count)
   increment)
 
-; Create a counter
+# Create a counter
 (def counter (make-counter))
 
-; Test that calling the function works and state is maintained
+# Test that calling the function works and state is maintained
 (assert (= (counter) 1) "Counter first call failed")
 (assert (= (counter) 2) "Counter second call failed")
 (assert (= (counter) 3) "Counter third call failed")
 
-; Define and test a recursive function
+# Define and test a recursive function
 (def factorial (n)
   (if (<= n 1)
       1
       (* n (factorial (- n 1)))))
 
-; Test factorial
+# Test factorial
 (assert (= (factorial 5) 120) "Factorial function failed")
 
-; Test list comprehension
-(def numbers [1, 2, 3, 4, 5])
-(def squares [x * x for x in numbers])
+# Test list comprehension
+(= numbers [1, 2, 3, 4, 5])
+(= squares [x * x for x in numbers])
 (assert (= squares [1, 4, 9, 16, 25]) "List comprehension failed")
 
-; Print successful completion
+# Print successful completion
 (print "REPL integration test completed successfully")

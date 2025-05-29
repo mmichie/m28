@@ -1,9 +1,9 @@
-; Test loop control flow forms
+# Test loop control flow forms
 
-; Test while loop
+# Test while loop
 (do
-  (def counter 0)
-  (def result nil)
+  (= counter 0)
+  (= result nil)
   
   (print "Testing while loop...")
   
@@ -17,10 +17,10 @@
     (print "FAIL: while loop failed, counter =" counter))
 )
 
-; Test for loop with a list
+# Test for loop with a list
 (do
-  (def numbers [1 2 3 4 5])
-  (def sum 0)
+  (= numbers [1 2 3 4 5])
+  (= sum 0)
   
   (print "Testing for loop with list...")
   
@@ -33,9 +33,9 @@
     (print "FAIL: for loop sum =" sum))
 )
 
-; Test break in while loop
+# Test break in while loop
 (do
-  (def counter 0)
+  (= counter 0)
   
   (print "Testing break in while loop...")
   
@@ -51,10 +51,10 @@
     (print "FAIL: break failed, counter =" counter))
 )
 
-; Test continue in while loop
+# Test continue in while loop
 (do
-  (def counter 0)
-  (def evens 0)
+  (= counter 0)
+  (= evens 0)
   
   (print "Testing continue in while loop...")
   
@@ -71,5 +71,5 @@
     (print "FAIL: continue failed, evens =" evens))
 )
 
-; All tests passed message
+# All tests passed message
 (print "All loop tests completed.")

@@ -1,4 +1,4 @@
-; Built-in functions tests
+# Built-in functions tests
 
 (import "test_framework" as test)
 
@@ -69,7 +69,7 @@
       (test/assert-eq [0, 2, 4] (range 0 6 2) "Range with step")))
     
     (test/run-test "Enumerate" (lambda ()
-      (def result [])
+      (= result [])
       (for pair in (enumerate ["a", "b", "c"])
         (set! result (append result pair)))
       (test/assert-eq [[0, "a"], [1, "b"], [2, "c"]] result "Enumerate")))
@@ -141,13 +141,13 @@
   (test/test-suite "Dictionary Operations" (lambda ()
     
     (test/run-test "Dict Access" (lambda ()
-      (def d {"a": 1, "b": 2, "c": 3})
+      (= d {"a": 1, "b": 2, "c": 3})
       (test/assert-eq 2 (get d "b") "Get existing key")
       (test/assert-nil (get d "x") "Get missing key")
       (test/assert-eq 99 (get d "x" 99) "Get with default")))
     
     (test/run-test "Dict Modification" (lambda ()
-      (def d {"a": 1})
+      (= d {"a": 1})
       (def d2 (assoc d "b" 2))
       (test/assert-eq 2 (get d2 "b") "Assoc adds key")
       (test/assert-eq 1 (len d) "Original unchanged")
@@ -155,7 +155,7 @@
       (test/assert-false (has-key d3 "a") "Dissoc removes key")))
     
     (test/run-test "Dict Info" (lambda ()
-      (def d {"x": 10, "y": 20})
+      (= d {"x": 10, "y": 20})
       (test/assert-eq ["x", "y"] (sort (keys d)) "Dict keys")
       (test/assert-eq [10, 20] (sort (values d)) "Dict values")
       (test/assert-true (has-key d "x") "Has key")

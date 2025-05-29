@@ -1,15 +1,15 @@
-; context-manager-test-comprehensive.m28
-;
-; Comprehensive test for context managers in M28
-; Testing various aspects of context managers as per the language specification
+# context-manager-test-comprehensive.m28
+#
+# Comprehensive test for context managers in M28
+# Testing various aspects of context managers as per the language specification
 
 (print "===== Context Manager Tests =====\n")
 
-; -- Basic Context Manager Protocol --
+# -- Basic Context Manager Protocol --
 
 (print "-- Basic Context Manager Protocol --")
 
-; Define a simple context manager class
+# Define a simple context manager class
 (class SimpleContext ()
   (def (init self name)
     (= self.name name)
@@ -27,7 +27,7 @@
     (print "Exception info: type=" exc_type "value=" exc_val)
     False))  # Don't suppress exceptions
 
-; Test basic context manager
+# Test basic context manager
 (print "\nTesting basic context manager:")
 (= ctx (SimpleContext "test"))
 (with ctx as context
@@ -36,11 +36,11 @@
   (assert context.entered "Enter method should have been called"))
 (assert ctx.exited "Exit method should have been called")
 
-; -- Exception Handling in Context Managers --
+# -- Exception Handling in Context Managers --
 
 (print "\n-- Exception Handling in Context Managers --")
 
-; Define a context manager that can optionally suppress exceptions
+# Define a context manager that can optionally suppress exceptions
 (class SuppressibleContext ()
   (def (init self suppress)
     (= self.suppress suppress))
@@ -55,7 +55,7 @@
       (print "Caught exception:" exc_type exc_val))
     self.suppress))  # Return suppress value to determine if exception is suppressed
 
-; Test exception handling without suppression
+# Test exception handling without suppression
 (print "\nTesting exception without suppression:")
 (try
   (with (SuppressibleContext False) as ctx
@@ -64,18 +64,18 @@
   (except ValueError as e
     (print "Exception propagated as expected:" e)))
 
-; Test exception suppression
+# Test exception suppression
 (print "\nTesting exception with suppression:")
 (with (SuppressibleContext True) as ctx
   (print "Inside with block, about to raise exception")
   (raise ValueError "This should be suppressed"))
 (print "Continued execution after suppressed exception")
 
-; -- Nested Context Managers --
+# -- Nested Context Managers --
 
 (print "\n-- Nested Context Managers --")
 
-; Test nested context managers
+# Test nested context managers
 (print "\nTesting nested context managers:")
 (with (SimpleContext "outer") as outer
   (print "In outer context")
@@ -87,11 +87,11 @@
   (assert (not inner.entered) "Inner context should not be re-entered"))
 (assert outer.exited "Outer context should be exited")
 
-; -- Resource Management --
+# -- Resource Management --
 
 (print "\n-- Resource Management --")
 
-; Define a context manager for a mock resource
+# Define a context manager for a mock resource
 (class MockResource ()
   (def (init self name)
     (= self.name name)
@@ -113,7 +113,7 @@
     (self.close_resource)
     False))
 
-; Test resource management
+# Test resource management
 (print "\nTesting resource management:")
 (= resource (MockResource "test_resource"))
 (assert (not resource.open) "Resource should start closed")
@@ -122,7 +122,7 @@
   (print "Using resource inside context"))
 (assert (not resource.open) "Resource should be closed after context")
 
-; Test resource cleanup after exception
+# Test resource cleanup after exception
 (print "\nTesting resource cleanup after exception:")
 (= resource (MockResource "exception_resource"))
 (try
@@ -133,11 +133,11 @@
     (print "Exception caught:" e)))
 (assert (not resource.open) "Resource should be closed even after exception")
 
-; -- Multiple Resources in Single Context --
+# -- Multiple Resources in Single Context --
 
 (print "\n-- Multiple Resources in Single Context --")
 
-; Test handling multiple resources in a single with statement
+# Test handling multiple resources in a single with statement
 (print "\nTesting multiple resources:")
 (with (MockResource "resource1") as r1, (MockResource "resource2") as r2
   (print "Using multiple resources")
@@ -145,29 +145,29 @@
   (assert r2.open "Second resource should be open"))
 (print "Both resources should be closed now")
 
-; -- File Context Manager (Built-in) --
+# -- File Context Manager (Built-in) --
 
 (print "\n-- File Context Manager --")
 
-; Test the built-in file context manager
+# Test the built-in file context manager
 (print "\nTesting file context manager:")
-; Create a temporary file
+# Create a temporary file
 (with (open "test_context.txt" "w") as file
   (print "Writing to test file")
   (file.write "Line 1\nLine 2\nLine 3"))
 
-; Read the file back
+# Read the file back
 (with (open "test_context.txt" "r") as file
   (print "Reading from test file")
   (= content (file.read))
   (print "File content:" content)
   (assert (in "Line 1" content) "File should contain the written content"))
 
-; -- Custom Context Manager Function (if supported) --
+# -- Custom Context Manager Function (if supported) --
 
 (print "\n-- Custom Context Manager Function --")
 
-; Test contextlib.contextmanager decorator equivalent if supported
+# Test contextlib.contextmanager decorator equivalent if supported
 (try
   (def (temp_directory)
     (print "\nCreating temporary directory")
@@ -184,11 +184,11 @@
   (except Exception as e
     (print "Custom context manager function not supported:" e)))
 
-; -- Programmatic Context Management (if supported) --
+# -- Programmatic Context Management (if supported) --
 
 (print "\n-- Programmatic Context Management --")
 
-; Test manually calling __enter__ and __exit__ if needed
+# Test manually calling __enter__ and __exit__ if needed
 (print "\nTesting programmatic context management:")
 (= manual_ctx (SimpleContext "manual"))
 (try
@@ -211,11 +211,11 @@
   (except Exception as e
     (print "Programmatic context management not supported as expected:" e)))
 
-; -- Cleanup --
+# -- Cleanup --
 
 (print "\n-- Cleanup --")
 
-; Clean up any test files created
+# Clean up any test files created
 (try
   (import "os")
   (os.remove "test_context.txt")
@@ -223,6 +223,6 @@
   (except Exception as e
     (print "Could not remove test file:" e)))
 
-; -- Conclusion --
+# -- Conclusion --
 
 (print "\n===== Context Manager Tests Complete =====")

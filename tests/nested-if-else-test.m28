@@ -1,9 +1,9 @@
-; Test cases for nested if/else contexts
-; This file attempts to identify issues with nested contexts in if/else blocks
+# Test cases for nested if/else contexts
+# This file attempts to identify issues with nested contexts in if/else blocks
 
 (print "===== Nested If/Else Context Tests =====\n")
 
-; Test 1: Basic nested if statements
+# Test 1: Basic nested if statements
 (print "Test 1: Basic nested if statements")
 
 (def (nested_if_test a b)
@@ -22,7 +22,7 @@
 (print "nested_if_test(-5, 10):" (nested_if_test -5 10))
 (print "Expected: a is not positive")
 
-; Test 2: Nested if with variable shadowing
+# Test 2: Nested if with variable shadowing
 (print "\nTest 2: Nested if with variable shadowing")
 
 (def (shadowing_test x)
@@ -43,7 +43,7 @@
 (print "shadowing_test(3):" (shadowing_test 3))
 (print "Expected: inner else")
 
-; Test 3: Nested if with multiple levels
+# Test 3: Nested if with multiple levels
 (print "\nTest 3: Nested if with multiple levels")
 
 (def (multi_level_test a b c)
@@ -67,7 +67,7 @@
 (print "multi_level_test(-1, 2, 3):" (multi_level_test -1 2 3))
 (print "Expected: a not positive")
 
-; Test 4: Nested if with side effects
+# Test 4: Nested if with side effects
 (print "\nTest 4: Nested if with side effects")
 
 (def (side_effect_test x)
@@ -96,9 +96,9 @@
 (print "side_effect_test(3):" (side_effect_test 3))
 (print "Expected: 100")
 
-; Test 5: Nested if with early return simulation
-; Note: In M28, return is a signal that's caught only in function evaluation
-; so we'll simulate it with a variable assignment and breaks
+# Test 5: Nested if with early return simulation
+# Note: In M28, return is a signal that's caught only in function evaluation
+# so we'll simulate it with a variable assignment and breaks
 (print "\nTest 5: Conditional early exit")
 
 (def (conditional_exit_test x)
@@ -124,7 +124,7 @@
 (print "conditional_exit_test(15):" (conditional_exit_test 15))
 (print "Expected: large positive")
 
-; Test 6: Nested if in a loop context
+# Test 6: Nested if in a loop context
 (print "\nTest 6: Nested if in a loop context")
 
 (def (loop_if_test max)
@@ -149,7 +149,7 @@
 (print "loop_if_test(10):" (loop_if_test 10))
 (print "Expected: 30 (2+4+6+8+10)")
 
-; Test 7: Nested if with complex condition evaluation
+# Test 7: Nested if with complex condition evaluation
 (print "\nTest 7: Nested if with complex condition evaluation")
 
 (def (complex_condition_test a b)

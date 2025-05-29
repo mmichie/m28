@@ -1,13 +1,13 @@
-; Debugging class methods and __init__
+# Debugging class methods and __init__
 
-; Define a simple class with explicit __init__ method
+# Define a simple class with explicit __init__ method
 (class TestClass nil
   (def __init__ (self)
     (print "TestClass.__init__ called")))
 
 (print "TestClass created")
 
-; Try to instantiate it
+# Try to instantiate it
 (print "Creating object of TestClass")
 (= obj (TestClass))
 

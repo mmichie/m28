@@ -1,7 +1,7 @@
-; Dot Notation Test
-; Tests basic dot notation functionality with dictionaries
+# Dot Notation Test
+# Tests basic dot notation functionality with dictionaries
 
-; Create a simple dictionary
+# Create a simple dictionary
 (= config (dict
   "app_name" "MyApp"
   "version" "1.0.3"
@@ -12,16 +12,16 @@
   )
 ))
 
-; Test dictionary property access
+# Test dictionary property access
 (= app_name (get config "app_name"))
 (= server_host (get (get config "server") "host"))
 (= port (get (get config "server") "port"))
 
-; Test list operations
+# Test list operations
 (= numbers (list 1 2 3 4 5))
 (= length (len numbers))
 (= first (nth numbers 0))
 (= last (nth numbers 4))
 
-; Return success status
+# Return success status
 (dict "status" "success")

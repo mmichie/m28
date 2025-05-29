@@ -1,15 +1,15 @@
-; Simple test for inheritance with debug
+# Simple test for inheritance with debug
 
-; 1. Create base class
+# 1. Create base class
 (class Base nil)
 (print "Base class created")
 
-; 2. Create derived class with correct syntax
-; Need Base in a list format that matches what the parser expects
+# 2. Create derived class with correct syntax
+# Need Base in a list format that matches what the parser expects
 (class Derived Base)
 (print "Derived class created")
 
-; 3. Test issubclass
+# 3. Test issubclass
 (print "Derived issubclass of Base:" (issubclass Derived Base))
 (print "Base issubclass of Derived:" (issubclass Base Derived))
 (print "Base issubclass of Base:" (issubclass Base Base))

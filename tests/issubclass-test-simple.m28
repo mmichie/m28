@@ -1,6 +1,6 @@
-; Test file for issubclass function - simple version
+# Test file for issubclass function - simple version
 
-; 1. Basic inheritance test
+# 1. Basic inheritance test
 (class Animal nil
   (def __init__ (self name)
     (set self.name name)))
@@ -19,7 +19,7 @@
 (print "Animal issubclass of Dog:" (issubclass Animal Dog))
 (print "Dog issubclass of Dog:" (issubclass Dog Dog))
 
-; 2. Instance checks
+# 2. Instance checks
 (print "\nInstance checks:")
 (= fido (Dog "Fido" "Labrador"))
 (= generic_animal (Animal "Generic"))

@@ -1,6 +1,6 @@
-; Basic async test
+# Basic async test
 
-; Test 1: Basic async function
+# Test 1: Basic async function
 (print "Test 1: Basic async function")
 (def async-add (async (lambda (a b)
   (+ a b))))
@@ -8,13 +8,13 @@
 (def result (run_async (async-add 5 7)))
 (print (+ "Result: " (str result)))  ; Should print 12
 
-; Test 2: Create task
+# Test 2: Create task
 (print "\nTest 2: Create task")
 (def add-task (create_task (lambda () (+ 10 20))))
 (def task-result (run_async add-task))
 (print (+ "Task result: " (str task-result)))  ; Should print 30
 
-; Test 3: Gather multiple tasks
+# Test 3: Gather multiple tasks
 (print "\nTest 3: Gather multiple tasks")
 (def task1 (async (lambda () 1)))
 (def task2 (async (lambda () 2)))
@@ -22,7 +22,7 @@
 (def results (gather (task1) (task2) (task3)))
 (print (+ "Gather results: " (str results)))  ; Should print (1 2 3)
 
-; Test 4: Channels without go
+# Test 4: Channels without go
 (print "\nTest 4: Channels")
 (def ch (Channel 1))  ; Buffered channel
 (send! ch 42)

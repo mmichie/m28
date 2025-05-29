@@ -1,9 +1,9 @@
-; Recursion Tests for M28
-; Tests deep recursion with tail call optimization
+# Recursion Tests for M28
+# Tests deep recursion with tail call optimization
 
 (print "===== Recursion Tests with Tail Call Optimization =====\n")
 
-; Section 1: Deep Recursion Test
+# Section 1: Deep Recursion Test
 (print "-- Deep Recursion --")
 
 (print "\nTest 1.1: Count Down Function")
@@ -24,7 +24,7 @@
 (print (count-down 1000))
 (print "Expected: 0")
 
-; Section 2: Factorial with Tail Call Optimization
+# Section 2: Factorial with Tail Call Optimization
 (print "\n-- Factorial with Tail Call Optimization --")
 
 (print "\nTest 2.1: Tail-Recursive Factorial")
@@ -48,7 +48,7 @@
 (print (factorial 20))
 (print "Expected: 2432902008176640000")
 
-; Section 3: Fibonacci with Tail Call Optimization
+# Section 3: Fibonacci with Tail Call Optimization
 (print "\n-- Fibonacci with Tail Call Optimization --")
 
 (print "\nTest 3.1: Tail-Recursive Fibonacci")
@@ -72,11 +72,11 @@
 (print (fibonacci 30))
 (print "Expected: 832040")
 
-; Section 4: Tower of Hanoi (should now work with deep recursion)
+# Section 4: Tower of Hanoi (should now work with deep recursion)
 (print "\n-- Tower of Hanoi with Tail Call Optimization --")
 (print "\nTest 4.1: Testing Tower of Hanoi for higher disk counts")
 
-; Count moves without actually printing them
+# Count moves without actually printing them
 (def (hanoi-count n src aux dst)
   (if (== n 0)
       0

@@ -1,13 +1,13 @@
-; Test file for context package
-; Tests context creation, cancellation, and timeout
+# Test file for context package
+# Tests context creation, cancellation, and timeout
 
-; Create a background context
+# Create a background context
 (= bg (context-background))
 (print "Background context created:" bg)
 (print "Background context canceled?:" (context-canceled? bg))
 (print "Background context error:" (context-error bg))
 
-; Test cancellable context
+# Test cancellable context
 (= result (context-with-cancel bg))
 (= ctx (nth result 0))
 (= cancel (nth result 1))
@@ -15,13 +15,13 @@
 (print "\nCancellable context created:" ctx)
 (print "Context canceled?:" (context-canceled? ctx))
 
-; Test cancellation
+# Test cancellation
 (print "\nCancelling context...")
 (cancel "manually canceled")
 (print "Context canceled?:" (context-canceled? ctx))
 (print "Context error:" (context-error ctx))
 
-; Test timeout context
+# Test timeout context
 (print "\nCreating timeout context (500ms)...")
 (= result (context-with-timeout bg 500))
 (= timeout-ctx (nth result 0))
@@ -34,20 +34,20 @@
 (print "Context canceled?:" (context-canceled? timeout-ctx))
 (print "Context error:" (context-error timeout-ctx))
 
-; We can verify context cancellation and timeout without channels
+# We can verify context cancellation and timeout without channels
 (print "\nSimple cancellation and timeout tests...")
 
-; Create a new cancellable context
+# Create a new cancellable context
 (= result (context-with-cancel bg))
 (= simple-ctx (nth result 0))
 (= simple-cancel (nth result 1))
 
-; Cancel it
+# Cancel it
 (simple-cancel "manually canceled here")
 (print "Context canceled after explicit cancel?:" (context-canceled? simple-ctx))
 (print "Cancellation error:" (context-error simple-ctx))
 
-; Create a context with timeout and check timeout behavior
+# Create a context with timeout and check timeout behavior
 (= timeout-result (context-with-timeout bg 100))  # 100ms timeout
 (= short-timeout-ctx (nth timeout-result 0))
 (print "Context with short timeout, initially canceled?:" (context-canceled? short-timeout-ctx))

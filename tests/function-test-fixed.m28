@@ -1,11 +1,11 @@
-; Consolidated Function Test Suite
+# Consolidated Function Test Suite
 
 (print "===== Function Tests =====\n")
 
-; Section 1: Basic Function Definition and Usage
+# Section 1: Basic Function Definition and Usage
 (print "-- Basic Function Definition --")
 
-; Simple function definition
+# Simple function definition
 (print "\nTest 1.1: Simple Function Definition")
 (def (add-two-numbers a b)
   (+ a b))
@@ -18,7 +18,7 @@
 (print (add-two-numbers -1 1))
 (print "Expected: 0")
 
-; Section 2: Recursive Functions
+# Section 2: Recursive Functions
 (print "\n-- Recursive Functions --")
 
 (print "\nTest 2.1: Factorial Function")
@@ -53,7 +53,7 @@
 (print (fibonacci 5))
 (print "Expected: 5")
 
-; Section 3: Function as First-Class Objects
+# Section 3: Function as First-Class Objects
 (print "\n-- Functions as Values --")
 
 (print "\nTest 3.1: Function Definition")
@@ -78,7 +78,7 @@
 (print (add 3 4))
 (print "Expected: 7")
 
-; Section 4: Higher-Order Functions
+# Section 4: Higher-Order Functions
 (print "\n-- Higher-Order Functions --")
 
 (print "\nTest 4.1: Function as Argument")
@@ -93,7 +93,7 @@
 (print (apply-twice double 5))
 (print "Expected: 20")
 
-; Section 5: Basic Closures
+# Section 5: Basic Closures
 (print "\n-- Basic Closure Test --")
 (def (make-adder n)
   (lambda (x)

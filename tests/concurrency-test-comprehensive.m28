@@ -1,36 +1,36 @@
-; concurrency-test-comprehensive.m28
-;
-; Comprehensive test for concurrency features in M28
-; Testing goroutines, channels, select, and sync primitives
+# concurrency-test-comprehensive.m28
+#
+# Comprehensive test for concurrency features in M28
+# Testing goroutines, channels, select, and sync primitives
 
 (print "===== Concurrency Tests =====\n")
 
-; -- Basic Goroutine --
+# -- Basic Goroutine --
 
 (print "-- Basic Goroutine --")
 
-; Define a function to be executed in a goroutine
+# Define a function to be executed in a goroutine
 (def (print-numbers count)
   (print "\nPrinting numbers from goroutine:")
   (for i (range count)
     (print "Number:" i)))
 
-; Run a goroutine
+# Run a goroutine
 (print "\nLaunching goroutine for printing numbers")
 (go (print-numbers 5))
 
-; Give some time for goroutine to execute
+# Give some time for goroutine to execute
 (time.sleep 0.1)
 
-; -- Channel Communication --
+# -- Channel Communication --
 
 (print "\n-- Channel Communication --")
 
-; Create an unbuffered channel
+# Create an unbuffered channel
 (= ch (channel))
 (print "\nCreated unbuffered channel")
 
-; Send values through a goroutine
+# Send values through a goroutine
 (def (send-values ch count)
   (print "Sending values to channel:")
   (for i (range count)
@@ -38,47 +38,47 @@
     (ch <- i))
   (print "Sender finished"))
 
-; Launch sender goroutine
+# Launch sender goroutine
 (go (send-values ch 5))
 
-; Receive values in main goroutine
+# Receive values in main goroutine
 (print "\nReceiving values from channel:")
 (for i (range 5)
   (= val (<- ch))
   (print "Received:" val)
   (assert (== val i) "Channel should preserve message order"))
 
-; -- Buffered Channels --
+# -- Buffered Channels --
 
 (print "\n-- Buffered Channels --")
 
-; Create a buffered channel with capacity 3
+# Create a buffered channel with capacity 3
 (= buf-ch (channel 3))
 (print "\nCreated buffered channel with capacity 3")
 
-; Send values to the buffered channel without blocking
+# Send values to the buffered channel without blocking
 (print "Sending values to buffered channel without receiver:")
 (for i (range 3)
   (buf-ch <- i)
   (print "Sent:" i))
 (print "Sent 3 values to buffered channel without blocking")
 
-; Receive values from the buffered channel
+# Receive values from the buffered channel
 (print "\nReceiving values from buffered channel:")
 (for i (range 3)
   (= val (<- buf-ch))
   (print "Received:" val)
   (assert (== val i) "Buffered channel should preserve message order"))
 
-; -- Channel Closing --
+# -- Channel Closing --
 
 (print "\n-- Channel Closing --")
 
-; Create a channel for testing close
+# Create a channel for testing close
 (= close-ch (channel))
 (print "\nCreated channel for close testing")
 
-; Function that sends values and then closes the channel
+# Function that sends values and then closes the channel
 (def (send-and-close ch count)
   (print "Sending values before close:")
   (for i (range count)
@@ -87,10 +87,10 @@
   (print "Closing channel")
   (close ch))
 
-; Start the sender
+# Start the sender
 (go (send-and-close close-ch 3))
 
-; Receive values until the channel is closed
+# Receive values until the channel is closed
 (print "\nReceiving values until channel closed:")
 (= received (list))
 (for value done (<- close-ch)
@@ -105,16 +105,16 @@
 (print "Received values:" received)
 (assert (== received (list 0 1 2)) "Should receive all sent values before close")
 
-; -- Select Statement --
+# -- Select Statement --
 
 (print "\n-- Select Statement --")
 
-; Create channels for select testing
+# Create channels for select testing
 (= ch1 (channel))
 (= ch2 (channel))
 (print "\nCreated two channels for select testing")
 
-; Send values to different channels
+# Send values to different channels
 (def (send-to-channel1)
   (time.sleep 0.05)
   (print "Sending to channel 1")
@@ -125,16 +125,16 @@
   (print "Sending to channel 2")
   (ch2 <- "from 2"))
 
-; Start senders
+# Start senders
 (go (send-to-channel1))
 (go (send-to-channel2))
 
-; Use select to wait for either channel
+# Use select to wait for either channel
 (print "\nWaiting with select:")
 (= result1 "")
 (= result2 "")
 
-; First select should get from channel 1 (faster sender)
+# First select should get from channel 1 (faster sender)
 (select
   ((ch1 -> value)
     (= result1 value)
@@ -144,7 +144,7 @@
     (= result2 value)
     (print "Selected from channel 2:" value)))
 
-; Second select should get from channel 2
+# Second select should get from channel 2
 (select
   ((ch1 -> value)
     (= result1 value)
@@ -158,15 +158,15 @@
 (assert (== result1 "from 1") "Should receive from channel 1")
 (assert (== result2 "from 2") "Should receive from channel 2")
 
-; -- Select with Default --
+# -- Select with Default --
 
 (print "\n-- Select with Default --")
 
-; Create channel for default testing
+# Create channel for default testing
 (= default-ch (channel))
 (print "\nCreated channel for testing select with default")
 
-; Select with default should take default case when no messages
+# Select with default should take default case when no messages
 (print "Select with default when no messages available:")
 (= default-taken False)
 (select
@@ -179,15 +179,15 @@
 
 (assert default-taken "Default case should be taken when no messages available")
 
-; -- Select with Timeout --
+# -- Select with Timeout --
 
 (print "\n-- Select with Timeout --")
 
-; Create channel for timeout testing
+# Create channel for timeout testing
 (= timeout-ch (channel))
 (print "\nCreated channel for testing select with timeout")
 
-; Select with timeout should take timeout case when no messages within timeframe
+# Select with timeout should take timeout case when no messages within timeframe
 (print "Select with timeout when no messages arrive in time:")
 (= timed-out False)
 (select
@@ -200,55 +200,55 @@
 
 (assert timed-out "Timeout case should be taken when no messages arrive in time")
 
-; -- Mutex Synchronization --
+# -- Mutex Synchronization --
 
 (print "\n-- Mutex Synchronization --")
 
-; Create mutex and shared data
+# Create mutex and shared data
 (= mu (mutex))
 (= shared-data 0)
 (print "\nCreated mutex for synchronization")
 
-; Function that increments shared data with mutex protection
+# Function that increments shared data with mutex protection
 (def (increment-with-mutex n)
   (for i (range n)
     (mu.lock)
     (= shared-data (+ shared-data 1))
     (mu.unlock)))
 
-; Launch multiple goroutines to increment
+# Launch multiple goroutines to increment
 (print "\nLaunching 5 goroutines to increment counter")
 (for i (range 5)
   (go (increment-with-mutex 100)))
 
-; Wait for goroutines to complete (simple approach)
+# Wait for goroutines to complete (simple approach)
 (time.sleep 0.5)
 
 (print "Final shared counter value:" shared-data)
 (assert (== shared-data 500) "Counter should be incremented safely with mutex")
 
-; -- WaitGroup Synchronization --
+# -- WaitGroup Synchronization --
 
 (print "\n-- WaitGroup Synchronization --")
 
-; Create waitgroup and shared counter
+# Create waitgroup and shared counter
 (= wg (waitgroup))
 (= waitgroup-counter 0)
 (print "\nCreated waitgroup for synchronization")
 
-; Function that increments the counter and signals completion
+# Function that increments the counter and signals completion
 (def (increment-with-waitgroup n)
   (for i (range n)
     (= waitgroup-counter (+ waitgroup-counter 1)))
   (wg.done))
 
-; Launch multiple goroutines with waitgroup tracking
+# Launch multiple goroutines with waitgroup tracking
 (print "\nLaunching 5 goroutines with waitgroup tracking")
 (wg.add 5)  # Expect 5 goroutines
 (for i (range 5)
   (go (increment-with-waitgroup 100)))
 
-; Wait for all goroutines to complete
+# Wait for all goroutines to complete
 (print "Waiting for all goroutines to complete...")
 (wg.wait)
 (print "All goroutines completed")
@@ -256,16 +256,16 @@
 (print "Final counter value with waitgroup:" waitgroup-counter)
 (assert (== waitgroup-counter 500) "Counter should reach expected value")
 
-; -- Fan-out/Fan-in Pattern --
+# -- Fan-out/Fan-in Pattern --
 
 (print "\n-- Fan-out/Fan-in Pattern --")
 
-; Create channels for the pattern
+# Create channels for the pattern
 (= jobs (channel))
 (= results (channel))
 (print "\nCreated channels for fan-out/fan-in pattern")
 
-; Worker function
+# Worker function
 (def (worker jobs results)
   (for job done (<- jobs)
     (if done
@@ -276,19 +276,19 @@
         (print "Jobs channel closed, worker exiting")
         (break)))))
 
-; Start multiple workers
+# Start multiple workers
 (print "\nStarting 3 workers")
 (for i (range 3)
   (go (worker jobs results)))
 
-; Send jobs to the workers
+# Send jobs to the workers
 (print "Sending 9 jobs to workers")
 (for i (range 9)
   (jobs <- i))
 (print "Closing jobs channel")
 (close jobs)
 
-; Collect results
+# Collect results
 (print "\nCollecting results:")
 (= result-list (list))
 (for i (range 9)
@@ -296,17 +296,17 @@
   (append result-list result)
   (print "Got result:" result))
 
-; Sort results for consistent comparison
+# Sort results for consistent comparison
 (= sorted-results (sorted result-list))
 (print "Sorted results:" sorted-results)
 (= expected (list 0 1 4 9 16 25 36 49 64))
 (assert (== sorted-results expected) "Should receive all expected squared values")
 
-; -- Parallel Map --
+# -- Parallel Map --
 
 (print "\n-- Parallel Map --")
 
-; Implement a simple parallel map
+# Implement a simple parallel map
 (def (parallel-map func items num-workers)
   (= result (list))
   (= in-ch (channel))
@@ -345,28 +345,28 @@
   # Return results
   result)
 
-; Test parallel map
+# Test parallel map
 (print "\nTesting parallel map with 3 workers")
 (= numbers (list 1 2 3 4 5 6 7 8 9))
 (= squares (parallel-map (lambda (x) (* x x)) numbers 3))
 
-; Note: results might be in different order than input
+# Note: results might be in different order than input
 (= sorted-squares (sorted squares))
 (print "Original numbers:" numbers)
 (print "Parallel map results (sorted):" sorted-squares)
 (= expected-squares (list 1 4 9 16 25 36 49 64 81))
 (assert (== sorted-squares expected-squares) "Parallel map should compute correct results")
 
-; -- Context and Cancellation --
+# -- Context and Cancellation --
 
 (print "\n-- Context and Cancellation --")
 
-; Create a context with cancellation
+# Create a context with cancellation
 (= ctx (context))
 (= cancel-func (ctx.cancel-func))
 (print "\nCreated cancellable context")
 
-; Function that uses context for cancellation
+# Function that uses context for cancellation
 (def (cancellable-worker ctx)
   (= i 0)
   (while True
@@ -381,23 +381,23 @@
         (if (>= i 10)
           (return "Completed"))))))
 
-; Start worker with context
+# Start worker with context
 (print "\nStarting worker with cancellable context")
 (= worker-result-ch (channel))
 (go
   (= result (cancellable-worker ctx))
   (worker-result-ch <- result))
 
-; Let it run for a bit, then cancel
+# Let it run for a bit, then cancel
 (time.sleep 0.2)  # Let it execute a few iterations
 (print "Cancelling context")
 (cancel-func)
 
-; Get the result
+# Get the result
 (= worker-result (<- worker-result-ch))
 (print "Worker returned:" worker-result)
 (assert (in worker-result (list "Cancelled" "Completed")) "Worker should be cancelled or complete normally")
 
-; -- Conclusion --
+# -- Conclusion --
 
 (print "\n===== Concurrency Tests Complete =====")

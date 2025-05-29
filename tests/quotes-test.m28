@@ -1,11 +1,11 @@
-; Test handling of quoted keys in dictionaries
+# Test handling of quoted keys in dictionaries
 
-; Define dictionary with quoted keys
-(def quoted_dict {'a': 1, 'b': 2})
+# Define dictionary with quoted keys
+(= quoted_dict {'a': 1, 'b': 2})
 
-; Access dictionary value
+# Access dictionary value
 (def a_value (get quoted_dict "a"))
 
-; Print results
+# Print results
 (print "Dictionary:" quoted_dict)
 (print "Value of 'a':" a_value)

@@ -1,4 +1,4 @@
-; File I/O tests
+# File I/O tests
 
 (import "test_framework" as test)
 
@@ -37,7 +37,7 @@
         ((getattr f "write") "Line 2\n"))
       
       ; File should be closed automatically
-      (def content nil)
+      (= content nil)
       (with (open "test_with.txt" "r") as f
         (set! content ((getattr f "read"))))
       
@@ -77,7 +77,7 @@
         ((getattr f "write") "Appended content\n"))
       
       ; Read and verify
-      (def content nil)
+      (= content nil)
       (with (open "test_append.txt" "r") as f
         (set! content ((getattr f "read"))))
       
@@ -104,5 +104,5 @@
     
   )))
 
-; Export test function
+# Export test function
 (export test-file-io)

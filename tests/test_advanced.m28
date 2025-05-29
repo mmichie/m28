@@ -1,4 +1,4 @@
-; Advanced features tests
+# Advanced features tests
 
 (import "test_framework" as test)
 
@@ -87,7 +87,7 @@
     
     (test/run-test "Basic Generator" (lambda ()
       (def count-gen (lambda (n)
-        (def i 0)
+        (= i 0)
         (while (< i n)
           (yield i)
           (set! i (+ i 1)))))
@@ -102,14 +102,14 @@
         (for i in (range n)
           (yield (* i i)))))
       
-      (def result [])
+      (= result [])
       (for sq in (squares 4)
         (set! result (append result sq)))
       (test/assert-eq [0, 1, 4, 9] result "Generator in for loop")))
     
     (test/run-test "Generator State" (lambda ()
       (def stateful (lambda ()
-        (def total 0)
+        (= total 0)
         (while true
           (def val (yield total))
           (if val
@@ -125,7 +125,7 @@
     
     (test/run-test "Basic With" (lambda ()
       (def MockFile (lambda (name)
-        (def obj {"name": name, "closed": false})
+        (= obj {"name": name, "closed": false})
         (setattr obj "__enter__" (lambda () obj))
         (setattr obj "__exit__" (lambda (exc-type exc-val exc-tb) 
           (set! obj.closed true)
@@ -144,7 +144,7 @@
       (def cleanup-run false)
       
       (def Manager (lambda ()
-        (def obj {})
+        (= obj {})
         (setattr obj "__enter__" (lambda () obj))
         (setattr obj "__exit__" (lambda (exc-type exc-val exc-tb)
           (set! cleanup-run true)
@@ -191,7 +191,7 @@
   (test/test-suite "Object Protocol" (lambda ()
     
     (test/run-test "Getattr/Setattr" (lambda ()
-      (def obj {})
+      (= obj {})
       (setattr obj "x" 10)
       (test/assert-eq 10 (getattr obj "x") "Set and get attr")
       (test/assert-eq 99 (getattr obj "y" 99) "Get with default")
@@ -199,21 +199,21 @@
       (test/assert-false (hasattr obj "y") "No attr")))
     
     (test/run-test "Dict Protocol" (lambda ()
-      (def d {"a": 1, "b": 2})
+      (= d {"a": 1, "b": 2})
       (test/assert-eq 1 d.a "Dict dot access")
       (set! d.c 3)
       (test/assert-eq 3 (get d "c") "Dict dot assignment")
       (test/assert-eq 2 (len d.keys) "Dict methods")))
     
     (test/run-test "List Protocol" (lambda ()
-      (def lst [1, 2, 3])
+      (= lst [1, 2, 3])
       (test/assert-eq 3 lst.length "List length property")
       (lst.append 4)
       (test/assert-eq [1, 2, 3, 4] lst "List method call")
       (test/assert-eq 1 lst.0 "List index access")))
     
     (test/run-test "String Methods" (lambda ()
-      (def s "hello")
+      (= s "hello")
       (test/assert-eq "HELLO" (s.upper) "String method")
       (test/assert-eq 5 s.length "String length")
       (test/assert-true (s.startswith "hel") "String predicate"))))
@@ -229,17 +229,17 @@
       (test/assert-eq [0, 2, 4, 6, 8] evens "Filter evens")))
     
     (test/run-test "Nested Structures" (lambda ()
-      (def matrix [[1, 2], [3, 4], [5, 6]])
+      (= matrix [[1, 2], [3, 4], [5, 6]])
       (def flat (reduce (lambda (acc row) (+ acc row)) matrix []))
       (test/assert-eq [1, 2, 3, 4, 5, 6] flat "Flatten matrix")
       
-      (def nested {"users": [{"name": "Alice", "age": 30},
+      (= nested {"users": [{"name": "Alice", "age": 30},
                              {"name": "Bob", "age": 25}]})
       (test/assert-eq "Alice" nested.users.0.name "Deep access")))
     
     (test/run-test "Set Operations" (lambda ()
-      (def s1 #{1, 2, 3})
-      (def s2 #{2, 3, 4})
+      (= s1 #{1, 2, 3})
+      (= s2 #{2, 3, 4})
       (test/assert-eq #{1, 2, 3, 4} (union s1 s2) "Set union")
       (test/assert-eq #{2, 3} (intersection s1 s2) "Set intersection")
       (test/assert-eq #{1} (difference s1 s2) "Set difference"))))

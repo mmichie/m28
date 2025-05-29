@@ -1,13 +1,13 @@
-; performance-benchmark.m28
-;
-; Comprehensive benchmarks for M28 performance
-; Tests execution time and memory usage for various language operations
+# performance-benchmark.m28
+#
+# Comprehensive benchmarks for M28 performance
+# Tests execution time and memory usage for various language operations
 
 (print "===== Performance Benchmarks =====\n")
 
-; -- Utility Functions --
+# -- Utility Functions --
 
-; Simple timer function for benchmarking
+# Simple timer function for benchmarking
 (def (benchmark label func)
   (print "\n-- Benchmarking:" label "--")
   (= start-time (time))
@@ -17,11 +17,11 @@
   (print "Time elapsed:" elapsed "ms")
   (list result elapsed))
 
-; -- Arithmetic Operations Benchmark --
+# -- Arithmetic Operations Benchmark --
 
 (print "\n-- Arithmetic Operations --")
 
-; Test basic arithmetic speed
+# Test basic arithmetic speed
 (def (arithmetic-benchmark iterations)
   (= result 0)
   (for i (range iterations)
@@ -37,11 +37,11 @@
 (print "Final result:" (get arithmetic-result 0))
 (print "Operations per second:" (/ 400000 (/ (get arithmetic-result 1) 1000)))  # 4 ops per iteration
 
-; -- Function Call Benchmark --
+# -- Function Call Benchmark --
 
 (print "\n-- Function Calls --")
 
-; Test function call overhead
+# Test function call overhead
 (def (empty-function)
   None)
 
@@ -53,11 +53,11 @@
                              (lambda () (function-call-benchmark 100000))))
 (print "Calls per second:" (/ 100000 (/ (get function-result 1) 1000)))
 
-; -- Recursion Benchmark --
+# -- Recursion Benchmark --
 
 (print "\n-- Recursion --")
 
-; Test recursion performance (with TCO if implemented)
+# Test recursion performance (with TCO if implemented)
 (def (recursive-sum n acc)
   (if (== n 0)
       acc
@@ -71,11 +71,11 @@
 (print "Recursion result:" (get recursion-result 0))
 (assert (== (get recursion-result 0) 10000) "Recursive sum should equal 10000")
 
-; -- Object Property Access Benchmark --
+# -- Object Property Access Benchmark --
 
 (print "\n-- Object Property Access --")
 
-; Test object property access speed
+# Test object property access speed
 (def (create-test-object)
   (= obj (dict))
   (= obj.prop1 1)
@@ -101,11 +101,11 @@
 (print "Property access result:" (get object-result 0))
 (print "Property accesses per second:" (/ 100000 (/ (get object-result 1) 1000)))  # 5 props per iteration
 
-; -- Dictionary Operation Benchmark --
+# -- Dictionary Operation Benchmark --
 
 (print "\n-- Dictionary Operations --")
 
-; Test dictionary operations speed
+# Test dictionary operations speed
 (def (dict-benchmark iterations)
   (= d (dict))
   (for i (range iterations)
@@ -120,11 +120,11 @@
 (print "Dictionary sum result:" (get dict-result 0))
 (print "Dictionary operations per second:" (/ 20000 (/ (get dict-result 1) 1000)))  # set + get per iteration
 
-; -- List Operations Benchmark --
+# -- List Operations Benchmark --
 
 (print "\n-- List Operations --")
 
-; Test list operations speed
+# Test list operations speed
 (def (list-create-benchmark size)
   (= l (list))
   (for i (range size)
@@ -136,7 +136,7 @@
 (print "List size:" (len (get list-create-result 0)))
 (print "List appends per second:" (/ 100000 (/ (get list-create-result 1) 1000)))
 
-; Test list random access
+# Test list random access
 (def (list-access-benchmark iterations list-data)
   (= sum 0)
   (= size (len list-data))
@@ -150,11 +150,11 @@
 (print "List access sum:" (get list-access-result 0))
 (print "List accesses per second:" (/ 100000 (/ (get list-access-result 1) 1000)))
 
-; -- String Operations Benchmark --
+# -- String Operations Benchmark --
 
 (print "\n-- String Operations --")
 
-; Test string manipulation speed
+# Test string manipulation speed
 (def (string-benchmark iterations)
   (= s "")
   (for i (range iterations)
@@ -166,11 +166,11 @@
 (print "Final string length:" (get string-result 0))
 (print "String concatenations per second:" (/ 10000 (/ (get string-result 1) 1000)))
 
-; -- Fibonacci Benchmark --
+# -- Fibonacci Benchmark --
 
 (print "\n-- Fibonacci Benchmark --")
 
-; Classic recursive Fibonacci (inefficient, good stress test)
+# Classic recursive Fibonacci (inefficient, good stress test)
 (def (fibonacci n)
   (if (< n 2)
       n
@@ -181,11 +181,11 @@
 (print "Fibonacci(30):" (get fib-result 0))
 (assert (== (get fib-result 0) 832040) "Fibonacci(30) should equal 832040")
 
-; -- Algorithmic Benchmark --
+# -- Algorithmic Benchmark --
 
 (print "\n-- QuickSort Benchmark --")
 
-; Quicksort implementation
+# Quicksort implementation
 (def (quicksort lst)
   (if (< (len lst) 2)
       lst
@@ -195,7 +195,7 @@
         (= greater (filter (lambda (x) (>= x pivot)) (slice lst 1)))
         (+ (quicksort lesser) (list pivot) (quicksort greater)))))
 
-; Create a list to sort
+# Create a list to sort
 (def (create-random-list size)
   (= lst (list))
   (for i (range size)
@@ -207,11 +207,11 @@
                          (lambda () (quicksort lst-to-sort))))
 (print "Sorted list length:" (len (get sort-result 0)))
 
-; -- Concurrency Benchmark --
+# -- Concurrency Benchmark --
 
 (print "\n-- Concurrency Benchmark --")
 
-; Test goroutine creation and channel communication
+# Test goroutine creation and channel communication
 (def (concurrency-benchmark num-goroutines)
   (= ch (channel))
   (= sum 0)
@@ -232,7 +232,7 @@
 (print "Sum of all worker IDs:" (get concurrency-result 0))
 (print "Goroutines per second:" (/ 1000 (/ (get concurrency-result 1) 1000)))
 
-; -- Summary Table --
+# -- Summary Table --
 
 (print "\n===== Performance Summary =====")
 (print "Operation                          | Time (ms) | Units per second")

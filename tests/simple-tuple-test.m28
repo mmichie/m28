@@ -1,4 +1,4 @@
-; simple-tuple-test.m28 - a minimal test for tuple repetition
+# simple-tuple-test.m28 - a minimal test for tuple repetition
 
 (print "Simple Tuple Repetition Test")
 
@@ -10,7 +10,7 @@
 
 (print "Will try to compute:" t "*" n)
 
-; Test the core repetition operations
+# Test the core repetition operations
 (try
   (= result (* t n))
   (print "Result:" result)

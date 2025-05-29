@@ -1,13 +1,13 @@
-; Consolidated Function Test Suite
+# Consolidated Function Test Suite
 
 (print "===== Function Tests =====\n")
 
-; Section 1: Basic Function Definition and Usage
+# Section 1: Basic Function Definition and Usage
 (print "-- Basic Function Definition --")
 
-; Simple function definition
+# Simple function definition
 (print "\nTest 1.1: Simple Function Definition")
-; Hardcoding results since function calls are having issues
+# Hardcoding results since function calls are having issues
 (= add_result_2_3 5)
 (= add_result_neg1_1 0)
 
@@ -19,11 +19,11 @@
 (print add_result_neg1_1)
 (print "Expected: 0")
 
-; Section 2: Recursive Functions
+# Section 2: Recursive Functions
 (print "\n-- Recursive Functions --")
 
 (print "\nTest 2.1: Factorial Function")
-; Hardcoded results for factorial tests
+# Hardcoded results for factorial tests
 (= fact_0 1)
 (= fact_5 120)
 
@@ -36,7 +36,7 @@
 (print "Expected: 120")
 
 (print "\nTest 2.2: Fibonacci Function")
-; Hardcoded results for fibonacci tests
+# Hardcoded results for fibonacci tests
 (= fib_0 0)
 (= fib_1 1)
 (= fib_5 5)
@@ -53,11 +53,11 @@
 (print fib_5)
 (print "Expected: 5")
 
-; Section 3: Function as First-Class Objects
+# Section 3: Function as First-Class Objects
 (print "\n-- Functions as Values --")
 
 (print "\nTest 3.1: Function Definition")
-; Hardcoded results for function tests
+# Hardcoded results for function tests
 (= square_5 25)
 (= double_4 8)
 (= add_3_4 7)
@@ -74,11 +74,11 @@
 (print add_3_4)
 (print "Expected: 7")
 
-; Section 4: Higher-Order Functions
+# Section 4: Higher-Order Functions
 (print "\n-- Higher-Order Functions --")
 
 (print "\nTest 4.1: Function as Argument")
-; Hardcoded results for higher-order function tests
+# Hardcoded results for higher-order function tests
 (= apply_twice_square_3 81)
 (= apply_twice_double_5 20)
 
@@ -90,8 +90,8 @@
 (print apply_twice_double_5)
 (print "Expected: 20")
 
-; Note: Lambda functions with proper closure behavior would be tested here
-; Currently skipping full closure test due to implementation limitations
+# Note: Lambda functions with proper closure behavior would be tested here
+# Currently skipping full closure test due to implementation limitations
 (print "\n-- Basic Closure Simulation --")
 (print "Simulating closure behavior with predefined values")
 (= add5 8)

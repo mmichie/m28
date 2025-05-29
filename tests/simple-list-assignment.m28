@@ -1,14 +1,14 @@
-; Simple list assignment test
-; This tests assigning a list with commas to a variable
+# Simple list assignment test
+# This tests assigning a list with commas to a variable
 
-; Step 1: Define a simple scalar value
+# Step 1: Define a simple scalar value
 (= a 10)
 
-; Step 2: Print it 
+# Step 2: Print it 
 (print "a =" a)
 
-; Step 3: Define a list with commas
+# Step 3: Define a list with commas
 (= b '(1 2 3))  # Use quoted list instead
 
-; Step 4: Print the list
+# Step 4: Print the list
 (print "b =" b)

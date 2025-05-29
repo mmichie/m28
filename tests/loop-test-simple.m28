@@ -1,19 +1,19 @@
-; Simple test for loop forms
+# Simple test for loop forms
 
-; Test while loop
+# Test while loop
 (print "Testing while loop...")
 
-(def i 0)
+(= i 0)
 (while (< i 5)
   (print "i =" i)
   (= i (+ i 1)))
   
 (print "After loop, i =" i)
 
-; Test break
+# Test break
 (print "Testing break...")
 
-(def j 0)
+(= j 0)
 (while true
   (print "j =" j)
   (= j (+ j 1))
@@ -22,11 +22,11 @@
     
 (print "After break, j =" j)
 
-; Test continue
+# Test continue
 (print "Testing continue...")
 
-(def k 0)
-(def seen 0)
+(= k 0)
+(= seen 0)
 (while (< k 5)
   (= k (+ k 1))
   ; Skip odd numbers (1, 3, 5)

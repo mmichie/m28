@@ -1,20 +1,20 @@
-; M28 Test Framework
-; A simple but effective testing framework
+# M28 Test Framework
+# A simple but effective testing framework
 
-; Test statistics
+# Test statistics
 (def test-count 0)
 (def pass-count 0)
 (def fail-count 0)
 (def current-suite "")
 (def test-results [])
 
-; ANSI color codes
-(def GREEN "\033[32m")
-(def RED "\033[31m")
-(def YELLOW "\033[33m")
-(def RESET "\033[0m")
+# ANSI color codes
+(= GREEN "\033[32m")
+(= RED "\033[31m")
+(= YELLOW "\033[33m")
+(= RESET "\033[0m")
 
-; Test assertion functions
+# Test assertion functions
 (def assert (lambda (condition message)
   (set! test-count (+ test-count 1))
   (if condition
@@ -52,7 +52,7 @@
     (+ message " (expected type: " expected-type ", actual: " (type value) ")"))))
 
 (def assert-error (lambda (thunk error-type message)
-  (def caught false)
+  (= caught false)
   (def error-msg "")
   (try
     (thunk)
@@ -62,7 +62,7 @@
   (assert caught (+ message " (expected error: " error-type ")"))))
 
 (def assert-no-error (lambda (thunk message)
-  (def success true)
+  (= success true)
   (def error-msg "")
   (try
     (thunk)
@@ -71,7 +71,7 @@
       (set! error-msg (str e))))
   (assert success (+ message " (unexpected error: " error-msg ")"))))
 
-; Test suite functions
+# Test suite functions
 (def test-suite (lambda (name tests)
   (print (+ "\n" YELLOW "Test Suite: " name RESET))
   (set! current-suite name)
@@ -86,7 +86,7 @@
   (print (+ "  " name ": "))
   (test-fn)))
 
-; Test runner
+# Test runner
 (def run-all-tests (lambda ()
   (print (+ YELLOW "\n=== M28 Test Suite ===" RESET))
   (set! test-count 0)
@@ -121,7 +121,7 @@
   ; Return success/failure
   (= fail-count 0)))
 
-; Export test framework
+# Export test framework
 (export assert)
 (export assert-eq)
 (export assert-neq)

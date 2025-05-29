@@ -1,8 +1,8 @@
-; Quick sanity test for M28 v2.0
+# Quick sanity test for M28 v2.0
 
 (print "\n=== M28 v2.0 Quick Sanity Test ===\n")
 
-; 1. Basic types and operations
+# 1. Basic types and operations
 (print "1. Basic Types:")
 (= num 42)
 (= str "hello")
@@ -14,14 +14,14 @@
 (print "  Dict: " dct)
 (print "  ✓ Basic types work")
 
-; 2. Arithmetic
+# 2. Arithmetic
 (print "\n2. Arithmetic:")
 (= result (+ 10 20))
 (print "  10 + 20 = " result)
 (assert (= result 30) "Addition failed")
 (print "  ✓ Arithmetic works")
 
-; 3. Functions
+# 3. Functions
 (print "\n3. Functions:")
 (def square (x) (* x x))
 (= sq (square 5))
@@ -29,7 +29,7 @@
 (assert (= sq 25) "Function failed")
 (print "  ✓ Functions work")
 
-; 4. Control flow
+# 4. Control flow
 (print "\n4. Control Flow:")
 (= x 0)
 (if (> 10 5)
@@ -39,7 +39,7 @@
 (assert (= x 1) "If statement failed")
 (print "  ✓ Control flow works")
 
-; 5. Loops
+# 5. Loops
 (print "\n5. Loops:")
 (= sum 0)
 (= nums [1, 2, 3, 4, 5])
@@ -49,7 +49,7 @@
 (assert (= sum 15) "For loop failed")
 (print "  ✓ Loops work")
 
-; 6. Dot notation
+# 6. Dot notation
 (print "\n6. Dot Notation:")
 (= person {"name": "Alice", "age": 30})
 (print "  person.name: " person.name)
@@ -59,7 +59,7 @@
 (assert (= person.age 31) "Dot assignment failed")
 (print "  ✓ Dot notation works")
 
-; 7. Exceptions
+# 7. Exceptions
 (print "\n7. Exception Handling:")
 (= result 
     (try
@@ -71,7 +71,7 @@
 (assert (= result "caught") "Exception not caught")
 (print "  ✓ Exceptions work")
 
-; 8. File I/O
+# 8. File I/O
 (print "\n8. File I/O:")
 (= f (open "test_temp.txt" "w"))
 (f.write "M28 v2.0")
