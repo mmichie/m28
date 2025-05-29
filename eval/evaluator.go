@@ -400,10 +400,11 @@ func (r *ReturnValue) String() string {
 // UserFunction represents a user-defined function
 type UserFunction struct {
 	core.BaseObject
-	params []core.SymbolValue
-	body   core.Value
-	env    *core.Context
-	name   string  // Optional function name
+	params    []core.SymbolValue  // Legacy: simple parameter list
+	signature *FunctionSignature   // New: full signature with defaults
+	body      core.Value
+	env       *core.Context
+	name      string  // Optional function name
 }
 
 // Call implements Callable.Call
@@ -411,13 +412,22 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	// Create a new environment with the function's environment as parent
 	funcEnv := core.NewContext(f.env)
 
-	// Bind arguments to parameters
-	if len(args) != len(f.params) {
-		return nil, fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
-	}
+	// Use new signature-based binding if available
+	if f.signature != nil {
+		// For now, we don't support keyword arguments in calls, just positional
+		err := f.signature.BindArguments(args, nil, f.env, funcEnv)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Legacy: simple parameter binding
+		if len(args) != len(f.params) {
+			return nil, fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
+		}
 
-	for i, param := range f.params {
-		funcEnv.Define(string(param), args[i])
+		for i, param := range f.params {
+			funcEnv.Define(string(param), args[i])
+		}
 	}
 
 	// Evaluate the body in the new environment

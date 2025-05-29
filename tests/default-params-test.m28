@@ -1,0 +1,50 @@
+# Test default parameters
+# In M28, default parameters use the syntax: (param default-value)
+
+# Simple function with default parameter
+(def greet (name (greeting "Hello"))
+  (print greeting name))
+
+(print "Testing simple default parameter:")
+(greet "Alice")           # Should print "Hello Alice"
+(greet "Bob" "Hi")        # Should print "Hi Bob"
+
+# Function with multiple defaults
+(def format_message (message (prefix "[INFO]") (suffix ""))
+  (print prefix message suffix))
+
+(print "\nTesting multiple defaults:")
+(format_message "Starting server")                    # "[INFO] Starting server"
+(format_message "Connection failed" "[ERROR]")        # "[ERROR] Connection failed"
+(format_message "Low memory" "[WARN]" "!")           # "[WARN] Low memory !"
+
+# Function with mix of required and optional parameters
+(def create_user (name (age 0) (role "user"))
+  (print "Creating user:" name "age:" age "role:" role))
+
+(print "\nTesting mix of required and optional:")
+(create_user "Alice")                    # name="Alice", age=0, role="user"
+(create_user "Bob" 25)                   # name="Bob", age=25, role="user"
+(create_user "Charlie" 30 "admin")      # name="Charlie", age=30, role="admin"
+
+# Default values can be expressions
+(def make_list (item (count 3))
+  (= result (list))
+  (for i (range count)
+    (= result (result.append item)))
+  result)
+
+(print "\nTesting expression as default:")
+(print (make_list "x"))      # ["x", "x", "x"]
+(print (make_list "y" 2))    # ["y", "y"]
+
+# Default values are evaluated when function is called
+(= default_val 10)
+(def use_default ((x default_val))
+  (print "x =" x))
+
+(print "\nTesting default evaluation timing:")
+(use_default)           # Should use 10
+(= default_val 20)     # Change the variable
+(use_default)           # Should use 20 (re-evaluated)
+(use_default 30)       # Should use 30 (explicit)

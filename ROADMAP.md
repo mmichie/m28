@@ -84,7 +84,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] **Function Features**
   - [x] Restrict `def` to functions only ✅ (now gives clear error for non-functions)
   - [ ] Keyword arguments: `func(a=1, b=2)`
-  - [ ] Default parameters: `(def func (a b=10) ...)`
+  - [x] Default parameters: `(def func (a (b 10)) ...)` ✅ DONE
   - [ ] `*args` and `**kwargs`
 
 ### Medium Priority - Built-in Methods

@@ -116,32 +116,40 @@ func WhileForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // ForForm implements the for loop special form
-// Syntax: (for (var sequence) body...)
+// Syntax: (for (var sequence) body...) or (for var sequence body...)
 func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {
-		return nil, ErrArgCount("for requires at least 2 arguments (binding and body)")
+		return nil, ErrArgCount("for requires at least 2 arguments")
 	}
 
-	// Extract binding and body
-	binding, ok := args[0].(core.ListValue)
-	if !ok || len(binding) != 2 {
-		return nil, ArgumentError{"for binding must be a list with two elements: (var sequence)"}
-	}
+	var varName core.SymbolValue
+	var sequenceExpr core.Value
+	var body core.ListValue
 
-	// Get variable name
-	varName, ok := binding[0].(core.SymbolValue)
-	if !ok {
-		return nil, TypeError{Expected: "symbol", Got: binding[0].Type()}
+	// Check if first arg is a list (old syntax) or symbol (new syntax)
+	if binding, ok := args[0].(core.ListValue); ok && len(binding) == 2 {
+		// Old syntax: (for (var sequence) body...)
+		var ok bool
+		varName, ok = binding[0].(core.SymbolValue)
+		if !ok {
+			return nil, TypeError{Expected: "symbol", Got: binding[0].Type()}
+		}
+		sequenceExpr = binding[1]
+		body = args[1:]
+	} else if sym, ok := args[0].(core.SymbolValue); ok && len(args) >= 3 {
+		// New syntax: (for var sequence body...)
+		varName = sym
+		sequenceExpr = args[1]
+		body = args[2:]
+	} else {
+		return nil, ArgumentError{"for requires (var sequence) or var sequence syntax"}
 	}
 
 	// Evaluate the sequence
-	sequence, err := Eval(binding[1], ctx)
+	sequence, err := Eval(sequenceExpr, ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	// Get body expressions
-	body := args[1:]
 
 	// Create a body function that evaluates all expressions
 	bodyFunc := func(item core.Value) (core.Value, error) {

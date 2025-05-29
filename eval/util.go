@@ -103,16 +103,44 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		if paramList, ok := args[1].(core.ListValue); ok {
 			// It's a function definition with parameter list
 
-			// Parse parameter list
-			params := make([]core.SymbolValue, 0, len(paramList))
-			for _, param := range paramList {
-				if sym, ok := param.(core.SymbolValue); ok {
-					params = append(params, sym)
-				} else {
-					return nil, TypeError{Expected: "symbol", Got: param.Type()}
+			// Try to parse as new-style parameter list with defaults
+			signature, err := ParseParameterList(paramList)
+			if err != nil {
+				// Fall back to legacy simple parameter parsing
+				params := make([]core.SymbolValue, 0, len(paramList))
+				for _, param := range paramList {
+					if sym, ok := param.(core.SymbolValue); ok {
+						params = append(params, sym)
+					} else {
+						return nil, TypeError{Expected: "symbol", Got: param.Type()}
+					}
 				}
+
+				// Create function body (implicit do)
+				body := args[2:]
+				var functionBody core.Value
+
+				if len(body) == 1 {
+					// Single expression body
+					functionBody = body[0]
+				} else {
+					// Multi-expression body, wrap in do
+					functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+				}
+
+				function := &UserFunction{
+					BaseObject: *core.NewBaseObject(core.FunctionType),
+					params:     params,
+					body:       functionBody,
+					env:        ctx,
+					name:       string(name),
+				}
+
+				ctx.Define(string(name), function)
+				return function, nil
 			}
 
+			// New-style function with signature
 			// Create function body (implicit do)
 			body := args[2:]
 			var functionBody core.Value
@@ -125,9 +153,19 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
 			}
 
+			// Build legacy params list for backward compatibility
+			var params []core.SymbolValue
+			for _, p := range signature.RequiredParams {
+				params = append(params, p.Name)
+			}
+			for _, p := range signature.OptionalParams {
+				params = append(params, p.Name)
+			}
+
 			function := &UserFunction{
 				BaseObject: *core.NewBaseObject(core.FunctionType),
 				params:     params,
+				signature:  signature,
 				body:       functionBody,
 				env:        ctx,
 				name:       string(name),
