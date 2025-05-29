@@ -1,0 +1,11 @@
+# Test slice assignment
+
+(= lst [0 , 1 , 2 , 3 , 4 , 5])
+(print "Original:" lst)
+
+# Try slice assignment
+(try
+  (= lst[1:4] [10 , 20 , 30])
+  (print "After lst[1:4] = [10, 20, 30]:" lst)
+  (except Exception e
+    (print "Slice assignment not implemented:" e)))

@@ -50,6 +50,33 @@ func EqualValues(a, b Value) bool {
 			}
 			return true
 		}
+	case *SetValue:
+		if bVal, ok := b.(*SetValue); ok {
+			if aVal.Size() != bVal.Size() {
+				return false
+			}
+			// Check if all items in a are in b
+			for _, v := range aVal.items {
+				if !bVal.Contains(v) {
+					return false
+				}
+			}
+			return true
+		}
+	case *DictValue:
+		if bVal, ok := b.(*DictValue); ok {
+			if aVal.Size() != bVal.Size() {
+				return false
+			}
+			// Check if all key-value pairs in a are in b
+			for k, v1 := range aVal.entries {
+				v2, exists := bVal.entries[k]
+				if !exists || !EqualValues(v1, v2) {
+					return false
+				}
+			}
+			return true
+		}
 	}
 
 	return false

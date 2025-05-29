@@ -1,0 +1,29 @@
+# Test property assignment
+
+# Test dict property assignment with old syntax
+(= d {"name": "Bob"})
+(print "Before:" d)
+(= (. d "name") "Alice")
+(print "After:" d)
+
+# Test if obj.prop = value works
+(try
+  (= d.name "Charlie")
+  (print "Direct assignment worked:" d)
+  (except Exception e
+    (print "Direct assignment failed:" e)))
+
+# Test with classes
+(class Person ()
+  (def __init__ (self name)
+    (= self.name name)))
+
+(= p (Person "Dave"))
+(print "\nPerson before:" p.name)
+
+# Try assignment
+(try
+  (= p.name "Eve")
+  (print "Person after:" p.name)
+  (except Exception e
+    (print "Class property assignment failed:" e)))

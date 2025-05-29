@@ -1,0 +1,39 @@
+# Comprehensive property assignment test
+
+# Test nested property assignment
+(= data {"user": {"name": "Bob", "age": 30}})
+(print "Original:" data)
+
+(= data.user.name "Alice")
+(= data.user.age 25)
+(print "After nested assignment:" data)
+
+# Test creating new properties
+(= obj {})
+(= obj.new_prop "created")
+(print "\nNew property:" obj)
+
+# Test with numbers as property names
+(= obj.123 "numeric key")
+(print "Numeric property:" obj)
+
+# Test chained assignment
+(= a {})
+(= b {})
+(= a.x 42)
+(= b.y 42)
+(print "\nChained assignment:")
+(print "a.x =" a.x)
+(print "b.y =" b.y)
+
+# Test property assignment returns value
+(= result (= obj.test "value"))
+(print "\nAssignment returns:" result)
+
+# Test with methods (should fail appropriately)
+(= s "hello")
+(try
+  (= s.upper "HELLO")  # Should fail - can't assign to method
+  (print "ERROR: Should not be able to assign to method")
+  (except Exception e
+    (print "\nCorrectly failed to assign to method:" e)))

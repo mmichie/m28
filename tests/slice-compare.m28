@@ -1,0 +1,14 @@
+# Compare slice behavior with Python
+
+(= lst [0 , 1 , 2 , 3 , 4 , 5])
+
+# In Python:
+# lst[5:2:-1] = [5, 4, 3]  (end index 2 is excluded)
+# lst[5::-1] = [5, 4, 3, 2, 1, 0]
+# lst[:2:-1] = [5, 4, 3]
+
+(print "lst =" lst)
+(print "lst[5:2:-1] =" lst[5:2:-1])
+(print "Should be [5, 4, 3]")
+
+# The issue is my code includes the end index for negative step

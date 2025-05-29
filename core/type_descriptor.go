@@ -205,6 +205,12 @@ func (bm *BoundMethod) String() string {
 
 // Call implements Callable
 func (bm *BoundMethod) Call(args []Value, ctx *Context) (Value, error) {
+	if bm.Method == nil {
+		return nil, fmt.Errorf("bound method has nil method descriptor")
+	}
+	if bm.Method.Handler == nil {
+		return nil, fmt.Errorf("method %s has nil handler", bm.Method.Name)
+	}
 	return bm.Method.Handler(bm.Receiver, args, ctx)
 }
 

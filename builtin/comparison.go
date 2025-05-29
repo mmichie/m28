@@ -33,52 +33,8 @@ func EqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("== requires exactly 2 arguments")
 	}
 
-	// Compare based on type
-	switch a := args[0].(type) {
-	case core.NumberValue:
-		if b, ok := args[1].(core.NumberValue); ok {
-			return core.BoolValue(a == b), nil
-		}
-		return core.False, nil
-
-	case core.StringValue:
-		if b, ok := args[1].(core.StringValue); ok {
-			return core.BoolValue(a == b), nil
-		}
-		return core.False, nil
-
-	case core.BoolValue:
-		if b, ok := args[1].(core.BoolValue); ok {
-			return core.BoolValue(a == b), nil
-		}
-		return core.False, nil
-
-	case core.NilValue:
-		_, isNil := args[1].(core.NilValue)
-		return core.BoolValue(isNil), nil
-
-	case core.ListValue:
-		if b, ok := args[1].(core.ListValue); ok {
-			if len(a) != len(b) {
-				return core.False, nil
-			}
-			for i := range a {
-				result, err := EqualFunc([]core.Value{a[i], b[i]}, ctx)
-				if err != nil {
-					return nil, err
-				}
-				if result == core.False {
-					return core.False, nil
-				}
-			}
-			return core.True, nil
-		}
-		return core.False, nil
-
-	default:
-		// For other types, just check if they're the same object
-		return core.BoolValue(args[0] == args[1]), nil
-	}
+	// Use core.EqualValues for comprehensive comparison
+	return core.BoolValue(core.EqualValues(args[0], args[1])), nil
 }
 
 // NotEqualFunc implements the != operator
@@ -333,8 +289,20 @@ func InFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		}
 		return core.False, nil
 		
-	case core.Object:
+	case *core.SetValue:
+		// Check if value is in set
+		return core.BoolValue(c.Contains(value)), nil
+		
+	case *core.DictValue:
 		// Check if key is in dictionary
+		if key, ok := value.(core.StringValue); ok {
+			_, exists := c.Get(string(key))
+			return core.BoolValue(exists), nil
+		}
+		return core.False, nil
+		
+	case core.Object:
+		// For other objects, check attributes
 		if key, ok := value.(core.StringValue); ok {
 			_, found := c.GetAttr(string(key))
 			return core.BoolValue(found), nil

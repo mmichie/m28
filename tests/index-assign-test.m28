@@ -1,0 +1,35 @@
+# Test index assignment
+
+# Test list index assignment
+(= lst [1 , 2 , 3])
+(print "Original list:" lst)
+
+(try
+  (= lst[0] 10)
+  (print "After lst[0] = 10:" lst)
+  (except Exception e
+    (print "List index assignment failed:" e)))
+
+# Test dict key assignment with brackets
+(= d {"a": 1 , "b": 2})
+(print "\nOriginal dict:" d)
+
+(try
+  (= d["a"] 10)
+  (print "After d[\"a\"] = 10:" d)
+  (except Exception e
+    (print "Dict bracket assignment failed:" e)))
+
+# Test creating new dict key
+(try
+  (= d["c"] 3)
+  (print "After d[\"c\"] = 3:" d)
+  (except Exception e
+    (print "New dict key assignment failed:" e)))
+
+# Test negative indices
+(try
+  (= lst[-1] 30)
+  (print "\nAfter lst[-1] = 30:" lst)
+  (except Exception e
+    (print "Negative index assignment failed:" e)))
