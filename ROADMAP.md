@@ -9,7 +9,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] **Core Language**
   - [x] S-expression syntax with Python semantics
   - [x] Comments with `#` (`;` disabled)
-  - [x] F-strings: `f"Hello, {name}!"`
+  - [x] F-strings: `f"Hello, {name}!"` ✅ WORKING
   - [x] All primitive types (numbers, strings, booleans, nil)
   - [x] Variable assignment with `=`
   - [x] Function definitions with `def` and lambda
@@ -87,6 +87,10 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] Default parameters: `(def func (a (b 10)) ...)` ✅ DONE
   - [x] `*args` and `**kwargs` ✅ DONE
 
+- [ ] **Additional Python Features**
+  - [ ] Argument unpacking: `func(*args, **kwargs)` syntax
+  - [ ] Keyword argument support in built-in functions (sorted, min, max, etc.)
+
 ### Medium Priority - Built-in Methods
 
 - [x] **String Methods** ✅ DONE
@@ -132,6 +136,13 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [ ] Dictionary/set comprehensions
   - [ ] Multiple assignment: `a, b = 1, 2`
   - [ ] Async/await support
+
+- [ ] **Type Inference (Low Priority)**
+  - [ ] Local type inference within functions
+  - [ ] Flow-sensitive type narrowing (isinstance checks)
+  - [ ] Optional type annotations for function signatures
+  - [ ] Basic type checking for common errors
+  - [ ] Union types from control flow analysis
 
 - [ ] **Literals**
   - [ ] Set literals that work (currently `{1,2,3}` parsed as dict)

@@ -71,10 +71,10 @@
 ])
 
 # Sort by age
-(= sorted_by_age (sort people (lambda (p) p.age)))
+(= sorted_by_age (sorted people key: (lambda (p) p.age)))
 (print "\nSorted by age:")
 (for person in sorted_by_age
-  (print f"{person.name}: {person.age}"))
+  (print person.name ": " person.age))
 
 # Practical example: temperature converter
 (= celsius_to_fahrenheit (lambda (c) (+ (* c 1.8) 32)))

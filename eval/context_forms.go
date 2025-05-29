@@ -17,7 +17,7 @@ func withForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Parse context managers
 	var managers []withManager
-	
+
 	// Check if first arg is a list (multiple managers)
 	if list, ok := args[0].(core.ListValue); ok {
 		// Multiple managers: (with [mgr1 as var1 mgr2 as var2] ...)
@@ -25,25 +25,32 @@ func withForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	} else {
 		// Single manager: (with mgr ...) or (with mgr as var ...)
 		mgr := withManager{expr: args[0]}
-		
+		bodyStart := 1
+
 		// Check for 'as' clause
 		if len(args) >= 3 {
 			if sym, ok := args[1].(core.SymbolValue); ok && string(sym) == "as" {
 				if varSym, ok := args[2].(core.SymbolValue); ok {
 					mgr.varName = string(varSym)
-					args = args[2:] // Skip "as var"
+					bodyStart = 3 // Skip "mgr as var"
 				} else {
 					return nil, fmt.Errorf("with: variable name must be a symbol")
 				}
 			}
 		}
-		
+
 		managers = []withManager{mgr}
+
+		// Get the body
+		body := args[bodyStart:]
+
+		// Execute with proper context management
+		return executeWith(managers, body, ctx)
 	}
 
-	// Get the body
+	// For multiple managers case, body is everything after the manager list
 	body := args[1:]
-	
+
 	// Execute with proper context management
 	return executeWith(managers, body, ctx)
 }
@@ -57,11 +64,11 @@ type withManager struct {
 // parseManagerList parses a list of managers with optional 'as' clauses
 func parseManagerList(list core.ListValue) []withManager {
 	var managers []withManager
-	
+
 	i := 0
 	for i < len(list) {
 		mgr := withManager{expr: list[i]}
-		
+
 		// Check for 'as var' after the expression
 		if i+2 < len(list) {
 			if sym, ok := list[i+1].(core.SymbolValue); ok && string(sym) == "as" {
@@ -77,10 +84,10 @@ func parseManagerList(list core.ListValue) []withManager {
 		} else {
 			i++
 		}
-		
+
 		managers = append(managers, mgr)
 	}
-	
+
 	return managers
 }
 
@@ -131,7 +138,7 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 
 	// Call __exit__ with exception info
 	var excType, excValue, excTraceback core.Value = core.Nil, core.Nil, core.Nil
-	
+
 	if bodyErr != nil {
 		// Extract exception information
 		excType = core.StringValue("Exception")
@@ -161,7 +168,7 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 // executeBody executes a sequence of expressions
 func executeBody(body []core.Value, ctx *core.Context) (core.Value, error) {
 	var result core.Value = core.Nil
-	
+
 	for _, expr := range body {
 		var err error
 		result, err = Eval(expr, ctx)
@@ -169,10 +176,9 @@ func executeBody(body []core.Value, ctx *core.Context) (core.Value, error) {
 			return nil, err
 		}
 	}
-	
+
 	return result, nil
 }
-
 
 // RegisterContextForms registers context manager related forms
 func RegisterContextForms() {

@@ -27,26 +27,25 @@
 (print "square(5) then add 1:" (square_then_add_one 5))  # 26
 (print "add 1 to 5 then square:" (add_one_then_square 5))  # 36
 
-# Partial application
-(def partial (f *args)
-  (lambda (*more_args)
-    (apply f (+ args more_args))))
+# Partial application - simplified example
+(def make_adder (n)
+  (lambda (x) (+ n x)))
 
-(def add_three (a b c)
-  (+ a b c))
+(def make_multiplier (n)
+  (lambda (x) (* n x)))
 
-(= add_10_and (partial add_three 10))
-(= add_10_20 (partial add_three 10 20))
+(= add_10 (make_adder 10))
+(= multiply_by_3 (make_multiplier 3))
 
 (print "\nPartial application:")
-(print "add_10_and(5, 7):" (add_10_and 5 7))  # 22
-(print "add_10_20(5):" (add_10_20 5))  # 35
+(print "add_10(5):" (add_10 5))  # 15
+(print "multiply_by_3(7):" (multiply_by_3 7))  # 21
 
 # Custom map implementation
 (def my_map (f lst)
   (if (== (len lst) 0)
       []
-      (cons (f (first lst)) (my_map f (rest lst)))))
+      (+ [(f lst[0])] (my_map f lst[1:]))))
 
 (print "\nCustom map:")
 (print (my_map (lambda (x) (* x x)) [1, 2, 3, 4]))
@@ -55,19 +54,19 @@
 (def my_filter (pred lst)
   (if (== (len lst) 0)
       []
-      (if (pred (first lst))
-          (cons (first lst) (my_filter pred (rest lst)))
-          (my_filter pred (rest lst)))))
+      (if (pred lst[0])
+          (+ [lst[0]] (my_filter pred lst[1:]))
+          (my_filter pred lst[1:]))))
 
 (print "\nCustom filter:")
 (print (my_filter (lambda (x) (> x 2)) [1, 2, 3, 4, 5]))
 
 # Function decorator pattern
 (def with_logging (f)
-  (lambda (*args)
-    (print f"Calling function with args: {args}")
-    (= result (apply f args))
-    (print f"Result: {result}")
+  (lambda (a b)
+    (print "Calling function with args: (" a ", " b ")")
+    (= result (f a b))
+    (print "Result: " result)
     result))
 
 (def multiply (a b)
@@ -78,19 +77,18 @@
 (print "\nFunction with logging:")
 (logged_multiply 5 3)
 
-# Memoization decorator
+# Memoization example (simplified for single argument)
 (def memoize (f)
   (= cache {})
-  (lambda (*args)
-    (= key (str args))
-    (if (in key cache)
+  (lambda (n)
+    (if (in n cache)
         (do
-          (print f"Cache hit for {args}")
-          (get cache key))
+          (print "Cache hit for " n)
+          cache[n])
         (do
-          (print f"Computing for {args}")
-          (= result (apply f args))
-          (set cache key result)
+          (print "Computing for " n)
+          (= result (f n))
+          (= cache[n] result)
           result))))
 
 (def slow_fibonacci (n)
