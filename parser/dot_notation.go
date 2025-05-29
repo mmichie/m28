@@ -42,8 +42,13 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 	}
 	
 	// Check for method call
+	// First, check if there's whitespace before the potential '('
+	startPos := p.pos
 	p.skipWhitespaceAndComments()
-	if p.pos < len(p.input) && p.input[p.pos] == '(' {
+	hasWhitespace := p.pos > startPos
+	
+	// Only treat '(' as method call if there's no whitespace before it
+	if p.pos < len(p.input) && p.input[p.pos] == '(' && !hasWhitespace {
 		// It's a method call - parse arguments
 		args, err := p.parseMethodArgs()
 		if err != nil {
