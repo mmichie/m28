@@ -71,9 +71,9 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] Chained access: `obj.prop.method().value`
   - [x] Property assignment: `obj.prop = value` ✅ DONE
 
-- [x] **Indexing and Slicing** (Mostly Complete)
+- [x] **Indexing and Slicing** ✅ COMPLETE
   - [x] Direct indexing: `list[0]`, `dict["key"]`
-  - [ ] Slice syntax: `list[1:3]` or `(slice list 1 3)`
+  - [x] Slice syntax: `list[1:3]` ✅ DONE (including negative indices and step)
   - [x] Index assignment: `list[0] = value` ✅ DONE
 
 - [x] **Operators**

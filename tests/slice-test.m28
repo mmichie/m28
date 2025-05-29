@@ -1,0 +1,52 @@
+# Test slice syntax
+
+# Basic list slicing
+(= lst [0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9])
+(print "Original list:" lst)
+
+# Test basic slices
+(print "\nBasic slices:")
+(print "lst[2:5] =" lst[2:5])
+(print "lst[:5] =" lst[:5])
+(print "lst[5:] =" lst[5:])
+(print "lst[:] =" lst[:])
+
+# Test negative indices
+(print "\nNegative indices:")
+(print "lst[-5:-2] =" lst[-5:-2])
+(print "lst[:-3] =" lst[:-3])
+(print "lst[-3:] =" lst[-3:])
+
+# Test step
+(print "\nWith step:")
+(print "lst[::2] =" lst[::2])
+(print "lst[1::2] =" lst[1::2])
+(print "lst[::3] =" lst[::3])
+
+# Test negative step (reverse)
+(print "\nNegative step:")
+(print "lst[::-1] =" lst[::-1])
+(print "lst[5:2:-1] =" lst[5:2:-1])
+(print "lst[::-2] =" lst[::-2])
+
+# Test string slicing
+(= s "Hello, World!")
+(print "\nString slicing:")
+(print "Original:" s)
+(print "s[0:5] =" s[0:5])
+(print "s[7:] =" s[7:])
+(print "s[:5] =" s[:5])
+(print "s[::-1] =" s[::-1])
+
+# Test tuple slicing
+(= t (tuple [10 , 20 , 30 , 40 , 50]))
+(print "\nTuple slicing:")
+(print "Original:" t)
+(print "t[1:4] =" t[1:4])
+(print "t[::2] =" t[::2])
+
+# Edge cases
+(print "\nEdge cases:")
+(print "Empty slice lst[10:20] =" lst[10:20])
+(print "Out of bounds lst[5:100] =" lst[5:100])
+(print "Reversed empty lst[5:2:1] =" lst[5:2:1])
