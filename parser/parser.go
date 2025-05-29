@@ -151,7 +151,7 @@ func (p *Parser) parseAtom() (core.Value, error) {
 	}
 
 	// Check for f-string
-	if p.pos+1 < len(p.input) && p.input[p.pos] == 'f' && p.input[p.pos+1] == '"' {
+	if p.pos+1 < len(p.input) && p.input[p.pos] == 'f' && (p.input[p.pos+1] == '"' || p.input[p.pos+1] == '\'') {
 		return p.parseFString()
 	}
 
@@ -164,7 +164,7 @@ func (p *Parser) parseAtom() (core.Value, error) {
 	switch p.input[p.pos] {
 	case '(':
 		return p.parseList()
-	case '"':
+	case '"', '\'':
 		return p.parseString()
 	case '[':
 		return p.parseVectorLiteral()
@@ -375,8 +375,11 @@ func (p *Parser) parseTupleLiteral() (core.Value, error) {
 	return elements, nil
 }
 
-// parseString parses a string literal "..."
+// parseString parses a string literal "..." or '...'
 func (p *Parser) parseString() (core.Value, error) {
+	// Remember the opening quote character
+	quoteChar := p.input[p.pos]
+	
 	// Skip opening quote
 	p.advance()
 
@@ -398,18 +401,22 @@ func (p *Parser) parseString() (core.Value, error) {
 				builder.WriteByte('\r')
 			case '"':
 				builder.WriteByte('"')
+			case '\'':
+				builder.WriteByte('\'')
 			case '\\':
 				builder.WriteByte('\\')
 			default:
-				return nil, fmt.Errorf("invalid escape sequence: \\%c", ch)
+				// For any other character, just include it literally
+				// This allows for escaping any character
+				builder.WriteByte(ch)
 			}
 			escaped = false
 		} else {
 			// Handle regular characters
 			if ch == '\\' {
 				escaped = true
-			} else if ch == '"' {
-				// End of string
+			} else if ch == quoteChar {
+				// End of string (matching quote)
 				p.advance()
 				return core.StringValue(builder.String()), nil
 			} else {
@@ -425,9 +432,12 @@ func (p *Parser) parseString() (core.Value, error) {
 
 // parseFString parses an f-string literal
 func (p *Parser) parseFString() (core.Value, error) {
-	// Skip 'f' and opening quote
+	// Skip 'f'
 	p.advance() // skip 'f'
-	p.advance() // skip '"'
+	
+	// Remember the quote character
+	quoteChar := p.input[p.pos]
+	p.advance() // skip quote
 
 	var parts []core.Value
 	var currentString strings.Builder
@@ -448,6 +458,8 @@ func (p *Parser) parseFString() (core.Value, error) {
 				currentString.WriteByte('\r')
 			case '"':
 				currentString.WriteByte('"')
+			case '\'':
+				currentString.WriteByte('\'')
 			case '\\':
 				currentString.WriteByte('\\')
 			case '{':
@@ -455,14 +467,16 @@ func (p *Parser) parseFString() (core.Value, error) {
 			case '}':
 				currentString.WriteByte('}')
 			default:
-				return nil, fmt.Errorf("invalid escape sequence: \\%c", ch)
+				// For any other character, just include it literally
+				// This allows for escaping any character
+				currentString.WriteByte(ch)
 			}
 			escaped = false
 			p.advance()
 		} else if ch == '\\' {
 			escaped = true
 			p.advance()
-		} else if ch == '"' {
+		} else if ch == quoteChar {
 			// End of f-string
 			if currentString.Len() > 0 {
 				parts = append(parts, core.StringValue(currentString.String()))
@@ -809,7 +823,7 @@ func isSymbolChar(ch byte) bool {
 		ch != '(' && ch != ')' &&
 		ch != '[' && ch != ']' &&
 		ch != '{' && ch != '}' &&
-		ch != '"' && ch != ';' &&
+		ch != '"' && ch != '\'' && ch != ';' &&
 		ch != ':' && ch != '.' &&  // dot is not valid in symbols (used for dot notation)
 		ch != ','  // comma is not valid in symbols (used for separating elements)
 }
