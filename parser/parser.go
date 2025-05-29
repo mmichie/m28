@@ -405,6 +405,44 @@ func (p *Parser) parseString() (core.Value, error) {
 				builder.WriteByte('\'')
 			case '\\':
 				builder.WriteByte('\\')
+			case 'b':
+				builder.WriteByte('\b')
+			case 'f':
+				builder.WriteByte('\f')
+			case 'v':
+				builder.WriteByte('\v')
+			case '0':
+				builder.WriteByte('\000')
+			case 'u':
+				// Unicode escape: \uXXXX
+				if p.pos+4 < len(p.input) {
+					hexStr := p.input[p.pos+1:p.pos+5]
+					if codePoint, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
+						builder.WriteRune(rune(codePoint))
+						p.pos += 4 // Skip the 4 hex digits
+					} else {
+						// Invalid Unicode escape, just include literally
+						builder.WriteByte(ch)
+					}
+				} else {
+					// Not enough characters for Unicode escape
+					builder.WriteByte(ch)
+				}
+			case 'U':
+				// Unicode escape: \UXXXXXXXX
+				if p.pos+8 < len(p.input) {
+					hexStr := p.input[p.pos+1:p.pos+9]
+					if codePoint, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
+						builder.WriteRune(rune(codePoint))
+						p.pos += 8 // Skip the 8 hex digits
+					} else {
+						// Invalid Unicode escape, just include literally
+						builder.WriteByte(ch)
+					}
+				} else {
+					// Not enough characters for Unicode escape
+					builder.WriteByte(ch)
+				}
 			default:
 				// For any other character, just include it literally
 				// This allows for escaping any character
@@ -466,6 +504,44 @@ func (p *Parser) parseFString() (core.Value, error) {
 				currentString.WriteByte('{')
 			case '}':
 				currentString.WriteByte('}')
+			case 'b':
+				currentString.WriteByte('\b')
+			case 'f':
+				currentString.WriteByte('\f')
+			case 'v':
+				currentString.WriteByte('\v')
+			case '0':
+				currentString.WriteByte('\000')
+			case 'u':
+				// Unicode escape: \uXXXX
+				if p.pos+4 < len(p.input) {
+					hexStr := p.input[p.pos+1:p.pos+5]
+					if codePoint, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
+						currentString.WriteRune(rune(codePoint))
+						p.pos += 4 // Skip the 4 hex digits
+					} else {
+						// Invalid Unicode escape, just include literally
+						currentString.WriteByte(ch)
+					}
+				} else {
+					// Not enough characters for Unicode escape
+					currentString.WriteByte(ch)
+				}
+			case 'U':
+				// Unicode escape: \UXXXXXXXX
+				if p.pos+8 < len(p.input) {
+					hexStr := p.input[p.pos+1:p.pos+9]
+					if codePoint, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
+						currentString.WriteRune(rune(codePoint))
+						p.pos += 8 // Skip the 8 hex digits
+					} else {
+						// Invalid Unicode escape, just include literally
+						currentString.WriteByte(ch)
+					}
+				} else {
+					// Not enough characters for Unicode escape
+					currentString.WriteByte(ch)
+				}
 			default:
 				// For any other character, just include it literally
 				// This allows for escaping any character

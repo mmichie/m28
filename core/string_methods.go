@@ -13,6 +13,19 @@ func InitStringMethods() {
 		return
 	}
 
+	// Add __len__ method that properly counts Unicode characters
+	td.Methods["__len__"] = &MethodDescriptor{
+		Name:    "__len__",
+		Arity:   0,
+		Doc:     "Return the number of characters in the string",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			// Count runes (Unicode characters) instead of bytes
+			return NumberValue(len([]rune(s))), nil
+		},
+	}
+
 	// Add missing methods
 	td.Methods["replace"] = &MethodDescriptor{
 		Name:    "replace",
