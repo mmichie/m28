@@ -155,6 +155,11 @@ func (p *Parser) parseAtom() (core.Value, error) {
 		return p.parseFString()
 	}
 
+	// Check for tuple literal %(...)
+	if p.pos+1 < len(p.input) && p.input[p.pos] == '%' && p.input[p.pos+1] == '(' {
+		return p.parseTupleLiteral()
+	}
+
 	// Check what kind of expression we have
 	switch p.input[p.pos] {
 	case '(':
@@ -329,6 +334,45 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 	p.advance()
 
 	return core.ListValue(elements), nil
+}
+
+// parseTupleLiteral parses a tuple literal %(...)
+func (p *Parser) parseTupleLiteral() (core.Value, error) {
+	// Skip % and opening parenthesis
+	p.advance() // skip %
+	p.advance() // skip (
+
+	elements := make(core.TupleValue, 0)
+
+	// Skip whitespace after the opening paren
+	p.skipWhitespaceAndComments()
+
+	// Parse elements until we hit the closing parenthesis
+	for p.pos < len(p.input) && p.input[p.pos] != ')' {
+		element, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+
+		elements = append(elements, element)
+		p.skipWhitespaceAndComments()
+		
+		// Skip optional comma
+		if p.pos < len(p.input) && p.input[p.pos] == ',' {
+			p.advance()
+			p.skipWhitespaceAndComments()
+		}
+	}
+
+	// Check for unclosed tuple
+	if p.pos >= len(p.input) {
+		return nil, fmt.Errorf("unclosed tuple")
+	}
+
+	// Skip closing parenthesis
+	p.advance()
+
+	return elements, nil
 }
 
 // parseString parses a string literal "..."

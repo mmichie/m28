@@ -7,8 +7,92 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// RegisterMathModule creates and registers the math module
+func RegisterMathModule() {
+	mathModule := core.NewDict()
+	
+	// sqrt - square root
+	mathModule.Set("sqrt", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("sqrt() takes exactly one argument (%d given)", len(args))
+		}
+		
+		switch v := args[0].(type) {
+		case core.NumberValue:
+			return core.NumberValue(math.Sqrt(float64(v))), nil
+		default:
+			return nil, fmt.Errorf("sqrt() argument must be a number, not '%s'", v.Type())
+		}
+	}))
+	
+	// pow - power function
+	mathModule.Set("pow", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("pow() takes exactly two arguments (%d given)", len(args))
+		}
+		
+		x, ok1 := args[0].(core.NumberValue)
+		y, ok2 := args[1].(core.NumberValue)
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("pow() arguments must be numbers")
+		}
+		
+		return core.NumberValue(math.Pow(float64(x), float64(y))), nil
+	}))
+	
+	// sin, cos, tan
+	mathModule.Set("sin", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("sin() takes exactly one argument (%d given)", len(args))
+		}
+		
+		switch v := args[0].(type) {
+		case core.NumberValue:
+			return core.NumberValue(math.Sin(float64(v))), nil
+		default:
+			return nil, fmt.Errorf("sin() argument must be a number, not '%s'", v.Type())
+		}
+	}))
+	
+	mathModule.Set("cos", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("cos() takes exactly one argument (%d given)", len(args))
+		}
+		
+		switch v := args[0].(type) {
+		case core.NumberValue:
+			return core.NumberValue(math.Cos(float64(v))), nil
+		default:
+			return nil, fmt.Errorf("cos() argument must be a number, not '%s'", v.Type())
+		}
+	}))
+	
+	mathModule.Set("tan", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("tan() takes exactly one argument (%d given)", len(args))
+		}
+		
+		switch v := args[0].(type) {
+		case core.NumberValue:
+			return core.NumberValue(math.Tan(float64(v))), nil
+		default:
+			return nil, fmt.Errorf("tan() argument must be a number, not '%s'", v.Type())
+		}
+	}))
+	
+	// Constants
+	mathModule.Set("pi", core.NumberValue(math.Pi))
+	mathModule.Set("e", core.NumberValue(math.E))
+	
+	// Register in the global module registry
+	registry := core.GetModuleRegistry()
+	registry.StoreModule("math", mathModule, "<builtin>", []string{})
+}
+
 // RegisterMathFunctions registers mathematical builtin functions
 func RegisterMathFunctions(ctx *core.Context) {
+	// Also register as a math module
+	RegisterMathModule()
 	// abs - absolute value
 	ctx.Define("abs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
