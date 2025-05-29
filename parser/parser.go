@@ -199,6 +199,12 @@ func (p *Parser) parseList() (core.Value, error) {
 
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
+		
+		// Skip optional comma
+		if p.pos < len(p.input) && p.input[p.pos] == ',' {
+			p.advance()
+			p.skipWhitespaceAndComments()
+		}
 	}
 
 	// Check for unclosed list
@@ -232,9 +238,9 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
 		
-		// Check for comma separator
+		// Skip optional comma
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
-			p.advance() // consume comma
+			p.advance()
 			p.skipWhitespaceAndComments()
 		}
 	}
@@ -760,7 +766,8 @@ func isSymbolChar(ch byte) bool {
 		ch != '[' && ch != ']' &&
 		ch != '{' && ch != '}' &&
 		ch != '"' && ch != ';' &&
-		ch != ':' && ch != '.'  // dot is not valid in symbols (used for dot notation)
+		ch != ':' && ch != '.' &&  // dot is not valid in symbols (used for dot notation)
+		ch != ','  // comma is not valid in symbols (used for separating elements)
 }
 
 // error creates a parser error with current position info

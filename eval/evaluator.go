@@ -274,7 +274,44 @@ func assignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Get the target
 	target := args[0]
 
-	// Ensure target is a symbol
+	// Check if target is a list (tuple unpacking)
+	if targetList, ok := target.(core.ListValue); ok {
+		// Tuple unpacking: (= (x, y) (10, 20))
+		// Evaluate the value
+		value, err := Eval(args[1], ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// The value must be a tuple or list
+		var values []core.Value
+		switch v := value.(type) {
+		case core.TupleValue:
+			values = []core.Value(v)
+		case core.ListValue:
+			values = []core.Value(v)
+		default:
+			return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
+		}
+
+		// Check that the number of targets matches the number of values
+		if len(targetList) != len(values) {
+			return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targetList), len(values))
+		}
+
+		// Assign each value to its corresponding target
+		for i, t := range targetList {
+			sym, ok := t.(core.SymbolValue)
+			if !ok {
+				return nil, fmt.Errorf("assignment target must be a symbol, got %v", t.Type())
+			}
+			ctx.Define(string(sym), values[i])
+		}
+
+		return value, nil
+	}
+
+	// Single variable assignment
 	sym, ok := target.(core.SymbolValue)
 	if !ok {
 		return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())

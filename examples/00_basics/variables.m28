@@ -28,13 +28,11 @@
 (print "Ready?" is_ready)
 (print "Done?" is_done)
 
-# None/nil
+# None
 (= nothing None)
-(= also_nothing nil)  # Both work
 
 (print "\nNone values:")
 (print nothing)
-(print also_nothing)
 
 # Variable reassignment
 (= count 0)
@@ -47,7 +45,7 @@
 (print "Incremented count:" count)
 
 # Multiple variables (tuple unpacking)
-(= (x, y) (10, 20))
+(= (x, y) [10, 20])
 (print "\nCoordinates:")
 (print "x =" x)
 (print "y =" y)

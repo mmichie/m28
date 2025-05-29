@@ -263,6 +263,45 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return value, nil
 		
 	case core.ListValue:
+		// Check if it's tuple unpacking first
+		isTupleUnpacking := true
+		for _, elem := range t {
+			if _, ok := elem.(core.SymbolValue); !ok {
+				isTupleUnpacking = false
+				break
+			}
+		}
+		
+		if isTupleUnpacking && len(t) > 0 {
+			// Tuple unpacking: (= (x, y) [10, 20])
+			// The value must be a tuple or list
+			var values []core.Value
+			switch v := value.(type) {
+			case core.TupleValue:
+				values = []core.Value(v)
+			case core.ListValue:
+				values = []core.Value(v)
+			default:
+				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
+			}
+
+			// Check that the number of targets matches the number of values
+			if len(t) != len(values) {
+				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(t), len(values))
+			}
+
+			// Assign each value to its corresponding target
+			for i, target := range t {
+				sym, ok := target.(core.SymbolValue)
+				if !ok {
+					return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
+				}
+				ctx.Define(string(sym), values[i])
+			}
+
+			return value, nil
+		}
+		
 		// Check if it's a dot notation expression
 		if len(t) >= 3 {
 			if dotSym, ok := t[0].(core.SymbolValue); ok && string(dotSym) == "." {
