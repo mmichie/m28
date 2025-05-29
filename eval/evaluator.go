@@ -792,13 +792,44 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 //	(raise "message")
 //	(raise ExceptionType)
 //	(raise ExceptionType "message")
+//	(raise (ExceptionType args...))
 func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("raise requires at least 1 argument")
 	}
 
-	// Single string argument - generic exception with message
+	// Single argument
 	if len(args) == 1 {
+		// Check if it's a list (exception constructor call)
+		if list, ok := args[0].(core.ListValue); ok && len(list) > 0 {
+			// Evaluate the exception constructor
+			excObj, err := Eval(list, ctx)
+			if err != nil {
+				return nil, err
+			}
+			
+			// Extract exception information from the object
+			// For now, we'll create a basic exception with the type name
+			if sym, ok := list[0].(core.SymbolValue); ok {
+				excType := string(sym)
+				
+				// Try to get message from the object
+				var message string
+				if obj, ok := excObj.(*core.DictValue); ok {
+					if msgVal, exists := obj.Get("message"); exists {
+						message = core.PrintValueWithoutQuotes(msgVal)
+					}
+				}
+				
+				return nil, &Exception{
+					Type:    excType,
+					Message: message,
+					Value:   excObj, // Store the actual exception object
+				}
+			}
+		}
+		
+		// Single string argument - generic exception with message
 		if msg, ok := args[0].(core.StringValue); ok {
 			return nil, &Exception{
 				Type:    "Exception",

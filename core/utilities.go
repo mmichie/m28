@@ -4,9 +4,12 @@ import "fmt"
 
 // EqualValues compares two values for equality
 func EqualValues(a, b Value) bool {
-	// Equal if identical
-	if a == b {
+	// Check nil values first
+	if a == nil && b == nil {
 		return true
+	}
+	if a == nil || b == nil {
+		return false
 	}
 
 	// Check by type

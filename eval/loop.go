@@ -137,12 +137,27 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		sequenceExpr = binding[1]
 		body = args[1:]
 	} else if sym, ok := args[0].(core.SymbolValue); ok && len(args) >= 3 {
-		// New syntax: (for var sequence body...)
-		varName = sym
-		sequenceExpr = args[1]
-		body = args[2:]
+		// Check for Python-style syntax: (for var in sequence body...)
+		if len(args) >= 4 {
+			if inSym, ok := args[1].(core.SymbolValue); ok && string(inSym) == "in" {
+				// Python-style syntax: (for var in sequence body...)
+				varName = sym
+				sequenceExpr = args[2]
+				body = args[3:]
+			} else {
+				// New syntax: (for var sequence body...)
+				varName = sym
+				sequenceExpr = args[1]
+				body = args[2:]
+			}
+		} else {
+			// New syntax: (for var sequence body...)
+			varName = sym
+			sequenceExpr = args[1]
+			body = args[2:]
+		}
 	} else {
-		return nil, ArgumentError{"for requires (var sequence) or var sequence syntax"}
+		return nil, ArgumentError{"for requires (var sequence) or var sequence or var in sequence syntax"}
 	}
 
 	// Evaluate the sequence

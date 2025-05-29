@@ -361,6 +361,89 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 
 		return core.False, nil
 	}))
+
+	// apply - apply a function to a list of arguments
+	ctx.Define("apply", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("apply() takes exactly 2 arguments (function and args list)")
+		}
+
+		// Get the function
+		fn, ok := args[0].(core.Callable)
+		if !ok {
+			return nil, fmt.Errorf("apply() first argument must be callable, got %s", args[0].Type())
+		}
+
+		// Get the arguments list
+		var fnArgs []core.Value
+		switch argList := args[1].(type) {
+		case core.ListValue:
+			fnArgs = []core.Value(argList)
+		case core.TupleValue:
+			fnArgs = []core.Value(argList)
+		default:
+			return nil, fmt.Errorf("apply() second argument must be a list or tuple, got %s", args[1].Type())
+		}
+
+		// Call the function with the unpacked arguments
+		return fn.Call(fnArgs, ctx)
+	}))
+
+	// reduce - reduce a sequence using a binary function
+	ctx.Define("reduce", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 || len(args) > 3 {
+			return nil, fmt.Errorf("reduce() takes 2 or 3 arguments (%d given)", len(args))
+		}
+
+		// Get the function
+		fn, ok := args[0].(core.Callable)
+		if !ok {
+			return nil, fmt.Errorf("reduce() first argument must be callable, got %s", args[0].Type())
+		}
+
+		// Get the sequence
+		var items []core.Value
+		switch seq := args[1].(type) {
+		case core.ListValue:
+			items = []core.Value(seq)
+		case core.TupleValue:
+			items = []core.Value(seq)
+		default:
+			return nil, fmt.Errorf("reduce() second argument must be a list or tuple, got %s", args[1].Type())
+		}
+
+		// Handle empty sequence
+		if len(items) == 0 {
+			if len(args) == 3 {
+				// Return the initial value
+				return args[2], nil
+			}
+			return nil, fmt.Errorf("reduce() of empty sequence with no initial value")
+		}
+
+		// Get initial value and starting index
+		var result core.Value
+		startIdx := 0
+		if len(args) == 3 {
+			// Use provided initial value
+			result = args[2]
+		} else {
+			// Use first item as initial value
+			result = items[0]
+			startIdx = 1
+		}
+
+		// Reduce the sequence
+		for i := startIdx; i < len(items); i++ {
+			fnResult, err := fn.Call([]core.Value{result, items[i]}, ctx)
+			if err != nil {
+				return nil, err
+			}
+			result = fnResult
+		}
+
+		return result, nil
+	}))
 }
 
 // Helper function to extract number from value

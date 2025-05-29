@@ -12,50 +12,66 @@ func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, ErrArgCount("if requires at least 2 arguments")
 	}
 
-	// Handle simple if or if-else (2 or 3 args)
-	if len(args) == 2 || len(args) == 3 {
-		// Evaluate the condition
-		condition, err := Eval(args[0], ctx)
-		if err != nil {
-			return nil, err
-		}
+	// Evaluate the first condition
+	condition, err := Eval(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
 
-		// Check if condition is truthy
-		if core.IsTruthy(condition) {
-			return Eval(args[1], ctx)
-		} else if len(args) > 2 {
-			return Eval(args[2], ctx)
-		}
+	// If truthy, evaluate and return the then-branch
+	if core.IsTruthy(condition) {
+		return Eval(args[1], ctx)
+	}
 
+	// Check for elif or else
+	if len(args) <= 2 {
 		// No else clause, return nil
 		return core.Nil, nil
 	}
 
-	// Handle if-elif-else chain
-	// Must have pairs of condition-expr, optionally with final else
-	i := 0
-	for i < len(args)-1 {
-		// Evaluate condition
-		condition, err := Eval(args[i], ctx)
-		if err != nil {
-			return nil, err
+	// Check if the third argument is elif
+	if sym, ok := args[2].(core.SymbolValue); ok && string(sym) == "elif" {
+		// Handle elif chain
+		// Structure: (if cond1 expr1 (elif cond2 expr2 (elif cond3 expr3 (else expr4))))
+		elifArgs := args[2:] // Skip "if" condition and expression
+		
+		for len(elifArgs) > 0 {
+			// Check if current element is elif
+			if sym, ok := elifArgs[0].(core.SymbolValue); ok && string(sym) == "elif" {
+				if len(elifArgs) < 3 {
+					return nil, ErrArgCount("elif requires condition and expression")
+				}
+				
+				// Evaluate elif condition
+				elifCond, err := Eval(elifArgs[1], ctx)
+				if err != nil {
+					return nil, err
+				}
+				
+				if core.IsTruthy(elifCond) {
+					return Eval(elifArgs[2], ctx)
+				}
+				
+				// Move to next elif or else
+				elifArgs = elifArgs[3:]
+			} else if sym, ok := elifArgs[0].(core.SymbolValue); ok && string(sym) == "else" {
+				// Handle else clause
+				if len(elifArgs) < 2 {
+					return nil, ErrArgCount("else requires an expression")
+				}
+				return Eval(elifArgs[1], ctx)
+			} else {
+				// This is the else expression (old style)
+				return Eval(elifArgs[0], ctx)
+			}
 		}
-
-		// If truthy, evaluate and return the corresponding expression
-		if core.IsTruthy(condition) {
-			return Eval(args[i+1], ctx)
-		}
-
-		i += 2
+		
+		// No condition matched and no else clause
+		return core.Nil, nil
+	} else {
+		// Traditional if-else (third argument is the else expression)
+		return Eval(args[2], ctx)
 	}
-
-	// If we have one remaining arg, it's the else clause
-	if i < len(args) {
-		return Eval(args[i], ctx)
-	}
-
-	// No condition matched and no else clause
-	return core.Nil, nil
 }
 
 // DoForm provides the implementation of the do special form
