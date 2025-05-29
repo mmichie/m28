@@ -57,7 +57,8 @@ func main() {
 	special_forms.RegisterAllForms()
 
 	// Create error reporter for enhanced error messages
-	errorReporter := repl.NewErrorReporter()
+	colorManager := repl.NewColorManager(true)
+	errorReporter := repl.NewErrorReporter(colorManager)
 
 	// Evaluate an expression from -e
 	if *evalExpr != "" {

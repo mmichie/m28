@@ -1,0 +1,7 @@
+# Test script to verify IPython-style features
+(print "Testing output history...")
+(+ 1 2)
+(* 3 4)
+(print _)
+(print _1)
+(print _2)

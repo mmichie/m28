@@ -15,24 +15,40 @@ import (
 
 // REPL represents a read-eval-print loop
 type REPL struct {
-	ctx        *core.Context
-	reader     *bufio.Reader
-	writer     io.Writer
-	history    *History
-	completer  *Completer
-	helpSystem *HelpSystem
+	ctx               *core.Context
+	reader            *bufio.Reader
+	writer            io.Writer
+	outputTracker     *OutputTracker
+	history           *History
+	completer         *Completer
+	helpSystem        *HelpSystem
+	executionState    *ExecutionState
+	errorReporter     *ErrorReporter
+	commandHandler    *CommandHandler
+	indentTracker     *IndentationTracker
+	colorManager      *ColorManager
 }
 
 // NewREPL creates a new REPL with the given context
 func NewREPL(globalCtx *core.Context) *REPL {
-	return &REPL{
-		ctx:        globalCtx,
-		reader:     bufio.NewReader(os.Stdin),
-		writer:     os.Stdout,
-		history:    NewHistory(1000),
-		completer:  NewCompleter(globalCtx),
-		helpSystem: NewHelpSystem(globalCtx),
+	outputTracker := NewOutputTracker(os.Stdout)
+	colorManager := NewColorManager(true) // Colors enabled by default
+	
+	r := &REPL{
+		ctx:            globalCtx,
+		reader:         bufio.NewReader(os.Stdin),
+		writer:         outputTracker,
+		outputTracker:  outputTracker,
+		history:        NewHistory(1000),
+		completer:      NewCompleter(globalCtx),
+		helpSystem:     NewHelpSystem(globalCtx),
+		executionState: NewExecutionState(globalCtx),
+		errorReporter:  NewErrorReporter(colorManager),
+		indentTracker:  NewIndentationTracker(),
+		colorManager:   colorManager,
 	}
+	r.commandHandler = NewCommandHandler(r)
+	return r
 }
 
 // SetInput sets the input reader for the REPL
@@ -42,16 +58,20 @@ func (r *REPL) SetInput(reader io.Reader) {
 
 // SetOutput sets the output writer for the REPL
 func (r *REPL) SetOutput(writer io.Writer) {
-	r.writer = writer
+	r.outputTracker = NewOutputTracker(writer)
+	r.writer = r.outputTracker
 }
 
 // Start starts the REPL
 func (r *REPL) Start() {
-	fmt.Fprintln(r.writer, "M28 REPL (New Implementation)")
+	fmt.Fprintln(r.writer, "M28 REPL")
 	fmt.Fprintln(r.writer, "Type 'exit' to quit, 'help' for more information")
+	fmt.Fprintln(r.writer)
 
 	for {
-		fmt.Fprint(r.writer, "> ")
+		// Display the input prompt with execution number
+		prompt := r.executionState.FormatInputPrompt()
+		fmt.Fprint(r.writer, r.colorManager.ColorizePrompt(prompt))
 
 		line, err := r.reader.ReadString('\n')
 		if err != nil {
@@ -68,10 +88,28 @@ func (r *REPL) Start() {
 			continue
 		}
 
-		// Add to history
+		// Check if this is a REPL command
+		if r.commandHandler.IsCommand(line) {
+			handled, err := r.commandHandler.HandleCommand(line)
+			if err != nil {
+				fmt.Fprintf(r.writer, "Command error: %s\n", err)
+				continue
+			}
+			if handled {
+				continue
+			}
+			// If not handled (e.g., ! command that returns code to execute),
+			// get the command to execute
+			if cmdToExec := r.commandHandler.GetCommandToExecute(); cmdToExec != "" {
+				line = cmdToExec
+				fmt.Fprintf(r.writer, "%s%s\n", r.executionState.FormatInputPrompt(), line)
+			}
+		}
+		
+		// Add to history (after command processing)
 		r.history.Add(line)
 
-		// Handle special commands
+		// Handle built-in commands
 		switch {
 		case line == "exit" || line == "quit":
 			fmt.Fprintln(r.writer, "Exiting...")
@@ -96,6 +134,9 @@ func (r *REPL) Start() {
 			fullInput = multiLine
 		}
 
+		// Get the execution number for this command
+		execNum := r.executionState.NextExecutionNumber()
+
 		// Parse the input
 		p := parser.NewParser()
 		expr, err := p.Parse(fullInput)
@@ -104,15 +145,36 @@ func (r *REPL) Start() {
 			continue
 		}
 
+		// Start tracking output for duplicate detection
+		r.outputTracker.StartTracking()
+
 		// Evaluate the expression
 		result, err := eval.Eval(expr, r.ctx)
+		
+		// Stop tracking and get the printed output
+		printedOutput := r.outputTracker.StopTracking()
+
 		if err != nil {
-			fmt.Fprintf(r.writer, "Evaluation error: %s\n", err)
+			r.errorReporter.ReportError(err, r.ctx, r.writer)
 			continue
 		}
 
-		// Print the result
-		fmt.Fprintln(r.writer, result.String())
+		// Store the result in output history
+		if result != core.Nil {
+			r.executionState.StoreOutput(execNum, result)
+		}
+
+		// Only print the result if it's not nil and wasn't already printed
+		if result != core.Nil {
+			resultStr := result.String()
+			// Check if the result was already printed to avoid duplication
+			if printedOutput == "" || printedOutput != resultStr {
+				outputPrompt := r.executionState.FormatOutputPrompt(execNum)
+				fmt.Fprintf(r.writer, "%s%s\n", 
+					r.colorManager.ColorizeOutputPrompt(outputPrompt), 
+					resultStr)
+			}
+		}
 	}
 }
 

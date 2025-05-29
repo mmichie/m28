@@ -10,13 +10,15 @@ import (
 
 // ErrorReporter provides enhanced error reporting
 type ErrorReporter struct {
-	sourceCode map[string][]string // filename -> lines
+	sourceCode   map[string][]string // filename -> lines
+	colorManager *ColorManager
 }
 
 // NewErrorReporter creates a new error reporter
-func NewErrorReporter() *ErrorReporter {
+func NewErrorReporter(colorManager *ColorManager) *ErrorReporter {
 	return &ErrorReporter{
-		sourceCode: make(map[string][]string),
+		sourceCode:   make(map[string][]string),
+		colorManager: colorManager,
 	}
 }
 
@@ -47,7 +49,8 @@ func (er *ErrorReporter) ReportError(err error, ctx *core.Context, w io.Writer) 
 	}
 	
 	// Default error reporting
-	fmt.Fprintf(w, "Error: %s\n", err)
+	msg := fmt.Sprintf("Error: %s", err)
+	fmt.Fprintln(w, er.colorManager.ColorizeError(msg))
 	
 	// Add stack trace if available
 	if ctx != nil && len(ctx.CallStack) > 0 {
@@ -58,7 +61,8 @@ func (er *ErrorReporter) ReportError(err error, ctx *core.Context, w io.Writer) 
 // reportEvalError reports an evaluation error with source context
 func (er *ErrorReporter) reportEvalError(err *core.EvalError, ctx *core.Context, w io.Writer) {
 	// Print error type and message
-	fmt.Fprintf(w, "%s: %s\n", err.Type, err.Message)
+	msg := fmt.Sprintf("%s: %s", err.Type, err.Message)
+	fmt.Fprintln(w, er.colorManager.ColorizeError(msg))
 	
 	// Print stack trace
 	if ctx != nil && len(ctx.CallStack) > 0 {
@@ -78,7 +82,8 @@ func (er *ErrorReporter) reportEvalError(err *core.EvalError, ctx *core.Context,
 
 // reportNameError reports a name error with suggestions
 func (er *ErrorReporter) reportNameError(err *core.NameError, ctx *core.Context, w io.Writer) {
-	fmt.Fprintf(w, "NameError: name '%s' is not defined\n", err.Name)
+	msg := fmt.Sprintf("NameError: name '%s' is not defined", err.Name)
+	fmt.Fprintln(w, er.colorManager.ColorizeError(msg))
 	
 	// Show stack trace
 	if ctx != nil && len(ctx.CallStack) > 0 {
@@ -96,7 +101,8 @@ func (er *ErrorReporter) reportNameError(err *core.NameError, ctx *core.Context,
 
 // reportTypeError reports a type error with details
 func (er *ErrorReporter) reportTypeError(err *core.TypeError, ctx *core.Context, w io.Writer) {
-	fmt.Fprintf(w, "TypeError: %s\n", err.Message)
+	msg := fmt.Sprintf("TypeError: %s", err.Message)
+	fmt.Fprintln(w, er.colorManager.ColorizeError(msg))
 	
 	if err.Expected != "" && err.Got != "" {
 		fmt.Fprintf(w, "  Expected: %s\n", err.Expected)

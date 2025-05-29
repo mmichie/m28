@@ -59,22 +59,48 @@ func (r *REPL) readMultilineInput(firstLine string) (string, error) {
 	var lines []string
 	lines = append(lines, firstLine)
 	
+	// Initialize indentation tracker for this multi-line input
+	r.indentTracker.Reset()
+	r.indentTracker.UpdateLevel(firstLine)
+	
 	for isIncomplete(strings.Join(lines, "\n")) {
 		// Print continuation prompt
-		fmt.Fprint(r.writer, "... ")
+		fmt.Fprint(r.writer, r.executionState.FormatContinuationPrompt())
+		
+		// Add smart indentation
+		indentation := r.indentTracker.GetIndentation()
+		fmt.Fprint(r.writer, indentation)
 		
 		line, err := r.reader.ReadString('\n')
 		if err != nil {
 			return "", err
 		}
 		
-		// Allow user to cancel multi-line input with empty line
-		if strings.TrimSpace(line) == "" {
+		// Allow user to cancel multi-line input with empty line at base indentation
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" && r.indentTracker.indentLevel == 0 {
 			return "", fmt.Errorf("multi-line input cancelled")
 		}
 		
-		lines = append(lines, strings.TrimRight(line, "\n"))
+		// If user provided their own indentation, respect it
+		if len(line) > 0 && line[0] == ' ' {
+			r.indentTracker.SetLevelFromLine(line)
+			line = strings.TrimRight(line, "\n")
+		} else if trimmed != "" {
+			// Add our indentation to non-empty lines
+			line = indentation + strings.TrimRight(line, "\n")
+		} else {
+			line = strings.TrimRight(line, "\n")
+		}
+		
+		lines = append(lines, line)
+		
+		// Update indentation level for next line
+		if trimmed != "" {
+			r.indentTracker.UpdateLevel(trimmed)
+		}
 	}
 	
+	r.indentTracker.Reset()
 	return strings.Join(lines, "\n"), nil
 }

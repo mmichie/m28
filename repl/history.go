@@ -9,10 +9,11 @@ import (
 
 // History manages REPL command history
 type History struct {
-	commands []string
-	maxSize  int
-	position int
-	file     string
+	commands    []string
+	maxSize     int
+	position    int
+	file        string
+	totalCount  int // Track total commands ever entered
 }
 
 // NewHistory creates a new history manager
@@ -44,6 +45,7 @@ func (h *History) Add(cmd string) {
 	}
 	
 	h.commands = append(h.commands, cmd)
+	h.totalCount++
 	
 	// Trim history if it exceeds max size
 	if len(h.commands) > h.maxSize {
@@ -102,6 +104,7 @@ func (h *History) load() {
 	}
 	
 	h.position = len(h.commands)
+	h.totalCount = len(h.commands) // Initialize total count from loaded history
 }
 
 // save saves history to file
@@ -118,4 +121,44 @@ func (h *History) save() {
 	for _, cmd := range h.commands {
 		writer.WriteString(cmd + "\n")
 	}
+}
+
+// GetCommand returns the command at the given position (1-based)
+func (h *History) GetCommand(position int) string {
+	// Convert from 1-based to 0-based index
+	idx := position - 1
+	if idx >= 0 && idx < len(h.commands) {
+		return h.commands[idx]
+	}
+	return ""
+}
+
+// FindByPrefix finds the most recent command starting with the given prefix
+func (h *History) FindByPrefix(prefix string) string {
+	// Search backwards for most recent match
+	for i := len(h.commands) - 1; i >= 0; i-- {
+		if strings.HasPrefix(h.commands[i], prefix) {
+			return h.commands[i]
+		}
+	}
+	return ""
+}
+
+// GetLastN returns the last n commands from history
+func (h *History) GetLastN(n int) []string {
+	if n <= 0 {
+		return nil
+	}
+	
+	start := len(h.commands) - n
+	if start < 0 {
+		start = 0
+	}
+	
+	return h.commands[start:]
+}
+
+// GetTotalCount returns the total number of commands ever entered
+func (h *History) GetTotalCount() int {
+	return h.totalCount
 }
