@@ -102,6 +102,7 @@ func (it *listIterator) Reset() {
 type DictValue struct {
 	BaseObject
 	entries map[string]Value
+	keys    map[string]Value // Maps string representation to original key value
 }
 
 // NewDict creates a new dictionary
@@ -109,6 +110,7 @@ func NewDict() *DictValue {
 	return &DictValue{
 		BaseObject: *NewBaseObject(DictType),
 		entries:    make(map[string]Value),
+		keys:       make(map[string]Value),
 	}
 }
 
@@ -133,7 +135,12 @@ func (d *DictValue) String() string {
 	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
 		v := d.entries[k]
-		parts = append(parts, fmt.Sprintf("%q: %s", k, PrintValue(v)))
+		// Use original key if available, otherwise use string representation
+		if origKey, hasOrig := d.keys[k]; hasOrig {
+			parts = append(parts, fmt.Sprintf("%s: %s", PrintValue(origKey), PrintValue(v)))
+		} else {
+			parts = append(parts, fmt.Sprintf("%q: %s", k, PrintValue(v)))
+		}
 	}
 
 	return "{" + strings.Join(parts, ", ") + "}"
@@ -150,9 +157,16 @@ func (d *DictValue) Set(key string, value Value) {
 	d.entries[key] = value
 }
 
+// SetWithKey sets a value with both key representation and original key
+func (d *DictValue) SetWithKey(keyRepr string, origKey Value, value Value) {
+	d.entries[keyRepr] = value
+	d.keys[keyRepr] = origKey
+}
+
 // Delete removes a key
 func (d *DictValue) Delete(key string) {
 	delete(d.entries, key)
+	delete(d.keys, key)
 }
 
 // Keys returns all keys

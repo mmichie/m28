@@ -1,0 +1,66 @@
+# Test dictionary keys with various hashable types
+
+(print "Testing hashable dictionary key types...")
+
+# Test 1: String keys
+(= string_dict {"foo": 1, "bar": 2})
+(assert (== string_dict["foo"] 1) "String key access")
+
+# Test 2: Number keys
+(= num_dict {42: "answer", 3.14: "pi", -1: "negative"})
+(assert (== num_dict[42] "answer") "Integer key access")
+(assert (== num_dict[3.14] "pi") "Float key access")
+(assert (== num_dict[-1] "negative") "Negative number key")
+
+# Test 3: Boolean keys
+(= bool_dict {True: "yes", False: "no"})
+(assert (== bool_dict[True] "yes") "True key access")
+(assert (== bool_dict[False] "no") "False key access")
+
+# Test 4: None key
+(= none_dict {None: "nothing", "something": 123})
+(assert (== none_dict[None] "nothing") "None key access")
+
+# Test 5: Tuple keys
+(= tuple_dict {
+  %(1, 2): "coordinate",
+  %("a", "b", "c"): "letters",
+  %(True, 42, "mixed"): "mixed types"
+})
+(assert (== tuple_dict[%(1, 2)] "coordinate") "Tuple key access")
+(assert (== tuple_dict[%("a", "b", "c")] "letters") "String tuple key")
+
+# Test 6: Mixed key types
+(= mixed_dict {
+  "string": 1,
+  42: "number",
+  True: "boolean", 
+  %(1, 2): "tuple",
+  None: "none"
+})
+(assert (== (len mixed_dict) 5) "Mixed dict has 5 entries")
+
+# Test 7: Keys method returns original types
+# Work around the (d.keys()) parsing issue
+(= keys_result mixed_dict.keys())
+(= key_list (list keys_result))
+(assert (in "string" key_list) "String key in keys()")
+(assert (in 42 key_list) "Number key in keys()")
+(assert (in True key_list) "Boolean key in keys()")
+(assert (in %(1, 2) key_list) "Tuple key in keys()")
+(assert (in None key_list) "None key in keys()")
+
+# Test 8: Dynamic key assignment
+(= d {})
+(= key %(10, 20))
+(= d[key] "dynamic")
+(assert (== d[key] "dynamic") "Dynamic tuple key assignment")
+
+# Test 9: Items method works
+(= items_result mixed_dict.items())
+(assert (> (len items_result) 0) "Items method returns results")
+
+# Note: Unhashable types (lists, dicts, sets) are properly rejected
+# at evaluation time when used as dictionary keys
+
+(print "All hashable dictionary key tests passed!")

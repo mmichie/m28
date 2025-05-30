@@ -5,40 +5,40 @@
 (import math_utils)
 
 # Use module constants
-(print f"PI = {math_utils.PI}")
-(print f"E = {math_utils.E}")
-(print f"Golden Ratio = {math_utils.GOLDEN_RATIO}")
+(print "PI =" math_utils.PI)
+(print "E =" math_utils.E)
+(print "Golden Ratio =" math_utils.GOLDEN_RATIO)
 
 # Use circle functions
 (= radius 5)
-(print f"\nCircle with radius {radius}:")
-(print f"Area: {math_utils.circle_area radius}")
-(print f"Circumference: {math_utils.circle_circumference radius}")
+(print "\nCircle with radius" radius ":")
+(print "Area:" (math_utils.circle_area radius))
+(print "Circumference:" (math_utils.circle_circumference radius))
 
 # Temperature conversions
 (print "\nTemperature conversions:")
 (= temp_c 25)
 (= temp_f (math_utils.celsius_to_fahrenheit temp_c))
-(print f"{temp_c}°C = {temp_f}°F")
-(print f"{temp_f}°F = {math_utils.fahrenheit_to_celsius temp_f}°C")
+(print temp_c "°C =" temp_f "°F")
+(print temp_f "°F =" (math_utils.fahrenheit_to_celsius temp_f) "°C")
 
 # Statistical functions
 (print "\nStatistics:")
 (= data [1, 2, 3, 4, 5, 6, 7, 8, 9])
-(print f"Data: {data}")
-(print f"Mean: {math_utils.mean data}")
-(print f"Median: {math_utils.median data}")
+(print "Data:" data)
+(print "Mean:" (math_utils.mean data))
+(print "Median:" (math_utils.median data))
 
 # Distance calculation
 (print "\nDistance calculation:")
 (= p1 (0, 0))
 (= p2 (3, 4))
-(print f"Distance from {p1} to {p2}: {math_utils.distance 0 0 3 4}")
+(print "Distance from" p1 "to" p2 ":" (math_utils.distance 0 0 3 4))
 
 # Factorial
 (print "\nFactorials:")
 (for n [0, 1, 5, 10]
-  (print f"{n}! = {math_utils.factorial n}"))
+  (print n "! =" (math_utils.factorial n)))
 
 # Prime checking
 (print "\nPrime numbers up to 20:")
@@ -53,11 +53,11 @@
 (from math_utils import (circle_area is_prime factorial))
 
 # Now we can use them directly
-(print f"Area of radius 10 circle: {circle_area 10}")
-(print f"Is 17 prime? {is_prime 17}")
-(print f"6! = {factorial 6}")
+(print "Area of radius 10 circle:" (circle_area 10))
+(print "Is 17 prime?" (is_prime 17))
+(print "6! =" (factorial 6))
 
 # Import with alias
 (print "\nUsing module alias:")
 (import math_utils as mu)
-(print f"Distance: {mu.distance 0 0 1 1}")
+(print "Distance:" (mu.distance 0 0 1 1))

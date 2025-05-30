@@ -649,14 +649,14 @@ func (p *Parser) parseFString() (core.Value, error) {
 			// Parse expression until '}'
 			expr, err := p.parseExpr()
 			if err != nil {
-				return nil, fmt.Errorf("error parsing f-string expression: %v", err)
+				return nil, fmt.Errorf("error parsing f-string expression at line %d, column %d: %v", p.line, p.col, err)
 			}
 
 			// Skip whitespace before '}'
 			p.skipWhitespaceAndComments()
 
 			if p.pos >= len(p.input) || p.input[p.pos] != '}' {
-				return nil, fmt.Errorf("unclosed f-string expression")
+				return nil, fmt.Errorf("unclosed f-string expression at line %d, column %d", p.line, p.col)
 			}
 
 			// Skip '}'
@@ -670,7 +670,7 @@ func (p *Parser) parseFString() (core.Value, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unclosed f-string")
+	return nil, fmt.Errorf("unclosed f-string at line %d, column %d", p.line, p.col)
 }
 
 // isListComprehension checks if the elements form a list comprehension pattern

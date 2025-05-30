@@ -212,7 +212,7 @@
   (print "Type 'help' for instructions")
   
   (while True
-    (= input_line (input "\ncalc> ").strip.lower)
+    (= input_line ((input "\ncalc> ").strip.lower))
     
     (if (not input_line)
       (continue))
@@ -235,7 +235,7 @@
        (calc.memory_clear))
       
       ((== input_line "mr")
-       (print f"Memory: {calc.memory_recall}"))
+       (print f"Memory: {(calc.memory_recall)}"))
       
       ((== input_line "ms")
        (calc.memory_store))

@@ -799,12 +799,15 @@ func InitializeTypeRegistry() {
 						return nil, fmt.Errorf("get expects 1 or 2 arguments")
 					}
 
-					key, ok := args[0].(StringValue)
-					if !ok {
-						return nil, fmt.Errorf("dict key must be a string")
+					// Check if key is hashable
+					if !IsHashable(args[0]) {
+						return nil, fmt.Errorf("unhashable type: '%s'", args[0].Type())
 					}
 
-					val, found := dict.Get(string(key))
+					// Convert key to string representation
+					keyStr := ValueToKey(args[0])
+
+					val, found := dict.Get(keyStr)
 					if found {
 						return val, nil
 					}
@@ -822,18 +825,27 @@ func InitializeTypeRegistry() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					dict := receiver.(*DictValue)
-					key, ok := args[0].(StringValue)
-					if !ok {
-						return nil, fmt.Errorf("dict key must be a string")
+
+					// Check if key is hashable
+					if !IsHashable(args[0]) {
+						return nil, fmt.Errorf("unhashable type: '%s'", args[0].Type())
 					}
+
+					// Convert key to string representation
+					keyStr := ValueToKey(args[0])
 
 					// Create new dict with the update
 					newDict := NewDict()
 					for _, k := range dict.Keys() {
 						v, _ := dict.Get(k)
-						newDict.Set(k, v)
+						// Copy original keys if available
+						if origKey, hasOrig := dict.keys[k]; hasOrig {
+							newDict.SetWithKey(k, origKey, v)
+						} else {
+							newDict.Set(k, v)
+						}
 					}
-					newDict.Set(string(key), args[1])
+					newDict.SetWithKey(keyStr, args[0], args[1])
 					return newDict, nil
 				},
 			},
@@ -844,10 +856,15 @@ func InitializeTypeRegistry() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					dict := receiver.(*DictValue)
-					keys := dict.Keys()
-					result := make(ListValue, len(keys))
-					for i, k := range keys {
-						result[i] = StringValue(k)
+					keyReprs := dict.Keys()
+					result := make(ListValue, len(keyReprs))
+					for i, k := range keyReprs {
+						// Return original key if available, otherwise string
+						if origKey, hasOrig := dict.keys[k]; hasOrig {
+							result[i] = origKey
+						} else {
+							result[i] = StringValue(k)
+						}
 					}
 					return result, nil
 				},
@@ -875,11 +892,18 @@ func InitializeTypeRegistry() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					dict := receiver.(*DictValue)
-					keys := dict.Keys()
-					result := make(ListValue, len(keys))
-					for i, k := range keys {
+					keyReprs := dict.Keys()
+					result := make(ListValue, len(keyReprs))
+					for i, k := range keyReprs {
 						v, _ := dict.Get(k)
-						result[i] = TupleValue{StringValue(k), v}
+						// Use original key if available, otherwise string
+						var key Value
+						if origKey, hasOrig := dict.keys[k]; hasOrig {
+							key = origKey
+						} else {
+							key = StringValue(k)
+						}
+						result[i] = TupleValue{key, v}
 					}
 					return result, nil
 				},

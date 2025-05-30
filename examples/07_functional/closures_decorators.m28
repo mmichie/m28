@@ -60,9 +60,9 @@
   }))
 
 (= account (make_account 100))
-(print f"Initial: {account['balance']}")      # 100
-(print f"After deposit: {account['deposit'] 50}")  # 150
-(print f"After withdraw: {account['withdraw'] 30}") # 120
+(print f"Initial: {(account['balance'])}")      # 100
+(print f"After deposit: {(account['deposit'] 50)}")  # 150
+(print f"After withdraw: {(account['withdraw'] 30)}") # 120
 
 # DECORATORS - Functions that modify other functions
 (print "\n=== DECORATORS ===")
@@ -91,7 +91,7 @@
     (= start (time.time))
     (= result (apply func args kwargs))
     (= end (time.time))
-    (print f"{func.__name__} took {- end start:.4f} seconds")
+    (print f"{func.__name__} took {(- end start)} seconds")
     (return result))
   (return wrapper))
 
@@ -206,4 +206,4 @@
 (greet "Alice")
 (greet "Bob")
 (greet "Charlie")
-(print f"Total calls: {greet.call_count}")
+(print f"Total calls: {(greet.call_count)}")

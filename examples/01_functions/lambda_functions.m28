@@ -64,11 +64,10 @@
 (print "abs(5) =" (abs_val 5))
 
 # Sorting with lambda
-(= people [
-  {"name": "Alice", "age": 30},
-  {"name": "Bob", "age": 25},
-  {"name": "Charlie", "age": 35}
-])
+(= alice {"name": "Alice", "age": 30})
+(= bob {"name": "Bob", "age": 25})
+(= charlie {"name": "Charlie", "age": 35})
+(= people (list alice bob charlie))
 
 # Sort by age
 # Note: sorted doesn't support keyword arguments yet, using a workaround
@@ -76,7 +75,7 @@
 (= sorted_by_age people)  # TODO: implement (sorted people key = get_age)
 (print "\nSorted by age:")
 (for person in sorted_by_age
-  (print person.name ": " person.age))
+  (print (get person "name") ": " (get person "age")))
 
 # Practical example: temperature converter
 (= celsius_to_fahrenheit (lambda (c) (+ (* c 1.8) 32)))

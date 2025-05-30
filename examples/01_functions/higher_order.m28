@@ -45,21 +45,21 @@
 (def my_map (f lst)
   (if (== (len lst) 0)
       []
-      (+ [(f lst[0])] (my_map f lst[1:]))))
+      (+ (list (f (nth lst 0))) (my_map f (slice lst 1 (len lst) 1)))))
 
 (print "\nCustom map:")
-(print (my_map (lambda (x) (* x x)) [1, 2, 3, 4]))
+(print (my_map (lambda (x) (* x x)) (list 1 2 3 4)))
 
 # Custom filter implementation
 (def my_filter (pred lst)
   (if (== (len lst) 0)
       []
-      (if (pred lst[0])
-          (+ [lst[0]] (my_filter pred lst[1:]))
-          (my_filter pred lst[1:]))))
+      (if (pred (nth lst 0))
+          (+ (list (nth lst 0)) (my_filter pred (slice lst 1 (len lst) 1)))
+          (my_filter pred (slice lst 1 (len lst) 1)))))
 
 (print "\nCustom filter:")
-(print (my_filter (lambda (x) (> x 2)) [1, 2, 3, 4, 5]))
+(print (my_filter (lambda (x) (> x 2)) (list 1 2 3 4 5)))
 
 # Function decorator pattern
 (def with_logging (f)
@@ -77,18 +77,19 @@
 (print "\nFunction with logging:")
 (logged_multiply 5 3)
 
-# Memoization example (simplified for single argument)
+# Memoization example
 (def memoize (f)
   (= cache {})
   (lambda (n)
-    (if (in n cache)
+    (= key (str n))  # Convert to string for dict key
+    (if (in key cache)
         (do
           (print "Cache hit for " n)
-          cache[n])
+          (get cache key))
         (do
           (print "Computing for " n)
           (= result (f n))
-          (= cache[n] result)
+          (= cache[key] result)
           result))))
 
 (def slow_fibonacci (n)
@@ -101,7 +102,7 @@
 
 (print "\nMemoized Fibonacci:")
 (print "fib(10):" (fast_fibonacci 10))
-(print "fib(10) again:" (fast_fibonacci 10))  # From cache
+(print "fib(10) again:" (fast_fibonacci 10))  # Now from cache!
 
 # Pipeline function
 (def pipeline (*funcs)
@@ -130,7 +131,7 @@
 (= positive_or_even (either is_positive is_even))
 
 (print "\nPredicate combinators:")
-(= test_values [-2, -1, 0, 1, 2, 3, 4])
+(= test_values (list -2 -1 0 1 2 3 4))
 (print "Positive AND even:" (filter positive_and_even test_values))
 (print "Positive OR even:" (filter positive_or_even test_values))
 

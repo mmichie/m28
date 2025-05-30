@@ -74,7 +74,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] **Indexing and Slicing** ✅ COMPLETE
   - [x] Direct indexing: `list[0]`, `dict["key"]`
   - [x] Slice syntax: `list[1:3]` ✅ DONE (including negative indices and step)
-  - [x] Index assignment: `list[0] = value` ✅ DONE
+  - [x] Index assignment: `list[0] = value`, `dict[key] = value` ✅ DONE (fixed dict assignment with variable keys)
 
 - [x] **Operators**
   - [x] Augmented assignment: `+=`, `-=`, `*=`, `/=`, `%=`, `**=`

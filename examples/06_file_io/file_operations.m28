@@ -10,10 +10,10 @@
   (if (os.path.exists filepath)
     (begin
       (print f"File: {filepath}")
-      (print f"Size: {os.path.getsize filepath} bytes")
-      (print f"Is file: {os.path.isfile filepath}")
-      (print f"Is directory: {os.path.isdir filepath}")
-      (print f"Last modified: {os.path.getmtime filepath}"))
+      (print f"Size: {(os.path.getsize filepath)} bytes")
+      (print f"Is file: {(os.path.isfile filepath)}")
+      (print f"Is directory: {(os.path.isdir filepath)}")
+      (print f"Last modified: {(os.path.getmtime filepath)}"))
     (print f"File does not exist: {filepath}")))
 
 (file_info "example.txt")
@@ -47,9 +47,10 @@
 # List directory contents
 (def list_files (directory pattern="*")
   (= path (pathlib.Path directory))
-  (if (path.exists)
+  (if (path.exists())
     (for file (path.glob pattern)
-      (print f"  {file.name} ({'dir' if file.is_dir else 'file'})"))
+      (= file_type (if (file.is_dir) "dir" "file"))
+      (print f"  {file.name} ({file_type})"))
     (print f"Directory not found: {directory}")))
 
 (print "\nFiles in current directory:")
@@ -94,12 +95,12 @@
   (= matches [])
   (= path (pathlib.Path directory))
   (for file (path.rglob pattern)  # recursive glob
-    (matches.append str file))
+    (matches.append (str file)))
   (return matches))
 
 # Find all .m28 files
 (= m28_files (find_files "." "*.m28"))
-(print f"\nFound {len m28_files} M28 files")
+(print f"\nFound {(len m28_files)} M28 files")
 
 # Temporary files
 (import tempfile)
@@ -113,7 +114,7 @@
   
   # Use the temp file
   (with (open temp_name "r") as f
-    (print f"Temp file contents: {f.read}"))
+    (print f"Temp file contents: {f.read()}"))
   
   # Clean up
   (os.unlink temp_name)

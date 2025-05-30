@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // EqualValues compares two values for equality
 func EqualValues(a, b Value) bool {
@@ -85,6 +88,16 @@ func EqualValues(a, b Value) bool {
 	return false
 }
 
+// IsHashable determines if a value can be used as a dictionary key
+func IsHashable(v Value) bool {
+	switch v.(type) {
+	case NumberValue, StringValue, BoolValue, NilValue, TupleValue:
+		return true
+	default:
+		return false
+	}
+}
+
 // ValueToKey converts a value to a string key for use in sets and dicts
 func ValueToKey(v Value) string {
 	switch val := v.(type) {
@@ -96,6 +109,13 @@ func ValueToKey(v Value) string {
 		return fmt.Sprintf("b:%t", bool(val))
 	case NilValue:
 		return "nil"
+	case TupleValue:
+		// For tuples, create a key based on their content
+		elements := make([]string, len(val))
+		for i, elem := range val {
+			elements[i] = ValueToKey(elem)
+		}
+		return fmt.Sprintf("t:(%s)", strings.Join(elements, ","))
 	default:
 		// For non-hashable types, use pointer address
 		return fmt.Sprintf("p:%p", v)

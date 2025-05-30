@@ -41,7 +41,7 @@
 (= numbers (range 1 11))
 (= evens (filter (lambda (x) (== (% x 2) 0)) numbers))
 (= odds (filter (lambda (x) (== (% x 2) 1)) numbers))
-(print f"Numbers: {list numbers}")
+(print f"Numbers: {(list numbers)}")
 (print f"Evens: {evens}")
 (print f"Odds: {odds}")
 
@@ -85,7 +85,7 @@
 # String concatenation
 (= words ["M28", "is", "awesome"])
 (= sentence (reduce (lambda (acc w) f"{acc} {w}") "" words))
-(print f"Sentence: {sentence.strip}")
+(print f"Sentence: {(sentence.strip)}")
 
 # Build dictionary
 (= pairs [["a", 1], ["b", 2], ["c", 3]])
@@ -93,7 +93,7 @@
   (reduce 
     (lambda (acc pair) 
       (begin 
-        (= acc[pair[0]] pair[1])
+        (= acc[(pair 0)] (pair 1))
         acc))
     {}
     pairs))
@@ -155,6 +155,6 @@
 # Test custom implementations
 (print "\n=== Custom Implementations ===")
 (= nums [1, 2, 3, 4])
-(print f"my_map double: {my_map (lambda (x) (* x 2)) nums}")
-(print f"my_filter even: {my_filter (lambda (x) (== (% x 2) 0)) nums}")
-(print f"my_reduce sum: {my_reduce + 0 nums}")
+(print f"my_map double: {(my_map (lambda (x) (* x 2)) nums)}")
+(print f"my_filter even: {(my_filter (lambda (x) (== (% x 2) 0)) nums)}")
+(print f"my_reduce sum: {(my_reduce + 0 nums)}")

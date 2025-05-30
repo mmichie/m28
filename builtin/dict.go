@@ -34,14 +34,16 @@ func DictFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Add key-value pairs
 	for i := 0; i < len(args); i += 2 {
-		// Get the key (must be a string)
-		key, ok := args[i].(core.StringValue)
-		if !ok {
-			return nil, fmt.Errorf("dict keys must be strings, got %s", args[i].Type())
+		// Check if key is hashable
+		if !core.IsHashable(args[i]) {
+			return nil, fmt.Errorf("unhashable type: '%s'", args[i].Type())
 		}
 
+		// Convert key to string representation
+		keyStr := core.ValueToKey(args[i])
+
 		// Set the value
-		dict.Set(string(key), args[i+1])
+		dict.SetWithKey(keyStr, args[i], args[i+1])
 	}
 
 	return dict, nil
@@ -53,25 +55,24 @@ func GetFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("get requires 2 or 3 arguments: dict, key[, default]")
 	}
 
-	// Get the dictionary (ensure it's an Object with GetAttr capability)
-	obj, ok := args[0].(core.Object)
-	if !ok {
-		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
-	}
-
 	// Make sure it's a dictionary
 	if args[0].Type() != core.DictType {
 		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
 	}
 
-	// Get the key
-	key, ok := args[1].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("key must be a string, got %s", args[1].Type())
+	// Check if key is hashable
+	if !core.IsHashable(args[1]) {
+		return nil, fmt.Errorf("unhashable type: '%s'", args[1].Type())
 	}
 
+	// Convert key to string representation
+	keyStr := core.ValueToKey(args[1])
+
+	// Get the dictionary directly
+	dict := args[0].(*core.DictValue)
+
 	// Try to get the value
-	value, found := obj.GetAttr(string(key))
+	value, found := dict.Get(keyStr)
 	if found {
 		return value, nil
 	}
@@ -91,28 +92,24 @@ func SetFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("set requires 3 arguments: dict, key, value")
 	}
 
-	// Get the dictionary (ensure it's an Object with SetAttr capability)
-	obj, ok := args[0].(core.Object)
-	if !ok {
-		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
-	}
-
 	// Make sure it's a dictionary
 	if args[0].Type() != core.DictType {
 		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
 	}
 
-	// Get the key
-	key, ok := args[1].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("key must be a string, got %s", args[1].Type())
+	// Check if key is hashable
+	if !core.IsHashable(args[1]) {
+		return nil, fmt.Errorf("unhashable type: '%s'", args[1].Type())
 	}
 
+	// Convert key to string representation
+	keyStr := core.ValueToKey(args[1])
+
+	// Get the dictionary directly
+	dict := args[0].(*core.DictValue)
+
 	// Set the value
-	err := obj.SetAttr(string(key), args[2])
-	if err != nil {
-		return nil, err
-	}
+	dict.SetWithKey(keyStr, args[1], args[2])
 
 	// Return the dictionary
 	return args[0], nil
@@ -130,14 +127,16 @@ func DeleteFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
 	}
 
-	// Get the key
-	key, ok := args[1].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("key must be a string, got %s", args[1].Type())
+	// Check if key is hashable
+	if !core.IsHashable(args[1]) {
+		return nil, fmt.Errorf("unhashable type: '%s'", args[1].Type())
 	}
 
-	// Delete the key - we need to use the direct method since Object interface doesn't have Delete
-	dict.Delete(string(key))
+	// Convert key to string representation
+	keyStr := core.ValueToKey(args[1])
+
+	// Delete the key
+	dict.Delete(keyStr)
 
 	// Return the dictionary
 	return dict, nil
@@ -149,25 +148,24 @@ func HasKeyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("has-key requires 2 arguments: dict, key")
 	}
 
-	// Get the dictionary (ensure it's an Object with GetAttr capability)
-	obj, ok := args[0].(core.Object)
-	if !ok {
-		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
-	}
-
 	// Make sure it's a dictionary
 	if args[0].Type() != core.DictType {
 		return nil, fmt.Errorf("first argument must be a dictionary, got %s", args[0].Type())
 	}
 
-	// Get the key
-	key, ok := args[1].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("key must be a string, got %s", args[1].Type())
+	// Check if key is hashable
+	if !core.IsHashable(args[1]) {
+		return nil, fmt.Errorf("unhashable type: '%s'", args[1].Type())
 	}
 
-	// Check if the attribute exists
-	_, found := obj.GetAttr(string(key))
+	// Convert key to string representation
+	keyStr := core.ValueToKey(args[1])
+
+	// Get the dictionary directly
+	dict := args[0].(*core.DictValue)
+
+	// Check if the key exists
+	_, found := dict.Get(keyStr)
 
 	// Return a boolean
 	return core.BoolValue(found), nil

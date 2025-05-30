@@ -65,18 +65,13 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	case *core.DictValue:
 		// Dictionary key access
-		// Convert key to string
-		keyStr := ""
-		switch k := key.(type) {
-		case core.StringValue:
-			keyStr = string(k)
-		case core.NumberValue:
-			keyStr = fmt.Sprintf("%g", float64(k))
-		case core.SymbolValue:
-			keyStr = string(k)
-		default:
-			keyStr = key.String()
+		// Check if key is hashable
+		if !core.IsHashable(key) {
+			return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
 		}
+
+		// Convert key to string representation
+		keyStr := core.ValueToKey(key)
 
 		// Check if key exists
 		if val, exists := v.Get(keyStr); exists {
@@ -156,19 +151,15 @@ func SetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	case *core.DictValue:
 		// Dictionary key assignment
-		keyStr := ""
-		switch k := key.(type) {
-		case core.StringValue:
-			keyStr = string(k)
-		case core.NumberValue:
-			keyStr = fmt.Sprintf("%g", float64(k))
-		case core.SymbolValue:
-			keyStr = string(k)
-		default:
-			keyStr = key.String()
+		// Check if key is hashable
+		if !core.IsHashable(key) {
+			return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
 		}
 
-		v.Set(keyStr, value)
+		// Convert key to string representation
+		keyStr := core.ValueToKey(key)
+
+		v.SetWithKey(keyStr, key, value)
 		return value, nil
 
 	default:

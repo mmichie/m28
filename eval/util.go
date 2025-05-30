@@ -294,25 +294,22 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 			return nil, fmt.Errorf("error evaluating dict key: %v", err)
 		}
 
-		// Convert key to string
-		var keyStr string
-		switch k := key.(type) {
-		case core.StringValue:
-			keyStr = string(k)
-		case core.SymbolValue:
-			keyStr = string(k)
-		default:
-			return nil, fmt.Errorf("dict keys must be strings or symbols, got %v", key.Type())
+		// Check if key is hashable
+		if !core.IsHashable(key) {
+			return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
 		}
+
+		// Convert key to string representation
+		keyStr := core.ValueToKey(key)
 
 		// Evaluate the value
 		value, err := Eval(args[i+1], ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating dict value for key %q: %v", keyStr, err)
+			return nil, fmt.Errorf("error evaluating dict value for key %v: %v", key, err)
 		}
 
 		// Set the key-value pair
-		dict.Set(keyStr, value)
+		dict.SetWithKey(keyStr, key, value)
 	}
 
 	return dict, nil
@@ -341,47 +338,9 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return value, nil
 
 	case core.ListValue:
-		// Check if it's tuple unpacking first
-		isTupleUnpacking := true
-		for _, elem := range t {
-			if _, ok := elem.(core.SymbolValue); !ok {
-				isTupleUnpacking = false
-				break
-			}
-		}
-
-		if isTupleUnpacking && len(t) > 0 {
-			// Tuple unpacking: (= (x, y) [10, 20])
-			// The value must be a tuple or list
-			var values []core.Value
-			switch v := value.(type) {
-			case core.TupleValue:
-				values = []core.Value(v)
-			case core.ListValue:
-				values = []core.Value(v)
-			default:
-				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
-			}
-
-			// Check that the number of targets matches the number of values
-			if len(t) != len(values) {
-				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(t), len(values))
-			}
-
-			// Assign each value to its corresponding target
-			for i, target := range t {
-				sym, ok := target.(core.SymbolValue)
-				if !ok {
-					return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
-				}
-				ctx.Define(string(sym), values[i])
-			}
-
-			return value, nil
-		}
-
-		// Check if it's a dot notation expression
+		// Check if it's a special form first (get-item or dot notation)
 		if len(t) >= 3 {
+			// Check if it's a dot notation expression
 			if dotSym, ok := t[0].(core.SymbolValue); ok && string(dotSym) == "." {
 				// Dot notation assignment: (. obj prop) = value
 				// Evaluate the object
@@ -426,7 +385,45 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 			}
 		}
-		// Fall through to error
+
+		// Check if it's tuple unpacking
+		isTupleUnpacking := true
+		for _, elem := range t {
+			if _, ok := elem.(core.SymbolValue); !ok {
+				isTupleUnpacking = false
+				break
+			}
+		}
+
+		if isTupleUnpacking && len(t) > 0 {
+			// Tuple unpacking: (= (x, y) [10, 20])
+			// The value must be a tuple or list
+			var values []core.Value
+			switch v := value.(type) {
+			case core.TupleValue:
+				values = []core.Value(v)
+			case core.ListValue:
+				values = []core.Value(v)
+			default:
+				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
+			}
+
+			// Check that the number of targets matches the number of values
+			if len(t) != len(values) {
+				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(t), len(values))
+			}
+
+			// Assign each value to its corresponding target
+			for i, target := range t {
+				sym, ok := target.(core.SymbolValue)
+				if !ok {
+					return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
+				}
+				ctx.Define(string(sym), values[i])
+			}
+
+			return value, nil
+		}
 
 	default:
 		return nil, TypeError{Expected: "symbol or dot notation", Got: target.Type()}
