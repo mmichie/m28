@@ -16,11 +16,11 @@
 (print "\nAccessing elements:")
 (print "First element:" numbers.0)
 (print "Last element:" numbers.4)
-(print "Third element:" (nth numbers 2))
+(print "Third element:" numbers[2])
 
 # Negative indexing
-(print "Last with negative index:" numbers.-1)
-(print "Second to last:" numbers.-2)
+(print "Last with negative index:" numbers[-1])
+(print "Second to last:" numbers[-2])
 
 # Slicing
 (print "\nSlicing:")

@@ -48,3 +48,84 @@
 (= default_val 20)     # Change the variable
 (use_default)           # Should use 20 (re-evaluated)
 (use_default 30)       # Should use 30 (explicit)
+
+# Lambda functions with default parameters
+(print "\nTesting lambda with defaults:")
+(= add_with_default (lambda ((x 0) (y 1)) (+ x y)))
+(print (add_with_default))         # 0 + 1 = 1
+(print (add_with_default 5))       # 5 + 1 = 6
+(print (add_with_default 5 3))     # 5 + 3 = 8
+
+# Lambda with multiple defaults
+(= format_lambda (lambda (text (prefix "[") (suffix "]"))
+  (+ prefix text suffix)))
+(print (format_lambda "INFO"))              # "[INFO]"
+(print (format_lambda "ERROR" "<"))         # "<ERROR]"
+(print (format_lambda "WARN" "(" ")"))      # "(WARN)"
+
+# Class methods with default parameters
+(print "\nTesting class methods with defaults:")
+(class Point
+  (def __init__ (self (x 0) (y 0))
+    (= self.x x)
+    (= self.y y))
+  
+  (def move (self (dx 0) (dy 0))
+    (= self.x (+ self.x dx))
+    (= self.y (+ self.y dy))
+    (print "Moved to" (+ "(" (str self.x) ", " (str self.y) ")")))
+  
+  (def distance_from (self (other None))
+    (if (is other None)
+      # Distance from origin
+      (** (+ (** self.x 2) (** self.y 2)) 0.5)
+      # Distance from another point
+      (** (+ (** (- self.x other.x) 2) (** (- self.y other.y) 2)) 0.5))))
+
+# Test class with defaults
+(= p1 (Point))           # x=0, y=0
+(= p2 (Point 3 4))       # x=3, y=4
+(p1.move)                # No movement
+(p1.move 1)              # Move only x
+(p1.move 2 3)            # Move both
+
+(try
+  (print "Distance from origin:" (p2.distance_from))
+  (print "Distance between points:" (p1.distance_from p2))
+except e
+  (print "Error in distance calculation:" e))
+
+# Edge case: varargs with defaults
+(print "\nTesting varargs with defaults:")
+(def print_all ((prefix ">>>") *args)
+  (print prefix)
+  (for arg args
+    (print "  " arg)))
+
+(print_all)                          # Just prefix
+(print_all "Custom:")                # Custom prefix, no args
+(print_all "Items:" "a" "b" "c")    # Custom prefix with args
+
+# Edge case: kwargs with defaults
+(print "\nTesting kwargs with defaults:")
+(def configure ((verbose False) **kwargs)
+  (if verbose
+    (print "Configuration:")
+    (for (k v) kwargs
+      (print "  " k "=" v))))
+
+(configure)                                    # verbose=False, no output
+(configure True)                               # verbose=True, no config
+(configure True host="localhost" port=8080)    # verbose=True with config
+
+# Complex default expressions
+(print "\nTesting complex default expressions:")
+(def make_dict ((size (* 2 3)) (default_val (list 1 2 3)))
+  (= d (dict))
+  (for i (range size)
+    (setitem d i default_val))
+  d)
+
+(print (make_dict))        # size=6, default_val=[1,2,3]
+(print (make_dict 2))      # size=2, default_val=[1,2,3]
+(print (make_dict 2 "x"))  # size=2, default_val="x"

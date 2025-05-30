@@ -505,16 +505,40 @@ func lambdaForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("lambda: parameters must be a list")
 	}
 
-	// Convert parameters to symbols
-	params := make([]core.SymbolValue, 0, len(paramList))
-	for _, p := range paramList {
-		sym, ok := p.(core.SymbolValue)
-		if !ok {
-			return nil, fmt.Errorf("lambda: parameters must be symbols")
+	// Try to parse as new-style parameter list with defaults
+	signature, err := ParseParameterList(paramList)
+	if err != nil {
+		// Fall back to legacy simple parameter parsing
+		params := make([]core.SymbolValue, 0, len(paramList))
+		for _, p := range paramList {
+			sym, ok := p.(core.SymbolValue)
+			if !ok {
+				return nil, fmt.Errorf("lambda: parameters must be symbols")
+			}
+			params = append(params, sym)
 		}
-		params = append(params, sym)
+
+		// The body is the rest of the expressions wrapped in a do form
+		var body core.Value
+		if len(args) == 2 {
+			body = args[1]
+		} else {
+			// Multiple expressions - wrap in do
+			body = core.ListValue(append([]core.Value{core.SymbolValue("do")}, args[1:]...))
+		}
+
+		// Create the function with legacy params
+		fn := &UserFunction{
+			BaseObject: *core.NewBaseObject(core.FunctionType),
+			params:     params,
+			body:       body,
+			env:        ctx, // Capture current environment
+		}
+
+		return fn, nil
 	}
 
+	// New-style function with signature
 	// The body is the rest of the expressions wrapped in a do form
 	var body core.Value
 	if len(args) == 2 {
@@ -524,10 +548,20 @@ func lambdaForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		body = core.ListValue(append([]core.Value{core.SymbolValue("do")}, args[1:]...))
 	}
 
-	// Create the function
+	// Build legacy params list for backward compatibility
+	var params []core.SymbolValue
+	for _, p := range signature.RequiredParams {
+		params = append(params, p.Name)
+	}
+	for _, p := range signature.OptionalParams {
+		params = append(params, p.Name)
+	}
+
+	// Create the function with signature
 	fn := &UserFunction{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		params:     params,
+		signature:  signature,
 		body:       body,
 		env:        ctx, // Capture current environment
 	}

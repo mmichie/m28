@@ -6,7 +6,7 @@
   # Class variable
   (= total_accounts 0)
   
-  (def __init__ (self owner balance=0)
+  (def __init__ (self owner (balance 0))
     (= self.owner owner)
     (= self._balance balance)  # Convention: _ for private
     (= BankAccount.total_accounts (+ BankAccount.total_accounts 1))

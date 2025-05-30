@@ -133,3 +133,53 @@
 (= test_values [-2, -1, 0, 1, 2, 3, 4])
 (print "Positive AND even:" (filter positive_and_even test_values))
 (print "Positive OR even:" (filter positive_or_even test_values))
+
+# Higher-order functions with default parameters
+(print "\nHigher-order functions with defaults:")
+
+# Function that creates a bounded checker with default bounds
+(def make_range_checker ((min 0) (max 100))
+  (lambda (x) (and (>= x min) (<= x max))))
+
+(= in_default_range (make_range_checker))
+(= in_small_range (make_range_checker 0 10))
+(= in_negative_range (make_range_checker -10 0))
+
+(print "5 in default range (0-100):" (in_default_range 5))
+(print "50 in small range (0-10):" (in_small_range 50))
+(print "-5 in negative range (-10-0):" (in_negative_range -5))
+
+# Decorator with configurable behavior
+(def with_retry ((max_attempts 3) (delay 0))
+  (lambda (f)
+    (lambda (*args)
+      (= attempts 0)
+      (= last_error nil)
+      (while (< attempts max_attempts)
+        (try
+          (do
+            (= result (f *args))
+            (return result))
+          (except e
+            (= last_error e)
+            (= attempts (+ attempts 1))
+            (if (< attempts max_attempts)
+                (print "Retry" attempts "of" max_attempts)))))
+      (raise last_error))))
+
+# Function factory with default configuration
+(def make_accumulator ((initial 0) (step 1))
+  (= value initial)
+  (lambda ((n step))
+    (= value (+ value n))
+    value))
+
+(= counter (make_accumulator))          # Start at 0, increment by 1
+(= score (make_accumulator 100 10))     # Start at 100, increment by 10
+
+(print "\nAccumulators with defaults:")
+(print "Counter:" (counter))            # 1 (0 + 1)
+(print "Counter:" (counter))            # 2 (1 + 1)
+(print "Counter +5:" (counter 5))       # 7 (2 + 5)
+(print "Score:" (score))               # 110 (100 + 10)
+(print "Score +50:" (score 50))        # 160 (110 + 50)

@@ -152,16 +152,41 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // createMethod creates a method from a parameter list and body
 func createMethod(name string, params core.ListValue, body []core.Value, ctx *core.Context) (*UserFunction, error) {
-	// Parse parameters
-	paramSyms := make([]core.SymbolValue, 0, len(params))
-	for _, p := range params {
-		sym, ok := p.(core.SymbolValue)
-		if !ok {
-			return nil, fmt.Errorf("method parameters must be symbols")
+	// Try to parse as new-style parameter list with defaults
+	signature, err := ParseParameterList(params)
+	if err != nil {
+		// Fall back to legacy simple parameter parsing
+		paramSyms := make([]core.SymbolValue, 0, len(params))
+		for _, p := range params {
+			sym, ok := p.(core.SymbolValue)
+			if !ok {
+				return nil, fmt.Errorf("method parameters must be symbols")
+			}
+			paramSyms = append(paramSyms, sym)
 		}
-		paramSyms = append(paramSyms, sym)
+
+		// Create method body
+		var methodBody core.Value
+		if len(body) == 1 {
+			methodBody = body[0]
+		} else {
+			// Wrap in do
+			methodBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+		}
+
+		// Create the method with legacy params
+		method := &UserFunction{
+			BaseObject: *core.NewBaseObject(core.FunctionType),
+			params:     paramSyms,
+			body:       methodBody,
+			env:        ctx,
+			name:       name,
+		}
+
+		return method, nil
 	}
 
+	// New-style method with signature
 	// Create method body
 	var methodBody core.Value
 	if len(body) == 1 {
@@ -171,10 +196,20 @@ func createMethod(name string, params core.ListValue, body []core.Value, ctx *co
 		methodBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
 	}
 
-	// Create the method
+	// Build legacy params list for backward compatibility
+	var paramSyms []core.SymbolValue
+	for _, p := range signature.RequiredParams {
+		paramSyms = append(paramSyms, p.Name)
+	}
+	for _, p := range signature.OptionalParams {
+		paramSyms = append(paramSyms, p.Name)
+	}
+
+	// Create the method with signature
 	method := &UserFunction{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		params:     paramSyms,
+		signature:  signature,
 		body:       methodBody,
 		env:        ctx,
 		name:       name,

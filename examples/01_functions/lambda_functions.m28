@@ -85,3 +85,34 @@
 (print "\nTemperature conversion:")
 (print "20°C in Fahrenheit:" (celsius_to_fahrenheit 20))
 (print "68°F in Celsius:" (fahrenheit_to_celsius 68))
+
+# Lambda with default parameters
+(print "\nLambda with default parameters:")
+
+# Simple default
+(= greet (lambda (name (greeting "Hello"))
+  (+ greeting " " name "!")))
+
+(print (greet "World"))           # "Hello World!"
+(print (greet "Alice" "Hi"))      # "Hi Alice!"
+
+# Multiple defaults
+(= format_number (lambda (num (prefix "$") (decimals 2))
+  (+ prefix (str num))))  # Simplified formatting
+
+(print (format_number 100))              # "$100"
+(print (format_number 100 "€"))          # "€100"
+(print (format_number 100 "£" 0))        # "£100"
+
+# Lambda with default returning lambda
+(= make_formatter (lambda ((left "[") (right "]"))
+  (lambda (text) (+ left text right))))
+
+(= brackets (make_formatter))
+(= parens (make_formatter "(" ")"))
+(= quotes (make_formatter "\"" "\""))
+
+(print "\nFormatters with defaults:")
+(print (brackets "text"))    # "[text]"
+(print (parens "text"))      # "(text)"
+(print (quotes "text"))      # "\"text\""
