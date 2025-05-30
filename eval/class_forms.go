@@ -22,79 +22,93 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("class name must be a symbol")
 	}
 
-	// Parse parent class
-	var parentClass *core.Class
+	// Parse parent classes
+	var parentClasses []*core.Class
 	bodyStart := 1
 
 	if len(args) > 1 {
 		// Check if second argument is parent class specification
 		// Parent class spec is a list that either:
 		// - Is empty: ()
-		// - Contains a single symbol: (ParentClass)
+		// - Contains one or more symbols: (ParentClass) or (Parent1, Parent2)
 		// - Does NOT start with a special form like "def"
 		if parentList, ok := args[1].(core.ListValue); ok {
 			isParentSpec := false
-			
+
 			if len(parentList) == 0 {
 				// Empty list means no parent but still a parent spec
 				isParentSpec = true
-			} else if len(parentList) == 1 {
-				// Single element list - check if it's a symbol (parent class name)
-				if _, ok := parentList[0].(core.SymbolValue); ok {
+			} else {
+				// Check if all elements are symbols (parent class names)
+				allSymbols := true
+				for _, elem := range parentList {
+					if _, ok := elem.(core.SymbolValue); !ok {
+						allSymbols = false
+						break
+					}
+				}
+				if allSymbols {
 					isParentSpec = true
 				}
 			}
-			
+
 			if isParentSpec {
 				bodyStart = 2
-				
-				// Get parent class if specified
-				if len(parentList) > 0 {
-					parentName := parentList[0].(core.SymbolValue)
-					
+
+				// Get parent classes if specified
+				for _, parentElem := range parentList {
+					parentName := parentElem.(core.SymbolValue)
+
 					// Look up parent class
 					parentVal, err := ctx.Lookup(string(parentName))
 					if err != nil {
 						return nil, fmt.Errorf("parent class '%s' not found", string(parentName))
 					}
-					
+
 					parent, ok := parentVal.(*core.Class)
 					if !ok {
 						return nil, fmt.Errorf("'%s' is not a class", string(parentName))
 					}
-					
-					parentClass = parent
+
+					parentClasses = append(parentClasses, parent)
 				}
 			}
 		}
 	}
 
 	// Create the class
-	class := core.NewClass(string(className), parentClass)
+	var class *core.Class
+	if len(parentClasses) > 1 {
+		class = core.NewClassWithParents(string(className), parentClasses)
+	} else if len(parentClasses) == 1 {
+		class = core.NewClass(string(className), parentClasses[0])
+	} else {
+		class = core.NewClass(string(className), nil)
+	}
 
 	// Process class body
 	for i := bodyStart; i < len(args); i++ {
 		stmt := args[i]
-		
+
 		// Handle different statement types
 		switch s := stmt.(type) {
 		case core.ListValue:
 			if len(s) == 0 {
 				continue
 			}
-			
+
 			// Check for def form
 			if sym, ok := s[0].(core.SymbolValue); ok && string(sym) == "def" {
 				// Method or attribute definition
 				if len(s) < 3 {
 					return nil, fmt.Errorf("def requires at least name and value")
 				}
-				
+
 				name, ok := s[1].(core.SymbolValue)
 				if !ok {
 					return nil, fmt.Errorf("def name must be a symbol")
 				}
-				
+
 				// Check if it's a method definition
 				if len(s) >= 3 {
 					if paramList, ok := s[2].(core.ListValue); ok {
@@ -107,7 +121,7 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						continue
 					}
 				}
-				
+
 				// It's an attribute definition
 				value, err := Eval(s[2], ctx)
 				if err != nil {
@@ -183,7 +197,7 @@ func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	class, ok := classVal.(*core.Class)
 	if !ok {
 		return nil, fmt.Errorf("first argument to super must be a class")
@@ -194,7 +208,7 @@ func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	instance, ok := instanceVal.(*core.Instance)
 	if !ok {
 		return nil, fmt.Errorf("second argument to super must be an instance")
@@ -225,7 +239,7 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 	if typeName, ok := classVal.(core.StringValue); ok {
 		actualType := string(obj.Type())
 		expectedType := string(typeName)
-		
+
 		// Handle Python type name aliases
 		switch expectedType {
 		case "int", "float":
@@ -248,7 +262,7 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 			return core.BoolValue(actualType == expectedType), nil
 		}
 	}
-	
+
 	// Check if obj is an instance and classVal is a class
 	instance, isInst := obj.(*core.Instance)
 	class, isClass := classVal.(*core.Class)

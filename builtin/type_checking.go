@@ -9,7 +9,7 @@ func registerTypeCheckingBuiltins(ctx *core.Context) {
 	// NOTE: isinstance and issubclass are implemented as special forms in eval/class_forms.go
 
 	// Type conversion functions
-	
+
 	// int() - convert to integer
 	ctx.Define("int", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
@@ -97,4 +97,3 @@ func registerTypeCheckingBuiltins(ctx *core.Context) {
 		return core.BoolValue(core.IsTruthy(args[0])), nil
 	}))
 }
-

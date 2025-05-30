@@ -3,7 +3,7 @@ package repl
 import (
 	"sort"
 	"strings"
-	
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -22,12 +22,12 @@ func (c *Completer) Complete(prefix string) []string {
 	if prefix == "" {
 		return nil
 	}
-	
+
 	var completions []string
-	
+
 	// Get all defined symbols from context
 	symbols := c.ctx.GetAllSymbols()
-	
+
 	// Add special forms
 	specialForms := []string{
 		"def", "lambda", "if", "do", "let", "quote",
@@ -39,7 +39,7 @@ func (c *Completer) Complete(prefix string) []string {
 		"yield", "async", "await", "channel", "select",
 		"send!", "recv!", "go",
 	}
-	
+
 	// Add builtins
 	builtins := []string{
 		"print", "str", "len", "type", "repr",
@@ -50,32 +50,32 @@ func (c *Completer) Complete(prefix string) []string {
 		"open", "read", "write", "close",
 		"true", "false", "nil",
 	}
-	
+
 	// Collect all possible completions
 	allCompletions := make(map[string]bool)
-	
+
 	for _, sym := range symbols {
 		allCompletions[sym] = true
 	}
-	
+
 	for _, sf := range specialForms {
 		allCompletions[sf] = true
 	}
-	
+
 	for _, b := range builtins {
 		allCompletions[b] = true
 	}
-	
+
 	// Filter by prefix
 	for comp := range allCompletions {
 		if strings.HasPrefix(comp, prefix) {
 			completions = append(completions, comp)
 		}
 	}
-	
+
 	// Sort completions
 	sort.Strings(completions)
-	
+
 	return completions
 }
 

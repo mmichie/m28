@@ -36,26 +36,26 @@ func InitStringMethods() {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("replace() takes at least 2 arguments (%d given)", len(args))
 			}
-			
+
 			s := string(receiver.(StringValue))
-			
+
 			old, ok := args[0].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("replace() argument 1 must be a string")
 			}
-			
+
 			new, ok := args[1].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("replace() argument 2 must be a string")
 			}
-			
+
 			if len(args) >= 3 {
 				if count, ok := args[2].(NumberValue); ok {
 					return StringValue(strings.Replace(s, string(old), string(new), int(count))), nil
 				}
 				return nil, fmt.Errorf("replace() argument 3 must be a number")
 			}
-			
+
 			return StringValue(strings.ReplaceAll(s, string(old), string(new))), nil
 		},
 	}
@@ -69,13 +69,13 @@ func InitStringMethods() {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("startswith() takes exactly one argument (%d given)", len(args))
 			}
-			
+
 			s := string(receiver.(StringValue))
 			prefix, ok := args[0].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("startswith() argument must be a string")
 			}
-			
+
 			return BoolValue(strings.HasPrefix(s, string(prefix))), nil
 		},
 	}
@@ -89,13 +89,13 @@ func InitStringMethods() {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("endswith() takes exactly one argument (%d given)", len(args))
 			}
-			
+
 			s := string(receiver.(StringValue))
 			suffix, ok := args[0].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("endswith() argument must be a string")
 			}
-			
+
 			return BoolValue(strings.HasSuffix(s, string(suffix))), nil
 		},
 	}
@@ -109,13 +109,13 @@ func InitStringMethods() {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("find() takes exactly one argument (%d given)", len(args))
 			}
-			
+
 			s := string(receiver.(StringValue))
 			sub, ok := args[0].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("find() argument must be a string")
 			}
-			
+
 			return NumberValue(strings.Index(s, string(sub))), nil
 		},
 	}
@@ -129,9 +129,9 @@ func InitStringMethods() {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("join() takes exactly one argument (%d given)", len(args))
 			}
-			
+
 			sep := string(receiver.(StringValue))
-			
+
 			// Handle different iterable types
 			var parts []string
 			switch v := args[0].(type) {
@@ -156,7 +156,7 @@ func InitStringMethods() {
 			default:
 				return nil, fmt.Errorf("join() argument must be an iterable")
 			}
-			
+
 			return StringValue(strings.Join(parts, sep)), nil
 		},
 	}
@@ -196,13 +196,13 @@ func InitStringMethods() {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("count() takes exactly one argument (%d given)", len(args))
 			}
-			
+
 			s := string(receiver.(StringValue))
 			sub, ok := args[0].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("count() argument must be a string")
 			}
-			
+
 			return NumberValue(strings.Count(s, string(sub))), nil
 		},
 	}
@@ -216,7 +216,7 @@ func InitStringMethods() {
 			// Simple implementation - just replace {} with args in order
 			s := string(receiver.(StringValue))
 			result := s
-			
+
 			for i, arg := range args {
 				placeholder := "{}"
 				if idx := strings.Index(result, placeholder); idx >= 0 {
@@ -228,7 +228,7 @@ func InitStringMethods() {
 					result = strings.ReplaceAll(result, placeholder, PrintValueWithoutQuotes(arg))
 				}
 			}
-			
+
 			return StringValue(result), nil
 		},
 	}
@@ -333,13 +333,13 @@ func InitStringMethods() {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("index() takes exactly one argument (%d given)", len(args))
 			}
-			
+
 			s := string(receiver.(StringValue))
 			sub, ok := args[0].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("index() argument must be a string")
 			}
-			
+
 			idx := strings.Index(s, string(sub))
 			if idx == -1 {
 				return nil, fmt.Errorf("substring not found")
@@ -376,7 +376,7 @@ func InitStringMethods() {
 			s := string(receiver.(StringValue))
 			sep := " "
 			limit := -1
-			
+
 			if len(args) > 0 {
 				if sepStr, ok := args[0].(StringValue); ok {
 					sep = string(sepStr)
@@ -391,14 +391,14 @@ func InitStringMethods() {
 					return nil, fmt.Errorf("maxsplit must be a number")
 				}
 			}
-			
+
 			var parts []string
 			if limit == -1 {
 				parts = strings.Split(s, sep)
 			} else {
 				parts = strings.SplitN(s, sep, limit)
 			}
-			
+
 			result := make(ListValue, len(parts))
 			for i, part := range parts {
 				result[i] = StringValue(part)

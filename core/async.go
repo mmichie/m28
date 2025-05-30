@@ -40,14 +40,14 @@ func (t *Task) Type() Type {
 func (t *Task) String() string {
 	t.Mu.Lock()
 	defer t.Mu.Unlock()
-	
+
 	status := "pending"
 	if t.Finished {
 		status = "finished"
 	} else if t.Started {
 		status = "running"
 	}
-	
+
 	if t.Name != "" {
 		return fmt.Sprintf("<Task '%s' %s>", t.Name, status)
 	}
@@ -115,7 +115,7 @@ func (t *Task) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(t),
 		}, true
-		
+
 	case "done":
 		return &BoundMethod{
 			Receiver: t,
@@ -132,7 +132,7 @@ func (t *Task) GetAttr(name string) (Value, bool) {
 			TypeDesc: GetTypeDescriptorForValue(t),
 		}, true
 	}
-	
+
 	return t.BaseObject.GetAttr(name)
 }
 
@@ -163,7 +163,7 @@ func (c *Channel) Type() Type {
 func (c *Channel) String() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.closed {
 		return fmt.Sprintf("<channel(capacity=%d) closed>", c.capacity)
 	}
@@ -178,7 +178,7 @@ func (c *Channel) Send(value Value) error {
 		return fmt.Errorf("send on closed channel")
 	}
 	c.mu.Unlock()
-	
+
 	c.ch <- value
 	return nil
 }
@@ -206,11 +206,11 @@ func (c *Channel) TryReceive() (Value, bool) {
 func (c *Channel) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.closed {
 		return fmt.Errorf("close of closed channel")
 	}
-	
+
 	c.closed = true
 	close(c.ch)
 	return nil
@@ -246,7 +246,7 @@ func (c *Channel) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(c),
 		}, true
-		
+
 	case "receive", "recv", "get":
 		return &BoundMethod{
 			Receiver: c,
@@ -262,7 +262,7 @@ func (c *Channel) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(c),
 		}, true
-		
+
 	case "close":
 		return &BoundMethod{
 			Receiver: c,
@@ -282,7 +282,7 @@ func (c *Channel) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(c),
 		}, true
-		
+
 	case "__len__":
 		return &BoundMethod{
 			Receiver: c,
@@ -299,15 +299,15 @@ func (c *Channel) GetAttr(name string) (Value, bool) {
 			TypeDesc: GetTypeDescriptorForValue(c),
 		}, true
 	}
-	
+
 	return c.BaseObject.GetAttr(name)
 }
 
 // SelectCase represents a case in a select statement
 type SelectCase struct {
 	Channel *Channel
-	Value   Value      // Value to send (for send cases)
-	IsSend  bool       // true for send, false for receive
+	Value   Value                      // Value to send (for send cases)
+	IsSend  bool                       // true for send, false for receive
 	Body    func(Value) (Value, error) // Function to execute
 }
 
@@ -315,7 +315,7 @@ type SelectCase struct {
 func Select(cases []SelectCase, defaultCase func() (Value, error)) (Value, error) {
 	// Build reflect cases for Go's select
 	goCases := make([]interface{}, 0, len(cases))
-	
+
 	for _, c := range cases {
 		if c.IsSend {
 			goCases = append(goCases, sendCase{ch: c.Channel.ch, val: c.Value})
@@ -323,7 +323,7 @@ func Select(cases []SelectCase, defaultCase func() (Value, error)) (Value, error
 			goCases = append(goCases, recvCase{ch: c.Channel.ch})
 		}
 	}
-	
+
 	// Simple implementation - try each case
 	for i, c := range cases {
 		if c.IsSend {
@@ -351,12 +351,12 @@ func Select(cases []SelectCase, defaultCase func() (Value, error)) (Value, error
 			}
 		}
 	}
-	
+
 	// No case ready, use default
 	if defaultCase != nil {
 		return defaultCase()
 	}
-	
+
 	// Block on all cases
 	// This is a simplified implementation
 	// A full implementation would use reflect.Select

@@ -11,7 +11,7 @@ func RegisterAsyncBuiltins(ctx *core.Context) {
 	// Channel constructor function
 	ctx.Define("Channel", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		capacity := 0
-		
+
 		if len(args) > 0 {
 			if num, ok := args[0].(core.NumberValue); ok {
 				capacity = int(num)
@@ -22,7 +22,7 @@ func RegisterAsyncBuiltins(ctx *core.Context) {
 				return nil, fmt.Errorf("channel capacity must be a number")
 			}
 		}
-		
+
 		return core.NewChannel(capacity), nil
 	}))
 
@@ -54,11 +54,11 @@ func RegisterAsyncBuiltins(ctx *core.Context) {
 	// gather - run multiple async tasks concurrently
 	ctx.Define("gather", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		tasks := make([]*core.Task, 0, len(args))
-		
+
 		// Start all tasks
 		for i, arg := range args {
 			var task *core.Task
-			
+
 			switch v := arg.(type) {
 			case *core.Task:
 				task = v
@@ -80,10 +80,10 @@ func RegisterAsyncBuiltins(ctx *core.Context) {
 					return nil, fmt.Errorf("argument %d is not a task or callable", i)
 				}
 			}
-			
+
 			tasks = append(tasks, task)
 		}
-		
+
 		// Wait for all tasks and collect results
 		results := make(core.ListValue, len(tasks))
 		for i, task := range tasks {
@@ -93,7 +93,7 @@ func RegisterAsyncBuiltins(ctx *core.Context) {
 			}
 			results[i] = result
 		}
-		
+
 		return results, nil
 	}))
 

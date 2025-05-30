@@ -9,8 +9,8 @@ import (
 
 // CommandHandler handles REPL-specific commands
 type CommandHandler struct {
-	repl            *REPL
-	settings        *REPLSettings
+	repl             *REPL
+	settings         *REPLSettings
 	commandToExecute string // Command to execute after handling
 }
 
@@ -42,17 +42,17 @@ func (ch *CommandHandler) IsCommand(input string) bool {
 func (ch *CommandHandler) HandleCommand(input string) (bool, error) {
 	input = strings.TrimSpace(input)
 	ch.commandToExecute = "" // Reset
-	
+
 	// Handle : commands
 	if strings.HasPrefix(input, ":") {
 		return ch.handleColonCommand(input[1:])
 	}
-	
+
 	// Handle ! commands (history execution)
 	if strings.HasPrefix(input, "!") {
 		return ch.handleBangCommand(input[1:])
 	}
-	
+
 	return false, nil
 }
 
@@ -67,39 +67,39 @@ func (ch *CommandHandler) handleColonCommand(cmd string) (bool, error) {
 	if len(parts) == 0 {
 		return false, nil
 	}
-	
+
 	command := parts[0]
 	args := parts[1:]
-	
+
 	switch command {
 	case "help":
 		ch.showCommandHelp(ch.repl.writer)
 		return true, nil
-		
+
 	case "history":
 		return ch.handleHistoryCommand(args)
-		
+
 	case "toggle-keybindings":
 		return ch.toggleKeybindings()
-		
+
 	case "toggle-colors":
 		return ch.toggleColors()
-		
+
 	case "settings":
 		ch.showSettings(ch.repl.writer)
 		return true, nil
-		
+
 	case "clear":
 		// Clear screen (ANSI escape sequence)
 		fmt.Fprint(ch.repl.writer, "\033[2J\033[H")
 		return true, nil
-		
+
 	case "reset":
 		// Reset execution counter
 		ch.repl.executionState.executionCount = 0
 		fmt.Fprintln(ch.repl.writer, "Execution counter reset.")
 		return true, nil
-		
+
 	default:
 		fmt.Fprintf(ch.repl.writer, "Unknown command: :%s\n", command)
 		fmt.Fprintln(ch.repl.writer, "Type :help for available commands.")
@@ -112,7 +112,7 @@ func (ch *CommandHandler) handleBangCommand(cmd string) (bool, error) {
 	if cmd == "" {
 		return false, nil
 	}
-	
+
 	// Handle !! (repeat last command)
 	if cmd == "!" {
 		if lastCmd, ok := ch.repl.history.Previous(); ok {
@@ -123,7 +123,7 @@ func (ch *CommandHandler) handleBangCommand(cmd string) (bool, error) {
 		fmt.Fprintln(ch.repl.writer, "No commands in history.")
 		return true, nil
 	}
-	
+
 	// Handle !n (execute command n from history)
 	if num, err := strconv.Atoi(cmd); err == nil {
 		if histCmd := ch.repl.history.GetCommand(num); histCmd != "" {
@@ -133,13 +133,13 @@ func (ch *CommandHandler) handleBangCommand(cmd string) (bool, error) {
 		fmt.Fprintf(ch.repl.writer, "No command at position %d in history.\n", num)
 		return true, nil
 	}
-	
+
 	// Handle !prefix (execute most recent command starting with prefix)
 	if histCmd := ch.repl.history.FindByPrefix(cmd); histCmd != "" {
 		ch.commandToExecute = histCmd
 		return false, nil // Return false to let the main loop evaluate it
 	}
-	
+
 	fmt.Fprintf(ch.repl.writer, "No command starting with '%s' found in history.\n", cmd)
 	return true, nil
 }
@@ -147,25 +147,25 @@ func (ch *CommandHandler) handleBangCommand(cmd string) (bool, error) {
 // handleHistoryCommand handles the :history command
 func (ch *CommandHandler) handleHistoryCommand(args []string) (bool, error) {
 	limit := 10 // Default to showing last 10 commands
-	
+
 	if len(args) > 0 {
 		if num, err := strconv.Atoi(args[0]); err == nil {
 			limit = num
 		}
 	}
-	
+
 	commands := ch.repl.history.GetLastN(limit)
 	if len(commands) == 0 {
 		fmt.Fprintln(ch.repl.writer, "No commands in history.")
 		return true, nil
 	}
-	
+
 	fmt.Fprintln(ch.repl.writer, "Command History:")
 	startNum := ch.repl.history.GetTotalCount() - len(commands) + 1
 	for i, cmd := range commands {
 		fmt.Fprintf(ch.repl.writer, "%4d  %s\n", startNum+i, cmd)
 	}
-	
+
 	return true, nil
 }
 
@@ -176,7 +176,7 @@ func (ch *CommandHandler) toggleKeybindings() (bool, error) {
 	} else {
 		ch.settings.KeybindingMode = "emacs"
 	}
-	
+
 	fmt.Fprintf(ch.repl.writer, "Keybinding mode set to: %s\n", ch.settings.KeybindingMode)
 	fmt.Fprintln(ch.repl.writer, "Note: Keybinding support requires readline integration (not yet implemented).")
 	return true, nil
@@ -186,12 +186,12 @@ func (ch *CommandHandler) toggleKeybindings() (bool, error) {
 func (ch *CommandHandler) toggleColors() (bool, error) {
 	ch.settings.ColorsEnabled = !ch.settings.ColorsEnabled
 	ch.repl.colorManager.SetEnabled(ch.settings.ColorsEnabled)
-	
+
 	status := "disabled"
 	if ch.settings.ColorsEnabled {
 		status = "enabled"
 	}
-	
+
 	fmt.Fprintf(ch.repl.writer, "Colored output %s.\n", status)
 	return true, nil
 }

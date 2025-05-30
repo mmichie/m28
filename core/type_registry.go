@@ -247,16 +247,16 @@ func InitializeTypeRegistry() {
 					if len(args) != 1 {
 						return nil, fmt.Errorf("__getattr__ expects 1 argument")
 					}
-					
+
 					name, ok := args[0].(StringValue)
 					if !ok {
 						return nil, fmt.Errorf("attribute name must be a string")
 					}
-					
+
 					if val, ok := module.GetExport(string(name)); ok {
 						return val, nil
 					}
-					
+
 					return nil, fmt.Errorf("module '%s' has no attribute '%s'", module.Name, string(name))
 				},
 			},
@@ -580,7 +580,7 @@ func InitializeTypeRegistry() {
 					if idx > len(list) {
 						idx = len(list)
 					}
-					
+
 					newList := make(ListValue, len(list)+1)
 					copy(newList[:idx], list[:idx])
 					newList[idx] = args[1]
@@ -598,7 +598,7 @@ func InitializeTypeRegistry() {
 					if len(list) == 0 {
 						return nil, fmt.Errorf("pop from empty list")
 					}
-					
+
 					idx := len(list) - 1
 					if len(args) > 0 {
 						index, ok := args[0].(NumberValue)
@@ -610,11 +610,11 @@ func InitializeTypeRegistry() {
 							idx = len(list) + idx
 						}
 					}
-					
+
 					if idx < 0 || idx >= len(list) {
 						return nil, &IndexError{Index: idx, Length: len(list)}
 					}
-					
+
 					return list[idx], nil
 				},
 			},
@@ -798,17 +798,17 @@ func InitializeTypeRegistry() {
 					if len(args) < 1 || len(args) > 2 {
 						return nil, fmt.Errorf("get expects 1 or 2 arguments")
 					}
-					
+
 					key, ok := args[0].(StringValue)
 					if !ok {
 						return nil, fmt.Errorf("dict key must be a string")
 					}
-					
+
 					val, found := dict.Get(string(key))
 					if found {
 						return val, nil
 					}
-					
+
 					if len(args) > 1 {
 						return args[1], nil
 					}
@@ -826,7 +826,7 @@ func InitializeTypeRegistry() {
 					if !ok {
 						return nil, fmt.Errorf("dict key must be a string")
 					}
-					
+
 					// Create new dict with the update
 					newDict := NewDict()
 					for _, k := range dict.Keys() {

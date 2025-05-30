@@ -7,19 +7,41 @@ import (
 // Class represents a class definition
 type Class struct {
 	BaseObject
-	Name       string                       // Class name
-	Parent     *Class                       // Parent class (for inheritance)
-	Methods    map[string]Value             // Class methods
-	Attributes map[string]Value             // Class attributes
-	Constructor *MethodDescriptor           // __init__ method
+	Name        string            // Class name
+	Parent      *Class            // Parent class (for inheritance) - deprecated, use Parents
+	Parents     []*Class          // Parent classes (for multiple inheritance)
+	Methods     map[string]Value  // Class methods
+	Attributes  map[string]Value  // Class attributes
+	Constructor *MethodDescriptor // __init__ method
 }
 
 // NewClass creates a new class
 func NewClass(name string, parent *Class) *Class {
+	var parents []*Class
+	if parent != nil {
+		parents = []*Class{parent}
+	}
+	return &Class{
+		BaseObject: *NewBaseObject(Type("class")),
+		Name:       name,
+		Parent:     parent, // Keep for backward compatibility
+		Parents:    parents,
+		Methods:    make(map[string]Value),
+		Attributes: make(map[string]Value),
+	}
+}
+
+// NewClassWithParents creates a new class with multiple parents
+func NewClassWithParents(name string, parents []*Class) *Class {
+	var parent *Class
+	if len(parents) > 0 {
+		parent = parents[0] // First parent for backward compatibility
+	}
 	return &Class{
 		BaseObject: *NewBaseObject(Type("class")),
 		Name:       name,
 		Parent:     parent,
+		Parents:    parents,
 		Methods:    make(map[string]Value),
 		Attributes: make(map[string]Value),
 	}
@@ -41,19 +63,27 @@ func (c *Class) GetMethod(name string) (Value, bool) {
 	if method, ok := c.Methods[name]; ok {
 		return method, true
 	}
-	
-	// Check parent class
-	if c.Parent != nil {
+
+	// Check parent classes using MRO (Method Resolution Order)
+	// Simple left-to-right depth-first search
+	if len(c.Parents) > 0 {
+		for _, parent := range c.Parents {
+			if method, ok := parent.GetMethod(name); ok {
+				return method, true
+			}
+		}
+	} else if c.Parent != nil {
+		// Fallback to single parent for backward compatibility
 		return c.Parent.GetMethod(name)
 	}
-	
+
 	return nil, false
 }
 
 // SetMethod adds a method to the class
 func (c *Class) SetMethod(name string, method Value) {
 	c.Methods[name] = method
-	
+
 	// Special handling for __init__
 	// Constructor is set when creating instances
 }
@@ -64,12 +94,19 @@ func (c *Class) GetClassAttr(name string) (Value, bool) {
 	if attr, ok := c.Attributes[name]; ok {
 		return attr, true
 	}
-	
-	// Check parent class
-	if c.Parent != nil {
+
+	// Check parent classes using MRO
+	if len(c.Parents) > 0 {
+		for _, parent := range c.Parents {
+			if attr, ok := parent.GetClassAttr(name); ok {
+				return attr, true
+			}
+		}
+	} else if c.Parent != nil {
+		// Fallback to single parent for backward compatibility
 		return c.Parent.GetClassAttr(name)
 	}
-	
+
 	return nil, false
 }
 
@@ -84,12 +121,12 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	if method, ok := c.GetMethod(name); ok {
 		return method, true
 	}
-	
+
 	// Then check attributes
 	if attr, ok := c.GetClassAttr(name); ok {
 		return attr, true
 	}
-	
+
 	// Finally check base object
 	return c.BaseObject.GetAttr(name)
 }
@@ -98,7 +135,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 	// Create new instance
 	instance := NewInstance(c)
-	
+
 	// Call __init__ if it exists
 	if initMethod, ok := c.GetMethod("__init__"); ok {
 		// Create bound method for __init__
@@ -113,7 +150,7 @@ func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 			}
 		}
 	}
-	
+
 	return instance, nil
 }
 
@@ -153,7 +190,7 @@ func (i *Instance) String() string {
 			}
 		}
 	}
-	
+
 	return fmt.Sprintf("<%s instance at %p>", i.Class.Name, i)
 }
 
@@ -163,7 +200,7 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 	if attr, ok := i.Attributes[name]; ok {
 		return attr, true
 	}
-	
+
 	// Then check class methods
 	if method, ok := i.Class.GetMethod(name); ok {
 		// Bind method to instance if it's callable
@@ -179,17 +216,17 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 		}
 		return method, true
 	}
-	
+
 	// Then check class attributes
 	if attr, ok := i.Class.GetClassAttr(name); ok {
 		return attr, true
 	}
-	
+
 	// Check special attributes
 	if name == "__class__" {
 		return i.Class, true
 	}
-	
+
 	return nil, false
 }
 
@@ -230,6 +267,7 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 
 // Super represents access to parent class methods
 type Super struct {
+	BaseObject
 	Class    *Class
 	Instance *Instance
 }
@@ -237,8 +275,9 @@ type Super struct {
 // NewSuper creates a new super object
 func NewSuper(class *Class, instance *Instance) *Super {
 	return &Super{
-		Class:    class,
-		Instance: instance,
+		BaseObject: *NewBaseObject(Type("super")),
+		Class:      class,
+		Instance:   instance,
 	}
 }
 
@@ -254,25 +293,45 @@ func (s *Super) String() string {
 
 // GetAttr gets an attribute from the parent class
 func (s *Super) GetAttr(name string) (Value, bool) {
-	if s.Class.Parent == nil {
+	// Check if there are parent classes
+	if len(s.Class.Parents) == 0 && s.Class.Parent == nil {
 		return nil, false
 	}
-	
-	// Look up in parent class
-	if method, ok := s.Class.Parent.GetMethod(name); ok {
-		// Bind to instance if callable
-		if callable, ok := method.(interface {
-			Call([]Value, *Context) (Value, error)
-		}); ok {
-			boundMethod := &BoundInstanceMethod{
-				Instance: s.Instance,
-				Method:   callable,
+
+	// Look up in parent classes using MRO
+	if len(s.Class.Parents) > 0 {
+		for _, parent := range s.Class.Parents {
+			if method, ok := parent.GetMethod(name); ok {
+				// Bind to instance if callable
+				if callable, ok := method.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); ok {
+					boundMethod := &BoundInstanceMethod{
+						Instance: s.Instance,
+						Method:   callable,
+					}
+					return boundMethod, true
+				}
+				return method, true
 			}
-			return boundMethod, true
 		}
-		return method, true
+	} else if s.Class.Parent != nil {
+		// Fallback to single parent for backward compatibility
+		if method, ok := s.Class.Parent.GetMethod(name); ok {
+			// Bind to instance if callable
+			if callable, ok := method.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				boundMethod := &BoundInstanceMethod{
+					Instance: s.Instance,
+					Method:   callable,
+				}
+				return boundMethod, true
+			}
+			return method, true
+		}
 	}
-	
+
 	return nil, false
 }
 

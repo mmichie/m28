@@ -5,7 +5,7 @@ import (
 	"io"
 	"sort"
 	"strings"
-	
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -25,13 +25,13 @@ func (h *HelpSystem) ShowHelp(topic string, w io.Writer) {
 		h.showGeneralHelp(w)
 		return
 	}
-	
+
 	// Try to find documentation for the topic
 	if val, err := h.ctx.Lookup(topic); err == nil {
 		h.showValueHelp(topic, val, w)
 		return
 	}
-	
+
 	// Check for special topics
 	switch topic {
 	case "syntax":
@@ -85,7 +85,7 @@ func (h *HelpSystem) showGeneralHelp(w io.Writer) {
 func (h *HelpSystem) showValueHelp(name string, val core.Value, w io.Writer) {
 	fmt.Fprintf(w, "Help for '%s':\n", name)
 	fmt.Fprintf(w, "Type: %s\n", val.Type())
-	
+
 	// Show docstring if available
 	if obj, ok := val.(core.Object); ok {
 		if docVal, ok := obj.GetAttr("__doc__"); ok {
@@ -94,7 +94,7 @@ func (h *HelpSystem) showValueHelp(name string, val core.Value, w io.Writer) {
 			}
 		}
 	}
-	
+
 	// Show methods for objects
 	if td := core.GetTypeDescriptorForValue(val); td != nil && len(td.Methods) > 0 {
 		fmt.Fprintln(w, "\nMethods:")
@@ -103,13 +103,13 @@ func (h *HelpSystem) showValueHelp(name string, val core.Value, w io.Writer) {
 			methods = append(methods, name)
 		}
 		sort.Strings(methods)
-		
+
 		for _, name := range methods {
 			method := td.Methods[name]
 			fmt.Fprintf(w, "  %s(%s) - %s\n", name, h.formatArity(method.Arity), method.Doc)
 		}
 	}
-	
+
 	fmt.Fprintln(w)
 }
 
@@ -231,26 +231,26 @@ func (h *HelpSystem) showFunctionsHelp(w io.Writer) {
 	fmt.Fprintln(w, "M28 Built-in Functions")
 	fmt.Fprintln(w, "=====================")
 	fmt.Fprintln(w)
-	
+
 	// Group functions by category
 	categories := map[string][]string{
-		"I/O": {"print", "input", "open", "read", "write"},
+		"I/O":             {"print", "input", "open", "read", "write"},
 		"Type Conversion": {"str", "int", "float", "bool", "list", "dict", "tuple", "set"},
-		"Type Checking": {"type", "isinstance", "issubclass"},
-		"Math": {"abs", "min", "max", "sum", "round", "pow", "sqrt", "floor", "ceil"},
-		"Sequences": {"len", "range", "enumerate", "zip", "reversed", "sorted"},
-		"Functional": {"map", "filter", "reduce", "all", "any"},
-		"String": {"upper", "lower", "strip", "split", "join", "replace", "find"},
-		"Object": {"getattr", "setattr", "hasattr", "dir"},
+		"Type Checking":   {"type", "isinstance", "issubclass"},
+		"Math":            {"abs", "min", "max", "sum", "round", "pow", "sqrt", "floor", "ceil"},
+		"Sequences":       {"len", "range", "enumerate", "zip", "reversed", "sorted"},
+		"Functional":      {"map", "filter", "reduce", "all", "any"},
+		"String":          {"upper", "lower", "strip", "split", "join", "replace", "find"},
+		"Object":          {"getattr", "setattr", "hasattr", "dir"},
 	}
-	
+
 	for cat, funcs := range categories {
 		fmt.Fprintf(w, "\n%s:\n", cat)
 		for _, fn := range funcs {
 			if val, err := h.ctx.Lookup(fn); err == nil {
 				if td := core.GetTypeDescriptorForValue(val); td != nil {
 					fmt.Fprintf(w, "  %-15s", fn)
-					
+
 					// Try to get brief description
 					if bm, ok := val.(*core.BoundMethod); ok && bm.Method != nil {
 						if bm.Method.Doc != "" {

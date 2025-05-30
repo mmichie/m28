@@ -122,7 +122,7 @@ func (c *Context) FormatStackTrace() string {
 // GetAllSymbols returns all defined symbols in this context and its parents
 func (c *Context) GetAllSymbols() []string {
 	symbols := make(map[string]bool)
-	
+
 	// Collect symbols from this context and all parents
 	ctx := c
 	for ctx != nil {
@@ -131,12 +131,12 @@ func (c *Context) GetAllSymbols() []string {
 		}
 		ctx = ctx.Outer
 	}
-	
+
 	// Convert to slice
 	result := make([]string, 0, len(symbols))
 	for sym := range symbols {
 		result = append(result, sym)
 	}
-	
+
 	return result
 }

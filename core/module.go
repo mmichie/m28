@@ -10,11 +10,11 @@ import (
 // Module represents a loaded module with export control
 type Module struct {
 	BaseObject
-	Name     string              // Module name
-	Path     string              // File path
-	Context  *Context            // Module's execution context
-	Exports  map[string]Value    // Explicitly exported values
-	All      []string            // Names to export with * import
+	Name    string           // Module name
+	Path    string           // File path
+	Context *Context         // Module's execution context
+	Exports map[string]Value // Explicitly exported values
+	All     []string         // Names to export with * import
 }
 
 // NewModule creates a new module
@@ -86,7 +86,7 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 	if val, ok := m.Exports[name]; ok {
 		return val, true
 	}
-	
+
 	// Then check base object attributes
 	return m.BaseObject.GetAttr(name)
 }
@@ -101,8 +101,8 @@ type EnhancedModuleInfo struct {
 // EnhancedModuleRegistry keeps track of loaded modules
 type EnhancedModuleRegistry struct {
 	modules    map[string]EnhancedModuleInfo // Modules indexed by name
-	searchPath []string                       // List of directories to search for modules
-	mu         sync.RWMutex                   // For thread safety
+	searchPath []string                      // List of directories to search for modules
+	mu         sync.RWMutex                  // For thread safety
 }
 
 // NewEnhancedModuleRegistry creates a new enhanced module registry

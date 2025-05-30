@@ -7,13 +7,13 @@ import (
 // Generator represents a generator object
 type Generator struct {
 	BaseObject
-	name       string             // Generator function name
-	state      GeneratorState     // Current state
-	context    *Context           // Execution context
-	code       Value              // Generator body
-	yielded    Value              // Last yielded value
-	locals     map[string]Value   // Local variables
-	position   int                // Current position in execution
+	name     string           // Generator function name
+	state    GeneratorState   // Current state
+	context  *Context         // Execution context
+	code     Value            // Generator body
+	yielded  Value            // Last yielded value
+	locals   map[string]Value // Local variables
+	position int              // Current position in execution
 }
 
 // GeneratorState represents the state of a generator
@@ -57,7 +57,7 @@ func (g *Generator) String() string {
 	case GeneratorCompleted:
 		stateStr = "completed"
 	}
-	
+
 	if g.name != "" {
 		return fmt.Sprintf("<generator object %s at %p, state=%s>", g.name, g, stateStr)
 	}
@@ -83,7 +83,7 @@ func (g *Generator) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(g),
 		}, true
-		
+
 	case "send":
 		// Return bound send method
 		return &BoundMethod{
@@ -103,7 +103,7 @@ func (g *Generator) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(g),
 		}, true
-		
+
 	case "close":
 		// Return bound close method
 		return &BoundMethod{
@@ -121,7 +121,7 @@ func (g *Generator) GetAttr(name string) (Value, bool) {
 			TypeDesc: GetTypeDescriptorForValue(g),
 		}, true
 	}
-	
+
 	return g.BaseObject.GetAttr(name)
 }
 
@@ -130,11 +130,11 @@ func (g *Generator) Next() (Value, error) {
 	if g.state == GeneratorCompleted {
 		return nil, &StopIteration{}
 	}
-	
+
 	if g.state == GeneratorCreated {
 		g.state = GeneratorSuspended
 	}
-	
+
 	// This would be implemented by the evaluator
 	// For now, return a placeholder
 	return nil, &StopIteration{Message: "generator implementation pending"}
@@ -145,10 +145,10 @@ func (g *Generator) Send(value Value) (Value, error) {
 	if g.state == GeneratorCreated && value != Nil {
 		return nil, fmt.Errorf("can't send non-None value to a just-started generator")
 	}
-	
+
 	// Store the sent value for yield expressions
 	g.yielded = value
-	
+
 	return g.Next()
 }
 
@@ -240,9 +240,9 @@ func (gf *GeneratorFunction) String() string {
 func (gf *GeneratorFunction) Call(args []Value, ctx *Context) (Value, error) {
 	// Create a new generator with the function's code
 	gen := NewGenerator(gf.Name, gf.Function, ctx)
-	
+
 	// Store the arguments in the generator's context
 	// This would be handled by the evaluator
-	
+
 	return gen, nil
 }

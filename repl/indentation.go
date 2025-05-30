@@ -24,7 +24,7 @@ func (it *IndentationTracker) AnalyzeLine(line string) (indentChange int) {
 	if trimmed == "" {
 		return 0
 	}
-	
+
 	// Keywords that increase indentation
 	indentKeywords := []string{
 		"def ", "lambda ", "class ",
@@ -33,12 +33,12 @@ func (it *IndentationTracker) AnalyzeLine(line string) (indentChange int) {
 		"try:", "except ", "finally:",
 		"with ",
 	}
-	
+
 	// Keywords that decrease indentation (on the same line)
 	dedentKeywords := []string{
 		"return", "break", "continue", "pass", "raise",
 	}
-	
+
 	// Check for indent keywords
 	for _, keyword := range indentKeywords {
 		if strings.HasPrefix(trimmed, "("+keyword) || strings.HasPrefix(trimmed, keyword) {
@@ -50,7 +50,7 @@ func (it *IndentationTracker) AnalyzeLine(line string) (indentChange int) {
 			return 1
 		}
 	}
-	
+
 	// Check for dedent keywords
 	for _, keyword := range dedentKeywords {
 		if strings.HasPrefix(trimmed, "("+keyword) || strings.HasPrefix(trimmed, keyword) ||
@@ -58,12 +58,12 @@ func (it *IndentationTracker) AnalyzeLine(line string) (indentChange int) {
 			return -1
 		}
 	}
-	
+
 	// Check if line ends with a colon (likely to start a block)
 	if strings.HasSuffix(trimmed, ":") {
 		return 1
 	}
-	
+
 	return 0
 }
 
@@ -97,7 +97,7 @@ func (it *IndentationTracker) DetectDedent(line string) bool {
 			break
 		}
 	}
-	
+
 	currentIndent := leadingSpaces / it.indentSize
 	return currentIndent < it.indentLevel
 }
@@ -112,6 +112,6 @@ func (it *IndentationTracker) SetLevelFromLine(line string) {
 			break
 		}
 	}
-	
+
 	it.indentLevel = leadingSpaces / it.indentSize
 }

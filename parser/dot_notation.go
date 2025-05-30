@@ -4,29 +4,29 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	
+
 	"github.com/mmichie/m28/core"
 )
 
 // parseDotAccess handles parsing of dot notation after the initial dot
 // It converts:
-//   .prop -> builds (. base prop)
-//   .method(args) -> builds (. base method args...)
+//
+//	.prop -> builds (. base prop)
+//	.method(args) -> builds (. base method args...)
 func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 	// Skip whitespace after dot
 	p.skipWhitespaceAndComments()
-	
-	
+
 	// Parse the property name
 	if p.pos >= len(p.input) {
 		return nil, p.error("unexpected end of input after '.'")
 	}
-	
+
 	// Check what follows the dot
 	ch := p.input[p.pos]
-	
+
 	var propName string
-	
+
 	if isDigit(ch) {
 		// Numeric index like list.0
 		start := p.pos
@@ -40,13 +40,13 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 	} else {
 		return nil, p.error(fmt.Sprintf("unexpected character '%c' after '.'", ch))
 	}
-	
+
 	// Check for method call
 	// First, check if there's whitespace before the potential '('
 	startPos := p.pos
 	p.skipWhitespaceAndComments()
 	hasWhitespace := p.pos > startPos
-	
+
 	// Only treat '(' as method call if there's no whitespace before it
 	if p.pos < len(p.input) && p.input[p.pos] == '(' && !hasWhitespace {
 		// It's a method call - parse arguments
@@ -54,7 +54,7 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Build (. base method arg1 arg2...)
 		// For method calls, we need to distinguish from property access
 		// even when there are no args, so we add a special marker
@@ -72,7 +72,7 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 		}
 		return result, nil
 	}
-	
+
 	// Just property access - build (. base prop)
 	return core.ListValue{
 		core.SymbolValue("."),
@@ -85,16 +85,16 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 // Assumes the opening '(' has NOT been consumed
 func (p *Parser) parseMethodArgs() ([]core.Value, error) {
 	p.pos++ // consume '('
-	
+
 	var args []core.Value
 	p.skipWhitespaceAndComments()
-	
+
 	// Empty args
 	if p.pos < len(p.input) && p.input[p.pos] == ')' {
 		p.pos++ // consume ')'
 		return args, nil
 	}
-	
+
 	// Parse comma-separated arguments
 	for {
 		arg, err := p.parseExpr()
@@ -102,24 +102,24 @@ func (p *Parser) parseMethodArgs() ([]core.Value, error) {
 			return nil, err
 		}
 		args = append(args, arg)
-		
+
 		p.skipWhitespaceAndComments()
 		if p.pos >= len(p.input) {
 			return nil, p.error("unclosed method call")
 		}
-		
+
 		if p.input[p.pos] == ')' {
 			p.pos++ // consume ')'
 			break
 		}
-		
+
 		if p.input[p.pos] != ',' {
 			return nil, p.error(fmt.Sprintf("expected ',' or ')' in method call, got '%c'", p.input[p.pos]))
 		}
 		p.pos++ // consume ','
 		p.skipWhitespaceAndComments()
 	}
-	
+
 	return args, nil
 }
 
@@ -135,12 +135,12 @@ func isValidPropertyName(name string) bool {
 	if len(name) == 0 {
 		return false
 	}
-	
+
 	// Check if it's a number (for index access)
 	if _, err := strconv.Atoi(name); err == nil {
 		return true
 	}
-	
+
 	// Check if it's a valid identifier
 	for i, ch := range name {
 		if i == 0 {
@@ -153,7 +153,7 @@ func isValidPropertyName(name string) bool {
 			}
 		}
 	}
-	
+
 	return true
 }
 
@@ -163,12 +163,12 @@ func looksLikeModulePath(s string) bool {
 	if len(parts) < 2 {
 		return false
 	}
-	
+
 	for _, part := range parts {
 		if !isValidPropertyName(part) {
 			return false
 		}
 	}
-	
+
 	return true
 }

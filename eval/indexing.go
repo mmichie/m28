@@ -33,16 +33,16 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		if !ok {
 			return nil, fmt.Errorf("list indices must be integers, not %s", key.Type())
 		}
-		
+
 		index := int(idx)
 		if index < 0 {
 			index = len(v) + index
 		}
-		
+
 		if index < 0 || index >= len(v) {
 			return nil, &core.IndexError{Index: index, Length: len(v)}
 		}
-		
+
 		return v[index], nil
 
 	case core.TupleValue:
@@ -51,16 +51,16 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		if !ok {
 			return nil, fmt.Errorf("tuple indices must be integers, not %s", key.Type())
 		}
-		
+
 		index := int(idx)
 		if index < 0 {
 			index = len(v) + index
 		}
-		
+
 		if index < 0 || index >= len(v) {
 			return nil, &core.IndexError{Index: index, Length: len(v)}
 		}
-		
+
 		return v[index], nil
 
 	case *core.DictValue:
@@ -77,12 +77,12 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		default:
 			keyStr = key.String()
 		}
-		
+
 		// Check if key exists
 		if val, exists := v.Get(keyStr); exists {
 			return val, nil
 		}
-		
+
 		// If not found, return KeyError
 		return nil, &core.KeyError{Key: key}
 
@@ -92,18 +92,18 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		if !ok {
 			return nil, fmt.Errorf("string indices must be integers, not %s", key.Type())
 		}
-		
+
 		str := string(v)
 		index := int(idx)
 		if index < 0 {
 			index = len(str) + index
 		}
-		
+
 		if index < 0 || index >= len(str) {
 			return nil, &core.IndexError{Index: index, Length: len(str)}
 		}
-		
-		return core.StringValue(str[index:index+1]), nil
+
+		return core.StringValue(str[index : index+1]), nil
 
 	default:
 		return nil, fmt.Errorf("'%s' object is not subscriptable", obj.Type())
@@ -141,16 +141,16 @@ func SetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		if !ok {
 			return nil, fmt.Errorf("list indices must be integers, not %s", key.Type())
 		}
-		
+
 		index := int(idx)
 		if index < 0 {
 			index = len(v) + index
 		}
-		
+
 		if index < 0 || index >= len(v) {
 			return nil, &core.IndexError{Index: index, Length: len(v)}
 		}
-		
+
 		v[index] = value
 		return value, nil
 
@@ -167,7 +167,7 @@ func SetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		default:
 			keyStr = key.String()
 		}
-		
+
 		v.Set(keyStr, value)
 		return value, nil
 
@@ -195,18 +195,18 @@ func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Check if it's None
 		if _, isNil := val.(core.NilValue); isNil {
 			return defaultVal, nil
 		}
-		
+
 		// Must be a number
 		num, ok := val.(core.NumberValue)
 		if !ok {
 			return nil, fmt.Errorf("slice indices must be integers or None, not %s", val.Type())
 		}
-		
+
 		i := int(num)
 		return &i, nil
 	}
@@ -236,7 +236,7 @@ func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	switch v := obj.(type) {
 	case core.ListValue:
 		return sliceList(v, start, end, step)
-		
+
 	case core.TupleValue:
 		result, err := sliceList(core.ListValue(v), start, end, step)
 		if err != nil {
@@ -259,13 +259,13 @@ func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // sliceList performs slicing on a list
 func sliceList(list core.ListValue, start, end, step *int) (core.Value, error) {
 	length := len(list)
-	
+
 	// Normalize indices
 	startIdx, endIdx, stepVal := normalizeSliceIndices(length, start, end, step)
-	
+
 	// Build result
 	result := make(core.ListValue, 0)
-	
+
 	if stepVal > 0 {
 		for i := startIdx; i < endIdx; i += stepVal {
 			if i >= 0 && i < length {
@@ -279,20 +279,20 @@ func sliceList(list core.ListValue, start, end, step *int) (core.Value, error) {
 			}
 		}
 	}
-	
+
 	return result, nil
 }
 
 // sliceString performs slicing on a string
 func sliceString(str string, start, end, step *int) (core.Value, error) {
 	length := len(str)
-	
+
 	// Normalize indices
 	startIdx, endIdx, stepVal := normalizeSliceIndices(length, start, end, step)
-	
+
 	// Build result
 	result := ""
-	
+
 	if stepVal > 0 {
 		for i := startIdx; i < endIdx; i += stepVal {
 			if i >= 0 && i < length {
@@ -306,7 +306,7 @@ func sliceString(str string, start, end, step *int) (core.Value, error) {
 			}
 		}
 	}
-	
+
 	return core.StringValue(result), nil
 }
 
@@ -317,15 +317,15 @@ func normalizeSliceIndices(length int, start, end, step *int) (int, int, int) {
 	if step != nil {
 		stepVal = *step
 	}
-	
+
 	// Determine defaults based on step direction
 	var startIdx, endIdx int
-	
+
 	if stepVal > 0 {
 		// Forward slice
 		startIdx = 0
 		endIdx = length
-		
+
 		if start != nil {
 			startIdx = *start
 			if startIdx < 0 {
@@ -338,7 +338,7 @@ func normalizeSliceIndices(length int, start, end, step *int) (int, int, int) {
 				startIdx = length
 			}
 		}
-		
+
 		if end != nil {
 			endIdx = *end
 			if endIdx < 0 {
@@ -355,7 +355,7 @@ func normalizeSliceIndices(length int, start, end, step *int) (int, int, int) {
 		// Backward slice
 		startIdx = length - 1
 		endIdx = -length - 1
-		
+
 		if start != nil {
 			startIdx = *start
 			if startIdx < 0 {
@@ -368,7 +368,7 @@ func normalizeSliceIndices(length int, start, end, step *int) (int, int, int) {
 				startIdx = length - 1
 			}
 		}
-		
+
 		if end != nil {
 			endIdx = *end
 			if endIdx < 0 {
@@ -377,7 +377,7 @@ func normalizeSliceIndices(length int, start, end, step *int) (int, int, int) {
 			// endIdx is already exclusive, no need to adjust
 		}
 	}
-	
+
 	return startIdx, endIdx, stepVal
 }
 

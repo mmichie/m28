@@ -2,8 +2,8 @@ package builtin
 
 import (
 	"fmt"
-	"math"
 	"github.com/mmichie/m28/core"
+	"math"
 )
 
 // RegisterEssentialBuiltins registers additional essential built-in functions
@@ -141,7 +141,9 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		name := string(nameVal)
 
 		// Check for the attribute
-		if objWithAttrs, ok := obj.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if objWithAttrs, ok := obj.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			_, found := objWithAttrs.GetAttr(name)
 			return core.BoolValue(found), nil
 		}
@@ -174,7 +176,9 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		name := string(nameVal)
 
 		// Try to get the attribute
-		if objWithAttrs, ok := obj.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if objWithAttrs, ok := obj.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if val, found := objWithAttrs.GetAttr(name); found {
 				return val, nil
 			}
@@ -219,7 +223,9 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		value := args[2]
 
 		// Try to set the attribute
-		if objWithAttrs, ok := obj.(interface{ SetAttr(string, core.Value) error }); ok {
+		if objWithAttrs, ok := obj.(interface {
+			SetAttr(string, core.Value) error
+		}); ok {
 			if err := objWithAttrs.SetAttr(name, value); err != nil {
 				return nil, err
 			}

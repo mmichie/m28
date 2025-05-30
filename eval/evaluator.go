@@ -119,34 +119,34 @@ func init() {
 		// Exception handling
 		"try":   tryForm,
 		"raise": raiseForm,
-		
+
 		// List comprehension
 		"list-comp": ListCompForm,
 
 		// Other special forms will be added through RegisterSpecialForm
 	}
-	
+
 	// Register enhanced module forms
 	RegisterModuleForms()
-	
+
 	// Register class forms
 	RegisterClassForms()
-	
+
 	// Register generator forms
 	RegisterGeneratorForms()
-	
+
 	// Register context manager forms
 	RegisterContextForms()
-	
+
 	// Register async/concurrent forms
 	RegisterAsyncForms()
-	
+
 	// Register dot notation
 	RegisterDotNotation()
-	
+
 	// Register indexing
 	RegisterIndexing()
-	
+
 	// Register augmented assignment
 	RegisterAugmentedAssignment()
 }
@@ -437,11 +437,11 @@ func (r *ReturnValue) String() string {
 // UserFunction represents a user-defined function
 type UserFunction struct {
 	core.BaseObject
-	params    []core.SymbolValue  // Legacy: simple parameter list
-	signature *FunctionSignature   // New: full signature with defaults
+	params    []core.SymbolValue // Legacy: simple parameter list
+	signature *FunctionSignature // New: full signature with defaults
 	body      core.Value
 	env       *core.Context
-	name      string  // Optional function name
+	name      string // Optional function name
 }
 
 // Call implements Callable.Call
@@ -552,18 +552,18 @@ func (e *Exception) Error() string {
 // isExceptionType checks if a string is a known exception type
 func isExceptionType(name string) bool {
 	knownTypes := map[string]bool{
-		"Exception":           true,
-		"Error":              true,
-		"NameError":          true,
-		"TypeError":          true,
-		"ValueError":         true,
-		"ZeroDivisionError":  true,
-		"KeyError":           true,
-		"IndexError":         true,
-		"AttributeError":     true,
-		"RuntimeError":       true,
-		"FileNotFoundError":  true,
-		"PermissionError":    true,
+		"Exception":         true,
+		"Error":             true,
+		"NameError":         true,
+		"TypeError":         true,
+		"ValueError":        true,
+		"ZeroDivisionError": true,
+		"KeyError":          true,
+		"IndexError":        true,
+		"AttributeError":    true,
+		"RuntimeError":      true,
+		"FileNotFoundError": true,
+		"PermissionError":   true,
 	}
 	return knownTypes[name]
 }
@@ -654,11 +654,13 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Parse except clause
-		// Forms: 
+		// Forms:
 		// (except handler...) - catch all
-		// (except var handler...) - catch all with variable binding
+		// (except var handler...) - catch all with variable binding (legacy)
 		// (except Type handler...) - catch specific type
-		// (except Type var handler...) - catch specific type with variable
+		// (except Type var handler...) - catch specific type with variable (legacy)
+		// (except Type as var handler...) - catch specific type with variable (Python style)
+		// (except as var handler...) - catch all with variable (Python style)
 		var excType string
 		var excVar string
 		var handlerStart int = 1
@@ -667,14 +669,32 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Check if second element is a symbol
 			if sym, ok := exceptClause[1].(core.SymbolValue); ok {
 				symStr := string(sym)
-				
-				// Check if it's a known exception type or starts with capital letter (class convention)
-				if isExceptionType(symStr) || (len(symStr) > 0 && symStr[0] >= 'A' && symStr[0] <= 'Z') {
+
+				// Check for "as" syntax for catch-all
+				if symStr == "as" && len(exceptClause) > 2 {
+					// (except as var handler...)
+					if varSym, ok := exceptClause[2].(core.SymbolValue); ok {
+						excVar = string(varSym)
+						handlerStart = 3
+					}
+				} else if isExceptionType(symStr) || (len(symStr) > 0 && symStr[0] >= 'A' && symStr[0] <= 'Z') {
+					// It's an exception type
 					excType = symStr
 					handlerStart = 2
-					
-					// Check if next element is a variable name (lowercase)
-					if len(exceptClause) > 2 {
+
+					// Check for "as" syntax
+					if len(exceptClause) > 3 && handlerStart == 2 {
+						if asSym, ok := exceptClause[2].(core.SymbolValue); ok && string(asSym) == "as" {
+							// (except Type as var handler...)
+							if varSym, ok := exceptClause[3].(core.SymbolValue); ok {
+								excVar = string(varSym)
+								handlerStart = 4
+							}
+						}
+					}
+
+					// Legacy: Check if next element is a variable name (lowercase)
+					if excVar == "" && len(exceptClause) > 2 {
 						if varSym, ok := exceptClause[2].(core.SymbolValue); ok {
 							varStr := string(varSym)
 							if len(varStr) > 0 && varStr[0] >= 'a' && varStr[0] <= 'z' {
@@ -684,7 +704,7 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						}
 					}
 				} else {
-					// It's a variable name for catch-all
+					// Legacy: It's a variable name for catch-all
 					excVar = symStr
 					handlerStart = 2
 				}
@@ -807,12 +827,12 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			
+
 			// Extract exception information from the object
 			// For now, we'll create a basic exception with the type name
 			if sym, ok := list[0].(core.SymbolValue); ok {
 				excType := string(sym)
-				
+
 				// Try to get message from the object
 				var message string
 				if obj, ok := excObj.(*core.DictValue); ok {
@@ -820,7 +840,7 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						message = core.PrintValueWithoutQuotes(msgVal)
 					}
 				}
-				
+
 				return nil, &Exception{
 					Type:    excType,
 					Message: message,
@@ -828,7 +848,7 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 			}
 		}
-		
+
 		// Single string argument - generic exception with message
 		if msg, ok := args[0].(core.StringValue); ok {
 			return nil, &Exception{
@@ -878,26 +898,27 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // listCompForm implements list comprehensions
 // Forms:
-//   (list-comp expr var iterable)
-//   (list-comp expr var iterable condition)
+//
+//	(list-comp expr var iterable)
+//	(list-comp expr var iterable condition)
 func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 3 || len(args) > 4 {
 		return nil, fmt.Errorf("list-comp requires 3 or 4 arguments")
 	}
-	
+
 	// Get the variable name
 	varSym, ok := args[1].(core.SymbolValue)
 	if !ok {
 		return nil, fmt.Errorf("list comprehension variable must be a symbol")
 	}
 	varName := string(varSym)
-	
+
 	// Evaluate the iterable
 	iterable, err := Eval(args[2], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating iterable: %v", err)
 	}
-	
+
 	// Convert iterable to a sequence we can iterate over
 	var items []core.Value
 	switch v := iterable.(type) {
@@ -915,40 +936,40 @@ func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// For now, just error
 		return nil, fmt.Errorf("list comprehension iterable must be a sequence, got %s", v.Type())
 	}
-	
+
 	// Create result list
 	result := make(core.ListValue, 0)
-	
+
 	// Create a new context for the loop variable
 	loopCtx := core.NewContext(ctx)
-	
+
 	// Iterate over items
 	for _, item := range items {
 		// Bind the loop variable
 		loopCtx.Define(varName, item)
-		
+
 		// Check condition if present
 		if len(args) == 4 {
 			condResult, err := Eval(args[3], loopCtx)
 			if err != nil {
 				return nil, fmt.Errorf("error evaluating condition: %v", err)
 			}
-			
+
 			// Skip if condition is falsy
 			if !core.IsTruthy(condResult) {
 				continue
 			}
 		}
-		
+
 		// Evaluate the expression
 		exprResult, err := Eval(args[0], loopCtx)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating expression: %v", err)
 		}
-		
+
 		// Add to result
 		result = append(result, exprResult)
 	}
-	
+
 	return result, nil
 }

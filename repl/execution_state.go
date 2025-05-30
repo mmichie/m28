@@ -13,7 +13,7 @@ type ExecutionState struct {
 	executionCount  int
 	outputHistory   map[string]core.Value // _1, _2, etc.
 	lastOutput      core.Value            // _ variable
-	lastPrintOutput string                 // Track last print output to avoid duplication
+	lastPrintOutput string                // Track last print output to avoid duplication
 	ctx             *core.Context
 }
 

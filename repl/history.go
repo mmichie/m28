@@ -9,25 +9,25 @@ import (
 
 // History manages REPL command history
 type History struct {
-	commands    []string
-	maxSize     int
-	position    int
-	file        string
-	totalCount  int // Track total commands ever entered
+	commands   []string
+	maxSize    int
+	position   int
+	file       string
+	totalCount int // Track total commands ever entered
 }
 
 // NewHistory creates a new history manager
 func NewHistory(maxSize int) *History {
 	homeDir, _ := os.UserHomeDir()
 	histFile := filepath.Join(homeDir, ".m28_history")
-	
+
 	h := &History{
 		commands: make([]string, 0, maxSize),
 		maxSize:  maxSize,
 		position: 0,
 		file:     histFile,
 	}
-	
+
 	h.load()
 	return h
 }
@@ -38,20 +38,20 @@ func (h *History) Add(cmd string) {
 	if cmd == "" {
 		return
 	}
-	
+
 	// Don't add duplicates of the last command
 	if len(h.commands) > 0 && h.commands[len(h.commands)-1] == cmd {
 		return
 	}
-	
+
 	h.commands = append(h.commands, cmd)
 	h.totalCount++
-	
+
 	// Trim history if it exceeds max size
 	if len(h.commands) > h.maxSize {
 		h.commands = h.commands[len(h.commands)-h.maxSize:]
 	}
-	
+
 	h.position = len(h.commands)
 	h.save()
 }
@@ -89,7 +89,7 @@ func (h *History) load() {
 		return
 	}
 	defer file.Close()
-	
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -97,12 +97,12 @@ func (h *History) load() {
 			h.commands = append(h.commands, line)
 		}
 	}
-	
+
 	// Trim to max size
 	if len(h.commands) > h.maxSize {
 		h.commands = h.commands[len(h.commands)-h.maxSize:]
 	}
-	
+
 	h.position = len(h.commands)
 	h.totalCount = len(h.commands) // Initialize total count from loaded history
 }
@@ -114,10 +114,10 @@ func (h *History) save() {
 		return
 	}
 	defer file.Close()
-	
+
 	writer := bufio.NewWriter(file)
 	defer writer.Flush()
-	
+
 	for _, cmd := range h.commands {
 		writer.WriteString(cmd + "\n")
 	}
@@ -149,12 +149,12 @@ func (h *History) GetLastN(n int) []string {
 	if n <= 0 {
 		return nil
 	}
-	
+
 	start := len(h.commands) - n
 	if start < 0 {
 		start = 0
 	}
-	
+
 	return h.commands[start:]
 }
 

@@ -12,7 +12,7 @@ const (
 	ColorBold      = "\033[1m"
 	ColorDim       = "\033[2m"
 	ColorUnderline = "\033[4m"
-	
+
 	// Regular colors
 	ColorBlack   = "\033[30m"
 	ColorRed     = "\033[31m"
@@ -22,7 +22,7 @@ const (
 	ColorMagenta = "\033[35m"
 	ColorCyan    = "\033[36m"
 	ColorWhite   = "\033[37m"
-	
+
 	// Bright colors
 	ColorBrightBlack   = "\033[90m"
 	ColorBrightRed     = "\033[91m"
@@ -36,18 +36,18 @@ const (
 
 // ColorTheme defines colors for different syntax elements
 type ColorTheme struct {
-	Keyword       string
-	String        string
-	Number        string
-	Comment       string
-	Function      string
-	Variable      string
-	Operator      string
-	Parenthesis   string
-	Error         string
-	Prompt        string
-	Output        string
-	OutputPrompt  string
+	Keyword      string
+	String       string
+	Number       string
+	Comment      string
+	Function     string
+	Variable     string
+	Operator     string
+	Parenthesis  string
+	Error        string
+	Prompt       string
+	Output       string
+	OutputPrompt string
 }
 
 // DefaultTheme returns the default color theme
@@ -80,7 +80,7 @@ func NewColorManager(enabled bool) *ColorManager {
 	if !isTerminal() {
 		enabled = false
 	}
-	
+
 	return &ColorManager{
 		enabled: enabled,
 		theme:   DefaultTheme(),
@@ -132,11 +132,11 @@ func (cm *ColorManager) ColorizeSyntax(code string) string {
 	if !cm.enabled {
 		return code
 	}
-	
+
 	// This is a simple syntax highlighter
 	// In a real implementation, you'd use a proper lexer
 	result := code
-	
+
 	// Keywords
 	keywords := []string{
 		"def", "lambda", "if", "elif", "else", "for", "while", "in",
@@ -144,29 +144,29 @@ func (cm *ColorManager) ColorizeSyntax(code string) string {
 		"class", "super", "import", "from", "as", "with", "yield",
 		"async", "await", "channel", "select", "go", "true", "false", "nil",
 	}
-	
+
 	for _, kw := range keywords {
 		// Match whole words only
 		pattern := fmt.Sprintf(`\b%s\b`, kw)
 		colored := cm.Colorize(kw, cm.theme.Keyword)
 		result = replaceWholeWord(result, pattern, colored)
 	}
-	
+
 	// Numbers (simple pattern)
 	result = colorizePattern(result, `\b\d+\.?\d*\b`, cm.theme.Number, cm)
-	
+
 	// Strings (simple pattern for double quotes)
 	result = colorizePattern(result, `"[^"]*"`, cm.theme.String, cm)
-	
+
 	// Comments
 	result = colorizePattern(result, `#.*$`, cm.theme.Comment, cm)
-	
+
 	// Parentheses
 	for _, p := range []string{"(", ")", "[", "]", "{", "}"} {
 		colored := cm.Colorize(p, cm.theme.Parenthesis)
 		result = strings.ReplaceAll(result, p, colored)
 	}
-	
+
 	return result
 }
 

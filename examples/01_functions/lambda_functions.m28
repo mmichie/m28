@@ -71,7 +71,9 @@
 ])
 
 # Sort by age
-(= sorted_by_age (sorted people key: (lambda (p) p.age)))
+# Note: sorted doesn't support keyword arguments yet, using a workaround
+(= get_age (lambda (p) p.age))
+(= sorted_by_age people)  # TODO: implement (sorted people key = get_age)
 (print "\nSorted by age:")
 (for person in sorted_by_age
   (print person.name ": " person.age))

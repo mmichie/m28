@@ -21,22 +21,22 @@ func InitDictMethods() {
 			if !ok {
 				return nil, fmt.Errorf("update expects a dict, got %s", args[0].Type())
 			}
-			
+
 			// Create new dict with updates
 			newDict := NewDict()
-			
+
 			// Copy all from original
 			for _, k := range dict.Keys() {
 				v, _ := dict.Get(k)
 				newDict.Set(k, v)
 			}
-			
+
 			// Update/add from other
 			for _, k := range other.Keys() {
 				v, _ := other.Get(k)
 				newDict.Set(k, v)
 			}
-			
+
 			return newDict, nil
 		},
 	}
@@ -52,12 +52,12 @@ func InitDictMethods() {
 			if len(args) < 1 || len(args) > 2 {
 				return nil, fmt.Errorf("pop expects 1 or 2 arguments")
 			}
-			
+
 			key, ok := args[0].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("dict key must be a string")
 			}
-			
+
 			val, found := dict.Get(string(key))
 			if !found {
 				if len(args) > 1 {
@@ -65,7 +65,7 @@ func InitDictMethods() {
 				}
 				return nil, fmt.Errorf("KeyError: '%s'", string(key))
 			}
-			
+
 			// Note: In functional style, we'd return both the value and new dict
 			// For now, just return the value
 			return val, nil
@@ -83,23 +83,23 @@ func InitDictMethods() {
 			if len(args) < 1 || len(args) > 2 {
 				return nil, fmt.Errorf("setdefault expects 1 or 2 arguments")
 			}
-			
+
 			key, ok := args[0].(StringValue)
 			if !ok {
 				return nil, fmt.Errorf("dict key must be a string")
 			}
-			
+
 			val, found := dict.Get(string(key))
 			if found {
 				return val, nil
 			}
-			
+
 			// Key not found, use default
 			var defaultVal Value = None
 			if len(args) > 1 {
 				defaultVal = args[1]
 			}
-			
+
 			// Note: In functional style, we'd return a new dict
 			// For now, just return the default value
 			return defaultVal, nil
@@ -127,13 +127,13 @@ func InitDictMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
 			newDict := NewDict()
-			
+
 			// Copy all key-value pairs
 			for _, k := range dict.Keys() {
 				v, _ := dict.Get(k)
 				newDict.Set(k, v)
 			}
-			
+
 			return newDict, nil
 		},
 	}

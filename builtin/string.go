@@ -54,7 +54,7 @@ func StrFormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return core.StringValue(""), nil
 	}
-	
+
 	var result strings.Builder
 	for _, arg := range args {
 		switch v := arg.(type) {
@@ -64,7 +64,7 @@ func StrFormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			result.WriteString(core.PrintValueWithoutQuotes(arg))
 		}
 	}
-	
+
 	return core.StringValue(result.String()), nil
 }
 

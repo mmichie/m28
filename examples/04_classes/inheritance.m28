@@ -17,7 +17,7 @@
 (class Dog (Animal)
   (def __init__ (self name breed)
     # Call parent constructor
-    (super.__init__ name "Dog")
+    ((super Dog self).__init__ name "Dog")
     (= self.breed breed))
   
   # Override speak method
@@ -31,7 +31,7 @@
 # Another derived class - Cat
 (class Cat (Animal)
   (def __init__ (self name color)
-    (super.__init__ name "Cat")
+    ((super Cat self).__init__ name "Cat")
     (= self.color color))
   
   (def speak (self)
@@ -66,9 +66,9 @@
     (print f"{self.name} is swimming")))
 
 # Duck inherits from Animal, Flyable, and Swimmable
-(class Duck (Animal Flyable Swimmable)
+(class Duck (Animal, Flyable, Swimmable)
   (def __init__ (self name)
-    (super.__init__ name "Duck"))
+    ((super Duck self).__init__ name "Duck"))
   
   (def speak (self)
     (print f"{self.name} quacks: Quack!")))

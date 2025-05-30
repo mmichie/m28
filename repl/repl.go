@@ -15,25 +15,25 @@ import (
 
 // REPL represents a read-eval-print loop
 type REPL struct {
-	ctx               *core.Context
-	reader            *bufio.Reader
-	writer            io.Writer
-	outputTracker     *OutputTracker
-	history           *History
-	completer         *Completer
-	helpSystem        *HelpSystem
-	executionState    *ExecutionState
-	errorReporter     *ErrorReporter
-	commandHandler    *CommandHandler
-	indentTracker     *IndentationTracker
-	colorManager      *ColorManager
+	ctx            *core.Context
+	reader         *bufio.Reader
+	writer         io.Writer
+	outputTracker  *OutputTracker
+	history        *History
+	completer      *Completer
+	helpSystem     *HelpSystem
+	executionState *ExecutionState
+	errorReporter  *ErrorReporter
+	commandHandler *CommandHandler
+	indentTracker  *IndentationTracker
+	colorManager   *ColorManager
 }
 
 // NewREPL creates a new REPL with the given context
 func NewREPL(globalCtx *core.Context) *REPL {
 	outputTracker := NewOutputTracker(os.Stdout)
 	colorManager := NewColorManager(true) // Colors enabled by default
-	
+
 	r := &REPL{
 		ctx:            globalCtx,
 		reader:         bufio.NewReader(os.Stdin),
@@ -105,7 +105,7 @@ func (r *REPL) Start() {
 				fmt.Fprintf(r.writer, "%s%s\n", r.executionState.FormatInputPrompt(), line)
 			}
 		}
-		
+
 		// Add to history (after command processing)
 		r.history.Add(line)
 
@@ -150,7 +150,7 @@ func (r *REPL) Start() {
 
 		// Evaluate the expression
 		result, err := eval.Eval(expr, r.ctx)
-		
+
 		// Stop tracking and get the printed output
 		printedOutput := r.outputTracker.StopTracking()
 
@@ -170,8 +170,8 @@ func (r *REPL) Start() {
 			// Check if the result was already printed to avoid duplication
 			if printedOutput == "" || printedOutput != resultStr {
 				outputPrompt := r.executionState.FormatOutputPrompt(execNum)
-				fmt.Fprintf(r.writer, "%s%s\n", 
-					r.colorManager.ColorizeOutputPrompt(outputPrompt), 
+				fmt.Fprintf(r.writer, "%s%s\n",
+					r.colorManager.ColorizeOutputPrompt(outputPrompt),
 					resultStr)
 			}
 		}

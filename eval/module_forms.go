@@ -58,7 +58,7 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("import :from requires a list of names or *")
 			}
-			
+
 			if sym, ok := args[i+1].(core.SymbolValue); ok && string(sym) == "*" {
 				importAll = true
 			} else if list, ok := args[i+1].(core.ListValue); ok {
@@ -123,7 +123,7 @@ func exportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("export can only be used within a module")
 	}
-	
+
 	module, ok := moduleVal.(*core.Module)
 	if !ok {
 		return nil, fmt.Errorf("__module__ is not a module object")
@@ -151,7 +151,7 @@ func exportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Handle single name or list of names
 	var names []string
-	
+
 	if sym, ok := args[0].(core.SymbolValue); ok {
 		// Single name
 		names = []string{string(sym)}
@@ -184,20 +184,20 @@ func exportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 func loadModule(moduleName string, ctx *core.Context) (*core.Module, error) {
 	// Get the module registry
 	registry := core.GetModuleRegistry()
-	
+
 	// Check if module is already loaded
 	if moduleDict, found := registry.GetModule(moduleName); found {
 		// Convert old dict-based module to new Module type
 		// For now, create a simple module wrapper
 		module := core.NewModule(moduleName, "")
-		
+
 		// Add all dict entries as exports
 		for _, key := range moduleDict.Keys() {
 			if val, ok := moduleDict.Get(key); ok {
 				module.Export(key, val)
 			}
 		}
-		
+
 		return module, nil
 	}
 
@@ -209,13 +209,13 @@ func loadModule(moduleName string, ctx *core.Context) (*core.Module, error) {
 
 	// Create a new module
 	module := core.NewModule(moduleName, path)
-	
+
 	// Create module context
 	moduleCtx := core.NewContext(ctx.Global)
 	moduleCtx.Define("__name__", core.StringValue(moduleName))
 	moduleCtx.Define("__file__", core.StringValue(path))
 	moduleCtx.Define("__module__", module)
-	
+
 	// Parse the module content
 	// This requires access to the parser, which we'll need to inject
 	loader := core.GetModuleLoader()

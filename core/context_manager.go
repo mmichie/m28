@@ -78,7 +78,7 @@ func (cm *SimpleContextManager) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(cm),
 		}, true
-		
+
 	case "__exit__":
 		return &BoundMethod{
 			Receiver: cm,
@@ -89,7 +89,7 @@ func (cm *SimpleContextManager) GetAttr(name string) (Value, bool) {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					mgr := receiver.(*SimpleContextManager)
-					
+
 					var excType, excValue, excTraceback Value = Nil, Nil, Nil
 					if len(args) > 0 {
 						excType = args[0]
@@ -100,19 +100,19 @@ func (cm *SimpleContextManager) GetAttr(name string) (Value, bool) {
 					if len(args) > 2 {
 						excTraceback = args[2]
 					}
-					
+
 					suppress, err := mgr.Exit(excType, excValue, excTraceback)
 					if err != nil {
 						return nil, err
 					}
-					
+
 					return BoolValue(suppress), nil
 				},
 			},
 			TypeDesc: GetTypeDescriptorForValue(cm),
 		}, true
 	}
-	
+
 	return cm.BaseObject.GetAttr(name)
 }
 
@@ -182,7 +182,7 @@ func (f *FileContextManager) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "__exit__":
 		return &BoundMethod{
 			Receiver: f,
@@ -193,7 +193,7 @@ func (f *FileContextManager) GetAttr(name string) (Value, bool) {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					file := receiver.(*FileContextManager)
-					
+
 					var excType, excValue, excTraceback Value = Nil, Nil, Nil
 					if len(args) > 0 {
 						excType = args[0]
@@ -204,18 +204,18 @@ func (f *FileContextManager) GetAttr(name string) (Value, bool) {
 					if len(args) > 2 {
 						excTraceback = args[2]
 					}
-					
+
 					suppress, err := file.Exit(excType, excValue, excTraceback)
 					if err != nil {
 						return nil, err
 					}
-					
+
 					return BoolValue(suppress), nil
 				},
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "read":
 		return &BoundMethod{
 			Receiver: f,
@@ -235,7 +235,7 @@ func (f *FileContextManager) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "write":
 		return &BoundMethod{
 			Receiver: f,
@@ -259,7 +259,7 @@ func (f *FileContextManager) GetAttr(name string) (Value, bool) {
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
 	}
-	
+
 	return f.BaseObject.GetAttr(name)
 }
 
@@ -269,20 +269,20 @@ func IsContextManager(v Value) (ContextManager, bool) {
 	if cm, ok := v.(ContextManager); ok {
 		return cm, true
 	}
-	
+
 	// Then check if it has __enter__ and __exit__ methods
 	if obj, ok := v.(interface {
 		GetAttr(string) (Value, bool)
 	}); ok {
 		_, hasEnter := obj.GetAttr("__enter__")
 		_, hasExit := obj.GetAttr("__exit__")
-		
+
 		if hasEnter && hasExit {
 			// Create a wrapper that implements ContextManager
 			return &contextManagerWrapper{obj: obj}, true
 		}
 	}
-	
+
 	return nil, false
 }
 
@@ -326,7 +326,7 @@ func (w *contextManagerWrapper) Exit(excType, excValue, excTraceback Value) (boo
 		if err != nil {
 			return false, err
 		}
-		
+
 		// Check if exception should be suppressed
 		return IsTruthy(result), nil
 	}

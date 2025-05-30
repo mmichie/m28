@@ -27,19 +27,19 @@ func FindModule(name string) (string, error) {
 		}
 		return "", os.ErrNotExist
 	}
-	
+
 	// Convert module name to file path
 	// "foo.bar" -> "foo/bar.m28"
 	parts := strings.Split(name, ".")
 	filename := filepath.Join(parts...) + ".m28"
-	
+
 	// Search in module paths
 	for _, basePath := range modulePaths {
 		fullPath := filepath.Join(basePath, filename)
 		if fileExists(fullPath) {
 			return fullPath, nil
 		}
-		
+
 		// Also try without .m28 extension (for directories with __init__.m28)
 		dirPath := filepath.Join(basePath, filepath.Join(parts...))
 		initPath := filepath.Join(dirPath, "__init__.m28")
@@ -47,7 +47,7 @@ func FindModule(name string) (string, error) {
 			return initPath, nil
 		}
 	}
-	
+
 	return "", os.ErrNotExist
 }
 

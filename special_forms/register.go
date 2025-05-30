@@ -48,13 +48,13 @@ func registerDefinitionForms() {
 
 	// quote: Quote an expression
 	eval.RegisterSpecialForm("quote", quoteForm)
-	
+
 	// .: Dot notation for property access
 	eval.RegisterSpecialForm(".", dotForm)
-	
+
 	// dict-literal: Dictionary literal construction
 	eval.RegisterSpecialForm("dict-literal", dictLiteralForm)
-	
+
 	// list-comp: List comprehension
 	eval.RegisterSpecialForm("list-comp", listCompForm)
 }

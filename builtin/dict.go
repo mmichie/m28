@@ -12,7 +12,7 @@ func RegisterDictFunctions(ctx *core.Context) {
 	// Dictionary creation and access
 	ctx.Define("dict", core.NewBuiltinFunction(DictFunc))
 	ctx.Define("get", core.NewBuiltinFunction(GetFunc))
-	ctx.Define("set", core.NewBuiltinFunction(SetFunc))
+	ctx.Define("dict-set", core.NewBuiltinFunction(SetFunc)) // Renamed to avoid conflict with set constructor
 	ctx.Define("delete", core.NewBuiltinFunction(DeleteFunc))
 	ctx.Define("has-key", core.NewBuiltinFunction(HasKeyFunc))
 

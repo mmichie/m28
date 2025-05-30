@@ -118,7 +118,7 @@
 (try
   (process_file "data.csv")
   (except RuntimeError as e
-    (print f"Runtime error: {e}"))
+    (print f"Runtime error: {e}")))
     # In real Python, we'd see the chain with __cause__
 
 # Context manager pattern (with statement)

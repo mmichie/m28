@@ -116,12 +116,12 @@ func (e *ZeroDivisionError) Error() string {
 // NewTypeError creates a new type error
 func NewTypeError(expected string, got Value, context string) *TypeError {
 	gotType := string(got.Type())
-	
+
 	// Use TypeDescriptor for better type names
 	if desc := GetTypeDescriptorForValue(got); desc != nil {
 		gotType = desc.PythonName
 	}
-	
+
 	return &TypeError{
 		Expected: expected,
 		Got:      gotType,
@@ -135,7 +135,7 @@ func WrapEvalError(err error, message string, ctx *Context) *EvalError {
 		// Don't double-wrap eval errors
 		return evalErr
 	}
-	
+
 	return &EvalError{
 		Type:    "EvalError",
 		Message: message,

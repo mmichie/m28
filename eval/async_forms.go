@@ -69,7 +69,7 @@ func asyncDefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Wrap it as async
 	asyncFn := core.NewAsyncFunction(fn, string(name))
 	ctx.Define(string(name), asyncFn)
-	
+
 	return asyncFn, nil
 }
 
@@ -99,14 +99,14 @@ func awaitForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // (channel 10)   - buffered channel with capacity 10
 func channelForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	capacity := 0
-	
+
 	if len(args) > 0 {
 		// Evaluate capacity
 		capVal, err := Eval(args[0], ctx)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		if num, ok := capVal.(core.NumberValue); ok {
 			capacity = int(num)
 			if capacity < 0 {
@@ -177,9 +177,10 @@ func receiveForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // selectForm implements channel selection
 // (select
-//   ((recv! ch1) (lambda (val) ...))
-//   ((send! ch2 value) (lambda () ...))
-//   (default (lambda () ...)))
+//
+//	((recv! ch1) (lambda (val) ...))
+//	((send! ch2 value) (lambda () ...))
+//	(default (lambda () ...)))
 func selectForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("select requires at least one case")
@@ -309,7 +310,7 @@ func goForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Create a task that evaluates the expression
 	task := core.NewTask("", nil, nil)
-	
+
 	// Start the goroutine
 	go func() {
 		defer func() {
@@ -322,7 +323,7 @@ func goForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Evaluate in a new context
 		goCtx := core.NewContext(ctx)
 		result, err := Eval(args[0], goCtx)
-		
+
 		task.Mu.Lock()
 		task.Result = result
 		task.Err = err

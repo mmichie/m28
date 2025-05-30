@@ -17,13 +17,13 @@ import (
 
 // Command line flags
 var (
-	evalExpr     = flag.String("e", "", "Evaluate expression")
-	showHelp     = flag.Bool("help", false, "Show help")
-	showVersion  = flag.Bool("version", false, "Show version")
-	debugMode    = flag.Bool("debug", false, "Enable debug mode")
-	modulePath   = flag.String("path", "", "Additional module search paths (colon-separated)")
-	interactive  = flag.Bool("i", false, "Enter interactive mode after running file")
-	command      = flag.String("c", "", "Execute program passed as string")
+	evalExpr    = flag.String("e", "", "Evaluate expression")
+	showHelp    = flag.Bool("help", false, "Show help")
+	showVersion = flag.Bool("version", false, "Show version")
+	debugMode   = flag.Bool("debug", false, "Enable debug mode")
+	modulePath  = flag.String("path", "", "Additional module search paths (colon-separated)")
+	interactive = flag.Bool("i", false, "Enter interactive mode after running file")
+	command     = flag.String("c", "", "Execute program passed as string")
 )
 
 const version = "0.1.0-fresh-start"
@@ -104,7 +104,7 @@ func main() {
 			errorReporter.ReportError(err, globalCtx, os.Stderr)
 			os.Exit(1)
 		}
-		
+
 		if !*interactive {
 			return
 		}
@@ -174,7 +174,7 @@ func initializeGlobalContext(ctx *core.Context) {
 
 	// Register all built-in functions
 	builtin.RegisterAllBuiltins(ctx)
-	
+
 	// Initialize module loader
 	moduleLoader := core.NewDefaultModuleLoader(ctx, eval.Eval, func(code string) (core.Value, error) {
 		p := parser.NewParser()

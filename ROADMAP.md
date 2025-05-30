@@ -90,6 +90,10 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [ ] **Additional Python Features**
   - [ ] Argument unpacking: `func(*args, **kwargs)` syntax
   - [ ] Keyword argument support in built-in functions (sorted, min, max, etc.)
+  - [ ] Set literals: `{1, 2, 3}` (currently must use `(set [1, 2, 3])`)
+  - [ ] Exception variable binding: `except Error as e` syntax
+  - [ ] Multiple inheritance (currently not fully functional)
+  - [ ] super() calls (currently not working properly)
 
 ### Medium Priority - Built-in Methods
 

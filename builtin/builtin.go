@@ -29,25 +29,25 @@ func RegisterAllBuiltins(ctx *core.Context) {
 
 	// Register type functions
 	registerTypeBuiltins(ctx)
-	
+
 	// Register type checking functions (isinstance, issubclass, type conversions)
 	registerTypeCheckingBuiltins(ctx)
-	
+
 	// Register essential built-in functions (all, any, round, etc.)
 	RegisterEssentialBuiltins(ctx)
-	
+
 	// Register mathematical functions
 	RegisterMathFunctions(ctx)
-	
+
 	// Register utility functions
 	RegisterUtilityFunctions(ctx)
-	
+
 	// Register async/concurrent functions
 	RegisterAsyncBuiltins(ctx)
-	
+
 	// Register I/O functions
 	RegisterIOFunctions(ctx)
-	
+
 	// Register assertion functions
 	RegisterAssertBuiltins(ctx)
 }

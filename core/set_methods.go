@@ -10,7 +10,7 @@ func InitSetMethods() {
 	}
 
 	// Set operation methods
-	
+
 	// union - return union of sets
 	setType.Methods["union"] = &MethodDescriptor{
 		Name:    "union",
@@ -20,12 +20,12 @@ func InitSetMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
 			result := NewSet()
-			
+
 			// Add all items from this set
 			for k, v := range set.items {
 				result.items[k] = v
 			}
-			
+
 			// Add items from all other sets
 			for _, arg := range args {
 				other, ok := arg.(*SetValue)
@@ -36,7 +36,7 @@ func InitSetMethods() {
 					result.items[k] = v
 				}
 			}
-			
+
 			return result, nil
 		},
 	}
@@ -51,10 +51,10 @@ func InitSetMethods() {
 			if len(args) == 0 {
 				return nil, fmt.Errorf("intersection() requires at least one argument")
 			}
-			
+
 			set := receiver.(*SetValue)
 			result := NewSet()
-			
+
 			// Check each item in this set
 			for k, v := range set.items {
 				inAll := true
@@ -72,7 +72,7 @@ func InitSetMethods() {
 					result.items[k] = v
 				}
 			}
-			
+
 			return result, nil
 		},
 	}
@@ -86,12 +86,12 @@ func InitSetMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
 			result := NewSet()
-			
+
 			// Add all items from this set
 			for k, v := range set.items {
 				result.items[k] = v
 			}
-			
+
 			// Remove items from other sets
 			for _, arg := range args {
 				other, ok := arg.(*SetValue)
@@ -102,7 +102,7 @@ func InitSetMethods() {
 					delete(result.items, k)
 				}
 			}
-			
+
 			return result, nil
 		},
 	}
@@ -119,29 +119,29 @@ func InitSetMethods() {
 			if !ok {
 				return nil, fmt.Errorf("symmetric_difference() argument must be a set, not %s", args[0].Type())
 			}
-			
+
 			result := NewSet()
-			
+
 			// Add items in this set but not in other
 			for k, v := range set.items {
 				if !other.Contains(v) {
 					result.items[k] = v
 				}
 			}
-			
+
 			// Add items in other but not in this set
 			for k, v := range other.items {
 				if !set.Contains(v) {
 					result.items[k] = v
 				}
 			}
-			
+
 			return result, nil
 		},
 	}
 
 	// Mutating methods (return new sets in functional style)
-	
+
 	// add - add element to set
 	setType.Methods["add"] = &MethodDescriptor{
 		Name:    "add",
@@ -151,15 +151,15 @@ func InitSetMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
 			result := NewSet()
-			
+
 			// Copy current set
 			for k, v := range set.items {
 				result.items[k] = v
 			}
-			
+
 			// Add new element
 			result.Add(args[0])
-			
+
 			return result, nil
 		},
 	}
@@ -173,22 +173,22 @@ func InitSetMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
 			elem := args[0]
-			
+
 			// Check if element exists
 			key := PrintValue(elem)
 			if _, exists := set.items[key]; !exists {
 				return nil, &KeyError{Key: elem}
 			}
-			
+
 			result := NewSet()
-			
+
 			// Copy all except the removed element
 			for k, v := range set.items {
 				if k != key {
 					result.items[k] = v
 				}
 			}
-			
+
 			return result, nil
 		},
 	}
@@ -203,20 +203,20 @@ func InitSetMethods() {
 			set := receiver.(*SetValue)
 			elem := args[0]
 			key := PrintValue(elem)
-			
+
 			result := NewSet()
-			
+
 			// Copy all except the discarded element
 			for k, v := range set.items {
 				if k != key {
 					result.items[k] = v
 				}
 			}
-			
+
 			return result, nil
 		},
 	}
-	
+
 	// update - add elements from other sets
 	setType.Methods["update"] = &MethodDescriptor{
 		Name:    "update",
@@ -226,12 +226,12 @@ func InitSetMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
 			result := NewSet()
-			
+
 			// Copy current set
 			for k, v := range set.items {
 				result.items[k] = v
 			}
-			
+
 			// Add from other sets
 			for _, arg := range args {
 				other, ok := arg.(*SetValue)
@@ -242,7 +242,7 @@ func InitSetMethods() {
 					result.items[k] = v
 				}
 			}
-			
+
 			return result, nil
 		},
 	}
@@ -275,7 +275,7 @@ func InitSetMethods() {
 	}
 
 	// Comparison methods
-	
+
 	// issubset - test if this set is subset of other
 	setType.Methods["issubset"] = &MethodDescriptor{
 		Name:    "issubset",
@@ -288,14 +288,14 @@ func InitSetMethods() {
 			if !ok {
 				return nil, fmt.Errorf("issubset() argument must be a set, not %s", args[0].Type())
 			}
-			
+
 			// Check if all items in this set are in other
 			for _, v := range set.items {
 				if !other.Contains(v) {
 					return False, nil
 				}
 			}
-			
+
 			return True, nil
 		},
 	}
@@ -312,14 +312,14 @@ func InitSetMethods() {
 			if !ok {
 				return nil, fmt.Errorf("issuperset() argument must be a set, not %s", args[0].Type())
 			}
-			
+
 			// Check if all items in other are in this set
 			for _, v := range other.items {
 				if !set.Contains(v) {
 					return False, nil
 				}
 			}
-			
+
 			return True, nil
 		},
 	}
@@ -336,14 +336,14 @@ func InitSetMethods() {
 			if !ok {
 				return nil, fmt.Errorf("isdisjoint() argument must be a set, not %s", args[0].Type())
 			}
-			
+
 			// Check if any item in this set is in other
 			for _, v := range set.items {
 				if other.Contains(v) {
 					return False, nil
 				}
 			}
-			
+
 			return True, nil
 		},
 	}
@@ -356,18 +356,18 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			
+
 			if set.Size() == 0 {
 				return nil, fmt.Errorf("pop from empty set")
 			}
-			
+
 			// Get first item (arbitrary)
 			var firstVal Value
 			for _, v := range set.items {
 				firstVal = v
 				break
 			}
-			
+
 			// Return just the value (in functional style, we'd return both value and new set)
 			return firstVal, nil
 		},

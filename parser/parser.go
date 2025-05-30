@@ -75,7 +75,7 @@ func (p *Parser) parseExpr() (core.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Now handle postfix operations (dots, calls, indexing)
 	return p.parsePostfix(base)
 }
@@ -86,17 +86,17 @@ func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 		// Save current position to check if we moved past whitespace
 		startPos := p.pos
 		p.skipWhitespaceAndComments()
-		
+
 		if p.pos >= len(p.input) {
 			return base, nil
 		}
-		
+
 		// If we skipped any whitespace/comments, no postfix operators
 		// This ensures "x [" is not treated as "x["
 		if p.pos > startPos {
 			return base, nil
 		}
-		
+
 		switch p.input[p.pos] {
 		case '.':
 			// Check if it's a float continuation
@@ -109,7 +109,7 @@ func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 				// Numbers can't have properties
 				return nil, p.error(fmt.Sprintf("number %v has no properties", num))
 			}
-			
+
 			// Property access or method call
 			p.pos++ // consume '.'
 			var err error
@@ -117,7 +117,7 @@ func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			
+
 		// Note: Direct function calls on expressions not yet supported
 		// case '(':
 		// 	// Direct function call on the result
@@ -125,7 +125,7 @@ func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 		// 	if err != nil {
 		// 		return nil, err
 		// 	}
-			
+
 		case '[':
 			// Index access
 			p.pos++ // consume '['
@@ -134,7 +134,7 @@ func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			
+
 		default:
 			return base, nil
 		}
@@ -204,7 +204,7 @@ func (p *Parser) parseList() (core.Value, error) {
 
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
-		
+
 		// Skip optional comma
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
 			p.advance()
@@ -242,7 +242,7 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
-		
+
 		// Skip optional comma
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
 			p.advance()
@@ -272,38 +272,37 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 	}, nil
 }
 
-// parseDictLiteral parses a dictionary literal {...}
+// parseDictLiteral parses a dictionary literal {...} or set literal {1, 2, 3}
 func (p *Parser) parseDictLiteral() (core.Value, error) {
 	// Skip opening brace
 	p.advance()
 
-	// Build a dict construction form: (dict key1 val1 key2 val2 ...)
-	elements := []core.Value{core.SymbolValue("dict-literal")}
-
 	// Skip whitespace after the opening brace
 	p.skipWhitespaceAndComments()
 
-	// Parse key-value pairs until we hit the closing brace
-	for p.pos < len(p.input) && p.input[p.pos] != '}' {
-		// Parse the key
-		key, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-
-		// Add key to elements
-		elements = append(elements, key)
-
-		// Skip whitespace after the key
-		p.skipWhitespaceAndComments()
-
-		// Check for the colon
-		if p.pos >= len(p.input) || p.input[p.pos] != ':' {
-			return nil, fmt.Errorf("expected ':' after dict key")
-		}
+	// Check for empty dict/set
+	if p.pos < len(p.input) && p.input[p.pos] == '}' {
 		p.advance()
+		// Empty {} is a dict
+		return core.ListValue([]core.Value{core.SymbolValue("dict-literal")}), nil
+	}
 
-		// Skip whitespace after the colon
+	// Parse the first element to determine if it's a dict or set
+	firstElement, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip whitespace after the first element
+	p.skipWhitespaceAndComments()
+
+	// Check if it's a dictionary (has a colon) or a set
+	if p.pos < len(p.input) && p.input[p.pos] == ':' {
+		// It's a dictionary
+		elements := []core.Value{core.SymbolValue("dict-literal"), firstElement}
+
+		// Skip the colon
+		p.advance()
 		p.skipWhitespaceAndComments()
 
 		// Parse the value
@@ -311,29 +310,95 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		// Add value to elements
 		elements = append(elements, value)
 
-		// Skip whitespace after the value
+		// Skip whitespace and comma
 		p.skipWhitespaceAndComments()
-
-		// Skip optional comma
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
 			p.advance()
 			p.skipWhitespaceAndComments()
 		}
+
+		// Parse remaining key-value pairs
+		for p.pos < len(p.input) && p.input[p.pos] != '}' {
+			// Parse the key
+			key, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, key)
+
+			// Skip whitespace and expect colon
+			p.skipWhitespaceAndComments()
+			if p.pos >= len(p.input) || p.input[p.pos] != ':' {
+				return nil, fmt.Errorf("expected ':' after dict key")
+			}
+			p.advance()
+			p.skipWhitespaceAndComments()
+
+			// Parse the value
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, value)
+
+			// Skip whitespace and comma
+			p.skipWhitespaceAndComments()
+			if p.pos < len(p.input) && p.input[p.pos] == ',' {
+				p.advance()
+				p.skipWhitespaceAndComments()
+			}
+		}
+
+		// Check for unclosed dict
+		if p.pos >= len(p.input) {
+			return nil, fmt.Errorf("unclosed dict")
+		}
+
+		// Skip closing brace
+		p.advance()
+		return core.ListValue(elements), nil
+	} else {
+		// It's a set literal - collect elements into a list
+		setElements := []core.Value{firstElement}
+
+		// Skip comma if present
+		if p.pos < len(p.input) && p.input[p.pos] == ',' {
+			p.advance()
+			p.skipWhitespaceAndComments()
+		}
+
+		// Parse remaining elements
+		for p.pos < len(p.input) && p.input[p.pos] != '}' {
+			element, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			setElements = append(setElements, element)
+
+			// Skip whitespace and comma
+			p.skipWhitespaceAndComments()
+			if p.pos < len(p.input) && p.input[p.pos] == ',' {
+				p.advance()
+				p.skipWhitespaceAndComments()
+			}
+		}
+
+		// Check for unclosed set
+		if p.pos >= len(p.input) {
+			return nil, fmt.Errorf("unclosed set")
+		}
+
+		// Skip closing brace
+		p.advance()
+
+		// Return (set [elements...])
+		return core.ListValue([]core.Value{
+			core.SymbolValue("set"),
+			core.ListValue(setElements),
+		}), nil
 	}
-
-	// Check for unclosed dict
-	if p.pos >= len(p.input) {
-		return nil, fmt.Errorf("unclosed dict")
-	}
-
-	// Skip closing brace
-	p.advance()
-
-	return core.ListValue(elements), nil
 }
 
 // parseTupleLiteral parses a tuple literal %(...)
@@ -356,7 +421,7 @@ func (p *Parser) parseTupleLiteral() (core.Value, error) {
 
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
-		
+
 		// Skip optional comma
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
 			p.advance()
@@ -379,7 +444,7 @@ func (p *Parser) parseTupleLiteral() (core.Value, error) {
 func (p *Parser) parseString() (core.Value, error) {
 	// Remember the opening quote character
 	quoteChar := p.input[p.pos]
-	
+
 	// Skip opening quote
 	p.advance()
 
@@ -416,7 +481,7 @@ func (p *Parser) parseString() (core.Value, error) {
 			case 'u':
 				// Unicode escape: \uXXXX
 				if p.pos+4 < len(p.input) {
-					hexStr := p.input[p.pos+1:p.pos+5]
+					hexStr := p.input[p.pos+1 : p.pos+5]
 					if codePoint, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
 						builder.WriteRune(rune(codePoint))
 						p.pos += 4 // Skip the 4 hex digits
@@ -431,7 +496,7 @@ func (p *Parser) parseString() (core.Value, error) {
 			case 'U':
 				// Unicode escape: \UXXXXXXXX
 				if p.pos+8 < len(p.input) {
-					hexStr := p.input[p.pos+1:p.pos+9]
+					hexStr := p.input[p.pos+1 : p.pos+9]
 					if codePoint, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
 						builder.WriteRune(rune(codePoint))
 						p.pos += 8 // Skip the 8 hex digits
@@ -472,7 +537,7 @@ func (p *Parser) parseString() (core.Value, error) {
 func (p *Parser) parseFString() (core.Value, error) {
 	// Skip 'f'
 	p.advance() // skip 'f'
-	
+
 	// Remember the quote character
 	quoteChar := p.input[p.pos]
 	p.advance() // skip quote
@@ -480,11 +545,11 @@ func (p *Parser) parseFString() (core.Value, error) {
 	var parts []core.Value
 	var currentString strings.Builder
 	escaped := false
-	
+
 	// Parse characters until closing quote
 	for p.pos < len(p.input) {
 		ch := p.input[p.pos]
-		
+
 		if escaped {
 			// Handle escaped characters
 			switch ch {
@@ -515,7 +580,7 @@ func (p *Parser) parseFString() (core.Value, error) {
 			case 'u':
 				// Unicode escape: \uXXXX
 				if p.pos+4 < len(p.input) {
-					hexStr := p.input[p.pos+1:p.pos+5]
+					hexStr := p.input[p.pos+1 : p.pos+5]
 					if codePoint, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
 						currentString.WriteRune(rune(codePoint))
 						p.pos += 4 // Skip the 4 hex digits
@@ -530,7 +595,7 @@ func (p *Parser) parseFString() (core.Value, error) {
 			case 'U':
 				// Unicode escape: \UXXXXXXXX
 				if p.pos+8 < len(p.input) {
-					hexStr := p.input[p.pos+1:p.pos+9]
+					hexStr := p.input[p.pos+1 : p.pos+9]
 					if codePoint, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
 						currentString.WriteRune(rune(codePoint))
 						p.pos += 8 // Skip the 8 hex digits
@@ -558,14 +623,14 @@ func (p *Parser) parseFString() (core.Value, error) {
 				parts = append(parts, core.StringValue(currentString.String()))
 			}
 			p.advance()
-			
+
 			// Return a format expression
 			if len(parts) == 0 {
 				return core.StringValue(""), nil
 			} else if len(parts) == 1 {
 				return parts[0], nil
 			}
-			
+
 			// Create (str-format part1 part2 ...)
 			formatExpr := make(core.ListValue, 0, len(parts)+1)
 			formatExpr = append(formatExpr, core.SymbolValue("str-format"))
@@ -577,26 +642,26 @@ func (p *Parser) parseFString() (core.Value, error) {
 				parts = append(parts, core.StringValue(currentString.String()))
 				currentString.Reset()
 			}
-			
+
 			// Skip '{'
 			p.advance()
-			
+
 			// Parse expression until '}'
 			expr, err := p.parseExpr()
 			if err != nil {
 				return nil, fmt.Errorf("error parsing f-string expression: %v", err)
 			}
-			
+
 			// Skip whitespace before '}'
 			p.skipWhitespaceAndComments()
-			
+
 			if p.pos >= len(p.input) || p.input[p.pos] != '}' {
 				return nil, fmt.Errorf("unclosed f-string expression")
 			}
-			
+
 			// Skip '}'
 			p.advance()
-			
+
 			// Add expression to parts
 			parts = append(parts, expr)
 		} else {
@@ -604,7 +669,7 @@ func (p *Parser) parseFString() (core.Value, error) {
 			p.advance()
 		}
 	}
-	
+
 	return nil, fmt.Errorf("unclosed f-string")
 }
 
@@ -614,12 +679,12 @@ func (p *Parser) isListComprehension(elements core.ListValue) bool {
 	if len(elements) < 5 {
 		return false
 	}
-	
+
 	// Look for "for" and "in" keywords
 	hasFor := false
 	hasIn := false
 	forIndex := -1
-	
+
 	for i, elem := range elements {
 		if sym, ok := elem.(core.SymbolValue); ok {
 			if string(sym) == "for" && !hasFor {
@@ -630,7 +695,7 @@ func (p *Parser) isListComprehension(elements core.ListValue) bool {
 			}
 		}
 	}
-	
+
 	// Must have both "for" and "in", and "for" must not be the first element
 	return hasFor && hasIn && forIndex > 0
 }
@@ -640,7 +705,7 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 	// Find the positions of "for" and "in"
 	forIndex := -1
 	inIndex := -1
-	
+
 	for i, elem := range elements {
 		if sym, ok := elem.(core.SymbolValue); ok {
 			if string(sym) == "for" && forIndex == -1 {
@@ -650,16 +715,16 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 			}
 		}
 	}
-	
+
 	// Extract parts
 	// expr: elements[0:forIndex]
 	// var: elements[forIndex+1:inIndex]
 	// iterable: elements[inIndex+1:]
-	
+
 	if forIndex <= 0 || inIndex <= forIndex+1 {
 		return nil, fmt.Errorf("invalid list comprehension syntax")
 	}
-	
+
 	// Get the expression (everything before "for")
 	var expr core.Value
 	if forIndex == 1 {
@@ -678,17 +743,17 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 		copy(exprElements[1:], elements[:forIndex])
 		expr = exprElements
 	}
-	
+
 	// Get the variable (between "for" and "in")
 	if inIndex != forIndex+2 {
 		return nil, fmt.Errorf("list comprehension variable must be a single symbol")
 	}
 	variable := elements[forIndex+1]
-	
+
 	// Get the iterable (everything after "in")
 	var iterable core.Value
 	remainingElements := elements[inIndex+1:]
-	
+
 	// Check for "if" condition
 	ifIndex := -1
 	for i, elem := range remainingElements {
@@ -697,14 +762,14 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 			break
 		}
 	}
-	
+
 	var condition core.Value
 	if ifIndex >= 0 {
 		// Has condition
 		if ifIndex == 0 {
 			return nil, fmt.Errorf("missing iterable in list comprehension")
 		}
-		
+
 		// Iterable is everything before "if"
 		if ifIndex == 1 {
 			// Check if it's a list that should be unquoted
@@ -719,7 +784,7 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 			copy(iterElements[1:], remainingElements[:ifIndex])
 			iterable = iterElements
 		}
-		
+
 		// Condition is everything after "if"
 		condElements := remainingElements[ifIndex+1:]
 		if len(condElements) == 0 {
@@ -753,7 +818,7 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 			iterable = iterElements
 		}
 	}
-	
+
 	// Build the list-comp form
 	// (list-comp expr var iterable) or (list-comp expr var iterable condition)
 	result := make(core.ListValue, 0, 5)
@@ -764,7 +829,7 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 	if condition != nil {
 		result = append(result, condition)
 	}
-	
+
 	return result, nil
 }
 
@@ -900,8 +965,8 @@ func isSymbolChar(ch byte) bool {
 		ch != '[' && ch != ']' &&
 		ch != '{' && ch != '}' &&
 		ch != '"' && ch != '\'' && ch != ';' &&
-		ch != ':' && ch != '.' &&  // dot is not valid in symbols (used for dot notation)
-		ch != ','  // comma is not valid in symbols (used for separating elements)
+		ch != ':' && ch != '.' && // dot is not valid in symbols (used for dot notation)
+		ch != ',' // comma is not valid in symbols (used for separating elements)
 }
 
 // error creates a parser error with current position info

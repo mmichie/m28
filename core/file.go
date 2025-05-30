@@ -11,13 +11,13 @@ import (
 // File represents a file object
 type File struct {
 	BaseObject
-	Path     string
-	Mode     string
-	file     *os.File
-	reader   *bufio.Reader
-	writer   *bufio.Writer
-	closed   bool
-	isText   bool
+	Path   string
+	Mode   string
+	file   *os.File
+	reader *bufio.Reader
+	writer *bufio.Writer
+	closed bool
+	isText bool
 }
 
 // NewFile creates a new file object
@@ -31,7 +31,7 @@ func NewFile(path string, mode string) (*File, error) {
 	}
 
 	var err error
-	
+
 	// Parse mode
 	switch mode {
 	case "r", "rb":
@@ -40,21 +40,21 @@ func NewFile(path string, mode string) (*File, error) {
 			return nil, fmt.Errorf("cannot open file '%s': %v", path, err)
 		}
 		f.reader = bufio.NewReader(f.file)
-		
+
 	case "w", "wb":
 		f.file, err = os.Create(path)
 		if err != nil {
 			return nil, fmt.Errorf("cannot create file '%s': %v", path, err)
 		}
 		f.writer = bufio.NewWriter(f.file)
-		
+
 	case "a", "ab":
 		f.file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return nil, fmt.Errorf("cannot open file '%s' for append: %v", path, err)
 		}
 		f.writer = bufio.NewWriter(f.file)
-		
+
 	case "r+", "rb+", "r+b":
 		f.file, err = os.OpenFile(path, os.O_RDWR, 0644)
 		if err != nil {
@@ -62,7 +62,7 @@ func NewFile(path string, mode string) (*File, error) {
 		}
 		f.reader = bufio.NewReader(f.file)
 		f.writer = bufio.NewWriter(f.file)
-		
+
 	case "w+", "wb+", "w+b":
 		f.file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
@@ -70,7 +70,7 @@ func NewFile(path string, mode string) (*File, error) {
 		}
 		f.reader = bufio.NewReader(f.file)
 		f.writer = bufio.NewWriter(f.file)
-		
+
 	default:
 		return nil, fmt.Errorf("invalid file mode: %s", mode)
 	}
@@ -97,7 +97,7 @@ func (f *File) Read(size int) (Value, error) {
 	if f.closed {
 		return nil, fmt.Errorf("I/O operation on closed file")
 	}
-	
+
 	if f.reader == nil {
 		return nil, fmt.Errorf("file not open for reading")
 	}
@@ -108,7 +108,7 @@ func (f *File) Read(size int) (Value, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error reading file: %v", err)
 		}
-		
+
 		if f.isText {
 			return StringValue(string(content)), nil
 		}
@@ -122,7 +122,7 @@ func (f *File) Read(size int) (Value, error) {
 	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("error reading file: %v", err)
 	}
-	
+
 	if f.isText {
 		return StringValue(string(buf[:n])), nil
 	}
@@ -134,7 +134,7 @@ func (f *File) Write(data string) error {
 	if f.closed {
 		return fmt.Errorf("I/O operation on closed file")
 	}
-	
+
 	if f.writer == nil {
 		return fmt.Errorf("file not open for writing")
 	}
@@ -143,7 +143,7 @@ func (f *File) Write(data string) error {
 	if err != nil {
 		return fmt.Errorf("error writing to file: %v", err)
 	}
-	
+
 	// Flush to ensure data is written
 	return f.writer.Flush()
 }
@@ -153,7 +153,7 @@ func (f *File) ReadLine() (Value, error) {
 	if f.closed {
 		return nil, fmt.Errorf("I/O operation on closed file")
 	}
-	
+
 	if f.reader == nil {
 		return nil, fmt.Errorf("file not open for reading")
 	}
@@ -168,7 +168,7 @@ func (f *File) ReadLine() (Value, error) {
 		}
 		return nil, fmt.Errorf("error reading line: %v", err)
 	}
-	
+
 	return StringValue(line), nil
 }
 
@@ -177,22 +177,22 @@ func (f *File) ReadLines() (Value, error) {
 	if f.closed {
 		return nil, fmt.Errorf("I/O operation on closed file")
 	}
-	
+
 	if f.reader == nil {
 		return nil, fmt.Errorf("file not open for reading")
 	}
 
 	var lines ListValue
 	scanner := bufio.NewScanner(f.reader)
-	
+
 	for scanner.Scan() {
-		lines = append(lines, StringValue(scanner.Text() + "\n"))
+		lines = append(lines, StringValue(scanner.Text()+"\n"))
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("error reading lines: %v", err)
 	}
-	
+
 	return lines, nil
 }
 
@@ -201,17 +201,17 @@ func (f *File) Close() error {
 	if f.closed {
 		return nil // Already closed
 	}
-	
+
 	if f.writer != nil {
 		if err := f.writer.Flush(); err != nil {
 			return fmt.Errorf("error flushing file: %v", err)
 		}
 	}
-	
+
 	if err := f.file.Close(); err != nil {
 		return fmt.Errorf("error closing file: %v", err)
 	}
-	
+
 	f.closed = true
 	return nil
 }
@@ -221,12 +221,12 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	if f.closed {
 		return 0, fmt.Errorf("I/O operation on closed file")
 	}
-	
+
 	pos, err := f.file.Seek(offset, whence)
 	if err != nil {
 		return 0, fmt.Errorf("error seeking: %v", err)
 	}
-	
+
 	// Reset readers/writers after seek
 	if f.reader != nil {
 		f.reader = bufio.NewReader(f.file)
@@ -234,7 +234,7 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	if f.writer != nil {
 		f.writer = bufio.NewWriter(f.file)
 	}
-	
+
 	return pos, nil
 }
 
@@ -243,7 +243,7 @@ func (f *File) Tell() (int64, error) {
 	if f.closed {
 		return 0, fmt.Errorf("I/O operation on closed file")
 	}
-	
+
 	return f.file.Seek(0, io.SeekCurrent)
 }
 
@@ -284,7 +284,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "write":
 		return &BoundMethod{
 			Receiver: f,
@@ -314,7 +314,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "readline":
 		return &BoundMethod{
 			Receiver: f,
@@ -330,7 +330,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "readlines":
 		return &BoundMethod{
 			Receiver: f,
@@ -346,7 +346,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "close":
 		return &BoundMethod{
 			Receiver: f,
@@ -366,7 +366,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "seek":
 		return &BoundMethod{
 			Receiver: f,
@@ -379,12 +379,12 @@ func (f *File) GetAttr(name string) (Value, bool) {
 					if len(args) < 1 || len(args) > 2 {
 						return nil, fmt.Errorf("seek() takes 1 or 2 arguments")
 					}
-					
+
 					offset, ok := args[0].(NumberValue)
 					if !ok {
 						return nil, fmt.Errorf("seek() offset must be a number")
 					}
-					
+
 					whence := 0
 					if len(args) > 1 {
 						if w, ok := args[1].(NumberValue); ok {
@@ -393,7 +393,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 							return nil, fmt.Errorf("seek() whence must be a number")
 						}
 					}
-					
+
 					file := receiver.(*File)
 					pos, err := file.Seek(int64(offset), whence)
 					if err != nil {
@@ -404,7 +404,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "tell":
 		return &BoundMethod{
 			Receiver: f,
@@ -424,16 +424,16 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "closed":
 		return BoolValue(f.closed), true
-		
+
 	case "name":
 		return StringValue(f.Path), true
-		
+
 	case "mode":
 		return StringValue(f.Mode), true
-		
+
 	case "__enter__":
 		return &BoundMethod{
 			Receiver: f,
@@ -449,7 +449,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
-		
+
 	case "__exit__":
 		return &BoundMethod{
 			Receiver: f,
@@ -480,6 +480,6 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
 	}
-	
+
 	return f.BaseObject.GetAttr(name)
 }

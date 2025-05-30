@@ -441,12 +441,13 @@ func ReduceFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	return result, nil
 }
+
 // SortedFunc returns a sorted copy of a list
 func SortedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 || len(args) > 2 {
 		return nil, fmt.Errorf("sorted requires 1 or 2 arguments")
 	}
-	
+
 	// Get the sequence to sort
 	var items []core.Value
 	switch v := args[0].(type) {
@@ -467,7 +468,7 @@ func SortedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	default:
 		return nil, fmt.Errorf("sorted expects a sequence, got %s", v.Type())
 	}
-	
+
 	// Check for reverse parameter
 	reverse := false
 	if len(args) == 2 {
@@ -476,14 +477,14 @@ func SortedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			reverse = bool(b)
 		}
 	}
-	
+
 	// Sort using a simple comparison
 	// TODO: This is a basic implementation, should handle custom key functions
 	n := len(items)
 	for i := 0; i < n-1; i++ {
 		for j := 0; j < n-i-1; j++ {
 			shouldSwap := false
-			
+
 			// Compare based on type
 			switch a := items[j].(type) {
 			case core.NumberValue:
@@ -503,13 +504,13 @@ func SortedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 					}
 				}
 			}
-			
+
 			if shouldSwap {
 				items[j], items[j+1] = items[j+1], items[j]
 			}
 		}
 	}
-	
+
 	// Return as a list
 	return core.ListValue(items), nil
 }
@@ -519,7 +520,7 @@ func ReversedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("reversed requires 1 argument")
 	}
-	
+
 	switch v := args[0].(type) {
 	case core.ListValue:
 		// Create reversed copy
@@ -528,7 +529,7 @@ func ReversedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			result[i] = v[len(v)-1-i]
 		}
 		return result, nil
-		
+
 	case core.TupleValue:
 		// Return reversed as list
 		result := make(core.ListValue, len(v))
@@ -536,7 +537,7 @@ func ReversedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			result[i] = v[len(v)-1-i]
 		}
 		return result, nil
-		
+
 	case core.StringValue:
 		// Reverse string
 		runes := []rune(string(v))
@@ -544,7 +545,7 @@ func ReversedFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			runes[i], runes[j] = runes[j], runes[i]
 		}
 		return core.StringValue(string(runes)), nil
-		
+
 	default:
 		return nil, fmt.Errorf("reversed expects a sequence, got %s", v.Type())
 	}

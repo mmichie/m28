@@ -8,13 +8,13 @@ import (
 
 // parseIndexAccess handles parsing of index access after '['
 // It converts:
-//   obj[key] -> (get-item obj key)
-//   obj[start:end] -> (slice obj start end)
-//   obj[start:end:step] -> (slice obj start end step)
+//
+//	obj[key] -> (get-item obj key)
+//	obj[start:end] -> (slice obj start end)
+//	obj[start:end:step] -> (slice obj start end step)
 func (p *Parser) parseIndexAccess(base core.Value) (core.Value, error) {
 	// The '[' has already been consumed by parsePostfix
 	p.skipWhitespaceAndComments()
-	
 
 	if p.pos >= len(p.input) {
 		return nil, p.error("unexpected end of input after '['")
@@ -30,7 +30,7 @@ func (p *Parser) parseIndexAccess(base core.Value) (core.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing index: %v", err)
 	}
-	
+
 	// Skip whitespace and check what follows
 	p.skipWhitespaceAndComments()
 	if p.pos >= len(p.input) {
@@ -61,10 +61,10 @@ func (p *Parser) parseSlice(base core.Value, start core.Value) (core.Value, erro
 	// Consume the ':'
 	p.pos++
 	p.skipWhitespaceAndComments()
-	
+
 	var end core.Value
 	var step core.Value
-	
+
 	// Check for empty end (e.g., [start:] or [start::step])
 	if p.pos < len(p.input) && p.input[p.pos] != ']' && p.input[p.pos] != ':' {
 		var err error
@@ -74,12 +74,12 @@ func (p *Parser) parseSlice(base core.Value, start core.Value) (core.Value, erro
 		}
 		p.skipWhitespaceAndComments()
 	}
-	
+
 	// Check for step
 	if p.pos < len(p.input) && p.input[p.pos] == ':' {
 		p.pos++ // consume second ':'
 		p.skipWhitespaceAndComments()
-		
+
 		if p.pos < len(p.input) && p.input[p.pos] != ']' {
 			var err error
 			step, err = p.parseAtom()
@@ -89,13 +89,13 @@ func (p *Parser) parseSlice(base core.Value, start core.Value) (core.Value, erro
 			p.skipWhitespaceAndComments()
 		}
 	}
-	
+
 	// Expect closing bracket
 	if p.pos >= len(p.input) || p.input[p.pos] != ']' {
 		return nil, p.error("expected ']' after slice")
 	}
 	p.pos++ // consume ']'
-	
+
 	// Build slice expression
 	// Use nil for missing components
 	if start == nil {
@@ -107,7 +107,7 @@ func (p *Parser) parseSlice(base core.Value, start core.Value) (core.Value, erro
 	if step == nil {
 		step = core.None
 	}
-	
+
 	return core.ListValue{
 		core.SymbolValue("slice"),
 		base,

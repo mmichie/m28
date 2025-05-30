@@ -7,7 +7,7 @@ import (
 // yieldForm implements the yield expression
 func yieldForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	var value core.Value = core.Nil
-	
+
 	if len(args) > 0 {
 		// Evaluate the yielded value
 		val, err := Eval(args[0], ctx)
@@ -16,7 +16,7 @@ func yieldForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 		value = val
 	}
-	
+
 	// Return a yield marker
 	return &core.YieldValue{Value: value}, nil
 }
@@ -25,24 +25,24 @@ func yieldForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 func EvalGenerator(gen *core.Generator, ctx *core.Context) (core.Value, error) {
 	// This is a simplified implementation
 	// A full implementation would need to track execution state
-	
+
 	// Check if generator is already completed
 	if gen.GetState() == core.GeneratorCompleted {
 		return nil, &core.StopIteration{}
 	}
-	
+
 	// Evaluate the generator's code
 	result, err := Eval(gen.GetCode(), ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Check if we hit a yield
 	if yieldVal, ok := core.IsYield(result); ok {
 		gen.SetState(core.GeneratorSuspended)
 		return yieldVal.Value, nil
 	}
-	
+
 	// Generator completed
 	gen.SetState(core.GeneratorCompleted)
 	return nil, &core.StopIteration{Value: result}

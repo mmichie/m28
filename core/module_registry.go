@@ -131,7 +131,7 @@ func (r *ModuleRegistry) ResolveModulePath(name string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("module %s not found", name)
 	}
-	
+
 	return path, nil
 }
 

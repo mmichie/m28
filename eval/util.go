@@ -2,9 +2,42 @@ package eval
 
 import (
 	"fmt"
-	
+
 	"github.com/mmichie/m28/core"
 )
+
+// handleElifOrElse is a helper to process nested elif or else clauses
+func handleElifOrElse(clause core.Value, ctx *core.Context) (core.Value, error) {
+	// Check if it's another elif
+	if list, ok := clause.(core.ListValue); ok && len(list) > 0 {
+		if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "elif" {
+			// Recursive elif
+			if len(list) < 3 {
+				return nil, ErrArgCount("elif requires condition and expression")
+			}
+
+			// Evaluate condition
+			cond, err := Eval(list[1], ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			if core.IsTruthy(cond) {
+				return Eval(list[2], ctx)
+			}
+
+			// Check for more elif/else
+			if len(list) > 3 {
+				return handleElifOrElse(list[3], ctx)
+			}
+
+			return core.Nil, nil
+		}
+	}
+
+	// It's an else expression
+	return Eval(clause, ctx)
+}
 
 // IfForm provides the implementation of the if special form with elif support
 func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
@@ -29,29 +62,58 @@ func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return core.Nil, nil
 	}
 
-	// Check if the third argument is elif
+	// Check if the third argument is a list starting with elif
+	if list, ok := args[2].(core.ListValue); ok && len(list) > 0 {
+		if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "elif" {
+			// Nested elif structure: (elif condition expr else-clause)
+			if len(list) < 3 {
+				return nil, ErrArgCount("elif requires condition and expression")
+			}
+
+			// Evaluate elif condition
+			elifCond, err := Eval(list[1], ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			if core.IsTruthy(elifCond) {
+				return Eval(list[2], ctx)
+			}
+
+			// Check if there's an else clause (4th element) or another elif
+			if len(list) > 3 {
+				// The 4th element could be another elif or an else expression
+				return handleElifOrElse(list[3], ctx)
+			}
+
+			// No else clause
+			return core.Nil, nil
+		}
+	}
+
+	// Check if the third argument is elif symbol (flat structure)
 	if sym, ok := args[2].(core.SymbolValue); ok && string(sym) == "elif" {
-		// Handle elif chain
-		// Structure: (if cond1 expr1 (elif cond2 expr2 (elif cond3 expr3 (else expr4))))
+		// Handle flat elif chain
+		// Structure: (if cond1 expr1 elif cond2 expr2 elif cond3 expr3 else expr4)
 		elifArgs := args[2:] // Skip "if" condition and expression
-		
+
 		for len(elifArgs) > 0 {
 			// Check if current element is elif
 			if sym, ok := elifArgs[0].(core.SymbolValue); ok && string(sym) == "elif" {
 				if len(elifArgs) < 3 {
 					return nil, ErrArgCount("elif requires condition and expression")
 				}
-				
+
 				// Evaluate elif condition
 				elifCond, err := Eval(elifArgs[1], ctx)
 				if err != nil {
 					return nil, err
 				}
-				
+
 				if core.IsTruthy(elifCond) {
 					return Eval(elifArgs[2], ctx)
 				}
-				
+
 				// Move to next elif or else
 				elifArgs = elifArgs[3:]
 			} else if sym, ok := elifArgs[0].(core.SymbolValue); ok && string(sym) == "else" {
@@ -65,7 +127,7 @@ func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				return Eval(elifArgs[0], ctx)
 			}
 		}
-		
+
 		// No condition matched and no else clause
 		return core.Nil, nil
 	} else {
@@ -198,7 +260,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Only allow def for functions
 	switch value.(type) {
 	case *UserFunction:
@@ -220,10 +282,10 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 	if len(args)%2 != 0 {
 		return nil, fmt.Errorf("dict-literal requires an even number of arguments (key-value pairs)")
 	}
-	
+
 	// Create a new dictionary
 	dict := core.NewDict()
-	
+
 	// Process key-value pairs
 	for i := 0; i < len(args); i += 2 {
 		// Evaluate the key
@@ -231,7 +293,7 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating dict key: %v", err)
 		}
-		
+
 		// Convert key to string
 		var keyStr string
 		switch k := key.(type) {
@@ -242,17 +304,17 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 		default:
 			return nil, fmt.Errorf("dict keys must be strings or symbols, got %v", key.Type())
 		}
-		
+
 		// Evaluate the value
 		value, err := Eval(args[i+1], ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating dict value for key %q: %v", keyStr, err)
 		}
-		
+
 		// Set the key-value pair
 		dict.Set(keyStr, value)
 	}
-	
+
 	return dict, nil
 }
 
@@ -277,7 +339,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Variable assignment - define in current scope
 		ctx.Define(string(t), value)
 		return value, nil
-		
+
 	case core.ListValue:
 		// Check if it's tuple unpacking first
 		isTupleUnpacking := true
@@ -287,7 +349,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				break
 			}
 		}
-		
+
 		if isTupleUnpacking && len(t) > 0 {
 			// Tuple unpacking: (= (x, y) [10, 20])
 			// The value must be a tuple or list
@@ -317,7 +379,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			return value, nil
 		}
-		
+
 		// Check if it's a dot notation expression
 		if len(t) >= 3 {
 			if dotSym, ok := t[0].(core.SymbolValue); ok && string(dotSym) == "." {
@@ -327,13 +389,13 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				if err != nil {
 					return nil, err
 				}
-				
+
 				// Get the property name
 				propName, ok := t[2].(core.StringValue)
 				if !ok {
 					return nil, TypeError{Expected: "string property name", Got: t[2].Type()}
 				}
-				
+
 				// Set the attribute
 				if objWithAttrs, ok := obj.(interface {
 					SetAttr(string, core.Value) error
@@ -344,16 +406,16 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 					return value, nil
 				}
-				
+
 				// Special handling for dicts
 				if dict, ok := obj.(*core.DictValue); ok {
 					dict.Set(string(propName), value)
 					return value, nil
 				}
-				
+
 				return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
 			}
-			
+
 			// Check if it's an index expression
 			if len(t) == 3 {
 				if getItemSym, ok := t[0].(core.SymbolValue); ok && string(getItemSym) == "get-item" {
@@ -369,7 +431,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	default:
 		return nil, TypeError{Expected: "symbol or dot notation", Got: target.Type()}
 	}
-	
+
 	return nil, TypeError{Expected: "symbol or dot notation", Got: target.Type()}
 }
 

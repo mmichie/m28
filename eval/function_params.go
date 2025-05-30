@@ -8,14 +8,14 @@ import (
 // ParameterInfo holds information about a function parameter
 type ParameterInfo struct {
 	Name         core.SymbolValue
-	DefaultValue core.Value       // nil if no default
+	DefaultValue core.Value // nil if no default
 	HasDefault   bool
 }
 
 // FunctionSignature holds the full signature of a function
 type FunctionSignature struct {
-	RequiredParams []ParameterInfo  // Parameters without defaults
-	OptionalParams []ParameterInfo  // Parameters with defaults
+	RequiredParams []ParameterInfo   // Parameters without defaults
+	OptionalParams []ParameterInfo   // Parameters with defaults
 	RestParam      *core.SymbolValue // *args parameter (nil if none)
 	KeywordParam   *core.SymbolValue // **kwargs parameter (nil if none)
 }
@@ -40,16 +40,16 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 		RequiredParams: []ParameterInfo{},
 		OptionalParams: []ParameterInfo{},
 	}
-	
+
 	seenDefault := false
 	seenRest := false
 	seenKeyword := false
-	
+
 	for _, param := range paramList {
 		switch p := param.(type) {
 		case core.SymbolValue:
 			name := string(p)
-			
+
 			// Check for special parameters
 			if name == "*args" || (len(name) > 1 && name[0] == '*' && name[1] != '*') {
 				if seenRest {
@@ -66,7 +66,7 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 				sig.RestParam = &paramName
 				continue
 			}
-			
+
 			if name == "**kwargs" || (len(name) > 2 && name[0] == '*' && name[1] == '*') {
 				if seenKeyword {
 					return nil, fmt.Errorf("multiple **kwargs parameters not allowed")
@@ -79,40 +79,40 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 				sig.KeywordParam = &paramName
 				continue
 			}
-			
+
 			// Regular parameter without default
 			if seenDefault && !seenRest {
 				return nil, fmt.Errorf("non-default parameter %s after default parameter", name)
 			}
-			
+
 			sig.RequiredParams = append(sig.RequiredParams, ParameterInfo{
-				Name:         p,
-				HasDefault:   false,
+				Name:       p,
+				HasDefault: false,
 			})
-			
+
 		case core.ListValue:
 			// Parameter with default: (name default-value)
 			if len(p) != 2 {
 				return nil, fmt.Errorf("invalid parameter with default: expected (name value)")
 			}
-			
+
 			sym, ok := p[0].(core.SymbolValue)
 			if !ok {
 				return nil, fmt.Errorf("parameter name must be a symbol, got %T", p[0])
 			}
-			
+
 			seenDefault = true
 			sig.OptionalParams = append(sig.OptionalParams, ParameterInfo{
 				Name:         sym,
 				DefaultValue: p[1], // Store the unevaluated default expression
 				HasDefault:   true,
 			})
-			
+
 		default:
 			return nil, fmt.Errorf("invalid parameter: expected symbol or (symbol default), got %T", param)
 		}
 	}
-	
+
 	return sig, nil
 }
 
@@ -121,11 +121,11 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 	// Track which parameters have been bound
 	boundParams := make(map[string]bool)
 	argIndex := 0
-	
+
 	// 1. Bind required positional parameters
 	for _, param := range sig.RequiredParams {
 		paramName := string(param.Name)
-		
+
 		// Check if provided as keyword argument
 		if kwValue, ok := kwargs[paramName]; ok {
 			bindCtx.Define(paramName, kwValue)
@@ -140,11 +140,11 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			return fmt.Errorf("missing required argument: %s", paramName)
 		}
 	}
-	
+
 	// 2. Bind optional parameters with defaults
 	for _, param := range sig.OptionalParams {
 		paramName := string(param.Name)
-		
+
 		// Check if provided as keyword argument
 		if kwValue, ok := kwargs[paramName]; ok {
 			bindCtx.Define(paramName, kwValue)
@@ -166,7 +166,7 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			boundParams[paramName] = true
 		}
 	}
-	
+
 	// 3. Collect remaining positional arguments into *args if present
 	if sig.RestParam != nil {
 		restArgs := core.ListValue{}
@@ -176,10 +176,10 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 		bindCtx.Define(string(*sig.RestParam), restArgs)
 	} else if argIndex < len(args) {
 		// Too many positional arguments
-		return fmt.Errorf("too many positional arguments: expected at most %d, got %d", 
+		return fmt.Errorf("too many positional arguments: expected at most %d, got %d",
 			len(sig.RequiredParams)+len(sig.OptionalParams), len(args))
 	}
-	
+
 	// 4. Collect remaining keyword arguments into **kwargs if present
 	if sig.KeywordParam != nil {
 		kwargsDict := core.NewDict()
@@ -193,6 +193,6 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			return fmt.Errorf("unexpected keyword argument: %s", k)
 		}
 	}
-	
+
 	return nil
 }

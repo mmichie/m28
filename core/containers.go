@@ -176,7 +176,7 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 	if val, exists := d.Get(name); exists {
 		return val, true
 	}
-	
+
 	// Then check TypeDescriptor for methods
 	desc := GetTypeDescriptor(DictType)
 	if desc != nil {
@@ -185,7 +185,7 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 			return val, true
 		}
 	}
-	
+
 	// Finally check BaseObject
 	return d.BaseObject.GetAttr(name)
 }
@@ -213,7 +213,7 @@ func (t TupleValue) String() string {
 	if len(t) == 1 {
 		return "(" + PrintValue(t[0]) + ",)"
 	}
-	
+
 	elements := make([]string, len(t))
 	for i, v := range t {
 		elements[i] = PrintValue(v)

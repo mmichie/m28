@@ -18,7 +18,7 @@ func InitListMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			list := receiver.(ListValue)
 			value := args[0]
-			
+
 			// Find the first occurrence
 			index := -1
 			for i, item := range list {
@@ -27,16 +27,16 @@ func InitListMethods() {
 					break
 				}
 			}
-			
+
 			if index == -1 {
 				return nil, fmt.Errorf("list.remove(x): x not in list")
 			}
-			
+
 			// Create new list without the item
 			newList := make(ListValue, 0, len(list)-1)
 			newList = append(newList, list[:index]...)
 			newList = append(newList, list[index+1:]...)
-			
+
 			return newList, nil
 		},
 	}
