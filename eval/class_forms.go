@@ -97,37 +97,61 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				continue
 			}
 
-			// Check for def form
-			if sym, ok := s[0].(core.SymbolValue); ok && string(sym) == "def" {
-				// Method or attribute definition
-				if len(s) < 3 {
-					return nil, fmt.Errorf("def requires at least name and value")
-				}
+			// Check for def form (methods) or = form (class variables)
+			if sym, ok := s[0].(core.SymbolValue); ok {
+				switch string(sym) {
+				case "def":
+					// Method definition
+					if len(s) < 3 {
+						return nil, fmt.Errorf("def requires at least name and value")
+					}
 
-				name, ok := s[1].(core.SymbolValue)
-				if !ok {
-					return nil, fmt.Errorf("def name must be a symbol")
-				}
+					name, ok := s[1].(core.SymbolValue)
+					if !ok {
+						return nil, fmt.Errorf("def name must be a symbol")
+					}
 
-				// Check if it's a method definition
-				if len(s) >= 3 {
-					if paramList, ok := s[2].(core.ListValue); ok {
-						// It's a method definition
-						method, err := createMethod(string(name), paramList, s[3:], ctx)
-						if err != nil {
-							return nil, err
+					// Check if it's a method definition
+					if len(s) >= 3 {
+						if paramList, ok := s[2].(core.ListValue); ok {
+							// It's a method definition
+							method, err := createMethod(string(name), paramList, s[3:], ctx)
+							if err != nil {
+								return nil, err
+							}
+							class.SetMethod(string(name), method)
+							continue
 						}
-						class.SetMethod(string(name), method)
-						continue
+					}
+
+					// def should only be used for functions
+					return nil, fmt.Errorf("def can only be used for method definitions in classes")
+
+				case "=":
+					// Class variable definition
+					if len(s) != 3 {
+						return nil, fmt.Errorf("= requires exactly 2 arguments in class definition")
+					}
+
+					name, ok := s[1].(core.SymbolValue)
+					if !ok {
+						return nil, fmt.Errorf("class variable name must be a symbol")
+					}
+
+					// Evaluate the value
+					value, err := Eval(s[2], ctx)
+					if err != nil {
+						return nil, err
+					}
+					class.SetClassAttr(string(name), value)
+
+				default:
+					// Evaluate other forms in class context
+					_, err := Eval(stmt, ctx)
+					if err != nil {
+						return nil, err
 					}
 				}
-
-				// It's an attribute definition
-				value, err := Eval(s[2], ctx)
-				if err != nil {
-					return nil, err
-				}
-				class.SetClassAttr(string(name), value)
 			} else {
 				// Evaluate other forms in class context
 				_, err := Eval(stmt, ctx)

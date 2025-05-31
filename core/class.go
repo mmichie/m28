@@ -131,6 +131,13 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	return c.BaseObject.GetAttr(name)
 }
 
+// SetAttr implements Object interface for classes
+func (c *Class) SetAttr(name string, value Value) error {
+	// Set as class attribute
+	c.SetClassAttr(name, value)
+	return nil
+}
+
 // Call implements Callable interface for classes (instantiation)
 func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 	// Create new instance

@@ -15,13 +15,14 @@
 (= grade 85)
 (if (>= grade 90)
     (print "Grade: A")
-    (elif (>= grade 80)
-        (print "Grade: B")
-        (elif (>= grade 70)
-            (print "Grade: C")
-            (elif (>= grade 60)
-                (print "Grade: D")
-                (print "Grade: F")))))
+    elif (>= grade 80)
+    (print "Grade: B")
+    elif (>= grade 70)
+    (print "Grade: C")
+    elif (>= grade 60)
+    (print "Grade: D")
+    else
+    (print "Grade: F"))
 
 # Conditional expression (ternary-like)
 (= status (if (>= age 18) "adult" "minor"))
@@ -45,9 +46,10 @@
 (if (== user_type "member")
     (if (>= years_member 5)
         (print "\nGold member benefits")
-        (elif (>= years_member 2)
-            (print "\nSilver member benefits")
-            (print "\nBasic member benefits")))
+        elif (>= years_member 2)
+        (print "\nSilver member benefits")
+        else
+        (print "\nBasic member benefits"))
     (print "\nGuest access only"))
 
 # Checking multiple values
@@ -80,19 +82,30 @@
 
 (if (== command "start")
     (print "\nStarting the system...")
-    (elif (== command "stop")
-        (print "\nStopping the system...")
-        (elif (== command "restart")
-            (print "\nRestarting the system...")
-            (print "\nUnknown command"))))
+    elif (== command "stop")
+    (print "\nStopping the system...")
+    elif (== command "restart")
+    (print "\nRestarting the system...")
+    else
+    (print "\nUnknown command"))
 
 # Conditional with early return
 (def check_password (password)
   (if (< (len password) 8)
       (return "Password too short"))
-  (if (not (any (lambda (c) (in c "0123456789")) password))
+  # Check for digit
+  (= has_digit False)
+  (for c password
+    (if (in c "0123456789")
+        (= has_digit True)))
+  (if (not has_digit)
       (return "Password must contain a number"))
-  (if (not (any (lambda (c) (in c "ABCDEFGHIJKLMNOPQRSTUVWXYZ")) password))
+  # Check for uppercase
+  (= has_upper False)
+  (for c password
+    (if (in c "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        (= has_upper True)))
+  (if (not has_upper)
       (return "Password must contain an uppercase letter"))
   "Password is valid")
 
@@ -110,7 +123,6 @@
 })
 
 (= user_input "yes")
-(= response (if (in user_input responses)
-                responses.user_input
-                "I don't understand your response"))
+# Use dict.get with default value
+(= response (responses.get user_input "I don't understand your response"))
 (print f"\nResponse: {response}")

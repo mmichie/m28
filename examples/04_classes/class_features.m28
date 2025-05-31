@@ -30,13 +30,13 @@
         (print f"Deposited ${amount}. New balance: ${self._balance}"))
       (print "Amount must be positive")))
   
-  # Static method
-  (def validate_amount (amount)
-    (return (> amount 0)))
+  # Static method (not yet supported - all methods need self)
+  # (def validate_amount (amount)
+  #   (return (> amount 0)))
   
-  # Class method
-  (def get_total_accounts ()
-    (return BankAccount.total_accounts))
+  # Class method (not yet supported - all methods need self)
+  # (def get_total_accounts ()
+  #   (return BankAccount.total_accounts))
   
   # String representation
   (def __str__ (self)
@@ -54,15 +54,15 @@
 (acc2.deposit 250)   # "Deposited $250. New balance: $250"
 
 # Access property
-(print f"Alice's balance: ${acc1.balance}")
+(print f"Alice's balance: ${(acc1.balance)}")
 
-# Use static method
-(if (BankAccount.validate_amount 100)
-  (print "Valid amount")
-  (print "Invalid amount"))
+# Use static method (not yet supported)
+# (if (BankAccount.validate_amount 100)
+#   (print "Valid amount")
+#   (print "Invalid amount"))
 
-# Use class method
-(print f"Total accounts: {BankAccount.get_total_accounts}")
+# Use class method (not yet supported)
+# (print f"Total accounts: {BankAccount.get_total_accounts}")
 
 # Operator overloading example
 (class Vector
@@ -99,8 +99,9 @@
 (= v2 (Vector 1 2))
 
 (print v1)                # "Vector(3, 4)"
-(print (+ v1 v2))        # "Vector(4, 6)"
-(print (- v1 v2))        # "Vector(2, 2)"
-(print (* v1 2))         # "Vector(6, 8)"
-(print (== v1 v2))       # False
-(print f"Magnitude: {v1.magnitude}")  # "Magnitude: 5.0"
+# Operator overloading not yet supported in M28
+# (print (+ v1 v2))        # "Vector(4, 6)"
+# (print (- v1 v2))        # "Vector(2, 2)"
+# (print (* v1 2))         # "Vector(6, 8)"
+# (print (== v1 v2))       # False
+(print f"Magnitude: {(v1.magnitude)}")  # "Magnitude: 5.0"

@@ -5,94 +5,55 @@
 (try
   (= result (/ 10 0))
   (print "This won't print")
-  (except ZeroDivisionError
+  (except
     (print "Cannot divide by zero!")))
 
-# Try-except with exception variable
-(print "\nCapturing exception details:")
+# Try with finally
+(print "\nTry with finally:")
 (try
-  (= result (/ 10 0))
-  (except ZeroDivisionError as e
-    (print f"Error occurred: {e}")))
+  (print "In try block")
+  (= result (/ 100 5))
+  (print f"Result: {result}")
+  (finally
+    (print "Finally block always executes")))
 
-# Multiple exception types
-(print "\nHandling multiple exception types:")
-(def risky_function (x)
-  (if (== x 0)
-      (/ 1 0)  # ZeroDivisionError
-      (elif (< x 0)
-        (raise (ValueError "Negative value not allowed"))
-        (int "not a number"))))  # ValueError
-
-(for test_value in [0, -5, "abc"]
-  (try
-    (= result (risky_function test_value))
-    (print f"Result: {result}")
-    (except ZeroDivisionError
-      (print "Caught division by zero"))
-    (except ValueError as e
-      (print f"Caught value error: {e}"))
-    (except Exception as e
-      (print f"Caught unexpected error: {e}"))))
-
-# Try-except-else
-(print "\nTry-except-else pattern:")
-(for value in [10, 0]
-  (try
-    (= result (/ 100 value))
-    (except ZeroDivisionError
-      (print f"Cannot divide by {value}"))
-    (else
-      (print f"100 / {value} = {result}"))))
-
-# Try-except-finally
-(print "\nTry-except-finally (cleanup):")
-(def process_data (data)
-  (try
-    (print f"Processing {data}...")
-    (if (== data "bad")
-        (raise (RuntimeError "Bad data")))
-    (print "Processing complete")
-    (except RuntimeError as e
-      (print f"Error: {e}"))
-    (finally
-      (print "Cleanup performed"))))
-
-(process_data "good")
-(print)
-(process_data "bad")
+# Exception and finally together
+(print "\nException with finally:")
+(try
+  (print "About to raise an error")
+  (raise "Something went wrong")
+  (print "This won't print")
+  (except
+    (print "Exception caught"))
+  (finally
+    (print "Cleanup performed")))
 
 # Raising exceptions
 (print "\nRaising custom exceptions:")
 (def validate_age (age)
   (if (< age 0)
-      (raise (ValueError "Age cannot be negative"))
-      (elif (> age 150)
-        (raise (ValueError "Age seems unrealistic"))
-        age)))
+      (raise "Age cannot be negative")
+      elif (> age 150)
+      (raise "Age seems unrealistic")
+      else
+      age))
 
-(for test_age in [25, -5, 200]
+(for test_age [25, -5, 200]
   (try
     (= valid_age (validate_age test_age))
     (print f"Valid age: {valid_age}")
-    (except ValueError as e
-      (print f"Invalid age {test_age}: {e}"))))
+    (except
+      (print f"Invalid age: {test_age}"))))
 
-# Custom exception classes
-(print "\nCustom exception:")
-(class InsufficientFundsError (Exception)
-  (def __init__ (self balance needed)
-    (= self.balance balance)
-    (= self.needed needed)
-    (= self.message f"Insufficient funds: have {balance}, need {needed}")))
-
+# Simple bank account with error handling
+(print "\nBank account example:")
 (class BankAccount
   (def __init__ (self balance)
     (= self.balance balance))
   
   (def withdraw (self amount)
     (if (> amount self.balance)
-        (raise (InsufficientFundsError self.balance amount)))
+        (raise f"Insufficient funds: need {amount}, have {self.balance}"))
     (= self.balance (- self.balance amount))
     self.balance))
 
@@ -101,48 +62,60 @@
   (account.withdraw 50)
   (print f"Withdrawal successful, balance: {account.balance}")
   (account.withdraw 75)  # This will fail
-  (except InsufficientFundsError as e
-    (print e.message)))
+  (except
+    (print "Insufficient funds for withdrawal")))
 
-# Exception chaining
-(print "\nException chaining:")
-(def process_file (filename)
+# Nested function calls with error handling
+(print "\nNested function error handling:")
+(def risky_operation (x)
+  (if (== x 0)
+      (/ 1 0)  # Will cause error
+      elif (< x 0)
+      (raise "Negative value not allowed")
+      else
+      (* x 2)))
+
+(def process_value (x)
+  (print f"Processing {x}...")
+  (risky_operation x))
+
+(for value [5, 0, -3]
   (try
-    (if (not (ends_with filename ".txt"))
-        (raise (ValueError "Only .txt files allowed")))
-    # Simulate file processing
-    (raise (IOError "File not found"))
-    (except IOError as e
-      (raise (RuntimeError f"Failed to process {filename}") from e))))
+    (= result (process_value value))
+    (print f"Result: {result}")
+    (except
+      (print f"Failed to process {value}"))))
 
-(try
-  (process_file "data.csv")
-  (except RuntimeError as e
-    (print f"Runtime error: {e}")))
-    # In real Python, we'd see the chain with __cause__
+# Function with error handling
+(print "\nFunction with internal error handling:")
+(def safe_divide (a b)
+  (try
+    (/ a b)
+    (except
+      (print f"Cannot divide {a} by {b}")
+      nil)))
 
-# Context manager pattern (with statement)
-(print "\nContext manager with exception handling:")
-(class FileManager
-  (def __init__ (self filename mode)
-    (= self.filename filename)
-    (= self.mode mode))
-  
-  (def __enter__ (self)
-    (print f"Opening {self.filename}")
-    self)
-  
-  (def __exit__ (self exc_type exc_val exc_tb)
-    (print f"Closing {self.filename}")
-    (if exc_type
-        (print f"Exception occurred: {exc_val}"))
-    False))  # Don't suppress exceptions
+(print f"10 / 2 = {(safe_divide 10 2)}")
+(print f"10 / 0 = {(safe_divide 10 0)}")
 
-(with (FileManager "test.txt" "r") as f
-  (print "Working with file")
-  # Simulate an error
-  # (raise (IOError "Read error"))
-  (print "Done working"))
+# Multiple operations with shared error handling
+(print "\nMultiple operations:")
+(def process_data (data)
+  (try
+    (print f"Processing {data}...")
+    (if (== data "bad")
+        (raise "Bad data"))
+    (print "Processing complete")
+    (return f"Processed: {data}")
+    (except
+      (print "Error during processing")
+      (return nil))))
+
+(for data ["good", "bad", "ok"]
+  (= result (process_data data))
+  (if result
+      (print f"Success: {result}")
+      (print "Processing failed")))
 
 # Assertions
 (print "\nAssertions:")
@@ -150,8 +123,29 @@
   (assert (!= b 0) "Divisor cannot be zero")
   (/ a b))
 
+(print f"10 / 2 = {(divide 10 2)}")
 (try
-  (print (divide 10 2))
-  (print (divide 10 0))
-  (except AssertionError as e
-    (print f"Assertion failed: {e}")))
+  (divide 10 0)
+  (except
+    (print "Assertion failed: Cannot divide by zero")))
+
+# Error propagation
+(print "\nError propagation:")
+(def level3 ()
+  (print "  Level 3: raising error")
+  (raise "Error from level 3"))
+
+(def level2 ()
+  (print " Level 2: calling level 3")
+  (level3))
+
+(def level1 ()
+  (print "Level 1: calling level 2")
+  (level2))
+
+(try
+  (level1)
+  (except
+    (print "Error caught at top level")))
+
+(print "\n===== Exception Examples Complete =====")
