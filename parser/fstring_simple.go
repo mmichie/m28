@@ -95,9 +95,13 @@ func (p *Parser) parseFStringEnhancedSimple(quoteChar rune) (core.Value, error) 
 
 			// Add the expression with format spec if present
 			if formatSpec != "" {
-				// For now, just add the expression without format spec processing
-				// This can be enhanced later
-				parts = append(parts, expr)
+				// Create a format expression with the spec
+				formatExpr := core.ListValue{
+					core.SymbolValue("format-expr"),
+					expr,
+					core.StringValue(formatSpec),
+				}
+				parts = append(parts, formatExpr)
 			} else {
 				parts = append(parts, expr)
 			}
@@ -128,12 +132,16 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 	inString := false
 	var stringQuote rune
 	escaped := false
+	
+	// For tracking the original expression for self-documenting
+	var originalExpr strings.Builder
 
 	for p.pos < len(p.input) {
 		ch := rune(p.input[p.pos])
 
 		if escaped {
 			exprText.WriteRune(ch)
+			originalExpr.WriteRune(ch)
 			escaped = false
 			p.advance()
 			continue
@@ -141,6 +149,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 
 		if ch == '\\' {
 			exprText.WriteRune(ch)
+			originalExpr.WriteRune(ch)
 			escaped = true
 			p.advance()
 			continue
@@ -151,6 +160,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 			inString = true
 			stringQuote = ch
 			exprText.WriteRune(ch)
+			originalExpr.WriteRune(ch)
 			p.advance()
 			continue
 		}
@@ -158,6 +168,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 		if inString && ch == stringQuote {
 			inString = false
 			exprText.WriteRune(ch)
+			originalExpr.WriteRune(ch)
 			p.advance()
 			continue
 		}
@@ -167,16 +178,45 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 			case '{':
 				depth++
 				exprText.WriteRune(ch)
+				originalExpr.WriteRune(ch)
 			case '}':
 				if depth == 0 {
-					// End of expression - check for format spec
+					// End of expression - parse format spec, conversion, and self-doc
 					exprStr := exprText.String()
+					origStr := originalExpr.String()
 					
-					// Check for format spec (simplified - just look for :)
-					colonIdx := strings.LastIndex(exprStr, ":")
-					if colonIdx >= 0 {
-						formatSpec = exprStr[colonIdx+1:]
-						exprStr = exprStr[:colonIdx]
+					// Check for self-documenting expression (=)
+					// Must check for = that's not followed by : or !
+					selfDoc := false
+					equalIdx := strings.LastIndex(exprStr, "=")
+					if equalIdx >= 0 && equalIdx == len(exprStr)-1 {
+						// The = is at the end
+						selfDoc = true
+						exprStr = exprStr[:equalIdx]
+						origStr = origStr[:equalIdx]
+					}
+					
+					// Parse format spec and conversion from the = stripped version
+					
+					// First, check for format spec (:...)
+					if idx := strings.LastIndex(exprStr, ":"); idx >= 0 {
+						// Make sure this colon isn't inside a string or dict
+						if isValidFormatSpecColon(exprStr, idx) {
+							formatSpec = exprStr[idx+1:]
+							exprStr = exprStr[:idx]
+							// Don't update origStr - we want the original expression for self-doc
+						}
+					}
+					
+					// Then check for conversion (!r, !s, !a)
+					conversion := ""
+					if idx := strings.LastIndex(exprStr, "!"); idx >= 0 {
+						possibleConv := exprStr[idx+1:]
+						if possibleConv == "r" || possibleConv == "s" || possibleConv == "a" {
+							conversion = possibleConv
+							exprStr = exprStr[:idx]
+							// Don't update origStr - we want the original expression for self-doc
+						}
 					}
 
 					// Parse the expression by creating a temporary parser
@@ -186,21 +226,65 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 					if err != nil {
 						return nil, "", fmt.Errorf("error parsing f-string expression: %v", err)
 					}
+					
+					// Build enhanced format spec string that includes all modifiers
+					var enhancedSpec strings.Builder
+					if formatSpec != "" {
+						enhancedSpec.WriteString(formatSpec)
+					}
+					if conversion != "" {
+						enhancedSpec.WriteString("|!")
+						enhancedSpec.WriteString(conversion)
+					}
+					if selfDoc {
+						enhancedSpec.WriteString("|=")
+						enhancedSpec.WriteString(origStr)
+					}
 
-					return expr, formatSpec, nil
+					return expr, enhancedSpec.String(), nil
 				}
 				depth--
 				exprText.WriteRune(ch)
+				originalExpr.WriteRune(ch)
 			default:
 				exprText.WriteRune(ch)
+				originalExpr.WriteRune(ch)
 			}
 		} else {
 			// Inside a string
 			exprText.WriteRune(ch)
+			originalExpr.WriteRune(ch)
 		}
 
 		p.advance()
 	}
 
 	return nil, "", fmt.Errorf("unclosed f-string expression")
+}
+
+// isValidFormatSpecColon checks if a colon is a valid format spec separator
+func isValidFormatSpecColon(expr string, colonIdx int) bool {
+	// Simple heuristic: count quotes and braces before the colon
+	// If they're balanced, it's likely a format spec
+	quotes := 0
+	braces := 0
+	brackets := 0
+	
+	for i := 0; i < colonIdx; i++ {
+		switch expr[i] {
+		case '"', '\'':
+			quotes++
+		case '{':
+			braces++
+		case '}':
+			braces--
+		case '[':
+			brackets++
+		case ']':
+			brackets--
+		}
+	}
+	
+	// If quotes are odd or braces/brackets unbalanced, colon is inside a construct
+	return quotes%2 == 0 && braces == 0 && brackets == 0
 }

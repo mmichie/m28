@@ -1,4 +1,0 @@
-# Test nested quotes in f-strings
-
-(= d {"name": "Bob", "age": 25})
-(print f"Name: {d['name']}")

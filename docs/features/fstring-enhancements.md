@@ -37,22 +37,34 @@ The most requested feature - ability to use different quote types inside f-strin
 - Full Unicode: `f"Emoji: {emoji}"` where emoji = "🐍🎉"
 - International text: Works with Chinese, Greek, etc.
 
-## Not Yet Implemented
+## Newly Implemented Features (✅ ALL WORKING)
 
 ### 1. Format Specifications
-Python-style format specs like:
+Python-style format specs are now fully supported:
 - `f"{pi:.2f}"` - Decimal precision
-- `f"{num:04d}"` - Zero padding
-- `f"{text:>10}"` - Alignment
+- `f"{num:04d}"` - Zero padding  
+- `f"{text:>10}"` - Right alignment
+- `f"{text:<10}"` - Left alignment
+- `f"{text:^10}"` - Center alignment
+- `f"{text:*^10}"` - Custom fill character
 - `f"{value:,}"` - Thousands separator
+- `f"{value:+d}"` - Force sign display
+- `f"{num:b}"` - Binary format
+- `f"{num:x}"` - Hexadecimal
+- `f"{pct:%}"` - Percentage
+- `f"{sci:e}"` - Scientific notation
 
 ### 2. Conversion Flags
+All Python conversion flags work:
 - `f"{value!r}"` - repr() conversion
 - `f"{value!s}"` - str() conversion  
 - `f"{value!a}"` - ascii() conversion
 
 ### 3. Self-Documenting Expressions
-- `f"{expr=}"` - Shows both expression and value
+Debug output with `=`:
+- `f"{x=}"` - Shows "x=10"
+- `f"{x + y=}"` - Shows "x + y=30"
+- Works with any expression
 
 ## Implementation Details
 

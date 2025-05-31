@@ -16,6 +16,7 @@ func RegisterStringFunctions(ctx *core.Context) {
 	ctx.Define("str", core.NewBuiltinFunction(StrFunc))
 	ctx.Define("format", core.NewBuiltinFunction(FormatFunc))
 	ctx.Define("str-format", core.NewBuiltinFunction(StrFormatFunc))
+	ctx.Define("format-expr", core.NewBuiltinFunction(FormatExprFunc))
 
 	// String properties
 	ctx.Define("length", core.NewBuiltinFunction(LengthFunc))  // This function is already in list.go
@@ -48,6 +49,15 @@ func StrFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Use the PrintValue function to convert to string
 	return core.StringValue(core.PrintValueWithoutQuotes(args[0])), nil
+}
+
+// FormatExprFunc handles format expressions from enhanced f-strings
+func FormatExprFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	formatted, err := formatExpression(args, ctx)
+	if err != nil {
+		return nil, err
+	}
+	return core.StringValue(formatted), nil
 }
 
 // StrFormatFunc concatenates strings and values for f-string formatting
@@ -522,28 +532,170 @@ func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
 	// Default formatting
 	result := core.PrintValueWithoutQuotes(value)
 
-	// Check for format spec (dict with formatting options)
+	// Parse the enhanced format spec string if present
 	if len(args) > 1 {
-		if specDict, ok := args[1].(*core.DictValue); ok {
-			result = applyFormatSpec(value, specDict)
-		}
-	}
-
-	// Check for conversion (!r, !s, !a)
-	for i := 1; i < len(args); i++ {
-		if str, ok := args[i].(core.StringValue); ok {
-			s := string(str)
-			if strings.HasPrefix(s, "!") {
-				result = applyConversion(value, s[1:])
-			} else if strings.HasPrefix(s, "=") {
-				// Self-documenting expression
-				exprText := s[1:]
-				result = fmt.Sprintf("%s=%s", exprText, result)
+		if specStr, ok := args[1].(core.StringValue); ok {
+			spec := string(specStr)
+			
+			// The spec may contain format spec, conversion, and self-doc separated by |
+			parts := strings.Split(spec, "|")
+			formatSpec := ""
+			conversion := ""
+			selfDocExpr := ""
+			
+			for _, part := range parts {
+				if strings.HasPrefix(part, "!") {
+					conversion = part[1:]
+				} else if strings.HasPrefix(part, "=") {
+					selfDocExpr = part[1:]
+				} else if part != "" {
+					formatSpec = part
+				}
+			}
+			
+			// Apply conversion first if present
+			if conversion != "" {
+				result = applyConversion(value, conversion)
+				value = core.StringValue(result) // Convert for format spec
+			}
+			
+			// Apply format spec if present
+			if formatSpec != "" {
+				result = applyFormatSpecString(value, formatSpec)
+			}
+			
+			// Apply self-documenting if present
+			if selfDocExpr != "" {
+				result = fmt.Sprintf("%s=%s", selfDocExpr, result)
 			}
 		}
 	}
 
 	return result, nil
+}
+
+// applyFormatSpecString parses and applies a Python-style format specification string
+func applyFormatSpecString(value core.Value, specStr string) string {
+	if specStr == "" {
+		return core.PrintValueWithoutQuotes(value)
+	}
+	
+	// Parse the format spec string
+	spec := parseFormatSpecString(specStr)
+	
+	// Apply formatting based on value type
+	switch v := value.(type) {
+	case core.NumberValue:
+		return formatNumber(float64(v), spec.Fill, spec.Align, spec.Sign, spec.Alt, spec.Zero, spec.Width, spec.Precision, spec.Type, spec.Thousands)
+	case core.StringValue:
+		return formatString(string(v), spec.Fill, spec.Align, spec.Width, spec.Precision)
+	default:
+		str := core.PrintValueWithoutQuotes(value)
+		return formatString(str, spec.Fill, spec.Align, spec.Width, spec.Precision)
+	}
+}
+
+// FormatSpec represents a parsed format specification
+type FormatSpec struct {
+	Fill      rune
+	Align     rune // '<', '>', '^', '='
+	Sign      rune // '+', '-', ' '
+	Alt       bool // '#' flag
+	Zero      bool // '0' flag
+	Width     int
+	Precision int  // -1 if not specified
+	Type      rune // 'f', 'd', 's', etc.
+	Thousands bool // ',' flag for thousands separator
+}
+
+// parseFormatSpecString parses a Python format specification string
+func parseFormatSpecString(spec string) FormatSpec {
+	fs := FormatSpec{
+		Fill:      ' ',
+		Precision: -1,
+	}
+	
+	if spec == "" {
+		return fs
+	}
+	
+	i := 0
+	
+	// Parse fill and align
+	if len(spec) >= 2 {
+		possibleAlign := rune(spec[1])
+		if possibleAlign == '<' || possibleAlign == '>' || possibleAlign == '^' || possibleAlign == '=' {
+			fs.Fill = rune(spec[0])
+			fs.Align = possibleAlign
+			i = 2
+		} else if len(spec) >= 1 {
+			possibleAlign = rune(spec[0])
+			if possibleAlign == '<' || possibleAlign == '>' || possibleAlign == '^' || possibleAlign == '=' {
+				fs.Align = possibleAlign
+				i = 1
+			}
+		}
+	}
+	
+	// Parse sign
+	if i < len(spec) {
+		sign := rune(spec[i])
+		if sign == '+' || sign == '-' || sign == ' ' {
+			fs.Sign = sign
+			i++
+		}
+	}
+	
+	// Parse # flag
+	if i < len(spec) && spec[i] == '#' {
+		fs.Alt = true
+		i++
+	}
+	
+	// Parse 0 flag
+	if i < len(spec) && spec[i] == '0' {
+		fs.Zero = true
+		if fs.Align == 0 {
+			fs.Align = '='
+		}
+		i++
+	}
+	
+	// Parse width
+	widthStart := i
+	for i < len(spec) && spec[i] >= '0' && spec[i] <= '9' {
+		i++
+	}
+	if i > widthStart {
+		fmt.Sscanf(spec[widthStart:i], "%d", &fs.Width)
+	}
+	
+	// Parse thousands separator
+	if i < len(spec) && spec[i] == ',' {
+		fs.Thousands = true
+		i++
+	}
+	
+	// Parse precision
+	if i < len(spec) && spec[i] == '.' {
+		i++
+		precStart := i
+		for i < len(spec) && spec[i] >= '0' && spec[i] <= '9' {
+			i++
+		}
+		if i > precStart {
+			fmt.Sscanf(spec[precStart:i], "%d", &fs.Precision)
+		} else {
+			fs.Precision = 0
+		}
+	}
+	
+	// Parse type
+	if i < len(spec) {
+		fs.Type = rune(spec[i])
+	}
+	
+	return fs
 }
 
 // applyFormatSpec applies Python-style format specifications
@@ -610,7 +762,7 @@ func applyFormatSpec(value core.Value, spec *core.DictValue) string {
 	// Apply formatting based on value type
 	switch v := value.(type) {
 	case core.NumberValue:
-		return formatNumber(float64(v), fill, align, sign, alt, zero, width, precision, fmtType)
+		return formatNumber(float64(v), fill, align, sign, alt, zero, width, precision, fmtType, false)
 	case core.StringValue:
 		return formatString(string(v), fill, align, width, precision)
 	default:
@@ -620,7 +772,7 @@ func applyFormatSpec(value core.Value, spec *core.DictValue) string {
 }
 
 // formatNumber formats a number according to Python format spec
-func formatNumber(num float64, fill rune, align rune, sign rune, alt bool, zero bool, width int, precision int, fmtType rune) string {
+func formatNumber(num float64, fill rune, align rune, sign rune, alt bool, zero bool, width int, precision int, fmtType rune, thousands bool) string {
 	var result string
 
 	// Build format string for Go's fmt package
@@ -634,8 +786,8 @@ func formatNumber(num float64, fill rune, align rune, sign rune, alt bool, zero 
 		fmtStr.WriteRune(' ')
 	}
 
-	// Alt mode
-	if alt {
+	// Alt mode (for real alt mode, not thousands separator)
+	if alt && (fmtType == 'b' || fmtType == 'o' || fmtType == 'x' || fmtType == 'X') {
 		fmtStr.WriteRune('#')
 	}
 
@@ -679,8 +831,12 @@ func formatNumber(num float64, fill rune, align rune, sign rune, alt bool, zero 
 			result = "0x" + result
 		}
 	case 'd': // Decimal integer
-		fmtStr.WriteRune('d')
-		result = fmt.Sprintf(fmtStr.String(), int64(num))
+		if thousands {
+			result = addThousandsSeparator(num, -1)
+		} else {
+			fmtStr.WriteRune('d')
+			result = fmt.Sprintf(fmtStr.String(), int64(num))
+		}
 	case 'e', 'E': // Scientific
 		fmtStr.WriteByte(byte(fmtType))
 		result = fmt.Sprintf(fmtStr.String(), num)
@@ -688,26 +844,70 @@ func formatNumber(num float64, fill rune, align rune, sign rune, alt bool, zero 
 		if precision < 0 {
 			precision = 6
 		}
-		fmtStr.WriteRune('f')
-		result = fmt.Sprintf(fmtStr.String(), num)
+		if thousands {
+			result = addThousandsSeparator(num, precision)
+		} else {
+			fmtStr.WriteRune('f')
+			result = fmt.Sprintf(fmtStr.String(), num)
+		}
 	case 'g', 'G': // General format
-		fmtStr.WriteByte(byte(fmtType))
-		result = fmt.Sprintf(fmtStr.String(), num)
+		if thousands {
+			// For 'g' format with commas, format first then add commas
+			tempResult := fmt.Sprintf("%g", num)
+			result = addThousandsSeparatorToString(tempResult)
+		} else {
+			fmtStr.WriteByte(byte(fmtType))
+			result = fmt.Sprintf(fmtStr.String(), num)
+		}
 	case '%': // Percentage
 		if precision < 0 {
 			precision = 6
 		}
 		result = fmt.Sprintf("%.*f%%", precision, num*100)
-	case ',': // Thousands separator
-		// Format with commas
-		result = addThousandsSeparator(num, precision)
+	case 0: // No type specified
+		if thousands {
+			// Default to 'f' format for thousands separator without type
+			if precision < 0 {
+				// Use a reasonable default precision
+				if num == float64(int64(num)) {
+					// Integer - no decimal places
+					result = addThousandsSeparator(num, 0)
+				} else {
+					// Float - use default precision
+					result = addThousandsSeparator(num, -1)
+				}
+			} else {
+				result = addThousandsSeparator(num, precision)
+			}
+		} else {
+			if precision >= 0 {
+				result = fmt.Sprintf("%.*f", precision, num)
+			} else {
+				result = fmt.Sprintf("%g", num)
+			}
+		}
 	default:
 		// Default float formatting
-		if precision >= 0 {
-			result = fmt.Sprintf("%.*f", precision, num)
+		if thousands {
+			// Format first, then add thousands separator
+			if precision >= 0 {
+				result = fmt.Sprintf("%.*f", precision, num)
+			} else {
+				result = fmt.Sprintf("%g", num)
+			}
+			result = addThousandsSeparatorToString(result)
 		} else {
-			result = fmt.Sprintf("%g", num)
+			if precision >= 0 {
+				result = fmt.Sprintf("%.*f", precision, num)
+			} else {
+				result = fmt.Sprintf("%g", num)
+			}
 		}
+	}
+
+	// Apply sign formatting for positive numbers
+	if num >= 0 && sign == '+' && !strings.HasPrefix(result, "+") {
+		result = "+" + result
 	}
 
 	// Apply alignment if needed
@@ -800,9 +1000,20 @@ func addThousandsSeparator(num float64, precision int) string {
 	if precision >= 0 {
 		str = fmt.Sprintf("%.*f", precision, num)
 	} else {
-		str = fmt.Sprintf("%g", num)
+		// For -1, use default float representation
+		str = fmt.Sprintf("%f", num)
+		// Trim trailing zeros for cleaner output
+		if strings.Contains(str, ".") {
+			str = strings.TrimRight(str, "0")
+			str = strings.TrimRight(str, ".")
+		}
 	}
 
+	return addThousandsSeparatorToString(str)
+}
+
+// addThousandsSeparatorToString adds commas to a formatted number string
+func addThousandsSeparatorToString(str string) string {
 	// Split into integer and decimal parts
 	parts := strings.Split(str, ".")
 	intPart := parts[0]
@@ -811,6 +1022,13 @@ func addThousandsSeparator(num float64, precision int) string {
 	negative := false
 	if strings.HasPrefix(intPart, "-") {
 		negative = true
+		intPart = intPart[1:]
+	}
+
+	// Handle positive sign
+	positive := false
+	if strings.HasPrefix(intPart, "+") {
+		positive = true
 		intPart = intPart[1:]
 	}
 
@@ -823,19 +1041,20 @@ func addThousandsSeparator(num float64, precision int) string {
 		result.WriteRune(digit)
 	}
 
-	// Add back negative sign
+	// Build final result
+	finalResult := result.String()
+	
+	// Add back sign
 	if negative {
-		return "-" + result.String() + (func() string {
-			if len(parts) > 1 {
-				return "." + parts[1]
-			}
-			return ""
-		}())
+		finalResult = "-" + finalResult
+	} else if positive {
+		finalResult = "+" + finalResult
 	}
 
 	// Add back decimal part
 	if len(parts) > 1 {
-		return result.String() + "." + parts[1]
+		finalResult = finalResult + "." + parts[1]
 	}
-	return result.String()
+	
+	return finalResult
 }

@@ -1,4 +1,0 @@
-# Test format specifications in f-strings
-
-(= pi 3.14159)
-(print f"Pi with 2 decimals: {pi:.2f}")
