@@ -117,6 +117,11 @@ Strings use double quotes:
 # String formatting (f-strings)
 (= name "Alice")
 (= greeting f"Hello, {name}!")
+
+# Enhanced f-strings support nested quotes
+(= data {"name": "Bob", "age": 25})
+(print f"User: {data['name']}")  # Single quotes inside double
+(print f'Age: {data["age"]}')    # Double quotes inside single
 ```
 
 ### Booleans

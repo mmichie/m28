@@ -9,7 +9,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] **Core Language**
   - [x] S-expression syntax with Python semantics
   - [x] Comments with `#` (`;` disabled)
-  - [x] F-strings: `f"Hello, {name}!"` ✅ WORKING
+  - [x] F-strings: `f"Hello, {name}!"` ✅ ENHANCED - Now supports nested quotes!
   - [x] All primitive types (numbers, strings, booleans, nil)
   - [x] Variable assignment with `=`
   - [x] Function definitions with `def` and lambda
@@ -173,7 +173,8 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] Day 5: Test and fix issues ✅ DONE
 
 ### Week 4: Polish and Testing
-- [ ] Day 1-3: Run all example files and fix failures
+- [x] Day 1: Enhanced f-strings with nested quote support ✅ DONE
+- [ ] Day 2-3: Run all example files and fix failures
 - [ ] Day 4-5: Update documentation and clean up
 
 ## Testing Checklist

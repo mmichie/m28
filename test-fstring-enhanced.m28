@@ -1,0 +1,66 @@
+# Test enhanced f-string features in M28
+
+(print "=== Testing Enhanced F-String Features ===\n")
+
+# Basic interpolation (should still work)
+(= name "Alice")
+(= age 30)
+(print f"Basic: Hello, {name}! You are {age} years old.")
+
+# Test nested quotes
+(= person {"name": "Bob", "age": 25})
+(print f"Nested quotes: {person['name']} is {person['age']} years old")
+(print f'Nested quotes alt: {person["name"]} is {person["age"]} years old')
+
+# Test format specifications
+(= pi 3.14159)
+(print f"\nFormat specifications:")
+(print f"Pi with 2 decimals: {pi:.2f}")
+(print f"Pi with 4 decimals: {pi:.4f}")
+
+(= num 42)
+(print f"Padded number: {num:04d}")
+(print f"Right aligned: '{num:>10}'")
+(print f"Left aligned: '{num:<10}'")
+(print f"Center aligned: '{num:^10}'")
+
+# Test conversions
+(= text "Hello World")
+(print f"\nConversions:")
+(print f"String repr: {text!r}")
+(print f"String str: {text!s}")
+(print f"String ascii: {text!a}")
+
+# Test self-documenting expressions
+(= x 5)
+(= y 10)
+(print f"\nSelf-documenting:")
+(print f"Expression: {x + y=}")
+(print f"Variable: {x=}")
+
+# Complex expressions
+(= items [1, 2, 3, 4, 5])
+(print f"\nComplex expressions:")
+(print f"List doubled: {[x * 2 for x in items]}")
+(print f"Filtered list: {[x for x in items if x > 2]}")
+
+# Edge cases
+(print f"\nEdge cases:")
+(print f"Empty f-string: {}")
+(print f"Escaped braces: {{not interpolated}}")
+(print f"Multiple on one line: x={x}, y={y}, sum={x+y}")
+
+# Numeric formatting
+(= val 1234567.89)
+(print f"\nNumeric formatting:")
+(print f"With commas: {val:,}")
+(print f"Scientific: {val:e}")
+(print f"Percentage: {0.75:%}")
+
+# String formatting
+(= msg "hello")
+(print f"\nString formatting:")
+(print f"Padded right: '{msg:>10}'")
+(print f"Padded left: '{msg:<10}'")
+(print f"Centered: '{msg:^10}'")
+(print f"Truncated: '{msg:.3}'")

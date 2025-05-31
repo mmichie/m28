@@ -3,6 +3,7 @@ package builtin
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -60,6 +61,21 @@ func StrFormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		switch v := arg.(type) {
 		case core.StringValue:
 			result.WriteString(string(v))
+		case core.ListValue:
+			// Check if this is a format expression
+			if len(v) >= 2 {
+				if sym, ok := v[0].(core.SymbolValue); ok && string(sym) == "format-expr" {
+					// Handle format expression
+					formatted, err := formatExpression(v[1:], ctx)
+					if err != nil {
+						return nil, err
+					}
+					result.WriteString(formatted)
+					continue
+				}
+			}
+			// Regular list - convert to string
+			result.WriteString(core.PrintValueWithoutQuotes(arg))
 		default:
 			result.WriteString(core.PrintValueWithoutQuotes(arg))
 		}
@@ -492,4 +508,334 @@ func CountFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	count := strings.Count(string(str), string(substr))
 	return core.NumberValue(count), nil
+}
+
+// formatExpression handles enhanced format expressions from f-strings
+func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("format expression requires at least one argument")
+	}
+
+	// Get the value to format
+	value := args[0]
+
+	// Default formatting
+	result := core.PrintValueWithoutQuotes(value)
+
+	// Check for format spec (dict with formatting options)
+	if len(args) > 1 {
+		if specDict, ok := args[1].(*core.DictValue); ok {
+			result = applyFormatSpec(value, specDict)
+		}
+	}
+
+	// Check for conversion (!r, !s, !a)
+	for i := 1; i < len(args); i++ {
+		if str, ok := args[i].(core.StringValue); ok {
+			s := string(str)
+			if strings.HasPrefix(s, "!") {
+				result = applyConversion(value, s[1:])
+			} else if strings.HasPrefix(s, "=") {
+				// Self-documenting expression
+				exprText := s[1:]
+				result = fmt.Sprintf("%s=%s", exprText, result)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// applyFormatSpec applies Python-style format specifications
+func applyFormatSpec(value core.Value, spec *core.DictValue) string {
+	// Extract format spec components
+	var fill rune = ' '
+	var align rune
+	var sign rune
+	var alt bool
+	var zero bool
+	var width int
+	var precision int = -1
+	var fmtType rune
+
+	// Parse spec dict
+	if v, ok := spec.Get("fill"); ok {
+		if s, ok := v.(core.StringValue); ok && len(s) > 0 {
+			fill = rune(s[0])
+		}
+	}
+
+	if v, ok := spec.Get("align"); ok {
+		if s, ok := v.(core.StringValue); ok && len(s) > 0 {
+			align = rune(s[0])
+		}
+	}
+
+	if v, ok := spec.Get("sign"); ok {
+		if s, ok := v.(core.StringValue); ok && len(s) > 0 {
+			sign = rune(s[0])
+		}
+	}
+
+	if v, ok := spec.Get("alt"); ok {
+		if b, ok := v.(core.BoolValue); ok {
+			alt = bool(b)
+		}
+	}
+
+	if v, ok := spec.Get("zero"); ok {
+		if b, ok := v.(core.BoolValue); ok {
+			zero = bool(b)
+		}
+	}
+
+	if v, ok := spec.Get("width"); ok {
+		if n, ok := v.(core.NumberValue); ok {
+			width = int(n)
+		}
+	}
+
+	if v, ok := spec.Get("precision"); ok {
+		if n, ok := v.(core.NumberValue); ok {
+			precision = int(n)
+		}
+	}
+
+	if v, ok := spec.Get("type"); ok {
+		if s, ok := v.(core.StringValue); ok && len(s) > 0 {
+			fmtType = rune(s[0])
+		}
+	}
+
+	// Apply formatting based on value type
+	switch v := value.(type) {
+	case core.NumberValue:
+		return formatNumber(float64(v), fill, align, sign, alt, zero, width, precision, fmtType)
+	case core.StringValue:
+		return formatString(string(v), fill, align, width, precision)
+	default:
+		str := core.PrintValueWithoutQuotes(value)
+		return formatString(str, fill, align, width, precision)
+	}
+}
+
+// formatNumber formats a number according to Python format spec
+func formatNumber(num float64, fill rune, align rune, sign rune, alt bool, zero bool, width int, precision int, fmtType rune) string {
+	var result string
+
+	// Build format string for Go's fmt package
+	var fmtStr strings.Builder
+	fmtStr.WriteRune('%')
+
+	// Sign
+	if sign == '+' {
+		fmtStr.WriteRune('+')
+	} else if sign == ' ' {
+		fmtStr.WriteRune(' ')
+	}
+
+	// Alt mode
+	if alt {
+		fmtStr.WriteRune('#')
+	}
+
+	// Zero padding
+	if zero && align != '<' && align != '>' && align != '^' {
+		fmtStr.WriteRune('0')
+	}
+
+	// Width
+	if width > 0 {
+		fmtStr.WriteString(strconv.Itoa(width))
+	}
+
+	// Precision
+	if precision >= 0 {
+		fmtStr.WriteRune('.')
+		fmtStr.WriteString(strconv.Itoa(precision))
+	}
+
+	// Type
+	switch fmtType {
+	case 'b': // Binary
+		intVal := int64(num)
+		result = strconv.FormatInt(intVal, 2)
+		if alt {
+			result = "0b" + result
+		}
+	case 'o': // Octal
+		intVal := int64(num)
+		result = strconv.FormatInt(intVal, 8)
+		if alt {
+			result = "0o" + result
+		}
+	case 'x', 'X': // Hex
+		intVal := int64(num)
+		result = strconv.FormatInt(intVal, 16)
+		if fmtType == 'X' {
+			result = strings.ToUpper(result)
+		}
+		if alt {
+			result = "0x" + result
+		}
+	case 'd': // Decimal integer
+		fmtStr.WriteRune('d')
+		result = fmt.Sprintf(fmtStr.String(), int64(num))
+	case 'e', 'E': // Scientific
+		fmtStr.WriteByte(byte(fmtType))
+		result = fmt.Sprintf(fmtStr.String(), num)
+	case 'f', 'F': // Fixed point
+		if precision < 0 {
+			precision = 6
+		}
+		fmtStr.WriteRune('f')
+		result = fmt.Sprintf(fmtStr.String(), num)
+	case 'g', 'G': // General format
+		fmtStr.WriteByte(byte(fmtType))
+		result = fmt.Sprintf(fmtStr.String(), num)
+	case '%': // Percentage
+		if precision < 0 {
+			precision = 6
+		}
+		result = fmt.Sprintf("%.*f%%", precision, num*100)
+	case ',': // Thousands separator
+		// Format with commas
+		result = addThousandsSeparator(num, precision)
+	default:
+		// Default float formatting
+		if precision >= 0 {
+			result = fmt.Sprintf("%.*f", precision, num)
+		} else {
+			result = fmt.Sprintf("%g", num)
+		}
+	}
+
+	// Apply alignment if needed
+	if width > 0 && len(result) < width {
+		result = applyAlignment(result, fill, align, width)
+	}
+
+	return result
+}
+
+// formatString formats a string according to Python format spec
+func formatString(str string, fill rune, align rune, width int, precision int) string {
+	// Truncate if precision is specified
+	if precision >= 0 && len(str) > precision {
+		str = str[:precision]
+	}
+
+	// Apply alignment if width is specified
+	if width > 0 && len(str) < width {
+		str = applyAlignment(str, fill, align, width)
+	}
+
+	return str
+}
+
+// applyAlignment aligns a string within a given width
+func applyAlignment(str string, fill rune, align rune, width int) string {
+	if len(str) >= width {
+		return str
+	}
+
+	padding := width - len(str)
+	fillStr := strings.Repeat(string(fill), padding)
+
+	switch align {
+	case '<': // Left align
+		return str + fillStr
+	case '>': // Right align
+		return fillStr + str
+	case '^': // Center align
+		leftPad := padding / 2
+		rightPad := padding - leftPad
+		return strings.Repeat(string(fill), leftPad) + str + strings.Repeat(string(fill), rightPad)
+	case '=': // Numeric alignment (sign/prefix, then padding, then number)
+		// For numeric alignment, we need to split sign/prefix from the number
+		if len(str) > 0 && (str[0] == '+' || str[0] == '-' || strings.HasPrefix(str, "0x") || strings.HasPrefix(str, "0o") || strings.HasPrefix(str, "0b")) {
+			if strings.HasPrefix(str, "0x") || strings.HasPrefix(str, "0o") || strings.HasPrefix(str, "0b") {
+				return str[:2] + fillStr + str[2:]
+			}
+			return string(str[0]) + fillStr + str[1:]
+		}
+		return fillStr + str
+	default:
+		// Default to right align for numbers, left for strings
+		if _, err := strconv.ParseFloat(str, 64); err == nil {
+			return fillStr + str // Right align numbers
+		}
+		return str + fillStr // Left align strings
+	}
+}
+
+// applyConversion applies Python-style conversions (!r, !s, !a)
+func applyConversion(value core.Value, conversion string) string {
+	switch conversion {
+	case "r": // repr()
+		return core.PrintValue(value)
+	case "s": // str()
+		return core.PrintValueWithoutQuotes(value)
+	case "a": // ascii()
+		// Convert non-ASCII characters to escape sequences
+		str := core.PrintValue(value)
+		var result strings.Builder
+		for _, r := range str {
+			if r < 128 {
+				result.WriteRune(r)
+			} else {
+				result.WriteString(fmt.Sprintf("\\u%04x", r))
+			}
+		}
+		return result.String()
+	default:
+		return core.PrintValueWithoutQuotes(value)
+	}
+}
+
+// addThousandsSeparator adds commas to a number
+func addThousandsSeparator(num float64, precision int) string {
+	// Format the number first
+	var str string
+	if precision >= 0 {
+		str = fmt.Sprintf("%.*f", precision, num)
+	} else {
+		str = fmt.Sprintf("%g", num)
+	}
+
+	// Split into integer and decimal parts
+	parts := strings.Split(str, ".")
+	intPart := parts[0]
+
+	// Handle negative sign
+	negative := false
+	if strings.HasPrefix(intPart, "-") {
+		negative = true
+		intPart = intPart[1:]
+	}
+
+	// Add commas to integer part
+	var result strings.Builder
+	for i, digit := range intPart {
+		if i > 0 && (len(intPart)-i)%3 == 0 {
+			result.WriteRune(',')
+		}
+		result.WriteRune(digit)
+	}
+
+	// Add back negative sign
+	if negative {
+		return "-" + result.String() + (func() string {
+			if len(parts) > 1 {
+				return "." + parts[1]
+			}
+			return ""
+		}())
+	}
+
+	// Add back decimal part
+	if len(parts) > 1 {
+		return result.String() + "." + parts[1]
+	}
+	return result.String()
 }

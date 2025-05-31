@@ -1,0 +1,56 @@
+# Test current f-string capabilities in M28
+
+(print "=== Testing Current F-String Features ===\n")
+
+# Basic interpolation
+(= name "Alice")
+(= age 30)
+(print f"Basic: Hello, {name}! You are {age} years old.")
+
+# Expressions
+(print f"Math: 2 + 3 = {(+ 2 3)}")
+(print f"Comparison: 5 > 3 is {(> 5 3)}")
+
+# Method calls
+(= text "hello")
+(print f"Method: '{text}' uppercase is '{(text.upper)}'")
+
+# Nested access
+(= person {"name": "Bob", "age": 25})
+(print f"Dict access: {person['name']} is {person['age']} years old")
+
+# List access
+(= numbers [10, 20, 30])
+(print f"List: First number is {numbers[0]}")
+
+# Function calls
+(def double (x) (* x 2))
+(print f"Function: double(5) = {(double 5)}")
+
+# What Python supports but M28 might not:
+
+# Format specifiers (Python: {value:format})
+(= pi 3.14159)
+(print "\nTrying format specifiers:")
+(try
+  (print f"Pi with 2 decimals: {pi}")
+except e
+  (print "Format specifiers not supported"))
+
+# Note: Format specifiers not supported yet
+
+# Nested access
+(= d {"a": {"b": 1}})
+(print f"Nested: {d['a']['b']}")
+
+# Escaped braces
+(print f"Escaped: \{literal braces\}")
+
+# Multiple expressions
+(= x 5)
+(= y 10)
+(print f"Multiple: x={x}, y={y}, sum={(+ x y)}")
+
+# Comments in expressions
+(print "\nTesting comments in expressions:")
+(print "(Skipping - known to cause parse errors)")

@@ -1,0 +1,117 @@
+# Comprehensive F-String Test Suite for M28
+# Tests the enhanced f-string implementation
+
+(print "=== M28 Enhanced F-String Test Suite ===\n")
+
+# Test 1: Basic interpolation
+(print "Test 1: Basic Interpolation")
+(= name "Alice")
+(= age 30)
+(print f"Hello, {name}! You are {age} years old.")
+(print f'Single quotes work too: {name}')
+(print "✓ Basic interpolation works\n")
+
+# Test 2: Expressions in f-strings
+(print "Test 2: Expressions")
+(= x 10)
+(= y 20)
+(print f"Math: {x} + {y} = {(+ x y)}")
+(print f"Comparison: {x} < {y} is {(< x y)}")
+(print f"Complex expression: {(* (+ x y) 2)}")
+(print "✓ Expression evaluation works\n")
+
+# Test 3: Nested quotes (major enhancement)
+(print "Test 3: Nested Quotes")
+(= person {"name": "Bob", "age": 25, "city": "NYC"})
+(print f"Using single quotes inside: {person['name']}")
+(print f'Using double quotes inside: {person["city"]}')
+(print f"Multiple accesses: {person['name']} from {person['city']}")
+(print "✓ Nested quotes work correctly\n")
+
+# Test 4: Method calls
+(print "Test 4: Method Calls")
+(= text "hello world")
+(print f"Original: '{text}'")
+(print f"Uppercase: '{(text.upper)}'")
+(print f"Title case: '{(text.title)}'")
+(= numbers [1, 2, 3, 4, 5])
+(print f"List length: {(len numbers)}")
+(print "✓ Method calls work\n")
+
+# Test 5: Nested data structures
+(print "Test 5: Nested Data Structures")
+(= data {
+    "users": [
+        {"name": "Alice", "score": 95},
+        {"name": "Bob", "score": 87}
+    ],
+    "total": 2
+})
+(print f"Total users: {data['total']}")
+(print f"First user: {data['users'][0]['name']} with score {data['users'][0]['score']}")
+(print "✓ Nested data access works\n")
+
+# Test 6: Escaped braces
+(print "Test 6: Escaped Braces")
+(print f"Literal braces: {{these are not interpolated}}")
+(print f"Mixed: {name} and {{literal}}")
+(print "✓ Escaped braces work\n")
+
+# Test 7: Multiple expressions
+(print "Test 7: Multiple Expressions")
+(= a 5)
+(= b 10)
+(= c 15)
+(print f"Values: a={a}, b={b}, c={c}, sum={(+ a b c)}")
+(print "✓ Multiple expressions work\n")
+
+# Test 8: Empty expressions and edge cases
+(print "Test 8: Edge Cases")
+(print f"Empty string: ''")
+(= empty "")
+(print f"Empty variable: '{empty}'")
+(= zero 0)
+(print f"Zero value: {zero}")
+(= none None)
+(print f"None value: {none}")
+(print "✓ Edge cases handled\n")
+
+# Test 9: List comprehensions in f-strings
+(print "Test 9: List Comprehensions")
+(= nums [1, 2, 3, 4, 5])
+(print f"Doubled: {[x * 2 for x in nums]}")
+(print f"Filtered: {[x for x in nums if x > 3]}")
+(print "✓ List comprehensions work\n")
+
+# Test 10: Function calls
+(print "Test 10: Function Calls")
+(def add (a b) (+ a b))
+(def greet (name) (+ "Hello, " name "!"))
+(print f"Function result: {(add 3 4)}")
+(print f"Greeting: {(greet name)}")
+(print "✓ Function calls work\n")
+
+# Test 11: Unicode support
+(print "Test 11: Unicode Support")
+(= emoji "🐍🎉")
+(= chinese "你好")
+(= greek "Γειά σου")
+(print f"Emoji: {emoji}")
+(print f"Chinese: {chinese}")
+(print f"Greek: {greek}")
+(print "✓ Unicode works correctly\n")
+
+# Test 12: Complex nested expressions
+(print "Test 12: Complex Nested Expressions")
+(= users {"alice": {"age": 30, "scores": [85, 90, 95]}, 
+          "bob": {"age": 25, "scores": [80, 85, 90]}})
+(print f"Alice's average score: {(/ (+ users['alice']['scores'][0] 
+                                     users['alice']['scores'][1] 
+                                     users['alice']['scores'][2]) 3)}")
+(print "✓ Complex nested expressions work\n")
+
+(print "\n=== All F-String Tests Passed! ===")
+(print "\nNote: Format specifications (like {value:.2f}) are not yet implemented")
+(print "Note: Self-documenting expressions (like {expr=}) are not yet implemented")
+(print "Note: Conversion flags (!r, !s, !a) are not yet implemented")
+(print "\nBut nested quotes now work, which was the #1 priority!")

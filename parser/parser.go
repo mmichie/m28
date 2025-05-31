@@ -152,7 +152,8 @@ func (p *Parser) parseAtom() (core.Value, error) {
 
 	// Check for f-string
 	if p.pos+1 < len(p.input) && p.input[p.pos] == 'f' && (p.input[p.pos+1] == '"' || p.input[p.pos+1] == '\'') {
-		return p.parseFString()
+		// Use simpler enhanced f-string parser for now
+		return p.parseFStringEnhancedSimple(rune(p.input[p.pos+1]))
 	}
 
 	// Check for tuple literal %(...)
