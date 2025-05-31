@@ -6,8 +6,8 @@
 
 # Creating sets
 (= empty_set (set))
-(= numbers {1, 2, 3, 4, 5})
-(= duplicates {1, 2, 2, 3, 3, 3})  # Duplicates removed
+(= numbers (set [1, 2, 3, 4, 5]))
+(= duplicates (set [1, 2, 2, 3, 3, 3]))  # Duplicates removed
 (= from_list (set [1, 2, 2, 3, 3, 3]))
 
 (print "Empty set:" empty_set)
@@ -17,32 +17,32 @@
 
 # Set operations
 (print "\nSet operations:")
-(= a {1, 2, 3, 4})
-(= b {3, 4, 5, 6})
+(= a (set [1, 2, 3, 4]))
+(= b (set [3, 4, 5, 6]))
 
 (print "Set A:" a)
 (print "Set B:" b)
-(print "Union (A | B):" (union a b))
-(print "Intersection (A & B):" (intersection a b))
-(print "Difference (A - B):" (difference a b))
-(print "Symmetric difference (A ^ B):" (symmetric_difference a b))
+(print "Union (A | B):" (a.union b))
+(print "Intersection (A & B):" (a.intersection b))
+(print "Difference (A - B):" (a.difference b))
+(print "Symmetric difference (A ^ B):" (a.symmetric_difference b))
 
 # Subset and superset
-(= small {1, 2})
-(= large {1, 2, 3, 4})
+(= small (set [1, 2]))
+(= large (set [1, 2, 3, 4]))
 (print "\nSubset/Superset:")
-(print f"{small} subset of {large}?" (is_subset small large))
-(print f"{large} superset of {small}?" (is_superset large small))
+(print f"{small} subset of {large}?" (small.issubset large))
+(print f"{large} superset of {small}?" (large.issuperset small))
 
 # Adding and removing elements
 (print "\nModifying sets:")
-(= fruits {"apple", "banana"})
+(= fruits (set ["apple", "banana"]))
 (print "Original:" fruits)
 
-(add fruits "orange")
+(= fruits (fruits.add "orange"))
 (print "After add:" fruits)
 
-(remove fruits "banana")
+(= fruits (fruits.remove "banana"))
 (print "After remove:" fruits)
 
 # Membership testing
@@ -52,10 +52,10 @@
 
 # Set comprehensions
 (print "\nSet comprehensions:")
-(= squares {x**2 for x in (range 10)})
+(= squares (set [(* x x) for x in (range 10)]))
 (print "Squares:" squares)
 
-(= evens {x for x in (range 20) if (== (% x 2) 0)})
+(= evens (set [x for x in (range 20) if (== (% x 2) 0)]))
 (print "Even numbers:" evens)
 
 # Practical set examples
@@ -68,15 +68,15 @@
 (print "Unique elements:" unique_list)
 
 # Find common elements
-(= skills_alice {"Python", "JavaScript", "SQL"}
-(= skills_bob {"Python", "Java", "SQL", "C++"}
-(= common_skills (intersection skills_alice skills_bob))
+(= skills_alice (set ["Python", "JavaScript", "SQL"]))
+(= skills_bob (set ["Python", "Java", "SQL", "C++"]))
+(= common_skills (skills_alice.intersection skills_bob))
 (print f"\nAlice's skills: {skills_alice}")
 (print f"Bob's skills: {skills_bob}")
 (print f"Common skills: {common_skills}")
 
 # Find unique elements
-(= all_skills (union skills_alice skills_bob))
+(= all_skills (skills_alice.union skills_bob))
 (print f"All skills: {all_skills}")
 
 # TUPLES - Immutable sequences
@@ -84,11 +84,11 @@
 (print "\n\n=== TUPLES ===")
 
 # Creating tuples
-(= empty_tuple ())
-(= single (42,))  # Note the comma!
-(= coordinates (10, 20))
-(= rgb (255, 128, 0))
-(= mixed (1, "hello", 3.14, True))
+(= empty_tuple (tuple []))
+(= single (tuple [42]))  # Single element tuple
+(= coordinates (tuple [10, 20]))
+(= rgb (tuple [255, 128, 0]))
+(= mixed (tuple [1, "hello", 3.14, True]))
 
 (print "Empty tuple:" empty_tuple)
 (print "Single element:" single)
@@ -98,9 +98,9 @@
 
 # Accessing tuple elements
 (print "\nAccessing elements:")
-(print "X coordinate:" coordinates.0)
-(print "Y coordinate:" coordinates.1)
-(print "Red value:" rgb.0)
+(print "X coordinate:" coordinates[0])
+(print "Y coordinate:" coordinates[1])
+(print "Red value:" rgb[0])
 
 # Tuple unpacking
 (print "\nTuple unpacking:")
@@ -111,39 +111,40 @@
 (print f"Red: {r}, Green: {g}, Blue: {b}")
 
 # Multiple assignment
-(= (a, b, c) (1, 2, 3))
+(= (a, b, c) [1, 2, 3])
 (print f"a={a}, b={b}, c={c}")
 
 # Swapping values
-(= (a, b) (b, a))
+(= (a, b) [b, a])
 (print f"After swap: a={a}, b={b}")
 
 # Functions returning tuples
 (print "\nFunctions with tuple returns:")
 
 (def get_min_max (numbers)
-  ((min numbers), (max numbers)))
+  (tuple (list (min numbers) (max numbers))))
 
 (= data [5, 2, 8, 1, 9, 3])
 (= (minimum, maximum) (get_min_max data))
 (print f"Data: {data}")
 (print f"Min: {minimum}, Max: {maximum}")
 
-(def divmod (a b)
-  ((// a b), (% a b)))
+(def my_divmod (a b)
+  (tuple (list (int (/ a b)) (% a b))))
 
-(= (quotient, remainder) (divmod 17 5))
+(= (quotient, remainder) (my_divmod 17 5))
 (print f"17 ÷ 5 = {quotient} remainder {remainder}")
 
 # Tuples as dictionary keys
 (print "\nTuples as dictionary keys:")
 (= board {})
-(= board.(0, 0) "X")
-(= board.(1, 1) "O")
-(= board.(2, 2) "X")
+(= board[(tuple [0, 0])] "X")
+(= board[(tuple [1, 1])] "O")
+(= board[(tuple [2, 2])] "X")
 
 (print "Tic-tac-toe board positions:")
-(for (pos, mark) in (items board)
+(for item in (board.items)
+  (= (pos, mark) item)
   (print f"  Position {pos}: {mark}"))
 
 # Named tuples (using dictionaries to simulate)
@@ -159,17 +160,17 @@
 (= p2 (Point 30 40))
 (= red (Color 255 0 0))
 
-(print f"Point 1: ({p1.x}, {p1.y})")
-(print f"Point 2: ({p2.x}, {p2.y})")
-(print f"Red color: RGB({red.r}, {red.g}, {red.b})")
+(print "Point 1: (" p1["x"] ", " p1["y"] ")")
+(print "Point 2: (" p2["x"] ", " p2["y"] ")")
+(print "Red color: RGB(" red["r"] ", " red["g"] ", " red["b"] ")")
 
 # Tuple vs List
 (print "\nTuple vs List:")
 (= list_example [1, 2, 3])
-(= tuple_example (1, 2, 3))
+(= tuple_example (tuple [1, 2, 3]))
 
 (print "List (mutable):" list_example)
-(append list_example 4)
+(= list_example (append list_example 4))
 (print "After append:" list_example)
 
 (print "\nTuple (immutable):" tuple_example)
@@ -180,23 +181,23 @@
 (print "\nPractical examples:")
 
 # Database records
-(= employees [
-  (1, "Alice", "Engineering", 100000),
-  (2, "Bob", "Sales", 80000),
-  (3, "Charlie", "Marketing", 90000)
-])
+(= employees (list
+  (tuple [1, "Alice", "Engineering", 100000])
+  (tuple [2, "Bob", "Sales", 80000])
+  (tuple [3, "Charlie", "Marketing", 90000])))
 
 (print "Employee records:")
-(for (id, name, dept, salary) in employees
+(for emp in employees
+  (= (id, name, dept, salary) emp)
   (print f"  {id}: {name} - {dept} (${salary})"))
 
 # Returning multiple values with status
 (def parse_number (s)
   (try
     (= num (int s))
-    (True, num)
-    (except ValueError
-      (False, None))))
+    (tuple (list True num))
+    (except Exception
+      (tuple (list False None)))))
 
 (print "\nParsing numbers:")
 (for test in ["123", "abc", "456"]
