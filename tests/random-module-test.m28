@@ -1,0 +1,133 @@
+# Test the random module
+
+# Import the random module
+(import random)
+
+# Test random() - should return float in [0.0, 1.0)
+(print "Testing random.random():")
+(= r1 (random.random))
+(print "  Random value:" r1)
+(= r1_check (and (>= r1 0) (< r1 1)))
+(assert r1_check "random() should return value in [0, 1)")
+
+# Test multiple calls return different values (with high probability)
+(= r2 (random.random))
+(= r3 (random.random))
+(print "  Multiple calls:" r1 r2 r3)
+
+# Test randint(a, b) - should return int in [a, b] inclusive
+(print "\nTesting random.randint():")
+(= int1 (random.randint 1 10))
+(print "  randint(1, 10):" int1)
+(= int_range_check (and (>= int1 1) (<= int1 10)))
+(assert int_range_check "randint(1, 10) should be in [1, 10]")
+# Check that it's a whole number
+(= int_whole_check (== int1 (round int1)))
+(assert int_whole_check "randint should return an integer")
+
+# Test edge case
+(= int2 (random.randint 5 5))
+(= edge_check (== int2 5))
+(assert edge_check "randint(5, 5) should always return 5")
+
+# Test uniform(a, b) - should return float in [a, b)
+(print "\nTesting random.uniform():")
+(= u1 (random.uniform 10 20))
+(print "  uniform(10, 20):" u1)
+(= uniform_check (and (>= u1 10) (< u1 20)))
+(assert uniform_check "uniform(10, 20) should be in [10, 20)")
+
+# Test choice() with different sequences
+(print "\nTesting random.choice():")
+(= lst [1, 2, 3, 4, 5])
+(= c1 (random.choice lst))
+(print "  choice from list:" c1)
+(= c1_in_check (in c1 lst))
+(assert c1_in_check "choice should return element from list")
+
+(= tup (tuple lst))  # Create tuple from list
+(= c2 (random.choice tup))
+(print "  choice from tuple:" c2)
+(= c2_in_check (in c2 tup))
+(assert c2_in_check "choice should return element from tuple")
+
+(= c3 (random.choice "hello"))
+(print "  choice from string:" c3)
+(= c3_in_check (in c3 "hello"))
+(assert c3_in_check "choice should return character from string")
+
+# Test shuffle() - modifies list in place
+(print "\nTesting random.shuffle():")
+(= original [1, 2, 3, 4, 5])
+(= to_shuffle (list original))  # Make a copy
+(print "  Original:" to_shuffle)
+(= result (random.shuffle to_shuffle))
+(print "  After shuffle:" to_shuffle)
+# Check that shuffle returns nil
+(if result
+  (print "ERROR: shuffle() should return None/nil, got:" result)
+  (print "  shuffle() correctly returned None/nil"))
+(= len_check (== (len to_shuffle) 5))
+(assert len_check "shuffle should preserve list length")
+
+# Test seed() for reproducibility
+(print "\nTesting random.seed():")
+(random.seed 42)
+(= s1 (random.random))
+(= s2 (random.random))
+(random.seed 42)  # Reset to same seed
+(= s3 (random.random))
+(= s4 (random.random))
+(print "  First sequence:" s1 s2)
+(print "  Second sequence:" s3 s4)
+(= seed_check1 (== s1 s3))
+(assert seed_check1 "Same seed should produce same first value")
+(= seed_check2 (== s2 s4))
+(assert seed_check2 "Same seed should produce same second value")
+
+# Test sample() - choose k unique elements
+(print "\nTesting random.sample():")
+(= population [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+(= sample1 (random.sample population 3))
+(print "  sample from list:" sample1)
+(= sample_len_check (== (len sample1) 3))
+(assert sample_len_check "sample should return k elements")
+
+# Check uniqueness by converting to set
+(= unique_set (set sample1))
+(= unique_check (== (len unique_set) 3))
+(assert unique_check "sample should return unique elements")
+
+# Test sample with string
+(= sample2 (random.sample "abcdefgh" 4))
+(print "  sample from string:" sample2)
+(= sample2_len_check (== (len sample2) 4))
+(assert sample2_len_check "sample from string should return k elements")
+
+# Test error cases
+(print "\nTesting error handling:")
+
+# randint with bad range
+(try
+  (random.randint 10 5)
+  (assert false "randint(10, 5) should raise error")
+  (except e
+    (print "  Expected error for randint(10, 5):" e)))
+
+# choice with empty sequence
+(try
+  (= empty [])
+  (random.choice empty)
+  (assert false "choice([]) should raise error")
+  (except e
+    (print "  Expected error for choice([]):" e)))
+
+# sample with k > population size
+(try
+  (= small [1, 2, 3])
+  (random.sample small 5)
+  (assert false "sample([1,2,3], 5) should raise error")
+  (except e
+    (print "  Expected error for sample with k > len:" e)))
+
+(print "\nAll random module tests passed!")

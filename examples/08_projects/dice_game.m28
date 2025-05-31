@@ -1,0 +1,43 @@
+# Simple dice game using the random module
+
+(import random)
+
+(def roll_dice ()
+  # Roll a six-sided die
+  (random.randint 1 6))
+
+(def play_game ()
+  (print "Welcome to the Dice Game!")
+  (print "You and the computer will each roll a die.")
+  (print "Highest roll wins!")
+  (print)
+  
+  # Player rolls
+  (print "Press Enter to roll your die...")
+  (input)
+  (= player_roll (roll_dice))
+  (print "You rolled:" player_roll)
+  
+  # Computer rolls
+  (print "\nComputer is rolling...")
+  (= computer_roll (roll_dice))
+  (print "Computer rolled:" computer_roll)
+  
+  # Determine winner
+  (print)
+  (if (> player_roll computer_roll)
+    (print "You win! 🎉")
+    (if (< player_roll computer_roll)
+      (print "Computer wins! 🤖")
+      (print "It's a tie! 🤝"))))
+
+# Play the game
+(play_game)
+
+# Ask if they want to play again
+(print "\nPlay again? (y/n)")
+(= answer (input))
+(if (== answer "y")
+  (do
+    (print "\n" "=" 30 "\n")
+    (play_game)))

@@ -39,6 +39,9 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	// Register mathematical functions
 	RegisterMathFunctions(ctx)
 
+	// Register random functions
+	RegisterRandomFunctions(ctx)
+
 	// Register utility functions
 	RegisterUtilityFunctions(ctx)
 
@@ -50,6 +53,11 @@ func RegisterAllBuiltins(ctx *core.Context) {
 
 	// Register assertion functions
 	RegisterAssertBuiltins(ctx)
+
+	// Register Python standard library modules
+	RegisterJSONModule(ctx)
+	RegisterOSModule(ctx)
+	RegisterDateTimeModule(ctx)
 }
 
 // registerArithmeticBuiltins registers arithmetic functions

@@ -1,0 +1,50 @@
+# Examples of using the random module
+
+(import random)
+
+# Generate random floats
+(print "Random float between 0 and 1:" (random.random))
+(print "Random float between 5.0 and 10.0:" (random.uniform 5.0 10.0))
+
+# Generate random integers
+(print "\nRandom integer between 1 and 100:" (random.randint 1 100))
+(print "Simulating a coin flip (0=heads, 1=tails):" (random.randint 0 1))
+
+# Choose from sequences
+(= colors ["red", "green", "blue", "yellow", "purple"])
+(print "\nRandom color:" (random.choice colors))
+
+(= cards ["Ace", "King", "Queen", "Jack", "10", "9", "8", "7", "6", "5", "4", "3", "2"])
+(print "Random card:" (random.choice cards))
+
+# Shuffle a list
+(= deck [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+(print "\nOriginal deck:" deck)
+(random.shuffle deck)
+(print "Shuffled deck:" deck)
+
+# Sample without replacement
+(= lottery_numbers (range 1 50))
+(= winning_numbers (random.sample lottery_numbers 6))
+(print "\nLottery numbers (6 from 1-49):" winning_numbers)
+
+# Set seed for reproducible results
+(print "\nWith seed 42:")
+(random.seed 42)
+(print "First random:" (random.random))
+(print "Second random:" (random.random))
+
+(print "\nWith seed 42 again (same sequence):")
+(random.seed 42)
+(print "First random:" (random.random))
+(print "Second random:" (random.random))
+
+# Password generator example
+(def generate_password (length)
+  (= chars "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*")
+  (= password [])
+  (for (i (range length))
+    (append password (random.choice chars)))
+  (join "" password))
+
+(print "\nRandom password:" (generate_password 12))
