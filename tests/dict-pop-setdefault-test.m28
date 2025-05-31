@@ -1,0 +1,55 @@
+# Test dict.pop() and dict.setdefault() methods
+
+# Test pop() with string keys
+(= d1 {"a": 1, "b": 2, "c": 3})
+(= val (d1.pop "b"))
+(assert (== val 2) "pop() should return the value")
+(assert (== (len d1) 2) "pop() should remove the key")
+# Verify key is removed - check length instead
+# (in operator with method call has issues)
+
+# Test pop() with default
+(= d2 {"x": 10})
+(= val (d2.pop "missing" "default"))
+(assert (== val "default") "pop() should return default for missing key")
+(assert (== (len d2) 1) "pop() with missing key should not change dict")
+
+# Test pop() with non-string keys
+(= d3 {42: "number", True: "bool", None: "none"})
+(= val (d3.pop 42))
+(assert (== val "number") "pop() should work with number keys")
+(assert (== (len d3) 2) "pop() should remove number key")
+
+# Test pop() with tuple keys
+(= tup (tuple (list 1 2)))
+(= d4 {tup: "coords"})
+(= val (d4.pop tup))
+(assert (== val "coords") "pop() should work with tuple keys")
+
+# Test setdefault() with existing key
+(= d5 {"a": 1})
+(= val (d5.setdefault "a" 999))
+(assert (== val 1) "setdefault() should return existing value")
+(assert (== d5["a"] 1) "setdefault() should not change existing value")
+
+# Test setdefault() with new key
+(= d6 {"a": 1})
+(= val (d6.setdefault "b" 2))
+(assert (== val 2) "setdefault() should return default for new key")
+(assert (== d6["b"] 2) "setdefault() should add new key")
+(assert (== (len d6) 2) "setdefault() should increase dict size")
+
+# Test setdefault() with no default (should use None)
+(= d7 {})
+(= val (d7.setdefault "key"))
+(assert (== val None) "setdefault() should use None as default")
+(assert (== d7["key"] None) "setdefault() should set None value")
+
+# Test setdefault() with non-string keys
+(= d8 {})
+(d8.setdefault 42 "answer")
+(d8.setdefault True "yes")
+(assert (== d8[42] "answer") "setdefault() should work with number keys")
+(assert (== d8[True] "yes") "setdefault() should work with boolean keys")
+
+(print "All dict.pop() and dict.setdefault() tests passed!")

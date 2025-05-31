@@ -53,21 +53,26 @@ func InitDictMethods() {
 				return nil, fmt.Errorf("pop expects 1 or 2 arguments")
 			}
 
-			key, ok := args[0].(StringValue)
-			if !ok {
-				return nil, fmt.Errorf("dict key must be a string")
+			// Check if key is hashable
+			if !IsHashable(args[0]) {
+				return nil, fmt.Errorf("unhashable type: '%s'", args[0].Type())
 			}
 
-			val, found := dict.Get(string(key))
+			// Convert key to string representation
+			keyStr := ValueToKey(args[0])
+
+			// Try to get and remove the value
+			val, found := dict.Get(keyStr)
 			if !found {
 				if len(args) > 1 {
 					return args[1], nil
 				}
-				return nil, fmt.Errorf("KeyError: '%s'", string(key))
+				return nil, &KeyError{Key: args[0]}
 			}
 
-			// Note: In functional style, we'd return both the value and new dict
-			// For now, just return the value
+			// Remove the key from the dictionary
+			dict.Delete(keyStr)
+
 			return val, nil
 		},
 	}
@@ -84,12 +89,15 @@ func InitDictMethods() {
 				return nil, fmt.Errorf("setdefault expects 1 or 2 arguments")
 			}
 
-			key, ok := args[0].(StringValue)
-			if !ok {
-				return nil, fmt.Errorf("dict key must be a string")
+			// Check if key is hashable
+			if !IsHashable(args[0]) {
+				return nil, fmt.Errorf("unhashable type: '%s'", args[0].Type())
 			}
 
-			val, found := dict.Get(string(key))
+			// Convert key to string representation
+			keyStr := ValueToKey(args[0])
+
+			val, found := dict.Get(keyStr)
 			if found {
 				return val, nil
 			}
@@ -100,8 +108,9 @@ func InitDictMethods() {
 				defaultVal = args[1]
 			}
 
-			// Note: In functional style, we'd return a new dict
-			// For now, just return the default value
+			// Set the default value in the dictionary
+			dict.SetWithKey(keyStr, args[0], defaultVal)
+
 			return defaultVal, nil
 		},
 	}
