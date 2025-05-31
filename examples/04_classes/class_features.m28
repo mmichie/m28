@@ -99,9 +99,9 @@
 (= v2 (Vector 1 2))
 
 (print v1)                # "Vector(3, 4)"
-# Operator overloading not yet supported in M28
-# (print (+ v1 v2))        # "Vector(4, 6)"
-# (print (- v1 v2))        # "Vector(2, 2)"
-# (print (* v1 2))         # "Vector(6, 8)"
-# (print (== v1 v2))       # False
+# Test operator overloading
+(print (+ v1 v2))        # "Vector(4, 6)"
+(print (- v1 v2))        # "Vector(2, 2)"
+(print (* v1 2))         # "Vector(6, 8)"
+(print (== v1 v2))       # False
 (print f"Magnitude: {(v1.magnitude)}")  # "Magnitude: 5.0"

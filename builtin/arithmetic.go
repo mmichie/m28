@@ -35,6 +35,20 @@ func AddFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0), nil
 	}
 
+	// Check if the first argument has __add__ method (operator overloading)
+	if len(args) >= 2 {
+		if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+			if method, found := obj.GetAttr("__add__"); found {
+				if callable, ok := method.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					// Call __add__ with remaining arguments
+					return callable.Call(args[1:], ctx)
+				}
+			}
+		}
+	}
+
 	switch first := args[0].(type) {
 	case core.NumberValue:
 		// Number addition
@@ -92,6 +106,20 @@ func SubtractFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("cannot negate %s", args[0].Type())
 	}
 
+	// Check if the first argument has __sub__ method (operator overloading)
+	if len(args) >= 2 {
+		if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+			if method, found := obj.GetAttr("__sub__"); found {
+				if callable, ok := method.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					// Call __sub__ with remaining arguments
+					return callable.Call(args[1:], ctx)
+				}
+			}
+		}
+	}
+
 	// Binary subtraction
 	if first, ok := args[0].(core.NumberValue); ok {
 		result := float64(first)
@@ -112,6 +140,20 @@ func SubtractFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 func MultiplyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return core.NumberValue(1), nil
+	}
+
+	// Check if the first argument has __mul__ method (operator overloading)
+	if len(args) >= 2 {
+		if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+			if method, found := obj.GetAttr("__mul__"); found {
+				if callable, ok := method.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					// Call __mul__ with remaining arguments
+					return callable.Call(args[1:], ctx)
+				}
+			}
+		}
 	}
 
 	switch first := args[0].(type) {
@@ -183,6 +225,20 @@ func DivideFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.NumberValue(1 / float64(num)), nil
 		}
 		return nil, fmt.Errorf("cannot take reciprocal of %s", args[0].Type())
+	}
+
+	// Check if the first argument has __truediv__ method (operator overloading)
+	if len(args) >= 2 {
+		if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+			if method, found := obj.GetAttr("__truediv__"); found {
+				if callable, ok := method.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					// Call __truediv__ with remaining arguments
+					return callable.Call(args[1:], ctx)
+				}
+			}
+		}
 	}
 
 	// Division

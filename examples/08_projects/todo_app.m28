@@ -28,13 +28,13 @@
       "priority": self.priority,
       "completed": self.completed,
       "created_at": (str self.created_at),
-      "completed_at": (str self.completed_at) if self.completed_at else None
+      "completed_at": (if self.completed_at (str self.completed_at) None)
     }))
   
   (def __str__ (self)
     (= status (if self.completed "✓" "○"))
     (= priority_symbol {"high": "!", "medium": "-", "low": "·"})
-    (return f"{status} [{priority_symbol[self.priority]}] {self.title}")))
+    (return f"{status} [{(get-item priority_symbol self.priority)}] {self.title}")))
 
 # Todo list manager
 (class TodoList
@@ -155,9 +155,11 @@
       (begin
         (= by_priority {"high": 0, "medium": 0, "low": 0})
         (for todo (filter (lambda (t) (not t.completed)) self.todos)
-          (= by_priority[todo.priority] (+ by_priority[todo.priority] 1)))
+          (= by_priority (dict-set by_priority todo.priority (+ (get-item by_priority todo.priority) 1))))
         (print "\nPending by priority:")
-        (for priority count by_priority.items
+        (for item (by_priority.items)
+          (= priority (get-item item 0))
+          (= count (get-item item 1))
           (print f"  {priority}: {count}"))))))
 
 # Command-line interface

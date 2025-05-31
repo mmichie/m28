@@ -33,6 +33,18 @@ func EqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("== requires exactly 2 arguments")
 	}
 
+	// Check if the first argument has __eq__ method (operator overloading)
+	if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if method, found := obj.GetAttr("__eq__"); found {
+			if callable, ok := method.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				// Call __eq__ with the second argument
+				return callable.Call([]core.Value{args[1]}, ctx)
+			}
+		}
+	}
+
 	// Use core.EqualValues for comprehensive comparison
 	return core.BoolValue(core.EqualValues(args[0], args[1])), nil
 }
