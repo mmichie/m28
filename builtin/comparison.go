@@ -295,11 +295,14 @@ func InFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	case *core.DictValue:
 		// Check if key is in dictionary
-		if key, ok := value.(core.StringValue); ok {
-			_, exists := c.Get(string(key))
-			return core.BoolValue(exists), nil
+		// First check if the value is hashable
+		if !core.IsHashable(value) {
+			return core.False, nil
 		}
-		return core.False, nil
+		// Convert value to key format used by dictionary
+		keyStr := core.ValueToKey(value)
+		_, exists := c.Get(keyStr)
+		return core.BoolValue(exists), nil
 
 	case core.Object:
 		// For other objects, check attributes
