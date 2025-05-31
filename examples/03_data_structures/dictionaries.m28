@@ -14,20 +14,20 @@
 
 # Accessing values
 (print "\nAccessing values:")
-(print "Name (dot notation):" person.name)
+(print "Name (bracket notation):" person["name"])
 (print "Age (get function):" (get person "age"))
 (print "City with default:" (get person "city" "Unknown"))
 (print "Country with default:" (get person "country" "USA"))
-(print "Nested access:" nested.user.details.email)
+(print "Nested access:" nested["user"]["details"]["email"])
 
 # Modifying dictionaries
 (print "\nModifying dictionaries:")
 (= student {"name": "Bob", "grade": 10})
 (print "Original:" student)
 
-# Add/update using dot notation
-(= student.age 16)
-(= student.grade 11)
+# Add/update using bracket notation
+(= student["age"] 16)
+(= student["grade"] 11)
 (print "After updates:" student)
 
 # Add/update using index notation
@@ -108,12 +108,12 @@
   "departments": ["engineering", "sales", "hr"]
 })
 
-(print "Alice's department:" company.employees.alice.dept)
-(print "Bob's salary:" company.employees.bob.salary)
+(print "Alice's department:" company["employees"]["alice"]["dept"])
+(print "Bob's salary:" company["employees"]["bob"]["salary"])
 
 # Update nested value
-(= company.employees.alice.salary 110000)
-(print "Alice's new salary:" company.employees.alice.salary)
+(= company["employees"]["alice"]["salary"] 110000)
+(print "Alice's new salary:" company["employees"]["alice"]["salary"])
 
 # Dictionary as a data structure
 (print "\nPractical examples:")
@@ -183,7 +183,7 @@
 })
 
 (print "\nMixed type dictionary:")
-(print "ID: " record.id " (type: " (type record.id) ")")
-(print "Active: " record.active " (type: " (type record.active) ")")
-(print "Tags: " record.tags " (type: " (type record.tags) ")")
-(print "Metadata: " record.metadata)
+(print "ID: " record["id"] " (type: " (type record["id"]) ")")
+(print "Active: " record["active"] " (type: " (type record["active"]) ")")
+(print "Tags: " record["tags"] " (type: " (type record["tags"]) ")")
+(print "Metadata: " record["metadata"])

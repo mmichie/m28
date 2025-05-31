@@ -130,7 +130,7 @@
 (def take (n gen)
   (= result [])
   (for i (range n)
-    (result.append (next gen)))
+    (= result (result.append (next gen))))
   (return result))
 
 (= fib_gen (fibonacci))

@@ -95,7 +95,7 @@
   (= matches [])
   (= path (pathlib.Path directory))
   (for file (path.rglob pattern)  # recursive glob
-    (matches.append (str file)))
+    (= matches (matches.append (str file))))
   (return matches))
 
 # Find all .m28 files

@@ -134,7 +134,7 @@
   "Custom map implementation"
   (= result [])
   (for item lst
-    (result.append (f item)))
+    (= result (result.append (f item))))
   (return result))
 
 (def my_filter (pred lst)
@@ -142,7 +142,7 @@
   (= result [])
   (for item lst
     (if (pred item)
-      (result.append item)))
+      (= result (result.append item)))))
   (return result))
 
 (def my_reduce (f init lst)

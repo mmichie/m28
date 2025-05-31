@@ -208,7 +208,7 @@
     (test/run-test "List Protocol" (lambda ()
       (= lst [1, 2, 3])
       (test/assert-eq 3 lst.length "List length property")
-      (lst.append 4)
+      (= lst (lst.append 4))
       (test/assert-eq [1, 2, 3, 4] lst "List method call")
       (test/assert-eq 1 lst.0 "List index access")))
     

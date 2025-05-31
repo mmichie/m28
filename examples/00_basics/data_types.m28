@@ -42,9 +42,9 @@
 (print "\nDictionaries:")
 (print "Empty:" empty_dict)
 (print "Person:" person)
-(print "Name:" person.name)
+(print "Name:" person["name"])
 (print "Nested:" nested)
-(print "Email:" nested.user.email)
+(print "Email:" nested["user"]["email"])
 
 # Sets (unique values, unordered)
 (= empty_set (set))

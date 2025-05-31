@@ -44,14 +44,18 @@
 # None
 (= n None)   # or nil
 
-# Lists
+# Lists (hybrid mutability)
 (= lst [1, 2, 3])
+# Mutable: lst[0] = 99
+# Immutable: (= lst2 (lst.append 4))
 
 # Tuples
 (= tup (1, 2, 3))
 
-# Dictionaries
+# Dictionaries (Python-style access)
 (= dict {"key": "value", "num": 42})
+# Access: dict["key"], NOT dict.key
+# Update: dict["key"] = "new value"
 
 # Sets
 (= s {1, 2, 3})
@@ -118,12 +122,13 @@
 ## Data Access
 ```lisp
 # List access
-lst.0              # First element
-(nth lst 2)        # Third element
+lst[0]             # First element (Python-style)
+(get-item lst 2)   # Third element (function)
 
-# Dict access
-dict.key           # Dot notation
+# Dict access (Python-style only)
+dict["key"]        # Bracket notation
 (get dict "key")   # get function
+(get dict "key" default)  # with default
 
 # Method calls
 obj.method(arg1, arg2)
@@ -131,8 +136,19 @@ obj.method(arg1, arg2)
 
 ## List Operations
 ```lisp
-(append lst item)
-(extend lst other-list)
+# Mutable (modify in-place)
+(= lst[0] value)          # Index assignment
+(= lst[1:3] [a, b])       # Slice assignment
+
+# Immutable (return new list)
+(= new (lst.append item))      # Append
+(= new (lst.extend other))     # Extend
+(= new (lst.remove item))      # Remove
+(= new (lst.insert idx item))  # Insert
+(= new (lst.sort))             # Sort
+(= new (lst.reverse))          # Reverse
+
+# Functions
 (len lst)
 (map func lst)
 (filter pred lst)
