@@ -14,14 +14,51 @@ func withForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("with requires at least 2 arguments")
 	}
+	
+	// Debug: print all args
+	// fmt.Printf("DEBUG withForm: received %d args\n", len(args))
+	// for i, arg := range args {
+	// 	fmt.Printf("  arg[%d]: %v (type: %T)\n", i, arg, arg)
+	// }
 
 	// Parse context managers
 	var managers []withManager
 
 	// Check if first arg is a list (multiple managers)
+	// We need to distinguish between:
+	// 1. (with [mgr1 as var1 mgr2 as var2] ...) - multiple managers
+	// 2. (with (open file mode) as var ...) - single manager that's a function call
 	if list, ok := args[0].(core.ListValue); ok {
-		// Multiple managers: (with [mgr1 as var1 mgr2 as var2] ...)
-		managers = parseManagerList(list)
+		// Check if this looks like a multiple manager list by looking for 'as' keywords
+		// or if it's too short to be a manager list
+		if len(list) == 0 || !looksLikeManagerList(list) {
+			// It's a function call or expression, treat as single manager
+			mgr := withManager{expr: args[0]}
+			bodyStart := 1
+
+			// Check for 'as' clause
+			if len(args) >= 3 {
+				if sym, ok := args[1].(core.SymbolValue); ok && string(sym) == "as" {
+					if varSym, ok := args[2].(core.SymbolValue); ok {
+						mgr.varName = string(varSym)
+						bodyStart = 3 // Skip "mgr as var"
+					} else {
+						return nil, fmt.Errorf("with: variable name must be a symbol")
+					}
+				}
+			}
+
+			managers = []withManager{mgr}
+
+			// Get the body
+			body := args[bodyStart:]
+
+			// Execute with proper context management
+			return executeWith(managers, body, ctx)
+		} else {
+			// Multiple managers: (with [mgr1 as var1 mgr2 as var2] ...)
+			managers = parseManagerList(list)
+		}
 	} else {
 		// Single manager: (with mgr ...) or (with mgr as var ...)
 		mgr := withManager{expr: args[0]}
@@ -59,6 +96,20 @@ func withForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 type withManager struct {
 	expr    core.Value
 	varName string
+}
+
+// looksLikeManagerList checks if a list looks like a multiple manager list
+// by checking for 'as' keywords in the expected positions
+func looksLikeManagerList(list core.ListValue) bool {
+	// A manager list should have 'as' keywords at positions 1, 4, 7, etc.
+	// or could be just a list of expressions without 'as'
+	// The heuristic: if we see an 'as' symbol in position 1 or 2, it's likely a manager list
+	for i := 1; i < len(list) && i <= 2; i++ {
+		if sym, ok := list[i].(core.SymbolValue); ok && string(sym) == "as" {
+			return true
+		}
+	}
+	return false
 }
 
 // parseManagerList parses a list of managers with optional 'as' clauses
@@ -107,6 +158,10 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 	if err != nil {
 		return nil, err
 	}
+
+	// Debug output  
+	// fmt.Printf("DEBUG executeWith: Manager expression: %v (type: %T)\n", mgr.expr, mgr.expr)
+	// fmt.Printf("DEBUG executeWith: Manager expression evaluated to: %v (type: %T)\n", mgrValue, mgrValue)
 
 	// Check if it's a context manager
 	cm, ok := core.IsContextManager(mgrValue)
