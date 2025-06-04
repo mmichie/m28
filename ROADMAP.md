@@ -94,6 +94,8 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [ ] Exception variable binding: `except Error as e` syntax
   - [ ] Multiple inheritance (currently not fully functional)
   - [ ] super() calls (currently not working properly)
+  - [ ] `from module import name` syntax
+  - [ ] `import module as alias` syntax
 
 ### Medium Priority - Built-in Methods
 

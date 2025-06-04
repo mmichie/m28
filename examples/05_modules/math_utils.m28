@@ -35,17 +35,23 @@
   (= n (len sorted_nums))
   (if (== (% n 2) 0)
     # Even number of elements
-    (return (/ (+ (get sorted_nums (- (/ n 2) 1)) 
-                  (get sorted_nums (/ n 2))) 
-               2))
+    (begin
+      (= idx1 (int (- (/ n 2) 1)))
+      (= idx2 (int (/ n 2)))
+      (= val1 (nth sorted_nums idx1))
+      (= val2 (nth sorted_nums idx2))
+      (return (/ (+ val1 val2) 2)))
     # Odd number of elements
-    (return (get sorted_nums (// n 2))))))
+    (begin
+      (= idx (int (/ n 2)))
+      (return (nth sorted_nums idx)))))
 
 # Geometric functions
 (def distance (x1 y1 x2 y2)
   "Calculate Euclidean distance between two points"
-  (return (sqrt (+ (** (- x2 x1) 2) 
-                   (** (- y2 y1) 2))))))
+  (import math)
+  (return (math.sqrt (+ (** (- x2 x1) 2) 
+                        (** (- y2 y1) 2)))))
 
 # Factorial function
 (def factorial (n)
@@ -58,11 +64,11 @@
 (def is_prime (n)
   "Check if a number is prime"
   (if (<= n 1)
-    (return False)
-    (for i (range 2 (int (+ (sqrt n) 1)))
-      (if (== (% n i) 0)
-        (return False)))
-    )
+    (return False))
+  (import math)
+  (for i (range 2 (int (+ (math.sqrt n) 1)))
+    (if (== (% n i) 0)
+      (return False)))
   (return True))
 
 # Module initialization message

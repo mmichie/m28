@@ -31,8 +31,8 @@
 
 # Distance calculation
 (print "\nDistance calculation:")
-(= p1 (0, 0))
-(= p2 (3, 4))
+(= p1 [0, 0])
+(= p2 [3, 4])
 (print "Distance from" p1 "to" p2 ":" (math_utils.distance 0 0 3 4))
 
 # Factorial
@@ -43,21 +43,16 @@
 # Prime checking
 (print "\nPrime numbers up to 20:")
 (= primes [])
-(for n (range 1 21)
+(for n (range 2 21)
   (if (math_utils.is_prime n)
-    (primes.append n)))
+    (= primes (primes.append n))))
 (print primes)
 
 # Import specific functions
-(print "\nUsing specific imports:")
-(from math_utils import (circle_area is_prime factorial))
+# Note: from...import syntax not yet supported in M28
+# (from math_utils import (circle_area is_prime factorial))
 
-# Now we can use them directly
-(print "Area of radius 10 circle:" (circle_area 10))
-(print "Is 17 prime?" (is_prime 17))
-(print "6! =" (factorial 6))
+# Import with alias - also not yet supported
+# (import math_utils as mu)
 
-# Import with alias
-(print "\nUsing module alias:")
-(import math_utils as mu)
-(print "Distance:" (mu.distance 0 0 1 1))
+(print "\nExample complete!")
