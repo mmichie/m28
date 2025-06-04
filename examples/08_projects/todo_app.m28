@@ -8,7 +8,7 @@
 # Todo item class
 (class TodoItem
   (def __init__ (self title description="" priority="medium")
-    (= self.id (datetime.datetime.now.timestamp))
+    (= self.id ((datetime.datetime.now).timestamp))
     (= self.title title)
     (= self.description description)
     (= self.priority priority)
@@ -34,7 +34,8 @@
   (def __str__ (self)
     (= status (if self.completed "✓" "○"))
     (= priority_symbol {"high": "!", "medium": "-", "low": "·"})
-    (return f"{status} [{(get-item priority_symbol self.priority)}] {self.title}")))
+    (= p_sym (get priority_symbol self.priority))
+    (return f"{status} [{p_sym}] {self.title}")))
 
 # Todo list manager
 (class TodoList
@@ -231,8 +232,9 @@
       ((== command "search")
        (if (< (len parts) 2)
          (print "Usage: search <query>")
-         (= query (join " " (slice parts 1)))
-         (todo_list.search query)))
+         (begin
+           (= query (join " " (slice parts 1)))
+           (todo_list.search query))))
       
       ((== command "stats")
        (todo_list.stats))

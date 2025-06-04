@@ -177,6 +177,56 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [ ] Day 2-3: Run all example files and fix failures
 - [ ] Day 4-5: Update documentation and clean up
 
+## Critical Interpreter Fixes Needed
+
+### 1. Context Manager Protocol for Files
+**Issue**: File objects don't support the context manager protocol
+**Examples failing**: `file_operations.m28`, `reading_files.m28`, `writing_files.m28`
+**Implementation**:
+- Add `__enter__` and `__exit__` methods to file objects in `core/file.go`
+- `__enter__` should return the file object itself
+- `__exit__` should close the file and handle exceptions
+- Update `with` statement evaluation in `eval/context_forms.go`
+
+### 2. Function and Type `__name__` Attribute
+**Issue**: Functions and types don't have `__name__` attribute
+**Examples failing**: `closures_decorators.m28`, `text_adventure.m28`
+**Implementation**:
+- Add `__name__` field to `LispFunction` struct in `core/value.go`
+- Set `__name__` when creating functions in `eval/evaluator.go`
+- Add `__name__` to type objects in `core/type_descriptor.go`
+- Make `__name__` accessible via dot notation
+
+### 3. Tuple Unpacking in For Loops
+**Issue**: Cannot use `(for i line (enumerate f))` syntax
+**Examples failing**: `reading_files.m28`
+**Implementation**:
+- Update `evalFor` in `eval/loop.go` to handle multiple loop variables
+- Support unpacking when iterator returns tuples
+- Example: `(for key value (dict.items))` should work
+
+### 4. Local Module Import Resolution
+**Issue**: Cannot import local `.m28` modules
+**Examples failing**: `using_custom_modules.m28`
+**Implementation**:
+- Update `resolveModulePath` in `core/module_paths.go`
+- Check current directory and relative paths for `.m28` files
+- Add module caching to prevent re-evaluation
+
+### 5. Missing Python Standard Library Modules
+**Issue**: Missing essential stdlib modules
+**Examples failing**: `file_operations.m28`, `functional_basics.m28`
+**Modules needed**:
+- `shutil` - File operations (copy, move, rmtree)
+- `pathlib` - Path manipulation
+- `tempfile` - Temporary file creation
+- `zipfile` - Zip file handling
+- `time` - Time functions
+**Implementation**:
+- Add new files in `builtin/` directory for each module
+- Implement core functionality needed by examples
+- Register modules in `builtin/builtin.go`
+
 ## Testing Checklist
 
 ### Examples to Verify

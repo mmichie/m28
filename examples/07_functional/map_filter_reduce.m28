@@ -56,7 +56,7 @@
 (= adults (filter (lambda (p) (>= p["age"] 18)) people))
 (print "Adults:")
 (for person adults
-  (print f"  {person['name']} ({person['age']})")
+  (print f"  {person['name']} ({person['age']})"))
 
 # Filter strings
 (= words ["apple", "banana", "apricot", "cherry", "avocado"])
@@ -79,7 +79,7 @@
 (def max_reducer (acc x)
   (if (> x acc) x acc))
 
-(= maximum (reduce max_reducer (- infinity) numbers))
+(= maximum (reduce max_reducer -999999 numbers))
 (print f"Maximum of {numbers}: {maximum}")
 
 # String concatenation
@@ -142,7 +142,7 @@
   (= result [])
   (for item lst
     (if (pred item)
-      (= result (result.append item)))))
+      (= result (result.append item))))
   (return result))
 
 (def my_reduce (f init lst)

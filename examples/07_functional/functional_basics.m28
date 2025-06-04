@@ -80,15 +80,16 @@
 (print (multiply_by_2 10))  # 20
 
 # Function decorators
-(def timer (f)
-  "Decorator to time function execution"
-  (def wrapper (*args **kwargs)
-    (= start (time.time))
-    (= result (apply f args kwargs))
-    (= end (time.time))
-    (print f"{f.__name__} took {(- end start)} seconds")
-    (return result))
-  (return wrapper))
+# Note: timer decorator commented out as time module not available
+# (def timer (f)
+#   "Decorator to time function execution"
+#   (def wrapper (*args **kwargs)
+#     (= start (time.time))
+#     (= result (apply f args kwargs))
+#     (= end (time.time))
+#     (print f"{f.__name__} took {(- end start)} seconds")
+#     (return result))
+#   (return wrapper))
 
 (def memoize (f)
   "Decorator to cache function results"
@@ -101,13 +102,14 @@
   (return wrapper))
 
 # Use decorators
-(= slow_function 
-  (timer 
-    (lambda (n)
-      (time.sleep 0.1)
-      (* n n))))
-
-(print (slow_function 5))  # Prints timing info and result
+# Timer example commented out as time module not available
+# (= slow_function 
+#   (timer 
+#     (lambda (n)
+#       (time.sleep 0.1)
+#       (* n n))))
+# 
+# (print (slow_function 5))  # Prints timing info and result
 
 # Lazy evaluation with generators
 (def lazy_range (start end)
@@ -150,7 +152,7 @@
   (pipeline
     (lambda (x) (filter (lambda (n) (> n 0)) x))  # Keep positive
     (lambda (x) (map (lambda (n) (* n 2)) x))     # Double
-    (lambda (x) (sorted x reverse=True))))         # Sort descending
+    (lambda (x) (reversed (sorted x)))))           # Sort descending
 
 (= data [-5, 3, -2, 8, 1, -4, 6])
 (print (process_data data))  # [16, 12, 6, 2]

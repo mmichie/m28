@@ -38,6 +38,6 @@
 (print "\nPlay again? (y/n)")
 (= answer (input))
 (if (== answer "y")
-  (do
+  (begin
     (print "\n" "=" 30 "\n")
     (play_game)))

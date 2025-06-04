@@ -188,7 +188,7 @@
       
       # Check win condition
       (if (and (== self.player.current_room self.rooms["treasure_room"])
-               (in "treasure" (map (lambda (i) i.name) self.player.inventory)))
+               (in "treasure" (map (lambda i (i.name)) self.player.inventory)))
         (begin
           (= self.victory True)
           (= self.game_over True))))
@@ -231,7 +231,7 @@
        (if (< (len parts) 2)
          (print "Take what?")
          (begin
-           (= item_name (join " " (slice parts 1)))
+           (= item_name (join " " (parts[1:])))
            (= found False)
            (for item self.player.current_room.items
              (if (== item.name.lower item_name)
@@ -247,7 +247,7 @@
        (if (< (len parts) 2)
          (print "Drop what?")
          (begin
-           (= item_name (join " " (slice parts 1)))
+           (= item_name (join " " (parts[1:])))
            (self.player.drop_item item_name))))
       
       # Inventory
@@ -259,7 +259,7 @@
        (if (< (len parts) 2)
          (print "Examine what?")
          (begin
-           (= item_name (join " " (slice parts 1)))
+           (= item_name (join " " (parts[1:])))
            (= found False)
            # Check room items
            (for item self.player.current_room.items
@@ -311,5 +311,5 @@
   (= game (Game))
   (game.start))
 
-(if (== __name__ "__main__")
-  (main))
+# Run the game
+(main)
