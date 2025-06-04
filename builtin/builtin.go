@@ -58,6 +58,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterJSONModule(ctx)
 	RegisterOSModule(ctx)
 	RegisterDateTimeModule(ctx)
+	RegisterTimeModule(ctx)
 }
 
 // registerArithmeticBuiltins registers arithmetic functions

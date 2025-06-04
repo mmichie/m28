@@ -347,6 +347,51 @@ func (f *File) GetAttr(name string) (Value, bool) {
 			TypeDesc: GetTypeDescriptorForValue(f),
 		}, true
 
+	case "writelines":
+		return &BoundMethod{
+			Receiver: f,
+			Method: &MethodDescriptor{
+				Name:    "writelines",
+				Arity:   1,
+				Doc:     "Write a list of strings to file",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					if len(args) != 1 {
+						return nil, fmt.Errorf("writelines() takes exactly one argument")
+					}
+					file := receiver.(*File)
+					
+					// Get the lines to write
+					var lines []Value
+					switch v := args[0].(type) {
+					case ListValue:
+						lines = v
+					case TupleValue:
+						lines = v
+					default:
+						return nil, fmt.Errorf("writelines() argument must be a list or tuple of strings")
+					}
+					
+					// Write each line
+					for i, line := range lines {
+						var data string
+						if s, ok := line.(StringValue); ok {
+							data = string(s)
+						} else {
+							return nil, fmt.Errorf("writelines() argument must contain strings, found %s at index %d", line.Type(), i)
+						}
+						err := file.Write(data)
+						if err != nil {
+							return nil, err
+						}
+					}
+					
+					return Nil, nil
+				},
+			},
+			TypeDesc: GetTypeDescriptorForValue(f),
+		}, true
+
 	case "close":
 		return &BoundMethod{
 			Receiver: f,
