@@ -493,6 +493,19 @@ func (f *UserFunction) String() string {
 	return fmt.Sprintf("<function (%s)>", strings.Join(params, " "))
 }
 
+// GetAttr implements attribute access for user functions
+func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__name__":
+		if f.name != "" {
+			return core.StringValue(f.name), true
+		}
+		return core.StringValue("<anonymous>"), true
+	default:
+		return f.BaseObject.GetAttr(name)
+	}
+}
+
 // lambdaForm implements the lambda special form
 func lambdaForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {

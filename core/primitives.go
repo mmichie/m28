@@ -114,7 +114,8 @@ var (
 // BuiltinFunction represents a Go function that can be called from M28
 type BuiltinFunction struct {
 	BaseObject
-	fn func(args []Value, ctx *Context) (Value, error)
+	fn   func(args []Value, ctx *Context) (Value, error)
+	name string
 }
 
 // NewBuiltinFunction creates a new builtin function
@@ -122,6 +123,16 @@ func NewBuiltinFunction(fn func(args []Value, ctx *Context) (Value, error)) *Bui
 	return &BuiltinFunction{
 		BaseObject: *NewBaseObject(FunctionType),
 		fn:         fn,
+		name:       "",
+	}
+}
+
+// NewNamedBuiltinFunction creates a new builtin function with a name
+func NewNamedBuiltinFunction(name string, fn func(args []Value, ctx *Context) (Value, error)) *BuiltinFunction {
+	return &BuiltinFunction{
+		BaseObject: *NewBaseObject(FunctionType),
+		fn:         fn,
+		name:       name,
 	}
 }
 
@@ -132,7 +143,23 @@ func (f *BuiltinFunction) Call(args []Value, ctx *Context) (Value, error) {
 
 // String implements Value.String
 func (f *BuiltinFunction) String() string {
+	if f.name != "" {
+		return fmt.Sprintf("<builtin function %s>", f.name)
+	}
 	return "<builtin function>"
+}
+
+// GetAttr implements attribute access for builtin functions
+func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "__name__":
+		if f.name != "" {
+			return StringValue(f.name), true
+		}
+		return StringValue("<anonymous>"), true
+	default:
+		return f.BaseObject.GetAttr(name)
+	}
 }
 
 // BuiltinMethod represents a method that's implemented in Go
