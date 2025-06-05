@@ -85,6 +85,7 @@ func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 	for {
 		// Save current position to check if we moved past whitespace
 		startPos := p.pos
+		// fmt.Printf("DEBUG parsePostfix: at pos %d, base=%v, next='%.10s'\n", p.pos, base, p.input[p.pos:])
 		p.skipWhitespaceAndComments()
 
 		if p.pos >= len(p.input) {
@@ -94,6 +95,7 @@ func (p *Parser) parsePostfix(base core.Value) (core.Value, error) {
 		// If we skipped any whitespace/comments, no postfix operators
 		// This ensures "x [" is not treated as "x["
 		if p.pos > startPos {
+			// fmt.Printf("DEBUG parsePostfix: skipped whitespace from %d to %d, returning\n", startPos, p.pos)
 			return base, nil
 		}
 

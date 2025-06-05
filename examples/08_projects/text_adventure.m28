@@ -180,7 +180,7 @@
     (while (not self.game_over)
       # Show current room
       (print f"\n=== {self.player.current_room.name} ===")
-      (print self.player.current_room.get_full_description)
+      (print (self.player.current_room.get_full_description))
       
       # Get and process command
       (= command (((input "\n> ").strip).lower))
@@ -224,7 +224,7 @@
       
       # Look
       ((== action "look")
-       (print self.player.current_room.get_full_description))
+       (print (self.player.current_room.get_full_description)))
       
       # Take
       ((== action "take")

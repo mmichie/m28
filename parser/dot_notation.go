@@ -73,6 +73,9 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 		return result, nil
 	}
 
+	// Not a method call - restore position to before whitespace skip
+	p.pos = startPos
+
 	// Just property access - build (. base prop)
 	return core.ListValue{
 		core.SymbolValue("."),

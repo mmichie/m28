@@ -317,6 +317,9 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 
 // AssignForm provides the implementation of the = special form
 func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Debug: Print what we received
+	// fmt.Printf("DEBUG AssignForm: received %d args: %v\n", len(args), args)
+	
 	if len(args) < 2 {
 		return nil, ErrArgCount("= requires at least 2 arguments")
 	}
