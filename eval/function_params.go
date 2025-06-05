@@ -36,6 +36,44 @@ func (sig *FunctionSignature) MaxArgs() int {
 // ParseParameterList parses a parameter list into a FunctionSignature
 // Supports: (a b c=10 d=20 *args **kwargs)
 func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
+	// First, transform Python-style parameters (name=value) to M28 style ((name value))
+	transformedParams := make(core.ListValue, 0, len(paramList))
+	
+	i := 0
+	for i < len(paramList) {
+		param := paramList[i]
+		
+		// Check if this is a symbol ending with = (parser creates "name=" as one symbol)
+		if sym, ok := param.(core.SymbolValue); ok {
+			symStr := string(sym)
+			if len(symStr) > 1 && symStr[len(symStr)-1] == '=' && i+1 < len(paramList) {
+				// This is Python-style: name= value
+				// Transform to M28 style: (name value)
+				paramName := core.SymbolValue(symStr[:len(symStr)-1]) // Remove the =
+				defaultParam := core.ListValue{paramName, paramList[i+1]}
+				transformedParams = append(transformedParams, defaultParam)
+				i += 2 // Skip name= and value
+				continue
+			}
+		}
+		
+		// Also check for separated form: name = value
+		if sym, ok := param.(core.SymbolValue); ok && i+2 < len(paramList) {
+			if eq, ok := paramList[i+1].(core.SymbolValue); ok && string(eq) == "=" {
+				// This is Python-style: name = value
+				// Transform to M28 style: (name value)
+				defaultParam := core.ListValue{sym, paramList[i+2]}
+				transformedParams = append(transformedParams, defaultParam)
+				i += 3 // Skip name, =, and value
+				continue
+			}
+		}
+		
+		// Not a default parameter, keep as-is
+		transformedParams = append(transformedParams, param)
+		i++
+	}
+	
 	sig := &FunctionSignature{
 		RequiredParams: []ParameterInfo{},
 		OptionalParams: []ParameterInfo{},
@@ -45,7 +83,7 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 	seenRest := false
 	seenKeyword := false
 
-	for _, param := range paramList {
+	for _, param := range transformedParams {
 		switch p := param.(type) {
 		case core.SymbolValue:
 			name := string(p)
