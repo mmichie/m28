@@ -229,6 +229,16 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - Implement core functionality needed by examples
 - Register modules in `builtin/builtin.go`
 
+### 6. List/Dictionary Assignment in Class __init__ Methods
+**Issue**: Cannot assign lists or dictionaries to instance attributes in class __init__ methods
+**Examples failing**: `text_adventure.m28`, `todo_app.m28`
+**Error**: Assignment of `self.items = []` or `self.exits = {}` causes EvalError
+**Implementation**:
+- Debug the issue in `eval/evaluator.go` when evaluating assignments in class context
+- Check if there's a conflict with property access or method binding
+- Ensure that list and dict literals are properly evaluated in instance attribute context
+- Test case: `(class Test (def __init__ (self) (= self.items [])))`
+
 ## Testing Checklist
 
 ### Examples to Verify
