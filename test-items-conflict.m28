@@ -1,0 +1,10 @@
+# Test if items conflicts
+
+(class Test
+  (def __init__ (self)
+    (print "Setting item_list...")
+    (= self.item_list [])
+    (print "item_list set successfully")))
+
+(= t (Test))
+(print f"Item list: {t.item_list}")

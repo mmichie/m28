@@ -1,0 +1,10 @@
+# Test items attribute
+
+(class Test
+  (def __init__ (self)
+    (print "Setting items...")
+    (= self.items [])
+    (print "Items set successfully")))
+
+(= t (Test))
+(print f"Items: {t.items}")

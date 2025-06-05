@@ -1,0 +1,17 @@
+# Test without super
+
+(class Base
+  (def __init__ (self name)
+    (= self.name name)))
+
+(class Derived (Base)
+  (def __init__ (self name)
+    (print "Setting name directly...")
+    (= self.name name)
+    (print "Setting mylist...")
+    (= self.mylist [])
+    (print "List set!")))
+
+(print "Creating derived...")
+(= d (Derived "test"))
+(print f"Success: {d.name}, list: {d.mylist}")

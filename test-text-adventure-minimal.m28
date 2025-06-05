@@ -1,0 +1,22 @@
+# Test minimal version of text adventure
+
+# Base classes for game objects
+(class GameObject
+  (def __init__ (self name description)
+    (= self.name name)
+    (= self.description description))
+  
+  (def __str__ (self)
+    (return self.name)))
+
+(class Item (GameObject)
+  (def __init__ (self name description portable=True)
+    ((super Item self).__init__ name description)
+    (= self.portable portable)))
+
+(print "Creating item...")
+(= key (Item "key" "A small key."))
+(print f"Created: {key}")
+(print f"Name: {key.name}")
+(print f"Description: {key.description}")
+(print f"Portable: {key.portable}")

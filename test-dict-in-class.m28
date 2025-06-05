@@ -1,0 +1,11 @@
+# Test dictionary in class
+
+(class Test
+  (def __init__ (self)
+    (print "Setting dict...")
+    (= self.data {})
+    (print "Dict set successfully")))
+
+(print "Creating instance...")
+(= t (Test))
+(print "Instance created!")

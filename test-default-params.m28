@@ -1,0 +1,14 @@
+# Test default params in classes
+
+(class Test
+  (def __init__ (self name value=10)
+    (= self.name name)
+    (= self.value value)))
+
+(print "Creating with all params...")
+(= t1 (Test "first" 20))
+(print f"t1: name={t1.name}, value={t1.value}")
+
+(print "Creating with default param...")
+(= t2 (Test "second"))
+(print f"t2: name={t2.name}, value={t2.value}")

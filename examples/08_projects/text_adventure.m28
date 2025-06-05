@@ -13,8 +13,8 @@
     (return self.name)))
 
 (class Item (GameObject)
-  (def __init__ (self name description portable=True)
-    (super.__init__ name description)
+  (def __init__ (self name description portable)
+    ((super Item self).__init__ name description)
     (= self.portable portable))
   
   (def use (self player)
@@ -22,7 +22,7 @@
 
 (class Room (GameObject)
   (def __init__ (self name description)
-    (super.__init__ name description)
+    ((super Room self).__init__ name description)
     (= self.exits {})
     (= self.items [])
     (= self.visited False))
@@ -47,7 +47,7 @@
     (if self.exits
       (begin
         (= desc (+ desc "\n\nExits:"))
-        (for direction self.exits.keys
+        (for direction (self.exits.keys)
           (= desc (+ desc f"\n  - {direction}")))))
     (return desc)))
 
@@ -69,7 +69,7 @@
   
   (def drop_item (self item_name)
     (for item self.inventory
-      (if (== item.name.lower item_name.lower)
+      (if (== (item.name.lower) (item_name.lower))
         (begin
           (self.inventory.remove item)
           (self.current_room.add_item item)
@@ -140,9 +140,9 @@
     (treasure_room.add_exit "south" cellar)
     
     # Create items
-    (= key (Item "key" "A small brass key with intricate engravings."))
-    (= book (Item "book" "An ancient leather-bound book with mysterious symbols."))
-    (= torch (Item "torch" "A wooden torch that provides light."))
+    (= key (Item "key" "A small brass key with intricate engravings." True))
+    (= book (Item "book" "An ancient leather-bound book with mysterious symbols." True))
+    (= torch (Item "torch" "A wooden torch that provides light." True))
     (= treasure (Item "treasure" "A chest full of gold coins and precious gems." False))
     
     # Place items
@@ -167,8 +167,8 @@
     (print "Legend says great treasure lies within...")
     (print "\nWhat is your name, adventurer?")
     
-    (= name (input "> ").strip)
-    (= self.player (Player name or "Adventurer"))
+    (= name ((input "> ").strip))
+    (= self.player (Player (or name "Adventurer")))
     (= self.player.current_room self.rooms["entrance"])
     
     (print f"\nWelcome, {self.player.name}!")
@@ -183,7 +183,7 @@
       (print self.player.current_room.get_full_description)
       
       # Get and process command
-      (= command (input "\n> ").strip.lower)
+      (= command (((input "\n> ").strip).lower))
       (self.process_command command)
       
       # Check win condition
@@ -206,7 +206,7 @@
         (print f"Final score: {self.player.score}"))))
   
   (def process_command (self command)
-    (= parts (command.split))
+    (= parts ((command.split)))
     (if (not parts)
       (return))
     
@@ -234,7 +234,7 @@
            (= item_name (join " " (parts[1:])))
            (= found False)
            (for item self.player.current_room.items
-             (if (== item.name.lower item_name)
+             (if (== (item.name.lower) item_name)
                (begin
                  (self.player.take_item item)
                  (= found True)
@@ -263,7 +263,7 @@
            (= found False)
            # Check room items
            (for item self.player.current_room.items
-             (if (== item.name.lower item_name)
+             (if (== (item.name.lower) item_name)
                (begin
                  (print item.description)
                  (= found True)
@@ -271,7 +271,7 @@
            # Check inventory
            (if (not found)
              (for item self.player.inventory
-               (if (== item.name.lower item_name)
+               (if (== (item.name.lower) item_name)
                  (begin
                    (print item.description)
                    (= found True)
@@ -299,7 +299,7 @@
       # Quit
       ((== action "quit")
        (print "Are you sure you want to quit? (yes/no)")
-       (= confirm (input "> ").strip.lower)
+       (= confirm (((input "> ").strip).lower))
        (if (in confirm ["yes", "y"])
          (= self.game_over True)))
       

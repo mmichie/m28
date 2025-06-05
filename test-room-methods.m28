@@ -1,0 +1,29 @@
+# Test Room methods
+
+(class GameObject
+  (def __init__ (self name description)
+    (= self.name name)
+    (= self.description description))
+  
+  (def __str__ (self)
+    (return self.name)))
+
+(class Room (GameObject)
+  (def __init__ (self name description)
+    (print "Room.__init__ starting...")
+    ((super Room self).__init__ name description)
+    (print "Super called")
+    (= self.exits {})
+    (print "Exits set")
+    (= self.items [])
+    (print "Items set")
+    (= self.visited False)
+    (print "Visited set"))
+  
+  (def get_full_description (self)
+    (= desc self.description)
+    (return desc)))
+
+(print "Creating room...")
+(= room (Room "Test" "A test room"))
+(print f"Room created: {room}")

@@ -1,0 +1,40 @@
+# Test text adventure line by line
+
+(print "1. Import random...")
+(import random)
+
+(print "2. Define GameObject...")
+(class GameObject
+  (def __init__ (self name description)
+    (= self.name name)
+    (= self.description description))
+  
+  (def __str__ (self)
+    (return self.name)))
+
+(print "3. Define Item...")
+(class Item (GameObject)
+  (def __init__ (self name description portable)
+    ((super Item self).__init__ name description)
+    (= self.portable portable))
+  
+  (def use (self player)
+    (print f"You can't use the {self.name} here.")))
+
+(print "4. Create an item...")
+(= key (Item "key" "A small key" True))
+(print f"Created: {key}")
+
+(print "5. Define Room...")
+(class Room (GameObject)
+  (def __init__ (self name description)
+    ((super Room self).__init__ name description)
+    (= self.exits {})
+    (= self.items [])
+    (= self.visited False)))
+
+(print "6. Create room...")
+(= room (Room "Test Room" "A test room"))
+(print f"Created: {room}")
+
+(print "All basic tests passed!")

@@ -1,0 +1,25 @@
+# Debug text adventure issue
+
+(print "Testing import...")
+(import random)
+(print "Import successful")
+
+(print "Testing class definition...")
+(class GameObject
+  (def __init__ (self name description)
+    (= self.name name)
+    (= self.description description)))
+(print "GameObject defined")
+
+(print "Testing inheritance...")
+(class Item (GameObject)
+  (def __init__ (self name description portable=True)
+    ((super Item self).__init__ name description)
+    (= self.portable portable)))
+(print "Item defined")
+
+(print "Testing instance creation...")
+(= item (Item "key" "A key"))
+(print f"Created item: {item.name}")
+
+(print "All tests passed!")
