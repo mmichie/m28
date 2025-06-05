@@ -258,6 +258,7 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 	}))
 
 	// reduce - reduce iterable to single value
+	// Supports both (reduce fn iterable initial) and (reduce fn initial iterable) orders
 	ctx.Define("reduce", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 || len(args) > 3 {
 			return nil, fmt.Errorf("reduce() takes 2 or 3 arguments (%d given)", len(args))
@@ -271,29 +272,49 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 			return nil, fmt.Errorf("reduce() first argument must be callable")
 		}
 
-		// Get the iterable
+		// Determine argument order by checking types
 		var items []core.Value
-		switch v := args[1].(type) {
-		case core.ListValue:
-			items = v
-		case core.TupleValue:
-			items = v
-		default:
-			return nil, fmt.Errorf("reduce() second argument must be an iterable, not '%s'", v.Type())
-		}
-
-		// Get initial value
 		var accumulator core.Value
 		startIdx := 0
 
-		if len(args) == 3 {
-			accumulator = args[2]
-		} else {
+		if len(args) == 2 {
+			// Only function and iterable, no initial value
+			switch v := args[1].(type) {
+			case core.ListValue:
+				items = v
+			case core.TupleValue:
+				items = v
+			default:
+				return nil, fmt.Errorf("reduce() second argument must be an iterable, not '%s'", v.Type())
+			}
 			if len(items) == 0 {
 				return nil, fmt.Errorf("reduce() of empty sequence with no initial value")
 			}
 			accumulator = items[0]
 			startIdx = 1
+		} else {
+			// Three arguments - need to determine order
+			// Try (fn, iterable, initial) first
+			switch v := args[1].(type) {
+			case core.ListValue:
+				items = v
+				accumulator = args[2]
+			case core.TupleValue:
+				items = v
+				accumulator = args[2]
+			default:
+				// Try (fn, initial, iterable) order
+				switch v := args[2].(type) {
+				case core.ListValue:
+					items = v
+					accumulator = args[1]
+				case core.TupleValue:
+					items = v
+					accumulator = args[1]
+				default:
+					return nil, fmt.Errorf("reduce() requires an iterable (list or tuple)")
+				}
+			}
 		}
 
 		// Reduce
@@ -446,61 +467,7 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 		return core.TupleValue(result), nil
 	}))
 
-	// reduce - reduce a sequence using a binary function
-	ctx.Define("reduce", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 2 || len(args) > 3 {
-			return nil, fmt.Errorf("reduce() takes 2 or 3 arguments (%d given)", len(args))
-		}
-
-		// Get the function
-		fn, ok := args[0].(core.Callable)
-		if !ok {
-			return nil, fmt.Errorf("reduce() first argument must be callable, got %s", args[0].Type())
-		}
-
-		// Get the sequence
-		var items []core.Value
-		switch seq := args[1].(type) {
-		case core.ListValue:
-			items = []core.Value(seq)
-		case core.TupleValue:
-			items = []core.Value(seq)
-		default:
-			return nil, fmt.Errorf("reduce() second argument must be a list or tuple, got %s", args[1].Type())
-		}
-
-		// Handle empty sequence
-		if len(items) == 0 {
-			if len(args) == 3 {
-				// Return the initial value
-				return args[2], nil
-			}
-			return nil, fmt.Errorf("reduce() of empty sequence with no initial value")
-		}
-
-		// Get initial value and starting index
-		var result core.Value
-		startIdx := 0
-		if len(args) == 3 {
-			// Use provided initial value
-			result = args[2]
-		} else {
-			// Use first item as initial value
-			result = items[0]
-			startIdx = 1
-		}
-
-		// Reduce the sequence
-		for i := startIdx; i < len(items); i++ {
-			fnResult, err := fn.Call([]core.Value{result, items[i]}, ctx)
-			if err != nil {
-				return nil, err
-			}
-			result = fnResult
-		}
-
-		return result, nil
-	}))
+	// reduce - duplicate definition removed (see above for the main reduce implementation)
 }
 
 // Helper function to extract number from value

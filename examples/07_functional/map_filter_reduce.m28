@@ -88,7 +88,7 @@
 (print f"Sentence: {(sentence.strip)}")
 
 # Build dictionary
-(= pairs [["a", 1], ["b", 2], ["c", 3]])
+(= pairs (list (list "a" 1) (list "b" 2) (list "c" 3)))
 (= dict_result 
   (reduce 
     (lambda (acc pair) 

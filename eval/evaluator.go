@@ -10,7 +10,13 @@ import (
 
 // Eval evaluates an expression in a context
 func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
-	switch v := expr.(type) {
+	// First, pre-process to handle dict-literals in data structures
+	processed, err := processLiterals(expr, ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	switch v := processed.(type) {
 	case core.NumberValue, core.StringValue, core.BoolValue, core.NilValue:
 		// Self-evaluating primitives
 		return v, nil
@@ -41,7 +47,7 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 
 	default:
 		// Other values evaluate to themselves
-		return expr, nil
+		return processed, nil
 	}
 }
 
@@ -1019,4 +1025,45 @@ func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	return result, nil
+}
+
+// processLiterals recursively processes data structures to evaluate dict-literals
+func processLiterals(expr core.Value, ctx *core.Context) (core.Value, error) {
+	switch v := expr.(type) {
+	case core.ListValue:
+		// Check if this is a dict-literal form
+		if len(v) > 0 {
+			if sym, ok := v[0].(core.SymbolValue); ok && string(sym) == "dict-literal" {
+				// Evaluate the dict-literal
+				return DictLiteralForm(v[1:], ctx)
+			}
+		}
+		
+		// Otherwise, process elements recursively
+		result := make(core.ListValue, len(v))
+		for i, elem := range v {
+			processed, err := processLiterals(elem, ctx)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = processed
+		}
+		return result, nil
+		
+	case core.TupleValue:
+		// Process tuple elements recursively
+		result := make(core.TupleValue, len(v))
+		for i, elem := range v {
+			processed, err := processLiterals(elem, ctx)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = processed
+		}
+		return result, nil
+		
+	default:
+		// Other values are returned as-is
+		return expr, nil
+	}
 }
