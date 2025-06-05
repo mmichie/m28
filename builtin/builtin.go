@@ -59,6 +59,8 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterOSModule(ctx)
 	RegisterDateTimeModule(ctx)
 	RegisterTimeModule(ctx)
+	RegisterShutil(ctx)
+	RegisterPathlib(ctx)
 }
 
 // registerArithmeticBuiltins registers arithmetic functions

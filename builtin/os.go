@@ -25,6 +25,8 @@ func RegisterOSModule(ctx *core.Context) {
 	pathModule.SetWithKey("abspath", core.StringValue("abspath"), core.NewBuiltinFunction(osPathAbspath))
 	pathModule.SetWithKey("isfile", core.StringValue("isfile"), core.NewBuiltinFunction(osPathIsFile))
 	pathModule.SetWithKey("isdir", core.StringValue("isdir"), core.NewBuiltinFunction(osPathIsDir))
+	pathModule.SetWithKey("getsize", core.StringValue("getsize"), core.NewBuiltinFunction(osPathGetsize))
+	pathModule.SetWithKey("getmtime", core.StringValue("getmtime"), core.NewBuiltinFunction(osPathGetmtime))
 
 	// Register os functions
 	osModule.SetWithKey("path", core.StringValue("path"), pathModule)
@@ -37,6 +39,8 @@ func RegisterOSModule(ctx *core.Context) {
 	osModule.SetWithKey("rename", core.StringValue("rename"), core.NewBuiltinFunction(osRename))
 	osModule.SetWithKey("getenv", core.StringValue("getenv"), core.NewBuiltinFunction(osGetenv))
 	osModule.SetWithKey("environ", core.StringValue("environ"), core.NewBuiltinFunction(osEnviron))
+	osModule.SetWithKey("isfile", core.StringValue("isfile"), core.NewBuiltinFunction(osPathIsFile))
+	osModule.SetWithKey("isdir", core.StringValue("isdir"), core.NewBuiltinFunction(osPathIsDir))
 
 	// Register the module in the module registry
 	registry := core.GetModuleRegistry()
@@ -352,6 +356,45 @@ func osEnviron(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	return dict, nil
+}
+
+// osPathGetsize returns the size of a file in bytes
+func osPathGetsize(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("os.path.getsize requires exactly 1 argument")
+	}
+
+	path, ok := args[0].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("os.path.getsize: path must be a string")
+	}
+
+	info, err := os.Stat(string(path))
+	if err != nil {
+		return nil, fmt.Errorf("os.path.getsize: %v", err)
+	}
+
+	return core.NumberValue(info.Size()), nil
+}
+
+// osPathGetmtime returns the modification time of a file
+func osPathGetmtime(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("os.path.getmtime requires exactly 1 argument")
+	}
+
+	path, ok := args[0].(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("os.path.getmtime: path must be a string")
+	}
+
+	info, err := os.Stat(string(path))
+	if err != nil {
+		return nil, fmt.Errorf("os.path.getmtime: %v", err)
+	}
+
+	// Return Unix timestamp as a float
+	return core.NumberValue(float64(info.ModTime().Unix())), nil
 }
 
 // splitFirst splits a string on the first occurrence of a separator
