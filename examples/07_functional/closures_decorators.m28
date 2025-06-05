@@ -136,7 +136,7 @@
     (return wrapper))
   (return decorator))
 
-(= say_hello (repeat 3) (lambda () (print "Hello!")))
+(= say_hello ((repeat 3) (lambda () (print "Hello!"))))
 (say_hello)  # Prints "Hello!" three times
 
 # Access control decorator
@@ -165,8 +165,8 @@
   (return decorator))
 
 (= safe_divide 
-  (type_check int int)
-  (lambda (a b) (/ a b)))
+  ((type_check int int)
+   (lambda (a b) (/ a b))))
 
 # Chaining decorators
 (def debug (func)
