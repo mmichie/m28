@@ -12,7 +12,7 @@
 
 # Map with named function
 (def celsius_to_fahrenheit (c)
-  (+ (* c 9/5) 32))
+  (+ (* c (/ 9 5)) 32))
 
 (= temps_c [0, 10, 20, 30, 40])
 (= temps_f (map celsius_to_fahrenheit temps_c))
@@ -30,7 +30,7 @@
 # Map with multiple lists (zip and map)
 (= list1 [1, 2, 3])
 (= list2 [4, 5, 6])
-(= sums (map (lambda (pair) (+ (pair 0) (pair 1))) 
+(= sums (map (lambda (pair) (+ pair[0] pair[1])) 
               (zip list1 list2)))
 (print f"Pairwise sums: {sums}")
 
@@ -93,7 +93,9 @@
   (reduce 
     (lambda (acc pair) 
       (begin 
-        (= acc[(pair 0)] (pair 1))
+        (= key (nth pair 0))
+        (= value (nth pair 1))
+        (= acc[key] value)
         acc))
     {}
     pairs))
