@@ -1,10 +1,17 @@
 package builtin
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 )
+
+// Global stdin reader to avoid issues with multiple bufio readers
+var stdinReader = bufio.NewReader(os.Stdin)
 
 // RegisterIOFunctions registers I/O related functions
 func RegisterIOFunctions(ctx *core.Context) {
@@ -69,19 +76,22 @@ func printFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 func inputFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// Print prompt if provided
 	if len(args) > 0 {
-		fmt.Print(core.PrintValue(args[0]))
+		// Use PrintValueWithoutQuotes to avoid printing quotes around strings
+		fmt.Print(core.PrintValueWithoutQuotes(args[0]))
 	}
 
-	// Read line from stdin
-	var line string
-	_, err := fmt.Scanln(&line)
+	// Read entire line from stdin using the global reader
+	line, err := stdinReader.ReadString('\n')
 	if err != nil {
-		// Handle empty input (just pressing enter)
-		if err.Error() == "unexpected newline" {
+		if err == io.EOF {
+			// Handle EOF gracefully
 			return core.StringValue(""), nil
 		}
 		return nil, fmt.Errorf("error reading input: %v", err)
 	}
+
+	// Remove the trailing newline
+	line = strings.TrimRight(line, "\r\n")
 
 	return core.StringValue(line), nil
 }
