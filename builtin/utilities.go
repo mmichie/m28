@@ -468,6 +468,45 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 	}))
 
 	// reduce - duplicate definition removed (see above for the main reduce implementation)
+	
+	// next - get the next value from an iterator/generator
+	ctx.Define("next", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 || len(args) > 2 {
+			return nil, fmt.Errorf("next() takes 1 or 2 arguments")
+		}
+		
+		// Get the iterator
+		iterator := args[0]
+		
+		// Check if it has a __next__ method
+		if obj, ok := iterator.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			if nextMethod, found := obj.GetAttr("__next__"); found {
+				// Call the __next__ method
+				if callable, ok := nextMethod.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						// If StopIteration and default provided, return default
+						if len(args) == 2 {
+							return args[1], nil
+						}
+						return nil, err
+					}
+					return result, nil
+				}
+			}
+		}
+		
+		// If no __next__ method and default provided, return default
+		if len(args) == 2 {
+			return args[1], nil
+		}
+		
+		return nil, fmt.Errorf("'%s' object is not an iterator", iterator.Type())
+	}))
 }
 
 // Helper function to extract number from value
