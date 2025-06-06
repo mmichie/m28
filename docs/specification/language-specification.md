@@ -50,7 +50,7 @@ The first element of a list typically determines the operation to be performed:
 
 Special forms are expressions with special evaluation rules:
 
-- **Function Definition**: `(def (function-name param1 param2 ...) body...)`
+- **Function Definition**: `(def function-name (param1 param2 ...) body...)`
 - **Assignment**: `(= variable expression)`
 - **Conditional**: `(if condition true-expr false-expr)`
 - **Loops**: `(for item collection body...)` or `(while condition body...)`
@@ -118,7 +118,7 @@ go         async     await      select     channel
 **Example**:
 ```lisp
 # Tail-recursive factorial
-(def (factorial n acc)
+(def factorial (n acc)
   (if (<= n 1)
       acc
       (factorial (- n 1) (* n acc))))
@@ -147,9 +147,9 @@ go         async     await      select     channel
 
 **Example**:
 ```lisp
-(def (make-counter)
+(def make-counter ()
   (= count 0)
-  (def (increment)
+  (def increment ()
     (= count (+ count 1))
     count)
   increment)
@@ -166,7 +166,7 @@ go         async     await      select     channel
 **Example**:
 ```lisp
 (= x 10)
-(def (test)
+(def test ()
   (= x 20)
   (print x))  # Prints: 20
 (test)
@@ -297,9 +297,9 @@ go         async     await      select     channel
 
 **Example**:
 ```lisp
-(def (make-person name)
+(def make-person (name)
   (= person {})
-  (def (person.greet self)
+  (def person.greet (self)
     (print (+ "Hello, my name is " name)))
   person)
 ```
@@ -319,10 +319,10 @@ go         async     await      select     channel
 **Example**:
 ```lisp
 (class Person ()
-  (def (init self name)
+  (def __init__ (self name)
     (= self.name name))
   
-  (def (greet self)
+  (def greet (self)
     (print (+ "Hello, my name is " self.name))))
 ```
 
@@ -835,9 +835,9 @@ type ObjectProtocol interface {
 
 **Import Syntax**
 - Basic import: `(import "module_name")`
-- Aliased import: `(import "module_name" as "alias")`
-- Selective import: `(from "module_name" import symbol1 symbol2 ...)`
-- Wildcard import: `(from "module_name" import *)`
+- Aliased import: `(import "module_name" as alias)`
+- Selective import: `(from "module_name" import symbol1 symbol2 ...)` (not yet supported)
+- Wildcard import: `(from "module_name" import *)` (not yet supported)
 
 **Module Resolution Algorithm**
 1. Check if the module is already loaded in cache.
@@ -866,18 +866,14 @@ type ObjectProtocol interface {
 (print math.pi)
 
 # Aliased import
-(import "very_long_module_name" as "short")
+(import "very_long_module_name" as short)
 (print short.function)
 
-# Selective import
-(from "math" import pi sin cos)
-(print pi)
-(print (sin 0))
-
-# Wildcard import
-(from "math" import *)
-(print pi)
-(print (sin 0))
+# Note: from-import syntax not yet supported in v0.1.0
+# Use module.attribute notation instead:
+(import "math")
+(print math.pi)
+(print (math.sin 0))
 ```
 
 #### 4.2.3 Standard Modules
@@ -1040,9 +1036,10 @@ type ObjectProtocol interface {
 
 **List Comprehensions**
 ```lisp
-(= result
-  (for (x collection)
-    (transform x)))
+# List comprehensions are supported in M28 v0.1.0
+# Note: expressions inside must use prefix notation
+(= squares [(* x x) for x in (range 10)])
+(= evens [(* x 2) for x in (range 10) if (== (% x 2) 0)])
 ```
 
 **Example**:
