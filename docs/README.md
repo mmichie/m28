@@ -26,8 +26,7 @@ Welcome to the M28 documentation! M28 is a Lispy-Pythonic programming language t
 - [Concurrency](features/concurrency.md) - async/await, go, channels
 
 ### Module System
-- [Module Imports](module-import.md) - Using modules
-- [Module Exports](module-exports.md) - Creating modules
+- [Modules](modules.md) - Creating and using modules
 - [Standard Library](stdlib.md) - Built-in modules
 
 ### Advanced Topics
