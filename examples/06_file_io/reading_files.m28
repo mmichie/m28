@@ -1,8 +1,15 @@
 # Reading Files in M28
 # Various ways to read from files
 
-# Basic file reading
+# First, let's create a sample file to read
 (= filename "example.txt")
+(with (open filename "w") as f
+  (f.write "Hello from M28!\n")
+  (f.write "This is line 2.\n")
+  (f.write "And this is line 3.\n"))
+(print "Created example.txt for demonstration\n")
+
+# Basic file reading
 
 # Method 1: Using with statement (recommended)
 (with (open filename "r") as f
@@ -20,23 +27,29 @@
 (print "\nReading line by line:")
 (with (open filename "r") as f
   (for line f
-    (print f"Line: {line.strip}")))
+    (print f"Line: {(line.strip)}")))
 
 # Method 4: Read all lines into a list
 (with (open filename "r") as f
   (= lines (f.readlines))
-  (print f"\nFile has {len lines} lines"))
+  (print f"\nFile has {(len lines)} lines"))
 
-# Method 5: Read with specific encoding
-(with (open filename "r" encoding="utf-8") as f
+# Method 5: M28 handles UTF-8 by default
+(with (open filename "r") as f
   (= content (f.read))
-  (print "UTF-8 encoded content read"))
+  (print "Content read (UTF-8 is default)"))
 
-# Reading binary files
-(= binary_file "image.png")
-(with (open binary_file "rb") as f
-  (= data (f.read 100))  # Read first 100 bytes
-  (print f"First 100 bytes: {len data}"))
+# Reading binary files (skip if file doesn't exist)
+(= binary_file "sample.bin")
+(try
+  # Create a sample binary file first
+  (with (open binary_file "wb") as f
+    (f.write (bytes "Sample binary data")))
+  (with (open binary_file "rb") as f
+    (= data (f.read 100))  # Read first 100 bytes
+    (print f"Binary file size: {(len data)} bytes"))
+  (except Exception e
+    (print "Skipping binary file example")))
 
 # Safe file reading with error handling
 (def read_file_safely (filename)
@@ -75,8 +88,8 @@
   (= rows [])
   (with (open filename "r") as f
     (for line f
-      (= row (line.strip.split ","))
-      (rows.append row)))
+      (= row ((line.strip).split ","))
+      (= rows (rows.append row))))
   (return rows))
 
 # Process large files efficiently

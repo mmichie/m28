@@ -147,6 +147,63 @@ func InitDictMethods() {
 		},
 	}
 
+	// Add items method
+	dictType.Methods["items"] = &MethodDescriptor{
+		Name:    "items",
+		Arity:   0,
+		Doc:     "Return a list of (key, value) tuples",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			dict := receiver.(*DictValue)
+			items := make([]Value, 0, dict.Size())
+			
+			// Create tuples for each key-value pair
+			for _, k := range dict.Keys() {
+				v, _ := dict.Get(k)
+				pair := TupleValue{StringValue(k), v}
+				items = append(items, pair)
+			}
+			
+			return ListValue(items), nil
+		},
+	}
+
+	// Add keys method
+	dictType.Methods["keys"] = &MethodDescriptor{
+		Name:    "keys",
+		Arity:   0,
+		Doc:     "Return a list of all keys",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			dict := receiver.(*DictValue)
+			keys := dict.Keys()
+			keyValues := make([]Value, len(keys))
+			for i, k := range keys {
+				keyValues[i] = StringValue(k)
+			}
+			return ListValue(keyValues), nil
+		},
+	}
+
+	// Add values method
+	dictType.Methods["values"] = &MethodDescriptor{
+		Name:    "values",
+		Arity:   0,
+		Doc:     "Return a list of all values",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			dict := receiver.(*DictValue)
+			values := make([]Value, 0, dict.Size())
+			
+			for _, k := range dict.Keys() {
+				v, _ := dict.Get(k)
+				values = append(values, v)
+			}
+			
+			return ListValue(values), nil
+		},
+	}
+
 	// Add fromkeys class method (would need special handling)
 	// For now, we'll skip this as it requires class method support
 }

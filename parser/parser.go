@@ -268,11 +268,9 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 		return p.parseListComprehension(elements)
 	}
 
-	// Return a quoted list so it's not evaluated as a function call
-	return core.ListValue{
-		core.SymbolValue("quote"),
-		elements,
-	}, nil
+	// Return a list-literal form that evaluates its contents
+	// This allows expressions inside [...] to be evaluated
+	return core.ListValue(append([]core.Value{core.SymbolValue("list-literal")}, elements...)), nil
 }
 
 // parseDictLiteral parses a dictionary literal {...} or set literal {1, 2, 3}

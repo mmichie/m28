@@ -122,6 +122,9 @@ func init() {
 
 		// List comprehension
 		"list-comp": ListCompForm,
+		
+		// List literal (evaluates contents)
+		"list-literal": listLiteralForm,
 
 		// Other special forms will be added through RegisterSpecialForm
 	}
@@ -203,6 +206,7 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			params:     params,
 			body:       functionBody,
 			env:        ctx,
+			name:       string(name),
 		}
 
 		ctx.Define(string(name), function)
@@ -248,6 +252,7 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				params:     params,
 				body:       functionBody,
 				env:        ctx,
+				name:       string(name),
 			}
 
 			ctx.Define(string(name), function)
@@ -732,6 +737,7 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return result, nil
 	}
 
+
 	// Handle the exception
 	handled := false
 
@@ -1058,6 +1064,23 @@ func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		result = append(result, exprResult)
 	}
 
+	return result, nil
+}
+
+// listLiteralForm implements the list-literal special form
+// It evaluates all arguments and returns them as a list
+func listLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	result := make(core.ListValue, 0, len(args))
+	
+	// Evaluate each element
+	for _, arg := range args {
+		val, err := Eval(arg, ctx)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, val)
+	}
+	
 	return result, nil
 }
 

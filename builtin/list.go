@@ -384,24 +384,57 @@ func ReduceFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("first argument must be callable")
 	}
 
-	// Get the collection
+	// Handle both Python-style and current argument order
 	var coll interface{}
-	switch c := args[1].(type) {
-	case core.ListValue:
-		coll = c
-	case core.TupleValue:
-		coll = c
-	default:
-		return nil, fmt.Errorf("reduce expects a list or tuple, got %s", args[1].Type())
+	var initialValue core.Value
+	var hasInitial bool
+
+	if len(args) == 2 {
+		// Two arguments: (reduce function collection)
+		switch c := args[1].(type) {
+		case core.ListValue:
+			coll = c
+		case core.TupleValue:
+			coll = c
+		default:
+			return nil, fmt.Errorf("reduce expects a list or tuple, got %s", args[1].Type())
+		}
+		hasInitial = false
+	} else {
+		// Three arguments - could be either order
+		// Try Python order first: (reduce function initial collection)
+		switch c := args[2].(type) {
+		case core.ListValue:
+			coll = c
+			initialValue = args[1]
+			hasInitial = true
+		case core.TupleValue:
+			coll = c
+			initialValue = args[1]
+			hasInitial = true
+		default:
+			// Try original order: (reduce function collection initial)
+			switch c := args[1].(type) {
+			case core.ListValue:
+				coll = c
+				initialValue = args[2]
+				hasInitial = true
+			case core.TupleValue:
+				coll = c
+				initialValue = args[2]
+				hasInitial = true
+			default:
+				return nil, fmt.Errorf("reduce expects a list or tuple as second or third argument")
+			}
+		}
 	}
 
 	// Get initial value and first element index
 	var result core.Value
 	var startIdx int
 
-	if len(args) == 3 {
-		// Initial value provided
-		result = args[2]
+	if hasInitial {
+		result = initialValue
 		startIdx = 0
 	} else {
 		// No initial value, use first element

@@ -1,6 +1,16 @@
 # Using Custom Modules
 # Demonstrates importing and using our custom math_utils module
 
+# NOTE: This example requires math_utils.m28 to be in the same directory
+# or in the module search path. The math_utils.m28 file is provided
+# in this directory.
+#
+# To run this example:
+# 1. Make sure you're in the examples/05_modules directory
+# 2. Run: ../../bin/m28 using_custom_modules.m28
+#
+# The module import will fail if math_utils.m28 is not found.
+
 # Import the entire module
 (import math_utils)
 

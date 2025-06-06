@@ -24,13 +24,13 @@
 (with (open filename "a") as f
   (f.write "\nAppended line"))
 
-# Write with specific encoding
-(with (open "unicode.txt" "w" encoding="utf-8") as f
+# Write with Unicode content (M28 handles UTF-8 by default)
+(with (open "unicode.txt" "w") as f
   (f.write "Hello 世界! 🌍\n")
   (f.write "Unicode text works fine"))
 
 # Writing binary data
-(= binary_data (bytes [72, 101, 108, 108, 111]))  # "Hello" in bytes
+(= binary_data (bytes "Hello"))  # Convert string to bytes
 (with (open "binary.dat" "wb") as f
   (f.write binary_data))
 
@@ -52,7 +52,7 @@
 
 (def write_json_file (filename data)
   (with (open filename "w") as f
-    (json.dump data f indent=2)))
+    (json.dump data f)))
 
 # Example data
 (= config {
@@ -70,7 +70,7 @@
 (def write_csv_simple (filename rows)
   (with (open filename "w") as f
     (for row rows
-      (= line (join "," (map str row)))
+      (= line (join (map str row) ","))
       (f.write f"{line}\n"))))
 
 # Example CSV data
@@ -99,27 +99,29 @@
   (with (open filename "w") as f
     # Write header
     (f.write f"{'=' * 50}\n")
-    (f.write f"{title.center 50}\n")
+    (f.write f"{(title.center 50)}\n")
     (f.write f"{'=' * 50}\n\n")
     
     # Write data
-    (for key value data.items
+    (for key value (data.items)
       (f.write f"{key}: {value}\n"))
     
     # Write footer
     (f.write f"\n{'=' * 50}\n")
-    (f.write f"Report generated at: {datetime.now}\n")))
+    (f.write f"Report generated at: {(datetime.datetime.now)}\n")))
 
 # Atomic file writing (write to temp, then rename)
 (import os)
-(import tempfile)
+# tempfile module not available in M28 yet
 
 (def atomic_write (filename content)
   # Create temporary file
-  (= temp_fd temp_name (tempfile.mkstemp))
+  # Note: tempfile.mkstemp returns (fd, name) tuple
+  # For this example, we'll use a simpler approach
+  (= temp_name f"temp_{filename}")
   (try
     # Write to temporary file
-    (with (os.fdopen temp_fd "w") as f
+    (with (open temp_name "w") as f
       (f.write content))
     # Atomic rename
     (os.rename temp_name filename)
@@ -129,3 +131,5 @@
       (raise e))))
 
 # This ensures the file is either fully written or not at all
+
+(print "File writing examples completed!")
