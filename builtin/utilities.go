@@ -423,8 +423,21 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 			// This allows the code to run without errors
 		}
 
-		// Call the function with the unpacked arguments
-		return fn.Call(fnArgs, ctx)
+		// Extract kwargs if provided
+		kwargsMap := make(map[string]core.Value)
+		if len(args) == 3 {
+			dict := args[2].(*core.DictValue) // Already validated above
+			for _, key := range dict.Keys() {
+				value, _ := dict.Get(key)
+				if !ok {
+					// Keys are already strings from dict.Keys()
+				}
+				kwargsMap[key] = value
+			}
+		}
+
+		// Call the function with kwargs support
+		return ApplyWithKwargs(fn, fnArgs, kwargsMap, ctx)
 	}))
 
 	// concat - concatenate sequences (lists or tuples)
@@ -507,6 +520,29 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 		
 		return nil, fmt.Errorf("'%s' object is not an iterator", iterator.Type())
 	}))
+}
+
+// ApplyWithKwargs handles calling functions with keyword arguments
+func ApplyWithKwargs(fn core.Value, args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// Check if function supports CallWithKwargs
+	if kwFunc, ok := fn.(interface {
+		CallWithKwargs([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+	}); ok {
+		return kwFunc.CallWithKwargs(args, kwargs, ctx)
+	}
+
+	// Otherwise, fall back to regular Call
+	if len(kwargs) > 0 {
+		// Function doesn't support kwargs, but some were provided
+		// For compatibility, we just ignore them rather than error
+	}
+
+	callable, ok := fn.(core.Callable)
+	if !ok {
+		return nil, fmt.Errorf("apply() first argument must be callable, got %s", fn.Type())
+	}
+
+	return callable.Call(args, ctx)
 }
 
 // Helper function to extract number from value

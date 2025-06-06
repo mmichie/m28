@@ -481,6 +481,46 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	return result, nil
 }
 
+// CallWithKwargs calls the function with positional and keyword arguments
+func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// Create a new environment with the function's environment as parent
+	funcEnv := core.NewContext(f.env)
+
+	// Use new signature-based binding if available
+	if f.signature != nil {
+		// Signature supports keyword arguments
+		err := f.signature.BindArguments(args, kwargs, f.env, funcEnv)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Legacy: simple parameter binding - no kwargs support
+		if len(kwargs) > 0 {
+			return nil, fmt.Errorf("function does not support keyword arguments")
+		}
+		if len(args) != len(f.params) {
+			return nil, fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
+		}
+
+		for i, param := range f.params {
+			funcEnv.Define(string(param), args[i])
+		}
+	}
+
+	// Evaluate the body in the new environment
+	result, err := Eval(f.body, funcEnv)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle return values
+	if ret, ok := result.(*ReturnValue); ok {
+		return ret.Value, nil
+	}
+
+	return result, nil
+}
+
 // String implements Value.String
 func (f *UserFunction) String() string {
 	params := make([]string, len(f.params))

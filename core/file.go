@@ -20,6 +20,54 @@ type File struct {
 	isText bool
 }
 
+// FileIterator implements the Iterator interface for files
+type FileIterator struct {
+	file     *File
+	finished bool
+}
+
+// Next advances the iterator and returns the next line
+func (fi *FileIterator) Next() (Value, bool) {
+	if fi.finished || fi.file.closed {
+		return nil, false
+	}
+
+	line, err := fi.file.ReadLine()
+	if err != nil {
+		if err == io.EOF {
+			fi.finished = true
+			// If we got a line with EOF, return it
+			if line != nil && line.String() != "" {
+				return line, true
+			}
+			return nil, false
+		}
+		// For other errors, just stop iteration
+		fi.finished = true
+		return nil, false
+	}
+
+	return line, true
+}
+
+// Reset resets the iterator to the beginning
+func (fi *FileIterator) Reset() {
+	// For files, reset would require seeking to the beginning
+	// This is only possible for seekable files
+	if fi.file.file != nil && !fi.file.closed {
+		fi.file.Seek(0, 0)
+		fi.finished = false
+	}
+}
+
+// Iterator returns an iterator over the file's lines
+func (f *File) Iterator() Iterator {
+	return &FileIterator{
+		file:     f,
+		finished: false,
+	}
+}
+
 // NewFile creates a new file object
 func NewFile(path string, mode string) (*File, error) {
 	f := &File{
@@ -520,6 +568,23 @@ func (f *File) GetAttr(name string) (Value, bool) {
 						return nil, err
 					}
 					return BoolValue(suppress), nil
+				},
+			},
+			TypeDesc: GetTypeDescriptorForValue(f),
+		}, true
+
+	case "__iter__":
+		return &BoundMethod{
+			Receiver: f,
+			Method: &MethodDescriptor{
+				Name:    "__iter__",
+				Arity:   0,
+				Doc:     "Return an iterator over the file's lines",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					file := receiver.(*File)
+					// Return the file itself since it implements Iterable
+					return file, nil
 				},
 			},
 			TypeDesc: GetTypeDescriptorForValue(f),
