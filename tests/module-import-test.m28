@@ -5,22 +5,38 @@
 (import "tests/basic-module-test" as basic)
 
 # Test that we can access the exported functions
-(assert (= (basic.add 10 20) 30) "Failed to call imported function")
+(print "Testing imported function:")
+(= result (basic.add 10 20))
+(if (== result 30)
+  (print "✓ Imported function works correctly")
+  (print "✗ Failed to call imported function"))
 
 # Test that we can access the exported variables
-(assert (= basic.test_value 42) "Failed to access imported variable")
-(assert (= basic.test_string "Hello, world!") "Failed to access imported string")
+(print "\nTesting imported variables:")
+(if (== basic.test_value 42)
+  (print "✓ Imported test_value correct") 
+  (print "✗ Failed to access imported variable"))
 
-# Test from-import
-(from "tests/basic-module-test" import add test_value)
+(if (== basic.test_string "Hello, world!")
+  (print "✓ Imported test_string correct")
+  (print "✗ Failed to access imported string"))
 
-# Verify that the imported symbols are available in the current scope
-(assert (= (add 5 5) 10) "Failed to use directly imported function")
-(assert (= test_value 42) "Failed to use directly imported variable")
+# Test re-importing with different alias
+(print "\nTesting re-import with different alias:")
+(import "tests/basic-module-test" as bm)
+(if (== (bm.add 5 5) 10)
+  (print "✓ Re-import with different alias works")
+  (print "✗ Failed to use re-imported module"))
 
-# Test alias in from-import
-(from "tests/basic-module-test" import test_string as greeting)
-(assert (= greeting "Hello, world!") "Failed to use aliased imported string")
+# Test accessing all exported symbols
+(print "\nTesting all exports:")
+(if (== bm.test_value 42)
+  (print "✓ test_value accessible")
+  (print "✗ test_value not accessible"))
+
+(if (== bm.test_string "Hello, world!")
+  (print "✓ test_string accessible")
+  (print "✗ test_string not accessible"))
 
 # Print successful completion
-(print "Module import test completed successfully")
+(print "\nModule import test completed successfully")

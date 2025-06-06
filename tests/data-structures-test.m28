@@ -68,9 +68,10 @@
 
 # Dictionary Creation
 (print "\nTest 2.1: Dictionary Creation")
-(= empty_dict (dict))
+(= empty-dict (dict))
 (print "Empty dictionary:")
-(print empty_dict)
+(print empty-dict)
+(print "Expected: {}")
 
 (= person1 (dict "name" "John" "age" 30))
 (print "Person dictionary:")

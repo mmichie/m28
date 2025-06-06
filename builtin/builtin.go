@@ -367,13 +367,14 @@ func registerTypeBuiltins(ctx *core.Context) {
 	}))
 
 	// dict - create a new dictionary
-	ctx.Define("dict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return core.NewDict(), nil
-		}
-		// TODO: Add support for dict(key=value) syntax later
-		return nil, fmt.Errorf("dict() with arguments not yet implemented")
-	}))
+	// NOTE: Commented out because RegisterDictFunctions already provides a full implementation
+	// ctx.Define("dict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// 	if len(args) == 0 {
+	// 		return core.NewDict(), nil
+	// 	}
+	// 	// TODO: Add support for dict(key=value) syntax later
+	// 	return nil, fmt.Errorf("dict() with arguments not yet implemented")
+	// }))
 
 	// tuple - create a new tuple
 	ctx.Define("tuple", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

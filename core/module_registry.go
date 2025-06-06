@@ -17,6 +17,7 @@ type ModuleInfo struct {
 // ModuleRegistry keeps track of loaded modules
 type ModuleRegistry struct {
 	modules    map[string]ModuleInfo // Modules indexed by name
+	loading    map[string]bool       // Tracks modules currently being loaded
 	searchPath []string              // List of directories to search for modules
 	mu         sync.RWMutex          // For thread safety
 }
@@ -25,6 +26,7 @@ type ModuleRegistry struct {
 func NewModuleRegistry() *ModuleRegistry {
 	return &ModuleRegistry{
 		modules:    make(map[string]ModuleInfo),
+		loading:    make(map[string]bool),
 		searchPath: []string{}, // Will be set by SetModulePaths
 	}
 }
@@ -157,6 +159,25 @@ func (r *ModuleRegistry) ClearAllModules() {
 	defer r.mu.Unlock()
 
 	r.modules = make(map[string]ModuleInfo)
+	r.loading = make(map[string]bool)
+}
+
+// IsLoading checks if a module is currently being loaded
+func (r *ModuleRegistry) IsLoading(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.loading[name]
+}
+
+// SetLoading marks a module as being loaded
+func (r *ModuleRegistry) SetLoading(name string, loading bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if loading {
+		r.loading[name] = true
+	} else {
+		delete(r.loading, name)
+	}
 }
 
 // ListModules returns a list of all loaded module names

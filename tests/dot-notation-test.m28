@@ -1,27 +1,75 @@
 # Dot Notation Test
-# Tests basic dot notation functionality with dictionaries
+# Tests dot notation functionality with various object types
 
-# Create a simple dictionary
-(= config (dict
-  "app_name" "MyApp"
-  "version" "1.0.3"
-  "server" (dict
-    "host" "localhost"
-    "port" 8080
-    "debug" True
-  )
-))
+(print "===== Dot Notation Tests =====\n")
 
-# Test dictionary property access
-(= app_name (get config "app_name"))
-(= server_host (get (get config "server") "host"))
-(= port (get (get config "server") "port"))
+# Test 1: String methods
+(print "-- Test 1: String Method Access --")
+(= text "hello world")
 
-# Test list operations
-(= numbers (list 1 2 3 4 5))
-(= length (len numbers))
-(= first (nth numbers 0))
-(= last (nth numbers 4))
+(print "text.upper():" (text.upper))
+(print "Expected: HELLO WORLD")
 
-# Return success status
-(dict "status" "success")
+(print "text.split():" (text.split))  
+(print "Expected: [\"hello\", \"world\"]")
+
+(print "text.replace('world', 'M28'):" (text.replace "world" "M28"))
+(print "Expected: hello M28")
+
+# Test 2: List methods
+(print "\n-- Test 2: List Method Access --")
+(= numbers [1, 2, 3, 4, 5])
+
+(print "numbers + [6] (list concatenation):")
+(= numbers (+ numbers [6]))
+(print numbers)
+(print "Expected: [1, 2, 3, 4, 5, 6]")
+
+(print "List length:" (len numbers))
+(print "Expected: 6")
+
+(print "numbers[0]:" (nth numbers 0))
+(print "Expected: 1")
+
+(print "numbers[5] (last element):" (nth numbers 5))
+(print "Expected: 6")
+
+# Test 3: Dictionary methods
+(print "\n-- Test 3: Dictionary Method Access --")
+(= data {"a": 1, "b": 2, "c": 3})
+
+(print "data.keys():" (list (data.keys)))
+(print "Expected: [\"s:a\", \"s:b\", \"s:c\"]")
+
+(print "data.values():" (list (data.values)))
+(print "Expected: [1, 2, 3]")
+
+(print "data.get('a'):" (data.get "a"))
+(print "Expected: 1")
+
+(print "data.get('d', 'default'):" (data.get "d" "default"))
+(print "Expected: default")
+
+# Test 4: Module access (if math module is available)
+(print "\n-- Test 4: Module Access --")
+(try
+  (import "math")
+  (print "math.sqrt(16):" (math.sqrt 16))
+  (print "Expected: 4")
+  (print "math.pi:" math.pi)
+  (print "Expected: 3.141592...")
+  (except e
+    (print "Math module not available, skipping test")))
+
+# Test 5: Method chaining
+(print "\n-- Test 5: Method Chaining --")
+(= sentence "  HELLO WORLD  ")
+
+(print "sentence.strip().lower():" ((sentence.strip).lower))
+(print "Expected: hello world")
+
+(= words ["apple", "banana", "cherry"])
+(print "' '.join(words).upper():" ((" ".join words).upper))
+(print "Expected: APPLE BANANA CHERRY")
+
+(print "\n===== Dot Notation Tests Complete =====")

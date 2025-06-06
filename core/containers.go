@@ -186,8 +186,15 @@ func (d *DictValue) Size() int {
 
 // GetAttr implements Object interface using TypeDescriptor
 func (d *DictValue) GetAttr(name string) (Value, bool) {
-	// First check dictionary entries (for key access)
-	if val, exists := d.Get(name); exists {
+	// First try to find the key with string prefix
+	// This handles dot notation access like dict.key
+	stringKey := fmt.Sprintf("s:%s", name)
+	if val, exists := d.entries[stringKey]; exists {
+		return val, true
+	}
+	
+	// Also check without prefix (for backwards compatibility)
+	if val, exists := d.entries[name]; exists {
 		return val, true
 	}
 

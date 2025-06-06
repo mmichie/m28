@@ -36,11 +36,22 @@ func (l *DefaultModuleLoader) GetContext() *Context {
 
 // LoadModule loads a module by name and returns its content
 func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue, error) {
-	// First check if the module is already loaded
+	// Get the module registry
 	registry := GetModuleRegistry()
+	
+	// First check if the module is already loaded
 	if module, found := registry.GetModule(name); found {
 		return module, nil
 	}
+	
+	// Check if the module is currently being loaded (circular dependency)
+	if registry.IsLoading(name) {
+		return nil, fmt.Errorf("circular import detected: module '%s' is already being loaded", name)
+	}
+	
+	// Mark the module as being loaded
+	registry.SetLoading(name, true)
+	defer registry.SetLoading(name, false)
 
 	// Resolve the module path
 	path, err := registry.ResolveModulePath(name)
@@ -76,14 +87,37 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	// Create a dictionary for the module exports
 	moduleDict := NewDict()
 
-	// Add all module context variables to the module dictionary
-	// (in a real implementation, we'd filter out internal vars or respect __all__)
-	for name, value := range moduleCtx.Vars {
-		// Skip special vars like __name__ and __file__
-		if len(name) >= 2 && name[:2] == "__" && name[len(name)-2:] == "__" {
-			continue
+	// Check if __exports__ is defined
+	if exportsVal, err := moduleCtx.Lookup("__exports__"); err == nil {
+		// __exports__ is defined, only export listed names
+		if exportsList, ok := exportsVal.(ListValue); ok {
+			for _, item := range exportsList {
+				if nameStr, ok := item.(StringValue); ok {
+					name := string(nameStr)
+					if val, err := moduleCtx.Lookup(name); err == nil {
+						moduleDict.Set(name, val)
+					}
+				} else if nameSym, ok := item.(SymbolValue); ok {
+					name := string(nameSym)
+					if val, err := moduleCtx.Lookup(name); err == nil {
+						moduleDict.Set(name, val)
+					}
+				}
+			}
 		}
-		moduleDict.Set(name, value)
+	} else {
+		// No __exports__, export all non-special variables
+		for name, value := range moduleCtx.Vars {
+			// Skip special vars like __name__ and __file__
+			if len(name) >= 2 && name[:2] == "__" && name[len(name)-2:] == "__" {
+				continue
+			}
+			// Skip private vars (starting with _)
+			if len(name) > 0 && name[0] == '_' {
+				continue
+			}
+			moduleDict.Set(name, value)
+		}
 	}
 
 	// Register the module in the registry

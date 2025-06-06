@@ -62,7 +62,8 @@ func registerDefinitionForms() {
 // registerModuleForms registers special forms for module management
 func registerModuleForms() {
 	// import: Import modules
-	eval.RegisterSpecialForm("import", importForm)
+	// NOTE: Commented out because enhanced import is registered in eval/module_forms.go
+	// eval.RegisterSpecialForm("import", importForm)
 }
 
 // ifForm implements the 'if' special form

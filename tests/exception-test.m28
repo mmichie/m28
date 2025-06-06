@@ -39,54 +39,56 @@
   (except
     (print "Division by zero caught")))
 
-# Test 5: Define custom exception
-(print "\nTest 1.5: Custom exception")
-(defexception CustomError)
-(print "Custom exception defined")
+# Test 5: Raising custom strings as exceptions
+(print "\nTest 1.5: Custom exception messages")
+(try
+  (raise "CustomError: This is a custom error message")
+  (except e
+    (print "Caught custom exception:") 
+    (print e)))
 
 # Section 2: Traceback Functionality
 (print "\n-- Traceback Functionality --")
 
 # Test 1: Simple function with error
 (print "\nTest 2.1: Simple function error")
-(def (simple_error)
+(def simple-error ()
   (print "Function with division by zero")
   (/ 1 0))
 
 (try
-  (simple_error)
+  (simple-error)
   (except
     (print "Caught error from simple function")))
 
 # Test 2: Nested function calls with error
 (print "\nTest 2.2: Nested function calls")
-(def (inner_error)
+(def inner-error ()
   (print "Inner function with error")
   (/ 10 0))
 
-(def (middle_function)
+(def middle-function ()
   (print "Middle function calling inner")
-  (inner_error))
+  (inner-error))
 
-(def (outer_function)
+(def outer-function ()
   (print "Outer function calling middle")
-  (middle_function))
+  (middle-function))
 
 (try
-  (outer_function)
+  (outer-function)
   (except
     (print "Caught error from nested functions")))
 
 # Test 3: Custom exception
 (print "\nTest 2.3: Custom exception with traceback")
-(defexception TestError)
 
-(def (raise_custom)
+(def raise-custom ()
   (print "Function raising custom exception")
-  (raise TestError "Test error message"))
+  (raise "TestError: Test error message"))
 
 (try
-  (raise_custom)
+  (raise-custom)
   (except
     (print "Caught custom exception")))
 

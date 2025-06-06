@@ -3,15 +3,17 @@ package eval
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 )
 
 // enhancedImportForm implements advanced import forms:
 // (import module-name)                    - imports module as module-name
-// (import module-name :as alias)          - imports module as alias
-// (import module-name :from [name1 name2]) - imports specific names
-// (import module-name :from *)            - imports all exported names
+// (import module-name as alias)           - imports module as alias
+// (import module-name from [name1 name2]) - imports specific names
+// (import module-name from *)             - imports all exported names
+// Note: :as and :from syntax also supported but may cause issues with parser
 func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("import requires at least 1 argument")
@@ -42,7 +44,7 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 	// Parse options
 	i := 1
 	for i < len(args) {
-		if sym, ok := args[i].(core.SymbolValue); ok && string(sym) == ":as" {
+		if sym, ok := args[i].(core.SymbolValue); ok && (string(sym) == ":as" || string(sym) == "as") {
 			// :as alias
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("import :as requires an alias")
@@ -53,7 +55,7 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 				return nil, fmt.Errorf("import alias must be a symbol")
 			}
 			i += 2
-		} else if sym, ok := args[i].(core.SymbolValue); ok && string(sym) == ":from" {
+		} else if sym, ok := args[i].(core.SymbolValue); ok && (string(sym) == ":from" || string(sym) == "from") {
 			// :from [names] or :from *
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("import :from requires a list of names or *")
@@ -78,8 +80,13 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 		}
 	}
 
-	// Load the module
-	module, err := loadModule(moduleName, ctx)
+	// Load the module using the loader directly to get a dict
+	loader := core.GetModuleLoader()
+	if loader == nil {
+		return nil, fmt.Errorf("no module loader registered")
+	}
+	
+	dictModule, err := loader.LoadModule(moduleName, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +95,7 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 	if len(importNames) > 0 {
 		// Import specific names
 		for _, name := range importNames {
-			if val, ok := module.GetExport(name); ok {
+			if val, ok := dictModule.Get(name); ok {
 				ctx.Define(name, val)
 			} else {
 				return nil, fmt.Errorf("module '%s' has no export '%s'", moduleName, name)
@@ -96,17 +103,25 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 		}
 	} else if importAll {
 		// Import all exported names
-		for _, name := range module.GetAllExports() {
-			if val, ok := module.GetExport(name); ok {
-				ctx.Define(name, val)
+		for _, key := range dictModule.Keys() {
+			if val, ok := dictModule.Get(key); ok {
+				// Extract the actual key name (remove prefix if any)
+				keyName := key
+				if strings.HasPrefix(key, "s:") {
+					keyName = key[2:]
+				}
+				// Skip private names
+				if !strings.HasPrefix(keyName, "_") {
+					ctx.Define(keyName, val)
+				}
 			}
 		}
 	} else {
 		// Import module as namespace
-		ctx.Define(alias, module)
+		ctx.Define(alias, dictModule)
 	}
 
-	return module, nil
+	return dictModule, nil
 }
 
 // exportForm implements the export special form:
@@ -182,55 +197,22 @@ func exportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // loadModule loads a module and returns a Module object
 func loadModule(moduleName string, ctx *core.Context) (*core.Module, error) {
-	// Get the module registry
-	registry := core.GetModuleRegistry()
-
-	// Check if module is already loaded
-	if moduleDict, found := registry.GetModule(moduleName); found {
-		// Convert old dict-based module to new Module type
-		// For now, create a simple module wrapper
-		module := core.NewModule(moduleName, "")
-
-		// Add all dict entries as exports
-		for _, key := range moduleDict.Keys() {
-			if val, ok := moduleDict.Get(key); ok {
-				module.Export(key, val)
-			}
-		}
-
-		return module, nil
-	}
-
-	// Resolve the module path
-	path, err := registry.ResolveModulePath(moduleName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve module path: %v", err)
-	}
-
-	// Create a new module
-	module := core.NewModule(moduleName, path)
-
-	// Create module context
-	moduleCtx := core.NewContext(ctx.Global)
-	moduleCtx.Define("__name__", core.StringValue(moduleName))
-	moduleCtx.Define("__file__", core.StringValue(path))
-	moduleCtx.Define("__module__", module)
-
-	// Parse the module content
-	// This requires access to the parser, which we'll need to inject
+	// Get the module loader
 	loader := core.GetModuleLoader()
 	if loader == nil {
 		return nil, fmt.Errorf("no module loader registered")
 	}
 
-	// Use the existing loader to parse and evaluate
-	// For now, we'll use the old mechanism and convert
+	// Use the loader to load the module
 	dictModule, err := loader.LoadModule(moduleName, ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert dict module to new Module type
+	// Convert dict-based module to new Module type
+	module := core.NewModule(moduleName, "")
+	
+	// Add all dict entries as exports
 	for _, key := range dictModule.Keys() {
 		if val, ok := dictModule.Get(key); ok {
 			module.Export(key, val)
