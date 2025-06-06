@@ -50,22 +50,22 @@ The dict function takes alternating keys and values as arguments.
 
 ## Accessing Dictionary Values
 
-Use the `get` function to access dictionary values:
+M28 provides multiple ways to access dictionary values:
 
+### Dot Notation (Read Only)
 ```lisp
-# Basic access
-(get person "name")  # Returns: "John"
-
-# With a default value for missing keys
-(get person "country" "Unknown")  # Returns: "Unknown" if "country" key doesn't exist
+# Direct property access
+person.name  # Returns: "John"
+person.age   # Returns: 30
 ```
 
-Using dictionary methods:
-
+### Get Method
 ```lisp
-# Using dict.get method
-(dict.get person "name")  # Returns: "John"
-(dict.get person "country" "Unknown")  # Returns: "Unknown" if "country" key doesn't exist
+# Using the get method
+(person.get "name")  # Returns: "John"
+
+# With a default value for missing keys
+(person.get "country" "Unknown")  # Returns: "Unknown" if "country" key doesn't exist
 ```
 
 ## Dictionary Operations
@@ -81,46 +81,44 @@ Using dictionary methods:
 
 ```lisp
 # Get all keys
-(dict.keys person)  # Returns: ["name", "age", "city"]
+(person.keys)  # Returns: ["name", "age", "city"]
 
 # Get all values
-(dict.values person)  # Returns: ["John", 30, "New York"]
+(person.values)  # Returns: ["John", 30, "New York"]
 
 # Get key-value pairs
-(dict.items person)  # Returns: [["name", "John"], ["age", 30], ["city", "New York"]]
+(person.items)  # Returns: [["name", "John"], ["age", 30], ["city", "New York"]]
 ```
 
 ### Checking for Keys
 
 ```lisp
 # Check if key exists
-(dict.has_key person "name")  # Returns: True
-(dict.contains? person "email")  # Returns: False
+(in "name" person)  # Returns: True
+(in "email" person)  # Returns: False
 ```
 
 ### Modifying Dictionaries
 
 ```lisp
-# Set a value
-(dict.set person "email" "john@example.com")
+# Set a value using index assignment
+(= person["email"] "john@example.com")
 
 # Update with another dictionary
-(dict.update person {"country": "USA", "zip": "10001"})
+(person.update {"country": "USA", "zip": "10001"})
 
 # Remove a key
-(dict.pop person "age")  # Removes the key and returns its value
-
-# Remove and return an arbitrary key-value pair
-(dict.popitem person)  # Returns something like ["name", "John"] and removes it from the dict
+(person.pop "age")  # Removes the key and returns its value
+(person.pop "missing" "default")  # Returns default if key doesn't exist
 
 # Set value only if key doesn't exist
-(dict.setdefault person "status" "active")
+(person.setdefault "status" "active")
 
 # Clear all entries
-(dict.clear person)  # Removes all key-value pairs
+(person.clear)  # Removes all key-value pairs
 
 # Create a copy
-(= person_copy (dict.copy person))
+(= person_copy (person.copy))
 ```
 
 ## Dictionary as Keyword Arguments

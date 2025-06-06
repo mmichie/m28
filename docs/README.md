@@ -2,45 +2,57 @@
 
 Welcome to the M28 documentation! M28 is a Lispy-Pythonic programming language that combines s-expression syntax with Python semantics.
 
-## Documentation Structure
+## Quick Links
 
-### Core Documentation
-- [Language Guide](language-guide.md) - Comprehensive language reference
+- 🚀 [Tutorial](tutorial.md) - Start here if you're new to M28
+- 📖 [Language Guide](language-guide.md) - Comprehensive language reference
+- 📋 [Quick Reference](quick-reference.md) - Handy syntax cheat sheet
+- 💡 [Examples](../examples/README.md) - Learn by example
+
+## Documentation Overview
+
+### Getting Started
 - [Tutorial](tutorial.md) - Step-by-step introduction to M28
-- [Quick Reference](quick-reference.md) - Quick syntax reference
+- [Quick Reference](quick-reference.md) - Common syntax and patterns
+- [Installation Guide](installation.md) - How to install and set up M28
 
-### Feature Guides
+### Language Features
 - [Functions](features/functions.md) - Function definition and usage
-- [Data Types](features/data-types.md) - Built-in data types
-- [Control Flow](features/control-flow.md) - Conditionals and loops
-- [Exception Handling](features/exception-handling.md) - Try/except/raise
-- [Classes](features/classes.md) - Object-oriented programming
-- [Modules](features/modules.md) - Module system and imports
+- [Data Types](features/data-types.md) - Lists, dicts, sets, tuples
+- [Control Flow](features/control-flow.md) - if/elif/else, loops
+- [Exception Handling](features/exception-handling.md) - try/except/finally
+- [Dot Notation](features/dot-notation.md) - Property and method access
+- [Dictionaries](features/dictionaries.md) - Python-style dictionaries
+- [Concurrency](features/concurrency.md) - async/await, go, channels
+
+### Module System
+- [Module Imports](module-import.md) - Using modules
+- [Module Exports](module-exports.md) - Creating modules
+- [Standard Library](stdlib.md) - Built-in modules
 
 ### Advanced Topics
-- [Functional Programming](advanced/functional.md) - Higher-order functions, composition
-- [Generators](advanced/generators.md) - Yield and generator expressions
-- [Context Managers](advanced/context-managers.md) - With statements
-- [Concurrency](advanced/concurrency.md) - Async/await and goroutines
+- [Class Syntax](class-syntax.md) - Object-oriented programming
+- [F-String Enhancements](features/fstring-enhancements.md) - String formatting
+- [List Mutability](features/list-mutability.md) - List behavior
+- [Direct Property Access](direct-property-access.md) - Dot notation details
 
 ### Reference
-- [Built-in Functions](reference/builtins.md) - All built-in functions
-- [Standard Library](reference/stdlib.md) - Standard library modules
-- [Python Interop](reference/python-interop.md) - Using Python libraries
+- [Language Specification](specification/language-specification.md) - Formal specification
+- [Built-in Functions](builtins.md) - All built-in functions
+- [Testing Guide](testing-guide.md) - Writing tests in M28
 
-## Key Concepts
+## Key Syntax Rules
 
-### Syntax Rules
+### The Three Golden Rules
 1. **Comments**: Always use `#` (never `;`)
-2. **Variables**: Always use `=` (never `def`)
-3. **Functions**: Only use `def` for functions
-4. **Expressions**: Everything is prefix notation `(function arg1 arg2)`
+2. **Variables**: Always use `=` for assignment
+3. **Functions**: Only use `def` for function definitions
 
-### Example
+### Basic Example
 ```lisp
 # This is a comment (always use #)
 
-# Variables use =
+# Variables use = for assignment
 (= name "Alice")
 (= age 30)
 
@@ -48,33 +60,43 @@ Welcome to the M28 documentation! M28 is a Lispy-Pythonic programming language t
 (def greet (person)
   (print f"Hello, {person}!"))
 
-# Call the function
-(greet name)
+# Everything is prefix notation
+(greet name)  # Prints: Hello, Alice!
 
-# Data structures
+# Python-style data structures
 (= numbers [1, 2, 3, 4, 5])
 (= person {"name": "Bob", "age": 25})
 
-# Control flow
+# Control flow uses Python keywords
 (if (> age 18)
-    (print "Adult")
-    (print "Minor"))
+  (print "Adult")
+  (print "Minor"))
 
 # Functional programming
 (= doubled (map (lambda (x) (* x 2)) numbers))
+(print doubled)  # [2, 4, 6, 8, 10]
 ```
-
-## Getting Started
-
-1. Read the [Tutorial](tutorial.md) for a gentle introduction
-2. Reference the [Language Guide](language-guide.md) for comprehensive details
-3. Check the [Quick Reference](quick-reference.md) for syntax reminders
-4. Explore the [Examples](../examples/) directory for real code
 
 ## Design Philosophy
 
-M28 combines:
-- **Lisp's homoiconicity**: Code is data, enabling powerful metaprogramming
-- **Python's pragmatism**: Familiar keywords, clear semantics, extensive ecosystem
-- **Modern features**: Type hints, async/await, pattern matching (planned)
-- **Simplicity**: One way to do things, clear and consistent
+M28 combines the best of both worlds:
+
+- **Lisp's Power**: S-expressions, homoiconicity, macros (planned)
+- **Python's Pragmatism**: Familiar keywords, clear semantics, rich data types
+- **Modern Features**: Dot notation, f-strings, async/await
+- **Consistency**: One clear way to do things
+
+## Version
+
+This documentation is for M28 v0.1.0. See the [CHANGELOG](../CHANGELOG.md) for version history.
+
+## Getting Help
+
+- Check the [Tutorial](tutorial.md) for step-by-step learning
+- Read the [Language Guide](language-guide.md) for detailed explanations
+- Browse [Examples](../examples/) for practical code samples
+- Consult the [Quick Reference](quick-reference.md) for syntax reminders
+
+## Contributing
+
+Found an error or want to improve the docs? Please submit an issue or PR on [GitHub](https://github.com/mmichie/m28).
