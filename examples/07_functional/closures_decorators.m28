@@ -1,16 +1,20 @@
 # Closures and Decorators in M28
 # Advanced functional programming patterns
 
+# Import time at top level so lambdas can access it
+(import time)
+
 # CLOSURES - Functions that capture their environment
 (print "=== CLOSURES ===")
 
 # Basic closure
 (def make_counter ()
   "Create a counter function with private state"
-  (= count 0)
+  # Use mutable container for state
+  (= state {"count": 0})
   (def counter ()
-    (= count (+ count 1))
-    (return count))
+    (= state["count"] (+ state["count"] 1))
+    (return state["count"]))
   (return counter))
 
 (= counter1 (make_counter))
@@ -193,13 +197,14 @@
 # Stateful decorators using closures
 (def count_calls (func)
   "Count how many times function is called"
-  (= calls 0)
+  # Use a mutable container to work around closure limitation
+  (= state {"calls": 0})
   (def wrapper (*args **kwargs)
-    (= calls (+ calls 1))
-    (print f"{func.__name__} called {calls} times")
+    (= state["calls"] (+ state["calls"] 1))
+    (print f"{func.__name__} called {state['calls']} times")
     (return (apply func args kwargs)))
   # Add attribute to access count
-  (= wrapper.call_count (lambda () calls))
+  (= wrapper.call_count (lambda () state["calls"]))
   (return wrapper))
 
 (= greet (count_calls (lambda (name) (print f"Hello, {name}!"))))
