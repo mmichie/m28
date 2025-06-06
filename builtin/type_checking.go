@@ -96,4 +96,44 @@ func registerTypeCheckingBuiltins(ctx *core.Context) {
 
 		return core.BoolValue(core.IsTruthy(args[0])), nil
 	}))
+
+	// bytes() - convert string to bytes representation
+	ctx.Define("bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 || len(args) > 2 {
+			return nil, fmt.Errorf("bytes() takes 1 or 2 arguments (%d given)", len(args))
+		}
+
+		// For now, we'll represent bytes as a list of numbers
+		// In a full implementation, we'd have a proper bytes type
+		
+		// Get the string to convert
+		str, ok := args[0].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("bytes() argument 1 must be a string, not '%s'", args[0].Type())
+		}
+
+		// Optional encoding parameter (default to UTF-8)
+		encoding := "utf-8"
+		if len(args) == 2 {
+			enc, ok := args[1].(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("bytes() argument 2 must be a string, not '%s'", args[1].Type())
+			}
+			encoding = string(enc)
+		}
+
+		// For now, only support UTF-8
+		if encoding != "utf-8" && encoding != "utf8" {
+			return nil, fmt.Errorf("unsupported encoding: %s", encoding)
+		}
+
+		// Convert string to bytes
+		bytes := []byte(string(str))
+		result := make(core.ListValue, len(bytes))
+		for i, b := range bytes {
+			result[i] = core.NumberValue(float64(b))
+		}
+
+		return result, nil
+	}))
 }

@@ -44,7 +44,7 @@
   (= chars "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*")
   (= password [])
   (for i (range length)
-    (password.append (random.choice chars)))
-  (return (join "" password)))
+    (= password (password.append (random.choice chars))))
+  (return (join password "")))
 
 (print "\nRandom password:" (generate_password 12))
