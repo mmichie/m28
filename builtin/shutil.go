@@ -193,9 +193,9 @@ func RegisterShutil(ctx *core.Context) error {
 		// For now, return a simple tuple with placeholder values
 		// In a real implementation, we'd use syscalls to get actual disk usage
 		return core.TupleValue{
-			core.NumberValue(0),    // total
-			core.NumberValue(0),    // used
-			core.NumberValue(0),    // free
+			core.NumberValue(0), // total
+			core.NumberValue(0), // used
+			core.NumberValue(0), // free
 		}, nil
 	})
 

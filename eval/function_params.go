@@ -38,11 +38,11 @@ func (sig *FunctionSignature) MaxArgs() int {
 func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 	// First, transform Python-style parameters (name=value) to M28 style ((name value))
 	transformedParams := make(core.ListValue, 0, len(paramList))
-	
+
 	i := 0
 	for i < len(paramList) {
 		param := paramList[i]
-		
+
 		// Check if this is a symbol ending with = (parser creates "name=" as one symbol)
 		if sym, ok := param.(core.SymbolValue); ok {
 			symStr := string(sym)
@@ -56,7 +56,7 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 				continue
 			}
 		}
-		
+
 		// Also check for separated form: name = value
 		if sym, ok := param.(core.SymbolValue); ok && i+2 < len(paramList) {
 			if eq, ok := paramList[i+1].(core.SymbolValue); ok && string(eq) == "=" {
@@ -68,12 +68,12 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 				continue
 			}
 		}
-		
+
 		// Not a default parameter, keep as-is
 		transformedParams = append(transformedParams, param)
 		i++
 	}
-	
+
 	sig := &FunctionSignature{
 		RequiredParams: []ParameterInfo{},
 		OptionalParams: []ParameterInfo{},

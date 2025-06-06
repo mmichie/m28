@@ -319,7 +319,7 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Debug: Print what we received
 	// fmt.Printf("DEBUG AssignForm: received %d args: %v\n", len(args), args)
-	
+
 	if len(args) < 2 {
 		return nil, ErrArgCount("= requires at least 2 arguments")
 	}
@@ -330,7 +330,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Two cases:
 		// 1. (= a b expr) where expr returns multiple values
 		// 2. (= a b c d) where we assign a=b, c=d
-		
+
 		// Check if all but last are symbols (case 1)
 		allSymbols := true
 		for i := 0; i < len(args)-1; i++ {
@@ -339,12 +339,12 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				break
 			}
 		}
-		
+
 		if allSymbols {
 			// Case 1: (= a b expr) - special handling for tuple unpacking
 			targets := args[:len(args)-1]
 			expr := args[len(args)-1]
-			
+
 			// Special case: (= a b (+ a b)) for Fibonacci-style assignment
 			// We need to build a tuple of the current values first
 			if len(targets) == 2 {
@@ -361,16 +361,16 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						}
 					}
 				}
-				
+
 				// Create a temporary context with the old values available
 				tempCtx := core.NewContext(ctx)
-				
+
 				// Evaluate the expression
 				value, err := Eval(expr, tempCtx)
 				if err != nil {
 					return nil, err
 				}
-				
+
 				// Now handle the assignment
 				// If expr is a single value, assign it to the last target
 				// If expr is a tuple/list, unpack it
@@ -389,29 +389,29 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						values = []core.Value{value}
 					}
 				}
-				
+
 				// Check length match
 				if len(targets) != len(values) {
 					return nil, fmt.Errorf("multiple assignment count mismatch: %d targets but %d values", len(targets), len(values))
 				}
-				
+
 				// Assign each value
 				for i, target := range targets {
 					if sym, ok := target.(core.SymbolValue); ok {
 						ctx.Define(string(sym), values[i])
 					}
 				}
-				
+
 				return value, nil
 			}
-			
+
 			// General case for more than 2 targets
 			// Evaluate the expression
 			value, err := Eval(expr, ctx)
 			if err != nil {
 				return nil, err
 			}
-			
+
 			// Check if it's a tuple or list
 			var values []core.Value
 			switch v := value.(type) {
@@ -423,12 +423,12 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				// If not a sequence, treat as single value
 				values = []core.Value{value}
 			}
-			
+
 			// Check length match
 			if len(targets) != len(values) {
 				return nil, fmt.Errorf("multiple assignment count mismatch: %d targets but %d values", len(targets), len(values))
 			}
-			
+
 			// Assign each value
 			for i, target := range targets {
 				if sym, ok := target.(core.SymbolValue); ok {
@@ -437,15 +437,15 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					return nil, fmt.Errorf("multiple assignment target must be a symbol")
 				}
 			}
-			
+
 			return value, nil
 		}
-		
+
 		// Case 2: (= a b c d) - pairwise assignment
 		if len(args)%2 != 0 {
 			return nil, fmt.Errorf("= with multiple arguments requires an even number of arguments")
 		}
-		
+
 		var lastValue core.Value
 		for i := 0; i < len(args); i += 2 {
 			target := args[i]
@@ -453,7 +453,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			
+
 			if sym, ok := target.(core.SymbolValue); ok {
 				ctx.Define(string(sym), value)
 				lastValue = value
@@ -461,7 +461,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("assignment target must be a symbol")
 			}
 		}
-		
+
 		return lastValue, nil
 	}
 

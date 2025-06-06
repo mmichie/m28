@@ -156,14 +156,14 @@ func InitDictMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
 			items := make([]Value, 0, dict.Size())
-			
+
 			// Create tuples for each key-value pair
 			for _, k := range dict.Keys() {
 				v, _ := dict.Get(k)
 				pair := TupleValue{StringValue(k), v}
 				items = append(items, pair)
 			}
-			
+
 			return ListValue(items), nil
 		},
 	}
@@ -194,12 +194,12 @@ func InitDictMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
 			values := make([]Value, 0, dict.Size())
-			
+
 			for _, k := range dict.Keys() {
 				v, _ := dict.Get(k)
 				values = append(values, v)
 			}
-			
+
 			return ListValue(values), nil
 		},
 	}

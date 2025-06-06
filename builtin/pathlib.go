@@ -42,14 +42,14 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 	switch name {
 	case "name":
 		return core.StringValue(filepath.Base(p.path)), true
-		
+
 	case "parent":
 		return NewPath(filepath.Dir(p.path)), true
-		
+
 	case "suffix":
 		ext := filepath.Ext(p.path)
 		return core.StringValue(ext), true
-		
+
 	case "stem":
 		base := filepath.Base(p.path)
 		ext := filepath.Ext(base)
@@ -57,7 +57,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 			base = base[:len(base)-len(ext)]
 		}
 		return core.StringValue(base), true
-		
+
 	case "parts":
 		parts := strings.Split(p.path, string(filepath.Separator))
 		values := make([]core.Value, len(parts))
@@ -65,7 +65,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 			values[i] = core.StringValue(part)
 		}
 		return core.TupleValue(values), true
-		
+
 	case "exists":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -85,7 +85,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "is_file":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -108,7 +108,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "is_dir":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -131,7 +131,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "mkdir":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -142,7 +142,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				Builtin: true,
 				Handler: func(receiver core.Value, args []core.Value, ctx *core.Context) (core.Value, error) {
 					path := receiver.(*Path)
-					
+
 					// Check for parents=True kwarg (simplified - just check if any arg is True)
 					parents := false
 					for _, arg := range args {
@@ -151,14 +151,14 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 							break
 						}
 					}
-					
+
 					var err error
 					if parents {
 						err = os.MkdirAll(path.path, 0755)
 					} else {
 						err = os.Mkdir(path.path, 0755)
 					}
-					
+
 					if err != nil {
 						return nil, fmt.Errorf("mkdir: %v", err)
 					}
@@ -170,7 +170,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "unlink":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -193,7 +193,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "rmdir":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -216,7 +216,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "glob":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -229,25 +229,25 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 					if len(args) != 1 {
 						return nil, fmt.Errorf("glob() takes exactly 1 argument")
 					}
-					
+
 					pattern, ok := args[0].(core.StringValue)
 					if !ok {
 						return nil, fmt.Errorf("glob() argument must be str")
 					}
-					
+
 					path := receiver.(*Path)
 					fullPattern := filepath.Join(path.path, string(pattern))
-					
+
 					matches, err := filepath.Glob(fullPattern)
 					if err != nil {
 						return nil, fmt.Errorf("glob: %v", err)
 					}
-					
+
 					result := make([]core.Value, len(matches))
 					for i, match := range matches {
 						result[i] = NewPath(match)
 					}
-					
+
 					return core.ListValue(result), nil
 				},
 			},
@@ -256,7 +256,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "joinpath":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -268,7 +268,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				Handler: func(receiver core.Value, args []core.Value, ctx *core.Context) (core.Value, error) {
 					path := receiver.(*Path)
 					parts := []string{path.path}
-					
+
 					for _, arg := range args {
 						str, ok := arg.(core.StringValue)
 						if !ok {
@@ -276,7 +276,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 						}
 						parts = append(parts, string(str))
 					}
-					
+
 					return NewPath(filepath.Join(parts...)), nil
 				},
 			},
@@ -285,7 +285,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "resolve":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -308,7 +308,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "read_text":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -331,7 +331,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "write_text":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -344,18 +344,18 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 					if len(args) != 1 {
 						return nil, fmt.Errorf("write_text() takes exactly 1 argument")
 					}
-					
+
 					text, ok := args[0].(core.StringValue)
 					if !ok {
 						return nil, fmt.Errorf("write_text() argument must be str")
 					}
-					
+
 					path := receiver.(*Path)
 					err := os.WriteFile(path.path, []byte(text), 0644)
 					if err != nil {
 						return nil, fmt.Errorf("write_text: %v", err)
 					}
-					
+
 					return core.NumberValue(len(text)), nil
 				},
 			},
@@ -364,7 +364,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "__str__":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -383,7 +383,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 				PythonName: "Path",
 			},
 		}, true
-		
+
 	case "__truediv__":
 		return &core.BoundMethod{
 			Receiver: p,
@@ -396,12 +396,12 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 					if len(args) != 1 {
 						return nil, fmt.Errorf("__truediv__ takes exactly 1 argument")
 					}
-					
+
 					other, ok := args[0].(core.StringValue)
 					if !ok {
 						return nil, fmt.Errorf("unsupported operand type(s) for /: 'Path' and '%s'", args[0].Type())
 					}
-					
+
 					path := receiver.(*Path)
 					return NewPath(filepath.Join(path.path, string(other))), nil
 				},
@@ -412,7 +412,7 @@ func (p *Path) GetAttr(name string) (core.Value, bool) {
 			},
 		}, true
 	}
-	
+
 	return nil, false
 }
 
@@ -425,7 +425,7 @@ func RegisterPathlib(ctx *core.Context) error {
 		if len(args) == 0 {
 			return NewPath("."), nil
 		}
-		
+
 		if len(args) == 1 {
 			str, ok := args[0].(core.StringValue)
 			if !ok {
@@ -433,7 +433,7 @@ func RegisterPathlib(ctx *core.Context) error {
 			}
 			return NewPath(string(str)), nil
 		}
-		
+
 		// Multiple arguments - join them
 		parts := make([]string, len(args))
 		for i, arg := range args {
@@ -443,18 +443,18 @@ func RegisterPathlib(ctx *core.Context) error {
 			}
 			parts[i] = string(str)
 		}
-		
+
 		return NewPath(filepath.Join(parts...)), nil
 	}
 	pathlib["Path"] = core.NewBuiltinFunction(pathFunc)
 
 	// PurePath (alias for Path for now)
 	pathlib["PurePath"] = pathlib["Path"]
-	
+
 	// PosixPath (alias for Path for now)
 	pathlib["PosixPath"] = pathlib["Path"]
-	
-	// WindowsPath (alias for Path for now) 
+
+	// WindowsPath (alias for Path for now)
 	pathlib["WindowsPath"] = pathlib["Path"]
 
 	// Create module as a dict

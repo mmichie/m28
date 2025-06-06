@@ -536,13 +536,13 @@ func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
 	if len(args) > 1 {
 		if specStr, ok := args[1].(core.StringValue); ok {
 			spec := string(specStr)
-			
+
 			// The spec may contain format spec, conversion, and self-doc separated by |
 			parts := strings.Split(spec, "|")
 			formatSpec := ""
 			conversion := ""
 			selfDocExpr := ""
-			
+
 			for _, part := range parts {
 				if strings.HasPrefix(part, "!") {
 					conversion = part[1:]
@@ -552,18 +552,18 @@ func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
 					formatSpec = part
 				}
 			}
-			
+
 			// Apply conversion first if present
 			if conversion != "" {
 				result = applyConversion(value, conversion)
 				value = core.StringValue(result) // Convert for format spec
 			}
-			
+
 			// Apply format spec if present
 			if formatSpec != "" {
 				result = applyFormatSpecString(value, formatSpec)
 			}
-			
+
 			// Apply self-documenting if present
 			if selfDocExpr != "" {
 				result = fmt.Sprintf("%s=%s", selfDocExpr, result)
@@ -579,10 +579,10 @@ func applyFormatSpecString(value core.Value, specStr string) string {
 	if specStr == "" {
 		return core.PrintValueWithoutQuotes(value)
 	}
-	
+
 	// Parse the format spec string
 	spec := parseFormatSpecString(specStr)
-	
+
 	// Apply formatting based on value type
 	switch v := value.(type) {
 	case core.NumberValue:
@@ -614,13 +614,13 @@ func parseFormatSpecString(spec string) FormatSpec {
 		Fill:      ' ',
 		Precision: -1,
 	}
-	
+
 	if spec == "" {
 		return fs
 	}
-	
+
 	i := 0
-	
+
 	// Parse fill and align
 	if len(spec) >= 2 {
 		possibleAlign := rune(spec[1])
@@ -636,7 +636,7 @@ func parseFormatSpecString(spec string) FormatSpec {
 			}
 		}
 	}
-	
+
 	// Parse sign
 	if i < len(spec) {
 		sign := rune(spec[i])
@@ -645,13 +645,13 @@ func parseFormatSpecString(spec string) FormatSpec {
 			i++
 		}
 	}
-	
+
 	// Parse # flag
 	if i < len(spec) && spec[i] == '#' {
 		fs.Alt = true
 		i++
 	}
-	
+
 	// Parse 0 flag
 	if i < len(spec) && spec[i] == '0' {
 		fs.Zero = true
@@ -660,7 +660,7 @@ func parseFormatSpecString(spec string) FormatSpec {
 		}
 		i++
 	}
-	
+
 	// Parse width
 	widthStart := i
 	for i < len(spec) && spec[i] >= '0' && spec[i] <= '9' {
@@ -669,13 +669,13 @@ func parseFormatSpecString(spec string) FormatSpec {
 	if i > widthStart {
 		fmt.Sscanf(spec[widthStart:i], "%d", &fs.Width)
 	}
-	
+
 	// Parse thousands separator
 	if i < len(spec) && spec[i] == ',' {
 		fs.Thousands = true
 		i++
 	}
-	
+
 	// Parse precision
 	if i < len(spec) && spec[i] == '.' {
 		i++
@@ -689,12 +689,12 @@ func parseFormatSpecString(spec string) FormatSpec {
 			fs.Precision = 0
 		}
 	}
-	
+
 	// Parse type
 	if i < len(spec) {
 		fs.Type = rune(spec[i])
 	}
-	
+
 	return fs
 }
 
@@ -1043,7 +1043,7 @@ func addThousandsSeparatorToString(str string) string {
 
 	// Build final result
 	finalResult := result.String()
-	
+
 	// Add back sign
 	if negative {
 		finalResult = "-" + finalResult
@@ -1055,6 +1055,6 @@ func addThousandsSeparatorToString(str string) string {
 	if len(parts) > 1 {
 		finalResult = finalResult + "." + parts[1]
 	}
-	
+
 	return finalResult
 }

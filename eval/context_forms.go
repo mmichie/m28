@@ -14,7 +14,7 @@ func withForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("with requires at least 2 arguments")
 	}
-	
+
 	// Debug: print all args
 	// fmt.Printf("DEBUG withForm: received %d args\n", len(args))
 	// for i, arg := range args {
@@ -159,7 +159,7 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 		return nil, err
 	}
 
-	// Debug output  
+	// Debug output
 	// fmt.Printf("DEBUG executeWith: Manager expression: %v (type: %T)\n", mgr.expr, mgr.expr)
 	// fmt.Printf("DEBUG executeWith: Manager expression evaluated to: %v (type: %T)\n", mgrValue, mgrValue)
 

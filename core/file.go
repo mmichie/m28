@@ -408,7 +408,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 						return nil, fmt.Errorf("writelines() takes exactly one argument")
 					}
 					file := receiver.(*File)
-					
+
 					// Get the lines to write
 					var lines []Value
 					switch v := args[0].(type) {
@@ -419,7 +419,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 					default:
 						return nil, fmt.Errorf("writelines() argument must be a list or tuple of strings")
 					}
-					
+
 					// Write each line
 					for i, line := range lines {
 						var data string
@@ -433,7 +433,7 @@ func (f *File) GetAttr(name string) (Value, bool) {
 							return nil, err
 						}
 					}
-					
+
 					return Nil, nil
 				},
 			},

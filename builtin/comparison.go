@@ -34,7 +34,9 @@ func EqualFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check if the first argument has __eq__ method (operator overloading)
-	if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+	if obj, ok := args[0].(interface {
+		GetAttr(string) (core.Value, bool)
+	}); ok {
 		if method, found := obj.GetAttr("__eq__"); found {
 			if callable, ok := method.(interface {
 				Call([]core.Value, *core.Context) (core.Value, error)

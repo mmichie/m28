@@ -148,7 +148,7 @@ func jsonLoad(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("json.load: %v", err)
 	}
-	
+
 	contentStr, ok := content.(core.StringValue)
 	if !ok {
 		return nil, fmt.Errorf("json.load: unexpected content type")
@@ -213,7 +213,9 @@ func m28ToGo(v core.Value) (interface{}, error) {
 		return result, nil
 	default:
 		// For objects with to_dict method
-		if obj, ok := v.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if obj, ok := v.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if method, found := obj.GetAttr("to_dict"); found {
 				if callable, ok := method.(interface {
 					Call([]core.Value, *core.Context) (core.Value, error)

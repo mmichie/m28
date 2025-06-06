@@ -192,7 +192,7 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 	if val, exists := d.entries[stringKey]; exists {
 		return val, true
 	}
-	
+
 	// Also check without prefix (for backwards compatibility)
 	if val, exists := d.entries[name]; exists {
 		return val, true

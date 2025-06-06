@@ -36,12 +36,12 @@ func FindModule(name string) (string, error) {
 
 	// Get a list of directories to search
 	searchDirs := []string{}
-	
+
 	// First, add the current working directory
 	if currentDir, err := os.Getwd(); err == nil {
 		searchDirs = append(searchDirs, currentDir)
 	}
-	
+
 	// Try each search directory
 	for _, baseDir := range searchDirs {
 		// Try as a file
@@ -49,7 +49,7 @@ func FindModule(name string) (string, error) {
 		if fileExists(fullPath) {
 			return fullPath, nil
 		}
-		
+
 		// Try as a package
 		initPath := filepath.Join(baseDir, dirname, "__init__.m28")
 		if fileExists(initPath) {

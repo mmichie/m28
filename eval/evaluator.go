@@ -122,7 +122,7 @@ func init() {
 
 		// List comprehension
 		"list-comp": ListCompForm,
-		
+
 		// List literal (evaluates contents)
 		"list-literal": listLiteralForm,
 
@@ -737,7 +737,6 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return result, nil
 	}
 
-
 	// Handle the exception
 	handled := false
 
@@ -1071,7 +1070,7 @@ func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // It evaluates all arguments and returns them as a list
 func listLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	result := make(core.ListValue, 0, len(args))
-	
+
 	// Evaluate each element
 	for _, arg := range args {
 		val, err := Eval(arg, ctx)
@@ -1080,7 +1079,6 @@ func listLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 		}
 		result = append(result, val)
 	}
-	
+
 	return result, nil
 }
-

@@ -87,7 +87,7 @@ func (p *Parser) parseFStringEnhancedSimple(quoteChar rune) (core.Value, error) 
 				return nil, err
 			}
 
-			// Skip '}' 
+			// Skip '}'
 			if p.pos >= len(p.input) || p.input[p.pos] != '}' {
 				return nil, fmt.Errorf("expected '}' after f-string expression")
 			}
@@ -132,7 +132,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 	inString := false
 	var stringQuote rune
 	escaped := false
-	
+
 	// For tracking the original expression for self-documenting
 	var originalExpr strings.Builder
 
@@ -184,7 +184,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 					// End of expression - parse format spec, conversion, and self-doc
 					exprStr := exprText.String()
 					origStr := originalExpr.String()
-					
+
 					// Check for self-documenting expression (=)
 					// Must check for = that's not followed by : or !
 					selfDoc := false
@@ -195,9 +195,9 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 						exprStr = exprStr[:equalIdx]
 						origStr = origStr[:equalIdx]
 					}
-					
+
 					// Parse format spec and conversion from the = stripped version
-					
+
 					// First, check for format spec (:...)
 					if idx := strings.LastIndex(exprStr, ":"); idx >= 0 {
 						// Make sure this colon isn't inside a string or dict
@@ -207,7 +207,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 							// Don't update origStr - we want the original expression for self-doc
 						}
 					}
-					
+
 					// Then check for conversion (!r, !s, !a)
 					conversion := ""
 					if idx := strings.LastIndex(exprStr, "!"); idx >= 0 {
@@ -226,7 +226,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 					if err != nil {
 						return nil, "", fmt.Errorf("error parsing f-string expression: %v", err)
 					}
-					
+
 					// Build enhanced format spec string that includes all modifiers
 					var enhancedSpec strings.Builder
 					if formatSpec != "" {
@@ -269,7 +269,7 @@ func isValidFormatSpecColon(expr string, colonIdx int) bool {
 	quotes := 0
 	braces := 0
 	brackets := 0
-	
+
 	for i := 0; i < colonIdx; i++ {
 		switch expr[i] {
 		case '"', '\'':
@@ -284,7 +284,7 @@ func isValidFormatSpecColon(expr string, colonIdx int) bool {
 			brackets--
 		}
 	}
-	
+
 	// If quotes are odd or braces/brackets unbalanced, colon is inside a construct
 	return quotes%2 == 0 && braces == 0 && brackets == 0
 }

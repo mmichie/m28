@@ -38,17 +38,17 @@ func (l *DefaultModuleLoader) GetContext() *Context {
 func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue, error) {
 	// Get the module registry
 	registry := GetModuleRegistry()
-	
+
 	// First check if the module is already loaded
 	if module, found := registry.GetModule(name); found {
 		return module, nil
 	}
-	
+
 	// Check if the module is currently being loaded (circular dependency)
 	if registry.IsLoading(name) {
 		return nil, fmt.Errorf("circular import detected: module '%s' is already being loaded", name)
 	}
-	
+
 	// Mark the module as being loaded
 	registry.SetLoading(name, true)
 	defer registry.SetLoading(name, false)

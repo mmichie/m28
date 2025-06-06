@@ -85,7 +85,7 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 	if loader == nil {
 		return nil, fmt.Errorf("no module loader registered")
 	}
-	
+
 	dictModule, err := loader.LoadModule(moduleName, ctx)
 	if err != nil {
 		return nil, err
@@ -211,7 +211,7 @@ func loadModule(moduleName string, ctx *core.Context) (*core.Module, error) {
 
 	// Convert dict-based module to new Module type
 	module := core.NewModule(moduleName, "")
-	
+
 	// Add all dict entries as exports
 	for _, key := range dictModule.Keys() {
 		if val, ok := dictModule.Get(key); ok {

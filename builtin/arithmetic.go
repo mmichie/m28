@@ -37,7 +37,9 @@ func AddFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Check if the first argument has __add__ method (operator overloading)
 	if len(args) >= 2 {
-		if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if obj, ok := args[0].(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if method, found := obj.GetAttr("__add__"); found {
 				if callable, ok := method.(interface {
 					Call([]core.Value, *core.Context) (core.Value, error)
@@ -108,7 +110,9 @@ func SubtractFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Check if the first argument has __sub__ method (operator overloading)
 	if len(args) >= 2 {
-		if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if obj, ok := args[0].(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if method, found := obj.GetAttr("__sub__"); found {
 				if callable, ok := method.(interface {
 					Call([]core.Value, *core.Context) (core.Value, error)
@@ -144,7 +148,9 @@ func MultiplyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Check if the first argument has __mul__ method (operator overloading)
 	if len(args) >= 2 {
-		if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if obj, ok := args[0].(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if method, found := obj.GetAttr("__mul__"); found {
 				if callable, ok := method.(interface {
 					Call([]core.Value, *core.Context) (core.Value, error)
@@ -229,7 +235,9 @@ func DivideFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Check if the first argument has __truediv__ method (operator overloading)
 	if len(args) >= 2 {
-		if obj, ok := args[0].(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if obj, ok := args[0].(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if method, found := obj.GetAttr("__truediv__"); found {
 				if callable, ok := method.(interface {
 					Call([]core.Value, *core.Context) (core.Value, error)

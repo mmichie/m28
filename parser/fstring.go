@@ -29,35 +29,35 @@ func (p *Parser) parseFStringExpression(outerQuote rune) (expr core.Value, spec 
 	startPos := p.pos
 	startLine := p.line
 	startCol := p.col
-	
+
 	// Track the expression for debug mode (expr=)
 	var exprText strings.Builder
-	
+
 	// Parse the expression, handling nested strings with different quotes
 	depth := 0
 	inString := false
 	var stringQuote rune
 	escaped := false
-	
+
 	spec = &FormatSpec{Precision: -1}
-	
+
 	for p.pos < len(p.input) {
 		ch := rune(p.input[p.pos])
-		
+
 		if escaped {
 			exprText.WriteRune(ch)
 			escaped = false
 			p.advance()
 			continue
 		}
-		
+
 		if ch == '\\' {
 			exprText.WriteRune(ch)
 			escaped = true
 			p.advance()
 			continue
 		}
-		
+
 		// Handle string quotes
 		if !inString && (ch == '"' || ch == '\'') && ch != outerQuote {
 			inString = true
@@ -66,14 +66,14 @@ func (p *Parser) parseFStringExpression(outerQuote rune) (expr core.Value, spec 
 			p.advance()
 			continue
 		}
-		
+
 		if inString && ch == stringQuote {
 			inString = false
 			exprText.WriteRune(ch)
 			p.advance()
 			continue
 		}
-		
+
 		if !inString {
 			switch ch {
 			case '{':
@@ -83,14 +83,14 @@ func (p *Parser) parseFStringExpression(outerQuote rune) (expr core.Value, spec 
 				if depth == 0 {
 					// End of expression - check for format spec or debug mode
 					exprStr := exprText.String()
-					
+
 					// Check for debug mode (=)
 					if strings.HasSuffix(exprStr, "=") {
 						spec.Debug = true
 						debugExpr = strings.TrimSuffix(exprStr, "=")
 						exprStr = debugExpr
 					}
-					
+
 					// Check for conversion (!r, !s, !a)
 					if idx := strings.LastIndex(exprStr, "!"); idx >= 0 {
 						conversion := exprStr[idx+1:]
@@ -99,7 +99,7 @@ func (p *Parser) parseFStringExpression(outerQuote rune) (expr core.Value, spec 
 							exprStr = exprStr[:idx]
 						}
 					}
-					
+
 					// Check for format spec (:...)
 					if idx := strings.LastIndex(exprStr, ":"); idx >= 0 {
 						formatStr := exprStr[idx+1:]
@@ -111,28 +111,28 @@ func (p *Parser) parseFStringExpression(outerQuote rune) (expr core.Value, spec 
 						}
 						exprStr = exprStr[:idx]
 					}
-					
+
 					// Parse the expression
 					savedPos := p.pos
 					savedLine := p.line
 					savedCol := p.col
-					
+
 					p.pos = startPos
 					p.line = startLine
 					p.col = startCol
 					p.input = p.input[:startPos] + exprStr + p.input[savedPos:]
-					
+
 					expr, err = p.parseExpr()
 					if err != nil {
 						return nil, nil, "", err
 					}
-					
+
 					// Restore position
 					p.pos = savedPos - (len(exprText.String()) - len(exprStr))
 					p.line = savedLine
 					p.col = savedCol
 					p.input = p.input[:startPos] + exprText.String() + p.input[savedPos:]
-					
+
 					return expr, spec, debugExpr, nil
 				}
 				depth--
@@ -168,10 +168,10 @@ func (p *Parser) parseFStringExpression(outerQuote rune) (expr core.Value, spec 
 			// Inside a string
 			exprText.WriteRune(ch)
 		}
-		
+
 		p.advance()
 	}
-	
+
 	return nil, nil, "", fmt.Errorf("unclosed f-string expression")
 }
 
@@ -180,9 +180,9 @@ func parseFormatSpec(spec string, fs *FormatSpec) error {
 	if spec == "" {
 		return nil
 	}
-	
+
 	i := 0
-	
+
 	// Parse fill and align
 	if len(spec) >= 2 {
 		possibleAlign := rune(spec[1])
@@ -198,7 +198,7 @@ func parseFormatSpec(spec string, fs *FormatSpec) error {
 			}
 		}
 	}
-	
+
 	// Parse sign
 	if i < len(spec) {
 		sign := rune(spec[i])
@@ -207,13 +207,13 @@ func parseFormatSpec(spec string, fs *FormatSpec) error {
 			i++
 		}
 	}
-	
+
 	// Parse # flag
 	if i < len(spec) && spec[i] == '#' {
 		fs.Alt = true
 		i++
 	}
-	
+
 	// Parse 0 flag
 	if i < len(spec) && spec[i] == '0' {
 		fs.Zero = true
@@ -222,7 +222,7 @@ func parseFormatSpec(spec string, fs *FormatSpec) error {
 		}
 		i++
 	}
-	
+
 	// Parse width
 	widthStart := i
 	for i < len(spec) && unicode.IsDigit(rune(spec[i])) {
@@ -231,7 +231,7 @@ func parseFormatSpec(spec string, fs *FormatSpec) error {
 	if i > widthStart {
 		fmt.Sscanf(spec[widthStart:i], "%d", &fs.Width)
 	}
-	
+
 	// Parse precision
 	if i < len(spec) && spec[i] == '.' {
 		i++
@@ -245,18 +245,18 @@ func parseFormatSpec(spec string, fs *FormatSpec) error {
 			fs.Precision = 0
 		}
 	}
-	
+
 	// Parse type
 	if i < len(spec) {
 		fs.Type = rune(spec[i])
 		i++
 	}
-	
+
 	// Check for extra characters
 	if i < len(spec) {
 		return fmt.Errorf("invalid format spec")
 	}
-	
+
 	return nil
 }
 
@@ -265,13 +265,13 @@ func (p *Parser) parseFStringEnhanced(quoteChar rune) (core.Value, error) {
 	// Skip the 'f' and quote
 	p.advance() // skip 'f'
 	p.advance() // skip quote
-	
+
 	var parts []core.Value
 	var currentString strings.Builder
-	
+
 	for p.pos < len(p.input) {
 		ch := rune(p.input[p.pos])
-		
+
 		if ch == '\\' && p.pos+1 < len(p.input) {
 			// Handle escape sequences
 			p.advance()
@@ -303,14 +303,14 @@ func (p *Parser) parseFStringEnhanced(quoteChar rune) (core.Value, error) {
 				parts = append(parts, core.StringValue(currentString.String()))
 			}
 			p.advance()
-			
+
 			// Return the formatted result
 			if len(parts) == 0 {
 				return core.StringValue(""), nil
 			} else if len(parts) == 1 {
 				return parts[0], nil
 			}
-			
+
 			// Create format expression with specs
 			return createFormatExpression(parts), nil
 		} else if ch == '{' {
@@ -321,28 +321,28 @@ func (p *Parser) parseFStringEnhanced(quoteChar rune) (core.Value, error) {
 				p.advance()
 				continue
 			}
-			
+
 			// Save current string part
 			if currentString.Len() > 0 {
 				parts = append(parts, core.StringValue(currentString.String()))
 				currentString.Reset()
 			}
-			
+
 			// Skip '{'
 			p.advance()
-			
+
 			// Parse the expression
 			expr, spec, debugExpr, err := p.parseFStringExpression(quoteChar)
 			if err != nil {
 				return nil, err
 			}
-			
+
 			// Skip '}'
 			if p.pos >= len(p.input) || p.input[p.pos] != '}' {
 				return nil, fmt.Errorf("expected '}' after f-string expression")
 			}
 			p.advance()
-			
+
 			// Add the expression with format info
 			if spec.HasSpec || spec.Conversion != "" || spec.Debug {
 				// Create a format expression node
@@ -350,22 +350,22 @@ func (p *Parser) parseFStringEnhanced(quoteChar rune) (core.Value, error) {
 					core.SymbolValue("format-expr"),
 					expr,
 				}
-				
+
 				// Add format spec if present
 				if spec.HasSpec {
 					formatExpr = append(formatExpr, createFormatSpecValue(spec))
 				}
-				
+
 				// Add conversion if present
 				if spec.Conversion != "" {
 					formatExpr = append(formatExpr, core.StringValue("!"+spec.Conversion))
 				}
-				
+
 				// Add debug expression if present
 				if spec.Debug {
 					formatExpr = append(formatExpr, core.StringValue("="+debugExpr))
 				}
-				
+
 				parts = append(parts, formatExpr)
 			} else {
 				parts = append(parts, expr)
@@ -385,7 +385,7 @@ func (p *Parser) parseFStringEnhanced(quoteChar rune) (core.Value, error) {
 			p.advance()
 		}
 	}
-	
+
 	return nil, fmt.Errorf("unclosed f-string")
 }
 
@@ -401,7 +401,7 @@ func createFormatExpression(parts []core.Value) core.Value {
 func createFormatSpecValue(spec *FormatSpec) core.Value {
 	// Create a dict with format spec details
 	specDict := core.NewDict()
-	
+
 	if spec.Fill != 0 {
 		specDict.Set("fill", core.StringValue(string(spec.Fill)))
 	}
@@ -426,6 +426,6 @@ func createFormatSpecValue(spec *FormatSpec) core.Value {
 	if spec.Type != 0 {
 		specDict.Set("type", core.StringValue(string(spec.Type)))
 	}
-	
+
 	return specDict
 }

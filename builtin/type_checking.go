@@ -105,7 +105,7 @@ func registerTypeCheckingBuiltins(ctx *core.Context) {
 
 		// For now, we'll represent bytes as a list of numbers
 		// In a full implementation, we'd have a proper bytes type
-		
+
 		// Get the string to convert
 		str, ok := args[0].(core.StringValue)
 		if !ok {

@@ -411,13 +411,13 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 			// For now, we need to handle kwargs differently based on the function type
 			// This is a simplified implementation - full kwargs support would require
 			// more extensive changes to the function call mechanism
-			
+
 			// Check if kwargs is a dict
 			_, ok := args[2].(*core.DictValue)
 			if !ok {
 				return nil, fmt.Errorf("apply() third argument must be a dict, got %s", args[2].Type())
 			}
-			
+
 			// TODO: Full kwargs support would require changes to core.Callable interface
 			// For now, we'll just pass the regular args and ignore kwargs
 			// This allows the code to run without errors
@@ -481,16 +481,16 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 	}))
 
 	// reduce - duplicate definition removed (see above for the main reduce implementation)
-	
+
 	// next - get the next value from an iterator/generator
 	ctx.Define("next", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 2 {
 			return nil, fmt.Errorf("next() takes 1 or 2 arguments")
 		}
-		
+
 		// Get the iterator
 		iterator := args[0]
-		
+
 		// Check if it has a __next__ method
 		if obj, ok := iterator.(interface {
 			GetAttr(string) (core.Value, bool)
@@ -512,12 +512,12 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 				}
 			}
 		}
-		
+
 		// If no __next__ method and default provided, return default
 		if len(args) == 2 {
 			return args[1], nil
 		}
-		
+
 		return nil, fmt.Errorf("'%s' object is not an iterator", iterator.Type())
 	}))
 }

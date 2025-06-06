@@ -17,7 +17,7 @@ func RegisterTimeModule(ctx *core.Context) {
 		if len(args) != 0 {
 			return nil, fmt.Errorf("time() takes no arguments")
 		}
-		
+
 		// Return current time as float seconds since Unix epoch
 		now := time.Now()
 		seconds := float64(now.Unix()) + float64(now.Nanosecond())/1e9
@@ -29,15 +29,15 @@ func RegisterTimeModule(ctx *core.Context) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("sleep() takes exactly one argument")
 		}
-		
+
 		seconds, ok := args[0].(core.NumberValue)
 		if !ok {
 			return nil, fmt.Errorf("sleep() argument must be a number")
 		}
-		
+
 		duration := time.Duration(float64(seconds) * float64(time.Second))
 		time.Sleep(duration)
-		
+
 		return core.Nil, nil
 	}))
 

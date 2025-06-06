@@ -47,21 +47,21 @@ func RegisterDateTimeModule(ctx *core.Context) {
 func datetimeNow(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// Create a new instance
 	instance := core.NewInstance(&core.Class{Name: "datetime"})
-	
+
 	// Store the current time
 	now := time.Now()
 	instance.Attributes["_time"] = &timeValue{Time: now}
-	
+
 	// Add timestamp method that returns the Unix timestamp
 	instance.Attributes["timestamp"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(float64(now.Unix()) + float64(now.Nanosecond())/1e9), nil
 	})
-	
+
 	// Add __str__ method
 	instance.Attributes["__str__"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.StringValue(now.Format("2006-01-02 15:04:05")), nil
 	})
-	
+
 	return instance, nil
 }
 
@@ -78,23 +78,23 @@ func datetimeFromTimestamp(args []core.Value, ctx *core.Context) (core.Value, er
 
 	// Create a new instance
 	instance := core.NewInstance(&core.Class{Name: "datetime"})
-	
+
 	// Convert timestamp to time
 	sec := int64(timestamp)
 	nsec := int64((float64(timestamp) - float64(sec)) * 1e9)
 	t := time.Unix(sec, nsec)
 	instance.Attributes["_time"] = &timeValue{Time: t}
-	
+
 	// Add timestamp method
 	instance.Attributes["timestamp"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(float64(t.Unix()) + float64(t.Nanosecond())/1e9), nil
 	})
-	
+
 	// Add __str__ method
 	instance.Attributes["__str__"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.StringValue(t.Format("2006-01-02 15:04:05")), nil
 	})
-	
+
 	return instance, nil
 }
 
