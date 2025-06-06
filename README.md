@@ -1,5 +1,9 @@
 # M28 - A Lispy-Pythonic Programming Language
 
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/go-%3E%3D1.19-00ADD8.svg)](go.mod)
+
 M28 is a modern programming language that blends the elegant s-expression syntax of Lisp with the pragmatic design and extensive ecosystem of Python. It offers the best of both worlds: the power of homoiconic code and macros with Python's clean semantics and familiar keywords.
 
 ## Quick Start
