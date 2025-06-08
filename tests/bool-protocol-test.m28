@@ -1,0 +1,46 @@
+# Simplified comprehensive test
+
+(print "Testing __bool__ protocol...")
+
+# Test 1: Basic __bool__ method
+(class AlwaysFalse ()
+  (def __bool__ (self)
+    False))
+
+(= f (AlwaysFalse))
+(assert (not (bool f)) "__bool__ returning False")
+(assert (not f) "object with __bool__=False in not expression")
+(print "✓ Test 1 passed")
+
+# Test 2: __bool__ in if statements
+(= result "unset")
+(if f
+  (= result "wrong")
+  (= result "correct"))
+(assert (== result "correct") "__bool__ in if statement")
+(print "✓ Test 2 passed")
+
+# Test 3: __len__ fallback
+(class Container ()
+  (def __init__ (self items)
+    (= self.items items))
+  
+  (def __len__ (self)
+    (len self.items)))
+
+(= empty (Container []))
+(= full (Container [1, 2, 3]))
+(assert (not (bool empty)) "__len__=0 means falsy")
+(assert (bool full) "__len__>0 means truthy")
+(print "✓ Test 3 passed")
+
+# Test 4: Built-in types
+(assert (not (bool 0)) "0 is falsy")
+(assert (bool 1) "1 is truthy")
+(assert (not (bool "")) "empty string is falsy")
+(assert (bool "text") "non-empty string is truthy")
+(assert (not (bool [])) "empty list is falsy")
+(assert (bool [1]) "non-empty list is truthy")
+(print "✓ Test 4 passed")
+
+(print "\nAll __bool__ protocol tests passed!")

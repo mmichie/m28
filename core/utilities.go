@@ -168,6 +168,45 @@ func IsTruthy(v Value) bool {
 		return false
 	}
 
+	// First, check if the value has a __bool__ method
+	if obj, ok := v.(Object); ok {
+		if boolMethod, hasBool := obj.GetAttr("__bool__"); hasBool {
+			if callable, isCallable := boolMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); isCallable {
+				// Call __bool__ with no arguments
+				result, err := callable.Call([]Value{}, nil)
+				if err == nil {
+					// __bool__ must return a boolean
+					if boolVal, isBool := result.(BoolValue); isBool {
+						return bool(boolVal)
+					}
+					// If __bool__ doesn't return a boolean, that's an error
+					// For now, we'll treat it as truthy to avoid breaking existing code
+					// In a strict implementation, this should raise an error
+					return true
+				}
+			}
+		}
+
+		// If no __bool__, check for __len__ as fallback
+		if lenMethod, hasLen := obj.GetAttr("__len__"); hasLen {
+			if callable, isCallable := lenMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); isCallable {
+				// Call __len__ with no arguments
+				result, err := callable.Call([]Value{}, nil)
+				if err == nil {
+					// __len__ should return a number
+					if numVal, isNum := result.(NumberValue); isNum {
+						return float64(numVal) != 0
+					}
+				}
+			}
+		}
+	}
+
+	// Fall back to type-specific behavior
 	switch val := v.(type) {
 	case BoolValue:
 		return bool(val)

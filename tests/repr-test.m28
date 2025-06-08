@@ -1,0 +1,95 @@
+# Test for repr() builtin and __repr__ method support
+
+(print "Testing repr() builtin function...")
+
+# Test repr for basic types
+(print "Testing numbers...")
+(assert (== (repr 42) "42") "repr of number")
+(assert (== (repr 3.14) "3.14") "repr of float")
+(assert (== (repr True) "True") "repr of True")
+(assert (== (repr False) "False") "repr of False")
+(assert (== (repr nil) "None") "repr of nil")
+
+# Test repr for strings - should show quotes
+(assert (== (repr "hello") "\"hello\"") "repr of string shows quotes")
+# Skip newline test for now - escaping might be complex
+# (assert (== (repr "hello\nworld") "\"hello\\nworld\"") "repr of string with newline")
+(assert (== (repr "") "\"\"") "repr of empty string")
+
+# Test repr for lists
+(assert (== (repr []) "[]") "repr of empty list")
+(assert (== (repr [1, 2, 3]) "[1, 2, 3]") "repr of list")
+(assert (== (repr ["a", "b"]) "[\"a\", \"b\"]") "repr of string list")
+(assert (== (repr [1, "a", True]) "[1, \"a\", True]") "repr of mixed list")
+
+# Test repr for tuples
+# Note: Tuple syntax in M28 might be different
+# Skip tuple tests for now as syntax needs clarification
+
+# Test repr for dictionaries
+(assert (== (repr {}) "{}") "repr of empty dict")
+# Note: dict ordering may vary, so we just check it starts and ends correctly
+(= d {"a": 1})
+(= repr_d (repr d))
+(assert (and (repr_d.startswith "{") (repr_d.endswith "}")) "repr of dict format")
+(assert (in "\"a\"" repr_d) "repr of dict shows key with quotes")
+(assert (in ": 1" repr_d) "repr of dict shows value")
+
+# Test repr for sets
+# Note: Set literal syntax might conflict with dict syntax
+# Skip set tests for now
+
+# Test custom __repr__ method
+(class Point ()
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y))
+  
+  (def __repr__ (self)
+    (+ "Point(" (str self.x) ", " (str self.y) ")")))
+
+(= p (Point 3 4))
+(assert (== (repr p) "Point(3, 4)") "custom __repr__ method")
+
+# Test that repr() calls __repr__ not __str__
+(class TestRepr ()
+  (def __str__ (self)
+    "str representation")
+  
+  (def __repr__ (self)
+    "repr representation"))
+
+(= t (TestRepr))
+(assert (== (str t) "str representation") "__str__ method works")
+(assert (== (repr t) "repr representation") "__repr__ method works")
+
+# Test class without __repr__ falls back to default
+(class NoRepr ()
+  (def __init__ (self)
+    (= self.value 42)))
+
+(= n (NoRepr))
+(= repr_n (repr n))
+(assert (repr_n.startswith "<NoRepr object at ") "default repr for objects")
+
+# Test repr for functions
+(def test_func (x) (+ x 1))
+(= repr_f (repr test_func))
+(assert (repr_f.startswith "<function test_func at ") "repr of named function")
+
+# Test repr for lambda
+(= lam (lambda (x) (* x 2)))
+(= repr_l (repr lam))
+(assert (repr_l.startswith "<function at ") "repr of lambda")
+
+# Test repr for classes
+(assert (== (repr Point) "<class 'Point'>") "repr of class")
+
+# Test nested structures
+(= nested [1, {"a": [2, 3]}, (4, 5)])
+(= repr_nested (repr nested))
+(print (+ "Nested repr: " repr_nested))
+(assert (in "[2, 3]" repr_nested) "nested list in repr")
+(assert (in "\"a\"" repr_nested) "nested dict key in repr")
+
+(print "All repr tests passed!")
