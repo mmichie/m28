@@ -55,6 +55,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] Generators with `yield`
   - [x] Tail call optimization
   - [x] REPL with history and completion
+  - [x] Full readline support (arrow keys, vi/emacs modes, Ctrl+R search) ✅ NEW
 
 ## 🚧 In Progress / Partially Working
 
@@ -227,12 +228,15 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [ ] Itertools-like functions (product, combinations, etc.)
 - [ ] Enhanced built-ins (reversed as iterator, sum with start)
 - [ ] Object introspection (dir, vars)
-- [ ] **REPL Enhancements**
+- [x] **REPL Enhancements** ✅ DONE
+  - [x] Full readline support with arrow key navigation
+  - [x] Vi/Emacs keybinding modes (toggle with `:toggle-keybindings`)
+  - [x] Tab completion for functions, variables, and keywords
+  - [x] Command history search (Ctrl+R)
+  - [x] Enhanced multi-line editing with smart indentation
   - [ ] Module reload without restart: `reload(module)`
   - [ ] Magic commands: `%time`, `%debug`, `%who`
-  - [ ] Enhanced multi-line editing with syntax highlighting
-  - [ ] Better autocomplete with type hints
-  - [ ] Command history search (Ctrl+R style)
+  - [ ] Syntax highlighting (future enhancement)
 
 ### 🔮 Future Enhancements
 - [ ] Decorators with @ syntax

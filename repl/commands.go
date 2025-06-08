@@ -177,8 +177,18 @@ func (ch *CommandHandler) toggleKeybindings() (bool, error) {
 		ch.settings.KeybindingMode = "emacs"
 	}
 
-	fmt.Fprintf(ch.repl.writer, "Keybinding mode set to: %s\n", ch.settings.KeybindingMode)
-	fmt.Fprintln(ch.repl.writer, "Note: Keybinding support requires readline integration (not yet implemented).")
+	// Apply the keybinding mode if readline is enabled
+	if ch.repl.IsReadlineEnabled() {
+		err := ch.repl.SetKeyBindingMode(ch.settings.KeybindingMode)
+		if err != nil {
+			return false, fmt.Errorf("failed to set keybinding mode: %v", err)
+		}
+		fmt.Fprintf(ch.repl.writer, "Keybinding mode set to: %s\n", ch.settings.KeybindingMode)
+	} else {
+		fmt.Fprintf(ch.repl.writer, "Keybinding mode preference set to: %s\n", ch.settings.KeybindingMode)
+		fmt.Fprintln(ch.repl.writer, "Note: Readline is not available. Arrow keys and editing features disabled.")
+	}
+	
 	return true, nil
 }
 
