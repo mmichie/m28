@@ -146,30 +146,36 @@ func (d *DictValue) String() string {
 	return "{" + strings.Join(parts, ", ") + "}"
 }
 
-// Get retrieves a value by key
+// Get retrieves a value by internal key representation
+// INTERNAL: Callers should use ValueToKey() to convert keys first
 func (d *DictValue) Get(key string) (Value, bool) {
 	val, ok := d.entries[key]
 	return val, ok
 }
 
-// Set sets a value by key
+// Set sets a value by internal key representation
+// INTERNAL: Use SetWithKey for proper key tracking
+// Deprecated: This method doesn't track original keys
 func (d *DictValue) Set(key string, value Value) {
 	d.entries[key] = value
 }
 
 // SetWithKey sets a value with both key representation and original key
+// This is the preferred method for setting dict values
 func (d *DictValue) SetWithKey(keyRepr string, origKey Value, value Value) {
 	d.entries[keyRepr] = value
 	d.keys[keyRepr] = origKey
 }
 
-// Delete removes a key
+// Delete removes a key by internal representation
+// INTERNAL: Callers should use ValueToKey() to convert keys first
 func (d *DictValue) Delete(key string) {
 	delete(d.entries, key)
 	delete(d.keys, key)
 }
 
-// Keys returns all keys
+// Keys returns all internal key representations
+// INTERNAL: Use dict.keys() method instead which returns original keys
 func (d *DictValue) Keys() []string {
 	keys := make([]string, 0, len(d.entries))
 	for k := range d.entries {
@@ -182,6 +188,54 @@ func (d *DictValue) Keys() []string {
 // Size returns the number of entries in the dictionary
 func (d *DictValue) Size() int {
 	return len(d.entries)
+}
+
+// GetValue retrieves a value by M28 value key (handles conversion)
+// This is the preferred public API for getting dict values
+func (d *DictValue) GetValue(key Value) (Value, bool) {
+	if !IsHashable(key) {
+		return nil, false
+	}
+	keyStr := ValueToKey(key)
+	return d.Get(keyStr)
+}
+
+// SetValue sets a value by M28 value key (handles conversion)
+// This is the preferred public API for setting dict values
+func (d *DictValue) SetValue(key Value, value Value) error {
+	if !IsHashable(key) {
+		return fmt.Errorf("unhashable type: '%s'", key.Type())
+	}
+	keyStr := ValueToKey(key)
+	d.SetWithKey(keyStr, key, value)
+	return nil
+}
+
+// DeleteValue removes a key by M28 value (handles conversion)
+// This is the preferred public API for deleting dict values
+func (d *DictValue) DeleteValue(key Value) bool {
+	if !IsHashable(key) {
+		return false
+	}
+	keyStr := ValueToKey(key)
+	if _, exists := d.entries[keyStr]; exists {
+		d.Delete(keyStr)
+		return true
+	}
+	return false
+}
+
+// OriginalKeys returns all original key values (not internal representations)
+// This is what dict.keys() method uses
+func (d *DictValue) OriginalKeys() []Value {
+	internalKeys := d.Keys()
+	result := make([]Value, 0, len(internalKeys))
+	for _, k := range internalKeys {
+		if origKey, exists := d.keys[k]; exists {
+			result = append(result, origKey)
+		}
+	}
+	return result
 }
 
 // GetAttr implements Object interface using TypeDescriptor
@@ -213,8 +267,10 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 
 // SetAttr implements Object.SetAttr for dictionary key assignment
 func (d *DictValue) SetAttr(name string, value Value) error {
-	// Set as dictionary entry
-	d.Set(name, value)
+	// Set as dictionary entry with proper key conversion
+	// Use string key since dot notation keys are always strings
+	stringKey := ValueToKey(StringValue(name))
+	d.SetWithKey(stringKey, StringValue(name), value)
 	return nil
 }
 
