@@ -1,0 +1,102 @@
+# Stress Tests for M28
+# Tests performance and stability under load
+
+(print "===== Stress Tests =====\n")
+(import time)
+
+# Test 1: Large list operations
+(print "-- Large List Operations --")
+(= start_time (time.time))
+(= large_list [])
+(for i (range 10000)
+  (append large_list i))
+(= list_time (- (time.time) start_time))
+(print (format "Created list with {} elements in {:.3f}s" (len large_list) list_time))
+(assert (== (len large_list) 10000) "Large list creation")
+
+# Sum all elements
+(= start_time (time.time))
+(= total 0)
+(for n large_list
+  (= total (+ total n)))
+(= sum_time (- (time.time) start_time))
+(print (format "Sum of elements: {} in {:.3f}s" total sum_time))
+(assert (== total 49995000) "Sum calculation correct")
+
+# Test 2: Dictionary stress test
+(print "\n-- Large Dictionary Operations --")
+(= start_time (time.time))
+(= large_dict {})
+(for i (range 5000)
+  (set large_dict (str i) (* i i)))
+(= dict_time (- (time.time) start_time))
+(print (format "Created dict with {} entries in {:.3f}s" (len large_dict) dict_time))
+
+# Random access test
+(= start_time (time.time))
+(= access_count 0)
+(for i (range 1000)
+  (= key (str (% (* i 7) 5000)))
+  (= value (get large_dict key))
+  (if value
+    (= access_count (+ access_count 1))))
+(= access_time (- (time.time) start_time))
+(print (format "Performed {} lookups in {:.3f}s" access_count access_time))
+
+# Test 3: String manipulation stress
+(print "\n-- String Manipulation --")
+(= start_time (time.time))
+(= big_string "")
+(for i (range 1000)
+  (= big_string (+ big_string "Hello World ")))
+(= string_time (- (time.time) start_time))
+(print (format "Built string of length {} in {:.3f}s" (len big_string) string_time))
+
+# Test 4: Nested function calls
+(print "\n-- Deep Recursion Test --")
+(def factorial (n)
+  (if (<= n 1)
+    1
+    (* n (factorial (- n 1)))))
+
+(= start_time (time.time))
+(= result (factorial 100))
+(= factorial_time (- (time.time) start_time))
+(print (format "Factorial(100) computed in {:.3f}s" factorial_time))
+(assert (> result 0) "Factorial result is positive")
+
+# Test 5: Many small objects
+(print "\n-- Object Creation Stress --")
+(= start_time (time.time))
+(= objects [])
+(for i (range 1000)
+  (append objects {"id": i, "value": (* i 2), "name": (format "obj_{}" i)}))
+(= object_time (- (time.time) start_time))
+(print (format "Created {} objects in {:.3f}s" (len objects) object_time))
+
+# Test 6: Exception handling stress
+(print "\n-- Exception Handling Stress --")
+(= start_time (time.time))
+(= exceptions_caught 0)
+(for i (range 1000)
+  (try
+    (if (== (% i 3) 0)
+      (/ 1 0)
+      (get [] 10))
+  except
+    (= exceptions_caught (+ exceptions_caught 1))))
+(= exception_time (- (time.time) start_time))
+(print (format "Caught {} exceptions in {:.3f}s" exceptions_caught exception_time))
+
+# Performance summary
+(print "\n===== Performance Summary =====")
+(= total_time (+ list_time dict_time string_time factorial_time object_time exception_time))
+(print (format "Total test time: {:.3f}s" total_time))
+
+(if (< total_time 5.0)
+  (print "✅ Excellent performance!")
+  (if (< total_time 10.0)
+    (print "✓ Good performance")
+    (print "⚠️ Performance could be improved")))
+
+(print "\n===== All Stress Tests Completed! =====")

@@ -1,0 +1,255 @@
+# Dynamic Programming Examples in M28
+
+# 1. Longest Common Subsequence (LCS)
+(def lcs (str1 str2)
+  "Find the longest common subsequence of two strings"
+  (= m (len str1))
+  (= n (len str2))
+  
+  # Create 2D DP table
+  (= dp [])
+  (for i in (range (+ m 1))
+    (= row [])
+    (for j in (range (+ n 1))
+      (= row (+ row [0])))
+    (= dp (+ dp [row])))
+  
+  # Fill the DP table
+  (for i in (range 1 (+ m 1))
+    (for j in (range 1 (+ n 1))
+      (if (== (nth str1 (- i 1)) (nth str2 (- j 1)))
+        (= dp[i][j] (+ (nth (nth dp (- i 1)) (- j 1)) 1))
+        (= dp[i][j] (max (nth (nth dp (- i 1)) j)
+                         (nth (nth dp i) (- j 1)))))))
+  
+  # Reconstruct the LCS
+  (= lcs_str "")
+  (= i m)
+  (= j n)
+  
+  (while (and (> i 0) (> j 0))
+    (if (== (nth str1 (- i 1)) (nth str2 (- j 1)))
+      (do
+        (= lcs_str (+ (nth str1 (- i 1)) lcs_str))
+        (= i (- i 1))
+        (= j (- j 1)))
+      (if (> (nth (nth dp (- i 1)) j) (nth (nth dp i) (- j 1)))
+        (= i (- i 1))
+        (= j (- j 1)))))
+  
+  [lcs_str, (nth (nth dp m) n)])
+
+# 2. Knapsack Problem (0/1 Knapsack)
+(def knapsack (weights values capacity)
+  "Solve the 0/1 knapsack problem"
+  (= n (len weights))
+  
+  # Create DP table
+  (= dp [])
+  (for i in (range (+ n 1))
+    (= row [])
+    (for w in (range (+ capacity 1))
+      (= row (+ row [0])))
+    (= dp (+ dp [row])))
+  
+  # Fill the DP table
+  (for i in (range 1 (+ n 1))
+    (for w in (range 1 (+ capacity 1))
+      (if (<= (nth weights (- i 1)) w)
+        (= dp[i][w] (max (nth (nth dp (- i 1)) w)
+                         (+ (nth values (- i 1))
+                            (nth (nth dp (- i 1)) (- w (nth weights (- i 1)))))))
+        (= dp[i][w] (nth (nth dp (- i 1)) w)))))
+  
+  # Find which items to include
+  (= selected [])
+  (= w capacity)
+  (for i in (range n 0 -1)
+    (if (!= (nth (nth dp i) w) (nth (nth dp (- i 1)) w))
+      (do
+        (= selected (+ [(- i 1)] selected))
+        (= w (- w (nth weights (- i 1)))))))
+  
+  [(nth (nth dp n) capacity), selected])
+
+# 3. Edit Distance (Levenshtein Distance)
+(def edit_distance (str1 str2)
+  "Calculate minimum edit distance between two strings"
+  (= m (len str1))
+  (= n (len str2))
+  
+  # Create DP table
+  (= dp [])
+  (for i in (range (+ m 1))
+    (= row [])
+    (for j in (range (+ n 1))
+      (= row (+ row [0])))
+    (= dp (+ dp [row])))
+  
+  # Initialize base cases
+  (for i in (range (+ m 1))
+    (= dp[i][0] i))
+  (for j in (range (+ n 1))
+    (= dp[0][j] j))
+  
+  # Fill the DP table
+  (for i in (range 1 (+ m 1))
+    (for j in (range 1 (+ n 1))
+      (if (== (nth str1 (- i 1)) (nth str2 (- j 1)))
+        (= dp[i][j] (nth (nth dp (- i 1)) (- j 1)))
+        (= dp[i][j] (+ 1 (min (nth (nth dp (- i 1)) j)      # Delete
+                              (nth (nth dp i) (- j 1))      # Insert
+                              (nth (nth dp (- i 1)) (- j 1)))))))  # Replace
+  
+  (nth (nth dp m) n))
+
+# 4. Coin Change Problem
+(def coin_change (coins amount)
+  "Find minimum number of coins needed to make amount"
+  (= dp [])
+  (for i in (range (+ amount 1))
+    (= dp (+ dp [float("inf")])))
+  
+  (= dp[0] 0)
+  
+  (for coin in coins
+    (for x in (range coin (+ amount 1))
+      (= dp[x] (min (nth dp x) (+ (nth dp (- x coin)) 1)))))
+  
+  (if (== (nth dp amount) float("inf"))
+    -1
+    (nth dp amount)))
+
+# 5. Longest Increasing Subsequence
+(def lis (nums)
+  "Find length of longest increasing subsequence"
+  (if (== (len nums) 0)
+    (return 0))
+  
+  (= n (len nums))
+  (= dp [])
+  (for i in (range n)
+    (= dp (+ dp [1])))
+  
+  (for i in (range 1 n)
+    (for j in (range i)
+      (if (< (nth nums j) (nth nums i))
+        (= dp[i] (max (nth dp i) (+ (nth dp j) 1))))))
+  
+  (max dp))
+
+# 6. Maximum Subarray Sum (Kadane's Algorithm)
+(def max_subarray (nums)
+  "Find maximum sum of contiguous subarray"
+  (if (== (len nums) 0)
+    (return 0))
+  
+  (= max_ending_here (nth nums 0))
+  (= max_so_far (nth nums 0))
+  
+  (for i in (range 1 (len nums))
+    (= max_ending_here (max (nth nums i) 
+                           (+ max_ending_here (nth nums i))))
+    (= max_so_far (max max_so_far max_ending_here)))
+  
+  max_so_far)
+
+# 7. House Robber Problem
+(def house_robber (houses)
+  "Maximum money that can be robbed without robbing adjacent houses"
+  (= n (len houses))
+  
+  (if (== n 0)
+    (return 0))
+  (if (== n 1)
+    (return (nth houses 0)))
+  
+  (= dp [])
+  (= dp (+ dp [(nth houses 0)]))
+  (= dp (+ dp [(max (nth houses 0) (nth houses 1))]))
+  
+  (for i in (range 2 n)
+    (= dp (+ dp [(max (nth dp (- i 1))
+                     (+ (nth dp (- i 2)) (nth houses i)))])))
+  
+  (nth dp (- n 1)))
+
+# 8. Unique Paths in Grid
+(def unique_paths (m n)
+  "Count unique paths from top-left to bottom-right in m×n grid"
+  # Create DP table
+  (= dp [])
+  (for i in (range m)
+    (= row [])
+    (for j in (range n)
+      (= row (+ row [0])))
+    (= dp (+ dp [row])))
+  
+  # Initialize first row and column
+  (for i in (range m)
+    (= dp[i][0] 1))
+  (for j in (range n)
+    (= dp[0][j] 1))
+  
+  # Fill the DP table
+  (for i in (range 1 m)
+    (for j in (range 1 n)
+      (= dp[i][j] (+ (nth (nth dp (- i 1)) j)
+                     (nth (nth dp i) (- j 1))))))
+  
+  (nth (nth dp (- m 1)) (- n 1)))
+
+# Demonstrations
+(print "Dynamic Programming Examples")
+(print "============================")
+
+# 1. Longest Common Subsequence
+(print "\n1. Longest Common Subsequence:")
+(= result (lcs "ABCDGH" "AEDFHR"))
+(print "LCS of 'ABCDGH' and 'AEDFHR':" (nth result 0) "(length:" (nth result 1) ")")
+
+# 2. Knapsack Problem
+(print "\n2. 0/1 Knapsack Problem:")
+(= weights [1, 3, 4, 5])
+(= values [1, 4, 5, 7])
+(= capacity 7)
+(= result (knapsack weights values capacity))
+(print f"Items: weights={weights}, values={values}")
+(print f"Knapsack capacity: {capacity}")
+(print f"Maximum value: {(nth result 0)}")
+(print f"Selected items (indices): {(nth result 1)}")
+
+# 3. Edit Distance
+(print "\n3. Edit Distance:")
+(print "Edit distance between 'kitten' and 'sitting':" (edit_distance "kitten" "sitting"))
+(print "Edit distance between 'saturday' and 'sunday':" (edit_distance "saturday" "sunday"))
+
+# 4. Coin Change
+(print "\n4. Coin Change Problem:")
+(= coins [1, 5, 10, 25])
+(print f"Coins: {coins}")
+(print f"Minimum coins for 41 cents: {(coin_change coins 41)}")
+(print f"Minimum coins for 63 cents: {(coin_change coins 63)}")
+
+# 5. Longest Increasing Subsequence
+(print "\n5. Longest Increasing Subsequence:")
+(= nums [10, 9, 2, 5, 3, 7, 101, 18])
+(print f"Array: {nums}")
+(print f"Length of LIS: {(lis nums)}")
+
+# 6. Maximum Subarray Sum
+(print "\n6. Maximum Subarray Sum:")
+(= nums [-2, 1, -3, 4, -1, 2, 1, -5, 4])
+(print f"Array: {nums}")
+(print f"Maximum subarray sum: {(max_subarray nums)}")
+
+# 7. House Robber
+(print "\n7. House Robber Problem:")
+(= houses [2, 7, 9, 3, 1])
+(print f"House values: {houses}")
+(print f"Maximum money that can be robbed: {(house_robber houses)}")
+
+# 8. Unique Paths
+(print "\n8. Unique Paths in Grid:")
+(print f"Unique paths in 3×7 grid: {(unique_paths 3 7)}")
+(print f"Unique paths in 5×5 grid: {(unique_paths 5 5)}")

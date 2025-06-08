@@ -25,6 +25,7 @@ Examples are organized by topic and complexity:
 - **06_file_io/** - File operations and I/O
 - **07_functional/** - Advanced functional programming
 - **08_projects/** - Complete example applications
+- **09_algorithms/** - Classic algorithm implementations
 
 See [index.md](index.md) for a detailed listing of all examples.
 

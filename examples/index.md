@@ -68,6 +68,18 @@ Full example projects demonstrating M28 capabilities.
 - **todo_app.m28** - Command-line todo list manager
 - **calculator.m28** - Scientific calculator with expression evaluation
 - **text_adventure.m28** - Text-based adventure game framework
+- **dice_game.m28** - Simple dice game with probability
+
+### 09_algorithms - Classic Algorithms
+Implementations of fundamental computer science algorithms.
+
+- **sorting.m28** - Bubble sort, selection sort, insertion sort, quicksort, merge sort
+- **fibonacci.m28** - Multiple Fibonacci implementations (recursive, iterative, memoized, generator, etc.)
+- **searching.m28** - Linear search, binary search, jump search, interpolation search
+- **graph_algorithms.m28** - BFS, DFS, shortest path, topological sort, cycle detection
+- **dynamic_programming.m28** - LCS, knapsack, edit distance, coin change, and more
+- **tree_algorithms.m28** - BST operations, tree traversals, LCA, tree properties
+- **heap_algorithms.m28** - Heap sort, priority queue, find k largest elements
 
 ## Running Examples
 
@@ -92,6 +104,7 @@ Or from the REPL:
 7. Master I/O operations in **06_file_io**
 8. Dive into **07_functional** for advanced patterns
 9. Study **08_projects** to see everything in action
+10. Explore **09_algorithms** for classic algorithm implementations
 
 ## Key Syntax Rules
 

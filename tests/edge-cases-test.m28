@@ -1,0 +1,104 @@
+# Edge Case Tests for M28
+# Tests unusual but valid scenarios to ensure robustness
+
+(print "===== Edge Case Tests =====\n")
+
+# Test 1: Empty structures
+(print "-- Empty Structures --")
+(= empty_list [])
+(assert (== (len empty_list) 0) "Empty list length")
+
+(= empty_dict {})
+(assert (== (len empty_dict) 0) "Empty dict length")
+
+(= empty_string "")
+(assert (== (len empty_string) 0) "Empty string length")
+(print "✓ Empty structures handled correctly\n")
+
+# Test 2: Large numbers
+(print "-- Large Numbers --")
+(= big_num (* 999999 999999))
+(assert (> big_num 0) "Large multiplication works")
+(= very_big (** 2 100))
+(assert (> very_big 0) "Large exponentiation works")
+(print "✓ Large numbers handled correctly\n")
+
+# Test 3: Deep nesting
+(print "-- Deep Nesting --")
+(= deeply_nested [[[[[[[[[[10]]]]]]]]]])
+(= extracted deeply_nested)
+(for i (range 10)
+  (= extracted (get extracted 0)))
+(assert (== extracted 10) "Deep nesting extraction")
+(print "✓ Deep nesting handled correctly\n")
+
+# Test 4: Special characters in strings
+(print "-- Special Characters --")
+(= special "Hello\nWorld\t!\r\n")
+(assert (in "\n" special) "Newline in string")
+(assert (in "\t" special) "Tab in string")
+(print "✓ Special characters handled correctly\n")
+
+# Test 5: Dictionary with various key types
+(print "-- Dictionary Key Types --")
+(= mixed_keys {})
+(set mixed_keys "string_key" "value1")
+(set mixed_keys 42 "value2")
+(set mixed_keys -10 "value3")
+(assert (== (get mixed_keys "string_key") "value1") "String key works")
+(assert (== (get mixed_keys 42) "value2") "Positive int key works")
+(assert (== (get mixed_keys -10) "value3") "Negative int key works")
+(print "✓ Various dictionary key types work\n")
+
+# Test 6: Function edge cases
+(print "-- Function Edge Cases --")
+(def no_params ()
+  "I take no parameters")
+(assert (== (no_params) "I take no parameters") "Zero parameter function")
+
+(def many_params (a b c d e f g)
+  (+ a b c d e f g))
+(assert (== (many_params 1 2 3 4 5 6 7) 28) "Many parameter function")
+(print "✓ Function parameter edge cases work\n")
+
+# Test 7: List operations at boundaries
+(print "-- List Boundary Operations --")
+(= test_list [1, 2, 3])
+(assert (== (get test_list 0) 1) "First element access")
+(assert (== (get test_list -1) 3) "Last element access")
+(assert (== (get test_list -3) 1) "Negative index wraparound")
+(print "✓ List boundary operations work\n")
+
+# Test 8: String edge cases
+(print "-- String Edge Cases --")
+(= long_string (* "a" 1000))
+(assert (== (len long_string) 1000) "String repetition creates long string")
+(= unicode_test "Hello 世界 🌍")
+(assert (in "世界" unicode_test) "Unicode characters in string")
+(print "✓ String edge cases work\n")
+
+# Test 9: Comparison edge cases
+(print "-- Comparison Edge Cases --")
+(assert (< -999999 0) "Large negative less than zero")
+(assert (> 0.0000001 0) "Small positive greater than zero")
+(assert (!= [] []) "Empty lists are not identical")
+(assert (== [] []) "Empty lists are equal")
+(print "✓ Comparison edge cases work\n")
+
+# Test 10: Error recovery
+(print "-- Error Recovery --")
+(= error_count 0)
+(try
+  (/ 1 0)
+except
+  (= error_count (+ error_count 1)))
+(assert (== error_count 1) "Division by zero caught")
+
+(try
+  (get [] 10)
+except
+  (= error_count (+ error_count 1)))
+(assert (== error_count 2) "List index error caught")
+(print "✓ Error recovery works\n")
+
+(print "\n===== All Edge Case Tests Passed! =====")

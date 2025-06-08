@@ -1,0 +1,169 @@
+# Fibonacci Sequence Implementations in M28
+
+# 1. Recursive Fibonacci (simple but inefficient)
+(def fib_recursive (n)
+  "Calculate nth Fibonacci number recursively"
+  (if (<= n 1)
+    n
+    (+ (fib_recursive (- n 1)) 
+       (fib_recursive (- n 2))))))
+
+# 2. Iterative Fibonacci (efficient)
+(def fib_iterative (n)
+  "Calculate nth Fibonacci number iteratively"
+  (if (<= n 1)
+    n
+    (do
+      (= a 0)
+      (= b 1)
+      (for i in (range 2 (+ n 1))
+        (= temp (+ a b))
+        (= a b)
+        (= b temp))
+      b)))
+
+# 3. Memoized Fibonacci (recursive with caching)
+(= fib_cache {})
+
+(def fib_memoized (n)
+  "Calculate nth Fibonacci number with memoization"
+  (if (in n fib_cache)
+    (fib_cache.get n)
+    (do
+      (= result
+        (if (<= n 1)
+          n
+          (+ (fib_memoized (- n 1))
+             (fib_memoized (- n 2))))))
+      (= fib_cache[n] result)
+      result)))
+
+# 4. Generator-based Fibonacci
+(def (fibonacci_generator)
+  "Generate Fibonacci numbers infinitely"
+  (= a 0)
+  (= b 1)
+  (= count 0)
+  (while (< count 100)  # Limit to prevent infinite loop
+    (yield a)
+    (= temp (+ a b))
+    (= a b)
+    (= b temp)
+    (= count (+ count 1))))
+
+# 5. Tail-recursive Fibonacci
+(def fib_tail_recursive (n acc1 acc2)
+  "Calculate nth Fibonacci number using tail recursion"
+  (if (== n 0)
+    acc1
+    (if (== n 1)
+      acc2
+      (fib_tail_recursive (- n 1) acc2 (+ acc1 acc2)))))
+
+(def fib_tail (n)
+  "Wrapper for tail-recursive Fibonacci"
+  (fib_tail_recursive n 0 1))
+
+# 6. Matrix multiplication Fibonacci (most efficient for large n)
+(def matrix_mult (a b)
+  "Multiply two 2x2 matrices"
+  [[(+ (* (nth (nth a 0) 0) (nth (nth b 0) 0))
+       (* (nth (nth a 0) 1) (nth (nth b 1) 0))),
+    (+ (* (nth (nth a 0) 0) (nth (nth b 0) 1))
+       (* (nth (nth a 0) 1) (nth (nth b 1) 1)))],
+   [(+ (* (nth (nth a 1) 0) (nth (nth b 0) 0))
+       (* (nth (nth a 1) 1) (nth (nth b 1) 0))),
+    (+ (* (nth (nth a 1) 0) (nth (nth b 0) 1))
+       (* (nth (nth a 1) 1) (nth (nth b 1) 1)))]])
+
+(def matrix_power (mat n)
+  "Raise a matrix to power n"
+  (if (== n 1)
+    mat
+    (if (== (% n 2) 0)
+      (do
+        (= half (matrix_power mat (int (/ n 2))))
+        (matrix_mult half half))
+      (matrix_mult mat (matrix_power mat (- n 1))))))
+
+(def fib_matrix (n)
+  "Calculate nth Fibonacci using matrix exponentiation"
+  (if (<= n 1)
+    n
+    (do
+      (= base_matrix [[1, 1], [1, 0]])
+      (= result (matrix_power base_matrix n))
+      (nth (nth result 0) 1))))
+
+# Demonstrations
+(print "Fibonacci Sequence Implementations")
+(print "==================================")
+
+# Test small values
+(print "\nFirst 10 Fibonacci numbers:")
+(for i in (range 10)
+  (print f"F({i}) = {(fib_iterative i)}"))
+(print)
+
+# Compare different implementations
+(print "\nComparing implementations for n=20:")
+(= n 20)
+(print f"Recursive: F({n}) = {(fib_recursive n)}")
+(print f"Iterative: F({n}) = {(fib_iterative n)}")
+(print f"Memoized:  F({n}) = {(fib_memoized n)}")
+(print f"Tail Rec:  F({n}) = {(fib_tail n)}")
+(print f"Matrix:    F({n}) = {(fib_matrix n)}")
+
+# Generator demonstration
+(print "\nFirst 15 Fibonacci numbers using generator:")
+(= fib_gen (fibonacci_generator))
+(= gen_values [])
+(= count 0)
+(for val in fib_gen
+  (if (>= count 15)
+    (break))
+  (= gen_values (+ gen_values [val]))
+  (= count (+ count 1)))
+(print gen_values)
+(print)
+
+# Fibonacci sequence properties
+(print "\nFibonacci Properties:")
+
+# Golden ratio approximation
+(def golden_ratio_approx (n)
+  "Approximate golden ratio using consecutive Fibonacci numbers"
+  (/ (float (fib_iterative (+ n 1))) 
+     (float (fib_iterative n))))
+
+(print "\nGolden ratio approximations:")
+(for n in [10, 20, 30]
+  (print f"F({(+ n 1)})/F({n}) = {(golden_ratio_approx n):.10f}"))
+(print "Actual golden ratio ≈ 1.6180339887...")
+
+# Sum of first n Fibonacci numbers
+(def fib_sum (n)
+  "Sum of first n Fibonacci numbers"
+  (= total 0)
+  (for i in (range n)
+    (= total (+ total (fib_iterative i))))
+  total)
+
+(print "\nSum properties:")
+(for n in [5, 10, 15]
+  (= sum_n (fib_sum n))
+  (= fib_n_plus_2 (fib_iterative (+ n 1)))
+  (print f"Sum of first {n} = {sum_n}, F({(+ n 1)})-1 = {(- fib_n_plus_2 1)}"))
+
+# Even Fibonacci numbers
+(print "\nEven Fibonacci numbers less than 100:")
+(= evens [])
+(= a 0)
+(= b 1)
+(while (< a 100)
+  (if (== (% a 2) 0)
+    (= evens (+ evens [a])))
+  (= temp (+ a b))
+  (= a b)
+  (= b temp))
+(print evens)

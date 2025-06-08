@@ -1,0 +1,293 @@
+# Heap Algorithms in M28
+
+# Min Heap implementation
+(class MinHeap ()
+  (def __init__ (self)
+    (= self.heap [])
+    (= self.size 0))
+  
+  # Helper methods
+  (def parent (self i)
+    (int (/ (- i 1) 2)))
+  
+  (def left_child (self i)
+    (+ (* 2 i) 1))
+  
+  (def right_child (self i)
+    (+ (* 2 i) 2)))
+  
+  (def swap (self i j)
+    "Swap elements at indices i and j"
+    (= temp (nth self.heap i))
+    (= self.heap[i] (nth self.heap j))
+    (= self.heap[j] temp))
+  
+  # Heap operations
+  (def insert (self value)
+    "Insert a value into the heap"
+    (= self.heap (+ self.heap [value]))
+    (= self.size (+ self.size 1))
+    (self._bubble_up (- self.size 1)))
+  
+  (def _bubble_up (self i)
+    "Move element up to maintain heap property"
+    (while (> i 0)
+      (if (< (nth self.heap i) (nth self.heap (self.parent i)))
+        (do
+          (self.swap i (self.parent i))
+          (= i (self.parent i)))
+        (break)))
+  
+  (def extract_min (self)
+    "Remove and return minimum element"
+    (if (== self.size 0)
+      (return None))
+    
+    (= min_val (nth self.heap 0))
+    (= self.heap[0] (nth self.heap (- self.size 1)))
+    (= self.heap self.heap[:-1])
+    (= self.size (- self.size 1))
+    
+    (if (> self.size 0)
+      (self._bubble_down 0))
+    
+    min_val)
+  
+  (def _bubble_down (self i)
+    "Move element down to maintain heap property"
+    (while True
+      (= min_index i)
+      (= left (self.left_child i))
+      (= right (self.right_child i))
+      
+      (if (< left self.size)
+        (if (< (nth self.heap left) (nth self.heap min_index))
+          (= min_index left)))
+      
+      (if (< right self.size)
+        (if (< (nth self.heap right) (nth self.heap min_index))
+          (= min_index right)))
+      
+      (if (!= min_index i)
+        (do
+          (self.swap i min_index)
+          (= i min_index))
+        (break))))
+  
+  (def peek (self)
+    "Return minimum element without removing"
+    (if (> self.size 0)
+      (nth self.heap 0)
+      None))
+  
+  (def is_empty (self)
+    (== self.size 0)))
+
+# Heap Sort Algorithm
+(def heapify (arr n i)
+  "Heapify subtree rooted at index i"
+  (= largest i)
+  (= left (+ (* 2 i) 1))
+  (= right (+ (* 2 i) 2)))
+  
+  # Check if left child is larger
+  (if (< left n)
+    (if (> (nth arr left) (nth arr largest))
+      (= largest left)))
+  
+  # Check if right child is larger
+  (if (< right n)
+    (if (> (nth arr right) (nth arr largest))
+      (= largest right)))
+  
+  # If largest is not root, swap and heapify
+  (if (!= largest i)
+    (do
+      (= temp (nth arr i))
+      (= arr[i] (nth arr largest))
+      (= arr[largest] temp)
+      (heapify arr n largest))))
+
+(def heap_sort (lst)
+  "Sort list using heap sort algorithm"
+  (= arr (lst.copy))
+  (= n (len arr))
+  
+  # Build max heap
+  (for i in (range (int (/ n 2) -1 -1)
+    (heapify arr n i))
+  
+  # Extract elements from heap one by one
+  (for i in (range (- n 1) 0 -1)
+    # Move current root to end
+    (= temp (nth arr 0))
+    (= arr[0] (nth arr i))
+    (= arr[i] temp)
+    
+    # Heapify reduced heap
+    (heapify arr i 0))
+  
+  arr)
+
+# Priority Queue using Heap
+(class PriorityQueue ()
+  (def __init__ (self)
+    (= self.heap []))
+  
+  (def push (self priority item)
+    "Add item with priority (lower number = higher priority)"
+    (= self.heap (+ self.heap [[priority, item]]))
+    (self._bubble_up (- (len self.heap) 1)))
+  
+  (def _bubble_up (self i)
+    (while (> i 0)
+      (= parent (int (/ (- i 1) 2)))
+      (if (< (nth (nth self.heap i) 0) (nth (nth self.heap parent) 0))
+        (do
+          (= temp (nth self.heap i))
+          (= self.heap[i] (nth self.heap parent))
+          (= self.heap[parent] temp)
+          (= i parent))
+        (break))))
+  
+  (def pop (self)
+    "Remove and return highest priority item"
+    (if (== (len self.heap) 0)
+      (return None))
+    
+    (= top (nth self.heap 0))
+    (= self.heap[0] (nth self.heap -1))
+    (= self.heap self.heap[:-1])
+    
+    (if (> (len self.heap) 0)
+      (self._bubble_down 0))
+    
+    (nth top 1))  # Return the item, not the priority
+  
+  (def _bubble_down (self i)
+    (= n (len self.heap))
+    (while True
+      (= min_idx i)
+      (= left (+ (* 2 i) 1))
+      (= right (+ (* 2 i) 2)))
+      
+      (if (< left n)
+        (if (< (nth (nth self.heap left) 0) 
+               (nth (nth self.heap min_idx) 0))
+          (= min_idx left)))
+      
+      (if (< right n)
+        (if (< (nth (nth self.heap right) 0) 
+               (nth (nth self.heap min_idx) 0))
+          (= min_idx right)))
+      
+      (if (!= min_idx i)
+        (do
+          (= temp (nth self.heap i))
+          (= self.heap[i] (nth self.heap min_idx))
+          (= self.heap[min_idx] temp)
+          (= i min_idx))
+        (break))))
+  
+  (def is_empty (self)
+    (== (len self.heap) 0)))
+
+# Find K largest elements using heap
+(def find_k_largest (lst k)
+  "Find k largest elements in list"
+  (= min_heap (MinHeap))
+  
+  # Keep heap size at most k
+  (for num in lst
+    (min_heap.insert num)
+    (if (> min_heap.size k)
+      (min_heap.extract_min)))
+  
+  # Extract all elements from heap
+  (= result [])
+  (while (not (min_heap.is_empty))
+    (= result (+ [(min_heap.extract_min)] result)))
+  
+  result)
+
+# Merge K sorted lists using heap
+(def merge_k_sorted_lists (lists)
+  "Merge k sorted lists into one sorted list"
+  (= pq (PriorityQueue))
+  (= result [])
+  
+  # Initialize with first element from each list
+  (for i in (range (len lists))
+    (if (> (len (nth lists i)) 0)
+      (pq.push (nth (nth lists i) 0) [i, 0])))
+  
+  # Process elements
+  (while (not (pq.is_empty))
+    (= item (pq.pop))
+    (= list_idx (nth item 0))
+    (= elem_idx (nth item 1))
+    (= lst (nth lists list_idx))
+    
+    (= result (+ result [(nth lst elem_idx)]))
+    
+    # Add next element from same list if exists
+    (if (< (+ elem_idx 1) (len lst))
+      (pq.push (nth lst (+ elem_idx 1)) [list_idx, (+ elem_idx 1)])))
+  
+  result)
+
+# Demonstrations
+(print "Heap Algorithms Demo")
+(print "===================")
+
+# Min Heap operations
+(print "\nMin Heap Operations:")
+(= heap (MinHeap))
+(= values [5, 3, 8, 1, 9, 2, 7, 6, 4])
+(print "Inserting values:" values)
+(for val in values
+  (print "Inserting" val)
+  (heap.insert val)
+  (print "Heap after insert:" heap.heap))
+
+(print "\nExtracting minimum values:")
+(= extracted [])
+(while (not (heap.is_empty))
+  (= extracted (+ extracted [(heap.extract_min)])))
+(print "Extracted order:" extracted)
+
+# Heap Sort
+(print "\n\nHeap Sort:")
+(= test_list [64, 34, 25, 12, 22, 11, 90, 88, 76, 50, 43])
+(print "Original list:" test_list)
+(print "Sorted list:" (heap_sort test_list))
+
+# Priority Queue
+(print "\n\nPriority Queue Example:")
+(= pq (PriorityQueue))
+(print "Adding tasks with priorities...")
+(pq.push 3 "Low priority task")
+(pq.push 1 "High priority task")
+(pq.push 2 "Medium priority task")
+(pq.push 1 "Another high priority task")
+
+(print "\nProcessing tasks in priority order:")
+(while (not (pq.is_empty))
+  (print "- " (pq.pop)))
+
+# Find K largest
+(print "\n\nFind K Largest Elements:")
+(= numbers [3, 2, 1, 5, 6, 4, 8, 7, 9, 10])
+(= k 4)
+(print f"List: {numbers}")
+(print f"The {k} largest elements: {(find_k_largest numbers k)}")
+
+# Merge K sorted lists
+(print "\n\nMerge K Sorted Lists:")
+(= sorted_lists [[1, 4, 7],
+                 [2, 5, 8],
+                 [3, 6, 9, 10]])
+(print "Lists to merge:")
+(for i in (range (len sorted_lists))
+  (print f"  List {i}: {(nth sorted_lists i)}"))
+(print "Merged result:" (merge_k_sorted_lists sorted_lists))

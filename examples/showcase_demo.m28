@@ -1,0 +1,152 @@
+# M28 Language Showcase
+# Demonstrates the elegant fusion of Lisp syntax with Python semantics
+
+(print "🚀 M28 Language Showcase - Lisp Syntax, Python Power\n")
+
+# Feature 1: Clean S-expression syntax with Python's readability
+(print "1. Elegant Syntax")
+(print "─────────────────")
+(def greet (name)
+  (format "Hello, {}! Welcome to M28." name))
+
+(print (greet "Meta Engineer"))
+(print "✓ S-expressions make code structure explicit\n")
+
+# Feature 2: Functional programming with Python familiarity  
+(print "2. Functional + Imperative")
+(print "──────────────────────────")
+(= numbers [1, 2, 3, 4, 5])
+(= squared (map (lambda (x) (** x 2)) numbers))
+(= evens (filter (lambda (x) (== (% x 2) 0)) numbers))
+
+(print (format "Numbers: {}" numbers))
+(print (format "Squared: {}" (list squared)))
+(print (format "Evens: {}" (list evens)))
+
+# Higher-order functions
+(def compose (f g)
+  (lambda (x) (f (g x))))
+
+(= add_one (lambda (x) (+ x 1)))
+(= double (lambda (x) (* x 2)))
+(= add_one_then_double (compose double add_one))
+
+(print (format "Composed function: 5 → {}" (add_one_then_double 5)))
+(print "✓ First-class functions with clean syntax\n")
+
+# Feature 3: Pattern-based problem solving
+(print "3. Algorithmic Elegance")
+(print "───────────────────────")
+(def quicksort (lst)
+  (if (<= (len lst) 1)
+    lst
+    (let ((pivot (get lst 0))
+          (rest (slice lst 1))
+          (less (filter (lambda (x) (< x pivot)) rest))
+          (greater (filter (lambda (x) (>= x pivot)) rest)))
+      (+ (quicksort less) [pivot] (quicksort greater)))))
+
+(= unsorted [3, 1, 4, 1, 5, 9, 2, 6])
+(print (format "Unsorted: {}" unsorted))
+(print (format "Sorted: {}" (quicksort unsorted)))
+(print "✓ Recursive algorithms expressed naturally\n")
+
+# Feature 4: Data processing pipeline
+(print "4. Data Processing Pipeline")
+(print "───────────────────────────")
+(= data [
+  {"name": "Alice", "score": 95},
+  {"name": "Bob", "score": 87},
+  {"name": "Charlie", "score": 92},
+  {"name": "Diana", "score": 88}
+])
+
+# Functional pipeline
+(= top_students 
+  (filter 
+    (lambda (s) (> (get s "score") 90))
+    data))
+
+(= names 
+  (map 
+    (lambda (s) (get s "name"))
+    top_students))
+
+(print (format "High scorers (>90): {}" (list names)))
+
+# Calculate average
+(= total_score 
+  (reduce 
+    (lambda (acc s) (+ acc (get s "score")))
+    data
+    0))
+(= average (/ total_score (len data)))
+(print (format "Class average: {:.1f}" average))
+(print "✓ Clean data transformation pipelines\n")
+
+# Feature 5: Meta-programming potential
+(print "5. Code as Data Philosophy")
+(print "──────────────────────────")
+(def make_operator (op)
+  (lambda (x y) (op x y)))
+
+(= my_add (make_operator +))
+(= my_mult (make_operator *))
+
+(print (format "Dynamic add: {} + {} = {}" 10 20 (my_add 10 20)))
+(print (format "Dynamic mult: {} × {} = {}" 5 6 (my_mult 5 6)))
+
+# Create custom control structure
+(def unless (condition action)
+  (if (not condition)
+    (action)
+    None))
+
+(unless (> 5 10)
+  (lambda () (print "✓ Custom control structures possible")))
+
+# Feature 6: Error handling with context
+(print "\n6. Pythonic Error Handling")
+(print "──────────────────────────")
+(def safe_divide (a b)
+  (try
+    (/ a b)
+  except
+    (format "Cannot divide {} by {}" a b)))
+
+(print (format "10 ÷ 2 = {}" (safe_divide 10 2)))
+(print (format "10 ÷ 0 = {}" (safe_divide 10 0)))
+(print "✓ Familiar exception handling\n")
+
+# Performance metrics
+(print "7. Performance Characteristics")
+(print "──────────────────────────────")
+(import time)
+
+(def benchmark (name func)
+  (= start (time.time))
+  (= result (func))
+  (= elapsed (* (- (time.time) start) 1000))
+  (print (format "{}: {:.2f}ms" name elapsed))
+  result)
+
+(benchmark "List creation (1000 items)" 
+  (lambda () (list (range 1000))))
+
+(benchmark "Dictionary operations (1000 items)"
+  (lambda () 
+    (= d {})
+    (for i (range 1000)
+      (set d (str i) (* i i)))
+    d))
+
+(print "\n" "="x50)
+(print "🎯 Why M28?")
+(print "="x50)
+(print "• S-expressions eliminate parsing ambiguity")
+(print "• Python semantics provide familiar behavior")  
+(print "• Functional features enable elegant solutions")
+(print "• Clean syntax reduces cognitive load")
+(print "• Great for teaching language concepts")
+(print "• Extensible through its homoiconic nature")
+(print "\n✨ M28: Where Lisp elegance meets Python practicality")

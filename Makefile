@@ -22,7 +22,15 @@ test:
 # Run m28 language tests
 m28-test:
 	@echo "Running m28 language tests..."
-	@./run-tests.sh
+	@./test.sh
+
+# Quick test (essential tests only)
+test-quick:
+	@./test.sh --quick
+
+# Full test suite (includes stress tests)
+test-full:
+	@./test.sh --full
 
 # Clean build artifacts
 clean:
@@ -43,15 +51,17 @@ run: build
 # Help
 help:
 	@echo "Makefile commands:"
-	@echo "  make build     - Compile the project."
-	@echo "  make test      - Run Go tests."
-	@echo "  make m28-test  - Run m28 language tests."
-	@echo "  make clean     - Clean build artifacts."
-	@echo "  make deps      - Install and tidy up dependencies."
-	@echo "  make run       - Start the REPL."
-	@echo "  make fmt       - Format Go code using gofmt."
-	@echo "  make all       - Default, build the project."
-	@echo "  make help      - Display this help."
+	@echo "  make build      - Compile the project."
+	@echo "  make test       - Run Go tests."
+	@echo "  make m28-test   - Run m28 language tests."
+	@echo "  make test-quick - Run essential tests only."
+	@echo "  make test-full  - Run full test suite including stress tests."
+	@echo "  make clean      - Clean build artifacts."
+	@echo "  make deps       - Install and tidy up dependencies."
+	@echo "  make run        - Start the REPL."
+	@echo "  make fmt        - Format Go code using gofmt."
+	@echo "  make all        - Default, build the project."
+	@echo "  make help       - Display this help."
 
 # Format the code
 fmt:

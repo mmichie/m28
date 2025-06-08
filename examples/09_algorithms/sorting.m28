@@ -1,0 +1,149 @@
+# Sorting Algorithms in M28
+
+# Bubble Sort
+(def bubble_sort (lst)
+  "Sort a list using bubble sort algorithm"
+  (= arr (lst.copy))  # Create a copy to avoid modifying original
+  (= n (len arr))
+  
+  (for i in (range n)
+    (= swapped False)
+    (for j in (range (- n i 1))
+      (if (> (nth arr j) (nth arr (+ j 1)))
+        (do
+          # Swap elements
+          (= temp (nth arr j))
+          (= arr[j] (nth arr (+ j 1)))
+          (= arr[(+ j 1)] temp)
+          (= swapped True))))
+    
+    # If no swaps occurred, array is sorted
+    (if (not swapped)
+      (break)))
+  
+  arr)
+
+# Selection Sort
+(def selection_sort (lst)
+  "Sort a list using selection sort algorithm"
+  (= arr (lst.copy))
+  (= n (len arr))
+  
+  (for i in (range n)
+    (= min_idx i)
+    
+    # Find minimum element in remaining array
+    (for j in (range (+ i 1) n)
+      (if (< (nth arr j) (nth arr min_idx))
+        (= min_idx j)))
+    
+    # Swap minimum with current position
+    (if (!= min_idx i)
+      (do
+        (= temp (nth arr i))
+        (= arr[i] (nth arr min_idx))
+        (= arr[min_idx] temp))))
+  
+  arr)
+
+# Insertion Sort
+(def insertion_sort (lst)
+  "Sort a list using insertion sort algorithm"
+  (= arr (lst.copy))
+  (= n (len arr))
+  
+  (for i in (range 1 n)
+    (= key (nth arr i))
+    (= j (- i 1))
+    
+    # Move elements greater than key one position ahead
+    (while (>= j 0)
+      (if (> (nth arr j) key)
+        (do
+          (= arr[(+ j 1)] (nth arr j))
+          (= j (- j 1)))
+        (break)))
+    
+    (= arr[(+ j 1)] key))
+  
+  arr)
+
+# Quick Sort
+(def quicksort (lst)
+  "Sort a list using quicksort algorithm"
+  (if (<= (len lst) 1)
+    lst
+    (do
+      (= pivot (nth lst (int (/ (len lst) 2))))
+      (= less (filter (lambda (x) (< x pivot)) lst))
+      (= equal (filter (lambda (x) (== x pivot)) lst))
+      (= greater (filter (lambda (x) (> x pivot)) lst))
+      (+ (quicksort less) equal (quicksort greater)))))
+
+# Merge Sort
+(def merge (left right)
+  "Merge two sorted lists"
+  (= result [])
+  (= i 0)
+  (= j 0)
+  
+  (while (and (< i (len left)) (< j (len right)))
+    (if (<= (nth left i) (nth right j))
+      (do
+        (= result (+ result [(nth left i)]))
+        (= i (+ i 1)))
+      (do
+        (= result (+ result [(nth right j)]))
+        (= j (+ j 1)))))
+  
+  # Add remaining elements
+  (while (< i (len left))
+    (= result (+ result [(nth left i)]))
+    (= i (+ i 1)))
+  
+  (while (< j (len right))
+    (= result (+ result [(nth right j)]))
+    (= j (+ j 1)))
+  
+  result)
+
+(def merge_sort (lst)
+  "Sort a list using merge sort algorithm"
+  (if (<= (len lst) 1)
+    lst
+    (do
+      (= mid (int (/ (len lst) 2)))
+      (= left (merge_sort lst[:mid]))
+      (= right (merge_sort lst[mid:]))
+      (merge left right))))
+
+# Test the sorting algorithms
+(print "Sorting Algorithms Demo")
+(print "======================")
+
+(= test_list [64, 34, 25, 12, 22, 11, 90, 88, 76, 50, 43])
+(print "Original list:" test_list)
+(print)
+
+(print "Bubble Sort:" (bubble_sort test_list))
+(print "Selection Sort:" (selection_sort test_list))
+(print "Insertion Sort:" (insertion_sort test_list))
+(print "Quick Sort:" (quicksort test_list))
+(print "Merge Sort:" (merge_sort test_list))
+
+# Performance comparison with larger list
+# (print "\nPerformance Comparison")
+# (print "=====================")
+
+# (import "random")
+# (= large_list (map (lambda (x) (random.randint 1 1000)) (range 100)))
+
+# (print "Testing with" (len large_list) "random elements...")
+
+# # Time each algorithm (note: timing would need actual time module)
+# (print "All algorithms produce the same sorted result!")
+
+# # Verify they all produce the same result
+# (= sorted_bubble (bubble_sort large_list))
+# (= sorted_quick (quicksort large_list))
+# (print "Results match:" (== sorted_bubble sorted_quick))

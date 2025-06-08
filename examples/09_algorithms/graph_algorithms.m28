@@ -1,0 +1,243 @@
+# Graph Algorithms in M28
+
+# Graph representation using adjacency list
+(def create_graph ()
+  "Create an empty graph"
+  {})
+
+(def add_edge (graph u v directed)
+  "Add edge between vertices u and v"
+  # Add u to graph if not present
+  (if (not (in u graph))
+    (= graph[u] []))
+  
+  # Add v to graph if not present
+  (if (not (in v graph))
+    (= graph[v] []))
+  
+  # Add edge u -> v
+  (if (not (in v graph[u]))
+    (= graph[u] (+ graph[u] [v])))
+  
+  # Add edge v -> u if undirected
+  (if (not directed)
+    (if (not (in u graph[v]))
+      (= graph[v] (+ graph[v] [u]))))
+  
+  graph)
+
+# Breadth-First Search (BFS)
+(def bfs (graph start)
+  "Perform BFS traversal from start vertex"
+  (= visited {})
+  (= queue [start])
+  (= result [])
+  
+  (= visited[start] True)
+  
+  (while (> (len queue) 0)
+    (= vertex (nth queue 0))
+    (= queue queue[1:])  # Dequeue
+    (= result (+ result [vertex]))
+    
+    # Visit all adjacent vertices
+    (if (in vertex graph)
+      (for neighbor in graph[vertex]
+        (if (not (in neighbor visited))
+          (do
+            (= visited[neighbor] True)
+            (= queue (+ queue [neighbor])))))))
+  
+  result)
+
+# Depth-First Search (DFS)
+(def dfs_recursive (graph vertex visited result)
+  "Recursive DFS helper"
+  (= visited[vertex] True)
+  (= result (+ result [vertex]))
+  
+  (if (in vertex graph)
+    (for neighbor in graph[vertex]
+      (if (not (in neighbor visited))
+        (= result (dfs_recursive graph neighbor visited result)))))
+  
+  result)
+
+(def dfs (graph start)
+  "Perform DFS traversal from start vertex"
+  (= visited {})
+  (= result [])
+  (dfs_recursive graph start visited result))
+
+# Find shortest path using BFS
+(def shortest_path (graph start end)
+  "Find shortest path between start and end vertices"
+  (if (== start end)
+    (return [start]))
+  
+  (= visited {})
+  (= queue [[start, [start]]])
+  (= visited[start] True)
+  
+  (while (> (len queue) 0)
+    (= current (nth queue 0))
+    (= vertex (nth current 0))
+    (= path (nth current 1))
+    (= queue queue[1:])
+    
+    (if (in vertex graph)
+      (for neighbor in graph[vertex]
+        (if (not (in neighbor visited))
+          (do
+            (= new_path (+ path [neighbor]))
+            
+            (if (== neighbor end)
+              (return new_path))
+            
+            (= visited[neighbor] True)
+            (= queue (+ queue [[neighbor, new_path]])))))))
+  
+  None)  # No path found
+
+# Check if graph has cycle (for undirected graph)
+(def has_cycle_util (graph vertex visited parent)
+  "Utility function to detect cycle"
+  (= visited[vertex] True)
+  
+  (if (in vertex graph)
+    (for neighbor in graph[vertex]
+      (if (not (in neighbor visited))
+        (if (has_cycle_util graph neighbor visited vertex)
+          (return True))
+        (if (!= neighbor parent)
+          (return True)))))
+  
+  False)
+
+(def has_cycle (graph)
+  "Check if undirected graph has a cycle"
+  (= visited {})
+  
+  (for vertex in (keys graph)
+    (if (not (in vertex visited))
+      (if (has_cycle_util graph vertex visited -1)
+        (return True))))
+  
+  False)
+
+# Topological Sort (for directed acyclic graph)
+(def topological_sort_util (graph vertex visited stack)
+  "Utility function for topological sort"
+  (= visited[vertex] True)
+  
+  (if (in vertex graph)
+    (for neighbor in graph[vertex]
+      (if (not (in neighbor visited))
+        (topological_sort_util graph neighbor visited stack))))
+  
+  (= stack (+ [vertex] stack))  # Push to front
+  stack)
+
+(def topological_sort (graph)
+  "Perform topological sort on directed acyclic graph"
+  (= visited {})
+  (= stack [])
+  
+  (for vertex in (keys graph)
+    (if (not (in vertex visited))
+      (= stack (topological_sort_util graph vertex visited stack))))
+  
+  stack)
+
+# Count connected components
+(def count_components (graph)
+  "Count number of connected components in undirected graph"
+  (= visited {})
+  (= count 0)
+  
+  (for vertex in (keys graph)
+    (if (not (in vertex visited))
+      (do
+        (dfs_recursive graph vertex visited [])
+        (= count (+ count 1)))))
+  
+  count)
+
+# Find all paths between two vertices
+(def find_all_paths_util (graph start end visited path all_paths)
+  "Utility to find all paths"
+  (= visited[start] True)
+  (= path (+ path [start]))
+  
+  (if (== start end)
+    (= all_paths (+ all_paths [path]))
+    (if (in start graph)
+      (for neighbor in graph[start]
+        (if (not (in neighbor visited))
+          (= all_paths (find_all_paths_util graph neighbor end visited path all_paths))))))
+  
+  # Backtrack
+  (= visited[start] False)
+  all_paths)
+
+(def find_all_paths (graph start end)
+  "Find all paths between start and end"
+  (= visited {})
+  (find_all_paths_util graph start end visited [] []))
+
+# Demonstrations
+(print "Graph Algorithms Demo")
+(print "====================")
+
+# Create sample graph
+(= g1 (create_graph))
+(= g1 (add_edge g1 0 1 False))
+(= g1 (add_edge g1 0 2 False))
+(= g1 (add_edge g1 1 2 False))
+(= g1 (add_edge g1 2 3 False))
+(= g1 (add_edge g1 3 4 False))
+
+(print "\nUndirected Graph:")
+(print "Adjacency List:" g1)
+
+(print "\nBFS Traversal from vertex 0:" (bfs g1 0))
+(print "DFS Traversal from vertex 0:" (dfs g1 0))
+
+(print "\nShortest path from 0 to 4:" (shortest_path g1 0 4))
+(print "All paths from 0 to 4:" (find_all_paths g1 0 4))
+
+(print "\nHas cycle?" (has_cycle g1))
+(print "Number of connected components:" (count_components g1))
+
+# Create directed graph for topological sort
+(print "\n\nDirected Acyclic Graph:")
+(= g2 (create_graph))
+(= g2 (add_edge g2 5 2 True))
+(= g2 (add_edge g2 5 0 True))
+(= g2 (add_edge g2 4 0 True))
+(= g2 (add_edge g2 4 1 True))
+(= g2 (add_edge g2 2 3 True))
+(= g2 (add_edge g2 3 1 True))
+
+(print "Adjacency List:" g2)
+(print "Topological Sort:" (topological_sort g2))
+
+# Create graph with cycle
+(print "\n\nGraph with Cycle:")
+(= g3 (create_graph))
+(= g3 (add_edge g3 0 1 False))
+(= g3 (add_edge g3 1 2 False))
+(= g3 (add_edge g3 2 0 False))
+
+(print "Adjacency List:" g3)
+(print "Has cycle?" (has_cycle g3))
+
+# Disconnected graph
+(print "\n\nDisconnected Graph:")
+(= g4 (create_graph))
+(= g4 (add_edge g4 0 1 False))
+(= g4 (add_edge g4 2 3 False))
+(= g4 (add_edge g4 4 5 False))
+
+(print "Adjacency List:" g4)
+(print "Number of connected components:" (count_components g4))
