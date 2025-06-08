@@ -1,0 +1,68 @@
+# Test arithmetic operations with operator overloading
+
+# Define a custom class with __add__ method
+(class Vector
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y))
+  
+  (def __add__ (self other)
+    (if (isinstance other Vector)
+      (Vector (+ self.x other.x) (+ self.y other.y))
+      (Vector (+ self.x other) (+ self.y other))))
+  
+  (def __str__ (self)
+    (+ "Vector(" (str self.x) ", " (str self.y) ")")))
+
+# Create some vectors
+(= v1 (Vector 1 2))
+(= v2 (Vector 3 4))
+(= v3 (Vector 5 6))
+
+# Test __add__ method directly
+(print "=== Direct __add__ calls ===")
+(print "v1.__add__(v2) = " (v1.__add__ v2))
+
+# Test + operator with two vectors
+(print "\n=== + operator with vectors ===")
+(= result (+ v1 v2))
+(print "(+ v1 v2) = " result)
+(assert (== result.x 4) "v1 + v2 x coordinate should be 4")
+(assert (== result.y 6) "v1 + v2 y coordinate should be 6")
+
+# Test + operator with three vectors (chained __add__)
+(print "\n=== + operator with three vectors ===")
+(= result2 (+ v1 v2 v3))
+(print "(+ v1 v2 v3) = " result2)
+(assert (== result2.x 9) "v1 + v2 + v3 x coordinate should be 9")
+(assert (== result2.y 12) "v1 + v2 + v3 y coordinate should be 12")
+
+# Test mixing vectors and numbers
+(print "\n=== + operator with vector and number ===")
+(= result3 (+ v1 10))
+(print "(+ v1 10) = " result3)
+(assert (== result3.x 11) "v1 + 10 x coordinate should be 11")
+(assert (== result3.y 12) "v1 + 10 y coordinate should be 12")
+
+# Verify that regular number addition still works
+(print "\n=== Regular number addition ===")
+(assert (== (+ 1 2 3) 6) "Regular number addition should still work")
+
+# Define a class that doesn't have __add__
+(class Point
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y)))
+
+(= p1 (Point 1 2))
+(= p2 (Point 3 4))
+
+# This should fail since Point doesn't have __add__
+(print "\n=== Testing class without __add__ ===")
+(try
+  (+ p1 p2)
+  (print "ERROR: Should have failed!")
+  (except Exception as e
+    (print "Correctly failed: " (str e))))
+
+(print "\n✅ All operator overloading tests passed!")

@@ -312,7 +312,9 @@ The language is considered "complete" when:
    - [x] `__contains__` - Custom `in` operator behavior ✅
 
 2. **Complete Arithmetic Protocols**
+   - [x] Basic operators: `__add__` (already implemented)
    - [ ] Basic operators: `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__pow__`
+     - Note: Currently only `__add__` is registered for NumberType. Other operators need dunder methods added to enable operator overloading while maintaining fast paths for built-in types.
    - [ ] Reverse operators: `__radd__`, `__rsub__`, `__rmul__`, etc. (for `5 + custom_obj`)
    - [ ] In-place operators: `__iadd__`, `__isub__`, `__imul__`, etc.
    - [ ] Unary operators: `__neg__`, `__pos__`, `__abs__`

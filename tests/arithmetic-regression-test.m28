@@ -1,0 +1,30 @@
+# Quick regression test for basic arithmetic
+# This ensures our fix didn't break any existing functionality
+
+# Basic operations
+(assert (== (+ 1 2) 3) "Basic addition")
+(assert (== (- 5 2) 3) "Basic subtraction")
+(assert (== (* 3 4) 12) "Basic multiplication")
+(assert (== (/ 10 2) 5) "Basic division")
+
+# Operations with variables
+(= x 10)
+(= y 5)
+(assert (== (+ x y) 15) "Variable addition")
+(assert (== (- x y) 5) "Variable subtraction")
+(assert (== (* x y) 50) "Variable multiplication")
+(assert (== (/ x y) 2) "Variable division")
+
+# String operations
+(assert (== (+ "hello" " " "world") "hello world") "String concatenation")
+
+# List operations
+(assert (== (+ [1 2] [3 4]) [1 2 3 4]) "List concatenation")
+
+# Edge cases that previously worked
+(assert (== (+ ) 0) "Empty addition")
+(assert (== (* ) 1) "Empty multiplication")
+(assert (== (- 5) -5) "Unary negation")
+(assert (== (/ 2) 0.5) "Reciprocal")
+
+(print "✅ No regressions detected!")

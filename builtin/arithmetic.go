@@ -35,20 +35,49 @@ func AddFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0), nil
 	}
 
-	// Check if the first argument has __add__ method (operator overloading)
-	if len(args) >= 2 {
-		if obj, ok := args[0].(interface {
-			GetAttr(string) (core.Value, bool)
-		}); ok {
-			if method, found := obj.GetAttr("__add__"); found {
-				if callable, ok := method.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					// Call __add__ with remaining arguments
-					return callable.Call(args[1:], ctx)
+	// For operator overloading, we need to handle multiple arguments by chaining calls
+	// Check if we should use __add__ method
+	// Skip operator overloading for built-in types that have optimized implementations
+	useAddMethod := false
+	switch args[0].(type) {
+	case core.NumberValue, core.StringValue, core.ListValue:
+		// Use built-in fast paths for these types
+		useAddMethod = false
+	default:
+		// Check for __add__ method on custom objects
+		if len(args) >= 2 {
+			if obj, ok := args[0].(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if _, found := obj.GetAttr("__add__"); found {
+					useAddMethod = true
 				}
 			}
 		}
+	}
+	
+	if useAddMethod {
+		// Chain __add__ calls for multiple arguments
+		result := args[0]
+		for i := 1; i < len(args); i++ {
+			// Get __add__ method from current result
+			if obj, ok := result.(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if method, found := obj.GetAttr("__add__"); found {
+					if callable, ok := method.(interface {
+						Call([]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						var err error
+						result, err = callable.Call([]core.Value{args[i]}, ctx)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+		}
+		return result, nil
 	}
 
 	switch first := args[0].(type) {
@@ -109,16 +138,35 @@ func SubtractFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check if the first argument has __sub__ method (operator overloading)
-	if len(args) >= 2 {
+	// Skip for built-in numeric types
+	if _, isNumber := args[0].(core.NumberValue); !isNumber && len(args) >= 2 {
 		if obj, ok := args[0].(interface {
 			GetAttr(string) (core.Value, bool)
 		}); ok {
 			if method, found := obj.GetAttr("__sub__"); found {
-				if callable, ok := method.(interface {
+				if _, ok := method.(interface {
 					Call([]core.Value, *core.Context) (core.Value, error)
 				}); ok {
-					// Call __sub__ with remaining arguments
-					return callable.Call(args[1:], ctx)
+					// Chain __sub__ calls for multiple arguments
+					result := args[0]
+					for i := 1; i < len(args); i++ {
+						if obj, ok := result.(interface {
+							GetAttr(string) (core.Value, bool)
+						}); ok {
+							if method, found := obj.GetAttr("__sub__"); found {
+								if subCallable, ok := method.(interface {
+									Call([]core.Value, *core.Context) (core.Value, error)
+								}); ok {
+									var err error
+									result, err = subCallable.Call([]core.Value{args[i]}, ctx)
+									if err != nil {
+										return nil, err
+									}
+								}
+							}
+						}
+					}
+					return result, nil
 				}
 			}
 		}
@@ -147,16 +195,40 @@ func MultiplyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check if the first argument has __mul__ method (operator overloading)
-	if len(args) >= 2 {
-		if obj, ok := args[0].(interface {
-			GetAttr(string) (core.Value, bool)
-		}); ok {
-			if method, found := obj.GetAttr("__mul__"); found {
-				if callable, ok := method.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					// Call __mul__ with remaining arguments
-					return callable.Call(args[1:], ctx)
+	// Skip for built-in types that have optimized implementations
+	switch args[0].(type) {
+	case core.NumberValue, core.StringValue, core.ListValue:
+		// Use built-in fast paths for these types
+	default:
+		if len(args) >= 2 {
+			if obj, ok := args[0].(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if method, found := obj.GetAttr("__mul__"); found {
+					if _, ok := method.(interface {
+						Call([]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						// Chain __mul__ calls for multiple arguments
+						result := args[0]
+						for i := 1; i < len(args); i++ {
+							if obj, ok := result.(interface {
+								GetAttr(string) (core.Value, bool)
+							}); ok {
+								if method, found := obj.GetAttr("__mul__"); found {
+									if mulCallable, ok := method.(interface {
+										Call([]core.Value, *core.Context) (core.Value, error)
+									}); ok {
+										var err error
+										result, err = mulCallable.Call([]core.Value{args[i]}, ctx)
+										if err != nil {
+											return nil, err
+										}
+									}
+								}
+							}
+						}
+						return result, nil
+					}
 				}
 			}
 		}
@@ -234,16 +306,35 @@ func DivideFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check if the first argument has __truediv__ method (operator overloading)
-	if len(args) >= 2 {
+	// Skip for built-in numeric types
+	if _, isNumber := args[0].(core.NumberValue); !isNumber && len(args) >= 2 {
 		if obj, ok := args[0].(interface {
 			GetAttr(string) (core.Value, bool)
 		}); ok {
 			if method, found := obj.GetAttr("__truediv__"); found {
-				if callable, ok := method.(interface {
+				if _, ok := method.(interface {
 					Call([]core.Value, *core.Context) (core.Value, error)
 				}); ok {
-					// Call __truediv__ with remaining arguments
-					return callable.Call(args[1:], ctx)
+					// Chain __truediv__ calls for multiple arguments
+					result := args[0]
+					for i := 1; i < len(args); i++ {
+						if obj, ok := result.(interface {
+							GetAttr(string) (core.Value, bool)
+						}); ok {
+							if method, found := obj.GetAttr("__truediv__"); found {
+								if divCallable, ok := method.(interface {
+									Call([]core.Value, *core.Context) (core.Value, error)
+								}); ok {
+									var err error
+									result, err = divCallable.Call([]core.Value{args[i]}, ctx)
+									if err != nil {
+										return nil, err
+									}
+								}
+							}
+						}
+					}
+					return result, nil
 				}
 			}
 		}

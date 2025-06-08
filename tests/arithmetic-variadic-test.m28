@@ -1,0 +1,139 @@
+# Comprehensive test for variadic arithmetic operations
+# This test ensures that arithmetic operators work correctly with multiple arguments
+
+# Test addition with various numbers of arguments
+(print "=== Addition Tests ===")
+
+# No arguments
+(assert (== (+) 0) "(+) should return 0")
+
+# Single argument
+(assert (== (+ 5) 5) "(+ 5) should return 5")
+
+# Two arguments
+(assert (== (+ 2 3) 5) "(+ 2 3) should return 5")
+
+# Three arguments
+(assert (== (+ 1 2 3) 6) "(+ 1 2 3) should return 6")
+
+# Four arguments
+(assert (== (+ 1 2 3 4) 10) "(+ 1 2 3 4) should return 10")
+
+# Five arguments
+(assert (== (+ 1 2 3 4 5) 15) "(+ 1 2 3 4 5) should return 15")
+
+# Ten arguments
+(assert (== (+ 1 2 3 4 5 6 7 8 9 10) 55) "(+ 1 2 3 4 5 6 7 8 9 10) should return 55")
+
+# With variables
+(= x 10)
+(= y 20)
+(= z 30)
+(assert (== (+ x y z) 60) "(+ x y z) should return 60")
+(assert (== (+ x y z 40) 100) "(+ x y z 40) should return 100")
+
+# Mixed variables and literals
+(assert (== (+ 5 x y) 35) "(+ 5 x y) should return 35")
+(assert (== (+ x 5 y) 35) "(+ x 5 y) should return 35")
+(assert (== (+ x y 5) 35) "(+ x y 5) should return 35")
+
+# Negative numbers
+(assert (== (+ -5 10) 5) "(+ -5 10) should return 5")
+(assert (== (+ 10 -5 -3) 2) "(+ 10 -5 -3) should return 2")
+(assert (== (+ -1 -2 -3 -4) -10) "(+ -1 -2 -3 -4) should return -10")
+
+# Floating point
+(assert (== (+ 1.5 2.5) 4.0) "(+ 1.5 2.5) should return 4.0")
+# Skip exact float comparison due to precision issues
+
+# Test subtraction with multiple arguments
+(print "\n=== Subtraction Tests ===")
+
+# Single argument (negation)
+(assert (== (- 5) -5) "(- 5) should return -5")
+(assert (== (- -5) 5) "(- -5) should return 5")
+
+# Two arguments
+(assert (== (- 10 3) 7) "(- 10 3) should return 7")
+
+# Three arguments
+(assert (== (- 10 3 2) 5) "(- 10 3 2) should return 5")
+
+# Four arguments
+(assert (== (- 20 5 3 2) 10) "(- 20 5 3 2) should return 10")
+
+# With variables
+(assert (== (- x y) -10) "(- x y) should return -10")
+(assert (== (- z y x) 0) "(- z y x) should return 0")
+
+# Test multiplication with multiple arguments
+(print "\n=== Multiplication Tests ===")
+
+# No arguments
+(assert (== (*) 1) "(*) should return 1")
+
+# Single argument
+(assert (== (* 5) 5) "(* 5) should return 5")
+
+# Two arguments
+(assert (== (* 2 3) 6) "(* 2 3) should return 6")
+
+# Three arguments
+(assert (== (* 2 3 4) 24) "(* 2 3 4) should return 24")
+
+# Four arguments
+(assert (== (* 2 3 4 5) 120) "(* 2 3 4 5) should return 120")
+
+# With variables
+(= a 2)
+(= b 3)
+(= c 4)
+(assert (== (* a b c) 24) "(* a b c) should return 24")
+
+# Test division with multiple arguments
+(print "\n=== Division Tests ===")
+
+# Single argument (reciprocal)
+(assert (== (/ 2) 0.5) "(/ 2) should return 0.5")
+(assert (== (/ 0.5) 2) "(/ 0.5) should return 2")
+
+# Two arguments
+(assert (== (/ 10 2) 5) "(/ 10 2) should return 5")
+
+# Three arguments
+(assert (== (/ 100 2 5) 10) "(/ 100 2 5) should return 10")
+
+# Four arguments
+(assert (== (/ 120 2 3 4) 5) "(/ 120 2 3 4) should return 5")
+
+# String concatenation
+(print "\n=== String Concatenation Tests ===")
+
+(assert (== (+ "hello" " " "world") "hello world") "String concatenation with 3 args")
+(assert (== (+ "a" "b" "c" "d") "abcd") "String concatenation with 4 args")
+
+# List concatenation
+(print "\n=== List Concatenation Tests ===")
+
+(assert (== (+ [1 2] [3 4]) [1 2 3 4]) "List concatenation with 2 args")
+(assert (== (+ [1] [2] [3] [4]) [1 2 3 4]) "List concatenation with 4 args")
+(assert (== (+ [] [1 2 3] []) [1 2 3]) "List concatenation with empty lists")
+
+# Edge cases
+(print "\n=== Edge Cases ===")
+
+# Large number of arguments
+(= sum (+ 1 1 1 1 1 1 1 1 1 1 
+          1 1 1 1 1 1 1 1 1 1
+          1 1 1 1 1 1 1 1 1 1))
+(assert (== sum 30) "Addition with 30 ones should return 30")
+
+# Zero in multiplication
+(assert (== (* 100 0 50) 0) "Multiplication with zero should return 0")
+(assert (== (* 0 100 50) 0) "Multiplication with zero first should return 0")
+
+# Identity operations
+(assert (== (+ 0 0 0 x 0 0) x) "Adding zeros should not change value")
+(assert (== (* 1 1 1 x 1 1) x) "Multiplying by ones should not change value")
+
+(print "\n✅ All variadic arithmetic tests passed!")
