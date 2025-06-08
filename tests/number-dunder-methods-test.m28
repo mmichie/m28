@@ -1,0 +1,67 @@
+# Test number dunder methods (__add__, etc.)
+
+(print "=== Number Dunder Methods Test ===\n")
+
+# Test 1: __add__ method exists and is accessible
+(print "Test 1: __add__ method access")
+(= x 5)
+(= add_method x.__add__)
+(assert (not (= add_method None)) "Number should have __add__ method")
+(print "  ✓ Numbers have __add__ method")
+
+# Test 2: __add__ can be called directly
+(print "\nTest 2: Direct __add__ call")
+(= result (x.__add__ 3))
+(assert (= result 8) "5.__add__(3) should equal 8")
+(print "  ✓ __add__ can be called directly")
+
+# Test 3: + operator uses __add__ for two arguments
+(print "\nTest 3: + operator with 2 args uses __add__")
+(= result (+ 10 5))
+(assert (= result 15) "10 + 5 should equal 15")
+(print "  ✓ + operator works with 2 args")
+
+# Test 4: + operator chains __add__ for multiple arguments
+(print "\nTest 4: + operator chains __add__ for multiple args")
+(= result (+ 1 2 3 4 5))
+(assert (= result 15) "1 + 2 + 3 + 4 + 5 should equal 15")
+(print "  ✓ + operator chains correctly for multiple args")
+
+# Test 5: Single argument + returns the value
+(print "\nTest 5: + with single argument")
+(= result (+ 42))
+(assert (= result 42) "(+ 42) should equal 42")
+(print "  ✓ + with single arg returns the value")
+
+# Test 6: No arguments + returns 0
+(print "\nTest 6: + with no arguments")
+(= result (+))
+(assert (= result 0) "(+) should equal 0")
+(print "  ✓ + with no args returns 0")
+
+# Test 7: Other dunder methods
+(print "\nTest 7: Other number methods")
+(= y 10)
+
+# Check abs method
+(= abs_method y.abs)
+(assert (not (= abs_method None)) "Number should have abs method")
+(= result (y.abs))
+(assert (= result 10) "10.abs() should equal 10")
+(print "  ✓ abs method works")
+
+# Check __neg__ method
+(= neg_method y.__neg__)
+(assert (not (= neg_method None)) "Number should have __neg__ method")
+(= result (y.__neg__))
+(assert (= result -10) "10.__neg__() should equal -10")
+(print "  ✓ __neg__ method works")
+
+# Test 8: Method binding works correctly
+(print "\nTest 8: Method binding")
+(= add_five x.__add__)  # x is 5
+(= result (add_five 7))
+(assert (= result 12) "Bound method should remember receiver")
+(print "  ✓ Method binding works correctly")
+
+(print "\n=== All number dunder method tests passed! ===")

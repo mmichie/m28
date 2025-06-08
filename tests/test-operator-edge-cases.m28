@@ -1,0 +1,59 @@
+# Test edge cases for arithmetic operators
+
+# Test modulo and power operators
+(print "=== Testing Modulo ===")
+(assert (== (% 10 3) 1) "(% 10 3) should equal 1")
+(assert (== (% 7 2) 1) "(% 7 2) should equal 1")
+(assert (== (% 8 4) 0) "(% 8 4) should equal 0")
+
+(print "=== Testing Power ===")
+(assert (== (** 2 3) 8) "(** 2 3) should equal 8")
+(assert (== (** 5 2) 25) "(** 5 2) should equal 25")
+(assert (== (** 10 0) 1) "(** 10 0) should equal 1")
+
+# Test operator precedence and chaining
+(print "\n=== Testing Complex Expressions ===")
+(= a 2)
+(= b 3)
+(= c 4)
+
+# These should work as expected
+(assert (== (+ (* a b) c) 10) "(+ (* a b) c) should equal 10")
+(assert (== (* a (+ b c)) 14) "(* a (+ b c)) should equal 14")
+(assert (== (- (/ 20 a) b) 7) "(- (/ 20 a) b) should equal 7")
+
+# Test with negative numbers
+(print "\n=== Testing Negative Numbers ===")
+(assert (== (* -2 3) -6) "(* -2 3) should equal -6")
+(assert (== (/ -10 2) -5) "(/ -10 2) should equal -5")
+(assert (== (% -7 3) -1) "(% -7 3) should equal -1")
+
+# Test division by zero
+(print "\n=== Testing Division by Zero ===")
+(try
+  (/ 1 0)
+  (print "ERROR: Division by zero should have raised an error!")
+  (except ZeroDivisionError as e
+    (print "✓ Division by zero correctly raised ZeroDivisionError")))
+
+(try
+  (% 1 0)
+  (print "ERROR: Modulo by zero should have raised an error!")
+  (except Exception as e
+    (print "✓ Modulo by zero correctly raised error: " (str e))))
+
+# Test type errors
+(print "\n=== Testing Type Errors ===")
+(try
+  (+ 1 "hello")
+  (print "ERROR: Adding number and string should fail!")
+  (except Exception as e
+    (print "✓ Type error correctly raised: " (str e))))
+
+(try
+  (* "hello" "world")
+  (print "ERROR: Multiplying two strings should fail!")
+  (except Exception as e
+    (print "✓ Type error correctly raised: " (str e))))
+
+(print "\n✅ All operator edge case tests passed!")
