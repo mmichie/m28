@@ -1,0 +1,37 @@
+# Simple test for repr() builtin
+
+(print "Testing repr() builtin function...")
+
+# Test repr for basic types
+(assert (== (repr 42) "42") "repr of number")
+(assert (== (repr True) "True") "repr of True")
+(assert (== (repr False) "False") "repr of False")
+(assert (== (repr nil) "None") "repr of nil")
+
+(print "Basic tests passed!")
+
+# Test repr for strings - should show quotes
+(assert (== (repr "hello") "\"hello\"") "repr of string shows quotes")
+(assert (== (repr "") "\"\"") "repr of empty string")
+
+(print "String tests passed!")
+
+# Test repr for lists
+(assert (== (repr []) "[]") "repr of empty list")
+(assert (== (repr [1, 2, 3]) "[1, 2, 3]") "repr of list")
+
+(print "List tests passed!")
+
+# Test custom __repr__ method
+(class Point ()
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y))
+  
+  (def __repr__ (self)
+    (+ "Point(" (str self.x) ", " (str self.y) ")")))
+
+(= p (Point 3 4))
+(assert (== (repr p) "Point(3, 4)") "custom __repr__ method")
+
+(print "All repr tests passed!")

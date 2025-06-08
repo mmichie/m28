@@ -166,7 +166,8 @@ func (r *REPL) Start() {
 
 		// Only print the result if it's not nil and wasn't already printed
 		if result != core.Nil {
-			resultStr := result.String()
+			// Use Repr for developer-friendly output in REPL
+			resultStr := core.Repr(result)
 			// Check if the result was already printed to avoid duplication
 			if printedOutput == "" || printedOutput != resultStr {
 				outputPrompt := r.executionState.FormatOutputPrompt(execNum)

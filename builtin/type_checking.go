@@ -97,6 +97,16 @@ func registerTypeCheckingBuiltins(ctx *core.Context) {
 		return core.BoolValue(core.IsTruthy(args[0])), nil
 	}))
 
+	// repr() - return developer-friendly representation
+	ctx.Define("repr", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("repr() takes exactly one argument (%d given)", len(args))
+		}
+
+		// Use the Repr function to get developer-friendly representation
+		return core.StringValue(core.Repr(args[0])), nil
+	}))
+
 	// bytes() - convert string to bytes representation
 	ctx.Define("bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 2 {

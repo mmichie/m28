@@ -117,6 +117,7 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Classes" "tests/simple-inheritance-test.m28" true
     run_test "Keywords" "tests/keyword-args-test.m28" true
     run_test "Loops" "tests/loop-test.m28"
+    run_test "Repr Function" "tests/repr-test-simple.m28"
 fi
 
 if [[ "$MODE" != "quick" ]]; then
