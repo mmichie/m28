@@ -118,6 +118,9 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Keywords" "tests/keyword-args-test.m28" true
     run_test "Loops" "tests/loop-test.m28"
     run_test "Repr Function" "tests/repr-test-simple.m28"
+    run_test "Bool Protocol" "tests/bool-protocol-test.m28"
+    run_test "Len Protocol" "tests/len-protocol-test.m28"
+    run_test "Contains Protocol" "tests/contains-protocol-test.m28"
 fi
 
 if [[ "$MODE" != "quick" ]]; then

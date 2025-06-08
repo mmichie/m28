@@ -74,6 +74,13 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 **Note**: Most core features are complete. Main gaps are:
 
+- [ ] **Macro System** (Fundamental Lisp Feature)
+  - [ ] `defmacro` for defining macros
+  - [ ] `quasiquote` (backtick) for template expressions
+  - [ ] `unquote` (comma) and `unquote-splice` (comma-at) for interpolation
+  - [ ] Hygienic macro support to prevent variable capture
+  - [ ] Macro expansion phase in evaluation
+
 - [x] **Property/Method Access** ✅ COMPLETE
   - [x] Direct dot notation: `obj.method()` instead of `(. obj method)`
   - [x] Chained access: `obj.prop.method().value`
@@ -143,8 +150,31 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] **More Built-ins** (Partially Complete)
   - [x] Boolean operations: `all()`, `any()` ✅ DONE
   - [x] Math functions: `round()`, `divmod()` ✅ DONE
-  - [ ] Iterator functions: `next()`, `iter()`
+  - [ ] Iterator functions: `iter()`, `next()` with default parameter
   - [ ] `eval()` and `exec()`
+  - [ ] `slice()` object creator
+  - [ ] `vars()`, `dir()` for object introspection
+  - [ ] `globals()`, `locals()` for namespace access
+
+- [ ] **Functional Programming Enhancements**
+  - [ ] Key parameter for `sorted()`, `min()`, `max()`: `sorted(items, key=lambda x: x.age)`
+  - [ ] `reversed()` as iterator (currently returns new list)
+  - [ ] `sum()` with start parameter: `sum([1,2,3], start=10)`
+  - [ ] `round()` with ndigits: `round(3.14159, 2)`
+  - [ ] `isinstance()` with tuple of types: `isinstance(x, (int, float))`
+  - [ ] `frozenset()` immutable set type
+  - [ ] **Threading Macros** (Clojure/Hy-style)
+    - [ ] `->` thread-first macro: `(-> x (foo) (bar 2) (baz))`
+    - [ ] `->>` thread-last macro: `(->> data (map inc) (filter even?) (take 5))`
+
+- [ ] **Itertools-like Functions**
+  - [ ] `product()` - Cartesian product
+  - [ ] `permutations()` - All permutations
+  - [ ] `combinations()` - Combinations without replacement
+  - [ ] `chain()` - Chain multiple iterables
+  - [ ] `groupby()` - Group consecutive elements
+  - [ ] `repeat()` - Repeat element n times
+  - [ ] `cycle()` - Infinite cycle through iterable
 
 - [ ] **Advanced Features**
   - [ ] Decorators with `@` syntax
@@ -166,28 +196,49 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [ ] Binary/octal/hex number literals
   - [ ] Raw strings: `r"raw\string"`
 
-## Implementation Plan
+## Implementation Priorities
 
-### Week 1: Fix Core Syntax Issues
-- [x] Day 1-2: Fix dot notation for method calls (`obj.method()`) ✅ DONE
-- [x] Day 3: Add direct indexing (`list[0]`, `dict["key"]`) ✅ DONE
-- [x] Day 4: Implement augmented assignment (`+=`, `-=`, etc.) ✅ DONE
-- [x] Day 5: Restrict `def` to functions only ✅ DONE
+### ✅ Completed Major Features
+- [x] Core syntax (dot notation, indexing, augmented assignment)
+- [x] All string, list, dict, set methods
+- [x] Type system improvements (isinstance, type conversions)
+- [x] Essential built-ins (all, any, round, divmod)
+- [x] Enhanced f-strings with nested quotes
+- [x] Tuple unpacking in for loops
+- [x] File context managers
 
-### Week 2: Essential Built-in Methods
-- [x] Day 1-2: Implement string methods ✅ DONE
-- [x] Day 3-4: Implement list methods ✅ DONE
-- [x] Day 5: Implement dictionary methods ✅ DONE
+### 🎯 High Priority - Next Steps
+1. **Module System Improvements**
+   - [ ] Local `.m28` module imports
+   - [ ] `from module import name` syntax
+   - [ ] `import module as alias` syntax
 
-### Week 3: Type System and Built-ins
-- [x] Day 1-2: Fix `isinstance`, `issubclass`, add type conversions ✅ DONE
-- [x] Day 3-4: Add remaining essential built-ins (`all`, `any`, `round`, etc.) ✅ DONE
-- [x] Day 5: Test and fix issues ✅ DONE
+2. **Functional Programming**
+   - [ ] Key parameter for sorted/min/max (high impact)
+   - [ ] Default parameter for next()
+   - [ ] slice() object creator
 
-### Week 4: Polish and Testing
-- [x] Day 1: Enhanced f-strings with nested quote support ✅ DONE
-- [ ] Day 2-3: Run all example files and fix failures
-- [ ] Day 4-5: Update documentation and clean up
+3. **Core Python Features**
+   - [ ] Set literals `{1, 2, 3}`
+   - [ ] Multiple assignment `a, b = 1, 2`
+   - [ ] Exception variable binding `except Error as e`
+
+### 📊 Medium Priority
+- [ ] Itertools-like functions (product, combinations, etc.)
+- [ ] Enhanced built-ins (reversed as iterator, sum with start)
+- [ ] Object introspection (dir, vars)
+- [ ] **REPL Enhancements**
+  - [ ] Module reload without restart: `reload(module)`
+  - [ ] Magic commands: `%time`, `%debug`, `%who`
+  - [ ] Enhanced multi-line editing with syntax highlighting
+  - [ ] Better autocomplete with type hints
+  - [ ] Command history search (Ctrl+R style)
+
+### 🔮 Future Enhancements
+- [ ] Decorators with @ syntax
+- [ ] Generator expressions
+- [ ] Dictionary/set comprehensions
+- [ ] Async/await support
 
 ## Remaining Implementation Gaps
 
@@ -243,3 +294,123 @@ The language is considered "complete" when:
 1. Start with fixing dot notation - this unblocks the most functionality
 2. Then add direct indexing - another major usability improvement
 3. Focus on making existing features work properly before adding new ones
+
+## Code Quality and Architecture Improvements
+
+### 🐍 Python Protocol Implementation
+
+#### High Priority - Essential Protocols
+1. **Core Object Protocols**
+   - [x] `__repr__` - Developer-friendly string representation ✅
+   - [ ] `__hash__` - Enable custom objects as dict keys/set members
+   - [x] `__bool__` - Custom truthiness for `if obj:` statements ✅
+   - [x] `__len__` - Length protocol for all containers ✅
+   - [x] `__contains__` - Custom `in` operator behavior ✅
+
+2. **Complete Arithmetic Protocols**
+   - [ ] Basic operators: `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__pow__`
+   - [ ] Reverse operators: `__radd__`, `__rsub__`, `__rmul__`, etc. (for `5 + custom_obj`)
+   - [ ] In-place operators: `__iadd__`, `__isub__`, `__imul__`, etc.
+   - [ ] Unary operators: `__neg__`, `__pos__`, `__abs__`
+
+3. **Comparison Protocols**
+   - [ ] Ordering operators: `__lt__`, `__le__`, `__gt__`, `__ge__`
+   - [ ] Inequality: `__ne__`
+   - [ ] Support for `sorted()` and `min()`/`max()` with custom objects
+
+4. **Container Protocols**
+   - [ ] `__getitem__` - Custom indexing `obj[key]`
+   - [ ] `__setitem__` - Custom assignment `obj[key] = value`
+   - [ ] `__delitem__` - Custom deletion `del obj[key]`
+   - [ ] `__reversed__` - Custom reversed iteration
+
+#### Medium Priority - Advanced Protocols
+1. **Callable and Iteration**
+   - [ ] `__call__` - Make any object callable like a function
+   - [ ] `__iter__` - Make any object iterable with full protocol
+   - [ ] `__getattr__` - Dynamic attribute access fallback
+   - [ ] `__setattr__` - Custom attribute setting behavior
+
+2. **Type Conversion and Formatting**
+   - [ ] `__format__` - Custom f-string formatting
+   - [ ] `__bytes__` - Bytes representation
+   - [ ] `__index__` - Convert to integer for slicing
+
+3. **Copying Support**
+   - [ ] `__copy__` - Shallow copy protocol
+   - [ ] `__deepcopy__` - Deep copy protocol
+
+#### Low Priority - Specialized Protocols
+1. **Bitwise Operators**
+   - [ ] `__and__`, `__or__`, `__xor__` - Bitwise operations
+   - [ ] `__lshift__`, `__rshift__` - Bit shifting
+   - [ ] `__invert__` - Bitwise NOT
+
+2. **Advanced Python Features**
+   - [ ] Descriptor protocol: `__get__`, `__set__`, `__delete__`
+   - [ ] Metaclass protocols: `__new__`, `__del__`
+   - [ ] Async protocols: `__aenter__`, `__aexit__`, `__aiter__`, `__anext__`
+   - [ ] Pickling: `__getstate__`, `__setstate__`, `__reduce__`
+
+### 🏗️ Architectural Refactoring
+
+#### High Priority - Code Quality
+1. **Refactor Complex Functions**
+   - [ ] Break down `eval/evaluator.go` tryForm (300+ lines) into smaller functions
+   - [ ] Simplify `parser/fstring.go` parseFString with helper functions
+   - [ ] Extract common patterns in builtin registration functions
+
+2. **Reduce Code Duplication**
+   - [ ] Create error handling utilities for consistent patterns across builtins
+   - [ ] Extract common type checking logic into shared utilities
+   - [ ] Implement generic iterator framework for container types
+
+3. **Improve Error Handling**
+   - [ ] Replace remaining panic() calls with proper error returns
+   - [ ] Implement consistent error wrapping with context
+   - [ ] Add error type hierarchy for better error discrimination
+   - [ ] **Better Error Messages** (Critical for Developer Experience)
+     - [ ] Add source location tracking (line and column numbers)
+     - [ ] Include source context in error messages (show problematic line)
+     - [ ] Improve stack traces with function names and locations
+     - [ ] Add "Did you mean?" suggestions for common typos
+
+#### Medium Priority - Type System Enhancements
+1. **Define Missing Protocols**
+   - [ ] Add numeric operation interfaces (Numeric protocol)
+   - [ ] Define comparison protocol for ordering operations
+   - [ ] Implement equality protocol for custom equality
+
+2. **Testing Infrastructure**
+   - [ ] Add Go unit tests for core functionality (currently only M28 tests)
+   - [ ] Implement property-based testing for parser
+   - [ ] Add performance benchmarks for critical paths
+
+#### Low Priority - Long-term Improvements
+1. **Concurrency Safety**
+   - [ ] Add race detector to test suite
+   - [ ] Document thread-safety guarantees for each component
+   - [ ] Fix potential races in module loading
+   - [ ] Use sync.Map where appropriate for concurrent access
+
+2. **Code Organization**
+   - [ ] Consolidate special_forms into eval package
+   - [ ] Create separate packages for each builtin category
+   - [ ] Move type descriptors closer to type definitions
+
+3. **Documentation**
+   - [ ] Add interface documentation with contracts
+   - [ ] Document concurrency guarantees
+   - [ ] Add architecture decision records (ADRs)
+
+4. **Compiler Architecture Improvements**
+   - [ ] Separate compilation phases (parse → expand → compile → execute)
+   - [ ] Source map tracking through transformations
+   - [ ] AST optimization passes before evaluation
+   - [ ] Macro expansion as distinct phase
+
+### 📊 Code Quality Metrics to Track
+- Function complexity (cyclomatic complexity < 10)
+- Test coverage (aim for >80% for core packages)
+- Code duplication percentage (target <5%)
+- Interface adherence and abstraction levels

@@ -430,6 +430,14 @@ func registerTypeBuiltins(ctx *core.Context) {
 					}
 					// Ensure it returns a number
 					if num, ok := result.(core.NumberValue); ok {
+						// Validate it's non-negative
+						if float64(num) < 0 {
+							return nil, fmt.Errorf("__len__ should return a non-negative integer")
+						}
+						// Check if it's an integer
+						if float64(num) != float64(int(num)) {
+							return nil, fmt.Errorf("__len__ should return an integer, not %.2f", float64(num))
+						}
 						return num, nil
 					}
 					return nil, fmt.Errorf("__len__ should return an integer")

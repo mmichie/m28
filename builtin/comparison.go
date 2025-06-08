@@ -174,25 +174,8 @@ func NotFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("not requires exactly 1 argument")
 	}
 
-	// Convert to boolean
-	var isTruthy bool
-	switch v := args[0].(type) {
-	case core.BoolValue:
-		isTruthy = bool(v)
-	case core.NilValue:
-		isTruthy = false
-	case core.NumberValue:
-		isTruthy = float64(v) != 0
-	case core.StringValue:
-		isTruthy = string(v) != ""
-	case core.ListValue:
-		isTruthy = len(v) > 0
-	case core.TupleValue:
-		isTruthy = len(v) > 0
-	default:
-		isTruthy = true
-	}
-
+	// Use the enhanced IsTruthy which checks for __bool__
+	isTruthy := core.IsTruthy(args[0])
 	return core.BoolValue(!isTruthy), nil
 }
 
@@ -204,24 +187,8 @@ func AndFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	var result core.Value = core.True
 	for _, arg := range args {
-		// Convert to boolean
-		var isTruthy bool
-		switch v := arg.(type) {
-		case core.BoolValue:
-			isTruthy = bool(v)
-		case core.NilValue:
-			isTruthy = false
-		case core.NumberValue:
-			isTruthy = float64(v) != 0
-		case core.StringValue:
-			isTruthy = string(v) != ""
-		case core.ListValue:
-			isTruthy = len(v) > 0
-		case core.TupleValue:
-			isTruthy = len(v) > 0
-		default:
-			isTruthy = true
-		}
+		// Use the enhanced IsTruthy which checks for __bool__
+		isTruthy := core.IsTruthy(arg)
 
 		if !isTruthy {
 			return arg, nil // Return the first falsy value
@@ -240,24 +207,8 @@ func OrFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	for _, arg := range args {
-		// Convert to boolean
-		var isTruthy bool
-		switch v := arg.(type) {
-		case core.BoolValue:
-			isTruthy = bool(v)
-		case core.NilValue:
-			isTruthy = false
-		case core.NumberValue:
-			isTruthy = float64(v) != 0
-		case core.StringValue:
-			isTruthy = string(v) != ""
-		case core.ListValue:
-			isTruthy = len(v) > 0
-		case core.TupleValue:
-			isTruthy = len(v) > 0
-		default:
-			isTruthy = true
-		}
+		// Use the enhanced IsTruthy which checks for __bool__
+		isTruthy := core.IsTruthy(arg)
 
 		if isTruthy {
 			return arg, nil // Return the first truthy value
@@ -277,6 +228,29 @@ func InFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	value := args[0]
 	container := args[1]
 
+	// Try to get __contains__ method first
+	if obj, ok := container.(interface {
+		GetAttr(string) (core.Value, bool)
+	}); ok {
+		if containsMethod, found := obj.GetAttr("__contains__"); found {
+			// Call the __contains__ method
+			if callable, ok := containsMethod.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				result, err := callable.Call([]core.Value{value}, ctx)
+				if err != nil {
+					return nil, err
+				}
+				// Ensure it returns a boolean
+				if boolVal, ok := result.(core.BoolValue); ok {
+					return boolVal, nil
+				}
+				return nil, fmt.Errorf("__contains__ should return a boolean")
+			}
+		}
+	}
+
+	// Fallback to type-specific behavior
 	switch c := container.(type) {
 	case core.ListValue:
 		// Check if value is in list

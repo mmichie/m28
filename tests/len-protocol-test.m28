@@ -1,0 +1,175 @@
+# Comprehensive test for __len__ protocol
+
+(print "Testing __len__ protocol...")
+
+# Test 1: Built-in types
+(print "\n1. Testing built-in types:")
+(assert (== (len "") 0) "empty string length")
+(assert (== (len "hello") 5) "string length")
+(assert (== (len []) 0) "empty list length")
+(assert (== (len [1, 2, 3]) 3) "list length")
+(assert (== (len {}) 0) "empty dict length")
+(assert (== (len {"a": 1, "b": 2}) 2) "dict length")
+(assert (== (len (set [])) 0) "empty set length")
+(assert (== (len (set [1, 2, 3, 2])) 3) "set length (duplicates removed)")
+# (assert (== (len ()) 0) "empty tuple length")  # Empty tuple syntax issue
+(assert (== (len (tuple [])) 0) "empty tuple length")
+(assert (== (len (tuple [1, 2, 3])) 3) "tuple length")
+(print "✓ Built-in types passed")
+
+# Test 2: Custom __len__ method
+(print "\n2. Testing custom __len__ method:")
+(class Container ()
+  (def __init__ (self items)
+    (= self.items items))
+  
+  (def __len__ (self)
+    (len self.items)))
+
+(= c1 (Container [1, 2, 3]))
+(= c2 (Container []))
+(assert (== (len c1) 3) "custom __len__ with items")
+(assert (== (len c2) 0) "custom __len__ empty")
+(print "✓ Custom __len__ passed")
+
+# Test 3: __len__ with inheritance
+(print "\n3. Testing __len__ with inheritance:")
+(class ExtendedContainer (Container)
+  (def __init__ (self items prefix)
+    (Container.__init__ self items)
+    (= self.prefix prefix))
+  
+  (def __len__ (self)
+    (+ (len self.prefix) (len self.items))))
+
+(= ec (ExtendedContainer [1, 2, 3] "prefix"))
+(assert (== (len ec) 9) "__len__ with inheritance (3 + 6)")
+(print "✓ Inheritance passed")
+
+# Test 4: __len__ returning non-integer (should fail)
+(print "\n4. Testing error cases:")
+(class BadLen1 ()
+  (def __len__ (self)
+    3.14))
+
+(= bad1 (BadLen1))
+(try
+  (len bad1)
+  (assert False "Should have raised error for non-integer __len__")
+  (except Exception as e
+    (assert (in "should return an integer" (str e)) "correct error for float return")))
+
+# Test 5: __len__ returning negative (should fail)
+(class BadLen2 ()
+  (def __len__ (self)
+    -5))
+
+(= bad2 (BadLen2))
+(try
+  (len bad2)
+  (assert False "Should have raised error for negative __len__")
+  (except Exception as e
+    (assert (in "non-negative" (str e)) "correct error for negative return")))
+
+# Test 6: __len__ returning non-number (should fail)
+(class BadLen3 ()
+  (def __len__ (self)
+    "five"))
+
+(= bad3 (BadLen3))
+(try
+  (len bad3)
+  (assert False "Should have raised error for string __len__")
+  (except Exception as e
+    (assert (in "should return an integer" (str e)) "correct error for non-number return")))
+(print "✓ Error cases passed")
+
+# Test 7: Integration with __bool__ fallback
+(print "\n5. Testing __bool__ fallback to __len__:")
+(class LenOnly ()
+  (def __init__ (self size)
+    (= self.size size))
+  
+  (def __len__ (self)
+    self.size))
+
+(= empty (LenOnly 0))
+(= nonempty (LenOnly 5))
+
+# Test truthiness (should use __len__ as fallback)
+(assert (not (bool empty)) "__len__=0 means falsy")
+(assert (bool nonempty) "__len__>0 means truthy")
+
+# Test in if statements
+(= result "unset")
+(if empty
+  (= result "wrong")
+  (= result "correct"))
+(assert (== result "correct") "__len__ fallback in if statement")
+
+# Test with 'not' operator
+(assert (not empty) "not operator with __len__=0")
+(assert (not (not nonempty)) "double not with __len__>0")
+(print "✓ __bool__ fallback passed")
+
+# Test 8: Complex container with __len__
+(print "\n6. Testing complex container:")
+(class Matrix ()
+  (def __init__ (self rows cols)
+    (= self.rows rows)
+    (= self.cols cols)
+    (= self.data [])
+    (for i (range rows)
+      (= row [])
+      (for j (range cols)
+        (row.append 0))
+      (self.data.append row)))
+  
+  (def __len__ (self)
+    (* self.rows self.cols)))
+
+(= m1 (Matrix 3 4))
+(= m2 (Matrix 0 5))
+(assert (== (len m1) 12) "matrix 3x4 has 12 elements")
+(assert (== (len m2) 0) "matrix 0x5 has 0 elements")
+(print "✓ Complex container passed")
+
+# Test 9: Objects without __len__
+(print "\n7. Testing objects without __len__:")
+(class NoLen ()
+  (def __init__ (self)
+    (= self.value 42)))
+
+(= nl (NoLen))
+(try
+  (len nl)
+  (assert False "Should have raised error for object without __len__")
+  (except Exception as e
+    (assert (in "has no len()" (str e)) "correct error for missing __len__")))
+(print "✓ Missing __len__ error passed")
+
+# Test 10: Edge cases
+(print "\n8. Testing edge cases:")
+(class Zero ()
+  (def __len__ (self)
+    0))
+
+(class Large ()
+  (def __len__ (self)
+    1000000))
+
+(= z (Zero))
+(= l (Large))
+(assert (== (len z) 0) "__len__ returning 0")
+(assert (== (len l) 1000000) "__len__ returning large number")
+
+# Test len() with exactly 0.0 (integer as float)
+(class FloatZero ()
+  (def __len__ (self)
+    0.0))
+
+(= fz (FloatZero))
+(assert (== (len fz) 0) "__len__ returning 0.0 (exact integer as float)")
+(print "✓ Edge cases passed")
+
+(print "\nAll __len__ protocol tests passed!")
