@@ -51,6 +51,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] **Advanced Features**
   - [x] Module system with `import`
   - [x] Context managers with `with`/`as`
+  - [x] File context managers (`with open(...) as f`) ✅
   - [x] Generators with `yield`
   - [x] Tail call optimization
   - [x] REPL with history and completion
@@ -60,11 +61,18 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [ ] **Module System** - Basic imports work, but missing:
   - [ ] `from module import symbol`
   - [ ] `import module as alias`
-  - [ ] Standard library modules
+  - [ ] Standard library modules (shutil, pathlib, tempfile, zipfile)
+  
+- [x] **Function and Type `__name__` Attribute** ✅ PARTIAL
+  - [x] User-defined functions have `__name__`
+  - [x] Classes have `__name__` method
+  - [ ] Built-in functions show `<anonymous>` instead of actual names
 
-## ❌ Not Implemented / Broken
+## ❌ Not Implemented
 
 ### High Priority - Language Core
+
+**Note**: Most core features are complete. Main gaps are:
 
 - [x] **Property/Method Access** ✅ COMPLETE
   - [x] Direct dot notation: `obj.method()` instead of `(. obj method)`
@@ -87,15 +95,17 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] Default parameters: `(def func (a (b 10)) ...)` ✅ DONE
   - [x] `*args` and `**kwargs` ✅ DONE
 
-- [ ] **Additional Python Features**
+- [ ] **Remaining Python Features**
+  - [x] Tuple unpacking in loops: `for key, value in items:` ✅ DONE
+  - [ ] Set literals: `{1, 2, 3}` (currently parsed as dict)
+  - [ ] Multiple assignment: `a, b = 1, 2`
+  - [ ] Exception variable binding: `except Error as e`
   - [ ] Argument unpacking: `func(*args, **kwargs)` syntax
-  - [ ] Keyword argument support in built-in functions (sorted, min, max, etc.)
-  - [ ] Set literals: `{1, 2, 3}` (currently must use `(set [1, 2, 3])`)
-  - [ ] Exception variable binding: `except Error as e` syntax
-  - [ ] Multiple inheritance (currently not fully functional)
-  - [ ] super() calls (currently not working properly)
   - [ ] `from module import name` syntax
   - [ ] `import module as alias` syntax
+  - [ ] Local `.m28` module imports
+  - [ ] Multiple inheritance (partial)
+  - [ ] Proper `super()` calls
 
 ### Medium Priority - Built-in Methods
 
@@ -179,65 +189,27 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [ ] Day 2-3: Run all example files and fix failures
 - [ ] Day 4-5: Update documentation and clean up
 
-## Critical Interpreter Fixes Needed
+## Remaining Implementation Gaps
 
-### 1. Context Manager Protocol for Files
-**Issue**: File objects don't support the context manager protocol
-**Examples failing**: `file_operations.m28`, `reading_files.m28`, `writing_files.m28`
-**Implementation**:
-- Add `__enter__` and `__exit__` methods to file objects in `core/file.go`
-- `__enter__` should return the file object itself
-- `__exit__` should close the file and handle exceptions
-- Update `with` statement evaluation in `eval/context_forms.go`
+### 1. Tuple Unpacking in For Loops ✅ COMPLETE
+**Status**: Fully implemented with support for multiple variables
+**Syntax supported**:
+- `(for key value in (dict.items) ...)`
+- `(for i item in (enumerate list) ...)`
+- `(for a b c in nested-list ...)`
+- Old syntax still works: `(for (k v (dict.items)) ...)`
 
-### 2. Function and Type `__name__` Attribute
-**Issue**: Functions and types don't have `__name__` attribute
-**Examples failing**: `closures_decorators.m28`, `text_adventure.m28`
-**Implementation**:
-- Add `__name__` field to `LispFunction` struct in `core/value.go`
-- Set `__name__` when creating functions in `eval/evaluator.go`
-- Add `__name__` to type objects in `core/type_descriptor.go`
-- Make `__name__` accessible via dot notation
-
-### 3. Tuple Unpacking in For Loops
-**Issue**: Cannot use `(for i line (enumerate f))` syntax
-**Examples failing**: `reading_files.m28`
-**Implementation**:
-- Update `evalFor` in `eval/loop.go` to handle multiple loop variables
-- Support unpacking when iterator returns tuples
-- Example: `(for key value (dict.items))` should work
-
-### 4. Local Module Import Resolution
+### 2. Local Module Import Resolution  
 **Issue**: Cannot import local `.m28` modules
 **Examples failing**: `using_custom_modules.m28`
-**Implementation**:
-- Update `resolveModulePath` in `core/module_paths.go`
-- Check current directory and relative paths for `.m28` files
-- Add module caching to prevent re-evaluation
+**Needed**: Update module resolution to check for `.m28` files in current directory
 
-### 5. Missing Python Standard Library Modules
-**Issue**: Missing essential stdlib modules
-**Examples failing**: `file_operations.m28`, `functional_basics.m28`
-**Modules needed**:
+### 3. Missing Python Standard Library Modules
+**Needed modules**:
 - `shutil` - File operations (copy, move, rmtree)
-- `pathlib` - Path manipulation
+- `pathlib` - Path manipulation  
 - `tempfile` - Temporary file creation
 - `zipfile` - Zip file handling
-- `time` - Time functions
-**Implementation**:
-- Add new files in `builtin/` directory for each module
-- Implement core functionality needed by examples
-- Register modules in `builtin/builtin.go`
-
-### 6. List/Dictionary Assignment in Class __init__ Methods ✅ FIXED
-**Issue**: Cannot assign lists or dictionaries to instance attributes in class __init__ methods
-**Examples failing**: `text_adventure.m28`, `todo_app.m28`
-**Error**: Assignment of `self.items = []` or `self.exits = {}` causes EvalError
-**Root Cause**: Parser was treating `self.items []` as indexing instead of two separate expressions
-**Fix**: Modified `parser/dot_notation.go` to restore position after checking for method calls
-- The parseDotAccess function was consuming whitespace when checking for method calls
-- If no method call was found, the position wasn't restored
-- This caused `expr []` to be parsed as `expr[]` (indexing)
 
 ## Testing Checklist
 

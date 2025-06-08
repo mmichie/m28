@@ -1,0 +1,105 @@
+# Test tuple unpacking in for loops
+
+(print "===== Tuple Unpacking in For Loops Test =====\n")
+
+# Test 1: dict.items() with new syntax
+(print "-- Test 1: dict.items() with 'in' syntax --")
+(= person {"name": "Alice", "age": 30, "city": "NYC"})
+(= count 0)
+(for key value in (person.items)
+  (= count (+ count 1))
+  (print "  " key "=" value))
+(assert (== count 3) "Dict items iteration count")
+(print "✓ Dict items unpacking works\n")
+
+# Test 2: dict.items() with old syntax
+(print "-- Test 2: dict.items() with old syntax --")
+(= counts {"apples": 5, "oranges": 3})
+(= total 0)
+(for (fruit count (counts.items))
+  (= total (+ total count)))
+(assert (== total 8) "Sum of dict values")
+(print "✓ Old syntax still works\n")
+
+# Test 3: enumerate()
+(print "-- Test 3: enumerate() unpacking --")
+(= colors ["red", "green", "blue"])
+(= indexed [])
+(for idx color in (enumerate colors)
+  (append indexed (+ (str idx) "-" color)))
+(assert (== indexed ["0-red", "1-green", "2-blue"]) "Enumerate unpacking")
+(print "✓ Enumerate unpacking works\n")
+
+# Test 4: zip()
+(print "-- Test 4: zip() unpacking --")
+(= names ["Alice", "Bob", "Charlie"])
+(= scores [95, 87, 92])
+(= report [])
+(for name score in (zip names scores)
+  (append report (+ name " scored " (str score))))
+(assert (== (len report) 3) "Zip iteration count")
+(print "✓ Zip unpacking works\n")
+
+# Test 5: Nested lists
+(print "-- Test 5: Nested lists unpacking --")
+(= points [[1, 2], [3, 4], [5, 6]])
+(= sum_x 0)
+(= sum_y 0)
+(for x y in points
+  (= sum_x (+ sum_x x))
+  (= sum_y (+ sum_y y)))
+(assert (== sum_x 9) "Sum of x coordinates")
+(assert (== sum_y 12) "Sum of y coordinates")
+(print "✓ Nested list unpacking works\n")
+
+# Test 6: Multiple variables (3+)
+(print "-- Test 6: Three variable unpacking --")
+(= data [["Alice", 25, "Engineer"], ["Bob", 30, "Designer"]])
+(= people [])
+(for name age job in data
+  (append people (+ name " (" (str age) ") - " job)))
+(assert (== (len people) 2) "Three variable unpacking")
+(print "✓ Multiple variable unpacking works\n")
+
+# Test 7: Error handling - wrong number of values
+(print "-- Test 7: Error handling --")
+(= error_caught False)
+(try
+  (= bad_data [[1, 2], [3, 4, 5]])  # Mismatched sizes
+  (for a b in bad_data
+    (print "Should not print"))
+except
+  (= error_caught True))
+(assert error_caught "Error caught for mismatched unpacking")
+(print "✓ Proper error handling for mismatched sizes\n")
+
+# Test 8: Single variable (no unpacking)
+(print "-- Test 8: Single variable (no unpacking) --")
+(= items [10, 20, 30])
+(= sum 0)
+(for item in items
+  (= sum (+ sum item)))
+(assert (== sum 60) "Single variable iteration still works")
+(print "✓ Single variable iteration unchanged\n")
+
+# Test 9: Empty sequences
+(print "-- Test 9: Empty sequences --")
+(= empty_dict {})
+(= count 0)
+(for k v in (empty_dict.items)
+  (= count (+ count 1)))
+(assert (== count 0) "Empty dict iteration")
+(print "✓ Empty sequence handling works\n")
+
+# Test 10: Break and continue with unpacking
+(print "-- Test 10: Control flow with unpacking --")
+(= pairs [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
+(= results [])
+(for a b in pairs
+  (if (== a 2) (continue))
+  (if (== a 4) (break))
+  (append results (+ a b)))
+(assert (== results [2, 6]) "Break/continue with unpacking")
+(print "✓ Control flow works correctly\n")
+
+(print "===== All Tuple Unpacking Tests Passed! =====")

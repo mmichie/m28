@@ -2,6 +2,7 @@
 package eval
 
 import (
+	"fmt"
 	"github.com/mmichie/m28/core"
 )
 
@@ -116,48 +117,59 @@ func WhileForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // ForForm implements the for loop special form
-// Syntax: (for (var sequence) body...) or (for var sequence body...)
+// Syntax: (for (var sequence) body...) or (for var sequence body...) or (for var1 var2 ... in sequence body...)
 func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 2 {
 		return nil, ErrArgCount("for requires at least 2 arguments")
 	}
 
-	var varName core.SymbolValue
+	var varNames []core.SymbolValue
 	var sequenceExpr core.Value
 	var body core.ListValue
 
 	// Check if first arg is a list (old syntax) or symbol (new syntax)
-	if binding, ok := args[0].(core.ListValue); ok && len(binding) == 2 {
-		// Old syntax: (for (var sequence) body...)
-		var ok bool
-		varName, ok = binding[0].(core.SymbolValue)
-		if !ok {
-			return nil, TypeError{Expected: "symbol", Got: binding[0].Type()}
-		}
-		sequenceExpr = binding[1]
-		body = args[1:]
-	} else if sym, ok := args[0].(core.SymbolValue); ok && len(args) >= 3 {
-		// Check for Python-style syntax: (for var in sequence body...)
-		if len(args) >= 4 {
-			if inSym, ok := args[1].(core.SymbolValue); ok && string(inSym) == "in" {
-				// Python-style syntax: (for var in sequence body...)
-				varName = sym
-				sequenceExpr = args[2]
-				body = args[3:]
-			} else {
-				// New syntax: (for var sequence body...)
-				varName = sym
-				sequenceExpr = args[1]
-				body = args[2:]
+	if binding, ok := args[0].(core.ListValue); ok && len(binding) >= 2 {
+		// Old syntax: (for (var sequence) body...) or (for (var1 var2 sequence) body...)
+		// Extract all symbols except the last element
+		for i := 0; i < len(binding)-1; i++ {
+			sym, ok := binding[i].(core.SymbolValue)
+			if !ok {
+				return nil, TypeError{Expected: "symbol", Got: binding[i].Type()}
 			}
-		} else {
-			// New syntax: (for var sequence body...)
-			varName = sym
+			varNames = append(varNames, sym)
+		}
+		sequenceExpr = binding[len(binding)-1]
+		body = args[1:]
+	} else {
+		// New syntax: check for multiple vars with 'in' keyword
+		// Look for 'in' keyword
+		inIndex := -1
+		for i := 1; i < len(args); i++ {
+			if sym, ok := args[i].(core.SymbolValue); ok && string(sym) == "in" {
+				inIndex = i
+				break
+			}
+		}
+		
+		if inIndex > 0 && inIndex < len(args)-1 {
+			// Found 'in': (for var1 var2 ... in sequence body...)
+			for i := 0; i < inIndex; i++ {
+				sym, ok := args[i].(core.SymbolValue)
+				if !ok {
+					return nil, TypeError{Expected: "symbol", Got: args[i].Type()}
+				}
+				varNames = append(varNames, sym)
+			}
+			sequenceExpr = args[inIndex+1]
+			body = args[inIndex+2:]
+		} else if sym, ok := args[0].(core.SymbolValue); ok && len(args) >= 3 {
+			// Single var syntax: (for var sequence body...)
+			varNames = []core.SymbolValue{sym}
 			sequenceExpr = args[1]
 			body = args[2:]
+		} else {
+			return nil, ArgumentError{"for requires (var sequence) or var sequence or var1 var2 ... in sequence syntax"}
 		}
-	} else {
-		return nil, ArgumentError{"for requires (var sequence) or var sequence or var in sequence syntax"}
 	}
 
 	// Evaluate the sequence
@@ -168,8 +180,46 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Create a body function that evaluates all expressions
 	bodyFunc := func(item core.Value) (core.Value, error) {
-		// Bind the current item to the variable in the current context
-		ctx.Define(string(varName), item)
+		// Handle tuple unpacking if multiple variables
+		if len(varNames) > 1 {
+			// Try to unpack the item as a sequence
+			var values []core.Value
+			
+			switch v := item.(type) {
+			case core.ListValue:
+				values = v
+			case core.TupleValue:
+				values = v
+			default:
+				// Try to get an iterator
+				if iteratorObj, ok := item.(interface{ Iterator() core.Iterator }); ok {
+					iter := iteratorObj.Iterator()
+					values = []core.Value{}
+					for {
+						val, done := iter.Next()
+						if done {
+							break
+						}
+						values = append(values, val)
+					}
+				} else {
+					return nil, fmt.Errorf("cannot unpack non-sequence type %s", item.Type())
+				}
+			}
+			
+			// Check if we have the right number of values
+			if len(values) != len(varNames) {
+				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(varNames), len(values))
+			}
+			
+			// Bind each value to its corresponding variable
+			for i, varName := range varNames {
+				ctx.Define(string(varName), values[i])
+			}
+		} else {
+			// Single variable - bind directly
+			ctx.Define(string(varNames[0]), item)
+		}
 
 		var result core.Value = core.Nil
 		var err error

@@ -1,0 +1,36 @@
+# Simple test for tuple unpacking in for loops
+
+(print "=== Tuple Unpacking Tests ===\n")
+
+# Test 1: dict.items()
+(print "1. Testing dict.items():")
+(= d {"a": 1, "b": 2, "c": 3})
+(for key value in (d.items)
+  (print "  " key "->" value))
+
+# Test 2: enumerate()
+(print "\n2. Testing enumerate():")
+(= fruits ["apple", "banana", "cherry"])
+(for idx item in (enumerate fruits)
+  (print "  " idx ":" item))
+
+# Test 3: zip()
+(print "\n3. Testing zip():")
+(= names ["Alice", "Bob"])
+(= ages [25, 30])
+(for name age in (zip names ages)
+  (print "  " name "is" age "years old"))
+
+# Test 4: Nested lists
+(print "\n4. Testing nested lists:")
+(= coords [[10, 20], [30, 40]])
+(for x y in coords
+  (print "  Point: (" x "," y ")"))
+
+# Test 5: Three variables
+(print "\n5. Testing three variables:")
+(= data [["red", 255, 0], ["green", 0, 255]])
+(for color r g in data
+  (print "  " color "= RGB(" r "," g ", 0)"))
+
+(print "\n✓ All tests passed!")
