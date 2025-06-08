@@ -160,7 +160,14 @@ func InitDictMethods() {
 			// Create tuples for each key-value pair
 			for _, k := range dict.Keys() {
 				v, _ := dict.Get(k)
-				pair := TupleValue{StringValue(k), v}
+				// Get the original key value
+				var keyVal Value
+				if origKey, exists := dict.keys[k]; exists {
+					keyVal = origKey
+				} else {
+					keyVal = StringValue(k)
+				}
+				pair := TupleValue{keyVal, v}
 				items = append(items, pair)
 			}
 
@@ -179,7 +186,13 @@ func InitDictMethods() {
 			keys := dict.Keys()
 			keyValues := make([]Value, len(keys))
 			for i, k := range keys {
-				keyValues[i] = StringValue(k)
+				// Get the original key value from the keys map
+				if origKey, exists := dict.keys[k]; exists {
+					keyValues[i] = origKey
+				} else {
+					// Fallback to string representation if original key not found
+					keyValues[i] = StringValue(k)
+				}
 			}
 			return ListValue(keyValues), nil
 		},

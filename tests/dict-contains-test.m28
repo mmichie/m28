@@ -1,0 +1,107 @@
+# Comprehensive test for dict 'in' operator
+
+(print "Testing dict 'in' operator (membership testing)...")
+
+# Test 1: String keys
+(print "\n1. Testing string keys:")
+(= d1 {"apple": 1, "banana": 2, "cherry": 3})
+(assert (in "apple" d1) "'apple' should be in dict")
+(assert (in "banana" d1) "'banana' should be in dict")
+(assert (in "cherry" d1) "'cherry' should be in dict")
+(assert (not (in "orange" d1)) "'orange' should not be in dict")
+(assert (not (in "grape" d1)) "'grape' should not be in dict")
+(assert (not (in "" d1)) "empty string should not be in dict")
+(print "✓ String keys passed")
+
+# Test 2: Numeric keys
+(print "\n2. Testing numeric keys:")
+(= d2 {1: "one", 2: "two", 3: "three", 0: "zero", -1: "minus one"})
+(assert (in 0 d2) "0 should be in dict")
+(assert (in 1 d2) "1 should be in dict")
+(assert (in 2 d2) "2 should be in dict")
+(assert (in 3 d2) "3 should be in dict")
+(assert (in -1 d2) "-1 should be in dict")
+(assert (not (in 4 d2)) "4 should not be in dict")
+(assert (not (in -2 d2)) "-2 should not be in dict")
+(print "✓ Numeric keys passed")
+
+# Test 3: Mixed key types
+(print "\n3. Testing mixed key types:")
+(= d3 {"str": 1, 42: "number", True: "bool", False: "false"})
+(assert (in "str" d3) "string key in mixed dict")
+(assert (in 42 d3) "numeric key in mixed dict")
+(assert (in True d3) "True key in mixed dict")
+(assert (in False d3) "False key in mixed dict")
+(assert (not (in "42" d3)) "string '42' != number 42")
+(assert (not (in 1 d3)) "1 != True in dict keys")
+(assert (not (in 0 d3)) "0 != False in dict keys")
+(print "✓ Mixed key types passed")
+
+# Test 4: Empty dict
+(print "\n4. Testing empty dict:")
+(= d4 {})
+(assert (not (in "anything" d4)) "string not in empty dict")
+(assert (not (in 0 d4)) "0 not in empty dict")
+(assert (not (in None d4)) "None not in empty dict")
+(assert (not (in True d4)) "True not in empty dict")
+(print "✓ Empty dict passed")
+
+# Test 5: None as key
+(print "\n5. Testing None as key:")
+(= d5 {None: "null value", "None": "string None"})
+(assert (in None d5) "None should be in dict")
+(assert (in "None" d5) "string 'None' should be in dict")
+(assert (not (in 0 d5)) "0 should not be in dict")
+(print "✓ None key passed")
+
+# Test 6: Tuple keys (hashable)
+(print "\n6. Testing tuple keys:")
+(= t1 (tuple [1, 2]))
+(= t2 (tuple [3, 4, 5]))
+(= t3 (tuple []))
+(= d6 {t1: "pair", t2: "triple", t3: "empty"})
+(assert (in t1 d6) "tuple (1, 2) should be in dict")
+(assert (in t2 d6) "tuple (3, 4, 5) should be in dict")
+(assert (in t3 d6) "empty tuple should be in dict")
+(= t4 (tuple [2, 1]))
+(= t5 (tuple [1, 2, 3]))
+(assert (not (in t4 d6)) "tuple (2, 1) should not be in dict")
+(assert (not (in t5 d6)) "tuple (1, 2, 3) should not be in dict")
+(print "✓ Tuple keys passed")
+
+# Test 7: Unhashable types (should return False)
+(print "\n7. Testing unhashable types:")
+(= d7 {"a": 1, "b": 2})
+(assert (not (in [1, 2] d7)) "list should not be found (unhashable)")
+(assert (not (in {"x": 1} d7)) "dict should not be found (unhashable)")
+(assert (not (in (set [1, 2]) d7)) "set should not be found (unhashable)")
+(print "✓ Unhashable types passed")
+
+# Test 8: Special numeric values
+(print "\n8. Testing special numeric values:")
+(= d8 {0: "zero", 0.0: "float zero", -0.0: "neg zero"})
+# Note: 0, 0.0, and -0.0 should all be the same key
+(assert (in 0 d8) "0 should be in dict")
+(assert (in 0.0 d8) "0.0 should be in dict")
+(assert (in -0.0 d8) "-0.0 should be in dict")
+(print "✓ Special numeric values passed")
+
+# Test 9: Case sensitivity
+(print "\n9. Testing case sensitivity:")
+(= d9 {"Hello": 1, "hello": 2, "HELLO": 3})
+(assert (in "Hello" d9) "'Hello' should be in dict")
+(assert (in "hello" d9) "'hello' should be in dict")
+(assert (in "HELLO" d9) "'HELLO' should be in dict")
+(assert (not (in "HeLLo" d9)) "'HeLLo' should not be in dict")
+(print "✓ Case sensitivity passed")
+
+# Test 10: Direct __contains__ call
+(print "\n10. Testing direct __contains__ call:")
+(= d10 {"x": 1, "y": 2})
+(= contains_method (getattr d10 "__contains__"))
+(assert (== (contains_method "x") True) "__contains__('x') should return True")
+(assert (== (contains_method "z") False) "__contains__('z') should return False")
+(assert (== (contains_method 42) False) "__contains__(42) should return False")
+(print "✓ Direct __contains__ call passed")
+
+(print "\nAll dict 'in' operator tests passed!")

@@ -10,12 +10,11 @@
 (assert (not (in 4 [1, 2, 3])) "element not in list")
 (assert (in 2 (tuple [1, 2, 3])) "element in tuple")
 (assert (not (in 4 (tuple [1, 2, 3]))) "element not in tuple")
-# Skip dict tests due to current implementation issue
-# (assert (in "a" {"a": 1, "b": 2}) "key in dict")
-# (assert (not (in "c" {"a": 1, "b": 2})) "key not in dict")
+(assert (in "a" {"a": 1, "b": 2}) "key in dict")
+(assert (not (in "c" {"a": 1, "b": 2})) "key not in dict")
 (assert (in 2 (set [1, 2, 3])) "element in set")
 (assert (not (in 4 (set [1, 2, 3]))) "element not in set")
-(print "✓ Built-in types passed (dict tests skipped)")
+(print "✓ Built-in types passed")
 
 # Test 2: Custom __contains__ method
 (print "\n2. Testing custom __contains__ method:")
@@ -127,4 +126,3 @@
 (print "✓ Empty container passed")
 
 (print "\nAll __contains__ protocol tests passed!")
-(print "(Note: dict 'in' operator tests skipped due to known issue)")

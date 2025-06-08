@@ -925,11 +925,13 @@ func InitializeTypeRegistry() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					dict := receiver.(*DictValue)
-					key, ok := args[0].(StringValue)
-					if !ok {
+					// Check if key is hashable
+					if !IsHashable(args[0]) {
 						return False, nil
 					}
-					_, found := dict.Get(string(key))
+					// Convert key to internal format
+					keyStr := ValueToKey(args[0])
+					_, found := dict.Get(keyStr)
 					return BoolValue(found), nil
 				},
 			},
