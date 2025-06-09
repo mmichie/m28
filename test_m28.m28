@@ -1,9 +1,9 @@
 # M28 Test Suite - Single comprehensive test file
 # Run with: ./bin/m28 test_m28.m28
 
-(print "=" 50)
+(print (* "=" 50))
 (print "          M28 Test Suite")
-(print "=" 50)
+(print (* "=" 50))
 (print "")
 
 # Test counter
@@ -18,7 +18,7 @@
 
 # 1. BASICS
 (print "\n1. Basic Operations")
-(print "-" 30)
+(print (* "-" 30))
 (test "Assignment" (== (do (= x 42) x) 42))
 (test "Addition" (== (+ 15 27) 42))
 (test "Subtraction" (== (- 50 8) 42))
@@ -29,7 +29,7 @@
 
 # 2. DATA TYPES
 (print "\n2. Data Types")
-(print "-" 30)
+(print (* "-" 30))
 (test "Integer" (== 42 42))
 (test "Float" (== 3.14 3.14))
 (test "String" (== "hello" "hello"))
@@ -39,7 +39,7 @@
 
 # 3. STRINGS
 (print "\n3. String Operations")
-(print "-" 30)
+(print (* "-" 30))
 (test "Concatenation" (== (+ "Hello" " World") "Hello World"))
 (test "Length" (== (len "test") 4))
 (test "Repetition" (== (* "Ha" 3) "HaHaHa"))
@@ -49,7 +49,7 @@
 
 # 4. LISTS
 (print "\n4. List Operations")
-(print "-" 30)
+(print (* "-" 30))
 (= lst [10, 20, 30, 40])
 (test "Length" (== (len lst) 4))
 (test "Index access" (== (get-item lst 0) 10))
@@ -61,7 +61,7 @@
 
 # 5. DICTIONARIES
 (print "\n5. Dictionary Operations")
-(print "-" 30)
+(print (* "-" 30))
 (= d {"name": "Alice", "age": 30, "city": "NYC"})
 (test "Length" (== (len d) 3))
 (test "Get value" (== (get-item d "name") "Alice"))
@@ -72,7 +72,7 @@
 
 # 6. COMPARISONS
 (print "\n6. Comparisons")
-(print "-" 30)
+(print (* "-" 30))
 (test "Less than" (< 5 10))
 (test "Greater than" (> 10 5))
 (test "Less equal" (<= 5 5))
@@ -85,7 +85,7 @@
 
 # 7. CONTROL FLOW
 (print "\n7. Control Flow")
-(print "-" 30)
+(print (* "-" 30))
 (test "If true" (== (if True "yes" "no") "yes"))
 (test "If false" (== (if False "yes" "no") "no"))
 (test "Nested if" (== (if True (if True 1 2) 3) 1))
@@ -104,7 +104,7 @@
 
 # 8. FUNCTIONS
 (print "\n8. Functions")
-(print "-" 30)
+(print (* "-" 30))
 (def square (x) (* x x))
 (test "Basic function" (== (square 6) 36))
 
@@ -121,31 +121,31 @@
 
 # 9. HIGHER-ORDER FUNCTIONS
 (print "\n9. Higher-Order Functions")
-(print "-" 30)
+(print (* "-" 30))
 (test "Map" (== (list (map double [1, 2, 3])) [2, 4, 6]))
 (test "Filter" (== (list (filter (lambda (x) (> x 3)) [1, 2, 3, 4, 5])) [4, 5]))
 (test "Range" (== (list (range 5)) [0, 1, 2, 3, 4]))
 
 # 10. EXCEPTION HANDLING
 (print "\n10. Exception Handling")
-(print "-" 30)
+(print (* "-" 30))
 (= error_caught False)
 (try
   (/ 1 0)
-except
-  (= error_caught True))
+  (except
+    (= error_caught True)))
 (test "Catch div by zero" error_caught)
 
 (= custom_error False)
 (try
-  (/ 1 0)  # Cause an error
-except
-  (= custom_error True))
+  (error "Custom error")
+  (except
+    (= custom_error True)))
 (test "Catch custom error" custom_error)
 
 # 11. CLASSES
 (print "\n11. Classes")
-(print "-" 30)
+(print (* "-" 30))
 (class Counter
   (def __init__ (self start)
     (= self.value start))
@@ -164,7 +164,7 @@ except
 
 # 12. BUILT-IN FUNCTIONS
 (print "\n12. Built-in Functions")
-(print "-" 30)
+(print (* "-" 30))
 (test "Sum" (== (sum [10, 20, 30]) 60))
 (test "Max" (== (max [5, 2, 8, 1]) 8))
 (test "Min" (== (min [5, 2, 8, 1]) 1))
@@ -172,15 +172,15 @@ except
 (test "Len" (== (len "hello") 5))
 
 # RESULTS
-(print "\n" "=" 50)
+(print (+ "\n" (* "=" 50)))
 (print "             RESULTS")
-(print "=" 50)
+(print (* "=" 50))
 (print (+ "Total tests: " (str total)))
 (print (+ "Passed:      " (str pass) " ✓"))
 (print (+ "Failed:      " (str (- total pass)) " ✗"))
 (= percent (int (* 100 (/ pass total))))
 (print (+ "Success:     " (str percent) "%"))
-(print "=" 50)
+(print (* "=" 50))
 
 (if (== pass total)
   (print "\n✅ Perfect! All tests passed.")

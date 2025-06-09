@@ -843,11 +843,14 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		if matches {
-			// Create new context for handler
-			handlerCtx := core.NewContext(ctx)
+			// Use parent context for handler to preserve variable assignments
+			// unless we need to bind an exception variable
+			handlerCtx := ctx
 
 			// Bind exception variable if specified
 			if excVar != "" {
+				// Create new context only when binding exception variable
+				handlerCtx = core.NewContext(ctx)
 				// Create exception value
 				var excValue core.Value
 
