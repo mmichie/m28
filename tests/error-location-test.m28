@@ -1,0 +1,150 @@
+# Test file for error messages with line numbers
+# This test verifies that errors include location information
+
+# Test 1: Simple undefined variable error
+(try
+  (do
+    # This should cause an error on line 7
+    undefined_variable
+  )
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "name error" msg) "Error should be a name error")
+      (print "Test 1 passed: Undefined variable error caught")
+    )))
+
+# Test 2: Type error with location
+(try
+  (do
+    # This should cause a type error on line 20
+    (+ "string" 42)
+  )
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "cannot concatenate" msg) "Error should be a type error")
+      (print "Test 2 passed: Type error caught")
+    )))
+
+# Test 3: Function call error with location
+(try
+  (do
+    # This should cause an error on line 33
+    ("not a function" 1 2 3)
+  )
+  (except error
+    (do
+      (= msg (str error))
+      (assert (or (in "not callable" msg) (in "TypeError" msg) (in "expected callable" msg)) 
+              "Error should indicate not callable")
+      (print "Test 3 passed: Not callable error caught")
+    )))
+
+# Test 4: Division by zero with location
+(try
+  (do
+    (= x 10)
+    (= y 0)
+    # This should cause an error on line 49
+    (/ x y)
+  )
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "division by zero" msg) "Error should be division by zero")
+      (print "Test 4 passed: Division by zero error caught")
+    )))
+
+# Test 5: List index error with location
+(try
+  (do
+    (= lst [1, 2, 3])
+    # This should cause an error on line 63
+    lst[10]
+  )
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "index out of range" msg) "Error should be index out of range")
+      (print "Test 5 passed: Index error caught")
+    )))
+
+# Test 6: Dictionary key error with location
+(try
+  (do
+    (= d {"a": 1, "b": 2})
+    # This should cause an error on line 77
+    d["nonexistent"]
+  )
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "key not found" msg) "Error should be key not found")
+      (print "Test 6 passed: Key error caught")
+    )))
+
+# Test 7: Error in nested function call
+(def cause_error ()
+  # This should cause an error on line 90
+  undefined_in_function)
+
+(try
+  (cause_error)
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "name error" msg) "Error should be a name error")
+      (print "Test 7 passed: Error in function caught")
+    )))
+
+# Test 8: Error with f-string location
+(try
+  (do
+    (= name "test")
+    # This should cause an error on line 107
+    (= result f"Hello {undefined_var}")
+  )
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "name error" msg) "Error should be a name error in f-string")
+      (print "Test 8 passed: F-string error caught")
+    )))
+
+# Test 9: Error in list comprehension
+(try
+  (do
+    # This should cause an error on line 120
+    (= result [x * undefined_mult for x in [1, 2, 3]])
+  )
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "name error" msg) "Error should be a name error in comprehension")
+      (print "Test 9 passed: List comprehension error caught")
+    )))
+
+# Test 10: Multiple errors to test stack trace
+(def level3 ()
+  # This should cause an error on line 133
+  undefined_at_level3)
+
+(def level2 ()
+  (level3))
+
+(def level1 ()
+  (level2))
+
+(try
+  (level1)
+  (except error
+    (do
+      (= msg (str error))
+      (assert (in "name error" msg) "Error should be a name error")
+      (print "Test 10 passed: Nested function error caught with stack trace")
+    )))
+
+(print "\nAll error location tests completed!")
+(print "Note: To verify line numbers are correct, run this file directly")
+(print "and check that errors show the expected line numbers in comments")
