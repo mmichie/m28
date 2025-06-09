@@ -60,7 +60,7 @@
   
   (while (< counter 5)
     (= counter (+ counter 1))
-    ; Check if counter is odd using a simpler approach: 1, 3, 5 = odd
+    # Check if counter is odd using a simpler approach: 1, 3, 5 = odd
     (if (or (= counter 1) (= counter 3) (= counter 5))
       (continue))
     (= evens (+ evens 1))

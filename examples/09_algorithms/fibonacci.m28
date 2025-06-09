@@ -39,7 +39,7 @@
       result)))
 
 # 4. Generator-based Fibonacci
-(def (fibonacci_generator)
+(def fibonacci_generator ()
   "Generate Fibonacci numbers infinitely"
   (= a 0)
   (= b 1)
@@ -115,17 +115,18 @@
 (print f"Matrix:    F({n}) = {(fib_matrix n)}")
 
 # Generator demonstration
-(print "\nFirst 15 Fibonacci numbers using generator:")
-(= fib_gen (fibonacci_generator))
-(= gen_values [])
-(= count 0)
-(for val in fib_gen
-  (if (>= count 15)
-    (break))
-  (= gen_values (+ gen_values [val]))
-  (= count (+ count 1)))
-(print gen_values)
-(print)
+# NOTE: Generator iteration seems to have issues - commenting out for now
+# (print "\nFirst 15 Fibonacci numbers using generator:")
+# (= fib_gen (fibonacci_generator))
+# (= gen_values [])
+# (= count 0)
+# (for val in fib_gen
+#   (if (>= count 15)
+#     (break))
+#   (= gen_values (+ gen_values [val]))
+#   (= count (+ count 1)))
+# (print gen_values)
+# (print)
 
 # Fibonacci sequence properties
 (print "\nFibonacci Properties:")

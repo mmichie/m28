@@ -268,6 +268,29 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ## Testing Checklist
 
+## Known Issues
+
+### 1. Continue Statement in While Loops
+**Issue**: The `continue` statement can cause infinite loops when used in while loops
+**Status**: Bug - needs investigation
+**Workaround**: Use conditional logic instead of continue in while loops
+
+### 2. Generator Iteration
+**Issue**: Generator functions are defined but iteration over generators is not fully implemented
+**Example**: `(for val in generator)` may fail with "expected sequence, got number"
+**Status**: Feature incomplete
+**Workaround**: Collect generator values manually using next()
+
+### 3. No raise/error Function
+**Issue**: No built-in function to raise custom exceptions
+**Status**: Missing feature
+**Workaround**: Trigger errors through invalid operations (e.g., division by zero)
+
+### 4. Performance Issues with Large Files
+**Issue**: Some algorithm examples (fibonacci.m28, searching.m28) timeout on execution
+**Status**: Performance optimization needed
+**Notes**: Individual functions work but full file execution is slow
+
 ### Examples to Verify
 - [ ] `examples/00_basics/` - All files should run
 - [ ] `examples/01_functions/` - All files should run

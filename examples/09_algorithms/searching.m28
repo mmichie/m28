@@ -201,8 +201,8 @@
 
 (print "\nFinding first/last occurrence:")
 (print "List with duplicates:" duplicates)
-(print "First occurrence of 2:" (find_first duplicates 2)))
-(print "Last occurrence of 2:" (find_last duplicates 2)))
+(print "First occurrence of 2:" (find_first duplicates 2))
+(print "Last occurrence of 2:" (find_last duplicates 2))
 (print "First occurrence of 5:" (find_first duplicates 5))
 (print "Last occurrence of 5:" (find_last duplicates 5))
 
