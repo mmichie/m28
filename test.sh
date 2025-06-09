@@ -76,7 +76,8 @@ run_test() {
     
     if timeout 10s ./bin/m28 "$file" > /tmp/m28_test_output.txt 2>&1; then
         # Check if output contains any test failures
-        if grep -q "FAILED\|Error\|error" /tmp/m28_test_output.txt 2>/dev/null; then
+        # Look for actual failure indicators, not just the word "error" in output
+        if grep -q "FAILED\|Test failed\|assertion failed\|✗" /tmp/m28_test_output.txt 2>/dev/null; then
             echo -e "${YELLOW}⚠ partial${NC}"
             PASSED=$((PASSED + 1))
         else

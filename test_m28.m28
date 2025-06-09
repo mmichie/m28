@@ -196,7 +196,7 @@
 (= start (time.time))
 (= big_list [])
 (for i (range 1000)
-  (append big_list (* i i)))
+  (= big_list (append big_list (* i i))))
 (= elapsed (* (- (time.time) start) 1000))
 (print (+ "Created 1000-element list in " (str (int elapsed)) "ms"))
 
