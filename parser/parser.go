@@ -394,10 +394,12 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 		// Skip closing brace
 		p.advance()
 
-		// Return (set [elements...])
+		// Return (set (list-literal elements...))
+		// We need to create a list-literal form so the elements get evaluated
+		listLiteral := append([]core.Value{core.SymbolValue("list-literal")}, setElements...)
 		return core.ListValue([]core.Value{
 			core.SymbolValue("set"),
-			core.ListValue(setElements),
+			core.ListValue(listLiteral),
 		}), nil
 	}
 }
