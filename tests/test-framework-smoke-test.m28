@@ -1,0 +1,11 @@
+# Simple test of the test framework
+
+(import "test_framework" as tf)
+
+(print "Testing framework import...")
+
+# Try calling a simple assert
+(tf/assert true "This should pass")
+(tf/assert false "This should fail")
+
+(print "Test completed")

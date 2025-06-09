@@ -1,0 +1,33 @@
+# Test curly brace parsing disambiguation
+# Ensures parser correctly distinguishes between:
+# - {} as empty dict
+# - {"key": value} as dict literal
+# - {value} as set literal
+
+(print "Testing empty dict:")
+(= d {})
+(assert (= (type d) "dict") "Empty {} should create a dict")
+(assert (= (len d) 0) "Empty dict should have length 0")
+(print "✓ Empty dict:" d)
+
+(print "\nTesting dict literal:")
+(= d2 {"a": 1, "b": 2})
+(assert (= (type d2) "dict") "Dict literal should create a dict")
+(assert (= (len d2) 2) "Dict should have 2 items")
+(assert (= d2["a"] 1) "Dict key 'a' should have value 1")
+(print "✓ Dict literal:" d2)
+
+(print "\nTesting set literal:")
+(= s {1, 2, 3})
+(assert (= (type s) "set") "Set literal should create a set")
+(assert (= (len s) 3) "Set should have 3 elements")
+(assert (in 2 s) "Set should contain element 2")
+(print "✓ Set literal:" s)
+
+(print "\nTesting single-element set:")
+(= s2 {42})
+(assert (= (type s2) "set") "Single element in {} should create a set")
+(assert (= (len s2) 1) "Single-element set should have length 1")
+(print "✓ Single-element set:" s2)
+
+(print "\nAll curly brace parsing tests passed!")
