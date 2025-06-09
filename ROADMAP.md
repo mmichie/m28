@@ -376,10 +376,106 @@ The language is considered "complete" when:
    - [ ] Implement consistent error wrapping with context
    - [ ] Add error type hierarchy for better error discrimination
    - [ ] **Better Error Messages** (Critical for Developer Experience)
-     - [ ] Add source location tracking (line and column numbers)
+     - [ ] Implement proper source location tracking (see detailed design below)
      - [ ] Include source context in error messages (show problematic line)
      - [ ] Improve stack traces with function names and locations
      - [ ] Add "Did you mean?" suggestions for common typos
+
+### 🎯 Better Error Messages - Detailed Implementation Plan
+
+**Problem**: Current error messages lack source location information, making debugging difficult.
+
+**Current Issues with LocatedValue Approach**:
+1. Type system pollution - requires unwrapping everywhere
+2. Breaks type assertions - `val.(core.NumberValue)` fails if wrapped
+3. Value equality problems - wrapped and unwrapped values not equal
+4. Performance overhead from constant unwrapping
+
+**Recommended Approach**: Hybrid AST + Context-based tracking
+
+#### Implementation Steps:
+
+1. **Create AST Node Types** (parser/ast.go)
+   ```go
+   type ASTNode interface {
+       GetLocation() *SourceLocation
+       GetValue() core.Value
+   }
+   
+   type ExprNode struct {
+       Value    core.Value
+       Location *SourceLocation
+   }
+   ```
+
+2. **Modify Parser to Build AST**
+   - Parser returns AST nodes instead of raw Values
+   - Each node includes source location (file, line, column)
+   - Preserve location through all parsing steps
+   - Example: `parseNumber()` returns `&ExprNode{Value: NumberValue(n), Location: loc}`
+
+3. **Update Evaluator for AST**
+   - `Eval(node ASTNode, ctx *Context)` instead of `Eval(value Value, ctx *Context)`
+   - Extract location from AST node at evaluation time
+   - Store current location in Context during evaluation
+   - Pass location to error creation functions
+
+4. **Enhance Context with Location Tracking**
+   ```go
+   type Context struct {
+       // ... existing fields
+       CurrentLocation *SourceLocation // Current evaluation location
+       SourceMap       map[string][]string // Cache of source files
+   }
+   ```
+
+5. **Improve Error Types**
+   ```go
+   type EvalError struct {
+       BaseError
+       Location    *SourceLocation
+       Expression  string // Source expression that caused error
+       Context     *Context // For stack trace
+   }
+   ```
+
+6. **Error Formatting with Context**
+   ```
+   Error at /path/to/file.m28:42:10
+   
+   40 | (def calculate (x y)
+   41 |   (= result (+ x y))
+   42 |   (/ result zero))  # <-- Error here
+        |          ^^^^
+   43 |   
+   
+   ZeroDivisionError: division by zero
+   
+   Stack trace:
+     File "main.m28", line 10, in <module>
+     File "main.m28", line 42, in calculate
+   ```
+
+7. **Implementation Priority**:
+   - Phase 1: AST nodes with locations (parser changes)
+   - Phase 2: Context location tracking (evaluator changes)
+   - Phase 3: Enhanced error formatting (error reporter)
+   - Phase 4: Source caching and display
+
+**Benefits**:
+- No runtime value wrapping
+- Clean separation of parse-time and runtime
+- Zero performance impact on successful execution
+- Precise location tracking for all errors
+- Extensible for future features (debugger, LSP)
+
+**Files to Modify**:
+- parser/parser.go - Return AST nodes
+- parser/ast.go (new) - AST node definitions
+- eval/evaluator.go - Accept AST nodes
+- core/context.go - Add location tracking
+- core/error.go - Enhanced error types
+- repl/error_reporter.go - Format errors with context
 
 #### Medium Priority - Type System Enhancements
 1. **Define Missing Protocols**
