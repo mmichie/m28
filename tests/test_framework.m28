@@ -1,100 +1,104 @@
 # M28 Test Framework
 # A simple but effective testing framework
 
-# Test statistics
-(def test-count 0)
-(def pass-count 0)
-(def fail-count 0)
-(def current-suite "")
-(def test-results [])
-
 # ANSI color codes
 (= GREEN "\033[32m")
 (= RED "\033[31m")
 (= YELLOW "\033[33m")
 (= RESET "\033[0m")
 
+# Test state - using lists that we can mutate
+(= test-count [0])
+(= pass-count [0])
+(= fail-count [0])
+(= failed-tests [])
+(= current-suite [""])
+
 # Test assertion functions
-(def assert (lambda (condition message)
-  (set! test-count (+ test-count 1))
+(def assert (condition message)
+  (= test-count[0] (+ test-count[0] 1))
   (if condition
     (do
-      (set! pass-count (+ pass-count 1))
-      (print (+ GREEN "✓ " RESET message)))
+      (= pass-count[0] (+ pass-count[0] 1))
+      (print (+ GREEN "✓ " RESET message))
+      true)
     (do
-      (set! fail-count (+ fail-count 1))
+      (= fail-count[0] (+ fail-count[0] 1))
       (print (+ RED "✗ " RESET message))
-      (set! test-results (append test-results
-        [(dict "suite" current-suite "test" message "passed" false)])))))
+      (= failed-tests[(len failed-tests)] 
+        (dict "suite" current-suite[0] "test" message))
+      false)))
 
-(def assert-eq (lambda (expected actual message)
+(def assert-eq (expected actual message)
   (assert (= expected actual)
-    (+ message " (expected: " (str expected) ", actual: " (str actual) ")"))))
+    (+ message " (expected: " (str expected) ", actual: " (str actual) ")")))
 
-(def assert-neq (lambda (expected actual message)
+(def assert-neq (expected actual message)
   (assert (not (= expected actual))
-    (+ message " (should not equal: " (str expected) ")"))))
+    (+ message " (should not equal: " (str expected) ")")))
 
-(def assert-true (lambda (value message)
-  (assert (= value true) message)))
+(def assert-true (value message)
+  (assert (= value true) message))
 
-(def assert-false (lambda (value message)
-  (assert (= value false) message)))
+(def assert-false (value message)
+  (assert (= value false) message))
 
-(def assert-nil (lambda (value message)
-  (assert (= value nil) message)))
+(def assert-nil (value message)
+  (assert (= value nil) message))
 
-(def assert-not-nil (lambda (value message)
-  (assert (not (= value nil)) message)))
+(def assert-not-nil (value message)
+  (assert (not (= value nil)) message))
 
-(def assert-type (lambda (value expected-type message)
+(def assert-type (value expected-type message)
   (assert (= (type value) expected-type)
-    (+ message " (expected type: " expected-type ", actual: " (type value) ")"))))
+    (+ message " (expected type: " expected-type ", actual: " (type value) ")")))
 
-(def assert-error (lambda (thunk error-type message)
+(def assert-error (thunk error-type message)
   (= caught false)
-  (def error-msg "")
+  (= error-msg "")
   (try
     (thunk)
     (except Exception e
-      (set! caught true)
-      (set! error-msg (str e))))
-  (assert caught (+ message " (expected error: " error-type ")"))))
+      (= caught true)
+      (= error-msg (str e))))
+  (assert caught (+ message " (expected error: " error-type ")")))
 
-(def assert-no-error (lambda (thunk message)
+(def assert-no-error (thunk message)
   (= success true)
-  (def error-msg "")
+  (= error-msg "")
   (try
     (thunk)
     (except Exception e
-      (set! success false)
-      (set! error-msg (str e))))
-  (assert success (+ message " (unexpected error: " error-msg ")"))))
+      (= success false)
+      (= error-msg (str e))))
+  (assert success (+ message " (unexpected error: " error-msg ")")))
 
 # Test suite functions
-(def test-suite (lambda (name tests)
+(def test-suite (name tests)
   (print (+ "\n" YELLOW "Test Suite: " name RESET))
-  (set! current-suite name)
-  (def suite-start-count test-count)
-  (def suite-start-pass pass-count)
+  (= current-suite[0] name)
+  (= suite-start-count test-count[0])
+  (= suite-start-pass pass-count[0])
   (tests)
-  (def suite-tests (- test-count suite-start-count))
-  (def suite-pass (- pass-count suite-start-pass))
-  (print (+ "  Suite Result: " (str suite-pass) "/" (str suite-tests) " passed\n"))))
+  (= suite-tests (- test-count[0] suite-start-count))
+  (= suite-pass (- pass-count[0] suite-start-pass))
+  (print (+ "  Suite Result: " (str suite-pass) "/" (str suite-tests) " passed\n")))
 
-(def run-test (lambda (name test-fn)
+(def run-test (name test-fn)
   (print (+ "  " name ": "))
-  (test-fn)))
+  (test-fn))
 
 # Test runner
-(def run-all-tests (lambda ()
+(def run-all-tests ()
   (print (+ YELLOW "\n=== M28 Test Suite ===" RESET))
-  (set! test-count 0)
-  (set! pass-count 0)
-  (set! fail-count 0)
-  (set! test-results [])
+  # Reset state
+  (= test-count[0] 0)
+  (= pass-count[0] 0)
+  (= fail-count[0] 0)
+  (= failed-tests (failed-tests.clear))
+  (= current-suite[0] "")
   
-  ; Run all test modules (will be imported)
+  # Run all test modules (will be imported)
   (if (try test-core (except NameError e false))
     (test-core))
   (if (try test-builtins (except NameError e false))
@@ -104,34 +108,34 @@
   (if (try test-advanced (except NameError e false))
     (test-advanced))
   
-  ; Print summary
+  # Print summary
   (print (+ "\n" YELLOW "=== Test Summary ===" RESET))
-  (print (+ "Total Tests: " (str test-count)))
-  (print (+ GREEN "Passed: " (str pass-count) RESET))
-  (print (+ RED "Failed: " (str fail-count) RESET))
+  (print (+ "Total Tests: " (str test-count[0])))
+  (print (+ GREEN "Passed: " (str pass-count[0]) RESET))
+  (print (+ RED "Failed: " (str fail-count[0]) RESET))
   
-  (if (= fail-count 0)
+  (if (= fail-count[0] 0)
     (print (+ "\n" GREEN "All tests passed! 🎉" RESET))
     (do
       (print (+ "\n" RED "Some tests failed:" RESET))
-      (for result in test-results
-        (if (not (get result "passed"))
-          (print (+ "  - " (get result "suite") ": " (get result "test")))))))
+      (for result in failed-tests
+        (print (+ "  - " (get result "suite") ": " (get result "test"))))))
   
-  ; Return success/failure
-  (= fail-count 0)))
+  # Return success/failure
+  (= fail-count[0] 0))
 
-# Export test framework
-(export assert)
-(export assert-eq)
-(export assert-neq)
-(export assert-true)
-(export assert-false)
-(export assert-nil)
-(export assert-not-nil)
-(export assert-type)
-(export assert-error)
-(export assert-no-error)
-(export test-suite)
-(export run-test)
-(export run-all-tests)
+# Export test framework using __exports__ convention
+(= __exports__ (list 
+  "assert"
+  "assert-eq"
+  "assert-neq"
+  "assert-true"
+  "assert-false"
+  "assert-nil"
+  "assert-not-nil"
+  "assert-type"
+  "assert-error"
+  "assert-no-error"
+  "test-suite"
+  "run-test"
+  "run-all-tests"))
