@@ -224,6 +224,222 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - [ ] Multiple assignment `a, b = 1, 2`
    - [ ] Exception variable binding `except Error as e`
 
+### 🚀 Major Feature: Macro System with S-Strings
+
+**Status**: Proposed
+**Priority**: High
+**Impact**: Enables metaprogramming and DSL creation
+
+#### Overview
+Introduce s-strings (S-expression strings) as a Pythonic approach to macros, combining Python's familiar f-string syntax with Lisp's powerful metaprogramming capabilities.
+
+#### S-String Syntax Specification
+
+##### Basic Syntax
+```lisp
+# S-strings use 's' prefix like f-strings use 'f'
+s"(+ 1 2)"          # Simple s-string
+s'(list {x})'       # Single quotes work too
+s"""                # Triple quotes for multiline
+(def {name} {value})
+"""
+```
+
+##### Interpolation Rules
+- `{expr}` - Interpolate a single value
+- `{*expr}` - Splice a sequence (like Python's *args)
+- `{**expr}` - Splice key-value pairs (like Python's **kwargs)
+- `{{` and `}}` - Literal braces
+- `{expr:format}` - Format specification (for future enhancement)
+
+##### Examples
+```lisp
+# Variable interpolation
+(= x 42)
+s"(+ {x} 1)"  # Expands to: (+ 42 1)
+
+# Splicing
+(= args [1 2 3])
+s"(list {*args})"  # Expands to: (list 1 2 3)
+
+# Conditional interpolation
+s"(if {test} {then_expr} {else_expr if has_else else 'nil'})"
+```
+
+#### Macro Definition Syntax
+
+##### Basic Form
+```lisp
+(defmacro name (params...)
+  body)
+```
+
+##### Parameter Types
+- Regular parameters: `param`
+- Rest parameters: `*rest`
+- Keyword parameters: `**kwargs`
+- Optional parameters with defaults: `(param default)`
+
+##### Examples
+```lisp
+# Simple macro
+(defmacro when (condition *body)
+  s"(if {condition} (do {*body}))")
+
+# Macro with optional parameter
+(defmacro with-default (value (default 0))
+  s"(if (nil? {value}) {default} {value})")
+
+# Complex macro with pattern building
+(defmacro -> (x *forms)
+  (reduce (lambda (acc form)
+            (if (list? form)
+              s"({form[0]} {acc} {*form[1:]})"
+              s"({form} {acc})"))
+          forms
+          x))
+```
+
+#### Implementation Plan
+
+##### Phase 1: S-String Parser (2-3 weeks)
+1. **Lexer modifications**:
+   - Recognize s" s' s""" prefixes
+   - Track interpolation boundaries with {}
+   - Handle nested braces and escape sequences
+
+2. **Parser modifications**:
+   - Create new SStringValue type in core/value.go
+   - Parse s-strings into AST with interpolation nodes
+   - Support {expr}, {*expr}, {**expr} syntax
+   - Handle multiline s-strings with proper indentation
+
+3. **AST representation**:
+   ```go
+   type SStringValue struct {
+       BaseObject
+       Parts []SStringPart  // Mix of literal and interpolation parts
+   }
+   
+   type SStringPart interface {
+       IsSStringPart()
+   }
+   
+   type LiteralPart struct {
+       Text string
+   }
+   
+   type InterpolationPart struct {
+       Expr     Value
+       Type     InterpolationType  // Normal, Splice, KwSplice
+   }
+   ```
+
+##### Phase 2: Macro System (3-4 weeks)
+1. **Macro definition**:
+   - Add `defmacro` special form
+   - Store macros in a separate namespace
+   - Macro objects contain parameter info and body
+
+2. **Macro expansion**:
+   - Detect macro calls during evaluation
+   - Bind arguments to macro parameters
+   - Evaluate s-string body with bound values
+   - Parse resulting string as S-expression
+   - Return parsed AST for evaluation
+
+3. **Evaluation order**:
+   - Macros expand at parse time (before evaluation)
+   - Nested macro calls expand inside-out
+   - Macro expansion is recursive
+
+##### Phase 3: Advanced Features (2-3 weeks)
+1. **Hygiene**:
+   - Automatic gensym for local bindings
+   - Namespace isolation for macro-generated code
+   - Optional unhygienic mode with special markers
+
+2. **Built-in macros**:
+   ```lisp
+   # Threading macros
+   (defmacro -> (x *forms) ...)
+   (defmacro ->> (x *forms) ...)
+   
+   # Binding macros
+   (defmacro let1 (var val *body) ...)
+   (defmacro when-let (bindings *body) ...)
+   
+   # Control flow macros
+   (defmacro cond (*clauses) ...)
+   (defmacro case (expr *cases) ...)
+   ```
+
+3. **Debugging support**:
+   - Macro expansion viewer: `(macroexpand '(when test body))`
+   - Step-through macro expansion
+   - Source location preservation
+
+#### Integration Points
+
+1. **With f-strings**:
+   ```lisp
+   (defmacro debug (expr)
+     s'(let ((value {expr}))
+         (print f"{expr} = {{value}}")
+         value))
+   ```
+
+2. **With classes**:
+   ```lisp
+   (defmacro defprop (name)
+     s"""
+     (do
+       (def get_{name} (self)
+         (. self _{name}))
+       (def set_{name} (self value)
+         (setattr self '_{name} value)))
+     """)
+   ```
+
+3. **With module system**:
+   ```lisp
+   (defmacro import-as (module name)
+     s"(= {name} (import '{module}))")
+   ```
+
+#### Testing Strategy
+1. **Parser tests**:
+   - S-string tokenization
+   - Interpolation parsing
+   - Edge cases (nested braces, quotes)
+
+2. **Macro tests**:
+   - Basic macro definition and expansion
+   - Parameter binding (positional, rest, keyword)
+   - Recursive macro expansion
+   - Hygiene tests
+
+3. **Integration tests**:
+   - Macros using s-strings with f-strings
+   - Macros generating macros
+   - Performance benchmarks
+
+#### Success Criteria
+- [ ] S-strings parse correctly with all interpolation types
+- [ ] Macros can be defined and called
+- [ ] Macro expansion happens before evaluation
+- [ ] Built-in macros provide useful abstractions
+- [ ] Performance overhead is minimal
+- [ ] Error messages are clear and helpful
+- [ ] Documentation and examples are comprehensive
+
+#### Future Enhancements
+- Pattern matching in macro parameters
+- Compile-time computation in macros
+- Macro modules and namespacing
+- Reader macros for custom syntax
+- Syntax-case style pattern matching
+
 ### 📊 Medium Priority
 - [ ] Itertools-like functions (product, combinations, etc.)
 - [ ] Enhanced built-ins (reversed as iterator, sum with start)
