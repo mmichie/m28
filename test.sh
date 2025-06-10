@@ -207,10 +207,11 @@ if [[ $FAILED -eq 0 ]]; then
     exit 0
 elif [[ $PERCENT -ge 90 ]]; then
     echo -e "${GREEN}✅ Excellent! Core features are solid.${NC}"
-    exit 0
+    echo -e "${YELLOW}⚠️  However, some tests failed and need attention.${NC}"
+    exit 1
 elif [[ $PERCENT -ge 80 ]]; then
     echo -e "${YELLOW}⚠️  Good. Most features work correctly.${NC}"
-    exit 0
+    exit 1
 else
     echo -e "${RED}❌ Issues found. Review failed tests above.${NC}"
     exit 1
