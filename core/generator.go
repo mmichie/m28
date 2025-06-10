@@ -158,6 +158,11 @@ func (g *Generator) Close() (Value, error) {
 	return Nil, nil
 }
 
+// Iterator returns an iterator for the generator
+func (g *Generator) Iterator() Iterator {
+	return &GeneratorIterator{generator: g}
+}
+
 // GetState returns the generator's current state
 func (g *Generator) GetState() GeneratorState {
 	return g.state
@@ -207,6 +212,31 @@ func (e *StopIteration) Error() string {
 	return "StopIteration"
 }
 
+// GeneratorIterator implements Iterator for generators
+type GeneratorIterator struct {
+	generator *Generator
+}
+
+// Next advances the iterator and returns the next value
+func (gi *GeneratorIterator) Next() (Value, bool) {
+	val, err := gi.generator.Next()
+	if err != nil {
+		// Check if it's StopIteration
+		if _, ok := err.(*StopIteration); ok {
+			return nil, false
+		}
+		// For other errors, we could log or handle differently
+		return nil, false
+	}
+	return val, true
+}
+
+// Reset resets the iterator to the beginning
+func (gi *GeneratorIterator) Reset() {
+	// Generators typically can't be reset in Python
+	// We'll leave this as a no-op
+}
+
 // GeneratorFunction wraps a function that contains yield statements
 type GeneratorFunction struct {
 	BaseObject
@@ -241,8 +271,9 @@ func (gf *GeneratorFunction) Call(args []Value, ctx *Context) (Value, error) {
 	// Create a new generator with the function's code
 	gen := NewGenerator(gf.Name, gf.Function, ctx)
 
-	// Store the arguments in the generator's context
-	// This would be handled by the evaluator
+	// Store the arguments and the function for later execution
+	gen.SetAttr("__args__", ListValue(args))
+	gen.SetAttr("__function__", gf.Function)
 
 	return gen, nil
 }

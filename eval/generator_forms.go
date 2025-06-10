@@ -51,8 +51,11 @@ func EvalGenerator(gen *core.Generator, ctx *core.Context) (core.Value, error) {
 // makeGeneratorFunction checks if a function contains yield and wraps it
 func makeGeneratorFunction(fn *UserFunction) core.Value {
 	// Check if function body contains yield
-	if containsYield(fn.body) {
-		return core.NewGeneratorFunction(fn, fn.name)
+	hasYield := containsYield(fn.body)
+	if hasYield {
+		// Create a generator function wrapper
+		genFunc := core.NewGeneratorFunction(fn, fn.name)
+		return genFunc
 	}
 	return fn
 }
@@ -71,6 +74,11 @@ func containsYield(expr core.Value) bool {
 					return true
 				}
 			}
+		}
+	case core.SymbolValue:
+		// Check if it's a yield symbol (shouldn't happen but just in case)
+		if string(e) == "yield" {
+			return true
 		}
 	}
 	return false

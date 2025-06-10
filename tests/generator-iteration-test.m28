@@ -1,0 +1,24 @@
+# Test for generator iteration in for loops
+
+(print "\n=== Generator Iteration Tests ===\n")
+
+# Test 1: Basic generator with for loop
+(print "Test 1: Basic generator iteration")
+(def count_to (n)
+  (= i 0)
+  (while (< i n)
+    (yield i)
+    (= i (+ i 1))))
+
+(print "Creating generator that counts to 3...")
+(= gen (count_to 3))
+(print "Called count_to(3), got:" gen)
+(print "Result type:" (type gen))
+
+# For now, this will show that generators return yield values
+# instead of generator objects
+(print "\nExpected: Should return a generator object")
+(print "Actual: Returns a yield value")
+(print "\nThis demonstrates that generator support is incomplete.")
+
+(print "\n=== End Generator Iteration Tests ===\n")

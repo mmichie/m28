@@ -209,8 +209,11 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			name:       string(name),
 		}
 
-		ctx.Define(string(name), function)
-		return function, nil
+		// Check if this is a generator function
+		finalFunc := makeGeneratorFunction(function)
+		
+		ctx.Define(string(name), finalFunc)
+		return finalFunc, nil
 	}
 
 	// Standard form: (def name ...)
@@ -255,8 +258,11 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				name:       string(name),
 			}
 
-			ctx.Define(string(name), function)
-			return function, nil
+			// Check if this is a generator function
+			finalFunc := makeGeneratorFunction(function)
+			
+			ctx.Define(string(name), finalFunc)
+			return finalFunc, nil
 		}
 	}
 
@@ -483,6 +489,11 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 		return ret.Value, nil
 	}
 
+	// Check if we got a yield value (shouldn't happen in normal functions)
+	if _, ok := result.(*core.YieldValue); ok {
+		return nil, fmt.Errorf("yield outside of generator function")
+	}
+
 	return result, nil
 }
 
@@ -593,7 +604,8 @@ func lambdaForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			env:        ctx, // Capture current environment
 		}
 
-		return fn, nil
+		// Check if this is a generator function
+		return makeGeneratorFunction(fn), nil
 	}
 
 	// New-style function with signature
@@ -624,7 +636,8 @@ func lambdaForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		env:        ctx, // Capture current environment
 	}
 
-	return fn, nil
+	// Check if this is a generator function
+	return makeGeneratorFunction(fn), nil
 }
 
 // Exception represents a raised exception
