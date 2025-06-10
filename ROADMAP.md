@@ -106,7 +106,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [ ] **Remaining Python Features**
   - [x] Tuple unpacking in loops: `for key, value in items:` ✅ DONE
   - [ ] Set literals: `{1, 2, 3}` (currently parsed as dict)
-  - [ ] Multiple assignment: `a, b = 1, 2`
+  - [x] Multiple assignment: `a, b = 1, 2` ✅ DONE
   - [ ] Exception variable binding: `except Error as e`
   - [ ] Argument unpacking: `func(*args, **kwargs)` syntax
   - [ ] `from module import name` syntax
@@ -181,7 +181,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [ ] Decorators with `@` syntax
   - [ ] Generator expressions: `(x*2 for x in range(10))`
   - [ ] Dictionary/set comprehensions
-  - [ ] Multiple assignment: `a, b = 1, 2`
+  - [x] Multiple assignment: `a, b = 1, 2` ✅ DONE
   - [ ] Async/await support
 
 - [ ] **Type Inference (Low Priority)**
@@ -221,7 +221,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 3. **Core Python Features**
    - [ ] Set literals `{1, 2, 3}`
-   - [ ] Multiple assignment `a, b = 1, 2`
+   - [x] Multiple assignment `a, b = 1, 2` ✅ DONE
    - [ ] Exception variable binding `except Error as e`
 
 ### 🚀 Major Feature: Macro System with S-Strings

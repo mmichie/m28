@@ -1,0 +1,124 @@
+# Edge Case Tests for Multiple Assignment
+
+(print "===== Multiple Assignment Edge Cases =====\n")
+
+# Test 1: Assignment from zip
+(print "-- Test 1: Assignment from zip --")
+(= names ["Alice" "Bob"])
+(= ages [25 30])
+(for name age in (zip names ages)
+  (= n1 n2 [name age])
+  (assert (== n1 name) "n1 should equal name")
+  (assert (== n2 age) "n2 should equal age"))
+(print "✓ Assignment from zip works\n")
+
+# Test 2: Assignment from enumerate
+(print "-- Test 2: Assignment from enumerate --")
+(= items ["apple" "banana"])
+(for idx item in (enumerate items)
+  (= i val [idx item])
+  (assert (== i idx) "i should equal idx")
+  (assert (== val item) "val should equal item"))
+(print "✓ Assignment from enumerate works\n")
+
+# Test 3: Multiple assignment in function
+(print "-- Test 3: Assignment in function --")
+(def test_func ()
+  (= a b c 10 20 30)
+  [a b c])
+(= result (test_func))
+(assert (== result [10 20 30]) "Function should return assigned values")
+(print "✓ Assignment in function works\n")
+
+# Test 4: Assignment with computed values
+(print "-- Test 4: Computed value assignment --")
+(= base 5)
+(= x y z [base (* base 2) (* base 3)])
+(assert (== x 5) "x should be 5")
+(assert (== y 10) "y should be 10")
+(assert (== z 15) "z should be 15")
+(print "✓ Computed value assignment works\n")
+
+# Test 5: Assignment from dictionary values
+(print "-- Test 5: Dict values assignment --")
+(= d {"a": 100 "b": 200 "c": 300})
+(= v1 v2 v3 (d.values))
+# Note: dict ordering may vary, so we check the sum
+(assert (== (+ v1 v2 v3) 600) "Sum of values should be 600")
+(print "✓ Dict values assignment works\n")
+
+# Test 6: Multiple assignment with different types
+(print "-- Test 6: Mixed sequence types --")
+(= lst [1 2])
+(= tup %(3 4))
+(= a b lst)
+(= c d tup)
+(assert (== a 1) "a from list should be 1")
+(assert (== b 2) "b from list should be 2")
+(assert (== c 3) "c from tuple should be 3")
+(assert (== d 4) "d from tuple should be 4")
+(print "✓ Mixed sequence type assignment works\n")
+
+# Test 7: Assignment with string (should convert to char list)
+(print "-- Test 7: String to char assignment --")
+(= s1 s2 s3 (list "abc"))
+(assert (== s1 "a") "s1 should be 'a'")
+(assert (== s2 "b") "s2 should be 'b'")
+(assert (== s3 "c") "s3 should be 'c'")
+(print "✓ String to char assignment works\n")
+
+# Test 8: Multiple return values from function
+(print "-- Test 8: Function returning multiple values --")
+(def divmod_func (a b)
+  [(int (/ a b)) (% a b)])
+(= quot rem (divmod_func 17 5))
+(assert (== quot 3) "quotient should be 3")
+(assert (== rem 2) "remainder should be 2")
+(print "✓ Multiple return value assignment works\n")
+
+# Test 9: Assignment in loop body
+(print "-- Test 9: Assignment in loop --")
+(= sum1 0)
+(= sum2 0)
+(for i in (range 3)
+  (= a b (* i 2) (* i 3))
+  (= sum1 (+ sum1 a))
+  (= sum2 (+ sum2 b)))
+(assert (== sum1 6) "sum1 should be 6 (0+2+4)")
+(assert (== sum2 9) "sum2 should be 9 (0+3+6)")
+(print "✓ Assignment in loop works\n")
+
+# Test 10: Chained multiple assignments
+(print "-- Test 10: Chained assignments --")
+(= a b 1 2)
+(= c d [a b])
+(= e f [c d])
+(assert (== e 1) "e should be 1")
+(assert (== f 2) "f should be 2")
+(print "✓ Chained assignments work\n")
+
+# Test 11: Assignment with conditionals
+(print "-- Test 11: Conditional assignment --")
+(= flag true)
+(= x y (if flag [10 20] [30 40]))
+(assert (== x 10) "x should be 10")
+(assert (== y 20) "y should be 20")
+(= flag false)
+(= x y (if flag [10 20] [30 40]))
+(assert (== x 30) "x should be 30")
+(assert (== y 40) "y should be 40")
+(print "✓ Conditional assignment works\n")
+
+# Test 12: Assignment creates copies (lists are immutable)
+(print "-- Test 12: Immutability check --")
+(= original [1 2 3])
+(= a b [original original])
+(= a_new (a.append 4))
+(assert (== (len a) 3) "a should still be length 3")
+(assert (== (len b) 3) "b should still be length 3")
+(assert (== (len a_new) 4) "a_new should be length 4")
+(assert (== a b) "a and b should still be equal")
+(assert (== a original) "a should equal original")
+(print "✓ Immutability preserved\n")
+
+(print "===== All Edge Case Tests Passed! =====")

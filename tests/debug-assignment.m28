@@ -1,0 +1,12 @@
+# Debug assignment
+
+(print "Testing assignment...")
+(= x y z 1 2 3)
+(print "x =" x "y =" y "z =" z)
+
+(print "\nTesting with base...")
+(= base 5)
+(print "base =" base)
+(= a b c base (* base 2) (* base 3))
+(print "a =" a "b =" b "c =" c)
+EOF && ./bin/m28 tests/debug-assignment.m28 < /dev/null

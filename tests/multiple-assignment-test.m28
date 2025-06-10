@@ -1,0 +1,158 @@
+# Comprehensive Multiple Assignment Tests
+
+(print "===== Multiple Assignment Tests =====\n")
+
+# Test 1: Basic multiple assignment with two values
+(print "-- Test 1: Basic two value assignment --")
+(= a b 10 20)
+(assert (== a 10) "a should be 10")
+(assert (== b 20) "b should be 20")
+(print "✓ Basic two value assignment works\n")
+
+# Test 2: Multiple assignment with three values
+(print "-- Test 2: Three value assignment --")
+(= x y z 1 2 3)
+(assert (== x 1) "x should be 1")
+(assert (== y 2) "y should be 2")
+(assert (== z 3) "z should be 3")
+(print "✓ Three value assignment works\n")
+
+# Test 3: Multiple assignment from list
+(print "-- Test 3: Assignment from list --")
+(= values [100 200 300])
+(= p q r values)
+(assert (== p 100) "p should be 100")
+(assert (== q 200) "q should be 200")
+(assert (== r 300) "r should be 300")
+(print "✓ Assignment from list works\n")
+
+# Test 4: Multiple assignment from tuple
+(print "-- Test 4: Assignment from tuple --")
+(= tup %(5 10 15))
+(= m n o tup)
+(assert (== m 5) "m should be 5")
+(assert (== n 10) "n should be 10")
+(assert (== o 15) "o should be 15")
+(print "✓ Assignment from tuple works\n")
+
+# Test 5: Multiple assignment with expressions
+(print "-- Test 5: Assignment with expressions --")
+(= i j (+ 1 2) (* 3 4))
+(assert (== i 3) "i should be 3")
+(assert (== j 12) "j should be 12")
+(print "✓ Assignment with expressions works\n")
+
+# Test 6: Swapping values
+(print "-- Test 6: Value swapping --")
+(= first second 100 200)
+(= first second [second first])
+(assert (== first 200) "first should be 200 after swap")
+(assert (== second 100) "second should be 100 after swap")
+(print "✓ Value swapping works\n")
+
+# Test 7: Multiple assignment from function returning list
+(print "-- Test 7: Assignment from function result --")
+(def make_list ()
+  [10 20 30])
+(= d e f (make_list))
+(assert (== d 10) "d should be 10")
+(assert (== e 20) "e should be 20")
+(assert (== f 30) "f should be 30")
+(print "✓ Assignment from function result works\n")
+
+# Test 8: Error handling - length mismatch (too few values)
+(print "-- Test 8: Error handling - too few values --")
+(= error_caught false)
+(try
+  (= a8 b8 c8 1 2)  # 3 targets, 2 values
+  (except
+    (= error_caught true)))
+(assert error_caught "Should catch error for too few values")
+(print "✓ Error caught for too few values\n")
+
+# Test 9: Error handling - length mismatch (too many values)
+(print "-- Test 9: Error handling - too many values --")
+(= error_caught false)
+(try
+  (= a9 b9 1 2 3)  # 2 targets, 3 values
+  (except
+    (= error_caught true)))
+(assert error_caught "Should catch error for too many values")
+(print "✓ Error caught for too many values\n")
+
+# Test 10: Error handling - non-sequence unpacking
+(print "-- Test 10: Error handling - non-sequence unpacking --")
+(= error_caught false)
+(try
+  (= a10 b10 42)  # single value, not a sequence
+  (except
+    (= error_caught true)))
+(assert error_caught "Should catch error for non-sequence unpacking")
+(print "✓ Error caught for non-sequence unpacking\n")
+
+# Test 11: Old style tuple unpacking still works
+(print "-- Test 11: Old style tuple unpacking --")
+(= (x y) [111 222])
+(assert (== x 111) "x should be 111")
+(assert (== y 222) "y should be 222")
+(print "✓ Old style tuple unpacking still works\n")
+
+# Test 12: Multiple assignment with string values
+(print "-- Test 12: String value assignment --")
+(= s1 s2 s3 "hello" "world" "!")
+(assert (== s1 "hello") "s1 should be 'hello'")
+(assert (== s2 "world") "s2 should be 'world'")
+(assert (== s3 "!") "s3 should be '!'")
+(print "✓ String value assignment works\n")
+
+# Test 13: Assignment with nil values
+(print "-- Test 13: Assignment with nil --")
+(= n1 n2 nil 42)
+(assert (== n1 nil) "n1 should be nil")
+(assert (== n2 42) "n2 should be 42")
+(print "✓ Assignment with nil works\n")
+
+# Test 14: Chain assignment still works
+(print "-- Test 14: Chain assignment --")
+(= a1 10 b1 20 c1 30)
+(assert (== a1 10) "a1 should be 10")
+(assert (== b1 20) "b1 should be 20")
+(assert (== c1 30) "c1 should be 30")
+(print "✓ Chain assignment still works\n")
+
+# Test 15: Multiple assignment from dict items
+(print "-- Test 15: Assignment from dict items --")
+(= d {"key": "value"})
+(for k v in (d.items)
+  (= key k)
+  (= val v))
+(assert (== key "key") "key should be 'key'")
+(assert (== val "value") "val should be 'value'")
+(print "✓ Assignment from dict items works\n")
+
+# Test 16: Multiple assignment with mixed types
+(print "-- Test 16: Mixed type assignment --")
+(= num str lst 42 "test" [1 2 3])
+(assert (== num 42) "num should be 42")
+(assert (== str "test") "str should be 'test'")
+(assert (== lst [1 2 3]) "lst should be [1 2 3]")
+(print "✓ Mixed type assignment works\n")
+
+# Test 17: Multiple assignment with boolean values
+(print "-- Test 17: Boolean assignment --")
+(= t f true false)
+(assert (== t true) "t should be true")
+(assert (== f false) "f should be false")
+(print "✓ Boolean assignment works\n")
+
+# Test 18: Empty sequence unpacking
+(print "-- Test 18: Empty sequence handling --")
+(= error_caught false)
+(try
+  (= a18 b18 [])  # empty list
+  (except
+    (= error_caught true)))
+(assert error_caught "Should catch error for empty sequence")
+(print "✓ Error caught for empty sequence\n")
+
+(print "===== All Multiple Assignment Tests Passed! =====")

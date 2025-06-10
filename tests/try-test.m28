@@ -1,0 +1,22 @@
+# Test try/except
+
+(print "Testing try/except...")
+
+(= caught false)
+(try
+  (/ 1 0)
+  except
+  (= caught true))
+
+(print "Division by zero caught:" caught)
+
+(print "\nTesting multiple assignment error...")
+(= caught2 false)
+(try
+  (= a b c [1 2])  # Will unpack the list
+  except
+  (= caught2 true))
+
+(print "Assignment worked, no error:" (not caught2))
+(print "a =" a "b =" b)
+EOF && ./bin/m28 tests/try-test.m28 < /dev/null

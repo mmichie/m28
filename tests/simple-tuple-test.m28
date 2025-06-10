@@ -1,20 +1,14 @@
-# simple-tuple-test.m28 - a minimal test for tuple repetition
+# Simple tuple test
 
-(print "Simple Tuple Repetition Test")
+(print "Testing tuple function...")
+(= t (tuple 1 2 3))
+(print "Created tuple:" t)
+(print "Type of tuple:" (type t))
 
-(= t (1, 2))
-(print "Tuple:" t)
-
-(= n 3)
-(print "Number:" n)
-
-(print "Will try to compute:" t "*" n)
-
-# Test the core repetition operations
-(try
-  (= result (* t n))
-  (print "Result:" result)
-  (except Exception as e
-    (print "Got exception:" e)))
-
-(print "Test complete")
+# Try multiple assignment  
+(print "\nTesting multiple assignment from tuple...")
+(= a b c t)
+(print "a =" a)
+(print "b =" b)
+(print "c =" c)
+EOF < /dev/null

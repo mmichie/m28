@@ -1,0 +1,14 @@
+# Test tuple creation methods
+
+(print "Testing tuple literal...")
+(= t %(1 2 3))
+(print "Created tuple literal:" t)
+
+(print "\nTesting multiple assignment...")
+(= x y z 10 20 30)
+(print "x =" x "y =" y "z =" z)
+
+(print "\nTesting list assignment...")
+(= a b c [100 200 300])
+(print "a =" a "b =" b "c =" c)
+EOF && ./bin/m28 tests/test-tuple-literal.m28 < /dev/null

@@ -1,0 +1,19 @@
+# Simple exception test
+
+(print "Testing exceptions...")
+
+(try
+  (print "About to divide by zero")
+  (/ 1 0)
+  (except
+    (print "Caught division by zero\!")))
+
+(print "\nTesting multiple assignment error...")
+(try
+  (print "About to do bad assignment")
+  (= a b c 1 2)
+  (except
+    (print "Caught assignment error\!")))
+
+(print "\nDone\!")
+EOF && ./bin/m28 tests/simple-exception-test.m28 < /dev/null

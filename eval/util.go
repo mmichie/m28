@@ -331,7 +331,62 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// 1. (= a b expr) where expr returns multiple values
 		// 2. (= a b c d) where we assign a=b, c=d
 
-		// Check if all but last are symbols (case 1)
+		// First, check if we have multiple symbols followed by values
+		// Count leading symbols
+		symbolCount := 0
+		for i := 0; i < len(args); i++ {
+			if _, ok := args[i].(core.SymbolValue); ok {
+				symbolCount++
+			} else {
+				break
+			}
+		}
+
+		// If we have multiple symbols followed by values, it's multiple assignment
+		if symbolCount > 1 && symbolCount < len(args) {
+			// Multiple assignment: (= a b c ... val1 val2 val3 ...)
+			targets := args[:symbolCount]
+			valueExprs := args[symbolCount:]
+
+			// Evaluate all value expressions
+			values := make([]core.Value, 0, len(valueExprs))
+			for _, expr := range valueExprs {
+				val, err := Eval(expr, ctx)
+				if err != nil {
+					return nil, err
+				}
+				values = append(values, val)
+			}
+
+			// If there's only one value expression but it evaluates to a sequence, unpack it
+			if len(valueExprs) == 1 && len(values) == 1 {
+				switch v := values[0].(type) {
+				case core.TupleValue:
+					values = []core.Value(v)
+				case core.ListValue:
+					values = []core.Value(v)
+				}
+			}
+
+			// Check length match
+			if len(targets) != len(values) {
+				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
+			}
+
+			// Assign each value
+			for i, target := range targets {
+				if sym, ok := target.(core.SymbolValue); ok {
+					ctx.Define(string(sym), values[i])
+				} else {
+					return nil, fmt.Errorf("multiple assignment target must be a symbol")
+				}
+			}
+
+			// Return a tuple of the assigned values
+			return core.TupleValue(values), nil
+		}
+
+		// Check if all but last are symbols (old case 1)
 		allSymbols := true
 		for i := 0; i < len(args)-1; i++ {
 			if _, ok := args[i].(core.SymbolValue); !ok {
@@ -340,7 +395,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
-		if allSymbols {
+		if allSymbols && symbolCount > 1 {
 			// Case 1: (= a b expr) - special handling for tuple unpacking
 			targets := args[:len(args)-1]
 			expr := args[len(args)-1]
@@ -392,7 +447,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				// Check length match
 				if len(targets) != len(values) {
-					return nil, fmt.Errorf("multiple assignment count mismatch: %d targets but %d values", len(targets), len(values))
+					return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
 				}
 
 				// Assign each value
@@ -420,13 +475,13 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			case core.ListValue:
 				values = v
 			default:
-				// If not a sequence, treat as single value
-				values = []core.Value{value}
+				// If not a sequence, error
+				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
 			}
 
 			// Check length match
 			if len(targets) != len(values) {
-				return nil, fmt.Errorf("multiple assignment count mismatch: %d targets but %d values", len(targets), len(values))
+				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
 			}
 
 			// Assign each value
