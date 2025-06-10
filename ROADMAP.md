@@ -271,9 +271,9 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 ## Known Issues
 
 ### 1. Continue Statement in While Loops
-**Issue**: The `continue` statement can cause infinite loops when used in while loops
-**Status**: Bug - needs investigation
-**Workaround**: Use conditional logic instead of continue in while loops
+**Issue**: The `continue` statement can cause infinite loops when used in while loops if the loop counter is incremented after the continue statement
+**Status**: Working as designed - matches Python behavior
+**Note**: This is expected behavior. When `continue` is executed, it skips all remaining statements in the loop body and jumps to the loop condition. Ensure loop counters are updated before any `continue` statements to avoid infinite loops.
 
 ### 2. Generator Iteration
 **Issue**: Generator functions are defined but iteration over generators is not fully implemented
