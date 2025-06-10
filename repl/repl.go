@@ -51,13 +51,13 @@ func NewREPL(globalCtx *core.Context) *REPL {
 		useReadline:    true, // Default to using readline
 	}
 	r.commandHandler = NewCommandHandler(r)
-	
+
 	// Check if readline should be disabled
 	if os.Getenv("M28_NO_READLINE") == "1" {
 		r.useReadline = false
 		fmt.Fprintln(os.Stderr, "Readline disabled by M28_NO_READLINE=1")
 	}
-	
+
 	// Try to initialize readline
 	if r.useReadline {
 		readlineInput, err := NewReadlineInput(r.completer, r.history, r.colorManager, r.indentTracker)
@@ -70,7 +70,7 @@ func NewREPL(globalCtx *core.Context) *REPL {
 			r.readlineInput = readlineInput
 		}
 	}
-	
+
 	return r
 }
 
@@ -90,7 +90,7 @@ func (r *REPL) SetKeyBindingMode(mode string) error {
 	if r.readlineInput == nil {
 		return fmt.Errorf("readline not available")
 	}
-	
+
 	switch mode {
 	case "vi":
 		return r.readlineInput.SetViMode(true)
@@ -120,10 +120,10 @@ func (r *REPL) Start() {
 	for {
 		// Display the input prompt with execution number
 		prompt := r.executionState.FormatInputPrompt()
-		
+
 		var line string
 		var err error
-		
+
 		if r.useReadline && r.readlineInput != nil {
 			// Use readline for input
 			line, err = r.readlineInput.ReadLine(prompt)
@@ -135,7 +135,7 @@ func (r *REPL) Start() {
 				line = strings.TrimRight(line, "\n\r")
 			}
 		}
-		
+
 		if err != nil {
 			if err == io.EOF {
 				fmt.Fprintln(r.writer, "\nExiting...")
@@ -193,7 +193,7 @@ func (r *REPL) Start() {
 		if isIncomplete(line) {
 			var multiLine string
 			var err error
-			
+
 			if r.useReadline && r.readlineInput != nil {
 				// Use readline for multiline input
 				multiLine, err = r.readlineInput.ReadMultiLine(line)
@@ -201,7 +201,7 @@ func (r *REPL) Start() {
 				// Fall back to basic multiline input
 				multiLine, err = r.readMultilineInput(line)
 			}
-			
+
 			if err != nil {
 				fmt.Fprintf(r.writer, "Error: %s\n", err)
 				continue

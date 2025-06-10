@@ -211,7 +211,7 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Check if this is a generator function
 		finalFunc := makeGeneratorFunction(function)
-		
+
 		ctx.Define(string(name), finalFunc)
 		return finalFunc, nil
 	}
@@ -260,7 +260,7 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// Check if this is a generator function
 			finalFunc := makeGeneratorFunction(function)
-			
+
 			ctx.Define(string(name), finalFunc)
 			return finalFunc, nil
 		}

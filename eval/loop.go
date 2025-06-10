@@ -150,7 +150,7 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				break
 			}
 		}
-		
+
 		if inIndex > 0 && inIndex < len(args)-1 {
 			// Found 'in': (for var1 var2 ... in sequence body...)
 			for i := 0; i < inIndex; i++ {
@@ -184,7 +184,7 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		if len(varNames) > 1 {
 			// Try to unpack the item as a sequence
 			var values []core.Value
-			
+
 			switch v := item.(type) {
 			case core.ListValue:
 				values = v
@@ -206,12 +206,12 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					return nil, fmt.Errorf("cannot unpack non-sequence type %s", item.Type())
 				}
 			}
-			
+
 			// Check if we have the right number of values
 			if len(values) != len(varNames) {
 				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(varNames), len(values))
 			}
-			
+
 			// Bind each value to its corresponding variable
 			for i, varName := range varNames {
 				ctx.Define(string(varName), values[i])

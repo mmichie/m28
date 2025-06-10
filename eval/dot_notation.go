@@ -36,15 +36,17 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Check if object supports GetAttr (either full Object interface or just GetAttr)
 	var value core.Value
 	var found bool
-	
+
 	if objWithAttrs, ok := obj.(core.Object); ok {
 		// Full Object interface
 		value, found = objWithAttrs.GetAttr(string(propName))
-	} else if objWithGetAttr, ok := obj.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+	} else if objWithGetAttr, ok := obj.(interface {
+		GetAttr(string) (core.Value, bool)
+	}); ok {
 		// Just GetAttr method
 		value, found = objWithGetAttr.GetAttr(string(propName))
 	}
-	
+
 	if found {
 
 		// If there are more arguments (even if just __call__ marker), it's a method call
@@ -102,7 +104,7 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Just property access
 		return value, nil
 	}
-	
+
 	if !found {
 		return nil, fmt.Errorf("%s has no attribute '%s'", obj.Type(), string(propName))
 	}

@@ -188,7 +188,7 @@ func (ch *CommandHandler) toggleKeybindings() (bool, error) {
 		fmt.Fprintf(ch.repl.writer, "Keybinding mode preference set to: %s\n", ch.settings.KeybindingMode)
 		fmt.Fprintln(ch.repl.writer, "Note: Readline is not available. Arrow keys and editing features disabled.")
 	}
-	
+
 	return true, nil
 }
 

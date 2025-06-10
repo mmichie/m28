@@ -28,7 +28,7 @@ func NewReadlineInput(completer *Completer, history *History, colorManager *Colo
 		// Set a reasonable default
 		os.Setenv("TERM", "xterm-256color")
 	}
-	
+
 	ri := &ReadlineInput{
 		completer:     completer,
 		history:       history,
@@ -47,17 +47,17 @@ func NewReadlineInput(completer *Completer, history *History, colorManager *Colo
 		VimMode:         ri.viMode,
 
 		// Enable history features
-		HistorySearchFold:   true,
+		HistorySearchFold:      true,
 		DisableAutoSaveHistory: false,
-		
+
 		// Disable masking - this might be causing the asterisk issue
-		EnableMask:          false,
-		
+		EnableMask: false,
+
 		// Explicitly set stdin/stdout/stderr
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
-		
+
 		// Don't use custom filter that might interfere
 		// FuncFilterInputRune: ri.filterInputRune,
 	}
@@ -101,19 +101,19 @@ type customCompleter struct {
 func (cc *customCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
 	// Convert to string for our completer
 	input := string(line[:pos])
-	
+
 	// Get completions from our completer
 	completions := cc.completer.Complete(input)
-	
+
 	// Convert back to rune slices for readline
 	result := make([][]rune, len(completions))
 	for i, comp := range completions {
 		result[i] = []rune(comp)
 	}
-	
+
 	// Find the start of the word being completed
 	wordStart := strings.LastIndexAny(input, " \t\n()[]{}\"'") + 1
-	
+
 	return result, pos - wordStart
 }
 
@@ -138,29 +138,29 @@ func (ri *ReadlineInput) ReadLine(prompt string) (string, error) {
 	// Set colored prompt
 	coloredPrompt := ri.colorManager.ColorizePrompt(prompt)
 	ri.rl.SetPrompt(coloredPrompt)
-	
+
 	// Read the line
 	line, err := ri.rl.Readline()
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Add to our history manager
 	if line != "" {
 		ri.history.Add(line)
 	}
-	
+
 	return line, nil
 }
 
 // ReadMultiLine reads multiple lines for incomplete expressions
 func (ri *ReadlineInput) ReadMultiLine(firstLine string) (string, error) {
 	lines := []string{firstLine}
-	
+
 	// Reset indent tracker for new multiline input
 	ri.indentTracker.Reset()
 	ri.indentTracker.UpdateLevel(firstLine)
-	
+
 	for {
 		// Calculate continuation prompt with proper indentation
 		lastLine := lines[len(lines)-1]
@@ -169,7 +169,7 @@ func (ri *ReadlineInput) ReadMultiLine(firstLine string) (string, error) {
 		contPrompt := fmt.Sprintf("... %s", indent)
 		coloredPrompt := ri.colorManager.ColorizePrompt(contPrompt)
 		ri.rl.SetPrompt(coloredPrompt)
-		
+
 		line, err := ri.rl.Readline()
 		if err != nil {
 			if err == io.EOF || err == readline.ErrInterrupt {
@@ -178,9 +178,9 @@ func (ri *ReadlineInput) ReadMultiLine(firstLine string) (string, error) {
 			}
 			return "", err
 		}
-		
+
 		lines = append(lines, line)
-		
+
 		// Check if we have a complete expression
 		fullInput := strings.Join(lines, "\n")
 		if !isIncomplete(fullInput) {

@@ -55,7 +55,7 @@ func AddFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 		}
 	}
-	
+
 	if useAddMethod {
 		// Chain __add__ calls for multiple arguments
 		result := args[0]

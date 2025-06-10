@@ -84,7 +84,7 @@ func formatListRepr(list ListValue) string {
 	if len(list) == 0 {
 		return "[]"
 	}
-	
+
 	result := "["
 	for i, item := range list {
 		if i > 0 {
@@ -103,7 +103,7 @@ func formatTupleRepr(tuple TupleValue) string {
 	if len(tuple) == 1 {
 		return "(" + Repr(tuple[0]) + ",)"
 	}
-	
+
 	result := "("
 	for i, item := range tuple {
 		if i > 0 {
@@ -119,7 +119,7 @@ func formatDictRepr(dict *DictValue) string {
 	if dict.Size() == 0 {
 		return "{}"
 	}
-	
+
 	result := "{"
 	first := true
 	for k, v := range dict.entries {
@@ -139,7 +139,7 @@ func formatSetRepr(set *SetValue) string {
 	if set.Size() == 0 {
 		return "set()"
 	}
-	
+
 	result := "{"
 	first := true
 	for _, item := range set.items {
