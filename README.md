@@ -95,7 +95,7 @@ Everything is an expression in prefix notation:
 (= squared (map (lambda (x) (* x x)) evens))
 
 # List comprehensions
-(= squares [x**2 for x in (range 10) if (even? x)])
+(= squares [(** x 2) for x in (range 10) if (== (% x 2) 0)])
 ```
 
 ### Exception Handling
