@@ -28,11 +28,20 @@ func FindModule(name string) (string, error) {
 		return "", os.ErrNotExist
 	}
 
-	// Convert module name to file path
-	// "foo.bar" -> "foo/bar.m28" or "foo/bar/__init__.m28"
-	parts := strings.Split(name, ".")
-	filename := filepath.Join(parts...) + ".m28"
-	dirname := filepath.Join(parts...)
+	// Check if the name already has .m28 extension
+	var filename, dirname string
+	if strings.HasSuffix(name, ".m28") {
+		// Use the name as-is for file lookup
+		filename = name
+		// For package lookup, remove the extension
+		dirname = strings.TrimSuffix(name, ".m28")
+	} else {
+		// Convert module name to file path
+		// "foo.bar" -> "foo/bar.m28" or "foo/bar/__init__.m28"
+		parts := strings.Split(name, ".")
+		filename = filepath.Join(parts...) + ".m28"
+		dirname = filepath.Join(parts...)
+	}
 
 	// Get a list of directories to search
 	searchDirs := []string{}

@@ -1,0 +1,33 @@
+# Test the from import with list syntax
+
+(print "Testing from import with [name1 name2] syntax\n")
+
+# Test 1: Import specific functions using list syntax
+(print "Test 1: Import specific functions")
+(import "tests/test_module_for_import" from [add multiply])
+
+(print "add(10, 5) =" (add 10 5))
+(print "multiply(3, 7) =" (multiply 3 7))
+
+# Test 2: Import different names
+(print "\nTest 2: Import constants")
+(import "tests/test_module_for_import" from [constant_value greeting])
+
+(print "constant_value =" constant_value)
+(print "greeting =" greeting)
+
+# Test 3: Verify that non-imported names are not available
+(print "\nTest 3: Verify non-imported names are not accessible")
+(try
+  (divide 10 2)
+  (print "ERROR: divide should not be accessible!")
+  (except e
+    (print "✓ Correctly got error when accessing non-imported 'divide'")))
+
+# Test 4: Import all using * syntax
+(print "\nTest 4: Import all using * syntax")
+(import "tests/test_module_for_import" from *)
+# divide should now be available since we imported everything
+(print "After 'from *', divide(20, 4) =" (divide 20 4))
+
+(print "\n✓ All from import tests passed!")

@@ -54,6 +54,48 @@ Modules in M28 are files with `.m28` extension containing M28 code. You can defi
 (print (mu.cube 3))               # 27
 ```
 
+### Import Specific Names
+
+You can import specific names from a module using the `from` clause with list syntax:
+
+```lisp
+# Import only specific functions/variables
+(import "math_utils" from [square cube])
+
+# Now you can use them directly without the module prefix
+(print (square 5))    # 25
+(print (cube 3))      # 27
+```
+
+### Wildcard Import
+
+Import all exported names into the current namespace:
+
+```lisp
+# Import all exported symbols
+(import "math_utils" from *)
+
+# All exported names are now available directly
+(print (square 4))    # 16
+```
+
+**Note:** Only symbols listed in `__exports__` or non-private symbols (not starting with `_`) are imported.
+
+### Import with .m28 Extension
+
+You can explicitly include the `.m28` extension when importing:
+
+```lisp
+# Both of these work and refer to the same module
+(import "math_utils")
+(import "math_utils.m28")
+
+# With alias
+(import "math_utils.m28" as mu)
+```
+
+The module system automatically handles the extension and ensures proper caching.
+
 ### Import from Package
 
 ```lisp

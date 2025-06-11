@@ -1,0 +1,134 @@
+# Comprehensive Module Import Test
+# Tests all variants of module import syntax and functionality
+
+# Create a test module for importing
+(= test_module_code "
+# Test module for comprehensive import testing
+(def func1 () 'func1-result)
+(def func2 () 'func2-result)
+(def func3 () 'func3-result)
+(= var1 100)
+(= var2 200)
+(= var3 300)
+(= _private_var 'should-not-export)
+
+# Use __exports__ to control what gets exported
+(= __exports__ ['func1 'func2 'func3 'var1 'var2 'var3])
+")
+
+# Write the test module to a file
+(with (open "test_import_module.m28" "w") as f
+  (f.write test_module_code))
+
+(print "=== Comprehensive Module Import Tests ===\n")
+
+# Test 1: Basic import (module bound to its name)
+(print "Test 1: Basic import")
+(import test_import_module)
+(assert (== test_import_module.var1 100) "Basic import failed - cannot access var1")
+(assert (== (test_import_module.func1) 'func1-result) "Basic import failed - cannot call func1")
+(print "✓ Basic import works\n")
+
+# Test 2: Import with alias using 'as'
+(print "Test 2: Import with alias")
+(import test_import_module as tim)
+(assert (== tim.var2 200) "Import as alias failed - cannot access var2")
+(assert (== (tim.func2) 'func2-result) "Import as alias failed - cannot call func2")
+(print "✓ Import with alias works\n")
+
+# Test 3: Import specific names using list syntax
+(print "Test 3: Import specific names with list syntax")
+(import test_import_module from [func3 var3])
+(assert (== var3 300) "Import from list failed - var3 not imported")
+(assert (== (func3) 'func3-result) "Import from list failed - func3 not imported")
+# Check that other names were not imported
+(try
+  var1  # This should fail
+  (assert false "Import from list failed - var1 should not be imported")
+except
+  (print "✓ Import from list correctly limited imports"))
+(print "✓ Import specific names works\n")
+
+# Test 4: Import all with *
+(print "Test 4: Import all with *")
+# Clear the namespace first by using a fresh context
+(def test_import_all ()
+  (import test_import_module from *)
+  (assert (== var1 100) "Import * failed - var1 not imported")
+  (assert (== var2 200) "Import * failed - var2 not imported") 
+  (assert (== (func1) 'func1-result) "Import * failed - func1 not imported")
+  # Check that private variables are not imported
+  (try
+    _private_var
+    (assert false "Import * failed - private var should not be imported")
+  except
+    true))
+(test_import_all)
+(print "✓ Import all with * works\n")
+
+# Test 5: Import with .m28 extension explicitly
+(print "Test 5: Import with .m28 extension")
+(import test_import_module.m28 as tim2)
+(assert (== tim2.var1 100) "Import with .m28 extension failed")
+(print "✓ Import with .m28 extension works\n")
+
+# Test 6: Re-importing doesn't reload (module caching)
+(print "Test 6: Module caching")
+# Modify the module file
+(with (open "test_import_module.m28" "a") as f
+  (f.write "\n(= new_var 'should-not-see-this)"))
+# Re-import
+(import test_import_module as tim3)
+# The new variable should not be visible due to caching
+(try
+  tim3.new_var
+  (assert false "Module caching failed - module was reloaded")
+except
+  (print "✓ Module caching works correctly\n"))
+
+# Test 7: Import from nested list syntax variations
+(print "Test 7: List syntax variations")
+# Clear func1 and var1 from namespace
+(del func1)
+(del func3)
+(del var1)
+(del var3)
+
+# Test with symbols in list
+(import test_import_module from [func1 var1])
+(assert (== var1 100) "Import from symbol list failed")
+(assert (== (func1) 'func1-result) "Import from symbol list failed")
+(print "✓ Import from list with symbols works\n")
+
+# Test 8: Error handling - non-existent module
+(print "Test 8: Error handling - non-existent module")
+(try
+  (import non_existent_module)
+  (assert false "Should have failed to import non-existent module")
+except
+  (print "✓ Correctly errors on non-existent module\n"))
+
+# Test 9: Error handling - non-existent export
+(print "Test 9: Error handling - non-existent export")
+(try
+  (import test_import_module from [non_existent_name])
+  (assert false "Should have failed to import non-existent name")
+except
+  (print "✓ Correctly errors on non-existent export\n"))
+
+# Test 10: Multiple imports in one statement (using multiple from names)
+(print "Test 10: Multiple name imports")
+(del func1)
+(del var1)
+(import test_import_module from [func1 func2 var1 var2])
+(assert (== var1 100) "Multiple import failed - var1")
+(assert (== var2 200) "Multiple import failed - var2")
+(assert (== (func1) 'func1-result) "Multiple import failed - func1")
+(assert (== (func2) 'func2-result) "Multiple import failed - func2")
+(print "✓ Multiple name imports work\n")
+
+# Clean up
+(import os)
+(os.remove "test_import_module.m28")
+
+(print "=== All Module Import Tests Passed! ===")

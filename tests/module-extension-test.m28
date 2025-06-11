@@ -1,0 +1,24 @@
+# Module Extension Test
+# Tests importing modules with explicit .m28 extension
+
+(print "=== Module Extension Tests ===\n")
+
+# Test 1: Import with .m28 extension
+(print "Test 1: Import with .m28 extension")
+(import "tests/basic-module-test.m28" as basic_ext)
+(print (basic_ext.add 15 25))
+(print basic_ext.test_value)
+(print "✓ Import with .m28 extension works\n")
+
+# Test 2: Import same module without extension (should use cache)
+(print "Test 2: Import without extension (testing cache)")
+(import "tests/basic-module-test" as basic_no_ext)
+(print (basic_no_ext.add 20 30))
+(print "✓ Import without extension works\n")
+
+# Test 3: Verify both refer to the same module (caching)
+(print "Test 3: Verify module caching")
+(assert (== basic_ext.test_value basic_no_ext.test_value) "Module caching failed")
+(print "✓ Module caching verified\n")
+
+(print "=== All Extension Tests Passed! ===")

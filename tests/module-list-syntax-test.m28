@@ -1,0 +1,29 @@
+# Module List Syntax Test
+# Tests the [name1 name2] syntax in imports
+
+(print "=== Module List Syntax Tests ===\n")
+
+# Test importing specific names with list syntax
+(print "Test 1: Import specific names with [name1 name2] syntax")
+(import "tests/basic-module-test" from [add test_value])
+(print "Imported names:")
+(print (add 3 4))
+(print test_value)
+(print "✓ List syntax import works\n")
+
+# Test that other names were not imported
+(print "Test 2: Check that only specified names were imported")
+(try
+  (do
+    test_string  # This should fail since we didn't import it
+    (print "✗ Error: test_string should not be accessible"))
+(except e
+  (print "✓ Correctly limited imports to specified names\n")))
+
+# Test import all with *
+(print "Test 3: Import all with *")
+(import "tests/basic-module-test" from *)
+(print test_string)  # Now this should work
+(print "✓ Import * works\n")
+
+(print "=== All List Syntax Tests Passed! ===")

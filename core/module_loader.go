@@ -39,19 +39,25 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	// Get the module registry
 	registry := GetModuleRegistry()
 
+	// Normalize the module name by removing .m28 extension for caching
+	cacheName := name
+	if filepath.Ext(cacheName) == ".m28" {
+		cacheName = cacheName[:len(cacheName)-4]
+	}
+
 	// First check if the module is already loaded
-	if module, found := registry.GetModule(name); found {
+	if module, found := registry.GetModule(cacheName); found {
 		return module, nil
 	}
 
 	// Check if the module is currently being loaded (circular dependency)
-	if registry.IsLoading(name) {
+	if registry.IsLoading(cacheName) {
 		return nil, fmt.Errorf("circular import detected: module '%s' is already being loaded", name)
 	}
 
 	// Mark the module as being loaded
-	registry.SetLoading(name, true)
-	defer registry.SetLoading(name, false)
+	registry.SetLoading(cacheName, true)
+	defer registry.SetLoading(cacheName, false)
 
 	// Resolve the module path
 	path, err := registry.ResolveModulePath(name)
@@ -69,7 +75,7 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	moduleCtx := NewContext(l.ctx.Global)
 
 	// Define the special __name__ variable
-	moduleCtx.Define("__name__", StringValue(name))
+	moduleCtx.Define("__name__", StringValue(cacheName))
 	moduleCtx.Define("__file__", StringValue(path))
 
 	// Parse the module content
@@ -121,7 +127,7 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	}
 
 	// Register the module in the registry
-	registry.StoreModule(name, moduleDict, path, []string{})
+	registry.StoreModule(cacheName, moduleDict, path, []string{})
 
 	return moduleDict, nil
 }

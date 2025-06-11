@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Module system enhancements:
+  - Support for explicit `.m28` extension in imports
+  - List syntax `[name1 name2]` in from imports now works correctly
+  - Proper module caching between imports with and without `.m28` extension
+
+### Fixed
+- Module loader now properly normalizes module names for caching
+- List literal syntax in import statements now correctly extracts symbols
+
 ## [0.1.0] - 2024-01-06
 
 ### Added

@@ -64,11 +64,26 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 			if sym, ok := args[i+1].(core.SymbolValue); ok && string(sym) == "*" {
 				importAll = true
 			} else if list, ok := args[i+1].(core.ListValue); ok {
-				for _, item := range list {
-					if nameSym, ok := item.(core.SymbolValue); ok {
-						importNames = append(importNames, string(nameSym))
+				// Check if this is a list-literal form
+				if len(list) > 0 {
+					if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+						// It's [name1 name2] syntax, extract the symbols
+						for j := 1; j < len(list); j++ {
+							if nameSym, ok := list[j].(core.SymbolValue); ok {
+								importNames = append(importNames, string(nameSym))
+							} else {
+								return nil, fmt.Errorf("import names must be symbols")
+							}
+						}
 					} else {
-						return nil, fmt.Errorf("import names must be symbols")
+						// It's a regular list, process normally
+						for _, item := range list {
+							if nameSym, ok := item.(core.SymbolValue); ok {
+								importNames = append(importNames, string(nameSym))
+							} else {
+								return nil, fmt.Errorf("import names must be symbols")
+							}
+						}
 					}
 				}
 			} else {
@@ -151,11 +166,26 @@ func exportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 		if list, ok := args[1].(core.ListValue); ok {
 			allNames := []string{}
-			for _, item := range list {
-				if nameSym, ok := item.(core.SymbolValue); ok {
-					allNames = append(allNames, string(nameSym))
+			// Check if this is a list-literal form
+			if len(list) > 0 {
+				if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+					// It's [name1 name2] syntax, extract the symbols
+					for j := 1; j < len(list); j++ {
+						if nameSym, ok := list[j].(core.SymbolValue); ok {
+							allNames = append(allNames, string(nameSym))
+						} else {
+							return nil, fmt.Errorf("export names must be symbols")
+						}
+					}
 				} else {
-					return nil, fmt.Errorf("export names must be symbols")
+					// It's a regular list, process normally
+					for _, item := range list {
+						if nameSym, ok := item.(core.SymbolValue); ok {
+							allNames = append(allNames, string(nameSym))
+						} else {
+							return nil, fmt.Errorf("export names must be symbols")
+						}
+					}
 				}
 			}
 			module.SetAll(allNames)
@@ -171,12 +201,26 @@ func exportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Single name
 		names = []string{string(sym)}
 	} else if list, ok := args[0].(core.ListValue); ok {
-		// List of names
-		for _, item := range list {
-			if nameSym, ok := item.(core.SymbolValue); ok {
-				names = append(names, string(nameSym))
+		// Check if this is a list-literal form
+		if len(list) > 0 {
+			if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+				// It's [name1 name2] syntax, extract the symbols
+				for j := 1; j < len(list); j++ {
+					if nameSym, ok := list[j].(core.SymbolValue); ok {
+						names = append(names, string(nameSym))
+					} else {
+						return nil, fmt.Errorf("export names must be symbols")
+					}
+				}
 			} else {
-				return nil, fmt.Errorf("export names must be symbols")
+				// It's a regular list, process normally
+				for _, item := range list {
+					if nameSym, ok := item.(core.SymbolValue); ok {
+						names = append(names, string(nameSym))
+					} else {
+						return nil, fmt.Errorf("export names must be symbols")
+					}
+				}
 			}
 		}
 	} else {

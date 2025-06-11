@@ -1,0 +1,19 @@
+# Simple Module Import Test
+# Tests basic module import functionality
+
+(print "=== Simple Module Import Tests ===\n")
+
+# Test 1: Basic import with existing module
+(print "Test 1: Import existing test module")
+(import "tests/basic-module-test" as basic)
+(print "✓ Module imported successfully")
+(print (basic.add 5 10))
+(print "\n")
+
+# Test 2: Access module variables
+(print "Test 2: Access module variables")
+(print basic.test_value)
+(print basic.test_string)
+(print "✓ Module variables accessible\n")
+
+(print "=== Tests Complete ===")

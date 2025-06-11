@@ -1,0 +1,16 @@
+# Test module for from import testing
+
+(def add (a b)
+  (+ a b))
+
+(def multiply (a b)
+  (* a b))
+
+(def divide (a b)
+  (/ a b))
+
+(= constant_value 42)
+(= greeting "Hello from test module!")
+
+# Export all of these
+(= __exports__ (list "add" "multiply" "divide" "constant_value" "greeting"))

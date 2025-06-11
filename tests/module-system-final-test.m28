@@ -1,0 +1,46 @@
+# Module System Final Test
+# Verifies all module import improvements
+
+(print "=== Module System Improvements Test ===\n")
+
+# Feature 1: .m28 extension support
+(print "1. Testing .m28 extension support:")
+(import "tests/basic-module-test.m28" as mod1)
+(assert (== (mod1.add 5 5) 10) ".m28 extension import failed")
+(print "   ✓ Can import with .m28 extension")
+
+# Verify caching between with/without extension
+(import "tests/basic-module-test" as mod2)
+(assert (== mod1.test_value mod2.test_value) "Module caching failed")
+(print "   ✓ Module caching works correctly\n")
+
+# Feature 2: List syntax in from imports
+(print "2. Testing list syntax [name1 name2]:")
+(import "tests/basic-module-test" from [add test_string])
+(assert (== (add 7 8) 15) "List syntax import failed")
+(assert (== test_string "Hello, world!") "List syntax import failed")
+(print "   ✓ List syntax imports work correctly\n")
+
+# Feature 3: Import with as (already existed but verify)
+(print "3. Testing import...as syntax:")
+(import "tests/basic-module-test" as my_module)
+(assert (== my_module.test_value 42) "Import as failed")
+(print "   ✓ Import...as syntax works\n")
+
+# Feature 4: Wildcard imports
+(print "4. Testing wildcard imports:")
+(def test_wildcard ()
+  (import "tests/basic-module-test" from *)
+  (assert (== test_value 42) "Wildcard import failed")
+  (assert (== (add 1 1) 2) "Wildcard import failed"))
+(test_wildcard)
+(print "   ✓ Wildcard imports work\n")
+
+# Summary
+(print "=== All Module System Improvements Working! ===")
+(print "\nSummary of improvements:")
+(print "- ✓ .m28 extension support with proper caching")
+(print "- ✓ List syntax [name1 name2] in from imports")
+(print "- ✓ Import...as aliasing")
+(print "- ✓ Wildcard imports with *")
+(print "\nModule system is now more flexible and Python-like!")

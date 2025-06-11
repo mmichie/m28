@@ -1,0 +1,35 @@
+# Test the export form with list syntax
+
+(print "Testing export with [name1 name2] syntax\n")
+
+# Since export only works in module context, we need to simulate this
+# by setting up a module context
+
+# Create a mock module object
+(= __module__ {"Export": (lambda (name val) 
+                           (print "Exporting" name "with value" val)),
+               "SetAll": (lambda (names)
+                           (print "Setting __all__ to" names))})
+
+# Define some values to export
+(= test_func1 (lambda (x) (* x 2)))
+(= test_func2 (lambda (x) (+ x 10)))
+(= test_value 42)
+(= private_value "should not export")
+
+# Test 1: Export single name
+(print "Test 1: Export single name")
+(export test_func1)
+
+# Test 2: Export multiple names using list syntax
+(print "\nTest 2: Export multiple names using [name1 name2]")
+(export [test_func2 test_value])
+
+# Test 3: Export :all with list syntax
+(print "\nTest 3: Export :all with [name1 name2]")
+(export :all [test_func1 test_func2 test_value])
+
+(print "\n✓ All export tests completed!")
+
+# Clean up
+(del __module__)

@@ -59,9 +59,11 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ## 🚧 In Progress / Partially Working
 
-- [ ] **Module System** - Basic imports work, but missing:
-  - [ ] `from module import symbol`
-  - [ ] `import module as alias`
+- [x] **Module System** - Basic imports work with enhanced features:
+  - [x] `(import "module" from [symbol1 symbol2])` - Import specific symbols
+  - [x] `(import "module" from *)` - Wildcard imports
+  - [x] `(import "module" as alias)` - Import with alias
+  - [x] Support for .m28 extension in imports
   - [ ] Standard library modules (shutil, pathlib, tempfile, zipfile)
   
 - [x] **Function and Type `__name__` Attribute** ✅ PARTIAL
@@ -209,10 +211,11 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] File context managers
 
 ### 🎯 High Priority - Next Steps
-1. **Module System Improvements**
-   - [ ] Local `.m28` module imports
-   - [ ] `from module import name` syntax
-   - [ ] `import module as alias` syntax
+1. **Module System Improvements** ✅ COMPLETE
+   - [x] Local `.m28` module imports
+   - [x] List syntax `[name1 name2]` in from imports
+   - [x] Wildcard imports with `*`
+   - [x] `.m28` extension support with proper caching
 
 2. **Functional Programming**
    - [ ] Key parameter for sorted/min/max (high impact)
