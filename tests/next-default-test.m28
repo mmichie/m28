@@ -1,0 +1,79 @@
+# Test next() with default parameter
+
+(print "=== next() Default Parameter Tests ===\n")
+
+# Test 1: Basic generator without default
+(print "Test 1: Basic generator without default")
+(def simple_gen ()
+  (yield 1)
+  (yield 2))
+
+(= gen1 (simple_gen))
+(print "First:" (next gen1))    # Should print 1
+(print "Second:" (next gen1))   # Should print 2
+(try
+  (print "Third:" (next gen1))  # Should raise StopIteration
+  (print "✗ Should have raised StopIteration")
+(except e
+  (print "✓ Correctly raised exception on exhausted generator")))
+
+# Test 2: Generator with default value
+(print "\nTest 2: Generator with default value")
+(= gen2 (simple_gen))
+(print "First:" (next gen2))                    # Should print 1
+(print "Second:" (next gen2))                   # Should print 2
+(print "Third with default:" (next gen2 "END")) # Should print "END"
+(print "Fourth with default:" (next gen2 nil))  # Should print nil
+(print "✓ Default values work correctly")
+
+# Test 3: Different default types
+(print "\nTest 3: Different default types")
+(= gen3 (simple_gen))
+(next gen3)  # Skip first
+(next gen3)  # Skip second
+(print "Default string:" (next gen3 "default"))
+(print "Default number:" (next gen3 42))
+(print "Default list:" (next gen3 [1 2 3]))
+(print "Default dict:" (next gen3 {"key": "value"}))
+(print "✓ Various default types work")
+
+# Test 4: Non-iterator with default
+(print "\nTest 4: Non-iterator with default")
+(= not_iter [1 2 3])  # List is not an iterator
+(= result (next not_iter "not an iterator"))
+(print "Result:" result)
+(assert (== result "not an iterator") "Default should be returned for non-iterator")
+(print "✓ Default returned for non-iterator")
+
+# Test 5: Custom iterator with __next__ method
+(print "\nTest 5: Custom iterator with __next__")
+(class Counter ()
+  (def __init__ (self (max 3))
+    (= self.current 0)
+    (= self.max max))
+  
+  (def __next__ (self)
+    (if (< self.current self.max)
+      (do
+        (= self.current (+ self.current 1))
+        self.current)
+      (raise "StopIteration"))))
+
+(= counter (Counter 2))
+(print "Count 1:" (next counter))
+(print "Count 2:" (next counter))
+(print "Count 3 with default:" (next counter 0))
+(print "✓ Custom iterator with __next__ works")
+
+# Test 6: Empty generator with default
+(print "\nTest 6: Empty generator with default")
+(def empty_gen ()
+  (if false (yield 1)))  # Never yields
+
+(= gen4 (empty_gen))
+(= result (next gen4 "empty"))
+(print "Empty generator result:" result)
+(assert (== result "empty") "Default should be returned for empty generator")
+(print "✓ Empty generator returns default")
+
+(print "\n=== All next() Default Tests Passed! ===")

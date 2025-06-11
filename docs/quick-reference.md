@@ -263,6 +263,38 @@ p.x                    # Get attribute
 (p.distance)           # Call method
 ```
 
+## Iterators and Generators
+```lisp
+# Creating an iterator (must have __next__ method)
+(class Counter ()
+  (def __init__ (self max)
+    (= self.current 0)
+    (= self.max max))
+  
+  (def __next__ (self)
+    (if (< self.current self.max)
+      (do
+        (= self.current (+ self.current 1))
+        self.current)
+      (raise "StopIteration"))))
+
+# Using next() with iterators
+(= counter (Counter 3))
+(next counter)          # Returns 1
+(next counter)          # Returns 2
+(next counter)          # Returns 3
+(next counter "done")   # Returns "done" (default)
+
+# Generator functions (yield values)
+(def count_up_to (n)
+  (= i 0)
+  (while (< i n)
+    (yield i)
+    (= i (+ i 1))))
+
+# Note: Generator support is limited in M28
+```
+
 ## Common Patterns
 ```lisp
 # Read file
@@ -320,6 +352,10 @@ p.x                    # Get attribute
 
 (min words key = len)                       # Find shortest word
 (max numbers key = abs)                     # Find number with max absolute value
+
+# Iteration
+(next iterator)        # Get next value from iterator
+(next iterator default) # Get next value or default if exhausted
 
 # Type checking
 (type obj)             # Get type

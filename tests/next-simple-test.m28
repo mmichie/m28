@@ -1,0 +1,42 @@
+# Simple test for next() with default
+
+(print "=== Simple next() Test ===\n")
+
+# First, let's test with a simple list iterator
+# Since M28 might not have built-in iterators for lists, 
+# let's create a simple manual iterator
+
+(class ListIterator ()
+  (def __init__ (self items)
+    (= self.items items)
+    (= self.index 0))
+  
+  (def __next__ (self)
+    (if (< self.index (len self.items))
+      (do
+        (= item (nth self.items self.index))
+        (= self.index (+ self.index 1))
+        item)
+      (raise "StopIteration"))))
+
+# Test 1: Basic iteration
+(print "Test 1: Basic iteration")
+(= iter1 (ListIterator [10 20 30]))
+(print "First:" (next iter1))
+(print "Second:" (next iter1))
+(print "Third:" (next iter1))
+
+# Test 2: With default on exhaustion
+(print "\nTest 2: With default on exhaustion")
+(= iter2 (ListIterator [100 200]))
+(print "First:" (next iter2))
+(print "Second:" (next iter2))
+(print "Third with default:" (next iter2 "DONE"))
+(print "Fourth with default:" (next iter2 -1))
+
+# Test 3: Non-iterator with default
+(print "\nTest 3: Non-iterator with default")
+(= result (next "not an iterator" "default value"))
+(print "Result for non-iterator:" result)
+
+(print "\n=== Tests Complete ===")

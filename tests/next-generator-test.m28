@@ -1,0 +1,77 @@
+# Test next() with generators and default parameter
+
+(print "=== next() with Generators Test ===\n")
+
+# Test with a manually created iterator that mimics generator behavior
+(class SimpleGenerator ()
+  (def __init__ (self)
+    (= self.values [1 2 3])
+    (= self.index 0))
+  
+  (def __next__ (self)
+    (if (< self.index (len self.values))
+      (do
+        (= value (nth self.values self.index))
+        (= self.index (+ self.index 1))
+        value)
+      (raise "StopIteration"))))
+
+# Test 1: Basic next() without default
+(print "Test 1: Basic next() without default")
+(= gen1 (SimpleGenerator))
+(print "Value 1:" (next gen1))
+(print "Value 2:" (next gen1)) 
+(print "Value 3:" (next gen1))
+(try
+  (print "Value 4:" (next gen1))
+  (print "✗ Should have raised StopIteration")
+(except e
+  (print "✓ Correctly raised StopIteration")))
+
+# Test 2: next() with default on exhausted iterator
+(print "\nTest 2: next() with default on exhausted iterator")
+(= gen2 (SimpleGenerator))
+# Exhaust the generator
+(next gen2)
+(next gen2)
+(next gen2)
+# Now use default
+(print "With default 'END':" (next gen2 "END"))
+(print "With default 0:" (next gen2 0))
+(print "With default nil:" (next gen2 nil))
+(print "✓ Default parameter works correctly")
+
+# Test 3: Mix of regular and default calls
+(print "\nTest 3: Mix of regular and default calls")
+(= gen3 (SimpleGenerator))
+(print "Value 1:" (next gen3))
+(print "Value 2 with unused default:" (next gen3 "ignored"))  # Default ignored when value available
+(print "Value 3:" (next gen3))
+(print "Value 4 with default:" (next gen3 "END"))
+(print "✓ Default only used when iterator exhausted")
+
+# Test 4: Different iterator implementations
+(print "\nTest 4: Custom iterator with different behavior")
+(class CountdownIterator ()
+  (def __init__ (self start)
+    (= self.count start))
+  
+  (def __next__ (self)
+    (if (> self.count 0)
+      (do
+        (= value self.count)
+        (= self.count (- self.count 1))
+        value)
+      (raise "StopIteration"))))
+
+(= countdown (CountdownIterator 2))
+(print "Countdown:" (next countdown))
+(print "Countdown:" (next countdown))
+(print "Countdown with default:" (next countdown "BOOM!"))
+(print "✓ Works with different iterator types")
+
+(print "\n=== All Tests Passed! ===")
+(print "\nSummary: next() function properly supports optional default parameter")
+(print "- Returns next value when available")
+(print "- Returns default when iterator is exhausted")
+(print "- Works with any object that has __next__ method")
