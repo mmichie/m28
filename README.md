@@ -49,7 +49,8 @@ Everything is an expression in prefix notation:
 ```lisp
 (+ 1 2 3)           # 6
 (print "Hello")     # Hello
-(if (> x 0) "positive" "non-positive")
+(= x 5)
+(if (> x 0) "positive" "non-positive")  # "positive"
 ```
 
 ### Python Semantics
@@ -71,7 +72,7 @@ Everything is an expression in prefix notation:
 (= unique {1, 2, 3})
 
 # Tuples
-(= point (10, 20))
+(= point (tuple [10, 20]))
 ```
 
 ### Object-Oriented Programming
@@ -101,11 +102,18 @@ Everything is an expression in prefix notation:
 ### Exception Handling
 ```lisp
 (try
-  (risky-operation)
-  (except ValueError as e
-    (print "Error:" e))
+  (/ 1 0)  # This will raise an error
+  (except
+    (print "Caught an error!")))
+
+# With finally block
+(try
+  (print "Attempting operation...")
+  (/ 10 2)
+  (except
+    (print "Error occurred"))
   (finally
-    (cleanup)))
+    (print "Cleanup complete")))
 ```
 
 ### Module System
@@ -149,16 +157,18 @@ Everything is an expression in prefix notation:
     (print (strip line))))
 ```
 
-### Web Server (using Python interop)
+### Quick Sort
 ```lisp
-(from flask import Flask)
-(= app (Flask __name__))
+(def quicksort (lst)
+  (if (<= (len lst) 1)
+      lst
+      (let pivot (first lst)
+           rest (rest lst)
+           less (filter (lambda (x) (< x pivot)) rest)
+           greater (filter (lambda (x) (>= x pivot)) rest)
+        (+ (quicksort less) [pivot] (quicksort greater)))))
 
-(app.route "/" 
-  (lambda ()
-    "Hello from M28!"))
-
-(app.run)
+(print (quicksort [3, 1, 4, 1, 5, 9, 2, 6]))  # [1, 1, 2, 3, 4, 5, 6, 9]
 ```
 
 ## Why M28?
@@ -166,8 +176,8 @@ Everything is an expression in prefix notation:
 1. **S-expressions** - Code is data, enabling powerful metaprogramming
 2. **Python semantics** - Familiar and pragmatic design choices
 3. **Prefix notation** - Consistent, unambiguous syntax
-4. **Python interop** - Access to Python's vast ecosystem
-5. **Modern features** - List comprehensions, context managers, async/await
+4. **Functional programming** - First-class functions, map/filter/reduce
+5. **Modern features** - List comprehensions, context managers, generators
 6. **Simple implementation** - Easy to understand and extend
 
 ## Contributing

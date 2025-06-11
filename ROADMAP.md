@@ -227,6 +227,25 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - [x] Multiple assignment `a, b = 1, 2` ✅ DONE
    - [ ] Exception variable binding `except Error as e`
 
+4. **F-String Enhancements** (Building on existing nested quotes support)
+   - [ ] **Format Specifications** (High Priority)
+     - [ ] Float precision: `f"{pi:.2f}"` → "3.14"
+     - [ ] Integer padding: `f"{num:04d}"` → "0042"
+     - [ ] Alignment: `f"{text:>10}"`, `f"{text:^20}"`, `f"{text:<15}"`
+     - [ ] Sign handling: `f"{num:+}"` shows + for positive
+     - [ ] Thousands separator: `f"{num:,}"` → "1,234"
+     - [ ] Percentage: `f"{ratio:.1%}"` → "45.5%"
+     - [ ] Binary/hex: `f"{num:b}"`, `f"{num:x}"`
+   - [ ] **Conversion Flags**
+     - [ ] `!r` for repr(): `f"{value!r}"`
+     - [ ] `!s` for str(): `f"{value!s}"`
+     - [ ] `!a` for ascii(): `f"{value!a}"`
+   - [ ] **Self-Documenting Expressions**: `f"{x+y=}"` → "x+y=8"
+   - [ ] **Complex Expressions in F-Strings**
+     - [ ] Inline conditionals: `f"{x if x > 0 else 'negative'}"`
+     - [ ] List comprehensions: `f"{[x*2 for x in range(3)]}"`
+     - [ ] Nested f-strings: `f"{f'{x}'*3}"`
+
 ### 🚀 Major Feature: Macro System with S-Strings
 
 **Status**: Proposed
@@ -447,6 +466,21 @@ s"(if {test} {then_expr} {else_expr if has_else else 'nil'})"
 - [ ] Itertools-like functions (product, combinations, etc.)
 - [ ] Enhanced built-ins (reversed as iterator, sum with start)
 - [ ] Object introspection (dir, vars)
+- [ ] **Documentation Testing Framework**
+  - [ ] Doctest-style execution of code examples in documentation
+  - [ ] Extract and validate code blocks from Markdown files
+  - [ ] Support for expected output verification
+  - [ ] Integration with test suite to ensure docs stay accurate
+  - [ ] Command: `m28 --doctest README.md` or `make doctest`
+  - [ ] Example format:
+    ```
+    # In documentation:
+    >>> (+ 1 2)
+    3
+    >>> (= x [1, 2, 3])
+    >>> (map (lambda (n) (* n 2)) x)
+    [2, 4, 6]
+    ```
 - [x] **REPL Enhancements** ✅ DONE
   - [x] Full readline support with arrow key navigation
   - [x] Vi/Emacs keybinding modes (toggle with `:toggle-keybindings`)
