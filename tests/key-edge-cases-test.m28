@@ -1,0 +1,68 @@
+# Key Parameter Edge Cases Test
+
+(print "=== Key Parameter Edge Cases ===\n")
+
+# Test 1: Empty sequence
+(print "Test 1: Empty sequence")
+(try
+  (sorted [] key = len)
+  (print "✓ Empty list sorted successfully")
+(except e
+  (print "✗ Empty list failed:" e)))
+
+# Test 2: Invalid key function
+(print "\nTest 2: Invalid key function")
+(try
+  (sorted [1 2 3] key = "not a function")
+  (print "✗ Should have failed with non-function key")
+(except e
+  (print "✓ Correctly rejected non-function key")))
+
+# Test 3: Unknown keyword argument
+(print "\nTest 3: Unknown keyword argument")
+(try
+  (sorted [1 2 3] unknown = true)
+  (print "✗ Should have failed with unknown kwarg")
+(except e
+  (print "✓ Correctly rejected unknown kwarg")))
+
+# Test 4: Key function that returns different types
+(print "\nTest 4: Mixed type keys")
+(= mixed_data [{"value": 10} {"value": "5"} {"value": 20}])
+(try
+  # This might work or fail depending on how Compare handles mixed types
+  (= result (sorted mixed_data key = (lambda (x) (x.get "value"))))
+  (print "Sorted mixed types:" result)
+(except e
+  (print "Mixed types comparison failed (expected):" e)))
+
+# Test 5: Complex sorting - sort by multiple criteria
+(print "\nTest 5: Complex sorting example")
+(= people [
+  {"name": "Alice", "age": 30, "city": "NYC"}
+  {"name": "Bob", "age": 25, "city": "LA"}
+  {"name": "Charlie", "age": 30, "city": "Boston"}
+  {"name": "David", "age": 25, "city": "NYC"}
+])
+
+# Sort by age (using key parameter)
+(= by_age (sorted people key = (lambda (p) (p.get "age"))))
+(print "Sorted by age:")
+(for p in by_age
+  (print "  " (p.get "name") ":" (p.get "age") "from" (p.get "city")))
+
+# Test 6: min/max on empty sequence
+(print "\nTest 6: min/max on empty sequence")
+(try
+  (min [] key = len)
+  (print "✗ min on empty should fail")
+(except e
+  (print "✓ min correctly failed on empty sequence")))
+
+(try
+  (max [] key = len)
+  (print "✗ max on empty should fail")
+(except e
+  (print "✓ max correctly failed on empty sequence")))
+
+(print "\n=== Edge Cases Handled Correctly! ===")

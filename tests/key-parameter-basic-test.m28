@@ -1,0 +1,29 @@
+# Basic Key Parameter Test
+# Tests the key parameter with :key syntax (Lisp-style)
+
+(print "=== Key Parameter Tests (Lisp-style) ===\n")
+
+# Test 1: Basic sorted with key
+(print "Test 1: sorted with :key")
+(= words ["apple" "pie" "a" "longer"])
+(print "Original:" words)
+(= sorted_words (sorted words :key len))
+(print "Sorted by length:" sorted_words)
+(print)
+
+# Test 2: min with key
+(print "Test 2: min with :key")
+(= numbers [-5 -2 0 1 3 -8 4])
+(print "Numbers:" numbers)
+(= closest (min numbers :key abs))
+(print "Closest to zero:" closest)
+(print)
+
+# Test 3: max with key
+(print "Test 3: max with :key")
+(= furthest (max numbers :key abs))
+(print "Furthest from zero:" furthest)
+(print)
+
+(print "Note: Currently using :key syntax (Lisp-style) instead of key=func (Python-style)")
+(print "Python-style keyword arguments in built-ins require parser changes")

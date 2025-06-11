@@ -108,66 +108,10 @@ func RegisterMathFunctions(ctx *core.Context) {
 	}))
 
 	// min - minimum value
-	ctx.Define("min", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return nil, fmt.Errorf("min expected at least 1 argument, got 0")
-		}
-
-		// Handle single iterable argument
-		if len(args) == 1 {
-			switch v := args[0].(type) {
-			case core.ListValue:
-				if len(v) == 0 {
-					return nil, fmt.Errorf("min() arg is an empty sequence")
-				}
-				args = v
-			case core.TupleValue:
-				if len(v) == 0 {
-					return nil, fmt.Errorf("min() arg is an empty sequence")
-				}
-				args = v
-			}
-		}
-
-		min := args[0]
-		for i := 1; i < len(args); i++ {
-			if core.Compare(args[i], min) < 0 {
-				min = args[i]
-			}
-		}
-		return min, nil
-	}))
+	ctx.Define("min", NewKwargsBuiltinFunction("min", MinWithKwargs))
 
 	// max - maximum value
-	ctx.Define("max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return nil, fmt.Errorf("max expected at least 1 argument, got 0")
-		}
-
-		// Handle single iterable argument
-		if len(args) == 1 {
-			switch v := args[0].(type) {
-			case core.ListValue:
-				if len(v) == 0 {
-					return nil, fmt.Errorf("max() arg is an empty sequence")
-				}
-				args = v
-			case core.TupleValue:
-				if len(v) == 0 {
-					return nil, fmt.Errorf("max() arg is an empty sequence")
-				}
-				args = v
-			}
-		}
-
-		max := args[0]
-		for i := 1; i < len(args); i++ {
-			if core.Compare(args[i], max) > 0 {
-				max = args[i]
-			}
-		}
-		return max, nil
-	}))
+	ctx.Define("max", NewKwargsBuiltinFunction("max", MaxWithKwargs))
 
 	// sum - sum of values
 	ctx.Define("sum", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

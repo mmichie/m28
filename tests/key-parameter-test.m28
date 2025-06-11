@@ -1,0 +1,106 @@
+# Key Parameter Test
+# Tests the key parameter functionality for sorted(), min(), and max()
+
+(print "=== Key Parameter Tests ===\n")
+
+# Test 1: sorted() with key parameter
+(print "Test 1: sorted() with key parameter")
+
+# Sort strings by length
+(= words ["apple" "pie" "a" "longer" "bb"])
+(= sorted_by_length (sorted words :key len))
+(print "Original:" words)
+(print "Sorted by length:" sorted_by_length)
+(assert (== sorted_by_length ["a" "bb" "pie" "apple" "longer"]) "sorted with key failed")
+(print "✓ sorted() with key parameter works\n")
+
+# Test 2: sorted() with key and reverse
+(print "Test 2: sorted() with key and reverse")
+(= sorted_reverse (sorted words :key len :reverse true))
+(print "Sorted by length (reverse):" sorted_reverse)
+(assert (== sorted_reverse ["longer" "apple" "pie" "bb" "a"]) "sorted with key and reverse failed")
+(print "✓ sorted() with key and reverse works\n")
+
+# Test 3: sorted() with lambda key
+(print "Test 3: sorted() with lambda key")
+(= numbers [-5 -2 0 1 3 -8 4])
+(= sorted_by_abs (sorted numbers :key (lambda (x) (abs x))))
+(print "Original:" numbers)
+(print "Sorted by absolute value:" sorted_by_abs)
+(assert (== sorted_by_abs [0 1 -2 3 4 -5 -8]) "sorted with lambda key failed")
+(print "✓ sorted() with lambda key works\n")
+
+# Test 4: min() with key parameter
+(print "Test 4: min() with key parameter")
+(= shortest (min words :key len))
+(print "Shortest word:" shortest)
+(assert (== shortest "a") "min with key failed")
+
+# min with multiple args
+(= closest_to_zero (min -5 -2 0 1 3 -8 4 :key (lambda (x) (abs x))))
+(print "Closest to zero:" closest_to_zero)
+(assert (== closest_to_zero 0) "min with key on multiple args failed")
+(print "✓ min() with key parameter works\n")
+
+# Test 5: max() with key parameter
+(print "Test 5: max() with key parameter")
+(= longest (max words :key len))
+(print "Longest word:" longest)
+(assert (== longest "longer") "max with key failed")
+
+# max with lambda
+(= furthest_from_zero (max numbers :key (lambda (x) (abs x))))
+(print "Furthest from zero:" furthest_from_zero)
+(assert (== furthest_from_zero -8) "max with lambda key failed")
+(print "✓ max() with key parameter works\n")
+
+# Test 6: Complex objects with key
+(print "Test 6: Complex objects with key")
+(= people [
+  {"name": "Alice", "age": 30}
+  {"name": "Bob", "age": 25}
+  {"name": "Charlie", "age": 35}
+  {"name": "David", "age": 20}
+])
+
+# Sort by age
+(= sorted_by_age (sorted people :key (lambda (p) (p.get "age"))))
+(print "People sorted by age:")
+(for person in sorted_by_age
+  (print f"  {person.get \"name\"}: {person.get \"age\"}"))
+(assert (== (first sorted_by_age).get("name") "David") "sorted complex objects failed")
+
+# Find youngest and oldest
+(= youngest (min people :key (lambda (p) (p.get "age"))))
+(= oldest (max people :key (lambda (p) (p.get "age"))))
+(print f"Youngest: {youngest.get \"name\"} ({youngest.get \"age\"})")
+(print f"Oldest: {oldest.get \"name\"} ({oldest.get \"age\"})")
+(assert (== youngest.get("name") "David") "min on complex objects failed")
+(assert (== oldest.get("name") "Charlie") "max on complex objects failed")
+(print "✓ Complex objects with key work\n")
+
+# Test 7: Edge cases
+(print "Test 7: Edge cases")
+
+# Empty list should error
+(try
+  (sorted [] :key len)
+  (print "✗ Empty list should error")
+except
+  (print "✓ Empty list correctly errors"))
+
+# Invalid key function
+(try
+  (sorted [1 2 3] :key "not a function")
+  (print "✗ Invalid key should error")
+except
+  (print "✓ Invalid key correctly errors"))
+
+# Backwards compatibility - sorted with just reverse
+(= nums [3 1 4 1 5 9])
+(= sorted_desc (sorted nums true))  # Old style with just reverse
+(print "Backwards compatible sorted:" sorted_desc)
+(assert (== sorted_desc [9 5 4 3 1 1]) "Backwards compatibility failed")
+(print "✓ Backwards compatibility maintained\n")
+
+(print "=== All Key Parameter Tests Passed! ===")

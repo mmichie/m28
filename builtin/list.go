@@ -23,7 +23,7 @@ func RegisterListFunctions(ctx *core.Context) {
 	ctx.Define("map", core.NewBuiltinFunction(MapFunc))
 	ctx.Define("filter", core.NewBuiltinFunction(FilterFunc))
 	ctx.Define("reduce", core.NewBuiltinFunction(ReduceFunc))
-	ctx.Define("sorted", core.NewBuiltinFunction(SortedFunc))
+	ctx.Define("sorted", NewKwargsBuiltinFunction("sorted", SortedWithKwargs))
 	ctx.Define("reversed", core.NewBuiltinFunction(ReversedFunc))
 }
 

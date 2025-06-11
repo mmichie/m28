@@ -111,9 +111,9 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [x] Multiple assignment: `a, b = 1, 2` ✅ DONE
   - [ ] Exception variable binding: `except Error as e`
   - [ ] Argument unpacking: `func(*args, **kwargs)` syntax
-  - [ ] `from module import name` syntax
-  - [ ] `import module as alias` syntax
-  - [ ] Local `.m28` module imports
+  - [x] `from module import name` syntax ✅ DONE (using list syntax)
+  - [x] `import module as alias` syntax ✅ DONE
+  - [x] Local `.m28` module imports ✅ DONE
   - [ ] Multiple inheritance (partial)
   - [ ] Proper `super()` calls
 
@@ -218,7 +218,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - [x] `.m28` extension support with proper caching
 
 2. **Functional Programming**
-   - [ ] Key parameter for sorted/min/max (high impact)
+   - [x] Key parameter for sorted/min/max ✅ DONE (Python-style key=func syntax)
    - [ ] Default parameter for next()
    - [ ] slice() object creator
 

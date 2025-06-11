@@ -105,6 +105,17 @@ func evalFunctionCallWithKeywords(expr core.ListValue, ctx *core.Context) (core.
 		return result, nil
 	}
 
+	// Check if it's a KwargsBuiltinFunction that supports keyword arguments
+	if kwargsFunc, ok := fn.(interface {
+		CallWithKeywords([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+	}); ok {
+		result, err := kwargsFunc.CallWithKeywords(positionalArgs, keywordArgs, ctx)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
 	// For functions that don't support keyword arguments,
 	// only allow calls with no keyword arguments
 	if len(keywordArgs) > 0 {

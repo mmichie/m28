@@ -1,0 +1,9 @@
+# Simple key parameter test
+
+(print "Testing basic sorted:")
+(= words ["apple" "pie" "a"])
+(print (sorted words))
+
+(print "\nTesting sorted with key:")
+(= result (sorted words :key len))
+(print result)

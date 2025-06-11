@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Support for explicit `.m28` extension in imports
   - List syntax `[name1 name2]` in from imports now works correctly
   - Proper module caching between imports with and without `.m28` extension
+- Key parameter support for sorted(), min(), and max() functions:
+  - Python-style keyword arguments: `sorted(items, key = len)`
+  - Support for lambda functions as key: `min(numbers, key = (lambda (x) (abs x)))`
+  - Reverse parameter for sorted: `sorted(items, key = len, reverse = true)`
+  - Backwards compatibility maintained for existing code
 
 ### Fixed
 - Module loader now properly normalizes module names for caching

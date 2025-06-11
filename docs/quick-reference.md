@@ -309,6 +309,17 @@ p.x                    # Get attribute
 (range 0 10 2)         # [0, 2, 4, 6, 8]
 (len sequence)         # Length
 (nth sequence index)   # Get item at index
+(sorted sequence)      # Return sorted copy
+(reversed sequence)    # Return reversed copy
+
+# Advanced sorting and min/max with key parameter
+(sorted words key = len)                    # Sort by length
+(sorted items key = (lambda (x) (abs x)))   # Sort by absolute value
+(sorted items reverse = true)               # Sort descending
+(sorted items key = len reverse = true)     # Sort by length, descending
+
+(min words key = len)                       # Find shortest word
+(max numbers key = abs)                     # Find number with max absolute value
 
 # Type checking
 (type obj)             # Get type

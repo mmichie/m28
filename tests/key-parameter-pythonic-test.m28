@@ -1,0 +1,63 @@
+# Key Parameter Test - Python-style
+# Tests the key parameter functionality with key=func syntax
+
+(print "=== Key Parameter Tests (Python-style) ===\n")
+
+# Test 1: sorted() with key parameter
+(print "Test 1: sorted() with key=len")
+(= words ["apple" "pie" "a" "longer" "bb"])
+(print "Original:" words)
+(= sorted_by_length (sorted words key = len))
+(print "Sorted by length:" sorted_by_length)
+(assert (== sorted_by_length ["a" "bb" "pie" "apple" "longer"]) "sorted with key failed")
+(print "✓ sorted with key=len works\n")
+
+# Test 2: sorted() with key and reverse
+(print "Test 2: sorted() with key=len reverse=true")
+(= sorted_reverse (sorted words key = len reverse = true))
+(print "Sorted by length (reverse):" sorted_reverse)
+(assert (== sorted_reverse ["longer" "apple" "pie" "bb" "a"]) "sorted with key and reverse failed")
+(print "✓ sorted with key and reverse works\n")
+
+# Test 3: sorted() with lambda key
+(print "Test 3: sorted() with lambda key")
+(= numbers [-5 -2 0 1 3 -8 4])
+(= sorted_by_abs (sorted numbers key = (lambda (x) (abs x))))
+(print "Original:" numbers)
+(print "Sorted by absolute value:" sorted_by_abs)
+(assert (== sorted_by_abs [0 1 -2 3 4 -5 -8]) "sorted with lambda key failed")
+(print "✓ sorted with lambda key works\n")
+
+# Test 4: min() with key parameter
+(print "Test 4: min() with key=len")
+(= shortest (min words key = len))
+(print "Shortest word:" shortest)
+(assert (== shortest "a") "min with key failed")
+
+# min with multiple args and key
+(= closest_to_zero (min -5 -2 0 1 3 -8 4 key = (lambda (x) (abs x))))
+(print "Closest to zero:" closest_to_zero)
+(assert (== closest_to_zero 0) "min with key on multiple args failed")
+(print "✓ min with key parameter works\n")
+
+# Test 5: max() with key parameter
+(print "Test 5: max() with key=len")
+(= longest (max words key = len))
+(print "Longest word:" longest)
+(assert (== longest "longer") "max with key failed")
+
+# max with lambda
+(= furthest_from_zero (max numbers key = (lambda (x) (abs x))))
+(print "Furthest from zero:" furthest_from_zero)
+(assert (== furthest_from_zero -8) "max with lambda key failed")
+(print "✓ max with key parameter works\n")
+
+# Test 6: Backwards compatibility
+(print "Test 6: Backwards compatibility")
+(= nums [3 1 4 1 5 9])
+(= sorted_desc (sorted nums true))  # Old style with just reverse
+(print "Backwards compatible sorted:" sorted_desc)
+(assert (== sorted_desc [9 5 4 3 1 1]) "Backwards compatibility failed")
+(print "✓ Backwards compatibility maintained\n")
+
+(print "=== All Python-style Key Parameter Tests Passed! ===")
