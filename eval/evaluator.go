@@ -835,19 +835,19 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Match built-in error types
 				switch baseErr.(type) {
 				case *core.NameError:
-					matches = excType == "NameError"
+					matches = excType == "NameError" || excType == "Exception"
 				case *core.TypeError:
-					matches = excType == "TypeError"
+					matches = excType == "TypeError" || excType == "Exception"
 				case *core.ZeroDivisionError:
-					matches = excType == "ZeroDivisionError"
+					matches = excType == "ZeroDivisionError" || excType == "Exception"
 				case *core.KeyError:
-					matches = excType == "KeyError"
+					matches = excType == "KeyError" || excType == "Exception"
 				case *core.IndexError:
-					matches = excType == "IndexError"
+					matches = excType == "IndexError" || excType == "Exception"
 				default:
 					// Check if it's our custom Exception type
 					if exc, ok := baseErr.(*Exception); ok {
-						matches = exc.Type == excType
+						matches = exc.Type == excType || excType == "Exception"
 					} else {
 						matches = excType == "Exception" || excType == "Error"
 					}

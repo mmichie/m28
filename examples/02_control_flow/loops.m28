@@ -73,12 +73,16 @@
 
 # List comprehension (loop expression)
 # List comprehensions not supported - using map
-(= squares (map (lambda (x) (* x x)) (range 10)))
+# TODO: Fix map to work with iterables like range
+(= range_list [])
+(for i in (range 10)
+  (= range_list (+ range_list [i])))
+(= squares (map (lambda (x) (* x x)) range_list))
 (print "\nSquares using comprehension:" squares)
 
 # Filtered comprehension
 # Filtered comprehension not supported - using filter and map
-(= even_squares (map (lambda (x) (* x x)) (filter (lambda (x) (== (% x 2) 0)) (range 10))))
+(= even_squares (map (lambda (x) (* x x)) (filter (lambda (x) (== (% x 2) 0)) range_list)))
 (print "Even squares:" even_squares)
 
 # While loop for user input simulation

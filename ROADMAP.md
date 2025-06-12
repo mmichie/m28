@@ -233,6 +233,12 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] File context managers
 
 ### 🎯 High Priority - Next Steps
+
+0. **P0: Fix list(range(n)) conversion** 🚨
+   - [ ] Currently `list(range(5))` returns `[range(5)]` instead of `[0, 1, 2, 3, 4]`
+   - [ ] list() function needs to properly iterate over Iterable types
+   - [ ] Critical for Python compatibility
+
 1. **Record Stream and JSON Processing** (NEW)
    - [ ] Path-based access functions (`get-in`, `assoc-in`, `update-in`, `dissoc-in`)
    - [ ] JSONL streaming support (`recordstream` module)
