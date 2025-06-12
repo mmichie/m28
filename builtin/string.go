@@ -13,7 +13,7 @@ import (
 // RegisterStringFunctions registers string-related functions in the global context
 func RegisterStringFunctions(ctx *core.Context) {
 	// String creation and conversion
-	ctx.Define("str", core.NewBuiltinFunction(StrFunc))
+	// str is defined in type_checking.go with full Python-style functionality
 	ctx.Define("format", core.NewBuiltinFunction(FormatFunc))
 	ctx.Define("str-format", core.NewBuiltinFunction(StrFormatFunc))
 	ctx.Define("format-expr", core.NewBuiltinFunction(FormatExprFunc))
@@ -39,16 +39,6 @@ func RegisterStringFunctions(ctx *core.Context) {
 	ctx.Define("substring", core.NewBuiltinFunction(SubstringFunc))
 	ctx.Define("find", core.NewBuiltinFunction(FindFunc))
 	ctx.Define("count", core.NewBuiltinFunction(CountFunc))
-}
-
-// StrFunc converts a value to a string
-func StrFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("str requires 1 argument")
-	}
-
-	// Use the PrintValue function to convert to string
-	return core.StringValue(core.PrintValueWithoutQuotes(args[0])), nil
 }
 
 // FormatExprFunc handles format expressions from enhanced f-strings

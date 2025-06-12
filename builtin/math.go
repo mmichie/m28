@@ -151,31 +151,7 @@ func RegisterMathFunctions(ctx *core.Context) {
 		return core.NumberValue(sum), nil
 	}))
 
-	// round - round to nearest integer or decimal places
-	ctx.Define("round", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 || len(args) > 2 {
-			return nil, fmt.Errorf("round() takes 1 or 2 arguments (%d given)", len(args))
-		}
-
-		num, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("round() argument must be a number, not '%s'", args[0].Type())
-		}
-
-		if len(args) == 1 {
-			// Round to nearest integer
-			return core.NumberValue(math.Round(float64(num))), nil
-		}
-
-		// Round to n decimal places
-		ndigits, ok := args[1].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("round() second argument must be a number, not '%s'", args[1].Type())
-		}
-
-		multiplier := math.Pow(10, float64(ndigits))
-		return core.NumberValue(math.Round(float64(num)*multiplier) / multiplier), nil
-	}))
+	// round is registered in essential_builtins.go with full functionality
 
 	// pow - power function
 	ctx.Define("pow", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

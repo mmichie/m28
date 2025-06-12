@@ -1091,3 +1091,27 @@ The language is considered "complete" when:
 - Test coverage (aim for >80% for core packages)
 - Code duplication percentage (target <5%)
 - Interface adherence and abstraction levels
+
+### 🔧 Constructor Enhancements
+
+**Issue**: The `dict`, `tuple`, and `set` constructors don't support iterables like the original list() bug.
+
+#### Current Limitations
+1. **dict constructor** - Only accepts key-value pairs as arguments
+   - Cannot do: `(dict [["a" 1] ["b" 2]])`
+   - Cannot do: `(dict (zip keys values))`
+
+2. **tuple constructor** - Only handles specific types (list, tuple, string)
+   - Missing generic iterable support
+   - Cannot convert arbitrary iterables to tuples
+
+3. **set constructor** - Implementation needs to be checked for iterable support
+   - Should accept any iterable to create a set
+
+#### Proposed Enhancement
+Add support for creating these collections from iterables, matching Python's behavior:
+- `dict(iterable)` - where iterable contains key-value pairs
+- `tuple(iterable)` - convert any iterable to a tuple
+- `set(iterable)` - create set from any iterable
+
+This would prevent bugs similar to the one where `list()` didn't support the Iterable interface.

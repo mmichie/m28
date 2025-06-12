@@ -18,15 +18,9 @@ func RegisterArithmeticFunctions(ctx *core.Context) {
 	ctx.Define("%", core.NewBuiltinFunction(ModuloFunc))
 	ctx.Define("**", core.NewBuiltinFunction(PowFunc)) // Power operator
 
-	// Math functions
-	ctx.Define("abs", core.NewBuiltinFunction(AbsFunc))
-	ctx.Define("sqrt", core.NewBuiltinFunction(SqrtFunc))
-	ctx.Define("pow", core.NewBuiltinFunction(PowFunc))
-	ctx.Define("max", core.NewBuiltinFunction(MaxFunc))
-	ctx.Define("min", core.NewBuiltinFunction(MinFunc))
-	ctx.Define("round", core.NewBuiltinFunction(RoundFunc))
-	ctx.Define("floor", core.NewBuiltinFunction(FloorFunc))
-	ctx.Define("ceil", core.NewBuiltinFunction(CeilFunc))
+	// Math functions are registered in math.go with more complete implementations
+	// Only keep pow as ** operator here
+	// Note: The pow, abs, sqrt, min, max, floor, ceil functions are all defined in math.go
 }
 
 // AddFunc implements the + operation
@@ -378,36 +372,7 @@ func ModuloFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return nil, fmt.Errorf("cannot apply %% to %s", args[0].Type())
 }
 
-// AbsFunc implements the abs function
-func AbsFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("abs requires exactly 1 argument")
-	}
-
-	if num, ok := args[0].(core.NumberValue); ok {
-		return core.NumberValue(math.Abs(float64(num))), nil
-	}
-
-	return nil, fmt.Errorf("cannot calculate absolute value of %s", args[0].Type())
-}
-
-// SqrtFunc implements the sqrt function
-func SqrtFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("sqrt requires exactly 1 argument")
-	}
-
-	if num, ok := args[0].(core.NumberValue); ok {
-		if float64(num) < 0 {
-			return nil, fmt.Errorf("cannot calculate square root of negative number")
-		}
-		return core.NumberValue(math.Sqrt(float64(num))), nil
-	}
-
-	return nil, fmt.Errorf("cannot calculate square root of %s", args[0].Type())
-}
-
-// PowFunc implements the pow function
+// PowFunc implements the pow function and ** operator
 func PowFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("pow requires exactly 2 arguments")
@@ -421,159 +386,4 @@ func PowFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	return nil, fmt.Errorf("base must be a number, got %s", args[0].Type())
-}
-
-// MaxFunc implements the max function
-func MaxFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) == 0 {
-		return nil, fmt.Errorf("max requires at least 1 argument")
-	}
-
-	if len(args) == 1 {
-		if list, ok := args[0].(core.ListValue); ok {
-			if len(list) == 0 {
-				return nil, fmt.Errorf("cannot calculate max of empty list")
-			}
-			return maxList(list)
-		}
-		return args[0], nil
-	}
-
-	return maxList(args)
-}
-
-// maxList finds the maximum value in a list
-func maxList(list []core.Value) (core.Value, error) {
-	if len(list) == 0 {
-		return nil, fmt.Errorf("cannot calculate max of empty list")
-	}
-
-	// Check if all elements are numbers
-	if _, ok := list[0].(core.NumberValue); ok {
-		max := float64(list[0].(core.NumberValue))
-		for _, v := range list[1:] {
-			if num, ok := v.(core.NumberValue); ok {
-				if float64(num) > max {
-					max = float64(num)
-				}
-			} else {
-				return nil, fmt.Errorf("all arguments to max must be numbers, got %s", v.Type())
-			}
-		}
-		return core.NumberValue(max), nil
-	}
-
-	// Check if all elements are strings
-	if _, ok := list[0].(core.StringValue); ok {
-		max := string(list[0].(core.StringValue))
-		for _, v := range list[1:] {
-			if str, ok := v.(core.StringValue); ok {
-				if string(str) > max {
-					max = string(str)
-				}
-			} else {
-				return nil, fmt.Errorf("all arguments to max must be strings, got %s", v.Type())
-			}
-		}
-		return core.StringValue(max), nil
-	}
-
-	return nil, fmt.Errorf("cannot calculate max of %s", list[0].Type())
-}
-
-// MinFunc implements the min function
-func MinFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) == 0 {
-		return nil, fmt.Errorf("min requires at least 1 argument")
-	}
-
-	if len(args) == 1 {
-		if list, ok := args[0].(core.ListValue); ok {
-			if len(list) == 0 {
-				return nil, fmt.Errorf("cannot calculate min of empty list")
-			}
-			return minList(list)
-		}
-		return args[0], nil
-	}
-
-	return minList(args)
-}
-
-// minList finds the minimum value in a list
-func minList(list []core.Value) (core.Value, error) {
-	if len(list) == 0 {
-		return nil, fmt.Errorf("cannot calculate min of empty list")
-	}
-
-	// Check if all elements are numbers
-	if _, ok := list[0].(core.NumberValue); ok {
-		min := float64(list[0].(core.NumberValue))
-		for _, v := range list[1:] {
-			if num, ok := v.(core.NumberValue); ok {
-				if float64(num) < min {
-					min = float64(num)
-				}
-			} else {
-				return nil, fmt.Errorf("all arguments to min must be numbers, got %s", v.Type())
-			}
-		}
-		return core.NumberValue(min), nil
-	}
-
-	// Check if all elements are strings
-	if _, ok := list[0].(core.StringValue); ok {
-		min := string(list[0].(core.StringValue))
-		for _, v := range list[1:] {
-			if str, ok := v.(core.StringValue); ok {
-				if string(str) < min {
-					min = string(str)
-				}
-			} else {
-				return nil, fmt.Errorf("all arguments to min must be strings, got %s", v.Type())
-			}
-		}
-		return core.StringValue(min), nil
-	}
-
-	return nil, fmt.Errorf("cannot calculate min of %s", list[0].Type())
-}
-
-// RoundFunc implements the round function
-func RoundFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("round requires exactly 1 argument")
-	}
-
-	if num, ok := args[0].(core.NumberValue); ok {
-		return core.NumberValue(math.Round(float64(num))), nil
-	}
-
-	return nil, fmt.Errorf("cannot round %s", args[0].Type())
-}
-
-// FloorFunc implements the floor function
-func FloorFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("floor requires exactly 1 argument")
-	}
-
-	if num, ok := args[0].(core.NumberValue); ok {
-		return core.NumberValue(math.Floor(float64(num))), nil
-	}
-
-	return nil, fmt.Errorf("cannot floor %s", args[0].Type())
-}
-
-// CeilFunc implements the ceil function
-func CeilFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("ceil requires exactly 1 argument")
-	}
-
-	if num, ok := args[0].(core.NumberValue); ok {
-		return core.NumberValue(math.Ceil(float64(num))), nil
-	}
-
-	return nil, fmt.Errorf("cannot ceil %s", args[0].Type())
 }
