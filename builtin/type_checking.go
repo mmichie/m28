@@ -5,7 +5,9 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-func registerTypeCheckingBuiltins(ctx *core.Context) {
+// This function is no longer used - type checking functions have been moved to types.go
+// Keeping RegisterTypeCheckingFunctions for backwards compatibility if needed
+func RegisterTypeCheckingFunctions(ctx *core.Context) {
 	// NOTE: isinstance and issubclass are implemented as special forms in eval/class_forms.go
 
 	// Type conversion functions

@@ -3,95 +3,79 @@ package builtin
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
 	"github.com/mmichie/m28/core"
 )
 
-// Global stdin reader to avoid issues with multiple bufio readers
-var stdinReader = bufio.NewReader(os.Stdin)
-
-// RegisterIOFunctions registers I/O related functions
-func RegisterIOFunctions(ctx *core.Context) {
-	// File operations
-	ctx.Define("open", core.NewBuiltinFunction(openFunc))
-
-	// Print function (already exists but let's ensure it handles multiple args)
-	ctx.Define("print", core.NewBuiltinFunction(printFunc))
-
-	// Input function
-	ctx.Define("input", core.NewBuiltinFunction(inputFunc))
-}
-
-// openFunc implements the open() builtin
-func openFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 || len(args) > 3 {
-		return nil, fmt.Errorf("open() takes 1 to 3 arguments")
-	}
-
-	// Get filename
-	filename, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("open() filename must be a string")
-	}
-
-	// Get mode (default to "r")
-	mode := "r"
-	if len(args) > 1 {
-		if m, ok := args[1].(core.StringValue); ok {
-			mode = string(m)
-		} else {
-			return nil, fmt.Errorf("open() mode must be a string")
+// RegisterIO registers I/O functions
+func RegisterIO(ctx *core.Context) {
+	// print - print objects to stdout
+	ctx.Define("print", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		strs := make([]string, len(args))
+		for i, arg := range args {
+			if arg == core.Nil {
+				strs[i] = "None"
+			} else {
+				strs[i] = arg.String()
+			}
 		}
-	}
+		fmt.Println(strings.Join(strs, " "))
+		return core.Nil, nil
+	}))
 
-	// TODO: Handle encoding parameter (args[2]) if provided
-
-	// Create and return file object
-	file, err := core.NewFile(string(filename), mode)
-	if err != nil {
-		return nil, err
-	}
-
-	return file, nil
-}
-
-// printFunc implements the print() builtin
-func printFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	// Print all arguments separated by spaces
-	for i, arg := range args {
-		if i > 0 {
-			fmt.Print(" ")
+	// input - read line from stdin
+	ctx.Define("input", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) > 1 {
+			return nil, fmt.Errorf("input() takes at most 1 argument (%d given)", len(args))
 		}
-		fmt.Print(core.PrintValueWithoutQuotes(arg))
-	}
-	fmt.Println()
 
-	return core.Nil, nil
-}
-
-// inputFunc implements the input() builtin
-func inputFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	// Print prompt if provided
-	if len(args) > 0 {
-		// Use PrintValueWithoutQuotes to avoid printing quotes around strings
-		fmt.Print(core.PrintValueWithoutQuotes(args[0]))
-	}
-
-	// Read entire line from stdin using the global reader
-	line, err := stdinReader.ReadString('\n')
-	if err != nil {
-		if err == io.EOF {
-			// Handle EOF gracefully
-			return core.StringValue(""), nil
+		// Print prompt if provided
+		if len(args) == 1 {
+			prompt := args[0].String()
+			fmt.Print(prompt)
 		}
-		return nil, fmt.Errorf("error reading input: %v", err)
-	}
 
-	// Remove the trailing newline
-	line = strings.TrimRight(line, "\r\n")
+		// Read line from stdin
+		reader := bufio.NewReader(os.Stdin)
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
 
-	return core.StringValue(line), nil
+		// Remove trailing newline
+		line = strings.TrimSuffix(line, "\n")
+		line = strings.TrimSuffix(line, "\r") // For Windows
+
+		return core.StringValue(line), nil
+	}))
+
+	// open - open file
+	ctx.Define("open", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 || len(args) > 3 {
+			return nil, fmt.Errorf("open() takes from 1 to 3 arguments (%d given)", len(args))
+		}
+
+		// Get filename
+		filename, ok := args[0].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("open() argument 1 must be string, not %s", args[0].Type())
+		}
+
+		// Get mode (default to "r")
+		mode := "r"
+		if len(args) >= 2 {
+			if m, ok := args[1].(core.StringValue); ok {
+				mode = string(m)
+			} else {
+				return nil, fmt.Errorf("open() argument 2 must be string, not %s", args[1].Type())
+			}
+		}
+
+		// Encoding parameter would be args[2], but we'll ignore it for now
+
+		// Create and return file object
+		return core.NewFile(string(filename), mode)
+	}))
 }
