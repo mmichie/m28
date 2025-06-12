@@ -225,7 +225,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 3. **Core Python Features**
    - [ ] Set literals `{1, 2, 3}`
    - [x] Multiple assignment `a, b = 1, 2` ✅ DONE
-   - [ ] Exception variable binding `except Error as e`
+   - [x] Exception variable binding `except Error as e` ✅ DONE
 
 4. **F-String Enhancements** (Building on existing nested quotes support)
    - [ ] **Format Specifications** (High Priority)

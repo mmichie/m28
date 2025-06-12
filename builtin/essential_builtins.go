@@ -8,27 +8,11 @@ import (
 
 // RegisterEssentialBuiltins registers additional essential built-in functions
 func RegisterEssentialBuiltins(ctx *core.Context) {
-	// raise() - raise an exception with an optional message
-	ctx.Define("raise", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return nil, fmt.Errorf("RuntimeError")
-		}
-		if len(args) > 1 {
-			return nil, fmt.Errorf("raise() takes at most 1 argument (%d given)", len(args))
-		}
-
-		// Get the error message
-		var message string
-		switch v := args[0].(type) {
-		case core.StringValue:
-			message = string(v)
-		default:
-			message = v.String()
-		}
-
-		// Return a generic error that will be caught by try/except
-		return nil, fmt.Errorf(message)
-	}))
+	// raise is now a special form in evaluator.go to support more flexible syntax
+	// Commented out to avoid conflict with the special form
+	// ctx.Define("raise", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// 	...
+	// }))
 
 	// error() - alias for raise() for backward compatibility
 	ctx.Define("error", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

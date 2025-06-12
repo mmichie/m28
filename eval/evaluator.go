@@ -957,19 +957,24 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
+		// Evaluate the argument
+		val, err := Eval(args[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		// Single string argument - generic exception with message
-		if msg, ok := args[0].(core.StringValue); ok {
+		if msg, ok := val.(core.StringValue); ok {
 			return nil, &Exception{
 				Type:    "Exception",
 				Message: string(msg),
 			}
 		}
 
-		// Single symbol - exception type with no message
-		if typ, ok := args[0].(core.SymbolValue); ok {
-			return nil, &Exception{
-				Type: string(typ),
-			}
+		// If it's not a string, convert to string
+		return nil, &Exception{
+			Type:    "Exception",
+			Message: core.PrintValueWithoutQuotes(val),
 		}
 	}
 
@@ -988,11 +993,16 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			return nil, fmt.Errorf("raise: exception type must be a symbol or string")
 		}
 
-		// Get message
-		if msg, ok := args[1].(core.StringValue); ok {
+		// Evaluate and get message
+		msgVal, err := Eval(args[1], ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		if msg, ok := msgVal.(core.StringValue); ok {
 			excMsg = string(msg)
 		} else {
-			excMsg = core.PrintValueWithoutQuotes(args[1])
+			excMsg = core.PrintValueWithoutQuotes(msgVal)
 		}
 
 		return nil, &Exception{

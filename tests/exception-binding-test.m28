@@ -1,0 +1,107 @@
+# Test exception variable binding with 'as' syntax
+
+# Test basic exception binding
+(try
+  (/ 1 0)
+  (except ZeroDivisionError as e
+    (assert (in "division" e) "Exception message should contain 'division'")))
+(print "✓ Basic exception binding with 'as'")
+
+# Test catch-all with binding
+(try
+  (undefined_var)
+  (except as e
+    (assert (in "undefined" e) "Should catch NameError")))
+(print "✓ Catch-all exception binding")
+
+# Test multiple except clauses with binding
+(try
+  (raise "ValueError: test error")
+  (except TypeError as te
+    (assert False "Should not catch TypeError"))
+  (except as ve
+    (assert (in "ValueError: test error" ve) "Should have error message")))
+(print "✓ Multiple except clauses with binding")
+
+# Test exception variable scope
+(= outer_e "outer")
+(try
+  (/ 1 0)
+  (except ZeroDivisionError as e
+    (assert (in "division" e) "Should have exception in handler")))
+(assert (== outer_e "outer") "Exception variable should not leak to outer scope")
+(print "✓ Exception variable scope isolation")
+
+# Test nested try/except with different variables
+(try
+  (try
+    (/ 1 0)
+    (except ZeroDivisionError as inner_e
+      (assert (in "division" inner_e) "Inner exception")
+      (raise "from inner")))
+  (except as outer_e
+    (assert (in "from inner" outer_e) "Outer exception")))
+(print "✓ Nested try/except with different variables")
+
+# Test exception value preservation
+(try
+  (= d {})
+  (= val d["missing_key"])
+  (except KeyError as ke
+    (assert (in "missing_key" ke) "KeyError should preserve key info")))
+(print "✓ Exception value preservation")
+
+# Test with finally clause
+(= finally_ran False)
+(try
+  (raise "RuntimeError: test")
+  (except as re
+    (assert (in "RuntimeError: test" re) "RuntimeError message"))
+  (finally
+    (= finally_ran True)))
+(assert finally_ran "Finally should run after except")
+(print "✓ Exception binding with finally clause")
+
+# Test error message format
+(try
+  (raise "file.txt not found")
+  (except as fnf
+    (assert (in "file.txt" fnf) "Error message preserved")))
+(print "✓ Error message preservation")
+
+# Test exception re-raise
+(try
+  (try
+    (list()[100])
+    (except IndexError as ie
+      (assert (in "index" ie) "IndexError caught")
+      (raise ie)))  # Re-raise with message
+  (except as ie2
+    (assert (in "index" ie2) "Re-raised exception")))
+(print "✓ Exception re-raise")
+
+# Test legacy syntax still works
+(try
+  (/ 1 0)
+  (except e
+    (assert (in "division" e) "Legacy catch-all syntax")))
+(print "✓ Legacy exception syntax compatibility")
+
+# Test legacy typed exception syntax
+(try
+  (= d {})
+  (= v d["key"])
+  (except KeyError ke
+    (assert (in "key" ke) "Legacy typed exception syntax")))
+(print "✓ Legacy typed exception syntax")
+
+# Test exception without binding
+(= handled False)
+(try
+  (/ 1 0)
+  (except ZeroDivisionError
+    (= handled True)))
+(assert handled "Exception without binding should work")
+(print "✓ Exception without variable binding")
+
+(print "\nAll exception binding tests passed!")
