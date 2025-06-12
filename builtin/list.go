@@ -29,10 +29,26 @@ func RegisterListFunctions(ctx *core.Context) {
 
 // ListFunc creates a list from the given arguments
 func ListFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Special case: if single argument is an iterable, convert it to a list
+	if len(args) == 1 {
+		if iterable, ok := args[0].(core.Iterable); ok {
+			result := make(core.ListValue, 0)
+			iter := iterable.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				result = append(result, val)
+			}
+			return result, nil
+		}
+	}
+
 	return core.ListValue(args), nil
 }
 
-// RangeFunc creates a list of numbers from start to end
+// RangeFunc creates a lazy range object
 func RangeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 || len(args) > 3 {
 		return nil, fmt.Errorf("range requires 1-3 arguments: end or start, end[, step]")
@@ -83,21 +99,12 @@ func RangeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
-	// Create the list
-	result := make(core.ListValue, 0)
-
-	// Handle positive and negative steps properly
-	if step > 0 {
-		for i := start; i < end; i += step {
-			result = append(result, core.NumberValue(i))
-		}
-	} else {
-		for i := start; i > end; i += step {
-			result = append(result, core.NumberValue(i))
-		}
+	// Create and return a range object
+	rangeVal, err := core.NewRangeValue(start, end, step)
+	if err != nil {
+		return nil, err
 	}
-
-	return result, nil
+	return rangeVal, nil
 }
 
 // FirstFunc returns the first element of a list

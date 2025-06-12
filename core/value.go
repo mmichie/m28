@@ -26,6 +26,7 @@ const (
 	ClassType     Type = "class"
 	ExceptionType Type = "exception"
 	SliceType     Type = "slice"
+	RangeType     Type = "range"
 )
 
 // Value is the base interface for all values in the language

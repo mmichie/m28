@@ -8,49 +8,7 @@ import (
 
 // RegisterUtilityFunctions registers utility functions in the global context
 func RegisterUtilityFunctions(ctx *core.Context) {
-	// range - generate a sequence of numbers
-	ctx.Define("range", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 || len(args) > 3 {
-			return nil, fmt.Errorf("range() takes 1 to 3 arguments (%d given)", len(args))
-		}
-
-		var start, stop, step float64
-
-		switch len(args) {
-		case 1:
-			// range(stop)
-			stop = getNumber(args[0])
-			start = 0
-			step = 1
-		case 2:
-			// range(start, stop)
-			start = getNumber(args[0])
-			stop = getNumber(args[1])
-			step = 1
-		case 3:
-			// range(start, stop, step)
-			start = getNumber(args[0])
-			stop = getNumber(args[1])
-			step = getNumber(args[2])
-			if step == 0 {
-				return nil, fmt.Errorf("range() step argument must not be zero")
-			}
-		}
-
-		// Generate the range
-		result := core.ListValue{}
-		if step > 0 {
-			for i := start; i < stop; i += step {
-				result = append(result, core.NumberValue(i))
-			}
-		} else {
-			for i := start; i > stop; i += step {
-				result = append(result, core.NumberValue(i))
-			}
-		}
-
-		return result, nil
-	}))
+	// range is now defined in list.go as a lazy range object
 
 	// enumerate - add index to iterable elements
 	ctx.Define("enumerate", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

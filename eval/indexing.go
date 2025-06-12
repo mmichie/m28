@@ -107,6 +107,20 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return core.StringValue(str[index : index+1]), nil
 
 	default:
+		// Check if object has __getitem__ method
+		if objWithGetItem, ok := obj.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			if getItem, found := objWithGetItem.GetAttr("__getitem__"); found {
+				// Call __getitem__ with the key
+				if callable, ok := getItem.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					return callable.Call([]core.Value{key}, ctx)
+				}
+			}
+		}
+
 		return nil, fmt.Errorf("'%s' object is not subscriptable", obj.Type())
 	}
 }
