@@ -234,10 +234,11 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### 🎯 High Priority - Next Steps
 
-0. **P0: Fix list(range(n)) conversion** 🚨
-   - [ ] Currently `list(range(5))` returns `[range(5)]` instead of `[0, 1, 2, 3, 4]`
-   - [ ] list() function needs to properly iterate over Iterable types
-   - [ ] Critical for Python compatibility
+0. **P0: Fix list(range(n)) conversion** ✅ FIXED
+   - [x] Previously `list(range(5))` returned `[range(5)]` instead of `[0, 1, 2, 3, 4]`
+   - [x] Fixed list() function to properly iterate over Iterable types
+   - [x] Added comprehensive tests in tests/test_list_range_conversion.m28
+   - [x] Critical for Python compatibility - now working correctly!
 
 1. **Record Stream and JSON Processing** (NEW)
    - [ ] Path-based access functions (`get-in`, `assoc-in`, `update-in`, `dissoc-in`)

@@ -1,0 +1,38 @@
+# Test that list() properly converts range objects and other iterables
+
+# Test basic range conversion
+(assert (== (list (range 5)) [0, 1, 2, 3, 4]) "list(range(5)) should return [0, 1, 2, 3, 4]")
+
+# Test range with start and stop
+(assert (== (list (range 2 8)) [2, 3, 4, 5, 6, 7]) "list(range(2, 8)) should return [2, 3, 4, 5, 6, 7]")
+
+# Test range with negative step
+(assert (== (list (range 10 0 -2)) [10, 8, 6, 4, 2]) "list(range(10, 0, -2)) should return [10, 8, 6, 4, 2]")
+
+# Test empty range
+(assert (== (list (range 0)) []) "list(range(0)) should return empty list")
+(assert (== (list (range 5 5)) []) "list(range(5, 5)) should return empty list")
+
+# Test converting existing sequences
+(assert (== (list [1, 2, 3]) [1, 2, 3]) "list([1, 2, 3]) should return a copy")
+(assert (== (list (tuple [4, 5, 6])) [4, 5, 6]) "list(tuple) should convert to list")
+(assert (== (list "hello") ["h", "e", "l", "l", "o"]) "list(string) should return list of characters")
+
+# Test empty sequences
+(assert (== (list []) []) "list([]) should return empty list")
+(assert (== (list "") []) "list('') should return empty list")
+
+# Test multiple arguments
+(assert (== (list 1 2 3) [1, 2, 3]) "list(1, 2, 3) should return [1, 2, 3]")
+
+# Test no arguments
+(assert (== (list) []) "list() should return empty list")
+
+# Test that modifying the result doesn't affect the original
+(= original [1, 2, 3])
+(= copied (list original))
+(= copied (append copied 4))
+(assert (== original [1, 2, 3]) "Original list should not be modified")
+(assert (== copied [1, 2, 3, 4]) "Copied list should have the appended element")
+
+(print "All list conversion tests passed!")

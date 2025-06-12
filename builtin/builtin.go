@@ -358,6 +358,19 @@ func registerTypeBuiltins(ctx *core.Context) {
 				}
 				return result, nil
 			default:
+				// Check if it implements Iterable interface
+				if iterable, ok := v.(core.Iterable); ok {
+					result := make(core.ListValue, 0)
+					iter := iterable.Iterator()
+					for {
+						val, hasNext := iter.Next()
+						if !hasNext {
+							break
+						}
+						result = append(result, val)
+					}
+					return result, nil
+				}
 				// If it's not an iterable, just create a list with this one element
 				return core.ListValue{v}, nil
 			}
