@@ -109,6 +109,7 @@ run_test "Lists" "tests/list-test.m28"
 run_test "Dictionaries" "tests/dict-test.m28"
 run_test "Dict Contains" "tests/dict-contains-test.m28"
 run_test "Strings" "tests/string-methods-test.m28"
+run_test "Set Literals" "tests/set-literal-test.m28"
 
 if [[ "$MODE" != "quick" ]]; then
     # Additional tests

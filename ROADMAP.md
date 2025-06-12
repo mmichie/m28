@@ -107,9 +107,9 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 - [ ] **Remaining Python Features**
   - [x] Tuple unpacking in loops: `for key, value in items:` ✅ DONE
-  - [ ] Set literals: `{1, 2, 3}` (currently parsed as dict)
+  - [x] Set literals: `{1, 2, 3}` ✅ DONE
   - [x] Multiple assignment: `a, b = 1, 2` ✅ DONE
-  - [ ] Exception variable binding: `except Error as e`
+  - [x] Exception variable binding: `except Error as e` ✅ DONE
   - [ ] Argument unpacking: `func(*args, **kwargs)` syntax
   - [x] `from module import name` syntax ✅ DONE (using list syntax)
   - [x] `import module as alias` syntax ✅ DONE
@@ -153,14 +153,14 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 - [x] **More Built-ins** (Partially Complete)
   - [x] Boolean operations: `all()`, `any()` ✅ DONE
   - [x] Math functions: `round()`, `divmod()` ✅ DONE
-  - [ ] Iterator functions: `iter()`, `next()` with default parameter
+  - [ ] Iterator functions: `iter()` (next() default parameter already implemented)
   - [ ] `eval()` and `exec()`
-  - [ ] `slice()` object creator
+  - [x] `slice()` object creator ✅ DONE
   - [ ] `vars()`, `dir()` for object introspection
   - [ ] `globals()`, `locals()` for namespace access
 
 - [ ] **Functional Programming Enhancements**
-  - [ ] Key parameter for `sorted()`, `min()`, `max()`: `sorted(items, key=lambda x: x.age)`
+  - [x] Key parameter for `sorted()`, `min()`, `max()`: `sorted(items, key=lambda x: x.age)` ✅ DONE
   - [ ] `reversed()` as iterator (currently returns new list)
   - [ ] `sum()` with start parameter: `sum([1,2,3], start=10)`
   - [ ] `round()` with ndigits: `round(3.14159, 2)`
@@ -183,7 +183,6 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [ ] Decorators with `@` syntax
   - [ ] Generator expressions: `(x*2 for x in range(10))`
   - [ ] Dictionary/set comprehensions
-  - [x] Multiple assignment: `a, b = 1, 2` ✅ DONE
   - [ ] Async/await support
 
 - [ ] **Type Inference (Low Priority)**
@@ -194,7 +193,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
   - [ ] Union types from control flow analysis
 
 - [ ] **Literals**
-  - [ ] Set literals that work (currently `{1,2,3}` parsed as dict)
+  - [x] Set literals that work ✅ DONE
   - [ ] Tuple literals without name error
   - [ ] Binary/octal/hex number literals
   - [ ] Raw strings: `r"raw\string"`
@@ -223,7 +222,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - [x] slice() object creator ✅ DONE
 
 3. **Core Python Features**
-   - [ ] Set literals `{1, 2, 3}`
+   - [x] Set literals `{1, 2, 3}` ✅ DONE
    - [x] Multiple assignment `a, b = 1, 2` ✅ DONE
    - [x] Exception variable binding `except Error as e` ✅ DONE
 

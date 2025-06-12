@@ -1,0 +1,106 @@
+# Test set literal syntax
+
+# Get the set type for comparisons
+(= set_type (type (set)))
+
+# Basic set literal creation
+(print "=== Basic Set Literals ===")
+(= s1 {1, 2, 3})
+(print "Set literal {1, 2, 3} =" s1)
+(assert (== (type s1) set_type) "Set literal should create a set")
+(assert (== (len s1) 3) "Set should have 3 elements")
+
+# Single element set
+(= s2 {42})
+(print "Single element set {42} =" s2)
+(assert (== (type s2) set_type) "Single element should create a set")
+(assert (== (len s2) 1) "Single element set should have length 1")
+
+# Mixed type set
+(= s3 {1, "hello", 3.14, True, nil})
+(print "Mixed type set =" s3)
+(assert (== (type s3) set_type) "Mixed types should create a set")
+(assert (== (len s3) 5) "Mixed type set should have 5 elements")
+
+# Empty braces should create dict, not set
+(= empty {})
+(print "Empty {} type =" (type empty))
+(assert (== (type empty) (type {})) "Empty {} should create a dict, not a set")
+
+# Duplicate elements should be deduplicated
+(= s4 {1, 2, 2, 3, 3, 3})
+(print "Set with duplicates {1, 2, 2, 3, 3, 3} =" s4)
+(assert (== (len s4) 3) "Duplicates should be removed")
+(assert (in 1 s4) "Should contain 1")
+(assert (in 2 s4) "Should contain 2")
+(assert (in 3 s4) "Should contain 3")
+
+# Set with expressions
+(print "\n=== Sets with Expressions ===")
+(= x 5)
+(= s5 {x, (+ x 1), (* x 2), (- x 1)})
+(print "Set with expressions =" s5)
+(assert (== (len s5) 4) "Should have 4 unique values")
+(assert (in 5 s5) "Should contain x (5)")
+(assert (in 6 s5) "Should contain x+1 (6)")
+(assert (in 10 s5) "Should contain x*2 (10)")
+(assert (in 4 s5) "Should contain x-1 (4)")
+
+# Dict vs Set disambiguation
+(print "\n=== Dict vs Set Disambiguation ===")
+(= d1 {"key": "value"})
+(= s6 {"key"})
+(print "Dict {\"key\": \"value\"} type =" (type d1))
+(print "Set {\"key\"} type =" (type s6))
+(assert (== (type d1) (type {})) "Colon syntax should create dict")
+(assert (== (type s6) set_type) "No colon should create set")
+
+# Set operations with set literals
+(print "\n=== Set Operations with Literals ===")
+(= union_result ({1, 2, 3}.union {3, 4, 5}))
+(print "{1, 2, 3}.union({3, 4, 5}) =" union_result)
+(assert (== (len union_result) 5) "Union should have 5 elements")
+
+(= intersect_result ({1, 2, 3}.intersection {2, 3, 4}))
+(print "{1, 2, 3}.intersection({2, 3, 4}) =" intersect_result)
+(assert (== (len intersect_result) 2) "Intersection should have 2 elements")
+
+(= diff_result ({1, 2, 3}.difference {2, 3}))
+(print "{1, 2, 3}.difference({2, 3}) =" diff_result)
+(assert (== (len diff_result) 1) "Difference should have 1 element")
+(assert (in 1 diff_result) "Difference should contain 1")
+
+# Trailing comma support
+(print "\n=== Trailing Comma ===")
+(= s7 {1, 2, 3,})
+(print "Set with trailing comma {1, 2, 3,} =" s7)
+(assert (== (len s7) 3) "Trailing comma should be allowed")
+
+# Nested set literals in operations
+(print "\n=== Nested Set Literals ===")
+(= s8 ({1, 2}.union {3, 4}))
+(print "({1, 2}.union {3, 4}) =" s8)
+(assert (== (len s8) 4) "Nested set operation should work")
+
+# Set membership with literals
+(print "\n=== Set Membership ===")
+(assert (in 2 {1, 2, 3}) "2 should be in {1, 2, 3}")
+(assert (not (in 4 {1, 2, 3})) "4 should not be in {1, 2, 3}")
+
+# Set size validation
+(print "\n=== Set Size and Deduplication ===")
+(= s9 {3, 1, 4, 1, 5, 9, 2, 6, 5})
+(print "Set {3, 1, 4, 1, 5, 9, 2, 6, 5} =" s9)
+(print "Length after deduplication:" (len s9))
+(assert (== (len s9) 7) "Set should have 7 unique elements")
+
+# Verify all unique elements are present
+(assert (in 1 s9) "Should contain 1")
+(assert (in 2 s9) "Should contain 2")
+(assert (in 3 s9) "Should contain 3")
+(assert (in 4 s9) "Should contain 4")
+(assert (in 5 s9) "Should contain 5")
+(assert (in 6 s9) "Should contain 6")
+(assert (in 9 s9) "Should contain 9")
+
+(print "\n=== All Set Literal Tests Passed! ===")
