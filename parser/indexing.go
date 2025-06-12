@@ -109,7 +109,7 @@ func (p *Parser) parseSlice(base core.Value, start core.Value) (core.Value, erro
 	}
 
 	return core.ListValue{
-		core.SymbolValue("slice"),
+		core.SymbolValue("__slice__"), // Use internal name to avoid conflict with slice() builtin
 		base,
 		start,
 		end,

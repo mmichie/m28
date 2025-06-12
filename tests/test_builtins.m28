@@ -43,6 +43,30 @@
       (test/assert-eq -1 (find "hello" "xyz") "Find not found")
       (test/assert-eq 2 (count "hello world" "l") "Count occurrences"))))
   
+  ; Test slice function
+  (test/test-suite "Slice Function" (lambda ()
+    
+    (test/run-test "Slice Creation" (lambda ()
+      (= s1 (slice 5))
+      (test/assert-eq None (. s1 start) "slice(5) start")
+      (test/assert-eq 5 (. s1 stop) "slice(5) stop")
+      (test/assert-eq None (. s1 step) "slice(5) step")
+      
+      (= s2 (slice 1 5))
+      (test/assert-eq 1 (. s2 start) "slice(1,5) start")
+      (test/assert-eq 5 (. s2 stop) "slice(1,5) stop")
+      
+      (= s3 (slice 1 10 2))
+      (test/assert-eq 2 (. s3 step) "slice(1,10,2) step")))
+    
+    (test/run-test "Slice Usage" (lambda ()
+      (= lst [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+      (= s (slice 2 7))
+      (test/assert-eq [2, 3, 4, 5, 6] lst[s] "list[slice(2,7)]")
+      
+      (= s (slice None None 2))
+      (test/assert-eq [0, 2, 4, 6, 8] lst[s] "list[slice(None,None,2)]"))))
+  
   ; Test type functions
   (test/test-suite "Type Functions" (lambda ()
     

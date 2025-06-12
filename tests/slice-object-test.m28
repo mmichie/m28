@@ -1,0 +1,137 @@
+# Test slice() object creator
+
+# Test basic slice creation
+(= s1 (slice 5))
+(assert (== s1.start None) "slice(5).start should be None")
+(assert (== s1.stop 5) "slice(5).stop should be 5")
+(assert (== s1.step None) "slice(5).step should be None")
+(print "✓ Basic slice(stop) creation")
+
+(= s2 (slice 1 5))
+(assert (== s2.start 1) "slice(1, 5).start should be 1")
+(assert (== s2.stop 5) "slice(1, 5).stop should be 5")
+(assert (== s2.step None) "slice(1, 5).step should be None")
+(print "✓ slice(start, stop) creation")
+
+(= s3 (slice 1 10 2))
+(assert (== s3.start 1) "slice(1, 10, 2).start should be 1")
+(assert (== s3.stop 10) "slice(1, 10, 2).stop should be 10")
+(assert (== s3.step 2) "slice(1, 10, 2).step should be 2")
+(print "✓ slice(start, stop, step) creation")
+
+# Test slice with None values
+(= s4 (slice None 5 None))
+(assert (== s4.start None) "slice(None, 5, None).start should be None")
+(assert (== s4.stop 5) "slice(None, 5, None).stop should be 5")
+(assert (== s4.step None) "slice(None, 5, None).step should be None")
+(print "✓ slice with None values")
+
+# Test slice string representation
+(assert (== (str s1) "slice(None, 5, None)") "str(slice(5))")
+(assert (== (str s2) "slice(1, 5, None)") "str(slice(1, 5))")
+(assert (== (str s3) "slice(1, 10, 2)") "str(slice(1, 10, 2))")
+(print "✓ slice string representation")
+
+# Test slice validation
+(try
+  (slice "a" 5)
+  (assert False "slice('a', 5) should raise error")
+  (except Exception as e
+    (assert (in "slice indices must be integers or None" (str e)) "Invalid start type error")))
+
+(try
+  (slice 1 "b")
+  (assert False "slice(1, 'b') should raise error")
+  (except Exception as e
+    (assert (in "slice indices must be integers or None" (str e)) "Invalid stop type error")))
+
+(try
+  (slice 1 5 "c")
+  (assert False "slice(1, 5, 'c') should raise error")
+  (except Exception as e
+    (assert (in "slice indices must be integers or None" (str e)) "Invalid step type error")))
+
+(try
+  (slice 1 5 0)
+  (assert False "slice(1, 5, 0) should raise error")
+  (except Exception as e
+    (assert (in "slice step cannot be zero" (str e)) "Zero step error")))
+
+(print "✓ slice validation")
+
+# Test using slice objects with sequences
+(= lst [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+# Test list slicing with slice object
+(= s (slice 2 7))
+(assert (== lst[s] [2, 3, 4, 5, 6]) "list[slice(2, 7)]")
+
+(= s (slice 1 8 2))
+(assert (== lst[s] [1, 3, 5, 7]) "list[slice(1, 8, 2)]")
+
+(= s (slice None 5))
+(assert (== lst[s] [0, 1, 2, 3, 4]) "list[slice(None, 5)]")
+
+(= s (slice 5 None))
+(assert (== lst[s] [5, 6, 7, 8, 9]) "list[slice(5, None)]")
+
+(= s (slice None None 2))
+(assert (== lst[s] [0, 2, 4, 6, 8]) "list[slice(None, None, 2)]")
+
+(= s (slice None None -1))
+(assert (== lst[s] [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]) "list[slice(None, None, -1)]")
+
+(print "✓ List slicing with slice objects")
+
+# Test tuple slicing with slice object
+(= tup (tuple [1, 2, 3, 4, 5]))
+(= s (slice 1 4))
+(assert (== tup[s] (tuple [2, 3, 4])) "tuple[slice(1, 4)]")
+
+(= s (slice None None -1))
+(assert (== tup[s] (tuple [5, 4, 3, 2, 1])) "tuple[slice(None, None, -1)]")
+
+(print "✓ Tuple slicing with slice objects")
+
+# Test string slicing with slice object
+(= text "Hello, World!")
+(= s (slice 0 5))
+(assert (== text[s] "Hello") "string[slice(0, 5)]")
+
+(= s (slice 7 None))
+(assert (== text[s] "World!") "string[slice(7, None)]")
+
+(= s (slice None None -1))
+(assert (== text[s] "!dlroW ,olleH") "string[slice(None, None, -1)]")
+
+(print "✓ String slicing with slice objects")
+
+# Test negative indices with slice objects
+(= s (slice -5 -1))
+(assert (== lst[s] [5, 6, 7, 8]) "list[slice(-5, -1)]")
+
+(= s (slice -1 None -1))
+(assert (== lst[s] [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]) "list[slice(-1, None, -1)]")
+
+(print "✓ Negative indices with slice objects")
+
+# Test edge cases
+(= s (slice 100 200))
+(assert (== lst[s] []) "list[slice(100, 200)] out of bounds")
+
+(= s (slice -100 -50))
+(assert (== lst[s] []) "list[slice(-100, -50)] out of bounds")
+
+(print "✓ Edge cases with slice objects")
+
+# Test slice object is not mutable
+(= s (slice 1 5 2))
+(try
+  (setattr s "start" 10)
+  (assert False "slice objects should be immutable")
+  (except Exception as e
+    (assert (in "cannot set attributes on slice objects" (str e)) "Immutability error")))
+
+(print "✓ Slice object immutability")
+
+(print "\nAll slice object tests passed!")

@@ -45,7 +45,7 @@
 (def my_map (f lst)
   (if (== (len lst) 0)
       []
-      (+ (list (f (nth lst 0))) (my_map f (slice lst 1 (len lst) 1)))))
+      (+ (list (f (nth lst 0))) (my_map f lst[1:]))))
 
 (print "\nCustom map:")
 (print (my_map (lambda (x) (* x x)) (list 1 2 3 4)))
@@ -55,8 +55,8 @@
   (if (== (len lst) 0)
       []
       (if (pred (nth lst 0))
-          (+ (list (nth lst 0)) (my_filter pred (slice lst 1 (len lst) 1)))
-          (my_filter pred (slice lst 1 (len lst) 1)))))
+          (+ (list (nth lst 0)) (my_filter pred lst[1:]))
+          (my_filter pred lst[1:]))))
 
 (print "\nCustom filter:")
 (print (my_filter (lambda (x) (> x 2)) (list 1 2 3 4 5)))

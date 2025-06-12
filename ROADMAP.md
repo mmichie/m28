@@ -220,7 +220,7 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 2. **Functional Programming**
    - [x] Key parameter for sorted/min/max ✅ DONE (Python-style key=func syntax)
    - [x] Default parameter for next() ✅ DONE (already implemented)
-   - [ ] slice() object creator
+   - [x] slice() object creator ✅ DONE
 
 3. **Core Python Features**
    - [ ] Set literals `{1, 2, 3}`

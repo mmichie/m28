@@ -409,6 +409,60 @@ func registerTypeBuiltins(ctx *core.Context) {
 		return nil, fmt.Errorf("tuple() takes at most 1 argument (%d given)", len(args))
 	}))
 
+	// slice - create a slice object
+	ctx.Define("slice", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		var start, stop, step core.Value
+
+		switch len(args) {
+		case 0:
+			return nil, fmt.Errorf("slice expected at least 1 argument, got 0")
+		case 1:
+			// slice(stop)
+			start = core.Nil
+			stop = args[0]
+			step = core.Nil
+		case 2:
+			// slice(start, stop)
+			start = args[0]
+			stop = args[1]
+			step = core.Nil
+		case 3:
+			// slice(start, stop, step)
+			start = args[0]
+			stop = args[1]
+			step = args[2]
+		default:
+			return nil, fmt.Errorf("slice expected at most 3 arguments, got %d", len(args))
+		}
+
+		// Validate that arguments are None or integers
+		if start != core.Nil {
+			if _, ok := start.(core.NumberValue); !ok {
+				return nil, fmt.Errorf("slice indices must be integers or None, not %s", start.Type())
+			}
+		}
+		if stop != core.Nil {
+			if _, ok := stop.(core.NumberValue); !ok {
+				return nil, fmt.Errorf("slice indices must be integers or None, not %s", stop.Type())
+			}
+		}
+		if step != core.Nil {
+			if _, ok := step.(core.NumberValue); !ok {
+				return nil, fmt.Errorf("slice indices must be integers or None, not %s", step.Type())
+			}
+			// Check that step is not zero
+			if num, ok := step.(core.NumberValue); ok && int64(num) == 0 {
+				return nil, fmt.Errorf("slice step cannot be zero")
+			}
+		}
+
+		return &core.SliceValue{
+			Start: start,
+			Stop:  stop,
+			Step:  step,
+		}, nil
+	}))
+
 	// len - get length of collection
 	ctx.Define("len", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {

@@ -25,6 +25,12 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("error evaluating key: %v", err)
 	}
 
+	// Check if key is a slice object
+	if slice, ok := key.(*core.SliceValue); ok {
+		// Handle slicing with slice object
+		return handleSliceObject(obj, slice)
+	}
+
 	// Handle different object types
 	switch v := obj.(type) {
 	case core.ListValue:
@@ -372,9 +378,66 @@ func normalizeSliceIndices(length int, start, end, step *int) (int, int, int) {
 	return startIdx, endIdx, stepVal
 }
 
+// handleSliceObject handles slicing with a slice object
+func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, error) {
+	// Extract slice parameters
+	var start, stop, step *int
+
+	// Convert slice values to integers
+	if slice.Start != nil && slice.Start != core.Nil {
+		if num, ok := slice.Start.(core.NumberValue); ok {
+			val := int(num)
+			start = &val
+		} else {
+			return nil, fmt.Errorf("slice indices must be integers or None")
+		}
+	}
+
+	if slice.Stop != nil && slice.Stop != core.Nil {
+		if num, ok := slice.Stop.(core.NumberValue); ok {
+			val := int(num)
+			stop = &val
+		} else {
+			return nil, fmt.Errorf("slice indices must be integers or None")
+		}
+	}
+
+	if slice.Step != nil && slice.Step != core.Nil {
+		if num, ok := slice.Step.(core.NumberValue); ok {
+			val := int(num)
+			if val == 0 {
+				return nil, fmt.Errorf("slice step cannot be zero")
+			}
+			step = &val
+		} else {
+			return nil, fmt.Errorf("slice indices must be integers or None")
+		}
+	}
+
+	// Handle different object types
+	switch v := obj.(type) {
+	case core.ListValue:
+		return sliceList(v, start, stop, step)
+	case core.TupleValue:
+		result, err := sliceList(core.ListValue(v), start, stop, step)
+		if err != nil {
+			return nil, err
+		}
+		// Convert result back to tuple
+		if list, ok := result.(core.ListValue); ok {
+			return core.TupleValue(list), nil
+		}
+		return result, nil
+	case core.StringValue:
+		return sliceString(string(v), start, stop, step)
+	default:
+		return nil, fmt.Errorf("'%s' object is not subscriptable", v.Type())
+	}
+}
+
 // RegisterIndexing registers the indexing special forms
 func RegisterIndexing() {
 	RegisterSpecialForm("get-item", GetItemForm)
 	RegisterSpecialForm("set-item", SetItemForm)
-	RegisterSpecialForm("slice", SliceForm)
+	RegisterSpecialForm("__slice__", SliceForm) // Internal name to avoid conflict with slice() builtin
 }

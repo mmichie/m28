@@ -347,6 +347,70 @@ func (it *tupleIterator) Reset() {
 	it.index = 0
 }
 
+// SliceValue represents a slice object with start, stop, and step
+type SliceValue struct {
+	Start Value
+	Stop  Value
+	Step  Value
+}
+
+// Type implements Value.Type
+func (s *SliceValue) Type() Type {
+	return SliceType
+}
+
+// String implements Value.String
+func (s *SliceValue) String() string {
+	startStr := "None"
+	stopStr := "None"
+	stepStr := "None"
+
+	if s.Start != nil && s.Start != Nil {
+		startStr = PrintValue(s.Start)
+	}
+	if s.Stop != nil && s.Stop != Nil {
+		stopStr = PrintValue(s.Stop)
+	}
+	if s.Step != nil && s.Step != Nil {
+		stepStr = PrintValue(s.Step)
+	}
+
+	return fmt.Sprintf("slice(%s, %s, %s)", startStr, stopStr, stepStr)
+}
+
+// GetAttr implements Object interface
+func (s *SliceValue) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "start":
+		if s.Start == nil {
+			return Nil, true
+		}
+		return s.Start, true
+	case "stop":
+		if s.Stop == nil {
+			return Nil, true
+		}
+		return s.Stop, true
+	case "step":
+		if s.Step == nil {
+			return Nil, true
+		}
+		return s.Step, true
+	default:
+		return nil, false
+	}
+}
+
+// SetAttr implements Object.SetAttr (not supported for slices)
+func (s *SliceValue) SetAttr(name string, value Value) error {
+	return fmt.Errorf("cannot set attributes on slice objects")
+}
+
+// CallMethod implements Object.CallMethod
+func (s *SliceValue) CallMethod(name string, args []Value, ctx *Context) (Value, error) {
+	return nil, fmt.Errorf("slice has no method named %s", name)
+}
+
 // SetValue represents a set of unique values
 type SetValue struct {
 	BaseObject
