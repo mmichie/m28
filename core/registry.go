@@ -15,34 +15,49 @@ type RegistryEntry struct {
 
 // Registry provides thread-safe registration with duplicate detection
 type Registry struct {
-	name    string
-	entries map[string]RegistryEntry
-	mu      sync.RWMutex
+	name       string
+	entries    map[string]RegistryEntry
+	duplicates map[string][]string // Track attempted duplicate registrations
+	mu         sync.RWMutex
 }
 
 // NewRegistry creates a new registry with the given name
 func NewRegistry(name string) *Registry {
 	return &Registry{
-		name:    name,
-		entries: make(map[string]RegistryEntry),
+		name:       name,
+		entries:    make(map[string]RegistryEntry),
+		duplicates: make(map[string][]string),
 	}
 }
 
 // Register adds an entry to the registry, returning an error if it already exists
 func (r *Registry) Register(key string, value interface{}) error {
+	return r.RegisterWithDepth(key, value, 2)
+}
+
+// RegisterWithDepth adds an entry to the registry with custom call stack depth
+func (r *Registry) RegisterWithDepth(key string, value interface{}, depth int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	newLocation := getCallerLocation(depth)
+
 	// Check if already registered
 	if existing, exists := r.entries[key]; exists {
+		// Track the duplicate attempt
+		if r.duplicates[key] == nil {
+			r.duplicates[key] = []string{existing.Location}
+		}
+		r.duplicates[key] = append(r.duplicates[key], newLocation)
+
 		return fmt.Errorf("%s '%s' already registered at %s, attempted to re-register at %s",
-			r.name, key, existing.Location, getCallerLocation(2))
+			r.name, key, existing.Location, newLocation)
 	}
 
 	// Register new entry
 	r.entries[key] = RegistryEntry{
 		Value:    value,
-		Location: getCallerLocation(2),
+		Location: newLocation,
 	}
 	return nil
 }
@@ -111,4 +126,19 @@ func getCallerLocation(depth int) string {
 	}
 
 	return fmt.Sprintf("%s:%d", file, line)
+}
+
+// GetDuplicates returns a map of keys that have been registered multiple times
+func (r *Registry) GetDuplicates() map[string][]string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	// Return a copy to prevent external modification
+	result := make(map[string][]string)
+	for k, v := range r.duplicates {
+		locations := make([]string, len(v))
+		copy(locations, v)
+		result[k] = locations
+	}
+	return result
 }

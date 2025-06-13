@@ -2,7 +2,14 @@ package core
 
 import (
 	"fmt"
+	"log"
 )
+
+// builtinRegistry tracks all builtin registrations
+var builtinRegistry = NewRegistry("builtin")
+
+// BuiltinLogging controls whether to log duplicate builtin registrations
+var BuiltinLogging = false
 
 // TraceEntry represents a single entry in a stack trace
 type TraceEntry struct {
@@ -51,17 +58,37 @@ func NewContext(outer *Context) *Context {
 
 // Define defines a new variable in the current scope
 func (c *Context) Define(name string, value Value) {
+	// If this is the global context and the value is a builtin function,
+	// register it in the builtin registry for tracking
+	if c.Outer == nil {
+		if _, isBuiltin := value.(*BuiltinFunction); isBuiltin {
+			// Try to register in the builtin registry
+			// Use depth 3: Define -> RegisterWithDepth -> getCallerLocation
+			if err := builtinRegistry.RegisterWithDepth(name, value, 3); err != nil {
+				// Log the duplicate if logging is enabled
+				if BuiltinLogging {
+					log.Printf("WARNING: %v", err)
+				}
+			}
+		}
+	}
 	c.Vars[name] = value
 }
 
-// DefineBuiltin defines a builtin function with optional duplicate checking
-// This should be used instead of Define when registering builtins to catch duplicates
+// DefineBuiltin defines a builtin function with duplicate tracking
+// This should be used instead of Define when registering builtins
 func (c *Context) DefineBuiltin(name string, value Value) error {
-	// Only check for duplicates in the global context
+	// Only track builtins in the global context
 	if c.Outer == nil {
-		if _, exists := c.Vars[name]; exists {
-			// Return error indicating duplicate
-			return fmt.Errorf("builtin '%s' already registered", name)
+		// Try to register in the global builtin registry
+		// Use depth 3: DefineBuiltin -> RegisterWithDepth -> getCallerLocation
+		if err := builtinRegistry.RegisterWithDepth(name, value, 3); err != nil {
+			// Log the duplicate if logging is enabled
+			if BuiltinLogging {
+				log.Printf("WARNING: %v", err)
+			}
+			// Return error but caller can choose to ignore it
+			return err
 		}
 	}
 	c.Vars[name] = value
@@ -153,4 +180,29 @@ func (c *Context) GetAllSymbols() []string {
 	}
 
 	return result
+}
+
+// GetBuiltinRegistry returns the global builtin registry
+func GetBuiltinRegistry() *Registry {
+	return builtinRegistry
+}
+
+// GetBuiltinRegistrationInfo returns information about builtin registrations
+func GetBuiltinRegistrationInfo() map[string]interface{} {
+	return builtinRegistry.GetAll()
+}
+
+// GetDuplicateBuiltins returns a list of builtin names that were attempted to be registered multiple times
+func GetDuplicateBuiltins() []string {
+	duplicates := builtinRegistry.GetDuplicates()
+	names := make([]string, 0, len(duplicates))
+	for name := range duplicates {
+		names = append(names, name)
+	}
+	return names
+}
+
+// GetDuplicateBuiltinDetails returns detailed information about duplicate builtin registrations
+func GetDuplicateBuiltinDetails() map[string][]string {
+	return builtinRegistry.GetDuplicates()
 }
