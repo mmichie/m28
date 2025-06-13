@@ -1,18 +1,22 @@
 # Duplicate Builtin Registrations Report
 
 Generated: 2025-06-13
+Updated: 2025-06-13 (After Phase 1 Cleanup)
 
 ## Summary
 
-- **Total builtins registered**: 110
-- **Builtins with duplicates**: 38
-- **Total duplicate registrations**: 41 (some builtins registered 3 times)
+- **Total builtins registered**: 94 (was 110)
+- **Builtins with duplicates**: 22 (was 38) 
+- **Total duplicate registrations**: 25 (was 41)
+
+### Phase 1 Complete ✅
+- Removed 16 operator duplicates by deleting legacy arithmetic.go and comparison.go files
 
 ## Duplicate Registrations by Category
 
-### 1. Operators (16 duplicates)
+### 1. Operators ✅ RESOLVED 
 
-All operators are registered twice - once in the new modular structure (`builtin/operators/`) and once in the legacy files:
+All 16 operator duplicates have been resolved by removing legacy files and using only the modular structure:
 
 | Operator | First Registration | Second Registration |
 |----------|-------------------|-------------------|

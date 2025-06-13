@@ -44,8 +44,6 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterAsyncBuiltins(ctx)
 
 	// Also register functions from other files that haven't been migrated yet
-	RegisterArithmeticFunctions(ctx)
-	RegisterComparisonFunctions(ctx)
 	RegisterStringFunctions(ctx)
 	RegisterListFunctions(ctx)
 	RegisterDictFunctions(ctx)

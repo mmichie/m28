@@ -244,10 +244,10 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - [x] Remove duplicate `all` function (3 implementations reduced to 1)
    - [x] Complete math module migration (removed old math.go, using modules/math.go)
    - [x] Implement duplicate detection system with registry tracking
-   - [ ] **Phase 1: Critical Operator Duplicates** (16 functions)
-     - [ ] Remove legacy arithmetic.go after verifying operators/ has all functionality
-     - [ ] Remove legacy comparison.go after verifying operators/ has all functionality  
-     - [ ] Consolidate logical operators (and, or, not, in)
+   - [x] **Phase 1: Critical Operator Duplicates** ✅ COMPLETE (16 functions)
+     - [x] Remove legacy arithmetic.go after verifying operators/ has all functionality
+     - [x] Remove legacy comparison.go after verifying operators/ has all functionality  
+     - [x] Consolidate logical operators (and, or, not, in)
    - [ ] **Phase 2: High-Value Function Duplicates** (6 functions with 3x registrations)
      - [ ] `map` - consolidate from functional.go, list.go, utilities.go
      - [ ] `filter` - consolidate from functional.go, list.go, utilities.go
