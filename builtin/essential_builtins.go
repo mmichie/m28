@@ -42,7 +42,22 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			return nil, fmt.Errorf("all() takes exactly one argument (%d given)", len(args))
 		}
 
-		// Handle different iterable types
+		// First check if it implements Iterable interface
+		if iterable, ok := args[0].(core.Iterable); ok {
+			iter := iterable.Iterator()
+			for {
+				item, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				if !core.IsTruthy(item) {
+					return core.False, nil
+				}
+			}
+			return core.True, nil
+		}
+
+		// Handle specific types that might not pass the interface check
 		switch v := args[0].(type) {
 		case core.ListValue:
 			for _, item := range v {
@@ -59,11 +74,20 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			}
 			return core.True, nil
 		case *core.SetValue:
-			// SetValue doesn't have a public Items() method, so we'll skip for now
-			// TODO: Add iteration support for sets
-			return nil, fmt.Errorf("all() does not yet support sets")
+			// Use the Iterator method we added
+			iter := v.Iterator()
+			for {
+				item, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				if !core.IsTruthy(item) {
+					return core.False, nil
+				}
+			}
+			return core.True, nil
 		default:
-			return nil, fmt.Errorf("all() argument must be an iterable")
+			return nil, fmt.Errorf("all() argument must be an iterable, got type %T", args[0])
 		}
 	}))
 
@@ -73,7 +97,22 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			return nil, fmt.Errorf("any() takes exactly one argument (%d given)", len(args))
 		}
 
-		// Handle different iterable types
+		// First check if it implements Iterable interface
+		if iterable, ok := args[0].(core.Iterable); ok {
+			iter := iterable.Iterator()
+			for {
+				item, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				if core.IsTruthy(item) {
+					return core.True, nil
+				}
+			}
+			return core.False, nil
+		}
+
+		// Handle specific types that might not pass the interface check
 		switch v := args[0].(type) {
 		case core.ListValue:
 			for _, item := range v {
@@ -90,11 +129,20 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			}
 			return core.False, nil
 		case *core.SetValue:
-			// SetValue doesn't have a public Items() method, so we'll skip for now
-			// TODO: Add iteration support for sets
-			return nil, fmt.Errorf("any() does not yet support sets")
+			// Use the Iterator method we added
+			iter := v.Iterator()
+			for {
+				item, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				if core.IsTruthy(item) {
+					return core.True, nil
+				}
+			}
+			return core.False, nil
 		default:
-			return nil, fmt.Errorf("any() argument must be an iterable")
+			return nil, fmt.Errorf("any() argument must be an iterable, got type %T", args[0])
 		}
 	}))
 

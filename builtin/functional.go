@@ -170,64 +170,9 @@ func RegisterFunctional(ctx *core.Context) {
 	}))
 
 	// all - return True if all elements are true
-	ctx.Define("all", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("all() takes exactly one argument (%d given)", len(args))
-		}
+	// all() function moved to essential_builtins.go to avoid duplication
 
-		// Get the iterable
-		var items []core.Value
-		switch v := args[0].(type) {
-		case core.ListValue:
-			items = v
-		case core.TupleValue:
-			items = v
-		case core.StringValue:
-			// For strings, check if all characters are truthy (non-empty)
-			return core.True, nil // All characters in a string are truthy
-		default:
-			return nil, fmt.Errorf("all() argument must be iterable")
-		}
-
-		// Check all items
-		for _, item := range items {
-			if !core.IsTruthy(item) {
-				return core.False, nil
-			}
-		}
-
-		return core.True, nil
-	}))
-
-	// any - return True if any element is true
-	ctx.Define("any", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("any() takes exactly one argument (%d given)", len(args))
-		}
-
-		// Get the iterable
-		var items []core.Value
-		switch v := args[0].(type) {
-		case core.ListValue:
-			items = v
-		case core.TupleValue:
-			items = v
-		case core.StringValue:
-			// For strings, check if any character exists
-			return core.BoolValue(len(string(v)) > 0), nil
-		default:
-			return nil, fmt.Errorf("any() argument must be iterable")
-		}
-
-		// Check any item
-		for _, item := range items {
-			if core.IsTruthy(item) {
-				return core.True, nil
-			}
-		}
-
-		return core.False, nil
-	}))
+	// any() function moved to essential_builtins.go to avoid duplication
 
 	// callable - check if object is callable
 	ctx.Define("callable", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

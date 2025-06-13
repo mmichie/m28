@@ -491,6 +491,38 @@ func (s *SetValue) GetAttr(name string) (Value, bool) {
 	return s.BaseObject.GetAttr(name)
 }
 
+// Iterator implements Iterable
+func (s *SetValue) Iterator() Iterator {
+	// Create a slice of values from the set
+	values := make([]Value, 0, len(s.items))
+	for _, v := range s.items {
+		values = append(values, v)
+	}
+
+	return &setIterator{
+		values: values,
+		index:  0,
+	}
+}
+
+type setIterator struct {
+	values []Value
+	index  int
+}
+
+func (it *setIterator) Next() (Value, bool) {
+	if it.index >= len(it.values) {
+		return nil, false
+	}
+	val := it.values[it.index]
+	it.index++
+	return val, true
+}
+
+func (it *setIterator) Reset() {
+	it.index = 0
+}
+
 // Predefined empty collections
 var (
 	EmptyList  = ListValue{}

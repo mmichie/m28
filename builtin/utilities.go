@@ -288,58 +288,9 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 	}))
 
 	// all - check if all elements are truthy
-	ctx.Define("all", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("all() takes exactly one argument (%d given)", len(args))
-		}
+	// all() function moved to essential_builtins.go to avoid duplication
 
-		// Get the iterable
-		var items []core.Value
-		switch v := args[0].(type) {
-		case core.ListValue:
-			items = v
-		case core.TupleValue:
-			items = v
-		default:
-			return nil, fmt.Errorf("all() argument must be an iterable, not '%s'", v.Type())
-		}
-
-		// Check all elements
-		for _, item := range items {
-			if !core.IsTruthy(item) {
-				return core.False, nil
-			}
-		}
-
-		return core.True, nil
-	}))
-
-	// any - check if any element is truthy
-	ctx.Define("any", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("any() takes exactly one argument (%d given)", len(args))
-		}
-
-		// Get the iterable
-		var items []core.Value
-		switch v := args[0].(type) {
-		case core.ListValue:
-			items = v
-		case core.TupleValue:
-			items = v
-		default:
-			return nil, fmt.Errorf("any() argument must be an iterable, not '%s'", v.Type())
-		}
-
-		// Check any element
-		for _, item := range items {
-			if core.IsTruthy(item) {
-				return core.True, nil
-			}
-		}
-
-		return core.False, nil
-	}))
+	// any() function moved to essential_builtins.go to avoid duplication
 
 	// apply - apply a function to a list of arguments
 	ctx.Define("apply", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

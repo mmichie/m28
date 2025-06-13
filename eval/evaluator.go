@@ -47,6 +47,12 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 
 // evalFunctionCall evaluates a function call expression
 func evalFunctionCall(expr core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Check if the function is referenced by a symbol (for better error messages)
+	var symbolName string
+	if sym, ok := expr[0].(core.SymbolValue); ok {
+		symbolName = string(sym)
+	}
+
 	// Evaluate the function
 	fn, err := Eval(expr[0], ctx)
 	if err != nil {
@@ -71,23 +77,30 @@ func evalFunctionCall(expr core.ListValue, ctx *core.Context) (core.Value, error
 
 	// Add function name to call stack if available
 	var funcName string
-	switch f := fn.(type) {
-	case core.SymbolValue:
-		funcName = string(f)
-	case *core.BuiltinFunction:
-		if nameVal, ok := f.GetAttr("__name__"); ok {
-			if nameStr, ok := nameVal.(core.StringValue); ok {
-				funcName = string(nameStr)
+
+	// Prefer the symbol name if we have it (for better error messages)
+	if symbolName != "" {
+		funcName = symbolName
+	} else {
+		// Fall back to introspecting the function object
+		switch f := fn.(type) {
+		case core.SymbolValue:
+			funcName = string(f)
+		case *core.BuiltinFunction:
+			if nameVal, ok := f.GetAttr("__name__"); ok {
+				if nameStr, ok := nameVal.(core.StringValue); ok {
+					funcName = string(nameStr)
+				} else {
+					funcName = "<builtin>"
+				}
 			} else {
 				funcName = "<builtin>"
 			}
-		} else {
-			funcName = "<builtin>"
+		case *core.BoundMethod:
+			funcName = fmt.Sprintf("%s.%s", f.TypeDesc.PythonName, f.Method.Name)
+		default:
+			funcName = "<anonymous>"
 		}
-	case *core.BoundMethod:
-		funcName = fmt.Sprintf("%s.%s", f.TypeDesc.PythonName, f.Method.Name)
-	default:
-		funcName = "<anonymous>"
 	}
 
 	ctx.PushStack(funcName, "", 0, 0)
@@ -95,6 +108,17 @@ func evalFunctionCall(expr core.ListValue, ctx *core.Context) (core.Value, error
 
 	result, err := callable.Call(args, ctx)
 	if err != nil {
+		// Check if this is already a well-formatted error (e.g., from assert)
+		// Don't wrap errors that are already EvalError or have specific messages
+		if _, isEvalError := err.(*core.EvalError); isEvalError {
+			return nil, err
+		}
+
+		// Special handling for assert - preserve its custom error messages
+		if funcName == "assert" {
+			return nil, core.WrapEvalError(err, err.Error(), ctx)
+		}
+
 		return nil, core.WrapEvalError(err, fmt.Sprintf("error in %s", funcName), ctx)
 	}
 
@@ -759,8 +783,6 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Handle the exception
-	handled := false
-
 	for _, exceptClause := range exceptClauses {
 		if len(exceptClause) < 2 {
 			continue
@@ -897,14 +919,20 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Execute handler
+			handlerErr := error(nil)
 			for i := handlerStart; i < len(exceptClause); i++ {
-				result, tryErr = Eval(exceptClause[i], handlerCtx)
-				if tryErr != nil {
+				result, handlerErr = Eval(exceptClause[i], handlerCtx)
+				if handlerErr != nil {
+					// Exception occurred in handler - this becomes the new error
+					tryErr = handlerErr
 					break
 				}
 			}
 
-			handled = true
+			// If handler completed without error, the exception is handled
+			if handlerErr == nil {
+				tryErr = nil // Clear the original exception
+			}
 			break
 		}
 	}
@@ -914,12 +942,12 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
-	// If exception wasn't handled, re-raise it
-	if !handled && tryErr != nil {
+	// If exception wasn't handled or a new exception occurred, raise it
+	if tryErr != nil {
 		return nil, tryErr
 	}
 
-	return result, tryErr
+	return result, nil
 }
 
 // raiseForm implements the raise special form

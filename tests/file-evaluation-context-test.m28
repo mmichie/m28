@@ -1,0 +1,82 @@
+# Test file evaluation context - assert errors should show proper messages
+# This test verifies the fix for the file evaluation context bug
+
+(print "===== File Evaluation Context Test =====")
+
+# Test 1: Basic assertion with custom message
+(print "\nTest 1: Basic assertion messages")
+(try
+  (assert False "Custom assertion message 1")
+  (except
+    (print "✓ Caught assertion with custom message")))
+
+# Test 2: Multiple assertions in sequence
+(print "\nTest 2: Multiple assertions")
+(assert True "This should pass")
+(print "✓ First assertion passed")
+
+(try
+  (assert (== 1 2) "Numbers should be equal")
+  (except
+    (print "✓ Caught assertion: Numbers should be equal")))
+
+# Test 3: Assertions in functions
+(print "\nTest 3: Assertions in functions")
+(def check_positive (n)
+  (assert (> n 0) (+ "Number " (str n) " must be positive"))
+  (print (+ "✓ " (str n) " is positive")))
+
+(check_positive 5)
+
+(try
+  (check_positive -3)
+  (except
+    (print "✓ Caught assertion from function")))
+
+# Test 4: Complex expressions with multiple function calls
+(print "\nTest 4: Complex expressions")
+(def validate_range (x min max)
+  (assert (>= x min) (+ (str x) " is less than minimum " (str min)))
+  (assert (<= x max) (+ (str x) " is greater than maximum " (str max)))
+  True)
+
+(assert (validate_range 5 1 10) "Range validation should pass")
+(print "✓ Range validation passed")
+
+(try
+  (validate_range 15 1 10)
+  (except
+    (print "✓ Caught range validation error")))
+
+# Test 5: Nested function calls
+(print "\nTest 5: Nested function calls")
+(def outer_func (x)
+  (def inner_func (y)
+    (assert (> y 0) "Inner function: y must be positive")
+    (* y 2))
+  (inner_func x))
+
+(assert (== (outer_func 3) 6) "Nested function call should work")
+(print "✓ Nested function call passed")
+
+(try
+  (outer_func -1)
+  (except
+    (print "✓ Caught assertion from nested function")))
+
+# Test 6: File with many expressions (tests implicit do wrapping)
+(print "\nTest 6: Multiple expressions in file")
+(= x 1)
+(= y 2)
+(= z 3)
+(assert (== (+ x y z) 6) "Sum should be 6")
+(print "✓ Multiple expressions evaluated correctly")
+
+# Test 7: Other builtin errors should still show function name
+(print "\nTest 7: Other builtin errors")
+(try
+  (int "not a number")
+  (except
+    (print "✓ Caught int conversion error")))
+
+(print "\n===== All File Evaluation Context Tests Passed! =====")

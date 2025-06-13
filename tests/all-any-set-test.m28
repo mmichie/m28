@@ -1,0 +1,47 @@
+# Test all() and any() functions with sets
+
+# Test all() with sets
+(print "Testing all() with sets:")
+
+# Test set with all true values
+(= true_set {true , true , true})
+(assert (== (all true_set) true) "all() with set of all true values failed")
+
+# Test set with mixed values
+(= mixed_set {true , false , true})
+(assert (== (all mixed_set) false) "all() with set containing false failed")
+
+# Test set with truthy values
+(= truthy_set {1 , 2 , 3})
+(assert (== (all truthy_set) true) "all() with set of truthy values failed")
+
+# Test set with falsy value
+(= falsy_set {1 , 0 , 3})
+(assert (== (all falsy_set) false) "all() with set containing zero failed")
+
+# Test empty set
+(= empty_set (set))
+(assert (== (all empty_set) true) "all() with empty set failed")
+
+# Test any() with sets
+(print "Testing any() with sets:")
+
+# Test set with all false values
+(= false_set {false , false , false})
+(assert (== (any false_set) false) "any() with set of all false values failed")
+
+# Test set with mixed values
+(assert (== (any mixed_set) true) "any() with set containing true failed")
+
+# Test set with one truthy value
+(= one_truthy_set {0 , 0 , 1})
+(assert (== (any one_truthy_set) true) "any() with set containing one truthy failed")
+
+# Test set with all falsy values
+(= all_falsy_set {0 , false , ""})
+(assert (== (any all_falsy_set) false) "any() with set of all falsy values failed")
+
+# Test empty set
+(assert (== (any empty_set) false) "any() with empty set failed")
+
+(print "All set tests passed!")

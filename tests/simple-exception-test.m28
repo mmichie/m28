@@ -15,5 +15,4 @@
   (except
     (print "Caught assignment error\!")))
 
-(print "\nDone\!")
-EOF && ./bin/m28 tests/simple-exception-test.m28 < /dev/null
+(print "\nDone!")

@@ -240,20 +240,29 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - [x] Added comprehensive tests in tests/test_list_range_conversion.m28
    - [x] Critical for Python compatibility - now working correctly!
 
-1. **P0: Fix try/except/finally mechanism** 🚨 CRITICAL
-   - [ ] try/except blocks cause infinite loop/timeout
-   - [ ] Exception class was missing from builtins (partially fixed)
-   - [ ] Need to investigate deeper issues with exception handling flow
-   - [ ] Critical for error handling and robustness
+1. **P0: Fix try/except/finally mechanism** ✅ FIXED
+   - [x] try/except blocks cause infinite loop/timeout
+   - [x] Exception class was missing from builtins (partially fixed)
+   - [x] Need to investigate deeper issues with exception handling flow
+   - [x] Critical for error handling and robustness
+   - **Resolution**: Fixed exception propagation in handlers. When an exception occurs in an except handler, it now properly propagates as a new exception rather than causing loops
 
-2. **P0: Fix file evaluation context issue** 🚨 CRITICAL
-   - [ ] Original repr-test.m28 fails when run as complete file
-   - [ ] Same code works when lines are tested individually
-   - [ ] Appears to be parser/evaluator context issue
-   - [ ] May affect other complex test files
-   - [ ] Need to investigate file vs REPL evaluation differences
+2. **P0: Fix file evaluation context issue** ✅ FIXED
+   - [x] Original repr-test.m28 fails when run as complete file
+   - [x] Same code works when lines are tested individually
+   - [x] Appears to be parser/evaluator context issue
+   - [x] May affect other complex test files
+   - [x] Need to investigate file vs REPL evaluation differences
+   - **Resolution**: Fixed error message wrapping for builtin functions. Assert and other functions now preserve their specific error messages instead of showing generic "error in <function>" messages. The issue was that function names weren't properly tracked when called via symbols
 
-3. **Record Stream and JSON Processing** (NEW)
+3. **P0: Builtin System Cleanup** 🟢 PARTIALLY COMPLETE
+   - [x] Remove duplicate `all` function (3 implementations reduced to 1)
+   - [x] Complete math module migration (removed old math.go, using modules/math.go)
+   - [ ] Fix remaining duplicate functions (37 functions have 2-3 duplicate definitions)
+   - **Resolution**: Critical duplicates fixed. The `all()` and `any()` functions now have single implementations in essential_builtins.go with set support. Math module successfully migrated to modules subdirectory.
+   - **Remaining work**: Address remaining 37 duplicate functions identified in audit (includes core functions like int, str, float, bool, operators, and utility functions)
+
+4. **Record Stream and JSON Processing** (NEW)
    - [ ] Path-based access functions (`get-in`, `assoc-in`, `update-in`, `dissoc-in`)
    - [ ] JSONL streaming support (`recordstream` module)
    - [ ] Basic record operations (`select-keys`, `rename-keys`)

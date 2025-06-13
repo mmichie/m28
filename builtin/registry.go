@@ -3,6 +3,7 @@ package builtin
 
 import (
 	"github.com/mmichie/m28/builtin/methods"
+	"github.com/mmichie/m28/builtin/modules"
 	"github.com/mmichie/m28/builtin/operators"
 	"github.com/mmichie/m28/core"
 )
@@ -31,9 +32,8 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	methods.RegisterDictMethods(ctx)
 	methods.RegisterSetMethods(ctx)
 
-	// Register standard library modules - using existing functions for now
-	// TODO: Complete migration to modules subdirectory
-	RegisterMathFunctions(ctx)
+	// Register standard library modules
+	modules.RegisterMathModule(ctx)
 	RegisterRandomFunctions(ctx)
 	RegisterJSONModule(ctx)
 	RegisterOSModule(ctx)

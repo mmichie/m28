@@ -1,0 +1,144 @@
+# Comprehensive test for exception handling fix
+# Tests various scenarios that could have caused infinite loops
+
+(print "===== Exception Handling Fix Tests =====")
+
+# Test 1: Exception in except handler should propagate
+(print "\nTest 1: Exception in except handler")
+(= test1-passed False)
+(try
+  (try
+    (raise ValueError "Initial error")
+    (except ValueError as e
+      (print "  Caught ValueError, raising TypeError")
+      (raise TypeError "Error in handler")))
+  (except TypeError
+    # Don't bind exception variable to avoid creating new scope
+    (print "  Outer try caught TypeError from inner handler")
+    (= test1-passed True)))
+(assert test1-passed "Exception in handler should propagate to outer try")
+
+# Test 2: Handler completes successfully
+(print "\nTest 2: Successful exception handling")
+(= test2-result None)
+(try
+  (raise Exception "Test error")
+  (except Exception
+    (print "  Exception caught and handled")
+    (= test2-result "handled")))
+(assert (== test2-result "handled") "Handler should complete successfully")
+
+# Test 3: Multiple except clauses
+(print "\nTest 3: Multiple except clauses")
+(= test3-caught None)
+(try
+  (raise KeyError "Missing key")
+  (except ValueError
+    (= test3-caught "ValueError"))
+  (except KeyError
+    (print "  Caught KeyError correctly")
+    (= test3-caught "KeyError"))
+  (except Exception
+    (= test3-caught "Exception")))
+(assert (== test3-caught "KeyError") "Should catch specific exception type")
+
+# Test 4: Finally always executes
+(print "\nTest 4: Finally with exception in handler")
+(= test4-finally-ran False)
+(= test4-error-caught False)
+(try
+  (try
+    (raise ValueError "Initial")
+    (except ValueError
+      (print "  Handler raising new exception")
+      (raise TypeError "From handler"))
+    (finally
+      (print "  Finally block executed")
+      (= test4-finally-ran True)))
+  (except TypeError
+    (= test4-error-caught True)))
+(assert test4-finally-ran "Finally should run even with exception in handler")
+(assert test4-error-caught "Exception from handler should be catchable")
+
+# Test 5: No infinite loop with same exception type
+(print "\nTest 5: Same exception type in handler")
+(= test5-count 0)
+(= test5-outer-caught False)
+(try
+  (try
+    (raise ValueError "First")
+    (except ValueError
+      (= test5-count (+ test5-count 1))
+      (print (+ "  Handler execution count: " (str test5-count)))
+      (if (< test5-count 3)
+        (raise ValueError "From handler"))))
+  (except ValueError
+    (print "  Outer handler caught ValueError")
+    (= test5-outer-caught True)))
+(assert (== test5-count 1) "Handler should only execute once")
+(assert test5-outer-caught "Exception from handler should propagate out")
+
+# Test 6: Exception value preservation
+(print "\nTest 6: Exception value preservation")
+(try
+  (raise Exception "Original message")
+  (except Exception as e
+    # Just verify we can access the exception value
+    (print (+ "  Caught: " (str e)))
+    (assert (in "Original message" (str e)) "Exception should contain original message")))
+
+# Test 7: No exception case
+(print "\nTest 7: No exception raised")
+(= test7-result None)
+(try
+  (= test7-result "no error")
+  (except Exception
+    (= test7-result "error caught")))
+(assert (== test7-result "no error") "Should not enter except when no exception")
+
+# Test 8: Nested try blocks with different exception types
+(print "\nTest 8: Nested try with different exceptions")
+(= test8-inner False)
+(= test8-outer False)
+(try
+  (try
+    (raise IndexError "Inner error")
+    (except IndexError
+      (print "  Inner: caught IndexError")
+      (= test8-inner True)
+      (raise KeyError "From inner handler")))
+  (except KeyError
+    (print "  Outer: caught KeyError")
+    (= test8-outer True)))
+(assert test8-inner "Inner handler should execute")
+(assert test8-outer "Outer handler should catch exception from inner")
+
+# Test 9: Return value from successful handler
+(print "\nTest 9: Return value from handler")
+(= test9-result
+  (try
+    (raise Exception "Error")
+    (except Exception
+      (print "  Handler returning value")
+      "handler result")))
+(assert (== test9-result "handler result") "Should return value from handler")
+
+# Test 10: Complex exception chain
+(print "\nTest 10: Complex exception chain")
+(= test10-trace [])
+(try
+  (try
+    (try
+      (raise ValueError "Start")
+      (except ValueError
+        (= test10-trace (+ test10-trace ["level1"]))
+        (raise TypeError "Level 1")))
+    (except TypeError
+      (= test10-trace (+ test10-trace ["level2"]))
+      (raise KeyError "Level 2")))
+  (except KeyError
+    (= test10-trace (+ test10-trace ["level3"]))
+    (print "  Exception chain completed")))
+(assert (== test10-trace ["level1" "level2" "level3"]) "All handlers should execute in order")
+
+(print "\n===== All Exception Handling Tests Passed! =====")
