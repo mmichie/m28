@@ -262,7 +262,7 @@ func RegisterCollections(ctx *core.Context) {
 	}))
 
 	// len - get length of collection
-	ctx.Define("len", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("len", core.NewNamedBuiltinFunction("len", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("len() takes exactly one argument (%d given)", len(args))
 		}

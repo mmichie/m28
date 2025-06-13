@@ -8,7 +8,22 @@ import (
 
 // RegisterErrors registers error-related functions
 func RegisterErrors(ctx *core.Context) {
-	// error - create an error object
+	// Exception - base exception class
+	ctx.Define("Exception", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.NewException(""), nil
+		}
+		if len(args) == 1 {
+			msg := ""
+			if args[0] != core.Nil {
+				msg = args[0].String()
+			}
+			return core.NewException(msg), nil
+		}
+		return nil, fmt.Errorf("Exception() takes at most 1 argument (%d given)", len(args))
+	}))
+
+	// error - create an error object (alias for Exception)
 	ctx.Define("error", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.NewException(""), nil

@@ -9,7 +9,7 @@ import (
 // RegisterAssertBuiltins registers assertion functions
 func RegisterAssertBuiltins(ctx *core.Context) {
 	// assert function
-	ctx.Define("assert", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("assert", core.NewNamedBuiltinFunction("assert", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("assert requires at least 1 argument")
 		}

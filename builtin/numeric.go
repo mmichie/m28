@@ -10,7 +10,7 @@ import (
 // RegisterNumeric registers numeric functions
 func RegisterNumeric(ctx *core.Context) {
 	// abs - absolute value
-	ctx.Define("abs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("abs", core.NewNamedBuiltinFunction("abs", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("abs() takes exactly one argument (%d given)", len(args))
 		}

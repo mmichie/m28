@@ -9,18 +9,17 @@ import (
 // RegisterMisc registers miscellaneous functions
 func RegisterMisc(ctx *core.Context) {
 	// repr - return string representation
-	ctx.Define("repr", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("repr", core.NewNamedBuiltinFunction("repr", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("repr() takes exactly one argument (%d given)", len(args))
 		}
 
-		// For now, just use String() method
-		// In the future, should distinguish between str() and repr()
-		return core.StringValue(args[0].String()), nil
+		// Use core.Repr which handles special representations properly
+		return core.StringValue(core.Repr(args[0])), nil
 	}))
 
 	// hash - return hash of object
-	ctx.Define("hash", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("hash", core.NewNamedBuiltinFunction("hash", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("hash() takes exactly one argument (%d given)", len(args))
 		}
@@ -41,7 +40,7 @@ func RegisterMisc(ctx *core.Context) {
 	}))
 
 	// id - return identity of object
-	ctx.Define("id", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("id", core.NewNamedBuiltinFunction("id", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("id() takes exactly one argument (%d given)", len(args))
 		}
@@ -59,7 +58,7 @@ func RegisterMisc(ctx *core.Context) {
 	}))
 
 	// help - print help for object
-	ctx.Define("help", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("help", core.NewNamedBuiltinFunction("help", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) > 1 {
 			return nil, fmt.Errorf("help() takes at most 1 argument (%d given)", len(args))
 		}

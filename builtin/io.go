@@ -12,7 +12,7 @@ import (
 // RegisterIO registers I/O functions
 func RegisterIO(ctx *core.Context) {
 	// print - print objects to stdout
-	ctx.Define("print", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("print", core.NewNamedBuiltinFunction("print", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		strs := make([]string, len(args))
 		for i, arg := range args {
 			if arg == core.Nil {

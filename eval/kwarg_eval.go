@@ -134,7 +134,15 @@ func evalFunctionCallWithKeywords(expr core.ListValue, ctx *core.Context) (core.
 	case core.SymbolValue:
 		funcName = string(f)
 	case *core.BuiltinFunction:
-		funcName = "<builtin>"
+		if nameVal, ok := f.GetAttr("__name__"); ok {
+			if nameStr, ok := nameVal.(core.StringValue); ok {
+				funcName = string(nameStr)
+			} else {
+				funcName = "<builtin>"
+			}
+		} else {
+			funcName = "<builtin>"
+		}
 	case *core.BoundMethod:
 		funcName = fmt.Sprintf("%s.%s", f.TypeDesc.PythonName, f.Method.Name)
 	case *UserFunction:

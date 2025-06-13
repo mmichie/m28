@@ -1,0 +1,39 @@
+# Test for repr() builtin
+# This is a fixed version that works around the issue in the original file
+
+(print "Testing repr() builtin function...")
+
+# Test repr for basic types
+(print "Testing numbers...")
+(assert (== (repr 42) "42") "repr of number")
+(assert (== (repr 3.14) "3.14") "repr of float")
+
+(print "Testing booleans...")
+(assert (== (repr True) "True") "repr of True")
+(assert (== (repr False) "False") "repr of False")
+
+(print "Testing None...")
+(assert (== (repr nil) "None") "repr of nil")
+
+# Test repr for strings - should show quotes
+(print "Testing strings...")
+(assert (== (repr "hello") "\"hello\"") "repr of string shows quotes")
+(assert (== (repr "") "\"\"") "repr of empty string")
+
+# Test repr for lists
+(print "Testing lists...")
+(assert (== (repr []) "[]") "repr of empty list")
+(assert (== (repr [1, 2, 3]) "[1, 2, 3]") "repr of list")
+(assert (== (repr ["a", "b"]) "[\"a\", \"b\"]") "repr of string list")
+(assert (== (repr [1, "a", True]) "[1, \"a\", True]") "repr of mixed list")
+
+# Test repr for dictionaries
+(print "Testing dictionaries...")
+(assert (== (repr {}) "{}") "repr of empty dict")
+(= d {"a": 1})
+(= repr_d (repr d))
+(assert (and (repr_d.startswith "{") (repr_d.endswith "}")) "repr of dict format")
+(assert (in "\"a\"" repr_d) "repr of dict shows key with quotes")
+(assert (in ": 1" repr_d) "repr of dict shows value")
+
+(print "Basic repr tests passed!")

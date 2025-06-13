@@ -9,7 +9,7 @@ import (
 // RegisterTypes registers type-related functions
 func RegisterTypes(ctx *core.Context) {
 	// type - returns type of value
-	ctx.Define("type", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("type", core.NewNamedBuiltinFunction("type", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("type requires 1 argument")
 		}
@@ -27,7 +27,7 @@ func RegisterTypes(ctx *core.Context) {
 	}))
 
 	// isinstance - check if object is instance of type
-	ctx.Define("isinstance", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("isinstance", core.NewNamedBuiltinFunction("isinstance", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("isinstance() takes exactly 2 arguments (%d given)", len(args))
 		}
@@ -61,7 +61,7 @@ func RegisterTypes(ctx *core.Context) {
 
 	// Type conversion functions
 	// int - convert to integer
-	ctx.Define("int", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("int", core.NewNamedBuiltinFunction("int", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.NumberValue(0), nil
 		}
@@ -100,7 +100,7 @@ func RegisterTypes(ctx *core.Context) {
 	}))
 
 	// float - convert to float
-	ctx.Define("float", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("float", core.NewNamedBuiltinFunction("float", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.NumberValue(0.0), nil
 		}
@@ -126,7 +126,7 @@ func RegisterTypes(ctx *core.Context) {
 	}))
 
 	// str - convert to string
-	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("str", core.NewNamedBuiltinFunction("str", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.StringValue(""), nil
 		}
@@ -138,7 +138,7 @@ func RegisterTypes(ctx *core.Context) {
 	}))
 
 	// bool - convert to boolean
-	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("bool", core.NewNamedBuiltinFunction("bool", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.False, nil
 		}
