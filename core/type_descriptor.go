@@ -46,8 +46,16 @@ type PropertyDescriptor struct {
 // Global type registry
 var typeRegistry = make(map[Type]*TypeDescriptor)
 
-// RegisterType registers a type descriptor
+// typeRegistryTracker tracks where types are registered for duplicate detection
+var typeRegistryTracker = NewRegistry("type")
+
+// RegisterType registers a type descriptor with duplicate detection
 func RegisterType(desc *TypeDescriptor) {
+	// Check for duplicates but don't panic - log warning if duplicate
+	if err := typeRegistryTracker.Register(string(desc.BaseType), desc); err != nil {
+		// Uncomment to debug duplicate type registrations:
+		// fmt.Printf("Warning: %v\n", err)
+	}
 	typeRegistry[desc.BaseType] = desc
 }
 

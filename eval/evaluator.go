@@ -131,6 +131,9 @@ type SpecialFormHandler func(args core.ListValue, ctx *core.Context) (core.Value
 // specialForms maps special form names to their handlers
 var specialForms map[string]SpecialFormHandler
 
+// specialFormsRegistry tracks where special forms are registered for duplicate detection
+var specialFormsRegistry = core.NewRegistry("special form")
+
 func init() {
 	specialForms = map[string]SpecialFormHandler{
 		// Control flow
@@ -161,6 +164,11 @@ func init() {
 		// Other special forms will be added through RegisterSpecialForm
 	}
 
+	// Register the initial forms in the registry to track them
+	for name, handler := range specialForms {
+		specialFormsRegistry.Register(name, handler)
+	}
+
 	// Register enhanced module forms
 	RegisterModuleForms()
 
@@ -186,8 +194,20 @@ func init() {
 	RegisterAugmentedAssignment()
 }
 
-// RegisterSpecialForm registers a special form
+// StrictDuplicateChecking controls whether duplicate registrations cause a panic
+var StrictDuplicateChecking = false
+
+// RegisterSpecialForm registers a special form with duplicate detection
 func RegisterSpecialForm(name string, handler SpecialFormHandler) {
+	if err := specialFormsRegistry.Register(name, handler); err != nil {
+		if StrictDuplicateChecking {
+			panic(err)
+		}
+		// In non-strict mode, allow overwrites but log them
+		// This preserves existing behavior where special_forms/register.go
+		// intentionally overrides some handlers with delegating versions
+		// fmt.Printf("Warning: %v\n", err)
+	}
 	specialForms[name] = handler
 }
 

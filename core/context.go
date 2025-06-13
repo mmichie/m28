@@ -54,6 +54,20 @@ func (c *Context) Define(name string, value Value) {
 	c.Vars[name] = value
 }
 
+// DefineBuiltin defines a builtin function with optional duplicate checking
+// This should be used instead of Define when registering builtins to catch duplicates
+func (c *Context) DefineBuiltin(name string, value Value) error {
+	// Only check for duplicates in the global context
+	if c.Outer == nil {
+		if _, exists := c.Vars[name]; exists {
+			// Return error indicating duplicate
+			return fmt.Errorf("builtin '%s' already registered", name)
+		}
+	}
+	c.Vars[name] = value
+	return nil
+}
+
 // Set updates an existing variable in the nearest scope where it's defined
 func (c *Context) Set(name string, value Value) error {
 	// Check current scope
