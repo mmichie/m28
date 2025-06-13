@@ -1,16 +1,20 @@
 # Duplicate Builtin Registrations Report
 
 Generated: 2025-06-13
-Updated: 2025-06-13 (After Phase 1 Cleanup)
+Updated: 2025-06-13 (After Phase 1 & 2 Cleanup)
 
 ## Summary
 
-- **Total builtins registered**: 94 (was 110)
-- **Builtins with duplicates**: 22 (was 38) 
-- **Total duplicate registrations**: 25 (was 41)
+- **Total builtins registered**: 88 (was 110)
+- **Builtins with duplicates**: 19 (was 38) 
+- **Total duplicate registrations**: 19 (was 41)
 
 ### Phase 1 Complete ✅
 - Removed 16 operator duplicates by deleting legacy arithmetic.go and comparison.go files
+
+### Phase 2 Complete ✅
+- Consolidated map, filter, reduce to functional.go
+- Removed 6 duplicate registrations (3 functions × 2 extra registrations each)
 
 ## Duplicate Registrations by Category
 
@@ -47,15 +51,15 @@ Math functions duplicated between numeric.go and modules/math.go:
 | `pow` | numeric.go:83 | modules/math.go:152 |
 | `sum` | numeric.go:117 | modules/math.go:114 |
 
-### 3. Functional Programming (3 functions with multiple registrations)
+### 3. Functional Programming ✅ RESOLVED
 
-These functions are registered in 3 different files:
+All functional programming duplicates have been consolidated to functional.go:
 
-| Function | Registrations |
-|----------|--------------|
-| `map` | functional.go:12, list.go:23, utilities.go:112 |
-| `filter` | functional.go:61, list.go:24, utilities.go:157 |
-| `reduce` | functional.go:123, list.go:25, utilities.go:220 |
+| Function | Previous Registrations | Current Location |
+|----------|----------------------|------------------|
+| `map` | functional.go:12, list.go:23, utilities.go:112 | functional.go only |
+| `filter` | functional.go:61, list.go:24, utilities.go:157 | functional.go only |
+| `reduce` | functional.go:123, list.go:25, utilities.go:220 | functional.go only |
 
 ### 4. Other Functions (19 duplicates)
 

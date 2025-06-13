@@ -248,10 +248,10 @@ This is the single source of truth for M28 development. All other roadmap/todo d
      - [x] Remove legacy arithmetic.go after verifying operators/ has all functionality
      - [x] Remove legacy comparison.go after verifying operators/ has all functionality  
      - [x] Consolidate logical operators (and, or, not, in)
-   - [ ] **Phase 2: High-Value Function Duplicates** (6 functions with 3x registrations)
-     - [ ] `map` - consolidate from functional.go, list.go, utilities.go
-     - [ ] `filter` - consolidate from functional.go, list.go, utilities.go
-     - [ ] `reduce` - consolidate from functional.go, list.go, utilities.go
+   - [x] **Phase 2: High-Value Function Duplicates** ✅ COMPLETE (6 functions with 3x registrations)
+     - [x] `map` - consolidated to functional.go (using best implementation from utilities.go)
+     - [x] `filter` - consolidated to functional.go (already had complete implementation)
+     - [x] `reduce` - consolidated to functional.go (using best implementation from list.go)
    - [ ] **Phase 3: Utility Function Cleanup** (19 remaining functions)
      - [ ] Move unique functions from utilities.go to appropriate modules
      - [ ] Remove duplicates from essential_builtins.go
