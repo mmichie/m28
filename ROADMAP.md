@@ -240,35 +240,48 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - [x] Added comprehensive tests in tests/test_list_range_conversion.m28
    - [x] Critical for Python compatibility - now working correctly!
 
-1. **Record Stream and JSON Processing** (NEW)
+1. **P0: Fix try/except/finally mechanism** 🚨 CRITICAL
+   - [ ] try/except blocks cause infinite loop/timeout
+   - [ ] Exception class was missing from builtins (partially fixed)
+   - [ ] Need to investigate deeper issues with exception handling flow
+   - [ ] Critical for error handling and robustness
+
+2. **P0: Fix file evaluation context issue** 🚨 CRITICAL
+   - [ ] Original repr-test.m28 fails when run as complete file
+   - [ ] Same code works when lines are tested individually
+   - [ ] Appears to be parser/evaluator context issue
+   - [ ] May affect other complex test files
+   - [ ] Need to investigate file vs REPL evaluation differences
+
+3. **Record Stream and JSON Processing** (NEW)
    - [ ] Path-based access functions (`get-in`, `assoc-in`, `update-in`, `dissoc-in`)
    - [ ] JSONL streaming support (`recordstream` module)
    - [ ] Basic record operations (`select-keys`, `rename-keys`)
    - [ ] Dictionary enhancements (`deep-merge`, `map-keys`, `map-values`)
 
-2. **Module System Improvements** ✅ COMPLETE
+4. **Module System Improvements** ✅ COMPLETE
    - [x] Local `.m28` module imports
    - [x] List syntax `[name1 name2]` in from imports
    - [x] Wildcard imports with `*`
    - [x] `.m28` extension support with proper caching
 
-3. **Functional Programming**
+5. **Functional Programming**
    - [x] Key parameter for sorted/min/max ✅ DONE (Python-style key=func syntax)
    - [x] Default parameter for next() ✅ DONE (already implemented)
    - [x] slice() object creator ✅ DONE
 
-4. **Core Python Features**
+6. **Core Python Features**
    - [x] Set literals `{1, 2, 3}` ✅ DONE
    - [x] Multiple assignment `a, b = 1, 2` ✅ DONE
    - [x] Exception variable binding `except Error as e` ✅ DONE
 
-5. **Essential Missing Data Structures**
+7. **Essential Missing Data Structures**
    - [ ] `bytes` and `bytearray` - Binary data handling
    - [ ] `frozenset` - Immutable sets for use as dict keys
    - [x] `range` object - Memory-efficient lazy ranges ✅ DONE
    - [ ] `complex` - Complex number support
 
-6. **F-String Enhancements** (Building on existing nested quotes support)
+8. **F-String Enhancements** (Building on existing nested quotes support)
    - [ ] **Format Specifications** (High Priority)
      - [ ] Float precision: `f"{pi:.2f}"` → "3.14"
      - [ ] Integer padding: `f"{num:04d}"` → "0042"
