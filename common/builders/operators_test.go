@@ -20,6 +20,18 @@ func TestOperatorAdd(t *testing.T) {
 	}{
 		// Number addition
 		{
+			name:    "add no args",
+			args:    []core.Value{},
+			want:    num(0),
+			wantErr: false,
+		},
+		{
+			name:    "add one number",
+			args:    []core.Value{num(5)},
+			want:    num(5),
+			wantErr: false,
+		},
+		{
 			name:    "add two numbers",
 			args:    []core.Value{num(1), num(2)},
 			want:    num(3),
@@ -82,20 +94,6 @@ func TestOperatorAdd(t *testing.T) {
 			wantErr: false,
 		},
 		// Error cases
-		{
-			name:    "too few args",
-			args:    []core.Value{num(1)},
-			want:    nil,
-			wantErr: true,
-			errMsg:  "ArgumentError: +: at least 2 arguments required",
-		},
-		{
-			name:    "no args",
-			args:    []core.Value{},
-			want:    nil,
-			wantErr: true,
-			errMsg:  "ArgumentError: +: at least 2 arguments required",
-		},
 		{
 			name:    "mixed types",
 			args:    []core.Value{num(1), str("2")},
@@ -180,6 +178,18 @@ func TestOperatorMultiply(t *testing.T) {
 	}{
 		// Number multiplication
 		{
+			name:    "multiply no args",
+			args:    []core.Value{},
+			want:    num(1),
+			wantErr: false,
+		},
+		{
+			name:    "multiply one number",
+			args:    []core.Value{num(5)},
+			want:    num(5),
+			wantErr: false,
+		},
+		{
 			name:    "multiply two numbers",
 			args:    []core.Value{num(3), num(4)},
 			want:    num(12),
@@ -241,20 +251,6 @@ func TestOperatorMultiply(t *testing.T) {
 			wantErr: false,
 		},
 		// Error cases
-		{
-			name:    "too few args",
-			args:    []core.Value{num(5)},
-			want:    nil,
-			wantErr: true,
-			errMsg:  "ArgumentError: *: at least 2 arguments required",
-		},
-		{
-			name:    "no args",
-			args:    []core.Value{},
-			want:    nil,
-			wantErr: true,
-			errMsg:  "ArgumentError: *: at least 2 arguments required",
-		},
 		{
 			name:    "string * string",
 			args:    []core.Value{str("a"), str("b")},

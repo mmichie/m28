@@ -1,0 +1,66 @@
+# Test variadic operator behavior
+
+(print "=== Variadic Operator Tests ===")
+
+# Addition tests
+(print "\n1. Addition (+)")
+(assert (== (+) 0) "(+) should return 0")
+(assert (== (+ 5) 5) "(+ 5) should return 5")
+(assert (== (+ 1 2 3 4 5) 15) "(+ 1 2 3 4 5) should return 15")
+(assert (== (+ "hello" " " "world") "hello world") "String concatenation")
+(assert (== (+ [1 2] [3 4] [5]) [1, 2, 3, 4, 5]) "List concatenation")
+(print "✓ Addition tests passed")
+
+# Multiplication tests
+(print "\n2. Multiplication (*)")
+(assert (== (*) 1) "(*) should return 1")
+(assert (== (* 5) 5) "(* 5) should return 5")
+(assert (== (* 2 3 4) 24) "(* 2 3 4) should return 24")
+(assert (== (* "ab" 3) "ababab") "String repetition")
+(assert (== (* 2 [1, 2]) [1, 2, 1, 2]) "List repetition")
+(print "✓ Multiplication tests passed")
+
+# Subtraction tests
+(print "\n3. Subtraction (-)")
+(assert (== (- 5) -5) "(- 5) should return -5 (unary negation)")
+(assert (== (- 10 3) 7) "(- 10 3) should return 7")
+(assert (== (- 20 5 3 2) 10) "(- 20 5 3 2) should return 10")
+(print "✓ Subtraction tests passed")
+
+# Division tests
+(print "\n4. Division (/)")
+(assert (== (/ 2) 0.5) "(/ 2) should return 0.5 (reciprocal)")
+(assert (== (/ 10 2) 5) "(/ 10 2) should return 5")
+(assert (== (/ 100 2 5 2) 5) "(/ 100 2 5 2) should return 5")
+(print "✓ Division tests passed")
+
+# Logical operators
+(print "\n5. Logical AND")
+(assert (== (and) True) "(and) should return True")
+(assert (== (and True) True) "(and True) should return True")
+(assert (== (and True True True) True) "All True")
+(assert (== (and True False True) False) "One False")
+(assert (== (and 1 2 3) 3) "Returns last truthy value")
+(assert (== (and 1 0 3) 0) "Returns first falsy value")
+(print "✓ AND tests passed")
+
+(print "\n6. Logical OR")
+(assert (== (or) False) "(or) should return False")
+(assert (== (or False) False) "(or False) should return False")
+(assert (== (or False False False) False) "All False")
+(assert (== (or False True False) True) "One True")
+(assert (== (or 0 2 3) 2) "Returns first truthy value")
+(assert (== (or 0 0 0) 0) "Returns last falsy value")
+(print "✓ OR tests passed")
+
+# Binary-only operators (should remain binary)
+(print "\n7. Binary-only operators")
+(assert (== (% 10 3) 1) "Modulo is binary")
+(assert (== (** 2 3) 8) "Power is binary")
+(assert (== (== 5 5) True) "Equality is binary")
+(assert (== (!= 5 6) True) "Inequality is binary")
+(assert (== (< 3 5) True) "Less than is binary")
+(assert (== (> 5 3) True) "Greater than is binary")
+(print "✓ Binary operator tests passed")
+
+(print "\n=== All Variadic Operator Tests Passed! ===")

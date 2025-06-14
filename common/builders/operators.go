@@ -113,6 +113,15 @@ func (ob *OperatorBuilder) Build() BuiltinFunc {
 			return nil, errors.NewTypeErrorf(ob.name,
 				"unsupported operand type(s) for %s: '%s'", ob.name, args[0].Type())
 		}
+
+		// For operators with no arguments, try to use the first handler that accepts empty args
+		for _, handler := range ob.handlers {
+			// Try calling with empty args
+			if result, err := handler.Handle(args, ctx); err == nil {
+				return result, nil
+			}
+		}
+
 		return nil, errors.NewRuntimeError(ob.name, "no arguments provided")
 	}
 }
@@ -123,6 +132,10 @@ func (ob *OperatorBuilder) Build() BuiltinFunc {
 func NumberHandler(fn func([]float64) (core.Value, error)) OperatorHandler {
 	return OperatorHandler{
 		Check: func(args []core.Value) bool {
+			// Empty args are valid for operators with identity elements
+			if len(args) == 0 {
+				return true
+			}
 			for _, arg := range args {
 				if _, ok := arg.(core.NumberValue); !ok {
 					return false
@@ -217,7 +230,12 @@ func MixedNumberStringHandler(fn func(string, int) (core.Value, error)) Operator
 // Add creates the + operator
 func Add() BuiltinFunc {
 	return NewOperator("+", "__add__").
+		WithArgs(0, -1). // Allow 0 or more arguments
 		WithHandler(NumberHandler(func(nums []float64) (core.Value, error) {
+			// With no args, return identity element 0
+			if len(nums) == 0 {
+				return core.NumberValue(0), nil
+			}
 			result := nums[0]
 			for i := 1; i < len(nums); i++ {
 				result += nums[i]
@@ -225,6 +243,10 @@ func Add() BuiltinFunc {
 			return core.NumberValue(result), nil
 		})).
 		WithHandler(StringHandler(func(strs []string) (core.Value, error) {
+			// With no args, return empty string
+			if len(strs) == 0 {
+				return core.StringValue(""), nil
+			}
 			result := strs[0]
 			for i := 1; i < len(strs); i++ {
 				result += strs[i]
@@ -244,7 +266,12 @@ func Add() BuiltinFunc {
 // Multiply creates the * operator
 func Multiply() BuiltinFunc {
 	return NewOperator("*", "__mul__").
+		WithArgs(0, -1). // Allow 0 or more arguments
 		WithHandler(NumberHandler(func(nums []float64) (core.Value, error) {
+			// With no args, return identity element 1
+			if len(nums) == 0 {
+				return core.NumberValue(1), nil
+			}
 			result := nums[0]
 			for i := 1; i < len(nums); i++ {
 				result *= nums[i]
@@ -334,12 +361,24 @@ func Subtract() BuiltinFunc {
 // Divide creates the / operator
 func Divide() BuiltinFunc {
 	return NewOperator("/", "__truediv__").
-		WithArgs(2, 2).
+		WithArgs(1, -1). // Allow 1 or more arguments
 		WithHandler(NumberHandler(func(nums []float64) (core.Value, error) {
-			if nums[1] == 0 {
-				return nil, &core.ZeroDivisionError{}
+			if len(nums) == 1 {
+				// Single argument: 1/x
+				if nums[0] == 0 {
+					return nil, &core.ZeroDivisionError{}
+				}
+				return core.NumberValue(1 / nums[0]), nil
 			}
-			return core.NumberValue(nums[0] / nums[1]), nil
+			// Multiple arguments: a / b / c / ...
+			result := nums[0]
+			for i := 1; i < len(nums); i++ {
+				if nums[i] == 0 {
+					return nil, &core.ZeroDivisionError{}
+				}
+				result /= nums[i]
+			}
+			return core.NumberValue(result), nil
 		})).
 		Build()
 }
