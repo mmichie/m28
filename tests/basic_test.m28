@@ -1,0 +1,17 @@
+# Test basic functions to ensure nothing is broken
+
+# Test math functions that exist
+(assert (== (abs -5) 5) "abs of -5 should be 5")
+(assert (== (abs 5) 5) "abs of 5 should be 5")
+
+# Test string functions
+(assert (== (upper "hello") "HELLO") "upper should convert to uppercase") 
+(assert (== (lower "WORLD") "world") "lower should convert to lowercase")
+(assert (contains "hello world" "world") "contains should find substring")
+(assert (starts-with "hello" "he") "starts-with should check prefix")
+(assert (ends-with "hello" "lo") "ends-with should check suffix")
+
+# Test numeric functions
+(assert (== (round 3.7) 4) "round(3.7) should be 4")
+
+(print "Basic tests passed!")
