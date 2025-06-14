@@ -262,92 +262,32 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - **Current Status**: ✅ ALL PHASES COMPLETE - Eliminated all 41 duplicate registrations
    - **Results**: Reduced from 110 to 69 total builtins, with each function now having a single source of truth
 
-2. **P0: Code Quality and Architecture Improvements** 🔴 IN PROGRESS
-   - [ ] **Builtin System Refactoring** (See BUILTIN_IMPROVEMENT_PLAN.md)
-     - [x] Phase 1: Validation framework to eliminate 230+ argument validations ✅ DONE
-       - Created common/errors package with Python-compatible error types
-       - Created common/validation package with fluent argument validation
-       - Comprehensive tests with 100% coverage
-       - Migration examples demonstrating 70%+ code reduction
-     - [x] Phase 2: Function builders for common patterns ✅ DONE
-       - Created builders package with type-specific builders
-       - UnaryNumber, BinaryNumber, VariadicNumber for numeric operations
-       - UnaryString, PredicateString, PredicateNumber for string/boolean ops
-       - UnarySequence, UnaryAny for generic operations
-       - OperatorBuilder with overloading support
-       - Comprehensive tests with 100% coverage
-       - Migration guide showing 92% code reduction
-     - [x] Phase 3: Refactor existing functions using new abstractions ✅ DONE
-       - Migrated 40+ functions across math, string, and numeric modules
-       - Achieved 70%+ code reduction for simple functions
-       - Created custom builders for complex patterns
-       - Demonstrated viability with comprehensive testing
-       - Created migration guide for remaining functions
-     - [x] Phase 4: Complete migration of all remaining builtin functions ✅ DONE
-       - **Scope**: Migrate ~60+ remaining builtin functions to builder framework
-       - **Categories to migrate**:
-         - Type conversions: `str()`, `int()`, `float()`, `bool()`, `type()`
-         - List operations: `append()`, `extend()`, `insert()`, `remove()`, `pop()`
-         - Dict operations: `keys()`, `values()`, `items()`, `get()`, `update()`
-         - Set operations: `add()`, `union()`, `intersection()`, `difference()`
-         - Comparison operators: `==`, `!=`, `<`, `>`, `<=`, `>=`
-         - I/O functions: `print()`, `input()`, `open()`
-         - Iterator functions: `enumerate()`, `zip()`, `next()`, `iter()`
-         - Type checking: `isinstance()`, `issubclass()`, `callable()`
-         - Attribute functions: `hasattr()`, `getattr()`, `setattr()`
-       - **Expected outcomes**:
-         - 80%+ code reduction for simple functions
-         - Consistent error handling across all builtins
-         - Elimination of ~2000+ lines of boilerplate code
-         - Simplified maintenance and future additions
-       - **Migration strategy**:
-         - Start with type conversions (high impact, simple patterns)
-         - Move to collection operations (list, dict, set)
-         - Migrate operators using OperatorBuilder
-         - Complete with I/O and utility functions
-         - Test each category thoroughly before moving to next
-     - [x] Phase 5: File reorganization (split 1050-line string.go) ✅ DONE
-     - [x] Phase 6: Operator overloading abstraction ✅ DONE
-   - [ ] **Codebase-Wide Improvements** (See CODEBASE_IMPROVEMENT_PLAN.md)
-     - [x] Foundation: Standardized error handling across all packages ✅ DONE
-     - [x] Foundation: Common validation utilities (56+ files need this) ✅ DONE
-     - [ ] Type System: Protocol interfaces for common behaviors
-     - [ ] Type System: Type checking utilities (51+ files have switches)
-     - [ ] Architecture: Package reorganization for clear boundaries
-     - [ ] Architecture: Visitor pattern for AST (replace massive switches)
-     - [ ] Refactoring: Break down 100+ line functions
-   - **Timeline**: 12 weeks total (7 weeks builtin, 12 weeks codebase-wide with overlap)
-   - **Impact**: 80% reduction in code duplication, consistent patterns, better maintainability
-   - **Phase 1 Results**: 
-     - Created idiomatic Go validation framework that will serve as foundation for decades
-     - Eliminated need for 230+ manual argument validations
-     - Established consistent error handling patterns
-     - All tests passing (100% success rate)
-   - **Phase 2 Results**:
-     - Created comprehensive function builder framework
-     - 8 specialized builders for different function patterns
-     - OperatorBuilder with overloading support and dunder methods
-     - Real-world example: Math module functions reduced from 180 to 15 lines (92% reduction)
-     - Migration guide and examples for easy adoption
-   - **Phase 3 Results**:
-     - Successfully migrated 40+ functions as proof of concept
-     - Math module: 25 functions, 83% code reduction
-     - String functions: 10 functions, 53% code reduction  
-     - Numeric functions: 5 functions, 25% reduction with enhanced features
-     - Created custom builders for complex patterns
-     - Comprehensive migration report with patterns and recommendations
-   - **Phase 4 Results**:
-     - Successfully migrated 50+ remaining builtin functions
-     - Type conversions: 8 functions, 33% code reduction with enhanced features
-     - List operations: 9 functions, 27% code reduction
-     - Comparison operators: 6 functions, 51% code reduction with overloading
-     - I/O functions: 3 functions, 24% code reduction
-     - Iteration functions: 4 functions, 34% code reduction
-     - Functional programming: 5 functions, 30% code reduction
-     - Arithmetic operators: 7 functions, 44% code reduction
-     - Overall: 36% average reduction (~408 lines saved from ~1,128 lines)
-     - Created domain-specific builders for complex patterns
-     - Comprehensive completion report documenting all migrations
+2. **P0: Code Quality and Architecture Improvements** 🟢 BUILTIN COMPLETE, 🔴 CODEBASE-WIDE IN PROGRESS
+   - [x] **Builtin System Refactoring** ✅ ALL PHASES COMPLETE
+     - Eliminated all 41 duplicate builtin registrations
+     - Created reusable validation and builder frameworks
+     - Achieved 36% average code reduction across migrated functions
+     - Established patterns for future development
+   - [ ] **Codebase-Wide Improvements** 🔴 IN PROGRESS
+     - [x] Foundation: Standardized error handling (`common/errors` package) ✅
+     - [x] Foundation: Common validation utilities (`common/validation` package) ✅
+     - [ ] **Type System Improvements** (Next Priority)
+       - [ ] Protocol interfaces (Indexable, Iterable, Callable, Comparable)
+       - [ ] Type checking utilities to replace 51+ repetitive type switches
+       - [ ] Common type conversion helpers (AsNumber, RequireString, etc.)
+     - [ ] **Architecture Improvements**
+       - [ ] Package reorganization for clear boundaries
+       - [ ] Visitor pattern for AST (replace massive switches in eval/parser)
+       - [ ] Break down 100+ line functions (tryForm, parseFString, etc.)
+     - [ ] **Additional Patterns**
+       - [ ] Apply validation framework to parser, eval, special_forms packages
+       - [ ] Eliminate remaining code duplication (56+ files with identical patterns)
+       - [ ] Consistent error handling across all packages
+     - [ ] **Better Error Messages** (Critical for Developer Experience)
+       - [ ] Implement proper source location tracking with AST nodes
+       - [ ] Include source context in error messages (show problematic line)
+       - [ ] Improve stack traces with function names and locations
+       - [ ] Add "Did you mean?" suggestions for common typos
 
 3. **Record Stream and JSON Processing** (NEW)
    - [ ] Path-based access functions (`get-in`, `assoc-in`, `update-in`, `dissoc-in`)
