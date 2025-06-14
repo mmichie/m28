@@ -1,8 +1,6 @@
 package operators
 
 import (
-	"math"
-
 	"github.com/mmichie/m28/common/builders"
 	"github.com/mmichie/m28/core"
 )
@@ -10,57 +8,28 @@ import (
 // RegisterArithmetic registers arithmetic operators using the builder framework
 func RegisterArithmetic(ctx *core.Context) {
 	// + addition operator
-	// BEFORE: ~40 lines with type checking for numbers, strings, lists
-	// AFTER: Using pre-built Add operator
 	ctx.Define("+", core.NewBuiltinFunction(builders.Add()))
 
 	// - subtraction operator
-	// BEFORE: ~20 lines
-	// AFTER: Using BinaryNumber builder
-	ctx.Define("-", core.NewBuiltinFunction(builders.BinaryNumberSimple("-", func(a, b float64) float64 {
-		return a - b
-	})))
+	ctx.Define("-", core.NewBuiltinFunction(builders.Subtract()))
 
 	// * multiplication operator
-	// BEFORE: ~30 lines with string/list repetition
-	// AFTER: Using pre-built Multiply operator
 	ctx.Define("*", core.NewBuiltinFunction(builders.Multiply()))
 
 	// / division operator
-	// BEFORE: ~15 lines
-	// AFTER: Using builders
-	ctx.Define("/", core.NewBuiltinFunction(builders.BinaryNumber("/", func(a, b float64) (float64, error) {
-		if b == 0 {
-			return 0, &core.ZeroDivisionError{}
-		}
-		return a / b, nil
-	})))
+	ctx.Define("/", core.NewBuiltinFunction(builders.Divide()))
 
 	// % modulo operator
-	// BEFORE: ~15 lines
-	// AFTER: Using builders
-	ctx.Define("%", core.NewBuiltinFunction(builders.BinaryNumber("%", func(a, b float64) (float64, error) {
-		if b == 0 {
-			return 0, &core.ZeroDivisionError{}
-		}
-		return math.Mod(a, b), nil
-	})))
+	ctx.Define("%", core.NewBuiltinFunction(builders.Modulo()))
 
 	// ** power operator
-	// BEFORE: ~10 lines
-	// AFTER: Using builders
-	ctx.Define("**", core.NewBuiltinFunction(builders.BinaryNumberSimple("**", math.Pow)))
+	ctx.Define("**", core.NewBuiltinFunction(builders.Power()))
 
 	// - unary negation
-	// BEFORE: ~12 lines
-	// AFTER: Using UnaryNumber
-	ctx.Define("unary-", core.NewBuiltinFunction(builders.UnaryNumberSimple("unary-", func(n float64) float64 {
-		return -n
-	})))
+	ctx.Define("unary-", core.NewBuiltinFunction(builders.UnaryNegate()))
 }
 
 // Migration Statistics:
 // Functions migrated: 7 arithmetic operators
-// Original lines: ~160 lines
-// Migrated lines: ~50 lines
-// Reduction: ~69% with pre-built operators
+// Using pre-built operator functions
+// Code reduction: ~85% (from ~160 lines to ~25 lines)

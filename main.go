@@ -170,6 +170,8 @@ func initializeGlobalContext(ctx *core.Context) {
 	// Register built-in values
 	ctx.Define("true", core.BoolValue(true))
 	ctx.Define("false", core.BoolValue(false))
+	ctx.Define("True", core.BoolValue(true))
+	ctx.Define("False", core.BoolValue(false))
 	ctx.Define("nil", core.NilValue{})
 
 	// Register all built-in functions

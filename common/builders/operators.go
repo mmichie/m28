@@ -1,6 +1,9 @@
 package builders
 
 import (
+	"math"
+	"strings"
+
 	"github.com/mmichie/m28/common/errors"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
@@ -259,4 +262,307 @@ func Multiply() BuiltinFunc {
 			return core.StringValue(result), nil
 		})).
 		Build()
+}
+
+// Subtract creates the - operator (supports both unary and binary)
+func Subtract() BuiltinFunc {
+	return NewOperator("-", "__sub__").
+		WithArgs(1, 2).
+		WithHandler(OperatorHandler{
+			Check: func(args []core.Value) bool {
+				// Check if all args are numbers
+				for _, arg := range args {
+					if _, ok := arg.(core.NumberValue); !ok {
+						return false
+					}
+				}
+				return true
+			},
+			Handle: func(args []core.Value, ctx *core.Context) (core.Value, error) {
+				if len(args) == 1 {
+					// Unary minus
+					num := float64(args[0].(core.NumberValue))
+					return core.NumberValue(-num), nil
+				} else {
+					// Binary minus
+					num1 := float64(args[0].(core.NumberValue))
+					num2 := float64(args[1].(core.NumberValue))
+					return core.NumberValue(num1 - num2), nil
+				}
+			},
+		}).
+		Build()
+}
+
+// Divide creates the / operator
+func Divide() BuiltinFunc {
+	return NewOperator("/", "__truediv__").
+		WithArgs(2, 2).
+		WithHandler(NumberHandler(func(nums []float64) (core.Value, error) {
+			if nums[1] == 0 {
+				return nil, &core.ZeroDivisionError{}
+			}
+			return core.NumberValue(nums[0] / nums[1]), nil
+		})).
+		Build()
+}
+
+// Modulo creates the % operator
+func Modulo() BuiltinFunc {
+	return NewOperator("%", "__mod__").
+		WithArgs(2, 2).
+		WithHandler(NumberHandler(func(nums []float64) (core.Value, error) {
+			if nums[1] == 0 {
+				return nil, &core.ZeroDivisionError{}
+			}
+			// Go's % operator doesn't match Python's for negative numbers
+			// Python: -7 % 3 = 2, Go: -7 % 3 = -1
+			// We need to adjust for Python compatibility
+			result := math.Mod(nums[0], nums[1])
+			if (result < 0 && nums[1] > 0) || (result > 0 && nums[1] < 0) {
+				result += nums[1]
+			}
+			return core.NumberValue(result), nil
+		})).
+		Build()
+}
+
+// Power creates the ** operator
+func Power() BuiltinFunc {
+	return NewOperator("**", "__pow__").
+		WithArgs(2, 2).
+		WithHandler(NumberHandler(func(nums []float64) (core.Value, error) {
+			return core.NumberValue(math.Pow(nums[0], nums[1])), nil
+		})).
+		Build()
+}
+
+// UnaryNegate creates the unary - operator
+func UnaryNegate() BuiltinFunc {
+	return NewOperator("unary-", "__neg__").
+		WithArgs(1, 1).
+		WithHandler(NumberHandler(func(nums []float64) (core.Value, error) {
+			return core.NumberValue(-nums[0]), nil
+		})).
+		Build()
+}
+
+// Comparison operators
+
+// ComparisonHandler creates a handler for comparison operations
+func ComparisonHandler(numCompare func(float64, float64) bool, strCompare func(string, string) bool) OperatorHandler {
+	return OperatorHandler{
+		Check: func(args []core.Value) bool {
+			if len(args) != 2 {
+				return false
+			}
+			// Check if both are numbers or both are strings
+			_, num1 := args[0].(core.NumberValue)
+			_, num2 := args[1].(core.NumberValue)
+			_, str1 := args[0].(core.StringValue)
+			_, str2 := args[1].(core.StringValue)
+			return (num1 && num2) || (str1 && str2)
+		},
+		Handle: func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if n1, ok := args[0].(core.NumberValue); ok {
+				n2 := args[1].(core.NumberValue)
+				return core.BoolValue(numCompare(float64(n1), float64(n2))), nil
+			}
+			s1 := args[0].(core.StringValue)
+			s2 := args[1].(core.StringValue)
+			return core.BoolValue(strCompare(string(s1), string(s2))), nil
+		},
+	}
+}
+
+// Equal creates the == operator
+func Equal() BuiltinFunc {
+	return NewOperator("==", "__eq__").
+		WithArgs(2, 2).
+		WithHandler(OperatorHandler{
+			Check: func(args []core.Value) bool {
+				return len(args) == 2
+			},
+			Handle: func(args []core.Value, ctx *core.Context) (core.Value, error) {
+				return core.BoolValue(core.EqualValues(args[0], args[1])), nil
+			},
+		}).
+		Build()
+}
+
+// NotEqual creates the != operator
+func NotEqual() BuiltinFunc {
+	return NewOperator("!=", "__ne__").
+		WithArgs(2, 2).
+		WithHandler(OperatorHandler{
+			Check: func(args []core.Value) bool {
+				return len(args) == 2
+			},
+			Handle: func(args []core.Value, ctx *core.Context) (core.Value, error) {
+				return core.BoolValue(!core.EqualValues(args[0], args[1])), nil
+			},
+		}).
+		Build()
+}
+
+// LessThan creates the < operator
+func LessThan() BuiltinFunc {
+	return NewOperator("<", "__lt__").
+		WithArgs(2, 2).
+		WithHandler(ComparisonHandler(
+			func(a, b float64) bool { return a < b },
+			func(a, b string) bool { return a < b },
+		)).
+		Build()
+}
+
+// LessThanOrEqual creates the <= operator
+func LessThanOrEqual() BuiltinFunc {
+	return NewOperator("<=", "__le__").
+		WithArgs(2, 2).
+		WithHandler(ComparisonHandler(
+			func(a, b float64) bool { return a <= b },
+			func(a, b string) bool { return a <= b },
+		)).
+		Build()
+}
+
+// GreaterThan creates the > operator
+func GreaterThan() BuiltinFunc {
+	return NewOperator(">", "__gt__").
+		WithArgs(2, 2).
+		WithHandler(ComparisonHandler(
+			func(a, b float64) bool { return a > b },
+			func(a, b string) bool { return a > b },
+		)).
+		Build()
+}
+
+// GreaterThanOrEqual creates the >= operator
+func GreaterThanOrEqual() BuiltinFunc {
+	return NewOperator(">=", "__ge__").
+		WithArgs(2, 2).
+		WithHandler(ComparisonHandler(
+			func(a, b float64) bool { return a >= b },
+			func(a, b string) bool { return a >= b },
+		)).
+		Build()
+}
+
+// Logical operators
+
+// Not creates the not operator
+func Not() BuiltinFunc {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, errors.NewArgumentError("not", 1, len(args))
+		}
+		// Use IsTruthy which already checks __bool__
+		return core.BoolValue(!core.IsTruthy(args[0])), nil
+	}
+}
+
+// And creates the and operator
+func And() BuiltinFunc {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.True, nil
+		}
+
+		var result core.Value = core.True
+		for _, arg := range args {
+			if !core.IsTruthy(arg) {
+				return arg, nil // Return the first falsy value
+			}
+			result = arg
+		}
+
+		// All values were truthy, return the last one
+		return result, nil
+	}
+}
+
+// Or creates the or operator
+func Or() BuiltinFunc {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.False, nil
+		}
+
+		for _, arg := range args {
+			if core.IsTruthy(arg) {
+				return arg, nil // Return the first truthy value
+			}
+		}
+
+		// All values were falsy, return the last one
+		return args[len(args)-1], nil
+	}
+}
+
+// In creates the in operator
+func In() BuiltinFunc {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, errors.NewArgumentError("in", 2, len(args))
+		}
+
+		value := args[0]
+		container := args[1]
+
+		// Check for __contains__ method
+		if obj, ok := container.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			if method, found := obj.GetAttr("__contains__"); found {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{value}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Ensure we return a boolean
+					if b, ok := result.(core.BoolValue); ok {
+						return b, nil
+					}
+					return core.BoolValue(core.IsTruthy(result)), nil
+				}
+			}
+		}
+
+		// Built-in container types
+		switch c := container.(type) {
+		case core.StringValue:
+			if str, ok := value.(core.StringValue); ok {
+				return core.BoolValue(strings.Contains(string(c), string(str))), nil
+			}
+			return core.BoolValue(false), nil
+
+		case core.ListValue:
+			for _, item := range c {
+				if core.EqualValues(value, item) {
+					return core.BoolValue(true), nil
+				}
+			}
+			return core.BoolValue(false), nil
+
+		case core.TupleValue:
+			for _, item := range c {
+				if core.EqualValues(value, item) {
+					return core.BoolValue(true), nil
+				}
+			}
+			return core.BoolValue(false), nil
+
+		case *core.SetValue:
+			return core.BoolValue(c.Contains(value)), nil
+
+		case *core.DictValue:
+			// For dicts, check if key exists
+			_, exists := c.GetValue(value)
+			return core.BoolValue(exists), nil
+
+		default:
+			return nil, errors.NewTypeError("in", "argument must be iterable", string(container.Type()))
+		}
+	}
 }
