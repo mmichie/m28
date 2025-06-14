@@ -283,77 +283,46 @@ func RangeBuilder() builders.BuiltinFunc {
 			return nil, err
 		}
 
-		var start, stop, step int
-
 		switch v.Count() {
 		case 1:
 			// range(stop)
-			stop, err := v.GetInt(0)
+			stop, err := v.GetNumber(0)
 			if err != nil {
 				return nil, err
 			}
-			// Create a simple list representation of range
-			result := make(core.ListValue, 0)
-			for i := 0; i < stop; i++ {
-				result = append(result, core.NumberValue(i))
-			}
-			return result, nil
+			return core.NewRangeValue(0, stop, 1)
 
 		case 2:
 			// range(start, stop)
-			s, err := v.GetInt(0)
+			start, err := v.GetNumber(0)
 			if err != nil {
 				return nil, err
 			}
-			start = s
 
-			st, err := v.GetInt(1)
+			stop, err := v.GetNumber(1)
 			if err != nil {
 				return nil, err
 			}
-			stop = st
-			// Create a simple list representation of range
-			result := make(core.ListValue, 0)
-			for i := start; i < stop; i++ {
-				result = append(result, core.NumberValue(i))
-			}
-			return result, nil
+			return core.NewRangeValue(start, stop, 1)
 
 		case 3:
 			// range(start, stop, step)
-			s, err := v.GetInt(0)
-			if err != nil {
-				return nil, err
-			}
-			start = s
-
-			st, err := v.GetInt(1)
-			if err != nil {
-				return nil, err
-			}
-			stop = st
-
-			step, err = v.GetInt(2)
+			start, err := v.GetNumber(0)
 			if err != nil {
 				return nil, err
 			}
 
-			if step == 0 {
-				return nil, errors.NewValueError("range", "range() arg 3 must not be zero")
+			stop, err := v.GetNumber(1)
+			if err != nil {
+				return nil, err
 			}
 
-			// Create a simple list representation of range
-			result := make(core.ListValue, 0)
-			if step > 0 {
-				for i := start; i < stop; i += step {
-					result = append(result, core.NumberValue(i))
-				}
-			} else {
-				for i := start; i > stop; i += step {
-					result = append(result, core.NumberValue(i))
-				}
+			step, err := v.GetNumber(2)
+			if err != nil {
+				return nil, err
 			}
-			return result, nil
+
+			return core.NewRangeValue(start, stop, step)
 		}
 
 		return nil, errors.NewRuntimeError("range", "unexpected argument count")

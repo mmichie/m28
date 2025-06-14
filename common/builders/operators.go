@@ -261,13 +261,48 @@ func Multiply() BuiltinFunc {
 			}
 			return core.StringValue(result), nil
 		})).
+		WithHandler(OperatorHandler{
+			Check: func(args []core.Value) bool {
+				if len(args) != 2 {
+					return false
+				}
+				// list * number or number * list
+				_, listFirst := args[0].(core.ListValue)
+				_, numSecond := args[1].(core.NumberValue)
+				_, numFirst := args[0].(core.NumberValue)
+				_, listSecond := args[1].(core.ListValue)
+				return (listFirst && numSecond) || (numFirst && listSecond)
+			},
+			Handle: func(args []core.Value, ctx *core.Context) (core.Value, error) {
+				var list core.ListValue
+				var num int
+
+				if l, ok := args[0].(core.ListValue); ok {
+					list = l
+					num = int(args[1].(core.NumberValue))
+				} else {
+					num = int(args[0].(core.NumberValue))
+					list = args[1].(core.ListValue)
+				}
+
+				if num < 0 {
+					return core.ListValue{}, nil
+				}
+
+				result := make(core.ListValue, 0, len(list)*num)
+				for i := 0; i < num; i++ {
+					result = append(result, list...)
+				}
+				return result, nil
+			},
+		}).
 		Build()
 }
 
-// Subtract creates the - operator (supports both unary and binary)
+// Subtract creates the - operator (supports unary and variadic)
 func Subtract() BuiltinFunc {
 	return NewOperator("-", "__sub__").
-		WithArgs(1, 2).
+		WithArgs(1, -1). // Allow 1 or more arguments
 		WithHandler(OperatorHandler{
 			Check: func(args []core.Value) bool {
 				// Check if all args are numbers
@@ -284,10 +319,12 @@ func Subtract() BuiltinFunc {
 					num := float64(args[0].(core.NumberValue))
 					return core.NumberValue(-num), nil
 				} else {
-					// Binary minus
-					num1 := float64(args[0].(core.NumberValue))
-					num2 := float64(args[1].(core.NumberValue))
-					return core.NumberValue(num1 - num2), nil
+					// Variadic subtraction: a - b - c - ...
+					result := float64(args[0].(core.NumberValue))
+					for i := 1; i < len(args); i++ {
+						result -= float64(args[i].(core.NumberValue))
+					}
+					return core.NumberValue(result), nil
 				}
 			},
 		}).
@@ -524,7 +561,8 @@ func In() BuiltinFunc {
 					if b, ok := result.(core.BoolValue); ok {
 						return b, nil
 					}
-					return core.BoolValue(core.IsTruthy(result)), nil
+					// The test expects an error for non-boolean returns
+					return nil, errors.NewTypeError("in", "__contains__ should return a boolean", string(result.Type()))
 				}
 			}
 		}

@@ -263,11 +263,22 @@ func TestOperatorMultiply(t *testing.T) {
 			errMsg:  "TypeError: *: unsupported operand type(s) for *: 'string'",
 		},
 		{
-			name:    "list multiplication not supported",
+			name:    "list * number",
 			args:    []core.Value{list(num(1)), num(2)},
-			want:    nil,
-			wantErr: true,
-			errMsg:  "TypeError: *: unsupported operand type(s) for *: 'list'",
+			want:    list(num(1), num(1)),
+			wantErr: false,
+		},
+		{
+			name:    "number * list",
+			args:    []core.Value{num(3), list(str("a"))},
+			want:    list(str("a"), str("a"), str("a")),
+			wantErr: false,
+		},
+		{
+			name:    "list * negative number",
+			args:    []core.Value{list(num(1), num(2)), num(-1)},
+			want:    list(),
+			wantErr: false,
 		},
 		{
 			name:    "bool multiplication not supported",
@@ -308,6 +319,20 @@ func TestOperatorMultiply(t *testing.T) {
 						}
 					} else {
 						t.Errorf("Multiply() returned non-string: %v", got)
+					}
+				case core.ListValue:
+					if l, ok := got.(core.ListValue); ok {
+						if len(l) != len(want) {
+							t.Errorf("Multiply() list length = %v, want %v", len(l), len(want))
+						} else {
+							for i := range l {
+								if !core.EqualValues(l[i], want[i]) {
+									t.Errorf("Multiply() list[%d] = %v, want %v", i, l[i], want[i])
+								}
+							}
+						}
+					} else {
+						t.Errorf("Multiply() returned non-list: %v", got)
 					}
 				}
 			}
