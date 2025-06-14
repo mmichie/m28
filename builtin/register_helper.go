@@ -6,7 +6,8 @@ import (
 )
 
 // StrictBuiltinChecking controls whether duplicate builtin registrations cause a fatal error
-var StrictBuiltinChecking = false
+// Now enabled by default to prevent accidental duplicate registrations
+var StrictBuiltinChecking = true
 
 // RegisterBuiltinFunc is a helper function that registers a builtin with duplicate detection
 func RegisterBuiltinFunc(ctx *core.Context, name string, fn func([]core.Value, *core.Context) (core.Value, error)) {
