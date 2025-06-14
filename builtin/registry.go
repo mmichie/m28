@@ -13,6 +13,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	// Register core language builtins
 	RegisterTypes(ctx)
 	RegisterAttributes(ctx)
+	RegisterList(ctx)
 	RegisterIteration(ctx)
 	RegisterFunctional(ctx)
 	RegisterCollections(ctx)
