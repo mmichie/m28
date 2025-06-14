@@ -262,35 +262,54 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - **Current Status**: ✅ ALL PHASES COMPLETE - Eliminated all 41 duplicate registrations
    - **Results**: Reduced from 110 to 69 total builtins, with each function now having a single source of truth
 
-2. **Record Stream and JSON Processing** (NEW)
+2. **P0: Code Quality and Architecture Improvements** 🔴 NEW
+   - [ ] **Builtin System Refactoring** (See BUILTIN_IMPROVEMENT_PLAN.md)
+     - [ ] Phase 1: Validation framework to eliminate 230+ argument validations
+     - [ ] Phase 2: Error type system for consistent error handling
+     - [ ] Phase 3: Function builders for common patterns
+     - [ ] Phase 4: Refactor existing functions using new abstractions
+     - [ ] Phase 5: File reorganization (split 1050-line string.go)
+     - [ ] Phase 6: Operator overloading abstraction
+   - [ ] **Codebase-Wide Improvements** (See CODEBASE_IMPROVEMENT_PLAN.md)
+     - [ ] Foundation: Standardized error handling across all packages
+     - [ ] Foundation: Common validation utilities (56+ files need this)
+     - [ ] Type System: Protocol interfaces for common behaviors
+     - [ ] Type System: Type checking utilities (51+ files have switches)
+     - [ ] Architecture: Package reorganization for clear boundaries
+     - [ ] Architecture: Visitor pattern for AST (replace massive switches)
+     - [ ] Refactoring: Break down 100+ line functions
+   - **Timeline**: 12 weeks total (7 weeks builtin, 12 weeks codebase-wide with overlap)
+   - **Impact**: 80% reduction in code duplication, consistent patterns, better maintainability
+
+3. **Record Stream and JSON Processing** (NEW)
    - [ ] Path-based access functions (`get-in`, `assoc-in`, `update-in`, `dissoc-in`)
    - [ ] JSONL streaming support (`recordstream` module)
    - [ ] Basic record operations (`select-keys`, `rename-keys`)
    - [ ] Dictionary enhancements (`deep-merge`, `map-keys`, `map-values`)
 
-3. **Module System Improvements** ✅ COMPLETE
+4. **Module System Improvements** ✅ COMPLETE
    - [x] Local `.m28` module imports
    - [x] List syntax `[name1 name2]` in from imports
    - [x] Wildcard imports with `*`
    - [x] `.m28` extension support with proper caching
 
-4. **Functional Programming**
+5. **Functional Programming**
    - [x] Key parameter for sorted/min/max ✅ DONE (Python-style key=func syntax)
    - [x] Default parameter for next() ✅ DONE (already implemented)
    - [x] slice() object creator ✅ DONE
 
-5. **Core Python Features**
+6. **Core Python Features**
    - [x] Set literals `{1, 2, 3}` ✅ DONE
    - [x] Multiple assignment `a, b = 1, 2` ✅ DONE
    - [x] Exception variable binding `except Error as e` ✅ DONE
 
-6. **Essential Missing Data Structures**
+7. **Essential Missing Data Structures**
    - [ ] `bytes` and `bytearray` - Binary data handling
    - [ ] `frozenset` - Immutable sets for use as dict keys
    - [x] `range` object - Memory-efficient lazy ranges ✅ DONE
    - [ ] `complex` - Complex number support
 
-7. **F-String Enhancements** (Building on existing nested quotes support)
+8. **F-String Enhancements** (Building on existing nested quotes support)
    - [ ] **Format Specifications** (High Priority)
      - [ ] Float precision: `f"{pi:.2f}"` → "3.14"
      - [ ] Integer padding: `f"{num:04d}"` → "0042"
