@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
 
@@ -30,44 +31,47 @@ func RegisterStringOpsFunctions(ctx *core.Context) {
 
 // UpperFunc converts a string to uppercase
 func UpperFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("upper requires exactly 1 argument, got %d", len(args))
+	v := validation.NewArgs("upper", args)
+	if err := v.Exact(1); err != nil {
+		return nil, err
 	}
 
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("upper requires a string argument, got %s", args[0].Type())
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
-	return core.StringValue(strings.ToUpper(string(str))), nil
+	return core.StringValue(strings.ToUpper(str)), nil
 }
 
 // LowerFunc converts a string to lowercase
 func LowerFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("lower requires exactly 1 argument, got %d", len(args))
+	v := validation.NewArgs("lower", args)
+	if err := v.Exact(1); err != nil {
+		return nil, err
 	}
 
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("lower requires a string argument, got %s", args[0].Type())
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
-	return core.StringValue(strings.ToLower(string(str))), nil
+	return core.StringValue(strings.ToLower(str)), nil
 }
 
 // TrimFunc removes whitespace from both ends of a string
 func TrimFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("trim requires exactly 1 argument, got %d", len(args))
+	v := validation.NewArgs("trim", args)
+	if err := v.Exact(1); err != nil {
+		return nil, err
 	}
 
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("trim requires a string argument, got %s", args[0].Type())
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
-	return core.StringValue(strings.TrimSpace(string(str))), nil
+	return core.StringValue(strings.TrimSpace(str)), nil
 }
 
 // StripFunc is an alias for trim (Python compatibility)
@@ -77,103 +81,91 @@ func StripFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // LStripFunc removes whitespace from the left side of a string
 func LStripFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 || len(args) > 2 {
-		return nil, fmt.Errorf("lstrip requires 1 or 2 arguments, got %d", len(args))
+	v := validation.NewArgs("lstrip", args)
+	if err := v.Range(1, 2); err != nil {
+		return nil, err
 	}
 
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("lstrip requires a string as first argument, got %s", args[0].Type())
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
-	// Default: strip whitespace
-	if len(args) == 1 {
-		return core.StringValue(strings.TrimLeft(string(str), " \t\n\r\f\v")), nil
-	}
+	// Get optional chars argument, default to whitespace
+	chars, _ := v.GetStringOrDefault(1, " \t\n\r\f\v")
 
-	// Custom characters to strip
-	chars, ok := args[1].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("lstrip chars argument must be a string, got %s", args[1].Type())
-	}
-
-	return core.StringValue(strings.TrimLeft(string(str), string(chars))), nil
+	return core.StringValue(strings.TrimLeft(str, chars)), nil
 }
 
 // RStripFunc removes whitespace from the right side of a string
 func RStripFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 || len(args) > 2 {
-		return nil, fmt.Errorf("rstrip requires 1 or 2 arguments, got %d", len(args))
+	v := validation.NewArgs("rstrip", args)
+	if err := v.Range(1, 2); err != nil {
+		return nil, err
 	}
 
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("rstrip requires a string as first argument, got %s", args[0].Type())
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
-	// Default: strip whitespace
-	if len(args) == 1 {
-		return core.StringValue(strings.TrimRight(string(str), " \t\n\r\f\v")), nil
-	}
+	// Get optional chars argument, default to whitespace
+	chars, _ := v.GetStringOrDefault(1, " \t\n\r\f\v")
 
-	// Custom characters to strip
-	chars, ok := args[1].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("rstrip chars argument must be a string, got %s", args[1].Type())
-	}
-
-	return core.StringValue(strings.TrimRight(string(str), string(chars))), nil
+	return core.StringValue(strings.TrimRight(str, chars)), nil
 }
 
 // ReplaceFunc replaces occurrences of a substring in a string
 func ReplaceFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 3 || len(args) > 4 {
-		return nil, fmt.Errorf("replace requires 3 or 4 arguments, got %d", len(args))
+	v := validation.NewArgs("replace", args)
+	if err := v.Range(3, 4); err != nil {
+		return nil, err
 	}
 
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("replace requires a string as first argument, got %s", args[0].Type())
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
-	oldStr, ok := args[1].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("replace requires a string as second argument, got %s", args[1].Type())
+	oldStr, err := v.GetString(1)
+	if err != nil {
+		return nil, err
 	}
 
-	newStr, ok := args[2].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("replace requires a string as third argument, got %s", args[2].Type())
+	newStr, err := v.GetString(2)
+	if err != nil {
+		return nil, err
 	}
 
-	// Optional count parameter
+	// Optional count parameter, default -1 (replace all)
 	count := -1
-	if len(args) == 4 {
-		n, ok := args[3].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("replace count must be a number, got %s", args[3].Type())
+	if v.Count() == 4 {
+		n, err := v.GetNumber(3)
+		if err != nil {
+			return nil, err
 		}
 		count = int(n)
 	}
 
-	result := strings.Replace(string(str), string(oldStr), string(newStr), count)
+	result := strings.Replace(str, oldStr, newStr, count)
 	return core.StringValue(result), nil
 }
 
 // SplitFunc splits a string by a delimiter
 func SplitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 || len(args) > 3 {
-		return nil, fmt.Errorf("split requires 1 to 3 arguments, got %d", len(args))
+	v := validation.NewArgs("split", args)
+	if err := v.Range(1, 3); err != nil {
+		return nil, err
 	}
 
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("split requires a string as first argument, got %s", args[0].Type())
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
 	// Default: split on whitespace
-	if len(args) == 1 {
-		fields := strings.Fields(string(str))
+	if v.Count() == 1 {
+		fields := strings.Fields(str)
 		result := make(core.ListValue, len(fields))
 		for i, field := range fields {
 			result[i] = core.StringValue(field)
@@ -182,17 +174,17 @@ func SplitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get delimiter
-	delim, ok := args[1].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("split delimiter must be a string, got %s", args[1].Type())
+	delim, err := v.GetString(1)
+	if err != nil {
+		return nil, err
 	}
 
 	// Optional maxsplit parameter
 	maxSplit := -1
-	if len(args) == 3 {
-		n, ok := args[2].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("split maxsplit must be a number, got %s", args[2].Type())
+	if v.Count() == 3 {
+		n, err := v.GetNumber(2)
+		if err != nil {
+			return nil, err
 		}
 		maxSplit = int(n)
 	}
@@ -200,9 +192,9 @@ func SplitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// Split the string
 	var parts []string
 	if maxSplit < 0 {
-		parts = strings.Split(string(str), string(delim))
+		parts = strings.Split(str, delim)
 	} else {
-		parts = strings.SplitN(string(str), string(delim), maxSplit+1)
+		parts = strings.SplitN(str, delim, maxSplit+1)
 	}
 
 	// Convert to ListValue
@@ -216,18 +208,19 @@ func SplitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // JoinFunc joins a list of strings with a separator
 func JoinFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("join requires exactly 2 arguments, got %d", len(args))
+	v := validation.NewArgs("join", args)
+	if err := v.Exact(2); err != nil {
+		return nil, err
 	}
 
-	sep, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("join requires a string separator as first argument, got %s", args[0].Type())
+	sep, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
-	list, ok := args[1].(core.ListValue)
-	if !ok {
-		return nil, fmt.Errorf("join requires a list as second argument, got %s", args[1].Type())
+	list, err := v.GetList(1)
+	if err != nil {
+		return nil, err
 	}
 
 	// Convert list elements to strings
@@ -241,75 +234,73 @@ func JoinFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
-	return core.StringValue(strings.Join(strs, string(sep))), nil
+	return core.StringValue(strings.Join(strs, sep)), nil
 }
 
 // SubstringFunc extracts a substring from a string
 func SubstringFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 || len(args) > 3 {
-		return nil, fmt.Errorf("substring requires 2 or 3 arguments (string, start[, end]), got %d", len(args))
+	v := validation.NewArgs("substring", args)
+	if err := v.Range(2, 3); err != nil {
+		return nil, err
 	}
 
 	// Get the string
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("substring: first argument must be a string, got %s", args[0].Type())
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
-	// Get start index
+	// Get start index - support both number and string
 	var start int
-	switch v := args[1].(type) {
-	case core.NumberValue:
-		start = int(v)
-	case core.StringValue:
+	if num, err := v.GetNumber(1); err == nil {
+		start = int(num)
+	} else if s, err := v.GetString(1); err == nil {
 		// Try to parse as number
-		n, err := strconv.Atoi(string(v))
+		n, err := strconv.Atoi(s)
 		if err != nil {
-			return nil, fmt.Errorf("substring: start index must be a number, got %s", string(v))
+			return nil, fmt.Errorf("substring: start index must be a number, got %s", s)
 		}
 		start = n
-	default:
+	} else {
 		return nil, fmt.Errorf("substring: start index must be a number, got %s", args[1].Type())
 	}
 
-	s := string(str)
 	// Handle negative indices
 	if start < 0 {
-		start = len(s) + start
+		start = len(str) + start
 	}
 	if start < 0 {
 		start = 0
 	}
-	if start > len(s) {
+	if start > len(str) {
 		return core.StringValue(""), nil
 	}
 
 	// Get end index (optional)
-	end := len(s)
-	if len(args) == 3 {
-		switch v := args[2].(type) {
-		case core.NumberValue:
-			end = int(v)
-		case core.StringValue:
+	end := len(str)
+	if v.Count() == 3 {
+		if num, err := v.GetNumber(2); err == nil {
+			end = int(num)
+		} else if s, err := v.GetString(2); err == nil {
 			// Try to parse as number
-			n, err := strconv.Atoi(string(v))
+			n, err := strconv.Atoi(s)
 			if err != nil {
-				return nil, fmt.Errorf("substring: end index must be a number, got %s", string(v))
+				return nil, fmt.Errorf("substring: end index must be a number, got %s", s)
 			}
 			end = n
-		default:
+		} else {
 			return nil, fmt.Errorf("substring: end index must be a number, got %s", args[2].Type())
 		}
 
 		// Handle negative indices
 		if end < 0 {
-			end = len(s) + end
+			end = len(str) + end
 		}
 		if end < 0 {
 			end = 0
 		}
-		if end > len(s) {
-			end = len(s)
+		if end > len(str) {
+			end = len(str)
 		}
 	}
 
@@ -318,5 +309,5 @@ func SubstringFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.StringValue(""), nil
 	}
 
-	return core.StringValue(s[start:end]), nil
+	return core.StringValue(str[start:end]), nil
 }

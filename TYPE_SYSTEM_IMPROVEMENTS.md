@@ -64,6 +64,32 @@ Implemented all predicates with proper type checking:
 - Consistent error messages across all functions
 - Eliminated manual type assertions and error formatting
 
+### Phase 1.5: Migration of Existing Code (In Progress)
+
+**Status**: Actively migrating high-priority files to validate helpers in practice
+
+#### Completed Migrations:
+1. **builtin/numeric.go** ✅
+   - abs(), round(), divmod(), pow(), sum() - all migrated
+   - ~50% code reduction achieved
+   - Cleaner error handling with validation framework
+   
+2. **builtin/string_ops.go** ✅
+   - All 9 functions migrated: upper(), lower(), trim(), lstrip(), rstrip(), replace(), split(), join(), substring()
+   - ~40% code reduction achieved
+   - Consistent validation patterns across all string operations
+
+#### Benefits Observed:
+- Significant code reduction (40-50%)
+- Consistent error messages
+- Easier to read and maintain
+- Single source of truth for type checking
+
+#### Next Migration Targets:
+- builtin/collections.go (complex type switches)
+- builtin/type_checking.go (can use helpers internally)
+- builtin/functional.go (callable validation)
+
 ## Phase 2: Protocol Interfaces (Week 1-2)
 
 ### Task 2.1: Define Core Protocol Interfaces

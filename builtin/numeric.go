@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/mmichie/m28/common/types"
+	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
 
@@ -11,67 +13,67 @@ import (
 func RegisterNumeric(ctx *core.Context) {
 	// abs - absolute value
 	ctx.Define("abs", core.NewNamedBuiltinFunction("abs", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("abs() takes exactly one argument (%d given)", len(args))
+		v := validation.NewArgs("abs", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
 		}
 
-		switch v := args[0].(type) {
-		case core.NumberValue:
-			return core.NumberValue(math.Abs(float64(v))), nil
-		default:
-			return nil, fmt.Errorf("abs() argument must be a number, not '%s'", v.Type())
+		num, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
 		}
+
+		return core.NumberValue(math.Abs(num)), nil
 	}))
 
 	// round - round to n digits
 	ctx.Define("round", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 || len(args) > 2 {
-			return nil, fmt.Errorf("round() takes 1 or 2 arguments (%d given)", len(args))
+		v := validation.NewArgs("round", args)
+		if err := v.Range(1, 2); err != nil {
+			return nil, err
 		}
 
-		num, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("round() argument must be a number, not '%s'", args[0].Type())
+		num, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
 		}
 
-		ndigits := 0
-		if len(args) == 2 {
-			if n, ok := args[1].(core.NumberValue); ok {
-				ndigits = int(n)
-			} else {
-				return nil, fmt.Errorf("round() ndigits must be an integer")
-			}
-		}
+		ndigits, _ := v.GetNumberOrDefault(1, 0)
+		ndigitsInt := int(ndigits)
 
-		if ndigits == 0 {
-			// Round to nearest integer
-			return core.NumberValue(math.Round(float64(num))), nil
+		if ndigitsInt == 0 {
+			return core.NumberValue(math.Round(num)), nil
 		}
 
 		// Round to n decimal places
-		multiplier := math.Pow(10, float64(ndigits))
-		return core.NumberValue(math.Round(float64(num)*multiplier) / multiplier), nil
+		multiplier := math.Pow(10, float64(ndigitsInt))
+		return core.NumberValue(math.Round(num*multiplier) / multiplier), nil
 	}))
 
 	// divmod - return quotient and remainder
 	ctx.Define("divmod", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("divmod() takes exactly 2 arguments (%d given)", len(args))
+		v := validation.NewArgs("divmod", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
 		}
 
-		a, ok1 := args[0].(core.NumberValue)
-		b, ok2 := args[1].(core.NumberValue)
-		if !ok1 || !ok2 {
-			return nil, fmt.Errorf("divmod() arguments must be numbers")
+		a, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
 		}
 
-		if float64(b) == 0 {
+		b, err := v.GetNumber(1)
+		if err != nil {
+			return nil, err
+		}
+
+		if b == 0 {
 			return nil, &core.ZeroDivisionError{}
 		}
 
 		// Python-style division
-		quotient := math.Floor(float64(a) / float64(b))
-		remainder := float64(a) - quotient*float64(b)
+		quotient := math.Floor(a / b)
+		remainder := a - quotient*b
 
 		return core.TupleValue{
 			core.NumberValue(quotient),
@@ -81,56 +83,58 @@ func RegisterNumeric(ctx *core.Context) {
 
 	// pow - power function (also available as ** operator)
 	ctx.Define("pow", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 2 || len(args) > 3 {
-			return nil, fmt.Errorf("pow() takes 2 or 3 arguments (%d given)", len(args))
+		v := validation.NewArgs("pow", args)
+		if err := v.Range(2, 3); err != nil {
+			return nil, err
 		}
 
-		base, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("pow() base must be a number, not '%s'", args[0].Type())
+		base, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
 		}
 
-		exp, ok := args[1].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("pow() exponent must be a number, not '%s'", args[1].Type())
+		exp, err := v.GetNumber(1)
+		if err != nil {
+			return nil, err
 		}
 
-		if len(args) == 3 {
+		if v.Count() == 3 {
 			// Three-argument form: pow(base, exp, mod)
-			mod, ok := args[2].(core.NumberValue)
-			if !ok {
-				return nil, fmt.Errorf("pow() modulus must be a number, not '%s'", args[2].Type())
+			mod, err := v.GetNumber(2)
+			if err != nil {
+				return nil, err
 			}
-			if float64(mod) == 0 {
+			if mod == 0 {
 				return nil, fmt.Errorf("pow() 3rd argument cannot be 0")
 			}
 			// For now, just compute normally and mod
 			// In the future, should use modular exponentiation
-			result := math.Pow(float64(base), float64(exp))
-			return core.NumberValue(math.Mod(result, float64(mod))), nil
+			result := math.Pow(base, exp)
+			return core.NumberValue(math.Mod(result, mod)), nil
 		}
 
-		return core.NumberValue(math.Pow(float64(base), float64(exp))), nil
+		return core.NumberValue(math.Pow(base, exp)), nil
 	}))
 
 	// sum - sum of values
 	ctx.Define("sum", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 || len(args) > 2 {
-			return nil, fmt.Errorf("sum expected 1 or 2 arguments, got %d", len(args))
+		v := validation.NewArgs("sum", args)
+		if err := v.Range(1, 2); err != nil {
+			return nil, err
 		}
 
-		var start float64 = 0
-		if len(args) == 2 {
-			if num, ok := args[1].(core.NumberValue); ok {
-				start = float64(num)
-			} else {
-				return nil, fmt.Errorf("sum() start argument must be a number")
-			}
+		// Get the iterable first argument
+		iterable, err := v.GetIterable(0)
+		if err != nil {
+			return nil, err
 		}
 
-		// Get the iterable
+		// Get optional start value (default 0)
+		start, _ := v.GetNumberOrDefault(1, 0)
+
+		// Extract items from the iterable
 		var items []core.Value
-		switch v := args[0].(type) {
+		switch v := iterable.(type) {
 		case core.ListValue:
 			items = v
 		case core.TupleValue:
@@ -141,11 +145,11 @@ func RegisterNumeric(ctx *core.Context) {
 
 		sum := start
 		for _, item := range items {
-			if num, ok := item.(core.NumberValue); ok {
-				sum += float64(num)
-			} else {
+			num, err := types.RequireNumber(item, "sum() element")
+			if err != nil {
 				return nil, fmt.Errorf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())
 			}
+			sum += num
 		}
 
 		return core.NumberValue(sum), nil

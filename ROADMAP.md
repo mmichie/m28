@@ -271,13 +271,14 @@ This is the single source of truth for M28 development. All other roadmap/todo d
    - [ ] **Codebase-Wide Improvements** 🔴 IN PROGRESS
      - [x] Foundation: Standardized error handling (`common/errors` package) ✅
      - [x] Foundation: Common validation utilities (`common/validation` package) ✅
-     - [ ] **Type System Improvements** (In Progress - See TYPE_SYSTEM_IMPROVEMENTS.md for detailed tasks)
-       - [x] Phase 1: Type assertion helpers (AsNumber, RequireString, etc.) ✅ COMPLETE
-         - Created `common/types` package with extraction and predicate utilities
-         - 13 As* functions and 13 Require* functions with consistent error handling
-         - 16 predicate functions for type checking
+     - [x] **Type System Improvements** (Phase 1 Complete ✅ - See TYPE_SYSTEM_IMPROVEMENTS.md)
+       - [x] Phase 1: Type assertion helpers ✅ COMPLETE
+         - Created 13 As* and 13 Require* functions in common/types/extraction.go
+         - Created 16 Is* predicate functions in common/types/predicates.go
          - Comprehensive tests with 100% pass rate
-         - Example shows 40-50% code reduction in type-heavy functions
+         - Migrated builtin/numeric.go (~50% code reduction)
+         - Migrated builtin/string_ops.go (~40% code reduction)
+       - [ ] Phase 1.5: Migration of remaining code (In Progress)
        - [ ] Phase 2: Protocol interfaces (Numeric, Indexable, Container) - Week 1-2
        - [ ] Phase 3: TypeSwitch builder for complex type handling - Week 2
        - [ ] Phase 4: Dunder method utilities (CallDunder, HasDunder) - Week 2-3
