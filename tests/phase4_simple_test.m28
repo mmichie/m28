@@ -1,0 +1,37 @@
+# Simple test for Phase 4 functions that should work with existing system
+
+# Test type conversions that are already in the system
+(print "Testing basic type conversions...")
+
+# str function (should already exist)
+(assert (== (str 42) "42") "str(42) should be '42'")
+(assert (== (str True) "True") "str(True) should be 'True'")
+
+# int function (should already exist)
+(assert (== (int "42") 42) "int('42') should be 42")
+(assert (== (int 3.14) 3) "int(3.14) should be 3")
+
+# bool function (should already exist)
+(assert (== (bool 1) True) "bool(1) should be True")
+(assert (== (bool 0) False) "bool(0) should be False")
+
+# Test list operations
+(print "Testing basic list operations...")
+
+# These should exist
+(assert (== (len [1, 2, 3]) 3) "len([1,2,3]) should be 3")
+(assert (== (list (range 5)) [0, 1, 2, 3, 4]) "range(5) should work")
+
+# Test comparisons (should exist)
+(print "Testing comparisons...")
+(assert (== 1 1) "1 == 1")
+(assert (!= 1 2) "1 != 2")
+(assert (< 1 2) "1 < 2")
+(assert (> 2 1) "2 > 1")
+
+# Test functional operations
+(print "Testing functional operations...")
+(assert (== (list (map (lambda (x) (* x 2)) [1, 2, 3])) [2, 4, 6]) "map should work")
+(assert (== (list (filter (lambda (x) (> x 2)) [1, 2, 3, 4])) [3, 4]) "filter should work")
+
+(print "\n✅ Basic Phase 4 tests passed!")

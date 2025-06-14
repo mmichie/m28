@@ -22,8 +22,8 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterMisc(ctx)
 
 	// Register operators
-	operators.RegisterArithmeticOperators(ctx)
-	operators.RegisterComparisonOperators(ctx)
+	operators.RegisterArithmetic(ctx)
+	operators.RegisterComparison(ctx)
 	operators.RegisterLogicalOperators(ctx)
 
 	// Register type methods
@@ -45,7 +45,6 @@ func RegisterAllBuiltins(ctx *core.Context) {
 
 	// Also register functions from other files that haven't been migrated yet
 	RegisterStringFunctions(ctx)
-	RegisterListFunctions(ctx)
 	RegisterDictFunctions(ctx)
 	RegisterEssentialBuiltins(ctx)
 	RegisterUtilityFunctions(ctx)

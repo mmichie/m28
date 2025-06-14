@@ -1,0 +1,45 @@
+# Check what functions are available
+
+(print "Checking type conversion functions...")
+
+# Try each function carefully
+(try
+  (print "str function:" (str 42))
+  (except Exception as e
+    (print "str failed:" e)))
+
+(try
+  (print "int function:" (int "42"))
+  (except Exception as e
+    (print "int failed:" e)))
+
+(try  
+  (print "bool function:" (bool 1))
+  (except Exception as e
+    (print "bool failed:" e)))
+
+(try
+  (print "type function:" (type 42))
+  (except Exception as e
+    (print "type failed:" e)))
+
+(print "\nChecking list functions...")
+
+(try
+  (print "len function:" (len [1, 2, 3]))
+  (except Exception as e
+    (print "len failed:" e)))
+
+(try
+  (print "range function:" (list (range 3)))
+  (except Exception as e
+    (print "range failed:" e)))
+
+(print "\nChecking functional operations...")
+
+(try
+  (print "map function:" (list (map (lambda (x) (* x 2)) [1, 2])))
+  (except Exception as e
+    (print "map failed:" e)))
+
+(print "\nDone checking functions")

@@ -1,0 +1,212 @@
+# Test Phase 4 migrated functions
+
+# Test type conversion functions
+(print "Testing type conversions...")
+
+# type function
+(assert (== (type 42) int) "type(42) should be int")
+(assert (== (type "hello") str) "type('hello') should be str")
+(assert (== (type True) bool) "type(True) should be bool")
+(assert (== (type nil) nil) "type(nil) should be nil")
+(assert (== (type [1, 2]) list) "type([1,2]) should be list")
+
+# str function
+(assert (== (str 42) "42") "str(42) should be '42'")
+(assert (== (str True) "True") "str(True) should be 'True'")
+(assert (== (str nil) "nil") "str(nil) should be 'nil'")
+
+# bool function
+(assert (== (bool 1) True) "bool(1) should be True")
+(assert (== (bool 0) False) "bool(0) should be False")
+(assert (== (bool "") False) "bool('') should be False")
+(assert (== (bool "hello") True) "bool('hello') should be True")
+(assert (== (bool []) False) "bool([]) should be False")
+(assert (== (bool [1]) True) "bool([1]) should be True")
+
+# is_none function
+(assert (is_none nil) "is_none(nil) should be True")
+(assert (not (is_none 0)) "is_none(0) should be False")
+(assert (not (is_none False)) "is_none(False) should be False")
+
+# int function
+(assert (== (int "42") 42) "int('42') should be 42")
+(assert (== (int 3.14) 3) "int(3.14) should be 3")
+(assert (== (int True) 1) "int(True) should be 1")
+(assert (== (int False) 0) "int(False) should be 0")
+(assert (== (int "10" 16) 16) "int('10', 16) should be 16")
+(assert (== (int "1010" 2) 10) "int('1010', 2) should be 10")
+
+# float function
+(assert (== (float "3.14") 3.14) "float('3.14') should be 3.14")
+(assert (== (float 42) 42.0) "float(42) should be 42.0")
+(assert (== (float True) 1.0) "float(True) should be 1.0")
+(assert (== (float False) 0.0) "float(False) should be 0.0")
+
+# isinstance function
+(assert (isinstance 42 int) "isinstance(42, int) should be True")
+(assert (isinstance "hello" str) "isinstance('hello', str) should be True")
+(assert (not (isinstance 42 str)) "isinstance(42, str) should be False")
+(assert (isinstance True bool) "isinstance(True, bool) should be True")
+
+(print "Type conversions passed!")
+
+# Test list operations
+(print "Testing list operations...")
+
+# append
+(= lst [1, 2, 3])
+(assert (== (append lst 4 5) [1, 2, 3, 4, 5]) "append should add elements")
+
+# length
+(assert (== (length [1, 2, 3]) 3) "length of [1,2,3] should be 3")
+(assert (== (length "hello") 5) "length of 'hello' should be 5")
+(assert (== (length {}) 0) "length of {} should be 0")
+
+# first
+(assert (== (first [1, 2, 3]) 1) "first of [1,2,3] should be 1")
+(assert (== (first "hello") "h") "first of 'hello' should be 'h'")
+
+# rest
+(assert (== (rest [1, 2, 3]) [2, 3]) "rest of [1,2,3] should be [2,3]")
+(assert (== (rest "hello") "ello") "rest of 'hello' should be 'ello'")
+
+# nth
+(assert (== (nth [10, 20, 30] 1) 20) "nth([10,20,30], 1) should be 20")
+(assert (== (nth "hello" 2) "l") "nth('hello', 2) should be 'l'")
+(assert (== (nth [1, 2, 3] -1) 3) "nth with negative index should work")
+
+# reversed
+(assert (== (reversed [1, 2, 3]) [3, 2, 1]) "reversed([1,2,3]) should be [3,2,1]")
+(assert (== (reversed "hello") "olleh") "reversed('hello') should be 'olleh'")
+
+# concat
+(assert (== (concat [1, 2] [3, 4] [5]) [1, 2, 3, 4, 5]) "concat lists")
+(assert (== (concat "hello" " " "world") "hello world") "concat strings")
+
+# range
+(assert (== (list (range 5)) [0, 1, 2, 3, 4]) "range(5)")
+(assert (== (list (range 2 5)) [2, 3, 4]) "range(2, 5)")
+(assert (== (list (range 0 10 2)) [0, 2, 4, 6, 8]) "range(0, 10, 2)")
+
+# sorted
+(assert (== (sorted [3, 1, 4, 1, 5]) [1, 1, 3, 4, 5]) "sorted should sort list")
+
+(print "List operations passed!")
+
+# Test comparison operators
+(print "Testing comparison operators...")
+
+# ==
+(assert (== 1 1) "1 == 1 should be True")
+(assert (not (== 1 2)) "1 == 2 should be False")
+(assert (== "hello" "hello") "string equality")
+(assert (== [1, 2] [1, 2]) "list equality")
+
+# !=
+(assert (!= 1 2) "1 != 2 should be True")
+(assert (not (!= 1 1)) "1 != 1 should be False")
+
+# <
+(assert (< 1 2) "1 < 2 should be True")
+(assert (not (< 2 1)) "2 < 1 should be False")
+(assert (< "apple" "banana") "string comparison")
+
+# <=
+(assert (<= 1 2) "1 <= 2 should be True")
+(assert (<= 2 2) "2 <= 2 should be True")
+(assert (not (<= 3 2)) "3 <= 2 should be False")
+
+# >
+(assert (> 2 1) "2 > 1 should be True")
+(assert (not (> 1 2)) "1 > 2 should be False")
+
+# >=
+(assert (>= 2 1) "2 >= 1 should be True")
+(assert (>= 2 2) "2 >= 2 should be True")
+(assert (not (>= 1 2)) "1 >= 2 should be False")
+
+(print "Comparison operators passed!")
+
+# Test I/O functions (basic tests)
+(print "Testing I/O functions...")
+
+# print - already using it throughout
+(print "print function works")
+
+# callable
+(assert (callable print) "print should be callable")
+(assert (not (callable 42)) "42 should not be callable")
+(assert (callable (lambda (x) x)) "lambda should be callable")
+
+# dir
+(= obj {"a": 1, "b": 2})
+(= attrs (dir obj))
+(assert (isinstance attrs list) "dir should return a list")
+
+(print "I/O functions passed!")
+
+# Test iteration functions
+(print "Testing iteration functions...")
+
+# enumerate
+(= enum_list [])
+(for i val in (enumerate ["a", "b", "c"])
+  (= enum_list (append enum_list [i, val])))
+(assert (== enum_list [[0, "a"], [1, "b"], [2, "c"]]) "enumerate should work")
+
+# zip
+(= zip_list [])
+(for pair in (zip [1, 2, 3] ["a", "b", "c"])
+  (= zip_list (append zip_list pair)))
+(assert (== zip_list [(1, "a"), (2, "b"), (3, "c")]) "zip should work")
+
+# map
+(assert (== (list (map (lambda (x) (* x 2)) [1, 2, 3])) [2, 4, 6]) "map should double values")
+
+# filter
+(assert (== (list (filter (lambda (x) (> x 2)) [1, 2, 3, 4])) [3, 4]) "filter should keep > 2")
+
+# reduce
+(assert (== (reduce + [1, 2, 3, 4]) 10) "reduce with + should sum")
+(assert (== (reduce + [1, 2, 3] 10) 16) "reduce with initial value")
+
+# all
+(assert (all [True, True, True]) "all([True, True, True]) should be True")
+(assert (not (all [True, False, True])) "all with False should be False")
+(assert (all []) "all([]) should be True")
+
+# any
+(assert (any [False, True, False]) "any with one True should be True")
+(assert (not (any [False, False, False])) "any all False should be False")
+(assert (not (any [])) "any([]) should be False")
+
+(print "Iteration functions passed!")
+
+# Test arithmetic operators
+(print "Testing arithmetic operators...")
+
+# +
+(assert (== (+ 1 2) 3) "1 + 2 should be 3")
+(assert (== (+ "hello" " world") "hello world") "string concatenation")
+(assert (== (+ [1, 2] [3, 4]) [1, 2, 3, 4]) "list concatenation")
+
+# -
+(assert (== (- 5 3) 2) "5 - 3 should be 2")
+
+# *
+(assert (== (* 3 4) 12) "3 * 4 should be 12")
+(assert (== (* "hi" 3) "hihihi") "string repetition")
+(assert (== (* [1, 2] 2) [1, 2, 1, 2]) "list repetition")
+
+# /
+(assert (== (/ 10 2) 5) "10 / 2 should be 5")
+
+# %
+(assert (== (% 10 3) 1) "10 % 3 should be 1")
+
+# **
+(assert (== (** 2 3) 8) "2 ** 3 should be 8")
+
+(print "Arithmetic operators passed!")
+
+(print "\n✅ All Phase 4 migration tests passed!")

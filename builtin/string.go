@@ -19,7 +19,7 @@ func RegisterStringFunctions(ctx *core.Context) {
 	ctx.Define("format-expr", core.NewBuiltinFunction(FormatExprFunc))
 
 	// String properties
-	ctx.Define("length", core.NewBuiltinFunction(LengthFunc))  // This function is already in list.go
+	// Note: "length" function is now registered in list.go
 	ctx.Define("str-len", core.NewBuiltinFunction(StrLenFunc)) // Legacy name for compatibility
 
 	// String operations
