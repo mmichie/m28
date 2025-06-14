@@ -3,7 +3,6 @@ package builtin
 import (
 	"fmt"
 	"github.com/mmichie/m28/core"
-	"math"
 )
 
 // RegisterEssentialBuiltins registers additional essential built-in functions
@@ -146,62 +145,9 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		}
 	}))
 
-	// round() - round a number to given precision
-	ctx.Define("round", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 || len(args) > 2 {
-			return nil, fmt.Errorf("round() takes 1 or 2 arguments (%d given)", len(args))
-		}
+	// round() - now registered in numeric.go
 
-		// Get the number to round
-		num, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("round() argument must be a number, not '%s'", args[0].Type())
-		}
-
-		// Get precision (default 0)
-		precision := 0
-		if len(args) == 2 {
-			p, ok := args[1].(core.NumberValue)
-			if !ok {
-				return nil, fmt.Errorf("round() precision must be an integer")
-			}
-			precision = int(p)
-		}
-
-		// Perform rounding
-		multiplier := math.Pow(10, float64(precision))
-		rounded := math.Round(float64(num)*multiplier) / multiplier
-
-		return core.NumberValue(rounded), nil
-	}))
-
-	// divmod() - return quotient and remainder
-	ctx.Define("divmod", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("divmod() takes exactly 2 arguments (%d given)", len(args))
-		}
-
-		// Get dividend and divisor
-		a, ok1 := args[0].(core.NumberValue)
-		b, ok2 := args[1].(core.NumberValue)
-		if !ok1 || !ok2 {
-			return nil, fmt.Errorf("divmod() arguments must be numbers")
-		}
-
-		if b == 0 {
-			return nil, fmt.Errorf("integer division or modulo by zero")
-		}
-
-		// Calculate quotient and remainder
-		quotient := math.Floor(float64(a) / float64(b))
-		remainder := float64(a) - quotient*float64(b)
-
-		// Return as tuple
-		return core.TupleValue{
-			core.NumberValue(quotient),
-			core.NumberValue(remainder),
-		}, nil
-	}))
+	// divmod() - now registered in numeric.go
 
 	// hasattr() - check if object has attribute
 	ctx.Define("hasattr", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -320,13 +266,5 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 	}))
 
 	// callable() - check if object is callable
-	ctx.Define("callable", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("callable() takes exactly 1 argument (%d given)", len(args))
-		}
-
-		// Check if implements Callable interface
-		_, isCallable := args[0].(core.Callable)
-		return core.BoolValue(isCallable), nil
-	}))
+	// callable() - now registered in functional.go
 }

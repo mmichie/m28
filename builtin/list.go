@@ -10,7 +10,7 @@ import (
 // RegisterListFunctions registers list-related functions in the global context
 func RegisterListFunctions(ctx *core.Context) {
 	// List creation and conversion
-	ctx.Define("list", core.NewBuiltinFunction(ListFunc))
+	// list is now registered in collections.go with better implementation
 	ctx.Define("range", core.NewBuiltinFunction(RangeFunc))
 
 	// List operations
@@ -23,27 +23,6 @@ func RegisterListFunctions(ctx *core.Context) {
 	// map, filter, reduce are now registered in functional.go
 	ctx.Define("sorted", NewKwargsBuiltinFunction("sorted", SortedWithKwargs))
 	ctx.Define("reversed", core.NewBuiltinFunction(ReversedFunc))
-}
-
-// ListFunc creates a list from the given arguments
-func ListFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	// Special case: if single argument is an iterable, convert it to a list
-	if len(args) == 1 {
-		if iterable, ok := args[0].(core.Iterable); ok {
-			result := make(core.ListValue, 0)
-			iter := iterable.Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				result = append(result, val)
-			}
-			return result, nil
-		}
-	}
-
-	return core.ListValue(args), nil
 }
 
 // RangeFunc creates a lazy range object

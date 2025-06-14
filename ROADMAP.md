@@ -252,12 +252,15 @@ This is the single source of truth for M28 development. All other roadmap/todo d
      - [x] `map` - consolidated to functional.go (using best implementation from utilities.go)
      - [x] `filter` - consolidated to functional.go (already had complete implementation)
      - [x] `reduce` - consolidated to functional.go (using best implementation from list.go)
-   - [ ] **Phase 3: Utility Function Cleanup** (19 remaining functions)
-     - [ ] Move unique functions from utilities.go to appropriate modules
-     - [ ] Remove duplicates from essential_builtins.go
-     - [ ] Establish single source of truth for each builtin
-   - **Current Status**: 38 duplicate builtins identified. Registry system implemented to track all registrations. See DUPLICATE_BUILTINS_REPORT.md for full details.
-   - **Next Steps**: Start with operators (Phase 1) as they're the most critical
+   - [x] **Phase 3: Utility Function Cleanup** ✅ COMPLETE (19 remaining functions)
+     - [x] Removed math duplicates (abs, pow, sum) from modules/math.go
+     - [x] Removed attribute duplicates (hasattr, getattr, setattr) from attributes.go
+     - [x] Consolidated collection/iteration functions (enumerate, zip, next, concat)
+     - [x] Removed duplicates from essential_builtins.go (error, round, divmod, callable)
+     - [x] Resolved assert duplicate between errors.go and assert.go
+     - [x] Established single source of truth for each builtin
+   - **Current Status**: ✅ ALL PHASES COMPLETE - Eliminated all 41 duplicate registrations
+   - **Results**: Reduced from 110 to 69 total builtins, with each function now having a single source of truth
 
 2. **Record Stream and JSON Processing** (NEW)
    - [ ] Path-based access functions (`get-in`, `assoc-in`, `update-in`, `dissoc-in`)

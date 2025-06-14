@@ -44,9 +44,37 @@ func RegisterIteration(ctx *core.Context) {
 			return nil, fmt.Errorf("next() takes 1 or 2 arguments (%d given)", len(args))
 		}
 
-		// For now, next() doesn't work with iterators since they're not Values
-		// TODO: Implement proper iterator support
-		return nil, fmt.Errorf("next() not yet implemented for iterators")
+		// Get the iterator
+		iterator := args[0]
+
+		// Check if it has a __next__ method
+		if obj, ok := iterator.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			if nextMethod, found := obj.GetAttr("__next__"); found {
+				// Call the __next__ method
+				if callable, ok := nextMethod.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						// If StopIteration and default provided, return default
+						if len(args) == 2 {
+							return args[1], nil
+						}
+						return nil, err
+					}
+					return result, nil
+				}
+			}
+		}
+
+		// If no __next__ method and default provided, return default
+		if len(args) == 2 {
+			return args[1], nil
+		}
+
+		return nil, fmt.Errorf("'%s' object is not an iterator", iterator.Type())
 	}))
 
 	// enumerate - return enumerate object

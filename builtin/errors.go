@@ -69,21 +69,5 @@ func RegisterErrors(ctx *core.Context) {
 		}
 	}))
 
-	// assert - assert a condition
-	ctx.Define("assert", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 || len(args) > 2 {
-			return nil, fmt.Errorf("assert takes 1 or 2 arguments (%d given)", len(args))
-		}
-
-		// Check condition
-		if !core.IsTruthy(args[0]) {
-			msg := "assertion failed"
-			if len(args) == 2 {
-				msg = args[1].String()
-			}
-			return nil, fmt.Errorf("AssertionError: %s", msg)
-		}
-
-		return core.Nil, nil
-	}))
+	// assert - now registered in assert.go
 }

@@ -94,78 +94,10 @@ func RegisterMathModule(ctx *core.Context) {
 
 // registerCoreMathFunctions registers core math functions in the global context
 func registerCoreMathFunctions(ctx *core.Context) {
-	// abs - absolute value
-	ctx.Define("abs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("abs() takes exactly one argument (%d given)", len(args))
-		}
-
-		switch v := args[0].(type) {
-		case core.NumberValue:
-			return core.NumberValue(math.Abs(float64(v))), nil
-		default:
-			return nil, fmt.Errorf("abs() argument must be a number, not '%s'", v.Type())
-		}
-	}))
-
+	// abs, sum, pow are now registered in numeric.go to avoid duplication
 	// Note: min and max are registered in numeric.go with full kwargs support
 
-	// sum - sum of values
-	ctx.Define("sum", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 || len(args) > 2 {
-			return nil, fmt.Errorf("sum expected 1 or 2 arguments, got %d", len(args))
-		}
-
-		var start float64 = 0
-		if len(args) == 2 {
-			if num, ok := args[1].(core.NumberValue); ok {
-				start = float64(num)
-			} else {
-				return nil, fmt.Errorf("sum() start argument must be a number")
-			}
-		}
-
-		// Get the iterable
-		var items []core.Value
-		switch v := args[0].(type) {
-		case core.ListValue:
-			items = v
-		case core.TupleValue:
-			items = v
-		default:
-			return nil, fmt.Errorf("sum() argument must be an iterable, not '%s'", v.Type())
-		}
-
-		sum := start
-		for _, item := range items {
-			if num, ok := item.(core.NumberValue); ok {
-				sum += float64(num)
-			} else {
-				return nil, fmt.Errorf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())
-			}
-		}
-
-		return core.NumberValue(sum), nil
-	}))
-
-	// pow - power function
-	ctx.Define("pow", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("pow() takes exactly 2 arguments (%d given)", len(args))
-		}
-
-		base, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("pow() base must be a number, not '%s'", args[0].Type())
-		}
-
-		exp, ok := args[1].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("pow() exponent must be a number, not '%s'", args[1].Type())
-		}
-
-		return core.NumberValue(math.Pow(float64(base), float64(exp))), nil
-	}))
+	// Math-specific functions that aren't duplicated elsewhere:
 
 	// sqrt - square root
 	ctx.Define("sqrt", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
