@@ -1,8 +1,10 @@
 # M28 Codebase-Wide Improvement Plan
 
+> **UPDATE**: The builtin package refactoring has been completed successfully. This document now focuses on remaining codebase-wide improvements beyond the builtin system.
+
 ## Executive Summary
 
-The M28 codebase exhibits systemic architectural issues that go beyond the builtin package. This document outlines a comprehensive plan to address these issues and establish better patterns for future development.
+The M28 codebase exhibits systemic architectural issues that go beyond the builtin package. While the builtin refactoring is complete (see ROADMAP.md for details), this document outlines remaining improvements needed across the broader codebase.
 
 ## Systemic Issues Identified
 
@@ -32,10 +34,12 @@ The M28 codebase exhibits systemic architectural issues that go beyond the built
 
 ## Improvement Strategy
 
-### Phase 1: Foundation Layer (Weeks 1-2)
+### Phase 1: Foundation Layer (Weeks 1-2) ✅ PARTIALLY COMPLETE
 
-#### 1.1 Error Handling Package
-Create `common/errors` package with standardized error types:
+> **UPDATE**: The `common/errors` and `common/validation` packages have been created as part of the builtin refactoring. These foundations are now available for use across the codebase.
+
+#### 1.1 Error Handling Package ✅ COMPLETE
+The `common/errors` package has been created with standardized error types:
 
 ```go
 // common/errors/types.go
@@ -83,8 +87,8 @@ func NewArgumentError(fn string, expected, got int) error {
 }
 ```
 
-#### 1.2 Validation Package
-Create `common/validation` package:
+#### 1.2 Validation Package ✅ COMPLETE
+The `common/validation` package has been created with comprehensive validation utilities:
 
 ```go
 // common/validation/args.go
@@ -369,15 +373,20 @@ func (r *StrategyRegistry) Evaluate(expr core.Value, ctx *core.Context) (core.Va
 
 ## Implementation Priorities
 
-### High Priority (Do First)
-1. Error handling standardization - Impacts entire codebase
-2. Validation utilities - Eliminates most duplication
-3. Type checking helpers - Reduces boilerplate
+### ✅ Completed (from builtin refactoring)
+1. Error handling standardization - `common/errors` package created
+2. Validation utilities - `common/validation` package created
+3. Function builders - `common/builders` package created
+
+### High Priority (Do Next)
+1. Type checking helpers - Reduces boilerplate across non-builtin code
+2. Protocol interfaces - Improves type system
+3. Package reorganization - Better architecture
 
 ### Medium Priority
-1. Protocol interfaces - Improves type system
-2. Package reorganization - Better architecture
-3. Complex function refactoring - Improves maintainability
+1. Complex function refactoring - Improves maintainability
+2. AST visitor pattern - Cleaner evaluation logic
+3. Testing infrastructure - Better coverage
 
 ### Low Priority (Do Later)
 1. Full visitor pattern - Nice to have but not critical
@@ -411,12 +420,15 @@ func (r *StrategyRegistry) Evaluate(expr core.Value, ctx *core.Context) (core.Va
 
 ## Next Steps
 
-1. Review and approve this plan
-2. Set up new package structure
-3. Implement error handling package
-4. Create validation utilities
-5. Begin migrating builtin package as proof of concept
-6. Roll out to other packages incrementally
+1. ~~Review and approve this plan~~ ✅
+2. ~~Set up new package structure~~ ✅ (common/ packages created)
+3. ~~Implement error handling package~~ ✅ (common/errors)
+4. ~~Create validation utilities~~ ✅ (common/validation)
+5. ~~Begin migrating builtin package as proof of concept~~ ✅ (complete)
+6. **CURRENT**: Apply patterns to non-builtin packages:
+   - Start with parser package (type checking helpers)
+   - Move to eval package (protocol interfaces)
+   - Continue with special_forms and modules
 
 ## Conclusion
 
