@@ -2,6 +2,9 @@ package builtin
 
 import (
 	"fmt"
+
+	"github.com/mmichie/m28/common/types"
+	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
 
@@ -14,73 +17,86 @@ func RegisterTypeCheckingFunctions(ctx *core.Context) {
 
 	// int() - convert to integer
 	ctx.Define("int", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return core.NumberValue(0), nil
+		v := validation.NewArgs("int", args)
+		if err := v.Max(2); err != nil {
+			return nil, err
 		}
-		if len(args) > 2 {
-			return nil, fmt.Errorf("int() takes at most 2 arguments (%d given)", len(args))
+
+		if v.Count() == 0 {
+			return core.NumberValue(0), nil
 		}
 
 		val := args[0]
 		// TODO: Handle optional base parameter for string conversion
 
-		switch v := val.(type) {
-		case core.NumberValue:
+		if num, ok := types.AsNumber(val); ok {
 			// Truncate to integer
-			return core.NumberValue(float64(int64(v))), nil
-		case core.StringValue:
+			return core.NumberValue(float64(int64(num))), nil
+		}
+
+		if str, ok := types.AsString(val); ok {
 			// Try to parse as integer
 			var num float64
-			if _, err := fmt.Sscanf(string(v), "%f", &num); err != nil {
-				return nil, fmt.Errorf("invalid literal for int() with base 10: '%s'", string(v))
+			if _, err := fmt.Sscanf(str, "%f", &num); err != nil {
+				return nil, fmt.Errorf("invalid literal for int() with base 10: '%s'", str)
 			}
 			return core.NumberValue(float64(int64(num))), nil
-		case core.BoolValue:
-			if v {
+		}
+
+		if b, ok := types.AsBool(val); ok {
+			if b {
 				return core.NumberValue(1), nil
 			}
 			return core.NumberValue(0), nil
-		default:
-			return nil, fmt.Errorf("int() argument must be a string or a number, not '%s'", val.Type())
 		}
+
+		return nil, fmt.Errorf("int() argument must be a string or a number, not '%s'", val.Type())
 	}))
 
 	// float() - convert to float
 	ctx.Define("float", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return core.NumberValue(0.0), nil
+		v := validation.NewArgs("float", args)
+		if err := v.Max(1); err != nil {
+			return nil, err
 		}
-		if len(args) != 1 {
-			return nil, fmt.Errorf("float() takes exactly one argument (%d given)", len(args))
+
+		if v.Count() == 0 {
+			return core.NumberValue(0.0), nil
 		}
 
 		val := args[0]
-		switch v := val.(type) {
-		case core.NumberValue:
-			return v, nil
-		case core.StringValue:
+
+		if num, ok := types.AsNumber(val); ok {
+			return core.NumberValue(num), nil
+		}
+
+		if str, ok := types.AsString(val); ok {
 			var num float64
-			if _, err := fmt.Sscanf(string(v), "%f", &num); err != nil {
-				return nil, fmt.Errorf("could not convert string to float: '%s'", string(v))
+			if _, err := fmt.Sscanf(str, "%f", &num); err != nil {
+				return nil, fmt.Errorf("could not convert string to float: '%s'", str)
 			}
 			return core.NumberValue(num), nil
-		case core.BoolValue:
-			if v {
+		}
+
+		if b, ok := types.AsBool(val); ok {
+			if b {
 				return core.NumberValue(1.0), nil
 			}
 			return core.NumberValue(0.0), nil
-		default:
-			return nil, fmt.Errorf("float() argument must be a string or a number, not '%s'", val.Type())
 		}
+
+		return nil, fmt.Errorf("float() argument must be a string or a number, not '%s'", val.Type())
 	}))
 
 	// str() - convert to string
 	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return core.StringValue(""), nil
+		v := validation.NewArgs("str", args)
+		if err := v.Max(1); err != nil {
+			return nil, err
 		}
-		if len(args) != 1 {
-			return nil, fmt.Errorf("str() takes exactly one argument (%d given)", len(args))
+
+		if v.Count() == 0 {
+			return core.StringValue(""), nil
 		}
 
 		// Use the string representation
@@ -89,42 +105,38 @@ func RegisterTypeCheckingFunctions(ctx *core.Context) {
 
 	// bool() - convert to boolean
 	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return core.False, nil
-		}
-		if len(args) != 1 {
-			return nil, fmt.Errorf("bool() takes exactly one argument (%d given)", len(args))
+		v := validation.NewArgs("bool", args)
+		if err := v.Max(1); err != nil {
+			return nil, err
 		}
 
-		return core.BoolValue(core.IsTruthy(args[0])), nil
+		if v.Count() == 0 {
+			return core.False, nil
+		}
+
+		return core.BoolValue(types.IsTruthy(args[0])), nil
 	}))
 
 	// repr() is now defined in misc.go to avoid duplication
 
 	// bytes() - convert string to bytes representation
 	ctx.Define("bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 || len(args) > 2 {
-			return nil, fmt.Errorf("bytes() takes 1 or 2 arguments (%d given)", len(args))
+		v := validation.NewArgs("bytes", args)
+		if err := v.Range(1, 2); err != nil {
+			return nil, err
 		}
 
 		// For now, we'll represent bytes as a list of numbers
 		// In a full implementation, we'd have a proper bytes type
 
 		// Get the string to convert
-		str, ok := args[0].(core.StringValue)
-		if !ok {
-			return nil, fmt.Errorf("bytes() argument 1 must be a string, not '%s'", args[0].Type())
+		str, err := v.GetString(0)
+		if err != nil {
+			return nil, err
 		}
 
 		// Optional encoding parameter (default to UTF-8)
-		encoding := "utf-8"
-		if len(args) == 2 {
-			enc, ok := args[1].(core.StringValue)
-			if !ok {
-				return nil, fmt.Errorf("bytes() argument 2 must be a string, not '%s'", args[1].Type())
-			}
-			encoding = string(enc)
-		}
+		encoding, _ := v.GetStringOrDefault(1, "utf-8")
 
 		// For now, only support UTF-8
 		if encoding != "utf-8" && encoding != "utf8" {
@@ -132,7 +144,7 @@ func RegisterTypeCheckingFunctions(ctx *core.Context) {
 		}
 
 		// Convert string to bytes
-		bytes := []byte(string(str))
+		bytes := []byte(str)
 		result := make(core.ListValue, len(bytes))
 		for i, b := range bytes {
 			result[i] = core.NumberValue(float64(b))

@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"github.com/mmichie/m28/common/errors"
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
@@ -44,19 +45,19 @@ func MapBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 		}
 
 		// First argument must be callable
-		fn, ok := v.Get(0).(core.Callable)
-		if !ok {
-			return nil, errors.NewTypeError("map", "callable", string(v.Get(0).Type()))
+		fn, err := types.RequireCallable(v.Get(0), "map() first argument")
+		if err != nil {
+			return nil, err
 		}
 
 		// Get all iterables
 		iterables := make([]core.Iterable, v.Count()-1)
 		for i := 1; i < v.Count(); i++ {
-			if iter, ok := v.Get(i).(core.Iterable); ok {
-				iterables[i-1] = iter
-			} else {
-				return nil, errors.NewTypeError("map", "iterable", string(v.Get(i).Type()))
+			iter, err := types.RequireIterable(v.Get(i), "map() argument")
+			if err != nil {
+				return nil, err
 			}
+			iterables[i-1] = iter
 		}
 
 		// TODO: Return map iterator when implemented
@@ -93,18 +94,18 @@ func FilterBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 
 		// First argument can be callable or None
 		var predicate core.Callable
-		if _, isNil := v.Get(0).(core.NilValue); !isNil {
-			fn, ok := v.Get(0).(core.Callable)
-			if !ok {
-				return nil, errors.NewTypeError("filter", "callable or None", string(v.Get(0).Type()))
+		if !types.IsNil(v.Get(0)) {
+			fn, err := types.RequireCallable(v.Get(0), "filter() first argument")
+			if err != nil {
+				return nil, err
 			}
 			predicate = fn
 		}
 
 		// Second argument must be iterable
-		iterable, ok := v.Get(1).(core.Iterable)
-		if !ok {
-			return nil, errors.NewTypeError("filter", "iterable", string(v.Get(1).Type()))
+		iterable, err := types.RequireIterable(v.Get(1), "filter() second argument")
+		if err != nil {
+			return nil, err
 		}
 
 		// TODO: Return filter iterator when implemented
@@ -118,7 +119,7 @@ func FilterBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 			}
 			// If predicate is nil, use truthiness
 			if predicate == nil {
-				if core.IsTruthy(val) {
+				if types.IsTruthy(val) {
 					result = append(result, val)
 				}
 			} else {
@@ -126,7 +127,7 @@ func FilterBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 				if err != nil {
 					return nil, err
 				}
-				if core.IsTruthy(keep) {
+				if types.IsTruthy(keep) {
 					result = append(result, val)
 				}
 			}
@@ -145,15 +146,15 @@ func ReduceBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 		}
 
 		// First argument must be callable
-		fn, ok := v.Get(0).(core.Callable)
-		if !ok {
-			return nil, errors.NewTypeError("reduce", "callable", string(v.Get(0).Type()))
+		fn, err := types.RequireCallable(v.Get(0), "reduce() first argument")
+		if err != nil {
+			return nil, err
 		}
 
 		// Second argument must be iterable
-		iterable, ok := v.Get(1).(core.Iterable)
-		if !ok {
-			return nil, errors.NewTypeError("reduce", "iterable", string(v.Get(1).Type()))
+		iterable, err := types.RequireIterable(v.Get(1), "reduce() second argument")
+		if err != nil {
+			return nil, err
 		}
 
 		// Get iterator
@@ -201,9 +202,9 @@ func AllBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 		}
 
 		// Get iterable
-		iterable, ok := v.Get(0).(core.Iterable)
-		if !ok {
-			return nil, errors.NewTypeError("all", "iterable", string(v.Get(0).Type()))
+		iterable, err := types.RequireIterable(v.Get(0), "all() argument")
+		if err != nil {
+			return nil, err
 		}
 
 		// Check all elements
@@ -214,7 +215,7 @@ func AllBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 				break
 			}
 
-			if !core.IsTruthy(val) {
+			if !types.IsTruthy(val) {
 				return core.BoolValue(false), nil
 			}
 		}
@@ -233,9 +234,9 @@ func AnyBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 		}
 
 		// Get iterable
-		iterable, ok := v.Get(0).(core.Iterable)
-		if !ok {
-			return nil, errors.NewTypeError("any", "iterable", string(v.Get(0).Type()))
+		iterable, err := types.RequireIterable(v.Get(0), "any() argument")
+		if err != nil {
+			return nil, err
 		}
 
 		// Check any element
@@ -246,7 +247,7 @@ func AnyBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 				break
 			}
 
-			if core.IsTruthy(val) {
+			if types.IsTruthy(val) {
 				return core.BoolValue(true), nil
 			}
 		}

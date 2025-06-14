@@ -28,22 +28,29 @@
 - Pattern: Identical validation patterns, string type assertions
 
 ### 3. `builtin/collections.go` - Complex type switches
-- [ ] `list()` constructor - Lines 12-57
-- [ ] `tuple()` constructor - Lines 60-95
-- [ ] `dict()` constructor - Lines 98-140
-- [ ] `set()` constructor - Lines 143-185
+- [x] `list()` constructor - Lines 12-57 ✓ Migrated
+- [x] `tuple()` constructor - Lines 60-95 ✓ Migrated
+- [ ] `dict()` constructor - Lines 98-140 (uses kwargs, skipped)
+- [x] `set()` constructor - Lines 143-185 ✓ Migrated
+- [x] `frozenset()` constructor ✓ Migrated
+- [x] `slice()` constructor ✓ Migrated
+- [x] `len()` function ✓ Migrated
 - Pattern: Complex iterable handling, could use `AsIterable()`
 
 ### 4. `builtin/type_checking.go` - Can use helpers internally
-- [ ] `isinstance()` - Lines 15-35
-- [ ] `type()` - Lines 38-48
-- [ ] `callable()` - Lines 51-65
+- [x] `int()` - Type conversion ✓ Migrated
+- [x] `float()` - Type conversion ✓ Migrated
+- [x] `str()` - Type conversion ✓ Migrated
+- [x] `bool()` - Type conversion ✓ Migrated
+- [x] `bytes()` - Type conversion ✓ Migrated
 - Pattern: Manual type checking that helpers now provide
 
 ### 5. `builtin/functional.go` - Callable validation
-- [ ] `map()` - Callable validation
-- [ ] `filter()` - Callable validation  
-- [ ] `reduce()` - Callable validation
+- [x] `map()` - Callable validation ✓ Migrated
+- [x] `filter()` - Callable validation ✓ Migrated
+- [x] `reduce()` - Callable validation ✓ Migrated
+- [x] `all()` - Iterable validation ✓ Migrated
+- [x] `any()` - Iterable validation ✓ Migrated
 - Pattern: All need callable as first argument
 
 ## Medium Priority Files

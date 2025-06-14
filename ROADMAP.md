@@ -276,9 +276,13 @@ This is the single source of truth for M28 development. All other roadmap/todo d
          - Created 13 As* and 13 Require* functions in common/types/extraction.go
          - Created 16 Is* predicate functions in common/types/predicates.go
          - Comprehensive tests with 100% pass rate
-         - Migrated builtin/numeric.go (~50% code reduction)
-         - Migrated builtin/string_ops.go (~40% code reduction)
-       - [ ] Phase 1.5: Migration of remaining code (In Progress)
+       - [x] Phase 1.5: Migration of high-priority code ✅ COMPLETE
+         - Migrated 5 files with significant code reduction:
+           - builtin/numeric.go (~50% reduction)
+           - builtin/string_ops.go (~40% reduction)
+           - builtin/collections.go (simplified type switches)
+           - builtin/type_checking.go (cleaner conversions)
+           - builtin/functional.go (consistent validation)
        - [ ] Phase 2: Protocol interfaces (Numeric, Indexable, Container) - Week 1-2
        - [ ] Phase 3: TypeSwitch builder for complex type handling - Week 2
        - [ ] Phase 4: Dunder method utilities (CallDunder, HasDunder) - Week 2-3

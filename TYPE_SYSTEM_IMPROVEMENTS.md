@@ -79,6 +79,21 @@ Implemented all predicates with proper type checking:
    - ~40% code reduction achieved
    - Consistent validation patterns across all string operations
 
+3. **builtin/collections.go** ✅
+   - Migrated: list(), tuple(), set(), frozenset(), slice(), len()
+   - Simplified complex type switches with AsIterable() helper
+   - Consistent handling of iterable conversions
+   
+4. **builtin/type_checking.go** ✅
+   - Migrated all type conversion functions: int(), float(), str(), bool(), bytes()
+   - Cleaner type checking with As* helpers
+   - Consistent error messages
+   
+5. **builtin/functional.go** ✅
+   - Migrated: map(), filter(), reduce(), all(), any()
+   - Simplified callable and iterable validation
+   - Consistent use of IsTruthy from types package
+
 #### Benefits Observed:
 - Significant code reduction (40-50%)
 - Consistent error messages
