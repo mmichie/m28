@@ -60,8 +60,8 @@ Successfully separated modules from builtins:
 ### Python Protocol Implementation
 - [x] Arithmetic protocols (`__add__`, `__sub__`, etc.) ✅ via Type System Phase 2
 - [x] Comparison protocols (`__lt__`, `__le__`, etc.) ✅ via Type System Phase 2
-- [ ] Container protocols (`__getitem__`, `__setitem__`)
-- [ ] Iterator protocol (`__iter__`, `__next__`)
+- [x] Iterator protocol (`__iter__`, `__next__`) ✅ COMPLETE
+- [ ] Container protocols (`__getitem__`, `__setitem__`, `__delitem__`, `__contains__`)
 
 ### Better Error Messages
 - [ ] AST nodes with source locations
@@ -94,6 +94,25 @@ Successfully separated modules from builtins:
 - [ ] Self-documenting: `f"{x+y=}"`
 
 ## 🔧 Technical Debt
+
+### Container Protocols Implementation
+- [ ] Create Indexable protocol adapters for List, Dict, Tuple, String, Range
+- [ ] Update indexing operations in eval/indexing.go
+- [ ] Add DelItemForm for del operations
+- [ ] Integrate with three-tier dispatch: dunder → protocol → type-specific
+- [ ] Add comprehensive tests for protocol-based indexing
+
+### Type System Migration (Ongoing)
+- [ ] Complete migration of remaining builtin files to use type helpers
+  - [ ] builtin/iteration.go - iterable type switches
+  - [ ] builtin/attributes.go - object type checking
+  - [ ] eval/evaluator.go - special forms validation
+  - [ ] builtin/modules/math.go - numeric validation
+- [ ] Migrate high-priority files with 40+ type checks:
+  - [ ] builtin/string_search.go (~42 manual checks)
+  - [ ] builtin/os.go (~35+ manual checks)
+  - [ ] builtin/json.go (complex validation)
+  - [ ] builtin/pathlib.go (~20+ type checks)
 
 ### Architecture Improvements
 - [ ] Package reorganization
