@@ -22,10 +22,8 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterErrors(ctx)
 	RegisterMisc(ctx)
 
-	// Register operators
-	operators.RegisterArithmetic(ctx)
-	operators.RegisterComparison(ctx)
-	operators.RegisterLogicalOperators(ctx)
+	// Register operators using new protocol-based implementation
+	operators.RegisterAll(ctx)
 
 	// Register type methods
 	methods.RegisterStringMethods(ctx)
