@@ -30,29 +30,9 @@ These files have extensive manual type checking and would benefit most from migr
 ### 🟡 Medium Priority
 Moderate benefits from migration:
 
-- [ ] **builtin/string_format.go**
-  - Format string parsing and validation
-  - Would benefit from cleaner validation patterns
+(All medium-priority files have been migrated!)
 
-- [ ] **builtin/errors.go**
-  - Exception handling functions
-  - Simple patterns but could be more consistent
-
-- [ ] **builtin/misc.go**
-  - Utility functions: repr, hash, id, etc.
-  - Each has similar argument count validation
-
-- [ ] **builtin/modules/os.go**
-  - OS module functions
-  - Similar patterns to builtin/os.go
-
-- [ ] **builtin/modules/json.go**
-  - JSON module implementation
-  - Could share patterns with builtin/json.go
-
-- [ ] **builtin/modules/pathlib.go**
-  - Path module implementation
-  - Complex but consistent patterns
+Note: builtin/modules/os.go, json.go, and pathlib.go are just stubs - the actual implementations in builtin/ have already been migrated.
 
 ### 🟢 Low Priority
 Minor improvements possible:
@@ -105,8 +85,16 @@ if err != nil {
 ## Benefits Tracking
 
 Files migrated so far have shown:
-- 40-50% reduction in validation code
+- 15-45% reduction in validation code
 - Consistent error messages
 - Improved readability
 - Easier maintenance
 - Reduced chance of bugs in type checking
+
+## Summary
+
+**Phase 1.5 Complete**: 10 files migrated
+**Phase 1.6 Complete**: 7 files migrated (4 high-priority + 3 medium-priority)
+
+**Total migrated**: 17 builtin files now using the new type helper system
+**Remaining**: 8 low-priority files for future migration

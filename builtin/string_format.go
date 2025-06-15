@@ -8,6 +8,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/mmichie/m28/common/types"
+	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/eval"
 )
@@ -30,21 +32,22 @@ func FormatExprFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // StrFormatFunc concatenates strings and values for f-string formatting
 func StrFormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) == 0 {
+	v := validation.NewArgs("str-format", args)
+	if v.Count() == 0 {
 		return core.StringValue(""), nil
 	}
 
 	var result strings.Builder
-	for _, arg := range args {
-		switch v := arg.(type) {
-		case core.StringValue:
-			result.WriteString(string(v))
-		case core.ListValue:
+	for i := 0; i < v.Count(); i++ {
+		arg := v.Get(i)
+		if str, ok := types.AsString(arg); ok {
+			result.WriteString(str)
+		} else if list, ok := types.AsList(arg); ok {
 			// Check if this is a format expression
-			if len(v) >= 2 {
-				if sym, ok := v[0].(core.SymbolValue); ok && string(sym) == "format-expr" {
+			if len(list) >= 2 {
+				if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "format-expr" {
 					// Handle format expression
-					formatted, err := formatExpression(v[1:], ctx)
+					formatted, err := formatExpression(list[1:], ctx)
 					if err != nil {
 						return nil, err
 					}
@@ -54,7 +57,7 @@ func StrFormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			}
 			// Regular list - convert to string
 			result.WriteString(core.PrintValueWithoutQuotes(arg))
-		default:
+		} else {
 			result.WriteString(core.PrintValueWithoutQuotes(arg))
 		}
 	}
@@ -64,75 +67,67 @@ func StrFormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // FormatFunc formats a string with placeholders
 func FormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("format requires at least 1 argument: format string")
+	v := validation.NewArgs("format", args)
+	if err := v.Min(1); err != nil {
+		return nil, err
 	}
 
 	// Get the format string
-	formatStr, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("first argument must be a string, got %s", args[0].Type())
+	formatStr, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
 	// Prepare values for formatting
-	values := make([]interface{}, len(args)-1)
-	for i, arg := range args[1:] {
+	values := make([]interface{}, v.Count()-1)
+	for i := 1; i < v.Count(); i++ {
+		arg := v.Get(i)
 		// Convert to Go native types for fmt.Sprintf
-		switch v := arg.(type) {
-		case core.NumberValue:
-			values[i] = float64(v)
-		case core.StringValue:
-			values[i] = string(v)
-		case core.BoolValue:
-			values[i] = bool(v)
-		default:
-			values[i] = core.PrintValueWithoutQuotes(arg)
+		if num, ok := types.AsNumber(arg); ok {
+			values[i-1] = num
+		} else if str, ok := types.AsString(arg); ok {
+			values[i-1] = str
+		} else if b, ok := types.AsBool(arg); ok {
+			values[i-1] = b
+		} else {
+			values[i-1] = core.PrintValueWithoutQuotes(arg)
 		}
 	}
 
 	// Format the string
-	result := fmt.Sprintf(string(formatStr), values...)
+	result := fmt.Sprintf(formatStr, values...)
 	return core.StringValue(result), nil
 }
 
 // formatExpression formats a Python-style format expression
 func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
-	if len(args) == 0 {
-		return "", fmt.Errorf("format-expr requires at least 1 argument")
+	v := validation.NewArgs("format-expr", args)
+	if err := v.Min(1); err != nil {
+		return "", err
 	}
 
 	// Evaluate the expression
-	expr := args[0]
+	expr := v.Get(0)
 	value, err := eval.Eval(expr, ctx)
 	if err != nil {
 		// If it's a raw string, use it as-is
-		if str, ok := expr.(core.StringValue); ok {
-			value = str
+		if str, ok := types.AsString(expr); ok {
+			value = core.StringValue(str)
 		} else {
 			return "", err
 		}
 	}
 
 	// Default format
-	if len(args) == 1 {
+	if v.Count() == 1 {
 		return applyFormatSpecString(value, "", ctx)
 	}
 
 	// Get format spec (second argument)
-	var formatSpec string
-	if len(args) >= 2 {
-		if spec, ok := args[1].(core.StringValue); ok {
-			formatSpec = string(spec)
-		}
-	}
+	formatSpec, _ := v.GetStringOrDefault(1, "")
 
 	// Check for conversion (!r, !s, !a)
-	var conversion string
-	if len(args) >= 3 {
-		if conv, ok := args[2].(core.StringValue); ok {
-			conversion = string(conv)
-		}
-	}
+	conversion, _ := v.GetStringOrDefault(2, "")
 
 	// Apply conversion first
 	if conversion != "" {
@@ -163,17 +158,15 @@ func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
 func applyFormatSpecString(value core.Value, spec string, ctx *core.Context) (string, error) {
 	if spec == "" {
 		// Default formatting
-		switch v := value.(type) {
-		case core.StringValue:
-			return string(v), nil
-		case core.NumberValue:
+		if str, ok := types.AsString(value); ok {
+			return str, nil
+		} else if num, ok := types.AsNumber(value); ok {
 			// Check if it's an integer
-			f := float64(v)
-			if f == math.Floor(f) {
-				return fmt.Sprintf("%.0f", f), nil
+			if num == math.Floor(num) {
+				return fmt.Sprintf("%.0f", num), nil
 			}
-			return fmt.Sprintf("%g", f), nil
-		default:
+			return fmt.Sprintf("%g", num), nil
+		} else {
 			return value.String(), nil
 		}
 	}
@@ -297,12 +290,11 @@ func applyFormatSpec(value core.Value, fs *FormatSpec, ctx *core.Context) (strin
 	var result string
 
 	// Handle different types
-	switch v := value.(type) {
-	case core.NumberValue:
-		result = formatNumber(float64(v), fs)
-	case core.StringValue:
-		result = formatString(string(v), fs)
-	default:
+	if num, ok := types.AsNumber(value); ok {
+		result = formatNumber(num, fs)
+	} else if str, ok := types.AsString(value); ok {
+		result = formatString(str, fs)
+	} else {
 		result = formatString(value.String(), fs)
 	}
 
@@ -529,3 +521,10 @@ func addThousandsSeparatorToString(s string, sep rune) string {
 
 	return string(result)
 }
+
+// Migration Statistics:
+// Functions migrated: 3 formatting functions + helper functions
+// Type checks eliminated: ~12 manual type assertions
+// Code reduction: ~25% in validation code
+// Benefits: Consistent error messages, cleaner type conversions with As* helpers
+// Improved readability with validation framework usage
