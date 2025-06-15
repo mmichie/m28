@@ -10,6 +10,7 @@ import (
 	"github.com/mmichie/m28/builtin"
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/eval"
+	"github.com/mmichie/m28/modules"
 	"github.com/mmichie/m28/parser"
 	"github.com/mmichie/m28/repl"
 	"github.com/mmichie/m28/special_forms"
@@ -177,11 +178,11 @@ func initializeGlobalContext(ctx *core.Context) {
 	// Register all built-in functions
 	builtin.RegisterAllBuiltins(ctx)
 
-	// Initialize module loader
-	moduleLoader := core.NewDefaultModuleLoader(ctx, eval.Eval, func(code string) (core.Value, error) {
+	// Initialize enhanced module loader with builtin Go modules
+	moduleLoader := core.NewModuleLoaderEnhanced(ctx, eval.Eval, func(code string) (core.Value, error) {
 		p := parser.NewParser()
 		return p.Parse(code)
-	})
+	}, modules.GetBuiltinModule)
 	core.SetModuleLoader(moduleLoader)
 }
 

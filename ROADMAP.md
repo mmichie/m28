@@ -4,31 +4,38 @@ This is the single source of truth for M28 development.
 
 ## 🎯 Current Priorities
 
-### 1. Module/Builtin Separation 🔴 NEW
-Separate true builtins from modules for better organization and performance:
-- **Modules to extract**: os, json, pathlib, random, time, datetime, shutil
-- **Keep as builtins**: len(), print(), type(), range(), type conversions
-- **Benefits**: Lazy loading, faster startup, cleaner codebase
+### 1. Module/Builtin Separation ✅ COMPLETE
+Successfully separated modules from builtins:
+- **Modules extracted**: os, json, pathlib, random, time, datetime, shutil
+- **Kept as builtins**: len(), print(), type(), range(), type conversions, math (special case)
+- **Benefits achieved**: Lazy loading, cleaner architecture, Python-like imports
 
-### 2. Type System Phase 2 🟡 NEXT
+### 1. Type System Phase 2 🔴 NEW PRIORITY
 - [ ] Protocol interfaces (Numeric, Indexable, Container)
 - [ ] TypeSwitch builder for complex type handling
 - [ ] Dunder method utilities (CallDunder, HasDunder)
 - [ ] Type error standardization
 
-### 3. Macro System with S-Strings 🟡 HIGH PRIORITY
+### 2. Macro System with S-Strings 🟡 HIGH PRIORITY
 - [ ] S-string syntax: `s"(+ {x} 1)"` with interpolation
 - [ ] `defmacro` for defining macros
 - [ ] Hygienic macro support
 - [ ] Built-in threading macros (`->`, `->>`)
 
-### 4. Record Stream & JSON Processing 🟡 HIGH VALUE
+### 3. Record Stream & JSON Processing 🟡 HIGH VALUE
 - [ ] Path-based access: `get-in`, `assoc-in`, `update-in`
 - [ ] JSONL streaming support
 - [ ] Record operations: `select-keys`, `rename-keys`
 - [ ] Deep merge and transformations
 
 ## ✅ Recently Completed
+
+### Module/Builtin Separation
+- Moved 7 modules from builtin to lazy-loaded modules
+- Created enhanced module loader supporting Go modules
+- Fixed dict key abstraction leak (removed "s:" prefix in JSON)
+- All modules now require import (matching Python)
+- Math module kept as builtin for convenience
 
 ### Type System Improvements (Phase 1)
 - **23 builtin files migrated** with 15-50% code reduction

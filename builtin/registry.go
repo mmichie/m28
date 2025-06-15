@@ -33,16 +33,10 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	methods.RegisterDictMethods(ctx)
 	methods.RegisterSetMethods(ctx)
 
-	// Register standard library modules
+	// Note: Standard library modules (os, json, time, etc.) are no longer
+	// registered as builtins. They must be imported using the import statement.
+	// Only math module remains as a special builtin.
 	modules.RegisterMathModule(ctx)
-	RegisterRandomFunctions(ctx)
-	RegisterJSONModule(ctx)
-	RegisterOSModule(ctx)
-	RegisterTimeModule(ctx)
-	RegisterDateTimeModule(ctx)
-	RegisterShutil(ctx)
-	RegisterPathlib(ctx)
-	RegisterAsyncBuiltins(ctx)
 
 	// Also register functions from other files that haven't been migrated yet
 	RegisterStringFunctions(ctx)
@@ -50,4 +44,5 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterEssentialBuiltins(ctx)
 	RegisterUtilityFunctions(ctx)
 	RegisterAssertBuiltins(ctx)
+	RegisterAsyncBuiltins(ctx) // Async builtins stay as builtins (Channel, create_task, etc.)
 }
