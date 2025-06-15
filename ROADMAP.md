@@ -240,7 +240,23 @@ This is the single source of truth for M28 development. All other roadmap/todo d
 
 ### 🎯 High Priority - Next Steps
 
-1. **P0: Builtin System Cleanup - Duplicate Functions** 🔴 IN PROGRESS
+1. **Module/Builtin Separation** 🔴 NEW PRIORITY
+   - [ ] Many files in `builtin/` are actually modules that should be separated:
+     - [ ] `builtin/os.go` → Should be a proper module
+     - [ ] `builtin/json.go` → Should be a proper module  
+     - [ ] `builtin/pathlib.go` → Should be a proper module
+     - [ ] `builtin/random.go` → Should be a proper module
+     - [ ] `builtin/time.go` → Should be a proper module
+     - [ ] `builtin/datetime.go` → Should be a proper module
+     - [ ] `builtin/shutil.go` → Should be a proper module
+   - [ ] True builtins should remain: `len()`, `print()`, `type()`, `range()`, type conversions, etc.
+   - [ ] Benefits:
+     - More organized codebase
+     - Lazy loading of modules
+     - Reduced interpreter startup time
+     - Follow Python's model more closely
+
+2. **P0: Builtin System Cleanup - Duplicate Functions** ✅ COMPLETE
    - [x] Remove duplicate `all` function (3 implementations reduced to 1)
    - [x] Complete math module migration (removed old math.go, using modules/math.go)
    - [x] Implement duplicate detection system with registry tracking
@@ -288,24 +304,27 @@ This is the single source of truth for M28 development. All other roadmap/todo d
            - builtin/list.go (type helper usage)
            - builtin/dict.go (consistent error handling)
            - builtin/modules/math.go (~40% reduction)
-       - [ ] **Phase 1.6: Remaining Builtin Migrations** (Backlog)
-         - [ ] HIGH PRIORITY - Major code reduction potential:
-           - [ ] `builtin/string_search.go` - ~42 manual type checks
-           - [ ] `builtin/os.go` - ~35+ manual type checks for file operations
-           - [ ] `builtin/json.go` - Complex validation with optional parameters
-           - [ ] `builtin/pathlib.go` - ~20+ type checks in Path methods
-         - [ ] MEDIUM PRIORITY - Moderate benefits:
-           - [ ] `builtin/string_format.go` - Format string handling
-           - [ ] `builtin/errors.go` - Exception functions
-           - [ ] `builtin/misc.go` - Utility functions (repr, hash, etc.)
-           - [ ] `builtin/modules/os.go` - OS module functions
-           - [ ] `builtin/modules/json.go` - JSON module
-           - [ ] `builtin/modules/pathlib.go` - Path module
-         - [ ] LOW PRIORITY - Minor improvements:
-           - [ ] `builtin/assert.go` - Simple validation
-           - [ ] `builtin/utilities.go` - Already simplified
-           - [ ] `builtin/essential_builtins.go` - Complex logic
-           - [ ] Various module files (datetime, time, random, shutil)
+       - [x] **Phase 1.6: High Priority Builtin Migrations** ✅ COMPLETE
+         - [x] `builtin/string_search.go` - Eliminated ~42 manual type checks (~45% code reduction)
+         - [x] `builtin/os.go` - Eliminated ~35+ manual type checks (~40% code reduction)
+         - [x] `builtin/json.go` - Cleaner optional parameter handling
+         - [x] `builtin/pathlib.go` - Eliminated ~20+ type checks (~30% code reduction)
+       - [x] **Phase 1.7: Medium Priority Builtin Migrations** ✅ COMPLETE
+         - [x] `builtin/string_format.go` - Format string handling (~25% code reduction)
+         - [x] `builtin/errors.go` - Exception functions (~20% code reduction)
+         - [x] `builtin/misc.go` - Utility functions (repr, hash, etc., ~15% code reduction)
+         - [x] `builtin/modules/os.go`, `json.go`, `pathlib.go` - Just stubs, actual implementations already migrated
+       - [x] **Phase 1.8: Low Priority Builtin Migrations** ✅ COMPLETE
+         - [x] `builtin/assert.go` - Simple validation (2 type checks eliminated)
+         - [x] `builtin/utilities.go` - apply function (~5 type checks eliminated)
+         - [x] `builtin/random.go` - Random number generation (~15 type checks eliminated)
+         - [x] `builtin/time.go` - Time module (2 type checks eliminated)
+         - [x] `builtin/shutil.go` - Shell utilities (~12 type checks eliminated)
+         - [x] `builtin/async.go` - Async operations (~6 type checks eliminated)
+       - [ ] **Phase 1.9: Complex Files (Deferred)** - Too complex for current migration approach
+         - [ ] `builtin/essential_builtins.go` - Very complex with intertwined logic
+         - [ ] `builtin/datetime.go` - Complex class-based implementation
+       - **Summary**: Successfully migrated 23 builtin files with 15-50% code reduction
        - [ ] Phase 2: Protocol interfaces (Numeric, Indexable, Container) - Week 1-2
        - [ ] Phase 3: TypeSwitch builder for complex type handling - Week 2
        - [ ] Phase 4: Dunder method utilities (CallDunder, HasDunder) - Week 2-3
