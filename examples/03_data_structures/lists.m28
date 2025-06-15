@@ -56,8 +56,9 @@
 # (= last_fruit (pop fruits))
 # (print "Popped: " last_fruit ", remaining: " fruits)
 
-# Update by index
-(= fruits[0] "strawberry")
+# Update by index (not supported - lists are immutable)
+# To update an element, create a new list
+(= fruits (+ ["strawberry"] fruits[1:]))
 (print "After update first:" fruits)
 
 # List operations
