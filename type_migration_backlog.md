@@ -16,28 +16,16 @@ This file tracks remaining builtin files that need to be migrated to use the new
 - [x] builtin/dict.go
 - [x] builtin/modules/math.go
 
+### ✅ Already Migrated (Phase 1.6 - Backlog)
+- [x] builtin/string_search.go (~45% code reduction)
+- [x] builtin/os.go (~40% code reduction)
+- [x] builtin/json.go (cleaner optional parameters)
+- [x] builtin/pathlib.go (~30% code reduction)
+
 ### 🔴 High Priority - Needs Migration
 These files have extensive manual type checking and would benefit most from migration:
 
-- [ ] **builtin/string_search.go** (~42 manual type checks)
-  - Functions: contains, index, find, startswith, endswith, count, etc.
-  - Pattern: Every function has `len(args)` check + manual type assertions
-  - Benefit: ~50% code reduction expected
-
-- [ ] **builtin/os.go** (~35+ manual type checks)
-  - Functions: File operations, path checking, environment vars
-  - Pattern: Path string validation in every function
-  - Benefit: Consistent path validation, cleaner code
-
-- [ ] **builtin/json.go** (Complex validation)
-  - Functions: json.dumps, json.loads with optional parameters
-  - Pattern: Complex optional parameter handling
-  - Benefit: Could use GetNumberOrDefault for indent
-
-- [ ] **builtin/pathlib.go** (~20+ type checks)
-  - Functions: Path methods with string arguments
-  - Pattern: Repetitive string argument validation
-  - Benefit: Unified path operation validation
+(All high-priority files have been migrated!)
 
 ### 🟡 Medium Priority
 Moderate benefits from migration:

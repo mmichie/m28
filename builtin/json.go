@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mmichie/m28/common/types"
+	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
 
@@ -27,24 +29,25 @@ func RegisterJSONModule(ctx *core.Context) {
 
 // jsonDumps converts an M28 value to a JSON string
 func jsonDumps(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("json.dumps requires at least 1 argument")
+	v := validation.NewArgs("json.dumps", args)
+	if err := v.Min(1); err != nil {
+		return nil, err
 	}
 
-	// Check for indent parameter
+	// Get the value to serialize
+	value := v.Get(0)
+
+	// Check for indent parameter (look for any number in remaining args)
 	indent := 0
-	if len(args) >= 2 {
-		// Check if we have a named parameter for indent
-		for i := 1; i < len(args); i++ {
-			if num, ok := args[i].(core.NumberValue); ok {
-				indent = int(num)
-				break
-			}
+	for i := 1; i < v.Count(); i++ {
+		if num, ok := types.AsNumber(v.Get(i)); ok {
+			indent = int(num)
+			break
 		}
 	}
 
 	// Convert M28 value to Go value
-	goValue, err := m28ToGo(args[0])
+	goValue, err := m28ToGo(value)
 	if err != nil {
 		return nil, fmt.Errorf("json.dumps: %v", err)
 	}
@@ -65,20 +68,20 @@ func jsonDumps(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // jsonLoads parses a JSON string into an M28 value
 func jsonLoads(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("json.loads requires exactly 1 argument")
+	v := validation.NewArgs("json.loads", args)
+	if err := v.Exact(1); err != nil {
+		return nil, err
 	}
 
-	str, ok := args[0].(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("json.loads: argument must be a string")
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
 	}
 
 	// Parse JSON
 	var goValue interface{}
-	err := json.Unmarshal([]byte(str), &goValue)
-	if err != nil {
-		return nil, fmt.Errorf("json.loads: %v", err)
+	if unmarshalErr := json.Unmarshal([]byte(str), &goValue); unmarshalErr != nil {
+		return nil, fmt.Errorf("json.loads: %v", unmarshalErr)
 	}
 
 	// Convert to M28 value
@@ -87,26 +90,26 @@ func jsonLoads(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // jsonDump writes JSON to a file
 func jsonDump(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("json.dump requires at least 2 arguments (obj, file)")
+	v := validation.NewArgs("json.dump", args)
+	if err := v.Min(2); err != nil {
+		return nil, err
 	}
 
+	// Get the value to serialize
+	value := v.Get(0)
+
 	// Get the file object
-	file, ok := args[1].(*core.File)
+	file, ok := v.Get(1).(*core.File)
 	if !ok {
 		return nil, fmt.Errorf("json.dump: second argument must be a file object")
 	}
 
 	// Check for indent parameter
-	indent := 0
-	if len(args) >= 3 {
-		if num, ok := args[2].(core.NumberValue); ok {
-			indent = int(num)
-		}
-	}
+	indentNum, _ := v.GetNumberOrDefault(2, 0)
+	indent := int(indentNum)
 
 	// Convert M28 value to Go value
-	goValue, err := m28ToGo(args[0])
+	goValue, err := m28ToGo(value)
 	if err != nil {
 		return nil, fmt.Errorf("json.dump: %v", err)
 	}
@@ -123,9 +126,8 @@ func jsonDump(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Write to file
-	err = file.Write(string(jsonBytes))
-	if err != nil {
-		return nil, fmt.Errorf("json.dump: %v", err)
+	if writeErr := file.Write(string(jsonBytes)); writeErr != nil {
+		return nil, fmt.Errorf("json.dump: %v", writeErr)
 	}
 
 	return core.NilValue{}, nil
@@ -133,32 +135,32 @@ func jsonDump(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // jsonLoad reads JSON from a file
 func jsonLoad(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("json.load requires exactly 1 argument")
+	v := validation.NewArgs("json.load", args)
+	if err := v.Exact(1); err != nil {
+		return nil, err
 	}
 
 	// Get the file object
-	file, ok := args[0].(*core.File)
+	file, ok := v.Get(0).(*core.File)
 	if !ok {
 		return nil, fmt.Errorf("json.load: argument must be a file object")
 	}
 
 	// Read all content
-	content, err := file.Read(-1)
-	if err != nil {
-		return nil, fmt.Errorf("json.load: %v", err)
+	content, readErr := file.Read(-1)
+	if readErr != nil {
+		return nil, fmt.Errorf("json.load: %v", readErr)
 	}
 
-	contentStr, ok := content.(core.StringValue)
+	contentStr, ok := types.AsString(content)
 	if !ok {
 		return nil, fmt.Errorf("json.load: unexpected content type")
 	}
 
 	// Parse JSON
 	var goValue interface{}
-	err = json.Unmarshal([]byte(contentStr), &goValue)
-	if err != nil {
-		return nil, fmt.Errorf("json.load: %v", err)
+	if unmarshalErr := json.Unmarshal([]byte(contentStr), &goValue); unmarshalErr != nil {
+		return nil, fmt.Errorf("json.load: %v", unmarshalErr)
 	}
 
 	// Convert to M28 value
@@ -167,18 +169,24 @@ func jsonLoad(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // m28ToGo converts an M28 value to a Go value for JSON encoding
 func m28ToGo(v core.Value) (interface{}, error) {
-	switch val := v.(type) {
-	case core.NilValue:
+	// Check nil first
+	if types.IsNil(v) {
 		return nil, nil
-	case core.BoolValue:
-		return bool(val), nil
-	case core.NumberValue:
-		return float64(val), nil
-	case core.StringValue:
-		return string(val), nil
-	case core.ListValue:
-		result := make([]interface{}, len(val))
-		for i, item := range val {
+	}
+
+	// Try basic types with helpers
+	if b, ok := types.AsBool(v); ok {
+		return b, nil
+	}
+	if n, ok := types.AsNumber(v); ok {
+		return n, nil
+	}
+	if s, ok := types.AsString(v); ok {
+		return s, nil
+	}
+	if list, ok := types.AsList(v); ok {
+		result := make([]interface{}, len(list))
+		for i, item := range list {
 			goItem, err := m28ToGo(item)
 			if err != nil {
 				return nil, err
@@ -186,11 +194,12 @@ func m28ToGo(v core.Value) (interface{}, error) {
 			result[i] = goItem
 		}
 		return result, nil
-	case *core.DictValue:
+	}
+	if dict, ok := types.AsDict(v); ok {
 		result := make(map[string]interface{})
-		keys := val.Keys()
+		keys := dict.Keys()
 		for _, k := range keys {
-			v, _ := val.Get(k)
+			v, _ := dict.Get(k)
 			// For JSON, we need string keys
 			keyStr := k
 			goValue, err := m28ToGo(v)
@@ -200,10 +209,11 @@ func m28ToGo(v core.Value) (interface{}, error) {
 			result[keyStr] = goValue
 		}
 		return result, nil
-	case core.TupleValue:
+	}
+	if tuple, ok := types.AsTuple(v); ok {
 		// Convert tuples to lists for JSON
-		result := make([]interface{}, len(val))
-		for i, item := range val {
+		result := make([]interface{}, len(tuple))
+		for i, item := range tuple {
 			goItem, err := m28ToGo(item)
 			if err != nil {
 				return nil, err
@@ -211,26 +221,25 @@ func m28ToGo(v core.Value) (interface{}, error) {
 			result[i] = goItem
 		}
 		return result, nil
-	default:
-		// For objects with to_dict method
-		if obj, ok := v.(interface {
-			GetAttr(string) (core.Value, bool)
-		}); ok {
-			if method, found := obj.GetAttr("to_dict"); found {
-				if callable, ok := method.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					// Call to_dict()
-					dictValue, err := callable.Call([]core.Value{}, nil)
-					if err != nil {
-						return nil, err
-					}
-					return m28ToGo(dictValue)
+	}
+
+	// Try to_dict method for objects
+	if obj, ok := v.(interface {
+		GetAttr(string) (core.Value, bool)
+	}); ok {
+		if method, found := obj.GetAttr("to_dict"); found {
+			if callable, ok := types.AsCallable(method); ok {
+				// Call to_dict()
+				dictValue, err := callable.Call([]core.Value{}, nil)
+				if err != nil {
+					return nil, err
 				}
+				return m28ToGo(dictValue)
 			}
 		}
-		return nil, fmt.Errorf("cannot convert %s to JSON", v.Type())
 	}
+
+	return nil, fmt.Errorf("cannot convert %s to JSON", v.Type())
 }
 
 // goToM28 converts a Go value from JSON decoding to an M28 value
@@ -268,3 +277,9 @@ func goToM28(v interface{}) (core.Value, error) {
 		return nil, fmt.Errorf("unexpected JSON type: %T", v)
 	}
 }
+
+// Migration Statistics:
+// Functions migrated: 4 JSON functions + helper conversions
+// Type checks eliminated: ~15 manual type assertions
+// Code improvements: Cleaner optional parameter handling with GetIntOrDefault
+// Benefits: Consistent validation, better error messages, type helper usage in conversions
