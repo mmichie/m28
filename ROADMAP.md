@@ -277,12 +277,35 @@ This is the single source of truth for M28 development. All other roadmap/todo d
          - Created 16 Is* predicate functions in common/types/predicates.go
          - Comprehensive tests with 100% pass rate
        - [x] Phase 1.5: Migration of high-priority code ✅ COMPLETE
-         - Migrated 5 files with significant code reduction:
+         - Migrated 10 files total with significant code reduction:
            - builtin/numeric.go (~50% reduction)
            - builtin/string_ops.go (~40% reduction)
            - builtin/collections.go (simplified type switches)
            - builtin/type_checking.go (cleaner conversions)
            - builtin/functional.go (consistent validation)
+           - builtin/iteration.go (unified patterns)
+           - builtin/attributes.go (cleaner validation)
+           - builtin/list.go (type helper usage)
+           - builtin/dict.go (consistent error handling)
+           - builtin/modules/math.go (~40% reduction)
+       - [ ] **Phase 1.6: Remaining Builtin Migrations** (Backlog)
+         - [ ] HIGH PRIORITY - Major code reduction potential:
+           - [ ] `builtin/string_search.go` - ~42 manual type checks
+           - [ ] `builtin/os.go` - ~35+ manual type checks for file operations
+           - [ ] `builtin/json.go` - Complex validation with optional parameters
+           - [ ] `builtin/pathlib.go` - ~20+ type checks in Path methods
+         - [ ] MEDIUM PRIORITY - Moderate benefits:
+           - [ ] `builtin/string_format.go` - Format string handling
+           - [ ] `builtin/errors.go` - Exception functions
+           - [ ] `builtin/misc.go` - Utility functions (repr, hash, etc.)
+           - [ ] `builtin/modules/os.go` - OS module functions
+           - [ ] `builtin/modules/json.go` - JSON module
+           - [ ] `builtin/modules/pathlib.go` - Path module
+         - [ ] LOW PRIORITY - Minor improvements:
+           - [ ] `builtin/assert.go` - Simple validation
+           - [ ] `builtin/utilities.go` - Already simplified
+           - [ ] `builtin/essential_builtins.go` - Complex logic
+           - [ ] Various module files (datetime, time, random, shutil)
        - [ ] Phase 2: Protocol interfaces (Numeric, Indexable, Container) - Week 1-2
        - [ ] Phase 3: TypeSwitch builder for complex type handling - Week 2
        - [ ] Phase 4: Dunder method utilities (CallDunder, HasDunder) - Week 2-3
