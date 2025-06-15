@@ -1,0 +1,13 @@
+# Test range iterator
+
+(print "Testing range iterator:")
+(= r (range 5))
+(print "Range:" r)
+
+(= it (iter r))
+(print "Iterator:" it)
+(print "Iterator type:" (type it))
+
+(print "Values:")
+(for i r
+  (print i))

@@ -124,6 +124,12 @@ type rangeIterator struct {
 	current float64
 }
 
+// iteratorState tracks the state when RangeValue acts as its own iterator
+type rangeIteratorState struct {
+	current float64
+	started bool
+}
+
 // Next implements Iterator.Next
 func (it *rangeIterator) Next() (Value, bool) {
 	if it.rang.Step > 0 {
@@ -190,6 +196,7 @@ func (r *RangeValue) GetAttr(name string) (Value, bool) {
 		}), true
 	case "__iter__":
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// Return self - iter() builtin will handle creating the proper iterator
 			return r, nil
 		}), true
 	}

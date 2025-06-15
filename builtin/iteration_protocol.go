@@ -21,6 +21,22 @@ func iterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Special case: if __iter__ returns self but it's not an iterator,
+		// try protocol-based iteration instead
+		if iter == obj {
+			if nextMethod, ok := obj.(core.Object); ok {
+				if _, hasNext := nextMethod.GetAttr("__next__"); !hasNext {
+					// Object returned self but has no __next__, try protocol
+					if pIter, ok := protocols.GetIterableOps(obj); ok {
+						if val, ok := pIter.(core.Value); ok {
+							return val, nil
+						}
+					}
+				}
+			}
+		}
+
 		return iter, nil
 	}
 

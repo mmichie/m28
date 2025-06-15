@@ -321,38 +321,74 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, err
 			}
 
-			// Use the iterator returned by __iter__
-			for {
-				// Call __next__ on the iterator
-				item, found, err := types.CallNext(iter, ctx)
-				if err != nil {
-					// Check if it's StopIteration
-					if _, isStop := err.(*protocols.StopIteration); isStop {
-						break
+			// Check if the iterator actually has __next__
+			// This handles cases where __iter__ returns self but doesn't implement __next__
+			if _, hasNext := types.GetDunder(iter, "__next__"); !hasNext {
+				// Try protocol-based iteration on the original sequence
+				if pIter, ok := protocols.GetIterableOps(sequence); ok {
+					for {
+						item, err := pIter.Next()
+						if err != nil {
+							if _, isStop := err.(*protocols.StopIteration); isStop {
+								break
+							}
+							return nil, err
+						}
+
+						result, err := bodyFunc(item)
+						if err != nil {
+							return nil, err
+						}
+
+						if result == Break {
+							break
+						}
+						if result == Continue {
+							continue
+						}
+						if ret, ok := result.(*ReturnValue); ok {
+							return ret, nil
+						}
+
+						lastResult = result
 					}
-					return nil, err
-				}
-				if !found {
-					// No __next__ method - shouldn't happen if __iter__ worked
+				} else {
 					return nil, fmt.Errorf("iterator has no __next__ method")
 				}
+			} else {
+				// Use the iterator returned by __iter__
+				for {
+					// Call __next__ on the iterator
+					item, found, err := types.CallNext(iter, ctx)
+					if err != nil {
+						// Check if it's StopIteration
+						if _, isStop := err.(*protocols.StopIteration); isStop {
+							break
+						}
+						return nil, err
+					}
+					if !found {
+						// No __next__ method - shouldn't happen if __iter__ worked
+						return nil, fmt.Errorf("iterator has no __next__ method")
+					}
 
-				result, err := bodyFunc(item)
-				if err != nil {
-					return nil, err
-				}
+					result, err := bodyFunc(item)
+					if err != nil {
+						return nil, err
+					}
 
-				if result == Break {
-					break
-				}
-				if result == Continue {
-					continue
-				}
-				if ret, ok := result.(*ReturnValue); ok {
-					return ret, nil
-				}
+					if result == Break {
+						break
+					}
+					if result == Continue {
+						continue
+					}
+					if ret, ok := result.(*ReturnValue); ok {
+						return ret, nil
+					}
 
-				lastResult = result
+					lastResult = result
+				}
 			}
 		} else if pIter, ok := protocols.GetIterableOps(sequence); ok {
 			// Try protocol-based iteration

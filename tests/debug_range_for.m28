@@ -1,0 +1,26 @@
+# Debug range in for loop
+
+(print "Creating range...")
+(= r (range 3))
+(print "Range:" r)
+
+(print "\nTrying iter()...")
+(= it (iter r))
+(print "Iterator:" it)
+(print "Type:" (type it))
+
+(print "\nTrying next()...")
+(try
+  (print "First:" (next it))
+  (print "Second:" (next it))
+  (print "Third:" (next it))
+  (print "Fourth:" (next it "DONE"))
+  (except Exception e
+    (print "Error in next():" e)))
+
+(print "\nTrying for loop...")
+(try
+  (for i r
+    (print "Value:" i))
+  (except Exception e
+    (print "Error in for:" e)))

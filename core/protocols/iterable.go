@@ -199,6 +199,56 @@ func (s *StringIterator) String() string {
 	return "<str_iterator>"
 }
 
+// RangeIterator iterates over range values
+type RangeIterator struct {
+	rang    *core.RangeValue
+	current float64
+}
+
+// NewRangeIterator creates an iterator for ranges
+func NewRangeIterator(rang *core.RangeValue) *RangeIterator {
+	return &RangeIterator{
+		rang:    rang,
+		current: rang.Start,
+	}
+}
+
+// Next returns the next value
+func (r *RangeIterator) Next() (core.Value, error) {
+	if r.rang.Step > 0 {
+		if r.current >= r.rang.Stop {
+			return nil, &StopIteration{}
+		}
+	} else {
+		if r.current <= r.rang.Stop {
+			return nil, &StopIteration{}
+		}
+	}
+
+	val := core.NumberValue(r.current)
+	r.current += r.rang.Step
+	return val, nil
+}
+
+// HasNext checks if there are more values
+func (r *RangeIterator) HasNext() bool {
+	if r.rang.Step > 0 {
+		return r.current < r.rang.Stop
+	} else {
+		return r.current > r.rang.Stop
+	}
+}
+
+// Type implements Value.Type
+func (r *RangeIterator) Type() core.Type {
+	return "range_iterator"
+}
+
+// String implements Value.String
+func (r *RangeIterator) String() string {
+	return "<range_iterator>"
+}
+
 // GetIterableOps returns an iterator for a value if possible
 func GetIterableOps(v core.Value) (Iterator, bool) {
 	switch val := v.(type) {
@@ -210,6 +260,8 @@ func GetIterableOps(v core.Value) (Iterator, bool) {
 		return NewTupleIterator(val), true
 	case core.StringValue:
 		return NewStringIterator(val), true
+	case *core.RangeValue:
+		return NewRangeIterator(val), true
 	default:
 		// Check if value implements Iterator directly
 		if iter, ok := v.(Iterator); ok {
