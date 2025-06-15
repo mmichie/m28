@@ -6,6 +6,7 @@ import (
 
 	"github.com/mmichie/m28/common/builders"
 	"github.com/mmichie/m28/common/errors"
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
@@ -36,85 +37,88 @@ func RegisterList(ctx *core.Context) {
 
 	// length - returns length of any sequence
 	// BEFORE: 19 lines
-	// AFTER: Using builder
+	// AFTER: Using builder with type helpers
 	ctx.Define("length", core.NewBuiltinFunction(builders.UnarySequence("length", func(seq core.Value) (core.Value, error) {
-		switch v := seq.(type) {
-		case core.StringValue:
-			return core.NumberValue(len(v)), nil
-		case core.ListValue:
-			return core.NumberValue(len(v)), nil
-		case core.TupleValue:
-			return core.NumberValue(len(v)), nil
-		case *core.DictValue:
-			return core.NumberValue(v.Size()), nil
-		case *core.SetValue:
-			return core.NumberValue(v.Size()), nil
-		// Note: core.Sequence is not defined - removed
-		default:
-			// Try __len__ protocol
-			if obj, ok := seq.(core.Object); ok {
-				if lenMethod, exists := obj.GetAttr("__len__"); exists {
-					if callable, ok := lenMethod.(core.Callable); ok {
-						result, err := callable.Call([]core.Value{}, ctx)
-						if err != nil {
-							return nil, err
-						}
-						return result, nil
+		// Check common types with helpers
+		if str, ok := types.AsString(seq); ok {
+			return core.NumberValue(len(str)), nil
+		}
+		if list, ok := types.AsList(seq); ok {
+			return core.NumberValue(len(list)), nil
+		}
+		if tuple, ok := types.AsTuple(seq); ok {
+			return core.NumberValue(len(tuple)), nil
+		}
+		if dict, ok := types.AsDict(seq); ok {
+			return core.NumberValue(dict.Size()), nil
+		}
+		if set, ok := types.AsSet(seq); ok {
+			return core.NumberValue(set.Size()), nil
+		}
+
+		// Try __len__ protocol
+		if obj, ok := seq.(core.Object); ok {
+			if lenMethod, exists := obj.GetAttr("__len__"); exists {
+				if callable, ok := types.AsCallable(lenMethod); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						return nil, err
 					}
+					return result, nil
 				}
 			}
-			return nil, errors.NewTypeErrorf("length", "object of type '%s' has no len()", seq.Type())
 		}
+		return nil, errors.NewTypeErrorf("length", "object of type '%s' has no len()", seq.Type())
 	})))
 
 	// first - returns first element of sequence
 	// BEFORE: 24 lines
-	// AFTER: 15 lines with builder
+	// AFTER: Using type helpers
 	ctx.Define("first", core.NewBuiltinFunction(builders.UnarySequence("first", func(seq core.Value) (core.Value, error) {
-		switch v := seq.(type) {
-		case core.StringValue:
-			if len(v) == 0 {
+		if str, ok := types.AsString(seq); ok {
+			if len(str) == 0 {
 				return nil, errors.NewRuntimeError("first", "string index out of range")
 			}
-			return core.StringValue(v[0:1]), nil
-		case core.ListValue:
-			if len(v) == 0 {
+			return core.StringValue(str[0:1]), nil
+		}
+		if list, ok := types.AsList(seq); ok {
+			if len(list) == 0 {
 				return nil, errors.NewRuntimeError("first", "list index out of range")
 			}
-			return v[0], nil
-		case core.TupleValue:
-			if len(v) == 0 {
+			return list[0], nil
+		}
+		if tuple, ok := types.AsTuple(seq); ok {
+			if len(tuple) == 0 {
 				return nil, errors.NewRuntimeError("first", "tuple index out of range")
 			}
-			return v[0], nil
-		default:
-			return nil, errors.NewTypeError("first", "sequence", string(v.Type()))
+			return tuple[0], nil
 		}
+		return nil, errors.NewTypeError("first", "sequence", string(seq.Type()))
 	})))
 
 	// rest - returns all elements after first
 	// BEFORE: 24 lines
-	// AFTER: 15 lines with builder
+	// AFTER: Using type helpers
 	ctx.Define("rest", core.NewBuiltinFunction(builders.UnarySequence("rest", func(seq core.Value) (core.Value, error) {
-		switch v := seq.(type) {
-		case core.StringValue:
-			if len(v) == 0 {
+		if str, ok := types.AsString(seq); ok {
+			if len(str) == 0 {
 				return core.StringValue(""), nil
 			}
-			return core.StringValue(v[1:]), nil
-		case core.ListValue:
-			if len(v) == 0 {
+			return core.StringValue(str[1:]), nil
+		}
+		if list, ok := types.AsList(seq); ok {
+			if len(list) == 0 {
 				return core.ListValue{}, nil
 			}
-			return core.ListValue(v[1:]), nil
-		case core.TupleValue:
-			if len(v) == 0 {
+			return core.ListValue(list[1:]), nil
+		}
+		if tuple, ok := types.AsTuple(seq); ok {
+			if len(tuple) == 0 {
 				return core.TupleValue{}, nil
 			}
-			return core.TupleValue(v[1:]), nil
-		default:
-			return nil, errors.NewTypeError("rest", "sequence", string(v.Type()))
+			return core.TupleValue(tuple[1:]), nil
 		}
+		return nil, errors.NewTypeError("rest", "sequence", string(seq.Type()))
 	})))
 
 	// nth - returns nth element of sequence
@@ -124,33 +128,33 @@ func RegisterList(ctx *core.Context) {
 
 	// reversed - returns reversed copy of sequence
 	// BEFORE: 33 lines
-	// AFTER: ~20 lines with builder
+	// AFTER: Using type helpers
 	ctx.Define("reversed", core.NewBuiltinFunction(builders.UnarySequence("reversed", func(seq core.Value) (core.Value, error) {
-		switch v := seq.(type) {
-		case core.StringValue:
+		if str, ok := types.AsString(seq); ok {
 			// Reverse string
-			runes := []rune(v)
+			runes := []rune(str)
 			for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
 				runes[i], runes[j] = runes[j], runes[i]
 			}
 			return core.StringValue(string(runes)), nil
-		case core.ListValue:
-			// Reverse list
-			result := make(core.ListValue, len(v))
-			for i, j := 0, len(v)-1; i < len(v); i, j = i+1, j-1 {
-				result[i] = v[j]
-			}
-			return result, nil
-		case core.TupleValue:
-			// Reverse tuple
-			result := make(core.TupleValue, len(v))
-			for i, j := 0, len(v)-1; i < len(v); i, j = i+1, j-1 {
-				result[i] = v[j]
-			}
-			return result, nil
-		default:
-			return nil, errors.NewTypeError("reversed", "sequence", string(v.Type()))
 		}
+		if list, ok := types.AsList(seq); ok {
+			// Reverse list
+			result := make(core.ListValue, len(list))
+			for i, j := 0, len(list)-1; i < len(list); i, j = i+1, j-1 {
+				result[i] = list[j]
+			}
+			return result, nil
+		}
+		if tuple, ok := types.AsTuple(seq); ok {
+			// Reverse tuple
+			result := make(core.TupleValue, len(tuple))
+			for i, j := 0, len(tuple)-1; i < len(tuple); i, j = i+1, j-1 {
+				result[i] = tuple[j]
+			}
+			return result, nil
+		}
+		return nil, errors.NewTypeError("reversed", "sequence", string(seq.Type()))
 	})))
 
 	// concat - concatenates multiple sequences
@@ -186,38 +190,39 @@ func NthBuilder() builders.BuiltinFunc {
 			return nil, err
 		}
 
-		switch s := seq.(type) {
-		case core.StringValue:
-			if idx < 0 || idx >= len(s) {
+		if str, ok := types.AsString(seq); ok {
+			if idx < 0 || idx >= len(str) {
 				return nil, errors.NewRuntimeError("nth", "string index out of range")
 			}
-			return core.StringValue(s[idx : idx+1]), nil
-		case core.ListValue:
+			return core.StringValue(str[idx : idx+1]), nil
+		}
+		if list, ok := types.AsList(seq); ok {
 			if idx < 0 {
-				idx = len(s) + idx
+				idx = len(list) + idx
 			}
-			if idx < 0 || idx >= len(s) {
+			if idx < 0 || idx >= len(list) {
 				return nil, errors.NewRuntimeError("nth", "list index out of range")
 			}
-			return s[idx], nil
-		case core.TupleValue:
+			return list[idx], nil
+		}
+		if tuple, ok := types.AsTuple(seq); ok {
 			if idx < 0 {
-				idx = len(s) + idx
+				idx = len(tuple) + idx
 			}
-			if idx < 0 || idx >= len(s) {
+			if idx < 0 || idx >= len(tuple) {
 				return nil, errors.NewRuntimeError("nth", "tuple index out of range")
 			}
-			return s[idx], nil
-		case *core.DictValue:
+			return tuple[idx], nil
+		}
+		if dict, ok := types.AsDict(seq); ok {
 			// For dict, convert index to key lookup
 			key := core.NumberValue(idx)
-			if val, exists := s.GetValue(key); exists {
+			if val, exists := dict.GetValue(key); exists {
 				return val, nil
 			}
 			return nil, errors.NewKeyError(fmt.Sprintf("%v", idx))
-		default:
-			return nil, errors.NewTypeError("nth", "sequence", string(seq.Type()))
 		}
+		return nil, errors.NewTypeError("nth", "sequence", string(seq.Type()))
 	}
 }
 
@@ -231,46 +236,49 @@ func ConcatBuilder() builders.BuiltinFunc {
 		}
 
 		// Determine result type from first argument
-		switch first := v.Get(0).(type) {
-		case core.StringValue:
+		first := v.Get(0)
+		if str, ok := types.AsString(first); ok {
 			// Concatenate strings
-			result := string(first)
+			result := str
 			for i := 1; i < v.Count(); i++ {
-				str, err := v.GetString(i)
+				s, err := v.GetString(i)
 				if err != nil {
 					return nil, errors.NewTypeError("concat", "string", string(v.Get(i).Type()))
 				}
-				result += str
+				result += s
 			}
 			return core.StringValue(result), nil
+		}
 
-		case core.ListValue:
+		if list, ok := types.AsList(first); ok {
 			// Concatenate lists
 			result := make(core.ListValue, 0)
-			for i := 0; i < v.Count(); i++ {
-				lst, ok := v.Get(i).(core.ListValue)
+			result = append(result, list...)
+			for i := 1; i < v.Count(); i++ {
+				lst, ok := types.AsList(v.Get(i))
 				if !ok {
 					return nil, errors.NewTypeError("concat", "list", string(v.Get(i).Type()))
 				}
 				result = append(result, lst...)
 			}
 			return result, nil
+		}
 
-		case core.TupleValue:
+		if tuple, ok := types.AsTuple(first); ok {
 			// Concatenate tuples
 			result := make([]core.Value, 0)
-			for i := 0; i < v.Count(); i++ {
-				tup, ok := v.Get(i).(core.TupleValue)
+			result = append(result, tuple...)
+			for i := 1; i < v.Count(); i++ {
+				tup, ok := types.AsTuple(v.Get(i))
 				if !ok {
 					return nil, errors.NewTypeError("concat", "tuple", string(v.Get(i).Type()))
 				}
 				result = append(result, tup...)
 			}
 			return core.TupleValue(result), nil
-
-		default:
-			return nil, errors.NewTypeError("concat", "string, list, or tuple", string(first.Type()))
 		}
+
+		return nil, errors.NewTypeError("concat", "string, list, or tuple", string(first.Type()))
 	}
 }
 
@@ -340,25 +348,26 @@ func SortedBuilder() builders.BuiltinFunc {
 
 		// Convert iterable to list
 		var items []core.Value
-		switch seq := v.Get(0).(type) {
-		case core.ListValue:
-			items = make([]core.Value, len(seq))
-			copy(items, seq)
-		case core.TupleValue:
-			items = make([]core.Value, len(seq))
-			copy(items, seq)
-		case *core.SetValue:
-			items = make([]core.Value, 0, seq.Size())
+		seq := v.Get(0)
+
+		if list, ok := types.AsList(seq); ok {
+			items = make([]core.Value, len(list))
+			copy(items, list)
+		} else if tuple, ok := types.AsTuple(seq); ok {
+			items = make([]core.Value, len(tuple))
+			copy(items, tuple)
+		} else if set, ok := types.AsSet(seq); ok {
+			items = make([]core.Value, 0, set.Size())
 			// SetValue needs proper iteration method
 			// For now, use a simple approach
-			items = []core.Value{}
-		case core.StringValue:
-			items = make([]core.Value, len(seq))
-			for i, ch := range seq {
+			// TODO: Add proper set iteration when available
+		} else if str, ok := types.AsString(seq); ok {
+			items = make([]core.Value, len(str))
+			for i, ch := range str {
 				items[i] = core.StringValue(string(ch))
 			}
-		case core.Iterable:
-			iter := seq.Iterator()
+		} else if iterable, ok := types.AsIterable(seq); ok {
+			iter := iterable.Iterator()
 			items = make([]core.Value, 0)
 			for {
 				val, hasNext := iter.Next()
@@ -367,7 +376,7 @@ func SortedBuilder() builders.BuiltinFunc {
 				}
 				items = append(items, val)
 			}
-		default:
+		} else {
 			return nil, errors.NewTypeError("sorted", "iterable", string(seq.Type()))
 		}
 
@@ -384,7 +393,7 @@ func SortedBuilder() builders.BuiltinFunc {
 }
 
 // Migration Statistics:
-// Functions migrated: 9 list operations
-// Original lines: ~245 lines
-// Migrated lines: ~180 lines
-// Reduction: ~27% with better error handling
+// Functions migrated: 9 list operations (all using type helpers)
+// Type helpers used: AsString, AsList, AsTuple, AsDict, AsSet, AsIterable, AsCallable
+// Code improvements: Consistent type checking, cleaner code
+// Additional benefits: Better error messages, reduced duplication

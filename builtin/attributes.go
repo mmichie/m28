@@ -6,6 +6,8 @@ import (
 
 	"github.com/mmichie/m28/common/builders"
 	"github.com/mmichie/m28/common/errors"
+	"github.com/mmichie/m28/common/types"
+	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
 
@@ -40,34 +42,38 @@ func RegisterAttributes(ctx *core.Context) {
 	// BEFORE: Simple check scattered across code
 	// AFTER: Centralized with builder
 	ctx.Define("callable", core.NewBuiltinFunction(builders.UnaryAny("callable", func(val core.Value) (core.Value, error) {
-		_, isCallable := val.(core.Callable)
-		return core.BoolValue(isCallable), nil
+		return core.BoolValue(types.IsCallable(val)), nil
 	})))
 
 	// error - create an error (alias for raise)
 	// BEFORE: 19 lines
-	// AFTER: 8 lines with custom function
+	// AFTER: Using validation framework
 	ctx.Define("error", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, errors.NewArgumentError("error", 1, len(args))
+		v := validation.NewArgs("error", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
 		}
-		msg, ok := args[0].(core.StringValue)
-		if !ok {
-			return nil, errors.NewTypeError("error", "string", string(args[0].Type()))
+
+		msg, err := v.GetString(0)
+		if err != nil {
+			return nil, err
 		}
+
 		// Create a RuntimeError with the message
-		return nil, errors.NewRuntimeError("error", string(msg))
+		return nil, errors.NewRuntimeError("error", msg)
 	}))
 
 	// delattr - delete attribute (placeholder)
 	// BEFORE: 17 lines returning NotImplementedError
-	// AFTER: Simple error return
+	// AFTER: Using validation framework
 	ctx.Define("delattr", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 2 {
-			return nil, errors.NewArgumentError("delattr", 2, len(args))
+		v := validation.NewArgs("delattr", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
 		}
+
 		// For now, we don't support attribute deletion
-		desc := core.GetTypeDescriptorForValue(args[0])
+		desc := core.GetTypeDescriptorForValue(v.Get(0))
 		typeName := "object"
 		if desc != nil {
 			typeName = desc.PythonName

@@ -3,6 +3,7 @@ package builtin
 import (
 	"github.com/mmichie/m28/common/builders"
 	"github.com/mmichie/m28/common/errors"
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
@@ -45,14 +46,14 @@ func IterBuilder() builders.BuiltinFunc {
 		if v.Count() == 1 {
 			// For now, just return the iterable itself
 			// TODO: Return proper iterator object when implemented
-			if _, ok := obj.(core.Iterable); ok {
-				return obj, nil
+			if iterable, ok := types.AsIterable(obj); ok {
+				return iterable, nil
 			}
 
 			// Try __iter__ method
 			if o, ok := obj.(core.Object); ok {
 				if method, exists := o.GetAttr("__iter__"); exists {
-					if callable, ok := method.(core.Callable); ok {
+					if callable, ok := types.AsCallable(method); ok {
 						result, err := callable.Call([]core.Value{}, ctx)
 						if err != nil {
 							return nil, err
@@ -100,7 +101,7 @@ func NextBuilder() builders.BuiltinFunc {
 		// Try __next__ method
 		if obj, ok := iterator.(core.Object); ok {
 			if method, exists := obj.GetAttr("__next__"); exists {
-				if callable, ok := method.(core.Callable); ok {
+				if callable, ok := types.AsCallable(method); ok {
 					result, err := callable.Call([]core.Value{}, ctx)
 					if err != nil {
 						// Check for StopIteration in error message
@@ -130,9 +131,9 @@ func EnumerateBuilder() builders.BuiltinFunc {
 
 		// Get iterable
 		obj := v.Get(0)
-		iterable, ok := obj.(core.Iterable)
-		if !ok {
-			return nil, errors.NewTypeError("enumerate", "argument must be iterable", string(obj.Type()))
+		iterable, err := types.RequireIterable(obj, "enumerate() argument")
+		if err != nil {
+			return nil, err
 		}
 
 		// Get optional start value
@@ -175,11 +176,11 @@ func ZipBuilder() builders.BuiltinFunc {
 		// Convert all arguments to iterables
 		iterables := make([]core.Iterable, v.Count())
 		for i := 0; i < v.Count(); i++ {
-			if iter, ok := v.Get(i).(core.Iterable); ok {
-				iterables[i] = iter
-			} else {
-				return nil, errors.NewTypeError("zip", "argument must be iterable", string(v.Get(i).Type()))
+			iter, err := types.RequireIterable(v.Get(i), "zip() argument")
+			if err != nil {
+				return nil, err
 			}
+			iterables[i] = iter
 		}
 
 		// TODO: Return proper zip iterator when implemented
