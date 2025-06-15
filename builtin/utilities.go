@@ -3,6 +3,8 @@ package builtin
 import (
 	"fmt"
 
+	"github.com/mmichie/m28/common/types"
+	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
 
@@ -27,37 +29,37 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 
 	// apply - apply a function to a list of arguments
 	ctx.Define("apply", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 2 || len(args) > 3 {
-			return nil, fmt.Errorf("apply() takes 2 or 3 arguments (function, args, and optionally kwargs)")
+		v := validation.NewArgs("apply", args)
+		if err := v.Range(2, 3); err != nil {
+			return nil, err
 		}
 
 		// Get the function
-		fn, ok := args[0].(core.Callable)
+		fn, ok := types.AsCallable(v.Get(0))
 		if !ok {
-			return nil, fmt.Errorf("apply() first argument must be callable, got %s", args[0].Type())
+			return nil, fmt.Errorf("apply() first argument must be callable, got %s", v.Get(0).Type())
 		}
 
 		// Get the arguments list
 		var fnArgs []core.Value
-		switch argList := args[1].(type) {
-		case core.ListValue:
-			fnArgs = []core.Value(argList)
-		case core.TupleValue:
-			fnArgs = []core.Value(argList)
-		default:
-			return nil, fmt.Errorf("apply() second argument must be a list or tuple, got %s", args[1].Type())
+		if list, ok := types.AsList(v.Get(1)); ok {
+			fnArgs = list
+		} else if tuple, ok := types.AsTuple(v.Get(1)); ok {
+			fnArgs = tuple
+		} else {
+			return nil, fmt.Errorf("apply() second argument must be a list or tuple, got %s", v.Get(1).Type())
 		}
 
 		// Handle keyword arguments if provided
-		if len(args) == 3 {
+		if v.Count() == 3 {
 			// For now, we need to handle kwargs differently based on the function type
 			// This is a simplified implementation - full kwargs support would require
 			// more extensive changes to the function call mechanism
 
 			// Check if kwargs is a dict
-			_, ok := args[2].(*core.DictValue)
+			_, ok := types.AsDict(v.Get(2))
 			if !ok {
-				return nil, fmt.Errorf("apply() third argument must be a dict, got %s", args[2].Type())
+				return nil, fmt.Errorf("apply() third argument must be a dict, got %s", v.Get(2).Type())
 			}
 
 			// TODO: Full kwargs support would require changes to core.Callable interface
@@ -67,13 +69,10 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 
 		// Extract kwargs if provided
 		kwargsMap := make(map[string]core.Value)
-		if len(args) == 3 {
-			dict := args[2].(*core.DictValue) // Already validated above
+		if v.Count() == 3 {
+			dict, _ := types.AsDict(v.Get(2)) // Already validated above
 			for _, key := range dict.Keys() {
 				value, _ := dict.Get(key)
-				if !ok {
-					// Keys are already strings from dict.Keys()
-				}
 				kwargsMap[key] = value
 			}
 		}
@@ -112,8 +111,14 @@ func ApplyWithKwargs(fn core.Value, args []core.Value, kwargs map[string]core.Va
 
 // Helper function to extract number from value
 func getNumber(v core.Value) float64 {
-	if num, ok := v.(core.NumberValue); ok {
-		return float64(num)
+	if num, ok := types.AsNumber(v); ok {
+		return num
 	}
 	panic(fmt.Sprintf("expected number, got %s", v.Type()))
 }
+
+// Migration Statistics:
+// Functions migrated: 1 (apply) + helper function
+// Type checks eliminated: ~5 manual type assertions
+// Code improvements: Uses AsCallable, AsList, AsTuple, AsDict helpers
+// Benefits: Consistent validation with v.Range(), cleaner type checking

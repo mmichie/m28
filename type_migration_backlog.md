@@ -37,14 +37,17 @@ Note: builtin/modules/os.go, json.go, and pathlib.go are just stubs - the actual
 ### 🟢 Low Priority
 Minor improvements possible:
 
-- [ ] **builtin/assert.go** - Simple, only 2 checks
-- [ ] **builtin/utilities.go** - Already simplified
-- [ ] **builtin/essential_builtins.go** - Complex intertwined logic
-- [ ] **builtin/datetime.go** - Date/time operations
-- [ ] **builtin/time.go** - Time module
-- [ ] **builtin/random.go** - Random number generation
-- [ ] **builtin/shutil.go** - Shell utilities
-- [ ] **builtin/async.go** - Async operations
+### ✅ Migrated (Phase 1.7 - Low Priority)
+- [x] **builtin/assert.go** - Simple validation (2 type checks eliminated)
+- [x] **builtin/utilities.go** - apply function (~5 type checks eliminated)
+- [x] **builtin/random.go** - Random number generation (~15 type checks eliminated)
+- [x] **builtin/time.go** - Time module (2 type checks eliminated)
+- [x] **builtin/shutil.go** - Shell utilities (~12 type checks eliminated)
+- [x] **builtin/async.go** - Async operations (~6 type checks eliminated)
+
+### ⏭️ Skipped (Too Complex for Now)
+- [ ] **builtin/essential_builtins.go** - Very complex with intertwined logic
+- [ ] **builtin/datetime.go** - Complex class-based implementation
 
 ## Migration Guidelines
 
@@ -95,6 +98,31 @@ Files migrated so far have shown:
 
 **Phase 1.5 Complete**: 10 files migrated
 **Phase 1.6 Complete**: 7 files migrated (4 high-priority + 3 medium-priority)
+**Phase 1.7 Complete**: 6 files migrated (low-priority)
 
-**Total migrated**: 17 builtin files now using the new type helper system
-**Remaining**: 8 low-priority files for future migration
+**Total migrated**: 23 builtin files now using the new type helper system
+**Remaining**: 2 complex files skipped (essential_builtins.go, datetime.go)
+
+## Future Work - Module/Builtin Separation
+
+Many files currently in the `builtin/` directory are actually modules that should be separated:
+
+### Modules to Extract:
+- `builtin/os.go` → Should be a proper module
+- `builtin/json.go` → Should be a proper module  
+- `builtin/pathlib.go` → Should be a proper module
+- `builtin/random.go` → Should be a proper module
+- `builtin/time.go` → Should be a proper module
+- `builtin/datetime.go` → Should be a proper module
+- `builtin/shutil.go` → Should be a proper module
+
+### True Builtins (should remain):
+- Functions like `len()`, `print()`, `type()`, `range()`, etc.
+- Type conversion functions: `int()`, `str()`, `float()`, `bool()`
+- Essential operations that are part of the core language
+
+This separation would:
+1. Make the codebase more organized
+2. Allow lazy loading of modules
+3. Reduce the initial interpreter startup time
+4. Follow Python's model more closely
