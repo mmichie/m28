@@ -51,53 +51,17 @@ func NewEnvironment(outer *Environment) *Environment {
 
 // Get retrieves a value from the environment
 func (e *Environment) Get(symbol string) (core.Value, bool) {
-	// Debug the lookup
-	if Debug {
-		fmt.Printf("DEBUG Get: Looking up symbol '%s' in environment %p\n", symbol, e)
-	}
-
 	value, ok := e.vars[symbol]
 	if !ok && e.outer != nil {
 		// Look in outer environment if not found in current
-		if Debug {
-			fmt.Printf("DEBUG Get: Symbol '%s' not found in current environment, checking outer\n", symbol)
-		}
 		return e.outer.Get(symbol)
 	}
-
-	if ok {
-		if Debug {
-			fmt.Printf("DEBUG Get: Found symbol '%s' = %v (type %T)\n", symbol, value, value)
-		}
-
-		// No special handling needed for now
-	} else {
-		if Debug {
-			fmt.Printf("DEBUG Get: Symbol '%s' not found\n", symbol)
-		}
-	}
-
 	return value, ok
 }
 
 // Set sets a value in the environment
 func (e *Environment) Set(symbol string, value core.Value) {
-	if Debug {
-		fmt.Printf("DEBUG Set: Setting symbol '%s' = %v (type %T) in environment %p\n", symbol, value, value, e)
-	}
-
-	// No special handling needed for now
-
 	e.vars[symbol] = value
-
-	// Verification
-	if Debug {
-		if storedValue, exists := e.vars[symbol]; exists {
-			fmt.Printf("DEBUG Set: Verified symbol '%s' exists after setting, value: %v\n", symbol, storedValue)
-		} else {
-			fmt.Printf("DEBUG Set: CRITICAL - Symbol '%s' not found after setting\n", symbol)
-		}
-	}
 }
 
 // SetEvaluator sets the evaluator for this environment
@@ -117,22 +81,7 @@ func (e *Environment) GetEvaluator() interface{} {
 
 // Define creates a new binding in the current environment
 func (e *Environment) Define(symbol string, value core.Value) {
-	if Debug {
-		fmt.Printf("DEBUG Define: Defining symbol '%s' = %v (type %T) in environment %p\n", symbol, value, value, e)
-	}
-
-	// No special handling needed for now
-
 	e.vars[symbol] = value
-
-	// Verification
-	if Debug {
-		if storedValue, exists := e.vars[symbol]; exists {
-			fmt.Printf("DEBUG Define: Verified symbol '%s' exists after defining, value: %v\n", symbol, storedValue)
-		} else {
-			fmt.Printf("DEBUG Define: CRITICAL - Symbol '%s' not found after defining\n", symbol)
-		}
-	}
 }
 
 // SetMutable sets a value in the environment, searching up the chain

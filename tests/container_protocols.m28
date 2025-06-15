@@ -1,0 +1,105 @@
+# Test container protocols: __getitem__, __setitem__, __delitem__
+
+# Test 1: Custom class with __getitem__
+(print "=== Test 1: __getitem__ ===")
+
+(class Vector
+  (def __init__ (self)
+    (= self.data [1, 2, 3, 4, 5]))
+  
+  (def __getitem__ (self index)
+    (get-item self.data index)))
+
+(= v (Vector))
+(assert (== (get-item v 0) 1) "Vector[0] should be 1")
+(assert (== (get-item v 2) 3) "Vector[2] should be 3")
+(assert (== (get-item v -1) 5) "Vector[-1] should be 5")
+(print "✓ __getitem__ works")
+
+# Test 2: Custom class with __setitem__
+(print "\n=== Test 2: __setitem__ ===")
+
+(class MutableVector
+  (def __init__ (self)
+    (= self.data {"0": 1, "1": 2, "2": 3, "3": 4, "4": 5, "-1": 5}))
+  
+  (def __getitem__ (self index)
+    (get-item self.data (str index)))
+  
+  (def __setitem__ (self index value)
+    (set-item self.data (str index) value)))
+
+(= mv (MutableVector))
+(set-item mv 1 10)
+(assert (== (get-item mv 1) 10) "MutableVector[1] should be 10 after setting")
+(set-item mv -1 20)
+(assert (== (get-item mv -1) 20) "MutableVector[-1] should be 20 after setting")
+(print "✓ __setitem__ works")
+
+# Test 3: Custom class with __delitem__
+(print "\n=== Test 3: __delitem__ ===")
+
+(class DeletableVector
+  (def __init__ (self)
+    (= self.data {"0": 1, "1": 2, "2": 3, "3": 4, "4": 5})
+    (= self.length 5))
+  
+  (def __getitem__ (self index)
+    (get-item self.data (str index)))
+  
+  (def __delitem__ (self index)
+    (del-item self.data (str index))
+    (= self.length (- self.length 1)))
+  
+  (def __len__ (self)
+    self.length))
+
+(= dv (DeletableVector))
+(assert (== (len dv) 5) "Initial length should be 5")
+(del-item dv 2)
+(assert (== (len dv) 4) "Length should be 4 after deletion")
+(assert (not (in "2" dv.data)) "Key '2' should be deleted from data")
+(print "✓ __delitem__ works")
+
+# Test 4: Slicing with __getitem__
+(print "\n=== Test 4: Slicing with __getitem__ ===")
+
+(class SliceableVector
+  (def __init__ (self)
+    (= self.data [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
+  
+  (def __getitem__ (self index)
+    # For this test, just handle regular indexing
+    (get-item self.data index)))
+
+(= sv (SliceableVector))
+(assert (== (get-item sv 3) 3) "sv[3] should be 3")
+
+# Test slice object creation
+(= s (slice 2 5 nil))
+(assert (== s.start 2) "slice start should be 2")
+(assert (== s.stop 5) "slice stop should be 5")
+(assert (== s.step nil) "slice step should be nil")
+
+# Test 5: Built-in types still work
+(print "\n=== Test 5: Built-in types ===")
+
+# List indexing (read-only)
+(= lst [10, 20, 30, 40])
+(assert (== (get-item lst 1) 20) "List indexing should work")
+# Lists are immutable, so we can't test set-item on them
+
+# Dict indexing
+(= d {"a": 1, "b": 2, "c": 3})
+(assert (== (get-item d "b") 2) "Dict indexing should work")
+(set-item d "d" 4)
+(assert (== (get-item d "d") 4) "Dict assignment should work")
+(del-item d "b")
+(assert (not (in "b" d)) "Dict deletion should work")
+
+# String indexing (read-only)
+(= s "hello")
+(assert (== (get-item s 1) "e") "String indexing should work")
+(assert (== (get-item s -1) "o") "String negative indexing should work")
+
+(print "\n✅ All container protocol tests passed!")

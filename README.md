@@ -1,6 +1,6 @@
 # M28 - A Lispy-Pythonic Programming Language
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/go-%3E%3D1.19-00ADD8.svg)](go.mod)
 
@@ -170,6 +170,60 @@ Everything is an expression in prefix notation:
 
 (print (quicksort [3, 1, 4, 1, 5, 9, 2, 6]))  # [1, 1, 2, 3, 4, 5, 6, 9]
 ```
+
+## New in v0.2.0: Protocol System
+
+M28 now supports Python-style protocols for creating extensible custom types:
+
+### Iterator Protocol
+```lisp
+(class Counter
+  (def __init__ (self max)
+    (= self.max max)
+    (= self.current 0))
+  
+  (def __iter__ (self)
+    self)  # Return self as iterator
+  
+  (def __next__ (self)
+    (if (< self.current self.max)
+      (let ((val self.current))
+        (= self.current (+ self.current 1))
+        val)
+      (raise StopIteration))))
+
+# Use in for loop
+(for i in (Counter 5)
+  (print i))  # Prints 0, 1, 2, 3, 4
+```
+
+### Container Protocols
+```lisp
+(class MyList
+  (def __init__ (self)
+    (= self.data {}))
+  
+  (def __getitem__ (self index)
+    (get-item self.data (str index)))
+  
+  (def __setitem__ (self index value)
+    (set-item self.data (str index) value))
+  
+  (def __delitem__ (self index)
+    (del-item self.data (str index))))
+
+(= ml (MyList))
+(set-item ml 0 "hello")
+(print (get-item ml 0))  # "hello"
+```
+
+### Other Protocols
+- **Arithmetic**: `__add__`, `__sub__`, `__mul__`, `__div__` for operator overloading
+- **Comparison**: `__eq__`, `__lt__`, `__le__` for custom comparisons
+- **String**: `__repr__`, `__str__` for string representations
+- **Boolean**: `__bool__` for truthiness
+- **Length**: `__len__` for container size
+- **Contains**: `__contains__` for membership testing
 
 ## Why M28?
 
