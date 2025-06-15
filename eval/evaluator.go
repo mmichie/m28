@@ -337,8 +337,33 @@ func assignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Get the target
 	target := args[0]
 
-	// Check if target is a list (tuple unpacking)
+	// Check if target is a list
 	if targetList, ok := target.(core.ListValue); ok {
+		// Check if it's a special form (indexed or property assignment)
+		if len(targetList) > 0 {
+			if sym, ok := targetList[0].(core.SymbolValue); ok {
+				switch string(sym) {
+				case "get-item":
+					// Indexed assignment: lst[i] = value
+					if len(targetList) != 3 {
+						return nil, fmt.Errorf("invalid index expression")
+					}
+					// Evaluate the value
+					value, err := Eval(args[1], ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Use SetItemForm to handle the assignment
+					return SetItemForm(core.ListValue{targetList[1], targetList[2], value}, ctx)
+
+				case ".":
+					// Property assignment: obj.prop = value
+					// This is handled by dot notation already
+					break
+				}
+			}
+		}
+
 		// Tuple unpacking: (= (x, y) (10, 20))
 		// Evaluate the value
 		value, err := Eval(args[1], ctx)

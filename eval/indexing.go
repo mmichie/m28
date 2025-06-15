@@ -3,7 +3,9 @@ package eval
 import (
 	"fmt"
 
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/protocols"
 )
 
 // GetItemForm implements the get-item special form for index access
@@ -31,98 +33,18 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return handleSliceObject(obj, slice)
 	}
 
-	// Handle different object types
-	switch v := obj.(type) {
-	case core.ListValue:
-		// List indexing requires numeric index
-		idx, ok := key.(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("list indices must be integers, not %s", key.Type())
-		}
-
-		index := int(idx)
-		if index < 0 {
-			index = len(v) + index
-		}
-
-		if index < 0 || index >= len(v) {
-			return nil, &core.IndexError{Index: index, Length: len(v)}
-		}
-
-		return v[index], nil
-
-	case core.TupleValue:
-		// Tuple indexing
-		idx, ok := key.(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("tuple indices must be integers, not %s", key.Type())
-		}
-
-		index := int(idx)
-		if index < 0 {
-			index = len(v) + index
-		}
-
-		if index < 0 || index >= len(v) {
-			return nil, &core.IndexError{Index: index, Length: len(v)}
-		}
-
-		return v[index], nil
-
-	case *core.DictValue:
-		// Dictionary key access
-		// Check if key is hashable
-		if !core.IsHashable(key) {
-			return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
-		}
-
-		// Convert key to string representation
-		keyStr := core.ValueToKey(key)
-
-		// Check if key exists
-		if val, exists := v.Get(keyStr); exists {
-			return val, nil
-		}
-
-		// If not found, return KeyError
-		return nil, &core.KeyError{Key: key}
-
-	case core.StringValue:
-		// String indexing
-		idx, ok := key.(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("string indices must be integers, not %s", key.Type())
-		}
-
-		str := string(v)
-		index := int(idx)
-		if index < 0 {
-			index = len(str) + index
-		}
-
-		if index < 0 || index >= len(str) {
-			return nil, &core.IndexError{Index: index, Length: len(str)}
-		}
-
-		return core.StringValue(str[index : index+1]), nil
-
-	default:
-		// Check if object has __getitem__ method
-		if objWithGetItem, ok := obj.(interface {
-			GetAttr(string) (core.Value, bool)
-		}); ok {
-			if getItem, found := objWithGetItem.GetAttr("__getitem__"); found {
-				// Call __getitem__ with the key
-				if callable, ok := getItem.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					return callable.Call([]core.Value{key}, ctx)
-				}
-			}
-		}
-
-		return nil, fmt.Errorf("'%s' object is not subscriptable", obj.Type())
+	// First, try dunder method __getitem__
+	if result, found, err := types.CallGetItem(obj, key, ctx); found {
+		return result, err
 	}
+
+	// Then try protocol-based indexing
+	if indexable, ok := protocols.GetIndexableOps(obj); ok {
+		return indexable.GetIndex(key)
+	}
+
+	// Fall back to type-specific handling (shouldn't reach here with proper protocol support)
+	return nil, fmt.Errorf("'%s' object is not subscriptable", obj.Type())
 }
 
 // SetItemForm implements the set-item special form for index assignment
@@ -148,43 +70,25 @@ func SetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("error evaluating value: %v", err)
 	}
 
-	// Handle different object types
-	switch v := obj.(type) {
-	case core.ListValue:
-		// List assignment requires numeric index
-		idx, ok := key.(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("list indices must be integers, not %s", key.Type())
+	// First, try dunder method __setitem__
+	if found, err := types.CallSetItem(obj, key, value, ctx); found {
+		if err != nil {
+			return nil, err
 		}
-
-		index := int(idx)
-		if index < 0 {
-			index = len(v) + index
-		}
-
-		if index < 0 || index >= len(v) {
-			return nil, &core.IndexError{Index: index, Length: len(v)}
-		}
-
-		v[index] = value
 		return value, nil
-
-	case *core.DictValue:
-		// Dictionary key assignment
-		// Check if key is hashable
-		if !core.IsHashable(key) {
-			return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
-		}
-
-		// Convert key to string representation
-		keyStr := core.ValueToKey(key)
-
-		v.SetWithKey(keyStr, key, value)
-		return value, nil
-
-	default:
-		return nil, fmt.Errorf("'%s' object does not support item assignment", obj.Type())
 	}
+
+	// Then try protocol-based indexing
+	if indexable, ok := protocols.GetIndexableOps(obj); ok {
+		err = indexable.SetIndex(key, value)
+		if err != nil {
+			return nil, err
+		}
+		return value, nil
+	}
+
+	// Fall back to error (shouldn't reach here with proper protocol support)
+	return nil, fmt.Errorf("'%s' object does not support item assignment", obj.Type())
 }
 
 // SliceForm implements the slice special form
@@ -449,9 +353,50 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 	}
 }
 
+// DelItemForm implements the del-item special form for index deletion
+// (del-item obj key) -> nil
+func DelItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("del-item requires exactly 2 arguments, got %d", len(args))
+	}
+
+	// Evaluate the object
+	obj, err := Eval(args[0], ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating object: %v", err)
+	}
+
+	// Evaluate the key/index
+	key, err := Eval(args[1], ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating key: %v", err)
+	}
+
+	// First, try dunder method __delitem__
+	if found, err := types.CallDelItem(obj, key, ctx); found {
+		if err != nil {
+			return nil, err
+		}
+		return core.Nil, nil
+	}
+
+	// Then try protocol-based indexing
+	if indexable, ok := protocols.GetIndexableOps(obj); ok {
+		err = indexable.DeleteIndex(key)
+		if err != nil {
+			return nil, err
+		}
+		return core.Nil, nil
+	}
+
+	// Fall back to error
+	return nil, fmt.Errorf("'%s' object does not support item deletion", obj.Type())
+}
+
 // RegisterIndexing registers the indexing special forms
 func RegisterIndexing() {
 	RegisterSpecialForm("get-item", GetItemForm)
 	RegisterSpecialForm("set-item", SetItemForm)
+	RegisterSpecialForm("del-item", DelItemForm)
 	RegisterSpecialForm("__slice__", SliceForm) // Internal name to avoid conflict with slice() builtin
 }

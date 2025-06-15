@@ -1,0 +1,73 @@
+# Test that lists are immutable
+
+(= lst [1, 2, 3])
+(print "Original list:" lst)
+
+# Test index assignment
+(try
+  (= lst[0] 10)
+  (print "ERROR: List assignment should have failed!")
+  (except Exception e
+    (print "✓ List assignment correctly failed:" e)))
+
+# Test deletion
+(try
+  (del-item lst 0)
+  (print "ERROR: List deletion should have failed!")
+  (except Exception e
+    (print "✓ List deletion correctly failed:" e)))
+
+# Test that reading still works
+(print "\nReading list elements still works:")
+(print "lst[0] =" lst[0])
+(print "lst[1] =" lst[1])
+(print "lst[-1] =" lst[-1])
+
+# Test that immutable operations work
+(print "\nImmutable operations return new lists:")
+(= lst2 (lst.append 4))
+(print "Original:" lst)
+(print "After append:" lst2)
+
+# Test with custom class that has mutable list behavior
+(print "\n\nCustom classes can still implement mutable behavior:")
+
+(class MutableList
+  (def __init__ (self)
+    (= self.data {})
+    (= self.length 0)
+    self)
+  
+  (def __getitem__ (self index)
+    (if (in index self.data)
+      self.data[index]
+      (raise IndexError (+ "index " (str index) " out of range"))))
+  
+  (def __setitem__ (self index value)
+    (= self.data[index] value)
+    (if (>= index self.length)
+      (= self.length (+ index 1))))
+  
+  (def append (self value)
+    (= idx self.length)
+    (= self.data[idx] value)
+    (= self.length (+ self.length 1))
+    self)
+  
+  (def __str__ (self)
+    (= items [])
+    (for i (range self.length)
+      (if (in i self.data)
+        (= items (items.append self.data[i]))
+        (= items (items.append nil))))
+    (+ "MutableList(" (str items) ")")))
+
+(= mut (MutableList))
+(mut.append 10)
+(mut.append 20)
+(mut.append 30)
+(print "MutableList:" mut)
+
+(= mut[1] 99)
+(print "After mut[1] = 99:" mut)
+(print "mut[1] =" mut[1])

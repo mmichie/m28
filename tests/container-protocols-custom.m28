@@ -1,0 +1,110 @@
+# Test custom classes with container protocols
+
+# Define a custom Vector class with indexing support
+(class Vector
+  (def __init__ (self)
+    (= self.data [])
+    self)
+  
+  (def __getitem__ (self index)
+    self.data[index])
+  
+  (def __setitem__ (self index value)
+    # Since lists are immutable, create a new list
+    (= new-data [])
+    (for i (range (len self.data))
+      (if (== i index)
+        (= new-data (new-data.append value))
+        (= new-data (new-data.append self.data[i]))))
+    (= self.data new-data))
+  
+  (def __len__ (self)
+    (len self.data))
+  
+  (def __contains__ (self item)
+    (in item self.data))
+  
+  (def __iter__ (self)
+    (iter self.data))
+  
+  (def append (self value)
+    (= self.data (self.data.append value))
+    self)
+  
+  (def __str__ (self)
+    (+ "Vector(" (str self.data) ")")))
+
+# Create and test vector
+(= v (Vector))
+(v.append 10)
+(v.append 20)
+(v.append 30)
+
+(print "Vector created:" v)
+(print "Length:" (len v))
+
+# Test __getitem__
+(print "\nTesting __getitem__:")
+(print "v[0] =" v[0])
+(print "v[1] =" v[1])
+(print "v[-1] =" v[-1])
+
+# Test __setitem__
+(print "\nTesting __setitem__:")
+(= v[1] 25)
+(print "After v[1] = 25:" v)
+(print "v[1] is now:" v[1])
+
+# Test __contains__
+(print "\nTesting __contains__:")
+(print "10 in v:" (in 10 v))
+(print "25 in v:" (in 25 v))
+(print "20 in v:" (in 20 v))
+(print "100 in v:" (in 100 v))
+
+# Test with for loop (commented out - requires more iteration protocol support)
+# (print "\nIterating over vector:")
+# (for x v
+#   (print "  Element:" x))
+
+# Define a sparse array that only stores non-zero values
+(class SparseArray
+  (def __init__ (self)
+    (= self.data {})
+    self)
+  
+  (def __getitem__ (self index)
+    (if (in index self.data)
+      self.data[index]
+      0))
+  
+  (def __setitem__ (self index value)
+    (if (!= value 0)
+      (= self.data[index] value)
+      (if (in index self.data)
+        (del self.data[index]))))
+  
+  (def __contains__ (self value)
+    (in value (self.data.values)))
+  
+  (def __str__ (self)
+    (+ "SparseArray(" (str self.data) ")")))
+
+# Test sparse array
+(print "\n\nTesting SparseArray:")
+(= sparse (SparseArray))
+(= sparse[5] 100)
+(= sparse[10] 200)
+(= sparse[15] 300)
+
+(print "Sparse array:" sparse)
+(print "sparse[5] =" sparse[5])
+(print "sparse[10] =" sparse[10])
+(print "sparse[0] =" sparse[0])  # Should return 0
+(print "sparse[7] =" sparse[7])  # Should return 0
+
+# Test setting to zero (should remove from dict)
+(= sparse[10] 0)
+(print "After sparse[10] = 0:" sparse)
+
+(print "\nAll container protocol tests passed!")

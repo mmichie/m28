@@ -1,0 +1,29 @@
+# Test container protocols with square bracket syntax
+
+# Test basic list indexing
+(= lst [1, 2, 3, 4, 5])
+(assert (== lst[0] 1) "list[0]")
+(assert (== lst[-1] 5) "list[-1]")
+(assert (== lst[2] 3) "list[2]")
+
+# Test list assignment
+(= lst[1] 20)
+(assert (== lst[1] 20) "list assignment")
+
+# Test dictionary
+(= d {"a": 1, "b": 2, "c": 3})
+(assert (== d["a"] 1) "dict access")
+(= d["b"] 20)
+(assert (== d["b"] 20) "dict assignment")
+
+# Test tuple
+(= t (1, 2, 3))
+(assert (== t[0] 1) "tuple[0]")
+(assert (== t[-1] 3) "tuple[-1]")
+
+# Test string
+(= s "hello")
+(assert (== s[0] "h") "string[0]")
+(assert (== s[-1] "o") "string[-1]")
+
+print("Square bracket syntax tests passed!")

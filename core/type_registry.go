@@ -706,26 +706,10 @@ func InitializeTypeRegistry() {
 			"__setitem__": {
 				Name:    "__setitem__",
 				Arity:   2,
-				Doc:     "Set item by index",
+				Doc:     "Set item by index (not supported - lists are immutable)",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					list := receiver.(ListValue)
-					index, ok := args[0].(NumberValue)
-					if !ok {
-						return nil, fmt.Errorf("list indices must be integers")
-					}
-					// Since lists are immutable, return a new list
-					idx := int(index)
-					if idx < 0 {
-						idx = len(list) + idx
-					}
-					if idx < 0 || idx >= len(list) {
-						return nil, &IndexError{Index: idx, Length: len(list)}
-					}
-					newList := make(ListValue, len(list))
-					copy(newList, list)
-					newList[idx] = args[1]
-					return newList, nil
+					return nil, fmt.Errorf("'list' object does not support item assignment (lists are immutable)")
 				},
 			},
 			"__contains__": {
