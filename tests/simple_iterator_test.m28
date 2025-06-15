@@ -1,0 +1,37 @@
+# Simple Iterator Protocol Test
+
+# Test iter() and next()
+(print "1. Basic iter/next test:")
+(= it (iter [10, 20, 30]))
+(print "  First:" (next it))
+(print "  Second:" (next it))
+(print "  Third:" (next it))
+(print "  With default:" (next it "END"))
+
+# Test for loop
+(print "\n2. For loop test:")
+(for x [1, 2, 3]
+  (print "  Value:" x))
+
+# Test string iteration
+(print "\n3. String iteration:")
+(for char "ABC"
+  (print "  Char:" char))
+
+# Test custom iterator
+(print "\n4. Custom iterator:")
+(class Counter
+  (def __init__ (self n)
+    (= self.i 0)
+    (= self.n n)
+    self)
+  (def __iter__ (self) self)
+  (def __next__ (self)
+    (if (< self.i self.n)
+      (do (= self.i (+ self.i 1)) self.i)
+      (raise (Exception "StopIteration")))))
+
+(for i (Counter 3)
+  (print "  Count:" i))
+
+(print "\n✅ Iterator protocol is working!")

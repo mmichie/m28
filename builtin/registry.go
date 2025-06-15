@@ -15,6 +15,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterAttributes(ctx)
 	RegisterList(ctx)
 	RegisterIteration(ctx)
+	RegisterIterationProtocol(ctx) // Register new iterator protocol functions
 	RegisterFunctional(ctx)
 	RegisterCollections(ctx)
 	RegisterNumeric(ctx)

@@ -10,15 +10,8 @@ import (
 
 // RegisterIteration registers iteration functions using the builder framework
 func RegisterIteration(ctx *core.Context) {
-	// iter - get iterator from iterable
-	// BEFORE: 27 lines
-	// AFTER: Custom builder with sentinel support
-	ctx.Define("iter", core.NewBuiltinFunction(IterBuilder()))
-
-	// next - get next item from iterator
-	// BEFORE: 36 lines with method lookup
-	// AFTER: Custom builder
-	ctx.Define("next", core.NewBuiltinFunction(NextBuilder()))
+	// iter and next are now registered by RegisterIterationProtocol
+	// which provides the proper iterator protocol implementation
 
 	// enumerate - return enumerate object
 	// BEFORE: 38 lines

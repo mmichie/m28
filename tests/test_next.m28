@@ -1,0 +1,12 @@
+# Test next() function
+
+(= lst [10, 20, 30])
+(= it (iter lst))
+(print "Iterator:" it)
+
+(print "First:" (next it))
+(print "Second:" (next it))
+(print "Third:" (next it))
+
+# Test with default
+(print "Fourth with default:" (next it "DONE"))

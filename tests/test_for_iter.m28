@@ -1,0 +1,32 @@
+# Test for loop with iterators
+
+# Test 1: Basic list iteration
+(print "Test 1: Basic list iteration")
+(for x [1, 2, 3]
+  (print x))
+
+# Test 2: Custom iterator class
+(print "\nTest 2: Custom iterator class")
+
+(class Counter
+  (def __init__ (self max)
+    (= self.max max)
+    (= self.count 0)
+    self)
+  
+  (def __iter__ (self)
+    self)  # Return self as iterator
+  
+  (def __next__ (self)
+    (if (< self.count self.max)
+      (do
+        (= self.count (+ self.count 1))
+        self.count)
+      (raise (Exception "StopIteration")))))
+
+# Test the custom iterator
+(print "Counting from 1 to 5:")
+(for n (Counter 5)
+  (print "Count:" n))
+
+(print "\nDone!")

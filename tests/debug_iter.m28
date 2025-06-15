@@ -1,0 +1,11 @@
+# Debug iter() function
+
+(= lst [1, 2, 3])
+(print "List:" lst)
+
+(try
+  (= it (iter lst))
+  (print "Iterator:" it)
+  (print "Iterator type:" (type it))
+  (except Exception e
+    (print "Error calling iter():" e)))

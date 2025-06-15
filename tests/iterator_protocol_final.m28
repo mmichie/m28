@@ -1,0 +1,75 @@
+# Test Iterator Protocol Implementation
+
+# Test 1: iter() returns proper iterators
+(print "=== Test 1: iter() returns proper iterators ===")
+(= lst_iter (iter [1, 2, 3]))
+(print "List iterator:" lst_iter)
+(assert (= (type lst_iter) "list_iterator") "iter() should return list_iterator")
+
+(= str_iter (iter "abc"))
+(print "String iterator:" str_iter)
+(assert (= (type str_iter) "str_iterator") "iter() should return str_iterator")
+
+# Test 2: next() function
+(print "\n=== Test 2: next() function ===")
+(= it (iter [10, 20, 30]))
+(assert (= (next it) 10) "First next() should return 10")
+(assert (= (next it) 20) "Second next() should return 20")
+(assert (= (next it) 30) "Third next() should return 30")
+(assert (= (next it "DONE") "DONE") "next() with default should return default")
+
+# Test 3: String iteration
+(print "\n=== Test 3: String iteration ===")
+(= result [])
+(for char "Hello"
+  (= result (+ result [char])))
+(assert (= result ["H", "e", "l", "l", "o"]) "String iteration should work")
+
+# Test 4: Dict iteration (keys)
+(print "\n=== Test 4: Dict iteration ===")
+(= d {"a": 1, "b": 2, "c": 3})
+(= keys [])
+(for k d
+  (= keys (+ keys [k])))
+(assert (= (len keys) 3) "Dict iteration should yield all keys")
+
+# Test 5: Custom iterator class
+(print "\n=== Test 5: Custom iterator class ===")
+(class Squares
+  (def __init__ (self n)
+    (= self.n n)
+    (= self.i 0)
+    self)
+  
+  (def __iter__ (self)
+    self)
+  
+  (def __next__ (self)
+    (if (< self.i self.n)
+      (do
+        (= self.i (+ self.i 1))
+        (* self.i self.i))
+      (raise (Exception "StopIteration")))))
+
+(= squares [])
+(for x (Squares 5)
+  (= squares (+ squares [x])))
+(assert (= squares [1, 4, 9, 16, 25]) "Custom iterator should work")
+
+# Test 6: Multiple iterations
+(print "\n=== Test 6: Multiple iterations ===")
+(= lst [1, 2, 3])
+(= sum1 0)
+(= sum2 0)
+(for x lst (= sum1 (+ sum1 x)))
+(for x lst (= sum2 (+ sum2 x)))
+(assert (= sum1 sum2) "Multiple iterations should work independently")
+
+# Test 7: iter() on iterator returns itself
+(print "\n=== Test 7: iter() on iterator ===")
+(= it1 (iter [1, 2, 3]))
+(= it2 (iter it1))
+(assert (= (next it1) 1) "Original iterator should advance")
+(assert (= (next it2) 2) "iter() on iterator should return same object")
+
+(print "\n✅ All iterator protocol tests passed!")

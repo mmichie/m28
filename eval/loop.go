@@ -3,7 +3,9 @@ package eval
 
 import (
 	"fmt"
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/protocols"
 )
 
 // Break signals a break from a loop
@@ -313,8 +315,76 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 	default:
-		// Try to get iterator if the object implements Iterable
-		if iterable, ok := sequence.(core.Iterable); ok {
+		// First, try calling __iter__ if it exists
+		if iter, found, err := types.CallIter(sequence, ctx); found {
+			if err != nil {
+				return nil, err
+			}
+
+			// Use the iterator returned by __iter__
+			for {
+				// Call __next__ on the iterator
+				item, found, err := types.CallNext(iter, ctx)
+				if err != nil {
+					// Check if it's StopIteration
+					if _, isStop := err.(*protocols.StopIteration); isStop {
+						break
+					}
+					return nil, err
+				}
+				if !found {
+					// No __next__ method - shouldn't happen if __iter__ worked
+					return nil, fmt.Errorf("iterator has no __next__ method")
+				}
+
+				result, err := bodyFunc(item)
+				if err != nil {
+					return nil, err
+				}
+
+				if result == Break {
+					break
+				}
+				if result == Continue {
+					continue
+				}
+				if ret, ok := result.(*ReturnValue); ok {
+					return ret, nil
+				}
+
+				lastResult = result
+			}
+		} else if pIter, ok := protocols.GetIterableOps(sequence); ok {
+			// Try protocol-based iteration
+			for {
+				item, err := pIter.Next()
+				if err != nil {
+					// Check if it's StopIteration
+					if _, isStop := err.(*protocols.StopIteration); isStop {
+						break
+					}
+					return nil, err
+				}
+
+				result, err := bodyFunc(item)
+				if err != nil {
+					return nil, err
+				}
+
+				if result == Break {
+					break
+				}
+				if result == Continue {
+					continue
+				}
+				if ret, ok := result.(*ReturnValue); ok {
+					return ret, nil
+				}
+
+				lastResult = result
+			}
+		} else if iterable, ok := sequence.(core.Iterable); ok {
+			// Fall back to old core.Iterable interface
 			iterator := iterable.Iterator()
 			for {
 				item, hasNext := iterator.Next()
@@ -340,7 +410,7 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				lastResult = result
 			}
 		} else {
-			return nil, TypeError{Expected: "sequence", Got: sequence.Type()}
+			return nil, TypeError{Expected: "iterable", Got: sequence.Type()}
 		}
 	}
 

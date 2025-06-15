@@ -1,0 +1,31 @@
+# Test custom iterator class
+
+(class Counter
+  (def __init__ (self start stop)
+    (= self.current start)
+    (= self.stop stop)
+    self)
+  
+  (def __iter__ (self)
+    self)  # Return self as iterator
+  
+  (def __next__ (self)
+    (if (< self.current self.stop)
+      (do
+        (= val self.current)
+        (= self.current (+ self.current 1))
+        val)
+      (raise (Exception "StopIteration")))))
+
+# Test the custom iterator
+(print "Counting from 10 to 15:")
+(for n (Counter 10 15)
+  (print n))
+
+# Test with nested loops
+(print "\nNested iteration:")
+(for i (Counter 1 3)
+  (for j (Counter 10 12)
+    (print "i:" i "j:" j)))
+
+(print "\nCustom iterator tests passed!")
