@@ -18,17 +18,23 @@ type Task struct {
 	Started  bool
 	Finished bool
 	Mu       sync.Mutex
+	registry *MethodRegistry
 }
 
 // NewTask creates a new async task
 func NewTask(name string, function Value, args []Value) *Task {
-	return &Task{
+	t := &Task{
 		BaseObject: *NewBaseObject(Type("task")),
 		Name:       name,
 		Function:   function,
 		Args:       args,
 		Done:       make(chan bool, 1),
 	}
+
+	// Initialize the method registry
+	t.registry = t.createRegistry()
+
+	return t
 }
 
 // Type returns the task type
@@ -97,43 +103,55 @@ func (t *Task) IsFinished() bool {
 	return t.Finished
 }
 
-// GetAttr implements Object interface
+// createRegistry sets up all methods for task
+func (t *Task) createRegistry() *MethodRegistry {
+	registry := NewMethodRegistry()
+
+	// Register methods
+	registry.RegisterMethods(
+		// result method
+		MakeMethod("result", 0, "Get the result of the task (blocking)",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				task, err := TypedReceiver[*Task](receiver, "result")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("result", args, 0); err != nil {
+					return nil, err
+				}
+				return task.Wait()
+			}),
+
+		// done method
+		MakeMethod("done", 0, "Check if the task is finished",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				task, err := TypedReceiver[*Task](receiver, "done")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("done", args, 0); err != nil {
+					return nil, err
+				}
+				return BoolValue(task.IsFinished()), nil
+			}),
+	)
+
+	return registry
+}
+
+// GetRegistry implements AttributeProvider
+func (t *Task) GetRegistry() *MethodRegistry {
+	return t.registry
+}
+
+// GetBaseObject implements AttributeProvider
+func (t *Task) GetBaseObject() *BaseObject {
+	return &t.BaseObject
+}
+
+// GetAttr implements the new simplified GetAttr pattern
 func (t *Task) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "result":
-		return &BoundMethod{
-			Receiver: t,
-			Method: &MethodDescriptor{
-				Name:    "result",
-				Arity:   0,
-				Doc:     "Get the result of the task (blocking)",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					task := receiver.(*Task)
-					return task.Wait()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(t),
-		}, true
-
-	case "done":
-		return &BoundMethod{
-			Receiver: t,
-			Method: &MethodDescriptor{
-				Name:    "done",
-				Arity:   0,
-				Doc:     "Check if the task is finished",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					task := receiver.(*Task)
-					return BoolValue(task.IsFinished()), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(t),
-		}, true
-	}
-
-	return t.BaseObject.GetAttr(name)
+	return GetAttrWithRegistry(t, name)
 }
 
 // Channel represents a Go channel with Pythonic interface
@@ -143,15 +161,21 @@ type Channel struct {
 	capacity int
 	closed   bool
 	mu       sync.Mutex
+	registry *MethodRegistry
 }
 
 // NewChannel creates a new channel
 func NewChannel(capacity int) *Channel {
-	return &Channel{
+	c := &Channel{
 		BaseObject: *NewBaseObject(Type("channel")),
 		ch:         make(chan Value, capacity),
 		capacity:   capacity,
 	}
+
+	// Initialize the method registry
+	c.registry = c.createRegistry()
+
+	return c
 }
 
 // Type returns the channel type
@@ -221,86 +245,135 @@ func (c *Channel) GetChan() chan Value {
 	return c.ch
 }
 
-// GetAttr implements Object interface
+// createRegistry sets up all methods for channel
+func (c *Channel) createRegistry() *MethodRegistry {
+	registry := NewMethodRegistry()
+
+	// Register methods
+	registry.RegisterMethods(
+		// send method (also aliased as "put")
+		MakeMethod("send", 1, "Send a value to the channel",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				ch, err := TypedReceiver[*Channel](receiver, "send")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("send", args, 1); err != nil {
+					return nil, err
+				}
+
+				err = ch.Send(args[0])
+				if err != nil {
+					return nil, err
+				}
+				return Nil, nil
+			}),
+
+		// put is an alias for send
+		MakeMethod("put", 1, "Send a value to the channel",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				ch, err := TypedReceiver[*Channel](receiver, "put")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("put", args, 1); err != nil {
+					return nil, err
+				}
+
+				err = ch.Send(args[0])
+				if err != nil {
+					return nil, err
+				}
+				return Nil, nil
+			}),
+
+		// receive method (also aliased as "recv" and "get")
+		MakeMethod("receive", 0, "Receive a value from the channel",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				ch, err := TypedReceiver[*Channel](receiver, "receive")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("receive", args, 0); err != nil {
+					return nil, err
+				}
+				return ch.Receive()
+			}),
+
+		// recv is an alias for receive
+		MakeMethod("recv", 0, "Receive a value from the channel",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				ch, err := TypedReceiver[*Channel](receiver, "recv")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("recv", args, 0); err != nil {
+					return nil, err
+				}
+				return ch.Receive()
+			}),
+
+		// get is an alias for receive
+		MakeMethod("get", 0, "Receive a value from the channel",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				ch, err := TypedReceiver[*Channel](receiver, "get")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("get", args, 0); err != nil {
+					return nil, err
+				}
+				return ch.Receive()
+			}),
+
+		// close method
+		MakeMethod("close", 0, "Close the channel",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				ch, err := TypedReceiver[*Channel](receiver, "close")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("close", args, 0); err != nil {
+					return nil, err
+				}
+
+				err = ch.Close()
+				if err != nil {
+					return nil, err
+				}
+				return Nil, nil
+			}),
+
+		// __len__ method
+		MakeMethod("__len__", 0, "Get the number of values in the channel buffer",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				ch, err := TypedReceiver[*Channel](receiver, "__len__")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("__len__", args, 0); err != nil {
+					return nil, err
+				}
+				return NumberValue(len(ch.ch)), nil
+			}),
+	)
+
+	return registry
+}
+
+// GetRegistry implements AttributeProvider
+func (c *Channel) GetRegistry() *MethodRegistry {
+	return c.registry
+}
+
+// GetBaseObject implements AttributeProvider
+func (c *Channel) GetBaseObject() *BaseObject {
+	return &c.BaseObject
+}
+
+// GetAttr implements the new simplified GetAttr pattern
 func (c *Channel) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "send", "put":
-		return &BoundMethod{
-			Receiver: c,
-			Method: &MethodDescriptor{
-				Name:    "send",
-				Arity:   1,
-				Doc:     "Send a value to the channel",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					if len(args) != 1 {
-						return nil, fmt.Errorf("send() takes exactly one argument")
-					}
-					ch := receiver.(*Channel)
-					err := ch.Send(args[0])
-					if err != nil {
-						return nil, err
-					}
-					return Nil, nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(c),
-		}, true
-
-	case "receive", "recv", "get":
-		return &BoundMethod{
-			Receiver: c,
-			Method: &MethodDescriptor{
-				Name:    "receive",
-				Arity:   0,
-				Doc:     "Receive a value from the channel",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					ch := receiver.(*Channel)
-					return ch.Receive()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(c),
-		}, true
-
-	case "close":
-		return &BoundMethod{
-			Receiver: c,
-			Method: &MethodDescriptor{
-				Name:    "close",
-				Arity:   0,
-				Doc:     "Close the channel",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					ch := receiver.(*Channel)
-					err := ch.Close()
-					if err != nil {
-						return nil, err
-					}
-					return Nil, nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(c),
-		}, true
-
-	case "__len__":
-		return &BoundMethod{
-			Receiver: c,
-			Method: &MethodDescriptor{
-				Name:    "__len__",
-				Arity:   0,
-				Doc:     "Get the number of values in the channel buffer",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					ch := receiver.(*Channel)
-					return NumberValue(len(ch.ch)), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(c),
-		}, true
-	}
-
-	return c.BaseObject.GetAttr(name)
+	return GetAttrWithRegistry(c, name)
 }
 
 // SelectCase represents a case in a select statement

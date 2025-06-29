@@ -114,26 +114,37 @@ var (
 // BuiltinFunction represents a Go function that can be called from M28
 type BuiltinFunction struct {
 	BaseObject
-	fn   func(args []Value, ctx *Context) (Value, error)
-	name string
+	fn       func(args []Value, ctx *Context) (Value, error)
+	name     string
+	registry *MethodRegistry
 }
 
 // NewBuiltinFunction creates a new builtin function
 func NewBuiltinFunction(fn func(args []Value, ctx *Context) (Value, error)) *BuiltinFunction {
-	return &BuiltinFunction{
+	f := &BuiltinFunction{
 		BaseObject: *NewBaseObject(FunctionType),
 		fn:         fn,
 		name:       "",
 	}
+
+	// Initialize the method registry
+	f.registry = f.createRegistry()
+
+	return f
 }
 
 // NewNamedBuiltinFunction creates a new builtin function with a name
 func NewNamedBuiltinFunction(name string, fn func(args []Value, ctx *Context) (Value, error)) *BuiltinFunction {
-	return &BuiltinFunction{
+	f := &BuiltinFunction{
 		BaseObject: *NewBaseObject(FunctionType),
 		fn:         fn,
 		name:       name,
 	}
+
+	// Initialize the method registry
+	f.registry = f.createRegistry()
+
+	return f
 }
 
 // Call implements Callable.Call
@@ -149,17 +160,37 @@ func (f *BuiltinFunction) String() string {
 	return "<builtin function>"
 }
 
-// GetAttr implements attribute access for builtin functions
+// createRegistry sets up all properties for BuiltinFunction
+func (f *BuiltinFunction) createRegistry() *MethodRegistry {
+	registry := NewMethodRegistry()
+
+	// Register properties
+	registry.RegisterProperties(
+		MakeProperty("__name__", "Function name", func(receiver Value) (Value, error) {
+			fn := receiver.(*BuiltinFunction)
+			if fn.name != "" {
+				return StringValue(fn.name), nil
+			}
+			return StringValue("<anonymous>"), nil
+		}),
+	)
+
+	return registry
+}
+
+// GetRegistry implements AttributeProvider
+func (f *BuiltinFunction) GetRegistry() *MethodRegistry {
+	return f.registry
+}
+
+// GetBaseObject implements AttributeProvider
+func (f *BuiltinFunction) GetBaseObject() *BaseObject {
+	return &f.BaseObject
+}
+
+// GetAttr implements the new simplified GetAttr pattern
 func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "__name__":
-		if f.name != "" {
-			return StringValue(f.name), true
-		}
-		return StringValue("<anonymous>"), true
-	default:
-		return f.BaseObject.GetAttr(name)
-	}
+	return GetAttrWithRegistry(f, name)
 }
 
 // BuiltinMethod represents a method that's implemented in Go

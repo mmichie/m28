@@ -11,13 +11,14 @@ import (
 // File represents a file object
 type File struct {
 	BaseObject
-	Path   string
-	Mode   string
-	file   *os.File
-	reader *bufio.Reader
-	writer *bufio.Writer
-	closed bool
-	isText bool
+	Path     string
+	Mode     string
+	file     *os.File
+	reader   *bufio.Reader
+	writer   *bufio.Writer
+	closed   bool
+	isText   bool
+	registry *MethodRegistry
 }
 
 // FileIterator implements the Iterator interface for files
@@ -122,6 +123,9 @@ func NewFile(path string, mode string) (*File, error) {
 	default:
 		return nil, fmt.Errorf("invalid file mode: %s", mode)
 	}
+
+	// Initialize the method registry
+	f.registry = f.createRegistry()
 
 	return f, nil
 }
@@ -306,290 +310,263 @@ func (f *File) Exit(excType, excValue, excTraceback Value) (bool, error) {
 	return false, err // Don't suppress exceptions
 }
 
-// GetAttr implements the Object interface
-func (f *File) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "read":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "read",
-				Arity:   -1, // Variable args
-				Doc:     "Read from file. read() reads entire file, read(n) reads n bytes",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*File)
-					size := -1
-					if len(args) > 0 {
-						if num, ok := args[0].(NumberValue); ok {
-							size = int(num)
-						} else {
-							return nil, fmt.Errorf("read() argument must be a number")
-						}
-					}
-					return file.Read(size)
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
+// createRegistry sets up all methods and properties for file
+func (f *File) createRegistry() *MethodRegistry {
+	registry := NewMethodRegistry()
 
-	case "write":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "write",
-				Arity:   1,
-				Doc:     "Write string to file",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					if len(args) != 1 {
-						return nil, fmt.Errorf("write() takes exactly one argument")
+	// Register properties
+	registry.RegisterProperties(
+		MakeProperty("closed", "Whether the file is closed", func(receiver Value) (Value, error) {
+			return BoolValue(receiver.(*File).closed), nil
+		}),
+		MakeProperty("name", "File path", func(receiver Value) (Value, error) {
+			return StringValue(receiver.(*File).Path), nil
+		}),
+		MakeProperty("mode", "File mode", func(receiver Value) (Value, error) {
+			return StringValue(receiver.(*File).Mode), nil
+		}),
+	)
+
+	// Register methods
+	registry.RegisterMethods(
+		// read method
+		MakeMethod("read", -1, "Read from file. read() reads entire file, read(n) reads n bytes",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "read")
+				if err != nil {
+					return nil, err
+				}
+
+				size := -1
+				if len(args) > 0 {
+					if num, ok := args[0].(NumberValue); ok {
+						size = int(num)
+					} else {
+						return nil, fmt.Errorf("read() argument must be a number")
 					}
-					file := receiver.(*File)
-					// For strings, write the actual string content, not the repr
+				}
+				return file.Read(size)
+			}),
+
+		// write method
+		MakeMethod("write", 1, "Write string to file",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "write")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("write", args, 1); err != nil {
+					return nil, err
+				}
+
+				// For strings, write the actual string content, not the repr
+				var data string
+				if s, ok := args[0].(StringValue); ok {
+					data = string(s)
+				} else {
+					data = PrintValue(args[0])
+				}
+
+				err = file.Write(data)
+				if err != nil {
+					return nil, err
+				}
+				return NumberValue(len(data)), nil // Return number of bytes written
+			}),
+
+		// readline method
+		MakeMethod("readline", 0, "Read a single line from file",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "readline")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("readline", args, 0); err != nil {
+					return nil, err
+				}
+				return file.ReadLine()
+			}),
+
+		// readlines method
+		MakeMethod("readlines", 0, "Read all lines from file into a list",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "readlines")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("readlines", args, 0); err != nil {
+					return nil, err
+				}
+				return file.ReadLines()
+			}),
+
+		// writelines method
+		MakeMethod("writelines", 1, "Write a list of strings to file",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "writelines")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("writelines", args, 1); err != nil {
+					return nil, err
+				}
+
+				// Get the lines to write
+				var lines []Value
+				switch v := args[0].(type) {
+				case ListValue:
+					lines = v
+				case TupleValue:
+					lines = v
+				default:
+					return nil, fmt.Errorf("writelines() argument must be a list or tuple of strings")
+				}
+
+				// Write each line
+				for i, line := range lines {
 					var data string
-					if s, ok := args[0].(StringValue); ok {
+					if s, ok := line.(StringValue); ok {
 						data = string(s)
 					} else {
-						data = PrintValue(args[0])
+						return nil, fmt.Errorf("writelines() argument must contain strings, found %s at index %d", line.Type(), i)
 					}
 					err := file.Write(data)
 					if err != nil {
 						return nil, err
 					}
-					return NumberValue(len(data)), nil // Return number of bytes written
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
+				}
 
-	case "readline":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "readline",
-				Arity:   0,
-				Doc:     "Read a single line from file",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*File)
-					return file.ReadLine()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
+				return Nil, nil
+			}),
 
-	case "readlines":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "readlines",
-				Arity:   0,
-				Doc:     "Read all lines from file into a list",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*File)
-					return file.ReadLines()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
+		// close method
+		MakeMethod("close", 0, "Close the file",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "close")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("close", args, 0); err != nil {
+					return nil, err
+				}
 
-	case "writelines":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "writelines",
-				Arity:   1,
-				Doc:     "Write a list of strings to file",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					if len(args) != 1 {
-						return nil, fmt.Errorf("writelines() takes exactly one argument")
+				err = file.Close()
+				if err != nil {
+					return nil, err
+				}
+				return Nil, nil
+			}),
+
+		// seek method
+		MakeMethod("seek", -1, "Change file position. seek(offset, whence=0)",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "seek")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArityRange("seek", args, 1, 2); err != nil {
+					return nil, err
+				}
+
+				offset, ok := args[0].(NumberValue)
+				if !ok {
+					return nil, fmt.Errorf("seek() offset must be a number")
+				}
+
+				whence := 0
+				if len(args) > 1 {
+					if w, ok := args[1].(NumberValue); ok {
+						whence = int(w)
+					} else {
+						return nil, fmt.Errorf("seek() whence must be a number")
 					}
-					file := receiver.(*File)
+				}
 
-					// Get the lines to write
-					var lines []Value
-					switch v := args[0].(type) {
-					case ListValue:
-						lines = v
-					case TupleValue:
-						lines = v
-					default:
-						return nil, fmt.Errorf("writelines() argument must be a list or tuple of strings")
-					}
+				pos, err := file.Seek(int64(offset), whence)
+				if err != nil {
+					return nil, err
+				}
+				return NumberValue(pos), nil
+			}),
 
-					// Write each line
-					for i, line := range lines {
-						var data string
-						if s, ok := line.(StringValue); ok {
-							data = string(s)
-						} else {
-							return nil, fmt.Errorf("writelines() argument must contain strings, found %s at index %d", line.Type(), i)
-						}
-						err := file.Write(data)
-						if err != nil {
-							return nil, err
-						}
-					}
+		// tell method
+		MakeMethod("tell", 0, "Get current file position",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "tell")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("tell", args, 0); err != nil {
+					return nil, err
+				}
 
-					return Nil, nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
+				pos, err := file.Tell()
+				if err != nil {
+					return nil, err
+				}
+				return NumberValue(pos), nil
+			}),
 
-	case "close":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "close",
-				Arity:   0,
-				Doc:     "Close the file",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*File)
-					err := file.Close()
-					if err != nil {
-						return nil, err
-					}
-					return Nil, nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
+		// __enter__ method
+		MakeMethod("__enter__", 0, "Enter context manager",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "__enter__")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("__enter__", args, 0); err != nil {
+					return nil, err
+				}
+				return file.Enter()
+			}),
 
-	case "seek":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "seek",
-				Arity:   -1,
-				Doc:     "Change file position. seek(offset, whence=0)",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					if len(args) < 1 || len(args) > 2 {
-						return nil, fmt.Errorf("seek() takes 1 or 2 arguments")
-					}
+		// __exit__ method
+		MakeMethod("__exit__", 3, "Exit context manager",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "__exit__")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArityRange("__exit__", args, 0, 3); err != nil {
+					return nil, err
+				}
 
-					offset, ok := args[0].(NumberValue)
-					if !ok {
-						return nil, fmt.Errorf("seek() offset must be a number")
-					}
+				var excType, excValue, excTraceback Value = Nil, Nil, Nil
+				if len(args) > 0 {
+					excType = args[0]
+				}
+				if len(args) > 1 {
+					excValue = args[1]
+				}
+				if len(args) > 2 {
+					excTraceback = args[2]
+				}
 
-					whence := 0
-					if len(args) > 1 {
-						if w, ok := args[1].(NumberValue); ok {
-							whence = int(w)
-						} else {
-							return nil, fmt.Errorf("seek() whence must be a number")
-						}
-					}
+				suppress, err := file.Exit(excType, excValue, excTraceback)
+				if err != nil {
+					return nil, err
+				}
+				return BoolValue(suppress), nil
+			}),
 
-					file := receiver.(*File)
-					pos, err := file.Seek(int64(offset), whence)
-					if err != nil {
-						return nil, err
-					}
-					return NumberValue(pos), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
+		// __iter__ method
+		MakeIterMethod(),
+	)
 
-	case "tell":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "tell",
-				Arity:   0,
-				Doc:     "Get current file position",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*File)
-					pos, err := file.Tell()
-					if err != nil {
-						return nil, err
-					}
-					return NumberValue(pos), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
+	return registry
+}
 
-	case "closed":
-		return BoolValue(f.closed), true
+// GetRegistry implements AttributeProvider
+func (f *File) GetRegistry() *MethodRegistry {
+	return f.registry
+}
 
-	case "name":
-		return StringValue(f.Path), true
+// GetBaseObject implements AttributeProvider
+func (f *File) GetBaseObject() *BaseObject {
+	return &f.BaseObject
+}
 
-	case "mode":
-		return StringValue(f.Mode), true
-
-	case "__enter__":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "__enter__",
-				Arity:   0,
-				Doc:     "Enter context manager",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*File)
-					return file.Enter()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
-
-	case "__exit__":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "__exit__",
-				Arity:   3,
-				Doc:     "Exit context manager",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*File)
-					var excType, excValue, excTraceback Value
-					if len(args) > 0 {
-						excType = args[0]
-					}
-					if len(args) > 1 {
-						excValue = args[1]
-					}
-					if len(args) > 2 {
-						excTraceback = args[2]
-					}
-					suppress, err := file.Exit(excType, excValue, excTraceback)
-					if err != nil {
-						return nil, err
-					}
-					return BoolValue(suppress), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
-
-	case "__iter__":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "__iter__",
-				Arity:   0,
-				Doc:     "Return an iterator over the file's lines",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*File)
-					// Return the file itself since it implements Iterable
-					return file, nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
-	}
-
-	return f.BaseObject.GetAttr(name)
+// GetAttr implements the new simplified GetAttr pattern
+func (f *File) GetAttr(name string) (Value, bool) {
+	return GetAttrWithRegistry(f, name)
 }

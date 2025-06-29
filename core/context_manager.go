@@ -114,16 +114,22 @@ type FileContextManager struct {
 	Mode     string
 	File     interface{} // Would be actual file handle
 	IsClosed bool
+	registry *MethodRegistry
 }
 
 // NewFileContextManager creates a new file context manager
 func NewFileContextManager(path string, mode string) *FileContextManager {
-	return &FileContextManager{
+	f := &FileContextManager{
 		BaseObject: *NewBaseObject(Type("file")),
 		Path:       path,
 		Mode:       mode,
 		IsClosed:   true,
 	}
+
+	// Initialize the method registry
+	f.registry = f.createRegistry()
+
+	return f
 }
 
 // Type implements Value.Type
@@ -155,103 +161,107 @@ func (f *FileContextManager) Exit(excType, excValue, excTraceback Value) (bool, 
 	return false, nil
 }
 
-// GetAttr implements Object interface
+// createRegistry sets up all methods for FileContextManager
+func (f *FileContextManager) createRegistry() *MethodRegistry {
+	registry := NewMethodRegistry()
+
+	// Register methods
+	registry.RegisterMethods(
+		// __enter__ method
+		MakeMethod("__enter__", 0, "Open the file",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*FileContextManager](receiver, "__enter__")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("__enter__", args, 0); err != nil {
+					return nil, err
+				}
+				return file.Enter()
+			}),
+
+		// __exit__ method
+		MakeMethod("__exit__", 3, "Close the file",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*FileContextManager](receiver, "__exit__")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArityRange("__exit__", args, 0, 3); err != nil {
+					return nil, err
+				}
+
+				var excType, excValue, excTraceback Value = Nil, Nil, Nil
+				if len(args) > 0 {
+					excType = args[0]
+				}
+				if len(args) > 1 {
+					excValue = args[1]
+				}
+				if len(args) > 2 {
+					excTraceback = args[2]
+				}
+
+				suppress, err := file.Exit(excType, excValue, excTraceback)
+				if err != nil {
+					return nil, err
+				}
+				return BoolValue(suppress), nil
+			}),
+
+		// read method
+		MakeMethod("read", 0, "Read file contents",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*FileContextManager](receiver, "read")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("read", args, 0); err != nil {
+					return nil, err
+				}
+
+				if file.IsClosed {
+					return nil, fmt.Errorf("I/O operation on closed file")
+				}
+				// Simulated read
+				return StringValue("file contents"), nil
+			}),
+
+		// write method
+		MakeMethod("write", 1, "Write to file",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*FileContextManager](receiver, "write")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("write", args, 1); err != nil {
+					return nil, err
+				}
+
+				if file.IsClosed {
+					return nil, fmt.Errorf("I/O operation on closed file")
+				}
+				// Simulated write
+				return NumberValue(len(PrintValue(args[0]))), nil
+			}),
+	)
+
+	return registry
+}
+
+// GetRegistry implements AttributeProvider
+func (f *FileContextManager) GetRegistry() *MethodRegistry {
+	return f.registry
+}
+
+// GetBaseObject implements AttributeProvider
+func (f *FileContextManager) GetBaseObject() *BaseObject {
+	return &f.BaseObject
+}
+
+// GetAttr implements the new simplified GetAttr pattern
 func (f *FileContextManager) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "__enter__":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "__enter__",
-				Arity:   0,
-				Doc:     "Open the file",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*FileContextManager)
-					return file.Enter()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
-
-	case "__exit__":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "__exit__",
-				Arity:   3,
-				Doc:     "Close the file",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*FileContextManager)
-
-					var excType, excValue, excTraceback Value = Nil, Nil, Nil
-					if len(args) > 0 {
-						excType = args[0]
-					}
-					if len(args) > 1 {
-						excValue = args[1]
-					}
-					if len(args) > 2 {
-						excTraceback = args[2]
-					}
-
-					suppress, err := file.Exit(excType, excValue, excTraceback)
-					if err != nil {
-						return nil, err
-					}
-
-					return BoolValue(suppress), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
-
-	case "read":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "read",
-				Arity:   0,
-				Doc:     "Read file contents",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*FileContextManager)
-					if file.IsClosed {
-						return nil, fmt.Errorf("I/O operation on closed file")
-					}
-					// Simulated read
-					return StringValue("file contents"), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
-
-	case "write":
-		return &BoundMethod{
-			Receiver: f,
-			Method: &MethodDescriptor{
-				Name:    "write",
-				Arity:   1,
-				Doc:     "Write to file",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					file := receiver.(*FileContextManager)
-					if file.IsClosed {
-						return nil, fmt.Errorf("I/O operation on closed file")
-					}
-					if len(args) != 1 {
-						return nil, fmt.Errorf("write() takes exactly one argument")
-					}
-					// Simulated write
-					return NumberValue(len(PrintValue(args[0]))), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(f),
-		}, true
-	}
-
-	return f.BaseObject.GetAttr(name)
+	return GetAttrWithRegistry(f, name)
 }
 
 // Helper to check if a value implements context manager protocol
