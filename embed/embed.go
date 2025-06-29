@@ -17,6 +17,7 @@ import (
 type M28Engine struct {
 	env    *env.Environment
 	parser *parser.Parser
+	ctx    *core.Context // Store the initialized context with builtins
 	// Callback for shell commands
 	ShellExecutor func(string) (string, error)
 }
@@ -26,16 +27,24 @@ func NewM28Engine() *M28Engine {
 	// Initialize the environment
 	environment := env.NewEnvironment(nil)
 
-	// Register built-in functions to a core.Context
+	// Create and initialize the context
 	ctx := &core.Context{
 		Vars: make(map[string]core.Value),
 	}
+
+	// Initialize basic values
+	ctx.Define("true", core.BoolValue(true))
+	ctx.Define("false", core.BoolValue(false))
+	ctx.Define("nil", core.Nil)
+
+	// Register all builtins
 	builtin.RegisterAllBuiltins(ctx)
 
 	// Create the engine
 	engine := &M28Engine{
 		env:    environment,
 		parser: parser.NewParser(),
+		ctx:    ctx, // Store the initialized context
 		// Default shell executor uses os/exec
 		ShellExecutor: defaultShellExecutor,
 	}
@@ -53,10 +62,10 @@ func defaultShellExecutor(command string) (string, error) {
 	return string(output), err
 }
 
-// registerShellFunctions adds shell-specific functions to the environment
+// registerShellFunctions adds shell-specific functions to the context
 func (m *M28Engine) registerShellFunctions() {
 	// Execute shell command and return output
-	m.env.Define("shell", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	m.ctx.Define("shell", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("shell: expected 1 argument, got %d", len(args))
 		}
@@ -77,7 +86,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Get environment variable
-	m.env.Define("getenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	m.ctx.Define("getenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("getenv: expected 1 argument, got %d", len(args))
 		}
@@ -92,7 +101,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Set environment variable
-	m.env.Define("setenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	m.ctx.Define("setenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("setenv: expected 2 arguments, got %d", len(args))
 		}
@@ -116,7 +125,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Get current working directory
-	m.env.Define("pwd", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	m.ctx.Define("pwd", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 0 {
 			return nil, fmt.Errorf("pwd: expected 0 arguments, got %d", len(args))
 		}
@@ -130,7 +139,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Change directory
-	m.env.Define("cd", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	m.ctx.Define("cd", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("cd: expected 1 argument, got %d", len(args))
 		}
@@ -149,7 +158,7 @@ func (m *M28Engine) registerShellFunctions() {
 	}))
 
 	// Exit with status code
-	m.env.Define("exit", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	m.ctx.Define("exit", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		code := 0
 		if len(args) > 0 {
 			if numVal, ok := args[0].(core.NumberValue); ok {
@@ -171,10 +180,9 @@ func (m *M28Engine) Evaluate(code string) (core.Value, error) {
 		return nil, fmt.Errorf("parse error: %v", err)
 	}
 
-	// Create context
-	ctx := &core.Context{
-		Vars: make(map[string]core.Value),
-	}
+	// Use the stored context with builtins
+	// Create a new child context to avoid polluting the global context
+	ctx := core.NewContext(m.ctx)
 
 	// Check if we got multiple expressions as a list
 	if exprList, ok := expr.(core.ListValue); ok && len(exprList) > 0 {
@@ -240,12 +248,12 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 
 // DefineValue defines a value in the M28 environment
 func (m *M28Engine) DefineValue(name string, value core.Value) {
-	m.env.Define(name, value)
+	m.ctx.Define(name, value)
 }
 
 // DefineFunction defines a Go function in the M28 environment
 func (m *M28Engine) DefineFunction(name string, function func(args []core.Value, ctx *core.Context) (core.Value, error)) {
-	m.env.Define(name, core.NewBuiltinFunction(function))
+	m.ctx.Define(name, core.NewBuiltinFunction(function))
 }
 
 // GetValue gets a value from the M28 environment

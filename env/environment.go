@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mmichie/m28/builtin"
 	"github.com/mmichie/m28/core"
 )
 
@@ -103,14 +102,9 @@ func (e *Environment) NewEnvironment(outer *Environment) *Environment {
 
 // SetupBuiltins initializes the environment with builtin functions
 func (e *Environment) SetupBuiltins() {
-	// Register builtin functions by calling the main registry function
-	builtin.RegisterAllBuiltins(&core.Context{Vars: make(map[string]core.Value)})
-
-	// Standard exceptions and type constants would be registered here
-	// but they're now handled by the core.Context system
-
-	// Register special form functions in builtins
-	// Removed direct special_forms dependency to avoid import cycle
+	// DEPRECATED: This function is no longer needed as builtin registration
+	// is handled by the core.Context system.
+	// Keeping empty function for backward compatibility.
 }
 
 func (e *Environment) String() string {
