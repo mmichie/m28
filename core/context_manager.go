@@ -20,18 +20,63 @@ type WithContext struct {
 
 // SimpleContextManager is a basic implementation for testing
 type SimpleContextManager struct {
-	BaseObject
+	BaseContextManager
 	EnterFunc func() (Value, error)
 	ExitFunc  func(excType, excValue, excTraceback Value) (bool, error)
 }
 
 // NewSimpleContextManager creates a new simple context manager
 func NewSimpleContextManager(enterFunc func() (Value, error), exitFunc func(excType, excValue, excTraceback Value) (bool, error)) *SimpleContextManager {
-	return &SimpleContextManager{
-		BaseObject: *NewBaseObject(Type("context_manager")),
-		EnterFunc:  enterFunc,
-		ExitFunc:   exitFunc,
+	cm := &SimpleContextManager{
+		BaseContextManager: *NewBaseContextManager(Type("context_manager")),
+		EnterFunc:          enterFunc,
+		ExitFunc:           exitFunc,
 	}
+
+	// Initialize registry with handlers
+	cm.initRegistry(
+		// __enter__ handler
+		func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			mgr, err := TypedReceiver[*SimpleContextManager](receiver, "__enter__")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("__enter__", args, 0); err != nil {
+				return nil, err
+			}
+			return mgr.Enter()
+		},
+		// __exit__ handler
+		func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			mgr, err := TypedReceiver[*SimpleContextManager](receiver, "__exit__")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArityRange("__exit__", args, 0, 3); err != nil {
+				return nil, err
+			}
+
+			var excType, excValue, excTraceback Value = Nil, Nil, Nil
+			if len(args) > 0 {
+				excType = args[0]
+			}
+			if len(args) > 1 {
+				excValue = args[1]
+			}
+			if len(args) > 2 {
+				excTraceback = args[2]
+			}
+
+			suppress, err := mgr.Exit(excType, excValue, excTraceback)
+			if err != nil {
+				return nil, err
+			}
+
+			return BoolValue(suppress), nil
+		},
+	)
+
+	return cm
 }
 
 // Type implements Value.Type
@@ -60,61 +105,7 @@ func (cm *SimpleContextManager) Exit(excType, excValue, excTraceback Value) (boo
 	return false, nil
 }
 
-// GetAttr implements Object interface
-func (cm *SimpleContextManager) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "__enter__":
-		return &BoundMethod{
-			Receiver: cm,
-			Method: &MethodDescriptor{
-				Name:    "__enter__",
-				Arity:   0,
-				Doc:     "Enter the runtime context",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					mgr := receiver.(*SimpleContextManager)
-					return mgr.Enter()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(cm),
-		}, true
-
-	case "__exit__":
-		return &BoundMethod{
-			Receiver: cm,
-			Method: &MethodDescriptor{
-				Name:    "__exit__",
-				Arity:   3,
-				Doc:     "Exit the runtime context",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					mgr := receiver.(*SimpleContextManager)
-
-					var excType, excValue, excTraceback Value = Nil, Nil, Nil
-					if len(args) > 0 {
-						excType = args[0]
-					}
-					if len(args) > 1 {
-						excValue = args[1]
-					}
-					if len(args) > 2 {
-						excTraceback = args[2]
-					}
-
-					suppress, err := mgr.Exit(excType, excValue, excTraceback)
-					if err != nil {
-						return nil, err
-					}
-
-					return BoolValue(suppress), nil
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(cm),
-		}, true
-	}
-
-	return cm.BaseObject.GetAttr(name)
-}
+// GetAttr is now inherited from BaseContextManager
 
 // FileContextManager represents a file that can be used with 'with'
 type FileContextManager struct {

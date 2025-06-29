@@ -95,6 +95,35 @@ Successfully separated modules from builtins:
 
 ## 🔧 Technical Debt
 
+### Code Quality Improvements 🔴 CRITICAL
+- [ ] **Refactor InitializeTypeRegistry god function** (1152 lines!)
+  - [ ] Split into smaller functions by type category
+  - [ ] Use data-driven approach with type definitions
+  - [ ] Consider code generation for repetitive patterns
+- [ ] **Replace panic() with proper error handling** (7 files)
+  - [ ] core/list_methods.go, dict_methods.go, set_methods.go
+  - [ ] Return errors from initialization functions
+- [ ] **Deduplicate GetAttr implementations** (36 files!)
+  - [ ] Create base type with common GetAttr logic
+  - [ ] Use embedding to reduce duplication
+- [ ] **Standardize error handling patterns**
+  - [ ] Define clear error types in core/error.go
+  - [ ] Use consistent error wrapping throughout
+- [ ] **Clean up debug code**
+  - [ ] Remove commented debug prints in parser/parser.go
+  - [ ] Implement proper logging if needed
+- [ ] **Fix import organization** (follow Go conventions)
+
+### Unimplemented Features from TODOs
+- [ ] **Protocol wrapper implementations**
+  - [ ] DunderIterator wrapper (core/protocols/iterable.go:273)
+  - [ ] DunderNumeric wrapper (core/protocols/numeric.go:181)
+  - [ ] DunderIndexable wrapper (core/protocols/indexable.go:251)
+- [ ] **Missing core functionality**
+  - [ ] Sentinel iterator in iter() (builtin/iteration.go:65)
+  - [ ] Dict initialization from pairs (core/type_registry.go:925)
+  - [ ] Container protocol __len__ and __contains__ checks (core/protocols/container.go:176)
+
 ### Container Protocols Implementation
 - [ ] Create Indexable protocol adapters for List, Dict, Tuple, String, Range
 - [ ] Update indexing operations in eval/indexing.go
@@ -115,10 +144,15 @@ Successfully separated modules from builtins:
   - [ ] builtin/pathlib.go (~20+ type checks)
 
 ### Architecture Improvements
-- [ ] Package reorganization
+- [ ] Package reorganization (core package doing too much)
 - [ ] Visitor pattern for AST
-- [ ] Break down 100+ line functions
+- [ ] Break down 100+ line functions:
+  - [ ] core/module_loader_enhanced.go: LoadModule() - 107 lines
+  - [ ] core/context_manager.go: FileContextManager.GetAttr() - 99 lines
+  - [ ] core/doc_registry.go: FormatDocEntry() - 81 lines
+  - [ ] core/repr.go: Repr() - 76 lines
 - [ ] Apply validation framework everywhere
+- [ ] Consider using generics (Go 1.18+) for common patterns
 
 ### Testing & Quality
 - [ ] Add Go unit tests (currently only M28 tests)
@@ -137,6 +171,8 @@ Successfully separated modules from builtins:
 - 🎯 < 10 cyclomatic complexity for all functions
 - 🎯 > 80% test coverage for core packages
 - 🎯 < 5% code duplication
+- 🎯 No functions > 100 lines
+- 🎯 Zero panic() calls in non-test code
 
 ## 🗺️ Long-term Vision
 

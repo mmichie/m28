@@ -8,9 +8,10 @@ import (
 // RangeValue represents a lazy range object like Python's range
 type RangeValue struct {
 	BaseObject
-	Start float64
-	Stop  float64
-	Step  float64
+	Start    float64
+	Stop     float64
+	Step     float64
+	registry *MethodRegistry
 }
 
 // NewRangeValue creates a new range value
@@ -18,12 +19,18 @@ func NewRangeValue(start, stop, step float64) (*RangeValue, error) {
 	if step == 0 {
 		return nil, fmt.Errorf("range() arg 3 must not be zero")
 	}
-	return &RangeValue{
+
+	r := &RangeValue{
 		BaseObject: *NewBaseObject(RangeType),
 		Start:      start,
 		Stop:       stop,
 		Step:       step,
-	}, nil
+	}
+
+	// Initialize the method registry
+	r.registry = r.createRegistry()
+
+	return r, nil
 }
 
 // Type implements Value.Type
@@ -152,26 +159,48 @@ func (it *rangeIterator) Reset() {
 	it.current = it.rang.Start
 }
 
-// GetAttr implements Object.GetAttr for range methods
-func (r *RangeValue) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "start":
-		return NumberValue(r.Start), true
-	case "stop":
-		return NumberValue(r.Stop), true
-	case "step":
-		return NumberValue(r.Step), true
-	case "__len__":
-		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 0 {
-				return nil, fmt.Errorf("__len__ takes no arguments")
+// createRegistry sets up all methods and properties for range
+func (r *RangeValue) createRegistry() *MethodRegistry {
+	registry := NewMethodRegistry()
+
+	// Register properties
+	registry.RegisterProperties(
+		MakeProperty("start", "Start value of the range", func(receiver Value) (Value, error) {
+			r := receiver.(*RangeValue)
+			return NumberValue(r.Start), nil
+		}),
+		MakeProperty("stop", "Stop value of the range", func(receiver Value) (Value, error) {
+			r := receiver.(*RangeValue)
+			return NumberValue(r.Stop), nil
+		}),
+		MakeProperty("step", "Step value of the range", func(receiver Value) (Value, error) {
+			r := receiver.(*RangeValue)
+			return NumberValue(r.Step), nil
+		}),
+	)
+
+	// Register methods
+	registry.RegisterMethods(
+		// __len__ method
+		MakeMethod("__len__", 0, "Return the length of the range", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			r, err := TypedReceiver[*RangeValue](receiver, "__len__")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("__len__", args, 0); err != nil {
+				return nil, err
 			}
 			return NumberValue(r.Length()), nil
-		}), true
-	case "__getitem__":
-		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, fmt.Errorf("__getitem__ requires 1 argument")
+		}),
+
+		// __getitem__ method
+		MakeMethod("__getitem__", 1, "Get item by index", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			r, err := TypedReceiver[*RangeValue](receiver, "__getitem__")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("__getitem__", args, 1); err != nil {
+				return nil, err
 			}
 
 			// Handle slice objects
@@ -186,22 +215,45 @@ func (r *RangeValue) GetAttr(name string) (Value, bool) {
 			}
 
 			return r.GetItem(int(idx))
-		}), true
-	case "__contains__":
-		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, fmt.Errorf("__contains__ requires 1 argument")
+		}),
+
+		// __contains__ method
+		MakeMethod("__contains__", 1, "Check if value is in range", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			r, err := TypedReceiver[*RangeValue](receiver, "__contains__")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("__contains__", args, 1); err != nil {
+				return nil, err
 			}
 			return BoolValue(r.Contains(args[0])), nil
-		}), true
-	case "__iter__":
-		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			// Return self - iter() builtin will handle creating the proper iterator
-			return r, nil
-		}), true
+		}),
+
+		// __iter__ method
+		MakeIterMethod(),
+	)
+
+	return registry
+}
+
+// GetRegistry implements AttributeProvider
+func (r *RangeValue) GetRegistry() *MethodRegistry {
+	return r.registry
+}
+
+// GetBaseObject implements AttributeProvider
+func (r *RangeValue) GetBaseObject() *BaseObject {
+	return &r.BaseObject
+}
+
+// GetAttr implements the new simplified GetAttr pattern
+func (r *RangeValue) GetAttr(name string) (Value, bool) {
+	// Use the common implementation
+	if val, ok := GetAttrWithRegistry(r, name); ok {
+		return val, ok
 	}
 
-	// Check type descriptor for other methods
+	// Check type descriptor for additional methods
 	desc := GetTypeDescriptor(RangeType)
 	if desc != nil {
 		val, err := desc.GetAttribute(r, name)

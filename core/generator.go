@@ -14,6 +14,7 @@ type Generator struct {
 	yielded  Value            // Last yielded value
 	locals   map[string]Value // Local variables
 	position int              // Current position in execution
+	registry *MethodRegistry  // Method registry
 }
 
 // GeneratorState represents the state of a generator
@@ -28,7 +29,7 @@ const (
 
 // NewGenerator creates a new generator
 func NewGenerator(name string, code Value, ctx *Context) *Generator {
-	return &Generator{
+	g := &Generator{
 		BaseObject: *NewBaseObject(Type("generator")),
 		name:       name,
 		state:      GeneratorCreated,
@@ -37,6 +38,11 @@ func NewGenerator(name string, code Value, ctx *Context) *Generator {
 		locals:     make(map[string]Value),
 		position:   0,
 	}
+
+	// Initialize the method registry
+	g.registry = g.createRegistry()
+
+	return g
 }
 
 // Type returns the generator type
@@ -64,65 +70,77 @@ func (g *Generator) String() string {
 	return fmt.Sprintf("<generator object at %p, state=%s>", g, stateStr)
 }
 
-// GetAttr implements Object interface
+// createRegistry sets up all methods for generator
+func (g *Generator) createRegistry() *MethodRegistry {
+	registry := NewMethodRegistry()
+
+	// Register methods
+	registry.RegisterMethods(
+		// __next__ / next method
+		MakeMethod("__next__", 0, "Retrieve the next value from the generator", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			gen, err := TypedReceiver[*Generator](receiver, "__next__")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("__next__", args, 0); err != nil {
+				return nil, err
+			}
+			return gen.Next()
+		}),
+
+		// Also register as "next" for compatibility
+		MakeMethod("next", 0, "Retrieve the next value from the generator", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			gen, err := TypedReceiver[*Generator](receiver, "next")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("next", args, 0); err != nil {
+				return nil, err
+			}
+			return gen.Next()
+		}),
+
+		// send method
+		MakeMethod("send", 1, "Send a value into the generator", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			gen, err := TypedReceiver[*Generator](receiver, "send")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("send", args, 1); err != nil {
+				return nil, err
+			}
+			return gen.Send(args[0])
+		}),
+
+		// close method
+		MakeMethod("close", 0, "Close the generator", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			gen, err := TypedReceiver[*Generator](receiver, "close")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("close", args, 0); err != nil {
+				return nil, err
+			}
+			return gen.Close()
+		}),
+	)
+
+	return registry
+}
+
+// GetRegistry implements AttributeProvider
+func (g *Generator) GetRegistry() *MethodRegistry {
+	return g.registry
+}
+
+// GetBaseObject implements AttributeProvider
+func (g *Generator) GetBaseObject() *BaseObject {
+	return &g.BaseObject
+}
+
+// GetAttr implements the new simplified GetAttr pattern
 func (g *Generator) GetAttr(name string) (Value, bool) {
-	switch name {
-	case "__next__", "next":
-		// Return bound next method
-		return &BoundMethod{
-			Receiver: g,
-			Method: &MethodDescriptor{
-				Name:    "next",
-				Arity:   0,
-				Doc:     "Retrieve the next value from the generator",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					gen := receiver.(*Generator)
-					return gen.Next()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(g),
-		}, true
-
-	case "send":
-		// Return bound send method
-		return &BoundMethod{
-			Receiver: g,
-			Method: &MethodDescriptor{
-				Name:    "send",
-				Arity:   1,
-				Doc:     "Send a value into the generator",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					if len(args) != 1 {
-						return nil, fmt.Errorf("send() takes exactly one argument")
-					}
-					gen := receiver.(*Generator)
-					return gen.Send(args[0])
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(g),
-		}, true
-
-	case "close":
-		// Return bound close method
-		return &BoundMethod{
-			Receiver: g,
-			Method: &MethodDescriptor{
-				Name:    "close",
-				Arity:   0,
-				Doc:     "Close the generator",
-				Builtin: true,
-				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					gen := receiver.(*Generator)
-					return gen.Close()
-				},
-			},
-			TypeDesc: GetTypeDescriptorForValue(g),
-		}, true
-	}
-
-	return g.BaseObject.GetAttr(name)
+	return GetAttrWithRegistry(g, name)
 }
 
 // Next advances the generator and returns the next value
