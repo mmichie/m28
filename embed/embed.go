@@ -26,9 +26,6 @@ func NewM28Engine() *M28Engine {
 	// Initialize the environment
 	environment := env.NewEnvironment(nil)
 
-	// Set up builtins in the environment
-	environment.SetupBuiltins()
-
 	// Register built-in functions to a core.Context
 	ctx := &core.Context{
 		Vars: make(map[string]core.Value),
