@@ -38,17 +38,17 @@ if err != nil {
 
 ```go
 // Define a custom function
-engine.DefineFunction("hello", func(args ...core.LispValue) (core.LispValue, error) {
+engine.DefineFunction("hello", func(args []core.Value, ctx *core.Context) (core.Value, error) {
     if len(args) != 1 {
         return nil, fmt.Errorf("hello: expected 1 argument, got %d", len(args))
     }
     
-    name, ok := args[0].(core.LispString)
+    name, ok := args[0].(core.StringValue)
     if !ok {
         return nil, fmt.Errorf("hello: expected string argument, got %T", args[0])
     }
     
-    return core.LispString(fmt.Sprintf("Hello, %s!", name)), nil
+    return core.StringValue(fmt.Sprintf("Hello, %s!", string(name))), nil
 })
 
 // Now you can call it from M28
@@ -88,17 +88,17 @@ A complete example shell is provided in the `m28shell` directory. To use it:
 Create a `.m28rc` file in your home directory:
 
 ```lisp
-;; Define a welcome message
-(define welcome-message "Welcome to M28 Shell!")
-(println welcome-message)
+# Define a welcome message
+(= welcome-message "Welcome to M28 Shell!")
+(print welcome-message)
 
-;; Define useful shell functions
-(define (ls) (shell "ls -la"))
-(define (grep pattern file) (shell (+ "grep " pattern " " file)))
+# Define useful shell functions
+(def ls () (shell "ls -la"))
+(def grep (pattern file) (shell (str "grep " pattern " " file)))
 
-;; Set up prompt
-(define (prompt)
-  (+ (getenv "USER") "@" (last (split "/" (pwd))) "> "))
+# Set up prompt
+(def prompt ()
+  (str (getenv "USER") "@" (last (split (pwd) "/")) "> "))
 ```
 
 ## Custom Shell Integration

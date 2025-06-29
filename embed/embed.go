@@ -178,23 +178,7 @@ func (m *M28Engine) Evaluate(code string) (core.Value, error) {
 	// Create a new child context to avoid polluting the global context
 	ctx := core.NewContext(m.ctx)
 
-	// Check if we got multiple expressions as a list
-	if exprList, ok := expr.(core.ListValue); ok && len(exprList) > 0 {
-		// Execute each expression in the list
-		var result core.Value = core.Nil
-
-		for _, subExpr := range exprList {
-			result, err = eval.Eval(subExpr, ctx)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		// Return the last result
-		return result, nil
-	}
-
-	// Single expression or empty list case
+	// Single expression - evaluate it directly
 	return eval.Eval(expr, ctx)
 }
 
@@ -215,10 +199,8 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 		return fmt.Errorf("parse error: %v", err)
 	}
 
-	// Create context
-	ctx := &core.Context{
-		Vars: make(map[string]core.Value),
-	}
+	// Use a child context of the engine's context (preserves access to builtins)
+	ctx := core.NewContext(m.ctx)
 
 	// Check if we got multiple expressions as a list
 	if exprList, ok := expr.(core.ListValue); ok {
