@@ -8,25 +8,20 @@ import (
 
 	"github.com/mmichie/m28/builtin"
 	"github.com/mmichie/m28/core"
-	"github.com/mmichie/m28/env"
 	"github.com/mmichie/m28/eval"
 	"github.com/mmichie/m28/parser"
 )
 
 // M28Engine provides the main interface for embedding M28 in other applications
 type M28Engine struct {
-	env    *env.Environment
 	parser *parser.Parser
 	ctx    *core.Context // Store the initialized context with builtins
 	// Callback for shell commands
 	ShellExecutor func(string) (string, error)
 }
 
-// NewM28Engine creates a new M28 interpreter with a clean environment
+// NewM28Engine creates a new M28 interpreter
 func NewM28Engine() *M28Engine {
-	// Initialize the environment
-	environment := env.NewEnvironment(nil)
-
 	// Create and initialize the context
 	ctx := &core.Context{
 		Vars: make(map[string]core.Value),
@@ -42,7 +37,6 @@ func NewM28Engine() *M28Engine {
 
 	// Create the engine
 	engine := &M28Engine{
-		env:    environment,
 		parser: parser.NewParser(),
 		ctx:    ctx, // Store the initialized context
 		// Default shell executor uses os/exec
@@ -256,7 +250,8 @@ func (m *M28Engine) DefineFunction(name string, function func(args []core.Value,
 	m.ctx.Define(name, core.NewBuiltinFunction(function))
 }
 
-// GetValue gets a value from the M28 environment
+// GetValue gets a value from the M28 context
 func (m *M28Engine) GetValue(name string) (core.Value, bool) {
-	return m.env.Get(name)
+	val, err := m.ctx.Lookup(name)
+	return val, err == nil
 }
