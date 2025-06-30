@@ -32,9 +32,8 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	methods.RegisterDictMethods(ctx)
 	methods.RegisterSetMethods(ctx)
 
-	// Note: Standard library modules (os, json, time, etc.) are no longer
-	// registered as builtins. They must be imported using the import statement.
-	// Only math module remains as a special builtin.
+	// Register core math functions (sqrt, sin, cos, etc.) as global builtins
+	// Note: The math module itself is lazy-loaded like other modules
 	modules.RegisterMathModule(ctx)
 
 	// Also register functions from other files that haven't been migrated yet

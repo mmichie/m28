@@ -93,9 +93,8 @@ func RegisterMathModule(ctx *core.Context) {
 	mathModule.Set("pi", core.NumberValue(math.Pi))
 	mathModule.Set("e", core.NumberValue(math.E))
 
-	// Register in the global module registry
-	registry := core.GetModuleRegistry()
-	registry.StoreModule("math", mathModule, "<builtin>", []string{})
+	// Don't register in the global module registry here - let lazy loading handle it
+	// This was causing the math module to be pre-loaded at startup
 
 	// Also register core math functions in global context
 	registerCoreMathFunctions(ctx)

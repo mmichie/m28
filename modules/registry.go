@@ -2,6 +2,8 @@
 package modules
 
 import (
+	"sync"
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -20,14 +22,39 @@ var builtinModules = map[string]ModuleInitializer{
 	"math":     InitMathModule,
 }
 
+// moduleCache stores initialized modules to avoid re-initialization
+var moduleCache = make(map[string]*core.DictValue)
+var moduleCacheMutex sync.RWMutex
+
 // GetBuiltinModule returns a builtin module by name if it exists
 func GetBuiltinModule(name string) (*core.DictValue, bool) {
-	if initializer, exists := builtinModules[name]; exists {
-		// Lazy initialization - create the module only when requested
-		module := initializer()
+	// Check cache first
+	moduleCacheMutex.RLock()
+	if module, cached := moduleCache[name]; cached {
+		moduleCacheMutex.RUnlock()
 		return module, true
 	}
-	return nil, false
+	moduleCacheMutex.RUnlock()
+
+	// Not in cache, check if it's a builtin module
+	initializer, exists := builtinModules[name]
+	if !exists {
+		return nil, false
+	}
+
+	// Initialize the module (with write lock to prevent races)
+	moduleCacheMutex.Lock()
+	defer moduleCacheMutex.Unlock()
+
+	// Double-check in case another goroutine initialized it
+	if module, cached := moduleCache[name]; cached {
+		return module, true
+	}
+
+	// Lazy initialization - create the module only when requested
+	module := initializer()
+	moduleCache[name] = module
+	return module, true
 }
 
 // IsBuiltinModule checks if a name corresponds to a builtin module
