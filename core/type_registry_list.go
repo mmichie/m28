@@ -566,11 +566,8 @@ func listMethodSetItem(receiver Value, args []Value, ctx *Context) (Value, error
 		return nil, &IndexError{Index: i, Length: len(list)}
 	}
 
-	// Create new list with updated value
-	result := make(ListValue, len(list))
-	copy(result, list)
-	result[i] = args[1]
-	return result, nil
+	// Lists are immutable in M28
+	return nil, fmt.Errorf("'list' object does not support item assignment")
 }
 
 func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error) {
@@ -593,9 +590,6 @@ func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error
 		return nil, &IndexError{Index: i, Length: len(list)}
 	}
 
-	// Create new list without the element
-	result := make(ListValue, len(list)-1)
-	copy(result[:i], list[:i])
-	copy(result[i:], list[i+1:])
-	return result, nil
+	// Lists are immutable in M28
+	return nil, fmt.Errorf("'list' object does not support item deletion")
 }

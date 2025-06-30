@@ -578,6 +578,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					// Index assignment: (get-item obj index) = value
 					// Convert to (set-item obj index value)
 					setItemArgs := core.ListValue{t[1], t[2], value}
+					// fmt.Printf("DEBUG: Converting index assignment to set-item with args: %v\n", setItemArgs)
 					return SetItemForm(setItemArgs, ctx)
 				}
 			}

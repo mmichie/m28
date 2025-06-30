@@ -37,7 +37,7 @@ func (l *ListIndexable) GetIndex(index core.Value) (core.Value, error) {
 
 // SetIndex returns error as lists are immutable
 func (l *ListIndexable) SetIndex(index, value core.Value) error {
-	return fmt.Errorf("'list' object does not support item assignment (lists are immutable)")
+	return fmt.Errorf("'list' object does not support item assignment")
 }
 
 // HasIndex checks if index exists
@@ -57,7 +57,7 @@ func (l *ListIndexable) HasIndex(index core.Value) bool {
 
 // DeleteIndex returns error as lists are immutable
 func (l *ListIndexable) DeleteIndex(index core.Value) error {
-	return fmt.Errorf("'list' object doesn't support item deletion (lists are immutable)")
+	return fmt.Errorf("'list' object does not support item deletion")
 }
 
 // DictIndexable adapts DictValue to Indexable protocol
