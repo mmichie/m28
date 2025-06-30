@@ -8,17 +8,23 @@ import (
 // KwargsBuiltinFunction is a builtin function that supports keyword arguments
 type KwargsBuiltinFunction struct {
 	core.BaseObject
-	fn   func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error)
-	name string
+	fn       func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error)
+	name     string
+	registry *core.MethodRegistry
 }
 
 // NewKwargsBuiltinFunction creates a new builtin function that accepts keyword arguments
 func NewKwargsBuiltinFunction(name string, fn func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error)) *KwargsBuiltinFunction {
-	return &KwargsBuiltinFunction{
+	f := &KwargsBuiltinFunction{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		fn:         fn,
 		name:       name,
 	}
+
+	// Initialize the method registry
+	f.registry = f.createRegistry()
+
+	return f
 }
 
 // Call implements Callable.Call - but this won't be called directly due to how eval works
@@ -45,12 +51,32 @@ func (f *KwargsBuiltinFunction) String() string {
 	return "<builtin>"
 }
 
-// GetAttr gets attributes from the function
+// createRegistry sets up all properties for KwargsBuiltinFunction
+func (f *KwargsBuiltinFunction) createRegistry() *core.MethodRegistry {
+	registry := core.NewMethodRegistry()
+
+	// Register properties
+	registry.RegisterProperties(
+		core.MakeProperty("__name__", "Function name", func(receiver core.Value) (core.Value, error) {
+			fn := receiver.(*KwargsBuiltinFunction)
+			return core.StringValue(fn.name), nil
+		}),
+	)
+
+	return registry
+}
+
+// GetRegistry implements AttributeProvider
+func (f *KwargsBuiltinFunction) GetRegistry() *core.MethodRegistry {
+	return f.registry
+}
+
+// GetBaseObject implements AttributeProvider
+func (f *KwargsBuiltinFunction) GetBaseObject() *core.BaseObject {
+	return &f.BaseObject
+}
+
+// GetAttr implements the new simplified GetAttr pattern
 func (f *KwargsBuiltinFunction) GetAttr(name string) (core.Value, bool) {
-	switch name {
-	case "__name__":
-		return core.StringValue(f.name), true
-	default:
-		return f.BaseObject.GetAttr(name)
-	}
+	return core.GetAttrWithRegistry(f, name)
 }
