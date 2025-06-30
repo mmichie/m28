@@ -1140,7 +1140,8 @@ func InitializeTypeRegistry() {
 
 // Helper to initialize types on startup
 func init() {
-	InitializeTypeRegistry()
+	// Switch to refactored version
+	InitializeTypeRegistryRefactored()
 	// Add additional string methods after types are registered
 	InitStringMethods()
 	// Add additional list methods after types are registered
