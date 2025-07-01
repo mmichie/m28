@@ -72,6 +72,7 @@ Successfully separated modules from builtins:
 - All string, list, dict, set methods
 - Module system with local imports
 - Keyword arguments and default parameters
+- Argument unpacking in function calls (*args, **kwargs)
 
 ## 🚧 In Progress
 
@@ -90,7 +91,7 @@ Successfully separated modules from builtins:
 ## ❌ Not Yet Implemented
 
 ### Language Features
-- [ ] Argument unpacking: `func(*args, **kwargs)`
+- [x] Argument unpacking: `func(*args, **kwargs)` ✅ COMPLETE (function calls only, not parameter definitions)
 - [ ] Multiple inheritance
 - [ ] Proper `super()` calls
 - [ ] Generator expressions
