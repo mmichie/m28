@@ -1,0 +1,94 @@
+# Test argument unpacking (*args and **kwargs)
+
+# Test 1: Basic positional unpacking
+(print "=== Test 1: Basic *args unpacking ===")
+(def show (*args) 
+  (list args))
+
+(= lst [1 2 3])
+(assert (== (show *lst) [1 2 3]) "Basic *args unpacking")
+
+# Test 2: Mixed regular and unpacked args  
+(print "=== Test 2: Mixed arguments ===")
+(def mixed (a b c d)
+  [a b c d])
+
+(= vals [2 3 4])
+(assert (== (mixed 1 *vals) [1 2 3 4]) "Mixed regular and unpacked args")
+
+# Test 3: Multiple unpacking
+(print "=== Test 3: Multiple unpacking ===")
+(= a [1 2])
+(= b [3 4])
+(assert (== (show *a *b) [1 2 3 4]) "Multiple *args unpacking")
+
+# Test 4: String unpacking
+(print "=== Test 4: String unpacking ===")
+(print "About to test string unpacking")
+(= s "abc")
+(assert (== (list *s) ["a" "b" "c"]) "String unpacking")
+(print "String unpacking passed")
+
+# Test 5: Tuple unpacking
+(print "=== Test 5: Tuple unpacking ===")
+(print "About to test tuple unpacking")
+(= t (tuple [10 20 30]))
+(assert (== (show *t) [10 20 30]) "Tuple unpacking")
+(print "Tuple unpacking passed")
+
+# Test 6: Empty unpacking
+(print "=== Test 6: Empty unpacking ===")
+(= empty [])
+(assert (== (show *empty) []) "Empty list unpacking")
+
+# Test 7: Dict unpacking with **kwargs
+(print "=== Test 7: Dict unpacking ===")
+(def greet (name="User" greeting="Hello")
+  (+ greeting " " name))
+
+(= d {"name": "Alice", "greeting": "Hi"})
+(assert (== (greet **d) "Hi Alice") "Dict unpacking with **kwargs")
+
+# Test 8: Mixed positional and keyword unpacking
+(print "=== Test 8: Mixed unpacking ===")
+(def complex_func (a b c=3 d=4)
+  [a b c d])
+
+(= pos [1 2])
+(= kw {"c": 30, "d": 40})
+(assert (== (complex_func *pos **kw) [1 2 30 40]) "Mixed *args and **kwargs")
+
+# Test 9: Order preservation
+(print "=== Test 9: Order preservation ===")
+(def ordered (*args)
+  args)
+
+(= x [2 3])
+(assert (== (ordered 1 *x 4 5) [1 2 3 4 5]) "Order preservation in unpacking")
+
+# Test 10: With built-in functions
+(print "=== Test 10: Built-in functions ===")
+(= nums [10 5 20 15])
+(assert (== (max *nums) 20) "Unpacking with max()")
+(assert (== (min *nums) 5) "Unpacking with min()")
+
+# Test 11: Error cases
+(print "=== Test 11: Error handling ===")
+
+# Can't unpack non-iterable
+(= num 42)
+(try
+  (show *num)
+  (assert false "Should fail to unpack non-iterable")
+  (except Exception e
+    (assert (in "requires an iterable" (str e)) "Non-iterable error message")))
+
+# Dict keys must be strings for **kwargs
+(= bad_dict {1: "value"})
+(try
+  (greet **bad_dict)
+  (assert false "Should fail with non-string keys")
+  (except Exception e
+    (assert (in "requires string keys" (str e)) "Non-string key error")))
+
+(print "\n✅ All argument unpacking tests passed!")

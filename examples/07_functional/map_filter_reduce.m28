@@ -68,23 +68,24 @@
 
 # Sum using reduce
 (= numbers [1, 2, 3, 4, 5])
-(= total (reduce + 0 numbers))
+(= total (reduce + numbers 0))
 (print f"Sum of {numbers}: {total}")
 
 # Product using reduce
-(= product (reduce * 1 numbers))
+(def multiply (a b) (* a b))
+(= product (reduce multiply numbers 1))
 (print f"Product of {numbers}: {product}")
 
 # Find maximum
 (def max_reducer (acc x)
   (if (> x acc) x acc))
 
-(= maximum (reduce max_reducer -999999 numbers))
+(= maximum (reduce max_reducer numbers -999999))
 (print f"Maximum of {numbers}: {maximum}")
 
 # String concatenation
 (= words ["M28", "is", "awesome"])
-(= sentence (reduce (lambda (acc w) f"{acc} {w}") "" words))
+(= sentence (reduce (lambda (acc w) f"{acc} {w}") words ""))
 (print f"Sentence: {(sentence.strip)}")
 
 # Build dictionary
@@ -97,8 +98,8 @@
         (= value (nth pair 1))
         (= acc[key] value)
         acc))
-    {}
-    pairs))
+    pairs
+    {}))
 (print f"Dictionary: {dict_result}")
 
 # COMBINING MAP, FILTER, REDUCE
@@ -107,15 +108,16 @@
 # Example 1: Sum of squares of even numbers
 (= numbers (range 1 11))
 (= result 
-  (reduce + 0
+  (reduce + 
     (map (lambda (x) (* x x))
-      (filter (lambda (x) (== (% x 2) 0)) numbers))))
+      (filter (lambda (x) (== (% x 2) 0)) numbers))
+    0))
 (print f"Sum of squares of even numbers 1-10: {result}")
 
 # Example 2: Average of positive numbers
 (= data [-5, 3, -2, 8, 0, -1, 7, 4])
 (= positives (filter (lambda (x) (> x 0)) data))
-(= average (/ (reduce + 0 positives) (len positives)))
+(= average (/ (reduce + positives 0) (len positives)))
 (print f"Average of positive numbers: {average}")
 
 # Example 3: Word frequency counter
@@ -127,8 +129,8 @@
       (begin
         (= acc[word] (+ (acc.get word 0) 1))
         acc))
-    {}
-    words))
+    words
+    {}))
 (print f"Word frequencies: {word_count}")
 
 # Custom implementations

@@ -3,6 +3,8 @@ package eval
 import (
 	"fmt"
 	"github.com/mmichie/m28/core"
+	"strconv"
+	"strings"
 )
 
 // ParameterInfo holds information about a function parameter
@@ -36,6 +38,12 @@ func (sig *FunctionSignature) MaxArgs() int {
 // ParseParameterList parses a parameter list into a FunctionSignature
 // Supports: (a b c=10 d=20 *args **kwargs)
 func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
+	// Debug: print what we received
+	// fmt.Printf("DEBUG ParseParameterList: received %d params\n", len(paramList))
+	// for i, p := range paramList {
+	// 	fmt.Printf("  [%d] %T: %v\n", i, p, p)
+	// }
+
 	// First, transform Python-style parameters (name=value) to M28 style ((name value))
 	transformedParams := make(core.ListValue, 0, len(paramList))
 
@@ -46,6 +54,36 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 		// Check if this is a symbol ending with = (parser creates "name=" as one symbol)
 		if sym, ok := param.(core.SymbolValue); ok {
 			symStr := string(sym)
+
+			// Check if this symbol contains = (e.g., "c=3")
+			if idx := strings.Index(symStr, "="); idx > 0 && idx < len(symStr)-1 {
+				// This is Python-style combined: name=value in one symbol
+				// Split it and transform to M28 style: (name value)
+				paramName := core.SymbolValue(symStr[:idx])
+				valueStr := symStr[idx+1:]
+
+				// Parse the value - could be a number or other literal
+				var defaultValue core.Value
+				if num, err := strconv.ParseFloat(valueStr, 64); err == nil {
+					defaultValue = core.NumberValue(num)
+				} else if valueStr == "true" || valueStr == "false" {
+					defaultValue = core.BoolValue(valueStr == "true")
+				} else if valueStr == "nil" || valueStr == "None" {
+					defaultValue = core.Nil
+				} else if len(valueStr) >= 2 && valueStr[0] == '"' && valueStr[len(valueStr)-1] == '"' {
+					// String literal
+					defaultValue = core.StringValue(valueStr[1 : len(valueStr)-1])
+				} else {
+					// Treat as symbol
+					defaultValue = core.SymbolValue(valueStr)
+				}
+
+				defaultParam := core.ListValue{paramName, defaultValue}
+				transformedParams = append(transformedParams, defaultParam)
+				i++
+				continue
+			}
+
 			if len(symStr) > 1 && symStr[len(symStr)-1] == '=' && i+1 < len(paramList) {
 				// This is Python-style: name= value
 				// Transform to M28 style: (name value)
@@ -159,6 +197,15 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 	// Track which parameters have been bound
 	boundParams := make(map[string]bool)
 	argIndex := 0
+
+	// Debug: print signature info
+	// fmt.Printf("DEBUG BindArguments: %d required, %d optional params\n", len(sig.RequiredParams), len(sig.OptionalParams))
+	// for _, p := range sig.RequiredParams {
+	//     fmt.Printf("  Required: %s\n", p.Name)
+	// }
+	// for _, p := range sig.OptionalParams {
+	//     fmt.Printf("  Optional: %s (default=%v)\n", p.Name, p.DefaultValue)
+	// }
 
 	// 1. Bind required positional parameters
 	for _, param := range sig.RequiredParams {

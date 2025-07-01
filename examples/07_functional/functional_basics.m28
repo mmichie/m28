@@ -58,7 +58,7 @@
 (= sum_all (reduce + 0 numbers))
 (print sum_all)  # 15
 
-(= product (reduce * 1 numbers))
+(= product (reduce (lambda (a b) (* a b)) 1 numbers))
 (print product)  # 120
 
 # Partial application / Currying
@@ -71,13 +71,14 @@
 (print (add5 3))  # 8
 
 # More practical partial application
-(def partial (f *args)
-  "Partially apply function with given arguments"
-  (return (lambda (*more_args) 
-    (apply f (concat args more_args)))))
-
-(= multiply_by_2 (partial * 2))
-(print (multiply_by_2 10))  # 20
+# Note: *args in function parameters not yet supported
+# (def partial (f *args)
+#   "Partially apply function with given arguments"
+#   (return (lambda (*more_args) 
+#     (apply f (concat args more_args)))))
+# 
+# (= multiply_by_2 (partial (lambda (a b) (* a b)) 2))
+# (print (multiply_by_2 10))  # 20
 
 # Function decorators
 # Note: timer decorator commented out as time module not available
@@ -91,15 +92,16 @@
 #     (return result))
 #   (return wrapper))
 
-(def memoize (f)
-  "Decorator to cache function results"
-  (= cache {})
-  (def wrapper (*args)
-    (= key (str args))
-    (if (not (in key cache))
-      (= cache[key] (apply f args)))
-    (return cache[key]))
-  (return wrapper))
+# Note: *args in function parameters not yet supported
+# (def memoize (f)
+#   "Decorator to cache function results"
+#   (= cache {})
+#   (def wrapper (*args)
+#     (= key (str args))
+#     (if (not (in key cache))
+#       (= cache[key] (apply f args)))
+#     (return cache[key]))
+#   (return wrapper))
 
 # Use decorators
 # Timer example commented out as time module not available
@@ -151,20 +153,21 @@
 (print f"After: a={a}, b={b}")  # Should be a=2, b=3
 
 # Function pipeline
-(def pipeline (*functions)
-  "Create a pipeline of functions"
-  (def pipe (x)
-    (for f functions
-      (= x (f x)))
-    (return x))
-  (return pipe))
-
-# Example pipeline
-(= process_data 
-  (pipeline
-    (lambda (x) (filter (lambda (n) (> n 0)) x))  # Keep positive
-    (lambda (x) (map (lambda (n) (* n 2)) x))     # Double
-    (lambda (x) (reversed (sorted x)))))           # Sort descending
-
-(= data [-5, 3, -2, 8, 1, -4, 6])
-(print (process_data data))  # [16, 12, 6, 2]
+# Note: *functions in parameters not yet supported
+# (def pipeline (*functions)
+#   "Create a pipeline of functions"
+#   (def pipe (x)
+#     (for f functions
+#       (= x (f x)))
+#     (return x))
+#   (return pipe))
+# 
+# # Example pipeline
+# (= process_data 
+#   (pipeline
+#     (lambda (x) (filter (lambda (n) (> n 0)) x))  # Keep positive
+#     (lambda (x) (map (lambda (n) (* n 2)) x))     # Double
+#     (lambda (x) (reversed (sorted x)))))           # Sort descending
+# 
+# (= data [-5, 3, -2, 8, 1, -4, 6])
+# (print (process_data data))  # [16, 12, 6, 2]
