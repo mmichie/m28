@@ -1,12 +1,15 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 // InitListMethods adds additional methods to the list type descriptor
 func InitListMethods() {
 	listType := GetTypeDescriptor("list")
 	if listType == nil {
-		panic("list type not found in registry")
+		log.Fatal("list type not found in registry")
 	}
 
 	// Add remove method

@@ -1,12 +1,15 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 // InitSetMethods adds additional methods to the set type descriptor
 func InitSetMethods() {
 	setType := GetTypeDescriptor("set")
 	if setType == nil {
-		panic("set type not found in registry")
+		log.Fatal("set type not found in registry")
 	}
 
 	// Set operation methods

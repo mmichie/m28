@@ -109,14 +109,6 @@ func ApplyWithKwargs(fn core.Value, args []core.Value, kwargs map[string]core.Va
 	return callable.Call(args, ctx)
 }
 
-// Helper function to extract number from value
-func getNumber(v core.Value) float64 {
-	if num, ok := types.AsNumber(v); ok {
-		return num
-	}
-	panic(fmt.Sprintf("expected number, got %s", v.Type()))
-}
-
 // Migration Statistics:
 // Functions migrated: 1 (apply) + helper function
 // Type checks eliminated: ~5 manual type assertions

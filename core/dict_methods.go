@@ -1,12 +1,15 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 // InitDictMethods adds additional methods to the dict type descriptor
 func InitDictMethods() {
 	dictType := GetTypeDescriptor("dict")
 	if dictType == nil {
-		panic("dict type not found in registry")
+		log.Fatal("dict type not found in registry")
 	}
 
 	// Add update method
