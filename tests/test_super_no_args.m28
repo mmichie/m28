@@ -1,0 +1,114 @@
+# Test Python-style super() with no arguments
+
+(print "=== Testing super() with no arguments ===\n")
+
+# Test 1: Basic super() in __init__
+(class Animal
+  (def __init__ (self name)
+    (= self.name name)
+    (= self.species "unknown")))
+
+(class Dog (Animal)
+  (def __init__ (self name breed)
+    # Python-style super() with no arguments
+    (super().__init__ name)
+    (= self.breed breed)
+    (= self.species "canine")))
+
+(print "Test 1: super() in __init__")
+(= fido (Dog "Fido" "Labrador"))
+(print "Name:" fido.name)
+(print "Breed:" fido.breed)
+(print "Species:" fido.species)
+(assert (== fido.name "Fido") "Name should be set by parent __init__")
+(assert (== fido.breed "Labrador") "Breed should be set")
+(assert (== fido.species "canine") "Species should be overridden")
+
+# Test 2: super() in regular methods
+(class Vehicle
+  (def describe (self)
+    (+ "A " self.type)))
+
+(class Car (Vehicle)
+  (def __init__ (self brand)
+    (= self.type "vehicle")
+    (= self.brand brand))
+  
+  (def describe (self)
+    (+ (super().describe) " made by " self.brand)))
+
+(print "\nTest 2: super() in regular methods")
+(= tesla (Car "Tesla"))
+(= desc (tesla.describe))
+(print "Description:" desc)
+(assert (== desc "A vehicle made by Tesla") "super() should call parent method")
+
+# Test 3: Multi-level inheritance with super()
+(class LivingThing
+  (def __init__ (self)
+    (= self.traits [])
+    (self.traits.append "alive"))
+  
+  (def get_traits (self)
+    self.traits))
+
+(class Animal2 (LivingThing)
+  (def __init__ (self)
+    (super().__init__)
+    (self.traits.append "can move")))
+
+(class Mammal (Animal2)
+  (def __init__ (self)
+    (super().__init__)
+    (self.traits.append "warm-blooded")))
+
+(class Cat (Mammal)
+  (def __init__ (self)
+    (super().__init__)
+    (self.traits.append "has whiskers")))
+
+(print "\nTest 3: Multi-level super() calls")
+(= kitty (Cat))
+(= traits (kitty.get_traits))
+(print "Cat traits:" traits)
+(assert (== (len traits) 4) "Should have 4 traits from inheritance chain")
+(assert (== (traits[0]) "alive") "First trait from LivingThing")
+(assert (== (traits[1]) "can move") "Second trait from Animal2")
+(assert (== (traits[2]) "warm-blooded") "Third trait from Mammal")
+(assert (== (traits[3]) "has whiskers") "Fourth trait from Cat")
+
+# Test 4: super() with explicit arguments (backward compatibility)
+(class Base
+  (def method (self)
+    "base method"))
+
+(class Derived (Base)
+  (def method (self)
+    (+ (super Derived self).method " + derived")))
+
+(print "\nTest 4: super(Class, instance) explicit form")
+(= obj (Derived))
+(= result (obj.method))
+(print "Result:" result)
+(assert (== result "base method + derived") "Explicit super should work")
+
+# Test 5: Error handling - super() outside method
+(print "\nTest 5: super() outside method context")
+(try
+  (super())
+  (assert false "super() should fail outside method")
+  (except Exception e
+    (print "Got expected error:" e)
+    (assert (in "no arguments given" (str e)) "Should get appropriate error")))
+
+# Test 6: Error handling - wrong argument count
+(print "\nTest 6: super() with wrong argument count")
+(try
+  (super Base)
+  (assert false "super() with 1 arg should fail")
+  (except Exception e
+    (print "Got expected error:" e)
+    (assert (in "takes 0 or 2 arguments" (str e)) "Should get argument count error")))
+
+(print "\n=== All super() tests passed! ===")
+{"status": "success"}

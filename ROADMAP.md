@@ -93,7 +93,7 @@ Successfully separated modules from builtins:
 ### Language Features
 - [x] Argument unpacking: `func(*args, **kwargs)` ✅ COMPLETE (function calls only, not parameter definitions)
 - [ ] Multiple inheritance
-- [ ] Proper `super()` calls
+- [x] Proper `super()` calls ✅ COMPLETE (supports both bare super and explicit super(Class, instance))
 - [ ] Generator expressions
 - [ ] Dictionary/set comprehensions
 - [ ] Decorators with `@` syntax

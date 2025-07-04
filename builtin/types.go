@@ -91,6 +91,9 @@ func RegisterTypes(ctx *core.Context) {
 	// BEFORE: 7 lines
 	// AFTER: ~8 lines with validation
 	ctx.Define("issubclass", core.NewBuiltinFunction(IsSubclassBuilder()))
+
+	// Note: super is implemented as a special form in eval/class_forms.go
+	// to support both bare "super" and "super()" syntax
 }
 
 // Custom builders for complex type conversion functions

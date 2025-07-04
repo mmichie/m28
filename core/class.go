@@ -80,6 +80,29 @@ func (c *Class) GetMethod(name string) (Value, bool) {
 	return nil, false
 }
 
+// GetMethodWithClass looks up a method and returns the class where it was defined
+func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
+	// Check this class first
+	if method, ok := c.Methods[name]; ok {
+		return method, c, true
+	}
+
+	// Check parent classes using MRO (Method Resolution Order)
+	// Simple left-to-right depth-first search
+	if len(c.Parents) > 0 {
+		for _, parent := range c.Parents {
+			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
+				return method, defClass, true
+			}
+		}
+	} else if c.Parent != nil {
+		// Fallback to single parent for backward compatibility
+		return c.Parent.GetMethodWithClass(name)
+	}
+
+	return nil, nil, false
+}
+
 // SetMethod adds a method to the class
 func (c *Class) SetMethod(name string, method Value) {
 	c.Methods[name] = method
@@ -209,15 +232,16 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 	}
 
 	// Then check class methods
-	if method, ok := i.Class.GetMethod(name); ok {
+	if method, defClass, ok := i.Class.GetMethodWithClass(name); ok {
 		// Bind method to instance if it's callable
 		if callable, ok := method.(interface {
 			Call([]Value, *Context) (Value, error)
 		}); ok {
 			// Create bound method
 			boundMethod := &BoundInstanceMethod{
-				Instance: i,
-				Method:   callable,
+				Instance:      i,
+				Method:        callable,
+				DefiningClass: defClass,
 			}
 			return boundMethod, true
 		}
@@ -249,6 +273,7 @@ type BoundInstanceMethod struct {
 	Method   interface {
 		Call([]Value, *Context) (Value, error)
 	}
+	DefiningClass *Class // The class where this method was defined
 }
 
 // Type returns the bound method type
@@ -267,9 +292,23 @@ func (bm *BoundInstanceMethod) String() string {
 
 // Call implements Callable interface
 func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
+	// Create a new context with __class__ set for super() support
+	methodCtx := NewContext(ctx)
+
+	// Determine the class to use for super
+	classForSuper := bm.DefiningClass
+	if classForSuper == nil {
+		// If DefiningClass is not set, use the instance's class
+		classForSuper = bm.Instance.Class
+	}
+
+	methodCtx.Define("__class__", classForSuper)
+	// Always define super as a value for bare super access
+	methodCtx.Define("super", NewSuper(classForSuper, bm.Instance))
+
 	// Prepend instance as first argument (self)
 	callArgs := append([]Value{bm.Instance}, args...)
-	return bm.Method.Call(callArgs, ctx)
+	return bm.Method.Call(callArgs, methodCtx)
 }
 
 // Super represents access to parent class methods
@@ -308,33 +347,16 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 	// Look up in parent classes using MRO
 	if len(s.Class.Parents) > 0 {
 		for _, parent := range s.Class.Parents {
-			if method, ok := parent.GetMethod(name); ok {
-				// Bind to instance if callable
-				if callable, ok := method.(interface {
-					Call([]Value, *Context) (Value, error)
-				}); ok {
-					boundMethod := &BoundInstanceMethod{
-						Instance: s.Instance,
-						Method:   callable,
-					}
-					return boundMethod, true
-				}
+			if method, _, ok := parent.GetMethodWithClass(name); ok {
+				// Return the method unbound for backward compatibility
+				// The existing tests expect to pass self explicitly
 				return method, true
 			}
 		}
 	} else if s.Class.Parent != nil {
 		// Fallback to single parent for backward compatibility
-		if method, ok := s.Class.Parent.GetMethod(name); ok {
-			// Bind to instance if callable
-			if callable, ok := method.(interface {
-				Call([]Value, *Context) (Value, error)
-			}); ok {
-				boundMethod := &BoundInstanceMethod{
-					Instance: s.Instance,
-					Method:   callable,
-				}
-				return boundMethod, true
-			}
+		if method, _, ok := s.Class.Parent.GetMethodWithClass(name); ok {
+			// Return the method unbound for backward compatibility
 			return method, true
 		}
 	}

@@ -1,0 +1,74 @@
+# Test proper super() implementation
+
+(print "=== Testing super() implementation ===\n")
+
+# Test 1: Basic inheritance with super
+(class Animal
+  (def __init__ (self name)
+    (= self.name name)
+    (= self.type "animal"))
+  
+  (def describe (self)
+    (+ "I am " self.name ", a " self.type)))
+
+(class Dog (Animal)
+  (def __init__ (self name breed)
+    # Old style super
+    ((super Dog self).__init__ name)
+    (= self.breed breed)
+    (= self.type "dog"))
+  
+  (def describe (self)
+    (+ ((super Dog self).describe) " of breed " self.breed)))
+
+(print "Test 1: Old-style super")
+(= dog (Dog "Buddy" "Golden Retriever"))
+(print "Dog name:" dog.name)
+(print "Dog type:" dog.type)
+(print "Dog breed:" dog.breed)
+(print "Description:" (dog.describe))
+(assert (== dog.name "Buddy") "Name should be set")
+(assert (== (dog.describe) "I am Buddy, a dog of breed Golden Retriever") "Description should be correct")
+
+# Test 2: Bare super syntax
+(class Cat (Animal)
+  (def __init__ (self name color)
+    # Bare super syntax used in existing tests
+    (super.__init__ self name)
+    (= self.color color)
+    (= self.type "cat"))
+  
+  (def describe (self)
+    (+ (super.describe self) " with " self.color " fur")))
+
+(print "\nTest 2: Bare super syntax")
+(= cat (Cat "Whiskers" "orange"))
+(print "Cat name:" cat.name)
+(print "Cat type:" cat.type)
+(print "Cat color:" cat.color)
+(print "Description:" (cat.describe))
+(assert (== cat.name "Whiskers") "Name should be set")
+(assert (== (cat.describe) "I am Whiskers, a cat with orange fur") "Description should be correct")
+
+# Test 3: Check super type
+(class Vehicle
+  (def info (self)
+    "vehicle info"))
+
+(class Car (Vehicle)
+  (def test_super (self)
+    (print "Testing super access...")
+    (print "super is:" super)
+    (print "super type:" (type super))
+    (print "super.info:" super.info)
+    (try
+      (print "super.info result:" (super.info self))
+      (except Exception e
+        (print "Error calling super.info:" e)))))
+
+(print "\nTest 3: Super access")
+(= car (Car))
+(car.test_super)
+
+(print "\n=== All super tests completed ===")
+{"status": "success"}

@@ -1,0 +1,120 @@
+# Test super() implementation - Python-compatible and M28 style
+
+(print "=== Testing super() ===\n")
+
+# Test 1: Basic inheritance with M28-style super
+(class Animal
+  (def __init__ (self name)
+    (= self.name name)
+    (= self.species "unknown"))
+  
+  (def speak (self)
+    (+ self.name " makes a sound"))
+  
+  (def info (self)
+    (+ self.name " is a " self.species)))
+
+(class Dog (Animal)
+  (def __init__ (self name breed)
+    # M28 style: super returns unbound methods
+    ((super).__init__ self name)
+    (= self.breed breed)
+    (= self.species "dog"))
+  
+  (def speak (self)
+    (+ ((super).speak self) " - Woof!"))
+  
+  (def info (self)
+    (+ ((super).info self) " (" self.breed ")")))
+
+(print "Test 1: M28-style super")
+(= dog (Dog "Buddy" "Golden Retriever"))
+(print "Name:" dog.name)
+(print "Species:" dog.species)
+(print "Breed:" dog.breed)
+(print "Speak:" (dog.speak))
+(print "Info:" (dog.info))
+(assert (== dog.name "Buddy"))
+(assert (== (dog.speak) "Buddy makes a sound - Woof!"))
+(assert (== (dog.info) "Buddy is a dog (Golden Retriever)"))
+
+# Test 2: Multi-level inheritance
+(class Puppy (Dog)
+  (def __init__ (self name breed age)
+    ((super).__init__ self name breed)
+    (= self.age age))
+  
+  (def info (self)
+    (+ ((super).info self) ", " (str self.age) " months old")))
+
+(print "\nTest 2: Multi-level inheritance")
+(= pup (Puppy "Max" "Beagle" 3))
+(print "Puppy info:" (pup.info))
+(assert (== (pup.info) "Max is a dog (Beagle), 3 months old"))
+
+# Test 3: Multiple inheritance
+(class Flyable
+  (def fly (self)
+    (+ self.name " is flying")))
+
+(class Swimmable
+  (def swim (self)
+    (+ self.name " is swimming")))
+
+(class Duck (Animal Flyable Swimmable)
+  (def __init__ (self name)
+    ((super).__init__ self name)
+    (= self.species "duck"))
+  
+  (def speak (self)
+    "Quack!"))
+
+(print "\nTest 3: Multiple inheritance")
+(= duck (Duck "Donald"))
+(print "Duck name:" duck.name)
+(print "Duck speaks:" (duck.speak))
+(print "Duck flies:" (duck.fly))
+(print "Duck swims:" (duck.swim))
+(assert (== (duck.fly) "Donald is flying"))
+(assert (== (duck.swim) "Donald is swimming"))
+
+# Test 4: Explicit super with class and instance
+(class Cat (Animal)
+  (def __init__ (self name color)
+    ((super Cat self).__init__ name)
+    (= self.color color)
+    (= self.species "cat"))
+  
+  (def info (self)
+    (+ ((super Cat self).info) " with " self.color " fur")))
+
+(print "\nTest 4: Explicit super(Class, instance)")
+(= cat (Cat "Whiskers" "orange"))
+(print "Cat info:" (cat.info))
+(assert (== (cat.info) "Whiskers is a cat with orange fur"))
+
+# Test 5: super() function call (Python-style)
+(print "\nTest 5: super() function call")
+(try
+  (= s (super()))
+  (print "Got super() outside method - should not happen")
+  (except Exception e
+    (print "Expected error:" e)))
+
+# Test 6: Using (super) in methods
+(class Vehicle
+  (def start (self)
+    "Vehicle starting"))
+
+(class Car (Vehicle)
+  (def start (self)
+    (= parent_result ((super).start self))
+    (+ parent_result " - Engine running")))
+
+(print "\nTest 6: Using (super) in methods")
+(= car (Car))
+(print "Car start:" (car.start))
+(assert (== (car.start) "Vehicle starting - Engine running"))
+
+(print "\n=== All tests passed! ===")
+{"status": "success"}

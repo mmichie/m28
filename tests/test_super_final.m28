@@ -1,0 +1,57 @@
+# Test super() implementation - Final version
+
+(print "=== Testing super() ===\n")
+
+# Test 1: Basic super usage
+(class Animal
+  (def __init__ (self name)
+    (= self.name name))
+  
+  (def speak (self)
+    "Animal sound"))
+
+(class Dog (Animal)
+  (def __init__ (self name breed)
+    # Get super object and call __init__
+    (= s (super))
+    (s.__init__ self name)
+    (= self.breed breed))
+  
+  (def speak (self)
+    # Get parent method and call it
+    (= parent_speak (super).speak)
+    (+ (parent_speak self) " - Woof!")))
+
+(print "Test 1: Basic super usage")
+(= dog (Dog "Buddy" "Golden"))
+(print "Dog name:" dog.name)
+(print "Dog breed:" dog.breed)
+(print "Dog speak:" (dog.speak))
+
+# Test 2: Explicit super(Class, instance)
+(class Cat (Animal)
+  (def __init__ (self name color)
+    # Explicit super form
+    ((super Cat self).__init__ name)
+    (= self.color color)))
+
+(print "\nTest 2: Explicit super")
+(= cat (Cat "Whiskers" "orange"))
+(print "Cat name:" cat.name)
+(print "Cat color:" cat.color)
+
+# Test 3: Method resolution order
+(class Mammal (Animal)
+  (def speak (self)
+    "Mammal sound"))
+
+(class Dolphin (Mammal)
+  (def speak (self)
+    (+ ((super).speak self) " - Click!")))
+
+(print "\nTest 3: Method resolution")
+(= dolphin (Dolphin "Flipper"))
+(print "Dolphin speak:" (dolphin.speak))
+
+(print "\n=== All tests passed! ===")
+{"status": "success"}

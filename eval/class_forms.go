@@ -242,13 +242,40 @@ func createMethod(name string, params core.ListValue, body []core.Value, ctx *co
 	return method, nil
 }
 
-// superForm implements the super function for accessing parent methods
-// (super) - returns super object for current class/instance
-// (super ClassName instance) - explicit super
+// superForm implements the super special form for backward compatibility
+// This handles the bare "super" syntax used in method definitions
 func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	// For now, implement basic super
+	// Special form super with no args - look up self
+	if len(args) == 0 {
+		// Look for self in context
+		selfVal, err := ctx.Lookup("self")
+		if err != nil {
+			return nil, fmt.Errorf("super: no arguments given and cannot determine self")
+		}
+
+		instance, ok := selfVal.(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("super: self is not an instance")
+		}
+
+		// Try to get __class__ from context, otherwise use instance's class
+		classVal, err := ctx.Lookup("__class__")
+		if err != nil {
+			// Use instance's class as fallback
+			return core.NewSuper(instance.Class, instance), nil
+		}
+
+		class, ok := classVal.(*core.Class)
+		if !ok {
+			return core.NewSuper(instance.Class, instance), nil
+		}
+
+		return core.NewSuper(class, instance), nil
+	}
+
+	// Legacy form with explicit class and instance
 	if len(args) != 2 {
-		return nil, fmt.Errorf("super requires class and instance arguments")
+		return nil, fmt.Errorf("super requires 0 or 2 arguments")
 	}
 
 	// Get class
@@ -378,7 +405,7 @@ func issubclassForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 // RegisterClassForms registers class-related special forms
 func RegisterClassForms() {
 	RegisterSpecialForm("class", classForm)
-	RegisterSpecialForm("super", superForm)
+	RegisterSpecialForm("super", superForm) // Special form for bare "super" syntax
 	RegisterSpecialForm("isinstance", isinstanceForm)
 	RegisterSpecialForm("issubclass", issubclassForm)
 }
