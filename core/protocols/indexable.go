@@ -229,6 +229,102 @@ func (s *StringIndexable) DeleteIndex(index core.Value) error {
 	return fmt.Errorf("'str' object doesn't support item deletion")
 }
 
+// BytesIndexable adapts BytesValue to Indexable protocol
+type BytesIndexable struct {
+	bytes core.BytesValue
+}
+
+// NewBytesIndexable creates an Indexable adapter for bytes
+func NewBytesIndexable(bytes core.BytesValue) Indexable {
+	return &BytesIndexable{bytes: bytes}
+}
+
+// GetIndex retrieves byte at index
+func (b *BytesIndexable) GetIndex(index core.Value) (core.Value, error) {
+	idx, ok := index.(core.NumberValue)
+	if !ok {
+		return nil, fmt.Errorf("bytes indices must be integers, not %s", index.Type())
+	}
+
+	return b.bytes.GetItem(int(idx))
+}
+
+// SetIndex returns error as bytes are immutable
+func (b *BytesIndexable) SetIndex(index, value core.Value) error {
+	return fmt.Errorf("'bytes' object does not support item assignment")
+}
+
+// HasIndex checks if index exists
+func (b *BytesIndexable) HasIndex(index core.Value) bool {
+	idx, ok := index.(core.NumberValue)
+	if !ok {
+		return false
+	}
+
+	i := int(idx)
+	if i < 0 {
+		i = len(b.bytes) + i
+	}
+
+	return i >= 0 && i < len(b.bytes)
+}
+
+// DeleteIndex returns error as bytes are immutable
+func (b *BytesIndexable) DeleteIndex(index core.Value) error {
+	return fmt.Errorf("'bytes' object does not support item deletion")
+}
+
+// ByteArrayIndexable adapts ByteArrayValue to Indexable protocol
+type ByteArrayIndexable struct {
+	bytearray *core.ByteArrayValue
+}
+
+// NewByteArrayIndexable creates an Indexable adapter for bytearray
+func NewByteArrayIndexable(bytearray *core.ByteArrayValue) Indexable {
+	return &ByteArrayIndexable{bytearray: bytearray}
+}
+
+// GetIndex retrieves byte at index
+func (b *ByteArrayIndexable) GetIndex(index core.Value) (core.Value, error) {
+	idx, ok := index.(core.NumberValue)
+	if !ok {
+		return nil, fmt.Errorf("bytearray indices must be integers, not %s", index.Type())
+	}
+
+	return b.bytearray.GetItem(int(idx))
+}
+
+// SetIndex sets byte at index
+func (b *ByteArrayIndexable) SetIndex(index, value core.Value) error {
+	idx, ok := index.(core.NumberValue)
+	if !ok {
+		return fmt.Errorf("bytearray indices must be integers, not %s", index.Type())
+	}
+
+	return b.bytearray.SetItem(int(idx), value)
+}
+
+// HasIndex checks if index exists
+func (b *ByteArrayIndexable) HasIndex(index core.Value) bool {
+	idx, ok := index.(core.NumberValue)
+	if !ok {
+		return false
+	}
+
+	i := int(idx)
+	data := b.bytearray.GetData()
+	if i < 0 {
+		i = len(data) + i
+	}
+
+	return i >= 0 && i < len(data)
+}
+
+// DeleteIndex returns error as bytearray doesn't support item deletion
+func (b *ByteArrayIndexable) DeleteIndex(index core.Value) error {
+	return fmt.Errorf("'bytearray' object doesn't support item deletion")
+}
+
 // GetIndexableOps returns an Indexable implementation for a value if possible
 func GetIndexableOps(v core.Value) (Indexable, bool) {
 	switch val := v.(type) {
@@ -240,6 +336,10 @@ func GetIndexableOps(v core.Value) (Indexable, bool) {
 		return NewTupleIndexable(val), true
 	case core.StringValue:
 		return NewStringIndexable(val), true
+	case core.BytesValue:
+		return NewBytesIndexable(val), true
+	case *core.ByteArrayValue:
+		return NewByteArrayIndexable(val), true
 	default:
 		// Check if value implements Indexable directly
 		if indexable, ok := v.(Indexable); ok {

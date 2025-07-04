@@ -119,37 +119,5 @@ func RegisterTypeCheckingFunctions(ctx *core.Context) {
 
 	// repr() is now defined in misc.go to avoid duplication
 
-	// bytes() - convert string to bytes representation
-	ctx.Define("bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("bytes", args)
-		if err := v.Range(1, 2); err != nil {
-			return nil, err
-		}
-
-		// For now, we'll represent bytes as a list of numbers
-		// In a full implementation, we'd have a proper bytes type
-
-		// Get the string to convert
-		str, err := v.GetString(0)
-		if err != nil {
-			return nil, err
-		}
-
-		// Optional encoding parameter (default to UTF-8)
-		encoding, _ := v.GetStringOrDefault(1, "utf-8")
-
-		// For now, only support UTF-8
-		if encoding != "utf-8" && encoding != "utf8" {
-			return nil, fmt.Errorf("unsupported encoding: %s", encoding)
-		}
-
-		// Convert string to bytes
-		bytes := []byte(str)
-		result := make(core.ListValue, len(bytes))
-		for i, b := range bytes {
-			result[i] = core.NumberValue(float64(b))
-		}
-
-		return result, nil
-	}))
+	// bytes() is now a proper type with constructor registered in type_registry_primitives.go
 }

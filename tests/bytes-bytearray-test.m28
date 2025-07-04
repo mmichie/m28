@@ -1,0 +1,225 @@
+# Test bytes and bytearray types
+
+# Test bytes creation
+(print "=== Testing bytes creation ===")
+
+# Create empty bytes
+(= b1 (bytes))
+(print "Type of b1:" (type b1))
+(print "Expected type: bytes")
+(assert (== (type b1) "bytes") "Empty bytes type check failed")
+(assert (== (len b1) 0) "Empty bytes length failed")
+(assert (== (str b1) "b''") "Empty bytes string representation failed")
+
+# Create bytes from string
+(= b2 (bytes "hello"))
+(assert (== (type b2) "bytes") "bytes from string type check failed")
+(assert (== (len b2) 5) "bytes from string length failed")
+(assert (== (str b2) "b'hello'") "bytes from string representation failed")
+
+# Create bytes from list of numbers
+(= b3 (bytes [72 101 108 108 111]))  # "Hello" in ASCII
+(assert (== (type b3) "bytes") "bytes from list type check failed")
+(assert (== (len b3) 5) "bytes from list length failed")
+(assert (== (str b3) "b'Hello'") "bytes from list representation failed")
+
+# Create bytes with encoding
+(= b4 (bytes "hello" "utf-8"))
+(assert (== (type b4) "bytes") "bytes with encoding type check failed")
+(assert (== (len b4) 5) "bytes with encoding length failed")
+
+# Test bytes with special characters
+(= b5 (bytes "hello\nworld\t!"))
+(assert (== (str b5) "b'hello\\nworld\\t!'") "bytes with escape sequences failed")
+
+# Test bytes with non-printable characters
+(= b6 (bytes [0 1 2 255]))
+(assert (== (str b6) "b'\\x00\\x01\\x02\\xff'") "bytes with non-printable failed")
+
+# Test bytes operations
+(print "=== Testing bytes operations ===")
+
+# Test indexing
+(= b (bytes "hello"))
+(assert (== (get-item b 0) 104) "bytes[0] failed")  # 'h' = 104
+(assert (== (get-item b 1) 101) "bytes[1] failed")  # 'e' = 101
+(assert (== (get-item b -1) 111) "bytes[-1] failed") # 'o' = 111
+
+# Test slicing
+(= b (bytes "hello world"))
+(assert (== (str (get-item b (slice 0 5 None))) "b'hello'") "bytes slice [0:5] failed")
+(assert (== (str (get-item b (slice 6 None None))) "b'world'") "bytes slice [6:] failed")
+(assert (== (str (get-item b (slice None None 2))) "b'hlowrd'") "bytes slice [::2] failed")
+
+# Test iteration
+(= b (bytes "abc"))
+(= sum 0)
+(for byte in b
+  (= sum (+ sum byte)))
+(assert (== sum 294) "bytes iteration failed")  # 97 + 98 + 99 = 294
+
+# Test contains
+(= b (bytes [65 66 67]))  # ABC
+(assert (in 65 b) "bytes __contains__ true case failed")
+(assert (not (in 68 b)) "bytes __contains__ false case failed")
+
+# Test bytes methods
+(print "=== Testing bytes methods ===")
+
+# Test decode
+(= b (bytes "hello"))
+(assert (== (b.decode) "hello") "bytes decode() failed")
+(assert (== (b.decode "utf-8") "hello") "bytes decode('utf-8') failed")
+
+# Test hex
+(= b (bytes "ABC"))
+(assert (== (b.hex) "414243") "bytes hex() failed")
+
+# Test string encode
+(= s "hello")
+(= b (s.encode))
+(assert (== (type b) "bytes") "string encode() type failed")
+(assert (== (str b) "b'hello'") "string encode() value failed")
+(assert (== (s.encode "utf-8") b) "string encode('utf-8') failed")
+
+# Test bytearray creation
+(print "=== Testing bytearray creation ===")
+
+# Create empty bytearray
+(= ba1 (bytearray))
+(assert (== (type ba1) "bytearray") "Empty bytearray type check failed")
+(assert (== (len ba1) 0) "Empty bytearray length failed")
+(assert (== (str ba1) "bytearray(b'')") "Empty bytearray string representation failed")
+
+# Create bytearray from string
+(= ba2 (bytearray "hello"))
+(assert (== (type ba2) "bytearray") "bytearray from string type check failed")
+(assert (== (len ba2) 5) "bytearray from string length failed")
+(assert (== (str ba2) "bytearray(b'hello')") "bytearray from string representation failed")
+
+# Create bytearray from list
+(= ba3 (bytearray [72 101 108 108 111]))
+(assert (== (type ba3) "bytearray") "bytearray from list type check failed")
+(assert (== (len ba3) 5) "bytearray from list length failed")
+
+# Create bytearray from bytes
+(= b (bytes "test"))
+(= ba4 (bytearray b))
+(assert (== (type ba4) "bytearray") "bytearray from bytes type check failed")
+(assert (== (len ba4) 4) "bytearray from bytes length failed")
+
+# Test bytearray operations
+(print "=== Testing bytearray operations ===")
+
+# Test indexing
+(= ba (bytearray "hello"))
+(assert (== (get-item ba 0) 104) "bytearray[0] failed")
+(assert (== (get-item ba -1) 111) "bytearray[-1] failed")
+
+# Test item assignment
+(set-item ba 0 72)  # 'H'
+(assert (== (get-item ba 0) 72) "bytearray set-item failed")
+(assert (== (str ba) "bytearray(b'Hello')") "bytearray after set-item failed")
+
+# Test slicing
+(= ba (bytearray "hello world"))
+(assert (== (str (get-item ba (slice 0 5 None))) "bytearray(b'hello')") "bytearray slice failed")
+
+# Test iteration
+(= ba (bytearray "abc"))
+(= sum 0)
+(for byte in ba
+  (= sum (+ sum byte)))
+(assert (== sum 294) "bytearray iteration failed")
+
+# Test contains
+(= ba (bytearray [65 66 67]))
+(assert (in 65 ba) "bytearray __contains__ true case failed")
+(assert (not (in 68 ba)) "bytearray __contains__ false case failed")
+
+# Test bytearray methods
+(print "=== Testing bytearray methods ===")
+
+# Test decode
+(= ba (bytearray "hello"))
+(assert (== (ba.decode) "hello") "bytearray decode() failed")
+
+# Test hex
+(= ba (bytearray "ABC"))
+(assert (== (ba.hex) "414243") "bytearray hex() failed")
+
+# Test append
+(= ba (bytearray "hello"))
+(ba.append 33)  # '!'
+(assert (== (str ba) "bytearray(b'hello!')") "bytearray append() failed")
+(assert (== (len ba) 6) "bytearray length after append failed")
+
+# Test extend
+(= ba (bytearray "hello"))
+(ba.extend (bytes " world"))
+(assert (== (str ba) "bytearray(b'hello world')") "bytearray extend with bytes failed")
+
+(= ba2 (bytearray "test"))
+(ba2.extend [33 33])  # "!!"
+(assert (== (str ba2) "bytearray(b'test!!')") "bytearray extend with list failed")
+
+# Test clear
+(= ba (bytearray "hello"))
+(ba.clear)
+(assert (== (len ba) 0) "bytearray clear() failed")
+(assert (== (str ba) "bytearray(b'')") "bytearray after clear() failed")
+
+# Test error cases
+(print "=== Testing error cases ===")
+
+# Test invalid byte values
+(try
+  (bytes [256])
+  (assert false "bytes should reject values > 255")
+  (except Exception e
+    (assert true "bytes correctly rejected value > 255")))
+
+(try
+  (bytes [-1])
+  (assert false "bytes should reject negative values")
+  (except Exception e
+    (assert true "bytes correctly rejected negative value")))
+
+# Test invalid set-item on bytearray
+(= ba (bytearray "test"))
+(try
+  (set-item ba 0 256)
+  (assert false "bytearray set-item should reject values > 255")
+  (except Exception e
+    (assert true "bytearray correctly rejected value > 255")))
+
+# Test immutability of bytes
+(= b (bytes "test"))
+(try
+  (set-item b 0 65)
+  (assert false "bytes should not support item assignment")
+  (except Exception e
+    (assert true "bytes correctly rejected item assignment")))
+
+# Test type conversions
+(print "=== Testing type conversions ===")
+
+# bytes to bytearray
+(= b (bytes "test"))
+(= ba (bytearray b))
+(assert (== (type ba) "bytearray") "bytes to bytearray conversion failed")
+(assert (== (str ba) "bytearray(b'test')") "bytes to bytearray value failed")
+
+# bytearray to bytes
+(= ba (bytearray "test"))
+(= b (bytes ba))
+(assert (== (type b) "bytes") "bytearray to bytes conversion failed")
+(assert (== (str b) "b'test'") "bytearray to bytes value failed")
+
+# Round-trip encode/decode
+(= s "hello world")
+(= b (s.encode))
+(= s2 (b.decode))
+(assert (== s s2) "encode/decode round-trip failed")
+
+(print "All bytes and bytearray tests passed!")

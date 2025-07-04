@@ -223,3 +223,210 @@ func (m *BuiltinMethod) Call(args []Value, ctx *Context) (Value, error) {
 func (m *BuiltinMethod) String() string {
 	return "<builtin method>"
 }
+
+// BytesValue represents an immutable sequence of bytes
+type BytesValue []byte
+
+// Type implements Value.Type
+func (b BytesValue) Type() Type {
+	return BytesType
+}
+
+// String implements Value.String
+func (b BytesValue) String() string {
+	// Format bytes as Python does: b'...'
+	// Escape non-printable characters
+	result := "b'"
+	for _, ch := range b {
+		switch ch {
+		case '\n':
+			result += "\\n"
+		case '\r':
+			result += "\\r"
+		case '\t':
+			result += "\\t"
+		case '\\':
+			result += "\\\\"
+		case '\'':
+			result += "\\'"
+		default:
+			if ch >= 32 && ch < 127 {
+				result += string(ch)
+			} else {
+				result += fmt.Sprintf("\\x%02x", ch)
+			}
+		}
+	}
+	result += "'"
+	return result
+}
+
+// GetAttr implements basic bytes methods using TypeDescriptor
+func (b BytesValue) GetAttr(name string) (Value, bool) {
+	desc := GetTypeDescriptor(BytesType)
+	if desc != nil {
+		val, err := desc.GetAttribute(b, name)
+		if err == nil {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
+// GetItem gets a byte by index
+func (b BytesValue) GetItem(index int) (Value, error) {
+	if index < 0 {
+		index = len(b) + index
+	}
+	if index < 0 || index >= len(b) {
+		return nil, &IndexError{Index: index, Length: len(b)}
+	}
+	return NumberValue(b[index]), nil
+}
+
+// Iterator implements Iterable
+func (b BytesValue) Iterator() Iterator {
+	return &bytesIterator{
+		bytes: b,
+		index: 0,
+	}
+}
+
+type bytesIterator struct {
+	bytes BytesValue
+	index int
+}
+
+func (it *bytesIterator) Next() (Value, bool) {
+	if it.index >= len(it.bytes) {
+		return nil, false
+	}
+	val := NumberValue(it.bytes[it.index])
+	it.index++
+	return val, true
+}
+
+func (it *bytesIterator) Reset() {
+	it.index = 0
+}
+
+// ByteArrayValue represents a mutable sequence of bytes
+type ByteArrayValue struct {
+	data []byte
+}
+
+// NewByteArray creates a new bytearray
+func NewByteArray(data []byte) *ByteArrayValue {
+	return &ByteArrayValue{data: data}
+}
+
+// Type implements Value.Type
+func (b *ByteArrayValue) Type() Type {
+	return ByteArrayType
+}
+
+// String implements Value.String
+func (b *ByteArrayValue) String() string {
+	// Format bytearray as Python does: bytearray(b'...')
+	result := "bytearray(b'"
+	for _, ch := range b.data {
+		switch ch {
+		case '\n':
+			result += "\\n"
+		case '\r':
+			result += "\\r"
+		case '\t':
+			result += "\\t"
+		case '\\':
+			result += "\\\\"
+		case '\'':
+			result += "\\'"
+		default:
+			if ch >= 32 && ch < 127 {
+				result += string(ch)
+			} else {
+				result += fmt.Sprintf("\\x%02x", ch)
+			}
+		}
+	}
+	result += "')"
+	return result
+}
+
+// GetAttr implements basic bytearray methods using TypeDescriptor
+func (b *ByteArrayValue) GetAttr(name string) (Value, bool) {
+	desc := GetTypeDescriptor(ByteArrayType)
+	if desc != nil {
+		val, err := desc.GetAttribute(b, name)
+		if err == nil {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
+// GetItem gets a byte by index
+func (b *ByteArrayValue) GetItem(index int) (Value, error) {
+	if index < 0 {
+		index = len(b.data) + index
+	}
+	if index < 0 || index >= len(b.data) {
+		return nil, &IndexError{Index: index, Length: len(b.data)}
+	}
+	return NumberValue(b.data[index]), nil
+}
+
+// SetItem sets a byte by index
+func (b *ByteArrayValue) SetItem(index int, value Value) error {
+	if index < 0 {
+		index = len(b.data) + index
+	}
+	if index < 0 || index >= len(b.data) {
+		return &IndexError{Index: index, Length: len(b.data)}
+	}
+
+	// Value must be an integer between 0 and 255
+	num, ok := value.(NumberValue)
+	if !ok {
+		return fmt.Errorf("an integer is required")
+	}
+
+	intVal := int(num)
+	if intVal < 0 || intVal > 255 {
+		return fmt.Errorf("byte must be in range(0, 256)")
+	}
+
+	b.data[index] = byte(intVal)
+	return nil
+}
+
+// Iterator implements Iterable
+func (b *ByteArrayValue) Iterator() Iterator {
+	return &bytearrayIterator{
+		bytearray: b,
+		index:     0,
+	}
+}
+
+// GetData returns the internal byte data
+func (b *ByteArrayValue) GetData() []byte {
+	return b.data
+}
+
+type bytearrayIterator struct {
+	bytearray *ByteArrayValue
+	index     int
+}
+
+func (it *bytearrayIterator) Next() (Value, bool) {
+	if it.index >= len(it.bytearray.data) {
+		return nil, false
+	}
+	val := NumberValue(it.bytearray.data[it.index])
+	it.index++
+	return val, true
+}
+
+func (it *bytearrayIterator) Reset() {
+	it.index = 0
+}

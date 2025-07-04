@@ -170,6 +170,12 @@ func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	case core.StringValue:
 		return sliceString(string(v), start, end, step)
 
+	case core.BytesValue:
+		return sliceBytes(v, start, end, step)
+
+	case *core.ByteArrayValue:
+		return sliceByteArray(v, start, end, step)
+
 	default:
 		return nil, fmt.Errorf("'%s' object is not subscriptable", obj.Type())
 	}
@@ -227,6 +233,61 @@ func sliceString(str string, start, end, step *int) (core.Value, error) {
 	}
 
 	return core.StringValue(result), nil
+}
+
+// sliceBytes performs slicing on bytes
+func sliceBytes(bytes core.BytesValue, start, end, step *int) (core.Value, error) {
+	length := len(bytes)
+
+	// Normalize indices
+	startIdx, endIdx, stepVal := normalizeSliceIndices(length, start, end, step)
+
+	// Build result
+	result := make([]byte, 0)
+
+	if stepVal > 0 {
+		for i := startIdx; i < endIdx; i += stepVal {
+			if i >= 0 && i < length {
+				result = append(result, bytes[i])
+			}
+		}
+	} else {
+		for i := startIdx; i > endIdx; i += stepVal {
+			if i >= 0 && i < length {
+				result = append(result, bytes[i])
+			}
+		}
+	}
+
+	return core.BytesValue(result), nil
+}
+
+// sliceByteArray performs slicing on bytearray
+func sliceByteArray(ba *core.ByteArrayValue, start, end, step *int) (core.Value, error) {
+	data := ba.GetData() // We'll need to add this getter method
+	length := len(data)
+
+	// Normalize indices
+	startIdx, endIdx, stepVal := normalizeSliceIndices(length, start, end, step)
+
+	// Build result
+	result := make([]byte, 0)
+
+	if stepVal > 0 {
+		for i := startIdx; i < endIdx; i += stepVal {
+			if i >= 0 && i < length {
+				result = append(result, data[i])
+			}
+		}
+	} else {
+		for i := startIdx; i > endIdx; i += stepVal {
+			if i >= 0 && i < length {
+				result = append(result, data[i])
+			}
+		}
+	}
+
+	return core.NewByteArray(result), nil
 }
 
 // normalizeSliceIndices converts slice parameters to normalized indices
@@ -352,6 +413,10 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 		return result, nil
 	case core.StringValue:
 		return sliceString(string(v), start, stop, step)
+	case core.BytesValue:
+		return sliceBytes(v, start, stop, step)
+	case *core.ByteArrayValue:
+		return sliceByteArray(v, start, stop, step)
 	default:
 		return nil, fmt.Errorf("'%s' object is not subscriptable", v.Type())
 	}

@@ -226,6 +226,27 @@ func getStringMethods() map[string]*MethodDescriptor {
 				return StringValue(strings.Repeat(s, count)), nil
 			},
 		},
+		"encode": {
+			Name:    "encode",
+			Arity:   -1, // Variable args
+			Doc:     "Encode the string using the specified encoding",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				s := string(receiver.(StringValue))
+				encoding := "utf-8"
+				if len(args) > 0 {
+					enc, ok := args[0].(StringValue)
+					if !ok {
+						return nil, fmt.Errorf("encode() argument 1 must be str, not %s", args[0].Type())
+					}
+					encoding = string(enc)
+				}
+				if encoding != "utf-8" {
+					return nil, fmt.Errorf("only utf-8 encoding is currently supported")
+				}
+				return BytesValue([]byte(s)), nil
+			},
+		},
 	}
 }
 

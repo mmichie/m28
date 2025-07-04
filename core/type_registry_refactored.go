@@ -25,13 +25,15 @@ func registerObjectTypes() {
 	registerModuleType()
 }
 
-// registerPrimitiveTypes registers number, string, bool, nil, and symbol types
+// registerPrimitiveTypes registers number, string, bool, nil, symbol, bytes, and bytearray types
 func registerPrimitiveTypes() {
 	registerNumberType()
 	registerStringType()
 	registerBoolType()
 	registerNilType()
 	registerSymbolType()
+	registerBytesType()
+	registerByteArrayType()
 }
 
 // registerCollectionTypes registers list, dict, tuple, and set types

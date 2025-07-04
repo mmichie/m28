@@ -387,4 +387,24 @@ func RegisterCollections(ctx *core.Context) {
 
 		return nil, fmt.Errorf("object of type '%s' has no len()", arg.Type())
 	}))
+
+	// bytes - create a new bytes object
+	ctx.Define("bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Get the type descriptor for bytes to use its constructor
+		desc := core.GetTypeDescriptor(core.BytesType)
+		if desc == nil {
+			return nil, fmt.Errorf("bytes type not registered")
+		}
+		return desc.Constructor(args, ctx)
+	}))
+
+	// bytearray - create a new bytearray object
+	ctx.Define("bytearray", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Get the type descriptor for bytearray to use its constructor
+		desc := core.GetTypeDescriptor(core.ByteArrayType)
+		if desc == nil {
+			return nil, fmt.Errorf("bytearray type not registered")
+		}
+		return desc.Constructor(args, ctx)
+	}))
 }

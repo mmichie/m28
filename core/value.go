@@ -27,6 +27,8 @@ const (
 	ExceptionType Type = "exception"
 	SliceType     Type = "slice"
 	RangeType     Type = "range"
+	BytesType     Type = "bytes"
+	ByteArrayType Type = "bytearray"
 )
 
 // Value is the base interface for all values in the language
