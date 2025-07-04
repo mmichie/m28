@@ -207,24 +207,212 @@ Successfully separated modules from builtins:
 - 🎯 No functions > 100 lines
 - 🎯 Zero panic() calls in non-test code
 
+## 🏗️ Architecture Evolution
+
+### Phase 1: Parser Abstraction (Foundation)
+**Goal**: Separate parsing from evaluation to support multiple syntaxes
+
+#### 1.1 Common AST Definition
+- [ ] Define language-agnostic AST nodes in `core/ast/`
+- [ ] Include source location info in every node for error reporting
+- [ ] Design AST to support type annotations (even if not used yet)
+- [ ] Create AST visitor pattern for transformations
+
+#### 1.2 Parser Interface
+- [ ] Create `Parser` interface with multiple implementations
+- [ ] Move current S-expr parser to `parser/sexpr/`
+- [ ] Add parser registry for file extension mapping
+- [ ] Support for parsing strings, files, and streams
+
+#### 1.3 Intermediate Representation (IR)
+- [ ] Design a lower-level IR between AST and evaluation
+- [ ] IR should be easier to optimize than AST
+- [ ] Consider SSA form for future optimizations
+- [ ] Support for type information in IR
+
+### Phase 2: Error Handling Enhancement
+**Goal**: Rust/Elm-quality error messages with helpful suggestions
+
+#### 2.1 Source Tracking
+- [ ] Add line/column info to all AST nodes
+- [ ] Implement source span tracking (start/end positions)
+- [ ] Keep original source text for error display
+- [ ] Support for multi-file error traces
+
+#### 2.2 Error Reporting System
+- [ ] Rich error types with structured information
+- [ ] Error recovery in parser (continue after errors)
+- [ ] "Did you mean?" suggestions using edit distance
+- [ ] Colorized error output with source highlights
+- [ ] Error explanation system (like Rust's `--explain`)
+
+### Phase 3: Type System Foundation
+**Goal**: Prepare for gradual or mandatory typing
+
+#### 3.1 Type Representation
+- [ ] Type AST nodes (for type annotations)
+- [ ] Type inference infrastructure
+- [ ] Gradual typing support (typed + untyped code)
+- [ ] Generic/parametric types foundation
+
+#### 3.2 Type Checking Pipeline
+- [ ] Optional type checking phase
+- [ ] Type error reporting using diagnostic framework
+- [ ] Type-directed optimizations
+- [ ] Runtime type checking for gradual typing
+
+### Phase 4: Multiple Frontend Support
+**Goal**: Support Python syntax and custom typed variant
+
+#### 4.1 Python Parser
+- [ ] Python 3.x grammar implementation
+- [ ] Transpiler option (Python → S-expr)
+- [ ] Native parser option using parser combinator
+- [ ] Handle Python-specific features (decorators, etc.)
+
+#### 4.2 Typed Python Variant
+- [ ] Mandatory type annotations
+- [ ] Stricter semantics (immutability by default)
+- [ ] Additional keywords for mutability opt-in
+- [ ] Compile-time guarantees
+
+### Phase 5: Optimization & Backends
+**Goal**: Make M28 performant through various optimization techniques
+
+#### 5.1 High-Level IR (HIR) Design
+**Why**: LLVM IR doesn't work well for dynamic languages; need our own IR first
+- [ ] Design M28 HIR with dynamic operation support
+- [ ] Include type guards and profiling points
+- [ ] Support for gradual lowering to different backends
+- [ ] Deoptimization points for returning to interpreter
+
+Example HIR for `(+ a b)`:
+```
+ADD_DYNAMIC %a, %b → %result
+  guards: [
+    if type(%a) == int && type(%b) == int → ADD_INT
+    if type(%a) == str && type(%b) == str → CONCAT_STR
+    else → CALL_METHOD %a.__add__(%b)
+  ]
+```
+
+#### 5.2 Interpreter Optimizations
+- [ ] Bytecode VM with register-based design
+- [ ] Inline caching for method lookups
+- [ ] Quickening (bytecode specialization)
+- [ ] Computed goto dispatch (if supported)
+
+#### 5.3 Typed Subset → LLVM
+**Strategy**: Only compile fully-typed code to LLVM, keep dynamic parts interpreted
+- [ ] Type annotation validator
+- [ ] LLVM IR generation for typed functions
+- [ ] FFI boundary between compiled and interpreted code
+- [ ] Benchmark common numeric kernels
+
+```python
+# This compiles to LLVM
+@compile
+def fib(n: int) -> int:
+    return n if n < 2 else fib(n-1) + fib(n-2)
+
+# This stays interpreted  
+def dynamic_func(x):
+    return x.whatever()
+```
+
+#### 5.4 Profile-Guided Optimization
+- [ ] Runtime type profiling infrastructure
+- [ ] Hot path detection
+- [ ] Speculative optimization with guards
+- [ ] On-stack replacement (OSR) for hot loops
+
+#### 5.5 Backend Targets
+- [ ] **Interpreter** (current, keep as fallback)
+- [ ] **Bytecode VM** (2-5x speedup)
+- [ ] **LLVM** (typed code only, 50-200x for numeric)
+- [ ] **Go codegen** (easier FFI, reuse Go's GC)
+- [ ] **WASM** (via LLVM or direct)
+- [ ] **JavaScript** (for browser embedding)
+
+#### 5.6 Compilation Pipeline
+```
+┌─────────────┐
+│  M28 Source │
+└──────┬──────┘
+       ↓
+┌──────▼──────┐
+│     AST     │
+└──────┬──────┘
+       ↓
+┌──────▼──────┐
+│   M28 HIR   │ ← High-level IR (dynamic ops)
+└──────┬──────┘
+       ├─────────────┬────────────┬─────────────┐
+       ↓             ↓            ↓             ↓
+┌──────▼──────┐ ┌───▼────┐ ┌────▼────┐ ┌──────▼──────┐
+│ Interpreter │ │Bytecode│ │Type Spec│ │ LLVM (typed)│
+└─────────────┘ └────────┘ └─────────┘ └─────────────┘
+```
+
+### Phase 6: Developer Experience
+**Goal**: Professional tooling and debugging support
+
+#### 6.1 Language Server Protocol (LSP)
+- [ ] Basic LSP implementation
+- [ ] Syntax highlighting
+- [ ] Auto-completion
+- [ ] Go-to-definition
+- [ ] Inline error display
+
+#### 6.2 Debugging & Tools
+- [ ] Debug adapter protocol (DAP)
+- [ ] Code formatter (like gofmt/black)
+- [ ] Linter with configurable rules
+- [ ] Documentation generator
+- [ ] Package manager
+
 ## 🗺️ Long-term Vision
 
-### Performance
-- [ ] Bytecode compilation
-- [ ] JIT compilation
-- [ ] Parallel execution
+### Architecture Goals
+```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│   Python    │  │   S-Expr    │  │Typed Python │
+│   Parser    │  │   Parser    │  │   Parser    │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                 │                 │
+       └─────────────────┴─────────────────┘
+                         │
+                    ┌────▼────┐
+                    │   AST   │
+                    │ + Types │
+                    └────┬────┘
+                         │
+                  ┌──────▼──────┐
+                  │Type Checker │ (Optional)
+                  └──────┬──────┘
+                         │
+                  ┌──────▼──────┐
+                  │ Optimizer   │
+                  └──────┬──────┘
+                         │
+                  ┌──────▼──────┐
+                  │  Evaluator  │
+                  │      or     │
+                  │   Backend   │
+                  └─────────────┘
+```
 
-### Developer Experience
-- [ ] Language Server Protocol (LSP)
-- [ ] Debugger support
-- [ ] Package manager
-- [ ] Standard library
+### Implementation Timeline
+- **Near Term (3-6 months)**: AST extraction, error improvements, parser interface
+- **Medium Term (6-12 months)**: Python parser, type annotations, basic optimizations
+- **Long Term (1-2 years)**: Full Python support, typed variant, LSP, native compilation
 
-### Community
-- [ ] Plugin system
+### Community & Ecosystem
+- [ ] Plugin system for extensions
 - [ ] FFI for C extensions
 - [ ] Web playground
 - [ ] Comprehensive documentation
+- [ ] Standard library expansion
 
 ---
 
@@ -285,5 +473,20 @@ Successfully separated modules from builtins:
 2. Macro definition and expansion (3-4 weeks)
 3. Built-in macros (2-3 weeks)
 4. Testing and documentation (1-2 weeks)
+
+### Compilation Strategy Rationale
+**Why not pure LLVM?** Dynamic languages need:
+- Runtime type information
+- Dynamic dispatch
+- Reflection/introspection
+- Deoptimization capability
+
+**Our approach:**
+1. Build M28 HIR that understands dynamic operations
+2. Use LLVM only for typed, performance-critical code
+3. Keep interpreter for dynamic features
+4. Profile-guided optimization for hot paths
+
+This follows successful implementations like V8, PyPy, and Julia rather than trying to force everything through LLVM.
 
 </details>
