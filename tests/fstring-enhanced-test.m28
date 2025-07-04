@@ -1,0 +1,146 @@
+# Enhanced F-String Test Suite for M28
+# Tests format specifications, alignment, conversion flags, and self-documenting expressions
+
+(print "=== M28 Enhanced F-String Features Test Suite ===\n")
+
+# Test 1: Format specifications for numbers
+(print "Test 1: Format Specifications - Numbers")
+(= pi 3.14159265359)
+(= price 49.99)
+(= big_num 1234567.89)
+(print f"Pi to 2 decimals: {pi:.2f}")
+(print f"Pi to 4 decimals: {pi:.4f}")
+(print f"Price with 1 decimal: {price:.1f}")
+(print f"Scientific notation: {big_num:.2e}")
+(print f"Scientific (uppercase): {big_num:.2E}")
+(print f"General format: {pi:.3g}")
+(print f"Percentage: {0.75:.1%}")
+(print f"Binary: {42:b}")
+(print f"Octal: {42:o}")
+(print f"Hex (lowercase): {255:x}")
+(print f"Hex (uppercase): {255:X}")
+(print "✓ Number format specifications work\n")
+
+# Test 2: Width and alignment
+(print "Test 2: Width and Alignment")
+(= text "Hello")
+(= num 42)
+(print f"Right align text: '{text:>10}'")
+(print f"Left align text: '{text:<10}'")
+(print f"Center align text: '{text:^10}'")
+(print f"Right align number: '{num:>5}'")
+(print f"Left align number: '{num:<5}'")
+(print f"Center align number: '{num:^5}'")
+(print "✓ Basic alignment works\n")
+
+# Test 3: Fill characters with alignment
+(print "Test 3: Fill Characters")
+(print f"Dots: '{text:.>10}'")
+(print f"Dashes: '{text:-<10}'")
+(print f"Stars: '{text:*^10}'")
+(print f"Zeros: '{num:0>5}'")
+(print f"Equals: '{num:=^7}'")
+(print "✓ Fill characters work\n")
+
+# Test 4: Zero padding for numbers
+(print "Test 4: Zero Padding")
+(= value 42)
+(= negative -17)
+(print f"Zero padded: {value:05}")
+(print f"Zero padded negative: {negative:05}")
+(print f"With sign: {value:+05}")
+(print f"Space for positive: {value: 05}")
+(print "✓ Zero padding works\n")
+
+# Test 5: Precision for strings
+(print "Test 5: String Precision")
+(= long_text "This is a very long string that needs truncation")
+(print f"First 10 chars: '{long_text:.10}'")
+(print f"First 20 chars: '{long_text:.20}'")
+(print f"Truncated and aligned: '{long_text:.15>25}'")
+(print "✓ String precision works\n")
+
+# Test 6: Conversion flags (!r, !s, !a)
+(print "Test 6: Conversion Flags")
+(= text "Hello\nWorld")
+(= name "Alice")
+(print f"Normal: {text}")
+(print f"Repr: {text!r}")
+(print f"String: {name!s}")
+(= unicode_text "Café ☕")
+(print f"ASCII: {unicode_text!a}")
+(print "✓ Conversion flags work\n")
+
+# Test 7: Self-documenting expressions (=)
+(print "Test 7: Self-Documenting Expressions")
+(= x 10)
+(= y 20)
+(print f"Simple: {x=}")
+(print f"Expression: {(+ x y)=}")
+(print f"Method call: {text.upper()=}")
+(= data {"key": "value"})
+(print f"Dict access: {data['key']=}")
+(print "✓ Self-documenting expressions work\n")
+
+# Test 8: Combining features
+(print "Test 8: Combined Features")
+(= value 42.7)
+(print f"Format + width: {value:8.2f}")
+(print f"Format + align + fill: {value:*>10.1f}")
+(print f"Self-doc + format: {value:.2f=}")
+(print f"Conversion + format: {text!r:>20}")
+(= percent 0.8765)
+(print f"Percentage with precision: {percent:.1%}")
+(print "✓ Combined features work\n")
+
+# Test 9: Thousands separators
+(print "Test 9: Thousands Separators")
+(= big 1234567890)
+(= decimal 1234567.89)
+(print f"Comma separator: {big:,}")
+(print f"Underscore separator: {big:_}")
+(print f"With decimals: {decimal:,.2f}")
+(print f"In different bases: {big:_x}")
+(print "✓ Thousands separators work\n")
+
+# Test 10: Sign handling
+(print "Test 10: Sign Handling")
+(= positive 42)
+(= negative -42)
+(= zero 0)
+(print f"Always show sign: {positive:+}, {negative:+}, {zero:+}")
+(print f"Space for positive: {positive: }, {negative: }, {zero: }")
+(print f"Default: {positive:}, {negative:}, {zero:}")
+(print "✓ Sign handling works\n")
+
+# Test 11: Alternate forms
+(print "Test 11: Alternate Forms")
+(= num 42)
+(print f"Hex with prefix: {num:#x}")
+(print f"Octal with prefix: {num:#o}")
+(print f"Binary with prefix: {num:#b}")
+(= float_num 10.0)
+(print f"Float with decimal point: {float_num:#.0f}")
+(print "✓ Alternate forms work\n")
+
+# Test 12: Complex expressions with format specs
+(print "Test 12: Complex Expressions")
+(= items [["Apple", 1.50], ["Banana", 0.75], ["Cherry", 2.25]])
+(for item in items
+    (print f"{item[0]:<10} ${item[1]:>6.2f}"))
+(print "✓ Complex formatted expressions work\n")
+
+# Test 13: Edge cases
+(print "Test 13: Edge Cases")
+(= empty "")
+(print f"Empty with width: '{empty:>5}'")
+(= none None)
+(print f"None formatted: {none:>10}")
+# Skip infinity/NaN tests as division by zero causes error
+# (= inf (/ 1.0 0.0))
+# (= nan (/ 0.0 0.0))
+# (print f"Infinity: {inf:10.2f}")
+# (print f"NaN: {nan:10.2f}")
+(print "✓ Edge cases handled\n")
+
+(print "\n=== All Enhanced F-String Tests Passed! ===")

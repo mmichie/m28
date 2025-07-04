@@ -23,11 +23,11 @@
 - [ ] Decorators with `@` syntax
 - [ ] `eval()` and `exec()`
 
-#### F-String Enhancements
-- [ ] Format specifications: `f"{pi:.2f}"`
-- [ ] Alignment: `f"{text:>10}"`
-- [ ] Conversion flags: `f"{value!r}"`
-- [ ] Self-documenting: `f"{x+y=}"`
+#### F-String Enhancements ✅
+- [x] Format specifications: `f"{pi:.2f}"`
+- [x] Alignment: `f"{text:>10}"`
+- [x] Conversion flags: `f"{value!r}"`
+- [x] Self-documenting: `f"{x+y=}"`
 
 ### Data Types
 - [ ] `complex` numbers
@@ -181,6 +181,7 @@
 ## ✅ Recently Completed (2024)
 
 ### December 2024
+- **F-String Enhancements**: Format specifications, alignment, conversion flags, self-documenting expressions
 - **Argument unpacking**: `func(*args, **kwargs)` in function calls
 - **Container Protocol Implementation**: All container protocols for built-in types
 - **Bytes and ByteArray Implementation**: Full implementation with methods

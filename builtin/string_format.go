@@ -123,21 +123,43 @@ func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
 		return applyFormatSpecString(value, "", ctx)
 	}
 
-	// Get format spec (second argument)
-	formatSpec, _ := v.GetStringOrDefault(1, "")
+	// Get enhanced format spec (second argument)
+	// Format: "spec|!conversion|=original_expr"
+	enhancedSpec, _ := v.GetStringOrDefault(1, "")
 
-	// Check for conversion (!r, !s, !a)
-	conversion, _ := v.GetStringOrDefault(2, "")
+	// Parse the enhanced spec
+	var formatSpec string
+	var conversion string
+	var selfDocExpr string
+
+	parts := strings.Split(enhancedSpec, "|")
+	if len(parts) > 0 && parts[0] != "" {
+		formatSpec = parts[0]
+	}
+
+	for i := 1; i < len(parts); i++ {
+		part := parts[i]
+		if strings.HasPrefix(part, "!") && len(part) > 1 {
+			conversion = part[1:]
+		} else if strings.HasPrefix(part, "=") && len(part) > 1 {
+			selfDocExpr = part[1:]
+		}
+	}
 
 	// Apply conversion first
 	if conversion != "" {
 		switch conversion {
 		case "r":
-			value = core.StringValue(core.PrintValue(value))
+			// repr() - should return a quoted string representation
+			if str, ok := types.AsString(value); ok {
+				value = core.StringValue(fmt.Sprintf("%q", str))
+			} else {
+				value = core.StringValue(core.PrintValue(value))
+			}
 		case "s":
 			value = core.StringValue(value.String())
 		case "a":
-			// ASCII representation - for now just escape non-ASCII
+			// ASCII representation - escape non-ASCII
 			s := value.String()
 			var result strings.Builder
 			for _, r := range s {
@@ -151,7 +173,18 @@ func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
 		}
 	}
 
-	return applyFormatSpecString(value, formatSpec, ctx)
+	// Apply format spec
+	formatted, err := applyFormatSpecString(value, formatSpec, ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Handle self-documenting expressions
+	if selfDocExpr != "" {
+		return selfDocExpr + "=" + formatted, nil
+	}
+
+	return formatted, nil
 }
 
 // applyFormatSpecString applies Python-style format specification to a value
@@ -451,6 +484,10 @@ func applyAlignment(str string, fs *FormatSpec) string {
 	}
 
 	fillChar := string(fs.Fill)
+	// Special case: if ZeroPad is true and fill char is space, use '0'
+	if fs.ZeroPad && fillChar == " " {
+		fillChar = "0"
+	}
 	padding := fs.Width - len(str)
 
 	switch fs.Align {
@@ -469,6 +506,10 @@ func applyAlignment(str string, fs *FormatSpec) string {
 		// Pad after sign but before digits
 		if len(str) > 0 && (str[0] == '+' || str[0] == '-' || str[0] == ' ') {
 			return string(str[0]) + strings.Repeat(fillChar, padding) + str[1:]
+		}
+		// For numbers without sign, pad with zeros/fill on the left
+		if fs.ZeroPad || fillChar == "0" {
+			return strings.Repeat(fillChar, padding) + str
 		}
 		// Fall back to right align
 		return strings.Repeat(fillChar, padding) + str
