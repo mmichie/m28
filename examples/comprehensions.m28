@@ -1,0 +1,36 @@
+# Comprehensions in M28
+# Demonstrates list, dict, and set comprehensions
+
+(print "=== List Comprehensions ===")
+(print "Squares:" [(* x x) for x in (range 10)])
+(print "Even squares:" [(* x x) for x in (range 10) if (== (% x 2) 0)])
+
+(print "\n=== Dictionary Comprehensions ===")
+(print "Number to square:" {x: (* x x) for x in (range 6)})
+(print "Square to number:" {(* x x): x for x in (range 6)})
+(print "Filtered dict:" {x: (* x 2) for x in (range 10) if (> x 5)})
+
+(print "\n=== Set Comprehensions ===")
+(print "Unique values:" {x for x in [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]})
+(print "Doubled values:" {(* x 2) for x in (range 5)})
+(print "Filtered set:" {x for x in (range 20) if (== (% x 3) 0)})
+
+(print "\n=== Practical Examples ===")
+
+# Word lengths
+(= words ["python", "lisp", "scheme", "clojure", "m28"])
+(print "Word lengths:" {word: (len word) for word in words})
+
+# Character frequency (simplified)
+(= text "hello world")
+(= unique_chars {c for c in text})
+(print "Unique characters:" unique_chars)
+
+# Even and odd partitioning
+(= numbers (range 10))
+(= evens {x for x in numbers if (== (% x 2) 0)})
+(= odds {x for x in numbers if (== (% x 2) 1)})
+(print "Evens:" evens)
+(print "Odds:" odds)
+
+(print "\n✓ Comprehensions demo complete!")

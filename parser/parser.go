@@ -271,7 +271,8 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 	return core.ListValue(append([]core.Value{core.SymbolValue("list-literal")}, elements...)), nil
 }
 
-// parseDictLiteral parses a dictionary literal {...} or set literal {1, 2, 3}
+// parseDictLiteral parses a dictionary literal {...}, set literal {1, 2, 3},
+// dict comprehension {k: v for ...}, or set comprehension {x for ...}
 func (p *Parser) parseDictLiteral() (core.Value, error) {
 	// Skip opening brace
 	p.advance()
@@ -286,115 +287,67 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 		return core.ListValue([]core.Value{core.SymbolValue("dict-literal")}), nil
 	}
 
-	// Parse the first element to determine if it's a dict or set
-	firstElement, err := p.parseExpr()
-	if err != nil {
-		return nil, err
-	}
+	// Parse all elements first to determine what kind of structure this is
+	elements := make(core.ListValue, 0)
+	hasColon := false
+	colonPositions := make(map[int]bool) // Track which element positions have colons after them
 
-	// Skip whitespace after the first element
-	p.skipWhitespaceAndComments()
-
-	// Check if it's a dictionary (has a colon) or a set
-	if p.pos < len(p.input) && p.input[p.pos] == ':' {
-		// It's a dictionary
-		elements := []core.Value{core.SymbolValue("dict-literal"), firstElement}
-
-		// Skip the colon
-		p.advance()
-		p.skipWhitespaceAndComments()
-
-		// Parse the value
-		value, err := p.parseExpr()
+	for p.pos < len(p.input) && p.input[p.pos] != '}' {
+		element, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
-		elements = append(elements, value)
+		elements = append(elements, element)
 
-		// Skip whitespace and comma
 		p.skipWhitespaceAndComments()
-		if p.pos < len(p.input) && p.input[p.pos] == ',' {
-			p.advance()
-			p.skipWhitespaceAndComments()
-		}
 
-		// Parse remaining key-value pairs
-		for p.pos < len(p.input) && p.input[p.pos] != '}' {
-			// Parse the key
-			key, err := p.parseExpr()
-			if err != nil {
-				return nil, err
-			}
-			elements = append(elements, key)
-
-			// Skip whitespace and expect colon
-			p.skipWhitespaceAndComments()
-			if p.pos >= len(p.input) || p.input[p.pos] != ':' {
-				return nil, fmt.Errorf("expected ':' after dict key")
-			}
+		// Check for colon (dictionary syntax)
+		if p.pos < len(p.input) && p.input[p.pos] == ':' {
+			hasColon = true
+			colonPositions[len(elements)-1] = true
 			p.advance()
 			p.skipWhitespaceAndComments()
 
-			// Parse the value
+			// Parse the value after colon
 			value, err := p.parseExpr()
 			if err != nil {
 				return nil, err
 			}
 			elements = append(elements, value)
-
-			// Skip whitespace and comma
 			p.skipWhitespaceAndComments()
-			if p.pos < len(p.input) && p.input[p.pos] == ',' {
-				p.advance()
-				p.skipWhitespaceAndComments()
-			}
 		}
 
-		// Check for unclosed dict
-		if p.pos >= len(p.input) {
-			return nil, fmt.Errorf("unclosed dict")
-		}
-
-		// Skip closing brace
-		p.advance()
-		return core.ListValue(elements), nil
-	} else {
-		// It's a set literal - collect elements into a list
-		setElements := []core.Value{firstElement}
-
-		// Skip comma if present
+		// Skip optional comma
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
 			p.advance()
 			p.skipWhitespaceAndComments()
 		}
+	}
 
-		// Parse remaining elements
-		for p.pos < len(p.input) && p.input[p.pos] != '}' {
-			element, err := p.parseExpr()
-			if err != nil {
-				return nil, err
-			}
-			setElements = append(setElements, element)
+	// Check for unclosed brace
+	if p.pos >= len(p.input) {
+		return nil, fmt.Errorf("unclosed dict or set")
+	}
 
-			// Skip whitespace and comma
-			p.skipWhitespaceAndComments()
-			if p.pos < len(p.input) && p.input[p.pos] == ',' {
-				p.advance()
-				p.skipWhitespaceAndComments()
-			}
+	// Skip closing brace
+	p.advance()
+
+	// Check for comprehensions
+	if hasColon {
+		// Check for dict comprehension: {k: v for ...}
+		if p.isDictComprehension(elements, colonPositions) {
+			return p.parseDictComprehension(elements, colonPositions)
 		}
-
-		// Check for unclosed set
-		if p.pos >= len(p.input) {
-			return nil, fmt.Errorf("unclosed set")
+		// Regular dict literal
+		return core.ListValue(append([]core.Value{core.SymbolValue("dict-literal")}, elements...)), nil
+	} else {
+		// Check for set comprehension: {x for ...}
+		if p.isSetComprehension(elements) {
+			return p.parseSetComprehension(elements)
 		}
-
-		// Skip closing brace
-		p.advance()
-
+		// Regular set literal
 		// Return (set (list-literal elements...))
-		// We need to create a list-literal form so the elements get evaluated
-		listLiteral := append([]core.Value{core.SymbolValue("list-literal")}, setElements...)
+		listLiteral := append([]core.Value{core.SymbolValue("list-literal")}, elements...)
 		return core.ListValue([]core.Value{
 			core.SymbolValue("set"),
 			core.ListValue(listLiteral),
@@ -825,6 +778,296 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 	result := make(core.ListValue, 0, 5)
 	result = append(result, core.SymbolValue("list-comp"))
 	result = append(result, expr)
+	result = append(result, variable)
+	result = append(result, iterable)
+	if condition != nil {
+		result = append(result, condition)
+	}
+
+	return result, nil
+}
+
+// isSetComprehension checks if the elements form a set comprehension pattern
+// Pattern: {expr for var in iterable} or {expr for var in iterable if condition}
+func (p *Parser) isSetComprehension(elements core.ListValue) bool {
+	// Need at least 5 elements: expr for var in iterable
+	if len(elements) < 5 {
+		return false
+	}
+
+	// Look for "for" and "in" keywords
+	hasFor := false
+	hasIn := false
+	forIndex := -1
+
+	for i, elem := range elements {
+		if sym, ok := elem.(core.SymbolValue); ok {
+			if string(sym) == "for" && !hasFor {
+				hasFor = true
+				forIndex = i
+			} else if string(sym) == "in" && hasFor && i > forIndex {
+				hasIn = true
+			}
+		}
+	}
+
+	// Must have both "for" and "in", and "for" must not be the first element
+	return hasFor && hasIn && forIndex > 0
+}
+
+// parseSetComprehension converts set comprehension elements into a comprehension form
+// Pattern: {expr for var in iterable} -> (set-comp expr var iterable)
+// Pattern: {expr for var in iterable if condition} -> (set-comp expr var iterable condition)
+func (p *Parser) parseSetComprehension(elements core.ListValue) (core.Value, error) {
+	// Reuse the same logic as list comprehension parsing
+	// Find the positions of "for" and "in"
+	forIndex := -1
+	inIndex := -1
+
+	for i, elem := range elements {
+		if sym, ok := elem.(core.SymbolValue); ok {
+			if string(sym) == "for" && forIndex == -1 {
+				forIndex = i
+			} else if string(sym) == "in" && forIndex != -1 && inIndex == -1 {
+				inIndex = i
+			}
+		}
+	}
+
+	if forIndex <= 0 || inIndex <= forIndex+1 {
+		return nil, fmt.Errorf("invalid set comprehension syntax")
+	}
+
+	// Get the expression (everything before "for")
+	var expr core.Value
+	if forIndex == 1 {
+		if list, ok := elements[0].(core.ListValue); ok && len(list) > 0 {
+			expr = list
+		} else {
+			expr = elements[0]
+		}
+	} else {
+		exprElements := make(core.ListValue, forIndex+1)
+		exprElements[0] = core.SymbolValue("do")
+		copy(exprElements[1:], elements[:forIndex])
+		expr = exprElements
+	}
+
+	// Get the variable (between "for" and "in")
+	if inIndex != forIndex+2 {
+		return nil, fmt.Errorf("set comprehension variable must be a single symbol")
+	}
+	variable := elements[forIndex+1]
+
+	// Get the iterable and optional condition (same as list comprehension)
+	var iterable core.Value
+	remainingElements := elements[inIndex+1:]
+
+	// Check for "if" condition
+	ifIndex := -1
+	for i, elem := range remainingElements {
+		if sym, ok := elem.(core.SymbolValue); ok && string(sym) == "if" {
+			ifIndex = i
+			break
+		}
+	}
+
+	var condition core.Value
+	if ifIndex >= 0 {
+		if ifIndex == 0 {
+			return nil, fmt.Errorf("missing iterable in set comprehension")
+		}
+
+		if ifIndex == 1 {
+			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+				iterable = list
+			} else {
+				iterable = remainingElements[0]
+			}
+		} else {
+			iterElements := make(core.ListValue, ifIndex+1)
+			iterElements[0] = core.SymbolValue("do")
+			copy(iterElements[1:], remainingElements[:ifIndex])
+			iterable = iterElements
+		}
+
+		condElements := remainingElements[ifIndex+1:]
+		if len(condElements) == 0 {
+			return nil, fmt.Errorf("missing condition after 'if' in set comprehension")
+		} else if len(condElements) == 1 {
+			if list, ok := condElements[0].(core.ListValue); ok && len(list) > 0 {
+				condition = list
+			} else {
+				condition = condElements[0]
+			}
+		} else {
+			condExpr := make(core.ListValue, len(condElements)+1)
+			condExpr[0] = core.SymbolValue("do")
+			copy(condExpr[1:], condElements)
+			condition = condExpr
+		}
+	} else {
+		if len(remainingElements) == 1 {
+			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+				iterable = list
+			} else {
+				iterable = remainingElements[0]
+			}
+		} else {
+			iterElements := make(core.ListValue, len(remainingElements)+1)
+			iterElements[0] = core.SymbolValue("do")
+			copy(iterElements[1:], remainingElements)
+			iterable = iterElements
+		}
+	}
+
+	// Build the set-comp form
+	result := make(core.ListValue, 0, 5)
+	result = append(result, core.SymbolValue("set-comp"))
+	result = append(result, expr)
+	result = append(result, variable)
+	result = append(result, iterable)
+	if condition != nil {
+		result = append(result, condition)
+	}
+
+	return result, nil
+}
+
+// isDictComprehension checks if elements form a dict comprehension pattern
+// Pattern: {k: v for var in iterable} or {k: v for var in iterable if condition}
+func (p *Parser) isDictComprehension(elements core.ListValue, colonPositions map[int]bool) bool {
+	// Need at least 6 elements: key value for var in iterable
+	// (colon is consumed during parsing, so it's not in elements)
+	if len(elements) < 6 {
+		return false
+	}
+
+	// Must have a colon at position 0 (after first element)
+	if !colonPositions[0] {
+		return false
+	}
+
+	// Look for "for" and "in" keywords after the first key:value pair
+	hasFor := false
+	hasIn := false
+	forIndex := -1
+
+	// Start looking after the first value (position 1)
+	for i := 2; i < len(elements); i++ {
+		if sym, ok := elements[i].(core.SymbolValue); ok {
+			if string(sym) == "for" && !hasFor {
+				hasFor = true
+				forIndex = i
+			} else if string(sym) == "in" && hasFor && i > forIndex {
+				hasIn = true
+			}
+		}
+	}
+
+	return hasFor && hasIn && forIndex > 1
+}
+
+// parseDictComprehension converts dict comprehension elements into a comprehension form
+// Pattern: {k: v for var in iterable} -> (dict-comp k v var iterable)
+// Pattern: {k: v for var in iterable if condition} -> (dict-comp k v var iterable condition)
+func (p *Parser) parseDictComprehension(elements core.ListValue, colonPositions map[int]bool) (core.Value, error) {
+	// Find the positions of "for" and "in"
+	forIndex := -1
+	inIndex := -1
+
+	for i, elem := range elements {
+		if sym, ok := elem.(core.SymbolValue); ok {
+			if string(sym) == "for" && forIndex == -1 {
+				forIndex = i
+			} else if string(sym) == "in" && forIndex != -1 && inIndex == -1 {
+				inIndex = i
+			}
+		}
+	}
+
+	if forIndex <= 1 || inIndex <= forIndex+1 {
+		return nil, fmt.Errorf("invalid dict comprehension syntax")
+	}
+
+	// Key is element[0], value is element[1]
+	keyExpr := elements[0]
+	valueExpr := elements[1]
+
+	// Get the variable (between "for" and "in")
+	if inIndex != forIndex+2 {
+		return nil, fmt.Errorf("dict comprehension variable must be a single symbol")
+	}
+	variable := elements[forIndex+1]
+
+	// Get the iterable and optional condition
+	var iterable core.Value
+	remainingElements := elements[inIndex+1:]
+
+	// Check for "if" condition
+	ifIndex := -1
+	for i, elem := range remainingElements {
+		if sym, ok := elem.(core.SymbolValue); ok && string(sym) == "if" {
+			ifIndex = i
+			break
+		}
+	}
+
+	var condition core.Value
+	if ifIndex >= 0 {
+		if ifIndex == 0 {
+			return nil, fmt.Errorf("missing iterable in dict comprehension")
+		}
+
+		if ifIndex == 1 {
+			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+				iterable = list
+			} else {
+				iterable = remainingElements[0]
+			}
+		} else {
+			iterElements := make(core.ListValue, ifIndex+1)
+			iterElements[0] = core.SymbolValue("do")
+			copy(iterElements[1:], remainingElements[:ifIndex])
+			iterable = iterElements
+		}
+
+		condElements := remainingElements[ifIndex+1:]
+		if len(condElements) == 0 {
+			return nil, fmt.Errorf("missing condition after 'if' in dict comprehension")
+		} else if len(condElements) == 1 {
+			if list, ok := condElements[0].(core.ListValue); ok && len(list) > 0 {
+				condition = list
+			} else {
+				condition = condElements[0]
+			}
+		} else {
+			condExpr := make(core.ListValue, len(condElements)+1)
+			condExpr[0] = core.SymbolValue("do")
+			copy(condExpr[1:], condElements)
+			condition = condExpr
+		}
+	} else {
+		if len(remainingElements) == 1 {
+			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+				iterable = list
+			} else {
+				iterable = remainingElements[0]
+			}
+		} else {
+			iterElements := make(core.ListValue, len(remainingElements)+1)
+			iterElements[0] = core.SymbolValue("do")
+			copy(iterElements[1:], remainingElements)
+			iterable = iterElements
+		}
+	}
+
+	// Build the dict-comp form
+	// (dict-comp key-expr value-expr var iterable) or (dict-comp key-expr value-expr var iterable condition)
+	result := make(core.ListValue, 0, 6)
+	result = append(result, core.SymbolValue("dict-comp"))
+	result = append(result, keyExpr)
+	result = append(result, valueExpr)
 	result = append(result, variable)
 	result = append(result, iterable)
 	if condition != nil {

@@ -1,0 +1,99 @@
+# Dictionary Comprehension Tests
+
+(print "=== Basic Dict Comprehensions ===")
+
+# Basic dict comprehension
+(= d1 {x: (* x 2) for x in [1, 2, 3, 4, 5]})
+(print "d1 =" d1)
+(assert (== (len d1) 5) "d1 should have 5 elements")
+(assert (== (d1.get 3) 6) "d1[3] should be 6")
+
+# Identity mapping
+(= d2 {x: x for x in [10, 20, 30]})
+(print "d2 =" d2)
+(assert (== (d2.get 10) 10) "d2[10] should be 10")
+(assert (== (d2.get 20) 20) "d2[20] should be 20")
+
+# Key transformation
+(= d3 {(* x 2): x for x in (range 5)})
+(print "d3 =" d3)
+(assert (== (d3.get 0) 0) "d3[0] should be 0")
+(assert (== (d3.get 4) 2) "d3[4] should be 2")
+(assert (== (d3.get 8) 4) "d3[8] should be 4")
+
+(print "\n=== Dict Comprehensions with Conditions ===")
+
+# With simple condition
+(= d4 {x: (* x 3) for x in [1, 2, 3, 4, 5, 6] if (> x 3)})
+(print "d4 =" d4)
+(assert (== (len d4) 3) "d4 should have 3 elements")
+(assert (== (d4.get 4) 12) "d4[4] should be 12")
+(assert (== (d4.get 5) 15) "d4[5] should be 15")
+(assert (== (d4.get 6) 18) "d4[6] should be 18")
+
+# Even numbers only
+(= d5 {x: x for x in (range 10) if (== (% x 2) 0)})
+(print "d5 =" d5)
+(assert (== (len d5) 5) "d5 should have 5 even numbers")
+(assert (== (d5.get 0) 0) "d5[0] should be 0")
+(assert (== (d5.get 8) 8) "d5[8] should be 8")
+
+(print "\n=== Dict Comprehensions from Strings ===")
+
+# Note: enumerate with unpacking not yet fully supported
+# (= d6 {c: i for (i, c) in (enumerate "hello")})
+
+# Character count (unique characters)
+(= d7 {c: 1 for c in "hello"})
+(print "d7 =" d7)
+(assert (== (len d7) 4) "Should have 4 unique characters")
+
+(print "\n=== Complex Key/Value Expressions ===")
+
+# Complex transformations
+(= d8 {(+ x 10): (* x x) for x in [1, 2, 3]})
+(print "d8 =" d8)
+(assert (== (d8.get 11) 1) "d8[11] should be 1")
+(assert (== (d8.get 12) 4) "d8[12] should be 4")
+(assert (== (d8.get 13) 9) "d8[13] should be 9")
+
+# String keys
+(= names ["alice", "bob", "charlie"])
+(= d9 {name: (len name) for name in names})
+(print "d9 =" d9)
+(assert (== (d9.get "alice") 5) "alice has 5 characters")
+(assert (== (d9.get "bob") 3) "bob has 3 characters")
+(assert (== (d9.get "charlie") 7) "charlie has 7 characters")
+
+(print "\n=== Edge Cases ===")
+
+# Empty iterable
+(= d10 {x: x for x in []})
+(print "d10 =" d10)
+(assert (== (len d10) 0) "d10 should be empty")
+
+# Single element
+(= d11 {x: (* x 100) for x in [42]})
+(print "d11 =" d11)
+(assert (== (len d11) 1) "d11 should have 1 element")
+(assert (== (d11.get 42) 4200) "d11[42] should be 4200")
+
+# Condition filters everything
+(= d12 {x: x for x in [1, 2, 3] if (> x 10)})
+(print "d12 =" d12)
+(assert (== (len d12) 0) "d12 should be empty (all filtered)")
+
+(print "\n=== Nested Data Structures ===")
+
+# Note: Tuple/list indexing with .N notation not yet fully supported in comprehensions
+# (= pairs [(tuple [1, "one"]), (tuple [2, "two"]), (tuple [3, "three"])])
+# (= d13 {(p.0): (p.1) for p in pairs})
+
+# List of lists to dict - using subscript instead
+(= pairs2 [[1, "one"], [2, "two"], [3, "three"]])
+(= d14 {(p.__getitem__ 0): (p.__getitem__ 1) for p in pairs2})
+(print "d14 =" d14)
+(assert (== (d14.get 1) "one") "d14[1] should be 'one'")
+(assert (== (d14.get 2) "two") "d14[2] should be 'two'")
+
+(print "\n✓ All dict comprehension tests passed!")

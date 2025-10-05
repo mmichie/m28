@@ -155,8 +155,10 @@ func init() {
 		"try":   tryForm,
 		"raise": raiseForm,
 
-		// List comprehension
+		// Comprehensions
 		"list-comp": ListCompForm,
+		"dict-comp": DictCompForm,
+		"set-comp":  SetCompForm,
 
 		// List literal (evaluates contents)
 		"list-literal": listLiteralForm,
@@ -1196,9 +1198,19 @@ func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			items = append(items, core.StringValue(string(ch)))
 		}
 	default:
-		// Try to call iter() on it if it has that method
-		// For now, just error
-		return nil, fmt.Errorf("list comprehension iterable must be a sequence, got %s", v.Type())
+		// Try using Iterator interface
+		if iterableObj, ok := v.(core.Iterable); ok {
+			iter := iterableObj.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				items = append(items, val)
+			}
+		} else {
+			return nil, fmt.Errorf("list comprehension iterable must be a sequence, got %s", v.Type())
+		}
 	}
 
 	// Create result list
@@ -1233,6 +1245,189 @@ func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Add to result
 		result = append(result, exprResult)
+	}
+
+	return result, nil
+}
+
+// DictCompForm implements the dict-comp special form
+// Syntax:
+//
+//	(dict-comp key-expr value-expr var iterable)
+//	(dict-comp key-expr value-expr var iterable condition)
+func DictCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 4 || len(args) > 5 {
+		return nil, fmt.Errorf("dict-comp requires 4 or 5 arguments")
+	}
+
+	// Get the variable name
+	varSym, ok := args[2].(core.SymbolValue)
+	if !ok {
+		return nil, fmt.Errorf("dict comprehension variable must be a symbol")
+	}
+	varName := string(varSym)
+
+	// Evaluate the iterable
+	iterable, err := Eval(args[3], ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating iterable: %v", err)
+	}
+
+	// Convert iterable to a sequence we can iterate over
+	var items []core.Value
+	switch v := iterable.(type) {
+	case core.ListValue:
+		items = v
+	case core.TupleValue:
+		items = v
+	case core.StringValue:
+		// Convert string to list of characters
+		for _, ch := range string(v) {
+			items = append(items, core.StringValue(string(ch)))
+		}
+	default:
+		// Try using Iterator interface
+		if iterableObj, ok := v.(core.Iterable); ok {
+			iter := iterableObj.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				items = append(items, val)
+			}
+		} else {
+			return nil, fmt.Errorf("dict comprehension iterable must be a sequence, got %s", v.Type())
+		}
+	}
+
+	// Create result dict
+	result := core.NewDict()
+
+	// Create a new context for the loop variable
+	loopCtx := core.NewContext(ctx)
+
+	// Iterate over items
+	for _, item := range items {
+		// Bind the loop variable
+		loopCtx.Define(varName, item)
+
+		// Check condition if present
+		if len(args) == 5 {
+			condResult, err := Eval(args[4], loopCtx)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating condition: %v", err)
+			}
+
+			// Skip if condition is falsy
+			if !core.IsTruthy(condResult) {
+				continue
+			}
+		}
+
+		// Evaluate the key expression
+		keyResult, err := Eval(args[0], loopCtx)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating key expression: %v", err)
+		}
+
+		// Evaluate the value expression
+		valueResult, err := Eval(args[1], loopCtx)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating value expression: %v", err)
+		}
+
+		// Add to result dict
+		keyStr := core.ValueToKey(keyResult)
+		result.SetWithKey(keyStr, keyResult, valueResult)
+	}
+
+	return result, nil
+}
+
+// SetCompForm implements the set-comp special form
+// Syntax:
+//
+//	(set-comp expr var iterable)
+//	(set-comp expr var iterable condition)
+func SetCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 3 || len(args) > 4 {
+		return nil, fmt.Errorf("set-comp requires 3 or 4 arguments")
+	}
+
+	// Get the variable name
+	varSym, ok := args[1].(core.SymbolValue)
+	if !ok {
+		return nil, fmt.Errorf("set comprehension variable must be a symbol")
+	}
+	varName := string(varSym)
+
+	// Evaluate the iterable
+	iterable, err := Eval(args[2], ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating iterable: %v", err)
+	}
+
+	// Convert iterable to a sequence we can iterate over
+	var items []core.Value
+	switch v := iterable.(type) {
+	case core.ListValue:
+		items = v
+	case core.TupleValue:
+		items = v
+	case core.StringValue:
+		// Convert string to list of characters
+		for _, ch := range string(v) {
+			items = append(items, core.StringValue(string(ch)))
+		}
+	default:
+		// Try using Iterator interface
+		if iterableObj, ok := v.(core.Iterable); ok {
+			iter := iterableObj.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				items = append(items, val)
+			}
+		} else {
+			return nil, fmt.Errorf("set comprehension iterable must be a sequence, got %s", v.Type())
+		}
+	}
+
+	// Create result set
+	result := core.NewSet()
+
+	// Create a new context for the loop variable
+	loopCtx := core.NewContext(ctx)
+
+	// Iterate over items
+	for _, item := range items {
+		// Bind the loop variable
+		loopCtx.Define(varName, item)
+
+		// Check condition if present
+		if len(args) == 4 {
+			condResult, err := Eval(args[3], loopCtx)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating condition: %v", err)
+			}
+
+			// Skip if condition is falsy
+			if !core.IsTruthy(condResult) {
+				continue
+			}
+		}
+
+		// Evaluate the expression
+		exprResult, err := Eval(args[0], loopCtx)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating expression: %v", err)
+		}
+
+		// Add to result set
+		result.Add(exprResult)
 	}
 
 	return result, nil

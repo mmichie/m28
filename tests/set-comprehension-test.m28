@@ -1,0 +1,122 @@
+# Set Comprehension Tests
+
+(print "=== Basic Set Comprehensions ===")
+
+# Basic set comprehension
+(= s1 {x for x in [1, 2, 3, 4, 5]})
+(print "s1 =" s1)
+(assert (== (len s1) 5) "s1 should have 5 elements")
+(assert (in 3 s1) "3 should be in s1")
+
+# Transformation
+(= s2 {(* x 2) for x in [1, 2, 3, 4, 5]})
+(print "s2 =" s2)
+(assert (== (len s2) 5) "s2 should have 5 elements")
+(assert (in 10 s2) "10 should be in s2")
+(assert (in 6 s2) "6 should be in s2")
+
+# Uniqueness (duplicates removed)
+(= s3 {x for x in [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]})
+(print "s3 =" s3)
+(assert (== (len s3) 4) "s3 should have 4 unique elements")
+
+(print "\n=== Set Comprehensions with Conditions ===")
+
+# Filter with condition
+(= s4 {x for x in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] if (> x 5)})
+(print "s4 =" s4)
+(assert (== (len s4) 5) "s4 should have 5 elements")
+(assert (in 6 s4) "6 should be in s4")
+(assert (in 10 s4) "10 should be in s4")
+(assert (not (in 5 s4)) "5 should not be in s4")
+
+# Even numbers
+(= s5 {x for x in (range 20) if (== (% x 2) 0)})
+(print "s5 =" s5)
+(assert (== (len s5) 10) "s5 should have 10 even numbers")
+(assert (in 0 s5) "0 should be in s5")
+(assert (in 18 s5) "18 should be in s5")
+(assert (not (in 7 s5)) "7 should not be in s5")
+
+# Odd numbers
+(= s6 {x for x in (range 10) if (== (% x 2) 1)})
+(print "s6 =" s6)
+(assert (== (len s6) 5) "s6 should have 5 odd numbers")
+(assert (in 1 s6) "1 should be in s6")
+(assert (in 9 s6) "9 should be in s6")
+
+(print "\n=== Set Comprehensions from Strings ===")
+
+# Unique characters
+(= s7 {c for c in "hello"})
+(print "s7 =" s7)
+(assert (== (len s7) 4) "Should have 4 unique characters: h, e, l, o")
+
+# Unique characters from longer string
+(= s8 {c for c in "mississippi"})
+(print "s8 =" s8)
+(assert (== (len s8) 4) "Should have 4 unique characters: m, i, s, p")
+
+(print "\n=== Complex Expressions ===")
+
+# Squares
+(= s9 {(* x x) for x in (range 6)})
+(print "s9 =" s9)
+(assert (== (len s9) 6) "s9 should have 6 squares")
+(assert (in 0 s9) "0 should be in s9")
+(assert (in 25 s9) "25 should be in s9")
+
+# Multiple transformations
+(= s10 {(+ (* x 2) 1) for x in [0, 1, 2, 3, 4]})
+(print "s10 =" s10)
+(assert (== (len s10) 5) "s10 should have 5 elements")
+(assert (in 1 s10) "1 should be in s10")
+(assert (in 9 s10) "9 should be in s10")
+
+(print "\n=== Edge Cases ===")
+
+# Empty iterable
+(= s11 {x for x in []})
+(print "s11 =" s11)
+(assert (== (len s11) 0) "s11 should be empty")
+
+# Single element
+(= s12 {x for x in [42]})
+(print "s12 =" s12)
+(assert (== (len s12) 1) "s12 should have 1 element")
+(assert (in 42 s12) "42 should be in s12")
+
+# Condition filters everything
+(= s13 {x for x in [1, 2, 3, 4, 5] if (> x 100)})
+(print "s13 =" s13)
+(assert (== (len s13) 0) "s13 should be empty (all filtered)")
+
+# All elements filtered, but unique
+(= s14 {(% x 3) for x in (range 12)})
+(print "s14 =" s14)
+(assert (== (len s14) 3) "s14 should have 3 unique remainders: 0, 1, 2")
+(assert (in 0 s14) "0 should be in s14")
+(assert (in 1 s14) "1 should be in s14")
+(assert (in 2 s14) "2 should be in s14")
+
+(print "\n=== Set Operations with Comprehensions ===")
+
+# Create sets and combine
+(= evens {x for x in (range 10) if (== (% x 2) 0)})
+(= odds {x for x in (range 10) if (== (% x 2) 1)})
+(print "evens =" evens)
+(print "odds =" odds)
+
+# They should be disjoint
+(assert (evens.isdisjoint odds) "evens and odds should be disjoint")
+
+# Union should give all numbers
+(= all_nums (evens.union odds))
+(print "all_nums =" all_nums)
+(assert (== (len all_nums) 10) "Union should have 10 elements")
+
+(print "\n=== Nested Comprehensions (Future) ===")
+# Note: Nested comprehensions like {x for row in matrix for x in row}
+# are not yet implemented, but basic comprehensions work
+
+(print "\n✓ All set comprehension tests passed!")

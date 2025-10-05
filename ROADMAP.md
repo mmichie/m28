@@ -19,7 +19,7 @@
 #### Missing Python Features
 - [ ] Multiple inheritance
 - [ ] Generator expressions
-- [ ] Dictionary/set comprehensions
+- [x] Dictionary/set comprehensions
 - [ ] Decorators with `@` syntax
 - [ ] `eval()` and `exec()`
 
@@ -181,6 +181,7 @@
 ## ✅ Recently Completed (2024)
 
 ### December 2024
+- **Dictionary and Set Comprehensions**: Full support for `{k: v for ...}` and `{x for ...}` with conditions
 - **Frozenset Implementation**: Immutable, hashable set type with full method support
 - **Type System Migration Complete**: All builtin functions migrated to validation framework and type helpers
 - **F-String Enhancements**: Format specifications, alignment, conversion flags, self-documenting expressions
