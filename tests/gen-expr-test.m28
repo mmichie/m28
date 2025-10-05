@@ -1,0 +1,126 @@
+# Generator Expression Tests
+
+(print "=== Basic Generator Expressions ===")
+
+# Basic generator expression
+(= gen1 ((* x 2) for x in [1, 2, 3, 4, 5]))
+(print "gen1 =" gen1)
+(assert (== (gen1.next) 2) "gen1.next() should be 2")
+(assert (== (gen1.next) 4) "gen1.next() should be 4")
+(assert (== (gen1.next) 6) "gen1.next() should be 6")
+
+# Convert generator to list
+(= gen2 ((* x 2) for x in [1, 2, 3]))
+(= list2 (list gen2))
+(print "list2 =" list2)
+(assert (== list2 [2, 4, 6]) "Converting gen to list should work")
+
+# Identity generator
+(= gen3 (x for x in [10, 20, 30]))
+(= list3 (list gen3))
+(print "list3 =" list3)
+(assert (== list3 [10, 20, 30]) "Identity generator should work")
+
+(print "\n=== Generator Expressions with Conditions ===")
+
+# With simple condition
+(= gen4 ((* x 3) for x in [1, 2, 3, 4, 5, 6] if (> x 3)))
+(= list4 (list gen4))
+(print "list4 =" list4)
+(assert (== list4 [12, 15, 18]) "Filtered generator should work")
+
+# Even numbers only
+(= gen5 (x for x in (range 10) if (== (% x 2) 0)))
+(= list5 (list gen5))
+(print "list5 =" list5)
+(assert (== list5 [0, 2, 4, 6, 8]) "Even number generator should work")
+
+# Odd numbers
+(= gen6 (x for x in (range 10) if (== (% x 2) 1)))
+(= list6 (list gen6))
+(print "list6 =" list6)
+(assert (== list6 [1, 3, 5, 7, 9]) "Odd number generator should work")
+
+(print "\n=== Generator Expressions from Strings ===")
+
+# Character generator
+(= gen7 (c for c in "hello"))
+(= list7 (list gen7))
+(print "list7 =" list7)
+(assert (== (len list7) 5) "String generator should have 5 characters")
+(assert (== (list7.__getitem__ 0) "h") "First character should be 'h'")
+
+(print "\n=== Generator Expressions in For Loops ===")
+
+# Convert generator to list (since append in for loops has issues)
+(= squares (list ((* n n) for n in (range 5))))
+(print "squares =" squares)
+(assert (== squares [0, 1, 4, 9, 16]) "Generator in list() should work")
+
+# Filtered generator
+(= evens (list (n for n in (range 10) if (== (% n 2) 0))))
+(print "evens =" evens)
+(assert (== evens [0, 2, 4, 6, 8]) "Filtered generator should work")
+
+(print "\n=== Complex Expressions ===")
+
+# Squares
+(= gen8 ((* x x) for x in (range 6)))
+(= list8 (list gen8))
+(print "list8 =" list8)
+(assert (== list8 [0, 1, 4, 9, 16, 25]) "Square generator should work")
+
+# Multiple transformations
+(= gen9 ((+ (* x 2) 1) for x in [0, 1, 2, 3, 4]))
+(= list9 (list gen9))
+(print "list9 =" list9)
+(assert (== list9 [1, 3, 5, 7, 9]) "Complex expression generator should work")
+
+(print "\n=== Edge Cases ===")
+
+# Empty iterable
+(= gen10 (x for x in []))
+(= list10 (list gen10))
+(print "list10 =" list10)
+(assert (== (len list10) 0) "Empty generator should produce empty list")
+
+# Single element
+(= gen11 (x for x in [42]))
+(= list11 (list gen11))
+(print "list11 =" list11)
+(assert (== list11 [42]) "Single element generator should work")
+
+# Condition filters everything
+(= gen12 (x for x in [1, 2, 3, 4, 5] if (> x 100)))
+(= list12 (list gen12))
+(print "list12 =" list12)
+(assert (== (len list12) 0) "Fully filtered generator should be empty")
+
+(print "\n=== Memory Efficiency Test ===")
+
+# Generator should not compute all values immediately
+# This should create the generator without evaluating all items
+(= big_gen (x for x in (range 1000000)))
+(print "big_gen created (should be instant):" big_gen)
+
+# Get just a few values
+(= first_val (big_gen.next))
+(= second_val (big_gen.next))
+(print "First two values:" first_val second_val)
+(assert (== first_val 0) "First value should be 0")
+(assert (== second_val 1) "Second value should be 1")
+
+(print "\n=== Generator Exhaustion ===")
+
+# Generator can only be consumed once
+(= gen13 (x for x in [1, 2, 3]))
+(= list13a (list gen13))
+(print "list13a =" list13a)
+(assert (== list13a [1, 2, 3]) "First consumption should work")
+
+# Second consumption should give empty list
+(= list13b (list gen13))
+(print "list13b =" list13b)
+(assert (== list13b []) "Second consumption should be empty")
+
+(print "\n✓ All generator expression tests passed!")

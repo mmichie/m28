@@ -159,6 +159,7 @@ func init() {
 		"list-comp": ListCompForm,
 		"dict-comp": DictCompForm,
 		"set-comp":  SetCompForm,
+		"gen-expr":  GenExprForm,
 
 		// List literal (evaluates contents)
 		"list-literal": listLiteralForm,
@@ -1431,6 +1432,46 @@ func SetCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	return result, nil
+}
+
+// GenExprForm implements generator expressions
+// Forms:
+//
+//	(gen-expr expr var iterable)
+//	(gen-expr expr var iterable condition)
+//
+// Returns a Generator object that lazily evaluates the expression
+func GenExprForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 3 || len(args) > 4 {
+		return nil, fmt.Errorf("gen-expr requires 3 or 4 arguments")
+	}
+
+	// Get the variable name
+	varSym, ok := args[1].(core.SymbolValue)
+	if !ok {
+		return nil, fmt.Errorf("generator expression variable must be a symbol")
+	}
+	varName := string(varSym)
+
+	// Evaluate the iterable
+	iterable, err := Eval(args[2], ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating iterable: %v", err)
+	}
+
+	// Store the expression, condition (if present), and context
+	expr := args[0]
+	var condition core.Value
+	if len(args) == 4 {
+		condition = args[3]
+	}
+
+	// Create a Generator object with the expression, variable, iterable, and condition
+	gen, err := core.NewGeneratorExpression("genexpr", expr, varName, iterable, condition, ctx, Eval)
+	if err != nil {
+		return nil, err
+	}
+	return gen, nil
 }
 
 // listLiteralForm implements the list-literal special form

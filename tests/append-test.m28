@@ -1,8 +1,0 @@
-# Test append
-
-(= lst [1 2 3])
-(print "Before append:" lst)
-(append lst 4)
-(print "After append:" lst)
-(print "Length:" (len lst))
-EOF && ./bin/m28 tests/append-test.m28 < /dev/null

@@ -1,0 +1,68 @@
+# Generator Expressions in M28
+# Demonstrates lazy evaluation for memory-efficient iteration
+
+(print "=== Basic Generator Expressions ===")
+(print "Generator expressions use syntax: (expr for var in iterable)")
+(print "Note: Use parentheses around complex expressions: ((* x 2) for x in ...)")
+
+# Simple generator
+(= gen (x for x in (range 5)))
+(print "gen =" gen)
+(print "First value:" (gen.next))
+(print "Second value:" (gen.next))
+
+# Generator with transformation
+(= squares ((* n n) for n in (range 10)))
+(print "\nSquares as list:" (list squares))
+
+(print "\n=== Generator Expressions with Conditions ===")
+
+# Filter even numbers
+(= evens (n for n in (range 20) if (== (% n 2) 0)))
+(print "Even numbers:" (list evens))
+
+# Filter odd squares
+(= odd_squares ((* x x) for x in (range 10) if (== (% x 2) 1)))
+(print "Odd squares:" (list odd_squares))
+
+(print "\n=== Memory Efficiency ===")
+
+# Create a large generator without computing all values
+(= million (x for x in (range 1000000)))
+(print "Created generator for 1 million items (instant)")
+
+# Get just a few values
+(print "First value:" (million.next))
+(print "Second value:" (million.next))
+(print "Third value:" (million.next))
+
+(print "\n=== Practical Examples ===")
+
+# Sum of squares (memory efficient)
+(= sum_of_squares (fn (n)
+  (= total 0)
+  (= gen ((* x x) for x in (range n)))
+  (for val in gen
+    (= total (+ total val)))
+  total))
+
+(print "Sum of squares 1-10:" (sum_of_squares 11))
+
+# Filter and transform pipeline
+(= numbers (range 20))
+(= filtered ((* x 3) for x in numbers if (> x 10)))
+(print "\nNumbers > 10, tripled:" (list filtered))
+
+# String processing
+(= text "Hello, World!")
+(= upper_chars (c for c in text))
+(print "\nCharacters from string:" (list upper_chars))
+
+(print "\n=== Generator Exhaustion ===")
+
+# Generators can only be consumed once
+(= gen ((* x 2) for x in [1, 2, 3]))
+(print "First consumption:" (list gen))
+(print "Second consumption:" (list gen))  # Empty!
+
+(print "\n✓ Generator expressions demo complete!")

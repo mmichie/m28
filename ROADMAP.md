@@ -18,7 +18,7 @@
 
 #### Missing Python Features
 - [ ] Multiple inheritance
-- [ ] Generator expressions
+- [x] Generator expressions
 - [x] Dictionary/set comprehensions
 - [ ] Decorators with `@` syntax
 - [ ] `eval()` and `exec()`

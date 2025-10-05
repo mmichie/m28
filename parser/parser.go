@@ -186,7 +186,7 @@ func (p *Parser) parseAtom() (core.Value, error) {
 	}
 }
 
-// parseList parses a list expression (...)
+// parseList parses a list expression (...) or generator expression
 func (p *Parser) parseList() (core.Value, error) {
 	// Skip opening parenthesis
 	p.advance()
@@ -220,6 +220,12 @@ func (p *Parser) parseList() (core.Value, error) {
 
 	// Skip closing parenthesis
 	p.advance()
+
+	// Check if this is a generator expression
+	// Pattern: (expr for var in iterable) or (expr for var in iterable if condition)
+	if p.isGeneratorExpression(elements) {
+		return p.parseGeneratorExpression(elements)
+	}
 
 	return elements, nil
 }
@@ -777,6 +783,159 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 	// (list-comp expr var iterable) or (list-comp expr var iterable condition)
 	result := make(core.ListValue, 0, 5)
 	result = append(result, core.SymbolValue("list-comp"))
+	result = append(result, expr)
+	result = append(result, variable)
+	result = append(result, iterable)
+	if condition != nil {
+		result = append(result, condition)
+	}
+
+	return result, nil
+}
+
+// isGeneratorExpression checks if the elements form a generator expression pattern
+// Pattern: (expr for var in iterable) or (expr for var in iterable if condition)
+func (p *Parser) isGeneratorExpression(elements core.ListValue) bool {
+	// Need at least 5 elements: expr for var in iterable
+	if len(elements) < 5 {
+		return false
+	}
+
+	// Look for "for" and "in" keywords
+	hasFor := false
+	hasIn := false
+	forIndex := -1
+
+	for i, elem := range elements {
+		if sym, ok := elem.(core.SymbolValue); ok {
+			if string(sym) == "for" && !hasFor {
+				hasFor = true
+				forIndex = i
+			} else if string(sym) == "in" && hasFor && i > forIndex {
+				hasIn = true
+			}
+		}
+	}
+
+	// Must have both "for" and "in", and "for" must not be the first element
+	return hasFor && hasIn && forIndex > 0
+}
+
+// parseGeneratorExpression converts comprehension elements into a generator expression form
+// Pattern: (expr for var in iterable) or (expr for var in iterable if condition)
+// Returns: (gen-expr expr var iterable) or (gen-expr expr var iterable condition)
+func (p *Parser) parseGeneratorExpression(elements core.ListValue) (core.Value, error) {
+	// Find the positions of "for" and "in"
+	forIndex := -1
+	inIndex := -1
+
+	for i, elem := range elements {
+		if sym, ok := elem.(core.SymbolValue); ok {
+			if string(sym) == "for" && forIndex == -1 {
+				forIndex = i
+			} else if string(sym) == "in" && forIndex != -1 && inIndex == -1 {
+				inIndex = i
+			}
+		}
+	}
+
+	if forIndex <= 0 || inIndex <= forIndex+1 {
+		return nil, fmt.Errorf("invalid generator expression syntax")
+	}
+
+	// Get the expression (everything before "for")
+	var expr core.Value
+	if forIndex == 1 {
+		// Single element
+		if list, ok := elements[0].(core.ListValue); ok && len(list) > 0 {
+			expr = list
+		} else {
+			expr = elements[0]
+		}
+	} else {
+		// Multiple elements - wrap in a do block
+		exprElements := make(core.ListValue, forIndex+1)
+		exprElements[0] = core.SymbolValue("do")
+		copy(exprElements[1:], elements[:forIndex])
+		expr = exprElements
+	}
+
+	// Get the variable (between "for" and "in")
+	if inIndex-forIndex != 2 {
+		return nil, fmt.Errorf("generator expression requires single variable between 'for' and 'in'")
+	}
+	variable := elements[forIndex+1]
+
+	// Everything after "in" is either the iterable or iterable + condition
+	remainingElements := elements[inIndex+1:]
+
+	// Look for "if" keyword
+	var iterable core.Value
+	ifIndex := -1
+	for i, elem := range remainingElements {
+		if sym, ok := elem.(core.SymbolValue); ok && string(sym) == "if" {
+			ifIndex = i
+			break
+		}
+	}
+
+	var condition core.Value
+	if ifIndex >= 0 {
+		// Has condition
+		if ifIndex == 0 {
+			return nil, fmt.Errorf("missing iterable in generator expression")
+		}
+
+		// Iterable is everything before "if"
+		if ifIndex == 1 {
+			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+				iterable = list
+			} else {
+				iterable = remainingElements[0]
+			}
+		} else {
+			iterElements := make(core.ListValue, ifIndex+1)
+			iterElements[0] = core.SymbolValue("do")
+			copy(iterElements[1:], remainingElements[:ifIndex])
+			iterable = iterElements
+		}
+
+		// Condition is everything after "if"
+		condElements := remainingElements[ifIndex+1:]
+		if len(condElements) == 0 {
+			return nil, fmt.Errorf("missing condition after 'if' in generator expression")
+		} else if len(condElements) == 1 {
+			if list, ok := condElements[0].(core.ListValue); ok && len(list) > 0 {
+				condition = list
+			} else {
+				condition = condElements[0]
+			}
+		} else {
+			condExpr := make(core.ListValue, len(condElements)+1)
+			condExpr[0] = core.SymbolValue("do")
+			copy(condExpr[1:], condElements)
+			condition = condExpr
+		}
+	} else {
+		// No condition
+		if len(remainingElements) == 1 {
+			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+				iterable = list
+			} else {
+				iterable = remainingElements[0]
+			}
+		} else {
+			iterElements := make(core.ListValue, len(remainingElements)+1)
+			iterElements[0] = core.SymbolValue("do")
+			copy(iterElements[1:], remainingElements)
+			iterable = iterElements
+		}
+	}
+
+	// Build the gen-expr form
+	// (gen-expr expr var iterable) or (gen-expr expr var iterable condition)
+	result := make(core.ListValue, 0, 5)
+	result = append(result, core.SymbolValue("gen-expr"))
 	result = append(result, expr)
 	result = append(result, variable)
 	result = append(result, iterable)

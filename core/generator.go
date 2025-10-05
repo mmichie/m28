@@ -10,11 +10,20 @@ type Generator struct {
 	name     string           // Generator function name
 	state    GeneratorState   // Current state
 	context  *Context         // Execution context
-	code     Value            // Generator body
+	code     Value            // Generator body (for generator functions)
 	yielded  Value            // Last yielded value
 	locals   map[string]Value // Local variables
 	position int              // Current position in execution
 	registry *MethodRegistry  // Method registry
+
+	// Fields for generator expressions
+	expr         Value                                // Expression to evaluate
+	varName      string                               // Loop variable name
+	iterable     Value                                // Original iterable
+	condition    Value                                // Optional condition (nil if none)
+	items        []Value                              // Converted items from iterable
+	currentIndex int                                  // Current position in items
+	evalFunc     func(Value, *Context) (Value, error) // Evaluator function
 }
 
 // GeneratorState represents the state of a generator
@@ -43,6 +52,59 @@ func NewGenerator(name string, code Value, ctx *Context) *Generator {
 	g.registry = g.createRegistry()
 
 	return g
+}
+
+// NewGeneratorExpression creates a new generator for generator expressions
+// This converts the iterable to items immediately, but evaluates the expression lazily
+func NewGeneratorExpression(name string, expr Value, varName string, iterable Value, condition Value, ctx *Context, evalFunc func(Value, *Context) (Value, error)) (*Generator, error) {
+	g := &Generator{
+		BaseObject:   *NewBaseObject(Type("generator")),
+		name:         name,
+		state:        GeneratorCreated,
+		context:      NewContext(ctx),
+		expr:         expr,
+		varName:      varName,
+		iterable:     iterable,
+		condition:    condition,
+		currentIndex: 0,
+		locals:       make(map[string]Value),
+		evalFunc:     evalFunc,
+	}
+
+	// Convert iterable to a sequence of items
+	var items []Value
+	switch v := iterable.(type) {
+	case ListValue:
+		items = v
+	case TupleValue:
+		items = v
+	case StringValue:
+		// Convert string to list of characters
+		for _, ch := range string(v) {
+			items = append(items, StringValue(string(ch)))
+		}
+	default:
+		// Try using Iterator interface
+		if iterableObj, ok := v.(Iterable); ok {
+			iter := iterableObj.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				items = append(items, val)
+			}
+		} else {
+			return nil, fmt.Errorf("generator expression iterable must be a sequence, got %s", v.Type())
+		}
+	}
+
+	g.items = items
+
+	// Initialize the method registry
+	g.registry = g.createRegistry()
+
+	return g, nil
 }
 
 // Type returns the generator type
@@ -153,9 +215,45 @@ func (g *Generator) Next() (Value, error) {
 		g.state = GeneratorSuspended
 	}
 
-	// This would be implemented by the evaluator
-	// For now, return a placeholder
-	return nil, &StopIteration{Message: "generator implementation pending"}
+	// Handle generator expressions
+	if g.expr != nil && g.evalFunc != nil {
+		// Loop through items until we find one that satisfies the condition
+		for g.currentIndex < len(g.items) {
+			item := g.items[g.currentIndex]
+			g.currentIndex++
+
+			// Define the loop variable in the generator's context
+			g.context.Define(g.varName, item)
+
+			// Check condition if present
+			if g.condition != nil {
+				condResult, err := g.evalFunc(g.condition, g.context)
+				if err != nil {
+					return nil, fmt.Errorf("error evaluating condition: %v", err)
+				}
+
+				// Skip if condition is falsy
+				if !IsTruthy(condResult) {
+					continue
+				}
+			}
+
+			// Evaluate the expression
+			exprResult, err := g.evalFunc(g.expr, g.context)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating expression: %v", err)
+			}
+
+			return exprResult, nil
+		}
+
+		// No more items - mark as completed and raise StopIteration
+		g.state = GeneratorCompleted
+		return nil, &StopIteration{}
+	}
+
+	// Generator functions with yield are not yet implemented
+	return nil, &StopIteration{Message: "generator functions with yield not yet implemented"}
 }
 
 // Send sends a value into the generator
