@@ -91,7 +91,7 @@ func EqualValues(a, b Value) bool {
 // IsHashable determines if a value can be used as a dictionary key
 func IsHashable(v Value) bool {
 	switch v.(type) {
-	case NumberValue, StringValue, BoolValue, NilValue, TupleValue:
+	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue:
 		return true
 	default:
 		return false
@@ -116,6 +116,9 @@ func ValueToKey(v Value) string {
 			elements[i] = ValueToKey(elem)
 		}
 		return fmt.Sprintf("t:(%s)", strings.Join(elements, ","))
+	case *FrozenSetValue:
+		// For frozensets, use the hash value
+		return fmt.Sprintf("fs:%d", val.Hash())
 	default:
 		// For non-hashable types, use pointer address
 		return fmt.Sprintf("p:%p", v)

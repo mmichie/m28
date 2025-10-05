@@ -220,60 +220,14 @@ func RegisterCollections(ctx *core.Context) {
 		return nil, fmt.Errorf("set() argument must be an iterable, not '%s'", arg.Type())
 	}))
 
-	// frozenset - create a new frozenset (for now, just alias to set)
+	// frozenset - create a new immutable frozenset
 	ctx.Define("frozenset", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// For now, frozenset is the same as set
-		// In the future, we should make it immutable
-		v := validation.NewArgs("frozenset", args)
-		if err := v.Max(1); err != nil {
-			return nil, err
+		// Use the type descriptor's constructor
+		desc := core.GetTypeDescriptor(core.FrozenSetType)
+		if desc != nil && desc.Constructor != nil {
+			return desc.Constructor(args, ctx)
 		}
-
-		if v.Count() == 0 {
-			return core.NewSet(), nil
-		}
-
-		// Convert iterable to set
-		set := core.NewSet()
-		arg := args[0]
-
-		if list, ok := types.AsList(arg); ok {
-			for _, elem := range list {
-				set.Add(elem)
-			}
-			return set, nil
-		}
-
-		if tuple, ok := types.AsTuple(arg); ok {
-			for _, elem := range tuple {
-				set.Add(elem)
-			}
-			return set, nil
-		}
-
-		if str, ok := types.AsString(arg); ok {
-			// Convert string to set of characters
-			for _, ch := range str {
-				charVal := core.StringValue(string(ch))
-				set.Add(charVal)
-			}
-			return set, nil
-		}
-
-		// Check if it implements Iterable interface
-		if iterable, ok := types.AsIterable(arg); ok {
-			iter := iterable.Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				set.Add(val)
-			}
-			return set, nil
-		}
-
-		return nil, fmt.Errorf("frozenset() argument must be an iterable, not '%s'", arg.Type())
+		return nil, fmt.Errorf("frozenset type not registered")
 	}))
 
 	// slice - create a slice object

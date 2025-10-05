@@ -20,6 +20,7 @@ const (
 	DictType      Type = "dict"
 	TupleType     Type = "tuple"
 	SetType       Type = "set"
+	FrozenSetType Type = "frozenset"
 	FunctionType  Type = "function"
 	MethodType    Type = "method"
 	ModuleType    Type = "module"

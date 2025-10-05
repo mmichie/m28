@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"hash/fnv"
 	"sort"
 	"strings"
 )
@@ -521,6 +522,120 @@ func (it *setIterator) Next() (Value, bool) {
 
 func (it *setIterator) Reset() {
 	it.index = 0
+}
+
+// FrozenSetValue represents an immutable set of unique values
+type FrozenSetValue struct {
+	BaseObject
+	items map[string]Value // Key is the string representation
+	hash  uint64           // Cached hash value
+}
+
+// NewFrozenSet creates a new frozenset
+func NewFrozenSet() *FrozenSetValue {
+	return &FrozenSetValue{
+		BaseObject: *NewBaseObject(FrozenSetType),
+		items:      make(map[string]Value),
+		hash:       0, // Will be computed on first access
+	}
+}
+
+// Type implements Value.Type
+func (fs *FrozenSetValue) Type() Type {
+	return FrozenSetType
+}
+
+// String implements Value.String
+func (fs *FrozenSetValue) String() string {
+	if len(fs.items) == 0 {
+		return "frozenset()"
+	}
+
+	// Sort for consistent output
+	keys := make([]string, 0, len(fs.items))
+	for k := range fs.items {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	elements := make([]string, 0, len(keys))
+	for _, k := range keys {
+		elements = append(elements, PrintValue(fs.items[k]))
+	}
+
+	return "frozenset({" + strings.Join(elements, ", ") + "})"
+}
+
+// Add adds a value to the frozenset (internal use only during construction)
+func (fs *FrozenSetValue) Add(value Value) {
+	key := PrintValue(value)
+	fs.items[key] = value
+	fs.hash = 0 // Invalidate cached hash
+}
+
+// Contains checks if a value is in the frozenset
+func (fs *FrozenSetValue) Contains(value Value) bool {
+	key := PrintValue(value)
+	_, ok := fs.items[key]
+	return ok
+}
+
+// Size returns the number of elements
+func (fs *FrozenSetValue) Size() int {
+	return len(fs.items)
+}
+
+// Hash computes and caches the hash value for the frozenset
+func (fs *FrozenSetValue) Hash() uint64 {
+	if fs.hash != 0 {
+		return fs.hash
+	}
+
+	// Create a stable hash by sorting keys and hashing them
+	keys := make([]string, 0, len(fs.items))
+	for k := range fs.items {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	h := fnv.New64a()
+	for _, k := range keys {
+		h.Write([]byte(k))
+		h.Write([]byte{0}) // Separator
+	}
+
+	fs.hash = h.Sum64()
+	if fs.hash == 0 {
+		fs.hash = 1 // Avoid 0 as it's our "not computed" marker
+	}
+
+	return fs.hash
+}
+
+// GetAttr implements Object interface using TypeDescriptor
+func (fs *FrozenSetValue) GetAttr(name string) (Value, bool) {
+	desc := GetTypeDescriptor(FrozenSetType)
+	if desc != nil {
+		val, err := desc.GetAttribute(fs, name)
+		if err == nil {
+			return val, true
+		}
+	}
+	return fs.BaseObject.GetAttr(name)
+}
+
+// Iterator implements Iterable
+func (fs *FrozenSetValue) Iterator() Iterator {
+	// Create a slice of values from the frozenset
+	values := make([]Value, 0, len(fs.items))
+	for _, v := range fs.items {
+		values = append(values, v)
+	}
+
+	return &setIterator{
+		values: values,
+		index:  0,
+	}
 }
 
 // Predefined empty collections

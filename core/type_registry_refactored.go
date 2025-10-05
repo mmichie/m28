@@ -36,10 +36,11 @@ func registerPrimitiveTypes() {
 	registerByteArrayType()
 }
 
-// registerCollectionTypes registers list, dict, tuple, and set types
+// registerCollectionTypes registers list, dict, tuple, set, and frozenset types
 func registerCollectionTypes() {
 	registerListType()
 	registerDictType()
 	registerTupleType()
 	registerSetType()
+	registerFrozenSetType()
 }

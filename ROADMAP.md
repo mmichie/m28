@@ -31,7 +31,7 @@
 
 ### Data Types
 - [ ] `complex` numbers
-- [ ] `frozenset`
+- [x] `frozenset`
 - [ ] `decimal.Decimal`
 - [ ] Collections module types (deque, Counter, defaultdict)
 
@@ -50,15 +50,15 @@
 - [ ] core/doc_registry.go: FormatDocEntry() - 81 lines
 - [ ] core/repr.go: Repr() - 76 lines
 
-#### Complete type system migration
-- [ ] builtin/iteration.go - iterable type switches
-- [ ] builtin/attributes.go - object type checking
-- [ ] eval/evaluator.go - special forms validation
-- [ ] builtin/modules/math.go - numeric validation
-- [ ] builtin/string_search.go (~42 manual checks)
-- [ ] builtin/os.go (~35+ manual checks)
-- [ ] builtin/json.go (complex validation)
-- [ ] builtin/pathlib.go (~20+ type checks)
+#### Complete type system migration ✅
+- [x] builtin/iteration.go - iterable type switches
+- [x] builtin/attributes.go - object type checking
+- [x] eval/evaluator.go - special forms validation (AST pattern matching - appropriate)
+- [x] builtin/modules/math.go - numeric validation
+- [x] builtin/string_search.go (~42 manual checks)
+- [x] builtin/os.go (~35+ manual checks)
+- [x] builtin/json.go (complex validation)
+- [x] builtin/pathlib.go (~20+ type checks)
 
 #### Protocol wrapper implementations
 - [ ] DunderIterator wrapper (core/protocols/iterable.go:273)
@@ -74,7 +74,7 @@
 - [ ] Define clear error types in core/error.go
 - [ ] Use consistent error wrapping throughout
 - [ ] Fix import organization (follow Go conventions)
-- [ ] Apply validation framework everywhere
+- [x] Apply validation framework everywhere
 - [ ] Consider using generics (Go 1.18+) for common patterns
 
 ### Missing Core Functionality
@@ -181,6 +181,8 @@
 ## ✅ Recently Completed (2024)
 
 ### December 2024
+- **Frozenset Implementation**: Immutable, hashable set type with full method support
+- **Type System Migration Complete**: All builtin functions migrated to validation framework and type helpers
 - **F-String Enhancements**: Format specifications, alignment, conversion flags, self-documenting expressions
 - **Argument unpacking**: `func(*args, **kwargs)` in function calls
 - **Container Protocol Implementation**: All container protocols for built-in types
