@@ -1,0 +1,31 @@
+# Simple S-String Tests
+
+(print "=== S-String Tests ===")
+
+# Test 1: Basic s-string
+(print "Test 1: Basic s-string")
+(= template s"(+ 1 2)")
+(print "Result: " template)
+(print "Type: " (type template))
+
+# Test 2: Value interpolation
+(print "Test 2: Value interpolation")
+(= x 10)
+(= code s"(+ {x} 5)")
+(print "Code: " code)
+(print "Evaluating...")
+(= result (eval code))
+(print "Result: " result)
+
+# Test 3: Code interpolation
+(print "Test 3: Code interpolation")
+(= varname 'myvar)
+(= defcode s"(def {=varname} 42)")
+(print "Generated code: " defcode)
+
+# Test 4: Raw s-string
+(print "Test 4: Raw s-string")
+(= raw rs"no {interpolation} here")
+(print "Raw: " raw)
+
+(print "=== Tests Complete ===")

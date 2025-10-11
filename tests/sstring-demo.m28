@@ -1,0 +1,55 @@
+# S-String Feature Demonstration
+
+(print "=== S-String Feature Demo ===")
+
+# Test 1: Basic s-string - generates AST
+(print "Test 1: Basic s-string")
+(= basic s"(+ 1 2)")
+(print "Generated AST:" basic)
+(print "Type:" (type basic))
+
+# Test 2: Value interpolation - inserts evaluated values
+(print "")
+(print "Test 2: Value interpolation")
+(= x 10)
+(= y 20)
+(= expr s"(+ {x} {y})")
+(print "With x=10, y=20")
+(print "Generated:" expr)
+
+# Test 3: Multiple interpolations
+(print "")
+(print "Test 3: Multiple values")
+(= a 1)
+(= b 2)
+(= c 3)
+(= multi s"(list {a} {b} {c})")
+(print "Generated:" multi)
+
+# Test 4: Code interpolation - inserts symbols/code directly
+(print "")
+(print "Test 4: Code interpolation")
+(= defvar s"(= {=myvar} 100)")
+(print "Generated variable definition:" defvar)
+
+# Test 5: Nested s-strings work correctly
+(print "")
+(print "Test 5: Nested expressions")
+(= nested s"(if true (+ {x} 5) (- {x} 5))")
+(print "Generated:" nested)
+
+# Test 6: String values in interpolation
+(print "")
+(print "Test 6: String interpolation")
+(= name "Alice")
+(= greeting s"(print \"Hello\" {name})")
+(print "Generated:" greeting)
+
+# Test 7: Raw s-strings (no interpolation)
+(print "")
+(print "Test 7: Raw s-string")
+(= raw rs"This {x} is not interpolated")
+(print "Raw result:" raw)
+
+(print "")
+(print "=== All Features Demonstrated ===")

@@ -195,6 +195,9 @@ func init() {
 
 	// Register augmented assignment
 	RegisterAugmentedAssignment()
+
+	// Register s-string forms
+	RegisterSStringForms()
 }
 
 // StrictDuplicateChecking controls whether duplicate registrations cause a panic
