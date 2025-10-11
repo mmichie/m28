@@ -156,6 +156,16 @@ func (p *Parser) parseAtom() (core.Value, error) {
 		return p.parseFStringEnhancedSimple(rune(p.input[p.pos+1]))
 	}
 
+	// Check for s-string (s"..." or s'...')
+	if p.pos+1 < len(p.input) && p.input[p.pos] == 's' && (p.input[p.pos+1] == '"' || p.input[p.pos+1] == '\'') {
+		return p.parseSString(rune(p.input[p.pos+1]), false)
+	}
+
+	// Check for raw s-string (rs"..." or rs'...')
+	if p.pos+2 < len(p.input) && p.input[p.pos] == 'r' && p.input[p.pos+1] == 's' && (p.input[p.pos+2] == '"' || p.input[p.pos+2] == '\'') {
+		return p.parseSString(rune(p.input[p.pos+2]), true)
+	}
+
 	// Check for tuple literal %(...)
 	if p.pos+1 < len(p.input) && p.input[p.pos] == '%' && p.input[p.pos+1] == '(' {
 		return p.parseTupleLiteral()
