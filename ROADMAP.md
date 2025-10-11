@@ -10,8 +10,12 @@
   - Five interpolation types: value, code, splice, dict-splice, gensym
   - Evaluator generates AST from templates
   - Comprehensive test coverage
-- [ ] `defmacro` for defining macros
-- [ ] Hygienic macro support
+- [x] `@macro` decorator for defining macros (Pythonic approach)
+  - Decorator syntax: `(@macro (def name (params) body))`
+  - Macros receive unevaluated arguments
+  - Macro expansion at call time
+  - `__macro__` attribute marks functions as macros
+- [ ] Quasiquote/unquote for code generation in macros
 - [ ] Built-in threading macros (`->`, `->>`)
 
 #### Record Stream & JSON Processing 🟡 HIGH VALUE
@@ -24,7 +28,8 @@
 - [ ] Multiple inheritance
 - [x] Generator expressions
 - [x] Dictionary/set comprehensions
-- [ ] Decorators with `@` syntax
+- [x] Decorators with `@` syntax (implemented for macros)
+- [ ] General decorator system for functions (not just macros)
 - [ ] `eval()` and `exec()`
 
 #### F-String Enhancements ✅
@@ -182,7 +187,18 @@
 - [ ] Comprehensive documentation
 - [ ] Standard library expansion
 
-## ✅ Recently Completed (2024)
+## ✅ Recently Completed (2024-2025)
+
+### January 2025
+- **Macro System (Phase 1)**: Pythonic `@macro` decorator implementation
+  - Decorator syntax: `(@macro (def name (params) body))` for defining macros
+  - Macros receive unevaluated arguments (key difference from functions)
+  - Macro expansion at call time with two-phase evaluation
+  - `__macro__` attribute marks functions as macros
+  - Decorator form handler in evaluator
+  - Macro expansion logic with unevaluated argument passing
+  - Basic macro functionality working (identity, passthrough, constant macros)
+  - Foundation for advanced code generation (needs quasiquote/unquote)
 
 ### December 2024
 - **S-String Implementation (Phases 1 & 2)**: Syntax strings for metaprogramming and code generation

@@ -29,10 +29,22 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 			return core.EmptyList, nil
 		}
 
+		// Check if it's a decorator form (@decorator ...)
+		if isDecoratorForm(v) {
+			return evalDecoratorForm(v, ctx)
+		}
+
 		// Check if it's a special form first (if, def, etc.)
 		if sym, ok := v[0].(core.SymbolValue); ok {
 			if handler, ok := specialForms[string(sym)]; ok {
 				return handler(v[1:], ctx)
+			}
+		}
+
+		// Check if it's a macro call (function with __macro__ attribute)
+		if sym, ok := v[0].(core.SymbolValue); ok {
+			if isMacroCall(sym, ctx) {
+				return evalMacroCall(v, ctx)
 			}
 		}
 
