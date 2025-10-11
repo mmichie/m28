@@ -30,6 +30,7 @@ const (
 	RangeType     Type = "range"
 	BytesType     Type = "bytes"
 	ByteArrayType Type = "bytearray"
+	DecimalType   Type = "decimal"
 )
 
 // Value is the base interface for all values in the language

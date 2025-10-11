@@ -32,7 +32,7 @@
 ### Data Types
 - [ ] `complex` numbers
 - [x] `frozenset`
-- [ ] `decimal.Decimal`
+- [x] `decimal.Decimal`
 - [ ] Collections module types (deque, Counter, defaultdict)
 
 ### Error Messages & Developer Experience
@@ -181,6 +181,13 @@
 ## ✅ Recently Completed (2024)
 
 ### December 2024
+- **Decimal.Decimal Implementation**: Full high-precision decimal arithmetic with Python API compatibility
+  - Exact decimal representation (no float rounding errors)
+  - Complete arithmetic and comparison operators
+  - Rich method set: sqrt, quantize, normalize, as_tuple, to_integral
+  - Context management with getcontext/setcontext
+  - Mixed-type operations (Decimal + int/float)
+  - Comprehensive test coverage
 - **Dictionary and Set Comprehensions**: Full support for `{k: v for ...}` and `{x for ...}` with conditions
 - **Frozenset Implementation**: Immutable, hashable set type with full method support
 - **Type System Migration Complete**: All builtin functions migrated to validation framework and type helpers

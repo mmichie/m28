@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 // registerNumberType registers the number type descriptor
@@ -608,6 +610,371 @@ func registerByteArrayType() {
 		},
 		Repr: func(v Value) string {
 			return v.(*ByteArrayValue).String()
+		},
+	})
+}
+
+// registerDecimalType registers the decimal type descriptor
+func registerDecimalType() {
+	RegisterType(&TypeDescriptor{
+		Name:       "decimal",
+		PythonName: "Decimal",
+		BaseType:   DecimalType,
+		Methods: map[string]*MethodDescriptor{
+			// Arithmetic operations
+			"__add__": {
+				Name:    "__add__",
+				Arity:   1,
+				Doc:     "Return self+value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return NewDecimal(d1.Add(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return NewDecimal(d1.Add(d2)), nil
+					default:
+						return nil, fmt.Errorf("unsupported operand type(s) for +: 'Decimal' and '%s'", args[0].Type())
+					}
+				},
+			},
+			"__sub__": {
+				Name:    "__sub__",
+				Arity:   1,
+				Doc:     "Return self-value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return NewDecimal(d1.Sub(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return NewDecimal(d1.Sub(d2)), nil
+					default:
+						return nil, fmt.Errorf("unsupported operand type(s) for -: 'Decimal' and '%s'", args[0].Type())
+					}
+				},
+			},
+			"__mul__": {
+				Name:    "__mul__",
+				Arity:   1,
+				Doc:     "Return self*value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return NewDecimal(d1.Mul(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return NewDecimal(d1.Mul(d2)), nil
+					default:
+						return nil, fmt.Errorf("unsupported operand type(s) for *: 'Decimal' and '%s'", args[0].Type())
+					}
+				},
+			},
+			"__truediv__": {
+				Name:    "__truediv__",
+				Arity:   1,
+				Doc:     "Return self/value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					var d2 decimal.Decimal
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						d2 = v.GetDecimal()
+					case NumberValue:
+						d2 = decimal.NewFromFloat(float64(v))
+					default:
+						return nil, fmt.Errorf("unsupported operand type(s) for /: 'Decimal' and '%s'", args[0].Type())
+					}
+					if d2.IsZero() {
+						return nil, fmt.Errorf("division by zero")
+					}
+					return NewDecimal(d1.Div(d2)), nil
+				},
+			},
+			"__neg__": {
+				Name:    "__neg__",
+				Arity:   0,
+				Doc:     "Return -self",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					return NewDecimal(d.Neg()), nil
+				},
+			},
+			"__abs__": {
+				Name:    "__abs__",
+				Arity:   0,
+				Doc:     "Return abs(self)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					return NewDecimal(d.Abs()), nil
+				},
+			},
+			// Comparison operations
+			"__eq__": {
+				Name:    "__eq__",
+				Arity:   1,
+				Doc:     "Return self==value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return BoolValue(d1.Equal(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return BoolValue(d1.Equal(d2)), nil
+					default:
+						return False, nil
+					}
+				},
+			},
+			"__lt__": {
+				Name:    "__lt__",
+				Arity:   1,
+				Doc:     "Return self<value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return BoolValue(d1.LessThan(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return BoolValue(d1.LessThan(d2)), nil
+					default:
+						return nil, fmt.Errorf("'<' not supported between instances of 'Decimal' and '%s'", args[0].Type())
+					}
+				},
+			},
+			"__le__": {
+				Name:    "__le__",
+				Arity:   1,
+				Doc:     "Return self<=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return BoolValue(d1.LessThanOrEqual(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return BoolValue(d1.LessThanOrEqual(d2)), nil
+					default:
+						return nil, fmt.Errorf("'<=' not supported between instances of 'Decimal' and '%s'", args[0].Type())
+					}
+				},
+			},
+			"__gt__": {
+				Name:    "__gt__",
+				Arity:   1,
+				Doc:     "Return self>value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return BoolValue(d1.GreaterThan(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return BoolValue(d1.GreaterThan(d2)), nil
+					default:
+						return nil, fmt.Errorf("'>' not supported between instances of 'Decimal' and '%s'", args[0].Type())
+					}
+				},
+			},
+			"__ge__": {
+				Name:    "__ge__",
+				Arity:   1,
+				Doc:     "Return self>=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return BoolValue(d1.GreaterThanOrEqual(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return BoolValue(d1.GreaterThanOrEqual(d2)), nil
+					default:
+						return nil, fmt.Errorf("'>=' not supported between instances of 'Decimal' and '%s'", args[0].Type())
+					}
+				},
+			},
+			"__ne__": {
+				Name:    "__ne__",
+				Arity:   1,
+				Doc:     "Return self!=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d1 := receiver.(*DecimalValue).GetDecimal()
+					switch v := args[0].(type) {
+					case *DecimalValue:
+						return BoolValue(!d1.Equal(v.GetDecimal())), nil
+					case NumberValue:
+						d2 := decimal.NewFromFloat(float64(v))
+						return BoolValue(!d1.Equal(d2)), nil
+					default:
+						return True, nil
+					}
+				},
+			},
+			// Decimal-specific methods
+			"sqrt": {
+				Name:    "sqrt",
+				Arity:   0,
+				Doc:     "Return the square root of self",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					if d.IsNegative() {
+						return nil, fmt.Errorf("cannot take square root of negative number")
+					}
+					// Use big.Float for square root
+					f, _ := d.Float64()
+					result := math.Sqrt(f)
+					return NewDecimalFromFloat(result), nil
+				},
+			},
+			"quantize": {
+				Name:    "quantize",
+				Arity:   1,
+				Doc:     "Quantize to a fixed exponent",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					exp, ok := args[0].(*DecimalValue)
+					if !ok {
+						return nil, fmt.Errorf("quantize() argument must be a Decimal")
+					}
+					// Round to the same exponent as exp
+					expInt := exp.GetDecimal().Exponent()
+					return NewDecimal(d.Round(expInt)), nil
+				},
+			},
+			"normalize": {
+				Name:    "normalize",
+				Arity:   0,
+				Doc:     "Normalize the decimal by stripping trailing zeros",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					// Parse and reformat to normalize
+					str := d.String()
+					normalized, _ := decimal.NewFromString(str)
+					return NewDecimal(normalized), nil
+				},
+			},
+			"is_finite": {
+				Name:    "is_finite",
+				Arity:   0,
+				Doc:     "Return True if the value is finite",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					// shopspring/decimal doesn't have infinity/nan support the same way
+					// For now, all decimals are finite
+					return True, nil
+				},
+			},
+			"is_nan": {
+				Name:    "is_nan",
+				Arity:   0,
+				Doc:     "Return True if the value is NaN",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					// shopspring/decimal doesn't support NaN
+					return False, nil
+				},
+			},
+			"is_zero": {
+				Name:    "is_zero",
+				Arity:   0,
+				Doc:     "Return True if the value is zero",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					return BoolValue(d.IsZero()), nil
+				},
+			},
+			"as_tuple": {
+				Name:    "as_tuple",
+				Arity:   0,
+				Doc:     "Return a tuple representation (sign, digits, exponent)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					sign := 0
+					if d.IsNegative() {
+						sign = 1
+					}
+
+					// Get coefficient and exponent
+					coef := d.Coefficient()
+					exp := d.Exponent()
+
+					// Convert coefficient to digits
+					digitStr := coef.String()
+					if sign == 1 && len(digitStr) > 0 && digitStr[0] == '-' {
+						digitStr = digitStr[1:]
+					}
+
+					digits := make([]Value, len(digitStr))
+					for i, ch := range digitStr {
+						digits[i] = NumberValue(ch - '0')
+					}
+
+					return TupleValue([]Value{
+						NumberValue(sign),
+						TupleValue(digits),
+						NumberValue(exp),
+					}), nil
+				},
+			},
+			"to_integral": {
+				Name:    "to_integral",
+				Arity:   0,
+				Doc:     "Round to the nearest integer",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					return NewDecimal(d.Round(0)), nil
+				},
+			},
+			"__float__": {
+				Name:    "__float__",
+				Arity:   0,
+				Doc:     "Convert to float",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					f, _ := d.Float64()
+					return NumberValue(f), nil
+				},
+			},
+			"__int__": {
+				Name:    "__int__",
+				Arity:   0,
+				Doc:     "Convert to int",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					d := receiver.(*DecimalValue).GetDecimal()
+					return NumberValue(d.IntPart()), nil
+				},
+			},
+		},
+		Str: func(v Value) string {
+			return v.(*DecimalValue).String()
+		},
+		Repr: func(v Value) string {
+			return "Decimal('" + v.(*DecimalValue).String() + "')"
 		},
 	})
 }

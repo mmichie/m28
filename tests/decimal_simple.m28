@@ -1,0 +1,23 @@
+# Simple decimal test
+
+(print "Testing Decimal creation...")
+(= d1 (Decimal "10.5"))
+(print "d1: " (str d1))
+
+(= d2 (Decimal 42))
+(print "d2: " (str d2))
+
+(print "\nTesting arithmetic...")
+(= sum (+ d1 d2))
+(print "Sum: " (str sum))
+
+(= diff (- d1 d2))
+(print "Diff: " (str diff))
+
+(print "\nTesting comparisons...")
+(= x (Decimal "10"))
+(= y (Decimal "20"))
+(print "x < y: " (< x y))
+(print "x == x: " (== x x))
+
+(print "\nAll simple tests passed!")

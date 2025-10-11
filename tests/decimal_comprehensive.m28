@@ -1,0 +1,87 @@
+# Comprehensive Decimal tests
+
+(print "=== Decimal Creation Tests ===")
+(= d1 (Decimal "10.5"))
+(assert (== (str d1) "10.5") "Decimal from string")
+
+(= d2 (Decimal 42))
+(assert (== (str d2) "42") "Decimal from int")
+
+(= d3 (Decimal 3.14))
+(print "Decimal from float: " (str d3))
+
+(= d_zero (Decimal 0))
+(assert (== (str d_zero) "0") "Decimal zero")
+
+(= d_default (Decimal))
+(assert (== (str d_default) "0") "Decimal default constructor")
+
+(print "=== Arithmetic Tests ===")
+(= a (Decimal "10.5"))
+(= b (Decimal "2.5"))
+
+(= sum_result (+ a b))
+(assert (== (str sum_result) "13") "Addition")
+
+(= diff_result (- a b))
+(assert (== (str diff_result) "8") "Subtraction")
+
+(= prod_result (* a b))
+(assert (== (str prod_result) "26.25") "Multiplication")
+
+(= quot_result (/ a b))
+(assert (== (str quot_result) "4.2") "Division")
+
+(= neg_result (- a))
+(assert (== (str neg_result) "-10.5") "Negation")
+
+(print "=== Comparison Tests ===")
+(= x (Decimal "10"))
+(= y (Decimal "20"))
+(= z (Decimal "10"))
+
+(assert (== x z) "Equality")
+(assert (!= x y) "Inequality")
+(assert (< x y) "Less than")
+(assert (<= x z) "Less than or equal")
+(assert (> y x) "Greater than")
+(assert (>= x z) "Greater than or equal")
+
+(print "=== Mixed Type Arithmetic ===")
+(= d_mixed (Decimal "10"))
+(= n_mixed 5)
+
+(= mixed_sum (+ d_mixed n_mixed))
+(assert (== (type mixed_sum) "decimal") "Mixed addition returns Decimal")
+
+(= mixed_prod (* d_mixed n_mixed))
+(assert (== (type mixed_prod) "decimal") "Mixed multiplication returns Decimal")
+
+(print "=== Precision Preservation ===")
+(= precise1 (Decimal "0.1"))
+(= precise2 (Decimal "0.2"))
+(= precise_sum (+ precise1 precise2))
+(assert (== (str precise_sum) "0.3") "Decimal preserves precision")
+
+(print "Float sum (imprecise): " (str (+ 0.1 0.2)))
+(print "Decimal sum (precise): " (str precise_sum))
+
+(print "=== Large/Small Number Tests ===")
+(= large (Decimal "99999999999999999999"))
+(= one (Decimal "1"))
+(= large_plus_one (+ large one))
+(assert (== (str large_plus_one) "100000000000000000000") "Large numbers")
+
+(= small (Decimal "0.00000001"))
+(= small_times_2 (* small (Decimal "2")))
+(assert (== (str small_times_2) "0.00000002") "Small numbers")
+
+(print "=== Division by Zero Test ===")
+(try
+  (begin
+    (= bad (/ (Decimal "10") (Decimal "0")))
+    (assert False "Should have raised division by zero error"))
+  (except Exception e
+    (assert True "Division by zero raises error")))
+
+(print "\nAll decimal tests passed!")

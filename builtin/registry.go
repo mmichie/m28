@@ -36,6 +36,9 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	// Note: The math module itself is lazy-loaded like other modules
 	modules.RegisterMathModule(ctx)
 
+	// Register decimal module (Decimal type)
+	modules.RegisterDecimalModule(ctx)
+
 	// Also register functions from other files that haven't been migrated yet
 	RegisterStringFunctions(ctx)
 	RegisterDictFunctions(ctx)

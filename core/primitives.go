@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/shopspring/decimal"
 )
 
 // NumberValue represents a numeric value
@@ -429,4 +431,60 @@ func (it *bytearrayIterator) Next() (Value, bool) {
 
 func (it *bytearrayIterator) Reset() {
 	it.index = 0
+}
+
+// DecimalValue represents a high-precision decimal number
+type DecimalValue struct {
+	Value decimal.Decimal
+}
+
+// NewDecimal creates a new decimal value
+func NewDecimal(d decimal.Decimal) *DecimalValue {
+	return &DecimalValue{Value: d}
+}
+
+// NewDecimalFromString creates a decimal from a string
+func NewDecimalFromString(s string) (*DecimalValue, error) {
+	d, err := decimal.NewFromString(s)
+	if err != nil {
+		return nil, err
+	}
+	return &DecimalValue{Value: d}, nil
+}
+
+// NewDecimalFromFloat creates a decimal from a float64
+func NewDecimalFromFloat(f float64) *DecimalValue {
+	return &DecimalValue{Value: decimal.NewFromFloat(f)}
+}
+
+// NewDecimalFromInt creates a decimal from an int64
+func NewDecimalFromInt(i int64) *DecimalValue {
+	return &DecimalValue{Value: decimal.NewFromInt(i)}
+}
+
+// Type implements Value.Type
+func (d *DecimalValue) Type() Type {
+	return DecimalType
+}
+
+// String implements Value.String
+func (d *DecimalValue) String() string {
+	return d.Value.String()
+}
+
+// GetAttr implements basic decimal methods using TypeDescriptor
+func (d *DecimalValue) GetAttr(name string) (Value, bool) {
+	desc := GetTypeDescriptor(DecimalType)
+	if desc != nil {
+		val, err := desc.GetAttribute(d, name)
+		if err == nil {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
+// GetDecimal returns the underlying decimal.Decimal
+func (d *DecimalValue) GetDecimal() decimal.Decimal {
+	return d.Value
 }
