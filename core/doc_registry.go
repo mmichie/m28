@@ -222,81 +222,130 @@ func ListTypes() []string {
 func FormatDocEntry(entry DocEntry) string {
 	var sb strings.Builder
 
-	// Header with name and type
-	sb.WriteString(fmt.Sprintf("┌───────────────────────────────────────────────────────────────────┐\n"))
-	sb.WriteString(fmt.Sprintf("│ %-52s [%s] │\n", entry.Name, entry.Type))
-	sb.WriteString(fmt.Sprintf("├───────────────────────────────────────────────────────────────────┤\n"))
-
-	// Brief description
-	sb.WriteString(fmt.Sprintf("│ %-67s │\n", entry.Brief))
-	sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
-
-	// Detailed description if available
-	if entry.Description != "" {
-		sb.WriteString(fmt.Sprintf("│ Description:                                                       │\n"))
-		for _, line := range formatLongText(entry.Description, 65, "   ") {
-			sb.WriteString(fmt.Sprintf("│ %-67s │\n", line))
-		}
-		sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
-	}
-
-	// Parameters
-	if len(entry.Params) > 0 {
-		sb.WriteString(fmt.Sprintf("│ Parameters:                                                        │\n"))
-		for _, param := range entry.Params {
-			name := param.Name
-			if param.Optional {
-				name = name + " (optional)"
-			}
-
-			if param.Default != "" {
-				name = name + ", default=" + param.Default
-			}
-
-			sb.WriteString(fmt.Sprintf("│   %-65s │\n", name))
-
-			for _, line := range formatLongText(param.Description, 61, "     ") {
-				sb.WriteString(fmt.Sprintf("│ %-67s │\n", line))
-			}
-		}
-		sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
-	}
-
-	// Return value
-	if entry.Returns != "" {
-		sb.WriteString(fmt.Sprintf("│ Returns:                                                           │\n"))
-		for _, line := range formatLongText(entry.Returns, 65, "   ") {
-			sb.WriteString(fmt.Sprintf("│ %-67s │\n", line))
-		}
-		sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
-	}
-
-	// Examples
-	if len(entry.Examples) > 0 {
-		sb.WriteString(fmt.Sprintf("│ Examples:                                                          │\n"))
-		for _, example := range entry.Examples {
-			sb.WriteString(fmt.Sprintf("│   %-65s │\n", example))
-		}
-		sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
-	}
-
-	// Related topics
-	if len(entry.Related) > 0 {
-		sb.WriteString(fmt.Sprintf("│ Related:                                                           │\n"))
-		sb.WriteString(fmt.Sprintf("│   %-65s │\n", strings.Join(entry.Related, ", ")))
-		sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
-	}
-
-	// Module
-	if entry.Module != "" {
-		sb.WriteString(fmt.Sprintf("│ Module:                                                            │\n"))
-		sb.WriteString(fmt.Sprintf("│   %-65s │\n", entry.Module))
-	}
-
-	// Footer
-	sb.WriteString(fmt.Sprintf("└───────────────────────────────────────────────────────────────────┘\n"))
+	formatHeader(&sb, entry.Name, entry.Type)
+	formatBrief(&sb, entry.Brief)
+	formatDescription(&sb, entry.Description)
+	formatParameters(&sb, entry.Params)
+	formatReturns(&sb, entry.Returns)
+	formatExamples(&sb, entry.Examples)
+	formatRelated(&sb, entry.Related)
+	formatModule(&sb, entry.Module)
+	formatFooter(&sb)
 
 	return sb.String()
+}
+
+// formatHeader writes the header section with name and type
+func formatHeader(sb *strings.Builder, name, docType string) {
+	sb.WriteString(fmt.Sprintf("┌───────────────────────────────────────────────────────────────────┐\n"))
+	sb.WriteString(fmt.Sprintf("│ %-52s [%s] │\n", name, docType))
+	sb.WriteString(fmt.Sprintf("├───────────────────────────────────────────────────────────────────┤\n"))
+}
+
+// formatBrief writes the brief description section
+func formatBrief(sb *strings.Builder, brief string) {
+	sb.WriteString(fmt.Sprintf("│ %-67s │\n", brief))
+	sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
+}
+
+// formatDescription writes the detailed description section if available
+func formatDescription(sb *strings.Builder, description string) {
+	if description == "" {
+		return
+	}
+
+	sb.WriteString(fmt.Sprintf("│ Description:                                                       │\n"))
+	for _, line := range formatLongText(description, 65, "   ") {
+		sb.WriteString(fmt.Sprintf("│ %-67s │\n", line))
+	}
+	sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
+}
+
+// formatParameters writes the parameters section if available
+func formatParameters(sb *strings.Builder, params []ParamDoc) {
+	if len(params) == 0 {
+		return
+	}
+
+	sb.WriteString(fmt.Sprintf("│ Parameters:                                                        │\n"))
+	for _, param := range params {
+		formatParameter(sb, param)
+	}
+	sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
+}
+
+// formatParameter writes a single parameter documentation
+func formatParameter(sb *strings.Builder, param ParamDoc) {
+	name := buildParameterName(param)
+	sb.WriteString(fmt.Sprintf("│   %-65s │\n", name))
+
+	for _, line := range formatLongText(param.Description, 61, "     ") {
+		sb.WriteString(fmt.Sprintf("│ %-67s │\n", line))
+	}
+}
+
+// buildParameterName constructs the parameter name with optional and default annotations
+func buildParameterName(param ParamDoc) string {
+	name := param.Name
+	if param.Optional {
+		name = name + " (optional)"
+	}
+	if param.Default != "" {
+		name = name + ", default=" + param.Default
+	}
+	return name
+}
+
+// formatReturns writes the return value section if available
+func formatReturns(sb *strings.Builder, returns string) {
+	if returns == "" {
+		return
+	}
+
+	sb.WriteString(fmt.Sprintf("│ Returns:                                                           │\n"))
+	for _, line := range formatLongText(returns, 65, "   ") {
+		sb.WriteString(fmt.Sprintf("│ %-67s │\n", line))
+	}
+	sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
+}
+
+// formatExamples writes the examples section if available
+func formatExamples(sb *strings.Builder, examples []string) {
+	if len(examples) == 0 {
+		return
+	}
+
+	sb.WriteString(fmt.Sprintf("│ Examples:                                                          │\n"))
+	for _, example := range examples {
+		sb.WriteString(fmt.Sprintf("│   %-65s │\n", example))
+	}
+	sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
+}
+
+// formatRelated writes the related topics section if available
+func formatRelated(sb *strings.Builder, related []string) {
+	if len(related) == 0 {
+		return
+	}
+
+	sb.WriteString(fmt.Sprintf("│ Related:                                                           │\n"))
+	sb.WriteString(fmt.Sprintf("│   %-65s │\n", strings.Join(related, ", ")))
+	sb.WriteString(fmt.Sprintf("│                                                                    │\n"))
+}
+
+// formatModule writes the module section if available
+func formatModule(sb *strings.Builder, module string) {
+	if module == "" {
+		return
+	}
+
+	sb.WriteString(fmt.Sprintf("│ Module:                                                            │\n"))
+	sb.WriteString(fmt.Sprintf("│   %-65s │\n", module))
+}
+
+// formatFooter writes the footer line
+func formatFooter(sb *strings.Builder) {
+	sb.WriteString(fmt.Sprintf("└───────────────────────────────────────────────────────────────────┘\n"))
 }
 
 // RegisterDocStrings registers a map of symbol names to documentation strings

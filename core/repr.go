@@ -9,35 +9,56 @@ func Repr(val Value) string {
 		return "nil"
 	}
 
-	// Check if value has __repr__ method
-	if obj, ok := val.(Object); ok {
-		if reprMethod, hasRepr := obj.GetAttr("__repr__"); hasRepr {
-			if callable, isCallable := reprMethod.(interface {
-				Call([]Value, *Context) (Value, error)
-			}); isCallable {
-				// Call __repr__ with no arguments
-				result, err := callable.Call([]Value{}, nil)
-				if err == nil {
-					if str, ok := result.(StringValue); ok {
-						return string(str)
-					}
-				}
-			}
-		}
+	// Try __repr__ method first
+	if repr, ok := tryReprMethod(val); ok {
+		return repr
 	}
 
-	// Default representations for built-in types
+	// Fall back to built-in type representations
+	return reprBuiltinType(val)
+}
+
+// tryReprMethod attempts to call __repr__ method on objects
+func tryReprMethod(val Value) (string, bool) {
+	obj, ok := val.(Object)
+	if !ok {
+		return "", false
+	}
+
+	reprMethod, hasRepr := obj.GetAttr("__repr__")
+	if !hasRepr {
+		return "", false
+	}
+
+	callable, isCallable := reprMethod.(interface {
+		Call([]Value, *Context) (Value, error)
+	})
+	if !isCallable {
+		return "", false
+	}
+
+	result, err := callable.Call([]Value{}, nil)
+	if err != nil {
+		return "", false
+	}
+
+	str, ok := result.(StringValue)
+	if !ok {
+		return "", false
+	}
+
+	return string(str), true
+}
+
+// reprBuiltinType returns the representation for built-in types
+func reprBuiltinType(val Value) string {
 	switch v := val.(type) {
 	case StringValue:
-		// For strings, return quoted representation
-		return fmt.Sprintf("%q", string(v))
+		return reprString(v)
 	case NumberValue:
-		return fmt.Sprintf("%g", float64(v))
+		return reprNumber(v)
 	case BoolValue:
-		if v {
-			return "True"
-		}
-		return "False"
+		return reprBool(v)
 	case NilValue:
 		return "None"
 	case ListValue:
@@ -49,35 +70,90 @@ func Repr(val Value) string {
 	case *SetValue:
 		return formatSetRepr(v)
 	case *Class:
-		return fmt.Sprintf("<class '%s'>", v.Name)
+		return reprClass(v)
 	case *Instance:
-		// For instances without __repr__, use default format
-		return fmt.Sprintf("<%s object at %p>", v.Class.Name, v)
+		return reprInstance(v)
 	case *BuiltinFunction:
-		if v.name != "" {
-			return fmt.Sprintf("<built-in function %s>", v.name)
-		}
-		return fmt.Sprintf("<built-in function>")
+		return reprBuiltinFunction(v)
 	case *Module:
-		return fmt.Sprintf("<module '%s'>", v.Name)
+		return reprModule(v)
 	default:
-		// Check if it's a callable with a name (like UserFunction from eval package)
-		if _, ok := val.(Callable); ok {
-			// Try to get name through reflection or interface
-			if named, ok := val.(interface{ GetName() string }); ok {
-				name := named.GetName()
-				if name != "" {
-					return fmt.Sprintf("<function %s at %p>", name, val)
-				}
-			}
-			// Check if it's a function type
-			if val.Type() == FunctionType {
-				return fmt.Sprintf("<function at %p>", val)
-			}
-		}
-		// Fall back to String() method
-		return val.String()
+		return reprDefault(val)
 	}
+}
+
+// reprString returns quoted string representation
+func reprString(s StringValue) string {
+	return fmt.Sprintf("%q", string(s))
+}
+
+// reprNumber returns numeric representation
+func reprNumber(n NumberValue) string {
+	return fmt.Sprintf("%g", float64(n))
+}
+
+// reprBool returns boolean representation (True/False)
+func reprBool(b BoolValue) string {
+	if b {
+		return "True"
+	}
+	return "False"
+}
+
+// reprClass returns class representation
+func reprClass(c *Class) string {
+	return fmt.Sprintf("<class '%s'>", c.Name)
+}
+
+// reprInstance returns instance representation
+func reprInstance(i *Instance) string {
+	return fmt.Sprintf("<%s object at %p>", i.Class.Name, i)
+}
+
+// reprBuiltinFunction returns builtin function representation
+func reprBuiltinFunction(f *BuiltinFunction) string {
+	if f.name != "" {
+		return fmt.Sprintf("<built-in function %s>", f.name)
+	}
+	return "<built-in function>"
+}
+
+// reprModule returns module representation
+func reprModule(m *Module) string {
+	return fmt.Sprintf("<module '%s'>", m.Name)
+}
+
+// reprDefault handles default representation for unknown types
+func reprDefault(val Value) string {
+	// Check if it's a callable with a name (like UserFunction from eval package)
+	if _, ok := val.(Callable); ok {
+		if repr := reprNamedCallable(val); repr != "" {
+			return repr
+		}
+
+		// Check if it's a function type
+		if val.Type() == FunctionType {
+			return fmt.Sprintf("<function at %p>", val)
+		}
+	}
+
+	// Fall back to String() method
+	return val.String()
+}
+
+// reprNamedCallable attempts to get name from callable
+func reprNamedCallable(val Value) string {
+	named, ok := val.(interface{ GetName() string })
+	if !ok {
+		return ""
+	}
+
+	name := named.GetName()
+	if name == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("<function %s at %p>", name, val)
 }
 
 func formatListRepr(list ListValue) string {

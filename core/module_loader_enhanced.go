@@ -32,109 +32,180 @@ func NewModuleLoaderEnhanced(
 
 // LoadModule loads a module by name and returns its content
 func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue, error) {
-	// Get the module registry
 	registry := GetModuleRegistry()
+	cacheName := normalizeCacheName(name)
 
-	// Normalize the module name by removing .m28 extension for caching
-	cacheName := name
-	if filepath.Ext(cacheName) == ".m28" {
-		cacheName = cacheName[:len(cacheName)-4]
+	// Check cache and circular dependencies
+	if module, err := l.checkModuleCache(registry, cacheName, name); module != nil || err != nil {
+		return module, err
 	}
 
-	// First check if the module is already loaded
+	// Mark module as loading
+	registry.SetLoading(cacheName, true)
+	defer registry.SetLoading(cacheName, false)
+
+	// Try to load as builtin module
+	if module := l.tryLoadBuiltinModule(registry, cacheName); module != nil {
+		return module, nil
+	}
+
+	// Load from file system
+	return l.loadFileModule(registry, name, cacheName)
+}
+
+// normalizeCacheName removes .m28 extension for caching
+func normalizeCacheName(name string) string {
+	if filepath.Ext(name) == ".m28" {
+		return name[:len(name)-4]
+	}
+	return name
+}
+
+// checkModuleCache checks if module is already loaded or being loaded
+func (l *ModuleLoaderEnhanced) checkModuleCache(registry *ModuleRegistry, cacheName, name string) (*DictValue, error) {
+	// Check if already loaded
 	if module, found := registry.GetModule(cacheName); found {
 		return module, nil
 	}
 
-	// Check if the module is currently being loaded (circular dependency)
+	// Check for circular dependency
 	if registry.IsLoading(cacheName) {
 		return nil, fmt.Errorf("circular import detected: module '%s' is already being loaded", name)
 	}
 
-	// Mark the module as being loaded
-	registry.SetLoading(cacheName, true)
-	defer registry.SetLoading(cacheName, false)
+	return nil, nil
+}
 
-	// Check if it's a builtin Go module
-	if l.getBuiltinModule != nil {
-		if module, isBuiltin := l.getBuiltinModule(cacheName); isBuiltin {
-			// Store in registry for future use
-			registry.StoreModule(cacheName, module, "<builtin>", []string{})
-			return module, nil
-		}
+// tryLoadBuiltinModule attempts to load a builtin Go module
+func (l *ModuleLoaderEnhanced) tryLoadBuiltinModule(registry *ModuleRegistry, cacheName string) *DictValue {
+	if l.getBuiltinModule == nil {
+		return nil
 	}
 
-	// Not a builtin module, try to load from file system
+	module, isBuiltin := l.getBuiltinModule(cacheName)
+	if !isBuiltin {
+		return nil
+	}
+
+	registry.StoreModule(cacheName, module, "<builtin>", []string{})
+	return module
+}
+
+// loadFileModule loads a module from the file system
+func (l *ModuleLoaderEnhanced) loadFileModule(registry *ModuleRegistry, name, cacheName string) (*DictValue, error) {
+	// Resolve module path
 	path, err := registry.ResolveModulePath(name)
 	if err != nil {
 		return nil, fmt.Errorf("module '%s' not found", name)
 	}
 
-	// Load the module content
+	// Load module content
 	content, err := l.loadModuleContent(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load module content: %v", err)
 	}
 
-	// Create a new module context
-	moduleCtx := NewContext(l.ctx.Global)
+	// Create module context and execute
+	moduleCtx := l.createModuleContext(cacheName, path)
+	if err := l.parseAndEvaluateModule(content, moduleCtx); err != nil {
+		return nil, err
+	}
 
-	// Define the special __name__ variable
+	// Extract and register module exports
+	moduleDict := extractModuleExports(moduleCtx)
+	registry.StoreModule(cacheName, moduleDict, path, []string{})
+
+	return moduleDict, nil
+}
+
+// createModuleContext creates a new context for module execution
+func (l *ModuleLoaderEnhanced) createModuleContext(cacheName, path string) *Context {
+	moduleCtx := NewContext(l.ctx.Global)
 	moduleCtx.Define("__name__", StringValue(cacheName))
 	moduleCtx.Define("__file__", StringValue(path))
+	return moduleCtx
+}
 
-	// Parse the module content
+// parseAndEvaluateModule parses and evaluates module code
+func (l *ModuleLoaderEnhanced) parseAndEvaluateModule(content string, moduleCtx *Context) error {
 	expr, err := l.parseFunc(content)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse module: %v", err)
+		return fmt.Errorf("failed to parse module: %v", err)
 	}
 
-	// Evaluate the module code
 	_, err = l.evalFunc(expr, moduleCtx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate module: %v", err)
+		return fmt.Errorf("failed to evaluate module: %v", err)
 	}
 
-	// Create a dictionary for the module exports
+	return nil
+}
+
+// extractModuleExports extracts module exports from context
+func extractModuleExports(moduleCtx *Context) *DictValue {
 	moduleDict := NewDict()
 
 	// Check if __exports__ is defined
 	if exportsVal, err := moduleCtx.Lookup("__exports__"); err == nil {
-		// __exports__ is defined, only export listed names
-		if exportsList, ok := exportsVal.(ListValue); ok {
-			for _, item := range exportsList {
-				if nameStr, ok := item.(StringValue); ok {
-					name := string(nameStr)
-					if val, err := moduleCtx.Lookup(name); err == nil {
-						moduleDict.Set(name, val)
-					}
-				} else if nameSym, ok := item.(SymbolValue); ok {
-					name := string(nameSym)
-					if val, err := moduleCtx.Lookup(name); err == nil {
-						moduleDict.Set(name, val)
-					}
-				}
-			}
-		}
+		exportNamedVars(moduleDict, moduleCtx, exportsVal)
 	} else {
-		// No __exports__, export all non-special variables
-		for name, value := range moduleCtx.Vars {
-			// Skip special vars like __name__ and __file__
-			if len(name) >= 2 && name[:2] == "__" && name[len(name)-2:] == "__" {
-				continue
-			}
-			// Skip private vars (starting with _)
-			if len(name) > 0 && name[0] == '_' {
-				continue
-			}
-			moduleDict.Set(name, value)
-		}
+		exportAllPublicVars(moduleDict, moduleCtx)
 	}
 
-	// Register the module in the registry
-	registry.StoreModule(cacheName, moduleDict, path, []string{})
+	return moduleDict
+}
 
-	return moduleDict, nil
+// exportNamedVars exports only variables listed in __exports__
+func exportNamedVars(moduleDict *DictValue, moduleCtx *Context, exportsVal Value) {
+	exportsList, ok := exportsVal.(ListValue)
+	if !ok {
+		return
+	}
+
+	for _, item := range exportsList {
+		name := getExportName(item)
+		if name == "" {
+			continue
+		}
+
+		if val, err := moduleCtx.Lookup(name); err == nil {
+			moduleDict.Set(name, val)
+		}
+	}
+}
+
+// getExportName extracts name from export list item (string or symbol)
+func getExportName(item Value) string {
+	if nameStr, ok := item.(StringValue); ok {
+		return string(nameStr)
+	}
+	if nameSym, ok := item.(SymbolValue); ok {
+		return string(nameSym)
+	}
+	return ""
+}
+
+// exportAllPublicVars exports all non-private variables from module context
+func exportAllPublicVars(moduleDict *DictValue, moduleCtx *Context) {
+	for name, value := range moduleCtx.Vars {
+		if isPrivateVar(name) {
+			continue
+		}
+		moduleDict.Set(name, value)
+	}
+}
+
+// isPrivateVar checks if a variable name is private (special or starts with _)
+func isPrivateVar(name string) bool {
+	// Skip special vars like __name__ and __file__
+	if len(name) >= 2 && name[:2] == "__" && name[len(name)-2:] == "__" {
+		return true
+	}
+	// Skip private vars (starting with _)
+	if len(name) > 0 && name[0] == '_' {
+		return true
+	}
+	return false
 }
 
 // loadModuleContent reads a module file and returns its content
