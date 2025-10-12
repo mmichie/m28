@@ -168,6 +168,74 @@ func (n *NumericOps) Absolute() (core.Value, error) {
 	return core.NumberValue(math.Abs(n.value)), nil
 }
 
+// DunderNumeric wraps objects with arithmetic dunder methods
+type DunderNumeric struct {
+	obj core.Object
+	ctx *core.Context
+}
+
+// NewDunderNumeric creates a Numeric wrapper for an object with arithmetic methods
+func NewDunderNumeric(obj core.Object, ctx *core.Context) *DunderNumeric {
+	return &DunderNumeric{obj: obj, ctx: ctx}
+}
+
+// callDunder is a helper to call a dunder method on the wrapped object
+func (d *DunderNumeric) callDunder(method string, args []core.Value) (core.Value, error) {
+	methodVal, exists := d.obj.GetAttr(method)
+	if !exists {
+		return nil, fmt.Errorf("object has no %s method", method)
+	}
+
+	callable, ok := methodVal.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("%s is not callable", method)
+	}
+
+	return callable.Call(args, d.ctx)
+}
+
+// Add implements Numeric.Add by calling __add__
+func (d *DunderNumeric) Add(other core.Value) (core.Value, error) {
+	return d.callDunder("__add__", []core.Value{other})
+}
+
+// Subtract implements Numeric.Subtract by calling __sub__
+func (d *DunderNumeric) Subtract(other core.Value) (core.Value, error) {
+	return d.callDunder("__sub__", []core.Value{other})
+}
+
+// Multiply implements Numeric.Multiply by calling __mul__
+func (d *DunderNumeric) Multiply(other core.Value) (core.Value, error) {
+	return d.callDunder("__mul__", []core.Value{other})
+}
+
+// Divide implements Numeric.Divide by calling __truediv__
+func (d *DunderNumeric) Divide(other core.Value) (core.Value, error) {
+	return d.callDunder("__truediv__", []core.Value{other})
+}
+
+// Modulo implements Numeric.Modulo by calling __mod__
+func (d *DunderNumeric) Modulo(other core.Value) (core.Value, error) {
+	return d.callDunder("__mod__", []core.Value{other})
+}
+
+// Power implements Numeric.Power by calling __pow__
+func (d *DunderNumeric) Power(other core.Value) (core.Value, error) {
+	return d.callDunder("__pow__", []core.Value{other})
+}
+
+// Negate implements Numeric.Negate by calling __neg__
+func (d *DunderNumeric) Negate() (core.Value, error) {
+	return d.callDunder("__neg__", []core.Value{})
+}
+
+// Absolute implements Numeric.Absolute by calling __abs__
+func (d *DunderNumeric) Absolute() (core.Value, error) {
+	return d.callDunder("__abs__", []core.Value{})
+}
+
 // GetNumericOps returns a Numeric implementation for a value if possible
 func GetNumericOps(v core.Value) (Numeric, bool) {
 	switch val := v.(type) {
@@ -176,10 +244,10 @@ func GetNumericOps(v core.Value) (Numeric, bool) {
 	default:
 		// Check if value has numeric dunder methods
 		if obj, ok := v.(core.Object); ok {
-			// For now, we'll check if it has __add__ as a proxy for numeric
+			// Check if it has __add__ as a proxy for numeric capability
 			if _, exists := obj.GetAttr("__add__"); exists {
-				// TODO: Return a DunderNumeric wrapper
-				return nil, false
+				// Return a DunderNumeric wrapper
+				return NewDunderNumeric(obj, nil), true
 			}
 		}
 		return nil, false

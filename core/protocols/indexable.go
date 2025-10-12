@@ -325,6 +325,58 @@ func (b *ByteArrayIndexable) DeleteIndex(index core.Value) error {
 	return fmt.Errorf("'bytearray' object doesn't support item deletion")
 }
 
+// DunderIndexable wraps objects with indexing dunder methods
+type DunderIndexable struct {
+	obj core.Object
+	ctx *core.Context
+}
+
+// NewDunderIndexable creates an Indexable wrapper for an object with indexing methods
+func NewDunderIndexable(obj core.Object, ctx *core.Context) *DunderIndexable {
+	return &DunderIndexable{obj: obj, ctx: ctx}
+}
+
+// callDunder is a helper to call a dunder method on the wrapped object
+func (d *DunderIndexable) callDunder(method string, args []core.Value) (core.Value, error) {
+	methodVal, exists := d.obj.GetAttr(method)
+	if !exists {
+		return nil, fmt.Errorf("object has no %s method", method)
+	}
+
+	callable, ok := methodVal.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("%s is not callable", method)
+	}
+
+	return callable.Call(args, d.ctx)
+}
+
+// GetIndex implements Indexable.GetIndex by calling __getitem__
+func (d *DunderIndexable) GetIndex(index core.Value) (core.Value, error) {
+	return d.callDunder("__getitem__", []core.Value{index})
+}
+
+// SetIndex implements Indexable.SetIndex by calling __setitem__
+func (d *DunderIndexable) SetIndex(index, value core.Value) error {
+	_, err := d.callDunder("__setitem__", []core.Value{index, value})
+	return err
+}
+
+// HasIndex implements Indexable.HasIndex by attempting GetIndex
+func (d *DunderIndexable) HasIndex(index core.Value) bool {
+	// Try to get the item - if it succeeds, the index exists
+	_, err := d.GetIndex(index)
+	return err == nil
+}
+
+// DeleteIndex implements Indexable.DeleteIndex by calling __delitem__
+func (d *DunderIndexable) DeleteIndex(index core.Value) error {
+	_, err := d.callDunder("__delitem__", []core.Value{index})
+	return err
+}
+
 // GetIndexableOps returns an Indexable implementation for a value if possible
 func GetIndexableOps(v core.Value) (Indexable, bool) {
 	switch val := v.(type) {
@@ -348,8 +400,8 @@ func GetIndexableOps(v core.Value) (Indexable, bool) {
 		// Check if value has __getitem__ method
 		if obj, ok := v.(core.Object); ok {
 			if _, exists := obj.GetAttr("__getitem__"); exists {
-				// TODO: Return a DunderIndexable wrapper
-				return nil, false
+				// Return a DunderIndexable wrapper
+				return NewDunderIndexable(obj, nil), true
 			}
 		}
 		return nil, false

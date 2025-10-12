@@ -82,6 +82,11 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 		return result, err
 	}
 
+	// Try protocol-based numeric operations
+	if leftNum, ok := protocols.GetNumericOps(left); ok {
+		return leftNum.Add(right)
+	}
+
 	// Fall back to type-based dispatch using TypeSwitch
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
@@ -165,6 +170,11 @@ func negateValue(value core.Value, ctx *core.Context) (core.Value, error) {
 		return result, err
 	}
 
+	// Try protocol-based numeric operations
+	if num, ok := protocols.GetNumericOps(value); ok {
+		return num.Negate()
+	}
+
 	// Fall back to type-based negation
 	return types.Switch(value).
 		Number(func(n float64) (core.Value, error) {
@@ -188,6 +198,11 @@ func subtractTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 	// Try __rsub__ on right operand
 	if result, found, err := types.CallDunder(right, "__rsub__", []core.Value{left}, ctx); found {
 		return result, err
+	}
+
+	// Try protocol-based numeric operations
+	if leftNum, ok := protocols.GetNumericOps(left); ok {
+		return leftNum.Subtract(right)
 	}
 
 	// Fall back to numeric subtraction
@@ -379,6 +394,11 @@ func divideValue(left, right core.Value, ctx *core.Context) (core.Value, error) 
 		return result, err
 	}
 
+	// Try protocol-based numeric operations
+	if leftNum, ok := protocols.GetNumericOps(left); ok {
+		return leftNum.Divide(right)
+	}
+
 	// Fall back to numeric division
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
@@ -498,6 +518,11 @@ func moduloTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 		return result, err
 	}
 
+	// Try protocol-based numeric operations
+	if leftNum, ok := protocols.GetNumericOps(left); ok {
+		return leftNum.Modulo(right)
+	}
+
 	// Fall back to numeric modulo
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
@@ -553,6 +578,11 @@ func powerTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 	// Try __rpow__ on right operand
 	if result, found, err := types.CallDunder(right, "__rpow__", []core.Value{left}, ctx); found {
 		return result, err
+	}
+
+	// Try protocol-based numeric operations
+	if leftNum, ok := protocols.GetNumericOps(left); ok {
+		return leftNum.Power(right)
 	}
 
 	// Fall back to numeric power

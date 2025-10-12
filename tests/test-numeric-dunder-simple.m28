@@ -1,0 +1,123 @@
+# Test Numeric Functions with Dunder Method Support - Simple Version
+# Tests: abs(), round(), divmod()
+
+(print "Testing Numeric Functions with Dunder Method Support")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: abs() with __abs__()
+# =============================================================================
+(print "\n1. Testing abs() with __abs__()")
+(print "-" 70)
+
+(class Vector ()
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y))
+
+  (def __abs__ (self)
+    # Return magnitude of vector
+    (** (+ (* self.x self.x) (* self.y self.y)) 0.5)))
+
+(= v (Vector 3 4))
+(= magnitude (abs v))
+(print (+ "Vector (3, 4) magnitude: " (str magnitude)))
+(assert (== magnitude 5.0) "abs() calls __abs__() for custom magnitude")
+(print "✓ abs() with __abs__() works")
+
+# Test with negative numbers (default behavior)
+(= neg_abs (abs -42))
+(print (+ "abs(-42) = " (str neg_abs)))
+(assert (== neg_abs 42) "abs() handles negative numbers")
+(print "✓ abs() fallback works for numbers")
+
+# =============================================================================
+# Test 2: round() with __round__()
+# =============================================================================
+(print "\n2. Testing round() with __round__()")
+(print "-" 70)
+
+(class Money ()
+  (def __init__ (self amount)
+    (= self.amount amount))
+
+  (def __round__ (self ndigits)
+    # Custom rounding that always uses 2 decimal places
+    (Money (round self.amount 2))))
+
+(= price (Money 19.99))
+(= rounded (round price 2))
+(print (+ "Money __round__ called, amount: " (str rounded.amount)))
+(assert (== rounded.amount 19.99) "round() calls __round__() with ndigits")
+(print "✓ round() with __round__() works")
+
+# Test with regular numbers
+(= rounded_num (round 3.14159 2))
+(print (+ "round(3.14159, 2) = " (str rounded_num)))
+(assert (== rounded_num 3.14) "round() works with numbers")
+(print "✓ round() fallback works for numbers")
+
+# Test round without ndigits
+(= rounded_int (round 3.7))
+(print (+ "round(3.7) = " (str rounded_int)))
+(assert (== rounded_int 4.0) "round() without ndigits works")
+(print "✓ round() without ndigits works")
+
+# =============================================================================
+# Test 3: divmod() with __divmod__()
+# =============================================================================
+(print "\n3. Testing divmod() with __divmod__()")
+(print "-" 70)
+
+(class Counter ()
+  (def __init__ (self count)
+    (= self.count count))
+
+  (def __divmod__ (self divisor)
+    # Return how many groups and remainder
+    (divmod self.count divisor)))
+
+(= items (Counter 17))
+(= result (divmod items 5))
+(print (+ "17 items divmod 5: " (str result)))
+(= groups result[0])
+(= leftover result[1])
+(print (+ "  Groups: " (str groups)))
+(print (+ "  Leftover: " (str leftover)))
+(assert (== groups 3.0) "divmod() quotient correct")
+(assert (== leftover 2.0) "divmod() remainder correct")
+(print "✓ divmod() with __divmod__() works")
+
+# Test with regular numbers
+(= result2 (divmod 17 5))
+(print (+ "divmod(17, 5) = " (str result2)))
+(= quot result2[0])
+(= rem result2[1])
+(assert (== quot 3.0) "divmod() regular quotient correct")
+(assert (== rem 2.0) "divmod() regular remainder correct")
+(print "✓ divmod() fallback works for numbers")
+
+# Test Python-style floor division behavior
+(= result3 (divmod -17 5))
+(print (+ "divmod(-17, 5) = " (str result3)))
+(= quot3 result3[0])
+(= rem3 result3[1])
+(print (+ "  Quotient: " (str quot3) ", Remainder: " (str rem3)))
+(assert (== quot3 -4.0) "divmod() uses floor division for negatives")
+(assert (== rem3 3.0) "divmod() remainder correct for negatives")
+(print "✓ divmod() Python-style floor division works")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All Numeric Dunder Method Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented dunder method support:")
+(print "  • abs() - Calls __abs__() for custom absolute value")
+(print "  • round() - Calls __round__(ndigits) for custom rounding")
+(print "  • divmod() - Calls __divmod__() for custom division with remainder")
+
+(print "\nThese functions enable full Python-style numeric customization")
+(print "for user-defined classes in M28.")

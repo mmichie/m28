@@ -7,6 +7,7 @@ import (
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/protocols"
 )
 
 // RegisterNumeric registers numeric functions
@@ -18,6 +19,27 @@ func RegisterNumeric(ctx *core.Context) {
 			return nil, err
 		}
 
+		val := v.Get(0)
+
+		// Try __abs__ dunder method first
+		if obj, ok := val.(core.Object); ok {
+			if method, exists := obj.GetAttr("__abs__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					return result, nil
+				}
+			}
+		}
+
+		// Try protocol-based numeric operations
+		if numOps, ok := protocols.GetNumericOps(val); ok {
+			return numOps.Absolute()
+		}
+
+		// Fall back to direct number conversion
 		num, err := v.GetNumber(0)
 		if err != nil {
 			return nil, err
@@ -33,13 +55,40 @@ func RegisterNumeric(ctx *core.Context) {
 			return nil, err
 		}
 
+		val := v.Get(0)
+
+		// Get ndigits if provided
+		var ndigits core.Value
+		if v.Count() == 2 {
+			ndigits = v.Get(1)
+		}
+
+		// Try __round__ dunder method first
+		if obj, ok := val.(core.Object); ok {
+			if method, exists := obj.GetAttr("__round__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					// Call __round__ with ndigits if provided
+					var callArgs []core.Value
+					if ndigits != nil {
+						callArgs = []core.Value{ndigits}
+					}
+					result, err := callable.Call(callArgs, ctx)
+					if err != nil {
+						return nil, err
+					}
+					return result, nil
+				}
+			}
+		}
+
+		// Fall back to built-in rounding
 		num, err := v.GetNumber(0)
 		if err != nil {
 			return nil, err
 		}
 
-		ndigits, _ := v.GetNumberOrDefault(1, 0)
-		ndigitsInt := int(ndigits)
+		ndigitsVal, _ := v.GetNumberOrDefault(1, 0)
+		ndigitsInt := int(ndigitsVal)
 
 		if ndigitsInt == 0 {
 			return core.NumberValue(math.Round(num)), nil
@@ -57,6 +106,36 @@ func RegisterNumeric(ctx *core.Context) {
 			return nil, err
 		}
 
+		left := v.Get(0)
+		right := v.Get(1)
+
+		// Try __divmod__ dunder method on left operand
+		if obj, ok := left.(core.Object); ok {
+			if method, exists := obj.GetAttr("__divmod__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{right}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					return result, nil
+				}
+			}
+		}
+
+		// Try __rdivmod__ dunder method on right operand
+		if obj, ok := right.(core.Object); ok {
+			if method, exists := obj.GetAttr("__rdivmod__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{left}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					return result, nil
+				}
+			}
+		}
+
+		// Fall back to built-in divmod
 		a, err := v.GetNumber(0)
 		if err != nil {
 			return nil, err

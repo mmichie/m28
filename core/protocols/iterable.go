@@ -249,6 +249,140 @@ func (r *RangeIterator) String() string {
 	return "<range_iterator>"
 }
 
+// DunderIterator wraps objects with __iter__/__next__ methods
+type DunderIterator struct {
+	iterator   core.Value    // The iterator returned by __iter__
+	ctx        *core.Context // Context for method calls
+	exhausted  bool          // Whether the iterator is exhausted
+	cachedNext core.Value    // Cached next value for HasNext
+	cacheValid bool          // Whether cached value is valid
+}
+
+// NewDunderIterator creates an iterator from an object with __iter__
+func NewDunderIterator(obj core.Value, ctx *core.Context) (*DunderIterator, error) {
+	// Call __iter__ to get the iterator
+	iterObj, ok := obj.(core.Object)
+	if !ok {
+		return nil, fmt.Errorf("object does not support iteration")
+	}
+
+	iterMethod, exists := iterObj.GetAttr("__iter__")
+	if !exists {
+		return nil, fmt.Errorf("object has no __iter__ method")
+	}
+
+	callable, ok := iterMethod.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("__iter__ is not callable")
+	}
+
+	// Call __iter__() to get the iterator object
+	iterator, err := callable.Call([]core.Value{}, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the iterator has __next__ method
+	iteratorObj, ok := iterator.(core.Object)
+	if !ok {
+		return nil, fmt.Errorf("__iter__ did not return an object with __next__")
+	}
+
+	if _, hasNext := iteratorObj.GetAttr("__next__"); !hasNext {
+		return nil, fmt.Errorf("iterator has no __next__ method")
+	}
+
+	return &DunderIterator{
+		iterator:   iterator,
+		ctx:        ctx,
+		exhausted:  false,
+		cacheValid: false,
+	}, nil
+}
+
+// Next returns the next value or StopIteration
+func (d *DunderIterator) Next() (core.Value, error) {
+	if d.exhausted {
+		return nil, &StopIteration{}
+	}
+
+	// If we have a cached value from HasNext, return it
+	if d.cacheValid {
+		d.cacheValid = false
+		return d.cachedNext, nil
+	}
+
+	// Call __next__ on the iterator
+	iterObj, ok := d.iterator.(core.Object)
+	if !ok {
+		d.exhausted = true
+		return nil, &StopIteration{}
+	}
+
+	nextMethod, exists := iterObj.GetAttr("__next__")
+	if !exists {
+		d.exhausted = true
+		return nil, &StopIteration{}
+	}
+
+	callable, ok := nextMethod.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("__next__ is not callable")
+	}
+
+	val, err := callable.Call([]core.Value{}, d.ctx)
+	if err != nil {
+		// Check if it's a StopIteration
+		if _, ok := err.(*StopIteration); ok {
+			d.exhausted = true
+			return nil, err
+		}
+		// Other errors are propagated
+		return nil, err
+	}
+
+	return val, nil
+}
+
+// HasNext checks if there are more values by attempting to fetch the next one
+func (d *DunderIterator) HasNext() bool {
+	if d.exhausted {
+		return false
+	}
+
+	// If we already have a cached value, we know there's a next
+	if d.cacheValid {
+		return true
+	}
+
+	// Try to get the next value and cache it
+	val, err := d.Next()
+	if err != nil {
+		// StopIteration or any error means no more values
+		d.exhausted = true
+		return false
+	}
+
+	// Cache the value for the actual Next() call
+	d.cachedNext = val
+	d.cacheValid = true
+	return true
+}
+
+// Type implements Value.Type
+func (d *DunderIterator) Type() core.Type {
+	return "dunder_iterator"
+}
+
+// String implements Value.String
+func (d *DunderIterator) String() string {
+	return "<dunder_iterator>"
+}
+
 // GetIterableOps returns an iterator for a value if possible
 func GetIterableOps(v core.Value) (Iterator, bool) {
 	switch val := v.(type) {
@@ -270,8 +404,13 @@ func GetIterableOps(v core.Value) (Iterator, bool) {
 		// Check if value has __iter__ method
 		if obj, ok := v.(core.Object); ok {
 			if _, exists := obj.GetAttr("__iter__"); exists {
-				// TODO: Return a DunderIterator wrapper
-				return nil, false
+				// Return a DunderIterator wrapper
+				// Note: We need a context, but don't have one here
+				// For now, create with nil context - callers should handle this
+				iter, err := NewDunderIterator(v, nil)
+				if err == nil {
+					return iter, true
+				}
 			}
 		}
 		return nil, false
