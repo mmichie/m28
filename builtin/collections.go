@@ -66,56 +66,56 @@ func RegisterCollections(ctx *core.Context) {
 
 	// tuple - create a new tuple
 	ctx.Define("tuple", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("tuple", args)
-		if err := v.Max(1); err != nil {
-			return nil, err
-		}
-
-		if v.Count() == 0 {
+		if len(args) == 0 {
 			return core.EmptyTuple, nil
 		}
+		if len(args) == 1 {
+			// Python-style: Convert iterable to tuple
+			arg := args[0]
 
-		// Convert iterable to tuple
-		arg := args[0]
-
-		if tuple, ok := types.AsTuple(arg); ok {
-			// Copy the tuple
-			result := make(core.TupleValue, len(tuple))
-			copy(result, tuple)
-			return result, nil
-		}
-
-		if list, ok := types.AsList(arg); ok {
-			// Convert list to tuple
-			result := make(core.TupleValue, len(list))
-			copy(result, list)
-			return result, nil
-		}
-
-		if str, ok := types.AsString(arg); ok {
-			// Convert string to tuple of characters
-			result := make(core.TupleValue, len(str))
-			for i, ch := range str {
-				result[i] = core.StringValue(string(ch))
+			// Try to convert from different types
+			if tuple, ok := types.AsTuple(arg); ok {
+				// Copy the tuple
+				result := make(core.TupleValue, len(tuple))
+				copy(result, tuple)
+				return result, nil
 			}
-			return result, nil
-		}
 
-		// Check if it implements Iterable interface
-		if iterable, ok := types.AsIterable(arg); ok {
-			result := make(core.TupleValue, 0)
-			iter := iterable.Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
+			if list, ok := types.AsList(arg); ok {
+				// Convert list to tuple
+				result := make(core.TupleValue, len(list))
+				copy(result, list)
+				return result, nil
+			}
+
+			if str, ok := types.AsString(arg); ok {
+				// Convert string to tuple of characters
+				result := make(core.TupleValue, len(str))
+				for i, ch := range str {
+					result[i] = core.StringValue(string(ch))
 				}
-				result = append(result, val)
+				return result, nil
 			}
-			return result, nil
-		}
 
-		return nil, fmt.Errorf("tuple() argument must be an iterable, not '%s'", arg.Type())
+			// Check if it implements Iterable interface
+			if iterable, ok := types.AsIterable(arg); ok {
+				result := make(core.TupleValue, 0)
+				iter := iterable.Iterator()
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					result = append(result, val)
+				}
+				return result, nil
+			}
+
+			// If it's not an iterable, just create a tuple with this one element
+			return core.TupleValue{arg}, nil
+		}
+		// Multiple arguments: create a tuple from all arguments
+		return core.TupleValue(args), nil
 	}))
 
 	// dict - create a new dictionary

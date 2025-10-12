@@ -1,0 +1,133 @@
+# Data Processing with Infix Notation
+# Demonstrates list comprehensions and data transformations
+
+(print "=== Student Grade Analysis ===\n")
+
+# Student data: [name, score]
+(= students [
+  ["Alice" 92]
+  ["Bob" 78]
+  ["Charlie" 85]
+  ["Diana" 95]
+  ["Eve" 67]
+  ["Frank" 88]
+])
+
+# Calculate statistics
+(= scores [(student[1]) for student in students])
+(= total (sum scores))
+(= count (len scores))
+(= average (total / count))
+
+(print f"Total students: {count}")
+(print f"Average score: {average:.2f}")
+
+# Find students above average
+(print "\nStudents above average:")
+(for student in students
+  (= name student[0])
+  (= score student[1])
+  (if (> score average)
+    (print f"  {name}: {score} (+{(score - average):.1f})")
+    None))
+
+# Grade distribution
+(= grade_a [student for student in students if (>= student[1] 90)])
+(= grade_b [student for student in students if (and (>= student[1] 80) (< student[1] 90))])
+(= grade_c [student for student in students if (and (>= student[1] 70) (< student[1] 80))])
+
+(print f"\nGrade Distribution:")
+(print f"A grades: {(len grade_a)}")
+(print f"B grades: {(len grade_b)}")
+(print f"C grades: {(len grade_c)}")
+
+# Sales data analysis
+(print "\n=== Sales Analysis ===\n")
+
+(= sales_data [
+  {"product": "Laptop" "quantity": 5 "price": 999.99}
+  {"product": "Mouse" "quantity": 15 "price": 29.99}
+  {"product": "Keyboard" "quantity": 12 "price": 79.99}
+  {"product": "Monitor" "quantity": 8 "price": 299.99}
+])
+
+# Calculate revenue for each product
+(print "Product Revenue:")
+(= total_revenue 0)
+(for item in sales_data
+  (= product item["product"])
+  (= qty item["quantity"])
+  (= price item["price"])
+  (= revenue (qty * price))
+  (= total_revenue (total_revenue + revenue))
+  (print f"  {product}: ${revenue:.2f} ({qty} × ${price})"))
+
+(print f"\nTotal Revenue: ${total_revenue:.2f}")
+
+# Find high-value items (revenue > $1000)
+(= high_value [item for item in sales_data
+               if (> (item["quantity"] * item["price"]) 1000)])
+(print f"\nHigh-value products (>$1000 revenue): {(len high_value)}")
+(for item in high_value
+  (print f"  {item[\"product\"]}"))
+
+# Temperature data processing
+(print "\n=== Temperature Data Analysis ===\n")
+
+(= daily_temps [72 75 68 71 78 82 79 76 73 70 74 77])
+
+# Calculate statistics
+(= min_temp (min daily_temps))
+(= max_temp (max daily_temps))
+(= avg_temp ((sum daily_temps) / (len daily_temps)))
+
+(print f"Temperature Statistics:")
+(print f"  Min: {min_temp}°F")
+(print f"  Max: {max_temp}°F")
+(print f"  Average: {avg_temp:.1f}°F")
+(print f"  Range: {(max_temp - min_temp)}°F")
+
+# Count days in different ranges
+(= cold_days (len [t for t in daily_temps if (< t 70)]))
+(= mild_days (len [t for t in daily_temps if (and (>= t 70) (<= t 75))]))
+(= warm_days (len [t for t in daily_temps if (> t 75)]))
+
+(print f"\nDay Classification:")
+(print f"  Cold days (<70°F): {cold_days}")
+(print f"  Mild days (70-75°F): {mild_days}")
+(print f"  Warm days (>75°F): {warm_days}")
+
+# Price calculations with tax
+(print "\n=== Shopping Cart with Tax ===\n")
+
+(= cart [
+  {"item": "Book" "price": 24.99 "qty": 2}
+  {"item": "Pen" "price": 3.50 "qty": 5}
+  {"item": "Notebook" "price": 8.99 "qty": 3}
+])
+
+(= tax_rate 0.08)
+
+(print "Cart Items:")
+(= subtotal 0)
+(for entry in cart
+  (= item entry["item"])
+  (= price entry["price"])
+  (= qty entry["qty"])
+  (= line_total (price * qty))
+  (= subtotal (subtotal + line_total))
+  (print f"  {item}: {qty} × ${price} = ${line_total:.2f}"))
+
+(= tax (subtotal * tax_rate))
+(= total (subtotal + tax))
+
+(print f"\nSubtotal: ${subtotal:.2f}")
+(print f"Tax ({(tax_rate * 100):.0f}%): ${tax:.2f}")
+(print f"Total: ${total:.2f}")
+
+# Filter items over $20
+(= expensive_items [item for item in cart
+                     if (> (item["price"] * item["qty"]) 20)])
+(print f"\nExpensive items (>$20): {(len expensive_items)}")
+
+(print "\n=== Data Processing Complete ===")

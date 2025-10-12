@@ -19,6 +19,7 @@ func RegisterAll(ctx *core.Context) {
 	ctx.Define("-", core.NewBuiltinFunction(Subtract()))
 	ctx.Define("*", core.NewBuiltinFunction(Multiply()))
 	ctx.Define("/", core.NewBuiltinFunction(Divide()))
+	ctx.Define("//", core.NewBuiltinFunction(FloorDivide()))
 	ctx.Define("%", core.NewBuiltinFunction(Modulo()))
 	ctx.Define("**", core.NewBuiltinFunction(Power()))
 
@@ -397,6 +398,74 @@ func divideValue(left, right core.Value, ctx *core.Context) (core.Value, error) 
 		}).
 		Default(func(l core.Value) (core.Value, error) {
 			return nil, errors.NewTypeError("/",
+				"unsupported operand type(s)",
+				"'"+string(l.Type())+"'")
+		}).
+		Execute()
+}
+
+// FloorDivide implements the // operator (integer division) using protocol-based dispatch
+func FloorDivide() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("//", args)
+
+		// // operator requires at least 1 argument
+		if err := v.Min(1); err != nil {
+			return nil, err
+		}
+
+		// Single argument: 1//x
+		if v.Count() == 1 {
+			return floorDivideValue(core.NumberValue(1), args[0], ctx)
+		}
+
+		// Multiple arguments: a // b // c / ...
+		result := args[0]
+		for i := 1; i < len(args); i++ {
+			var err error
+			result, err = floorDivideValue(result, args[i], ctx)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return result, nil
+	}
+}
+
+// floorDivideValue performs integer division: left // right
+func floorDivideValue(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Try __floordiv__ on left operand
+	if result, found, err := types.CallDunder(left, "__floordiv__", []core.Value{right}, ctx); found {
+		return result, err
+	}
+
+	// Try __rfloordiv__ on right operand
+	if result, found, err := types.CallDunder(right, "__rfloordiv__", []core.Value{left}, ctx); found {
+		return result, err
+	}
+
+	// Fall back to numeric floor division
+	return types.Switch(left).
+		Number(func(leftNum float64) (core.Value, error) {
+			return types.Switch(right).
+				Number(func(rightNum float64) (core.Value, error) {
+					if rightNum == 0 {
+						return nil, &core.ZeroDivisionError{}
+					}
+					// Python-style floor division
+					result := math.Floor(leftNum / rightNum)
+					return core.NumberValue(result), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("//",
+						"unsupported operand type(s)",
+						"'float' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
+		Default(func(l core.Value) (core.Value, error) {
+			return nil, errors.NewTypeError("//",
 				"unsupported operand type(s)",
 				"'"+string(l.Type())+"'")
 		}).

@@ -50,7 +50,7 @@
 # Test 6: Multiple assignment with different types
 (print "-- Test 6: Mixed sequence types --")
 (= lst [1 2])
-(= tup %(3 4))
+(= tup (tuple 3 4))
 (= a b lst)
 (= c d tup)
 (assert (== a 1) "a from list should be 1")

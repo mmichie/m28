@@ -1,0 +1,60 @@
+# Calculator Example - Using Infix Notation
+# Demonstrates natural mathematical expressions
+
+(print "=== M28 Infix Calculator ===\n")
+
+# Basic arithmetic
+(print "Basic Arithmetic:")
+(= result (10 + 5 * 2))
+(print f"10 + 5 * 2 = {result}")
+
+(= result (100 - 25 / 5))
+(print f"100 - 25 / 5 = {result}")
+
+(= result (2 ** 10))
+(print f"2 ** 10 = {result}")
+
+(= result (17 // 3))
+(print f"17 // 3 = {result} (floor division)")
+
+(= result (17 % 3))
+(print f"17 % 3 = {result} (modulo)")
+
+# Complex expressions
+(print "\nComplex Expressions:")
+(= result ((5 + 3) * (10 - 2)))
+(print f"(5 + 3) * (10 - 2) = {result}")
+
+(= result (2 ** 3 ** 2))
+(print f"2 ** 3 ** 2 = {result} (right-associative)")
+
+# Temperature conversion
+(print "\nTemperature Conversion:")
+(= fahrenheit 98.6)
+(= celsius ((fahrenheit - 32) * 5 / 9))
+(print f"{fahrenheit}°F = {celsius:.1f}°C")
+
+# Quadratic formula: (-b ± sqrt(b^2 - 4ac)) / 2a
+(print "\nQuadratic Formula (x^2 + 5x + 6 = 0):")
+(= a 1)
+(= b 5)
+(= c 6)
+(= discriminant (b ** 2 - 4 * a * c))
+(= sqrt_disc (discriminant ** 0.5))
+(= neg_b (- b))
+(= root1 ((neg_b + sqrt_disc) / (2 * a)))
+(= root2 ((neg_b - sqrt_disc) / (2 * a)))
+(print f"Root 1: {root1}")
+(print f"Root 2: {root2}")
+
+# Circle calculations
+(print "\nCircle Calculations:")
+(= radius 5)
+(= pi 3.14159)
+(= area (pi * radius ** 2))
+(= circumference (2 * pi * radius))
+(print f"Radius: {radius}")
+(print f"Area: {area:.2f}")
+(print f"Circumference: {circumference:.2f}")
+
+(print "\n=== Calculator Complete ===")

@@ -1,0 +1,133 @@
+# Algorithms with Infix Notation
+# Demonstrates iterative algorithms with natural syntax
+
+(print "=== Fibonacci Sequence ===\n")
+
+(def fibonacci (n)
+  (if (<= n 0)
+    []
+    (if (== n 1)
+      [0]
+      (do
+        (= result [0 1])
+        (= i 2)
+        (while (< i n)
+          (= a result[(i - 2)])
+          (= b result[(i - 1)])
+          (= next (a + b))
+          (result.append next)
+          (= i (i + 1)))
+        result))))
+
+(= fib_nums (fibonacci 10))
+(print f"First 10 Fibonacci numbers: {fib_nums}")
+
+# Prime number checker
+(print "\n=== Prime Number Finder ===\n")
+
+(def is_prime (n)
+  (if (<= n 1)
+    False
+    (if (== n 2)
+      True
+      (do
+        (= is_prime_flag True)
+        (= i 2)
+        (while (and is_prime_flag (<= (i * i) n))
+          (if (== (n % i) 0)
+            (= is_prime_flag False)
+            None)
+          (= i (i + 1)))
+        is_prime_flag))))
+
+(print "Prime numbers from 1 to 30:")
+(= primes [])
+(= num 1)
+(while (<= num 30)
+  (if (is_prime num)
+    (primes.append num)
+    None)
+  (= num (num + 1)))
+(print primes)
+
+# Factorial calculator
+(print "\n=== Factorial Calculator ===\n")
+
+(def factorial (n)
+  (if (<= n 1)
+    1
+    (do
+      (= result 1)
+      (= i 2)
+      (while (<= i n)
+        (= result (result * i))
+        (= i (i + 1)))
+      result)))
+
+(= nums [5 10 12])
+(for n in nums
+  (print f"{n}! = {(factorial n)}"))
+
+# Sum of digits
+(print "\n=== Sum of Digits ===\n")
+
+(def sum_of_digits (n)
+  (do
+    (= total 0)
+    (= num n)
+    (while (> num 0)
+      (= digit (num % 10))
+      (= total (total + digit))
+      (= num (num // 10)))
+    total))
+
+(= numbers [123 456 789 1234])
+(for num in numbers
+  (= digit_sum (sum_of_digits num))
+  (print f"Sum of digits of {num}: {digit_sum}"))
+
+# Collatz conjecture
+(print "\n=== Collatz Conjecture Sequence ===\n")
+
+(def collatz_sequence (n)
+  (do
+    (= sequence [n])
+    (= current n)
+    (while (!= current 1)
+      (if (== (current % 2) 0)
+        (= current (current // 2))
+        (= current (3 * current + 1)))
+      (sequence.append current))
+    sequence))
+
+(= start 7)
+(= seq (collatz_sequence start))
+(print f"Collatz sequence starting from {start}:")
+(print f"{seq}")
+(print f"Length: {(len seq)} steps")
+
+# Binary search
+(print "\n=== Binary Search ===\n")
+
+(def binary_search (arr target)
+  (do
+    (= left 0)
+    (= right ((len arr) - 1))
+    (= found -1)
+    (while (and (<= left right) (== found -1))
+      (= mid ((left + right) // 2))
+      (= mid_val arr[mid])
+      (if (== mid_val target)
+        (= found mid)
+        (if (< mid_val target)
+          (= left (mid + 1))
+          (= right (mid - 1)))))
+    found))
+
+(= sorted_list [1 3 5 7 9 11 13 15 17 19])
+(= target 13)
+(= index (binary_search sorted_list target))
+(print f"Searching for {target} in {sorted_list}")
+(print f"Found at index: {index}")
+
+(print "\n=== Algorithms Complete ===")

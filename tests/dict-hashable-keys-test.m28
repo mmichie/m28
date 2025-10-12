@@ -23,19 +23,19 @@
 
 # Test 5: Tuple keys
 (= tuple_dict {
-  %(1, 2): "coordinate",
-  %("a", "b", "c"): "letters",
-  %(True, 42, "mixed"): "mixed types"
+  (tuple 1 2): "coordinate",
+  (tuple "a" "b" "c"): "letters",
+  (tuple True 42 "mixed"): "mixed types"
 })
-(assert (== tuple_dict[%(1, 2)] "coordinate") "Tuple key access")
-(assert (== tuple_dict[%("a", "b", "c")] "letters") "String tuple key")
+(assert (== tuple_dict[(tuple 1 2)] "coordinate") "Tuple key access")
+(assert (== tuple_dict[(tuple "a" "b" "c")] "letters") "String tuple key")
 
 # Test 6: Mixed key types
 (= mixed_dict {
   "string": 1,
   42: "number",
-  True: "boolean", 
-  %(1, 2): "tuple",
+  True: "boolean",
+  (tuple 1 2): "tuple",
   None: "none"
 })
 (assert (== (len mixed_dict) 5) "Mixed dict has 5 entries")
@@ -47,12 +47,12 @@
 (assert (in "string" key_list) "String key in keys()")
 (assert (in 42 key_list) "Number key in keys()")
 (assert (in True key_list) "Boolean key in keys()")
-(assert (in %(1, 2) key_list) "Tuple key in keys()")
+(assert (in (tuple 1 2) key_list) "Tuple key in keys()")
 (assert (in None key_list) "None key in keys()")
 
 # Test 8: Dynamic key assignment
 (= d {})
-(= key %(10, 20))
+(= key (tuple 10 20))
 (= d[key] "dynamic")
 (assert (== d[key] "dynamic") "Dynamic tuple key assignment")
 

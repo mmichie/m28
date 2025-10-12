@@ -28,7 +28,7 @@
 
 # Test 4: Multiple assignment from tuple
 (print "-- Test 4: Assignment from tuple --")
-(= tup %(5 10 15))
+(= tup (tuple 5 10 15))
 (= m n o tup)
 (assert (== m 5) "m should be 5")
 (assert (== n 10) "n should be 10")

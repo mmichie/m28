@@ -1,0 +1,172 @@
+# Game Logic Examples with Infix Notation
+# Demonstrates game-like scenarios with natural expressions
+
+(print "=== RPG Character Stats ===\n")
+
+# Character class
+(= warrior {
+  "name": "Conan"
+  "level": 10
+  "hp": 100
+  "max_hp": 100
+  "attack": 25
+  "defense": 20
+  "gold": 150
+})
+
+(= enemy {
+  "name": "Goblin"
+  "hp": 40
+  "attack": 15
+  "defense": 8
+})
+
+# Display character
+(print f"{warrior[\"name\"]} - Level {warrior[\"level\"]}")
+(print f"  HP: {warrior[\"hp\"]}/{warrior[\"max_hp\"]}")
+(print f"  Attack: {warrior[\"attack\"]}")
+(print f"  Defense: {warrior[\"defense\"]}")
+(print f"  Gold: {warrior[\"gold\"]}")
+
+# Calculate damage
+(def calculate_damage (attacker defender)
+  (do
+    (= base_damage attacker["attack"])
+    (= mitigation defender["defense"])
+    (= final_damage (base_damage - mitigation // 2))
+    (if (< final_damage 1)
+      1
+      final_damage)))
+
+# Combat simulation
+(print f"\n=== Combat: {warrior[\"name\"]} vs {enemy[\"name\"]} ===\n")
+
+(= round 1)
+(while (and (> warrior["hp"] 0) (> enemy["hp"] 0))
+  (print f"Round {round}:")
+
+  # Warrior attacks
+  (= damage (calculate_damage warrior enemy))
+  (= enemy["hp"] (enemy["hp"] - damage))
+  (print f"  {warrior[\"name\"]} deals {damage} damage")
+
+  (if (> enemy["hp"] 0)
+    (do
+      # Enemy counter-attacks
+      (= counter_damage (calculate_damage enemy warrior))
+      (= warrior["hp"] (warrior["hp"] - counter_damage))
+      (print f"  {enemy[\"name\"]} deals {counter_damage} damage"))
+    None)
+
+  (= round (round + 1))
+  (print f"  {warrior[\"name\"]}: {warrior[\"hp\"]} HP | {enemy[\"name\"]}: {enemy[\"hp\"]} HP\n"))
+
+(if (> warrior["hp"] 0)
+  (print f"Victory! {warrior[\"name\"]} wins!")
+  (print f"Defeat! {enemy[\"name\"]} wins!"))
+
+# Health regeneration
+(print "\n=== Health Regeneration ===\n")
+
+(def regenerate_hp (character regen_amount)
+  (do
+    (= current character["hp"])
+    (= max_hp character["max_hp"])
+    (= new_hp (current + regen_amount))
+    (if (> new_hp max_hp)
+      (= character["hp"] max_hp)
+      (= character["hp"] new_hp))
+    (= healed (character["hp"] - current))
+    healed))
+
+(= warrior["hp"] 65)
+(= healed (regenerate_hp warrior 25))
+(print f"{warrior[\"name\"]} regenerated {healed} HP")
+(print f"New HP: {warrior[\"hp\"]}/{warrior[\"max_hp\"]}")
+
+# Inventory system
+(print "\n=== Inventory Management ===\n")
+
+(= inventory {
+  "Health Potion": {"qty": 3 "value": 50}
+  "Mana Potion": {"qty": 2 "value": 40}
+  "Sword": {"qty": 1 "value": 200}
+  "Shield": {"qty": 1 "value": 150}
+})
+
+# Calculate total inventory value
+(= total_value 0)
+(print "Inventory:")
+(for item_name in (inventory.keys)
+  (= item inventory[item_name])
+  (= item_value (item["qty"] * item["value"]))
+  (= total_value (total_value + item_value))
+  (print f"  {item_name}: {item[\"qty\"]} (${item_value})"))
+
+(print f"\nTotal inventory value: ${total_value}")
+
+# Level up system
+(print "\n=== Experience & Level Up ===\n")
+
+(def calculate_xp_needed (level)
+  (100 * level + level ** 2))
+
+(= character {
+  "name": "Hero"
+  "level": 5
+  "xp": 450
+  "xp_to_next": (calculate_xp_needed 5)
+})
+
+(print f"{character[\"name\"]} - Level {character[\"level\"]}")
+(print f"XP: {character[\"xp\"]}/{character[\"xp_to_next\"]}")
+
+# Gain XP
+(= xp_gained 200)
+(= character["xp"] (character["xp"] + xp_gained))
+(print f"\nGained {xp_gained} XP!")
+
+# Check for level up
+(while (>= character["xp"] character["xp_to_next"])
+  (= overflow (character["xp"] - character["xp_to_next"]))
+  (= character["level"] (character["level"] + 1))
+  (= character["xp"] overflow)
+  (= character["xp_to_next"] (calculate_xp_needed character["level"]))
+  (print f"Level Up! Now level {character[\"level\"]}!"))
+
+(print f"\nFinal: Level {character[\"level\"]}")
+(print f"XP: {character[\"xp\"]}/{character[\"xp_to_next\"]}")
+
+# Distance and collision detection
+(print "\n=== 2D Game Physics ===\n")
+
+(def distance (x1 y1 x2 y2)
+  (do
+    (= dx (x2 - x1))
+    (= dy (y2 - y1))
+    (= dist_squared (dx ** 2 + dy ** 2))
+    (dist_squared ** 0.5)))
+
+(= player {"x": 0 "y": 0 "radius": 5})
+(= coin {"x": 10 "y": 10 "radius": 3})
+(= enemy {"x": 25 "y": 25 "radius": 8})
+
+(= dist_to_coin (distance player["x"] player["y"] coin["x"] coin["y"]))
+(= dist_to_enemy (distance player["x"] player["y"] enemy["x"] enemy["y"]))
+
+(print f"Player position: ({player[\"x\"]}, {player[\"y\"]})")
+(print f"Distance to coin: {dist_to_coin:.2f}")
+(print f"Distance to enemy: {dist_to_enemy:.2f}")
+
+# Check collisions
+(= collision_dist (player["radius"] + coin["radius"]))
+(if (< dist_to_coin collision_dist)
+  (print "Collected coin! ✨")
+  (print "Coin out of reach"))
+
+(= danger_dist (player["radius"] + enemy["radius"]))
+(if (< dist_to_enemy danger_dist)
+  (print "Collision with enemy! 💥")
+  (print "Safe from enemy"))
+
+(print "\n=== Game Logic Complete ===")

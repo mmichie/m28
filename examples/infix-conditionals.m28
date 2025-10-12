@@ -1,0 +1,89 @@
+# Conditional Logic with Infix Operators
+# Demonstrates readable comparison and logical expressions
+
+(print "=== Grade Calculator ===\n")
+
+# Function to determine letter grade
+(def get_grade (score)
+  (if (>= score 90)
+    "A"
+    (if (>= score 80)
+      "B"
+      (if (>= score 70)
+        "C"
+        (if (>= score 60)
+          "D"
+          "F")))))
+
+# Test various scores
+(= scores [95 87 72 65 58])
+(for score in scores
+  (= grade (get_grade score))
+  (print f"Score: {score} -> Grade: {grade}"))
+
+# Range checking
+(print "\n=== Temperature Warning System ===\n")
+
+(def check_temperature (temp)
+  (if (and (>= temp 60) (<= temp 80))
+    (print f"{temp}°F: Comfortable")
+    (if (< temp 32)
+      (print f"{temp}°F: Freezing! ❄️")
+      (if (> temp 95)
+        (print f"{temp}°F: Too hot! 🔥")
+        (print f"{temp}°F: Tolerable")))))
+
+(= temps [25 55 72 88 100])
+(for temp in temps
+  (check_temperature temp))
+
+# Complex logical conditions
+(print "\n=== User Access Control ===\n")
+
+(def check_access (age is_member has_ticket)
+  (if (or (and (>= age 18) has_ticket)
+          (and is_member (>= age 13)))
+    "Access granted ✓"
+    "Access denied ✗"))
+
+(print "Adult with ticket:")
+(print (check_access 25 False True))
+
+(print "\nTeen member:")
+(print (check_access 15 True False))
+
+(print "\nChild without membership:")
+(print (check_access 10 False True))
+
+# Number classification
+(print "\n=== Number Classification ===\n")
+
+(def classify_number (n)
+  (if (== n 0)
+    "zero"
+    (if (and (> n 0) (< n 10))
+      "small positive"
+      (if (and (>= n 10) (< n 100))
+        "medium positive"
+        (if (>= n 100)
+          "large positive"
+          "negative")))))
+
+(= numbers [0 5 42 150 -7])
+(for num in numbers
+  (print f"{num}: {(classify_number num)}"))
+
+# Leap year checker
+(print "\n=== Leap Year Checker ===\n")
+
+(def is_leap_year (year)
+  (or (and (== (year % 4) 0) (!= (year % 100) 0))
+      (== (year % 400) 0)))
+
+(= years [2000 2020 2100 2024 2023])
+(for year in years
+  (if (is_leap_year year)
+    (print f"{year} is a leap year ✓")
+    (print f"{year} is not a leap year")))
+
+(print "\n=== Complete ===")

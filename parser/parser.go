@@ -175,11 +175,6 @@ func (p *Parser) parseAtom() (core.Value, error) {
 		return p.parseSString(rune(p.input[p.pos+2]), true)
 	}
 
-	// Check for tuple literal %(...)
-	if p.pos+1 < len(p.input) && p.input[p.pos] == '%' && p.input[p.pos+1] == '(' {
-		return p.parseTupleLiteral()
-	}
-
 	// Check what kind of expression we have
 	switch p.input[p.pos] {
 	case '(':
@@ -252,6 +247,17 @@ func (p *Parser) parseList() (core.Value, error) {
 
 	// Skip closing parenthesis
 	p.advance()
+
+	// Check if this is an infix expression
+	// Pattern: (x op y) where second element is an infix operator
+	// If infix parsing fails, fall back to prefix (allows functions like (reduce + 0 lst))
+	if detectInfixPattern(elements) {
+		result, err := parseInfixExpressionSimple(elements)
+		if err == nil {
+			return result, nil
+		}
+		// Fall through to treat as prefix if infix parsing failed
+	}
 
 	// Check if this is a generator expression
 	// Pattern: (expr for var in iterable) or (expr for var in iterable if condition)
@@ -405,52 +411,6 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 			core.ListValue(listLiteral),
 		}), nil
 	}
-}
-
-// parseTupleLiteral parses a tuple literal %(...)
-func (p *Parser) parseTupleLiteral() (core.Value, error) {
-	// Skip % and opening parenthesis
-	p.advance() // skip %
-	p.advance() // skip (
-
-	elements := make(core.TupleValue, 0)
-
-	// Skip whitespace after the opening paren
-	p.skipWhitespaceAndComments()
-
-	// Parse elements until we hit the closing parenthesis
-	for p.pos < len(p.input) && p.input[p.pos] != ')' {
-		element, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-
-		elements = append(elements, element)
-		p.skipWhitespaceAndComments()
-
-		// Skip optional comma as separator, but not if it's a reader macro
-		if p.pos < len(p.input) && p.input[p.pos] == ',' {
-			nextPos := p.pos + 1
-			if nextPos >= len(p.input) ||
-				unicode.IsSpace(rune(p.input[nextPos])) ||
-				p.input[nextPos] == ')' ||
-				p.input[nextPos] == ']' ||
-				p.input[nextPos] == '}' {
-				p.advance()
-				p.skipWhitespaceAndComments()
-			}
-		}
-	}
-
-	// Check for unclosed tuple
-	if p.pos >= len(p.input) {
-		return nil, fmt.Errorf("unclosed tuple")
-	}
-
-	// Skip closing parenthesis
-	p.advance()
-
-	return elements, nil
 }
 
 // parseString parses a string literal "..." or '...'
