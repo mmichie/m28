@@ -197,7 +197,24 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		}
 		name := string(nameVal)
 
-		// Try to get the attribute
+		// Try __getattribute__ first (called for every attribute access)
+		if o, ok := obj.(core.Object); ok {
+			if method, exists := o.GetAttr("__getattribute__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{core.StringValue(name)}, ctx)
+					if err == nil {
+						return result, nil
+					}
+					// If __getattribute__ raises AttributeError, continue to normal lookup
+					// For other errors, return them
+					if !isAttributeError(err) {
+						return nil, err
+					}
+				}
+			}
+		}
+
+		// Try normal attribute lookup
 		if objWithAttrs, ok := obj.(interface {
 			GetAttr(string) (core.Value, bool)
 		}); ok {
@@ -219,6 +236,19 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			}
 			if prop, ok := desc.Properties[name]; ok && prop.Getter != nil {
 				return prop.Getter(obj)
+			}
+		}
+
+		// Try __getattr__ as fallback when attribute not found
+		if o, ok := obj.(core.Object); ok {
+			if method, exists := o.GetAttr("__getattr__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{core.StringValue(name)}, ctx)
+					if err == nil {
+						return result, nil
+					}
+					// If __getattr__ also fails, continue to default/error
+				}
 			}
 		}
 
@@ -244,7 +274,20 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		name := string(nameVal)
 		value := args[2]
 
-		// Try to set the attribute
+		// Try __setattr__ dunder method first
+		if o, ok := obj.(core.Object); ok {
+			if method, exists := o.GetAttr("__setattr__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					_, err := callable.Call([]core.Value{core.StringValue(name), value}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					return core.None, nil
+				}
+			}
+		}
+
+		// Try normal attribute setting
 		if objWithAttrs, ok := obj.(interface {
 			SetAttr(string, core.Value) error
 		}); ok {
@@ -267,4 +310,27 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 
 	// callable() - check if object is callable
 	// callable() - now registered in functional.go
+}
+
+// isAttributeError checks if an error is an AttributeError
+func isAttributeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return contains(msg, "attribute") || contains(msg, "AttributeError")
+}
+
+// contains checks if string s contains substr (case-insensitive helper)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || findSubstring(s, substr))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

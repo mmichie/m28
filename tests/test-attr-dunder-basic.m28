@@ -1,0 +1,57 @@
+# Basic Test of Attribute Dunder Methods
+# Minimal tests to verify dunder method support
+
+(print "Testing Basic Attribute Dunder Support")
+(print "=" 70)
+
+# Test 1: __getattr__() fallback
+(print "\nTest 1: __getattr__() fallback")
+(class Dynamic ()
+  (def __init__ (self)
+    (= self.x 10))
+  (def __getattr__ (self name)
+    (+ "fallback_" name)))
+
+(= d (Dynamic))
+(print (+ "Real attr: " (str (getattr d "x"))))
+(print (+ "Missing attr: " (getattr d "missing")))
+(assert (== (getattr d "x") 10) "Real attribute works")
+(assert (== (getattr d "missing") "fallback_missing") "__getattr__() works")
+(print "✓ __getattr__() works")
+
+# Test 2: __getattribute__() intercepts all
+(print "\nTest 2: __getattribute__() intercepts all")
+(class Intercept ()
+  (def __getattribute__ (self name)
+    (+ "intercepted_" name)))
+
+(= i (Intercept))
+(= result (getattr i "anything"))
+(print (+ "Result: " result))
+(assert (== result "intercepted_anything") "__getattribute__() intercepts")
+(print "✓ __getattribute__() works")
+
+# Test 3: __dir__() custom listing
+(print "\nTest 3: __dir__() custom listing")
+(class CustomDir ()
+  (def __dir__ (self)
+    ["a" "b" "c"]))
+
+(= c (CustomDir))
+(= attrs (dir c))
+(print (+ "Custom dir: " (str attrs)))
+(assert (== attrs ["a" "b" "c"]) "__dir__() returns custom list")
+(print "✓ __dir__() works")
+
+# Test 4: getattr with default
+(print "\nTest 4: getattr() with default value")
+(class Empty ())
+(= e (Empty))
+(= result (getattr e "missing" "default_value"))
+(print (+ "Default: " result))
+(assert (== result "default_value") "getattr() default works")
+(print "✓ getattr() default works")
+
+(print "\n" "=" 70)
+(print "✅ Basic Attribute Dunder Tests Pass!")
+(print "=" 70)
