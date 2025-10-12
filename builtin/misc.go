@@ -16,8 +16,27 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
+		val := v.Get(0)
+
+		// Try __repr__ dunder method first
+		if obj, ok := val.(core.Object); ok {
+			if method, exists := obj.GetAttr("__repr__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Ensure it returns a string
+					if str, ok := result.(core.StringValue); ok {
+						return str, nil
+					}
+					return nil, fmt.Errorf("__repr__ returned non-string (type %s)", result.Type())
+				}
+			}
+		}
+
 		// Use core.Repr which handles special representations properly
-		return core.StringValue(core.Repr(v.Get(0))), nil
+		return core.StringValue(core.Repr(val)), nil
 	}))
 
 	// hash - return hash of object
@@ -28,6 +47,24 @@ func RegisterMisc(ctx *core.Context) {
 		}
 
 		obj := v.Get(0)
+
+		// Try __hash__ dunder method first
+		if o, ok := obj.(core.Object); ok {
+			if method, exists := o.GetAttr("__hash__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Ensure it returns a number (int)
+					if num, ok := result.(core.NumberValue); ok {
+						return num, nil
+					}
+					return nil, fmt.Errorf("__hash__ returned non-int (type %s)", result.Type())
+				}
+			}
+		}
+
 		if !core.IsHashable(obj) {
 			return nil, fmt.Errorf("unhashable type: '%s'", obj.Type())
 		}

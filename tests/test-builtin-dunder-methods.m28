@@ -1,0 +1,153 @@
+# Test Built-in Type Conversion Functions with Dunder Method Support
+# Tests: int(), str(), repr(), bool(), hash()
+
+(print "Testing Built-in Functions with Dunder Method Support")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: int() with __int__()
+# =============================================================================
+(print "\n1. Testing int() with __int__() dunder method")
+(print "-" 70)
+
+(class Temperature ()
+  (def __init__ (self celsius)
+    (= self.celsius celsius))
+
+  (def __int__ (self)
+    # Return temperature in Celsius as integer
+    self.celsius)
+
+  (def __str__ (self)
+    (+ (str self.celsius) "°C")))
+
+(= temp (Temperature 25.7))
+(print (+ "Temperature: " (str temp)))
+(= temp_int (int temp))
+(print (+ "int(temp) = " (str temp_int)))
+(assert (== temp_int 25) "int() calls __int__() correctly")
+(print "✓ int() with __int__() works")
+
+# =============================================================================
+# Test 2: str() with __str__()
+# =============================================================================
+(print "\n2. Testing str() with __str__() dunder method")
+(print "-" 70)
+
+(class Point ()
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y))
+
+  (def __str__ (self)
+    (+ "(" (str self.x) ", " (str self.y) ")")))
+
+(= p (Point 10 20))
+(= p_str (str p))
+(print (+ "str(Point(10, 20)) = " p_str))
+(assert (== p_str "(10, 20)") "str() calls __str__() correctly")
+(print "✓ str() with __str__() works")
+
+# =============================================================================
+# Test 3: repr() with __repr__()
+# =============================================================================
+(print "\n3. Testing repr() with __repr__() dunder method")
+(print "-" 70)
+
+(class Person ()
+  (def __init__ (self name age)
+    (= self.name name)
+    (= self.age age))
+
+  (def __repr__ (self)
+    (+ "Person(name='" self.name "', age=" (str self.age) ")"))
+
+  (def __str__ (self)
+    self.name))
+
+(= alice (Person "Alice" 30))
+(= alice_repr (repr alice))
+(= alice_str (str alice))
+(print (+ "repr(alice) = " alice_repr))
+(print (+ "str(alice) = " alice_str))
+(assert (== alice_repr "Person(name='Alice', age=30)") "repr() calls __repr__()")
+(assert (== alice_str "Alice") "str() calls __str__()")
+(print "✓ repr() with __repr__() works")
+
+# =============================================================================
+# Test 4: bool() with __bool__()
+# =============================================================================
+(print "\n4. Testing bool() with __bool__() dunder method")
+(print "-" 70)
+
+(class Container ()
+  (def __init__ (self items)
+    (= self.items items))
+
+  (def __bool__ (self)
+    # Container is truthy if it has items
+    (> (len self.items) 0)))
+
+(= empty_container (Container []))
+(= full_container (Container [1 2 3]))
+(= empty_bool (bool empty_container))
+(= full_bool (bool full_container))
+(print (+ "bool(empty_container) = " (str empty_bool)))
+(print (+ "bool(full_container) = " (str full_bool)))
+(assert (== empty_bool False) "Empty container is False")
+(assert (== full_bool True) "Full container is True")
+(print "✓ bool() with __bool__() works")
+
+# =============================================================================
+# Test 5: hash() with __hash__()
+# =============================================================================
+(print "\n5. Testing hash() with __hash__() dunder method")
+(print "-" 70)
+
+(class ID ()
+  (def __init__ (self value)
+    (= self.value value))
+
+  (def __hash__ (self)
+    # Simple hash based on value
+    (* self.value 1000)))
+
+(= id1 (ID 42))
+(= id_hash (hash id1))
+(print (+ "hash(ID(42)) = " (str id_hash)))
+(assert (== id_hash 42000) "hash() calls __hash__() correctly")
+(print "✓ hash() with __hash__() works")
+
+# =============================================================================
+# Test 6: Verify fallback to default behavior
+# =============================================================================
+(print "\n6. Testing fallback to default behavior")
+(print "-" 70)
+
+# Class without dunder methods should use default behavior
+(class Simple ()
+  (def __init__ (self value)
+    (= self.value value)))
+
+(= s (Simple 100))
+(= s_int (int 123))  # Regular int conversion
+(= s_str (str "test"))  # Regular str conversion
+(= s_bool (bool True))  # Regular bool conversion
+(print "✓ Fallback behavior works for built-in types")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All Built-in Dunder Method Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented dunder method support:")
+(print "  • int() - Calls __int__() if available")
+(print "  • str() - Calls __str__() if available")
+(print "  • repr() - Calls __repr__() if available")
+(print "  • bool() - Calls __bool__() if available")
+(print "  • hash() - Calls __hash__() if available")
+
+(print "\nThese functions now properly support Python-style dunder methods")
+(print "while maintaining backward compatibility with built-in types.")

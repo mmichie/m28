@@ -1,0 +1,85 @@
+# Test Refactored Operators with Protocol Layer
+# Tests: +, -, unary -, /, %, **
+
+(print "Testing Refactored Arithmetic Operators")
+(print "=" 70)
+
+# Test with custom Vector class
+(class Vector ()
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y))
+
+  (def __add__ (self other)
+    (Vector (+ self.x other.x) (+ self.y other.y)))
+
+  (def __sub__ (self other)
+    (Vector (- self.x other.x) (- self.y other.y)))
+
+  (def __mul__ (self scalar)
+    (Vector (* self.x scalar) (* self.y scalar)))
+
+  (def __truediv__ (self scalar)
+    (Vector (/ self.x scalar) (/ self.y scalar)))
+
+  (def __mod__ (self scalar)
+    (Vector (% self.x scalar) (% self.y scalar)))
+
+  (def __pow__ (self scalar)
+    (Vector (** self.x scalar) (** self.y scalar)))
+
+  (def __neg__ (self)
+    (Vector (- self.x) (- self.y)))
+
+  (def __str__ (self)
+    (+ "Vector(" (str self.x) ", " (str self.y) ")")))
+
+# Create test vectors
+(= v1 (Vector 6 8))
+(= v2 (Vector 2 4))
+
+(print "\nTest 1: Addition (+)")
+(= v3 (+ v1 v2))
+(assert (== v3.x 8) "Addition x component")
+(assert (== v3.y 12) "Addition y component")
+(print "✓ Addition works via protocol")
+
+(print "\nTest 2: Subtraction (-)")
+(= v4 (- v1 v2))
+(assert (== v4.x 4) "Subtraction x component")
+(assert (== v4.y 4) "Subtraction y component")
+(print "✓ Subtraction works via protocol")
+
+(print "\nTest 3: Unary negation (-)")
+(= v5 (- v1))
+(assert (== v5.x -6) "Negation x component")
+(assert (== v5.y -8) "Negation y component")
+(print "✓ Unary negation works via protocol")
+
+(print "\nTest 4: Division (/)")
+(= v6 (/ v1 2))
+(assert (== v6.x 3) "Division x component")
+(assert (== v6.y 4) "Division y component")
+(print "✓ Division works via protocol")
+
+(print "\nTest 5: Modulo (%)")
+(= v7 (% v1 5))
+(assert (== v7.x 1) "Modulo x component")
+(assert (== v7.y 3) "Modulo y component")
+(print "✓ Modulo works via protocol")
+
+(print "\nTest 6: Power (**)")
+(= v8 (** v2 2))
+(assert (== v8.x 4) "Power x component")
+(assert (== v8.y 16) "Power y component")
+(print "✓ Power works via protocol")
+
+(print "\nTest 7: Multiplication (*)")
+(= v9 (* v2 3))
+(assert (== v9.x 6) "Multiplication x component")
+(assert (== v9.y 12) "Multiplication y component")
+(print "✓ Multiplication works via protocol")
+
+(print "\n" "=" 70)
+(print "✅ All Refactored Operators Work Correctly!")
+(print "=" 70)

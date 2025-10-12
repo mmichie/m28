@@ -53,16 +53,66 @@ func RegisterTypes(ctx *core.Context) {
 	// str - convert to string
 	// BEFORE: 9 lines
 	// AFTER: 3 lines
-	ctx.Define("str", core.NewBuiltinFunction(builders.UnaryAny("str", func(val core.Value) (core.Value, error) {
+	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("str", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		val := v.Get(0)
+
+		// Try __str__ dunder method first
+		if obj, ok := val.(core.Object); ok {
+			if method, exists := obj.GetAttr("__str__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Ensure it returns a string
+					if str, ok := result.(core.StringValue); ok {
+						return str, nil
+					}
+					return nil, errors.NewTypeError("str", "__str__ returned non-string", string(result.Type()))
+				}
+			}
+		}
+
+		// Fall back to built-in String() method
 		return core.StringValue(val.String()), nil
-	})))
+	}))
 
 	// bool - convert to boolean
 	// BEFORE: 9 lines
 	// AFTER: 3 lines
-	ctx.Define("bool", core.NewBuiltinFunction(builders.UnaryAny("bool", func(val core.Value) (core.Value, error) {
+	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("bool", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		val := v.Get(0)
+
+		// Try __bool__ dunder method first
+		if obj, ok := val.(core.Object); ok {
+			if method, exists := obj.GetAttr("__bool__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Ensure it returns a bool
+					if b, ok := result.(core.BoolValue); ok {
+						return b, nil
+					}
+					return nil, errors.NewTypeError("bool", "__bool__ returned non-bool", string(result.Type()))
+				}
+			}
+		}
+
+		// Fall back to IsTruthy
 		return core.BoolValue(core.IsTruthy(val)), nil
-	})))
+	}))
 
 	// is_none - check if value is None
 	// BEFORE: 6 lines
@@ -111,6 +161,24 @@ func IntBuilder() builders.BuiltinFunc {
 
 		// No base specified - simple conversion
 		if v.Count() == 1 {
+			// Try __int__ dunder method first
+			if obj, ok := val.(core.Object); ok {
+				if method, exists := obj.GetAttr("__int__"); exists {
+					if callable, ok := method.(core.Callable); ok {
+						result, err := callable.Call([]core.Value{}, ctx)
+						if err != nil {
+							return nil, err
+						}
+						// Ensure it returns a number
+						if num, ok := result.(core.NumberValue); ok {
+							// Truncate to integer
+							return core.NumberValue(float64(int(num))), nil
+						}
+						return nil, errors.NewTypeError("int", "__int__ returned non-int", string(result.Type()))
+					}
+				}
+			}
+
 			switch x := val.(type) {
 			case core.NumberValue:
 				return core.NumberValue(float64(int(x))), nil

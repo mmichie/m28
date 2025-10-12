@@ -77,10 +77,173 @@
 - [x] builtin/json.go (complex validation)
 - [x] builtin/pathlib.go (~20+ type checks)
 
-#### Protocol wrapper implementations
-- [ ] DunderIterator wrapper (core/protocols/iterable.go:273)
-- [ ] DunderNumeric wrapper (core/protocols/numeric.go:181)
-- [ ] DunderIndexable wrapper (core/protocols/indexable.go:251)
+#### Protocol wrapper implementations ✅
+- [x] DunderIterator wrapper (core/protocols/iterable.go) - Wraps objects with `__iter__`/`__next__`
+- [x] DunderNumeric wrapper (core/protocols/numeric.go) - Wraps objects with arithmetic dunder methods
+- [x] DunderIndexable wrapper (core/protocols/indexable.go) - Wraps objects with indexing dunder methods
+
+#### Internal code refactoring to use protocols
+Current: Some operators use protocols (multiply, comparisons, `in`), but most follow pattern: Dunder → Type-switch
+Target: Consistent pattern: Dunder → Protocol → Type-switch
+
+**High Priority - Arithmetic Operators (builtin/operators/operators.go):** ✅ COMPLETE
+- [x] Refactor `addTwo()` (line 74) to use `GetNumericOps().Add()`
+- [x] Refactor `subtractTwo()` (line 187) to use `GetNumericOps().Subtract()`
+- [x] Refactor `divideValue()` (line 386) to use `GetNumericOps().Divide()`
+- [ ] Refactor `floorDivideValue()` (line 437) to use protocol (needs FloorDivide method in Numeric protocol)
+- [x] Refactor `moduloTwo()` (line 510) to use `GetNumericOps().Modulo()`
+- [x] Refactor `powerTwo()` (line 572) to use `GetNumericOps().Power()`
+- [x] Refactor `negateValue()` (line 167) to use `GetNumericOps().Negate()`
+
+**Medium Priority - Iterator/Indexable Protocol Usage:**
+- [ ] Update `IterBuilder()` in builtin/iteration.go to use `GetIterableOps()`
+- [ ] Audit eval/indexing.go for `GetIndexableOps()` opportunities
+
+**Benefits:** Consistent codebase, DunderNumeric/Iterator wrappers work everywhere, easier maintenance
+
+#### Internal builtin functions need dunder method support
+Many builtin functions bypass dunder methods and go straight to type switches. Need to add proper dunder method checks.
+
+**High Priority - Type Conversion Functions:** ✅ COMPLETE
+- [x] `int()` (builtin/types.go:114) - Add `__int__()` dunder method support
+- [x] `str()` (builtin/types.go:64) - Add `__str__()` dunder method support
+- [x] `repr()` (builtin/misc.go:21) - Add `__repr__()` dunder method support
+- [x] `bool()` (builtin/types.go:96) - Add `__bool__()` dunder method support in constructor
+- [x] `hash()` (builtin/misc.go:51) - Add `__hash__()` dunder method support
+
+**Medium Priority - Attribute Functions:** 🟡
+- [ ] `getattr()` (builtin/essential_builtins.go:188) - Add `__getattr__()` and `__getattribute__()` support
+- [ ] `setattr()` (builtin/essential_builtins.go:234) - Add `__setattr__()` dunder method support
+- [ ] `delattr()` (builtin/attributes.go:69) - Implement `__delattr__()` dunder method (currently returns error)
+- [ ] `dir()` (builtin/attributes.go:19) - Add `__dir__()` dunder method support
+
+**Medium Priority - Numeric Functions:** 🟡
+- [ ] `abs()` - Verify uses `GetNumericOps().Absolute()` properly
+- [ ] `round()` - Add `__round__()` dunder method support
+- [ ] `divmod()` - Add `__divmod__()` and `__rdivmod__()` dunder method support
+
+**Medium Priority - Missing Builtins:** 🟡
+- [ ] Implement `format()` builtin with `__format__(format_spec)` dunder method
+- [ ] Implement `reversed()` builtin with `__reversed__()` dunder method
+- [ ] `bytes()` (builtin/collections.go:59) - Add `__bytes__()` dunder method support
+
+**Status:**
+- ✅ `float()` - Already has `__float__()` support (builtin/types.go:199)
+- ✅ `len()` - Already has `__len__()` support (builtin/collections.go:297)
+- ✅ Operators - All arithmetic operators now use protocol layer
+
+#### Python Dunder Methods - Missing Implementations
+
+##### Currently Implemented ✅
+Arithmetic: `__add__`, `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__pow__`, `__neg__`, `__abs__`
+Reflected: `__radd__`, `__rsub__`, `__rmul__`, `__rtruediv__`, `__rfloordiv__`, `__rmod__`, `__rpow__`
+Comparison: `__eq__`, `__ne__`, `__lt__`, `__le__`, `__gt__`, `__ge__`
+Container: `__len__`, `__getitem__`, `__setitem__`, `__delitem__`, `__contains__`, `__iter__`, `__next__`
+Bitwise (partial): `__and__`, `__or__`, `__xor__` (sets only), `__hash__`
+Context Manager: `__enter__`, `__exit__`
+Conversion: `__int__`, `__float__`, `__str__`, `__repr__`, `__bool__`
+Lifecycle: `__init__`, `__call__`
+Metaclass: `__instancecheck__`, `__subclasscheck__`
+
+##### High Priority - Core Operations 🔴
+
+**Unary Operations:**
+- [ ] `__pos__` - Unary positive (+x)
+- [ ] `__invert__` - Bitwise NOT (~x)
+
+**Bitwise Operations (for int types):**
+- [ ] `__lshift__` - Left shift (<<)
+- [ ] `__rshift__` - Right shift (>>)
+- [ ] `__rand__` - Reflected AND
+- [ ] `__ror__` - Reflected OR
+- [ ] `__rxor__` - Reflected XOR
+- [ ] `__rlshift__` - Reflected left shift
+- [ ] `__rrshift__` - Reflected right shift
+
+**Augmented Assignment (In-place Operations):**
+- [ ] `__iadd__` - In-place addition (+=)
+- [ ] `__isub__` - In-place subtraction (-=)
+- [ ] `__imul__` - In-place multiplication (*=)
+- [ ] `__itruediv__` - In-place true division (/=)
+- [ ] `__ifloordiv__` - In-place floor division (//=)
+- [ ] `__imod__` - In-place modulo (%=)
+- [ ] `__ipow__` - In-place power (**=)
+- [ ] `__iand__` - In-place AND (&=)
+- [ ] `__ior__` - In-place OR (|=)
+- [ ] `__ixor__` - In-place XOR (^=)
+- [ ] `__ilshift__` - In-place left shift (<<=)
+- [ ] `__irshift__` - In-place right shift (>>=)
+
+**Attribute Access:**
+- [ ] `__getattr__` - Fallback for undefined attributes
+- [ ] `__getattribute__` - Intercept all attribute access
+- [ ] `__setattr__` - Attribute assignment
+- [ ] `__delattr__` - Attribute deletion
+- [ ] `__dir__` - Directory listing for dir()
+
+**Type Conversion:**
+- [ ] `__bytes__` - Convert to bytes
+- [ ] `__complex__` - Convert to complex number
+- [ ] `__index__` - Convert to integer index (for slicing)
+- [ ] `__format__` - Custom string formatting (for format())
+
+##### Medium Priority - Extended Functionality 🟡
+
+**Object Lifecycle:**
+- [ ] `__new__` - Constructor (before __init__)
+- [ ] `__del__` - Finalizer/destructor
+
+**Numeric Protocol:**
+- [ ] `__divmod__` - divmod() function support
+- [ ] `__matmul__` - Matrix multiplication (@)
+- [ ] `__rmatmul__` - Reflected matrix multiplication
+- [ ] `__imatmul__` - In-place matrix multiplication (@=)
+- [ ] `__round__` - Rounding behavior
+- [ ] `__trunc__` - Truncation to integer
+- [ ] `__floor__` - Floor value
+- [ ] `__ceil__` - Ceiling value
+
+**Sequence Protocol:**
+- [ ] `__reversed__` - Reverse iteration
+- [ ] `__missing__` - For dict subclasses when key not found
+- [ ] `__length_hint__` - Length hint for optimization
+
+**Descriptors:**
+- [ ] `__get__` - Descriptor getter
+- [ ] `__set__` - Descriptor setter
+- [ ] `__delete__` - Descriptor deleter
+- [ ] `__set_name__` - Descriptor name binding
+
+**Copy Protocol:**
+- [ ] `__copy__` - Shallow copy support
+- [ ] `__deepcopy__` - Deep copy support
+
+##### Low Priority - Advanced Features 🟢
+
+**Async Protocol (Future):**
+- [ ] `__await__` - Make object awaitable
+- [ ] `__aiter__` - Async iterator protocol
+- [ ] `__anext__` - Async next()
+- [ ] `__aenter__` - Async context manager enter
+- [ ] `__aexit__` - Async context manager exit
+
+**Pickle Protocol:**
+- [ ] `__reduce__` - Pickle support
+- [ ] `__reduce_ex__` - Extended pickle support
+- [ ] `__getnewargs__` - Pickle arguments for __new__
+- [ ] `__getnewargs_ex__` - Extended pickle arguments
+- [ ] `__getstate__` - Get object state for pickling
+- [ ] `__setstate__` - Restore object state from pickle
+
+**Metaclass Protocol:**
+- [ ] `__prepare__` - Metaclass namespace preparation
+- [ ] `__init_subclass__` - Subclass initialization hook
+- [ ] `__mro_entries__` - MRO computation hook
+- [ ] `__class_getitem__` - Generic class indexing (List[int])
+
+**Buffer Protocol (Low-level):**
+- [ ] `__buffer__` - Buffer protocol support
+- [ ] `__release_buffer__` - Buffer release
 
 ### Architecture Improvements
 - [ ] Package reorganization (core package doing too much)
