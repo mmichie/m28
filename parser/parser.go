@@ -150,6 +150,15 @@ func (p *Parser) parseAtom() (core.Value, error) {
 		return nil, fmt.Errorf("unexpected end of input")
 	}
 
+	// Check for reader macros: backtick (quasiquote), comma (unquote/unquote-splicing)
+	if p.input[p.pos] == '`' {
+		return p.parseBacktickQuasiquote()
+	}
+
+	if p.input[p.pos] == ',' {
+		return p.parseCommaUnquote()
+	}
+
 	// Check for f-string
 	if p.pos+1 < len(p.input) && p.input[p.pos] == 'f' && (p.input[p.pos+1] == '"' || p.input[p.pos+1] == '\'') {
 		// Use simpler enhanced f-string parser for now
@@ -216,10 +225,23 @@ func (p *Parser) parseList() (core.Value, error) {
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
 
-		// Skip optional comma
+		// Skip optional comma as separator, but not if it's a reader macro
+		// A comma followed immediately by non-whitespace (except closing delimiters) is a reader macro
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
-			p.advance()
-			p.skipWhitespaceAndComments()
+			nextPos := p.pos + 1
+			// Skip comma if:
+			// 1. Followed by whitespace (normal separator)
+			// 2. Followed by closing delimiter ) ] } (trailing comma)
+			// 3. At end of input
+			if nextPos >= len(p.input) ||
+				unicode.IsSpace(rune(p.input[nextPos])) ||
+				p.input[nextPos] == ')' ||
+				p.input[nextPos] == ']' ||
+				p.input[nextPos] == '}' {
+				p.advance()
+				p.skipWhitespaceAndComments()
+			}
+			// Otherwise, don't skip it - let parseExpr() handle it as a reader macro (e.g., ,x or ,@x)
 		}
 	}
 
@@ -260,10 +282,17 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
 
-		// Skip optional comma
+		// Skip optional comma as separator, but not if it's a reader macro
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
-			p.advance()
-			p.skipWhitespaceAndComments()
+			nextPos := p.pos + 1
+			if nextPos >= len(p.input) ||
+				unicode.IsSpace(rune(p.input[nextPos])) ||
+				p.input[nextPos] == ')' ||
+				p.input[nextPos] == ']' ||
+				p.input[nextPos] == '}' {
+				p.advance()
+				p.skipWhitespaceAndComments()
+			}
 		}
 	}
 
@@ -333,10 +362,17 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 			p.skipWhitespaceAndComments()
 		}
 
-		// Skip optional comma
+		// Skip optional comma as separator, but not if it's a reader macro
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
-			p.advance()
-			p.skipWhitespaceAndComments()
+			nextPos := p.pos + 1
+			if nextPos >= len(p.input) ||
+				unicode.IsSpace(rune(p.input[nextPos])) ||
+				p.input[nextPos] == ')' ||
+				p.input[nextPos] == ']' ||
+				p.input[nextPos] == '}' {
+				p.advance()
+				p.skipWhitespaceAndComments()
+			}
 		}
 	}
 
@@ -392,10 +428,17 @@ func (p *Parser) parseTupleLiteral() (core.Value, error) {
 		elements = append(elements, element)
 		p.skipWhitespaceAndComments()
 
-		// Skip optional comma
+		// Skip optional comma as separator, but not if it's a reader macro
 		if p.pos < len(p.input) && p.input[p.pos] == ',' {
-			p.advance()
-			p.skipWhitespaceAndComments()
+			nextPos := p.pos + 1
+			if nextPos >= len(p.input) ||
+				unicode.IsSpace(rune(p.input[nextPos])) ||
+				p.input[nextPos] == ')' ||
+				p.input[nextPos] == ']' ||
+				p.input[nextPos] == '}' {
+				p.advance()
+				p.skipWhitespaceAndComments()
+			}
 		}
 	}
 
@@ -1308,6 +1351,61 @@ func (p *Parser) parseSymbolName() string {
 
 	// Get the symbol name
 	return p.input[start:p.pos]
+}
+
+// parseBacktickQuasiquote parses backtick reader macro for quasiquote
+// Transforms `expr into (quasiquote expr)
+func (p *Parser) parseBacktickQuasiquote() (core.Value, error) {
+	// Skip the backtick
+	p.advance()
+
+	// Parse the expression after the backtick
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, p.error(fmt.Sprintf("error parsing expression after backtick: %v", err))
+	}
+
+	// Wrap in (quasiquote expr)
+	return core.ListValue{
+		core.SymbolValue("quasiquote"),
+		expr,
+	}, nil
+}
+
+// parseCommaUnquote parses comma reader macro for unquote and unquote-splicing
+// Transforms ,expr into (unquote expr)
+// Transforms ,@expr into (unquote-splicing expr)
+func (p *Parser) parseCommaUnquote() (core.Value, error) {
+	// Skip the comma
+	p.advance()
+
+	// Check if this is unquote-splicing (,@)
+	isSplicing := false
+	if p.pos < len(p.input) && p.input[p.pos] == '@' {
+		isSplicing = true
+		p.advance() // skip @
+	}
+
+	// Parse the expression after the comma (and optional @)
+	expr, err := p.parseExpr()
+	if err != nil {
+		if isSplicing {
+			return nil, p.error(fmt.Sprintf("error parsing expression after ,@: %v", err))
+		}
+		return nil, p.error(fmt.Sprintf("error parsing expression after comma: %v", err))
+	}
+
+	// Wrap in (unquote expr) or (unquote-splicing expr)
+	if isSplicing {
+		return core.ListValue{
+			core.SymbolValue("unquote-splicing"),
+			expr,
+		}, nil
+	}
+	return core.ListValue{
+		core.SymbolValue("unquote"),
+		expr,
+	}, nil
 }
 
 // skipWhitespaceAndComments skips whitespace and comments

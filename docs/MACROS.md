@@ -133,28 +133,48 @@ M28 now has full quasiquote support for easy code generation in macros.
 
 ### Syntax
 
+There are two ways to use quasiquote:
+
+**Full Form (Explicit):**
 - `(quasiquote expr)` - Like quote, but allows selective evaluation
 - `(unquote expr)` - Evaluate `expr` within quasiquote
 - `(unquote-splicing expr)` - Evaluate and splice list elements
 
-### Example: unless Macro with Quasiquote
+**Reader Macro Syntax (Shorthand):**
+- `` `expr `` - Quasiquote (backtick)
+- `,expr` - Unquote (comma)
+- `,@expr` - Unquote-splicing (comma-at)
+
+The reader macro syntax is syntactic sugar that makes macro code much cleaner and more readable.
+
+### Example: unless Macro with Reader Macros
 
 ```lisp
 (@macro
  (def unless (condition body)
-   (quasiquote (if (not (unquote condition)) (unquote body) nil))))
+   `(if (not ,condition) ,body nil)))
 
 (unless (> x 5) (print "x is small"))
 ```
 
-This expands to: `(if (not (> x 5)) (print "x is small") nil)`
+This is equivalent to the explicit form:
+```lisp
+(@macro
+ (def unless (condition body)
+   (quasiquote (if (not (unquote condition)) (unquote body) nil))))
+```
+
+Both expand to: `(if (not (> x 5)) (print "x is small") nil)`
 
 ### Unquote-Splicing Example
 
 ```lisp
 (= items [1 2 3])
-(= expr (quasiquote (list a (unquote-splicing items) b)))
+(= expr `(list a ,@items b))
 # Result: [list a 1 2 3 b]
+
+# Same as:
+(= expr (quasiquote (list a (unquote-splicing items) b)))
 ```
 
 ## Built-in Macros
@@ -216,7 +236,7 @@ Thread value through forms, inserting as last argument:
 - [x] Quasiquote and unquote operators for easy AST construction
 - [x] Unquote-splicing for list splicing in quasiquote
 - [x] Built-in utility macros (`unless`, `when`, `->`, `->>`)
-- [ ] Reader macro syntax: `` ` `` for quasiquote, `,` for unquote, `,@` for unquote-splicing
+- [x] Reader macro syntax: `` ` `` for quasiquote, `,` for unquote, `,@` for unquote-splicing
 - [ ] Hygienic macro support (automatic variable capture prevention)
 - [ ] Macro debugging tools (macro expansion inspection)
 - [ ] Better error messages for macro expansion errors
@@ -232,15 +252,15 @@ Thread value through forms, inserting as last argument:
 
 ### M28
 ```lisp
-# M28 (with quasiquote)
-(@macro
- (def unless (condition body)
-   (quasiquote (if (not (unquote condition)) (unquote body) nil))))
-
-# M28 (future - with reader macro syntax)
+# M28 (with reader macro syntax - recommended)
 (@macro
  (def unless (condition body)
    `(if (not ,condition) ,body nil)))
+
+# M28 (explicit form - also supported)
+(@macro
+ (def unless (condition body)
+   (quasiquote (if (not (unquote condition)) (unquote body) nil))))
 ```
 
 ### Python

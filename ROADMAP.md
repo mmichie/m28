@@ -24,7 +24,7 @@
   - `when` - execute if condition is true
   - `->` (thread-first) - data pipeline, first argument
   - `->>` (thread-last) - data pipeline, last argument
-- [ ] Reader macro syntax (syntactic sugar): `` ` `` for quasiquote, `,` for unquote
+- [x] Reader macro syntax (syntactic sugar): `` ` `` for quasiquote, `,` for unquote, `,@` for unquote-splicing
 
 #### Record Stream & JSON Processing 🟡 HIGH VALUE
 - [ ] Path-based access: `get-in`, `assoc-in`, `update-in`
@@ -213,6 +213,12 @@
     - `unless` and `when` - conditional execution macros
     - `->` (thread-first) - thread value as first argument through pipeline
     - `->>` (thread-last) - thread value as last argument through pipeline
+  - **Phase 4**: Reader macro syntax (syntactic sugar)
+    - `` `expr `` for quasiquote (backtick)
+    - `,expr` for unquote (comma)
+    - `,@expr` for unquote-splicing (comma-at)
+    - Parser-level transformations for cleaner macro code
+    - Smart comma handling: commas followed by whitespace are separators, commas followed by non-whitespace are reader macros
   - Full test coverage with comprehensive examples
   - Complete documentation in docs/MACROS.md
 
