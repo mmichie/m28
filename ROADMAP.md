@@ -198,6 +198,18 @@
 ## ✅ Recently Completed (2024-2025)
 
 ### January 2025
+- **Phase 2.5 Infix Operator Support**: Natural, Pythonic syntax for operators
+  - Infix notation inside parentheses: `(x + y)` instead of `(+ x y)`
+  - Smart context-aware parsing: detects infix vs prefix automatically
+  - Pratt parser with Python-compatible operator precedence
+  - 30+ operators: arithmetic (+, -, *, /, //, %, **), comparison (==, !=, <, >, <=, >=), logical (and, or, not, in), assignment (=, +=, -=, etc.)
+  - Right-associativity for exponentiation and assignment
+  - Graceful fallback: if infix parsing fails, falls back to prefix (handles edge cases like `(reduce + 0 lst)`)
+  - Floor division operator (//) implementation with protocol-based dispatch
+  - Updated tuple syntax: `(tuple ...)` instead of `%(...)` for clarity
+  - 5 comprehensive example programs demonstrating real-world usage
+  - 100% backward compatible - all existing prefix code works unchanged
+  - All 37 tests passing
 - **Complete Macro System**: Full Lisp-style macros with Pythonic syntax
   - **Phase 1**: `@macro` decorator implementation
     - Decorator syntax: `(@macro (def name (params) body))`
