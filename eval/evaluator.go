@@ -210,6 +210,9 @@ func init() {
 
 	// Register s-string forms
 	RegisterSStringForms()
+
+	// Register quasiquote forms
+	RegisterQuasiquoteForms()
 }
 
 // StrictDuplicateChecking controls whether duplicate registrations cause a panic

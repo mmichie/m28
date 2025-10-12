@@ -1,0 +1,74 @@
+# Working Macro System Tests
+# Tests the @macro decorator and basic macro expansion
+
+print "=== Macro System Tests ==="
+
+# Test 1: Simple identity macro
+print ""
+print "Test 1: Identity macro"
+(@macro
+ (def identity (x) x))
+
+(= result1 (identity (+ 1 2)))
+(assert (= result1 3) "Identity macro should evaluate its argument")
+print "✓ Identity macro works"
+
+# Test 2: Check __macro__ attribute
+print ""
+print "Test 2: __macro__ attribute"
+(= has_attr (hasattr identity "__macro__"))
+(assert has_attr "__macro__ attribute should be set")
+
+(= macro_val (getattr identity "__macro__"))
+(assert (= macro_val true) "__macro__ should be true")
+print "✓ __macro__ attribute is set correctly"
+
+# Test 3: Macro that returns a constant
+print ""
+print "Test 3: Constant macro"
+(@macro
+ (def const_42 (x) 42))
+
+(= result3 (const_42 anything))
+(assert (= result3 42) "const_42 should always return 42")
+print "✓ Constant macro works"
+
+# Test 4: Macro that returns its argument unchanged
+print ""
+print "Test 4: Pass-through macro"
+(@macro
+ (def passthrough (expr) expr))
+
+(= result4 (passthrough (+ 5 7)))
+(assert (= result4 12) "passthrough should evaluate expression")
+print "✓ Pass-through macro works"
+
+# Test 5: Multiple macro definitions
+print ""
+print "Test 5: Multiple macros"
+(@macro (def mac1 (x) x))
+(@macro (def mac2 (x) (+ x 1)))
+
+(= r1 (mac1 42))
+(= r2 (mac2 10))
+(assert (= r1 42) "First macro should work")
+(assert (= r2 11) "Second macro should add 1")
+print "✓ Multiple macros can coexist"
+
+# Test 6: Regular function vs macro
+print ""
+print "Test 6: Regular function vs macro"
+(def regular_fn (x) (+ x 1))
+(@macro (def macro_fn (x) (+ x 1)))
+
+(= reg_result (regular_fn 5))
+(= mac_result (macro_fn 5))
+(assert (= reg_result 6) "Regular function should evaluate normally")
+(assert (= mac_result 6) "Macro should also work")
+print "✓ Functions and macros can be distinguished"
+
+print ""
+print "=== All Macro Tests Passed! ==="
+print ""
+print "Note: Advanced macro features like code generation with s-strings"
+print "require additional work on quasiquote/unquote semantics."

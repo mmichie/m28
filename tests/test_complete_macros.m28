@@ -1,0 +1,63 @@
+# Complete Macro System Tests
+
+print "=== Testing Complete Macro System ==="
+
+# Test 1: unless macro
+print ""
+print "Test 1: unless macro"
+(= x 3)
+(= r1 (unless (> x 5) (+ x 100)))
+print "unless (> 3 5): should be 103 =" r1
+(assert (= r1 103) "unless test 1 failed")
+
+(= r2 (unless (< x 5) (+ x 100)))
+print "unless (< 3 5): should be None =" r2
+(assert (is_none r2) "unless test 2 failed")
+
+# Test 2: when macro
+print ""
+print "Test 2: when macro"
+(= r3 (when (< x 5) (+ x 100)))
+print "when (< 3 5): should be 103 =" r3
+(assert (= r3 103) "when test 1 failed")
+
+(= r4 (when (> x 5) (+ x 100)))
+print "when (> 3 5): should be None =" r4
+(assert (is_none r4) "when test 2 failed")
+
+# Test 3: -> (thread-first) macro
+print ""
+print "Test 3: -> (thread-first) macro"
+(= data 5)
+(= r5 (-> data (+ 10) (* 2)))
+print "(-&gt; 5 (+ 10) (* 2)): should be 30 =" r5
+(assert (= r5 30) "thread-first test failed")
+
+# Test 4: ->> (thread-last) macro
+print ""
+print "Test 4: ->> (thread-last) macro"
+(= nums [1 2 3 4 5])
+(= r6 (->> nums (map (lambda (x) (* x 2))) (filter (lambda (x) (> x 4))) list))
+print "(->> [1 2 3 4 5] (map (* 2)) (filter (> 4))): should be [6, 8, 10] =" r6
+(assert (= r6 [6 8 10]) "thread-last test failed")
+
+# Test 5: Nested macros
+print ""
+print "Test 5: Nested macros"
+(= r7 (when (< x 10) (unless (> x 5) (* x 10))))
+print "when (< 3 10) (unless (> 3 5) (* 3 10)): should be 30 =" r7
+(assert (= r7 30) "nested macros test failed")
+
+# Test 6: Custom macro using quasiquote
+print ""
+print "Test 6: Custom macro with quasiquote"
+(@macro
+ (def my_if (cond then_val else_val)
+   (quasiquote (if (unquote cond) (unquote then_val) (unquote else_val)))))
+
+(= r8 (my_if (> 10 5) "yes" "no"))
+print "my_if (> 10 5) \"yes\" \"no\": should be \"yes\" =" r8
+(assert (= r8 "yes") "custom macro test failed")
+
+print ""
+print "=== All Macro Tests Passed! ==="

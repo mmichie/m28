@@ -4,7 +4,7 @@
 
 ### Language Features
 
-#### Macro System with S-Strings 🟡 HIGH PRIORITY
+#### Macro System ✅ COMPLETE
 - [x] S-string syntax: `s"(+ {x} 1)"` with interpolation
   - Parser recognizes s-strings and raw s-strings
   - Five interpolation types: value, code, splice, dict-splice, gensym
@@ -15,8 +15,16 @@
   - Macros receive unevaluated arguments
   - Macro expansion at call time
   - `__macro__` attribute marks functions as macros
-- [ ] Quasiquote/unquote for code generation in macros
-- [ ] Built-in threading macros (`->`, `->>`)
+- [x] Quasiquote/unquote for code generation in macros
+  - `(quasiquote expr)`, `(unquote expr)`, `(unquote-splicing expr)`
+  - Perfect for macro code generation
+  - Seamless integration with macro system
+- [x] Built-in utility macros
+  - `unless` - execute if condition is false
+  - `when` - execute if condition is true
+  - `->` (thread-first) - data pipeline, first argument
+  - `->>` (thread-last) - data pipeline, last argument
+- [ ] Reader macro syntax (syntactic sugar): `` ` `` for quasiquote, `,` for unquote
 
 #### Record Stream & JSON Processing 🟡 HIGH VALUE
 - [ ] Path-based access: `get-in`, `assoc-in`, `update-in`
@@ -190,15 +198,23 @@
 ## ✅ Recently Completed (2024-2025)
 
 ### January 2025
-- **Macro System (Phase 1)**: Pythonic `@macro` decorator implementation
-  - Decorator syntax: `(@macro (def name (params) body))` for defining macros
-  - Macros receive unevaluated arguments (key difference from functions)
-  - Macro expansion at call time with two-phase evaluation
-  - `__macro__` attribute marks functions as macros
-  - Decorator form handler in evaluator
-  - Macro expansion logic with unevaluated argument passing
-  - Basic macro functionality working (identity, passthrough, constant macros)
-  - Foundation for advanced code generation (needs quasiquote/unquote)
+- **Complete Macro System**: Full Lisp-style macros with Pythonic syntax
+  - **Phase 1**: `@macro` decorator implementation
+    - Decorator syntax: `(@macro (def name (params) body))`
+    - Macros receive unevaluated arguments (key difference from functions)
+    - Macro expansion at call time with two-phase evaluation
+    - `__macro__` attribute marks functions as macros
+  - **Phase 2**: Quasiquote/unquote system
+    - `(quasiquote expr)` - like quote but allows selective evaluation
+    - `(unquote expr)` - evaluate expression within quasiquote
+    - `(unquote-splicing expr)` - splice list elements
+    - Recursive expansion with proper nesting support
+  - **Phase 3**: Built-in utility macros
+    - `unless` and `when` - conditional execution macros
+    - `->` (thread-first) - thread value as first argument through pipeline
+    - `->>` (thread-last) - thread value as last argument through pipeline
+  - Full test coverage with comprehensive examples
+  - Complete documentation in docs/MACROS.md
 
 ### December 2024
 - **S-String Implementation (Phases 1 & 2)**: Syntax strings for metaprogramming and code generation

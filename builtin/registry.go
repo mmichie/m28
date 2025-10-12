@@ -23,6 +23,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterErrors(ctx)
 	RegisterMisc(ctx)
 	RegisterDecorators(ctx) // Register decorators (@macro)
+	RegisterMacros(ctx)     // Register built-in macros (unless, when, ->, ->>)
 
 	// Register operators using new protocol-based implementation
 	operators.RegisterAll(ctx)

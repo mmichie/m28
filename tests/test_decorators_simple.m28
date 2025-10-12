@@ -1,0 +1,22 @@
+# Simple decorator test
+
+# Test 1: Define a macro
+(@macro
+ (def my_macro (x)
+   (print "Macro received:" x)
+   x))
+
+print "Defined macro"
+
+# Test 2: Call the macro
+(= result (my_macro (+ 1 2)))
+print "Result:" result
+
+# Test 3: Check __macro__ attribute
+(= has_macro (hasattr my_macro "__macro__"))
+print "has __macro__ attribute:" has_macro
+
+(= macro_val (getattr my_macro "__macro__"))
+print "__macro__ value:" macro_val
+
+print "Test completed!"

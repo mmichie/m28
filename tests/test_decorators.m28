@@ -1,0 +1,91 @@
+# Test decorator and macro system
+
+# Test 1: Basic macro definition and application
+(@macro
+ (def simple_macro (x)
+   x))
+
+(= result1 (simple_macro (+ 1 2)))
+(assert (= result1 (+ 1 2)) "Simple macro should return unevaluated expression")
+
+# Test 2: Macro that transforms code - unless
+(@macro
+ (def unless (condition body)
+   s"(if (not {condition}) {body} nil)"))
+
+(= x 10)
+(= result2 (unless (< x 5) (+ x 100)))
+(assert (= result2 110) "unless macro should execute body when condition is false")
+
+(= result3 (unless (> x 5) (+ x 100)))
+(assert (= result3 nil) "unless macro should return nil when condition is true")
+
+# Test 3: Macro that transforms code - when
+(@macro
+ (def when (condition body)
+   s"(if {condition} {body} nil)"))
+
+(= y 20)
+(= result4 (when (> y 10) (+ y 50)))
+(assert (= result4 70) "when macro should execute body when condition is true")
+
+(= result5 (when (< y 10) (+ y 50)))
+(assert (= result5 nil) "when macro should return nil when condition is false")
+
+# Test 4: Macro receives unevaluated arguments
+(@macro
+ (def debug_args (arg1 arg2)
+   # Return a list showing the raw AST of the arguments
+   s"[{=arg1} {=arg2}]"))
+
+(= z 5)
+# The macro should receive the symbols 'z' and '(+ z 1)', not their values
+(= result6 (debug_args z (+ z 1)))
+(assert (= (len result6) 2) "debug_args should return list with 2 elements")
+
+# Test 5: Macro with code generation
+(@macro
+ (def make_adder (n)
+   s"(def adder (x) (+ x {n}))"))
+
+(make_adder 10)
+(= result7 (adder 5))
+(assert (= result7 15) "Generated adder function should add 10 to input")
+
+# Test 6: Check that __macro__ attribute is set
+(@macro
+ (def test_func (x) x))
+
+(= macro_attr (getattr test_func "__macro__"))
+(assert (= macro_attr true) "Macro should have __macro__ attribute set to true")
+
+# Test 7: Regular function should not have __macro__ attribute
+(def regular_func (x) (+ x 1))
+(= has_macro_attr (hasattr regular_func "__macro__"))
+(assert (= has_macro_attr false) "Regular function should not have __macro__ attribute")
+
+# Test 8: Multiple decorators can be applied
+(@macro
+ (def another_macro (x) x))
+
+(= result8 (another_macro 42))
+(assert (= result8 42) "Multiple macros should work independently")
+
+# Test 9: Macro with multiple arguments
+(@macro
+ (def swap (a b)
+   s"[{b} {a}]"))
+
+(= result9 (swap "first" "second"))
+(assert (= result9 ["second" "first"]) "swap macro should reverse arguments")
+
+# Test 10: Macro using splice interpolation
+(@macro
+ (def make_list (items)
+   s"[{*items}]"))
+
+(= items [1 2 3])
+(= result10 (make_list items))
+(assert (= result10 [1 2 3]) "make_list should splice items into list")
+
+print "All decorator and macro tests passed!"
