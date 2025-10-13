@@ -1,0 +1,14 @@
+# Debug test for infix
+
+(print "Test 1: Simple assignment")
+(= x 5)
+(print "x =" x)
+
+(print "Test 2: Assignment with infix RHS")
+(= y (5 + 3))
+(print "y =" y)
+
+(print "Test 3: Infix in parens")
+(print (2 + 3))
+
+(print "All tests passed!")

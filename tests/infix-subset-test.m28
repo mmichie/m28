@@ -1,0 +1,33 @@
+# Test subset of edge cases
+
+(print "Testing infix edge cases...")
+
+# Test 1: Mixed prefix and infix - infix result used in prefix context
+(print (2 + 3))
+(print "Mixed prefix/infix works")
+
+# Test 2: Assignment with infix RHS
+(= x (5 + 3))
+(assert (== x 8) "Assignment with infix RHS")
+
+(= y (x * 2 + 1))
+(assert (== y 17) "Complex infix RHS: 8 * 2 + 1 = 17")
+
+# Test 3: Nested infix expressions
+(= result ((2 + 3) * (4 + 1)))
+(assert (== result 25) "Nested infix: (2+3)*(4+1) = 25")
+
+# Test 4: Infix in function arguments
+(def add3 (a b c)
+  (+ a b c))
+
+(= result (add3 (1 + 2) (3 * 2) (10 - 5)))
+(assert (== result 14) "Infix in function args: 3 + 6 + 5 = 14")
+
+# Test 5: Comparison chains (each comparison is separate in M28)
+(= x 5)
+(= y 10)
+(= z 15)
+(assert (and (< x y) (< y z)) "Chained comparison simulation")
+
+(print "Tests 1-5 passed!")

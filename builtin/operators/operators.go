@@ -36,6 +36,14 @@ func RegisterAll(ctx *core.Context) {
 	ctx.Define("and", core.NewBuiltinFunction(And()))
 	ctx.Define("or", core.NewBuiltinFunction(Or()))
 	ctx.Define("in", core.NewBuiltinFunction(In()))
+
+	// Bitwise operators
+	ctx.Define("<<", core.NewBuiltinFunction(LeftShift()))
+	ctx.Define(">>", core.NewBuiltinFunction(RightShift()))
+	ctx.Define("&", core.NewBuiltinFunction(BitwiseAnd()))
+	ctx.Define("|", core.NewBuiltinFunction(BitwiseOr()))
+	ctx.Define("^", core.NewBuiltinFunction(BitwiseXor()))
+	ctx.Define("~", core.NewBuiltinFunction(BitwiseInvert()))
 }
 
 // Arithmetic Operators
@@ -51,9 +59,9 @@ func Add() func([]core.Value, *core.Context) (core.Value, error) {
 			return core.NumberValue(0), nil
 		}
 
-		// Single argument returns itself
+		// Single argument: unary plus
 		if v.Count() == 1 {
-			return args[0], nil
+			return positiveValue(args[0], ctx)
 		}
 
 		// Multiple arguments - chain additions
@@ -1089,4 +1097,340 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 			return nil, errors.NewTypeError("in", "argument must be iterable", string(container.Type()))
 		}
 	}
+}
+
+// Bitwise Operators
+
+// positiveValue implements unary + operator
+func positiveValue(value core.Value, ctx *core.Context) (core.Value, error) {
+	// Try __pos__ dunder method
+	if result, found, err := types.CallDunder(value, "__pos__", []core.Value{}, ctx); found {
+		return result, err
+	}
+
+	// For numeric types, return the value as-is
+	return types.Switch(value).
+		Number(func(n float64) (core.Value, error) {
+			return core.NumberValue(n), nil
+		}).
+		Default(func(v core.Value) (core.Value, error) {
+			return nil, errors.NewTypeError("+",
+				"bad operand type for unary +",
+				"'"+string(v.Type())+"'")
+		}).
+		Execute()
+}
+
+// BitwiseInvert implements the ~ operator (bitwise NOT)
+func BitwiseInvert() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("~", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		return invertValue(args[0], ctx)
+	}
+}
+
+// invertValue inverts a single value
+func invertValue(value core.Value, ctx *core.Context) (core.Value, error) {
+	// Try __invert__ dunder method
+	if result, found, err := types.CallDunder(value, "__invert__", []core.Value{}, ctx); found {
+		return result, err
+	}
+
+	// Fall back to integer bitwise inversion
+	return types.Switch(value).
+		Number(func(n float64) (core.Value, error) {
+			// Check if it's an integer
+			if n != float64(int(n)) {
+				return nil, errors.NewTypeError("~",
+					"bad operand type for unary ~",
+					"'float'")
+			}
+			// Bitwise NOT for integer
+			return core.NumberValue(float64(^int(n))), nil
+		}).
+		Default(func(v core.Value) (core.Value, error) {
+			return nil, errors.NewTypeError("~",
+				"bad operand type for unary ~",
+				"'"+string(v.Type())+"'")
+		}).
+		Execute()
+}
+
+// LeftShift implements the << operator
+func LeftShift() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("<<", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		return leftShiftTwo(args[0], args[1], ctx)
+	}
+}
+
+// leftShiftTwo performs left shift: left << right
+func leftShiftTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Try __lshift__ on left operand
+	if result, found, err := types.CallDunder(left, "__lshift__", []core.Value{right}, ctx); found {
+		return result, err
+	}
+
+	// Try __rlshift__ on right operand
+	if result, found, err := types.CallDunder(right, "__rlshift__", []core.Value{left}, ctx); found {
+		return result, err
+	}
+
+	// Fall back to integer left shift
+	return types.Switch(left).
+		Number(func(leftNum float64) (core.Value, error) {
+			return types.Switch(right).
+				Number(func(rightNum float64) (core.Value, error) {
+					// Check both are integers
+					if leftNum != float64(int(leftNum)) {
+						return nil, errors.NewTypeError("<<",
+							"unsupported operand type(s)",
+							"'float' and '"+string(right.Type())+"'")
+					}
+					if rightNum != float64(int(rightNum)) || rightNum < 0 {
+						return nil, errors.NewTypeError("<<",
+							"unsupported operand type(s)",
+							"'int' and 'float'")
+					}
+					result := int(leftNum) << uint(rightNum)
+					return core.NumberValue(float64(result)), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("<<",
+						"unsupported operand type(s)",
+						"'int' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
+		Default(func(l core.Value) (core.Value, error) {
+			return nil, errors.NewTypeError("<<",
+				"unsupported operand type(s)",
+				"'"+string(l.Type())+"' and '"+string(right.Type())+"'")
+		}).
+		Execute()
+}
+
+// RightShift implements the >> operator
+func RightShift() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs(">>", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		return rightShiftTwo(args[0], args[1], ctx)
+	}
+}
+
+// rightShiftTwo performs right shift: left >> right
+func rightShiftTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Try __rshift__ on left operand
+	if result, found, err := types.CallDunder(left, "__rshift__", []core.Value{right}, ctx); found {
+		return result, err
+	}
+
+	// Try __rrshift__ on right operand
+	if result, found, err := types.CallDunder(right, "__rrshift__", []core.Value{left}, ctx); found {
+		return result, err
+	}
+
+	// Fall back to integer right shift
+	return types.Switch(left).
+		Number(func(leftNum float64) (core.Value, error) {
+			return types.Switch(right).
+				Number(func(rightNum float64) (core.Value, error) {
+					// Check both are integers
+					if leftNum != float64(int(leftNum)) {
+						return nil, errors.NewTypeError(">>",
+							"unsupported operand type(s)",
+							"'float' and '"+string(right.Type())+"'")
+					}
+					if rightNum != float64(int(rightNum)) || rightNum < 0 {
+						return nil, errors.NewTypeError(">>",
+							"unsupported operand type(s)",
+							"'int' and 'float'")
+					}
+					result := int(leftNum) >> uint(rightNum)
+					return core.NumberValue(float64(result)), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError(">>",
+						"unsupported operand type(s)",
+						"'int' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
+		Default(func(l core.Value) (core.Value, error) {
+			return nil, errors.NewTypeError(">>",
+				"unsupported operand type(s)",
+				"'"+string(l.Type())+"' and '"+string(right.Type())+"'")
+		}).
+		Execute()
+}
+
+// BitwiseAnd implements the & operator
+func BitwiseAnd() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("&", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		return bitwiseAndTwo(args[0], args[1], ctx)
+	}
+}
+
+// bitwiseAndTwo performs bitwise AND: left & right
+func bitwiseAndTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Try __and__ on left operand
+	if result, found, err := types.CallDunder(left, "__and__", []core.Value{right}, ctx); found {
+		return result, err
+	}
+
+	// Try __rand__ on right operand
+	if result, found, err := types.CallDunder(right, "__rand__", []core.Value{left}, ctx); found {
+		return result, err
+	}
+
+	// Fall back to integer bitwise AND
+	return types.Switch(left).
+		Number(func(leftNum float64) (core.Value, error) {
+			return types.Switch(right).
+				Number(func(rightNum float64) (core.Value, error) {
+					// Check both are integers
+					if leftNum != float64(int(leftNum)) || rightNum != float64(int(rightNum)) {
+						return nil, errors.NewTypeError("&",
+							"unsupported operand type(s)",
+							"'float' and 'float'")
+					}
+					result := int(leftNum) & int(rightNum)
+					return core.NumberValue(float64(result)), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("&",
+						"unsupported operand type(s)",
+						"'int' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
+		Default(func(l core.Value) (core.Value, error) {
+			return nil, errors.NewTypeError("&",
+				"unsupported operand type(s)",
+				"'"+string(l.Type())+"' and '"+string(right.Type())+"'")
+		}).
+		Execute()
+}
+
+// BitwiseOr implements the | operator
+func BitwiseOr() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("|", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		return bitwiseOrTwo(args[0], args[1], ctx)
+	}
+}
+
+// bitwiseOrTwo performs bitwise OR: left | right
+func bitwiseOrTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Try __or__ on left operand
+	if result, found, err := types.CallDunder(left, "__or__", []core.Value{right}, ctx); found {
+		return result, err
+	}
+
+	// Try __ror__ on right operand
+	if result, found, err := types.CallDunder(right, "__ror__", []core.Value{left}, ctx); found {
+		return result, err
+	}
+
+	// Fall back to integer bitwise OR
+	return types.Switch(left).
+		Number(func(leftNum float64) (core.Value, error) {
+			return types.Switch(right).
+				Number(func(rightNum float64) (core.Value, error) {
+					// Check both are integers
+					if leftNum != float64(int(leftNum)) || rightNum != float64(int(rightNum)) {
+						return nil, errors.NewTypeError("|",
+							"unsupported operand type(s)",
+							"'float' and 'float'")
+					}
+					result := int(leftNum) | int(rightNum)
+					return core.NumberValue(float64(result)), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("|",
+						"unsupported operand type(s)",
+						"'int' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
+		Default(func(l core.Value) (core.Value, error) {
+			return nil, errors.NewTypeError("|",
+				"unsupported operand type(s)",
+				"'"+string(l.Type())+"' and '"+string(right.Type())+"'")
+		}).
+		Execute()
+}
+
+// BitwiseXor implements the ^ operator
+func BitwiseXor() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("^", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		return bitwiseXorTwo(args[0], args[1], ctx)
+	}
+}
+
+// bitwiseXorTwo performs bitwise XOR: left ^ right
+func bitwiseXorTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Try __xor__ on left operand
+	if result, found, err := types.CallDunder(left, "__xor__", []core.Value{right}, ctx); found {
+		return result, err
+	}
+
+	// Try __rxor__ on right operand
+	if result, found, err := types.CallDunder(right, "__rxor__", []core.Value{left}, ctx); found {
+		return result, err
+	}
+
+	// Fall back to integer bitwise XOR
+	return types.Switch(left).
+		Number(func(leftNum float64) (core.Value, error) {
+			return types.Switch(right).
+				Number(func(rightNum float64) (core.Value, error) {
+					// Check both are integers
+					if leftNum != float64(int(leftNum)) || rightNum != float64(int(rightNum)) {
+						return nil, errors.NewTypeError("^",
+							"unsupported operand type(s)",
+							"'float' and 'float'")
+					}
+					result := int(leftNum) ^ int(rightNum)
+					return core.NumberValue(float64(result)), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("^",
+						"unsupported operand type(s)",
+						"'int' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
+		Default(func(l core.Value) (core.Value, error) {
+			return nil, errors.NewTypeError("^",
+				"unsupported operand type(s)",
+				"'"+string(l.Type())+"' and '"+string(right.Type())+"'")
+		}).
+		Execute()
 }

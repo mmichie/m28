@@ -1,0 +1,29 @@
+# Test infix-style compound assignment
+
+(print "Testing infix compound assignment...\n")
+
+(print "Test 1: Infix += ")
+(= x 10)
+(print "x =" x)
+(x += 5)
+(print "After (x += 5), x =" x)
+
+(print "\nTest 2: Infix -= ")
+(= y 20)
+(print "y =" y)
+(y -= 7)
+(print "After (y -= 7), y =" y)
+
+(print "\nTest 3: Infix *= ")
+(= z 3)
+(print "z =" z)
+(z *= 4)
+(print "After (z *= 4), z =" z)
+
+(print "\nTest 4: Infix with expression on RHS")
+(= a 100)
+(print "a =" a)
+(a += (5 * 10))
+(print "After (a += (5 * 10)), a =" a)
+
+(print "\nDone!")

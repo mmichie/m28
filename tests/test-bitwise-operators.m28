@@ -1,0 +1,266 @@
+# Test bitwise operators with dunder method support
+
+(print "Testing Bitwise Operators")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: Bitwise AND (&)
+# =============================================================================
+(print "\n1. Testing Bitwise AND (&)")
+(print "-" 70)
+
+(= result1 (& 12 10))  # 0b1100 & 0b1010 = 0b1000 = 8
+(print (+ "12 & 10 = " (str result1)))
+(assert (== result1 8) "Bitwise AND works")
+
+(= result2 (& 7 3))  # 0b0111 & 0b0011 = 0b0011 = 3
+(print (+ "7 & 3 = " (str result2)))
+(assert (== result2 3) "Bitwise AND works")
+
+(= result3 (& 15 0))  # Any number & 0 = 0
+(print (+ "15 & 0 = " (str result3)))
+(assert (== result3 0) "Bitwise AND with 0 works")
+
+(print "✓ Bitwise AND works")
+
+# =============================================================================
+# Test 2: Bitwise OR (|)
+# =============================================================================
+(print "\n2. Testing Bitwise OR (|)")
+(print "-" 70)
+
+(= result4 (| 12 10))  # 0b1100 | 0b1010 = 0b1110 = 14
+(print (+ "12 | 10 = " (str result4)))
+(assert (== result4 14) "Bitwise OR works")
+
+(= result5 (| 4 2))  # 0b0100 | 0b0010 = 0b0110 = 6
+(print (+ "4 | 2 = " (str result5)))
+(assert (== result5 6) "Bitwise OR works")
+
+(= result6 (| 0 5))  # 0 | 5 = 5
+(print (+ "0 | 5 = " (str result6)))
+(assert (== result6 5) "Bitwise OR with 0 works")
+
+(print "✓ Bitwise OR works")
+
+# =============================================================================
+# Test 3: Bitwise XOR (^)
+# =============================================================================
+(print "\n3. Testing Bitwise XOR (^)")
+(print "-" 70)
+
+(= result7 (^ 12 10))  # 0b1100 ^ 0b1010 = 0b0110 = 6
+(print (+ "12 ^ 10 = " (str result7)))
+(assert (== result7 6) "Bitwise XOR works")
+
+(= result8 (^ 5 3))  # 0b0101 ^ 0b0011 = 0b0110 = 6
+(print (+ "5 ^ 3 = " (str result8)))
+(assert (== result8 6) "Bitwise XOR works")
+
+(= result9 (^ 7 7))  # Same number XOR = 0
+(print (+ "7 ^ 7 = " (str result9)))
+(assert (== result9 0) "Bitwise XOR with same number works")
+
+(print "✓ Bitwise XOR works")
+
+# =============================================================================
+# Test 4: Left Shift (<<)
+# =============================================================================
+(print "\n4. Testing Left Shift (<<)")
+(print "-" 70)
+
+(= result10 (<< 5 2))  # 5 << 2 = 20 (multiply by 4)
+(print (+ "5 << 2 = " (str result10)))
+(assert (== result10 20) "Left shift works")
+
+(= result11 (<< 1 3))  # 1 << 3 = 8
+(print (+ "1 << 3 = " (str result11)))
+(assert (== result11 8) "Left shift works")
+
+(= result12 (<< 7 0))  # 7 << 0 = 7
+(print (+ "7 << 0 = " (str result12)))
+(assert (== result12 7) "Left shift by 0 works")
+
+(print "✓ Left shift works")
+
+# =============================================================================
+# Test 5: Right Shift (>>)
+# =============================================================================
+(print "\n5. Testing Right Shift (>>)")
+(print "-" 70)
+
+(= result13 (>> 20 2))  # 20 >> 2 = 5 (divide by 4)
+(print (+ "20 >> 2 = " (str result13)))
+(assert (== result13 5) "Right shift works")
+
+(= result14 (>> 8 3))  # 8 >> 3 = 1
+(print (+ "8 >> 3 = " (str result14)))
+(assert (== result14 1) "Right shift works")
+
+(= result15 (>> 7 0))  # 7 >> 0 = 7
+(print (+ "7 >> 0 = " (str result15)))
+(assert (== result15 7) "Right shift by 0 works")
+
+(print "✓ Right shift works")
+
+# =============================================================================
+# Test 6: Bitwise NOT (~)
+# =============================================================================
+(print "\n6. Testing Bitwise NOT (~)")
+(print "-" 70)
+
+(= result16 (~ 5))  # ~5 = -6 (two's complement)
+(print (+ "~5 = " (str result16)))
+(assert (== result16 -6) "Bitwise NOT works")
+
+(= result17 (~ 0))  # ~0 = -1
+(print (+ "~0 = " (str result17)))
+(assert (== result17 -1) "Bitwise NOT of 0 works")
+
+(= result18 (~ -1))  # ~(-1) = 0
+(print (+ "~(-1) = " (str result18)))
+(assert (== result18 0) "Bitwise NOT of -1 works")
+
+(print "✓ Bitwise NOT works")
+
+# =============================================================================
+# Test 7: Unary Plus (+)
+# =============================================================================
+(print "\n7. Testing Unary Plus (+)")
+(print "-" 70)
+
+(= result19 (+ 5))  # +5 = 5
+(print (+ "+(5) = " (str result19)))
+(assert (== result19 5) "Unary plus works")
+
+(= result20 (+ -3))  # +(-3) = -3
+(print (+ "+(-3) = " (str result20)))
+(assert (== result20 -3) "Unary plus with negative works")
+
+(print "✓ Unary plus works")
+
+# =============================================================================
+# Test 8: Custom class with bitwise dunder methods
+# =============================================================================
+(print "\n8. Testing custom class with bitwise dunder methods")
+(print "-" 70)
+
+(class BitFlags ()
+  (def __init__ (self value)
+    (= self.value value))
+
+  (def __and__ (self other)
+    (BitFlags (& self.value other.value)))
+
+  (def __or__ (self other)
+    (BitFlags (| self.value other.value)))
+
+  (def __xor__ (self other)
+    (BitFlags (^ self.value other.value)))
+
+  (def __lshift__ (self other)
+    (BitFlags (<< self.value other)))
+
+  (def __rshift__ (self other)
+    (BitFlags (>> self.value other)))
+
+  (def __invert__ (self)
+    (BitFlags (~ self.value)))
+
+  (def __pos__ (self)
+    self))
+
+(= flags1 (BitFlags 12))  # 0b1100
+(= flags2 (BitFlags 10))  # 0b1010
+
+(= and_result (& flags1 flags2))
+(print (+ "BitFlags(12) & BitFlags(10) = BitFlags(" (str and_result.value) ")"))
+(assert (== and_result.value 8) "Custom __and__ works")
+
+(= or_result (| flags1 flags2))
+(print (+ "BitFlags(12) | BitFlags(10) = BitFlags(" (str or_result.value) ")"))
+(assert (== or_result.value 14) "Custom __or__ works")
+
+(= xor_result (^ flags1 flags2))
+(print (+ "BitFlags(12) ^ BitFlags(10) = BitFlags(" (str xor_result.value) ")"))
+(assert (== xor_result.value 6) "Custom __xor__ works")
+
+(= lshift_result (<< flags1 2))
+(print (+ "BitFlags(12) << 2 = BitFlags(" (str lshift_result.value) ")"))
+(assert (== lshift_result.value 48) "Custom __lshift__ works")
+
+(= rshift_result (>> flags1 2))
+(print (+ "BitFlags(12) >> 2 = BitFlags(" (str rshift_result.value) ")"))
+(assert (== rshift_result.value 3) "Custom __rshift__ works")
+
+(= invert_result (~ flags1))
+(print (+ "~BitFlags(12) = BitFlags(" (str invert_result.value) ")"))
+(assert (== invert_result.value -13) "Custom __invert__ works")
+
+(= pos_result (+ flags1))
+(print (+ "+(BitFlags(12)) = " (str pos_result.value)))
+(assert (== pos_result.value 12) "Custom __pos__ works")
+
+(print "✓ Custom bitwise dunder methods work")
+
+# =============================================================================
+# Test 9: Negative numbers
+# =============================================================================
+(print "\n9. Testing bitwise operations with negative numbers")
+(print "-" 70)
+
+(= neg_result1 (& -1 5))  # -1 has all bits set
+(print (+ "(-1) & 5 = " (str neg_result1)))
+(assert (== neg_result1 5) "Bitwise AND with -1 works")
+
+(= neg_result2 (| -8 3))
+(print (+ "(-8) | 3 = " (str neg_result2)))
+(assert (== neg_result2 -5) "Bitwise OR with negative works")
+
+(= neg_result3 (>> -16 2))
+(print (+ "(-16) >> 2 = " (str neg_result3)))
+(assert (== neg_result3 -4) "Right shift negative works")
+
+(print "✓ Bitwise operations with negative numbers work")
+
+# =============================================================================
+# Test 10: Combining operations
+# =============================================================================
+(print "\n10. Testing combined bitwise operations")
+(print "-" 70)
+
+(= combined1 (& (| 12 3) 14))  # (12 | 3) & 14 = 15 & 14 = 14
+(print (+ "(12 | 3) & 14 = " (str combined1)))
+(assert (== combined1 14) "Combined operations work")
+
+(= combined2 (>> (<< 5 2) 1))  # (5 << 2) >> 1 = 20 >> 1 = 10
+(print (+ "(5 << 2) >> 1 = " (str combined2)))
+(assert (== combined2 10) "Combined shift operations work")
+
+(= combined3 (^ (& 15 12) (| 3 8)))  # (15 & 12) ^ (3 | 8) = 12 ^ 11 = 7
+(print (+ "(15 & 12) ^ (3 | 8) = " (str combined3)))
+(assert (== combined3 7) "Complex combined operations work")
+
+(print "✓ Combined bitwise operations work")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All Bitwise Operator Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented bitwise operators:")
+(print "  • & (AND) - Calls __and__ / __rand__")
+(print "  • | (OR) - Calls __or__ / __ror__")
+(print "  • ^ (XOR) - Calls __xor__ / __rxor__")
+(print "  • << (LEFT SHIFT) - Calls __lshift__ / __rlshift__")
+(print "  • >> (RIGHT SHIFT) - Calls __rshift__ / __rrshift__")
+(print "  • ~ (NOT/INVERT) - Calls __invert__")
+(print "  • + (UNARY PLUS) - Calls __pos__")
+
+(print "\nAll operators support:")
+(print "  • Dunder methods for custom types")
+(print "  • Reflected operations for right-hand operands")
+(print "  • Integer-only operations with proper type checking")
+(print "  • Pythonic error messages")

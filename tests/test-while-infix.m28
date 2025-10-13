@@ -1,0 +1,20 @@
+# Test while loop with infix
+
+(print "Starting while loop test...")
+(= counter 0)
+(print "counter initialized to" counter)
+
+(= sum 0)
+(print "sum initialized to" sum)
+
+(print "Testing condition:" (< counter 5))
+
+(while (< counter 5)
+  (print "Loop iteration, counter =" counter)
+  (= sum (+ sum counter))
+  (print "  sum is now" sum)
+  (= counter (+ counter 1))
+  (print "  counter is now" counter))
+
+(print "Final sum:" sum)
+(print "Done!")

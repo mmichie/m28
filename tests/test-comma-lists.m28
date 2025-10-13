@@ -1,0 +1,7 @@
+# Test comma-separated lists
+
+(print "Test 1: List with commas")
+(= numbers [1, 2, 3, 4, 5])
+(print numbers)
+
+(print "\nDone")

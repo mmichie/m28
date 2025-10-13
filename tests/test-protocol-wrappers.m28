@@ -1,0 +1,108 @@
+# Test Protocol Wrappers - DunderIterator, DunderNumeric, DunderIndexable
+#
+# This test demonstrates the three protocol wrappers that allow custom M28
+# classes with Python-style dunder methods to integrate seamlessly with
+# M28's protocol system.
+
+(print "Testing Protocol Wrappers")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: DunderNumeric - Custom arithmetic with Vector class
+# =============================================================================
+(print "\n1. Testing DunderNumeric Wrapper")
+(print "-" 70)
+
+(class Vector ()
+  (def __init__ (self x y)
+    (= self.x x)
+    (= self.y y))
+
+  (def __add__ (self other)
+    (Vector (+ self.x other.x) (+ self.y other.y)))
+
+  (def __sub__ (self other)
+    (Vector (- self.x other.x) (- self.y other.y)))
+
+  (def __mul__ (self scalar)
+    (Vector (* self.x scalar) (* self.y scalar)))
+
+  (def __str__ (self)
+    (+ "Vector(" (str self.x) ", " (str self.y) ")")))
+
+# Create test vectors
+(= v1 (Vector 3 4))
+(= v2 (Vector 1 2))
+(print (+ "Created v1 = " (str v1)))
+(print (+ "Created v2 = " (str v2)))
+
+# Test addition (DunderNumeric calls __add__)
+(= v3 (+ v1 v2))
+(print (+ "\nv1 + v2 = " (str v3)))
+(assert (== v3.x 4) "Vector addition x component")
+(assert (== v3.y 6) "Vector addition y component")
+(print "✓ Addition works via DunderNumeric")
+
+# Test subtraction (DunderNumeric calls __sub__)
+(= v4 (- v1 v2))
+(print (+ "\nv1 - v2 = " (str v4)))
+(assert (== v4.x 2) "Vector subtraction x component")
+(assert (== v4.y 2) "Vector subtraction y component")
+(print "✓ Subtraction works via DunderNumeric")
+
+# Test multiplication (DunderNumeric calls __mul__)
+(= v5 (* v1 2))
+(print (+ "\nv1 * 2 = " (str v5)))
+(assert (== v5.x 6) "Vector multiplication x component")
+(assert (== v5.y 8) "Vector multiplication y component")
+(print "✓ Multiplication works via DunderNumeric")
+
+# =============================================================================
+# Test 2: DunderIterator - Custom iteration with Counter class
+# =============================================================================
+(print "\n\n2. Testing DunderIterator Wrapper")
+(print "-" 70)
+
+(class Counter ()
+  (def __init__ (self start end)
+    (= self.current start)
+    (= self.end end))
+
+  (def __iter__ (self)
+    self)
+
+  (def __next__ (self)
+    (if (>= self.current self.end)
+      (raise (StopIteration))
+      (progn
+        (= result self.current)
+        (+= self.current 1)
+        result))))
+
+# Test iteration (DunderIterator calls __iter__ and __next__)
+(= counter (Counter 1 5))
+(print "Created Counter(1, 5)")
+
+(= values [])
+(for x counter
+  (+= values [x]))
+
+(print (+ "\nIterated values: " (str values)))
+(assert (== values [1 2 3 4]) "Custom iterator produces correct sequence")
+(print "✓ Iteration works via DunderIterator")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ Protocol Wrapper Tests Completed Successfully!")
+(print "=" 70)
+
+(print "\nImplemented Wrappers:")
+(print "  • DunderNumeric    - Wraps __add__, __sub__, __mul__, __truediv__, etc.")
+(print "  • DunderIterator   - Wraps __iter__ and __next__")
+(print "  • DunderIndexable  - Wraps __getitem__, __setitem__, __delitem__")
+
+(print "\nThese wrappers enable custom M28 classes with Python-style dunder")
+(print "methods to work seamlessly with M28's protocol system, allowing")
+(print "natural integration with operators and language constructs.")

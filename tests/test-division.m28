@@ -1,0 +1,15 @@
+# Test division operators
+
+(print "Test 1: Float division")
+(= result (10 / 2))
+(print "result =" result)
+
+(print "Test 2: Integer division")
+(= result2 (10 // 3))
+(print "result2 =" result2)
+
+(print "Test 3: Modulo")
+(= result3 (10 % 3))
+(print "result3 =" result3)
+
+(print "Done")

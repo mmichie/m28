@@ -1,0 +1,150 @@
+# Test Attribute Functions with Dunder Method Support - Simple Version
+# Tests: getattr(), setattr(), delattr(), dir()
+
+(print "Testing Attribute Functions with Dunder Method Support")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: getattr() with __getattr__() fallback
+# =============================================================================
+(print "\n1. Testing getattr() with __getattr__() fallback")
+(print "-" 70)
+
+(class DynamicAttrs ()
+  (def __init__ (self)
+    (= self.real_attr "I'm real!"))
+
+  (def __getattr__ (self name)
+    # Fallback for missing attributes
+    (+ "Dynamic: " name)))
+
+(= obj (DynamicAttrs))
+(= real (getattr obj "real_attr"))
+(= dynamic (getattr obj "missing_attr"))
+(print (+ "Real attribute: " real))
+(print (+ "Dynamic attribute: " dynamic))
+(assert (== real "I'm real!") "getattr finds real attributes")
+(assert (== dynamic "Dynamic: missing_attr") "getattr() calls __getattr__() for missing attrs")
+(print "✓ getattr() with __getattr__() works")
+
+# =============================================================================
+# Test 2: setattr() with __setattr__()
+# =============================================================================
+(print "\n2. Testing setattr() with __setattr__()")
+(print "-" 70)
+
+(class PrintingAttrs ()
+  (def __init__ (self)
+    (= self.log []))
+
+  (def __setattr__ (self name value)
+    # Log all attribute settings
+    (if (== name "log")
+      # Direct assignment for log
+      (= self.log value)
+      # Log other attributes
+      (progn
+        (print (+ "Setting " name " = " (str value)))
+        (+= self.log [(list name value)])
+        (= self.data value)))))  # Store the actual value
+
+(= printer (PrintingAttrs))
+(setattr printer "age" 25)
+(print (+ "Log size: " (str (len printer.log))))
+(assert (> (len printer.log) 0) "setattr() calls __setattr__()")
+(print "✓ setattr() with __setattr__() works")
+
+# =============================================================================
+# Test 3: delattr() with __delattr__()
+# =============================================================================
+(print "\n3. Testing delattr() with __delattr__()")
+(print "-" 70)
+
+(class DeleteTracking ()
+  (def __init__ (self)
+    (= self.deleted_count 0))
+
+  (def __delattr__ (self name)
+    # Track deletions
+    (print (+ "Deleting attribute: " name))
+    (+= self.deleted_count 1)))
+
+(= tracker (DeleteTracking))
+(delattr tracker "anything")
+(print (+ "Deleted count: " (str tracker.deleted_count)))
+(assert (== tracker.deleted_count 1) "delattr() calls __delattr__()")
+(print "✓ delattr() with __delattr__() works")
+
+# =============================================================================
+# Test 4: dir() with __dir__()
+# =============================================================================
+(print "\n4. Testing dir() with __dir__()")
+(print "-" 70)
+
+(class CustomDir ()
+  (def __init__ (self)
+    (= self.visible_attr "visible"))
+
+  (def __dir__ (self)
+    # Custom dir() output
+    ["visible_attr" "custom_method" "hidden_feature"]))
+
+(= custom (CustomDir))
+(= attrs (dir custom))
+(print (+ "dir() output: " (str attrs)))
+(assert (in "visible_attr" attrs) "dir() includes actual attributes")
+(assert (in "custom_method" attrs) "dir() includes __dir__() additions")
+(assert (in "hidden_feature" attrs) "dir() can add non-existent attributes")
+(print "✓ dir() with __dir__() works")
+
+# =============================================================================
+# Test 5: getattr() with __getattribute__() (intercepts all access)
+# =============================================================================
+(print "\n5. Testing getattr() with __getattribute__()")
+(print "-" 70)
+
+(class InterceptAll ()
+  (def __init__ (self)
+    (= self.count 0))
+
+  (def __getattribute__ (self name)
+    # Intercept ALL attribute access
+    (+ "Intercepted: " name)))
+
+(= interceptor (InterceptAll))
+(= result (getattr interceptor "anything"))
+(print (+ "getattr result: " result))
+(assert (== result "Intercepted: anything") "__getattribute__() intercepts all access")
+(print "✓ getattr() with __getattribute__() works")
+
+# =============================================================================
+# Test 6: Fallback to default value
+# =============================================================================
+(print "\n6. Testing getattr() default value")
+(print "-" 70)
+
+(class Simple ()
+  (def __init__ (self)
+    (= self.exists "yes")))
+
+(= simple (Simple))
+(= missing (getattr simple "missing" "default"))
+(print (+ "Missing attribute with default: " missing))
+(assert (== missing "default") "getattr() returns default for missing attrs")
+(print "✓ getattr() default value works")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All Attribute Dunder Method Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented dunder method support:")
+(print "  • getattr() - Calls __getattribute__() first, then __getattr__() as fallback")
+(print "  • setattr() - Calls __setattr__() if available")
+(print "  • delattr() - Calls __delattr__() if available")
+(print "  • dir() - Calls __dir__() if available")
+
+(print "\nThese functions enable full Python-style attribute customization")
+(print "for user-defined classes in M28.")

@@ -1,0 +1,18 @@
+# Test infix assignment
+
+(print "Test 1: Regular assignment")
+(= x 10)
+(print "x =" x)
+
+(print "\nTest 2: Infix assignment attempt")
+(= result (y = 20))
+(print "y =" y)
+(print "result =" result)
+
+(print "\nTest 3: Compound assignment")
+(= z 5)
+(print "z =" z)
+(= z (z + 10))
+(print "z after (z + 10) =" z)
+
+(print "\nDone")

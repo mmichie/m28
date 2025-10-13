@@ -1,0 +1,119 @@
+# Comprehensive edge case tests for infix operator support
+
+(print "Testing infix edge cases...")
+
+# Test 1: Mixed prefix and infix - infix result used in prefix context
+(print (2 + 3))
+
+# Test 2: Assignment with infix RHS
+(= x (5 + 3))
+(assert (== x 8) "Assignment with infix RHS")
+
+(= y (x * 2 + 1))
+(assert (== y 17) "Complex infix RHS")
+
+# Test 3: Nested infix expressions
+(= result ((2 + 3) * (4 + 1)))
+(assert (== result 25) "Nested infix")
+
+# Test 4: Infix in function arguments
+(def add3 (a b c)
+  (+ a b c))
+(= result (add3 (1 + 2) (3 * 2) (10 - 5)))
+(assert (== result 14) "Infix in function args")
+
+# Test 5: Comparison chains
+(= x 5)
+(= y 10)
+(= z 15)
+(assert (and (< x y) (< y z)) "Chained comparisons")
+
+# Test 6: Boolean logic with infix
+(= a 10)
+(= b 20)
+(assert (and (> a 5) (< b 30)) "Boolean and with infix")
+(assert (or (< a 5) (> b 15)) "Boolean or with infix")
+
+# Test 7: Operator precedence
+(= result (2 + 3 * 4 - 1))
+(assert (== result 13) "Precedence: 2 + 3*4 - 1")
+
+(= result (10 - 2 * 3))
+(assert (== result 4) "Precedence: 10 - 2*3")
+
+# Test 8: Multiple groupings
+(= result (((2 + 3) * 4) - 1))
+(assert (== result 19) "Multiple parens")
+
+# Test 9: Infix in list literals
+(= nums [(1 + 1) (2 * 2) (3 ** 2)])
+(assert (== nums[0] 2) "Infix in list [0]")
+(assert (== nums[1] 4) "Infix in list [1]")
+(assert (== nums[2] 9) "Infix in list [2]")
+
+# Test 10: Infix in tuple literals
+(= coords (tuple (10 + 5) (20 * 2)))
+(assert (== coords[0] 15) "Infix in tuple [0]")
+(assert (== coords[1] 40) "Infix in tuple [1]")
+
+# Test 11: Infix in dict literals
+(= d {"sum": (5 + 5), "product": (3 * 4)})
+(assert (== d["sum"] 10) "Infix in dict value")
+(assert (== d["product"] 12) "Infix in dict value")
+
+# Test 12: Division operators
+(= result (10 / 2))
+(assert (== result 5.0) "Float division")
+
+(= result (10 // 3))
+(assert (== result 3) "Integer division")
+
+(= result (10 % 3))
+(assert (== result 1) "Modulo")
+
+# Test 13: Comparison operators
+(assert (< 5 10) "Less than")
+(assert (<= 5 5) "Less than or equal")
+(assert (> 10 5) "Greater than")
+(assert (>= 5 5) "Greater than or equal")
+(assert (== 5 5) "Equal")
+(assert (!= 5 6) "Not equal")
+
+# Test 14: String concatenation
+(= s1 "Hello")
+(= s2 "World")
+(= greeting (+ s1 s2))
+(assert (== greeting "HelloWorld") "String concatenation")
+
+# Test 15: Infix in conditional
+(= x 10)
+(if (> x 5)
+  (= test_result "greater")
+  (= test_result "not greater"))
+(assert (== test_result "greater") "Infix in conditional")
+
+# Test 16: Infix in while loop
+(= counter 0)
+(= sum 0)
+(while (< counter 5)
+  (= sum (+ sum counter))
+  (= counter (+ counter 1)))
+(assert (== sum 10) "While loop with infix")
+
+# Test 17: Complex operator precedence
+(= result (2 + 3 * 4 ** 2 - 1))
+(assert (== result 49) "Complex precedence")
+
+# Test 18: Right-associative exponentiation
+(= result (2 ** 3 ** 2))
+(assert (== result 512) "Right-associativity")
+
+# Test 19: Prefix function call with infix args (backward compatibility)
+(= result (+ (2 * 3) (4 + 5)))
+(assert (== result 15) "Prefix with infix args")
+
+# Test 20: Single element in parens (not infix)
+(= x (42))
+(assert (== x 42) "Single element in parens")
+
+(print "All infix edge case tests passed!")

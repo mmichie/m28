@@ -1,0 +1,118 @@
+# Test Missing Builtin Functions with Dunder Method Support
+# Tests: format(), reversed()
+
+(print "Testing Missing Builtin Functions with Dunder Method Support")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: format() with __format__()
+# =============================================================================
+(print "\n1. Testing format() with __format__()")
+(print "-" 70)
+
+(class FormattableNumber ()
+  (def __init__ (self value)
+    (= self.value value))
+
+  (def __format__ (self format_spec)
+    # Custom formatting: prepend "NUM:" to the value
+    (+ "NUM:" (str self.value))))
+
+(= num (FormattableNumber 42))
+(= formatted (format num ".2f"))
+(print (+ "Formatted number: " formatted))
+(assert (== formatted "NUM:42") "format() calls __format__() with format spec")
+(print "✓ format() with __format__() works")
+
+# Test format() without format_spec
+(= simple (format 123))
+(print (+ "format(123) = " simple))
+(assert (== simple "123") "format() without format spec works")
+(print "✓ format() without format spec works")
+
+# Test format() with string
+(= str_format (format "hello"))
+(print (+ "format('hello') = " str_format))
+(assert (== str_format "hello") "format() works with strings")
+(print "✓ format() with strings works")
+
+# =============================================================================
+# Test 2: reversed() with __reversed__()
+# =============================================================================
+(print "\n2. Testing reversed() with __reversed__()")
+(print "-" 70)
+
+(class CustomReversible ()
+  (def __init__ (self items)
+    (= self.items items))
+
+  (def __reversed__ (self)
+    # Return items in custom reverse order (double reverse)
+    self.items))
+
+(= custom (CustomReversible [1 2 3]))
+(= rev (reversed custom))
+(print (+ "Custom reversed: " (str rev)))
+(assert (== rev [1 2 3]) "reversed() calls __reversed__() method")
+(print "✓ reversed() with __reversed__() works")
+
+# Test reversed() with list
+(= list_rev (reversed [1 2 3 4 5]))
+(print (+ "reversed([1,2,3,4,5]) = " (str list_rev)))
+(assert (== list_rev [5 4 3 2 1]) "reversed() works with lists")
+(print "✓ reversed() with lists works")
+
+# Test reversed() with tuple
+(= tuple_rev (reversed (tuple [10 20 30])))
+(print (+ "reversed((10, 20, 30)) = " (str tuple_rev)))
+(assert (== tuple_rev [30 20 10]) "reversed() works with tuples")
+(print "✓ reversed() with tuples works")
+
+# Test reversed() with string
+(= str_rev (reversed "hello"))
+(print (+ "reversed('hello') = " (str str_rev)))
+(assert (== str_rev ["o" "l" "l" "e" "h"]) "reversed() works with strings")
+(print "✓ reversed() with strings works")
+
+# =============================================================================
+# Test 3: Integration test - format() and reversed() together
+# =============================================================================
+(print "\n3. Testing integration of format() and reversed()")
+(print "-" 70)
+
+(class DisplayList ()
+  (def __init__ (self items)
+    (= self.items items))
+
+  (def __format__ (self format_spec)
+    # Format as comma-separated list
+    (+ "[" (str (len self.items)) " items]"))
+
+  (def __reversed__ (self)
+    # Return reversed items
+    (reversed self.items)))
+
+(= dlist (DisplayList [1 2 3 4]))
+(= display (format dlist ""))
+(print (+ "Display: " display))
+(assert (== display "[4 items]") "format() works on custom class")
+
+(= rev_items (reversed dlist))
+(print (+ "Reversed items: " (str rev_items)))
+(assert (== rev_items [4 3 2 1]) "reversed() works on custom class")
+
+(print "✓ Integration of format() and reversed() works")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All Missing Builtin Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented functions:")
+(print "  • format(value, format_spec='') - Calls __format__() for custom formatting")
+(print "  • reversed(seq) - Calls __reversed__() or reverses built-in sequences")
+
+(print "\nThese functions complete the Python builtin compatibility layer,")
+(print "allowing full customization of formatting and iteration behavior.")

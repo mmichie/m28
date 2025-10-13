@@ -1,0 +1,13 @@
+# Test assert with infix
+
+(print "Test 1: assert with prefix ==")
+(= x 8)
+(assert (== x 8) "x should be 8")
+(print "Test 1 passed")
+
+(print "Test 2: assert with multiple asserts")
+(assert (== x 8) "First assert")
+(assert (== (+ 2 3) 5) "Second assert")
+(print "Test 2 passed")
+
+(print "All tests passed!")

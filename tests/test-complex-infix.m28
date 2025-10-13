@@ -1,0 +1,13 @@
+# Test complex infix expressions
+
+(print "Test 1: 2 + 3 * 4 ** 2 - 1")
+(= result (2 + 3 * 4 ** 2 - 1))
+(print "result =" result)
+(assert (== result 49) "Should be 49")
+
+(print "Test 2: 2 ** 3 ** 2")
+(= result2 (2 ** 3 ** 2))
+(print "result2 =" result2)
+(assert (== result2 512) "Should be 512")
+
+(print "All tests passed!")

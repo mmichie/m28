@@ -1,0 +1,30 @@
+# Test compound assignment operators
+
+(print "Testing compound assignment operators...\n")
+
+# Check if compound operators are defined
+(print "Test 1: += operator")
+(= x 10)
+(print "x =" x)
+(+= x 5)
+(print "After (+=x 5), x =" x)
+
+(print "\nTest 2: -= operator")
+(= y 20)
+(print "y =" y)
+(-= y 7)
+(print "After (-= y 7), y =" y)
+
+(print "\nTest 3: *= operator")
+(= z 3)
+(print "z =" z)
+(*= z 4)
+(print "After (*= z 4), z =" z)
+
+(print "\nTest 4: Infix style compound (if supported)")
+(= a 100)
+(print "a =" a)
+# Try infix: (a += 50)
+# This would need special form support
+
+(print "\nDone")

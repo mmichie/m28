@@ -1,0 +1,27 @@
+# Test subset 6-14
+
+(print "Test 6...")
+(= a 10)
+(= b 20)
+(assert (and (> a 5) (< b 30)) "Boolean and with infix comparisons")
+(assert (or (< a 5) (> b 15)) "Boolean or with infix comparisons")
+(print "Test 6 passed")
+
+(print "Test 7...")
+(= result (2 + 3 * 4 - 1))
+(assert (== result 13) "Precedence: 2 + (3*4) - 1 = 13")
+(= result (10 - 2 * 3))
+(assert (== result 4) "Precedence: 10 - (2*3) = 4")
+(print "Test 7 passed")
+
+(print "Test 8...")
+(= result (((2 + 3) * 4) - 1))
+(assert (== result 19) "Multiple parens: ((2+3)*4)-1 = 19")
+(print "Test 8 passed")
+
+(print "Test 9...")
+(= nums [(1 + 1) (2 * 2) (3 ** 2)])
+(assert (== nums[0] 2) "Infix in list literal [0]")
+(print "Test 9 passed")
+
+(print "All tests passed!")
