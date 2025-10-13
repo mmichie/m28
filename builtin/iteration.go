@@ -22,6 +22,9 @@ func RegisterIteration(ctx *core.Context) {
 	// BEFORE: 42 lines
 	// AFTER: Custom builder for variadic iterables
 	ctx.Define("zip", core.NewBuiltinFunction(ZipBuilder()))
+
+	// reversed - return reversed iterator
+	ctx.Define("reversed", core.NewBuiltinFunction(ReversedBuilder()))
 }
 
 // IterBuilder creates the iter function with optional sentinel
@@ -202,8 +205,86 @@ func ZipBuilder() builders.BuiltinFunc {
 	}
 }
 
+// ReversedBuilder creates the reversed function
+func ReversedBuilder() builders.BuiltinFunc {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("reversed", args)
+
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		obj := v.Get(0)
+
+		// Try __reversed__ dunder method first
+		if o, ok := obj.(core.Object); ok {
+			if method, exists := o.GetAttr("__reversed__"); exists {
+				if callable, ok := types.AsCallable(method); ok {
+					result, err := callable.Call([]core.Value{}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Return the iterator from __reversed__
+					return result, nil
+				}
+			}
+		}
+
+		// Fall back to using __len__ and __getitem__ for sequences
+		// Check if object has __len__ and __getitem__
+		hasLen := false
+		hasGetitem := false
+
+		if o, ok := obj.(core.Object); ok {
+			if _, exists := o.GetAttr("__len__"); exists {
+				hasLen = true
+			}
+			if _, exists := o.GetAttr("__getitem__"); exists {
+				hasGetitem = true
+			}
+		}
+
+		// If it's a built-in sequence type, we can reverse it directly
+		if list, ok := types.AsList(obj); ok {
+			// Create reversed list
+			result := make(core.ListValue, len(list))
+			for i := 0; i < len(list); i++ {
+				result[i] = list[len(list)-1-i]
+			}
+			return result, nil
+		}
+
+		if tuple, ok := types.AsTuple(obj); ok {
+			// Create reversed list (Python's reversed() returns iterator, but for simplicity return list)
+			result := make(core.ListValue, len(tuple))
+			for i := 0; i < len(tuple); i++ {
+				result[i] = tuple[len(tuple)-1-i]
+			}
+			return result, nil
+		}
+
+		if str, ok := types.AsString(obj); ok {
+			// Create reversed string as list of characters
+			runes := []rune(str)
+			result := make(core.ListValue, len(runes))
+			for i := 0; i < len(runes); i++ {
+				result[i] = core.StringValue(string(runes[len(runes)-1-i]))
+			}
+			return result, nil
+		}
+
+		// If object has __len__ and __getitem__, we could implement reverse iteration
+		// but for now, require __reversed__ or built-in sequence types
+		if hasLen && hasGetitem {
+			return nil, errors.NewRuntimeError("reversed", "reverse iteration via __getitem__ not yet implemented")
+		}
+
+		return nil, errors.NewTypeError("reversed", "argument must be a sequence", string(obj.Type()))
+	}
+}
+
 // Migration Statistics:
-// Functions migrated: 4 iteration functions
+// Functions migrated: 5 iteration functions (including reversed)
 // Original lines: ~143 lines
-// Migrated lines: ~95 lines
-// Reduction: ~34% with better structure
+// Migrated lines: ~175 lines
+// Benefits: Consistent structure and dunder method support

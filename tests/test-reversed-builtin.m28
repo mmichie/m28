@@ -1,0 +1,94 @@
+# Test reversed() builtin with dunder method support
+
+(print "Testing reversed() Builtin Function")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: reversed() with __reversed__()
+# =============================================================================
+(print "\n1. Testing reversed() with __reversed__()")
+(print "-" 70)
+
+(class CustomReversible ()
+  (def __init__ (self items)
+    (= self.items items))
+
+  (def __reversed__ (self)
+    # Return items in custom reverse order (double reverse = original)
+    self.items))
+
+(= custom (CustomReversible [1 2 3]))
+(= rev (reversed custom))
+(print (+ "Custom reversed: " (str rev)))
+(assert (== rev [1 2 3]) "reversed() calls __reversed__() method")
+(print "✓ reversed() with __reversed__() works")
+
+# =============================================================================
+# Test 2: reversed() with list
+# =============================================================================
+(print "\n2. Testing reversed() with lists")
+(print "-" 70)
+
+(= list_rev (reversed [1 2 3 4 5]))
+(print (+ "reversed([1,2,3,4,5]) = " (str list_rev)))
+(assert (== list_rev [5 4 3 2 1]) "reversed() works with lists")
+(print "✓ reversed() with lists works")
+
+(= empty_rev (reversed []))
+(print (+ "reversed([]) = " (str empty_rev)))
+(assert (== empty_rev []) "reversed() works with empty lists")
+(print "✓ reversed() with empty lists works")
+
+# =============================================================================
+# Test 3: reversed() with tuple
+# =============================================================================
+(print "\n3. Testing reversed() with tuples")
+(print "-" 70)
+
+(= tuple_rev (reversed (tuple [10 20 30])))
+(print (+ "reversed((10, 20, 30)) = " (str tuple_rev)))
+(assert (== tuple_rev [30 20 10]) "reversed() works with tuples")
+(print "✓ reversed() with tuples works")
+
+# =============================================================================
+# Test 4: reversed() with string
+# =============================================================================
+(print "\n4. Testing reversed() with strings")
+(print "-" 70)
+
+(= str_rev (reversed "hello"))
+(print (+ "reversed('hello') = " (str str_rev)))
+(assert (== str_rev ["o" "l" "l" "e" "h"]) "reversed() works with strings")
+(print "✓ reversed() with strings works")
+
+(= single_rev (reversed "a"))
+(print (+ "reversed('a') = " (str single_rev)))
+(assert (== single_rev ["a"]) "reversed() works with single character")
+(print "✓ reversed() with single character works")
+
+# =============================================================================
+# Test 5: reversed() with nested structures
+# =============================================================================
+(print "\n5. Testing reversed() with nested structures")
+(print "-" 70)
+
+(= nested [[1 2] [3 4] [5 6]])
+(= nested_rev (reversed nested))
+(print (+ "reversed([[1,2],[3,4],[5,6]]) = " (str nested_rev)))
+(assert (== nested_rev [[5 6] [3 4] [1 2]]) "reversed() works with nested lists")
+(print "✓ reversed() with nested structures works")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All reversed() Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented functionality:")
+(print "  • reversed(seq) - Calls __reversed__() for custom reverse iteration")
+(print "  • reversed() works with lists, tuples, and strings")
+(print "  • Returns reversed sequence as a list")
+
+(print "\nThis function enables Python-style reverse iteration")
+(print "for both built-in and custom sequence types.")

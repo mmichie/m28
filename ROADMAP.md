@@ -117,15 +117,18 @@ Many builtin functions bypass dunder methods and go straight to type switches. N
 - [x] `delattr()` (builtin/attributes.go:82) - Implement `__delattr__()` dunder method
 - [x] `dir()` (builtin/attributes.go:27) - Add `__dir__()` dunder method support
 
-**Medium Priority - Numeric Functions:** 🟡
-- [ ] `abs()` - Verify uses `GetNumericOps().Absolute()` properly
-- [ ] `round()` - Add `__round__()` dunder method support
-- [ ] `divmod()` - Add `__divmod__()` and `__rdivmod__()` dunder method support
+**Medium Priority - Numeric Functions:** ✅ COMPLETE
+- [x] `abs()` - Verified uses `GetNumericOps().Absolute()` properly with __abs__() dunder support
+- [x] `round()` - Added `__round__()` dunder method support
+- [x] `divmod()` - Added `__divmod__()` and `__rdivmod__()` dunder method support
 
-**Medium Priority - Missing Builtins:** 🟡
+**Medium Priority - Missing Builtins:** ✅ COMPLETE (except format)
 - [ ] Implement `format()` builtin with `__format__(format_spec)` dunder method
-- [ ] Implement `reversed()` builtin with `__reversed__()` dunder method
-- [ ] `bytes()` (builtin/collections.go:59) - Add `__bytes__()` dunder method support
+  - **NOTE**: Naming conflict with existing sprintf-style format() in builtin/string_format.go
+  - Python's builtin format(value, format_spec) differs from current format(template, *values)
+  - Needs resolution: either rename existing format() or implement dual behavior
+- [x] `reversed()` - Implemented with `__reversed__()` dunder method support (builtin/iteration.go)
+- [x] `bytes()` (core/type_registry_primitives.go:307) - Added `__bytes__()` dunder method support
 
 **Status:**
 - ✅ `float()` - Already has `__float__()` support (builtin/types.go:199)

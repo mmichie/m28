@@ -309,7 +309,26 @@ func registerBytesType() {
 				return BytesValue([]byte{}), nil
 			}
 			if len(args) == 1 {
-				switch v := args[0].(type) {
+				val := args[0]
+
+				// Try __bytes__ dunder method first
+				if obj, ok := val.(Object); ok {
+					if method, exists := obj.GetAttr("__bytes__"); exists {
+						if callable, ok := method.(Callable); ok {
+							result, err := callable.Call([]Value{}, ctx)
+							if err != nil {
+								return nil, err
+							}
+							// Ensure it returns bytes
+							if bytes, ok := result.(BytesValue); ok {
+								return bytes, nil
+							}
+							return nil, fmt.Errorf("__bytes__ returned non-bytes (type %s)", result.Type())
+						}
+					}
+				}
+
+				switch v := val.(type) {
 				case StringValue:
 					return BytesValue([]byte(string(v))), nil
 				case ListValue:

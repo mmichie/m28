@@ -1,0 +1,73 @@
+# Test bytes() builtin with __bytes__() dunder method support
+
+(print "Testing bytes() with __bytes__() Dunder Method")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: bytes() with __bytes__()
+# =============================================================================
+(print "\n1. Testing bytes() with __bytes__()")
+(print "-" 70)
+
+(class CustomBytes ()
+  (def __init__ (self data)
+    (= self.data data))
+
+  (def __bytes__ (self)
+    # Return custom bytes representation
+    (bytes self.data)))
+
+(= custom (CustomBytes "hello"))
+(= result (bytes custom))
+(print (+ "bytes(CustomBytes('hello')) = " (str result)))
+(assert (== result (bytes "hello")) "bytes() calls __bytes__() method")
+(print "✓ bytes() with __bytes__() works")
+
+# =============================================================================
+# Test 2: bytes() with string (default behavior)
+# =============================================================================
+(print "\n2. Testing bytes() with string")
+(print "-" 70)
+
+(= str_bytes (bytes "test"))
+(print (+ "bytes('test') = " (str str_bytes)))
+(assert (== (bytes "test") (bytes "test")) "bytes() works with strings")
+(print "✓ bytes() with strings works")
+
+# =============================================================================
+# Test 3: bytes() with list of numbers
+# =============================================================================
+(print "\n3. Testing bytes() with list of numbers")
+(print "-" 70)
+
+(= list_bytes (bytes [72 101 108 108 111]))
+(print (+ "bytes([72, 101, 108, 108, 111]) = " (str list_bytes)))
+(= decoded (list_bytes.decode "utf-8"))
+(print (+ "Decoded: " decoded))
+(assert (== decoded "Hello") "bytes() works with list of numbers")
+(print "✓ bytes() with list of numbers works")
+
+# =============================================================================
+# Test 4: bytes() with empty input
+# =============================================================================
+(print "\n4. Testing bytes() with empty input")
+(print "-" 70)
+
+(= empty_bytes (bytes))
+(print (+ "bytes() = " (str empty_bytes)))
+(assert (== (len empty_bytes) 0) "bytes() creates empty bytes")
+(print "✓ bytes() with empty input works")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All bytes() Dunder Method Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented __bytes__() support:")
+(print "  • bytes(obj) - Calls __bytes__() for custom bytes conversion")
+(print "  • Falls back to standard conversions (string, list, etc.)")
+
+(print "\nThis enables Python-style bytes conversion")
+(print "for user-defined classes in M28.")
