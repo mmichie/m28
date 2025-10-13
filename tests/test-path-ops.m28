@@ -1,0 +1,385 @@
+# Test Pythonic path operations (get-path, set-path, update-path, has-path?)
+# Inspired by Clojure's get-in, assoc-in, update-in
+
+(print "Testing Pythonic Path Operations")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: get-path with nested dicts (string paths)
+# =============================================================================
+(print "\n1. Testing get-path with nested dicts (string paths)")
+(print "-" 70)
+
+(= user {"name": "Alice"
+         "address": {"city": "NYC"
+                    "zip": "10001"
+                    "country": "USA"}
+         "age": 30})
+
+(= city (get-path user "address.city"))
+(print (+ "City: " city))
+(assert (== city "NYC") "get-path works with nested dict")
+
+(= zip (get-path user "address.zip"))
+(print (+ "ZIP: " zip))
+(assert (== zip "10001") "get-path works with deeply nested values")
+
+(= name (get-path user "name"))
+(print (+ "Name: " name))
+(assert (== name "Alice") "get-path works with top-level keys")
+
+(print "✓ get-path with string paths works")
+
+# =============================================================================
+# Test 2: get-path with nested lists (string paths with numeric indices)
+# =============================================================================
+(print "\n2. Testing get-path with lists (numeric indices)")
+(print "-" 70)
+
+(= users [{"name": "Alice" "age": 30}
+          {"name": "Bob" "age": 25}
+          {"name": "Charlie" "age": 35}])
+
+(= bob-name (get-path users "1.name"))
+(print (+ "Second user name: " bob-name))
+(assert (== bob-name "Bob") "get-path works with list indices")
+
+(= alice-age (get-path users "0.age"))
+(print (+ "First user age: " (str alice-age)))
+(assert (== alice-age 30) "get-path works with list + dict combination")
+
+(print "✓ get-path with list indices works")
+
+# =============================================================================
+# Test 3: get-path with list paths (explicit path segments)
+# =============================================================================
+(print "\n3. Testing get-path with list paths")
+(print "-" 70)
+
+(= data {"users": [{"profile": {"email": "alice@example.com"}}
+                   {"profile": {"email": "bob@example.com"}}]})
+
+# Use list path instead of string path
+(= email (get-path data ["users" 0 "profile" "email"]))
+(print (+ "First user email: " email))
+(assert (== email "alice@example.com") "get-path works with list paths")
+
+(= email2 (get-path data ["users" 1 "profile" "email"]))
+(print (+ "Second user email: " email2))
+(assert (== email2 "bob@example.com") "get-path works with complex list paths")
+
+(print "✓ get-path with list paths works")
+
+# =============================================================================
+# Test 4: get-path with default values
+# =============================================================================
+(print "\n4. Testing get-path with default values")
+(print "-" 70)
+
+(= data {"a": {"b": 10}})
+
+(= found (get-path data "a.b" "NOT_FOUND"))
+(print (+ "Found value: " (str found)))
+(assert (== found 10) "get-path returns found value")
+
+(= missing (get-path data "a.c" "DEFAULT"))
+(print (+ "Missing value with default: " missing))
+(assert (== missing "DEFAULT") "get-path returns default for missing path")
+
+(= deep-missing (get-path data "x.y.z" 42))
+(print (+ "Deep missing with default: " (str deep-missing)))
+(assert (== deep-missing 42) "get-path returns default for deep missing path")
+
+(print "✓ get-path with default values works")
+
+# =============================================================================
+# Test 5: has-path? checking path existence
+# =============================================================================
+(print "\n5. Testing has-path? for path existence")
+(print "-" 70)
+
+(= data {"a": {"b": {"c": 10}}
+         "x": [1 2 3]})
+
+(assert (has-path? data "a.b.c") "has-path? finds existing nested path")
+(assert (has-path? data "a.b") "has-path? finds intermediate path")
+(assert (has-path? data "a") "has-path? finds top-level path")
+(assert (has-path? data "x.0") "has-path? finds list index")
+(assert (has-path? data "x.2") "has-path? finds last list index")
+
+(assert (not (has-path? data "a.b.d")) "has-path? returns false for missing path")
+(assert (not (has-path? data "y")) "has-path? returns false for missing top-level")
+(assert (not (has-path? data "x.5")) "has-path? returns false for out-of-bounds index")
+
+(print "✓ has-path? works correctly")
+
+# =============================================================================
+# Test 6: set-path immutable updates on dicts
+# =============================================================================
+(print "\n6. Testing set-path immutable updates on dicts")
+(print "-" 70)
+
+(= original {"a": {"b": 10} "c": 20})
+(print (+ "Original: " (str original)))
+
+(= updated (set-path original "a.b" 999))
+(print (+ "Updated: " (str updated)))
+(print (+ "Original after update: " (str original)))
+
+# Check that updated has new value
+(assert (== (get-path updated "a.b") 999) "set-path creates new structure with updated value")
+
+# Check that original is unchanged (immutability)
+(assert (== (get-path original "a.b") 10) "set-path preserves original structure")
+(assert (== (get-path original "c") 20) "set-path preserves other keys in original")
+
+# Check that other values in updated are preserved
+(assert (== (get-path updated "c") 20) "set-path preserves sibling values")
+
+(print "✓ set-path immutable updates work")
+
+# =============================================================================
+# Test 7: set-path immutable updates on lists
+# =============================================================================
+(print "\n7. Testing set-path immutable updates on lists")
+(print "-" 70)
+
+(= original [{"x": 1} {"x": 2} {"x": 3}])
+(print (+ "Original list: " (str original)))
+
+(= updated (set-path original "1.x" 999))
+(print (+ "Updated list: " (str updated)))
+
+# Check updated has new value
+(assert (== (get-path updated "1.x") 999) "set-path updates list element")
+
+# Check original is unchanged
+(assert (== (get-path original "1.x") 2) "set-path preserves original list")
+
+# Check other elements preserved
+(assert (== (get-path updated "0.x") 1) "set-path preserves other list elements")
+(assert (== (get-path updated "2.x") 3) "set-path preserves all list elements")
+
+(print "✓ set-path on lists works")
+
+# =============================================================================
+# Test 8: set-path creating new nested structures
+# =============================================================================
+(print "\n8. Testing set-path with new nested keys")
+(print "-" 70)
+
+(= data {"existing": 1})
+(= updated (set-path data "existing" 42))
+
+(assert (== (get-path updated "existing") 42) "set-path updates existing key")
+(assert (== (get-path data "existing") 1) "set-path doesn't modify original")
+
+(print "✓ set-path with new keys works")
+
+# =============================================================================
+# Test 9: update-path applying functions
+# =============================================================================
+(print "\n9. Testing update-path with functions")
+(print "-" 70)
+
+(= data {"counter": 10 "nested": {"value": 5}})
+
+# Increment counter
+(= updated1 (update-path data "counter" (lambda (x) (+ x 1))))
+(print (+ "Incremented counter: " (str (get-path updated1 "counter"))))
+(assert (== (get-path updated1 "counter") 11) "update-path applies function")
+
+# Double nested value
+(= updated2 (update-path data "nested.value" (lambda (x) (* x 2))))
+(print (+ "Doubled nested value: " (str (get-path updated2 "nested.value"))))
+(assert (== (get-path updated2 "nested.value") 10) "update-path works on nested paths")
+
+# Original unchanged
+(assert (== (get-path data "counter") 10) "update-path preserves original")
+(assert (== (get-path data "nested.value") 5) "update-path preserves nested original")
+
+(print "✓ update-path with functions works")
+
+# =============================================================================
+# Test 10: update-path with string operations
+# =============================================================================
+(print "\n10. Testing update-path with string transformations")
+(print "-" 70)
+
+(= user {"name": "alice" "email": "ALICE@EXAMPLE.COM"})
+
+# Uppercase name
+(= updated (update-path user "name" (lambda (s) (upper s))))
+(print (+ "Uppercased name: " (get-path updated "name")))
+(assert (== (get-path updated "name") "ALICE") "update-path can transform strings")
+
+# Lowercase email
+(= updated2 (update-path user "email" (lambda (s) (lower s))))
+(print (+ "Lowercased email: " (get-path updated2 "email")))
+(assert (== (get-path updated2 "email") "alice@example.com") "update-path transforms emails")
+
+(print "✓ update-path with string operations works")
+
+# =============================================================================
+# Test 11: Chaining path operations
+# =============================================================================
+(print "\n11. Testing chained path operations")
+(print "-" 70)
+
+(= data {"a": {"b": {"c": 1}}})
+
+# Chain multiple set-path operations
+(= step1 (set-path data "a.b.c" 10))
+(= step2 (set-path step1 "a.b.d" 20))
+(= step3 (set-path step2 "a.e" 30))
+
+(assert (== (get-path step3 "a.b.c") 10) "First set-path applied")
+(assert (== (get-path step3 "a.b.d") 20) "Second set-path applied")
+(assert (== (get-path step3 "a.e") 30) "Third set-path applied")
+
+# Original still unchanged
+(assert (== (get-path data "a.b.c") 1) "Original unchanged after chaining")
+(assert (not (has-path? data "a.b.d")) "Original doesn't have new keys")
+
+(print "✓ Chained path operations work")
+
+# =============================================================================
+# Test 12: Empty paths and edge cases
+# =============================================================================
+(print "\n12. Testing empty paths and edge cases")
+(print "-" 70)
+
+(= data {"a": 1})
+
+# Empty path returns the data structure itself
+(= empty-result (get-path data ""))
+(print (+ "Empty path result: " (str empty-result)))
+(assert (== empty-result data) "Empty path returns original data")
+
+# Single segment path
+(= single (get-path data "a"))
+(assert (== single 1) "Single segment path works")
+
+(print "✓ Edge cases handled correctly")
+
+# =============================================================================
+# Test 13: Complex nested structure
+# =============================================================================
+(print "\n13. Testing complex nested structures")
+(print "-" 70)
+
+(= company {
+    "name": "TechCorp"
+    "departments": [
+        {"name": "Engineering"
+         "teams": [
+             {"name": "Backend" "size": 5}
+             {"name": "Frontend" "size": 3}
+         ]}
+        {"name": "Sales"
+         "teams": [
+             {"name": "Enterprise" "size": 10}
+         ]}
+    ]
+})
+
+# Get deeply nested value
+(= backend-size (get-path company "departments.0.teams.0.size"))
+(print (+ "Backend team size: " (str backend-size)))
+(assert (== backend-size 5) "Deep nesting works")
+
+# Update deeply nested value
+(= updated (set-path company "departments.0.teams.0.size" 8))
+(= new-size (get-path updated "departments.0.teams.0.size"))
+(print (+ "Updated backend team size: " (str new-size)))
+(assert (== new-size 8) "Deep set-path works")
+
+# Original unchanged
+(assert (== (get-path company "departments.0.teams.0.size") 5) "Original preserved")
+
+# Check other values preserved
+(assert (== (get-path updated "departments.0.teams.1.size") 3) "Sibling values preserved")
+(assert (== (get-path updated "departments.1.teams.0.size") 10) "Other branches preserved")
+
+(print "✓ Complex nested structures work")
+
+# =============================================================================
+# Test 14: Working with tuples
+# =============================================================================
+(print "\n14. Testing path operations with tuples")
+(print "-" 70)
+
+(= data {"coords": (tuple 10 20 30)})
+
+(= x (get-path data "coords.0"))
+(print (+ "X coordinate: " (str x)))
+(assert (== x 10) "get-path works with tuples")
+
+(= y (get-path data "coords.1"))
+(print (+ "Y coordinate: " (str y)))
+(assert (== y 20) "get-path accesses tuple elements")
+
+(assert (has-path? data "coords.2") "has-path? works with tuples")
+(assert (not (has-path? data "coords.5")) "has-path? checks tuple bounds")
+
+(print "✓ Tuple path operations work")
+
+# =============================================================================
+# Test 15: Practical use case - configuration management
+# =============================================================================
+(print "\n15. Testing practical use case - configuration management")
+(print "-" 70)
+
+(= config {
+    "database": {"host": "localhost" "port": 5432 "name": "mydb"}
+    "cache": {"enabled": true "ttl": 3600}
+    "features": {"new_ui": false "beta_api": true}
+})
+
+# Check if features are enabled
+(def is-feature-enabled (feature)
+    (get-path config (+ "features." feature) false))
+
+(assert (is-feature-enabled "beta_api") "Feature flag lookup works")
+(assert (not (is-feature-enabled "new_ui")) "Disabled feature detected")
+(assert (not (is-feature-enabled "nonexistent")) "Missing feature defaults to false")
+
+# Update configuration
+(= updated-config (set-path config "cache.ttl" 7200))
+(assert (== (get-path updated-config "cache.ttl") 7200) "Config update works")
+
+# Enable feature
+(= updated-config2 (set-path config "features.new_ui" true))
+(assert (get-path updated-config2 "features.new_ui") "Feature toggle works")
+
+(print "✓ Practical configuration management works")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All Path Operations Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented functions:")
+(print "  • get-path    - Get value at path with optional default")
+(print "  • set-path    - Immutably set value at path")
+(print "  • update-path - Apply function to value at path")
+(print "  • has-path?   - Check if path exists")
+
+(print "\nPath formats:")
+(print "  • String paths: \"user.address.city\"")
+(print "  • List paths:   [\"users\" 0 \"name\"]")
+(print "  • Numeric indices: \"users.0.name\"")
+
+(print "\nSupported data structures:")
+(print "  • Dicts (key access)")
+(print "  • Lists (index access)")
+(print "  • Tuples (index access)")
+(print "  • Objects (attribute access)")
+
+(print "\nFeatures:")
+(print "  • Immutable updates (original unchanged)")
+(print "  • Default values for missing paths")
+(print "  • Deep nesting support")
+(print "  • Chainable operations")

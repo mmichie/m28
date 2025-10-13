@@ -27,7 +27,16 @@
 - [x] Reader macro syntax (syntactic sugar): `` ` `` for quasiquote, `,` for unquote, `,@` for unquote-splicing
 
 #### Record Stream & JSON Processing 🟡 HIGH VALUE
-- [ ] Path-based access: `get-in`, `assoc-in`, `update-in`
+- [x] Path-based access: Pythonic path operations
+  - `get-path` - Get value at nested path with optional default
+  - `set-path` - Immutably set value at path (returns new structure)
+  - `update-path` - Apply function to value at path
+  - `has-path?` - Check if path exists
+  - String paths: `"user.address.city"` with automatic numeric index parsing
+  - List paths: `["users", 0, "profile", "email"]` for complex keys
+  - Works with dicts (key access), lists/tuples (index access), objects (attribute access)
+  - Immutable updates preserve original structures
+  - Comprehensive test coverage (tests/test-path-ops.m28)
 - [ ] JSONL streaming support
 - [ ] Record operations: `select-keys`, `rename-keys`
 - [ ] Deep merge and transformations
@@ -374,6 +383,17 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
     - Smart comma handling: commas followed by whitespace are separators, commas followed by non-whitespace are reader macros
   - Full test coverage with comprehensive examples
   - Complete documentation in docs/MACROS.md
+- **Pythonic Path Operations**: Clojure-inspired nested data access with Python-style syntax
+  - `get-path` - Get value at nested path with optional default: `(get-path user "address.city" "Unknown")`
+  - `set-path` - Immutable set returns new structure: `(set-path data "users.0.name" "Alice")`
+  - `update-path` - Apply function at path: `(update-path config "cache.ttl" (lambda (x) (* x 2)))`
+  - `has-path?` - Check path existence: `(has-path? data "users.0.profile.email")`
+  - String paths with dot notation: `"user.address.city"` parses to `["user", "address", "city"]`
+  - Automatic numeric index parsing: `"users.0.name"` parses to `["users", 0, "name"]`
+  - List paths for complex keys: `["users", "contact.info", 0]` handles keys with dots
+  - Multi-tier data structure support: dicts (key access), lists/tuples (index access), objects (attribute access)
+  - Immutable updates preserve original structures (functional programming style)
+  - Comprehensive test suite with 15 test scenarios (tests/test-path-ops.m28)
 
 ### December 2024
 - **S-String Implementation (Phases 1 & 2)**: Syntax strings for metaprogramming and code generation

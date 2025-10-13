@@ -24,6 +24,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterMisc(ctx)
 	RegisterDecorators(ctx) // Register decorators (@macro)
 	RegisterMacros(ctx)     // Register built-in macros (unless, when, ->, ->>)
+	RegisterPathOps(ctx)    // Register path operations (get-path, set-path, update-path, has-path?)
 
 	// Register operators using new protocol-based implementation
 	operators.RegisterAll(ctx)
