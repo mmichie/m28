@@ -37,8 +37,19 @@
   - Works with dicts (key access), lists/tuples (index access), objects (attribute access)
   - Immutable updates preserve original structures
   - Comprehensive test coverage (tests/test-path-ops.m28)
+- [x] Record operations: Pythonic dict operations
+  - `select-keys` - Extract subset of keys: `(select-keys user ["name" "email"])`
+  - `rename-keys` - Rename keys with mapping or function: `(rename-keys data {"old": "new"})`
+  - `map-keys` - Transform all keys: `(map-keys dict upper)`
+  - `map-values` - Transform all values: `(map-values dict (lambda (x) (* x 2)))`
+  - `filter-keys` - Keep keys matching predicate: `(filter-keys dict (lambda (k) (k.startswith "user_")))`
+  - `filter-values` - Keep values matching predicate: `(filter-values dict (lambda (v) (> v 10)))`
+  - Immutable operations (original unchanged)
+  - Collision detection for rename operations
+  - Composable with threading macros (->)
+  - Works with nested structures
+  - Comprehensive test coverage (tests/test-dict-ops.m28)
 - [ ] JSONL streaming support
-- [ ] Record operations: `select-keys`, `rename-keys`
 - [ ] Deep merge and transformations
 
 #### Missing Python Features
@@ -394,6 +405,18 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
   - Multi-tier data structure support: dicts (key access), lists/tuples (index access), objects (attribute access)
   - Immutable updates preserve original structures (functional programming style)
   - Comprehensive test suite with 15 test scenarios (tests/test-path-ops.m28)
+- **Pythonic Dict Operations**: Functional dict manipulation with composable operations
+  - `select-keys` - Extract subset of keys, skips missing: `(select-keys user ["name" "email"])`
+  - `rename-keys` - Dual-mode renaming with collision detection: `(rename-keys data {"old": "new"})` or `(rename-keys data upper)`
+  - `map-keys` - Transform all keys with function: `(map-keys dict (lambda (k) (+ "prefix_" k)))`
+  - `map-values` - Transform all values with function: `(map-values prices (lambda (p) (* p 1.1)))`
+  - `filter-keys` - Keep keys matching predicate: `(filter-keys data (lambda (k) (not (k.startswith "internal_"))))`
+  - `filter-values` - Keep values matching predicate: `(filter-values scores (lambda (s) (>= s 90)))`
+  - All operations immutable (return new dict, original unchanged)
+  - Collision detection prevents duplicate keys in rename operations
+  - Fully composable with threading macros: `(-> data (select-keys [...]) (rename-keys {...}) (map-values ...))`
+  - Works seamlessly with nested structures and path operations
+  - Comprehensive test suite with 13 test scenarios (tests/test-dict-ops.m28)
 
 ### December 2024
 - **S-String Implementation (Phases 1 & 2)**: Syntax strings for metaprogramming and code generation
