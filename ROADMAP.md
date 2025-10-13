@@ -144,26 +144,13 @@ Comparison: `__eq__`, `__ne__`, `__lt__`, `__le__`, `__gt__`, `__ge__`
 Container: `__len__`, `__getitem__`, `__setitem__`, `__delitem__`, `__contains__`, `__iter__`, `__next__`
 Bitwise: `__and__`, `__or__`, `__xor__`, `__invert__`, `__lshift__`, `__rshift__`, `__hash__`
 Reflected Bitwise: `__rand__`, `__ror__`, `__rxor__`, `__rlshift__`, `__rrshift__`
+Augmented Assignment: `__iadd__`, `__isub__`, `__imul__`, `__itruediv__`, `__ifloordiv__`, `__imod__`, `__ipow__`, `__iand__`, `__ior__`, `__ixor__`, `__ilshift__`, `__irshift__`
 Context Manager: `__enter__`, `__exit__`
 Conversion: `__int__`, `__float__`, `__str__`, `__repr__`, `__bool__`
 Lifecycle: `__init__`, `__call__`
 Metaclass: `__instancecheck__`, `__subclasscheck__`
 
 ##### High Priority - Core Operations 🔴
-
-**Augmented Assignment (In-place Operations):**
-- [ ] `__iadd__` - In-place addition (+=)
-- [ ] `__isub__` - In-place subtraction (-=)
-- [ ] `__imul__` - In-place multiplication (*=)
-- [ ] `__itruediv__` - In-place true division (/=)
-- [ ] `__ifloordiv__` - In-place floor division (//=)
-- [ ] `__imod__` - In-place modulo (%=)
-- [ ] `__ipow__` - In-place power (**=)
-- [ ] `__iand__` - In-place AND (&=)
-- [ ] `__ior__` - In-place OR (|=)
-- [ ] `__ixor__` - In-place XOR (^=)
-- [ ] `__ilshift__` - In-place left shift (<<=)
-- [ ] `__irshift__` - In-place right shift (>>=)
 
 **Attribute Access:**
 - [ ] `__getattr__` - Fallback for undefined attributes

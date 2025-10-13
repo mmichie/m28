@@ -1,0 +1,13 @@
+# Test append on object attribute
+
+(class Foo ()
+  (def __init__ (self)
+    (= self.items [])))
+
+(= obj (Foo))
+(print (+ "Before: " (str obj.items)))
+
+(obj.items.append "test")
+(print (+ "After append: " (str obj.items)))
+
+(print (+ "Length: " (str (len obj.items))))

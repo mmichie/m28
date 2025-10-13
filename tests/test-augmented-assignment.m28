@@ -1,0 +1,266 @@
+# Test augmented assignment operators with in-place dunder methods
+
+(print "Testing Augmented Assignment Operators")
+(print "=" 70)
+
+# =============================================================================
+# Test 1: Arithmetic augmented assignment with built-in types
+# =============================================================================
+(print "\n1. Testing arithmetic augmented assignment")
+(print "-" 70)
+
+(= x 10)
+(+= x 5)
+(print (+ "x += 5: " (str x)))
+(assert (== x 15) "Addition assignment works")
+
+(= y 20)
+(-= y 8)
+(print (+ "y -= 8: " (str y)))
+(assert (== y 12) "Subtraction assignment works")
+
+(= z 4)
+(*= z 3)
+(print (+ "z *= 3: " (str z)))
+(assert (== z 12) "Multiplication assignment works")
+
+(= w 20)
+(/= w 4)
+(print (+ "w /= 4: " (str w)))
+(assert (== w 5) "Division assignment works")
+
+(= a 17)
+(//= a 5)
+(print (+ "a //= 5: " (str a)))
+(assert (== a 3) "Floor division assignment works")
+
+(= b 17)
+(%= b 5)
+(print (+ "b %= 5: " (str b)))
+(assert (== b 2) "Modulo assignment works")
+
+(= c 2)
+(**= c 3)
+(print (+ "c **= 3: " (str c)))
+(assert (== c 8) "Power assignment works")
+
+(print "✓ Arithmetic augmented assignment works")
+
+# =============================================================================
+# Test 2: Bitwise augmented assignment with built-in types
+# =============================================================================
+(print "\n2. Testing bitwise augmented assignment")
+(print "-" 70)
+
+(= p 12)  # 0b1100
+(&= p 10)  # 0b1010
+(print (+ "p &= 10: " (str p)))
+(assert (== p 8) "AND assignment works")
+
+(= q 4)  # 0b0100
+(|= q 2)  # 0b0010
+(print (+ "q |= 2: " (str q)))
+(assert (== q 6) "OR assignment works")
+
+(= r 12)  # 0b1100
+(^= r 10)  # 0b1010
+(print (+ "r ^= 10: " (str r)))
+(assert (== r 6) "XOR assignment works")
+
+(= s 5)
+(<<= s 2)
+(print (+ "s <<= 2: " (str s)))
+(assert (== s 20) "Left shift assignment works")
+
+(= t 20)
+(>>= t 2)
+(print (+ "t >>= 2: " (str t)))
+(assert (== t 5) "Right shift assignment works")
+
+(print "✓ Bitwise augmented assignment works")
+
+# =============================================================================
+# Test 3: Custom class with in-place dunder methods
+# =============================================================================
+(print "\n3. Testing custom class with in-place dunder methods")
+(print "-" 70)
+
+(class Counter ()
+  (def __init__ (self value)
+    (= self.value value)
+    (= self.iadd_called false)
+    (= self.imul_called false))
+
+  (def __iadd__ (self other)
+    # In-place add - modifies self and returns self
+    (= self.iadd_called true)
+    (= self.value (+ self.value other))
+    self)
+
+  (def __imul__ (self other)
+    # In-place multiply
+    (= self.imul_called true)
+    (= self.value (* self.value other))
+    self)
+
+  (def __str__ (self)
+    (str self.value)))
+
+(= counter (Counter 10))
+(print (+ "Initial counter: " (str counter)))
+
+# Use in-place add (should call __iadd__)
+(+= counter 5)
+(print (+ "After += 5: " (str counter)))
+(assert (== counter.value 15) "In-place add works")
+(assert counter.iadd_called "__iadd__ was called")
+
+# Use in-place multiply
+(*= counter 2)
+(print (+ "After *= 2: " (str counter)))
+(assert (== counter.value 30) "In-place multiply works")
+(assert counter.imul_called "__imul__ was called")
+
+(print "✓ In-place dunder methods work")
+
+# =============================================================================
+# Test 4: Fallback to regular operations
+# =============================================================================
+(print "\n4. Testing fallback to regular operations")
+(print "-" 70)
+
+(class SimpleValue ()
+  (def __init__ (self value)
+    (= self.value value))
+
+  # Has __add__ but NOT __iadd__
+  (def __add__ (self other)
+    (SimpleValue (+ self.value other.value)))
+
+  (def __str__ (self)
+    (str self.value)))
+
+(= val1 (SimpleValue 10))
+(= val2 (SimpleValue 5))
+
+# This should fall back to __add__ since __iadd__ is not defined
+(+= val1 val2)
+(print (+ "val1 after += val2: " (str val1)))
+(assert (== val1.value 15) "Fallback to __add__ works")
+
+(print "✓ Fallback to regular operations works")
+
+# =============================================================================
+# Test 5: All in-place bitwise operators
+# =============================================================================
+(print "\n5. Testing all bitwise in-place operators")
+(print "-" 70)
+
+(class Flags ()
+  (def __init__ (self value)
+    (= self.value value)
+    (= self.and_called false)
+    (= self.or_called false)
+    (= self.xor_called false)
+    (= self.lshift_called false)
+    (= self.rshift_called false))
+
+  (def __iand__ (self other)
+    (= self.and_called true)
+    (= self.value (& self.value other))
+    self)
+
+  (def __ior__ (self other)
+    (= self.or_called true)
+    (= self.value (| self.value other))
+    self)
+
+  (def __ixor__ (self other)
+    (= self.xor_called true)
+    (= self.value (^ self.value other))
+    self)
+
+  (def __ilshift__ (self other)
+    (= self.lshift_called true)
+    (= self.value (<< self.value other))
+    self)
+
+  (def __irshift__ (self other)
+    (= self.rshift_called true)
+    (= self.value (>> self.value other))
+    self))
+
+(= flags (Flags 15))
+(&= flags 7)
+(assert (== flags.value 7) "__iand__ works")
+(assert flags.and_called "__iand__ was called")
+
+(|= flags 8)
+(assert (== flags.value 15) "__ior__ works")
+(assert flags.or_called "__ior__ was called")
+
+(^= flags 3)
+(assert (== flags.value 12) "__ixor__ works")
+(assert flags.xor_called "__ixor__ was called")
+
+(<<= flags 2)
+(assert (== flags.value 48) "__ilshift__ works")
+(assert flags.lshift_called "__ilshift__ was called")
+
+(>>= flags 3)
+(assert (== flags.value 6) "__irshift__ works")
+(assert flags.rshift_called "__irshift__ was called")
+
+(print "✓ All bitwise in-place operators work")
+
+# =============================================================================
+# Test 6: Chain multiple augmented assignments
+# =============================================================================
+(print "\n6. Testing chained augmented assignments")
+(print "-" 70)
+
+(= n 5)
+(+= n 3)
+(*= n 2)
+(-= n 4)
+(//= n 2)
+(print (+ "Final value after chaining: " (str n)))
+(assert (== n 6) "Chained assignments work")
+
+(print "✓ Chained augmented assignments work")
+
+# =============================================================================
+# Test 7: String concatenation with +=
+# =============================================================================
+(print "\n7. Testing string concatenation with +=")
+(print "-" 70)
+
+(= msg "Hello")
+(+= msg " ")
+(+= msg "World")
+(print (+ "msg = " msg))
+(assert (== msg "Hello World") "String += works")
+
+(print "✓ String concatenation with += works")
+
+# =============================================================================
+# Summary
+# =============================================================================
+(print "\n" "=" 70)
+(print "✅ All Augmented Assignment Tests Passed!")
+(print "=" 70)
+
+(print "\nImplemented augmented assignment operators:")
+(print "  Arithmetic: +=, -=, *=, /=, //=, %=, **=")
+(print "  Bitwise: &=, |=, ^=, <<=, >>=")
+
+(print "\nIn-place dunder methods:")
+(print "  • __iadd__, __isub__, __imul__, __itruediv__")
+(print "  • __ifloordiv__, __imod__, __ipow__")
+(print "  • __iand__, __ior__, __ixor__, __ilshift__, __irshift__")
+
+(print "\nFeatures:")
+(print "  • Tries in-place dunder method first (e.g., __iadd__)")
+(print "  • Falls back to regular operation if not defined")
+(print "  • Works with variables, indexing, and attributes")
+(print "  • Full compatibility with built-in and custom types")

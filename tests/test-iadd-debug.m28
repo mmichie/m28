@@ -1,0 +1,21 @@
+# Debug test for __iadd__
+
+(class TestClass ()
+  (def __init__ (self val)
+    (= self.val val)
+    (= self.called false))
+
+  (def __iadd__ (self other)
+    (print "__iadd__ was called!")
+    (= self.called true)
+    (= self.val (+ self.val other))
+    self))
+
+(= obj (TestClass 10))
+(print (+ "Before: obj.val = " (str obj.val)))
+(print (+ "Before: obj.called = " (str obj.called)))
+
+(+= obj 5)
+
+(print (+ "After: obj.val = " (str obj.val)))
+(print (+ "After: obj.called = " (str obj.called)))

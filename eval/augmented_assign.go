@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 )
 
@@ -13,21 +14,61 @@ var augmentedOps = map[string]string{
 	"-=":  "-",
 	"*=":  "*",
 	"/=":  "/",
+	"//=": "//",
 	"%=":  "%",
 	"**=": "**",
+	"&=":  "&",
+	"|=":  "|",
+	"^=":  "^",
+	"<<=": "<<",
+	">>=": ">>",
 }
 
-// AugmentedAssignForm handles augmented assignment operators
-// (+= x y) -> (= x (+ x y))
-func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("%s requires exactly 2 arguments, got %d", op, len(args))
+// augmentedDunderMethods maps augmented operators to their in-place dunder methods
+var augmentedDunderMethods = map[string]string{
+	"+=":  "__iadd__",
+	"-=":  "__isub__",
+	"*=":  "__imul__",
+	"/=":  "__itruediv__",
+	"//=": "__ifloordiv__",
+	"%=":  "__imod__",
+	"**=": "__ipow__",
+	"&=":  "__iand__",
+	"|=":  "__ior__",
+	"^=":  "__ixor__",
+	"<<=": "__ilshift__",
+	">>=": "__irshift__",
+}
+
+// performAugmentedOp performs an augmented operation, trying in-place dunder method first
+func performAugmentedOp(op string, currentValue, augValue core.Value, ctx *core.Context) (core.Value, error) {
+	// Try in-place dunder method first (e.g., __iadd__)
+	if dunderMethod, ok := augmentedDunderMethods[op]; ok {
+		if result, found, err := types.CallDunder(currentValue, dunderMethod, []core.Value{augValue}, ctx); found {
+			return result, err
+		}
 	}
 
-	// Get the base operator
+	// Fall back to regular operation (e.g., __add__)
 	baseOp, ok := augmentedOps[op]
 	if !ok {
 		return nil, fmt.Errorf("unknown augmented assignment operator: %s", op)
+	}
+
+	// Create the operation expression and evaluate it
+	opExpr := core.ListValue{
+		core.SymbolValue(baseOp),
+		currentValue,
+		augValue,
+	}
+	return Eval(opExpr, ctx)
+}
+
+// AugmentedAssignForm handles augmented assignment operators
+// (+= x y) -> tries __iadd__ first, then falls back to (= x (+ x y))
+func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("%s requires exactly 2 arguments, got %d", op, len(args))
 	}
 
 	target := args[0]
@@ -36,7 +77,7 @@ func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (cor
 	// Handle different target types
 	switch t := target.(type) {
 	case core.SymbolValue:
-		// Simple variable: x += y -> (= x (+ x y))
+		// Simple variable: x += y
 		// First get current value
 		currentValue, err := ctx.Lookup(string(t))
 		if err != nil {
@@ -49,15 +90,8 @@ func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (cor
 			return nil, err
 		}
 
-		// Create the operation expression
-		opExpr := core.ListValue{
-			core.SymbolValue(baseOp),
-			currentValue,
-			evalAugValue,
-		}
-
-		// Evaluate the operation
-		result, err := Eval(opExpr, ctx)
+		// Perform the augmented operation (tries __iadd__ first, then falls back)
+		result, err := performAugmentedOp(op, currentValue, evalAugValue, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -73,10 +107,10 @@ func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (cor
 				switch string(sym) {
 				case "get-item":
 					// Index assignment: lst[i] += y
-					return augmentedIndexAssign(t, baseOp, augValue, ctx)
+					return augmentedIndexAssign(t, op, augValue, ctx)
 				case ".":
 					// Property assignment: obj.prop += y
-					return augmentedPropertyAssign(t, baseOp, augValue, ctx)
+					return augmentedPropertyAssign(t, op, augValue, ctx)
 				}
 			}
 		}
@@ -88,13 +122,11 @@ func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (cor
 }
 
 // augmentedIndexAssign handles lst[i] += value
-func augmentedIndexAssign(indexExpr core.ListValue, baseOp string, augValue core.Value, ctx *core.Context) (core.Value, error) {
+func augmentedIndexAssign(indexExpr core.ListValue, op string, augValue core.Value, ctx *core.Context) (core.Value, error) {
 	// indexExpr is (get-item obj key)
 	if len(indexExpr) != 3 {
 		return nil, fmt.Errorf("invalid index expression")
 	}
-
-	// We don't need to evaluate obj and key separately since GetItemForm will do it
 
 	// Get current value
 	currentValue, err := GetItemForm(core.ListValue{indexExpr[1], indexExpr[2]}, ctx)
@@ -108,13 +140,8 @@ func augmentedIndexAssign(indexExpr core.ListValue, baseOp string, augValue core
 		return nil, err
 	}
 
-	// Perform operation
-	opExpr := core.ListValue{
-		core.SymbolValue(baseOp),
-		currentValue,
-		evalAugValue,
-	}
-	result, err := Eval(opExpr, ctx)
+	// Perform the augmented operation (tries __iadd__ first, then falls back)
+	result, err := performAugmentedOp(op, currentValue, evalAugValue, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +151,7 @@ func augmentedIndexAssign(indexExpr core.ListValue, baseOp string, augValue core
 }
 
 // augmentedPropertyAssign handles obj.prop += value
-func augmentedPropertyAssign(dotExpr core.ListValue, baseOp string, augValue core.Value, ctx *core.Context) (core.Value, error) {
+func augmentedPropertyAssign(dotExpr core.ListValue, op string, augValue core.Value, ctx *core.Context) (core.Value, error) {
 	// dotExpr is (. obj "prop")
 	if len(dotExpr) < 3 {
 		return nil, fmt.Errorf("invalid property expression")
@@ -142,13 +169,8 @@ func augmentedPropertyAssign(dotExpr core.ListValue, baseOp string, augValue cor
 		return nil, err
 	}
 
-	// Perform operation
-	opExpr := core.ListValue{
-		core.SymbolValue(baseOp),
-		currentValue,
-		evalAugValue,
-	}
-	result, err := Eval(opExpr, ctx)
+	// Perform the augmented operation (tries __iadd__ first, then falls back)
+	result, err := performAugmentedOp(op, currentValue, evalAugValue, ctx)
 	if err != nil {
 		return nil, err
 	}

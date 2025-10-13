@@ -1,0 +1,32 @@
+# Debug Counter class
+
+(class Counter ()
+  (def __init__ (self value)
+    (= self.value value)
+    (= self.history []))
+
+  (def __iadd__ (self other)
+    # In-place add - modifies self and returns self
+    (print "DEBUG: __iadd__ called!")
+    (print (+ "DEBUG: other = " (str other)))
+    (self.history.append (+ "iadd " (str other)))
+    (print (+ "DEBUG: history after append = " (str self.history)))
+    (= self.value (+ self.value other))
+    self)
+
+  (def __str__ (self)
+    (str self.value)))
+
+(= counter (Counter 10))
+(print (+ "Initial: " (str counter)))
+(print (+ "History before: " (str counter.history)))
+
+(+= counter 5)
+
+(print (+ "After +=: " (str counter)))
+(print (+ "History after: " (str counter.history)))
+(print (+ "History length: " (str (len counter.history))))
+
+(if (> (len counter.history) 0)
+  (print (+ "First history item: " counter.history[0]))
+  (print "History is empty!"))
