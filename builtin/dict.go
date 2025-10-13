@@ -23,7 +23,7 @@ func RegisterDictFunctions(ctx *core.Context) {
 	ctx.Define("keys", core.NewBuiltinFunction(KeysFunc))
 	ctx.Define("values", core.NewBuiltinFunction(ValuesFunc))
 	ctx.Define("items", core.NewBuiltinFunction(ItemsFunc))
-	ctx.Define("merge", core.NewBuiltinFunction(MergeFunc))
+	// Note: merge, deep-merge, merge-with are now registered in merge_ops.go
 }
 
 // DictFunc creates a new dictionary from key-value pairs

@@ -49,8 +49,16 @@
   - Composable with threading macros (->)
   - Works with nested structures
   - Comprehensive test coverage (tests/test-dict-ops.m28)
+- [x] Deep merge and transformations: Pythonic merge operations with predictable semantics
+  - `merge` - Shallow merge multiple dicts, later values win: `(merge dict1 dict2 dict3)`
+  - `deep-merge` - Recursive merge of nested structures: `(deep-merge config1 config2)`
+  - `merge-with` - Custom conflict resolution with function: `(merge-with + dict1 dict2)`
+  - Immutable operations (originals unchanged)
+  - Variadic arguments (merge unlimited dicts)
+  - Type mismatch handling (later replaces earlier, no errors)
+  - Fully composable with path-ops and dict-ops
+  - Comprehensive test coverage (tests/test-merge-ops.m28)
 - [ ] JSONL streaming support
-- [ ] Deep merge and transformations
 
 #### Missing Python Features
 - [ ] Multiple inheritance
@@ -417,6 +425,18 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
   - Fully composable with threading macros: `(-> data (select-keys [...]) (rename-keys {...}) (map-values ...))`
   - Works seamlessly with nested structures and path operations
   - Comprehensive test suite with 13 test scenarios (tests/test-dict-ops.m28)
+- **Pythonic Merge Operations**: Deep merge and transformations with predictable semantics
+  - `merge` - Shallow merge multiple dicts: `(merge dict1 dict2 dict3)`
+  - `deep-merge` - Recursive merge of nested structures: `(deep-merge config1 config2)`
+  - `merge-with` - Custom conflict resolution: `(merge-with + dict1 dict2)` sums conflicting values
+  - Later-wins semantics (simple, predictable, matches Python's `{**dict1, **dict2}`)
+  - Type mismatch handling: later value replaces earlier (no errors, practical defaults)
+  - List handling: later list replaces earlier (not concatenated, explicit behavior)
+  - Immutable operations return new dicts (functional programming style)
+  - Variadic arguments for merging unlimited dicts
+  - Fully composable: `(-> base (deep-merge overrides) (select-keys [...]) (update-path ...))`
+  - Replaced buggy old merge implementation that used deprecated Set() method
+  - Comprehensive test suite with 16 test scenarios covering all edge cases (tests/test-merge-ops.m28)
 
 ### December 2024
 - **S-String Implementation (Phases 1 & 2)**: Syntax strings for metaprogramming and code generation
