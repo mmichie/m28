@@ -61,6 +61,18 @@ func (p *Parser) Parse(input string) (core.Value, error) {
 		return expressions[0], nil
 	}
 
+	// Check if expressions form an infix pattern at top level
+	// This makes "1 + 2" work naturally at REPL and in files
+	// Example: "1 + 2" is parsed as [1, +, 2] and becomes (+ 1 2)
+	if detectInfixPattern(expressions) {
+		result, err := parseInfixExpressionSimple(expressions)
+		if err == nil {
+			return result, nil
+		}
+		// If infix parsing fails, fall through to wrap in do
+		// This allows things like (reduce + 0 list) to still work
+	}
+
 	// Otherwise, wrap expressions in an implicit do form
 	return core.ListValue(append(
 		[]core.Value{core.SymbolValue("do")},

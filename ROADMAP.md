@@ -388,6 +388,23 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
   - Composable with functional operations (`filter`, `map`, `reduce`)
   - Implementation in builtin/jsonl.go with helper functions for type conversion
   - Test suite demonstrates all functionality (tests/test-jsonl.m28)
+- **Top-Level Infix Operator Fix**: REPL now intuitively handles infix expressions
+  - **Problem**: `1 + 2` at REPL returned `2` (last of three atoms), not `3`
+  - **Solution**: Parser detects infix patterns at top level before wrapping in `(do ...)`
+  - **Impact**: Natural REPL experience - `1 + 2` → `3` as users expect
+  - Graceful fallback: if infix parsing fails, falls back to traditional behavior
+  - 100% backward compatible: all existing code works unchanged
+  - **Examples that now work naturally at REPL**:
+    - `1 + 2` → `3` ✓ (was `2` before)
+    - `5 - 3` → `2` ✓
+    - `1 + 2 * 3` → `7` ✓ (correct precedence)
+    - `2 ** 3` → `8` ✓
+    - `5 > 3` → `True` ✓
+  - Prefix notation still works: `(+ 1 2)` → `3`
+  - Inside-paren infix still works: `(1 + 2)` → `3`
+  - Implementation: 8-line addition to parser/parser.go Parse() method
+  - Test coverage: tests/test-infix-repl-simple.m28
+  - All 37 existing tests pass
 - **Phase 2.5 Infix Operator Support**: Natural, Pythonic syntax for operators
   - Infix notation inside parentheses: `(x + y)` instead of `(+ x y)`
   - Smart context-aware parsing: detects infix vs prefix automatically

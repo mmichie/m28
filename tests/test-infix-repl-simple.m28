@@ -1,0 +1,54 @@
+# Simple test for top-level infix
+(print "=== Top-Level Infix Tests ===\n")
+
+# Test 1: Basic arithmetic
+(print "Test 1: 1 + 2")
+(assert (== (1 + 2) 3) "1 + 2 should be 3")
+(print "✓ Pass\n")
+
+# Test 2: Precedence
+(print "Test 2: 1 + 2 * 3")
+(assert (== (1 + 2 * 3) 7) "1 + 2 * 3 should be 7")
+(print "✓ Pass\n")
+
+# Test 3: Comparison
+(print "Test 3: 5 > 3")
+(assert (5 > 3) "5 > 3 should be true")
+(print "✓ Pass\n")
+
+# Test 4: Boolean
+(print "Test 4: true and false")
+(assert (not (true and false)) "true and false should be false")
+(print "✓ Pass\n")
+
+# Test 5: Prefix still works
+(print "Test 5: (+ 1 2)")
+(assert (== (+ 1 2) 3) "(+ 1 2) should be 3")
+(print "✓ Pass\n")
+
+# Test 6: Floor division
+(print "Test 6: 7 // 2")
+(assert (== (7 // 2) 3) "7 // 2 should be 3")
+(print "✓ Pass\n")
+
+# Test 7: Exponentiation
+(print "Test 7: 2 ** 3")
+(assert (== (2 ** 3) 8) "2 ** 3 should be 8")
+(print "✓ Pass\n")
+
+# Test 8: Right associativity
+(print "Test 8: 2 ** 3 ** 2")
+(assert (== (2 ** 3 ** 2) 512) "2 ** 3 ** 2 should be 512")
+(print "✓ Pass\n")
+
+# Test 9: Mixed with functions
+(print "Test 9: (len [1, 2, 3]) + 2")
+(assert (== ((len [1, 2, 3]) + 2) 5) "len + 2 should be 5")
+(print "✓ Pass\n")
+
+# Test 10: String concat
+(print "Test 10: String concatenation")
+(assert (== ("hello" + " " + "world") "hello world") "String concat should work")
+(print "✓ Pass\n")
+
+(print "=== All Tests Passed! ===\n")
