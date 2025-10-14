@@ -27,6 +27,7 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	RegisterPathOps(ctx)    // Register path operations (get-path, set-path, update-path, has-path?)
 	RegisterDictOps(ctx)    // Register dict operations (select-keys, rename-keys, map-keys, map-values, filter-keys, filter-values)
 	RegisterMergeOps(ctx)   // Register merge operations (merge, deep-merge, merge-with)
+	RegisterJSONL(ctx)      // Register JSONL streaming operations (read-jsonl, write-jsonl, parse-jsonl-line, etc.)
 
 	// Register operators using new protocol-based implementation
 	operators.RegisterAll(ctx)

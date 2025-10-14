@@ -1,0 +1,49 @@
+# JSONL Streaming Functions - Test Suite
+# Demonstrates all JSONL functions: parse-jsonl-line, format-jsonl-line,
+# read-jsonl, write-jsonl, append-jsonl-line
+
+(print "=== JSONL Functions Test ===\n")
+
+# Test parse-jsonl-line
+(print "1. parse-jsonl-line")
+(= parsed (parse-jsonl-line "{\"name\": \"Alice\", \"age\": 30}"))
+(print "   Parsed:" parsed)
+(assert (== parsed.name "Alice") "parse-jsonl-line works")
+
+# Test format-jsonl-line
+(print "\n2. format-jsonl-line")
+(= formatted (format-jsonl-line {"name": "Bob", "score": 95}"))
+(print "   Formatted:" formatted)
+(assert (str-contains? formatted "\"name\"") "format-jsonl-line works")
+
+# Test write-jsonl and read-jsonl
+(print "3. write-jsonl and read-jsonl")
+(= data [
+  {"id": 1, "name": "Alice"},
+  {"id": 2, "name": "Bob"},
+  {"id": 3, "name": "Charlie"}
+])
+(write-jsonl "/tmp/test-users.jsonl" data)
+(= loaded (read-jsonl "/tmp/test-users.jsonl"))
+(print "   Wrote and read" (len loaded) "objects")
+(assert (== (len loaded) 3) "write-jsonl and read-jsonl work")
+
+# Test append-jsonl-line
+(print "\n4. append-jsonl-line")
+(write-jsonl "/tmp/test-log.jsonl" [])
+(append-jsonl-line "/tmp/test-log.jsonl" {"event": "start"})
+(append-jsonl-line "/tmp/test-log.jsonl" {"event": "process"})
+(append-jsonl-line "/tmp/test-log.jsonl" {"event": "finish"})
+(= log (read-jsonl "/tmp/test-log.jsonl"))
+(print "   Appended" (len log) "log entries")
+(assert (== (len log) 3) "append-jsonl-line works")
+
+# Test append mode
+(print "\n5. write-jsonl :append mode")
+(write-jsonl "/tmp/test-append.jsonl" [{"batch": 1}])
+(write-jsonl "/tmp/test-append.jsonl" [{"batch": 2}] :append)
+(= batches (read-jsonl "/tmp/test-append.jsonl"))
+(print "   Wrote" (len batches) "batches")
+(assert (== (len batches) 2) "write-jsonl append mode works")
+
+(print "\n=== All JSONL Tests Passed ===\n")

@@ -58,7 +58,17 @@
   - Type mismatch handling (later replaces earlier, no errors)
   - Fully composable with path-ops and dict-ops
   - Comprehensive test coverage (tests/test-merge-ops.m28)
-- [ ] JSONL streaming support
+- [x] JSONL streaming support: Record-oriented JSON processing
+  - `parse-jsonl-line` - Parse single JSONL line into object
+  - `format-jsonl-line` - Format object as JSONL line (with newline)
+  - `read-jsonl` - Read entire JSONL file (eager loading)
+  - `write-jsonl` - Write list of objects to JSONL file (with append mode)
+  - `append-jsonl-line` - Append single object to JSONL file
+  - Type-safe JSON conversion between M28 and Go types
+  - Empty line handling (automatically skipped)
+  - Composable with path-ops, dict-ops, merge-ops, filter/map
+  - Perfect for log processing, data pipelines, API streaming
+  - Test coverage (tests/test-jsonl.m28)
 
 #### Missing Python Features
 - [ ] Multiple inheritance
@@ -367,6 +377,17 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
 ## ✅ Recently Completed (2024-2025)
 
 ### January 2025
+- **JSONL Streaming Support**: Record-oriented JSON processing for data pipelines
+  - Five core functions: `parse-jsonl-line`, `format-jsonl-line`, `read-jsonl`, `write-jsonl`, `append-jsonl-line`
+  - Type-safe JSON ↔ M28 conversion (handles all M28 types: dicts, lists, strings, numbers, bools, nil)
+  - Eager file loading with `read-jsonl` (loads entire file into memory)
+  - Write modes: overwrite (default) or append for incremental processing
+  - Automatic empty line handling (skipped during parsing)
+  - Perfect for log processing, data streams, API responses, ETL pipelines
+  - Seamless integration with path-ops (`get-path`), dict-ops (`select-keys`, `rename-keys`), merge-ops (`merge`, `deep-merge`)
+  - Composable with functional operations (`filter`, `map`, `reduce`)
+  - Implementation in builtin/jsonl.go with helper functions for type conversion
+  - Test suite demonstrates all functionality (tests/test-jsonl.m28)
 - **Phase 2.5 Infix Operator Support**: Natural, Pythonic syntax for operators
   - Infix notation inside parentheses: `(x + y)` instead of `(+ x y)`
   - Smart context-aware parsing: detects infix vs prefix automatically
