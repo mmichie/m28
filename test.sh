@@ -132,6 +132,7 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Bool Protocol" "tests/bool-protocol-test.m28"
     run_test "Len Protocol" "tests/len-protocol-test.m28"
     run_test "Contains Protocol" "tests/contains-protocol-test.m28"
+    run_test "Not In Operator" "tests/not-in-test.m28"
     run_test "Container Protocols" "tests/container_protocols.m28"
     run_test "Index Protocol" "tests/test-index-dunder.m28"
     run_test "S-Strings" "tests/sstring-simple.m28"

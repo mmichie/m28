@@ -1,0 +1,50 @@
+# Test not in operator
+# Python-style "not in" operator tests
+
+(print "Testing 'not in' operator...")
+
+# Test 1: not in with lists
+(assert (1 not in [2 3 4]) "1 not in [2 3 4] should be True")
+(assert (not (2 not in [2 3 4])) "2 not in [2 3 4] should be False")
+(assert (5 not in [1 2 3]) "5 not in [1 2 3] should be True")
+(assert (not (3 not in [1 2 3])) "3 not in [1 2 3] should be False")
+
+# Test 2: not in with strings
+(assert ("x" not in "hello") "x not in 'hello' should be True")
+(assert (not ("e" not in "hello")) "e not in 'hello' should be False")
+(assert ("world" not in "hello") "world not in 'hello' should be True")
+(assert (not ("ell" not in "hello")) "ell not in 'hello' should be False")
+
+# Test 3: not in with dicts (checks keys)
+(= d {"a" 1 "b" 2 "c" 3})
+(assert (not ("a" not in d)) "a not in dict should be False")
+(assert ("x" not in d) "x not in dict should be True")
+(assert (not ("b" not in d)) "b not in dict should be False")
+
+# Test 4: not in with sets
+(= s {1, 2, 3})
+(assert (4 not in s) "4 not in set should be True")
+(assert (not (2 not in s)) "2 not in set should be False")
+
+# Test 5: not in with tuples
+(= t (tuple [10 20 30]))
+(assert (40 not in t) "40 not in tuple should be True")
+(assert (not (20 not in t)) "20 not in tuple should be False")
+
+# Test 6: not in in conditionals
+(= fruits ["apple" "banana" "cherry"])
+(if ("grape" not in fruits)
+    (print "✓ Conditional with not in works")
+    (assert false "not in conditional failed"))
+
+# Test 7: not in with empty containers
+(assert (1 not in []) "1 not in empty list should be True")
+(assert ("x" not in "") "x not in empty string should be True")
+(assert ("x" not in {}) "x not in empty dict should be True")
+
+# Test 8: Compare with workaround (not (in x y))
+(= nums [1 2 3])
+(assert ((5 not in nums) == (not (5 in nums))) "not in should equal not (in)")
+(assert ((2 not in nums) == (not (2 in nums))) "not in should equal not (in)")
+
+(print "✓ All 'not in' tests passed!")

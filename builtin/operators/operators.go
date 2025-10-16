@@ -36,6 +36,7 @@ func RegisterAll(ctx *core.Context) {
 	ctx.Define("and", core.NewBuiltinFunction(And()))
 	ctx.Define("or", core.NewBuiltinFunction(Or()))
 	ctx.Define("in", core.NewBuiltinFunction(In()))
+	ctx.Define("not in", core.NewBuiltinFunction(NotIn()))
 
 	// Bitwise operators
 	ctx.Define("<<", core.NewBuiltinFunction(LeftShift()))
@@ -1096,6 +1097,30 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 		default:
 			return nil, errors.NewTypeError("in", "argument must be iterable", string(container.Type()))
 		}
+	}
+}
+
+// NotIn implements the "not in" operator using protocol-based dispatch
+func NotIn() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("not in", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		// Call the In operator
+		inFunc := In()
+		result, err := inFunc(args, ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Negate the result
+		if b, ok := result.(core.BoolValue); ok {
+			return core.BoolValue(!b), nil
+		}
+
+		return nil, errors.NewTypeError("not in", "in operator should return a boolean", string(result.Type()))
 	}
 }
 
