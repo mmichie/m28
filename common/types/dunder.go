@@ -166,6 +166,29 @@ func CallBool(obj core.Value, ctx *core.Context) (bool, bool, error) {
 	return b, true, nil
 }
 
+// CallIndex calls __index__ on an object to convert it to an integer index
+// Used for slicing, indexing, and functions like bin(), hex(), oct()
+func CallIndex(obj core.Value, ctx *core.Context) (int, bool, error) {
+	result, found, err := CallDunder(obj, "__index__", []core.Value{}, ctx)
+	if !found || err != nil {
+		return 0, found, err
+	}
+
+	// Ensure result is an integer
+	num, ok := result.(core.NumberValue)
+	if !ok {
+		return 0, true, fmt.Errorf("__index__ returned non-int type %s", result.Type())
+	}
+
+	// Check if it's an integer value (not a float)
+	intVal := int(num)
+	if float64(intVal) != float64(num) {
+		return 0, true, fmt.Errorf("__index__ returned non-integer value %v", num)
+	}
+
+	return intVal, true, nil
+}
+
 // CallContains calls __contains__ on an object (item in self)
 func CallContains(self, item core.Value, ctx *core.Context) (bool, bool, error) {
 	result, found, err := CallDunder(self, "__contains__", []core.Value{item}, ctx)
@@ -239,4 +262,30 @@ func CallLt(self, other core.Value, ctx *core.Context) (bool, bool, error) {
 
 	// Use truthiness as fallback
 	return IsTruthy(result), true, nil
+}
+
+// ToIndex converts a value to an integer index using __index__ if available
+// This is the standard way to convert values to indices for slicing/indexing
+// Returns (intValue, error)
+func ToIndex(obj core.Value, ctx *core.Context) (int, error) {
+	// First try __index__ dunder method
+	if intVal, found, err := CallIndex(obj, ctx); found {
+		if err != nil {
+			return 0, err
+		}
+		return intVal, nil
+	}
+
+	// Fall back to NumberValue for built-in numeric types
+	if num, ok := obj.(core.NumberValue); ok {
+		intVal := int(num)
+		// Check if it's actually an integer
+		if float64(intVal) != float64(num) {
+			return 0, fmt.Errorf("slice indices must be integers or None, not float")
+		}
+		return intVal, nil
+	}
+
+	// Not convertible to index
+	return 0, fmt.Errorf("'%s' object cannot be interpreted as an integer", obj.Type())
 }

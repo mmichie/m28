@@ -120,13 +120,12 @@ func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			return defaultVal, nil
 		}
 
-		// Must be a number
-		num, ok := val.(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("slice indices must be integers or None, not %s", val.Type())
+		// Use ToIndex to convert value to integer (supports __index__)
+		i, err := types.ToIndex(val, ctx)
+		if err != nil {
+			return nil, err
 		}
 
-		i := int(num)
 		return &i, nil
 	}
 
@@ -366,35 +365,32 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 	// Extract slice parameters
 	var start, stop, step *int
 
-	// Convert slice values to integers
+	// Convert slice values to integers using ToIndex (supports __index__)
 	if slice.Start != nil && slice.Start != core.Nil {
-		if num, ok := slice.Start.(core.NumberValue); ok {
-			val := int(num)
-			start = &val
-		} else {
-			return nil, fmt.Errorf("slice indices must be integers or None")
+		val, err := types.ToIndex(slice.Start, nil)
+		if err != nil {
+			return nil, err
 		}
+		start = &val
 	}
 
 	if slice.Stop != nil && slice.Stop != core.Nil {
-		if num, ok := slice.Stop.(core.NumberValue); ok {
-			val := int(num)
-			stop = &val
-		} else {
-			return nil, fmt.Errorf("slice indices must be integers or None")
+		val, err := types.ToIndex(slice.Stop, nil)
+		if err != nil {
+			return nil, err
 		}
+		stop = &val
 	}
 
 	if slice.Step != nil && slice.Step != core.Nil {
-		if num, ok := slice.Step.(core.NumberValue); ok {
-			val := int(num)
-			if val == 0 {
-				return nil, fmt.Errorf("slice step cannot be zero")
-			}
-			step = &val
-		} else {
-			return nil, fmt.Errorf("slice indices must be integers or None")
+		val, err := types.ToIndex(slice.Step, nil)
+		if err != nil {
+			return nil, err
 		}
+		if val == 0 {
+			return nil, fmt.Errorf("slice step cannot be zero")
+		}
+		step = &val
 	}
 
 	// Handle different object types

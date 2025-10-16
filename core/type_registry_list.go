@@ -528,13 +528,11 @@ func listMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, error
 		return result, nil
 	}
 
-	// Handle index
-	idx, ok := args[0].(NumberValue)
-	if !ok {
-		return nil, fmt.Errorf("list indices must be integers")
+	// Handle index - use ToIndex to support __index__ dunder method
+	i, err := toIndex(args[0], ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	i := int(idx)
 	if i < 0 {
 		i = len(list) + i
 	}
@@ -592,4 +590,44 @@ func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error
 
 	// Lists are immutable in M28
 	return nil, fmt.Errorf("'list' object does not support item deletion")
+}
+
+// toIndex converts a value to an integer index using __index__ if available
+// This is a helper for list indexing operations
+func toIndex(obj Value, ctx *Context) (int, error) {
+	// First try __index__ dunder method
+	if attrObj, ok := obj.(interface{ GetAttr(string) (Value, bool) }); ok {
+		if indexMethod, exists := attrObj.GetAttr("__index__"); exists {
+			if callable, ok := indexMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				result, err := callable.Call([]Value{}, ctx)
+				if err != nil {
+					return 0, err
+				}
+				// Ensure result is an integer
+				num, ok := result.(NumberValue)
+				if !ok {
+					return 0, fmt.Errorf("__index__ returned non-int type %s", result.Type())
+				}
+				intVal := int(num)
+				if float64(intVal) != float64(num) {
+					return 0, fmt.Errorf("__index__ returned non-integer value %v", num)
+				}
+				return intVal, nil
+			}
+		}
+	}
+
+	// Fall back to NumberValue for built-in numeric types
+	if num, ok := obj.(NumberValue); ok {
+		intVal := int(num)
+		if float64(intVal) != float64(num) {
+			return 0, fmt.Errorf("list indices must be integers, not float")
+		}
+		return intVal, nil
+	}
+
+	// Not convertible to index
+	return 0, fmt.Errorf("list indices must be integers, not %s", obj.Type())
 }

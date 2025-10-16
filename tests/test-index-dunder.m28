@@ -1,0 +1,88 @@
+# Test __index__ dunder method implementation
+# Tests proper integer conversion for indexing and slicing
+
+# Test 1: Basic integer indexing and slicing
+(= lst [10, 20, 30, 40, 50])
+(assert (== (get-item lst 2) 30) "Basic indexing with integer")
+(assert (== lst[1:4] [20, 30, 40]) "Basic slicing with integers")
+(assert (== lst[-1] 50) "Negative index")
+(assert (== lst[-3:-1] [30, 40]) "Negative slice")
+
+# Test 2: Integer __index__ returns self
+(= idx 3)
+(assert (== (get-item lst idx) 40) "Integer acts as index")
+
+# Test 3: Custom class with __index__
+(class MyIndex
+  (def __init__ (self value)
+    (= self.value value))
+
+  (def __index__ (self)
+    self.value)
+
+  (def __repr__ (self)
+    (+ "MyIndex(" (str self.value) ")")))
+
+# Test 4: Custom __index__ for indexing
+(= custom_idx (MyIndex 2))
+(assert (hasattr custom_idx "__index__") "Custom class has __index__")
+(assert (== (get-item lst custom_idx) 30) "Custom __index__ for indexing")
+
+# Test 5: Custom __index__ for slicing
+(= start_idx (MyIndex 1))
+(= end_idx (MyIndex 4))
+(assert (== lst[start_idx:end_idx] [20, 30, 40]) "Custom __index__ in slicing")
+
+# Test 6: Custom __index__ with negative values
+(= neg_idx (MyIndex -2))
+(assert (== lst[neg_idx] 40) "Custom __index__ with negative value")
+
+# Test 7: Error handling - non-integer __index__
+(class BadIndex
+  (def __init__ (self value)
+    (= self.value value))
+
+  (def __index__ (self)
+    self.value))  # Returns float
+
+(= bad_idx (BadIndex 2.5))
+(try
+  (do
+    (get-item lst bad_idx)
+    (assert False "Should have raised error for non-integer __index__"))
+  (except e
+    # Success - error was raised as expected
+    (assert (in "__index__ returned non-integer" (str e))
+            "Error message for non-integer __index__")))
+
+# Test 8: Error handling - missing __index__ on non-number
+(class NoIndex
+  (def __init__ (self)
+    (= self.dummy 1)))
+
+(= no_idx (NoIndex))
+(try
+  (do
+    (get-item lst no_idx)
+    (assert False "Should have raised error for missing __index__"))
+  (except e
+    # Success - error was raised as expected
+    (assert (in "indices must be integers" (str e))
+            "Error message for missing __index__")))
+
+# Test 9: Float without proper integer value should fail
+(try
+  (do
+    (get-item lst 2.5)
+    (assert False "Should have raised error for float index"))
+  (except e
+    # Success - error was raised as expected
+    (assert (in "non-integer" (str e)) "Error message for float index")))
+
+# Test 10: Slicing with custom __index__ in all positions
+(= s1 (MyIndex 0))
+(= s2 (MyIndex 5))
+(= s3 (MyIndex 2))
+(assert (== lst[s1:s2:s3] [10, 30, 50]) "Custom __index__ for start:stop:step")
+
+(print "All __index__ tests passed!")

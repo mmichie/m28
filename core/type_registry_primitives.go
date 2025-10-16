@@ -65,6 +65,21 @@ func registerNumberType() {
 					return NumberValue(math.Abs(n)), nil
 				},
 			},
+			"__index__": {
+				Name:    "__index__",
+				Arity:   0,
+				Doc:     "Return self converted to an integer (for use in slicing/indexing)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					n := float64(receiver.(NumberValue))
+					intVal := int(n)
+					// Check if the number is actually an integer
+					if float64(intVal) != n {
+						return nil, fmt.Errorf("__index__ returned non-integer value")
+					}
+					return NumberValue(n), nil
+				},
+			},
 		},
 		Constructor: func(args []Value, ctx *Context) (Value, error) {
 			if len(args) == 0 {
