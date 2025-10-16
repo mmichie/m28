@@ -160,11 +160,11 @@ Many builtin functions bypass dunder methods and go straight to type switches. N
 - [x] `round()` - Added `__round__()` dunder method support
 - [x] `divmod()` - Added `__divmod__()` and `__rdivmod__()` dunder method support
 
-**Medium Priority - Missing Builtins:** ✅ COMPLETE (except format)
-- [ ] Implement `format()` builtin with `__format__(format_spec)` dunder method
-  - **NOTE**: Naming conflict with existing sprintf-style format() in builtin/string_format.go
-  - Python's builtin format(value, format_spec) differs from current format(template, *values)
-  - Needs resolution: either rename existing format() or implement dual behavior
+**Medium Priority - Missing Builtins:** ✅ COMPLETE
+- [x] `format()` - Implemented Python-style format(value, format_spec='') with `__format__()` dunder method (builtin/types.go:397)
+  - Replaced old sprintf-style format() which didn't work with {} placeholders
+  - Calls __format__(format_spec) on objects when available
+  - Falls back to str() conversion for built-in types
 - [x] `reversed()` - Implemented with `__reversed__()` dunder method support (builtin/iteration.go)
 - [x] `bytes()` (core/type_registry_primitives.go:307) - Added `__bytes__()` dunder method support
 
@@ -184,9 +184,11 @@ Bitwise: `__and__`, `__or__`, `__xor__`, `__invert__`, `__lshift__`, `__rshift__
 Reflected Bitwise: `__rand__`, `__ror__`, `__rxor__`, `__rlshift__`, `__rrshift__`
 Augmented Assignment: `__iadd__`, `__isub__`, `__imul__`, `__itruediv__`, `__ifloordiv__`, `__imod__`, `__ipow__`, `__iand__`, `__ior__`, `__ixor__`, `__ilshift__`, `__irshift__`
 Context Manager: `__enter__`, `__exit__`
-Conversion: `__int__`, `__float__`, `__str__`, `__repr__`, `__bool__`
+Conversion: `__int__`, `__float__`, `__str__`, `__repr__`, `__bool__`, `__bytes__`, `__format__`, `__index__`
 Lifecycle: `__init__`, `__call__`
 Metaclass: `__instancecheck__`, `__subclasscheck__`
+Iteration: `__iter__`, `__next__`, `__reversed__`
+Numeric Extended: `__round__`, `__divmod__`, `__rdivmod__`
 
 ##### High Priority - Core Operations 🔴
 
@@ -198,10 +200,10 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
 - [ ] `__dir__` - Directory listing for dir()
 
 **Type Conversion:**
-- [ ] `__bytes__` - Convert to bytes
-- [ ] `__complex__` - Convert to complex number
+- [x] `__bytes__` - Convert to bytes (core/type_registry_primitives.go:329)
+- [ ] `__complex__` - Convert to complex number (blocked: requires complex number type implementation)
 - [x] `__index__` - Convert to integer index (for slicing) - Enables custom classes as indices
-- [ ] `__format__` - Custom string formatting (for format())
+- [x] `__format__` - Custom string formatting (builtin/types.go:397)
 
 ##### Medium Priority - Extended Functionality 🟡
 
@@ -378,6 +380,28 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
 ## ✅ Recently Completed (2024-2025)
 
 ### January 2025
+- **`__format__` Dunder Method**: Python-style format() builtin with custom formatting support
+  - **Python-style format()**: Implemented format(value, format_spec='') builtin function
+  - **Dunder method support**: Calls __format__(format_spec) on objects when available
+  - **Built-in type fallback**: Falls back to str() conversion for types without __format__
+  - **String handling**: Properly returns strings without repr quotes
+  - **Replaced old format()**: Old sprintf-style format() didn't work with {} placeholders anyway
+  - **Implementation**: FormatBuilder() in builtin/types.go:397-445
+  - **Test integration**: test-missing-builtins.m28 added to test.sh
+  - **Example usage**:
+    ```python
+    (class FormattableNumber ()
+      (def __init__ (self value) (= self.value value))
+      (def __format__ (self format_spec)
+        (+ "NUM:" (str self.value))))
+    (= num (FormattableNumber 42))
+    (format num ".2f")  # Returns "NUM:42"
+    (format 123)        # Returns "123"
+    (format "hello")    # Returns "hello"
+    ```
+  - All 50 tests passing (was 49, added 1 new test)
+  - Completes __format__ dunder method from roadmap
+  - Note: __bytes__ already implemented, __complex__ blocked on complex number type
 - **`__index__` Dunder Method**: Python-compatible integer index conversion protocol
   - **CallIndex() helper**: Calls `__index__` dunder method on objects (common/types/dunder.go)
   - **ToIndex() converter**: Standard way to convert values to indices with __index__ support
