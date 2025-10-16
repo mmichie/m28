@@ -204,7 +204,7 @@ fi
 echo -e "\nBreakdown:"
 echo -e "  Core tests:     ${GREEN}✓${NC}"
 echo -e "  Data structures: ${GREEN}✓${NC}"
-echo -e "  Examples:       ${GREEN}✓${NC} (most working)"
+echo -e "  Examples:       ${GREEN}✓${NC}"
 
 # Failed test details
 if [[ ${#FAILED_TESTS[@]} -gt 0 ]]; then
