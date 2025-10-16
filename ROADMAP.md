@@ -91,10 +91,10 @@
 - [ ] Collections module types (deque, Counter, defaultdict)
 
 ### Error Messages & Developer Experience
-- [ ] AST nodes with source locations
-- [ ] Context-aware error reporting
-- [ ] Stack traces with function names
-- [ ] "Did you mean?" suggestions
+- [x] Parser errors with source locations (via token position tracking)
+- [x] Context-aware error reporting (shows source code with line numbers and carets)
+- [ ] Stack traces with function names (partially implemented via CallStack)
+- [x] "Did you mean?" suggestions (Levenshtein-based similarity matching for undefined names)
 
 ## 🔧 Code Quality & Refactoring
 
@@ -308,13 +308,14 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
 - [ ] Support for type information in IR
 
 ### Error Handling Enhancement
-- [ ] Add line/column info to all AST nodes
-- [ ] Implement source span tracking (start/end positions)
-- [ ] Keep original source text for error display
+- [x] Add line/column info to all tokens (via tokenizer)
+- [x] Implement source span tracking (StartPos/EndPos in tokens)
+- [x] Keep original source text for error display (stored in ParseError)
+- [x] Rich error types with structured information (ParseError, NameError, etc.)
+- [x] Colorized error output with source highlights (via ErrorReporter)
+- [ ] Add line/column info to all AST nodes (next step: AST metadata)
 - [ ] Support for multi-file error traces
-- [ ] Rich error types with structured information
 - [ ] Error recovery in parser (continue after errors)
-- [ ] Colorized error output with source highlights
 - [ ] Error explanation system (like Rust's `--explain`)
 
 ### Type System Foundation
@@ -377,6 +378,36 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
 ## ✅ Recently Completed (2024-2025)
 
 ### January 2025
+- **Enhanced Error Messages**: Token-based error reporting with source context and suggestions
+  - **ParseError type** with precise source location tracking (line, column, lexeme, filename)
+  - **Source context display**: Shows 2-3 lines before/after error with line numbers
+  - **Caret indicators**: Points exactly to error location with `^` or `^^^` for multi-char tokens
+  - **Unclosed delimiter tracking**: "expected ']' to match '[' at line 3, column 1"
+  - **Better runtime errors**: NameError shows variable name, preserves details through wrapping
+  - **"Did you mean?" suggestions**: Levenshtein-based similarity matching for typos
+  - **Example improvements**:
+    - Before: `Error: parse error: unclosed vector`
+    - After: Shows exact location with source snippet and helpful message
+    - Before: `EvalError: name error`
+    - After: `NameError: name 'prin' is not defined\n\nDid you mean: in, print?`
+  - Integrated with ErrorReporter for consistent formatting
+  - All error types use structured formatting with position info
+  - No test regressions (100% pass rate maintained)
+- **Complete Tokenizer Integration**: Token-based parsing with 100% test pass rate
+  - **Token infrastructure**: TOKEN_NUMBER, TOKEN_STRING, TOKEN_IDENTIFIER, etc. with position tracking
+  - **Token navigation**: currentToken(), advanceToken(), expectToken(), matchToken()
+  - **Position-aware parsing**: Every token has Line, Col, StartPos, EndPos fields
+  - **Infix operator detection**: Uses token position (no whitespace = infix)
+  - **Parser methods migrated**: parseAtomFromToken(), parseListFromToken(), parsePostfixFromToken()
+  - **Special handling**:
+    - Negative literals: `-1` as single token (MINUS + NUMBER with no whitespace)
+    - F-strings: Check for `f"..."` before general identifier scanning
+    - Kebab-case: Identifiers support dashes (get-item, set-item)
+    - Varargs: Transform `(* args)` into `*args` symbol during parameter parsing
+  - **Error improvements**: Token positions enable precise error locations
+  - **Whitespace significance**: Method calls vs property access detected via token spacing
+  - All 37 integration tests passing
+  - Foundation for future enhancements (AST with positions, better debugging)
 - **JSONL Streaming Support**: Record-oriented JSON processing for data pipelines
   - Five core functions: `parse-jsonl-line`, `format-jsonl-line`, `read-jsonl`, `write-jsonl`, `append-jsonl-line`
   - Type-safe JSON ↔ M28 conversion (handles all M28 types: dicts, lists, strings, numbers, bools, nil)
