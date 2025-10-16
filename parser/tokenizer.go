@@ -102,8 +102,8 @@ func (t *Tokenizer) scanToken() Token {
 		}
 	}
 
-	// Identifiers and keywords
-	if isLetter(ch) || ch == '_' {
+	// Identifiers and keywords (allow ? for predicates like has-path?)
+	if isLetter(ch) || ch == '_' || ch == '?' {
 		return t.scanIdentifier(start, startLine, startCol)
 	}
 
@@ -331,7 +331,8 @@ func (t *Tokenizer) scanNumber(start, startLine, startCol int) Token {
 // scanIdentifier scans an identifier or keyword
 func (t *Tokenizer) scanIdentifier(start, startLine, startCol int) Token {
 	// Scan identifier characters (including dashes for kebab-case like get-item)
-	for !t.isAtEnd() && (isLetter(t.peek()) || isDigit(t.peek()) || t.peek() == '_' || t.peek() == '-') {
+	// Also allow '?' for predicate functions (Lisp/Scheme convention)
+	for !t.isAtEnd() && (isLetter(t.peek()) || isDigit(t.peek()) || t.peek() == '_' || t.peek() == '-' || t.peek() == '?') {
 		t.advance()
 	}
 
