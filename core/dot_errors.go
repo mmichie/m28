@@ -136,6 +136,15 @@ func WrapEvalError(err error, message string, ctx *Context) *EvalError {
 		return evalErr
 	}
 
+	// Check if it's a NameError and preserve the detail
+	if nameErr, ok := err.(*NameError); ok {
+		return &EvalError{
+			Type:    "NameError",
+			Message: fmt.Sprintf("name '%s' is not defined", nameErr.Name),
+			Wrapped: err,
+		}
+	}
+
 	return &EvalError{
 		Type:    "EvalError",
 		Message: message,

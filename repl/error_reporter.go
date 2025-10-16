@@ -32,6 +32,11 @@ func (er *ErrorReporter) AddSource(filename, source string) {
 func (er *ErrorReporter) ReportError(err error, ctx *core.Context, w io.Writer) {
 	// Check if it's a structured error
 	if evalErr, ok := err.(*core.EvalError); ok {
+		// Check if EvalError wraps a NameError
+		if nameErr, ok := evalErr.Wrapped.(*core.NameError); ok {
+			er.reportNameError(nameErr, ctx, w)
+			return
+		}
 		er.reportEvalError(evalErr, ctx, w)
 		return
 	}

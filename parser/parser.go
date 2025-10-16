@@ -10,6 +10,73 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// ParseError represents a parsing error with source location info
+type ParseError struct {
+	Message  string
+	Line     int
+	Col      int
+	Lexeme   string
+	Source   string // Full source code for context
+	Filename string
+}
+
+func (e *ParseError) Error() string {
+	if e.Filename != "" {
+		return fmt.Sprintf("%s:%d:%d: %s", e.Filename, e.Line, e.Col, e.Message)
+	}
+	return fmt.Sprintf("line %d, column %d: %s", e.Line, e.Col, e.Message)
+}
+
+// FormatWithContext returns the error with source code context
+func (e *ParseError) FormatWithContext() string {
+	var b strings.Builder
+
+	// Error header
+	if e.Filename != "" {
+		fmt.Fprintf(&b, "Parse error in %s at line %d, column %d:\n", e.Filename, e.Line, e.Col)
+	} else {
+		fmt.Fprintf(&b, "Parse error at line %d, column %d:\n", e.Line, e.Col)
+	}
+	fmt.Fprintf(&b, "  %s\n\n", e.Message)
+
+	// Source context
+	if e.Source != "" {
+		lines := strings.Split(e.Source, "\n")
+
+		// Show 2 lines before and after
+		start := e.Line - 3
+		if start < 0 {
+			start = 0
+		}
+		end := e.Line + 1
+		if end >= len(lines) {
+			end = len(lines) - 1
+		}
+
+		for i := start; i <= end; i++ {
+			lineNum := i + 1
+			prefix := "  "
+			if lineNum == e.Line {
+				prefix = "> "
+			}
+
+			fmt.Fprintf(&b, "%s%4d | %s\n", prefix, lineNum, lines[i])
+
+			// Show caret pointing to error
+			if lineNum == e.Line && e.Col > 0 {
+				spaces := strings.Repeat(" ", e.Col-1+8)
+				marker := "^"
+				if e.Lexeme != "" && len(e.Lexeme) > 1 {
+					marker = strings.Repeat("^", len(e.Lexeme))
+				}
+				fmt.Fprintf(&b, "%s%s\n", spaces, marker)
+			}
+		}
+	}
+
+	return b.String()
+}
+
 // Parser parses M28 code into expressions
 type Parser struct {
 	input    string // The input string
@@ -312,8 +379,9 @@ func (p *Parser) parseUnaryOpFromToken() (core.Value, error) {
 
 // parseListFromToken parses a list expression (...) using tokens
 func (p *Parser) parseListFromToken() (core.Value, error) {
-	// Consume opening parenthesis
-	if _, err := p.expectToken(TOKEN_LPAREN); err != nil {
+	// Consume opening parenthesis and remember its position
+	openParen, err := p.expectToken(TOKEN_LPAREN)
+	if err != nil {
 		return nil, err
 	}
 
@@ -322,7 +390,15 @@ func (p *Parser) parseListFromToken() (core.Value, error) {
 	// Parse elements until closing parenthesis
 	for !p.matchToken(TOKEN_RPAREN) {
 		if p.matchToken(TOKEN_EOF) {
-			return nil, fmt.Errorf("unclosed list")
+			eofTok := p.currentToken()
+			return nil, &ParseError{
+				Message:  fmt.Sprintf("Unclosed list: expected ')' to match '(' at line %d, column %d", openParen.Line, openParen.Col),
+				Line:     eofTok.Line,
+				Col:      eofTok.Col,
+				Lexeme:   "",
+				Source:   p.input,
+				Filename: p.filename,
+			}
 		}
 
 		expr, err := p.parseExpr()
@@ -362,8 +438,9 @@ func (p *Parser) parseListFromToken() (core.Value, error) {
 
 // parseVectorLiteralFromToken parses a vector literal [...] using tokens
 func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
-	// Consume opening bracket
-	if _, err := p.expectToken(TOKEN_LBRACKET); err != nil {
+	// Consume opening bracket and remember its position
+	openBracket, err := p.expectToken(TOKEN_LBRACKET)
+	if err != nil {
 		return nil, err
 	}
 
@@ -372,7 +449,15 @@ func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
 	// Parse elements until closing bracket
 	for !p.matchToken(TOKEN_RBRACKET) {
 		if p.matchToken(TOKEN_EOF) {
-			return nil, fmt.Errorf("unclosed vector")
+			eofTok := p.currentToken()
+			return nil, &ParseError{
+				Message:  fmt.Sprintf("Unclosed vector: expected ']' to match '[' at line %d, column %d", openBracket.Line, openBracket.Col),
+				Line:     eofTok.Line,
+				Col:      eofTok.Col,
+				Lexeme:   "",
+				Source:   p.input,
+				Filename: p.filename,
+			}
 		}
 
 		expr, err := p.parseExpr()
@@ -403,8 +488,9 @@ func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
 
 // parseDictLiteralFromToken parses a dictionary literal {...} using tokens
 func (p *Parser) parseDictLiteralFromToken() (core.Value, error) {
-	// Consume opening brace
-	if _, err := p.expectToken(TOKEN_LBRACE); err != nil {
+	// Consume opening brace and remember its position
+	openBrace, err := p.expectToken(TOKEN_LBRACE)
+	if err != nil {
 		return nil, err
 	}
 
@@ -422,7 +508,15 @@ func (p *Parser) parseDictLiteralFromToken() (core.Value, error) {
 	// Parse all elements
 	for !p.matchToken(TOKEN_RBRACE) {
 		if p.matchToken(TOKEN_EOF) {
-			return nil, fmt.Errorf("unclosed dict or set")
+			eofTok := p.currentToken()
+			return nil, &ParseError{
+				Message:  fmt.Sprintf("Unclosed dict/set: expected '}' to match '{' at line %d, column %d", openBrace.Line, openBrace.Col),
+				Line:     eofTok.Line,
+				Col:      eofTok.Col,
+				Lexeme:   "",
+				Source:   p.input,
+				Filename: p.filename,
+			}
 		}
 
 		expr, err := p.parseExpr()
@@ -2255,5 +2349,12 @@ func (p *Parser) matchToken(types ...TokenType) bool {
 
 // tokenError creates an error with token position info
 func (p *Parser) tokenError(msg string, tok Token) error {
-	return fmt.Errorf("%s at line %d, column %d", msg, tok.Line, tok.Col)
+	return &ParseError{
+		Message:  msg,
+		Line:     tok.Line,
+		Col:      tok.Col,
+		Lexeme:   tok.Lexeme,
+		Source:   p.input,
+		Filename: p.filename,
+	}
 }

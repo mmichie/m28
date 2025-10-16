@@ -204,6 +204,11 @@ func executeFile(filename string, ctx *core.Context, errorReporter *repl.ErrorRe
 	// Parse the content
 	expr, err := p.Parse(string(content))
 	if err != nil {
+		// Check if it's a ParseError and format with context
+		if parseErr, ok := err.(*parser.ParseError); ok {
+			fmt.Fprintln(os.Stderr, parseErr.FormatWithContext())
+			os.Exit(1)
+		}
 		return fmt.Errorf("parse error: %v", err)
 	}
 
