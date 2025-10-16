@@ -153,6 +153,33 @@ func (t *Tokenizer) scanToken() Token {
 		return t.makeToken(TOKEN_PLUS, start, startLine, startCol)
 
 	case '-':
+		// Check for -> (thread-first macro) or ->> (thread-last macro)
+		if !t.isAtEnd() && t.peek() == '>' {
+			t.advance()
+			// Check for ->>
+			if !t.isAtEnd() && t.peek() == '>' {
+				t.advance()
+				return Token{
+					Type:     TOKEN_IDENTIFIER,
+					Lexeme:   "->>",
+					Value:    core.SymbolValue("->>"),
+					Line:     startLine,
+					Col:      startCol,
+					StartPos: start,
+					EndPos:   t.pos,
+				}
+			}
+			// Just ->
+			return Token{
+				Type:     TOKEN_IDENTIFIER,
+				Lexeme:   "->",
+				Value:    core.SymbolValue("->"),
+				Line:     startLine,
+				Col:      startCol,
+				StartPos: start,
+				EndPos:   t.pos,
+			}
+		}
 		if !t.isAtEnd() && t.peek() == '=' {
 			t.advance()
 			return t.makeToken(TOKEN_MINUS_EQ, start, startLine, startCol)

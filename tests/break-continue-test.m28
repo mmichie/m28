@@ -5,7 +5,7 @@
 
 # Test for loop with break
 (print "1. Testing 'for' loop with break at middle:")
-(def break-result 
+(= break-result
   (for x [1 2 3 4 5]
     (print "  Processing item:" x)
     (if (== x 3)
@@ -16,7 +16,7 @@
 
 # Test for loop with continue
 (print "\n2. Testing 'for' loop with continue:")
-(def continue-result 
+(= continue-result
   (for x [1 2 3 4 5]
     (print "  Processing item:" x)
     (if (% x 2)
@@ -27,7 +27,7 @@
 
 # Test nested for loops with break
 (print "\n3. Testing nested 'for' loops with break in inner loop:")
-(def nested-break-result 
+(= nested-break-result 
   (for x ["a" "b" "c"]
     (print "  Outer loop x =" x)
     (for y [1 2 3 4 5]
@@ -40,7 +40,7 @@
 
 # Test nested for loops with continue
 (print "\n4. Testing nested 'for' loops with continue in inner loop:")
-(def nested-continue-result 
+(= nested-continue-result
   (for x ["a" "b" "c"]
     (print "  Outer loop x =" x)
     (for y [1 2 3 4 5]
@@ -53,7 +53,7 @@
 
 # Test break from complex condition
 (print "\n5. Testing break from complex condition:")
-(def complex-break-result 
+(= complex-break-result
   (for item [1 2 3 4 5]
     (print "  Item:" item)
     (if (> item 2)
@@ -65,7 +65,7 @@
 
 # Test continue from complex condition
 (print "\n6. Testing continue from complex condition:")
-(def complex-continue-result 
+(= complex-continue-result
   (for item [1 2 3 4 5]
     (print "  Item:" item)
     (if (> item 1)
@@ -79,7 +79,7 @@
 # Test while loop with break
 (print "\n7. Testing while loop with break:")
 (= i 0)
-(def while-break-result
+(= while-break-result
   (while (< i 10)
     (print "  i =" i)
     (= i (+ i 1))
@@ -92,7 +92,7 @@
 # Test while loop with continue
 (print "\n8. Testing while loop with continue:")
 (= i 0)
-(def while-continue-result
+(= while-continue-result
   (while (< i 5)
     (= i (+ i 1))
     (print "  i =" i)
@@ -104,7 +104,7 @@
 
 # Test direct for loop with break on strings
 (print "\n9. Testing direct for loop with break on strings:")
-(def dolist-break-result
+(= dolist-break-result
   (for item ["a" "b" "c" "d" "e"]
     (print "  Processing item:" item)
     (if (== item "c")
@@ -115,7 +115,7 @@
 
 # Test direct for loop with continue on strings
 (print "\n10. Testing direct for loop with continue on strings:")
-(def dolist-continue-result
+(= dolist-continue-result
   (for item ["a" "b" "c" "d" "e"]
     (print "  Processing item:" item)
     (if (== item "c")
@@ -126,7 +126,7 @@
 
 # Test manual loop with break (similar to dotimes)
 (print "\n11. Testing manual loop with break:")
-(def dotimes-break-result
+(= dotimes-break-result
   (begin
     (= loop-result None)
     (= i 0)
@@ -142,7 +142,7 @@
 
 # Test manual loop with continue
 (print "\n12. Testing manual loop with continue:")
-(def dotimes-continue-result
+(= dotimes-continue-result
   (begin
     (= loop-result None)
     (= i 0)
