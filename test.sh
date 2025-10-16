@@ -126,6 +126,7 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Len Protocol" "tests/len-protocol-test.m28"
     run_test "Contains Protocol" "tests/contains-protocol-test.m28"
     run_test "Container Protocols" "tests/container_protocols.m28"
+    run_test "Index Protocol" "tests/test-index-dunder.m28"
 fi
 
 if [[ "$MODE" != "quick" ]]; then
