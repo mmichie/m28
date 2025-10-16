@@ -8,6 +8,51 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// convertToSlice converts an iterable value to a slice of values
+// This is shared logic for list(), tuple(), and set() constructors
+func convertToSlice(arg core.Value) ([]core.Value, error) {
+	// Try to convert from different types
+	if list, ok := types.AsList(arg); ok {
+		// Copy the list
+		result := make([]core.Value, len(list))
+		copy(result, list)
+		return result, nil
+	}
+
+	if tuple, ok := types.AsTuple(arg); ok {
+		// Convert tuple to slice
+		result := make([]core.Value, len(tuple))
+		copy(result, tuple)
+		return result, nil
+	}
+
+	if str, ok := types.AsString(arg); ok {
+		// Convert string to slice of characters
+		result := make([]core.Value, len(str))
+		for i, ch := range str {
+			result[i] = core.StringValue(string(ch))
+		}
+		return result, nil
+	}
+
+	// Check if it implements Iterable interface
+	if iterable, ok := types.AsIterable(arg); ok {
+		result := make([]core.Value, 0)
+		iter := iterable.Iterator()
+		for {
+			val, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+			result = append(result, val)
+		}
+		return result, nil
+	}
+
+	// If it's not an iterable, just create a slice with this one element
+	return []core.Value{arg}, nil
+}
+
 // RegisterCollections registers collection constructor functions
 func RegisterCollections(ctx *core.Context) {
 	// list - create a new list
@@ -17,48 +62,11 @@ func RegisterCollections(ctx *core.Context) {
 		}
 		if len(args) == 1 {
 			// Python-style: Convert iterable to list
-			arg := args[0]
-
-			// Try to convert from different types
-			if list, ok := types.AsList(arg); ok {
-				// Copy the list
-				result := make(core.ListValue, len(list))
-				copy(result, list)
-				return result, nil
+			items, err := convertToSlice(args[0])
+			if err != nil {
+				return nil, err
 			}
-
-			if tuple, ok := types.AsTuple(arg); ok {
-				// Convert tuple to list
-				result := make(core.ListValue, len(tuple))
-				copy(result, tuple)
-				return result, nil
-			}
-
-			if str, ok := types.AsString(arg); ok {
-				// Convert string to list of characters
-				result := make(core.ListValue, len(str))
-				for i, ch := range str {
-					result[i] = core.StringValue(string(ch))
-				}
-				return result, nil
-			}
-
-			// Check if it implements Iterable interface
-			if iterable, ok := types.AsIterable(arg); ok {
-				result := make(core.ListValue, 0)
-				iter := iterable.Iterator()
-				for {
-					val, hasNext := iter.Next()
-					if !hasNext {
-						break
-					}
-					result = append(result, val)
-				}
-				return result, nil
-			}
-
-			// If it's not an iterable, just create a list with this one element
-			return core.ListValue{arg}, nil
+			return core.ListValue(items), nil
 		}
 		// Multiple arguments: create a list from all arguments
 		return core.ListValue(args), nil
@@ -71,48 +79,11 @@ func RegisterCollections(ctx *core.Context) {
 		}
 		if len(args) == 1 {
 			// Python-style: Convert iterable to tuple
-			arg := args[0]
-
-			// Try to convert from different types
-			if tuple, ok := types.AsTuple(arg); ok {
-				// Copy the tuple
-				result := make(core.TupleValue, len(tuple))
-				copy(result, tuple)
-				return result, nil
+			items, err := convertToSlice(args[0])
+			if err != nil {
+				return nil, err
 			}
-
-			if list, ok := types.AsList(arg); ok {
-				// Convert list to tuple
-				result := make(core.TupleValue, len(list))
-				copy(result, list)
-				return result, nil
-			}
-
-			if str, ok := types.AsString(arg); ok {
-				// Convert string to tuple of characters
-				result := make(core.TupleValue, len(str))
-				for i, ch := range str {
-					result[i] = core.StringValue(string(ch))
-				}
-				return result, nil
-			}
-
-			// Check if it implements Iterable interface
-			if iterable, ok := types.AsIterable(arg); ok {
-				result := make(core.TupleValue, 0)
-				iter := iterable.Iterator()
-				for {
-					val, hasNext := iter.Next()
-					if !hasNext {
-						break
-					}
-					result = append(result, val)
-				}
-				return result, nil
-			}
-
-			// If it's not an iterable, just create a tuple with this one element
-			return core.TupleValue{arg}, nil
+			return core.TupleValue(items), nil
 		}
 		// Multiple arguments: create a tuple from all arguments
 		return core.TupleValue(args), nil

@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/mmichie/m28/common/errors"
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 )
 
@@ -28,16 +29,12 @@ func (n *NumericOps) Add(other core.Value) (core.Value, error) {
 	case core.NumberValue:
 		return core.NumberValue(n.value + float64(v)), nil
 	default:
-		// Try to get __radd__ from other
-		if obj, ok := other.(core.Object); ok {
-			if method, exists := obj.GetAttr("__radd__"); exists {
-				// Call other.__radd__(self)
-				if callable, ok := method.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					return callable.Call([]core.Value{core.NumberValue(n.value)}, nil)
-				}
+		// Try __radd__ on other
+		if result, found, err := types.CallRadd(other, core.NumberValue(n.value), nil); found {
+			if err != nil {
+				return nil, err
 			}
+			return result, nil
 		}
 		return nil, errors.NewTypeError("+", "unsupported operand type(s)",
 			fmt.Sprintf("'float' and '%s'", other.Type()))
@@ -50,15 +47,12 @@ func (n *NumericOps) Subtract(other core.Value) (core.Value, error) {
 	case core.NumberValue:
 		return core.NumberValue(n.value - float64(v)), nil
 	default:
-		// Try to get __rsub__ from other
-		if obj, ok := other.(core.Object); ok {
-			if method, exists := obj.GetAttr("__rsub__"); exists {
-				if callable, ok := method.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					return callable.Call([]core.Value{core.NumberValue(n.value)}, nil)
-				}
+		// Try __rsub__ on other
+		if result, found, err := types.CallRsub(other, core.NumberValue(n.value), nil); found {
+			if err != nil {
+				return nil, err
 			}
+			return result, nil
 		}
 		return nil, errors.NewTypeError("-", "unsupported operand type(s)",
 			fmt.Sprintf("'float' and '%s'", other.Type()))
@@ -94,15 +88,12 @@ func (n *NumericOps) Multiply(other core.Value) (core.Value, error) {
 		}
 		return nil, errors.NewTypeError("*", "can't multiply sequence by non-int of type 'float'", "")
 	default:
-		// Try to get __rmul__ from other
-		if obj, ok := other.(core.Object); ok {
-			if method, exists := obj.GetAttr("__rmul__"); exists {
-				if callable, ok := method.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					return callable.Call([]core.Value{core.NumberValue(n.value)}, nil)
-				}
+		// Try __rmul__ on other
+		if result, found, err := types.CallRmul(other, core.NumberValue(n.value), nil); found {
+			if err != nil {
+				return nil, err
 			}
+			return result, nil
 		}
 		return nil, errors.NewTypeError("*", "unsupported operand type(s)",
 			fmt.Sprintf("'float' and '%s'", other.Type()))
@@ -118,15 +109,12 @@ func (n *NumericOps) Divide(other core.Value) (core.Value, error) {
 		}
 		return core.NumberValue(n.value / float64(v)), nil
 	default:
-		// Try to get __rdiv__ from other
-		if obj, ok := other.(core.Object); ok {
-			if method, exists := obj.GetAttr("__rdiv__"); exists {
-				if callable, ok := method.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					return callable.Call([]core.Value{core.NumberValue(n.value)}, nil)
-				}
+		// Try __rtruediv__ on other
+		if result, found, err := types.CallRdiv(other, core.NumberValue(n.value), nil); found {
+			if err != nil {
+				return nil, err
 			}
+			return result, nil
 		}
 		return nil, errors.NewTypeError("/", "unsupported operand type(s)",
 			fmt.Sprintf("'float' and '%s'", other.Type()))

@@ -226,117 +226,69 @@ func RegisterNumeric(ctx *core.Context) {
 	ctx.Define("max", NewKwargsBuiltinFunction("max", maxWithKwargs))
 }
 
-// minWithKwargs implements min() with keyword argument support
-func minWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-	// Check for key parameter
-	var keyFunc core.Value
-	if k, ok := kwargs["key"]; ok {
-		keyFunc = k
-		delete(kwargs, "key")
-	}
-
-	// Check for default parameter
-	var defaultValue core.Value
-	var hasDefault bool
-	if d, ok := kwargs["default"]; ok {
-		defaultValue = d
-		hasDefault = true
-		delete(kwargs, "default")
-	}
-
-	// Check for any remaining kwargs
-	if len(kwargs) > 0 {
-		for k := range kwargs {
-			return nil, fmt.Errorf("min() got an unexpected keyword argument '%s'", k)
-		}
-	}
-
-	if len(args) == 0 {
-		return nil, fmt.Errorf("min expected at least 1 argument, got 0")
-	}
-
-	// If single iterable argument
-	if len(args) == 1 {
-		var items []core.Value
-		switch v := args[0].(type) {
-		case core.ListValue:
-			items = v
-		case core.TupleValue:
-			items = v
-		default:
-			// Not an iterable, treat as single value
-			items = args
+// extremeWithKwargs is a helper for min/max with keyword argument support
+func extremeWithKwargs(funcName string, isMin bool) func([]core.Value, map[string]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		// Check for key parameter
+		var keyFunc core.Value
+		if k, ok := kwargs["key"]; ok {
+			keyFunc = k
+			delete(kwargs, "key")
 		}
 
-		if len(items) == 0 {
-			if hasDefault {
-				return defaultValue, nil
+		// Check for default parameter
+		var defaultValue core.Value
+		var hasDefault bool
+		if d, ok := kwargs["default"]; ok {
+			defaultValue = d
+			hasDefault = true
+			delete(kwargs, "default")
+		}
+
+		// Check for any remaining kwargs
+		if len(kwargs) > 0 {
+			for k := range kwargs {
+				return nil, fmt.Errorf("%s() got an unexpected keyword argument '%s'", funcName, k)
 			}
-			return nil, fmt.Errorf("min() arg is an empty sequence")
 		}
 
-		return findExtreme(items, keyFunc, ctx, true)
-	}
+		if len(args) == 0 {
+			return nil, fmt.Errorf("%s expected at least 1 argument, got 0", funcName)
+		}
 
-	// Multiple arguments
-	return findExtreme(args, keyFunc, ctx, true)
+		// If single iterable argument
+		if len(args) == 1 {
+			var items []core.Value
+			switch v := args[0].(type) {
+			case core.ListValue:
+				items = v
+			case core.TupleValue:
+				items = v
+			default:
+				// Not an iterable, treat as single value
+				items = args
+			}
+
+			if len(items) == 0 {
+				if hasDefault {
+					return defaultValue, nil
+				}
+				return nil, fmt.Errorf("%s() arg is an empty sequence", funcName)
+			}
+
+			return findExtreme(items, keyFunc, ctx, isMin)
+		}
+
+		// Multiple arguments
+		return findExtreme(args, keyFunc, ctx, isMin)
+	}
 }
+
+// minWithKwargs implements min() with keyword argument support
+var minWithKwargs = extremeWithKwargs("min", true)
 
 // maxWithKwargs implements max() with keyword argument support
-func maxWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-	// Check for key parameter
-	var keyFunc core.Value
-	if k, ok := kwargs["key"]; ok {
-		keyFunc = k
-		delete(kwargs, "key")
-	}
-
-	// Check for default parameter
-	var defaultValue core.Value
-	var hasDefault bool
-	if d, ok := kwargs["default"]; ok {
-		defaultValue = d
-		hasDefault = true
-		delete(kwargs, "default")
-	}
-
-	// Check for any remaining kwargs
-	if len(kwargs) > 0 {
-		for k := range kwargs {
-			return nil, fmt.Errorf("max() got an unexpected keyword argument '%s'", k)
-		}
-	}
-
-	if len(args) == 0 {
-		return nil, fmt.Errorf("max expected at least 1 argument, got 0")
-	}
-
-	// If single iterable argument
-	if len(args) == 1 {
-		var items []core.Value
-		switch v := args[0].(type) {
-		case core.ListValue:
-			items = v
-		case core.TupleValue:
-			items = v
-		default:
-			// Not an iterable, treat as single value
-			items = args
-		}
-
-		if len(items) == 0 {
-			if hasDefault {
-				return defaultValue, nil
-			}
-			return nil, fmt.Errorf("max() arg is an empty sequence")
-		}
-
-		return findExtreme(items, keyFunc, ctx, false)
-	}
-
-	// Multiple arguments
-	return findExtreme(args, keyFunc, ctx, false)
-}
+var maxWithKwargs = extremeWithKwargs("max", false)
 
 // findExtreme finds the minimum or maximum value based on the isMin flag
 func findExtreme(items []core.Value, keyFunc core.Value, ctx *core.Context, isMin bool) (core.Value, error) {

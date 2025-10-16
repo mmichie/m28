@@ -86,14 +86,29 @@ func CallSub(self, other core.Value, ctx *core.Context) (core.Value, bool, error
 	return CallDunder(self, "__sub__", []core.Value{other}, ctx)
 }
 
+// CallRsub calls __rsub__ on an object (other - self)
+func CallRsub(self, other core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(self, "__rsub__", []core.Value{other}, ctx)
+}
+
 // CallMul calls __mul__ on an object (self * other)
 func CallMul(self, other core.Value, ctx *core.Context) (core.Value, bool, error) {
 	return CallDunder(self, "__mul__", []core.Value{other}, ctx)
 }
 
+// CallRmul calls __rmul__ on an object (other * self)
+func CallRmul(self, other core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(self, "__rmul__", []core.Value{other}, ctx)
+}
+
 // CallDiv calls __truediv__ on an object (self / other)
 func CallDiv(self, other core.Value, ctx *core.Context) (core.Value, bool, error) {
 	return CallDunder(self, "__truediv__", []core.Value{other}, ctx)
+}
+
+// CallRdiv calls __rtruediv__ on an object (other / self)
+func CallRdiv(self, other core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(self, "__rtruediv__", []core.Value{other}, ctx)
 }
 
 // CallLen calls __len__ on an object and returns an integer
