@@ -77,29 +77,20 @@ func (t *Tokenizer) scanToken() Token {
 		return t.scanNumber(start, startLine, startCol)
 	}
 
-	// Identifiers and keywords
-	if isLetter(ch) || ch == '_' {
-		return t.scanIdentifier(start, startLine, startCol)
-	}
-
-	// Strings
-	if ch == '"' || ch == '\'' {
-		return t.scanString(ch, start, startLine, startCol)
-	}
-
-	// F-strings
+	// Check for special string prefixes BEFORE identifiers
+	// F-strings (f"..." or f'...')
 	if ch == 'f' && !t.isAtEnd() && (t.peek() == '"' || t.peek() == '\'') {
 		quote := t.advance()
 		return t.scanFString(quote, start, startLine, startCol)
 	}
 
-	// S-strings (s"..." or rs"...")
+	// S-strings (s"..." or s'...')
 	if ch == 's' && !t.isAtEnd() && (t.peek() == '"' || t.peek() == '\'') {
 		quote := t.advance()
 		return t.scanSString(quote, start, startLine, startCol, false)
 	}
 
-	// Raw S-strings (rs"...")
+	// Raw S-strings (rs"..." or rs'...')
 	if ch == 'r' && !t.isAtEnd() && t.peek() == 's' {
 		if t.pos+2 < len(t.input) {
 			quote := t.input[t.pos+1]
@@ -109,6 +100,16 @@ func (t *Tokenizer) scanToken() Token {
 				return t.scanSString(byte(quote), start, startLine, startCol, true)
 			}
 		}
+	}
+
+	// Identifiers and keywords
+	if isLetter(ch) || ch == '_' {
+		return t.scanIdentifier(start, startLine, startCol)
+	}
+
+	// Strings
+	if ch == '"' || ch == '\'' {
+		return t.scanString(ch, start, startLine, startCol)
 	}
 
 	// Operators and punctuation
@@ -266,6 +267,10 @@ func (t *Tokenizer) scanToken() Token {
 	case '#':
 		// Comment - skip to end of line
 		t.skipLineComment()
+		t.skipWhitespace() // Skip whitespace (including newline) after comment
+		if t.isAtEnd() {
+			return t.makeToken(TOKEN_EOF, t.pos, t.line, t.col)
+		}
 		return t.scanToken() // Recurse to get next token
 
 	default:
@@ -325,8 +330,8 @@ func (t *Tokenizer) scanNumber(start, startLine, startCol int) Token {
 
 // scanIdentifier scans an identifier or keyword
 func (t *Tokenizer) scanIdentifier(start, startLine, startCol int) Token {
-	// Scan identifier characters
-	for !t.isAtEnd() && (isLetter(t.peek()) || isDigit(t.peek()) || t.peek() == '_') {
+	// Scan identifier characters (including dashes for kebab-case like get-item)
+	for !t.isAtEnd() && (isLetter(t.peek()) || isDigit(t.peek()) || t.peek() == '_' || t.peek() == '-') {
 		t.advance()
 	}
 

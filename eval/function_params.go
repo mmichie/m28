@@ -45,11 +45,37 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 	// }
 
 	// First, transform Python-style parameters (name=value) to M28 style ((name value))
+	// Also handle (* args) and (** kwargs) parsed as separate tokens
 	transformedParams := make(core.ListValue, 0, len(paramList))
 
 	i := 0
 	for i < len(paramList) {
 		param := paramList[i]
+
+		// Check if this is a varargs marker (* or **)
+		if sym, ok := param.(core.SymbolValue); ok {
+			symStr := string(sym)
+
+			// Handle (* args) - varargs parameter split into two tokens
+			if symStr == "*" && i+1 < len(paramList) {
+				if nextSym, ok := paramList[i+1].(core.SymbolValue); ok {
+					// Combine into single *args symbol
+					transformedParams = append(transformedParams, core.SymbolValue("*"+string(nextSym)))
+					i += 2 // Skip both * and args
+					continue
+				}
+			}
+
+			// Handle (** kwargs) - keyword args parameter split into two tokens
+			if symStr == "**" && i+1 < len(paramList) {
+				if nextSym, ok := paramList[i+1].(core.SymbolValue); ok {
+					// Combine into single **kwargs symbol
+					transformedParams = append(transformedParams, core.SymbolValue("**"+string(nextSym)))
+					i += 2 // Skip both ** and kwargs
+					continue
+				}
+			}
+		}
 
 		// Check if this is a symbol ending with = (parser creates "name=" as one symbol)
 		if sym, ok := param.(core.SymbolValue); ok {
@@ -167,6 +193,35 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 			})
 
 		case core.ListValue:
+			// Check if this is a varargs parameter parsed as (* args) or (** kwargs)
+			if len(p) == 2 {
+				if star, ok := p[0].(core.SymbolValue); ok && string(star) == "*" {
+					// This is (*args) - varargs parameter
+					if argSym, ok := p[1].(core.SymbolValue); ok {
+						if seenRest {
+							return nil, fmt.Errorf("multiple *args parameters not allowed")
+						}
+						if seenKeyword {
+							return nil, fmt.Errorf("*args must come before **kwargs")
+						}
+						seenRest = true
+						sig.RestParam = &argSym
+						continue
+					}
+				}
+				if dstar, ok := p[0].(core.SymbolValue); ok && string(dstar) == "**" {
+					// This is (**kwargs) - keyword args parameter
+					if kwargSym, ok := p[1].(core.SymbolValue); ok {
+						if seenKeyword {
+							return nil, fmt.Errorf("multiple **kwargs parameters not allowed")
+						}
+						seenKeyword = true
+						sig.KeywordParam = &kwargSym
+						continue
+					}
+				}
+			}
+
 			// Parameter with default: (name default-value)
 			if len(p) != 2 {
 				return nil, fmt.Errorf("invalid parameter with default: expected (name value)")
@@ -189,6 +244,8 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 		}
 	}
 
+	// fmt.Printf("DEBUG ParseParameterList result: %d required, %d optional, RestParam=%v, KeywordParam=%v\n",
+	// 	len(sig.RequiredParams), len(sig.OptionalParams), sig.RestParam, sig.KeywordParam)
 	return sig, nil
 }
 

@@ -734,7 +734,7 @@ func lambdaForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Get the parameter list
 	paramList, ok := args[0].(core.ListValue)
 	if !ok {
-		return nil, fmt.Errorf("lambda: parameters must be a list")
+		return nil, fmt.Errorf("lambda: parameters must be a list, got %T: %#v", args[0], args[0])
 	}
 
 	// Try to parse as new-style parameter list with defaults

@@ -17,6 +17,10 @@ type Parser struct {
 	line     int    // Current line number
 	col      int    // Current column number
 	filename string // Current filename for error reporting
+
+	// Token-based parsing fields
+	tokens   []Token // Token stream from tokenizer
+	tokenPos int     // Current position in token stream
 }
 
 // NewParser creates a new parser
@@ -34,26 +38,33 @@ func (p *Parser) SetFilename(filename string) {
 
 // Parse parses a string into a value
 func (p *Parser) Parse(input string) (core.Value, error) {
-	p.input = input
-	p.pos = 0
-	p.line = 1
-	p.col = 1
+	// Step 1: Tokenize the input
+	tokenizer := NewTokenizer(input)
+	tokens, err := tokenizer.Tokenize()
+	if err != nil {
+		return nil, fmt.Errorf("tokenization error: %w", err)
+	}
 
-	// Program is a list of expressions
+	// Step 2: Set up parser with tokens
+	p.tokens = tokens
+	p.tokenPos = 0
+	p.input = input // Keep for backward compatibility
+
+	// Step 3: Parse the program
+	return p.parseProgram()
+}
+
+// parseProgram parses a complete program (multiple expressions)
+func (p *Parser) parseProgram() (core.Value, error) {
 	expressions := make(core.ListValue, 0)
 
-	// Skip whitespace and comments at the beginning
-	p.skipWhitespaceAndComments()
-
-	// Parse expressions until the end of input
-	for p.pos < len(p.input) {
+	// Parse expressions until EOF
+	for !p.matchToken(TOKEN_EOF) {
 		expr, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
-
 		expressions = append(expressions, expr)
-		p.skipWhitespaceAndComments()
 	}
 
 	// If there's only one expression, return it directly
@@ -83,13 +94,751 @@ func (p *Parser) Parse(input string) (core.Value, error) {
 // parseExpr parses a single expression
 func (p *Parser) parseExpr() (core.Value, error) {
 	// Parse the primary expression (atom, list, etc.)
-	base, err := p.parseAtom()
+	base, err := p.parseAtomFromToken()
 	if err != nil {
 		return nil, err
 	}
 
 	// Now handle postfix operations (dots, calls, indexing)
-	return p.parsePostfix(base)
+	base, err = p.parsePostfixFromToken(base)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for infix operators (no whitespace before operator)
+	// This allows "1+2" to work inside lists like (= x 1+2)
+	if p.matchToken(TOKEN_EOF) || p.matchToken(TOKEN_RPAREN) || p.matchToken(TOKEN_RBRACKET) || p.matchToken(TOKEN_RBRACE) || p.matchToken(TOKEN_COMMA) {
+		return base, nil
+	}
+
+	// Check if next token is an operator with no whitespace
+	prevTok := p.tokens[p.tokenPos-1]
+	tok := p.currentToken()
+
+	if tok.IsOperator() && prevTok.EndPos == tok.StartPos {
+		// This is an infix expression - collect all elements
+		elements := []core.Value{base}
+
+		for {
+			// Add the operator
+			opTok := p.advanceToken()
+			elements = append(elements, core.SymbolValue(opTok.Lexeme))
+
+			// Parse the right operand
+			right, err := p.parseAtomFromToken()
+			if err != nil {
+				return nil, err
+			}
+			right, err = p.parsePostfixFromToken(right)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, right)
+
+			// Check if there's another operator
+			if p.matchToken(TOKEN_EOF) || p.matchToken(TOKEN_RPAREN) || p.matchToken(TOKEN_RBRACKET) || p.matchToken(TOKEN_RBRACE) || p.matchToken(TOKEN_COMMA) {
+				break
+			}
+
+			prevTok = p.tokens[p.tokenPos-1]
+			tok = p.currentToken()
+
+			// Only continue if next operator has no whitespace before it
+			if !tok.IsOperator() || prevTok.EndPos < tok.StartPos {
+				break
+			}
+		}
+
+		// Parse as infix expression
+		if detectInfixPattern(elements) {
+			result, err := parseInfixExpressionSimple(elements)
+			if err == nil {
+				return result, nil
+			}
+		}
+	}
+
+	return base, nil
+}
+
+// parseAtomFromToken parses an atomic expression using tokens
+func (p *Parser) parseAtomFromToken() (core.Value, error) {
+	tok := p.currentToken()
+
+	switch tok.Type {
+	// Literals - already parsed by tokenizer!
+	case TOKEN_NUMBER:
+		p.advanceToken()
+		return tok.Value, nil
+
+	case TOKEN_STRING:
+		p.advanceToken()
+		return tok.Value, nil
+
+	case TOKEN_TRUE:
+		p.advanceToken()
+		return core.True, nil
+
+	case TOKEN_FALSE:
+		p.advanceToken()
+		return core.False, nil
+
+	case TOKEN_NIL:
+		p.advanceToken()
+		return core.None, nil
+
+	case TOKEN_IDENTIFIER:
+		p.advanceToken()
+		// Identifiers are symbols
+		return core.SymbolValue(tok.Lexeme), nil
+
+	// Delimiters - delegate to specialized parsers
+	case TOKEN_LPAREN:
+		return p.parseListFromToken()
+
+	case TOKEN_LBRACKET:
+		return p.parseVectorLiteralFromToken()
+
+	case TOKEN_LBRACE:
+		return p.parseDictLiteralFromToken()
+
+	// Special strings - need interpolation, so delegate to existing logic
+	case TOKEN_FSTRING:
+		p.advanceToken()
+		// Parse f-string from its lexeme using existing logic
+		return p.parseFStringFromLexeme(tok.Lexeme)
+
+	case TOKEN_SSTRING:
+		p.advanceToken()
+		// Parse s-string from its lexeme using existing logic
+		return p.parseSStringFromLexeme(tok.Lexeme)
+
+	// Reader macros
+	case TOKEN_BACKTICK:
+		p.advanceToken()
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, p.tokenError(fmt.Sprintf("error parsing expression after backtick: %v", err), tok)
+		}
+		return core.ListValue{core.SymbolValue("quasiquote"), expr}, nil
+
+	case TOKEN_COMMA:
+		p.advanceToken()
+		// Check if next token is @ for unquote-splicing
+		if p.matchToken(TOKEN_AT) {
+			p.advanceToken()
+			expr, err := p.parseExpr()
+			if err != nil {
+				return nil, p.tokenError(fmt.Sprintf("error parsing expression after ,@: %v", err), tok)
+			}
+			return core.ListValue{core.SymbolValue("unquote-splicing"), expr}, nil
+		}
+		// Regular unquote
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, p.tokenError(fmt.Sprintf("error parsing expression after comma: %v", err), tok)
+		}
+		return core.ListValue{core.SymbolValue("unquote"), expr}, nil
+
+	case TOKEN_COMMA_AT:
+		p.advanceToken()
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, p.tokenError(fmt.Sprintf("error parsing expression after ,@: %v", err), tok)
+		}
+		return core.ListValue{core.SymbolValue("unquote-splicing"), expr}, nil
+
+	// Dot by itself is a symbol
+	case TOKEN_DOT:
+		p.advanceToken()
+		return core.SymbolValue("."), nil
+
+	default:
+		// Special case: unary minus followed immediately by a number is a negative literal
+		if tok.Type == TOKEN_MINUS && !p.isAtEnd() {
+			nextTok := p.peekToken()
+			// Check if next token is a number with no whitespace
+			if nextTok.Type == TOKEN_NUMBER && tok.EndPos == nextTok.StartPos {
+				p.advanceToken() // consume -
+				p.advanceToken() // consume number
+				// Create negative number
+				if num, ok := nextTok.Value.(core.NumberValue); ok {
+					return core.NumberValue(-float64(num)), nil
+				}
+			}
+		}
+
+		// Handle operators and keywords as symbols when used in prefix position
+		// This allows (+ 1 2), (== a b), (and x y), etc.
+		if tok.IsOperator() || tok.IsKeyword() {
+			p.advanceToken()
+			return core.SymbolValue(tok.Lexeme), nil
+		}
+		return nil, p.tokenError(fmt.Sprintf("unexpected token %v", tok.Type), tok)
+	}
+}
+
+// isAtEnd checks if we're at the end of tokens
+func (p *Parser) isAtEnd() bool {
+	return p.matchToken(TOKEN_EOF)
+}
+
+// parseUnaryOpFromToken parses unary operator expressions
+func (p *Parser) parseUnaryOpFromToken() (core.Value, error) {
+	op := p.advanceToken()
+	operand, err := p.parseAtomFromToken()
+	if err != nil {
+		return nil, err
+	}
+
+	// Map token types to symbol names
+	var opSymbol string
+	switch op.Type {
+	case TOKEN_MINUS:
+		opSymbol = "-"
+	case TOKEN_PLUS:
+		opSymbol = "+"
+	case TOKEN_NOT:
+		opSymbol = "not"
+	case TOKEN_TILDE:
+		opSymbol = "~"
+	default:
+		opSymbol = op.Lexeme
+	}
+
+	// Build (op operand)
+	return core.ListValue{core.SymbolValue(opSymbol), operand}, nil
+}
+
+// parseListFromToken parses a list expression (...) using tokens
+func (p *Parser) parseListFromToken() (core.Value, error) {
+	// Consume opening parenthesis
+	if _, err := p.expectToken(TOKEN_LPAREN); err != nil {
+		return nil, err
+	}
+
+	elements := make(core.ListValue, 0)
+
+	// Parse elements until closing parenthesis
+	for !p.matchToken(TOKEN_RPAREN) {
+		if p.matchToken(TOKEN_EOF) {
+			return nil, fmt.Errorf("unclosed list")
+		}
+
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		elements = append(elements, expr)
+
+		// Skip optional comma separators
+		if p.matchToken(TOKEN_COMMA) {
+			p.advanceToken()
+		}
+	}
+
+	// Consume closing parenthesis
+	if _, err := p.expectToken(TOKEN_RPAREN); err != nil {
+		return nil, err
+	}
+
+	// Check if this is an infix expression
+	// Pattern: (x op y) where second element is an infix operator
+	if detectInfixPattern(elements) {
+		result, err := parseInfixExpressionSimple(elements)
+		if err == nil {
+			return result, nil
+		}
+		// Fall through to treat as prefix if infix parsing failed
+	}
+
+	// Check if this is a generator expression
+	if p.isGeneratorExpression(elements) {
+		return p.parseGeneratorExpression(elements)
+	}
+
+	return elements, nil
+}
+
+// parseVectorLiteralFromToken parses a vector literal [...] using tokens
+func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
+	// Consume opening bracket
+	if _, err := p.expectToken(TOKEN_LBRACKET); err != nil {
+		return nil, err
+	}
+
+	elements := make(core.ListValue, 0)
+
+	// Parse elements until closing bracket
+	for !p.matchToken(TOKEN_RBRACKET) {
+		if p.matchToken(TOKEN_EOF) {
+			return nil, fmt.Errorf("unclosed vector")
+		}
+
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		elements = append(elements, expr)
+
+		// Skip optional comma separators
+		if p.matchToken(TOKEN_COMMA) {
+			p.advanceToken()
+		}
+	}
+
+	// Consume closing bracket
+	if _, err := p.expectToken(TOKEN_RBRACKET); err != nil {
+		return nil, err
+	}
+
+	// Check if this is a list comprehension
+	if p.isListComprehension(elements) {
+		return p.parseListComprehension(elements)
+	}
+
+	// Return a list-literal form that evaluates its contents
+	return core.ListValue(append([]core.Value{core.SymbolValue("list-literal")}, elements...)), nil
+}
+
+// parseDictLiteralFromToken parses a dictionary literal {...} using tokens
+func (p *Parser) parseDictLiteralFromToken() (core.Value, error) {
+	// Consume opening brace
+	if _, err := p.expectToken(TOKEN_LBRACE); err != nil {
+		return nil, err
+	}
+
+	// Check for empty dict/set
+	if p.matchToken(TOKEN_RBRACE) {
+		p.advanceToken()
+		// Empty {} is a dict
+		return core.ListValue([]core.Value{core.SymbolValue("dict-literal")}), nil
+	}
+
+	elements := make(core.ListValue, 0)
+	hasColon := false
+	colonPositions := make(map[int]bool)
+
+	// Parse all elements
+	for !p.matchToken(TOKEN_RBRACE) {
+		if p.matchToken(TOKEN_EOF) {
+			return nil, fmt.Errorf("unclosed dict or set")
+		}
+
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		elements = append(elements, expr)
+
+		// Check for colon (dictionary syntax)
+		if p.matchToken(TOKEN_COLON) {
+			hasColon = true
+			colonPositions[len(elements)-1] = true
+			p.advanceToken()
+
+			// Parse the value after colon
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, value)
+		}
+
+		// Skip optional comma separators
+		if p.matchToken(TOKEN_COMMA) {
+			p.advanceToken()
+		}
+	}
+
+	// Consume closing brace
+	if _, err := p.expectToken(TOKEN_RBRACE); err != nil {
+		return nil, err
+	}
+
+	// Check for comprehensions
+	if hasColon {
+		// Check for dict comprehension: {k: v for ...}
+		if p.isDictComprehension(elements, colonPositions) {
+			return p.parseDictComprehension(elements, colonPositions)
+		}
+		// Regular dict literal
+		return core.ListValue(append([]core.Value{core.SymbolValue("dict-literal")}, elements...)), nil
+	} else {
+		// Check for set comprehension: {x for ...}
+		if p.isSetComprehension(elements) {
+			return p.parseSetComprehension(elements)
+		}
+		// Regular set literal
+		listLiteral := append([]core.Value{core.SymbolValue("list-literal")}, elements...)
+		return core.ListValue([]core.Value{
+			core.SymbolValue("set"),
+			core.ListValue(listLiteral),
+		}), nil
+	}
+}
+
+// parsePostfixFromToken handles postfix operations using tokens
+func (p *Parser) parsePostfixFromToken(base core.Value) (core.Value, error) {
+	for {
+		// Check for postfix operators
+		if p.matchToken(TOKEN_EOF) {
+			return base, nil
+		}
+
+		// Get previous token to check for whitespace
+		prevTok := p.tokens[p.tokenPos-1]
+		tok := p.currentToken()
+
+		// Check if there's whitespace between previous token and current token
+		// If so, no postfix operators (e.g., "tuple [1, 2]" is a call, not indexing)
+		if prevTok.EndPos < tok.StartPos {
+			return base, nil
+		}
+
+		switch tok.Type {
+		case TOKEN_DOT:
+			// Property access or method call
+			p.advanceToken() // consume DOT
+			var err error
+			base, err = p.parseDotAccessFromToken(base)
+			if err != nil {
+				return nil, err
+			}
+
+		case TOKEN_LBRACKET:
+			// Index access or slicing
+			var err error
+			base, err = p.parseIndexAccessFromToken(base)
+			if err != nil {
+				return nil, err
+			}
+
+		default:
+			// No more postfix operators
+			return base, nil
+		}
+	}
+}
+
+// parseDotAccessFromToken handles dot notation using tokens
+func (p *Parser) parseDotAccessFromToken(base core.Value) (core.Value, error) {
+	// Current token should be an identifier or number (for numeric index)
+	tok := p.currentToken()
+
+	var propName string
+
+	if tok.Type == TOKEN_NUMBER {
+		// Numeric index like list.0
+		propName = tok.Lexeme
+		p.advanceToken()
+	} else if tok.Type == TOKEN_IDENTIFIER {
+		// Regular property/method name
+		propName = tok.Lexeme
+		p.advanceToken()
+	} else {
+		return nil, p.tokenError(fmt.Sprintf("expected property name after '.', got %v", tok.Type), tok)
+	}
+
+	// Check for method call (opening parenthesis immediately after property name)
+	// Only treat as method call if there's no whitespace before the (
+	if p.matchToken(TOKEN_LPAREN) {
+		// Check for whitespace between property name and (
+		prevTok := p.tokens[p.tokenPos-1]
+		parenTok := p.currentToken()
+
+		// If there's whitespace, it's not a method call
+		if prevTok.EndPos < parenTok.StartPos {
+			// Property access, not method call
+			return core.ListValue{
+				core.SymbolValue("."),
+				base,
+				core.StringValue(propName),
+			}, nil
+		}
+
+		// It's a method call - parse arguments
+		args, err := p.parseMethodArgsFromToken()
+		if err != nil {
+			return nil, err
+		}
+
+		// Build (. base method arg1 arg2...)
+		result := core.ListValue{
+			core.SymbolValue("."),
+			base,
+			core.StringValue(propName),
+		}
+		if len(args) == 0 {
+			// Empty args, but still a method call
+			result = append(result, core.SymbolValue("__call__"))
+		} else {
+			result = append(result, args...)
+		}
+		return result, nil
+	}
+
+	// Just property access - build (. base prop)
+	return core.ListValue{
+		core.SymbolValue("."),
+		base,
+		core.StringValue(propName),
+	}, nil
+}
+
+// parseMethodArgsFromToken parses method call arguments using tokens
+func (p *Parser) parseMethodArgsFromToken() ([]core.Value, error) {
+	// Consume opening parenthesis
+	if _, err := p.expectToken(TOKEN_LPAREN); err != nil {
+		return nil, err
+	}
+
+	var args []core.Value
+
+	// Check for empty args
+	if p.matchToken(TOKEN_RPAREN) {
+		p.advanceToken()
+		return args, nil
+	}
+
+	// Parse comma-separated arguments
+	for {
+		arg, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+
+		// Check what's next
+		if p.matchToken(TOKEN_RPAREN) {
+			p.advanceToken()
+			break
+		}
+
+		if !p.matchToken(TOKEN_COMMA) {
+			tok := p.currentToken()
+			return nil, p.tokenError(fmt.Sprintf("expected ',' or ')' in method call, got %v", tok.Type), tok)
+		}
+		p.advanceToken() // consume comma
+	}
+
+	return args, nil
+}
+
+// parseIndexAccessFromToken handles indexing and slicing using tokens
+func (p *Parser) parseIndexAccessFromToken(base core.Value) (core.Value, error) {
+	// Consume opening bracket
+	if _, err := p.expectToken(TOKEN_LBRACKET); err != nil {
+		return nil, err
+	}
+
+	// Check for slice syntax with empty start [:end]
+	if p.matchToken(TOKEN_COLON) {
+		return p.parseSliceFromToken(base, nil)
+	}
+
+	// Parse the first expression (index or slice start)
+	// Handle unary minus for negative indices
+	first, err := p.parseIndexOrSliceValue()
+	if err != nil {
+		return nil, fmt.Errorf("error parsing index: %v", err)
+	}
+
+	// Check what follows
+	if p.matchToken(TOKEN_RBRACKET) {
+		// Simple index access
+		p.advanceToken()
+		return core.ListValue{
+			core.SymbolValue("get-item"),
+			base,
+			first,
+		}, nil
+	}
+
+	if p.matchToken(TOKEN_COLON) {
+		// Slice syntax
+		return p.parseSliceFromToken(base, first)
+	}
+
+	tok := p.currentToken()
+	return nil, p.tokenError(fmt.Sprintf("expected ']' or ':' after index, got %v", tok.Type), tok)
+}
+
+// parseIndexOrSliceValue parses a value in index/slice context, handling unary operators
+func (p *Parser) parseIndexOrSliceValue() (core.Value, error) {
+	tok := p.currentToken()
+
+	// Handle unary minus for negative indices
+	if tok.Type == TOKEN_MINUS {
+		p.advanceToken()
+		val, err := p.parseIndexOrSliceValue()
+		if err != nil {
+			return nil, err
+		}
+		// Build (- val)
+		return core.ListValue{core.SymbolValue("-"), val}, nil
+	}
+
+	// Otherwise use standard atom parsing
+	return p.parseAtomFromToken()
+}
+
+// parseSliceFromToken handles slice syntax using tokens
+func (p *Parser) parseSliceFromToken(base core.Value, start core.Value) (core.Value, error) {
+	// Consume colon
+	p.advanceToken()
+
+	var end core.Value
+	var step core.Value
+
+	// Check for end value
+	if !p.matchToken(TOKEN_RBRACKET) && !p.matchToken(TOKEN_COLON) {
+		var err error
+		end, err = p.parseIndexOrSliceValue()
+		if err != nil {
+			return nil, fmt.Errorf("error parsing slice end: %v", err)
+		}
+	}
+
+	// Check for step value
+	if p.matchToken(TOKEN_COLON) {
+		p.advanceToken()
+		if !p.matchToken(TOKEN_RBRACKET) {
+			var err error
+			step, err = p.parseIndexOrSliceValue()
+			if err != nil {
+				return nil, fmt.Errorf("error parsing slice step: %v", err)
+			}
+		}
+	}
+
+	// Consume closing bracket
+	if _, err := p.expectToken(TOKEN_RBRACKET); err != nil {
+		return nil, err
+	}
+
+	// Build slice form: (__slice__ base start end step)
+	// Always provide all 4 arguments (base, start, end, step)
+	result := core.ListValue{core.SymbolValue("__slice__"), base}
+
+	if start != nil {
+		result = append(result, start)
+	} else {
+		result = append(result, core.None)
+	}
+
+	if end != nil {
+		result = append(result, end)
+	} else {
+		result = append(result, core.None)
+	}
+
+	if step != nil {
+		result = append(result, step)
+	} else {
+		result = append(result, core.None)
+	}
+
+	return result, nil
+}
+
+// parseFStringFromLexeme parses an f-string from its full lexeme (e.g., f"hello {x}")
+func (p *Parser) parseFStringFromLexeme(lexeme string) (core.Value, error) {
+	// Save current parser state
+	savedInput := p.input
+	savedPos := p.pos
+	savedLine := p.line
+	savedCol := p.col
+
+	// Set up parser to parse the lexeme
+	p.input = lexeme
+	p.pos = 0
+	p.line = 1
+	p.col = 1
+
+	// Determine quote character
+	var quoteChar rune
+	if len(lexeme) > 1 && lexeme[1] == '"' {
+		quoteChar = '"'
+	} else if len(lexeme) > 1 && lexeme[1] == '\'' {
+		quoteChar = '\''
+	} else {
+		// Restore state
+		p.input = savedInput
+		p.pos = savedPos
+		p.line = savedLine
+		p.col = savedCol
+		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+	}
+
+	// Parse using existing f-string logic
+	result, err := p.parseFStringEnhancedSimple(quoteChar)
+
+	// Restore parser state
+	p.input = savedInput
+	p.pos = savedPos
+	p.line = savedLine
+	p.col = savedCol
+
+	return result, err
+}
+
+// parseSStringFromLexeme parses an s-string from its full lexeme (e.g., s"hello\nworld" or rs"raw\nstring")
+func (p *Parser) parseSStringFromLexeme(lexeme string) (core.Value, error) {
+	// Save current parser state
+	savedInput := p.input
+	savedPos := p.pos
+	savedLine := p.line
+	savedCol := p.col
+
+	// Set up parser to parse the lexeme
+	p.input = lexeme
+	p.pos = 0
+	p.line = 1
+	p.col = 1
+
+	// Check if it's raw s-string or regular s-string
+	isRaw := false
+	startPos := 0
+	if len(lexeme) > 2 && lexeme[0] == 'r' && lexeme[1] == 's' {
+		isRaw = true
+		startPos = 2
+	} else if len(lexeme) > 1 && lexeme[0] == 's' {
+		startPos = 1
+	} else {
+		// Restore state
+		p.input = savedInput
+		p.pos = savedPos
+		p.line = savedLine
+		p.col = savedCol
+		return nil, fmt.Errorf("invalid s-string lexeme: %s", lexeme)
+	}
+
+	// Determine quote character
+	var quoteChar rune
+	if startPos < len(lexeme) && lexeme[startPos] == '"' {
+		quoteChar = '"'
+	} else if startPos < len(lexeme) && lexeme[startPos] == '\'' {
+		quoteChar = '\''
+	} else {
+		// Restore state
+		p.input = savedInput
+		p.pos = savedPos
+		p.line = savedLine
+		p.col = savedCol
+		return nil, fmt.Errorf("invalid s-string lexeme: %s", lexeme)
+	}
+
+	// Parse using existing s-string logic
+	result, err := p.parseSString(quoteChar, isRaw)
+
+	// Restore parser state
+	p.input = savedInput
+	p.pos = savedPos
+	p.line = savedLine
+	p.col = savedCol
+
+	return result, err
 }
 
 // parsePostfix handles postfix operations like dot notation, function calls, etc.
@@ -1455,4 +2204,56 @@ func isSymbolChar(ch byte) bool {
 // error creates a parser error with current position info
 func (p *Parser) error(msg string) error {
 	return fmt.Errorf("%s at line %d, column %d", msg, p.line, p.col)
+}
+
+// Token navigation methods for token-based parsing
+
+// currentToken returns the current token without advancing
+func (p *Parser) currentToken() Token {
+	if p.tokenPos >= len(p.tokens) {
+		// Return EOF token
+		return p.tokens[len(p.tokens)-1]
+	}
+	return p.tokens[p.tokenPos]
+}
+
+// peekToken returns the next token without advancing
+func (p *Parser) peekToken() Token {
+	if p.tokenPos+1 >= len(p.tokens) {
+		return p.tokens[len(p.tokens)-1]
+	}
+	return p.tokens[p.tokenPos+1]
+}
+
+// advanceToken advances to the next token and returns the current one
+func (p *Parser) advanceToken() Token {
+	tok := p.currentToken()
+	if p.tokenPos < len(p.tokens)-1 {
+		p.tokenPos++
+	}
+	return tok
+}
+
+// expectToken expects a specific token type and advances
+func (p *Parser) expectToken(typ TokenType) (Token, error) {
+	tok := p.currentToken()
+	if tok.Type != typ {
+		return tok, p.tokenError(fmt.Sprintf("expected %v, got %v", typ, tok.Type), tok)
+	}
+	return p.advanceToken(), nil
+}
+
+// matchToken checks if current token matches any of the given types
+func (p *Parser) matchToken(types ...TokenType) bool {
+	for _, typ := range types {
+		if p.currentToken().Type == typ {
+			return true
+		}
+	}
+	return false
+}
+
+// tokenError creates an error with token position info
+func (p *Parser) tokenError(msg string, tok Token) error {
+	return fmt.Errorf("%s at line %d, column %d", msg, tok.Line, tok.Col)
 }
