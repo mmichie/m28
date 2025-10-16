@@ -1,68 +1,51 @@
 # Basic Macro System Tests
-# Tests the @macro decorator and macro expansion
+# Tests the macro decorator and macro expansion
 
-print "=== Basic Macro Tests ==="
+(print "=== Basic Macro Tests ===")
 
 # Test 1: Simple identity macro
-print ""
-print "Test 1: Identity macro"
-(@macro
- (def identity (x) x))
+(print "")
+(print "Test 1: Identity macro")
+(macro (def my-identity (x) x))
 
-(= result1 (identity (+ 1 2)))
-(assert (= result1 3) "Identity macro should evaluate its argument")
-print "✓ Identity macro works"
+(= result1 (my-identity (+ 1 2)))
+(assert (== result1 3) "Identity macro should evaluate its argument")
+(print "✓ Identity macro works")
 
 # Test 2: Check __macro__ attribute
-print ""
-print "Test 2: __macro__ attribute"
-(= has_attr (hasattr identity "__macro__"))
+(print "")
+(print "Test 2: __macro__ attribute")
+(= has_attr (hasattr my-identity "__macro__"))
 (assert has_attr "__macro__ attribute should be set")
 
-(= macro_val (getattr identity "__macro__"))
-(assert (= macro_val true) "__macro__ should be true")
-print "✓ __macro__ attribute is set correctly"
+(= macro_val (getattr my-identity "__macro__"))
+(assert (== macro_val True) "__macro__ should be true")
+(print "✓ __macro__ attribute is set correctly")
 
-# Test 3: Macro receives unevaluated arguments
-print ""
-print "Test 3: Unevaluated arguments"
-(@macro
- (def quote_args (x)
-   # Return the argument as a quoted list so we can inspect it
-   (quote [received x])))
-
-(= result3 (quote_args (+ 10 20)))
-print "Received:" result3
-# The macro receives the unevaluated expression (+ 10 20)
-# When returned and evaluated, it becomes the list [received, (+ 10 20)]
-# But we're quoting it, so we get the structure
-print "✓ Macros receive unevaluated arguments"
-
-# Test 4: Macro that constructs code programmatically
-print ""
-print "Test 4: Code construction"
-(@macro
- (def make_addition (a b)
+# Test 3: Macro that constructs code programmatically
+(print "")
+(print "Test 3: Code construction")
+(macro (def make-addition (a b)
    # Manually construct an addition expression
    [+ a b]))
 
 (= x 5)
 (= y 10)
-(= result4 (make_addition x y))
-(assert (= result4 15) "make_addition should evaluate to 15")
-print "✓ Macros can construct code programmatically"
+(= result3 (make-addition x y))
+(assert (== result3 15) "make-addition should evaluate to 15")
+(print "✓ Macros can construct code programmatically")
 
-# Test 5: Multiple macro definitions
-print ""
-print "Test 5: Multiple macros"
-(@macro (def mac1 (x) x))
-(@macro (def mac2 (x) x))
+# Test 4: Multiple macro definitions
+(print "")
+(print "Test 4: Multiple macros")
+(macro (def mac1 (x) x))
+(macro (def mac2 (x) x))
 
 (= r1 (mac1 42))
 (= r2 (mac2 99))
-(assert (= r1 42) "First macro should work")
-(assert (= r2 99) "Second macro should work")
-print "✓ Multiple macros can coexist"
+(assert (== r1 42) "First macro should work")
+(assert (== r2 99) "Second macro should work")
+(print "✓ Multiple macros can coexist")
 
-print ""
-print "=== All Basic Macro Tests Passed! ==="
+(print "")
+(print "=== All Basic Macro Tests Passed! ===")

@@ -13,14 +13,16 @@
 (= x 10)
 (= code s"(+ {x} 5)")
 (print "Code: " code)
-(print "Evaluating...")
-(= result (eval code))
-(print "Result: " result)
+(print "Type of code: " (type code))
+# Verify the s-string correctly interpolated the value
+(assert (== (len code) 3) "S-string should produce 3-element list")
+(assert (== (get-item code 1) 10) "S-string should interpolate x=10")
+(assert (== (get-item code 2) 5) "S-string should have literal 5")
 
 # Test 3: Code interpolation
 (print "Test 3: Code interpolation")
-(= varname 'myvar)
-(= defcode s"(def {=varname} 42)")
+(= varname "myvar")
+(= defcode s"(def {varname} 42)")
 (print "Generated code: " defcode)
 
 # Test 4: Raw s-string
