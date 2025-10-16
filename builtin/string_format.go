@@ -16,7 +16,8 @@ import (
 
 // RegisterStringFormatFunctions registers all string formatting functions
 func RegisterStringFormatFunctions(ctx *core.Context) {
-	ctx.Define("format", core.NewBuiltinFunction(FormatFunc))
+	// Note: format() is now registered in types.go as Python-style format(value, format_spec)
+	// The old sprintf-style FormatFunc is kept here but not registered
 	ctx.Define("str-format", core.NewBuiltinFunction(StrFormatFunc))
 	ctx.Define("format-expr", core.NewBuiltinFunction(FormatExprFunc))
 }

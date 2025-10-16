@@ -138,6 +138,7 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "S-Strings" "tests/sstring-simple.m28"
     run_test "Macros" "tests/test_macros_basic.m28"
     run_test "JSONL" "tests/test-jsonl.m28"
+    run_test "Missing Builtins" "tests/test-missing-builtins.m28"
 fi
 
 if [[ "$MODE" != "quick" ]]; then

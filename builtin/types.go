@@ -142,6 +142,10 @@ func RegisterTypes(ctx *core.Context) {
 	// AFTER: ~8 lines with validation
 	ctx.Define("issubclass", core.NewBuiltinFunction(IsSubclassBuilder()))
 
+	// format - Python-style format(value, format_spec='')
+	// Calls __format__ dunder method for custom formatting
+	ctx.Define("format", core.NewBuiltinFunction(FormatBuilder()))
+
 	// Note: super is implemented as a special form in eval/class_forms.go
 	// to support both bare "super" and "super()" syntax
 }
@@ -388,6 +392,56 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 		}
 	}
 	return false
+}
+
+// FormatBuilder creates the format() function
+// Python-style format(value, format_spec=”) that calls __format__ dunder method
+func FormatBuilder() builders.BuiltinFunc {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("format", args)
+
+		if err := v.Range(1, 2); err != nil {
+			return nil, err
+		}
+
+		val := v.Get(0)
+		formatSpec := ""
+
+		// Get format_spec if provided
+		if v.Count() == 2 {
+			spec, err := v.GetString(1)
+			if err != nil {
+				return nil, err
+			}
+			formatSpec = spec
+		}
+
+		// Try __format__ dunder method first
+		if obj, ok := val.(core.Object); ok {
+			if method, exists := obj.GetAttr("__format__"); exists {
+				if callable, ok := method.(core.Callable); ok {
+					result, err := callable.Call([]core.Value{core.StringValue(formatSpec)}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Ensure it returns a string
+					if str, ok := result.(core.StringValue); ok {
+						return str, nil
+					}
+					return nil, errors.NewTypeError("format", "__format__ returned non-string", string(result.Type()))
+				}
+			}
+		}
+
+		// Fall back to str() conversion if no __format__ method
+		// For built-in types, convert appropriately
+		if str, ok := val.(core.StringValue); ok {
+			// Strings should return themselves, not their repr
+			return str, nil
+		}
+		// For other types, use String() method
+		return core.StringValue(val.String()), nil
+	}
 }
 
 // Migration Statistics:
