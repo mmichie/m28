@@ -8,6 +8,7 @@ import (
 
 	"github.com/mmichie/m28/common/builders"
 	"github.com/mmichie/m28/common/errors"
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
@@ -51,8 +52,6 @@ func RegisterTypes(ctx *core.Context) {
 	})))
 
 	// str - convert to string
-	// BEFORE: 9 lines
-	// AFTER: 3 lines
 	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("str", args)
 		if err := v.Exact(1); err != nil {
@@ -62,20 +61,11 @@ func RegisterTypes(ctx *core.Context) {
 		val := v.Get(0)
 
 		// Try __str__ dunder method first
-		if obj, ok := val.(core.Object); ok {
-			if method, exists := obj.GetAttr("__str__"); exists {
-				if callable, ok := method.(core.Callable); ok {
-					result, err := callable.Call([]core.Value{}, ctx)
-					if err != nil {
-						return nil, err
-					}
-					// Ensure it returns a string
-					if str, ok := result.(core.StringValue); ok {
-						return str, nil
-					}
-					return nil, errors.NewTypeError("str", "__str__ returned non-string", string(result.Type()))
-				}
+		if str, found, err := types.CallStr(val, ctx); found {
+			if err != nil {
+				return nil, err
 			}
+			return core.StringValue(str), nil
 		}
 
 		// Fall back to built-in String() method
@@ -83,8 +73,6 @@ func RegisterTypes(ctx *core.Context) {
 	}))
 
 	// bool - convert to boolean
-	// BEFORE: 9 lines
-	// AFTER: 3 lines
 	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("bool", args)
 		if err := v.Exact(1); err != nil {
@@ -94,20 +82,11 @@ func RegisterTypes(ctx *core.Context) {
 		val := v.Get(0)
 
 		// Try __bool__ dunder method first
-		if obj, ok := val.(core.Object); ok {
-			if method, exists := obj.GetAttr("__bool__"); exists {
-				if callable, ok := method.(core.Callable); ok {
-					result, err := callable.Call([]core.Value{}, ctx)
-					if err != nil {
-						return nil, err
-					}
-					// Ensure it returns a bool
-					if b, ok := result.(core.BoolValue); ok {
-						return b, nil
-					}
-					return nil, errors.NewTypeError("bool", "__bool__ returned non-bool", string(result.Type()))
-				}
+		if b, found, err := types.CallBool(val, ctx); found {
+			if err != nil {
+				return nil, err
 			}
+			return core.BoolValue(b), nil
 		}
 
 		// Fall back to IsTruthy
@@ -166,21 +145,11 @@ func IntBuilder() builders.BuiltinFunc {
 		// No base specified - simple conversion
 		if v.Count() == 1 {
 			// Try __int__ dunder method first
-			if obj, ok := val.(core.Object); ok {
-				if method, exists := obj.GetAttr("__int__"); exists {
-					if callable, ok := method.(core.Callable); ok {
-						result, err := callable.Call([]core.Value{}, ctx)
-						if err != nil {
-							return nil, err
-						}
-						// Ensure it returns a number
-						if num, ok := result.(core.NumberValue); ok {
-							// Truncate to integer
-							return core.NumberValue(float64(int(num))), nil
-						}
-						return nil, errors.NewTypeError("int", "__int__ returned non-int", string(result.Type()))
-					}
+			if intVal, found, err := types.CallInt(val, ctx); found {
+				if err != nil {
+					return nil, err
 				}
+				return core.NumberValue(float64(intVal)), nil
 			}
 
 			switch x := val.(type) {
@@ -243,6 +212,14 @@ func FloatBuilder() builders.BuiltinFunc {
 
 		val := v.Get(0)
 
+		// Try __float__ dunder method first
+		if floatVal, found, err := types.CallFloat(val, ctx); found {
+			if err != nil {
+				return nil, err
+			}
+			return core.NumberValue(floatVal), nil
+		}
+
 		switch x := val.(type) {
 		case core.NumberValue:
 			return x, nil
@@ -268,21 +245,6 @@ func FloatBuilder() builders.BuiltinFunc {
 			}
 			return core.NumberValue(0.0), nil
 		default:
-			// Check if object has __float__ method
-			if obj, ok := val.(core.Object); ok {
-				if method, exists := obj.GetAttr("__float__"); exists {
-					if callable, ok := method.(core.Callable); ok {
-						result, err := callable.Call([]core.Value{}, ctx)
-						if err != nil {
-							return nil, err
-						}
-						if num, ok := result.(core.NumberValue); ok {
-							return num, nil
-						}
-						return nil, errors.NewTypeError("float", "__float__ returned non-float", string(result.Type()))
-					}
-				}
-			}
 			return nil, errors.NewTypeError("float", "number or string", string(val.Type()))
 		}
 	}
@@ -417,20 +379,11 @@ func FormatBuilder() builders.BuiltinFunc {
 		}
 
 		// Try __format__ dunder method first
-		if obj, ok := val.(core.Object); ok {
-			if method, exists := obj.GetAttr("__format__"); exists {
-				if callable, ok := method.(core.Callable); ok {
-					result, err := callable.Call([]core.Value{core.StringValue(formatSpec)}, ctx)
-					if err != nil {
-						return nil, err
-					}
-					// Ensure it returns a string
-					if str, ok := result.(core.StringValue); ok {
-						return str, nil
-					}
-					return nil, errors.NewTypeError("format", "__format__ returned non-string", string(result.Type()))
-				}
+		if str, found, err := types.CallFormat(val, formatSpec, ctx); found {
+			if err != nil {
+				return nil, err
 			}
+			return core.StringValue(str), nil
 		}
 
 		// Fall back to str() conversion if no __format__ method

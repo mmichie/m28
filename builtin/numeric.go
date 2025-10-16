@@ -22,16 +22,11 @@ func RegisterNumeric(ctx *core.Context) {
 		val := v.Get(0)
 
 		// Try __abs__ dunder method first
-		if obj, ok := val.(core.Object); ok {
-			if method, exists := obj.GetAttr("__abs__"); exists {
-				if callable, ok := method.(core.Callable); ok {
-					result, err := callable.Call([]core.Value{}, ctx)
-					if err != nil {
-						return nil, err
-					}
-					return result, nil
-				}
+		if result, found, err := types.CallAbs(val, ctx); found {
+			if err != nil {
+				return nil, err
 			}
+			return result, nil
 		}
 
 		// Try protocol-based numeric operations
@@ -64,21 +59,11 @@ func RegisterNumeric(ctx *core.Context) {
 		}
 
 		// Try __round__ dunder method first
-		if obj, ok := val.(core.Object); ok {
-			if method, exists := obj.GetAttr("__round__"); exists {
-				if callable, ok := method.(core.Callable); ok {
-					// Call __round__ with ndigits if provided
-					var callArgs []core.Value
-					if ndigits != nil {
-						callArgs = []core.Value{ndigits}
-					}
-					result, err := callable.Call(callArgs, ctx)
-					if err != nil {
-						return nil, err
-					}
-					return result, nil
-				}
+		if result, found, err := types.CallRound(val, ndigits, ctx); found {
+			if err != nil {
+				return nil, err
 			}
+			return result, nil
 		}
 
 		// Fall back to built-in rounding

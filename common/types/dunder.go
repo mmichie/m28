@@ -264,6 +264,96 @@ func CallLt(self, other core.Value, ctx *core.Context) (bool, bool, error) {
 	return IsTruthy(result), true, nil
 }
 
+// CallInt calls __int__ on an object to convert it to an integer
+func CallInt(obj core.Value, ctx *core.Context) (int, bool, error) {
+	result, found, err := CallDunder(obj, "__int__", []core.Value{}, ctx)
+	if !found || err != nil {
+		return 0, found, err
+	}
+
+	// Ensure result is a number
+	num, ok := AsNumber(result)
+	if !ok {
+		return 0, true, fmt.Errorf("__int__ returned non-int type %s", result.Type())
+	}
+
+	// Check if it's an integer value (not a float)
+	intVal := int(num)
+	if float64(intVal) != num {
+		return 0, true, fmt.Errorf("__int__ returned non-integer value %v", num)
+	}
+
+	return intVal, true, nil
+}
+
+// CallFloat calls __float__ on an object to convert it to a float
+func CallFloat(obj core.Value, ctx *core.Context) (float64, bool, error) {
+	result, found, err := CallDunder(obj, "__float__", []core.Value{}, ctx)
+	if !found || err != nil {
+		return 0, found, err
+	}
+
+	// Ensure result is a number
+	num, ok := AsNumber(result)
+	if !ok {
+		return 0, true, fmt.Errorf("__float__ returned non-numeric type %s", result.Type())
+	}
+
+	return num, true, nil
+}
+
+// CallFormat calls __format__ on an object with a format specifier
+func CallFormat(obj core.Value, formatSpec string, ctx *core.Context) (string, bool, error) {
+	result, found, err := CallDunder(obj, "__format__", []core.Value{core.StringValue(formatSpec)}, ctx)
+	if !found || err != nil {
+		return "", found, err
+	}
+
+	// Ensure result is a string
+	str, ok := AsString(result)
+	if !ok {
+		return "", true, fmt.Errorf("__format__ returned non-string value: %s", result.Type())
+	}
+
+	return str, true, nil
+}
+
+// CallAbs calls __abs__ on an object to get its absolute value
+func CallAbs(obj core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(obj, "__abs__", []core.Value{}, ctx)
+}
+
+// CallRound calls __round__ on an object with optional ndigits
+func CallRound(obj core.Value, ndigits core.Value, ctx *core.Context) (core.Value, bool, error) {
+	args := []core.Value{}
+	if ndigits != nil {
+		args = append(args, ndigits)
+	}
+	return CallDunder(obj, "__round__", args, ctx)
+}
+
+// CallHash calls __hash__ on an object to get its hash value
+func CallHash(obj core.Value, ctx *core.Context) (int, bool, error) {
+	result, found, err := CallDunder(obj, "__hash__", []core.Value{}, ctx)
+	if !found || err != nil {
+		return 0, found, err
+	}
+
+	// Ensure result is a number
+	num, ok := AsNumber(result)
+	if !ok {
+		return 0, true, fmt.Errorf("__hash__ returned non-numeric value: %s", result.Type())
+	}
+
+	// Convert to int
+	hashVal := int(num)
+	if float64(hashVal) != num {
+		return 0, true, fmt.Errorf("__hash__ should return an integer")
+	}
+
+	return hashVal, true, nil
+}
+
 // ToIndex converts a value to an integer index using __index__ if available
 // This is the standard way to convert values to indices for slicing/indexing
 // Returns (intValue, error)
