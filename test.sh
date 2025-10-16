@@ -109,6 +109,8 @@ run_test "Lists" "tests/list-test.m28"
 run_test "Dictionaries" "tests/dict-test.m28"
 run_test "Dict Contains" "tests/dict-contains-test.m28"
 run_test "Dict Hashable Keys" "tests/dict-hashable-keys-test.m28"
+run_test "Dict Operations" "tests/test-dict-ops.m28"
+run_test "Merge Operations" "tests/test-merge-ops.m28"
 run_test "Strings" "tests/string-methods-test.m28"
 run_test "Set Literals" "tests/set-literal-test.m28"
 run_test "Frozenset" "tests/frozenset-test.m28"
@@ -125,12 +127,16 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Classes" "tests/simple-inheritance-test.m28" true
     run_test "Keywords" "tests/keyword-args-test.m28" true
     run_test "Loops" "tests/loop-test.m28"
+    run_test "Break/Continue" "tests/break-continue-test.m28"
     run_test "Repr Function" "tests/repr-test-simple.m28"
     run_test "Bool Protocol" "tests/bool-protocol-test.m28"
     run_test "Len Protocol" "tests/len-protocol-test.m28"
     run_test "Contains Protocol" "tests/contains-protocol-test.m28"
     run_test "Container Protocols" "tests/container_protocols.m28"
     run_test "Index Protocol" "tests/test-index-dunder.m28"
+    run_test "S-Strings" "tests/sstring-simple.m28"
+    run_test "Macros" "tests/test_macros_basic.m28"
+    run_test "JSONL" "tests/test-jsonl.m28"
 fi
 
 if [[ "$MODE" != "quick" ]]; then
