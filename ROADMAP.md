@@ -200,7 +200,7 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
 **Type Conversion:**
 - [ ] `__bytes__` - Convert to bytes
 - [ ] `__complex__` - Convert to complex number
-- [ ] `__index__` - Convert to integer index (for slicing)
+- [x] `__index__` - Convert to integer index (for slicing) - Enables custom classes as indices
 - [ ] `__format__` - Custom string formatting (for format())
 
 ##### Medium Priority - Extended Functionality 🟡
@@ -378,6 +378,26 @@ Metaclass: `__instancecheck__`, `__subclasscheck__`
 ## ✅ Recently Completed (2024-2025)
 
 ### January 2025
+- **`__index__` Dunder Method**: Python-compatible integer index conversion protocol
+  - **CallIndex() helper**: Calls `__index__` dunder method on objects (common/types/dunder.go)
+  - **ToIndex() converter**: Standard way to convert values to indices with __index__ support
+  - **NumberValue.__index__**: Integer validation for built-in numbers (must be whole numbers)
+  - **List indexing integration**: listMethodGetItem() uses toIndex() helper
+  - **Slice operations support**: SliceForm() and handleSliceObject() use types.ToIndex()
+  - **Custom class support**: User-defined classes can implement __index__ for indexing
+  - **Proper validation**: Returns error for non-integer values or missing __index__
+  - **Example usage**:
+    ```python
+    (class MyIndex
+      (def __init__ (self value) (= self.value value))
+      (def __index__ (self) self.value))
+    (= idx (MyIndex 2))
+    lst[idx]        # Works! Returns lst[2]
+    lst[idx:4]      # Works! Returns lst[2:4]
+    ```
+  - Comprehensive test suite: tests/test-index-dunder.m28 with 10 test scenarios
+  - All 37 existing tests passing + new __index__ tests
+  - Completes high-priority Type Conversion dunder method from roadmap
 - **Enhanced Error Messages**: Token-based error reporting with source context and suggestions
   - **ParseError type** with precise source location tracking (line, column, lexeme, filename)
   - **Source context display**: Shows 2-3 lines before/after error with line numbers
