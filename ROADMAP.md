@@ -232,13 +232,16 @@ Building on the AST layer foundation to enable true Python syntax support.
 - [x] Deliverable: `parser/python_parser.go` with full Python parsing
 - [x] 62 comprehensive tests covering all features
 
-#### Phase D: AST Lowering (Pending)
-- [ ] Implement ToIR() for all Python nodes
-- [ ] Desugar Python constructs to S-expressions
-- [ ] Comprehensions → (list-comp ...), (dict-comp ...)
-- [ ] For loops → (for var iterable body)
-- [ ] Classes → (def-class name bases methods)
-- [ ] Deliverable: All Python nodes lower to M28 IR
+#### Phase D: AST Lowering ✅ COMPLETE
+- [x] Implement ToIR() for all Python nodes
+- [x] Desugar Python constructs to S-expressions
+- [x] Comprehensions → (list-comp expr var iterable condition)
+- [x] For loops → (for var iterable body)
+- [x] Classes → (class name bases methods)
+- [x] Fixed ComprehensionForm.ToIR() to match evaluator expectations
+- [x] Fixed ClassForm.ToIR() to use (class ...) instead of (def-class ...)
+- [x] Deliverable: All Python nodes lower to M28 IR
+- [x] 7 end-to-end integration tests (100% passing)
 
 #### Phase E: Integration (Pending)
 - [ ] File extension detection (.py vs .m28)

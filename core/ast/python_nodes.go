@@ -443,30 +443,21 @@ func (c *ComprehensionForm) ToIR() core.Value {
 	switch c.Kind {
 	case ListComp:
 		// [x*x for x in range(10) if x % 2 == 0]
-		// → (list-comp (lambda (x) (* x x)) (range 10) (lambda (x) (== (% x 2) 0)))
-		elemLambda := core.ListValue{
-			core.SymbolValue("lambda"),
-			core.ListValue{core.SymbolValue(c.Variable)},
-			c.Element.ToIR(),
-		}
-
+		// → (list-comp (* x x) x (range 10) (== (% x 2) 0))
 		if c.Condition != nil {
-			filterLambda := core.ListValue{
-				core.SymbolValue("lambda"),
-				core.ListValue{core.SymbolValue(c.Variable)},
-				c.Condition.ToIR(),
-			}
 			return core.ListValue{
 				core.SymbolValue("list-comp"),
-				elemLambda,
+				c.Element.ToIR(),
+				core.SymbolValue(c.Variable),
 				c.Iterable.ToIR(),
-				filterLambda,
+				c.Condition.ToIR(),
 			}
 		}
 
 		return core.ListValue{
 			core.SymbolValue("list-comp"),
-			elemLambda,
+			c.Element.ToIR(),
+			core.SymbolValue(c.Variable),
 			c.Iterable.ToIR(),
 		}
 
@@ -827,16 +818,16 @@ func (c *ClassForm) ToIR() core.Value {
 		bodyIR = append(bodyIR, item.ToIR())
 	}
 
-	// Basic class: (def-class Name (Base1 Base2) method1 method2 ...)
+	// Basic class: (class Name [Base1 Base2] method1 method2 ...)
 	result := core.ListValue{
-		core.SymbolValue("def-class"),
+		core.SymbolValue("class"),
 		core.SymbolValue(c.Name),
 		basesIR,
 	}
 	result = append(result, bodyIR...)
 
 	// Handle decorators
-	// @decorator class Foo: ... → (= Foo (decorator (def-class Foo ...)))
+	// @decorator class Foo: ... → (= Foo (decorator (class Foo ...)))
 	for i := len(c.Decorators) - 1; i >= 0; i-- {
 		decorator := c.Decorators[i]
 		result = core.ListValue{

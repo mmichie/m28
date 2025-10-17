@@ -281,29 +281,22 @@ func TestComprehensionForm_ListComp_NoFilter(t *testing.T) {
 	iterable := NewIdentifier("items", loc, SyntaxPython)
 	comp := NewComprehensionForm(ListComp, element, nil, nil, "x", iterable, nil, loc, SyntaxPython)
 
-	// Check ToIR: (list-comp (lambda (x) x) items)
+	// Check ToIR: (list-comp x x items)
 	ir := comp.ToIR()
 	list, ok := ir.(core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if len(list) != 3 {
-		t.Fatalf("Expected 3 elements, got %d", len(list))
+	if len(list) != 4 {
+		t.Fatalf("Expected 4 elements, got %d", len(list))
 	}
 	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "list-comp" {
 		t.Errorf("Expected 'list-comp' symbol, got %v", list[0])
 	}
 
-	// Check lambda structure
-	lambda, ok := list[1].(core.ListValue)
-	if !ok {
-		t.Fatalf("Expected lambda ListValue, got %T", list[1])
-	}
-	if len(lambda) != 3 {
-		t.Fatalf("Expected lambda with 3 elements, got %d", len(lambda))
-	}
-	if sym, ok := lambda[0].(core.SymbolValue); !ok || string(sym) != "lambda" {
-		t.Errorf("Expected 'lambda' symbol, got %v", lambda[0])
+	// Check variable symbol
+	if sym, ok := list[2].(core.SymbolValue); !ok || string(sym) != "x" {
+		t.Errorf("Expected variable 'x' symbol, got %v", list[2])
 	}
 }
 
@@ -315,14 +308,14 @@ func TestComprehensionForm_ListComp_WithFilter(t *testing.T) {
 	condition := NewIdentifier("condition", loc, SyntaxPython)
 	comp := NewComprehensionForm(ListComp, element, nil, nil, "x", iterable, condition, loc, SyntaxPython)
 
-	// Check ToIR: (list-comp (lambda (x) x) items (lambda (x) condition))
+	// Check ToIR: (list-comp x x items condition)
 	ir := comp.ToIR()
 	list, ok := ir.(core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if len(list) != 4 {
-		t.Fatalf("Expected 4 elements (with filter), got %d", len(list))
+	if len(list) != 5 {
+		t.Fatalf("Expected 5 elements (with filter), got %d", len(list))
 	}
 }
 
@@ -676,14 +669,14 @@ func TestClassForm_Simple(t *testing.T) {
 		t.Errorf("Expected name 'Foo', got %s", classStmt.Name)
 	}
 
-	// Check ToIR: (def-class Foo () ...)
+	// Check ToIR: (class Foo () ...)
 	ir := classStmt.ToIR()
 	list, ok := ir.(core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "def-class" {
-		t.Errorf("Expected 'def-class' symbol, got %v", list[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "class" {
+		t.Errorf("Expected 'class' symbol, got %v", list[0])
 	}
 	if sym, ok := list[1].(core.SymbolValue); !ok || string(sym) != "Foo" {
 		t.Errorf("Expected 'Foo' class name, got %v", list[1])
