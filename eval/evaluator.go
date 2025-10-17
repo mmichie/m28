@@ -154,7 +154,7 @@ func init() {
 		"return": returnForm,
 
 		// Definitions
-		"def":    defForm,
+		// Note: "def" is registered by special_forms/register.go
 		"=":      assignForm,
 		"quote":  quoteForm,
 		"lambda": lambdaForm,
@@ -236,182 +236,6 @@ func RegisterSpecialForm(name string, handler SpecialFormHandler) {
 func ifForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Delegate to util.go implementation which supports elif
 	return IfForm(args, ctx)
-}
-
-// defForm implements the def special form to define functions and variables
-func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("def requires at least 2 arguments")
-	}
-
-	// Check for alternative function definition form: (def (name args...) body...)
-	if fnDef, ok := args[0].(core.ListValue); ok && len(fnDef) > 0 {
-		// Get function name from the first element of the list
-		name, ok := fnDef[0].(core.SymbolValue)
-		if !ok {
-			return nil, fmt.Errorf("def: function name must be a symbol")
-		}
-
-		// Get parameter list (the rest of the elements after the name)
-		paramList := core.ListValue(fnDef[1:])
-
-		// Try to parse as new-style parameter list with defaults
-		signature, err := ParseParameterList(paramList)
-		if err != nil {
-			// Fall back to legacy simple parameter parsing
-			params := make([]core.SymbolValue, 0, len(fnDef)-1)
-			for _, param := range fnDef[1:] {
-				if sym, ok := param.(core.SymbolValue); ok {
-					params = append(params, sym)
-				} else {
-					return nil, fmt.Errorf("parameters must be symbols")
-				}
-			}
-
-			// Create function body (implicit do)
-			body := args[1:]
-			var functionBody core.Value
-
-			if len(body) == 1 {
-				// Single expression body
-				functionBody = body[0]
-			} else {
-				// Multi-expression body, wrap in do
-				functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
-			}
-
-			function := &UserFunction{
-				BaseObject: *core.NewBaseObject(core.FunctionType),
-				params:     params,
-				body:       functionBody,
-				env:        ctx,
-				name:       string(name),
-			}
-
-			// Check if this is a generator function
-			finalFunc := makeGeneratorFunction(function)
-
-			ctx.Define(string(name), finalFunc)
-			return finalFunc, nil
-		}
-
-		// Create function body (implicit do) for new-style function
-		body := args[1:]
-		var functionBody core.Value
-
-		if len(body) == 1 {
-			// Single expression body
-			functionBody = body[0]
-		} else {
-			// Multi-expression body, wrap in do
-			functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
-		}
-
-		// Create the function with signature
-		function := &UserFunction{
-			BaseObject: *core.NewBaseObject(core.FunctionType),
-			signature:  signature,
-			body:       functionBody,
-			env:        ctx,
-			name:       string(name),
-		}
-
-		// Check if this is a generator function
-		finalFunc := makeGeneratorFunction(function)
-
-		ctx.Define(string(name), finalFunc)
-		return finalFunc, nil
-	}
-
-	// Standard form: (def name ...)
-	name, ok := args[0].(core.SymbolValue)
-	if !ok {
-		return nil, fmt.Errorf("def: first argument must be a symbol")
-	}
-
-	// Check different definition forms
-	if len(args) >= 3 {
-		// Check for function definition: (def name (params) body...)
-		if paramList, ok := args[1].(core.ListValue); ok {
-			// It's a function definition with parameter list
-
-			// Try to parse as new-style parameter list with defaults
-			signature, err := ParseParameterList(paramList)
-			if err != nil {
-				// Fall back to legacy simple parameter parsing
-				params := make([]core.SymbolValue, 0, len(paramList))
-				for _, param := range paramList {
-					if sym, ok := param.(core.SymbolValue); ok {
-						params = append(params, sym)
-					} else {
-						return nil, fmt.Errorf("parameters must be symbols")
-					}
-				}
-
-				// Create function body (implicit do)
-				body := args[2:]
-				var functionBody core.Value
-
-				if len(body) == 1 {
-					// Single expression body
-					functionBody = body[0]
-				} else {
-					// Multi-expression body, wrap in do
-					functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
-				}
-
-				function := &UserFunction{
-					BaseObject: *core.NewBaseObject(core.FunctionType),
-					params:     params,
-					body:       functionBody,
-					env:        ctx,
-					name:       string(name),
-				}
-
-				// Check if this is a generator function
-				finalFunc := makeGeneratorFunction(function)
-
-				ctx.Define(string(name), finalFunc)
-				return finalFunc, nil
-			}
-
-			// Create function body (implicit do) for new-style function
-			body := args[2:]
-			var functionBody core.Value
-
-			if len(body) == 1 {
-				// Single expression body
-				functionBody = body[0]
-			} else {
-				// Multi-expression body, wrap in do
-				functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
-			}
-
-			// Create the function with signature
-			function := &UserFunction{
-				BaseObject: *core.NewBaseObject(core.FunctionType),
-				signature:  signature,
-				body:       functionBody,
-				env:        ctx,
-				name:       string(name),
-			}
-
-			// Check if this is a generator function
-			finalFunc := makeGeneratorFunction(function)
-
-			ctx.Define(string(name), finalFunc)
-			return finalFunc, nil
-		}
-	}
-
-	// Variable definition: (def name value)
-	value, err := Eval(args[1], ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx.Define(string(name), value)
-	return value, nil
 }
 
 // assignForm implements the = special form for assignment
@@ -1181,6 +1005,73 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return nil, fmt.Errorf("raise: too many arguments")
 }
 
+// convertIterableToSlice converts an iterable value to a slice of values
+// This supports lists, tuples, strings, and any type implementing the Iterable interface
+func convertIterableToSlice(iterable core.Value) ([]core.Value, error) {
+	var items []core.Value
+	switch v := iterable.(type) {
+	case core.ListValue:
+		items = v
+	case core.TupleValue:
+		items = v
+	case core.StringValue:
+		// Convert string to list of characters
+		for _, ch := range string(v) {
+			items = append(items, core.StringValue(string(ch)))
+		}
+	default:
+		// Try using Iterator interface
+		if iterableObj, ok := v.(core.Iterable); ok {
+			iter := iterableObj.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				items = append(items, val)
+			}
+		} else {
+			return nil, fmt.Errorf("value must be iterable, got %s", v.Type())
+		}
+	}
+	return items, nil
+}
+
+// comprehensionLoop executes a comprehension loop over items with optional filtering
+// The callback is called for each item that passes the condition (if provided)
+func comprehensionLoop(
+	items []core.Value,
+	varName string,
+	condition core.Value, // nil if no condition
+	ctx *core.Context,
+	callback func(loopCtx *core.Context) error,
+) error {
+	loopCtx := core.NewContext(ctx)
+	for _, item := range items {
+		// Bind the loop variable
+		loopCtx.Define(varName, item)
+
+		// Check condition if present
+		if condition != nil {
+			condResult, err := Eval(condition, loopCtx)
+			if err != nil {
+				return fmt.Errorf("error evaluating condition: %v", err)
+			}
+
+			// Skip if condition is falsy
+			if !core.IsTruthy(condResult) {
+				continue
+			}
+		}
+
+		// Execute the callback for this item
+		if err := callback(loopCtx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // listCompForm implements list comprehensions
 // Forms:
 //
@@ -1205,65 +1096,35 @@ func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Convert iterable to a sequence we can iterate over
-	var items []core.Value
-	switch v := iterable.(type) {
-	case core.ListValue:
-		items = v
-	case core.TupleValue:
-		items = v
-	case core.StringValue:
-		// Convert string to list of characters
-		for _, ch := range string(v) {
-			items = append(items, core.StringValue(string(ch)))
-		}
-	default:
-		// Try using Iterator interface
-		if iterableObj, ok := v.(core.Iterable); ok {
-			iter := iterableObj.Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				items = append(items, val)
-			}
-		} else {
-			return nil, fmt.Errorf("list comprehension iterable must be a sequence, got %s", v.Type())
-		}
+	items, err := convertIterableToSlice(iterable)
+	if err != nil {
+		return nil, fmt.Errorf("list comprehension: %v", err)
 	}
 
 	// Create result list
 	result := make(core.ListValue, 0)
 
-	// Create a new context for the loop variable
-	loopCtx := core.NewContext(ctx)
+	// Get optional condition
+	var condition core.Value
+	if len(args) == 4 {
+		condition = args[3]
+	}
 
-	// Iterate over items
-	for _, item := range items {
-		// Bind the loop variable
-		loopCtx.Define(varName, item)
-
-		// Check condition if present
-		if len(args) == 4 {
-			condResult, err := Eval(args[3], loopCtx)
-			if err != nil {
-				return nil, fmt.Errorf("error evaluating condition: %v", err)
-			}
-
-			// Skip if condition is falsy
-			if !core.IsTruthy(condResult) {
-				continue
-			}
-		}
-
+	// Execute the comprehension loop
+	err = comprehensionLoop(items, varName, condition, ctx, func(loopCtx *core.Context) error {
 		// Evaluate the expression
 		exprResult, err := Eval(args[0], loopCtx)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating expression: %v", err)
+			return fmt.Errorf("error evaluating expression: %v", err)
 		}
 
 		// Add to result
 		result = append(result, exprResult)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return result, nil
@@ -1293,72 +1154,42 @@ func DictCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Convert iterable to a sequence we can iterate over
-	var items []core.Value
-	switch v := iterable.(type) {
-	case core.ListValue:
-		items = v
-	case core.TupleValue:
-		items = v
-	case core.StringValue:
-		// Convert string to list of characters
-		for _, ch := range string(v) {
-			items = append(items, core.StringValue(string(ch)))
-		}
-	default:
-		// Try using Iterator interface
-		if iterableObj, ok := v.(core.Iterable); ok {
-			iter := iterableObj.Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				items = append(items, val)
-			}
-		} else {
-			return nil, fmt.Errorf("dict comprehension iterable must be a sequence, got %s", v.Type())
-		}
+	items, err := convertIterableToSlice(iterable)
+	if err != nil {
+		return nil, fmt.Errorf("dict comprehension: %v", err)
 	}
 
 	// Create result dict
 	result := core.NewDict()
 
-	// Create a new context for the loop variable
-	loopCtx := core.NewContext(ctx)
+	// Get optional condition
+	var condition core.Value
+	if len(args) == 5 {
+		condition = args[4]
+	}
 
-	// Iterate over items
-	for _, item := range items {
-		// Bind the loop variable
-		loopCtx.Define(varName, item)
-
-		// Check condition if present
-		if len(args) == 5 {
-			condResult, err := Eval(args[4], loopCtx)
-			if err != nil {
-				return nil, fmt.Errorf("error evaluating condition: %v", err)
-			}
-
-			// Skip if condition is falsy
-			if !core.IsTruthy(condResult) {
-				continue
-			}
-		}
-
+	// Execute the comprehension loop
+	err = comprehensionLoop(items, varName, condition, ctx, func(loopCtx *core.Context) error {
 		// Evaluate the key expression
 		keyResult, err := Eval(args[0], loopCtx)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating key expression: %v", err)
+			return fmt.Errorf("error evaluating key expression: %v", err)
 		}
 
 		// Evaluate the value expression
 		valueResult, err := Eval(args[1], loopCtx)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating value expression: %v", err)
+			return fmt.Errorf("error evaluating value expression: %v", err)
 		}
 
 		// Add to result dict
 		keyStr := core.ValueToKey(keyResult)
 		result.SetWithKey(keyStr, keyResult, valueResult)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return result, nil
@@ -1388,65 +1219,35 @@ func SetCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Convert iterable to a sequence we can iterate over
-	var items []core.Value
-	switch v := iterable.(type) {
-	case core.ListValue:
-		items = v
-	case core.TupleValue:
-		items = v
-	case core.StringValue:
-		// Convert string to list of characters
-		for _, ch := range string(v) {
-			items = append(items, core.StringValue(string(ch)))
-		}
-	default:
-		// Try using Iterator interface
-		if iterableObj, ok := v.(core.Iterable); ok {
-			iter := iterableObj.Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				items = append(items, val)
-			}
-		} else {
-			return nil, fmt.Errorf("set comprehension iterable must be a sequence, got %s", v.Type())
-		}
+	items, err := convertIterableToSlice(iterable)
+	if err != nil {
+		return nil, fmt.Errorf("set comprehension: %v", err)
 	}
 
 	// Create result set
 	result := core.NewSet()
 
-	// Create a new context for the loop variable
-	loopCtx := core.NewContext(ctx)
+	// Get optional condition
+	var condition core.Value
+	if len(args) == 4 {
+		condition = args[3]
+	}
 
-	// Iterate over items
-	for _, item := range items {
-		// Bind the loop variable
-		loopCtx.Define(varName, item)
-
-		// Check condition if present
-		if len(args) == 4 {
-			condResult, err := Eval(args[3], loopCtx)
-			if err != nil {
-				return nil, fmt.Errorf("error evaluating condition: %v", err)
-			}
-
-			// Skip if condition is falsy
-			if !core.IsTruthy(condResult) {
-				continue
-			}
-		}
-
+	// Execute the comprehension loop
+	err = comprehensionLoop(items, varName, condition, ctx, func(loopCtx *core.Context) error {
 		// Evaluate the expression
 		exprResult, err := Eval(args[0], loopCtx)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating expression: %v", err)
+			return fmt.Errorf("error evaluating expression: %v", err)
 		}
 
 		// Add to result set
 		result.Add(exprResult)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return result, nil

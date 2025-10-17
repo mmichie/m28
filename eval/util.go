@@ -168,7 +168,86 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, ErrArgCount("def requires at least 2 arguments")
 	}
 
-	// Get the name
+	// Check for alternative function definition form: (def (name args...) body...)
+	if fnDef, ok := args[0].(core.ListValue); ok && len(fnDef) > 0 {
+		// Get function name from the first element of the list
+		name, ok := fnDef[0].(core.SymbolValue)
+		if !ok {
+			return nil, TypeError{Expected: "symbol for function name", Got: fnDef[0].Type()}
+		}
+
+		// Get parameter list (the rest of the elements after the name)
+		paramList := core.ListValue(fnDef[1:])
+
+		// Try to parse as new-style parameter list with defaults
+		signature, err := ParseParameterList(paramList)
+		if err != nil {
+			// Fall back to legacy simple parameter parsing
+			params := make([]core.SymbolValue, 0, len(fnDef)-1)
+			for _, param := range fnDef[1:] {
+				if sym, ok := param.(core.SymbolValue); ok {
+					params = append(params, sym)
+				} else {
+					return nil, TypeError{Expected: "symbol", Got: param.Type()}
+				}
+			}
+
+			// Create function body (implicit do)
+			body := args[1:]
+			var functionBody core.Value
+
+			if len(body) == 1 {
+				// Single expression body
+				functionBody = body[0]
+			} else {
+				// Multi-expression body, wrap in do
+				functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+			}
+
+			function := &UserFunction{
+				BaseObject: *core.NewBaseObject(core.FunctionType),
+				params:     params,
+				body:       functionBody,
+				env:        ctx,
+				name:       string(name),
+			}
+
+			// Check if this is a generator function
+			finalFunc := makeGeneratorFunction(function)
+
+			ctx.Define(string(name), finalFunc)
+			return finalFunc, nil
+		}
+
+		// Create function body (implicit do) for new-style function
+		body := args[1:]
+		var functionBody core.Value
+
+		if len(body) == 1 {
+			// Single expression body
+			functionBody = body[0]
+		} else {
+			// Multi-expression body, wrap in do
+			functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+		}
+
+		// Create the function with signature
+		function := &UserFunction{
+			BaseObject: *core.NewBaseObject(core.FunctionType),
+			signature:  signature,
+			body:       functionBody,
+			env:        ctx,
+			name:       string(name),
+		}
+
+		// Check if this is a generator function
+		finalFunc := makeGeneratorFunction(function)
+
+		ctx.Define(string(name), finalFunc)
+		return finalFunc, nil
+	}
+
+	// Standard form: (def name ...)
 	name, ok := args[0].(core.SymbolValue)
 	if !ok {
 		return nil, TypeError{Expected: "symbol", Got: args[0].Type()}
@@ -214,8 +293,11 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					name:       string(name),
 				}
 
-				ctx.Define(string(name), function)
-				return function, nil
+				// Check if this is a generator function
+				finalFunc := makeGeneratorFunction(function)
+
+				ctx.Define(string(name), finalFunc)
+				return finalFunc, nil
 			}
 
 			// New-style function with signature
@@ -249,8 +331,11 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				name:       string(name),
 			}
 
-			ctx.Define(string(name), function)
-			return function, nil
+			// Check if this is a generator function
+			finalFunc := makeGeneratorFunction(function)
+
+			ctx.Define(string(name), finalFunc)
+			return finalFunc, nil
 		}
 	}
 
