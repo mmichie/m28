@@ -450,17 +450,81 @@ func (p *PythonParser) parseModuleName() string {
 func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 	expr := p.parseExpression()
 
-	// Check for assignment
-	if p.check(TOKEN_ASSIGN) {
-		tok := p.advance()
-		value := p.parseExpression()
-
-		// Consume newline
-		if p.check(TOKEN_NEWLINE) {
-			p.advance()
+	// Check for comma (tuple formation on left side of assignment)
+	// e.g., x, y = 1, 2
+	if p.check(TOKEN_COMMA) {
+		// Collect all comma-separated expressions
+		elements := []ast.ASTNode{expr}
+		for p.check(TOKEN_COMMA) {
+			p.advance() // consume comma
+			if p.check(TOKEN_ASSIGN) || p.check(TOKEN_NEWLINE) {
+				// Trailing comma before assignment or end of line
+				break
+			}
+			elements = append(elements, p.parseExpression())
 		}
 
-		return ast.NewAssignForm(expr, value, p.makeLocation(tok), ast.SyntaxPython)
+		// If more than one element, it's a tuple pattern for unpacking
+		// Don't use tuple-literal here - just a plain list of targets
+		if len(elements) > 1 {
+			expr = ast.NewSExpr(elements, p.makeLocation(p.peek()), ast.SyntaxPython)
+		}
+	}
+
+	// Check for assignment (including chained assignment like x = y = z = 0)
+	if p.check(TOKEN_ASSIGN) {
+		tok := p.advance()
+
+		// Collect all assignment targets
+		// For x = y = z = 0, we collect [x, y, z] and then parse 0
+		targets := []ast.ASTNode{expr}
+
+		// Keep collecting targets while we see = followed by another expression
+		for {
+			nextExpr := p.parseExpression()
+
+			// Check for comma on right side (tuple formation)
+			if p.check(TOKEN_COMMA) {
+				elements := []ast.ASTNode{nextExpr}
+				for p.check(TOKEN_COMMA) {
+					p.advance() // consume comma
+					if p.check(TOKEN_ASSIGN) || p.check(TOKEN_NEWLINE) {
+						break
+					}
+					elements = append(elements, p.parseExpression())
+				}
+
+				// Create tuple for right side
+				if len(elements) > 1 {
+					tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+					allElements := append([]ast.ASTNode{tupleSym}, elements...)
+					nextExpr = ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+				}
+			}
+
+			if p.check(TOKEN_ASSIGN) {
+				// Another assignment, collect this target
+				targets = append(targets, nextExpr)
+				p.advance() // consume the =
+			} else {
+				// This is the final value
+				// Build nested assignments right-to-left
+				// x = y = z = 0 becomes (= x (= y (= z 0)))
+				result := ast.NewAssignForm(targets[len(targets)-1], nextExpr, p.makeLocation(tok), ast.SyntaxPython)
+
+				// Work backwards through remaining targets
+				for i := len(targets) - 2; i >= 0; i-- {
+					result = ast.NewAssignForm(targets[i], result, p.makeLocation(tok), ast.SyntaxPython)
+				}
+
+				// Consume newline
+				if p.check(TOKEN_NEWLINE) {
+					p.advance()
+				}
+
+				return result
+			}
+		}
 	}
 
 	// Check for augmented assignment (+=, -=, etc.)

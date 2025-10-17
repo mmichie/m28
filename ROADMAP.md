@@ -254,10 +254,13 @@ Building on the AST layer foundation to enable true Python syntax support. All p
 
 **Features Currently Supported:**
 - ✅ Variables and assignment
+- ✅ **Chained assignment** - `x = y = z = 0`
+- ✅ **Multiple assignment / Tuple unpacking** - `x, y = 1, 2`
 - ✅ Function definitions (def, parameters, return)
 - ✅ **Default parameters** - `def func(x=5, y=10):`
 - ✅ **F-strings** - `f"Hello, {name}!"` with full interpolation support
 - ✅ **Tuple literals** - `(1, 2, 3)`, `(42,)`, `()`
+- ✅ **Number literal prefixes** - `0b1010` (binary), `0o755` (octal), `0xFF` (hex)
 - ✅ Control flow (if/elif/else)
 - ✅ Loops (for with range(), while, break, continue)
 - ✅ List comprehensions (with conditions)
@@ -268,10 +271,8 @@ Building on the AST layer foundation to enable true Python syntax support. All p
 - ✅ Exception handling (try/except/finally)
 
 **Known Limitations:**
-- ❌ Multiple assignment: `x, y = 1, 2` (tuple unpacking in assignments)
-- ❌ Chained assignment: `x = y = z = 0`
-- ❌ Binary/octal/hex literals: `0b1010`, `0o755`, `0xFF`
 - ❌ Per-name import aliasing: `from math import sqrt as sq`
+- ❌ Complex chained tuple unpacking: `a, b = c, d = 1, 2` (edge case)
 
 **Example Python Code:**
 ```python
@@ -394,33 +395,41 @@ for i in range(5):
 - tests/test-phase3.py: Integration tests pass
 - Full test suite: 54/54 M28 tests still passing (zero regressions)
 
-#### Phase 4: Polish & Edge Cases (Week 6) 🟢 NICE TO HAVE
-**Status:** Handle less common patterns
+#### Phase 4: Polish & Edge Cases (Week 6) ✅ COMPLETE
+**Status:** Python edge cases now fully supported!
 
-- [ ] **Multiple assignment** - `x, y = 1, 2`
-  - Requires tuple support from Phase 3
-  - Parse left side as tuple pattern
-  - Implement unpacking logic
-  - Files: `parser/python_parser.go`, `eval/evaluator.go`
+- [x] **Chained assignment** - `x = y = z = 0`
+  - Modified parseExpressionStatement() to collect multiple assignment targets
+  - Builds nested assignments right-to-left: `x = y = z = 0` → `(= x (= y (= z 0)))`
+  - Assignment returns value, enabling chaining
+  - Files: `parser/python_parser.go` (lines 449-530)
 
-- [ ] **Chained assignment** - `x = y = z = 0`
-  - Simple parser change to handle multiple `=`
-  - Right-to-left evaluation
-  - Files: `parser/python_parser.go`
+- [x] **Number literal prefixes** - `0b1010`, `0o755`, `0xFF`
+  - Extended scanNumber() to detect and parse binary (0b/0B), octal (0o/0O), hex (0x/0X)
+  - Supports underscores in numbers for readability
+  - Handles mixed case prefixes
+  - Files: `parser/python_tokenizer.go` (lines 463-584)
 
-- [ ] **Number literal prefixes** - `0b1010`, `0o755`, `0xFF`
-  - Add binary, octal, hex parsing to tokenizer
-  - Convert to NumberValue during tokenization
-  - Files: `parser/python_tokenizer.go`
+- [x] **Multiple assignment / Tuple unpacking** - `x, y = 1, 2`
+  - Detects comma-separated expressions on both sides of assignment
+  - Creates tuple patterns for left side (without tuple-literal symbol)
+  - Creates tuple values for right side (with tuple-literal)
+  - Leverages existing assignForm tuple unpacking logic in evaluator
+  - Files: `parser/python_parser.go` (lines 453-530)
 
-**Success Criteria:**
-- Tuple unpacking works in assignments
-- Can write `x = y = 0`
-- Hex literals work: `color = 0xFF0000`
+**Success Criteria:** ALL MET ✅
+- Tuple unpacking works in assignments: `x, y = 1, 2` ✅
+- Can write chained assignments: `x = y = z = 0` ✅
+- Hex literals work: `color = 0xFF0000` ✅
+- Binary literals work: `flags = 0b1010` ✅
+- Octal literals work: `perms = 0o755` ✅
 
-**Timeline:** 4-6 weeks for complete Python compatibility
-**Effort:** 1 developer, focused work
-**Impact:** Will enable running most real-world Python code on M28
+**Test Results:**
+- tests/test-chained-assignment.py: 7 tests pass
+- tests/test-number-prefixes.py: 7 tests pass
+- tests/test-multiple-assignment.py: 5 tests pass
+- tests/test-phase4.py: Integration tests pass
+- Full test suite: 54/54 M28 tests still passing (zero regressions)
 
 ### High-Impact Refactoring
 

@@ -462,6 +462,72 @@ func (t *PythonTokenizer) scanOperator(ch byte, start, startLine, startCol int) 
 
 // scanNumber scans a numeric literal
 func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
+	// Check for binary, octal, or hex prefix
+	// The first character has already been consumed and is at t.input[start]
+	if t.input[start] == '0' && !t.isAtEnd() {
+		prefix := t.peek()
+
+		// Binary: 0b1010 or 0B1010
+		if prefix == 'b' || prefix == 'B' {
+			t.advance() // consume 'b' or 'B'
+			// Scan binary digits
+			for !t.isAtEnd() && (t.peek() == '0' || t.peek() == '1' || t.peek() == '_') {
+				t.advance()
+			}
+			lexeme := t.input[start:t.pos]
+			// Remove underscores and parse
+			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0b" prefix
+			if i, err := strconv.ParseInt(cleanLexeme, 2, 64); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			return Token{Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(0),
+				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+		}
+
+		// Octal: 0o755 or 0O755
+		if prefix == 'o' || prefix == 'O' {
+			t.advance() // consume 'o' or 'O'
+			// Scan octal digits
+			for !t.isAtEnd() && ((t.peek() >= '0' && t.peek() <= '7') || t.peek() == '_') {
+				t.advance()
+			}
+			lexeme := t.input[start:t.pos]
+			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0o" prefix
+			if i, err := strconv.ParseInt(cleanLexeme, 8, 64); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			return Token{Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(0),
+				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+		}
+
+		// Hexadecimal: 0xFF or 0XFF
+		if prefix == 'x' || prefix == 'X' {
+			t.advance() // consume 'x' or 'X'
+			// Scan hex digits
+			for !t.isAtEnd() && (isDigit(t.peek()) || (t.peek() >= 'a' && t.peek() <= 'f') ||
+				(t.peek() >= 'A' && t.peek() <= 'F') || t.peek() == '_') {
+				t.advance()
+			}
+			lexeme := t.input[start:t.pos]
+			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0x" prefix
+			if i, err := strconv.ParseInt(cleanLexeme, 16, 64); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			return Token{Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(0),
+				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+		}
+	}
+
+	// Regular decimal number
 	// Scan integer part
 	for !t.isAtEnd() && isDigit(t.peek()) {
 		t.advance()
