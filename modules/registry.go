@@ -12,14 +12,15 @@ type ModuleInitializer func() *core.DictValue
 
 // builtinModules maps module names to their initializers
 var builtinModules = map[string]ModuleInitializer{
-	"os":       InitOSModule,
-	"json":     InitJSONModule,
-	"time":     InitTimeModule,
-	"datetime": InitDatetimeModule,
-	"pathlib":  InitPathlibModule,
-	"random":   InitRandomModule,
-	"shutil":   InitShutilModule,
-	"math":     InitMathModule,
+	"os":          InitOSModule,
+	"json":        InitJSONModule,
+	"time":        InitTimeModule,
+	"datetime":    InitDatetimeModule,
+	"pathlib":     InitPathlibModule,
+	"random":      InitRandomModule,
+	"shutil":      InitShutilModule,
+	"math":        InitMathModule,
+	"collections": InitCollectionsModule,
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

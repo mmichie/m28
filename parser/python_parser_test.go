@@ -396,14 +396,14 @@ func TestParseSubscript(t *testing.T) {
 		t.Fatalf("Expected SExpr, got %T", nodes[0])
 	}
 
-	// Should be ([] list 0)
+	// Should be (get-item list 0)
 	if len(sexpr.Elements) != 3 {
 		t.Fatalf("Expected 3 elements, got %d", len(sexpr.Elements))
 	}
 
-	brackets, ok := sexpr.Elements[0].(*ast.Identifier)
-	if !ok || brackets.Name != "[]" {
-		t.Errorf("Expected '[]' operator")
+	getItem, ok := sexpr.Elements[0].(*ast.Identifier)
+	if !ok || getItem.Name != "get-item" {
+		t.Errorf("Expected 'get-item' operator, got %v", getItem.Name)
 	}
 }
 

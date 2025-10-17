@@ -815,7 +815,7 @@ func (p *PythonParser) parseSubscript(obj ast.ASTNode) ast.ASTNode {
 	p.expect(TOKEN_RBRACKET)
 
 	return ast.NewSExpr([]ast.ASTNode{
-		ast.NewIdentifier("[]", p.makeLocation(tok), ast.SyntaxPython),
+		ast.NewIdentifier("get-item", p.makeLocation(tok), ast.SyntaxPython),
 		obj,
 		index,
 	}, p.makeLocation(tok), ast.SyntaxPython)
