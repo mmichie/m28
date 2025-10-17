@@ -711,13 +711,12 @@ func (p *PythonParser) parseListLiteral() ast.ASTNode {
 
 	p.expect(TOKEN_RBRACKET)
 
-	// Convert to ListValue IR
-	values := make(core.ListValue, len(elements))
-	for i, elem := range elements {
-		values[i] = elem.ToIR()
-	}
+	// Create (list-literal elem1 elem2 ...) form
+	// This is a special form that evaluates each element and returns a list
+	listLiteralSym := ast.NewIdentifier("list-literal", p.makeLocation(tok), ast.SyntaxPython)
+	allElements := append([]ast.ASTNode{listLiteralSym}, elements...)
 
-	return ast.NewLiteral(values, p.makeLocation(tok), ast.SyntaxPython)
+	return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseDictOrSetLiteral parses: {k:v, ...} or {elem, ...}
@@ -751,9 +750,8 @@ func (p *PythonParser) parseDictLiteral(firstKey ast.ASTNode, tok Token) ast.AST
 		return p.parseDictComprehension(firstKey, firstValue, tok)
 	}
 
-	// Regular dict
-	dict := core.NewDict()
-	dict.SetValue(firstKey.ToIR(), firstValue.ToIR())
+	// Regular dict - collect key-value pairs as AST nodes
+	keyValuePairs := []ast.ASTNode{firstKey, firstValue}
 
 	for p.check(TOKEN_COMMA) {
 		p.advance()
@@ -764,12 +762,16 @@ func (p *PythonParser) parseDictLiteral(firstKey ast.ASTNode, tok Token) ast.AST
 		key := p.parseExpression()
 		p.expect(TOKEN_COLON)
 		value := p.parseExpression()
-		dict.SetValue(key.ToIR(), value.ToIR())
+		keyValuePairs = append(keyValuePairs, key, value)
 	}
 
 	p.expect(TOKEN_RBRACE)
 
-	return ast.NewLiteral(dict, p.makeLocation(tok), ast.SyntaxPython)
+	// Create (dict-literal key1 value1 key2 value2 ...) form
+	dictLiteralSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+	allElements := append([]ast.ASTNode{dictLiteralSym}, keyValuePairs...)
+
+	return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseSetLiteral parses the rest of: {elem, ...}
@@ -779,25 +781,26 @@ func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode
 		return p.parseSetComprehension(first, tok)
 	}
 
-	// Regular set
-	elements := []core.Value{first.ToIR()}
+	// Regular set - collect elements as AST nodes
+	elements := []ast.ASTNode{first}
 
 	for p.check(TOKEN_COMMA) {
 		p.advance()
 		if p.check(TOKEN_RBRACE) {
 			break // Trailing comma
 		}
-		elements = append(elements, p.parseExpression().ToIR())
+		elements = append(elements, p.parseExpression())
 	}
 
 	p.expect(TOKEN_RBRACE)
 
-	set := core.NewSet()
-	for _, elem := range elements {
-		set.Add(elem)
-	}
+	// Create (set (list-literal elem1 elem2 ...)) form
+	listLiteralSym := ast.NewIdentifier("list-literal", p.makeLocation(tok), ast.SyntaxPython)
+	listElements := append([]ast.ASTNode{listLiteralSym}, elements...)
+	listLiteral := ast.NewSExpr(listElements, p.makeLocation(tok), ast.SyntaxPython)
 
-	return ast.NewLiteral(set, p.makeLocation(tok), ast.SyntaxPython)
+	setSym := ast.NewIdentifier("set", p.makeLocation(tok), ast.SyntaxPython)
+	return ast.NewSExpr([]ast.ASTNode{setSym, listLiteral}, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // ============================================================================

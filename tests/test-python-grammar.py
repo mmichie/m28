@@ -159,13 +159,19 @@ print("✓ Loops passed")
 # ============================================================================
 print("\n# Test 6: Data Structures")
 
-# Lists (empty lists and comprehensions work)
+# Lists
 lst = []
-lst = [x for x in range(3)]
-lst = [x for x in range(5)]
+lst = [1, 2, 3]
+lst = [1, 2, 3, 4, 5]
 
-# Dictionaries (empty dicts work)
+# Dictionaries
 d = {}
+d = {"a": 1, "b": 2}
+d = {"key1": "value1", "key2": "value2"}
+
+# Sets
+s = {1, 2, 3}
+s = {1, 2, 3, 4, 5}
 
 print("✓ Data structures passed")
 

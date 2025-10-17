@@ -443,18 +443,42 @@ func TestParseListLiteral(t *testing.T) {
 			t.Fatalf("Parse error for %q: %v", tt.source, err)
 		}
 
-		literal, ok := nodes[0].(*ast.Literal)
-		if !ok {
-			t.Fatalf("Expected Literal for %q, got %T", tt.source, nodes[0])
-		}
+		// Empty lists remain as Literal nodes, non-empty lists are SExpr
+		if tt.expected == 0 {
+			literal, ok := nodes[0].(*ast.Literal)
+			if !ok {
+				t.Fatalf("Expected Literal for empty list %q, got %T", tt.source, nodes[0])
+			}
 
-		list, ok := literal.Value.(core.ListValue)
-		if !ok {
-			t.Fatalf("Expected ListValue for %q, got %T", tt.source, literal.Value)
-		}
+			list, ok := literal.Value.(core.ListValue)
+			if !ok {
+				t.Fatalf("Expected ListValue for %q, got %T", tt.source, literal.Value)
+			}
 
-		if len(list) != tt.expected {
-			t.Errorf("Expected %d elements for %q, got %d", tt.expected, tt.source, len(list))
+			if len(list) != 0 {
+				t.Errorf("Expected empty list for %q, got %d elements", tt.source, len(list))
+			}
+		} else {
+			// List literals are now SExpr nodes representing (list-literal ...)
+			sexpr, ok := nodes[0].(*ast.SExpr)
+			if !ok {
+				t.Fatalf("Expected SExpr for %q, got %T", tt.source, nodes[0])
+			}
+
+			// Check it starts with "list-literal"
+			if len(sexpr.Elements) < 1 {
+				t.Fatalf("Expected at least 1 element in SExpr for %q", tt.source)
+			}
+
+			ident, ok := sexpr.Elements[0].(*ast.Identifier)
+			if !ok || ident.Name != "list-literal" {
+				t.Fatalf("Expected first element to be 'list-literal' for %q, got %v", tt.source, sexpr.Elements[0])
+			}
+
+			// Number of elements is total - 1 (excluding list-literal symbol)
+			if len(sexpr.Elements)-1 != tt.expected {
+				t.Errorf("Expected %d elements for %q, got %d", tt.expected, tt.source, len(sexpr.Elements)-1)
+			}
 		}
 	}
 }
@@ -475,18 +499,43 @@ func TestParseDictLiteral(t *testing.T) {
 			t.Fatalf("Parse error for %q: %v", tt.source, err)
 		}
 
-		literal, ok := nodes[0].(*ast.Literal)
-		if !ok {
-			t.Fatalf("Expected Literal for %q, got %T", tt.source, nodes[0])
-		}
+		// Empty dicts remain as Literal nodes, non-empty dicts are SExpr
+		if tt.expected == 0 {
+			literal, ok := nodes[0].(*ast.Literal)
+			if !ok {
+				t.Fatalf("Expected Literal for empty dict %q, got %T", tt.source, nodes[0])
+			}
 
-		dict, ok := literal.Value.(*core.DictValue)
-		if !ok {
-			t.Fatalf("Expected DictValue for %q, got %T", tt.source, literal.Value)
-		}
+			dict, ok := literal.Value.(*core.DictValue)
+			if !ok {
+				t.Fatalf("Expected DictValue for %q, got %T", tt.source, literal.Value)
+			}
 
-		if dict.Size() != tt.expected {
-			t.Errorf("Expected %d elements for %q, got %d", tt.expected, tt.source, dict.Size())
+			if dict.Size() != 0 {
+				t.Errorf("Expected empty dict for %q, got %d elements", tt.source, dict.Size())
+			}
+		} else {
+			// Dict literals are now SExpr nodes representing (dict-literal k1 v1 k2 v2 ...)
+			sexpr, ok := nodes[0].(*ast.SExpr)
+			if !ok {
+				t.Fatalf("Expected SExpr for %q, got %T", tt.source, nodes[0])
+			}
+
+			// Check it starts with "dict-literal"
+			if len(sexpr.Elements) < 1 {
+				t.Fatalf("Expected at least 1 element in SExpr for %q", tt.source)
+			}
+
+			ident, ok := sexpr.Elements[0].(*ast.Identifier)
+			if !ok || ident.Name != "dict-literal" {
+				t.Fatalf("Expected first element to be 'dict-literal' for %q, got %v", tt.source, sexpr.Elements[0])
+			}
+
+			// Number of key-value pairs is (total - 1) / 2
+			numPairs := (len(sexpr.Elements) - 1) / 2
+			if numPairs != tt.expected {
+				t.Errorf("Expected %d pairs for %q, got %d", tt.expected, tt.source, numPairs)
+			}
 		}
 	}
 }
@@ -506,18 +555,37 @@ func TestParseSetLiteral(t *testing.T) {
 			t.Fatalf("Parse error for %q: %v", tt.source, err)
 		}
 
-		literal, ok := nodes[0].(*ast.Literal)
+		// Set literals are now SExpr nodes representing (set (list-literal ...))
+		sexpr, ok := nodes[0].(*ast.SExpr)
 		if !ok {
-			t.Fatalf("Expected Literal for %q, got %T", tt.source, nodes[0])
+			t.Fatalf("Expected SExpr for %q, got %T", tt.source, nodes[0])
 		}
 
-		set, ok := literal.Value.(*core.SetValue)
-		if !ok {
-			t.Fatalf("Expected SetValue for %q, got %T", tt.source, literal.Value)
+		// Check it starts with "set"
+		if len(sexpr.Elements) != 2 {
+			t.Fatalf("Expected 2 elements in set SExpr for %q, got %d", tt.source, len(sexpr.Elements))
 		}
 
-		if set.Size() != tt.expected {
-			t.Errorf("Expected %d elements for %q, got %d", tt.expected, tt.source, set.Size())
+		ident, ok := sexpr.Elements[0].(*ast.Identifier)
+		if !ok || ident.Name != "set" {
+			t.Fatalf("Expected first element to be 'set' for %q, got %v", tt.source, sexpr.Elements[0])
+		}
+
+		// Second element should be (list-literal ...)
+		listLiteral, ok := sexpr.Elements[1].(*ast.SExpr)
+		if !ok {
+			t.Fatalf("Expected second element to be SExpr for %q, got %T", tt.source, sexpr.Elements[1])
+		}
+
+		listIdent, ok := listLiteral.Elements[0].(*ast.Identifier)
+		if !ok || listIdent.Name != "list-literal" {
+			t.Fatalf("Expected 'list-literal' in set for %q, got %v", tt.source, listLiteral.Elements[0])
+		}
+
+		// Number of elements is total - 1 (excluding list-literal symbol)
+		numElements := len(listLiteral.Elements) - 1
+		if numElements != tt.expected {
+			t.Errorf("Expected %d elements for %q, got %d", tt.expected, tt.source, numElements)
 		}
 	}
 }

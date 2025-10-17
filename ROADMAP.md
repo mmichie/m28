@@ -258,17 +258,19 @@ Building on the AST layer foundation to enable true Python syntax support. All p
 - ✅ Control flow (if/elif/else)
 - ✅ Loops (for with range(), while, break, continue)
 - ✅ List comprehensions (with conditions)
-- ✅ Empty data structures ([], {})
+- ✅ **Data structures with elements** (lists, dicts, sets) - `[1, 2, 3]`, `{"a": 1}`, `{1, 2}`
 - ✅ Operators (arithmetic, comparison, logical)
 - ✅ Classes and methods
 - ✅ Exception handling (try/except/finally)
 
 **Known Limitations:**
-- ❌ List/dict/set literals with elements: `[1, 2, 3]`, `{"key": "value"}`, `{1, 2}`
 - ❌ F-strings: `f"Hello, {name}!"`
+- ❌ Import statements: `import time`, `from math import sqrt`
+- ❌ Default parameters: `def func(x=5):`
+- ❌ Tuple literals: `(1, 2, 3)`
+- ❌ Multiple assignment: `x, y = 1, 2`
 - ❌ Chained assignment: `x = y = z = 0`
 - ❌ Binary/octal/hex literals: `0b1010`, `0o755`, `0xFF`
-- ❌ Default parameters not fully working
 
 **Example Python Code:**
 ```python
@@ -300,6 +302,108 @@ for i in range(5):
 - ✅ Error messages show original Python syntax
 - ✅ Type hints preserved for tooling
 - ✅ Foundation for Python LSP server
+
+### Python Compatibility Improvements 🔴 HIGH PRIORITY
+
+**Goal:** Fix parser bugs and add missing Python features to increase real-world compatibility
+
+**See detailed plan:** [docs/PYTHON_COMPATIBILITY_PLAN.md](docs/PYTHON_COMPATIBILITY_PLAN.md)
+
+#### Phase 1: Fix Critical Parser Bugs (Week 1-2) ✅ COMPLETE
+**Status:** Critical bugs fixed! Basic Python code now works
+
+- [x] **Fix list literals with elements** - `[1, 2, 3]` ✅
+  - Root cause: Parser called `.ToIR()` during parsing, mixing AST and IR
+  - Solution: Return `SExpr` representing `(list-literal elem1 elem2 ...)`
+  - Files: `parser/python_parser.go` parseListLiteral() line 714-719
+
+- [x] **Fix dict literals with elements** - `{"a": 1, "b": 2}` ✅
+  - Solution: Return `SExpr` representing `(dict-literal key1 value1 ...)`
+  - Files: `parser/python_parser.go` parseDictLiteral() line 770-774
+
+- [x] **Fix set literals with elements** - `{1, 2, 3}` ✅
+  - Solution: Return `SExpr` representing `(set (list-literal elem1 ...))`
+  - Files: `parser/python_parser.go` parseSetLiteral() line 797-803
+
+**Success Criteria:** ✅ ALL MET
+- ✅ All tests in test-python-grammar.py pass without modifications
+- ✅ Can use `[1, 2, 3]` and `{"key": "value"}` in Python files
+- ✅ Benchmark suite runs without workarounds
+- ✅ All Go unit tests pass (parser tests updated)
+
+#### Phase 2: Import Support (Week 3) 🟡 HIGH VALUE
+**Status:** Enable Python code to use M28's module system
+
+- [ ] **Add import statement parsing**
+  - Parse `import time` → lower to `(import "time")`
+  - Parse `from math import sqrt` → selective import
+  - Add TOKEN_IMPORT, TOKEN_FROM to tokenizer
+  - Add parseImportStatement() to parser
+  - Files: `parser/python_tokenizer.go`, `parser/python_parser.go`
+
+- [ ] **Add import aliasing**
+  - Support `import time as t`
+  - Support `from math import sqrt as sq`
+  - Store alias in context bindings
+
+**Success Criteria:**
+- `import time; print(time.time())` works in Python files
+- Can import M28 modules from Python code
+- Aliasing works correctly
+
+#### Phase 3: Common Python Patterns (Week 4-5) 🟡 HIGH VALUE
+**Status:** Support idiomatic Python code
+
+- [ ] **Default parameters** - `def func(x=5, y=10):`
+  - Parse default values in function definitions
+  - Store defaults in DefForm
+  - Apply defaults when arguments missing
+  - Files: `parser/python_parser.go`, `core/ast/nodes.go`, `eval/evaluator.go`
+
+- [ ] **F-strings** - `f"Hello, {name}!"`
+  - Check if PythonTokenizer handles f-string prefix
+  - Parse interpolations `{expr}`
+  - Lower to string concatenation or reuse M28's f-string code
+  - Files: `parser/python_tokenizer.go`, `parser/python_parser.go`
+
+- [ ] **Tuple literals** - `(1, 2, 3)` and `(1,)`
+  - Modify parseParenthesized() to detect comma-separated values
+  - Handle trailing comma case `(1,)` = 1-tuple
+  - Distinguish `(1)` (int) from `(1,)` (tuple)
+  - Files: `parser/python_parser.go`
+
+**Success Criteria:**
+- Can write `def greet(name="World"):` with defaults
+- F-strings work: `f"Value is {x}"`
+- Tuples work: `t = (1, 2, 3); a, b = (x, y)`
+
+#### Phase 4: Polish & Edge Cases (Week 6) 🟢 NICE TO HAVE
+**Status:** Handle less common patterns
+
+- [ ] **Multiple assignment** - `x, y = 1, 2`
+  - Requires tuple support from Phase 3
+  - Parse left side as tuple pattern
+  - Implement unpacking logic
+  - Files: `parser/python_parser.go`, `eval/evaluator.go`
+
+- [ ] **Chained assignment** - `x = y = z = 0`
+  - Simple parser change to handle multiple `=`
+  - Right-to-left evaluation
+  - Files: `parser/python_parser.go`
+
+- [ ] **Number literal prefixes** - `0b1010`, `0o755`, `0xFF`
+  - Add binary, octal, hex parsing to tokenizer
+  - Convert to NumberValue during tokenization
+  - Files: `parser/python_tokenizer.go`
+
+**Success Criteria:**
+- Tuple unpacking works in assignments
+- Can write `x = y = 0`
+- Hex literals work: `color = 0xFF0000`
+
+**Timeline:** 4-6 weeks for complete Python compatibility
+**Effort:** 1 developer, focused work
+**Impact:** Will enable running most real-world Python code on M28
 
 ### High-Impact Refactoring
 
