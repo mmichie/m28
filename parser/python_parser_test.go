@@ -546,3 +546,589 @@ z = 3`
 		}
 	}
 }
+
+// ============================================================================
+// Block Statement Tests
+// ============================================================================
+
+func TestParseIfStatement(t *testing.T) {
+	source := `if x > 0:
+    print("positive")`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	if len(nodes) != 1 {
+		t.Fatalf("Expected 1 node, got %d", len(nodes))
+	}
+
+	ifStmt, ok := nodes[0].(*ast.IfForm)
+	if !ok {
+		t.Fatalf("Expected IfForm, got %T", nodes[0])
+	}
+
+	if ifStmt.Condition == nil {
+		t.Error("Expected condition")
+	}
+	if ifStmt.ThenBranch == nil {
+		t.Error("Expected then branch")
+	}
+}
+
+func TestParseIfElseStatement(t *testing.T) {
+	source := `if x > 0:
+    print("positive")
+else:
+    print("non-positive")`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	ifStmt, ok := nodes[0].(*ast.IfForm)
+	if !ok {
+		t.Fatalf("Expected IfForm, got %T", nodes[0])
+	}
+
+	if ifStmt.ElseBranch == nil {
+		t.Error("Expected else branch")
+	}
+}
+
+func TestParseIfElifElse(t *testing.T) {
+	source := `if x > 0:
+    print("positive")
+elif x < 0:
+    print("negative")
+else:
+    print("zero")`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	ifStmt, ok := nodes[0].(*ast.IfForm)
+	if !ok {
+		t.Fatalf("Expected IfForm, got %T", nodes[0])
+	}
+
+	// elif should be nested as another IfForm
+	if ifStmt.ElseBranch == nil {
+		t.Error("Expected else branch (containing elif)")
+	}
+}
+
+func TestParseForLoop(t *testing.T) {
+	source := `for i in range(10):
+    print(i)`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	forLoop, ok := nodes[0].(*ast.ForForm)
+	if !ok {
+		t.Fatalf("Expected ForForm, got %T", nodes[0])
+	}
+
+	if forLoop.Variable != "i" {
+		t.Errorf("Expected variable 'i', got %q", forLoop.Variable)
+	}
+	if len(forLoop.Body) == 0 {
+		t.Error("Expected non-empty body")
+	}
+}
+
+func TestParseForLoopWithElse(t *testing.T) {
+	source := `for i in range(10):
+    print(i)
+else:
+    print("done")`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	forLoop, ok := nodes[0].(*ast.ForForm)
+	if !ok {
+		t.Fatalf("Expected ForForm, got %T", nodes[0])
+	}
+
+	if len(forLoop.ElseBody) == 0 {
+		t.Error("Expected else body")
+	}
+}
+
+func TestParseWhileLoop(t *testing.T) {
+	source := `while x > 0:
+    x = x - 1`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	whileLoop, ok := nodes[0].(*ast.WhileForm)
+	if !ok {
+		t.Fatalf("Expected WhileForm, got %T", nodes[0])
+	}
+
+	if whileLoop.Condition == nil {
+		t.Error("Expected condition")
+	}
+	if len(whileLoop.Body) == 0 {
+		t.Error("Expected non-empty body")
+	}
+}
+
+func TestParseSimpleFunctionDef(t *testing.T) {
+	source := `def foo(x, y):
+    return x + y`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	defForm, ok := nodes[0].(*ast.DefForm)
+	if !ok {
+		t.Fatalf("Expected DefForm, got %T", nodes[0])
+	}
+
+	if defForm.Name != "foo" {
+		t.Errorf("Expected name 'foo', got %q", defForm.Name)
+	}
+	if len(defForm.Params) != 2 {
+		t.Errorf("Expected 2 parameters, got %d", len(defForm.Params))
+	}
+	if defForm.Body == nil {
+		t.Error("Expected body")
+	}
+}
+
+func TestParseFunctionDefWithTypes(t *testing.T) {
+	source := `def add(x: int, y: int) -> int:
+    return x + y`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	defForm, ok := nodes[0].(*ast.DefForm)
+	if !ok {
+		t.Fatalf("Expected DefForm, got %T", nodes[0])
+	}
+
+	if defForm.Params[0].Type == nil {
+		t.Error("Expected type annotation on first parameter")
+	}
+	if defForm.ReturnType == nil {
+		t.Error("Expected return type annotation")
+	}
+	if defForm.ReturnType.Name != "int" {
+		t.Errorf("Expected return type 'int', got %q", defForm.ReturnType.Name)
+	}
+}
+
+func TestParseFunctionDefWithDefaults(t *testing.T) {
+	source := `def foo(x, y=10):
+    return x + y`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	defForm, ok := nodes[0].(*ast.DefForm)
+	if !ok {
+		t.Fatalf("Expected DefForm, got %T", nodes[0])
+	}
+
+	if defForm.Params[1].Default == nil {
+		t.Error("Expected default value on second parameter")
+	}
+}
+
+func TestParseFunctionDefWithDecorator(t *testing.T) {
+	source := `@decorator
+def foo():
+    pass`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	defForm, ok := nodes[0].(*ast.DefForm)
+	if !ok {
+		t.Fatalf("Expected DefForm, got %T", nodes[0])
+	}
+
+	if len(defForm.Decorators) != 1 {
+		t.Errorf("Expected 1 decorator, got %d", len(defForm.Decorators))
+	}
+}
+
+func TestParseSimpleClass(t *testing.T) {
+	source := `class Foo:
+    pass`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	classForm, ok := nodes[0].(*ast.ClassForm)
+	if !ok {
+		t.Fatalf("Expected ClassForm, got %T", nodes[0])
+	}
+
+	if classForm.Name != "Foo" {
+		t.Errorf("Expected name 'Foo', got %q", classForm.Name)
+	}
+}
+
+func TestParseClassWithBase(t *testing.T) {
+	source := `class Foo(Bar):
+    pass`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	classForm, ok := nodes[0].(*ast.ClassForm)
+	if !ok {
+		t.Fatalf("Expected ClassForm, got %T", nodes[0])
+	}
+
+	if len(classForm.Bases) != 1 {
+		t.Errorf("Expected 1 base class, got %d", len(classForm.Bases))
+	}
+}
+
+func TestParseClassWithDecorator(t *testing.T) {
+	source := `@dataclass
+class Foo:
+    pass`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	classForm, ok := nodes[0].(*ast.ClassForm)
+	if !ok {
+		t.Fatalf("Expected ClassForm, got %T", nodes[0])
+	}
+
+	if len(classForm.Decorators) != 1 {
+		t.Errorf("Expected 1 decorator, got %d", len(classForm.Decorators))
+	}
+}
+
+func TestParseTryExcept(t *testing.T) {
+	source := `try:
+    risky()
+except ValueError:
+    handle()`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	tryForm, ok := nodes[0].(*ast.TryForm)
+	if !ok {
+		t.Fatalf("Expected TryForm, got %T", nodes[0])
+	}
+
+	if len(tryForm.TryBody) == 0 {
+		t.Error("Expected try body")
+	}
+	if len(tryForm.ExceptClauses) != 1 {
+		t.Errorf("Expected 1 except clause, got %d", len(tryForm.ExceptClauses))
+	}
+	if tryForm.ExceptClauses[0].ExceptionType != "ValueError" {
+		t.Errorf("Expected exception type 'ValueError', got %q", tryForm.ExceptClauses[0].ExceptionType)
+	}
+}
+
+func TestParseTryExceptAsVariable(t *testing.T) {
+	source := `try:
+    risky()
+except ValueError as e:
+    handle(e)`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	tryForm, ok := nodes[0].(*ast.TryForm)
+	if !ok {
+		t.Fatalf("Expected TryForm, got %T", nodes[0])
+	}
+
+	if tryForm.ExceptClauses[0].Variable != "e" {
+		t.Errorf("Expected variable 'e', got %q", tryForm.ExceptClauses[0].Variable)
+	}
+}
+
+func TestParseTryExceptFinally(t *testing.T) {
+	source := `try:
+    risky()
+except:
+    handle()
+finally:
+    cleanup()`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	tryForm, ok := nodes[0].(*ast.TryForm)
+	if !ok {
+		t.Fatalf("Expected TryForm, got %T", nodes[0])
+	}
+
+	if len(tryForm.FinallyBody) == 0 {
+		t.Error("Expected finally body")
+	}
+}
+
+func TestParseWithStatement(t *testing.T) {
+	source := `with open("file.txt") as f:
+    data = f.read()`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	withForm, ok := nodes[0].(*ast.WithForm)
+	if !ok {
+		t.Fatalf("Expected WithForm, got %T", nodes[0])
+	}
+
+	if len(withForm.Items) != 1 {
+		t.Errorf("Expected 1 context manager, got %d", len(withForm.Items))
+	}
+	if withForm.Items[0].Variable != "f" {
+		t.Errorf("Expected variable 'f', got %q", withForm.Items[0].Variable)
+	}
+	if len(withForm.Body) == 0 {
+		t.Error("Expected non-empty body")
+	}
+}
+
+func TestParseWithMultipleContexts(t *testing.T) {
+	source := `with open("in.txt") as f, open("out.txt") as g:
+    g.write(f.read())`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	withForm, ok := nodes[0].(*ast.WithForm)
+	if !ok {
+		t.Fatalf("Expected WithForm, got %T", nodes[0])
+	}
+
+	if len(withForm.Items) != 2 {
+		t.Errorf("Expected 2 context managers, got %d", len(withForm.Items))
+	}
+}
+
+// ============================================================================
+// Integration Tests
+// ============================================================================
+
+func TestParseCompleteProgram(t *testing.T) {
+	source := `def factorial(n: int) -> int:
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
+
+result = factorial(5)
+print(result)`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	if len(nodes) != 3 {
+		t.Fatalf("Expected 3 statements, got %d", len(nodes))
+	}
+
+	// First should be function definition
+	if _, ok := nodes[0].(*ast.DefForm); !ok {
+		t.Errorf("Expected first node to be DefForm, got %T", nodes[0])
+	}
+
+	// Second should be assignment
+	if _, ok := nodes[1].(*ast.AssignForm); !ok {
+		t.Errorf("Expected second node to be AssignForm, got %T", nodes[1])
+	}
+
+	// Third should be expression (function call)
+	if nodes[2] == nil {
+		t.Error("Expected third node")
+	}
+}
+
+func TestParseClassWithMethods(t *testing.T) {
+	source := `class Counter:
+    def __init__(self, start: int = 0):
+        self.value = start
+
+    def increment(self):
+        self.value = self.value + 1
+        return self.value`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	classForm, ok := nodes[0].(*ast.ClassForm)
+	if !ok {
+		t.Fatalf("Expected ClassForm, got %T", nodes[0])
+	}
+
+	if len(classForm.Body) != 2 {
+		t.Errorf("Expected 2 methods in class body, got %d", len(classForm.Body))
+	}
+}
+
+// ============================================================================
+// Comprehension Tests
+// ============================================================================
+
+func TestParseListComprehension(t *testing.T) {
+	source := `[x * x for x in range(10)]`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	comp, ok := nodes[0].(*ast.ComprehensionForm)
+	if !ok {
+		t.Fatalf("Expected ComprehensionForm, got %T", nodes[0])
+	}
+
+	if comp.Kind != ast.ListComp {
+		t.Errorf("Expected ListComp, got %v", comp.Kind)
+	}
+
+	if comp.Variable != "x" {
+		t.Errorf("Expected variable 'x', got %q", comp.Variable)
+	}
+
+	if comp.Condition != nil {
+		t.Error("Expected no condition")
+	}
+}
+
+func TestParseListComprehensionWithCondition(t *testing.T) {
+	source := `[x * x for x in range(10) if x % 2 == 0]`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	comp, ok := nodes[0].(*ast.ComprehensionForm)
+	if !ok {
+		t.Fatalf("Expected ComprehensionForm, got %T", nodes[0])
+	}
+
+	if comp.Kind != ast.ListComp {
+		t.Errorf("Expected ListComp, got %v", comp.Kind)
+	}
+
+	if comp.Condition == nil {
+		t.Error("Expected condition")
+	}
+}
+
+func TestParseDictComprehension(t *testing.T) {
+	source := `{x: x * 2 for x in range(10)}`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	comp, ok := nodes[0].(*ast.ComprehensionForm)
+	if !ok {
+		t.Fatalf("Expected ComprehensionForm, got %T", nodes[0])
+	}
+
+	if comp.Kind != ast.DictComp {
+		t.Errorf("Expected DictComp, got %v", comp.Kind)
+	}
+
+	if comp.Variable != "x" {
+		t.Errorf("Expected variable 'x', got %q", comp.Variable)
+	}
+
+	if comp.KeyExpr == nil || comp.ValueExpr == nil {
+		t.Error("Expected both key and value expressions")
+	}
+}
+
+func TestParseSetComprehension(t *testing.T) {
+	source := `{x * 2 for x in numbers if x > 0}`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	comp, ok := nodes[0].(*ast.ComprehensionForm)
+	if !ok {
+		t.Fatalf("Expected ComprehensionForm, got %T", nodes[0])
+	}
+
+	if comp.Kind != ast.SetComp {
+		t.Errorf("Expected SetComp, got %v", comp.Kind)
+	}
+
+	if comp.Variable != "x" {
+		t.Errorf("Expected variable 'x', got %q", comp.Variable)
+	}
+}
+
+func TestParseGeneratorExpression(t *testing.T) {
+	source := `(x for x in range(100) if x % 3 == 0)`
+
+	_, nodes, err := parseSource(source)
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	comp, ok := nodes[0].(*ast.ComprehensionForm)
+	if !ok {
+		t.Fatalf("Expected ComprehensionForm, got %T", nodes[0])
+	}
+
+	if comp.Kind != ast.GeneratorComp {
+		t.Errorf("Expected GeneratorComp, got %v", comp.Kind)
+	}
+
+	if comp.Variable != "x" {
+		t.Errorf("Expected variable 'x', got %q", comp.Variable)
+	}
+}

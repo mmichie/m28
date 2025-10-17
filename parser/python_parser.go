@@ -660,8 +660,22 @@ func (p *PythonParser) parsePrimary() ast.ASTNode {
 
 // parseParenthesized parses: (expression)
 func (p *PythonParser) parseParenthesized() ast.ASTNode {
-	p.expect(TOKEN_LPAREN)
+	tok := p.expect(TOKEN_LPAREN)
+
+	// Empty parens is an error
+	if p.check(TOKEN_RPAREN) {
+		p.error("Empty parentheses are not allowed")
+		p.advance()
+		return nil
+	}
+
 	expr := p.parseExpression()
+
+	// Check if it's a generator expression
+	if p.check(TOKEN_FOR) {
+		return p.parseGeneratorExpression(expr, tok)
+	}
+
 	p.expect(TOKEN_RPAREN)
 	return expr
 }
@@ -791,81 +805,484 @@ func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode
 // ============================================================================
 
 func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
-	// TODO: Implement list comprehension parsing
-	p.error("List comprehensions not yet implemented")
-	return nil
+	// [expr for var in iter if condition]
+	p.expect(TOKEN_FOR)
+
+	varTok := p.expect(TOKEN_IDENTIFIER)
+	variable := varTok.Lexeme
+
+	p.expect(TOKEN_IN)
+	iterable := p.parseExpression()
+
+	var condition ast.ASTNode
+	if p.check(TOKEN_IF) {
+		p.advance()
+		condition = p.parseExpression()
+	}
+
+	p.expect(TOKEN_RBRACKET)
+
+	return ast.NewComprehensionForm(
+		ast.ListComp,
+		element, // Element expression
+		nil,     // KeyExpr (not used for list comp)
+		nil,     // ValueExpr (not used for list comp)
+		variable,
+		iterable,
+		condition,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
 }
 
 func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token) ast.ASTNode {
-	// TODO: Implement dict comprehension parsing
-	p.error("Dict comprehensions not yet implemented")
-	return nil
+	// {k: v for var in iter if condition}
+	p.expect(TOKEN_FOR)
+
+	varTok := p.expect(TOKEN_IDENTIFIER)
+	variable := varTok.Lexeme
+
+	p.expect(TOKEN_IN)
+	iterable := p.parseExpression()
+
+	var condition ast.ASTNode
+	if p.check(TOKEN_IF) {
+		p.advance()
+		condition = p.parseExpression()
+	}
+
+	p.expect(TOKEN_RBRACE)
+
+	return ast.NewComprehensionForm(
+		ast.DictComp,
+		nil,   // Element (not used for dict comp)
+		key,   // KeyExpr
+		value, // ValueExpr
+		variable,
+		iterable,
+		condition,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
 }
 
 func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
-	// TODO: Implement set comprehension parsing
-	p.error("Set comprehensions not yet implemented")
-	return nil
+	// {expr for var in iter if condition}
+	p.expect(TOKEN_FOR)
+
+	varTok := p.expect(TOKEN_IDENTIFIER)
+	variable := varTok.Lexeme
+
+	p.expect(TOKEN_IN)
+	iterable := p.parseExpression()
+
+	var condition ast.ASTNode
+	if p.check(TOKEN_IF) {
+		p.advance()
+		condition = p.parseExpression()
+	}
+
+	p.expect(TOKEN_RBRACE)
+
+	return ast.NewComprehensionForm(
+		ast.SetComp,
+		element, // Element expression
+		nil,     // KeyExpr (not used for set comp)
+		nil,     // ValueExpr (not used for set comp)
+		variable,
+		iterable,
+		condition,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
+}
+
+func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) ast.ASTNode {
+	// (expr for var in iter if condition)
+	p.expect(TOKEN_FOR)
+
+	varTok := p.expect(TOKEN_IDENTIFIER)
+	variable := varTok.Lexeme
+
+	p.expect(TOKEN_IN)
+	iterable := p.parseExpression()
+
+	var condition ast.ASTNode
+	if p.check(TOKEN_IF) {
+		p.advance()
+		condition = p.parseExpression()
+	}
+
+	p.expect(TOKEN_RPAREN)
+
+	return ast.NewComprehensionForm(
+		ast.GeneratorComp,
+		element, // Element expression
+		nil,     // KeyExpr (not used for generator)
+		nil,     // ValueExpr (not used for generator)
+		variable,
+		iterable,
+		condition,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
 }
 
 // ============================================================================
-// Block and Decorator Parsing (stubs - to be implemented)
+// Block and Decorator Parsing
 // ============================================================================
 
+// parseBlock parses a colon-delimited block: COLON NEWLINE INDENT statements DEDENT
 func (p *PythonParser) parseBlock() []ast.ASTNode {
-	// TODO: Implement block parsing
-	p.error("Blocks not yet implemented")
-	return nil
+	p.expect(TOKEN_COLON)
+	p.expect(TOKEN_NEWLINE)
+	p.expect(TOKEN_INDENT)
+
+	statements := []ast.ASTNode{}
+
+	for !p.check(TOKEN_DEDENT) && !p.isAtEnd() {
+		// Skip empty lines
+		for p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+
+		if p.check(TOKEN_DEDENT) {
+			break
+		}
+
+		stmt := p.parseStatement()
+		if stmt != nil {
+			statements = append(statements, stmt)
+		}
+
+		// If we hit an error, synchronize
+		if p.panic {
+			p.synchronize()
+		}
+	}
+
+	p.expect(TOKEN_DEDENT)
+	return statements
 }
 
+// parseDecorators parses: (@decorator_expr NEWLINE)*
 func (p *PythonParser) parseDecorators() []ast.ASTNode {
-	// TODO: Implement decorator parsing
-	p.error("Decorators not yet implemented")
-	return nil
+	decorators := []ast.ASTNode{}
+
+	for p.check(TOKEN_AT) {
+		p.advance() // consume @
+
+		// Parse decorator expression (identifier or call)
+		decorator := p.parsePrimary()
+
+		// If followed by (, it's a decorator call
+		if p.check(TOKEN_LPAREN) {
+			decorator = p.parseCall(decorator)
+		}
+
+		decorators = append(decorators, decorator)
+		p.expect(TOKEN_NEWLINE)
+	}
+
+	return decorators
 }
 
 // ============================================================================
-// Compound Statement Parsing (stubs - to be implemented)
+// Compound Statement Parsing
 // ============================================================================
 
-func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode) ast.ASTNode {
-	// TODO: Implement function definition parsing
-	p.error("Function definitions not yet implemented")
-	return nil
-}
-
-func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode {
-	// TODO: Implement class definition parsing
-	p.error("Class definitions not yet implemented")
-	return nil
-}
-
+// parseIfStatement parses: if expr: block (elif expr: block)* (else: block)?
 func (p *PythonParser) parseIfStatement() ast.ASTNode {
-	// TODO: Implement if statement parsing
-	p.error("If statements not yet implemented")
-	return nil
+	// Accept both if and elif (elif is used in recursive calls)
+	tok := p.peek()
+	if p.check(TOKEN_IF) {
+		p.advance()
+	} else if p.check(TOKEN_ELIF) {
+		p.advance()
+	} else {
+		p.error(fmt.Sprintf("expected 'if' or 'elif', got %v", p.peek().Type))
+		return nil
+	}
+
+	condition := p.parseExpression()
+	thenBranch := p.parseBlock()
+
+	var elseBranch []ast.ASTNode
+
+	// Check for elif (treated as nested if)
+	if p.check(TOKEN_ELIF) {
+		elseIf := p.parseIfStatement() // Recursive - will handle elif
+		elseBranch = []ast.ASTNode{elseIf}
+	} else if p.check(TOKEN_ELSE) {
+		p.advance()
+		elseBranch = p.parseBlock()
+	}
+
+	// Convert blocks to single nodes
+	var thenNode ast.ASTNode
+	if len(thenBranch) == 1 {
+		thenNode = thenBranch[0]
+	} else {
+		thenNode = ast.NewBlockForm(thenBranch, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	var elseNode ast.ASTNode
+	if len(elseBranch) == 1 {
+		elseNode = elseBranch[0]
+	} else if len(elseBranch) > 1 {
+		elseNode = ast.NewBlockForm(elseBranch, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return ast.NewIfForm(condition, thenNode, elseNode, p.makeLocation(tok), ast.SyntaxPython)
 }
 
+// parseForStatement parses: for var in iterable: block (else: block)?
 func (p *PythonParser) parseForStatement() ast.ASTNode {
-	// TODO: Implement for loop parsing
-	p.error("For loops not yet implemented")
-	return nil
+	tok := p.expect(TOKEN_FOR)
+
+	// Parse loop variable
+	varTok := p.expect(TOKEN_IDENTIFIER)
+	variable := varTok.Lexeme
+
+	p.expect(TOKEN_IN)
+
+	// Parse iterable
+	iterable := p.parseExpression()
+
+	// Parse body
+	body := p.parseBlock()
+
+	// Check for optional else clause
+	var elseBody []ast.ASTNode
+	if p.check(TOKEN_ELSE) {
+		p.advance()
+		elseBody = p.parseBlock()
+	}
+
+	return ast.NewForForm(variable, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
 }
 
+// parseWhileStatement parses: while expr: block (else: block)?
 func (p *PythonParser) parseWhileStatement() ast.ASTNode {
-	// TODO: Implement while loop parsing
-	p.error("While loops not yet implemented")
-	return nil
+	tok := p.expect(TOKEN_WHILE)
+
+	// Parse condition
+	condition := p.parseExpression()
+
+	// Parse body
+	body := p.parseBlock()
+
+	// Check for optional else clause
+	var elseBody []ast.ASTNode
+	if p.check(TOKEN_ELSE) {
+		p.advance()
+		elseBody = p.parseBlock()
+	}
+
+	return ast.NewWhileForm(condition, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
 }
 
+// parseDefStatement parses: (@decorator)* def name(params) (-> type)?: block
+func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode) ast.ASTNode {
+	tok := p.expect(TOKEN_DEF)
+
+	// Parse function name
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	name := nameTok.Lexeme
+
+	// Parse parameters
+	p.expect(TOKEN_LPAREN)
+	params := p.parseParameters()
+	p.expect(TOKEN_RPAREN)
+
+	// Parse optional return type annotation
+	var returnType *ast.TypeInfo
+	if p.check(TOKEN_ARROW) {
+		p.advance()
+		returnType = p.parseTypeAnnotation()
+	}
+
+	// Parse body
+	body := p.parseBlock()
+
+	// Convert body to single node
+	var bodyNode ast.ASTNode
+	if len(body) == 1 {
+		bodyNode = body[0]
+	} else {
+		bodyNode = ast.NewBlockForm(body, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return ast.NewDefForm(name, params, bodyNode, returnType, decorators, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseParameters parses: (param (: type)? (= default)?, ...)*
+func (p *PythonParser) parseParameters() []ast.Parameter {
+	params := []ast.Parameter{}
+
+	if p.check(TOKEN_RPAREN) {
+		return params // Empty parameter list
+	}
+
+	for {
+		// Parse parameter name
+		nameTok := p.expect(TOKEN_IDENTIFIER)
+		param := ast.Parameter{Name: nameTok.Lexeme}
+
+		// Parse optional type annotation
+		if p.check(TOKEN_COLON) {
+			p.advance()
+			param.Type = p.parseTypeAnnotation()
+		}
+
+		// Parse optional default value
+		if p.check(TOKEN_ASSIGN) {
+			p.advance()
+			param.Default = p.parseExpression()
+		}
+
+		params = append(params, param)
+
+		if !p.check(TOKEN_COMMA) {
+			break
+		}
+		p.advance()
+
+		// Allow trailing comma
+		if p.check(TOKEN_RPAREN) {
+			break
+		}
+	}
+
+	return params
+}
+
+// parseTypeAnnotation parses a type name (simplified - no generics yet)
+func (p *PythonParser) parseTypeAnnotation() *ast.TypeInfo {
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	return &ast.TypeInfo{Name: nameTok.Lexeme}
+}
+
+// parseClassStatement parses: (@decorator)* class name (bases)?: block
+func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode {
+	tok := p.expect(TOKEN_CLASS)
+
+	// Parse class name
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	name := nameTok.Lexeme
+
+	// Parse optional base classes
+	var bases []ast.ASTNode
+	if p.check(TOKEN_LPAREN) {
+		p.advance()
+
+		if !p.check(TOKEN_RPAREN) {
+			for {
+				bases = append(bases, p.parseExpression())
+
+				if !p.check(TOKEN_COMMA) {
+					break
+				}
+				p.advance()
+			}
+		}
+
+		p.expect(TOKEN_RPAREN)
+	}
+
+	// Parse body
+	body := p.parseBlock()
+
+	return ast.NewClassForm(name, bases, body, decorators, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseTryStatement parses: try: block (except (type (as var))?: block)+ (else: block)? (finally: block)?
 func (p *PythonParser) parseTryStatement() ast.ASTNode {
-	// TODO: Implement try/except parsing
-	p.error("Try statements not yet implemented")
-	return nil
+	tok := p.expect(TOKEN_TRY)
+
+	// Parse try body
+	tryBody := p.parseBlock()
+
+	// Parse except clauses
+	var exceptClauses []ast.ExceptClause
+
+	for p.check(TOKEN_EXCEPT) {
+		p.advance()
+
+		var exceptType string
+		var exceptVar string
+
+		// Check if there's an exception type
+		if !p.check(TOKEN_COLON) {
+			typeTok := p.expect(TOKEN_IDENTIFIER)
+			exceptType = typeTok.Lexeme
+
+			// Check for 'as variable'
+			if p.check(TOKEN_AS) {
+				p.advance()
+				varTok := p.expect(TOKEN_IDENTIFIER)
+				exceptVar = varTok.Lexeme
+			}
+		}
+
+		// Parse except body
+		exceptBody := p.parseBlock()
+
+		exceptClauses = append(exceptClauses, ast.ExceptClause{
+			ExceptionType: exceptType,
+			Variable:      exceptVar,
+			Body:          exceptBody,
+		})
+	}
+
+	// Parse optional else clause
+	var elseBody []ast.ASTNode
+	if p.check(TOKEN_ELSE) {
+		p.advance()
+		elseBody = p.parseBlock()
+	}
+
+	// Parse optional finally clause
+	var finallyBody []ast.ASTNode
+	if p.check(TOKEN_FINALLY) {
+		p.advance()
+		finallyBody = p.parseBlock()
+	}
+
+	return ast.NewTryForm(tryBody, exceptClauses, elseBody, finallyBody, p.makeLocation(tok), ast.SyntaxPython)
 }
 
+// parseWithStatement parses: with expr (as var)?(, expr (as var)?)* : block
 func (p *PythonParser) parseWithStatement() ast.ASTNode {
-	// TODO: Implement with statement parsing
-	p.error("With statements not yet implemented")
-	return nil
+	tok := p.expect(TOKEN_WITH)
+
+	// Parse context managers
+	var items []ast.WithItem
+
+	for {
+		// Parse context expression
+		context := p.parseExpression()
+
+		var variable string
+		if p.check(TOKEN_AS) {
+			p.advance()
+			varTok := p.expect(TOKEN_IDENTIFIER)
+			variable = varTok.Lexeme
+		}
+
+		items = append(items, ast.WithItem{
+			Context:  context,
+			Variable: variable,
+		})
+
+		if !p.check(TOKEN_COMMA) {
+			break
+		}
+		p.advance()
+	}
+
+	// Parse body
+	body := p.parseBlock()
+
+	return ast.NewWithForm(items, body, p.makeLocation(tok), ast.SyntaxPython)
 }
