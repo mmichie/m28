@@ -129,12 +129,17 @@ func printHelp() {
 	fmt.Println("  -version     Show version")
 	fmt.Println("  -help        Show this help")
 	fmt.Println()
+	fmt.Println("Supported File Types:")
+	fmt.Println("  .m28         M28 S-expression syntax")
+	fmt.Println("  .py          Python syntax (experimental)")
+	fmt.Println()
 	fmt.Println("Environment Variables:")
 	fmt.Println("  M28_PATH     Module search paths (colon-separated)")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  m28                    Start interactive REPL")
-	fmt.Println("  m28 script.m28         Run a script")
+	fmt.Println("  m28 script.m28         Run M28 script")
+	fmt.Println("  m28 script.py          Run Python script")
 	fmt.Println("  m28 -e '(+ 1 2)'       Evaluate expression")
 	fmt.Println("  m28 -i script.m28      Run script then enter REPL")
 }
@@ -197,12 +202,31 @@ func executeFile(filename string, ctx *core.Context, errorReporter *repl.ErrorRe
 	// Add source to error reporter
 	errorReporter.AddSource(filename, string(content))
 
-	// Create a parser
+	// Detect file type and parse accordingly
+	ext := filepath.Ext(filename)
+	isPython := ext == ".py"
+
+	// Set __file__ and __name__ in context
+	ctx.Define("__file__", core.StringValue(filename))
+	ctx.Define("__name__", core.StringValue("__main__"))
+
+	if isPython {
+		// Use Python parser for .py files
+		return executePythonFile(filename, string(content), ctx)
+	}
+
+	// Use M28 parser for .m28 files (default)
+	return executeM28File(filename, string(content), ctx)
+}
+
+// executeM28File executes an M28 (.m28) file
+func executeM28File(filename, content string, ctx *core.Context) error {
+	// Create M28 parser
 	p := parser.NewParser()
 	p.SetFilename(filename)
 
 	// Parse the content
-	expr, err := p.Parse(string(content))
+	expr, err := p.Parse(content)
 	if err != nil {
 		// Check if it's a ParseError and format with context
 		if parseErr, ok := err.(*parser.ParseError); ok {
@@ -212,11 +236,35 @@ func executeFile(filename string, ctx *core.Context, errorReporter *repl.ErrorRe
 		return fmt.Errorf("parse error: %v", err)
 	}
 
-	// Set __file__ in context
-	ctx.Define("__file__", core.StringValue(filename))
-	ctx.Define("__name__", core.StringValue("__main__"))
-
-	// Evaluate the expressions
+	// Evaluate the expression
 	_, err = eval.Eval(expr, ctx)
 	return err
+}
+
+// executePythonFile executes a Python (.py) file
+func executePythonFile(filename, content string, ctx *core.Context) error {
+	// Tokenize Python source
+	tokenizer := parser.NewPythonTokenizer(content)
+	tokens, err := tokenizer.Tokenize()
+	if err != nil {
+		return fmt.Errorf("tokenization error in %s: %v", filename, err)
+	}
+
+	// Parse Python tokens into AST
+	pythonParser := parser.NewPythonParser(tokens)
+	nodes, err := pythonParser.Parse()
+	if err != nil {
+		return fmt.Errorf("parse error in %s: %v", filename, err)
+	}
+
+	// Lower AST to IR and evaluate each statement
+	for _, node := range nodes {
+		ir := node.ToIR()
+		_, err = eval.Eval(ir, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
