@@ -135,6 +135,7 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Not In Operator" "tests/not-in-test.m28"
     run_test "Container Protocols" "tests/container_protocols.m28"
     run_test "Index Protocol" "tests/test-index-dunder.m28"
+    run_test "Attribute Dunder Methods" "tests/test-attr-dunder-basic.m28"
     run_test "S-Strings" "tests/sstring-simple.m28"
     run_test "Macros" "tests/test_macros_basic.m28"
     run_test "JSONL" "tests/test-jsonl.m28"

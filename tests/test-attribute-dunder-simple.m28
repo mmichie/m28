@@ -43,7 +43,7 @@
       # Direct assignment for log
       (= self.log value)
       # Log other attributes
-      (progn
+      (do
         (print (+ "Setting " name " = " (str value)))
         (+= self.log [(list name value)])
         (= self.data value)))))  # Store the actual value

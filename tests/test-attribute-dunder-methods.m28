@@ -41,10 +41,10 @@
     # Custom attribute setting with validation
     (if (== name "_attrs")
       # Allow setting _attrs directly
-      (progn
+      (do
         (= self._attrs value))
       # Store other attributes in dict
-      (progn
+      (do
         (print (+ "Setting " name " = " (str value)))
         (= (getitem self._attrs name) value))))
 
