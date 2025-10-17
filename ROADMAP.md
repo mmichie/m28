@@ -180,6 +180,92 @@ Frontend (Python/Lisp/DSL) → AST (with locations/types/comments) → IR (core.
 
 See [docs/design/ast-ir-multiple-frontends.md](docs/design/ast-ir-multiple-frontends.md) for complete design.
 
+### Python Frontend Implementation 🟢 Phase A Complete
+
+Building on the AST layer foundation to enable true Python syntax support.
+
+#### Phase A: Python Tokenizer (Week 1) ✅ COMPLETE
+- [x] Implement indentation-aware tokenizer with INDENT/DEDENT tokens
+- [x] Add Python keyword recognition (class, if, elif, for, while, try, except, etc.)
+- [x] Handle parenthesis continuation (newlines inside parens are not significant)
+- [x] Support Python operators (+=, -=, //, **, ->, etc.)
+- [x] Parse string literals (single, double, triple-quoted)
+- [x] Number parsing (int, float, scientific notation)
+- [x] Comment handling (# comments)
+- [x] Comprehensive test coverage (13 tests passing)
+- [x] Deliverable: `parser/python_tokenizer.go` with full Python tokenization
+
+**Key Features:**
+- Stack-based indentation tracking
+- Automatic INDENT/DEDENT generation for blocks
+- Parenthesis depth tracking (newlines ignored inside parens/brackets/braces)
+- Blank line and comment handling
+- Location tracking for all tokens
+
+#### Phase B: Python AST Nodes (Pending)
+- [ ] `ComprehensionForm` - [x for x in range(10) if x % 2 == 0]
+- [ ] `ForForm` - for i in range(5): body
+- [ ] `WhileForm` - while condition: body
+- [ ] `WithForm` - with open("file") as f: body
+- [ ] `TryForm` - try/except/finally
+- [ ] `ClassForm` - class definitions with inheritance
+- [ ] Enhanced `DefForm` - decorators, type hints
+- [ ] Deliverable: `core/ast/python_nodes.go` with Python-specific nodes
+
+#### Phase C: Python Parser (Pending)
+- [ ] Statement parsing (def, class, if, for, while, try, with, return)
+- [ ] Expression parsing (comprehensions, lambdas, ternary)
+- [ ] Block parsing using INDENT/DEDENT tokens
+- [ ] Type annotation parsing (name: int, -> str)
+- [ ] Decorator parsing (@decorator syntax)
+- [ ] Deliverable: `parser/python_parser.go` with full Python parsing
+
+#### Phase D: AST Lowering (Pending)
+- [ ] Implement ToIR() for all Python nodes
+- [ ] Desugar Python constructs to S-expressions
+- [ ] Comprehensions → (list-comp ...), (dict-comp ...)
+- [ ] For loops → (for var iterable body)
+- [ ] Classes → (def-class name bases methods)
+- [ ] Deliverable: All Python nodes lower to M28 IR
+
+#### Phase E: Integration (Pending)
+- [ ] File extension detection (.py vs .m28)
+- [ ] Parser selection in main.go
+- [ ] Error message routing with SyntaxKind tracking
+- [ ] End-to-end Python→AST→IR→Eval tests
+- [ ] Deliverable: Full Python file support
+
+**Example Python Code:**
+```python
+# This will work in M28!
+class Counter:
+    def __init__(self, start: int = 0):
+        self.value = start
+
+    def increment(self) -> int:
+        self.value += 1
+        return self.value
+
+# List comprehension
+squares = [x * x for x in range(10) if x % 2 == 0]
+
+# For loop
+for i in range(5):
+    print(i)
+```
+
+**Design Documents:**
+- [docs/design/python-frontend-design.md](docs/design/python-frontend-design.md) - Complete architecture
+- [docs/design/python-frontend-progress.md](docs/design/python-frontend-progress.md) - Implementation status
+
+**Benefits:**
+- ✅ Write actual Python code in M28
+- ✅ Same runtime, same semantics, different syntax
+- ✅ Mix Python and Lisp in same codebase
+- ✅ Error messages show original Python syntax
+- ✅ Type hints preserved for tooling
+- ✅ Foundation for Python LSP server
+
 ### High-Impact Refactoring
 
 #### Break down large functions (100+ lines) ✅

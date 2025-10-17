@@ -92,8 +92,72 @@ const (
 	TOKEN_COMMA_AT      // ,@ (unquote-splicing)
 	TOKEN_AT            // @ (decorators)
 
+	// Python-specific keywords
+	TOKEN_CLASS    // class
+	TOKEN_IF       // if
+	TOKEN_ELIF     // elif
+	TOKEN_ELSE     // else
+	TOKEN_FOR      // for
+	TOKEN_WHILE    // while
+	TOKEN_BREAK    // break
+	TOKEN_CONTINUE // continue
+	TOKEN_RETURN   // return
+	TOKEN_PASS     // pass
+	TOKEN_IMPORT   // import
+	TOKEN_FROM     // from
+	TOKEN_AS       // as
+	TOKEN_TRY      // try
+	TOKEN_EXCEPT   // except
+	TOKEN_FINALLY  // finally
+	TOKEN_RAISE    // raise
+	TOKEN_WITH     // with
+	TOKEN_LAMBDA   // lambda
+	TOKEN_YIELD    // yield
+	TOKEN_ASYNC    // async
+	TOKEN_AWAIT    // await
+	TOKEN_ASSERT   // assert
+	TOKEN_DEL      // del
+	TOKEN_GLOBAL   // global
+	TOKEN_NONLOCAL // nonlocal
+
+	// Python-specific operators/tokens
+	TOKEN_ARROW    // -> (type hint arrow)
+	TOKEN_ELLIPSIS // ... (Ellipsis)
+	TOKEN_BANG     // ! (not standard Python, but useful)
+
+	// Indentation tokens (Python-specific)
+	TOKEN_INDENT // Increase indentation level
+	TOKEN_DEDENT // Decrease indentation level
+
+	// Augmented assignment tokens (normalized names)
+	TOKEN_PLUS_ASSIGN        // +=
+	TOKEN_MINUS_ASSIGN       // -=
+	TOKEN_STAR_ASSIGN        // *=
+	TOKEN_SLASH_ASSIGN       // /=
+	TOKEN_DOUBLESLASH        // //
+	TOKEN_DOUBLESLASH_ASSIGN // //=
+	TOKEN_PERCENT_ASSIGN     // %=
+	TOKEN_DOUBLESTAR         // **
+	TOKEN_DOUBLESTAR_ASSIGN  // **=
+	TOKEN_AMPERSAND_ASSIGN   // &=
+	TOKEN_PIPE_ASSIGN        // |=
+	TOKEN_CARET_ASSIGN       // ^=
+	TOKEN_LSHIFT             // <<
+	TOKEN_LSHIFT_ASSIGN      // <<=
+	TOKEN_RSHIFT             // >>
+	TOKEN_RSHIFT_ASSIGN      // >>=
+
+	// Comparison operators (normalized names)
+	TOKEN_EQUALEQUAL   // ==
+	TOKEN_NOTEQUAL     // !=
+	TOKEN_LESS         // <
+	TOKEN_GREATER      // >
+	TOKEN_LESSEQUAL    // <=
+	TOKEN_GREATEREQUAL // >=
+
 	// Meta tokens
-	TOKEN_NEWLINE // Significant in REPL
+	TOKEN_NEWLINE // Significant in REPL and Python
+	TOKEN_COMMENT // # comment
 	TOKEN_EOF     // End of file/input
 	TOKEN_ERROR   // Lexical error
 )
@@ -259,8 +323,116 @@ func (tt TokenType) String() string {
 		return "COMMA_AT"
 	case TOKEN_AT:
 		return "AT"
+	case TOKEN_CLASS:
+		return "CLASS"
+	case TOKEN_IF:
+		return "IF"
+	case TOKEN_ELIF:
+		return "ELIF"
+	case TOKEN_ELSE:
+		return "ELSE"
+	case TOKEN_FOR:
+		return "FOR"
+	case TOKEN_WHILE:
+		return "WHILE"
+	case TOKEN_BREAK:
+		return "BREAK"
+	case TOKEN_CONTINUE:
+		return "CONTINUE"
+	case TOKEN_RETURN:
+		return "RETURN"
+	case TOKEN_PASS:
+		return "PASS"
+	case TOKEN_IMPORT:
+		return "IMPORT"
+	case TOKEN_FROM:
+		return "FROM"
+	case TOKEN_AS:
+		return "AS"
+	case TOKEN_TRY:
+		return "TRY"
+	case TOKEN_EXCEPT:
+		return "EXCEPT"
+	case TOKEN_FINALLY:
+		return "FINALLY"
+	case TOKEN_RAISE:
+		return "RAISE"
+	case TOKEN_WITH:
+		return "WITH"
+	case TOKEN_LAMBDA:
+		return "LAMBDA"
+	case TOKEN_YIELD:
+		return "YIELD"
+	case TOKEN_ASYNC:
+		return "ASYNC"
+	case TOKEN_AWAIT:
+		return "AWAIT"
+	case TOKEN_ASSERT:
+		return "ASSERT"
+	case TOKEN_DEL:
+		return "DEL"
+	case TOKEN_GLOBAL:
+		return "GLOBAL"
+	case TOKEN_NONLOCAL:
+		return "NONLOCAL"
+	case TOKEN_ARROW:
+		return "ARROW"
+	case TOKEN_ELLIPSIS:
+		return "ELLIPSIS"
+	case TOKEN_BANG:
+		return "BANG"
+	case TOKEN_INDENT:
+		return "INDENT"
+	case TOKEN_DEDENT:
+		return "DEDENT"
+	case TOKEN_PLUS_ASSIGN:
+		return "PLUS_ASSIGN"
+	case TOKEN_MINUS_ASSIGN:
+		return "MINUS_ASSIGN"
+	case TOKEN_STAR_ASSIGN:
+		return "STAR_ASSIGN"
+	case TOKEN_SLASH_ASSIGN:
+		return "SLASH_ASSIGN"
+	case TOKEN_DOUBLESLASH:
+		return "DOUBLESLASH"
+	case TOKEN_DOUBLESLASH_ASSIGN:
+		return "DOUBLESLASH_ASSIGN"
+	case TOKEN_PERCENT_ASSIGN:
+		return "PERCENT_ASSIGN"
+	case TOKEN_DOUBLESTAR:
+		return "DOUBLESTAR"
+	case TOKEN_DOUBLESTAR_ASSIGN:
+		return "DOUBLESTAR_ASSIGN"
+	case TOKEN_AMPERSAND_ASSIGN:
+		return "AMPERSAND_ASSIGN"
+	case TOKEN_PIPE_ASSIGN:
+		return "PIPE_ASSIGN"
+	case TOKEN_CARET_ASSIGN:
+		return "CARET_ASSIGN"
+	case TOKEN_LSHIFT:
+		return "LSHIFT"
+	case TOKEN_LSHIFT_ASSIGN:
+		return "LSHIFT_ASSIGN"
+	case TOKEN_RSHIFT:
+		return "RSHIFT"
+	case TOKEN_RSHIFT_ASSIGN:
+		return "RSHIFT_ASSIGN"
+	case TOKEN_EQUALEQUAL:
+		return "EQUALEQUAL"
+	case TOKEN_NOTEQUAL:
+		return "NOTEQUAL"
+	case TOKEN_LESS:
+		return "LESS"
+	case TOKEN_GREATER:
+		return "GREATER"
+	case TOKEN_LESSEQUAL:
+		return "LESSEQUAL"
+	case TOKEN_GREATEREQUAL:
+		return "GREATEREQUAL"
 	case TOKEN_NEWLINE:
 		return "NEWLINE"
+	case TOKEN_COMMENT:
+		return "COMMENT"
 	case TOKEN_EOF:
 		return "EOF"
 	case TOKEN_ERROR:
