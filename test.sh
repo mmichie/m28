@@ -99,6 +99,9 @@ echo "────────────────────────�
 run_test "Variables & Types" "tests/core-types-test.m28"
 run_test "Control Flow" "tests/control-flow-test.m28"
 run_test "Functions" "tests/function-test.m28"
+run_test "Pythonic Calls" "tests/pythonic-function-calls-test.m28"
+run_test "Pythonic Assignment" "tests/pythonic-assignment-test.m28"
+run_test "Pythonic Def" "tests/pythonic-def-test.m28"
 run_test "Exceptions" "tests/exception-test.m28"
 run_test "Comprehensive" "test_m28.m28"
 

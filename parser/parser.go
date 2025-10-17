@@ -88,6 +88,9 @@ type Parser struct {
 	// Token-based parsing fields
 	tokens   []Token // Token stream from tokenizer
 	tokenPos int     // Current position in token stream
+
+	// Context flags for parsing
+	inPythonicCall bool // True when parsing arguments to a Pythonic function call
 }
 
 // NewParser creates a new parser
@@ -158,8 +161,42 @@ func (p *Parser) parseProgram() (core.Value, error) {
 	)), nil
 }
 
+// isAssignmentOperator checks if a token type is an assignment operator
+func isAssignmentOperator(t TokenType) bool {
+	return t >= TOKEN_ASSIGN && t <= TOKEN_DOUBLE_GT_EQ
+}
+
 // parseExpr parses a single expression
 func (p *Parser) parseExpr() (core.Value, error) {
+	// Check for assignment syntax: identifier = expr
+	// This must come BEFORE parseAtomFromToken to detect the pattern
+	if p.matchToken(TOKEN_IDENTIFIER) {
+		nameTok := p.currentToken()
+
+		// Look ahead for = (TOKEN_ASSIGN, not == which is TOKEN_EQ)
+		if p.tokenPos+1 < len(p.tokens) {
+			nextTok := p.tokens[p.tokenPos+1]
+
+			if nextTok.Type == TOKEN_ASSIGN {
+				// It's an assignment! Parse: name = value
+				p.advanceToken() // consume identifier
+				p.advanceToken() // consume =
+
+				value, err := p.parseExpr()
+				if err != nil {
+					return nil, err
+				}
+
+				// Build (= name value)
+				return core.ListValue{
+					core.SymbolValue("="),
+					core.SymbolValue(nameTok.Lexeme),
+					value,
+				}, nil
+			}
+		}
+	}
+
 	// Parse the primary expression (atom, list, etc.)
 	base, err := p.parseAtomFromToken()
 	if err != nil {
@@ -178,11 +215,32 @@ func (p *Parser) parseExpr() (core.Value, error) {
 		return base, nil
 	}
 
-	// Check if next token is an operator with no whitespace
+	// Check if next token is an operator (but not assignment operator)
+	// In Pythonic function calls, allow infix with spaces: print(x * x)
+	// In S-expressions, require no spaces to avoid (list -3) being parsed as list-3
 	prevTok := p.tokens[p.tokenPos-1]
 	tok := p.currentToken()
 
-	if tok.IsOperator() && prevTok.EndPos == tok.StartPos {
+	// Only parse as infix if:
+	// 1. Next token is an operator (but not assignment)
+	// 2. AND base is not an operator symbol (to avoid (+ - 1) being parsed as infix)
+	// 3. AND either we're in a Pythonic call OR there's no whitespace before the operator
+	baseIsOperatorSymbol := false
+	if sym, ok := base.(core.SymbolValue); ok {
+		s := string(sym)
+		// Check if it's a known operator
+		if s == "+" || s == "-" || s == "*" || s == "/" || s == "%" || s == "**" || s == "//" ||
+			s == "==" || s == "!=" || s == "<" || s == ">" || s == "<=" || s == ">=" ||
+			s == "and" || s == "or" || s == "not" || s == "in" || s == "is" ||
+			s == "&" || s == "|" || s == "^" || s == "<<" || s == ">>" || s == "~" {
+			baseIsOperatorSymbol = true
+		}
+	}
+
+	// Allow infix if in Pythonic call (with spaces) or no whitespace (anywhere)
+	allowInfix := p.inPythonicCall || prevTok.EndPos == tok.StartPos
+
+	if tok.IsOperator() && !isAssignmentOperator(tok.Type) && !baseIsOperatorSymbol && allowInfix {
 		// This is an infix expression - collect all elements
 		elements := []core.Value{base}
 
@@ -207,11 +265,10 @@ func (p *Parser) parseExpr() (core.Value, error) {
 				break
 			}
 
-			prevTok = p.tokens[p.tokenPos-1]
 			tok = p.currentToken()
 
-			// Only continue if next operator has no whitespace before it
-			if !tok.IsOperator() || prevTok.EndPos < tok.StartPos {
+			// Only continue if next token is an operator (but not assignment)
+			if !tok.IsOperator() || isAssignmentOperator(tok.Type) {
 				break
 			}
 		}
@@ -255,9 +312,84 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 		return core.None, nil
 
 	case TOKEN_IDENTIFIER:
+		name := tok.Lexeme
 		p.advanceToken()
-		// Identifiers are symbols
-		return core.SymbolValue(tok.Lexeme), nil
+
+		// Check for Pythonic def syntax: def name(params): expr
+		if name == "def" {
+			// Must be followed by identifier
+			if !p.matchToken(TOKEN_IDENTIFIER) {
+				// Not Pythonic def pattern, just return as symbol
+				return core.SymbolValue(name), nil
+			}
+
+			funcNameTok := p.currentToken()
+
+			// Look ahead to check for ( after function name
+			if p.tokenPos+1 < len(p.tokens) {
+				nextTok := p.tokens[p.tokenPos+1]
+
+				// Check for pattern: def identifier( with NO whitespace
+				// This distinguishes Pythonic def name(params) from S-expr (def name (params))
+				if nextTok.Type == TOKEN_LPAREN && funcNameTok.EndPos == nextTok.StartPos {
+					// This is Pythonic def!
+					p.advanceToken() // consume function name
+
+					// Parse parameters
+					params, err := p.parseFunctionParams()
+					if err != nil {
+						return nil, err
+					}
+
+					// Expect :
+					if !p.matchToken(TOKEN_COLON) {
+						return nil, p.tokenError("expected ':' after parameters in def", p.currentToken())
+					}
+					p.advanceToken() // consume :
+
+					// Parse body
+					body, err := p.parseExpr()
+					if err != nil {
+						return nil, err
+					}
+
+					// Build (def name (params) body)
+					return core.ListValue{
+						core.SymbolValue("def"),
+						core.SymbolValue(funcNameTok.Lexeme),
+						params,
+						body,
+					}, nil
+				}
+			}
+
+			// Not Pythonic pattern, return "def" as symbol
+			return core.SymbolValue(name), nil
+		}
+
+		// Check for function call syntax: identifier(args)
+		// Only if there's no whitespace between identifier and (
+		if p.matchToken(TOKEN_LPAREN) {
+			prevTok := p.tokens[p.tokenPos-1]
+			parenTok := p.currentToken()
+
+			// No whitespace means it's a function call
+			if prevTok.EndPos == parenTok.StartPos {
+				// Parse as function call: name(args) -> (name args)
+				args, err := p.parseMethodArgsFromToken()
+				if err != nil {
+					return nil, err
+				}
+
+				// Build (name arg1 arg2 ...)
+				result := core.ListValue{core.SymbolValue(name)}
+				result = append(result, args...)
+				return result, nil
+			}
+		}
+
+		// Just a symbol
+		return core.SymbolValue(name), nil
 
 	// Delimiters - delegate to specialized parsers
 	case TOKEN_LPAREN:
@@ -321,16 +453,46 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 		return core.SymbolValue("."), nil
 
 	default:
-		// Special case: unary minus followed immediately by a number is a negative literal
+		// Special case: unary minus followed by a number is a negative literal
+		// BUT NOT when - is the first element of an S-expression (after '(')
 		if tok.Type == TOKEN_MINUS && !p.isAtEnd() {
 			nextTok := p.peekToken()
-			// Check if next token is a number with no whitespace
-			if nextTok.Type == TOKEN_NUMBER && tok.EndPos == nextTok.StartPos {
-				p.advanceToken() // consume -
-				p.advanceToken() // consume number
-				// Create negative number
-				if num, ok := nextTok.Value.(core.NumberValue); ok {
-					return core.NumberValue(-float64(num)), nil
+			// Check if next token is a number
+			if nextTok.Type == TOKEN_NUMBER {
+				// Check if - is right after ( which would make it an S-expression function symbol
+				// BUT if the ( is part of a function call name(, then - should be unary
+				prevIsLParenInSexpr := false
+				if p.tokenPos > 0 {
+					prevTok := p.tokens[p.tokenPos-1]
+					if prevTok.Type == TOKEN_LPAREN {
+						// Check if this ( is an S-expression or function call
+						// It's a function call if the token before ( is an identifier with no space
+						if p.tokenPos > 1 {
+							beforeParen := p.tokens[p.tokenPos-2]
+							// Function call: identifier( with no space
+							// S-expression: anything else
+							if beforeParen.Type == TOKEN_IDENTIFIER && beforeParen.EndPos == prevTok.StartPos {
+								// This is a function call like abs(, so - IS unary
+								prevIsLParenInSexpr = false
+							} else {
+								// This is an S-expression like (-, so - is NOT unary
+								prevIsLParenInSexpr = true
+							}
+						} else {
+							// ( is at the start, so it's an S-expression
+							prevIsLParenInSexpr = true
+						}
+					}
+				}
+
+				// Only treat as negative number if NOT the first element of an S-expression
+				if !prevIsLParenInSexpr {
+					p.advanceToken() // consume -
+					p.advanceToken() // consume number
+					// Create negative number
+					if num, ok := nextTok.Value.(core.NumberValue); ok {
+						return core.NumberValue(-float64(num)), nil
+					}
 				}
 			}
 		}
@@ -443,6 +605,12 @@ func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Save and reset inPythonicCall flag to avoid treating comprehension keywords as infix
+	// For example, [y for y in xs] should parse as separate elements, not y-in-xs as infix
+	oldInPythonicCall := p.inPythonicCall
+	p.inPythonicCall = false
+	defer func() { p.inPythonicCall = oldInPythonicCall }()
 
 	elements := make(core.ListValue, 0)
 
@@ -680,12 +848,61 @@ func (p *Parser) parseDotAccessFromToken(base core.Value) (core.Value, error) {
 	}, nil
 }
 
+// parseFunctionParams parses function parameters for def syntax
+func (p *Parser) parseFunctionParams() (core.ListValue, error) {
+	// Consume opening parenthesis
+	if _, err := p.expectToken(TOKEN_LPAREN); err != nil {
+		return nil, err
+	}
+
+	params := core.ListValue{}
+
+	// Check for empty params
+	if p.matchToken(TOKEN_RPAREN) {
+		p.advanceToken()
+		return params, nil
+	}
+
+	// Parse comma-separated parameters
+	for {
+		if p.matchToken(TOKEN_EOF) {
+			return nil, p.tokenError("unexpected EOF in parameter list", p.currentToken())
+		}
+
+		if !p.matchToken(TOKEN_IDENTIFIER) {
+			return nil, p.tokenError("expected parameter name", p.currentToken())
+		}
+
+		paramTok := p.advanceToken()
+		params = append(params, core.SymbolValue(paramTok.Lexeme))
+
+		// Check what's next
+		if p.matchToken(TOKEN_RPAREN) {
+			p.advanceToken()
+			break
+		}
+
+		if !p.matchToken(TOKEN_COMMA) {
+			tok := p.currentToken()
+			return nil, p.tokenError("expected ',' or ')' in parameter list", tok)
+		}
+		p.advanceToken() // consume comma
+	}
+
+	return params, nil
+}
+
 // parseMethodArgsFromToken parses method call arguments using tokens
 func (p *Parser) parseMethodArgsFromToken() ([]core.Value, error) {
 	// Consume opening parenthesis
 	if _, err := p.expectToken(TOKEN_LPAREN); err != nil {
 		return nil, err
 	}
+
+	// Set context flag for Pythonic function call
+	oldInPythonicCall := p.inPythonicCall
+	p.inPythonicCall = true
+	defer func() { p.inPythonicCall = oldInPythonicCall }()
 
 	var args []core.Value
 

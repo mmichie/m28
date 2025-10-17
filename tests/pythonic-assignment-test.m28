@@ -1,0 +1,232 @@
+# Test Pythonic Assignment Syntax
+# Tests the new x = value sugar that transforms to (= x value)
+
+(print "=== Pythonic Assignment Syntax Tests ===\n")
+
+# Test 1: Basic assignment
+(print "Test 1: Basic integer assignment")
+x = 10
+(assert (== x 10) "x = 10 should work")
+(print "✓ x = 10 works")
+
+# Test 2: String assignment
+(print "\nTest 2: String assignment")
+name = "Alice"
+(assert (== name "Alice") "name = 'Alice' should work")
+(print "✓ String assignment works")
+
+# Test 3: List assignment
+(print "\nTest 3: List assignment")
+numbers = [1, 2, 3, 4, 5]
+(assert (== (len numbers) 5) "List assignment should work")
+(assert (== numbers [1, 2, 3, 4, 5]) "List values should match")
+(print "✓ List assignment works")
+
+# Test 4: Dict assignment
+(print "\nTest 4: Dict assignment")
+person = {"name": "Bob", "age": 30}
+(assert (== person.name "Bob") "Dict assignment should work")
+(print "✓ Dict assignment works")
+
+# Test 5: Set assignment
+(print "\nTest 5: Set assignment")
+unique = {1, 2, 3, 2, 1}
+(assert (== (len unique) 3) "Set assignment should work")
+(print "✓ Set assignment works")
+
+# Test 6: Assignment with expression
+(print "\nTest 6: Assignment with infix expression")
+result = (1 + 2 + 3)
+(assert (== result 6) "x = (1 + 2 + 3) should work")
+(print "✓ Assignment with expression works")
+
+# Test 7: Assignment with function call (Pythonic)
+(print "\nTest 7: Assignment with Pythonic function call")
+length = len([1, 2, 3])
+(assert (== length 3) "x = len([1,2,3]) should work")
+(print "✓ Assignment with Pythonic call works")
+
+# Test 8: Assignment with function call (S-expression)
+(print "\nTest 8: Assignment with S-expression call")
+total = (sum [1, 2, 3, 4, 5])
+(assert (== total 15) "x = (sum [...]) should work")
+(print "✓ Assignment with S-expression call works")
+
+# Test 9: Multiple assignments
+(print "\nTest 9: Multiple assignments")
+a = 10
+b = 20
+c = 30
+(assert (== a 10) "First assignment should work")
+(assert (== b 20) "Second assignment should work")
+(assert (== c 30) "Third assignment should work")
+(print "✓ Multiple assignments work")
+
+# Test 10: Reassignment
+(print "\nTest 10: Reassignment")
+value = 100
+(assert (== value 100) "Initial assignment")
+value = 200
+(assert (== value 200) "Reassignment should work")
+(print "✓ Reassignment works")
+
+# Test 11: Assignment with comprehension
+(print "\nTest 11: Assignment with comprehension")
+squares = [x*x for x in range(5)]
+(assert (== squares [0, 1, 4, 9, 16]) "Comprehension assignment should work")
+(print "✓ Comprehension assignment works")
+
+# Test 12: Assignment with nested call
+(print "\nTest 12: Assignment with nested calls")
+count = len(range(10))
+(assert (== count 10) "Nested call assignment should work")
+(print "✓ Nested call assignment works")
+
+# Test 13: Assignment with f-string
+(print "\nTest 13: Assignment with f-string")
+greeting = f"Hello, {name}!"
+(assert (== greeting "Hello, Alice!") "F-string assignment should work")
+(print "✓ F-string assignment works")
+
+# Test 14: No whitespace variation
+(print "\nTest 14: No whitespace")
+x=42
+(assert (== x 42) "x=42 (no spaces) should work")
+(print "✓ No whitespace works")
+
+# Test 15: Extra whitespace variation
+(print "\nTest 15: Extra whitespace")
+y  =  100
+(assert (== y 100) "Extra whitespace should work")
+(print "✓ Extra whitespace works")
+
+# Test 16: Assignment vs comparison
+(print "\nTest 16: Distinguishing = from ==")
+test_val = 10
+is_equal = (test_val == 10)
+(assert is_equal "Comparison should work")
+is_not_equal = (test_val == 20)
+(assert (not is_not_equal) "Comparison should work")
+(print "✓ = vs == distinction works")
+
+# Test 17: Mixed assignment styles
+(print "\nTest 17: Mixed Pythonic and S-expression assignment")
+pythonic_var = 10
+(= sexp_var 20)
+(assert (== pythonic_var 10) "Pythonic assignment works")
+(assert (== sexp_var 20) "S-expression assignment works")
+(print "✓ Mixed styles work")
+
+# Test 18: Assignment in expression context
+(print "\nTest 18: Assignment in expression")
+result18 = (+ (= temp 5) 10)
+(assert (== temp 5) "Inner assignment should work")
+(assert (== result18 15) "Outer expression should work")
+(print "✓ Assignment in expression works")
+
+# Test 19: Chained assignment
+(print "\nTest 19: Chained assignment")
+final = middle = initial = 42
+(assert (== initial 42) "First in chain")
+(assert (== middle 42) "Middle in chain")
+(assert (== final 42) "Final in chain")
+(print "✓ Chained assignment works")
+
+# Test 20: Assignment with operators
+(print "\nTest 20: Assignment with various operators")
+mul_result = (5 * 6)
+div_result = (20 / 4)
+mod_result = (17 % 5)
+pow_result = (2 ** 8)
+(assert (== mul_result 30) "Multiplication")
+(assert (== div_result 5) "Division")
+(assert (== mod_result 2) "Modulo")
+(assert (== pow_result 256) "Power")
+(print "✓ Assignments with operators work")
+
+# Test 21: Assignment with boolean
+(print "\nTest 21: Boolean assignment")
+is_true = True
+is_false = False
+(assert is_true "True assignment")
+(assert (not is_false) "False assignment")
+(print "✓ Boolean assignment works")
+
+# Test 22: Assignment with None
+(print "\nTest 22: None assignment")
+empty = None
+(assert (== empty None) "None assignment should work")
+(print "✓ None assignment works")
+
+# Test 23: Assignment inside function
+(print "\nTest 23: Assignment inside function")
+(def test_func ()
+  (= local_var 99)
+  local_var_pythonic = 100
+  (+ local_var local_var_pythonic))
+result23 = test_func()
+(assert (== result23 199) "Assignment in function should work")
+(print "✓ Assignment in function works")
+
+# Test 24: Assignment with dict comprehension
+(print "\nTest 24: Dict comprehension assignment")
+squares_dict = {x: x*x for x in range(5)}
+(assert (== (len squares_dict) 5) "Dict comprehension assignment")
+(print "✓ Dict comprehension assignment works")
+
+# Test 25: Assignment with set comprehension
+(print "\nTest 25: Set comprehension assignment")
+even_set = {x for x in range(10) if (== (% x 2) 0)}
+(assert (== (len even_set) 5) "Set comprehension assignment")
+(print "✓ Set comprehension assignment works")
+
+# Test 26: Assignment with tuple
+(print "\nTest 26: Tuple assignment")
+coords = tuple([10, 20, 30])
+(assert (== (len coords) 3) "Tuple assignment")
+(print "✓ Tuple assignment works")
+
+# Test 27: Assignment with range
+(print "\nTest 27: Range assignment")
+my_range = range(10)
+(assert (== (len my_range) 10) "Range assignment")
+(print "✓ Range assignment works")
+
+# Test 28: Assignment with type conversion
+(print "\nTest 28: Type conversion assignment")
+int_val = int(3.7)
+str_val = str(42)
+tuple_val = tuple([1, 2, 3])
+list_val = list(tuple_val)
+(assert (== int_val 3) "int() conversion")
+(assert (== str_val "42") "str() conversion")
+(assert (== list_val [1, 2, 3]) "list() conversion")
+(print "✓ Type conversion assignment works")
+
+# Test 29: Assignment with comparison result
+(print "\nTest 29: Comparison result assignment")
+is_greater = (10 > 5)
+is_less = (3 < 2)
+(assert is_greater "10 > 5 should be True")
+(assert (not is_less) "3 < 2 should be False")
+(print "✓ Comparison result assignment works")
+
+# Test 30: Real-world example
+(print "\nTest 30: Real-world data processing")
+data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+evens = [x for x in data if (== (% x 2) 0)]
+odds = [x for x in data if (== (% x 2) 1)]
+even_sum = sum(evens)
+odd_sum = sum(odds)
+total = (even_sum + odd_sum)
+(assert (== evens [2, 4, 6, 8, 10]) "Evens filtered")
+(assert (== odds [1, 3, 5, 7, 9]) "Odds filtered")
+(assert (== even_sum 30) "Even sum")
+(assert (== odd_sum 25) "Odd sum")
+(assert (== total 55) "Total sum")
+print(f"Evens: {evens}, Sum: {even_sum}")
+print(f"Odds: {odds}, Sum: {odd_sum}")
+print(f"Total: {total}")
+(print "✓ Real-world example works")
+
+(print "\n=== All Pythonic Assignment Tests Passed! ===")

@@ -1,0 +1,87 @@
+# Complete Pythonic Syntax Demo
+# Shows all 3 phases of Pythonic syntax working together
+
+print("=== M28: Pythonic S-expressions ===\n")
+
+# Phase 1: Function Calls
+print("Phase 1: Pythonic Function Calls")
+print(len([1, 2, 3, 4, 5]))
+print(sum(list(range(10))))
+print(max([3, 1, 4, 1, 5, 9]))
+
+# Phase 2: Assignment
+print("\nPhase 2: Pythonic Assignment")
+x = 42
+name = "Alice"
+data = [1, 2, 3, 4, 5]
+print(f"x = {x}, name = {name}, data = {data}")
+
+# Phase 3: Function Definition
+print("\nPhase 3: Pythonic Def")
+def double(x): (* x 2)
+def triple(x): (* x 3)
+print(f"double(7) = {double(7)}")
+print(f"triple(7) = {triple(7)}")
+
+# All Together: Pure Python-style M28!
+print("\n=== All 3 Phases Together ===")
+
+# Define functions
+def square(x): x * x
+def is_even(x): (== (% x 2) 0)
+def filter_evens(nums): [x for x in nums if is_even(x)]
+def sum_squares(nums): sum([square(x) for x in nums])
+
+# Use them
+numbers = range(1, 11)
+nums_list = list(numbers)
+evens = filter_evens(nums_list)
+total = sum_squares(evens)
+
+print(f"Numbers: {nums_list}")
+print(f"Evens: {evens}")
+print(f"Sum of squares of evens: {total}")
+
+# Still have S-expressions when useful!
+print("\n=== S-expressions Still Available ===")
+(= result (+ 1 2 3 4 5))
+(def sexp_func (x) (* x x))
+print(f"S-expression math: {result}")
+print(f"S-expression func: {(sexp_func 8)}")
+
+# Mix styles freely
+print("\n=== Mix Styles Freely ===")
+def pythonic_style(x, y): (+ (* x x) (* y y))
+(def lisp_style (x y) (+ (* x x) (* y y)))
+
+result1 = pythonic_style(3, 4)
+result2 = (lisp_style 3 4)
+
+print(f"Pythonic: {result1}")
+print(f"Lisp: {result2}")
+print("Both work perfectly!")
+
+# Real-world example
+print("\n=== Real-World Data Pipeline ===")
+
+# Define data processing functions
+def clean(data): [x for x in data if (!= x None)]
+def normalize(data): [(/ x (max data)) for x in data]
+def categorize(val): (if (> val 0.7) "high" (if (> val 0.3) "medium" "low"))
+
+# Process data
+raw = [10, None, 30, None, 50, 70, 90]
+cleaned = clean(raw)
+normalized = normalize(cleaned)
+categories = [categorize(x) for x in normalized]
+
+print(f"Raw data: {raw}")
+print(f"Cleaned: {cleaned}")
+print(f"Normalized: {normalized}")
+print(f"Categories: {categories}")
+
+print("\n✅ M28 is now fully Pythonic!")
+print("   • Python-like syntax for shell scripting")
+print("   • S-expressions for metaprogramming")
+print("   • No whitespace sensitivity")
+print("   • Best of both worlds!")

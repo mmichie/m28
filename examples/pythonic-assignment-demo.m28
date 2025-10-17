@@ -1,0 +1,63 @@
+# Pythonic Assignment Syntax Demo
+# Shows the new x = value sugar alongside traditional S-expressions
+
+print("=== Pythonic Assignment Syntax ===\n")
+
+# BEFORE (S-expression style - still works!)
+print("Traditional S-expression style:")
+(= old_var 10)
+(= old_name "Alice")
+print(f"old_var = {old_var}, old_name = {old_name}")
+
+# AFTER (Pythonic style - new!)
+print("\nPythonic style:")
+new_var = 20
+new_name = "Bob"
+print(f"new_var = {new_var}, new_name = {new_name}")
+
+# Complex assignments
+print("\n=== Complex Assignments ===")
+
+# Lists and comprehensions
+numbers = [1, 2, 3, 4, 5]
+squares = [x*x for x in numbers]
+print(f"Numbers: {numbers}")
+print(f"Squares: {squares}")
+
+# Function calls
+total = sum(numbers)
+count = len(numbers)
+average = (/ total count)
+print(f"Sum: {total}, Count: {count}, Average: {average}")
+
+# Chained assignments
+print("\n=== Chained Assignment ===")
+x = y = z = 100
+print(f"x = {x}, y = {y}, z = {z}")
+
+# Mixed styles
+print("\n=== Mix Both Styles ===")
+pythonic_style = 42
+(= sexp_style 43)
+print(f"Pythonic: {pythonic_style}, S-expr: {sexp_style}")
+
+# Real-world data processing
+print("\n=== Real-World Example ===")
+data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+evens = [x for x in data if (== (% x 2) 0)]
+odds = [x for x in data if (== (% x 2) 1)]
+even_sum = sum(evens)
+odd_sum = sum(odds)
+
+print(f"Data: {data}")
+print(f"Evens: {evens}, Sum: {even_sum}")
+print(f"Odds: {odds}, Sum: {odd_sum}")
+print(f"Total: {(even_sum + odd_sum)}")
+
+# Shell one-liner style
+print("\n=== Shell One-Liner Style ===")
+print("You can now write:")
+print("  m28 -e 'x = 10 print(x)'")
+print("  m28 -e '(do data = [1,2,3] print(sum(data)))'")
+
+print("\n✅ Pythonic assignment makes M28 even more Python-like!")

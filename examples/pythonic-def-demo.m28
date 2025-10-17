@@ -1,0 +1,94 @@
+# Pythonic Def Syntax Demo
+# Shows the new def name(params): expr sugar alongside traditional S-expressions
+
+print("=== Pythonic Def Syntax ===\n")
+
+# BEFORE (S-expression style - still works!)
+print("Traditional S-expression style:")
+(def sexp_add (a b) (+ a b))
+print(f"sexp_add(3, 4) = {(sexp_add 3 4)}")
+
+# AFTER (Pythonic style - new!)
+print("\nPythonic style:")
+def pythonic_add(a, b): (+ a b)
+print(f"pythonic_add(3, 4) = {pythonic_add(3, 4)}")
+
+# Zero parameters
+print("\n=== Zero Parameters ===")
+def get_pi(): 3.14159
+print(f"Pi = {get_pi()}")
+
+# Multiple parameters
+print("\n=== Multiple Parameters ===")
+def greet(first, last): f"Hello, {first} {last}!"
+print(greet("John", "Doe"))
+
+# Function with comprehension
+print("\n=== Comprehensions in Functions ===")
+def squares(n): [x*x for x in range(n)]
+print(f"Squares of 0-4: {squares(5)}")
+
+# Higher-order functions
+print("\n=== Higher-Order Functions ===")
+def apply_twice(f, x): f(f(x))
+def inc(n): (+ n 1)
+result = apply_twice(inc, 10)
+print(f"apply_twice(inc, 10) = {result}")
+
+# Recursive functions
+print("\n=== Recursive Functions ===")
+def factorial(n): (if (<= n 1) 1 (* n (factorial (- n 1))))
+print(f"factorial(5) = {factorial(5)}")
+
+# Data processing pipeline
+print("\n=== Data Processing Pipeline ===")
+def filter_evens(nums): [x for x in nums if (== (% x 2) 0)]
+def double_all(nums): [x*2 for x in nums]
+def sum_list(nums): sum(nums)
+
+data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+evens = filter_evens(data)
+doubled = double_all(evens)
+total = sum_list(doubled)
+
+print(f"Data: {data}")
+print(f"Evens: {evens}")
+print(f"Doubled: {doubled}")
+print(f"Sum: {total}")
+
+# Mix both styles
+print("\n=== Mix Both Styles ===")
+def pythonic_multiply(x, y): (* x y)
+(def sexp_divide (x y) (/ x y))
+
+result1 = pythonic_multiply(6, 7)
+result2 = (sexp_divide 42 6)
+
+print(f"pythonic_multiply(6, 7) = {result1}")
+print(f"sexp_divide(42, 6) = {result2}")
+
+# Real-world example
+print("\n=== Real-World Example ===")
+def calculate_average(numbers): (/ (sum numbers) (len numbers))
+def filter_outliers(nums, threshold): [x for x in nums if (<= x threshold)]
+
+scores = [85, 92, 78, 95, 88, 250, 91]  # 250 is an outlier
+print(f"Raw scores: {scores}")
+
+clean_scores = filter_outliers(scores, 100)
+print(f"Clean scores: {clean_scores}")
+
+average = calculate_average(clean_scores)
+print(f"Average: {average}")
+
+# Shell one-liner style
+print("\n=== Shell One-Liner Style ===")
+print("You can now write:")
+print("  def double(x): x * 2")
+print("  def greet(name): f'Hello, {name}!'")
+print("  def squares(n): [x*x for x in range(n)]")
+
+print("\n✅ All 3 phases of Pythonic syntax complete!")
+print("  ✅ Phase 1: Function calls - print(x)")
+print("  ✅ Phase 2: Assignment - x = 10")
+print("  ✅ Phase 3: Def - def f(x): expr")

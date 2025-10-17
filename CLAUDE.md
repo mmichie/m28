@@ -8,15 +8,66 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **Comments**: ALWAYS use `#` for comments (NEVER use `;`)
 2. **Variables**: ALWAYS use `=` for variable assignment (NEVER use `def` for variables)
 3. **Functions**: ONLY use `def` for function definitions
-4. **All operations use prefix notation**: `(+ 1 2)` not `1 + 2`
+4. **S-expressions AND Pythonic calls**: Both styles work!
+   - S-expression: `(print "hello")`
+   - Pythonic: `print("hello")`
+5. **Operations**: Infix operators work inside expressions: `x * 2`, `i + 1`
 
-### Example
+### Syntax Examples
 ```lisp
-# This is a comment (always use #)
-(= x 10)              # Variable assignment (always use =)
-(def add (a b)        # Function definition (def only for functions)
+# Comments (always use #)
+
+# Variable assignment - BOTH styles work!
+(= x 10)              # S-expression style
+x = 10                # Pythonic style (NEW!)
+
+# Function definition - BOTH styles work!
+(def add (a b)          # S-expression style
   (+ a b))
+
+def subtract(a, b): (- a b)  # Pythonic style (NEW!)
+
+# Function calls - BOTH styles work!
+(print "hello")        # S-expression style
+print("hello")         # Pythonic style
+print(len([1, 2, 3]))  # Perfect for shell one-liners!
+
+# Mix and match
+print((+ 1 2 3))       # Pythonic call with S-expression arg
+(print (len [1, 2, 3])) # S-expression call with list
+
+# Real-world example
+data = [1, 2, 3, 4, 5]
+total = sum(data)
+print(f"Total: {total}")
 ```
+
+### Pythonic Syntax Sugar
+
+**Function Calls**: `name(args)` desugars to `(name args)`
+- `print("hello")` → `(print "hello")`
+- `len([1, 2, 3])` → `(len [1, 2, 3])`
+- No whitespace rule: `name(args)` is sugar, `name (args)` is S-expression
+
+**Assignment**: `x = value` desugars to `(= x value)`
+- `x = 10` → `(= x 10)`
+- `data = [1, 2, 3]` → `(= data [1, 2, 3])`
+- Works anywhere: top-level, inside functions, in expressions
+
+**Function Definition**: `def name(params): expr` desugars to `(def name (params) expr)`
+- `def double(x): (* x 2)` → `(def double (x) (* x 2))`
+- `def greet(name): f"Hello, {name}!"` → `(def greet (name) f"Hello, {name}!")`
+- No whitespace between name and `(` distinguishes from S-expression style
+
+**Shell scripting examples**:
+```bash
+m28 -e 'x = 10 print(x)'
+m28 -e 'data = [1,2,3] print(sum(data))'
+m28 -e 'print(sum([x*x for x in range(10)]))'
+m28 -e 'def double(x): x*2 print(double(5))'
+```
+
+**Mix styles freely**: Use whichever makes your code clearer!
 
 ## Build/Test Commands
 - Build: `make build`

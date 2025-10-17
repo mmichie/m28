@@ -1,0 +1,214 @@
+# Test Pythonic Function Call Syntax
+# Tests the new name(args) sugar that transforms to (name args)
+
+(print "=== Pythonic Function Call Syntax Tests ===\n")
+
+# Test 1: Basic function call with one argument
+(print "Test 1: Basic function call")
+(= result1 len([1, 2, 3]))
+(assert (== result1 3) "len([1,2,3]) should be 3")
+(print "✓ len([1,2,3]) works")
+
+# Test 2: Function call with no arguments
+(print "\nTest 2: Zero-argument function call")
+(= empty list())
+(assert (== (len empty) 0) "list() should create empty list")
+(print "✓ list() works")
+
+# Test 3: Function call with multiple arguments
+(print "\nTest 3: Multiple arguments")
+(= result3 max(1, 5, 3, 2))
+(assert (== result3 5) "max(1,5,3,2) should be 5")
+(print "✓ max(1,5,3,2) works")
+
+# Test 4: Nested function calls
+(print "\nTest 4: Nested calls")
+(= result4 len(range(10)))
+(assert (== result4 10) "len(range(10)) should be 10")
+(print "✓ len(range(10)) works")
+
+# Test 5: Function calls with expressions
+(print "\nTest 5: Calls with expressions")
+(= nums [1, 2, 3, 4, 5])
+(= result5 sum(nums))
+(assert (== result5 15) "sum([1,2,3,4,5]) should be 15")
+(print "✓ sum(nums) works")
+
+# Test 6: String functions
+(print "\nTest 6: String functions")
+(= text "hello")
+(= result6 len(text))
+(assert (== result6 5) "len('hello') should be 5")
+(print "✓ len('hello') works")
+
+# Test 7: Type conversions
+(print "\nTest 7: Type conversions")
+(= result7 int(3.7))
+(assert (== result7 3) "int(3.7) should be 3")
+(= result8 str(42))
+(assert (== result8 "42") "str(42) should be '42'")
+(print "✓ int() and str() work")
+
+# Test 8: Print function (most common use case)
+(print "\nTest 8: Print function")
+print("This should print via pythonic syntax")
+print("Multiple", "args", "work", "too")
+(print "✓ print() works")
+
+# Test 9: Mixing Pythonic and S-expression styles
+(print "\nTest 9: Mixed styles")
+(= result9a (len [1, 2, 3]))  # S-expression style
+(= result9b len([4, 5, 6]))   # Pythonic style
+(assert (== result9a result9b) "Both styles should work the same")
+(print "✓ Mixed styles work")
+
+# Test 10: Whitespace sensitivity
+# With whitespace, should NOT use sugar (this is important!)
+(print "\nTest 10: Whitespace sensitivity")
+(= result10 (len [7, 8, 9]))  # Space before ( means S-expression
+(assert (== result10 3) "S-expression style with space should still work")
+(print "✓ Whitespace handling correct")
+
+# Test 11: Comprehensions with function calls
+(print "\nTest 11: Comprehensions with function calls")
+(= result11 [len(x) for x in ["a", "bb", "ccc"]])
+(assert (== result11 [1, 2, 3]) "List comp with len() should work")
+(print "✓ Comprehensions with function calls work")
+
+# Test 12: Dict and set constructors
+(print "\nTest 12: Dict and set constructors")
+(= d dict())
+(assert (== (len d) 0) "dict() should create empty dict")
+(= s set())
+(assert (== (len s) 0) "set() should create empty set")
+(print "✓ dict() and set() work")
+
+# Test 13: Range function (very common in Python)
+(print "\nTest 13: Range function")
+(= r range(5))
+(assert (== (len r) 5) "range(5) should have length 5")
+(= r2 range(1, 10))
+(assert (== (len r2) 9) "range(1, 10) should have length 9")
+(print "✓ range() works")
+
+# Test 14: Nested comprehensions with calls
+(print "\nTest 14: Nested with calls")
+(= result14 sum([len(x) for x in ["ab", "cd", "ef"]]))
+(assert (== result14 6) "sum of lengths should be 6")
+(print "✓ Nested comprehensions with calls work")
+
+# Test 15: Function calls in expressions
+(print "\nTest 15: Calls in expressions")
+(= result15 (len([1, 2, 3]) + len([4, 5])))
+(assert (== result15 5) "len([1,2,3]) + len([4,5]) should be 5")
+(print "✓ Function calls in expressions work")
+
+# Test 16: Calling with f-strings
+(print "\nTest 16: F-strings in calls")
+(= name "World")
+print(f"Hello, {name}!")
+(print "✓ F-strings in calls work")
+
+# Test 17: Type checking functions
+(print "\nTest 17: Type checking")
+(= is_list isinstance([1, 2], "list"))
+(assert is_list "isinstance([1,2], 'list') should be True")
+(print "✓ isinstance() works")
+
+# Test 18: Min/max functions
+(print "\nTest 18: Min/max")
+(= nums2 [3, 1, 4, 1, 5])
+(= min_val min(nums2))
+(= max_val max(nums2))
+(assert (== min_val 1) "min([3,1,4,1,5]) should be 1")
+(assert (== max_val 5) "max([3,1,4,1,5]) should be 5")
+(print "✓ min/max work")
+
+# Test 19: Sorted function
+(print "\nTest 19: Sorted")
+(= unsorted [3, 1, 4, 1, 5])
+(= sorted_list sorted(unsorted))
+(assert (== sorted_list [1, 1, 3, 4, 5]) "sorted should work")
+(print "✓ sorted() works")
+
+# Test 20: Reversed function
+(print "\nTest 20: Reversed")
+(= original [1, 2, 3])
+(= reversed_list list(reversed(original)))
+(assert (== reversed_list [3, 2, 1]) "reversed should work")
+(print "✓ reversed() works")
+
+# Test 21: Enumerate
+(print "\nTest 21: Enumerate")
+(= items ["a", "b", "c"])
+(= enum_list list(enumerate(items)))
+(assert (== (len enum_list) 3) "enumerate should work")
+(print "✓ enumerate() works")
+
+# Test 22: Zip
+(print "\nTest 22: Zip")
+(= a [1, 2, 3])
+(= b ["a", "b", "c"])
+(= zipped list(zip(a, b)))
+(assert (== (len zipped) 3) "zip should work")
+(print "✓ zip() works")
+
+# Test 23: Map function
+(print "\nTest 23: Map")
+(= nums3 [1, 2, 3])
+(= doubled list(map((lambda (x) (* x 2)), nums3)))
+(assert (== doubled [2, 4, 6]) "map should work")
+(print "✓ map() works")
+
+# Test 24: Filter function
+(print "\nTest 24: Filter")
+(= nums4 [1, 2, 3, 4, 5])
+(= evens list(filter((lambda (x) (== (% x 2) 0)), nums4)))
+(assert (== evens [2, 4]) "filter should work")
+(print "✓ filter() works")
+
+# Test 25: All/any functions
+(print "\nTest 25: All/any")
+(= all_true all([True, True, True]))
+(= any_true any([False, True, False]))
+(assert all_true "all() should work")
+(assert any_true "any() should work")
+(print "✓ all/any work")
+
+# Test 26: Abs/round functions
+(print "\nTest 26: Abs/round")
+(= abs_val abs(-42))
+(= rounded round(3.7))
+(assert (== abs_val 42) "abs(-42) should be 42")
+(assert (== rounded 4) "round(3.7) should be 4")
+(print "✓ abs/round work")
+
+# Test 27: Pow function
+(print "\nTest 27: Pow")
+(= power pow(2, 10))
+(assert (== power 1024) "pow(2, 10) should be 1024")
+(print "✓ pow() works")
+
+# Test 28: Chain multiple calls
+(print "\nTest 28: Chained calls")
+(= result28 len(list(range(5))))
+(assert (== result28 5) "Chained calls should work")
+(print "✓ Chained calls work")
+
+# Test 29: Tuple constructor
+(print "\nTest 29: Tuple")
+(= t tuple([1, 2, 3]))
+(assert (== (len t) 3) "tuple() should work")
+(print "✓ tuple() works")
+
+# Test 30: Real-world example
+(print "\nTest 30: Real-world example")
+(= numbers [5, 2, 8, 1, 9])
+(= total sum(numbers))
+(= count len(numbers))
+(= avg (/ total count))
+(assert (== avg 5) "Average calculation should work")
+print(f"Average of {numbers} is {avg}")
+(print "✓ Real-world example works")
+
+(print "\n=== All Pythonic Function Call Tests Passed! ===")

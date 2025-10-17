@@ -56,6 +56,9 @@ const (
 	TOKEN_IS     // is
 	TOKEN_IS_NOT // is not
 
+	// Definition keyword
+	TOKEN_DEF // def
+
 	// Assignment Operators
 	TOKEN_ASSIGN          // =
 	TOKEN_PLUS_EQ         // +=
@@ -126,7 +129,7 @@ func (t Token) IsLiteral() bool {
 
 // IsKeyword returns true if the token is a keyword
 func (t Token) IsKeyword() bool {
-	return t.Type >= TOKEN_AND && t.Type <= TOKEN_IS_NOT
+	return t.Type >= TOKEN_AND && t.Type <= TOKEN_DEF
 }
 
 // String returns the name of the token type
@@ -200,6 +203,8 @@ func (tt TokenType) String() string {
 		return "IS"
 	case TOKEN_IS_NOT:
 		return "IS_NOT"
+	case TOKEN_DEF:
+		return "DEF"
 	case TOKEN_ASSIGN:
 		return "ASSIGN"
 	case TOKEN_PLUS_EQ:

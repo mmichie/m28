@@ -1,0 +1,224 @@
+# Test Pythonic Def Syntax
+# Tests the new def name(params): expr sugar that transforms to (def name (params) expr)
+
+(print "=== Pythonic Def Syntax Tests ===\n")
+
+# Test 1: Basic function with no parameters
+(print "Test 1: Zero-parameter function")
+def get_ten(): 10
+(assert (== (get_ten) 10) "def get_ten(): 10 should work")
+(print "✓ Zero-parameter function works")
+
+# Test 2: Single parameter function
+(print "\nTest 2: Single parameter function")
+def double(x): (* x 2)
+(assert (== (double 5) 10) "def double(x): (* x 2) should work")
+(print "✓ Single parameter function works")
+
+# Test 3: Multiple parameters
+(print "\nTest 3: Multiple parameters")
+def add(a, b): (+ a b)
+(assert (== (add 3 4) 7) "def add(a, b): (+ a b) should work")
+(print "✓ Multiple parameters work")
+
+# Test 4: Function with Pythonic call in body
+(print "\nTest 4: Pythonic call in body")
+def square_sum(a, b): (+ (* a a) (* b b))
+(assert (== (square_sum 3 4) 25) "def square_sum should work")
+(print "✓ Pythonic call in body works")
+
+# Test 5: Function returning list
+(print "\nTest 5: Function returning list")
+def make_list(a, b, c): [a, b, c]
+result5 = make_list(1, 2, 3)
+(assert (== result5 [1, 2, 3]) "def make_list should work")
+(print "✓ Function returning list works")
+
+# Test 6: Function with comprehension
+(print "\nTest 6: Function with comprehension")
+def squares(n): [x*x for x in range(n)]
+result6 = squares(5)
+(assert (== result6 [0, 1, 4, 9, 16]) "def squares should work")
+(print "✓ Function with comprehension works")
+
+# Test 7: Function with f-string
+(print "\nTest 7: Function with f-string")
+def greet(name): f"Hello, {name}!"
+result7 = greet("Alice")
+(assert (== result7 "Hello, Alice!") "def greet should work")
+(print "✓ Function with f-string works")
+
+# Test 8: Function with conditional
+(print "\nTest 8: Function with conditional")
+def abs_val(x): (if (< x 0) (- x) x)
+(assert (== (abs_val -5) 5) "abs_val(-5) should be 5")
+(assert (== (abs_val 3) 3) "abs_val(3) should be 3")
+(print "✓ Function with conditional works")
+
+# Test 9: Function calling another function
+(print "\nTest 9: Function calling another function")
+def triple(x): (* x 3)
+def triple_sum(a, b): triple((+ a b))
+result9 = triple_sum(2, 3)
+(assert (== result9 15) "triple_sum(2, 3) should be 15")
+(print "✓ Function calling another function works")
+
+# Test 10: Mixed styles - Pythonic def with S-expression body
+(print "\nTest 10: Mixed styles")
+def mixed_add(a, b, c): (+ a b c)
+pythonic_result = mixed_add(1, 2, 3)
+(assert (== pythonic_result 6) "Mixed style should work")
+(print "✓ Mixed styles work")
+
+# Test 11: S-expression def still works
+(print "\nTest 11: S-expression def compatibility")
+(def sexp_multiply (x y) (* x y))
+sexp_result = sexp_multiply(4, 5)
+(assert (== sexp_result 20) "S-expression def should still work")
+(print "✓ S-expression def still works")
+
+# Test 12: Using Pythonic function with Pythonic calls
+(print "\nTest 12: All Pythonic syntax")
+def process_list(nums): sum([x*x for x in nums])
+data12 = [1, 2, 3, 4]
+result12 = process_list(data12)
+(assert (== result12 30) "All Pythonic syntax should work")
+(print "✓ All Pythonic syntax works")
+
+# Test 13: Function with dict
+(print "\nTest 13: Function returning dict")
+def make_person(name, age): {"name": name, "age": age}
+person13 = make_person("Bob", 30)
+(assert (== person13.name "Bob") "Person name should be Bob")
+(assert (== person13.age 30) "Person age should be 30")
+(print "✓ Function returning dict works")
+
+# Test 14: Higher-order function
+(print "\nTest 14: Higher-order function")
+def apply_twice(f, x): f(f(x))
+def inc(n): (+ n 1)
+result14 = apply_twice(inc, 10)
+(assert (== result14 12) "apply_twice should work")
+(print "✓ Higher-order function works")
+
+# Test 15: Function with default behavior using or
+(print "\nTest 15: Function with default pattern")
+def get_value(x): (if (== x None) 0 x)
+(assert (== (get_value None) 0) "get_value(None) should be 0")
+(assert (== (get_value 5) 5) "get_value(5) should be 5")
+(print "✓ Default pattern works")
+
+# Test 16: Recursive function
+(print "\nTest 16: Recursive function")
+def factorial(n): (if (<= n 1) 1 (* n (factorial (- n 1))))
+result16 = factorial(5)
+(assert (== result16 120) "factorial(5) should be 120")
+(print "✓ Recursive function works")
+
+# Test 17: Function with type checking
+(print "\nTest 17: Function with type checking")
+def is_list_type(x): isinstance(x, "list")
+(assert (is_list_type [1, 2, 3]) "Should identify list")
+(assert (not (is_list_type "hello")) "Should not identify string as list")
+(print "✓ Type checking function works")
+
+# Test 18: Function with string operations
+(print "\nTest 18: Function with string operations")
+def shout(text): f"{text}!"
+result18 = shout("Hello")
+(assert (== result18 "Hello!") "shout should add exclamation")
+(print "✓ String operation function works")
+
+# Test 19: Function with tuple
+(print "\nTest 19: Function with tuple")
+def make_tuple(a, b): tuple([a, b])
+result19 = make_tuple(10, 20)
+(assert (== (len result19) 2) "Tuple should have 2 elements")
+(print "✓ Tuple function works")
+
+# Test 20: Function with range
+(print "\nTest 20: Function with range")
+def sum_range(n): sum(list(range(n)))
+result20 = sum_range(10)
+(assert (== result20 45) "sum_range(10) should be 45")
+(print "✓ Range function works")
+
+# Test 21: Function with filter pattern
+(print "\nTest 21: Function with filter")
+def get_evens(nums): [x for x in nums if (== (% x 2) 0)]
+result21 = get_evens([1, 2, 3, 4, 5, 6])
+(assert (== result21 [2, 4, 6]) "get_evens should filter evens")
+(print "✓ Filter pattern works")
+
+# Test 22: Function with map pattern
+(print "\nTest 22: Function with map")
+def double_all(nums): [x*2 for x in nums]
+result22 = double_all([1, 2, 3])
+(assert (== result22 [2, 4, 6]) "double_all should double all")
+(print "✓ Map pattern works")
+
+# Test 23: Lambda vs def
+(print "\nTest 23: Lambda vs def comparison")
+def add_ten_test(x): (+ x 10)
+lambda_func = (lambda (x) (+ x 10))
+(assert (== (add_ten_test 5) (lambda_func 5)) "def and lambda should work similarly")
+(print "✓ Lambda vs def comparison works")
+
+# Test 24: Function with chained operations
+(print "\nTest 24: Chained operations")
+def process(x): (+ (* x 2) 1)
+result24 = process(5)
+(assert (== result24 11) "process(5) should be 11")
+(print "✓ Chained operations work")
+
+# Test 25: Function with boolean logic
+(print "\nTest 25: Boolean logic in function")
+def is_in_range(x, low, high): (and (>= x low) (<= x high))
+(assert (is_in_range 5 1 10) "5 should be in range [1,10]")
+(assert (not (is_in_range 15 1 10)) "15 should not be in range [1,10]")
+(print "✓ Boolean logic works")
+
+# Test 26: Function with set operations
+(print "\nTest 26: Set operations")
+def unique_items(lst): set(lst)
+result26 = unique_items([1, 2, 2, 3, 3, 3])
+(assert (== (len result26) 3) "Should have 3 unique items")
+(print "✓ Set operations work")
+
+# Test 27: Function composition pattern
+(print "\nTest 27: Function composition")
+def add_one(x): (+ x 1)
+def times_two(x): (* x 2)
+def compose(x): times_two(add_one(x))
+result27 = compose(5)
+(assert (== result27 12) "compose(5) should be 12")
+(print "✓ Function composition works")
+
+# Test 28: Function with comparison
+(print "\nTest 28: Comparison function")
+def max_of_two(a, b): (if (> a b) a b)
+(assert (== (max_of_two 5 3) 5) "max_of_two(5, 3) should be 5")
+(assert (== (max_of_two 2 7) 7) "max_of_two(2, 7) should be 7")
+(print "✓ Comparison function works")
+
+# Test 29: Function with list operations
+(print "\nTest 29: List operations")
+def first_item(lst): (get-item lst 0)
+result29 = first_item([10, 20, 30])
+(assert (== result29 10) "first_item should return first element")
+(print "✓ List operations work")
+
+# Test 30: Real-world example - data processing pipeline
+(print "\nTest 30: Real-world data pipeline")
+def clean_data(nums): [x for x in nums if (!= x None)]
+def normalize(nums): [(/ x (max nums)) for x in nums]
+def process_pipeline(data): normalize(clean_data(data))
+
+raw_data = [10, None, 20, 30, None, 40]
+result30 = process_pipeline(raw_data)
+(assert (== (len result30) 4) "Should have 4 clean items")
+(assert (== (first_item result30) 0.25) "First normalized value should be 0.25")
+print(f"Pipeline result: {result30}")
+(print "✓ Real-world pipeline works")
+
+(print "\n=== All Pythonic Def Tests Passed! ===")
