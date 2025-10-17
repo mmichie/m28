@@ -48,6 +48,46 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	if found {
+		// Handle property descriptor protocol
+		if prop, ok := value.(*core.PropertyValue); ok {
+			// It's a property - call the getter
+			if prop.Getter == nil {
+				return nil, fmt.Errorf("unreadable attribute '%s'", string(propName))
+			}
+
+			// Call the getter with the object as self
+			if getter, ok := prop.Getter.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				return getter.Call([]core.Value{obj}, ctx)
+			}
+			return nil, fmt.Errorf("property getter is not callable")
+		}
+
+		// Handle staticmethod - unwrap to the underlying function
+		if sm, ok := value.(*core.StaticMethodValue); ok {
+			value = sm.Function
+		}
+
+		// Handle classmethod - bind to the class
+		if cm, ok := value.(*core.ClassMethodValue); ok {
+			// Get the class - either the object itself (if accessing from class)
+			// or the object's __class__ attribute (if accessing from instance)
+			cls := obj
+			if objWithClass, ok := obj.(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if classVal, found := objWithClass.GetAttr("__class__"); found {
+					cls = classVal
+				}
+			}
+
+			// Create a bound classmethod that will inject the class as first argument
+			value = &core.BoundClassMethod{
+				Class:    cls,
+				Function: cm.Function,
+			}
+		}
 
 		// If there are more arguments (even if just __call__ marker), it's a method call
 		if len(args) > 2 {

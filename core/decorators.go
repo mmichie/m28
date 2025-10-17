@@ -1,0 +1,137 @@
+package core
+
+import (
+	"fmt"
+)
+
+// PropertyValue represents a Python property descriptor
+type PropertyValue struct {
+	Getter  Value
+	Setter  Value
+	Deleter Value
+}
+
+// Type implements Value.Type
+func (p *PropertyValue) Type() Type {
+	return "property"
+}
+
+// String implements Value.String
+func (p *PropertyValue) String() string {
+	return "<property>"
+}
+
+// GetAttr retrieves an attribute
+func (p *PropertyValue) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "fget":
+		return p.Getter, true
+	case "fset":
+		if p.Setter != nil {
+			return p.Setter, true
+		}
+	case "fdel":
+		if p.Deleter != nil {
+			return p.Deleter, true
+		}
+	case "setter":
+		// Return a function that creates a new property with a setter
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("setter() takes exactly 1 argument")
+			}
+			return &PropertyValue{
+				Getter:  p.Getter,
+				Setter:  args[0],
+				Deleter: p.Deleter,
+			}, nil
+		}), true
+	case "deleter":
+		// Return a function that creates a new property with a deleter
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("deleter() takes exactly 1 argument")
+			}
+			return &PropertyValue{
+				Getter:  p.Getter,
+				Setter:  p.Setter,
+				Deleter: args[0],
+			}, nil
+		}), true
+	}
+	return nil, false
+}
+
+// SetAttr sets an attribute
+func (p *PropertyValue) SetAttr(name string, value Value) error {
+	return fmt.Errorf("cannot set attributes on property")
+}
+
+// StaticMethodValue represents a Python static method
+type StaticMethodValue struct {
+	Function Value
+}
+
+// Type implements Value.Type
+func (s *StaticMethodValue) Type() Type {
+	return "staticmethod"
+}
+
+// String implements Value.String
+func (s *StaticMethodValue) String() string {
+	return "<staticmethod>"
+}
+
+// Call implements Callable.Call
+func (s *StaticMethodValue) Call(args []Value, ctx *Context) (Value, error) {
+	if callable, ok := s.Function.(Callable); ok {
+		return callable.Call(args, ctx)
+	}
+	return nil, fmt.Errorf("staticmethod function is not callable")
+}
+
+// ClassMethodValue represents a Python class method
+type ClassMethodValue struct {
+	Function Value
+}
+
+// Type implements Value.Type
+func (c *ClassMethodValue) Type() Type {
+	return "classmethod"
+}
+
+// String implements Value.String
+func (c *ClassMethodValue) String() string {
+	return "<classmethod>"
+}
+
+// BoundClassMethod represents a class method bound to a specific class
+type BoundClassMethod struct {
+	Class    Value
+	Function Value
+}
+
+// Type implements Value.Type
+func (b *BoundClassMethod) Type() Type {
+	return MethodType
+}
+
+// String implements Value.String
+func (b *BoundClassMethod) String() string {
+	return fmt.Sprintf("<bound classmethod of %s>", b.Class.String())
+}
+
+// Call implements Callable.Call
+// Automatically injects the class as the first argument
+func (b *BoundClassMethod) Call(args []Value, ctx *Context) (Value, error) {
+	// Prepend the class to the arguments
+	classMethodArgs := make([]Value, len(args)+1)
+	classMethodArgs[0] = b.Class
+	copy(classMethodArgs[1:], args)
+
+	// Call the underlying function with class as first arg
+	if callable, ok := b.Function.(Callable); ok {
+		return callable.Call(classMethodArgs, ctx)
+	}
+	return nil, fmt.Errorf("classmethod function is not callable")
+}

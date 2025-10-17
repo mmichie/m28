@@ -12,6 +12,15 @@ import (
 func RegisterDecorators(ctx *core.Context) {
 	// Register the macro decorator
 	ctx.Define("macro", core.NewBuiltinFunction(macroDecorator()))
+
+	// property - converts a method into a property (getter)
+	ctx.Define("property", core.NewBuiltinFunction(propertyDecorator))
+
+	// staticmethod - makes a method static (no self parameter)
+	ctx.Define("staticmethod", core.NewBuiltinFunction(staticmethodDecorator))
+
+	// classmethod - makes a method receive the class as first parameter
+	ctx.Define("classmethod", core.NewBuiltinFunction(classmethodDecorator))
 }
 
 // macroDecorator creates the built-in macro decorator
@@ -44,4 +53,64 @@ func macroDecorator() func(args []core.Value, ctx *core.Context) (core.Value, er
 		// Return the modified function
 		return fn, nil
 	}
+}
+
+// propertyDecorator creates a property from a getter function
+// Usage: @property
+//
+//	def name(self): return self._name
+func propertyDecorator(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("property() takes exactly 1 argument (%d given)", len(args))
+	}
+
+	getter := args[0]
+
+	// Create a property object
+	// A property is a special object that intercepts attribute access
+	prop := &core.PropertyValue{
+		Getter:  getter,
+		Setter:  nil,
+		Deleter: nil,
+	}
+
+	return prop, nil
+}
+
+// staticmethodDecorator creates a static method
+// Usage: @staticmethod
+//
+//	def func(): pass
+func staticmethodDecorator(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("staticmethod() takes exactly 1 argument (%d given)", len(args))
+	}
+
+	function := args[0]
+
+	// Wrap the function in a StaticMethod object
+	sm := &core.StaticMethodValue{
+		Function: function,
+	}
+
+	return sm, nil
+}
+
+// classmethodDecorator creates a class method
+// Usage: @classmethod
+//
+//	def func(cls): pass
+func classmethodDecorator(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("classmethod() takes exactly 1 argument (%d given)", len(args))
+	}
+
+	function := args[0]
+
+	// Wrap the function in a ClassMethod object
+	cm := &core.ClassMethodValue{
+		Function: function,
+	}
+
+	return cm, nil
 }
