@@ -1,0 +1,871 @@
+package parser
+
+import (
+	"fmt"
+
+	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/ast"
+)
+
+// PythonParser implements a recursive descent parser for Python syntax
+type PythonParser struct {
+	tokens  []Token
+	current int
+	errors  []error
+	panic   bool // panic mode for error recovery
+}
+
+// NewPythonParser creates a new Python parser from a token stream
+func NewPythonParser(tokens []Token) *PythonParser {
+	return &PythonParser{
+		tokens:  tokens,
+		current: 0,
+		errors:  []error{},
+		panic:   false,
+	}
+}
+
+// Parse parses the token stream into a list of AST nodes
+func (p *PythonParser) Parse() ([]ast.ASTNode, error) {
+	statements := []ast.ASTNode{}
+
+	for !p.isAtEnd() {
+		// Skip any leading newlines
+		for p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+
+		if p.isAtEnd() {
+			break
+		}
+
+		stmt := p.parseStatement()
+		if stmt != nil {
+			statements = append(statements, stmt)
+		}
+
+		// If we hit an error, synchronize
+		if p.panic {
+			p.synchronize()
+		}
+	}
+
+	if len(p.errors) > 0 {
+		return statements, fmt.Errorf("parse errors: %v", p.errors)
+	}
+
+	return statements, nil
+}
+
+// ============================================================================
+// Token Navigation
+// ============================================================================
+
+// isAtEnd returns true if we've consumed all tokens
+func (p *PythonParser) isAtEnd() bool {
+	return p.current >= len(p.tokens) || p.peek().Type == TOKEN_EOF
+}
+
+// peek returns the current token without advancing
+func (p *PythonParser) peek() Token {
+	if p.current >= len(p.tokens) {
+		return Token{Type: TOKEN_EOF}
+	}
+	return p.tokens[p.current]
+}
+
+// previous returns the previous token
+func (p *PythonParser) previous() Token {
+	if p.current == 0 {
+		return Token{Type: TOKEN_EOF}
+	}
+	return p.tokens[p.current-1]
+}
+
+// advance consumes and returns the current token
+func (p *PythonParser) advance() Token {
+	if !p.isAtEnd() {
+		p.current++
+	}
+	return p.previous()
+}
+
+// check returns true if the current token is of the given type
+func (p *PythonParser) check(typ TokenType) bool {
+	if p.isAtEnd() {
+		return false
+	}
+	return p.peek().Type == typ
+}
+
+// match advances if the current token matches any of the given types
+func (p *PythonParser) match(types ...TokenType) bool {
+	for _, typ := range types {
+		if p.check(typ) {
+			p.advance()
+			return true
+		}
+	}
+	return false
+}
+
+// expect consumes a token of the given type or reports an error
+func (p *PythonParser) expect(typ TokenType) Token {
+	if p.check(typ) {
+		return p.advance()
+	}
+
+	p.error(fmt.Sprintf("Expected %v, got %v", typ, p.peek().Type))
+	return Token{Type: TOKEN_ERROR}
+}
+
+// ============================================================================
+// Error Handling
+// ============================================================================
+
+// error records a parse error
+func (p *PythonParser) error(message string) {
+	if p.panic {
+		return // Don't cascade errors
+	}
+
+	p.panic = true
+	tok := p.peek()
+	err := fmt.Errorf("parse error at line %d, col %d: %s (near %q)",
+		tok.Line, tok.Col, message, tok.Lexeme)
+	p.errors = append(p.errors, err)
+}
+
+// synchronize recovers from a parse error by advancing to the next statement boundary
+func (p *PythonParser) synchronize() {
+	p.panic = false
+
+	for !p.isAtEnd() {
+		// Found a statement boundary (newline or dedent)
+		if p.previous().Type == TOKEN_NEWLINE || p.previous().Type == TOKEN_DEDENT {
+			return
+		}
+
+		// At the start of a new statement
+		switch p.peek().Type {
+		case TOKEN_DEF, TOKEN_CLASS, TOKEN_IF, TOKEN_FOR,
+			TOKEN_WHILE, TOKEN_TRY, TOKEN_WITH, TOKEN_RETURN,
+			TOKEN_BREAK, TOKEN_CONTINUE, TOKEN_PASS, TOKEN_RAISE,
+			TOKEN_IMPORT, TOKEN_FROM:
+			return
+		}
+
+		p.advance()
+	}
+}
+
+// makeLocation creates a SourceLocation from a token
+func (p *PythonParser) makeLocation(tok Token) *core.SourceLocation {
+	return &core.SourceLocation{
+		File:   "<input>",
+		Line:   tok.Line,
+		Column: tok.Col,
+	}
+}
+
+// ============================================================================
+// Statement Parsing
+// ============================================================================
+
+// parseStatement parses a single statement
+func (p *PythonParser) parseStatement() ast.ASTNode {
+	// Check for decorators first (can precede def or class)
+	if p.check(TOKEN_AT) {
+		decorators := p.parseDecorators()
+
+		// Decorators must be followed by def or class
+		if p.check(TOKEN_DEF) {
+			return p.parseDefStatement(decorators)
+		} else if p.check(TOKEN_CLASS) {
+			return p.parseClassStatement(decorators)
+		} else {
+			p.error("Decorators must precede 'def' or 'class'")
+			return nil
+		}
+	}
+
+	// Simple statements
+	switch p.peek().Type {
+	case TOKEN_DEF:
+		return p.parseDefStatement(nil)
+	case TOKEN_CLASS:
+		return p.parseClassStatement(nil)
+	case TOKEN_IF:
+		return p.parseIfStatement()
+	case TOKEN_FOR:
+		return p.parseForStatement()
+	case TOKEN_WHILE:
+		return p.parseWhileStatement()
+	case TOKEN_TRY:
+		return p.parseTryStatement()
+	case TOKEN_WITH:
+		return p.parseWithStatement()
+	case TOKEN_RETURN:
+		return p.parseReturnStatement()
+	case TOKEN_BREAK:
+		return p.parseBreakStatement()
+	case TOKEN_CONTINUE:
+		return p.parseContinueStatement()
+	case TOKEN_PASS:
+		return p.parsePassStatement()
+	case TOKEN_RAISE:
+		return p.parseRaiseStatement()
+	default:
+		// Expression statement (could be assignment)
+		return p.parseExpressionStatement()
+	}
+}
+
+// ============================================================================
+// Simple Statement Parsing
+// ============================================================================
+
+// parseReturnStatement parses: return [expression]
+func (p *PythonParser) parseReturnStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_RETURN)
+
+	var value ast.ASTNode
+	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
+		value = p.parseExpression()
+	}
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewReturnForm(value, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseBreakStatement parses: break
+func (p *PythonParser) parseBreakStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_BREAK)
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewBreakForm(p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseContinueStatement parses: continue
+func (p *PythonParser) parseContinueStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_CONTINUE)
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewContinueForm(p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parsePassStatement parses: pass
+func (p *PythonParser) parsePassStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_PASS)
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewPassForm(p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseRaiseStatement parses: raise [exception [from cause]]
+func (p *PythonParser) parseRaiseStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_RAISE)
+
+	var exception, cause ast.ASTNode
+
+	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
+		exception = p.parseExpression()
+
+		// Check for 'from' clause
+		if p.check(TOKEN_FROM) {
+			p.advance()
+			cause = p.parseExpression()
+		}
+	}
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewRaiseForm(exception, cause, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseExpressionStatement parses an expression or assignment statement
+func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
+	expr := p.parseExpression()
+
+	// Check for assignment
+	if p.check(TOKEN_ASSIGN) {
+		tok := p.advance()
+		value := p.parseExpression()
+
+		// Consume newline
+		if p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+
+		return ast.NewAssignForm(expr, value, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Check for augmented assignment (+=, -=, etc.)
+	if p.match(TOKEN_PLUS_ASSIGN, TOKEN_MINUS_ASSIGN, TOKEN_STAR_ASSIGN,
+		TOKEN_SLASH_ASSIGN, TOKEN_DOUBLESLASH_ASSIGN, TOKEN_PERCENT_ASSIGN) {
+		tok := p.previous()
+		value := p.parseExpression()
+
+		// Convert augmented assignment to regular assignment
+		// x += 1 → x = x + 1
+		var op string
+		switch tok.Type {
+		case TOKEN_PLUS_ASSIGN:
+			op = "+"
+		case TOKEN_MINUS_ASSIGN:
+			op = "-"
+		case TOKEN_STAR_ASSIGN:
+			op = "*"
+		case TOKEN_SLASH_ASSIGN:
+			op = "/"
+		case TOKEN_DOUBLESLASH_ASSIGN:
+			op = "//"
+		case TOKEN_PERCENT_ASSIGN:
+			op = "%"
+		}
+
+		opCall := ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			value,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+
+		// Consume newline
+		if p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+
+		return ast.NewAssignForm(expr, opCall, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Bare expression statement
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return expr
+}
+
+// ============================================================================
+// Expression Parsing (Precedence Climbing)
+// ============================================================================
+
+// parseExpression is the entry point for expression parsing
+func (p *PythonParser) parseExpression() ast.ASTNode {
+	return p.parseOr()
+}
+
+// parseOr parses: and_expr (or and_expr)*
+func (p *PythonParser) parseOr() ast.ASTNode {
+	expr := p.parseAnd()
+
+	for p.check(TOKEN_OR) {
+		tok := p.advance()
+		right := p.parseAnd()
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("or", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseAnd parses: not_expr (and not_expr)*
+func (p *PythonParser) parseAnd() ast.ASTNode {
+	expr := p.parseNot()
+
+	for p.check(TOKEN_AND) {
+		tok := p.advance()
+		right := p.parseNot()
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseNot parses: not not_expr | comparison
+func (p *PythonParser) parseNot() ast.ASTNode {
+	if p.check(TOKEN_NOT) {
+		tok := p.advance()
+		expr := p.parseNot()
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("not", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return p.parseComparison()
+}
+
+// parseComparison parses: addition (comp_op addition)*
+func (p *PythonParser) parseComparison() ast.ASTNode {
+	expr := p.parseAddition()
+
+	for p.match(TOKEN_EQUALEQUAL, TOKEN_NOTEQUAL, TOKEN_LESS, TOKEN_LESSEQUAL,
+		TOKEN_GREATER, TOKEN_GREATEREQUAL, TOKEN_IN, TOKEN_IS) {
+		tok := p.previous()
+		right := p.parseAddition()
+
+		var op string
+		switch tok.Type {
+		case TOKEN_EQUALEQUAL:
+			op = "=="
+		case TOKEN_NOTEQUAL:
+			op = "!="
+		case TOKEN_LESS:
+			op = "<"
+		case TOKEN_LESSEQUAL:
+			op = "<="
+		case TOKEN_GREATER:
+			op = ">"
+		case TOKEN_GREATEREQUAL:
+			op = ">="
+		case TOKEN_IN:
+			op = "in"
+		case TOKEN_IS:
+			op = "is"
+		}
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseAddition parses: multiplication ((+|-) multiplication)*
+func (p *PythonParser) parseAddition() ast.ASTNode {
+	expr := p.parseMultiplication()
+
+	for p.match(TOKEN_PLUS, TOKEN_MINUS) {
+		tok := p.previous()
+		right := p.parseMultiplication()
+
+		var op string
+		if tok.Type == TOKEN_PLUS {
+			op = "+"
+		} else {
+			op = "-"
+		}
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseMultiplication parses: unary ((*|/|//|%) unary)*
+func (p *PythonParser) parseMultiplication() ast.ASTNode {
+	expr := p.parseUnary()
+
+	for p.match(TOKEN_STAR, TOKEN_SLASH, TOKEN_DOUBLESLASH, TOKEN_PERCENT) {
+		tok := p.previous()
+		right := p.parseUnary()
+
+		var op string
+		switch tok.Type {
+		case TOKEN_STAR:
+			op = "*"
+		case TOKEN_SLASH:
+			op = "/"
+		case TOKEN_DOUBLESLASH:
+			op = "//"
+		case TOKEN_PERCENT:
+			op = "%"
+		}
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseUnary parses: (-|+|~) unary | postfix
+func (p *PythonParser) parseUnary() ast.ASTNode {
+	if p.match(TOKEN_MINUS, TOKEN_PLUS, TOKEN_TILDE) {
+		tok := p.previous()
+		expr := p.parseUnary()
+
+		var op string
+		switch tok.Type {
+		case TOKEN_MINUS:
+			op = "-"
+		case TOKEN_PLUS:
+			op = "+"
+		case TOKEN_TILDE:
+			op = "~"
+		}
+
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return p.parsePostfix()
+}
+
+// parsePostfix parses: primary (call | subscript | attribute)*
+func (p *PythonParser) parsePostfix() ast.ASTNode {
+	expr := p.parsePrimary()
+
+	for {
+		if p.check(TOKEN_LPAREN) {
+			// Function call
+			expr = p.parseCall(expr)
+		} else if p.check(TOKEN_LBRACKET) {
+			// Subscript
+			expr = p.parseSubscript(expr)
+		} else if p.check(TOKEN_DOT) {
+			// Attribute access
+			expr = p.parseAttribute(expr)
+		} else {
+			break
+		}
+	}
+
+	return expr
+}
+
+// parseCall parses: (args)
+func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
+	tok := p.expect(TOKEN_LPAREN)
+
+	args := []ast.ASTNode{callee}
+
+	if !p.check(TOKEN_RPAREN) {
+		for {
+			args = append(args, p.parseExpression())
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance()
+		}
+	}
+
+	p.expect(TOKEN_RPAREN)
+
+	return ast.NewSExpr(args, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseSubscript parses: [index]
+func (p *PythonParser) parseSubscript(obj ast.ASTNode) ast.ASTNode {
+	tok := p.expect(TOKEN_LBRACKET)
+	index := p.parseExpression()
+	p.expect(TOKEN_RBRACKET)
+
+	return ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier("[]", p.makeLocation(tok), ast.SyntaxPython),
+		obj,
+		index,
+	}, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseAttribute parses: .name
+func (p *PythonParser) parseAttribute(obj ast.ASTNode) ast.ASTNode {
+	tok := p.expect(TOKEN_DOT)
+	name := p.expect(TOKEN_IDENTIFIER)
+
+	return ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier(".", p.makeLocation(tok), ast.SyntaxPython),
+		obj,
+		ast.NewLiteral(core.StringValue(name.Lexeme), p.makeLocation(name), ast.SyntaxPython),
+	}, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// ============================================================================
+// Primary Expression Parsing
+// ============================================================================
+
+// parsePrimary parses atoms: identifiers, literals, parens, lists, dicts, sets
+func (p *PythonParser) parsePrimary() ast.ASTNode {
+	tok := p.peek()
+
+	switch tok.Type {
+	case TOKEN_IDENTIFIER:
+		p.advance()
+		return ast.NewIdentifier(tok.Lexeme, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_NUMBER, TOKEN_STRING:
+		p.advance()
+		return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_TRUE:
+		p.advance()
+		return ast.NewLiteral(core.BoolValue(true), p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_FALSE:
+		p.advance()
+		return ast.NewLiteral(core.BoolValue(false), p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_NIL:
+		p.advance()
+		return ast.NewLiteral(core.None, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_LPAREN:
+		// Parenthesized expression or generator expression
+		return p.parseParenthesized()
+
+	case TOKEN_LBRACKET:
+		// List literal or list comprehension
+		return p.parseListLiteral()
+
+	case TOKEN_LBRACE:
+		// Dict literal, set literal, or comprehension
+		return p.parseDictOrSetLiteral()
+
+	default:
+		p.error(fmt.Sprintf("Unexpected token in expression: %v", tok.Type))
+		return nil
+	}
+}
+
+// parseParenthesized parses: (expression)
+func (p *PythonParser) parseParenthesized() ast.ASTNode {
+	p.expect(TOKEN_LPAREN)
+	expr := p.parseExpression()
+	p.expect(TOKEN_RPAREN)
+	return expr
+}
+
+// parseListLiteral parses: [elements] or [expr for var in iter]
+func (p *PythonParser) parseListLiteral() ast.ASTNode {
+	tok := p.expect(TOKEN_LBRACKET)
+
+	if p.check(TOKEN_RBRACKET) {
+		// Empty list
+		p.advance()
+		return ast.NewLiteral(core.ListValue{}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse first element
+	first := p.parseExpression()
+
+	// Check if it's a comprehension
+	if p.check(TOKEN_FOR) {
+		return p.parseListComprehension(first, tok)
+	}
+
+	// Regular list
+	elements := []ast.ASTNode{first}
+
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		if p.check(TOKEN_RBRACKET) {
+			break // Trailing comma
+		}
+		elements = append(elements, p.parseExpression())
+	}
+
+	p.expect(TOKEN_RBRACKET)
+
+	// Convert to ListValue IR
+	values := make(core.ListValue, len(elements))
+	for i, elem := range elements {
+		values[i] = elem.ToIR()
+	}
+
+	return ast.NewLiteral(values, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseDictOrSetLiteral parses: {k:v, ...} or {elem, ...}
+func (p *PythonParser) parseDictOrSetLiteral() ast.ASTNode {
+	tok := p.expect(TOKEN_LBRACE)
+
+	if p.check(TOKEN_RBRACE) {
+		// Empty dict (not set, since {} is dict in Python)
+		p.advance()
+		return ast.NewLiteral(core.NewDict(), p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse first element
+	first := p.parseExpression()
+
+	// Check if it's a dict (has colon) or set (no colon)
+	if p.check(TOKEN_COLON) {
+		return p.parseDictLiteral(first, tok)
+	} else {
+		return p.parseSetLiteral(first, tok)
+	}
+}
+
+// parseDictLiteral parses the rest of: {k: v, ...}
+func (p *PythonParser) parseDictLiteral(firstKey ast.ASTNode, tok Token) ast.ASTNode {
+	p.expect(TOKEN_COLON)
+	firstValue := p.parseExpression()
+
+	// Check if it's a dict comprehension
+	if p.check(TOKEN_FOR) {
+		return p.parseDictComprehension(firstKey, firstValue, tok)
+	}
+
+	// Regular dict
+	dict := core.NewDict()
+	dict.SetValue(firstKey.ToIR(), firstValue.ToIR())
+
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		if p.check(TOKEN_RBRACE) {
+			break // Trailing comma
+		}
+
+		key := p.parseExpression()
+		p.expect(TOKEN_COLON)
+		value := p.parseExpression()
+		dict.SetValue(key.ToIR(), value.ToIR())
+	}
+
+	p.expect(TOKEN_RBRACE)
+
+	return ast.NewLiteral(dict, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseSetLiteral parses the rest of: {elem, ...}
+func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode {
+	// Check if it's a set comprehension
+	if p.check(TOKEN_FOR) {
+		return p.parseSetComprehension(first, tok)
+	}
+
+	// Regular set
+	elements := []core.Value{first.ToIR()}
+
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		if p.check(TOKEN_RBRACE) {
+			break // Trailing comma
+		}
+		elements = append(elements, p.parseExpression().ToIR())
+	}
+
+	p.expect(TOKEN_RBRACE)
+
+	set := core.NewSet()
+	for _, elem := range elements {
+		set.Add(elem)
+	}
+
+	return ast.NewLiteral(set, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// ============================================================================
+// Comprehension Parsing (stub - to be implemented)
+// ============================================================================
+
+func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
+	// TODO: Implement list comprehension parsing
+	p.error("List comprehensions not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token) ast.ASTNode {
+	// TODO: Implement dict comprehension parsing
+	p.error("Dict comprehensions not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
+	// TODO: Implement set comprehension parsing
+	p.error("Set comprehensions not yet implemented")
+	return nil
+}
+
+// ============================================================================
+// Block and Decorator Parsing (stubs - to be implemented)
+// ============================================================================
+
+func (p *PythonParser) parseBlock() []ast.ASTNode {
+	// TODO: Implement block parsing
+	p.error("Blocks not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseDecorators() []ast.ASTNode {
+	// TODO: Implement decorator parsing
+	p.error("Decorators not yet implemented")
+	return nil
+}
+
+// ============================================================================
+// Compound Statement Parsing (stubs - to be implemented)
+// ============================================================================
+
+func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode) ast.ASTNode {
+	// TODO: Implement function definition parsing
+	p.error("Function definitions not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode {
+	// TODO: Implement class definition parsing
+	p.error("Class definitions not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseIfStatement() ast.ASTNode {
+	// TODO: Implement if statement parsing
+	p.error("If statements not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseForStatement() ast.ASTNode {
+	// TODO: Implement for loop parsing
+	p.error("For loops not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseWhileStatement() ast.ASTNode {
+	// TODO: Implement while loop parsing
+	p.error("While loops not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseTryStatement() ast.ASTNode {
+	// TODO: Implement try/except parsing
+	p.error("Try statements not yet implemented")
+	return nil
+}
+
+func (p *PythonParser) parseWithStatement() ast.ASTNode {
+	// TODO: Implement with statement parsing
+	p.error("With statements not yet implemented")
+	return nil
+}
