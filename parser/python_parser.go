@@ -1110,30 +1110,42 @@ func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode
 
 func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
 	// [expr for var in iter if condition]
-	p.expect(TOKEN_FOR)
+	// [expr for var1 in iter1 for var2 in iter2 if condition]
 
-	varTok := p.expect(TOKEN_IDENTIFIER)
-	variable := varTok.Lexeme
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
 
-	p.expect(TOKEN_IN)
-	iterable := p.parseExpression()
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
 
-	var condition ast.ASTNode
-	if p.check(TOKEN_IF) {
-		p.advance()
-		condition = p.parseExpression()
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		variable := varTok.Lexeme
+
+		p.expect(TOKEN_IN)
+		iterable := p.parseExpression()
+
+		var condition ast.ASTNode
+		if p.check(TOKEN_IF) {
+			p.advance()
+			condition = p.parseExpression()
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
 	}
 
 	p.expect(TOKEN_RBRACKET)
 
-	return ast.NewComprehensionForm(
+	// Use the multi-clause constructor
+	return ast.NewComprehensionFormMulti(
 		ast.ListComp,
 		element, // Element expression
 		nil,     // KeyExpr (not used for list comp)
 		nil,     // ValueExpr (not used for list comp)
-		variable,
-		iterable,
-		condition,
+		clauses,
 		p.makeLocation(tok),
 		ast.SyntaxPython,
 	)
@@ -1141,30 +1153,41 @@ func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) as
 
 func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token) ast.ASTNode {
 	// {k: v for var in iter if condition}
-	p.expect(TOKEN_FOR)
+	// {k: v for var1 in iter1 for var2 in iter2 if condition}
 
-	varTok := p.expect(TOKEN_IDENTIFIER)
-	variable := varTok.Lexeme
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
 
-	p.expect(TOKEN_IN)
-	iterable := p.parseExpression()
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
 
-	var condition ast.ASTNode
-	if p.check(TOKEN_IF) {
-		p.advance()
-		condition = p.parseExpression()
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		variable := varTok.Lexeme
+
+		p.expect(TOKEN_IN)
+		iterable := p.parseExpression()
+
+		var condition ast.ASTNode
+		if p.check(TOKEN_IF) {
+			p.advance()
+			condition = p.parseExpression()
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
 	}
 
 	p.expect(TOKEN_RBRACE)
 
-	return ast.NewComprehensionForm(
+	return ast.NewComprehensionFormMulti(
 		ast.DictComp,
 		nil,   // Element (not used for dict comp)
 		key,   // KeyExpr
 		value, // ValueExpr
-		variable,
-		iterable,
-		condition,
+		clauses,
 		p.makeLocation(tok),
 		ast.SyntaxPython,
 	)
@@ -1172,30 +1195,41 @@ func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token)
 
 func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
 	// {expr for var in iter if condition}
-	p.expect(TOKEN_FOR)
+	// {expr for var1 in iter1 for var2 in iter2 if condition}
 
-	varTok := p.expect(TOKEN_IDENTIFIER)
-	variable := varTok.Lexeme
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
 
-	p.expect(TOKEN_IN)
-	iterable := p.parseExpression()
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
 
-	var condition ast.ASTNode
-	if p.check(TOKEN_IF) {
-		p.advance()
-		condition = p.parseExpression()
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		variable := varTok.Lexeme
+
+		p.expect(TOKEN_IN)
+		iterable := p.parseExpression()
+
+		var condition ast.ASTNode
+		if p.check(TOKEN_IF) {
+			p.advance()
+			condition = p.parseExpression()
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
 	}
 
 	p.expect(TOKEN_RBRACE)
 
-	return ast.NewComprehensionForm(
+	return ast.NewComprehensionFormMulti(
 		ast.SetComp,
 		element, // Element expression
 		nil,     // KeyExpr (not used for set comp)
 		nil,     // ValueExpr (not used for set comp)
-		variable,
-		iterable,
-		condition,
+		clauses,
 		p.makeLocation(tok),
 		ast.SyntaxPython,
 	)

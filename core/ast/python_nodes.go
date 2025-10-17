@@ -398,19 +398,31 @@ func (ck ComprehensionKind) String() string {
 	}
 }
 
-// ComprehensionForm represents list/dict/set comprehensions and generator expressions
-type ComprehensionForm struct {
-	BaseNode
-	Kind      ComprehensionKind
-	Element   ASTNode // For list/set/generator: the expression
-	KeyExpr   ASTNode // For dict: key expression
-	ValueExpr ASTNode // For dict: value expression
+// ComprehensionClause represents a single for clause in a comprehension
+// e.g., "for x in items if x > 0"
+type ComprehensionClause struct {
 	Variable  string  // Loop variable
 	Iterable  ASTNode // What to iterate over
 	Condition ASTNode // Optional filter (nil if none)
 }
 
-// NewComprehensionForm creates a new comprehension
+// ComprehensionForm represents list/dict/set comprehensions and generator expressions
+// Supports nested comprehensions via multiple clauses
+type ComprehensionForm struct {
+	BaseNode
+	Kind      ComprehensionKind
+	Element   ASTNode               // For list/set/generator: the expression
+	KeyExpr   ASTNode               // For dict: key expression
+	ValueExpr ASTNode               // For dict: value expression
+	Clauses   []ComprehensionClause // One or more for clauses
+
+	// Deprecated fields - kept for backward compatibility
+	Variable  string  // Use Clauses instead
+	Iterable  ASTNode // Use Clauses instead
+	Condition ASTNode // Use Clauses instead
+}
+
+// NewComprehensionForm creates a new comprehension (legacy single-clause version)
 func NewComprehensionForm(kind ComprehensionKind, element, keyExpr, valueExpr ASTNode,
 	variable string, iterable, condition ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *ComprehensionForm {
 	return &ComprehensionForm{
@@ -422,6 +434,41 @@ func NewComprehensionForm(kind ComprehensionKind, element, keyExpr, valueExpr AS
 		Element:   element,
 		KeyExpr:   keyExpr,
 		ValueExpr: valueExpr,
+		Variable:  variable,
+		Iterable:  iterable,
+		Condition: condition,
+		Clauses: []ComprehensionClause{
+			{
+				Variable:  variable,
+				Iterable:  iterable,
+				Condition: condition,
+			},
+		},
+	}
+}
+
+// NewComprehensionFormMulti creates a new comprehension with multiple clauses (for nested comprehensions)
+func NewComprehensionFormMulti(kind ComprehensionKind, element, keyExpr, valueExpr ASTNode,
+	clauses []ComprehensionClause, loc *core.SourceLocation, syntax SyntaxKind) *ComprehensionForm {
+	// For backward compatibility, set Variable/Iterable/Condition to first clause
+	var variable string
+	var iterable, condition ASTNode
+	if len(clauses) > 0 {
+		variable = clauses[0].Variable
+		iterable = clauses[0].Iterable
+		condition = clauses[0].Condition
+	}
+
+	return &ComprehensionForm{
+		BaseNode: BaseNode{
+			Loc:    loc,
+			Syntax: syntax,
+		},
+		Kind:      kind,
+		Element:   element,
+		KeyExpr:   keyExpr,
+		ValueExpr: valueExpr,
+		Clauses:   clauses,
 		Variable:  variable,
 		Iterable:  iterable,
 		Condition: condition,
@@ -442,8 +489,34 @@ func (c *ComprehensionForm) String() string {
 func (c *ComprehensionForm) ToIR() core.Value {
 	switch c.Kind {
 	case ListComp:
-		// [x*x for x in range(10) if x % 2 == 0]
+		// Single clause: [x*x for x in range(10) if x % 2 == 0]
 		// → (list-comp (* x x) x (range 10) (== (% x 2) 0))
+		//
+		// Multiple clauses: [item for row in matrix for item in row]
+		// → (list-comp item ((row matrix) (item row)))
+
+		if len(c.Clauses) > 1 {
+			// Multi-clause (nested) comprehension
+			clausesIR := make(core.ListValue, 0, len(c.Clauses))
+			for _, clause := range c.Clauses {
+				clauseIR := core.ListValue{
+					core.SymbolValue(clause.Variable),
+					clause.Iterable.ToIR(),
+				}
+				if clause.Condition != nil {
+					clauseIR = append(clauseIR, clause.Condition.ToIR())
+				}
+				clausesIR = append(clausesIR, clauseIR)
+			}
+
+			return core.ListValue{
+				core.SymbolValue("list-comp"),
+				c.Element.ToIR(),
+				clausesIR,
+			}
+		}
+
+		// Single clause (backward compatible)
 		if c.Condition != nil {
 			return core.ListValue{
 				core.SymbolValue("list-comp"),
@@ -462,68 +535,99 @@ func (c *ComprehensionForm) ToIR() core.Value {
 		}
 
 	case DictComp:
-		// {k: v*2 for k, v in items}
-		// → (dict-comp (lambda (k v) k) (lambda (k v) (* v 2)) items)
-		// Note: This assumes variable is "k,v" or similar - parser needs to handle unpacking
-		keyLambda := core.ListValue{
-			core.SymbolValue("lambda"),
-			core.ListValue{core.SymbolValue(c.Variable)},
-			c.KeyExpr.ToIR(),
-		}
-		valueLambda := core.ListValue{
-			core.SymbolValue("lambda"),
-			core.ListValue{core.SymbolValue(c.Variable)},
-			c.ValueExpr.ToIR(),
-		}
+		// Single: {k: v*2 for k in items}
+		// → (dict-comp k (* v 2) k items)
+		//
+		// Multiple: {k: v for row in matrix for k, v in row.items()}
+		// → (dict-comp k v ((row matrix) ((k v) (row.items))))
 
-		if c.Condition != nil {
-			filterLambda := core.ListValue{
-				core.SymbolValue("lambda"),
-				core.ListValue{core.SymbolValue(c.Variable)},
-				c.Condition.ToIR(),
+		if len(c.Clauses) > 1 {
+			// Multi-clause (nested) dict comprehension
+			clausesIR := make(core.ListValue, 0, len(c.Clauses))
+			for _, clause := range c.Clauses {
+				clauseIR := core.ListValue{
+					core.SymbolValue(clause.Variable),
+					clause.Iterable.ToIR(),
+				}
+				if clause.Condition != nil {
+					clauseIR = append(clauseIR, clause.Condition.ToIR())
+				}
+				clausesIR = append(clausesIR, clauseIR)
 			}
+
 			return core.ListValue{
 				core.SymbolValue("dict-comp"),
-				keyLambda,
-				valueLambda,
+				c.KeyExpr.ToIR(),
+				c.ValueExpr.ToIR(),
+				clausesIR,
+			}
+		}
+
+		// Single clause (backward compatible)
+		// Format: (dict-comp key-expr value-expr var iterable [condition])
+		if c.Condition != nil {
+			return core.ListValue{
+				core.SymbolValue("dict-comp"),
+				c.KeyExpr.ToIR(),
+				c.ValueExpr.ToIR(),
+				core.SymbolValue(c.Variable),
 				c.Iterable.ToIR(),
-				filterLambda,
+				c.Condition.ToIR(),
 			}
 		}
 
 		return core.ListValue{
 			core.SymbolValue("dict-comp"),
-			keyLambda,
-			valueLambda,
+			c.KeyExpr.ToIR(),
+			c.ValueExpr.ToIR(),
+			core.SymbolValue(c.Variable),
 			c.Iterable.ToIR(),
 		}
 
 	case SetComp:
-		// {x for x in data if x > 10}
-		// → (set-comp (lambda (x) x) data (lambda (x) (> x 10)))
-		elemLambda := core.ListValue{
-			core.SymbolValue("lambda"),
-			core.ListValue{core.SymbolValue(c.Variable)},
-			c.Element.ToIR(),
-		}
+		// Single: {x for x in data if x > 10}
+		// → (set-comp x x data (> x 10))
+		//
+		// Multiple: {item for row in matrix for item in row}
+		// → (set-comp item ((row matrix) (item row)))
 
-		if c.Condition != nil {
-			filterLambda := core.ListValue{
-				core.SymbolValue("lambda"),
-				core.ListValue{core.SymbolValue(c.Variable)},
-				c.Condition.ToIR(),
+		if len(c.Clauses) > 1 {
+			// Multi-clause (nested) set comprehension
+			clausesIR := make(core.ListValue, 0, len(c.Clauses))
+			for _, clause := range c.Clauses {
+				clauseIR := core.ListValue{
+					core.SymbolValue(clause.Variable),
+					clause.Iterable.ToIR(),
+				}
+				if clause.Condition != nil {
+					clauseIR = append(clauseIR, clause.Condition.ToIR())
+				}
+				clausesIR = append(clausesIR, clauseIR)
 			}
+
 			return core.ListValue{
 				core.SymbolValue("set-comp"),
-				elemLambda,
+				c.Element.ToIR(),
+				clausesIR,
+			}
+		}
+
+		// Single clause (backward compatible)
+		// Format: (set-comp expr var iterable [condition])
+		if c.Condition != nil {
+			return core.ListValue{
+				core.SymbolValue("set-comp"),
+				c.Element.ToIR(),
+				core.SymbolValue(c.Variable),
 				c.Iterable.ToIR(),
-				filterLambda,
+				c.Condition.ToIR(),
 			}
 		}
 
 		return core.ListValue{
 			core.SymbolValue("set-comp"),
-			elemLambda,
+			c.Element.ToIR(),
+			core.SymbolValue(c.Variable),
 			c.Iterable.ToIR(),
 		}
 

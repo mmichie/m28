@@ -327,17 +327,21 @@ func TestComprehensionForm_DictComp(t *testing.T) {
 	iterable := NewIdentifier("items", loc, SyntaxPython)
 	comp := NewComprehensionForm(DictComp, nil, keyExpr, valueExpr, "k", iterable, nil, loc, SyntaxPython)
 
-	// Check ToIR: (dict-comp (lambda (k) k) (lambda (k) v) items)
+	// Check ToIR: (dict-comp key-expr value-expr var iterable)
 	ir := comp.ToIR()
 	list, ok := ir.(core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if len(list) != 4 {
-		t.Fatalf("Expected 4 elements, got %d", len(list))
+	if len(list) != 5 {
+		t.Fatalf("Expected 5 elements (dict-comp, key-expr, value-expr, var, iterable), got %d", len(list))
 	}
 	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "dict-comp" {
 		t.Errorf("Expected 'dict-comp' symbol, got %v", list[0])
+	}
+	// Verify variable is a symbol
+	if sym, ok := list[3].(core.SymbolValue); !ok || string(sym) != "k" {
+		t.Errorf("Expected variable 'k', got %v", list[3])
 	}
 }
 

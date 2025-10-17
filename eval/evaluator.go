@@ -1080,9 +1080,25 @@ func comprehensionLoop(
 //
 //	(list-comp expr var iterable)
 //	(list-comp expr var iterable condition)
+//	(list-comp expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))  // nested
 func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("list-comp requires at least 2 arguments")
+	}
+
+	// Check if this is multi-clause format (args[1] is a list)
+	if clausesList, ok := args[1].(core.ListValue); ok {
+		// Multi-clause nested comprehension (2 args: expr, clauses)
+		if len(args) != 2 {
+			return nil, fmt.Errorf("multi-clause list-comp requires exactly 2 arguments")
+		}
+		return listCompMultiClause(args[0], clausesList, ctx)
+	}
+
+	// Single-clause format (backward compatible)
+	// Requires 3-4 args: expr, var, iterable, [condition]
 	if len(args) < 3 || len(args) > 4 {
-		return nil, fmt.Errorf("list-comp requires 3 or 4 arguments")
+		return nil, fmt.Errorf("single-clause list-comp requires 3 or 4 arguments")
 	}
 
 	// Get the variable name
@@ -1133,14 +1149,111 @@ func ListCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return result, nil
 }
 
+// listCompMultiClause handles nested list comprehensions
+// Format: (list-comp expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))
+func listCompMultiClause(expr core.Value, clausesList core.ListValue, ctx *core.Context) (core.Value, error) {
+	result := make(core.ListValue, 0)
+
+	// Parse clauses
+	type clause struct {
+		varName   string
+		iterable  core.Value
+		condition core.Value
+	}
+
+	clauses := make([]clause, 0, len(clausesList))
+	for i, clauseVal := range clausesList {
+		clauseList, ok := clauseVal.(core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("clause %d must be a list", i)
+		}
+
+		if len(clauseList) < 2 || len(clauseList) > 3 {
+			return nil, fmt.Errorf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)
+		}
+
+		varSym, ok := clauseList[0].(core.SymbolValue)
+		if !ok {
+			return nil, fmt.Errorf("clause %d variable must be a symbol", i)
+		}
+
+		var condition core.Value
+		if len(clauseList) == 3 {
+			condition = clauseList[2]
+		}
+
+		clauses = append(clauses, clause{
+			varName:   string(varSym),
+			iterable:  clauseList[1], // Not evaluated yet
+			condition: condition,
+		})
+	}
+
+	// Recursively evaluate nested loops
+	var evalClauses func(clauseIdx int, loopCtx *core.Context) error
+	evalClauses = func(clauseIdx int, loopCtx *core.Context) error {
+		if clauseIdx >= len(clauses) {
+			// All loops processed, evaluate the expression
+			exprResult, err := Eval(expr, loopCtx)
+			if err != nil {
+				return fmt.Errorf("error evaluating expression: %v", err)
+			}
+			result = append(result, exprResult)
+			return nil
+		}
+
+		// Evaluate the iterable for this clause
+		c := clauses[clauseIdx]
+		iterable, err := Eval(c.iterable, loopCtx)
+		if err != nil {
+			return fmt.Errorf("error evaluating iterable in clause %d: %v", clauseIdx, err)
+		}
+
+		// Convert to slice
+		items, err := convertIterableToSlice(iterable)
+		if err != nil {
+			return fmt.Errorf("clause %d: %v", clauseIdx, err)
+		}
+
+		// Loop over items
+		return comprehensionLoop(items, c.varName, c.condition, loopCtx, func(innerCtx *core.Context) error {
+			// Recurse to next clause
+			return evalClauses(clauseIdx+1, innerCtx)
+		})
+	}
+
+	// Start evaluation from first clause
+	if err := evalClauses(0, ctx); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 // DictCompForm implements the dict-comp special form
 // Syntax:
 //
 //	(dict-comp key-expr value-expr var iterable)
 //	(dict-comp key-expr value-expr var iterable condition)
+//	(dict-comp key-expr value-expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))  // nested
 func DictCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 3 {
+		return nil, fmt.Errorf("dict-comp requires at least 3 arguments")
+	}
+
+	// Check if this is multi-clause format (args[2] is a list)
+	if clausesList, ok := args[2].(core.ListValue); ok {
+		// Multi-clause nested comprehension (3 args: key-expr, value-expr, clauses)
+		if len(args) != 3 {
+			return nil, fmt.Errorf("multi-clause dict-comp requires exactly 3 arguments")
+		}
+		return dictCompMultiClause(args[0], args[1], clausesList, ctx)
+	}
+
+	// Single-clause format (backward compatible)
+	// Requires 4-5 args: key-expr, value-expr, var, iterable, [condition]
 	if len(args) < 4 || len(args) > 5 {
-		return nil, fmt.Errorf("dict-comp requires 4 or 5 arguments")
+		return nil, fmt.Errorf("single-clause dict-comp requires 4 or 5 arguments")
 	}
 
 	// Get the variable name
@@ -1198,14 +1311,116 @@ func DictCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return result, nil
 }
 
+// dictCompMultiClause handles nested dict comprehensions
+// Format: (dict-comp key-expr value-expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))
+func dictCompMultiClause(keyExpr, valueExpr core.Value, clausesList core.ListValue, ctx *core.Context) (core.Value, error) {
+	result := core.NewDict()
+
+	// Parse clauses
+	type clause struct {
+		varName   string
+		iterable  core.Value
+		condition core.Value
+	}
+
+	clauses := make([]clause, 0, len(clausesList))
+	for i, clauseVal := range clausesList {
+		clauseList, ok := clauseVal.(core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("clause %d must be a list", i)
+		}
+
+		if len(clauseList) < 2 || len(clauseList) > 3 {
+			return nil, fmt.Errorf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)
+		}
+
+		varSym, ok := clauseList[0].(core.SymbolValue)
+		if !ok {
+			return nil, fmt.Errorf("clause %d variable must be a symbol", i)
+		}
+
+		var condition core.Value
+		if len(clauseList) == 3 {
+			condition = clauseList[2]
+		}
+
+		clauses = append(clauses, clause{
+			varName:   string(varSym),
+			iterable:  clauseList[1],
+			condition: condition,
+		})
+	}
+
+	// Recursively evaluate nested loops
+	var evalClauses func(clauseIdx int, loopCtx *core.Context) error
+	evalClauses = func(clauseIdx int, loopCtx *core.Context) error {
+		if clauseIdx >= len(clauses) {
+			// All loops processed, evaluate key and value
+			keyResult, err := Eval(keyExpr, loopCtx)
+			if err != nil {
+				return fmt.Errorf("error evaluating key expression: %v", err)
+			}
+
+			valueResult, err := Eval(valueExpr, loopCtx)
+			if err != nil {
+				return fmt.Errorf("error evaluating value expression: %v", err)
+			}
+
+			keyStr := core.ValueToKey(keyResult)
+			result.SetWithKey(keyStr, keyResult, valueResult)
+			return nil
+		}
+
+		// Evaluate the iterable for this clause
+		c := clauses[clauseIdx]
+		iterable, err := Eval(c.iterable, loopCtx)
+		if err != nil {
+			return fmt.Errorf("error evaluating iterable in clause %d: %v", clauseIdx, err)
+		}
+
+		// Convert to slice
+		items, err := convertIterableToSlice(iterable)
+		if err != nil {
+			return fmt.Errorf("clause %d: %v", clauseIdx, err)
+		}
+
+		// Loop over items
+		return comprehensionLoop(items, c.varName, c.condition, loopCtx, func(innerCtx *core.Context) error {
+			return evalClauses(clauseIdx+1, innerCtx)
+		})
+	}
+
+	if err := evalClauses(0, ctx); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 // SetCompForm implements the set-comp special form
 // Syntax:
 //
 //	(set-comp expr var iterable)
 //	(set-comp expr var iterable condition)
+//	(set-comp expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))  // nested
 func SetCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("set-comp requires at least 2 arguments")
+	}
+
+	// Check if this is multi-clause format (args[1] is a list)
+	if clausesList, ok := args[1].(core.ListValue); ok {
+		// Multi-clause nested comprehension (2 args: expr, clauses)
+		if len(args) != 2 {
+			return nil, fmt.Errorf("multi-clause set-comp requires exactly 2 arguments")
+		}
+		return setCompMultiClause(args[0], clausesList, ctx)
+	}
+
+	// Single-clause format (backward compatible)
+	// Requires 3-4 args: expr, var, iterable, [condition]
 	if len(args) < 3 || len(args) > 4 {
-		return nil, fmt.Errorf("set-comp requires 3 or 4 arguments")
+		return nil, fmt.Errorf("single-clause set-comp requires 3 or 4 arguments")
 	}
 
 	// Get the variable name
@@ -1250,6 +1465,85 @@ func SetCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	})
 
 	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// setCompMultiClause handles nested set comprehensions
+// Format: (set-comp expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))
+func setCompMultiClause(expr core.Value, clausesList core.ListValue, ctx *core.Context) (core.Value, error) {
+	result := core.NewSet()
+
+	// Parse clauses
+	type clause struct {
+		varName   string
+		iterable  core.Value
+		condition core.Value
+	}
+
+	clauses := make([]clause, 0, len(clausesList))
+	for i, clauseVal := range clausesList {
+		clauseList, ok := clauseVal.(core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("clause %d must be a list", i)
+		}
+
+		if len(clauseList) < 2 || len(clauseList) > 3 {
+			return nil, fmt.Errorf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)
+		}
+
+		varSym, ok := clauseList[0].(core.SymbolValue)
+		if !ok {
+			return nil, fmt.Errorf("clause %d variable must be a symbol", i)
+		}
+
+		var condition core.Value
+		if len(clauseList) == 3 {
+			condition = clauseList[2]
+		}
+
+		clauses = append(clauses, clause{
+			varName:   string(varSym),
+			iterable:  clauseList[1],
+			condition: condition,
+		})
+	}
+
+	// Recursively evaluate nested loops
+	var evalClauses func(clauseIdx int, loopCtx *core.Context) error
+	evalClauses = func(clauseIdx int, loopCtx *core.Context) error {
+		if clauseIdx >= len(clauses) {
+			// All loops processed, evaluate the expression
+			exprResult, err := Eval(expr, loopCtx)
+			if err != nil {
+				return fmt.Errorf("error evaluating expression: %v", err)
+			}
+			result.Add(exprResult)
+			return nil
+		}
+
+		// Evaluate the iterable for this clause
+		c := clauses[clauseIdx]
+		iterable, err := Eval(c.iterable, loopCtx)
+		if err != nil {
+			return fmt.Errorf("error evaluating iterable in clause %d: %v", clauseIdx, err)
+		}
+
+		// Convert to slice
+		items, err := convertIterableToSlice(iterable)
+		if err != nil {
+			return fmt.Errorf("clause %d: %v", clauseIdx, err)
+		}
+
+		// Loop over items
+		return comprehensionLoop(items, c.varName, c.condition, loopCtx, func(innerCtx *core.Context) error {
+			return evalClauses(clauseIdx+1, innerCtx)
+		})
+	}
+
+	if err := evalClauses(0, ctx); err != nil {
 		return nil, err
 	}
 
