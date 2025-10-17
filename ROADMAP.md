@@ -98,6 +98,84 @@
 
 ## 🔧 Code Quality & Refactoring
 
+### AST Layer for Multiple Frontend Support 🟡 HIGH PRIORITY
+
+**Status:** Design complete (see [docs/design/ast-ir-multiple-frontends.md](docs/design/ast-ir-multiple-frontends.md))
+**Timeline:** 5-6 weeks for critical path
+**Impact:** Foundation for Python frontend, IDE tooling, type system, optimization passes
+
+This is the foundational work that enables multiple frontend languages (Python, DSLs) to share M28's runtime.
+
+**Current Problem:**
+- Parser directly returns `core.Value` (IR) with no source location tracking
+- Error messages can't show "error at line 5, column 12" in original syntax
+- Lost original syntax (can't tell if user wrote `x = 10` or `(= x 10)`)
+- No way to preserve Python type hints (`def f(x: int) -> int:`)
+- Hard to add new frontends (would need to duplicate desugaring logic)
+
+**Proposed Three-Layer Architecture:**
+```
+Frontend (Python/Lisp/DSL) → AST (with locations/types/comments) → IR (core.Value) → Evaluator
+```
+
+**Implementation Phases:**
+
+#### Phase 1: Core AST Infrastructure (Week 1-2) ✅ COMPLETE
+- [x] Create `core/ast/` package with ASTNode interface
+- [x] Implement node types: Identifier, Literal, SExpr, DefForm, AssignForm, IfForm
+- [x] Add IRMetadata table for tracking locations/types/comments
+- [x] Update Context to carry metadata
+- [x] Deliverable: AST types working, all tests pass (8 AST tests + 7 metadata tests)
+
+#### Phase 2: Parser Refactoring (Week 3-4)
+- [ ] Refactor parser to build AST instead of returning IR directly
+- [ ] Add location tracking to every node creation
+- [ ] Populate metadata table during parsing
+- [ ] Parser returns `(ASTNode, *IRMetadata, error)`
+- [ ] Deliverable: AST-based parser with full location info
+
+#### Phase 3: Enhanced Error Messages (Week 5)
+- [ ] Update error types to include SourceLocation from metadata
+- [ ] Show original syntax in errors (Python vs Lisp)
+- [ ] Source snippets with caret indicators pointing to exact location
+- [ ] Deliverable: Beautiful error messages with source context
+
+#### Phase 4: Type Annotation Support (Week 6)
+- [ ] Add TypeInfo structure for Python type hints
+- [ ] Parse Python type annotations into AST
+- [ ] Store type info in metadata table
+- [ ] Deliverable: Type hints preserved, queryable by tooling
+
+**Benefits:**
+- ✅ **Multiple frontends** - Python, JSON DSLs share same runtime
+- ✅ **Perfect errors** - Show exact location in original syntax
+- ✅ **IDE support** - Foundation for LSP (go-to-def, hover, refactor)
+- ✅ **Type system** - Preserve Python type hints for gradual typing
+- ✅ **Optimizations** - AST transformation passes for performance
+
+**Design Decisions:**
+- Keep IR as S-expressions (current `core.Value`) - evaluator unchanged
+- Use separate metadata table instead of wrapping values (no type pollution)
+- AST implements Value interface for backwards compatibility during migration
+- Three layers: AST (tooling) → IR (evaluation) → Runtime (execution)
+
+**Migration Strategy:**
+- Zero breaking changes - add AST layer alongside existing parser
+- Evaluator continues using IR (completely unchanged)
+- Gradual rollout over 6 weeks with parallel testing
+
+**Success Metrics:**
+- [x] Phase 1: AST infrastructure complete (8 tests passing)
+- [x] Phase 1: Metadata table working (7 tests passing)
+- [x] Phase 1: Zero regressions (54/54 M28 tests passing)
+- [ ] Phase 2: Parser builds AST with locations
+- [ ] Phase 3: Error messages show source locations
+- [ ] Phase 4: Type annotations preserved from Python
+- [ ] No eval performance regression
+- [ ] Documentation complete
+
+See [docs/design/ast-ir-multiple-frontends.md](docs/design/ast-ir-multiple-frontends.md) for complete design.
+
 ### High-Impact Refactoring
 
 #### Break down large functions (100+ lines) ✅
@@ -295,19 +373,32 @@ Numeric Extended: `__round__`, `__divmod__`, `__rdivmod__`
 
 ## 🏗️ Long-Term Architecture Vision
 
-### Parser Abstraction (Foundation)
+### AST & Parser Abstraction (Foundation)
+**See detailed design:** [docs/design/ast-ir-multiple-frontends.md](docs/design/ast-ir-multiple-frontends.md)
+**Active work:** See "AST Layer for Multiple Frontend Support" under Code Quality & Refactoring
+
+This section tracks the long-term vision after the core AST layer is complete.
+
+#### Core AST Layer (5-6 weeks) - See roadmap item above for details
 - [ ] Define language-agnostic AST nodes in `core/ast/`
 - [ ] Include source location info in every node for error reporting
 - [ ] Design AST to support type annotations
-- [ ] Create AST visitor pattern for transformations
+- [ ] Implement IRMetadata table for tracking locations/types/comments
+- [ ] Refactor parser to build AST instead of returning IR directly
+
+#### Multiple Parser Support (Future)
 - [ ] Create `Parser` interface with multiple implementations
-- [ ] Move current S-expr parser to `parser/sexpr/`
-- [ ] Add parser registry for file extension mapping
+- [ ] Move current M28 parser to `parser/m28/`
+- [ ] Add parser registry for file extension mapping (`.m28`, `.py`, etc.)
 - [ ] Support for parsing strings, files, and streams
-- [ ] Design a lower-level IR between AST and evaluation
-- [ ] IR should be easier to optimize than AST
-- [ ] Consider SSA form for future optimizations
-- [ ] Support for type information in IR
+- [ ] Create AST visitor pattern for transformations
+
+#### IR Optimization Layers (Future)
+- [ ] Keep core.Value as evaluation IR (lightweight S-expressions)
+- [ ] Consider HIR (High-level IR) for optimization passes
+- [ ] Consider MIR (Mid-level IR) for type-directed optimizations
+- [ ] Consider SSA form for advanced optimizations
+- [ ] Support for type information flowing through IR layers
 
 ### Error Handling Enhancement
 - [x] Add line/column info to all tokens (via tokenizer)
@@ -315,60 +406,114 @@ Numeric Extended: `__round__`, `__divmod__`, `__rdivmod__`
 - [x] Keep original source text for error display (stored in ParseError)
 - [x] Rich error types with structured information (ParseError, NameError, etc.)
 - [x] Colorized error output with source highlights (via ErrorReporter)
-- [ ] Add line/column info to all AST nodes (next step: AST metadata)
+- [ ] Add line/column info to all AST nodes (Phase 2 of AST layer - in progress)
+- [ ] Use metadata table to show original syntax in errors (Phase 3 of AST layer)
 - [ ] Support for multi-file error traces
 - [ ] Error recovery in parser (continue after errors)
 - [ ] Error explanation system (like Rust's `--explain`)
 
 ### Type System Foundation
-- [ ] Type AST nodes (for type annotations)
+**Prerequisite:** AST layer with type annotation support (Phase 4)
+
+- [ ] Type AST nodes (for type annotations) - Phase 4 of AST layer
+- [ ] TypeInfo structure for Python type hints - Phase 4 of AST layer
 - [ ] Type inference infrastructure
 - [ ] Gradual typing support (typed + untyped code)
-- [ ] Generic/parametric types foundation
-- [ ] Optional type checking phase
+- [ ] Generic/parametric types foundation (List[int], Dict[str, int])
+- [ ] Optional type checking phase (can run without types)
 - [ ] Type error reporting using diagnostic framework
-- [ ] Type-directed optimizations
+- [ ] Type-directed optimizations (specialize on known types)
 - [ ] Runtime type checking for gradual typing
 
 ### Multiple Frontend Support
-- [ ] Python 3.x grammar implementation
-- [ ] Transpiler option (Python → S-expr)
-- [ ] Native parser option using parser combinator
-- [ ] Handle Python-specific features (decorators, etc.)
-- [ ] Mandatory type annotations for typed variant
-- [ ] Stricter semantics (immutability by default)
-- [ ] Additional keywords for mutability opt-in
-- [ ] Compile-time guarantees
+**Prerequisite:** AST layer complete (Phases 1-4)
+**See design:** [docs/design/ast-ir-multiple-frontends.md](docs/design/ast-ir-multiple-frontends.md)
+
+Once AST layer is in place, adding new frontends becomes straightforward:
+```
+Python Parser → AST (same structure) → IR (core.Value) → Evaluator (shared)
+```
+
+#### Python Frontend (Next Major Feature)
+- [ ] Python 3.x tokenizer (indentation-aware)
+- [ ] Python 3.x grammar implementation (recursive descent or parser combinator)
+- [ ] Python AST → M28 AST translation layer
+- [ ] Handle Python-specific features:
+  - [ ] Indentation-based blocks
+  - [ ] Multiple assignment (`x, y = 1, 2`)
+  - [ ] Unpacking (`*args, **kwargs`)
+  - [ ] Decorators (already supported for macros)
+  - [ ] Context managers (`with` statement - already supported)
+  - [ ] Async/await (already supported in IR)
+- [ ] Python REPL with Python syntax
+- [ ] Error messages in Python syntax (using metadata table)
+- [ ] Test suite: Run Python code and M28 code side-by-side
+
+#### Other Frontend Options (Future)
+- [ ] JSON configuration DSL
+- [ ] Typed M28 variant (stricter semantics, immutability by default)
+- [ ] SQL-like query language for data processing
 
 ### Optimization & Performance
-- [ ] Design M28 HIR with dynamic operation support
+**Prerequisite:** AST layer enables optimization passes
+
+With AST in place, we can implement optimization passes that transform code before evaluation.
+
+#### AST-Based Optimizations (Enabled by AST layer)
+- [ ] Constant folding (evaluate constant expressions at compile time)
+- [ ] Dead code elimination (remove unused definitions)
+- [ ] Function inlining (inline small functions)
+- [ ] Tail call optimization (detect and optimize tail recursion)
+- [ ] Escape analysis (determine if values escape scope)
+
+#### IR-Level Optimizations (Future)
+- [ ] Design M28 HIR (High-level IR) with dynamic operation support
 - [ ] Include type guards and profiling points
 - [ ] Support for gradual lowering to different backends
 - [ ] Deoptimization points for returning to interpreter
+
+#### Bytecode VM (Future - Major undertaking)
 - [ ] Bytecode VM with register-based design
 - [ ] Inline caching for method lookups
 - [ ] Quickening (bytecode specialization)
 - [ ] Computed goto dispatch (if supported)
+- [ ] Hot path detection
+- [ ] On-stack replacement (OSR) for hot loops
+
+#### JIT Compilation (Far Future)
 - [ ] Type annotation validator
 - [ ] LLVM IR generation for typed functions
 - [ ] FFI boundary between compiled and interpreted code
 - [ ] Benchmark common numeric kernels
 - [ ] Runtime type profiling infrastructure
-- [ ] Hot path detection
 - [ ] Speculative optimization with guards
-- [ ] On-stack replacement (OSR) for hot loops
 
 ### Developer Experience & Tooling
-- [ ] Basic LSP implementation
-- [ ] Syntax highlighting
-- [ ] Auto-completion
-- [ ] Go-to-definition
-- [ ] Inline error display
-- [ ] Debug adapter protocol (DAP)
-- [ ] Code formatter (like gofmt/black)
-- [ ] Linter with configurable rules
-- [ ] Documentation generator
-- [ ] Package manager
+**Prerequisite:** AST layer provides foundation for all tooling
+
+The AST layer with source locations enables all modern IDE features:
+
+#### LSP (Language Server Protocol)
+- [ ] Basic LSP implementation (foundation with AST)
+- [ ] Go-to-definition (using AST locations)
+- [ ] Find references (AST traversal)
+- [ ] Hover documentation (from docstrings in AST)
+- [ ] Auto-completion (using context + type info from AST)
+- [ ] Rename symbol (AST-based refactoring)
+- [ ] Inline error display (from AST metadata)
+- [ ] Document symbols (outline view from AST)
+
+#### Development Tools
+- [ ] Code formatter (like gofmt/black) - operates on AST
+- [ ] Linter with configurable rules - analyzes AST
+- [ ] Documentation generator - extracts from AST comments
+- [ ] Syntax highlighting - AST-aware semantic highlighting
+- [ ] Debug adapter protocol (DAP) - uses AST for breakpoints
+
+#### Package Management
+- [ ] Package manager (dependency resolution)
+- [ ] Module registry
+- [ ] Semantic versioning support
 
 ### Community & Ecosystem
 - [ ] Plugin system for extensions

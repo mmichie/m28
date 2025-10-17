@@ -35,6 +35,10 @@ type Context struct {
 
 	// Current function name for error reporting
 	CurrentFunction string
+
+	// Metadata table for tracking source locations, types, comments
+	// This is shared across all contexts in a program
+	Metadata *IRMetadata
 }
 
 // NewContext creates a new evaluation context
@@ -45,15 +49,31 @@ func NewContext(outer *Context) *Context {
 		CallStack: make([]TraceEntry, 0),
 	}
 
-	// If this is the global context, set Global to self
+	// If this is the global context, set Global to self and create new metadata
 	if outer == nil {
 		ctx.Global = ctx
+		ctx.Metadata = NewIRMetadata()
 	} else {
-		// Otherwise, inherit global from parent
+		// Otherwise, inherit global and metadata from parent
 		ctx.Global = outer.Global
+		ctx.Metadata = outer.Metadata
 	}
 
 	return ctx
+}
+
+// WithMetadata creates a new context with a specific metadata table
+// Useful for module imports or testing
+func (c *Context) WithMetadata(metadata *IRMetadata) *Context {
+	newCtx := &Context{
+		Vars:            c.Vars,
+		Outer:           c.Outer,
+		Global:          c.Global,
+		CallStack:       c.CallStack,
+		CurrentFunction: c.CurrentFunction,
+		Metadata:        metadata,
+	}
+	return newCtx
 }
 
 // Define defines a new variable in the current scope
