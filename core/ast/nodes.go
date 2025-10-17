@@ -160,9 +160,19 @@ func (d *DefForm) String() string {
 // ToIR implements ASTNode.ToIR
 func (d *DefForm) ToIR() core.Value {
 	// Build (def name (params) body)
+	// Parameters with defaults are represented as (param default-value)
 	params := make(core.ListValue, len(d.Params))
 	for i, p := range d.Params {
-		params[i] = core.SymbolValue(p.Name)
+		if p.Default != nil {
+			// Parameter with default: (param-name default-value)
+			params[i] = core.ListValue{
+				core.SymbolValue(p.Name),
+				p.Default.ToIR(),
+			}
+		} else {
+			// Parameter without default: just the symbol
+			params[i] = core.SymbolValue(p.Name)
+		}
 	}
 
 	result := core.ListValue{

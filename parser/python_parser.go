@@ -772,6 +772,17 @@ func (p *PythonParser) parsePrimary() ast.ASTNode {
 		p.advance()
 		return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
 
+	case TOKEN_FSTRING:
+		p.advance()
+		// Parse f-string using M28's f-string parser
+		fstringValue, err := p.parseFStringFromLexeme(tok.Lexeme)
+		if err != nil {
+			p.error(fmt.Sprintf("Error parsing f-string: %v", err))
+			return nil
+		}
+		// Return as SExpr to be evaluated (like dict-literal, etc.)
+		return p.convertValueToASTNode(fstringValue, tok)
+
 	case TOKEN_TRUE:
 		p.advance()
 		return ast.NewLiteral(core.BoolValue(true), p.makeLocation(tok), ast.SyntaxPython)
@@ -802,26 +813,48 @@ func (p *PythonParser) parsePrimary() ast.ASTNode {
 	}
 }
 
-// parseParenthesized parses: (expression)
+// parseParenthesized parses: (expression) or tuple literal
 func (p *PythonParser) parseParenthesized() ast.ASTNode {
 	tok := p.expect(TOKEN_LPAREN)
 
-	// Empty parens is an error
+	// Empty parens creates empty tuple
 	if p.check(TOKEN_RPAREN) {
-		p.error("Empty parentheses are not allowed")
 		p.advance()
-		return nil
+		return ast.NewLiteral(core.TupleValue{}, p.makeLocation(tok), ast.SyntaxPython)
 	}
 
-	expr := p.parseExpression()
+	// Parse first expression
+	elements := []ast.ASTNode{p.parseExpression()}
 
 	// Check if it's a generator expression
 	if p.check(TOKEN_FOR) {
-		return p.parseGeneratorExpression(expr, tok)
+		return p.parseGeneratorExpression(elements[0], tok)
 	}
 
+	// Check for comma (tuple literal)
+	if p.check(TOKEN_COMMA) {
+		p.advance()
+
+		// Parse remaining elements (if any)
+		for !p.check(TOKEN_RPAREN) && !p.isAtEnd() {
+			elements = append(elements, p.parseExpression())
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance()
+		}
+
+		// This is a tuple - create (tuple-literal elem1 elem2 ...)
+		tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+		allElements := append([]ast.ASTNode{tupleSym}, elements...)
+		p.expect(TOKEN_RPAREN)
+		return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// No comma - just a parenthesized expression
 	p.expect(TOKEN_RPAREN)
-	return expr
+	return elements[0]
 }
 
 // parseListLiteral parses: [elements] or [expr for var in iter]
@@ -1432,4 +1465,62 @@ func (p *PythonParser) parseWithStatement() ast.ASTNode {
 	body := p.parseBlock()
 
 	return ast.NewWithForm(items, body, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// ============================================================================
+// F-String Support
+// ============================================================================
+
+// parseFStringFromLexeme parses an f-string from its full lexeme (e.g., f"hello {x}")
+// by delegating to M28's existing f-string parser
+func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error) {
+	// Find the quote character (after 'f')
+	if len(lexeme) < 2 {
+		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+	}
+
+	var quoteChar rune
+	if lexeme[1] == '"' {
+		quoteChar = '"'
+	} else if lexeme[1] == '\'' {
+		quoteChar = '\''
+	} else {
+		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+	}
+
+	// Create a temporary M28 parser to handle the f-string
+	m28Parser := NewParser()
+	m28Parser.input = lexeme
+	m28Parser.pos = 0
+	m28Parser.line = 1
+	m28Parser.col = 1
+
+	// Parse using M28's existing f-string logic
+	return m28Parser.parseFStringEnhancedSimple(quoteChar)
+}
+
+// convertValueToASTNode converts a core.Value to an ASTNode
+// This is needed for f-strings which return IR values
+func (p *PythonParser) convertValueToASTNode(value core.Value, tok Token) ast.ASTNode {
+	switch v := value.(type) {
+	case core.StringValue:
+		// Simple string result - return as literal
+		return ast.NewLiteral(v, p.makeLocation(tok), ast.SyntaxPython)
+
+	case core.ListValue:
+		// F-string with interpolations returns a list like (format ...)
+		// Convert to SExpr
+		nodes := make([]ast.ASTNode, len(v))
+		for i, elem := range v {
+			nodes[i] = p.convertValueToASTNode(elem, tok)
+		}
+		return ast.NewSExpr(nodes, p.makeLocation(tok), ast.SyntaxPython)
+
+	case core.SymbolValue:
+		return ast.NewIdentifier(string(v), p.makeLocation(tok), ast.SyntaxPython)
+
+	default:
+		// For other types, wrap in literal
+		return ast.NewLiteral(v, p.makeLocation(tok), ast.SyntaxPython)
+	}
 }

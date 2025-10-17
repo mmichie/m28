@@ -176,6 +176,9 @@ func init() {
 		// List literal (evaluates contents)
 		"list-literal": listLiteralForm,
 
+		// Tuple literal (evaluates contents)
+		"tuple-literal": tupleLiteralForm,
+
 		// Other special forms will be added through RegisterSpecialForm
 	}
 
@@ -1297,6 +1300,23 @@ func GenExprForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // It evaluates all arguments and returns them as a list
 func listLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	result := make(core.ListValue, 0, len(args))
+
+	// Evaluate each element
+	for _, arg := range args {
+		val, err := Eval(arg, ctx)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, val)
+	}
+
+	return result, nil
+}
+
+// tupleLiteralForm implements the tuple-literal special form
+// Usage: (tuple-literal elem1 elem2 ...)
+func tupleLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	result := make(core.TupleValue, 0, len(args))
 
 	// Evaluate each element
 	for _, arg := range args {
