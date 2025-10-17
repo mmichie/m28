@@ -725,4 +725,230 @@ func InitStringMethods() {
 			return result, nil
 		},
 	}
+
+	// removeprefix - Python 3.9+
+	td.Methods["removeprefix"] = &MethodDescriptor{
+		Name:    "removeprefix",
+		Arity:   1,
+		Doc:     "Return a string with the given prefix removed if present (Python 3.9+)",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("removeprefix() takes exactly one argument (%d given)", len(args))
+			}
+
+			s := string(receiver.(StringValue))
+			prefix, ok := args[0].(StringValue)
+			if !ok {
+				return nil, fmt.Errorf("removeprefix() argument must be a string")
+			}
+
+			return StringValue(strings.TrimPrefix(s, string(prefix))), nil
+		},
+	}
+
+	// removesuffix - Python 3.9+
+	td.Methods["removesuffix"] = &MethodDescriptor{
+		Name:    "removesuffix",
+		Arity:   1,
+		Doc:     "Return a string with the given suffix removed if present (Python 3.9+)",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("removesuffix() takes exactly one argument (%d given)", len(args))
+			}
+
+			s := string(receiver.(StringValue))
+			suffix, ok := args[0].(StringValue)
+			if !ok {
+				return nil, fmt.Errorf("removesuffix() argument must be a string")
+			}
+
+			return StringValue(strings.TrimSuffix(s, string(suffix))), nil
+		},
+	}
+
+	// partition
+	td.Methods["partition"] = &MethodDescriptor{
+		Name:    "partition",
+		Arity:   1,
+		Doc:     "Split the string at the first occurrence of sep, return 3-tuple (before, sep, after)",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("partition() takes exactly one argument (%d given)", len(args))
+			}
+
+			s := string(receiver.(StringValue))
+			sep, ok := args[0].(StringValue)
+			if !ok {
+				return nil, fmt.Errorf("partition() argument must be a string")
+			}
+
+			sepStr := string(sep)
+			idx := strings.Index(s, sepStr)
+			if idx == -1 {
+				// Separator not found - return (original, "", "")
+				return TupleValue{StringValue(s), StringValue(""), StringValue("")}, nil
+			}
+
+			before := s[:idx]
+			after := s[idx+len(sepStr):]
+			return TupleValue{StringValue(before), sep, StringValue(after)}, nil
+		},
+	}
+
+	// rpartition
+	td.Methods["rpartition"] = &MethodDescriptor{
+		Name:    "rpartition",
+		Arity:   1,
+		Doc:     "Split the string at the last occurrence of sep, return 3-tuple (before, sep, after)",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("rpartition() takes exactly one argument (%d given)", len(args))
+			}
+
+			s := string(receiver.(StringValue))
+			sep, ok := args[0].(StringValue)
+			if !ok {
+				return nil, fmt.Errorf("rpartition() argument must be a string")
+			}
+
+			sepStr := string(sep)
+			idx := strings.LastIndex(s, sepStr)
+			if idx == -1 {
+				// Separator not found - return ("", "", original)
+				return TupleValue{StringValue(""), StringValue(""), StringValue(s)}, nil
+			}
+
+			before := s[:idx]
+			after := s[idx+len(sepStr):]
+			return TupleValue{StringValue(before), sep, StringValue(after)}, nil
+		},
+	}
+
+	// expandtabs
+	td.Methods["expandtabs"] = &MethodDescriptor{
+		Name:    "expandtabs",
+		Arity:   -1,
+		Doc:     "Return a copy where all tab characters are replaced by spaces",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			tabsize := 8 // Default tabsize
+
+			if len(args) > 0 {
+				if ts, ok := args[0].(NumberValue); ok {
+					tabsize = int(ts)
+					if tabsize < 0 {
+						tabsize = 0
+					}
+				} else {
+					return nil, fmt.Errorf("expandtabs() argument must be a number")
+				}
+			}
+
+			var result strings.Builder
+			col := 0
+
+			for _, r := range s {
+				if r == '\t' {
+					// Add spaces to next tab stop
+					spaces := tabsize - (col % tabsize)
+					result.WriteString(strings.Repeat(" ", spaces))
+					col += spaces
+				} else if r == '\n' || r == '\r' {
+					result.WriteRune(r)
+					col = 0
+				} else {
+					result.WriteRune(r)
+					col++
+				}
+			}
+
+			return StringValue(result.String()), nil
+		},
+	}
+
+	// translate - basic implementation
+	td.Methods["translate"] = &MethodDescriptor{
+		Name:    "translate",
+		Arity:   1,
+		Doc:     "Return a string where each character has been mapped through the given translation table",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("translate() takes exactly one argument (%d given)", len(args))
+			}
+
+			s := string(receiver.(StringValue))
+
+			// Translation table should be a dict mapping rune codes to replacement strings
+			table, ok := args[0].(*DictValue)
+			if !ok {
+				return nil, fmt.Errorf("translate() argument must be a dict")
+			}
+
+			var result strings.Builder
+			for _, r := range s {
+				// Look up the character code in the translation table
+				key := NumberValue(r)
+				if replacement, ok := table.Get(ValueToKey(key)); ok {
+					// Check if replacement is None (delete the character)
+					if _, isNil := replacement.(NilValue); isNil {
+						continue // Skip this character
+					}
+					// Convert replacement to string
+					if repStr, ok := replacement.(StringValue); ok {
+						result.WriteString(string(repStr))
+					} else if repNum, ok := replacement.(NumberValue); ok {
+						// If it's a number, convert to character
+						result.WriteRune(rune(repNum))
+					} else {
+						result.WriteString(PrintValueWithoutQuotes(replacement))
+					}
+				} else {
+					// No translation, keep original character
+					result.WriteRune(r)
+				}
+			}
+
+			return StringValue(result.String()), nil
+		},
+	}
+
+	// zfill - zero-fill to width
+	td.Methods["zfill"] = &MethodDescriptor{
+		Name:    "zfill",
+		Arity:   1,
+		Doc:     "Pad a numeric string with zeros on the left, to fill a field of the given width",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("zfill() takes exactly one argument (%d given)", len(args))
+			}
+
+			s := string(receiver.(StringValue))
+			width, ok := args[0].(NumberValue)
+			if !ok {
+				return nil, fmt.Errorf("zfill() argument must be a number")
+			}
+
+			w := int(width)
+			if w <= len(s) {
+				return receiver, nil
+			}
+
+			// Check for sign
+			sign := ""
+			if len(s) > 0 && (s[0] == '+' || s[0] == '-') {
+				sign = s[:1]
+				s = s[1:]
+			}
+
+			padding := w - len(s) - len(sign)
+			return StringValue(sign + strings.Repeat("0", padding) + s), nil
+		},
+	}
 }

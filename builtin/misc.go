@@ -167,6 +167,99 @@ func RegisterMisc(ctx *core.Context) {
 
 		return dict, nil
 	}))
+
+	// chr - convert integer to character
+	ctx.Define("chr", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("chr", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		i, err := v.GetInt(0)
+		if err != nil {
+			return nil, err
+		}
+
+		if i < 0 || i > 0x10FFFF {
+			return nil, fmt.Errorf("chr() arg not in range(0x110000)")
+		}
+
+		return core.StringValue(string(rune(i))), nil
+	}))
+
+	// ord - convert character to integer
+	ctx.Define("ord", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("ord", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		s, err := v.GetString(0)
+		if err != nil {
+			return nil, err
+		}
+
+		runes := []rune(s)
+		if len(runes) != 1 {
+			return nil, fmt.Errorf("ord() expected a character, but string of length %d found", len(runes))
+		}
+
+		return core.NumberValue(int(runes[0])), nil
+	}))
+
+	// hex - convert integer to hexadecimal string
+	ctx.Define("hex", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("hex", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		i, err := v.GetInt(0)
+		if err != nil {
+			return nil, err
+		}
+
+		if i < 0 {
+			return core.StringValue(fmt.Sprintf("-0x%x", -i)), nil
+		}
+		return core.StringValue(fmt.Sprintf("0x%x", i)), nil
+	}))
+
+	// bin - convert integer to binary string
+	ctx.Define("bin", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("bin", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		i, err := v.GetInt(0)
+		if err != nil {
+			return nil, err
+		}
+
+		if i < 0 {
+			return core.StringValue(fmt.Sprintf("-0b%b", -i)), nil
+		}
+		return core.StringValue(fmt.Sprintf("0b%b", i)), nil
+	}))
+
+	// oct - convert integer to octal string
+	ctx.Define("oct", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("oct", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		i, err := v.GetInt(0)
+		if err != nil {
+			return nil, err
+		}
+
+		if i < 0 {
+			return core.StringValue(fmt.Sprintf("-0o%o", -i)), nil
+		}
+		return core.StringValue(fmt.Sprintf("0o%o", i)), nil
+	}))
 }
 
 // Migration Statistics:
