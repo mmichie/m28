@@ -33,11 +33,8 @@ dd["a"].append(2)
 dd["b"].append(3)
 print(f"defaultdict with list: {dd}")
 
-# Test defaultdict with int factory (use custom function since int() requires args in M28)
-def zero():
-    return 0
-
-dd2 = defaultdict(zero)
+# Test defaultdict with int factory
+dd2 = defaultdict(int)
 dd2["x"] = dd2["x"] + 1
 dd2["y"] = dd2["y"] + 5
 print(f"defaultdict with int: {dd2}")

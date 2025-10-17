@@ -54,8 +54,13 @@ func RegisterTypes(ctx *core.Context) {
 	// str - convert to string
 	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("str", args)
-		if err := v.Exact(1); err != nil {
+		if err := v.Max(1); err != nil {
 			return nil, err
+		}
+
+		// Python str() with no args returns ""
+		if v.Count() == 0 {
+			return core.StringValue(""), nil
 		}
 
 		val := v.Get(0)
@@ -75,8 +80,13 @@ func RegisterTypes(ctx *core.Context) {
 	// bool - convert to boolean
 	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("bool", args)
-		if err := v.Exact(1); err != nil {
+		if err := v.Max(1); err != nil {
 			return nil, err
+		}
+
+		// Python bool() with no args returns False
+		if v.Count() == 0 {
+			return core.BoolValue(false), nil
 		}
 
 		val := v.Get(0)
@@ -136,8 +146,13 @@ func IntBuilder() builders.BuiltinFunc {
 	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("int", args)
 
-		if err := v.Range(1, 2); err != nil {
+		if err := v.Range(0, 2); err != nil {
 			return nil, err
+		}
+
+		// Python int() with no args returns 0
+		if v.Count() == 0 {
+			return core.NumberValue(0), nil
 		}
 
 		val := v.Get(0)
@@ -206,8 +221,13 @@ func FloatBuilder() builders.BuiltinFunc {
 	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("float", args)
 
-		if err := v.Exact(1); err != nil {
+		if err := v.Max(1); err != nil {
 			return nil, err
+		}
+
+		// Python float() with no args returns 0.0
+		if v.Count() == 0 {
+			return core.NumberValue(0.0), nil
 		}
 
 		val := v.Get(0)
