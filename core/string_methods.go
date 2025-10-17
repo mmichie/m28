@@ -2,8 +2,255 @@ package core
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
+	"unicode"
 )
+
+// formatValueWithSpec formats a value according to a Python-style format specification
+func formatValueWithSpec(value Value, spec string) (string, error) {
+	if spec == "" {
+		// No format spec - use default formatting
+		if str, ok := value.(StringValue); ok {
+			return string(str), nil
+		} else if num, ok := value.(NumberValue); ok {
+			f := float64(num)
+			if f == math.Floor(f) {
+				return fmt.Sprintf("%.0f", f), nil
+			}
+			return fmt.Sprintf("%g", f), nil
+		}
+		return PrintValueWithoutQuotes(value), nil
+	}
+
+	// Parse the format spec
+	// Format: [[fill]align][sign][#][0][width][,][.precision][type]
+	i := 0
+	var fill rune = ' '
+	var align rune
+	var sign rune
+	var alt bool
+	var zero bool
+	var width int
+	var precision int = -1
+	var fmtType rune
+
+	// Parse fill and align (must be first)
+	if len(spec) >= 2 {
+		possibleAlign := rune(spec[1])
+		if possibleAlign == '<' || possibleAlign == '>' || possibleAlign == '^' || possibleAlign == '=' {
+			fill = rune(spec[0])
+			align = possibleAlign
+			i = 2
+		} else if len(spec) >= 1 {
+			possibleAlign = rune(spec[0])
+			if possibleAlign == '<' || possibleAlign == '>' || possibleAlign == '^' || possibleAlign == '=' {
+				align = possibleAlign
+				i = 1
+			}
+		}
+	}
+
+	// Parse sign
+	if i < len(spec) {
+		ch := rune(spec[i])
+		if ch == '+' || ch == '-' || ch == ' ' {
+			sign = ch
+			i++
+		}
+	}
+
+	// Parse # (alternate form)
+	if i < len(spec) && spec[i] == '#' {
+		alt = true
+		i++
+	}
+
+	// Parse 0 (zero padding)
+	if i < len(spec) && spec[i] == '0' {
+		zero = true
+		if align == 0 {
+			align = '='
+		}
+		i++
+	}
+
+	// Parse width
+	widthStart := i
+	for i < len(spec) && unicode.IsDigit(rune(spec[i])) {
+		i++
+	}
+	if i > widthStart {
+		fmt.Sscanf(spec[widthStart:i], "%d", &width)
+	}
+
+	// Skip grouping option (,)
+	if i < len(spec) && spec[i] == ',' {
+		i++
+	}
+
+	// Parse precision
+	if i < len(spec) && spec[i] == '.' {
+		i++
+		precStart := i
+		for i < len(spec) && unicode.IsDigit(rune(spec[i])) {
+			i++
+		}
+		if i > precStart {
+			fmt.Sscanf(spec[precStart:i], "%d", &precision)
+		} else {
+			precision = 0
+		}
+	}
+
+	// Parse type
+	if i < len(spec) {
+		fmtType = rune(spec[i])
+	}
+
+	// Format the value
+	var result string
+
+	if num, ok := value.(NumberValue); ok {
+		f := float64(num)
+		// Number formatting
+		switch fmtType {
+		case 'f', 'F':
+			// Fixed-point
+			prec := precision
+			if prec == -1 {
+				prec = 6
+			}
+			result = fmt.Sprintf("%.*f", prec, f)
+		case 'e':
+			// Scientific notation (lowercase)
+			prec := precision
+			if prec == -1 {
+				prec = 6
+			}
+			result = fmt.Sprintf("%.*e", prec, f)
+		case 'E':
+			// Scientific notation (uppercase)
+			prec := precision
+			if prec == -1 {
+				prec = 6
+			}
+			result = fmt.Sprintf("%.*E", prec, f)
+		case 'g', 'G':
+			// General format
+			prec := precision
+			if prec == -1 {
+				prec = 6
+			}
+			if fmtType == 'g' {
+				result = fmt.Sprintf("%.*g", prec, f)
+			} else {
+				result = fmt.Sprintf("%.*G", prec, f)
+			}
+		case 'd':
+			// Integer decimal
+			result = fmt.Sprintf("%.0f", math.Trunc(f))
+		case 'x':
+			// Hexadecimal (lowercase)
+			result = fmt.Sprintf("%x", int64(f))
+			if alt {
+				result = "0x" + result
+			}
+		case 'X':
+			// Hexadecimal (uppercase)
+			result = fmt.Sprintf("%X", int64(f))
+			if alt {
+				result = "0X" + result
+			}
+		case 'o':
+			// Octal
+			result = fmt.Sprintf("%o", int64(f))
+			if alt && !strings.HasPrefix(result, "0") {
+				result = "0" + result
+			}
+		case 'b':
+			// Binary
+			result = strconv.FormatInt(int64(f), 2)
+			if alt {
+				result = "0b" + result
+			}
+		case '%':
+			// Percentage
+			prec := precision
+			if prec == -1 {
+				prec = 6
+			}
+			result = fmt.Sprintf("%.*f%%", prec, f*100)
+		default:
+			// Default number formatting
+			if f == math.Floor(f) {
+				result = fmt.Sprintf("%.0f", f)
+			} else if precision >= 0 {
+				result = fmt.Sprintf("%.*f", precision, f)
+			} else {
+				result = fmt.Sprintf("%g", f)
+			}
+		}
+
+		// Apply sign
+		if f >= 0 && !strings.HasPrefix(result, "-") {
+			switch sign {
+			case '+':
+				result = "+" + result
+			case ' ':
+				result = " " + result
+			}
+		}
+	} else if str, ok := value.(StringValue); ok {
+		// String formatting
+		result = string(str)
+		if precision >= 0 && len(result) > precision {
+			result = result[:precision]
+		}
+	} else {
+		result = PrintValueWithoutQuotes(value)
+	}
+
+	// Apply width and alignment
+	if width > 0 && len(result) < width {
+		padding := width - len(result)
+		fillStr := string(fill)
+		if zero && fillStr == " " {
+			fillStr = "0"
+		}
+
+		switch align {
+		case '<':
+			// Left align
+			result = result + strings.Repeat(fillStr, padding)
+		case '>':
+			// Right align
+			result = strings.Repeat(fillStr, padding) + result
+		case '^':
+			// Center align
+			leftPad := padding / 2
+			rightPad := padding - leftPad
+			result = strings.Repeat(fillStr, leftPad) + result + strings.Repeat(fillStr, rightPad)
+		case '=':
+			// Pad after sign
+			if len(result) > 0 && (result[0] == '+' || result[0] == '-' || result[0] == ' ') {
+				result = string(result[0]) + strings.Repeat(fillStr, padding) + result[1:]
+			} else {
+				result = strings.Repeat(fillStr, padding) + result
+			}
+		default:
+			// Default: right align for numbers, left for strings
+			if _, ok := value.(NumberValue); ok {
+				result = strings.Repeat(fillStr, padding) + result
+			} else {
+				result = result + strings.Repeat(fillStr, padding)
+			}
+		}
+	}
+
+	return result, nil
+}
 
 // InitStringMethods adds additional string methods to the string type descriptor
 func InitStringMethods() {
@@ -213,23 +460,95 @@ func InitStringMethods() {
 		Doc:     "Return a formatted version of the string",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			// Simple implementation - just replace {} with args in order
 			s := string(receiver.(StringValue))
-			result := s
+			result := &strings.Builder{}
 
-			for i, arg := range args {
-				placeholder := "{}"
-				if idx := strings.Index(result, placeholder); idx >= 0 {
-					argStr := PrintValueWithoutQuotes(arg)
-					result = result[:idx] + argStr + result[idx+len(placeholder):]
+			autoArgIndex := 0
+			i := 0
+
+			for i < len(s) {
+				// Look for '{'
+				if s[i] == '{' {
+					// Check for escaped brace
+					if i+1 < len(s) && s[i+1] == '{' {
+						result.WriteByte('{')
+						i += 2
+						continue
+					}
+
+					// Find the matching '}'
+					j := i + 1
+					depth := 1
+					for j < len(s) && depth > 0 {
+						if s[j] == '{' {
+							depth++
+						} else if s[j] == '}' {
+							depth--
+						}
+						j++
+					}
+
+					if depth != 0 {
+						return nil, fmt.Errorf("unmatched '{' in format string")
+					}
+
+					// Extract the format spec
+					spec := s[i+1 : j-1]
+
+					// Parse the spec: [field][!conversion][:format_spec]
+					var fieldSpec, formatSpec string
+					var argIndex int
+
+					// Split on ':' to separate field from format spec
+					colonIdx := strings.IndexByte(spec, ':')
+					if colonIdx >= 0 {
+						fieldSpec = spec[:colonIdx]
+						formatSpec = spec[colonIdx+1:]
+					} else {
+						fieldSpec = spec
+					}
+
+					// Determine which argument to use
+					if fieldSpec == "" {
+						// Auto-indexing: {}
+						argIndex = autoArgIndex
+						autoArgIndex++
+					} else {
+						// Try to parse as integer
+						var err error
+						_, err = fmt.Sscanf(fieldSpec, "%d", &argIndex)
+						if err != nil {
+							return nil, fmt.Errorf("invalid field name '%s' in format string", fieldSpec)
+						}
+					}
+
+					if argIndex >= len(args) {
+						return nil, fmt.Errorf("replacement index %d out of range for positional args tuple", argIndex)
+					}
+
+					// Format the argument
+					formatted, err := formatValueWithSpec(args[argIndex], formatSpec)
+					if err != nil {
+						return nil, err
+					}
+					result.WriteString(formatted)
+
+					i = j
+				} else if s[i] == '}' {
+					// Check for escaped brace
+					if i+1 < len(s) && s[i+1] == '}' {
+						result.WriteByte('}')
+						i += 2
+						continue
+					}
+					return nil, fmt.Errorf("single '}' encountered in format string")
 				} else {
-					// Try numbered placeholders
-					placeholder = fmt.Sprintf("{%d}", i)
-					result = strings.ReplaceAll(result, placeholder, PrintValueWithoutQuotes(arg))
+					result.WriteByte(s[i])
+					i++
 				}
 			}
 
-			return StringValue(result), nil
+			return StringValue(result.String()), nil
 		},
 	}
 
