@@ -1,24 +1,62 @@
 package eval
 
 import (
+	"strings"
+
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/ast"
 	"github.com/mmichie/m28/parser"
 	"os"
 )
 
 // EvalString parses and evaluates a string in the given context
 func EvalString(input string, ctx *core.Context) (core.Value, error) {
-	// Create a new parser
-	p := parser.NewParser()
+	// Auto-detect syntax: if it starts with '(', use S-expression parser
+	// Otherwise, use Python parser
+	trimmed := strings.TrimSpace(input)
 
-	// Parse the input
-	expr, err := p.Parse(input)
+	if strings.HasPrefix(trimmed, "(") {
+		// Use M28 S-expression parser
+		p := parser.NewParser()
+		expr, err := p.Parse(input)
+		if err != nil {
+			return nil, err
+		}
+		return Eval(expr, ctx)
+	}
+
+	// Use Python parser (default)
+	tokenizer := parser.NewPythonTokenizer(input)
+	tokens, err := tokenizer.Tokenize()
 	if err != nil {
 		return nil, err
 	}
 
-	// Evaluate the parsed expression
-	return Eval(expr, ctx)
+	pythonParser := parser.NewPythonParser(tokens)
+	nodes, err := pythonParser.Parse()
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert AST nodes to IR and evaluate
+	return evalPythonNodes(nodes, ctx)
+}
+
+// evalPythonNodes evaluates Python AST nodes
+func evalPythonNodes(nodes []ast.ASTNode, ctx *core.Context) (core.Value, error) {
+	var result core.Value = core.Nil
+	var err error
+
+	for _, node := range nodes {
+		ir := node.ToIR()
+
+		result, err = Eval(ir, ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
 }
 
 // ReadFile reads the content of a file and returns it as a string

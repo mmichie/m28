@@ -594,7 +594,53 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 
 // parseExpression is the entry point for expression parsing
 func (p *PythonParser) parseExpression() ast.ASTNode {
+	// Lambda has lowest precedence, handle it first
+	if p.check(TOKEN_LAMBDA) {
+		return p.parseLambda()
+	}
 	return p.parseOr()
+}
+
+// parseLambda parses: lambda [params]: expression
+func (p *PythonParser) parseLambda() ast.ASTNode {
+	tok := p.expect(TOKEN_LAMBDA)
+
+	// Parse parameters (no parentheses)
+	params := []ast.ASTNode{}
+
+	// If there's a colon immediately, no parameters
+	if !p.check(TOKEN_COLON) {
+		// Parse comma-separated parameter list
+		for {
+			if p.check(TOKEN_COLON) {
+				break
+			}
+
+			paramTok := p.expect(TOKEN_IDENTIFIER)
+			params = append(params, ast.NewIdentifier(paramTok.Lexeme, p.makeLocation(paramTok), ast.SyntaxPython))
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance() // consume comma
+		}
+	}
+
+	p.expect(TOKEN_COLON)
+
+	// Parse the body expression (everything after the colon)
+	// Use parseExpression to allow nested lambdas
+	body := p.parseExpression()
+
+	// Create parameter list S-expr
+	paramList := ast.NewSExpr(params, p.makeLocation(tok), ast.SyntaxPython)
+
+	// Create (lambda (params...) body) S-expr
+	return ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier("lambda", p.makeLocation(tok), ast.SyntaxPython),
+		paramList,
+		body,
+	}, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseOr parses: and_expr (or and_expr)*
