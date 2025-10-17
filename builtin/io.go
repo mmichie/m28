@@ -20,7 +20,7 @@ func RegisterIO(ctx *core.Context) {
 		// Print can take any number of arguments
 		parts := make([]string, len(args))
 		for i, arg := range args {
-			parts[i] = arg.String()
+			parts[i] = core.PrintValueWithoutQuotes(arg)
 		}
 		fmt.Println(strings.Join(parts, " "))
 		return core.NilValue{}, nil
