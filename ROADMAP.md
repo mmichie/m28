@@ -127,12 +127,12 @@ Frontend (Python/Lisp/DSL) → AST (with locations/types/comments) → IR (core.
 - [x] Update Context to carry metadata
 - [x] Deliverable: AST types working, all tests pass (8 AST tests + 7 metadata tests)
 
-#### Phase 2: Parser Refactoring (Week 3-4)
-- [ ] Refactor parser to build AST instead of returning IR directly
-- [ ] Add location tracking to every node creation
-- [ ] Populate metadata table during parsing
-- [ ] Parser returns `(ASTNode, *IRMetadata, error)`
-- [ ] Deliverable: AST-based parser with full location info
+#### Phase 2: Parser Refactoring (Week 3-4) ✅ COMPLETE
+- [x] Refactor parser to build AST instead of returning IR directly
+- [x] Add location tracking to every node creation
+- [x] Populate metadata table during parsing
+- [x] Parser returns `(ASTNode, *IRMetadata, error)` via ParseToAST()
+- [x] Deliverable: AST-based parser with full location info (7 parser tests passing)
 
 #### Phase 3: Enhanced Error Messages (Week 5)
 - [ ] Update error types to include SourceLocation from metadata
@@ -168,7 +168,9 @@ Frontend (Python/Lisp/DSL) → AST (with locations/types/comments) → IR (core.
 - [x] Phase 1: AST infrastructure complete (8 tests passing)
 - [x] Phase 1: Metadata table working (7 tests passing)
 - [x] Phase 1: Zero regressions (54/54 M28 tests passing)
-- [ ] Phase 2: Parser builds AST with locations
+- [x] Phase 2: Parser builds AST with locations (7 parser tests passing)
+- [x] Phase 2: ParseToAST() method returns AST + metadata
+- [x] Phase 2: Zero regressions (54/54 M28 tests still passing)
 - [ ] Phase 3: Error messages show source locations
 - [ ] Phase 4: Type annotations preserved from Python
 - [ ] No eval performance regression
