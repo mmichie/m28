@@ -8,10 +8,17 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// importNameSpec represents a name to import with optional alias
+type importNameSpec struct {
+	name  string
+	alias string // empty if no alias
+}
+
 // enhancedImportForm implements advanced import forms:
 // (import module-name)                    - imports module as module-name
 // (import module-name as alias)           - imports module as alias
 // (import module-name from [name1 name2]) - imports specific names
+// (import module-name from [name as alias]) - imports specific name with alias
 // (import module-name from *)             - imports all exported names
 // Note: :as and :from syntax also supported but may cause issues with parser
 func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
@@ -32,7 +39,7 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 
 	// Parse import options
 	var alias string
-	var importNames []string
+	var importNames []importNameSpec
 	var importAll bool
 
 	// Default alias is the module name
@@ -68,18 +75,51 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 				if len(list) > 0 {
 					if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
 						// It's [name1 name2] syntax, extract the symbols
+						// Each element can be either:
+						//   - A symbol (name without alias)
+						//   - A list-literal with [name, alias]
 						for j := 1; j < len(list); j++ {
 							if nameSym, ok := list[j].(core.SymbolValue); ok {
-								importNames = append(importNames, string(nameSym))
+								// Plain name without alias
+								importNames = append(importNames, importNameSpec{
+									name:  string(nameSym),
+									alias: "",
+								})
+							} else if pairList, ok := list[j].(core.ListValue); ok {
+								// Check if it's a [name, alias] pair
+								if len(pairList) == 3 {
+									if listLitSym, ok := pairList[0].(core.SymbolValue); ok && string(listLitSym) == "list-literal" {
+										if nameSym, ok := pairList[1].(core.SymbolValue); ok {
+											if aliasSym, ok := pairList[2].(core.SymbolValue); ok {
+												// [name, alias] pair
+												importNames = append(importNames, importNameSpec{
+													name:  string(nameSym),
+													alias: string(aliasSym),
+												})
+											} else {
+												return nil, fmt.Errorf("import alias must be a symbol")
+											}
+										} else {
+											return nil, fmt.Errorf("import name must be a symbol")
+										}
+									} else {
+										return nil, fmt.Errorf("import names must be symbols or [name, alias] pairs")
+									}
+								} else {
+									return nil, fmt.Errorf("import names must be symbols or [name, alias] pairs")
+								}
 							} else {
-								return nil, fmt.Errorf("import names must be symbols")
+								return nil, fmt.Errorf("import names must be symbols or [name, alias] pairs")
 							}
 						}
 					} else {
 						// It's a regular list, process normally
 						for _, item := range list {
 							if nameSym, ok := item.(core.SymbolValue); ok {
-								importNames = append(importNames, string(nameSym))
+								importNames = append(importNames, importNameSpec{
+									name:  string(nameSym),
+									alias: "",
+								})
 							} else {
 								return nil, fmt.Errorf("import names must be symbols")
 							}
@@ -108,12 +148,18 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 
 	// Handle different import forms
 	if len(importNames) > 0 {
-		// Import specific names
-		for _, name := range importNames {
-			if val, ok := dictModule.Get(name); ok {
-				ctx.Define(name, val)
+		// Import specific names (with optional aliases)
+		for _, spec := range importNames {
+			// Get the value from the module using the original name
+			if val, ok := dictModule.Get(spec.name); ok {
+				// Define in context using the alias if provided, otherwise use the original name
+				targetName := spec.name
+				if spec.alias != "" {
+					targetName = spec.alias
+				}
+				ctx.Define(targetName, val)
 			} else {
-				return nil, fmt.Errorf("module '%s' has no export '%s'", moduleName, name)
+				return nil, fmt.Errorf("module '%s' has no export '%s'", moduleName, spec.name)
 			}
 		}
 	} else if importAll {

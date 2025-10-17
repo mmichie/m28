@@ -1,0 +1,5 @@
+# Simple test module for import aliasing
+
+(= test_function (lambda (x) (* x 2)))
+(= test_value 42)
+(= another_function (lambda (x y) (+ x y)))

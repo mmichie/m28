@@ -392,31 +392,22 @@ func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
 	}
 
 	// Parse import names (comma-separated)
+	// Each name can be either:
+	//   - just a name: symbol
+	//   - name with alias: (list-literal name alias)
 	names := []ast.ASTNode{}
 
 	// First name
 	nameTok := p.expect(TOKEN_IDENTIFIER)
-	names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
-
-	// Check for 'as alias' - Note: M28's import doesn't support per-name aliasing
-	// We'll skip the alias for now and only import the original name
-	if p.check(TOKEN_AS) {
-		p.advance()
-		p.expect(TOKEN_IDENTIFIER) // Skip the alias
-		// TODO: Could define the alias after import: x = original_name
-	}
+	nameNode := p.parseImportName(nameTok, tok)
+	names = append(names, nameNode)
 
 	// Additional names
 	for p.check(TOKEN_COMMA) {
 		p.advance()
 		nameTok := p.expect(TOKEN_IDENTIFIER)
-		names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
-
-		// Skip alias if present
-		if p.check(TOKEN_AS) {
-			p.advance()
-			p.expect(TOKEN_IDENTIFIER)
-		}
+		nameNode := p.parseImportName(nameTok, tok)
+		names = append(names, nameNode)
 	}
 
 	// Create (list-literal name1 name2 ...) for the names
@@ -444,6 +435,29 @@ func (p *PythonParser) parseModuleName() string {
 	}
 
 	return name
+}
+
+// parseImportName parses a single import name with optional alias
+// Returns either:
+//   - symbol (for name without alias)
+//   - (list-literal name alias) (for name with alias)
+func (p *PythonParser) parseImportName(nameTok Token, baseTok Token) ast.ASTNode {
+	// Check for 'as alias'
+	if p.check(TOKEN_AS) {
+		p.advance()
+		aliasTok := p.expect(TOKEN_IDENTIFIER)
+
+		// Return (list-literal name alias)
+		elements := []ast.ASTNode{
+			ast.NewIdentifier("list-literal", p.makeLocation(baseTok), ast.SyntaxPython),
+			ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython),
+			ast.NewIdentifier(aliasTok.Lexeme, p.makeLocation(aliasTok), ast.SyntaxPython),
+		}
+		return ast.NewSExpr(elements, p.makeLocation(nameTok), ast.SyntaxPython)
+	}
+
+	// No alias, just return the symbol
+	return ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython)
 }
 
 // parseExpressionStatement parses an expression or assignment statement
