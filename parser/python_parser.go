@@ -598,7 +598,35 @@ func (p *PythonParser) parseExpression() ast.ASTNode {
 	if p.check(TOKEN_LAMBDA) {
 		return p.parseLambda()
 	}
-	return p.parseOr()
+	return p.parseTernary()
+}
+
+// parseTernary parses: or (if or else or)?
+// Python: x if condition else y
+func (p *PythonParser) parseTernary() ast.ASTNode {
+	expr := p.parseOr()
+
+	if p.check(TOKEN_IF) {
+		p.advance() // consume 'if'
+		condition := p.parseOr()
+
+		if !p.check(TOKEN_ELSE) {
+			return nil // Error: expected 'else' after 'if' in ternary
+		}
+		p.advance() // consume 'else'
+
+		elseExpr := p.parseTernary() // Allow nested ternaries
+
+		// Create (if condition expr elseExpr)
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("if", p.makeLocation(p.previous()), ast.SyntaxPython),
+			condition,
+			expr,
+			elseExpr,
+		}, p.makeLocation(p.previous()), ast.SyntaxPython)
+	}
+
+	return expr
 }
 
 // parseLambda parses: lambda [params]: expression
@@ -755,13 +783,13 @@ func (p *PythonParser) parseAddition() ast.ASTNode {
 	return expr
 }
 
-// parseMultiplication parses: unary ((*|/|//|%) unary)*
+// parseMultiplication parses: factor ((*|/|//|%) factor)*
 func (p *PythonParser) parseMultiplication() ast.ASTNode {
-	expr := p.parseUnary()
+	expr := p.parseFactor()
 
 	for p.match(TOKEN_STAR, TOKEN_SLASH, TOKEN_DOUBLESLASH, TOKEN_PERCENT) {
 		tok := p.previous()
-		right := p.parseUnary()
+		right := p.parseFactor()
 
 		var op string
 		switch tok.Type {
@@ -785,11 +813,12 @@ func (p *PythonParser) parseMultiplication() ast.ASTNode {
 	return expr
 }
 
-// parseUnary parses: (-|+|~) unary | postfix
-func (p *PythonParser) parseUnary() ast.ASTNode {
+// parseFactor parses: (-|+|~) factor | power
+// Python grammar: factor: ('+' | '-' | '~') factor | power
+func (p *PythonParser) parseFactor() ast.ASTNode {
 	if p.match(TOKEN_MINUS, TOKEN_PLUS, TOKEN_TILDE) {
 		tok := p.previous()
-		expr := p.parseUnary()
+		expr := p.parseFactor()
 
 		var op string
 		switch tok.Type {
@@ -807,7 +836,38 @@ func (p *PythonParser) parseUnary() ast.ASTNode {
 		}, p.makeLocation(tok), ast.SyntaxPython)
 	}
 
-	return p.parsePostfix()
+	return p.parsePower()
+}
+
+// parsePower parses: postfix (** factor)? (right-associative)
+// Python grammar: power: atom_expr ['**' factor]
+// Examples:
+//
+//	2**3**4 == 2**(3**4) = 512
+//	-2**2 == -(2**2) = -4
+//	2**-3 == 2**(-3) = 0.125
+func (p *PythonParser) parsePower() ast.ASTNode {
+	expr := p.parsePostfix()
+
+	if p.match(TOKEN_DOUBLESTAR) {
+		tok := p.previous()
+		// Right-associative: exponent can have unary operators
+		right := p.parseFactor()
+
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("**", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseUnary is now parseFactor (see above)
+// Keeping this for compatibility, but it now just calls parseFactor
+func (p *PythonParser) parseUnary() ast.ASTNode {
+	return p.parseFactor()
 }
 
 // parsePostfix parses: primary (call | subscript | attribute)*
@@ -1122,12 +1182,14 @@ func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) as
 		variable := varTok.Lexeme
 
 		p.expect(TOKEN_IN)
-		iterable := p.parseExpression()
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
 
 		var condition ast.ASTNode
 		if p.check(TOKEN_IF) {
 			p.advance()
-			condition = p.parseExpression()
+			// Condition can use full expression parsing (including ternary if needed)
+			condition = p.parseOr()
 		}
 
 		clauses = append(clauses, ast.ComprehensionClause{
@@ -1165,12 +1227,13 @@ func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token)
 		variable := varTok.Lexeme
 
 		p.expect(TOKEN_IN)
-		iterable := p.parseExpression()
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
 
 		var condition ast.ASTNode
 		if p.check(TOKEN_IF) {
 			p.advance()
-			condition = p.parseExpression()
+			condition = p.parseOr()
 		}
 
 		clauses = append(clauses, ast.ComprehensionClause{
@@ -1207,12 +1270,13 @@ func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast
 		variable := varTok.Lexeme
 
 		p.expect(TOKEN_IN)
-		iterable := p.parseExpression()
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
 
 		var condition ast.ASTNode
 		if p.check(TOKEN_IF) {
 			p.advance()
-			condition = p.parseExpression()
+			condition = p.parseOr()
 		}
 
 		clauses = append(clauses, ast.ComprehensionClause{
@@ -1243,12 +1307,13 @@ func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) 
 	variable := varTok.Lexeme
 
 	p.expect(TOKEN_IN)
-	iterable := p.parseExpression()
+	// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+	iterable := p.parseOr()
 
 	var condition ast.ASTNode
 	if p.check(TOKEN_IF) {
 		p.advance()
-		condition = p.parseExpression()
+		condition = p.parseOr()
 	}
 
 	p.expect(TOKEN_RPAREN)
@@ -1374,13 +1439,22 @@ func (p *PythonParser) parseIfStatement() ast.ASTNode {
 	return ast.NewIfForm(condition, thenNode, elseNode, p.makeLocation(tok), ast.SyntaxPython)
 }
 
-// parseForStatement parses: for var in iterable: block (else: block)?
+// parseForStatement parses: for var[, var2, ...] in iterable: block (else: block)?
 func (p *PythonParser) parseForStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_FOR)
 
-	// Parse loop variable
+	// Parse loop variables (can be single or tuple unpacking)
+	variables := []string{}
+
+	// First variable
 	varTok := p.expect(TOKEN_IDENTIFIER)
-	variable := varTok.Lexeme
+	variables = append(variables, varTok.Lexeme)
+
+	// Check for additional variables (tuple unpacking)
+	for p.match(TOKEN_COMMA) {
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		variables = append(variables, varTok.Lexeme)
+	}
 
 	p.expect(TOKEN_IN)
 
@@ -1397,7 +1471,7 @@ func (p *PythonParser) parseForStatement() ast.ASTNode {
 		elseBody = p.parseBlock()
 	}
 
-	return ast.NewForForm(variable, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
+	return ast.NewForFormMulti(variables, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseWhileStatement parses: while expr: block (else: block)?

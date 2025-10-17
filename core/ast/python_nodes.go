@@ -247,23 +247,46 @@ func (b *BlockForm) ToIR() core.Value {
 // ForForm represents a for loop
 type ForForm struct {
 	BaseNode
-	Variable string
-	Iterable ASTNode
-	Body     []ASTNode
-	ElseBody []ASTNode // Optional else clause (Python feature)
+	Variable  string   // Deprecated: use Variables instead
+	Variables []string // Loop variables (for tuple unpacking)
+	Iterable  ASTNode
+	Body      []ASTNode
+	ElseBody  []ASTNode // Optional else clause (Python feature)
 }
 
-// NewForForm creates a new for loop
+// NewForForm creates a new for loop with a single variable (backward compatible)
 func NewForForm(variable string, iterable ASTNode, body, elseBody []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *ForForm {
 	return &ForForm{
 		BaseNode: BaseNode{
 			Loc:    loc,
 			Syntax: syntax,
 		},
-		Variable: variable,
-		Iterable: iterable,
-		Body:     body,
-		ElseBody: elseBody,
+		Variable:  variable,
+		Variables: []string{variable},
+		Iterable:  iterable,
+		Body:      body,
+		ElseBody:  elseBody,
+	}
+}
+
+// NewForFormMulti creates a new for loop with multiple variables (tuple unpacking)
+func NewForFormMulti(variables []string, iterable ASTNode, body, elseBody []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *ForForm {
+	// Set Variable to first var for backward compatibility
+	var firstVar string
+	if len(variables) > 0 {
+		firstVar = variables[0]
+	}
+
+	return &ForForm{
+		BaseNode: BaseNode{
+			Loc:    loc,
+			Syntax: syntax,
+		},
+		Variable:  firstVar,
+		Variables: variables,
+		Iterable:  iterable,
+		Body:      body,
+		ElseBody:  elseBody,
 	}
 }
 
@@ -286,12 +309,31 @@ func (f *ForForm) ToIR() core.Value {
 		bodyIR = append(bodyIR, stmt.ToIR())
 	}
 
-	// Basic for loop: (for var iterable body)
-	result := core.ListValue{
-		core.SymbolValue("for"),
-		core.SymbolValue(f.Variable),
-		f.Iterable.ToIR(),
-		bodyIR,
+	var result core.ListValue
+
+	if len(f.Variables) == 1 {
+		// Single variable: (for var iterable body)
+		result = core.ListValue{
+			core.SymbolValue("for"),
+			core.SymbolValue(f.Variables[0]),
+			f.Iterable.ToIR(),
+			bodyIR,
+		}
+	} else {
+		// Multiple variables (tuple unpacking): (for var1 var2 ... in iterable body)
+		result = core.ListValue{core.SymbolValue("for")}
+
+		// Add all variables
+		for _, v := range f.Variables {
+			result = append(result, core.SymbolValue(v))
+		}
+
+		// Add 'in' keyword
+		result = append(result, core.SymbolValue("in"))
+
+		// Add iterable and body
+		result = append(result, f.Iterable.ToIR())
+		result = append(result, bodyIR)
 	}
 
 	// If there's an else clause, we need to handle it
@@ -517,21 +559,36 @@ func (c *ComprehensionForm) ToIR() core.Value {
 		}
 
 		// Single clause (backward compatible)
-		if c.Condition != nil {
+		// Use first clause if Variable not set properly
+		var variable string
+		var iterable, condition ASTNode
+		if len(c.Clauses) > 0 {
+			// Prefer clauses (new format)
+			variable = c.Clauses[0].Variable
+			iterable = c.Clauses[0].Iterable
+			condition = c.Clauses[0].Condition
+		} else {
+			// Fall back to deprecated fields
+			variable = c.Variable
+			iterable = c.Iterable
+			condition = c.Condition
+		}
+
+		if condition != nil {
 			return core.ListValue{
 				core.SymbolValue("list-comp"),
 				c.Element.ToIR(),
-				core.SymbolValue(c.Variable),
-				c.Iterable.ToIR(),
-				c.Condition.ToIR(),
+				core.SymbolValue(variable),
+				iterable.ToIR(),
+				condition.ToIR(),
 			}
 		}
 
 		return core.ListValue{
 			core.SymbolValue("list-comp"),
 			c.Element.ToIR(),
-			core.SymbolValue(c.Variable),
-			c.Iterable.ToIR(),
+			core.SymbolValue(variable),
+			iterable.ToIR(),
 		}
 
 	case DictComp:
@@ -565,14 +622,26 @@ func (c *ComprehensionForm) ToIR() core.Value {
 
 		// Single clause (backward compatible)
 		// Format: (dict-comp key-expr value-expr var iterable [condition])
-		if c.Condition != nil {
+		var variable string
+		var iterable, condition ASTNode
+		if len(c.Clauses) > 0 {
+			variable = c.Clauses[0].Variable
+			iterable = c.Clauses[0].Iterable
+			condition = c.Clauses[0].Condition
+		} else {
+			variable = c.Variable
+			iterable = c.Iterable
+			condition = c.Condition
+		}
+
+		if condition != nil {
 			return core.ListValue{
 				core.SymbolValue("dict-comp"),
 				c.KeyExpr.ToIR(),
 				c.ValueExpr.ToIR(),
-				core.SymbolValue(c.Variable),
-				c.Iterable.ToIR(),
-				c.Condition.ToIR(),
+				core.SymbolValue(variable),
+				iterable.ToIR(),
+				condition.ToIR(),
 			}
 		}
 
@@ -580,8 +649,8 @@ func (c *ComprehensionForm) ToIR() core.Value {
 			core.SymbolValue("dict-comp"),
 			c.KeyExpr.ToIR(),
 			c.ValueExpr.ToIR(),
-			core.SymbolValue(c.Variable),
-			c.Iterable.ToIR(),
+			core.SymbolValue(variable),
+			iterable.ToIR(),
 		}
 
 	case SetComp:
@@ -614,21 +683,33 @@ func (c *ComprehensionForm) ToIR() core.Value {
 
 		// Single clause (backward compatible)
 		// Format: (set-comp expr var iterable [condition])
-		if c.Condition != nil {
+		var variable string
+		var iterable, condition ASTNode
+		if len(c.Clauses) > 0 {
+			variable = c.Clauses[0].Variable
+			iterable = c.Clauses[0].Iterable
+			condition = c.Clauses[0].Condition
+		} else {
+			variable = c.Variable
+			iterable = c.Iterable
+			condition = c.Condition
+		}
+
+		if condition != nil {
 			return core.ListValue{
 				core.SymbolValue("set-comp"),
 				c.Element.ToIR(),
-				core.SymbolValue(c.Variable),
-				c.Iterable.ToIR(),
-				c.Condition.ToIR(),
+				core.SymbolValue(variable),
+				iterable.ToIR(),
+				condition.ToIR(),
 			}
 		}
 
 		return core.ListValue{
 			core.SymbolValue("set-comp"),
 			c.Element.ToIR(),
-			core.SymbolValue(c.Variable),
-			c.Iterable.ToIR(),
+			core.SymbolValue(variable),
+			iterable.ToIR(),
 		}
 
 	case GeneratorComp:
