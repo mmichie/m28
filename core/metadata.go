@@ -167,3 +167,22 @@ func (m *IRMetadata) Merge(other *IRMetadata) {
 		m.syntax[k] = v
 	}
 }
+
+// GetLocationForValue is a helper to extract location for a value from context metadata
+// Returns nil if context, metadata, or location is not available
+func GetLocationForValue(ctx *Context, val Value) *SourceLocation {
+	if ctx == nil || ctx.Metadata == nil {
+		return nil
+	}
+	return ctx.Metadata.GetLocation(val)
+}
+
+// GetSyntaxKindForValue is a helper to extract syntax kind for a value from context metadata
+// Returns 0 (SyntaxLisp) if context, metadata, or syntax kind is not available
+func GetSyntaxKindForValue(ctx *Context, val Value) int {
+	if ctx == nil || ctx.Metadata == nil {
+		return 0
+	}
+	kind, _ := ctx.Metadata.GetSyntaxKind(val)
+	return kind
+}

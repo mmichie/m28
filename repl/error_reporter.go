@@ -67,6 +67,15 @@ func (er *ErrorReporter) ReportError(err error, ctx *core.Context, w io.Writer) 
 func (er *ErrorReporter) reportEvalError(err *core.EvalError, ctx *core.Context, w io.Writer) {
 	// Print error type and message
 	msg := fmt.Sprintf("%s: %s", err.Type, err.Message)
+
+	// Add syntax kind if available
+	if err.SyntaxKind != 0 {
+		syntaxName := er.getSyntaxKindName(err.SyntaxKind)
+		if syntaxName != "" {
+			msg = fmt.Sprintf("%s [%s syntax]", msg, syntaxName)
+		}
+	}
+
 	fmt.Fprintln(w, er.colorManager.ColorizeError(msg))
 
 	// Print stack trace
@@ -95,6 +104,11 @@ func (er *ErrorReporter) reportNameError(err *core.NameError, ctx *core.Context,
 		fmt.Fprint(w, ctx.FormatStackTrace())
 	}
 
+	// Show source context if location is available
+	if err.Location != nil {
+		er.showSourceContext(err.Location.File, err.Location.Line, err.Location.Column, w)
+	}
+
 	// Find similar names for suggestions
 	if ctx != nil {
 		suggestions := er.findSimilarNames(err.Name, ctx)
@@ -117,6 +131,11 @@ func (er *ErrorReporter) reportTypeError(err *core.TypeError, ctx *core.Context,
 	// Show stack trace
 	if ctx != nil && len(ctx.CallStack) > 0 {
 		fmt.Fprint(w, ctx.FormatStackTrace())
+	}
+
+	// Show source context if location is available
+	if err.Location != nil {
+		er.showSourceContext(err.Location.File, err.Location.Line, err.Location.Column, w)
 	}
 }
 
@@ -214,4 +233,22 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+// getSyntaxKindName returns a human-readable name for syntax kind
+func (er *ErrorReporter) getSyntaxKindName(kind int) string {
+	// Import ast.SyntaxKind constants
+	// 0 = SyntaxLisp, 1 = SyntaxPython, 2 = SyntaxJSON, 3 = SyntaxCustom
+	switch kind {
+	case 0:
+		return "Lisp"
+	case 1:
+		return "Python"
+	case 2:
+		return "JSON"
+	case 3:
+		return "Custom"
+	default:
+		return ""
+	}
 }

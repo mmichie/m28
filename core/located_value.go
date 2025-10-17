@@ -1,11 +1,24 @@
 // Package core provides the fundamental types and interfaces for the M28 language.
 package core
 
+import "fmt"
+
 // SourceLocation represents a position in source code
 type SourceLocation struct {
 	File   string
 	Line   int
 	Column int
+}
+
+// String returns a human-readable representation of the source location
+func (sl *SourceLocation) String() string {
+	if sl == nil {
+		return "<unknown>"
+	}
+	if sl.Column > 0 {
+		return fmt.Sprintf("%s:%d:%d", sl.File, sl.Line, sl.Column)
+	}
+	return fmt.Sprintf("%s:%d", sl.File, sl.Line)
 }
 
 // LocatedValue wraps a Value with source location information

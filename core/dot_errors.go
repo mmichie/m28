@@ -54,11 +54,16 @@ func ErrTooManyArgumentsf(methodName string, expected, got int) error {
 
 // NameError is raised when a name is not found
 type NameError struct {
-	Name string
+	Name     string
+	Location *SourceLocation
 }
 
 func (e *NameError) Error() string {
-	return fmt.Sprintf("name error: name '%s' is not defined", e.Name)
+	msg := fmt.Sprintf("name error: name '%s' is not defined", e.Name)
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
 }
 
 // TypeError is raised when a type error occurs
@@ -66,9 +71,13 @@ type TypeError struct {
 	Message  string
 	Expected string
 	Got      string
+	Location *SourceLocation
 }
 
 func (e *TypeError) Error() string {
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", e.Message, e.Location.String())
+	}
 	return e.Message
 }
 
@@ -81,6 +90,7 @@ type EvalError struct {
 	Column     int
 	Suggestion string
 	Wrapped    error
+	SyntaxKind int // Which frontend syntax (ast.SyntaxKind)
 }
 
 func (e *EvalError) Error() string {
@@ -89,28 +99,44 @@ func (e *EvalError) Error() string {
 
 // IndexError represents an index out of bounds error
 type IndexError struct {
-	Index  int
-	Length int
+	Index    int
+	Length   int
+	Location *SourceLocation
 }
 
 func (e *IndexError) Error() string {
-	return fmt.Sprintf("list index out of range (index %d, length %d)", e.Index, e.Length)
+	msg := fmt.Sprintf("list index out of range (index %d, length %d)", e.Index, e.Length)
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
 }
 
 // KeyError represents a missing dictionary key
 type KeyError struct {
-	Key Value
+	Key      Value
+	Location *SourceLocation
 }
 
 func (e *KeyError) Error() string {
-	return fmt.Sprintf("key not found: %s", PrintValue(e.Key))
+	msg := fmt.Sprintf("key not found: %s", PrintValue(e.Key))
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
 }
 
 // ZeroDivisionError represents division by zero
-type ZeroDivisionError struct{}
+type ZeroDivisionError struct {
+	Location *SourceLocation
+}
 
 func (e *ZeroDivisionError) Error() string {
-	return "division by zero"
+	msg := "division by zero"
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
 }
 
 // NewTypeError creates a new type error

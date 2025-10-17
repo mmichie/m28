@@ -134,11 +134,11 @@ Frontend (Python/Lisp/DSL) → AST (with locations/types/comments) → IR (core.
 - [x] Parser returns `(ASTNode, *IRMetadata, error)` via ParseToAST()
 - [x] Deliverable: AST-based parser with full location info (7 parser tests passing)
 
-#### Phase 3: Enhanced Error Messages (Week 5)
-- [ ] Update error types to include SourceLocation from metadata
-- [ ] Show original syntax in errors (Python vs Lisp)
-- [ ] Source snippets with caret indicators pointing to exact location
-- [ ] Deliverable: Beautiful error messages with source context
+#### Phase 3: Enhanced Error Messages (Week 5) ✅ COMPLETE
+- [x] Update error types to include SourceLocation from metadata
+- [x] Show original syntax in errors (Python vs Lisp)
+- [x] Source snippets with caret indicators pointing to exact location (already implemented in ErrorReporter)
+- [x] Deliverable: Beautiful error messages with source context
 
 #### Phase 4: Type Annotation Support (Week 6)
 - [ ] Add TypeInfo structure for Python type hints
@@ -171,7 +171,9 @@ Frontend (Python/Lisp/DSL) → AST (with locations/types/comments) → IR (core.
 - [x] Phase 2: Parser builds AST with locations (7 parser tests passing)
 - [x] Phase 2: ParseToAST() method returns AST + metadata
 - [x] Phase 2: Zero regressions (54/54 M28 tests still passing)
-- [ ] Phase 3: Error messages show source locations
+- [x] Phase 3: Error messages show source locations (9 enhanced error tests passing)
+- [x] Phase 3: SyntaxKind tracking for Python vs Lisp distinction
+- [x] Phase 3: Zero regressions (54/54 M28 tests still passing)
 - [ ] Phase 4: Type annotations preserved from Python
 - [ ] No eval performance regression
 - [ ] Documentation complete

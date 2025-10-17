@@ -5,6 +5,8 @@ package errors
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mmichie/m28/core"
 )
 
 // ErrorType represents the category of error, similar to Python's exception types.
@@ -27,10 +29,12 @@ const (
 // M28Error is the base error type for all M28 errors.
 // It provides structured error information while implementing the standard error interface.
 type M28Error struct {
-	Type     ErrorType
-	Function string                 // The function where the error occurred
-	Message  string                 // The error message
-	Details  map[string]interface{} // Additional context
+	Type       ErrorType
+	Function   string                 // The function where the error occurred
+	Message    string                 // The error message
+	Details    map[string]interface{} // Additional context
+	Location   *core.SourceLocation   // Source location where error occurred
+	SyntaxKind int                    // Which frontend syntax (ast.SyntaxKind)
 }
 
 // Error implements the error interface
@@ -47,6 +51,13 @@ func (e *M28Error) Error() string {
 	}
 
 	b.WriteString(e.Message)
+
+	// Add location if available
+	if e.Location != nil {
+		b.WriteString(" at ")
+		b.WriteString(e.Location.String())
+	}
+
 	return b.String()
 }
 
@@ -71,6 +82,18 @@ func (e *M28Error) WithDetail(key string, value interface{}) *M28Error {
 		e.Details = make(map[string]interface{})
 	}
 	e.Details[key] = value
+	return e
+}
+
+// WithLocation adds source location to the error
+func (e *M28Error) WithLocation(loc *core.SourceLocation) *M28Error {
+	e.Location = loc
+	return e
+}
+
+// WithSyntaxKind adds syntax kind to the error
+func (e *M28Error) WithSyntaxKind(kind int) *M28Error {
+	e.SyntaxKind = kind
 	return e
 }
 
