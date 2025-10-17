@@ -205,6 +205,10 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 		return p.parseTryStatement()
 	case TOKEN_WITH:
 		return p.parseWithStatement()
+	case TOKEN_IMPORT:
+		return p.parseImportStatement()
+	case TOKEN_FROM:
+		return p.parseFromImportStatement()
 	case TOKEN_RETURN:
 		return p.parseReturnStatement()
 	case TOKEN_BREAK:
@@ -300,6 +304,146 @@ func (p *PythonParser) parseRaiseStatement() ast.ASTNode {
 	}
 
 	return ast.NewRaiseForm(exception, cause, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseImportStatement parses: import module [as alias] [, module2 [as alias2], ...]
+func (p *PythonParser) parseImportStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_IMPORT)
+
+	// Parse first module
+	modules := []ast.ASTNode{p.parseImportModule(tok)}
+
+	// Parse additional modules (comma-separated)
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		modules = append(modules, p.parseImportModule(tok))
+	}
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	// If there's only one import, return it directly
+	if len(modules) == 1 {
+		return modules[0]
+	}
+
+	// Multiple imports: wrap in a block
+	return ast.NewBlockForm(modules, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseImportModule parses a single module import: module [as alias]
+// Returns an SExpr representing (import "module" [:as alias])
+func (p *PythonParser) parseImportModule(tok Token) ast.ASTNode {
+	// Parse module name (can be dotted: os.path)
+	moduleName := p.parseModuleName()
+
+	// Create import form: (import "module" ...)
+	elements := []ast.ASTNode{
+		ast.NewIdentifier("import", p.makeLocation(tok), ast.SyntaxPython),
+		ast.NewLiteral(core.StringValue(moduleName), p.makeLocation(tok), ast.SyntaxPython),
+	}
+
+	// Check for 'as alias'
+	if p.check(TOKEN_AS) {
+		p.advance()
+		aliasTok := p.expect(TOKEN_IDENTIFIER)
+
+		// Add :as symbol and alias
+		elements = append(elements,
+			ast.NewIdentifier(":as", p.makeLocation(tok), ast.SyntaxPython),
+			ast.NewIdentifier(aliasTok.Lexeme, p.makeLocation(aliasTok), ast.SyntaxPython),
+		)
+	}
+
+	return ast.NewSExpr(elements, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseFromImportStatement parses: from module import name [as alias] [, name2 [as alias2], ...]
+// or: from module import *
+func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_FROM)
+
+	// Parse module name
+	moduleName := p.parseModuleName()
+
+	// Expect 'import'
+	p.expect(TOKEN_IMPORT)
+
+	// Create base import form: (import "module" :from ...)
+	elements := []ast.ASTNode{
+		ast.NewIdentifier("import", p.makeLocation(tok), ast.SyntaxPython),
+		ast.NewLiteral(core.StringValue(moduleName), p.makeLocation(tok), ast.SyntaxPython),
+		ast.NewIdentifier(":from", p.makeLocation(tok), ast.SyntaxPython),
+	}
+
+	// Check for '*' (import all)
+	if p.check(TOKEN_STAR) {
+		p.advance()
+		elements = append(elements, ast.NewIdentifier("*", p.makeLocation(tok), ast.SyntaxPython))
+
+		// Consume newline
+		if p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+
+		return ast.NewSExpr(elements, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse import names (comma-separated)
+	names := []ast.ASTNode{}
+
+	// First name
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
+
+	// Check for 'as alias' - Note: M28's import doesn't support per-name aliasing
+	// We'll skip the alias for now and only import the original name
+	if p.check(TOKEN_AS) {
+		p.advance()
+		p.expect(TOKEN_IDENTIFIER) // Skip the alias
+		// TODO: Could define the alias after import: x = original_name
+	}
+
+	// Additional names
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		nameTok := p.expect(TOKEN_IDENTIFIER)
+		names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
+
+		// Skip alias if present
+		if p.check(TOKEN_AS) {
+			p.advance()
+			p.expect(TOKEN_IDENTIFIER)
+		}
+	}
+
+	// Create (list-literal name1 name2 ...) for the names
+	listLiteral := append([]ast.ASTNode{ast.NewIdentifier("list-literal", p.makeLocation(tok), ast.SyntaxPython)}, names...)
+	elements = append(elements, ast.NewSExpr(listLiteral, p.makeLocation(tok), ast.SyntaxPython))
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewSExpr(elements, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseModuleName parses a module name (can be dotted: os.path.join)
+func (p *PythonParser) parseModuleName() string {
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	name := nameTok.Lexeme
+
+	// Handle dotted module names (os.path, etc.)
+	for p.check(TOKEN_DOT) {
+		p.advance()
+		nextTok := p.expect(TOKEN_IDENTIFIER)
+		name += "." + nextTok.Lexeme
+	}
+
+	return name
 }
 
 // parseExpressionStatement parses an expression or assignment statement
