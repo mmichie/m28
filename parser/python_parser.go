@@ -598,7 +598,37 @@ func (p *PythonParser) parseExpression() ast.ASTNode {
 	if p.check(TOKEN_LAMBDA) {
 		return p.parseLambda()
 	}
-	return p.parseTernary()
+	return p.parseNamedExpr()
+}
+
+// parseNamedExpr parses: ternary [:= ternary]
+// Python: (x := expr)  -- walrus operator / assignment expression
+func (p *PythonParser) parseNamedExpr() ast.ASTNode {
+	expr := p.parseTernary()
+
+	if p.check(TOKEN_COLONEQUAL) {
+		tok := p.advance()
+
+		// Left side must be an identifier
+		ident, ok := expr.(*ast.Identifier)
+		if !ok {
+			// Error: walrus operator requires identifier on left
+			return nil
+		}
+
+		// Parse the value
+		value := p.parseTernary()
+
+		// Create (:= var value) form
+		// This should both assign and return the value
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(":=", p.makeLocation(tok), ast.SyntaxPython),
+			ident,
+			value,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
 }
 
 // parseTernary parses: or (if or else or)?

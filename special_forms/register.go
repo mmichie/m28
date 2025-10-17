@@ -46,6 +46,9 @@ func registerDefinitionForms() {
 	// =: Assignment
 	eval.RegisterSpecialForm("=", assignForm)
 
+	// :=: Walrus operator (assignment expression)
+	eval.RegisterSpecialForm(":=", walrusForm)
+
 	// quote: Quote an expression
 	eval.RegisterSpecialForm("quote", quoteForm)
 
@@ -84,6 +87,11 @@ func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // assignForm implements the '=' special form
 func assignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.AssignForm(args, ctx)
+}
+
+// walrusForm implements the ':=' special form (walrus operator)
+func walrusForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.WalrusForm(args, ctx)
 }
 
 // quoteForm implements the 'quote' special form

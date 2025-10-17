@@ -334,6 +334,9 @@ func (t *PythonTokenizer) scanOperator(ch byte, start, startLine, startCol int) 
 	case ';':
 		return makeToken(TOKEN_SEMICOLON)
 	case ':':
+		if t.match('=') {
+			return makeToken(TOKEN_COLONEQUAL)
+		}
 		return makeToken(TOKEN_COLON)
 	case '@':
 		return makeToken(TOKEN_AT)

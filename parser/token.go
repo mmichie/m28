@@ -75,16 +75,17 @@ const (
 	TOKEN_DOUBLE_GT_EQ    // >>=
 
 	// Delimiters
-	TOKEN_LPAREN    // (
-	TOKEN_RPAREN    // )
-	TOKEN_LBRACKET  // [
-	TOKEN_RBRACKET  // ]
-	TOKEN_LBRACE    // {
-	TOKEN_RBRACE    // }
-	TOKEN_COMMA     // ,
-	TOKEN_DOT       // .
-	TOKEN_COLON     // :
-	TOKEN_SEMICOLON // ;
+	TOKEN_LPAREN     // (
+	TOKEN_RPAREN     // )
+	TOKEN_LBRACKET   // [
+	TOKEN_RBRACKET   // ]
+	TOKEN_LBRACE     // {
+	TOKEN_RBRACE     // }
+	TOKEN_COMMA      // ,
+	TOKEN_DOT        // .
+	TOKEN_COLON      // :
+	TOKEN_COLONEQUAL // := (walrus operator)
+	TOKEN_SEMICOLON  // ;
 
 	// Special/Reader Macros
 	TOKEN_BACKTICK      // ` (quasiquote)
@@ -313,6 +314,8 @@ func (tt TokenType) String() string {
 		return "DOT"
 	case TOKEN_COLON:
 		return "COLON"
+	case TOKEN_COLONEQUAL:
+		return "COLONEQUAL"
 	case TOKEN_SEMICOLON:
 		return "SEMICOLON"
 	case TOKEN_BACKTICK:

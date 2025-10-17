@@ -715,6 +715,33 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return nil, TypeError{Expected: "symbol or dot notation", Got: target.Type()}
 }
 
+// WalrusForm provides the implementation of the walrus operator (:=)
+// The walrus operator is an assignment expression that returns the assigned value
+// Usage: (if (:= n (len data)) (> n 10))
+func WalrusForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) != 2 {
+		return nil, ErrArgCount(":= requires exactly 2 arguments (variable and value)")
+	}
+
+	// First argument must be a symbol
+	target, ok := args[0].(core.SymbolValue)
+	if !ok {
+		return nil, TypeError{Expected: "symbol", Got: args[0].Type()}
+	}
+
+	// Evaluate the expression
+	value, err := Eval(args[1], ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Assign the value to the variable
+	ctx.Define(string(target), value)
+
+	// Return the value (this is what makes it an expression)
+	return value, nil
+}
+
 // QuoteForm provides the implementation of the quote special form
 func QuoteForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
