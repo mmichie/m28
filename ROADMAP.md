@@ -180,7 +180,7 @@ Frontend (Python/Lisp/DSL) → AST (with locations/types/comments) → IR (core.
 
 See [docs/design/ast-ir-multiple-frontends.md](docs/design/ast-ir-multiple-frontends.md) for complete design.
 
-### Python Frontend Implementation 🟢 Phase A Complete
+### Python Frontend Implementation 🟢 Phase A & B Complete
 
 Building on the AST layer foundation to enable true Python syntax support.
 
@@ -202,15 +202,26 @@ Building on the AST layer foundation to enable true Python syntax support.
 - Blank line and comment handling
 - Location tracking for all tokens
 
-#### Phase B: Python AST Nodes (Pending)
-- [ ] `ComprehensionForm` - [x for x in range(10) if x % 2 == 0]
-- [ ] `ForForm` - for i in range(5): body
-- [ ] `WhileForm` - while condition: body
-- [ ] `WithForm` - with open("file") as f: body
-- [ ] `TryForm` - try/except/finally
-- [ ] `ClassForm` - class definitions with inheritance
-- [ ] Enhanced `DefForm` - decorators, type hints
-- [ ] Deliverable: `core/ast/python_nodes.go` with Python-specific nodes
+#### Phase B: Python AST Nodes ✅ COMPLETE
+- [x] `ComprehensionForm` - [x for x in range(10) if x % 2 == 0]
+- [x] `ForForm` - for i in range(5): body (with optional else clause)
+- [x] `WhileForm` - while condition: body (with optional else clause)
+- [x] `WithForm` - with open("file") as f: body (supports multiple context managers)
+- [x] `TryForm` - try/except/finally (with multiple except clauses and else)
+- [x] `ClassForm` - class definitions with inheritance and decorators
+- [x] Control flow - break, continue, return, raise, pass
+- [x] `BlockForm` - statement sequences (do blocks)
+- [x] Enhanced `DefForm` - decorators field added
+- [x] Comprehensive test coverage (38 tests passing)
+- [x] Deliverable: `core/ast/python_nodes.go` with Python-specific nodes
+
+**Key Features:**
+- All nodes implement ASTNode interface (Type(), String(), ToIR())
+- ToIR() desugars Python constructs to S-expressions
+- Decorators support for both classes and functions
+- Python-specific control flow (for/while with else clauses)
+- Comprehensions desugar to lambda-based IR
+- Context managers and exception handling
 
 #### Phase C: Python Parser (Pending)
 - [ ] Statement parsing (def, class, if, for, while, try, with, return)

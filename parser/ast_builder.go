@@ -38,7 +38,7 @@ func (p *Parser) makeSExpr(elements []ast.ASTNode, tok Token) *ast.SExpr {
 
 // makeDefForm creates a DefForm AST node
 func (p *Parser) makeDefForm(name string, params []ast.Parameter, body ast.ASTNode, returnType *ast.TypeInfo, tok Token) *ast.DefForm {
-	return ast.NewDefForm(name, params, body, returnType, p.makeLocation(tok), ast.SyntaxLisp)
+	return ast.NewDefForm(name, params, body, returnType, nil, p.makeLocation(tok), ast.SyntaxLisp)
 }
 
 // makeAssignForm creates an AssignForm AST node

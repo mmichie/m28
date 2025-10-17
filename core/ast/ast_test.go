@@ -125,7 +125,7 @@ func TestDefForm(t *testing.T) {
 		NewLiteral(core.NumberValue(2), loc, SyntaxLisp),
 	}, loc, SyntaxLisp)
 
-	def := NewDefForm("double", params, body, nil, loc, SyntaxLisp)
+	def := NewDefForm("double", params, body, nil, nil, loc, SyntaxLisp)
 
 	if def.Name != "double" {
 		t.Errorf("Expected name 'double', got '%s'", def.Name)
@@ -190,7 +190,7 @@ func TestDefFormWithTypes(t *testing.T) {
 	}, loc, SyntaxPython)
 
 	returnType := &TypeInfo{Name: "int"}
-	def := NewDefForm("add", params, body, returnType, loc, SyntaxPython)
+	def := NewDefForm("add", params, body, returnType, nil, loc, SyntaxPython)
 
 	if def.ReturnType == nil {
 		t.Fatal("Expected return type to be set")

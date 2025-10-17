@@ -125,6 +125,7 @@ type DefForm struct {
 	Params     []Parameter // Parameters with optional types and defaults
 	Body       ASTNode     // Function body
 	ReturnType *TypeInfo   // Return type annotation (optional)
+	Decorators []ASTNode   // Function decorators (e.g., @property, @staticmethod)
 }
 
 // Type implements core.Value.Type
@@ -164,16 +165,39 @@ func (d *DefForm) ToIR() core.Value {
 		params[i] = core.SymbolValue(p.Name)
 	}
 
-	return core.ListValue{
+	result := core.ListValue{
 		core.SymbolValue("def"),
 		core.SymbolValue(d.Name),
 		params,
 		d.Body.ToIR(),
 	}
+
+	// Handle decorators
+	// @decorator1 @decorator2 def foo(): pass
+	// → (= foo (decorator1 (decorator2 (def foo () ...))))
+	if len(d.Decorators) > 0 {
+		// Apply decorators from bottom to top (innermost to outermost)
+		for i := len(d.Decorators) - 1; i >= 0; i-- {
+			decorator := d.Decorators[i]
+			result = core.ListValue{
+				decorator.ToIR(),
+				result,
+			}
+		}
+
+		// Wrap in assignment
+		result = core.ListValue{
+			core.SymbolValue("="),
+			core.SymbolValue(d.Name),
+			result,
+		}
+	}
+
+	return result
 }
 
 // NewDefForm creates a new function definition node
-func NewDefForm(name string, params []Parameter, body ASTNode, returnType *TypeInfo, loc *core.SourceLocation, syntax SyntaxKind) *DefForm {
+func NewDefForm(name string, params []Parameter, body ASTNode, returnType *TypeInfo, decorators []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *DefForm {
 	return &DefForm{
 		BaseNode: BaseNode{
 			Loc:    loc,
@@ -183,6 +207,7 @@ func NewDefForm(name string, params []Parameter, body ASTNode, returnType *TypeI
 		Params:     params,
 		Body:       body,
 		ReturnType: returnType,
+		Decorators: decorators,
 	}
 }
 
