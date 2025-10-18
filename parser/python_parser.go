@@ -773,14 +773,14 @@ func (p *PythonParser) parseNot() ast.ASTNode {
 	return p.parseComparison()
 }
 
-// parseComparison parses: addition (comp_op addition)*
+// parseComparison parses: bitwise_or (comp_op bitwise_or)*
 func (p *PythonParser) parseComparison() ast.ASTNode {
-	expr := p.parseAddition()
+	expr := p.parseBitwiseOr()
 
 	for p.match(TOKEN_EQUALEQUAL, TOKEN_NOTEQUAL, TOKEN_LESS, TOKEN_LESSEQUAL,
 		TOKEN_GREATER, TOKEN_GREATEREQUAL, TOKEN_IN, TOKEN_NOT_IN, TOKEN_IS, TOKEN_IS_NOT) {
 		tok := p.previous()
-		right := p.parseAddition()
+		right := p.parseBitwiseOr()
 
 		var op string
 		switch tok.Type {
@@ -804,6 +804,85 @@ func (p *PythonParser) parseComparison() ast.ASTNode {
 			op = "is"
 		case TOKEN_IS_NOT:
 			op = "is not"
+		}
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseBitwiseOr parses: xor (| xor)*
+func (p *PythonParser) parseBitwiseOr() ast.ASTNode {
+	expr := p.parseBitwiseXor()
+
+	for p.match(TOKEN_PIPE) {
+		tok := p.previous()
+		right := p.parseBitwiseXor()
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("|", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseBitwiseXor parses: and (^ and)*
+func (p *PythonParser) parseBitwiseXor() ast.ASTNode {
+	expr := p.parseBitwiseAnd()
+
+	for p.match(TOKEN_CARET) {
+		tok := p.previous()
+		right := p.parseBitwiseAnd()
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("^", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseBitwiseAnd parses: shift (& shift)*
+func (p *PythonParser) parseBitwiseAnd() ast.ASTNode {
+	expr := p.parseShift()
+
+	for p.match(TOKEN_AMPERSAND) {
+		tok := p.previous()
+		right := p.parseShift()
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("&", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseShift parses: addition ((<<|>>) addition)*
+func (p *PythonParser) parseShift() ast.ASTNode {
+	expr := p.parseAddition()
+
+	for p.match(TOKEN_LSHIFT, TOKEN_RSHIFT) {
+		tok := p.previous()
+		right := p.parseAddition()
+
+		var op string
+		if tok.Type == TOKEN_LSHIFT {
+			op = "<<"
+		} else {
+			op = ">>"
 		}
 
 		expr = ast.NewSExpr([]ast.ASTNode{
