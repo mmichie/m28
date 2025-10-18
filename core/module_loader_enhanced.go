@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ModuleLoaderEnhanced is an enhanced module loader that supports builtin Go modules
@@ -96,7 +97,8 @@ func (l *ModuleLoaderEnhanced) loadFileModule(registry *ModuleRegistry, name, ca
 	// Resolve module path
 	path, err := registry.ResolveModulePath(name)
 	if err != nil {
-		return nil, fmt.Errorf("module '%s' not found", name)
+		// M28 module not found, try Python module
+		return l.tryLoadPythonModule(registry, name, cacheName, err)
 	}
 
 	// Load module content
@@ -234,4 +236,29 @@ func (l *ModuleLoaderEnhanced) loadModuleContent(path string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+// tryLoadPythonModule attempts to load a Python module as a fallback
+func (l *ModuleLoaderEnhanced) tryLoadPythonModule(registry *ModuleRegistry, name, cacheName string, m28Err error) (*DictValue, error) {
+	// Check if Python loader is available
+	if pythonLoaderFunc == nil {
+		// Python loader not available, return original error
+		return nil, fmt.Errorf("module '%s' not found", name)
+	}
+
+	// Try to load as Python module
+	moduleDict, err := pythonLoaderFunc(name, l.GetContext(), l.evalFunc)
+	if err != nil {
+		// If error mentions "not found", include original M28 error
+		if strings.Contains(err.Error(), "not found") {
+			return nil, fmt.Errorf("module '%s' not found as M28 module or Python module", name)
+		}
+		// Other Python loading errors (transpilation, C extension, etc.)
+		return nil, err
+	}
+
+	// Successfully loaded Python module, register it
+	registry.StoreModule(cacheName, moduleDict, fmt.Sprintf("<Python module '%s'>", name), []string{})
+
+	return moduleDict, nil
 }

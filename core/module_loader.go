@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // DefaultModuleLoader is the default implementation of ModuleLoader
@@ -62,7 +63,8 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	// Resolve the module path
 	path, err := registry.ResolveModulePath(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve module path: %v", err)
+		// M28 module not found, try Python module
+		return l.tryLoadPythonModule(cacheName, ctx, err)
 	}
 
 	// Load the module content
@@ -158,4 +160,40 @@ func (l *DefaultModuleLoader) loadModuleContent(path string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+// tryLoadPythonModule attempts to load a Python module as a fallback
+func (l *DefaultModuleLoader) tryLoadPythonModule(name string, ctx *Context, m28Err error) (*DictValue, error) {
+	// Import here to avoid circular dependency
+	// We'll use a function variable set at initialization time
+	if pythonLoaderFunc == nil {
+		// Python loader not available, return original error
+		return nil, fmt.Errorf("failed to resolve module path: %v", m28Err)
+	}
+
+	// Try to load as Python module
+	moduleDict, err := pythonLoaderFunc(name, ctx, l.evalFunc)
+	if err != nil {
+		// If error mentions "not found", include original M28 error
+		if strings.Contains(err.Error(), "not found") {
+			return nil, fmt.Errorf("module '%s' not found as M28 module (%v) or Python module (%v)", name, m28Err, err)
+		}
+		// Other Python loading errors (transpilation, C extension, etc.)
+		return nil, err
+	}
+
+	// Successfully loaded Python module, register it
+	registry := GetModuleRegistry()
+	registry.StoreModule(name, moduleDict, fmt.Sprintf("<Python module '%s'>", name), []string{})
+
+	return moduleDict, nil
+}
+
+// pythonLoaderFunc is a function variable that will be set by the modules package
+// to avoid circular dependency
+var pythonLoaderFunc func(string, *Context, func(Value, *Context) (Value, error)) (*DictValue, error)
+
+// SetPythonLoader sets the Python module loader function
+func SetPythonLoader(loader func(string, *Context, func(Value, *Context) (Value, error)) (*DictValue, error)) {
+	pythonLoaderFunc = loader
 }

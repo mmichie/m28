@@ -322,6 +322,117 @@ for i in range(5):
 - ✅ Type hints preserved for tooling
 - ✅ Foundation for Python LSP server
 
+### Python Module Auto-Transpiling 🟡 HIGH PRIORITY
+
+**Goal:** Automatically transpile and load Python standard library modules at runtime, eliminating the need to reimplement every module natively.
+
+**Status:** Phase 1 starting - Foundation implementation
+
+**Design:** Auto-transpile Python .py files to M28 AST on import, enabling direct use of Python stdlib.
+
+#### Architecture Overview
+
+```
+M28 Import Request
+    ↓
+1. Check M28 module cache
+2. Look for .m28 file
+3. [NEW] Look for .py file in Python paths
+4. [NEW] Transpile .py → M28 AST
+5. Execute in module context
+6. Cache result
+```
+
+#### Implementation Phases
+
+**Phase 1: MVP (Week 1-2)** ✅ COMPLETE
+- [x] Python finder - locate .py files in stdlib paths
+- [x] Basic transpiler - use existing Python parser
+- [x] Import integration - add fallback to import system
+- [x] In-memory cache - module-level caching
+- [x] Test with simple Python modules
+
+**Implementation:** commit 009b93c+
+- `modules/python_finder.go` - Discovers Python stdlib paths and locates .py files
+- `modules/python_transpiler.go` - Transpiles Python source to M28 AST with caching
+- `modules/python_loader.go` - Loads and executes Python modules in isolated contexts
+- `core/module_loader.go` - Added Python fallback with SetPythonLoader()
+- `core/module_loader_enhanced.go` - Added tryLoadPythonModule() fallback
+
+**Testing:**
+```bash
+# Create a simple Python module
+echo 'x = 42\ndef greet(name): return f"Hello, {name}!"' > /tmp/simple.py
+
+# Import and use it from M28
+PYTHONPATH=/tmp m28 -e '(import simple) (print simple.x) (print (simple.greet "World"))'
+# Output:
+# 42
+# Hello, World!
+```
+
+**Known Limitations:**
+- Complex stdlib modules like `typing` may fail due to advanced syntax features
+- C extensions are properly detected and rejected with clear error messages
+- No disk caching yet (Phase 2)
+
+**Phase 2: Caching (Week 3)**
+- [ ] Disk cache with hash-based invalidation (~/.m28/cache/python/)
+- [ ] Cache metadata (source path, timestamp, hash)
+- [ ] Performance optimization
+
+**Phase 3: Package Support (Week 4)**
+- [ ] __init__.py handling
+- [ ] Submodule imports (unittest.mock)
+- [ ] Relative imports
+- [ ] Package vs module detection
+
+**Phase 4: Polish (Week 5)**
+- [ ] Configuration options (M28_PYTHON_PATH, etc.)
+- [ ] Better error messages
+- [ ] C extension detection and graceful errors
+- [ ] Documentation
+
+#### Key Components
+
+**Python Module Finder** (`modules/python_finder.go`)
+- Find .py files in Python stdlib paths
+- Detect packages vs modules (__init__.py)
+- Respect PYTHONPATH environment
+
+**Python Module Transpiler** (`modules/python_transpiler.go`)
+- Use existing PythonParser
+- Two-level cache (memory + disk)
+- Hash-based invalidation
+
+**Python Module Loader** (`modules/python_loader.go`)
+- Transpile on demand
+- Execute in isolated module context
+- Handle transitive imports
+
+**Import Integration**
+- Fallback: M28 native → Python stdlib
+- Circular import protection
+- C extension error handling
+
+#### Benefits
+- ✅ Access entire Python stdlib without reimplementation
+- ✅ unittest, test.support, and testing infrastructure work
+- ✅ Leverage existing Python ecosystem
+- ✅ Faster development (focus on core features)
+- ✅ Better Python compatibility
+
+#### Limitations
+- ❌ C extensions need native implementation (_io, _thread, etc.)
+- ❌ Bytecode-only .pyc files not supported
+- ❌ Performance overhead from transpilation (mitigated by caching)
+
+**Success Criteria:**
+- ✓ Import pure Python stdlib modules (unittest, functools, etc.)
+- ✓ Transitive imports work
+- ✓ Clear errors for C extensions
+- ✓ Fast enough for interactive development
+
 ### Python Compatibility Improvements 🔴 HIGH PRIORITY
 
 **Goal:** Fix parser bugs and add missing Python features to increase real-world compatibility
