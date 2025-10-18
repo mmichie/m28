@@ -13,6 +13,7 @@ type ModuleInitializer func() *core.DictValue
 // builtinModules maps module names to their initializers
 var builtinModules = map[string]ModuleInitializer{
 	"os":          InitOSModule,
+	"io":          InitIOModule,
 	"json":        InitJSONModule,
 	"time":        InitTimeModule,
 	"datetime":    InitDatetimeModule,
