@@ -130,6 +130,18 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 				return nil, fmt.Errorf("import :from requires a list of names or *")
 			}
 			i += 2
+		} else if sym, ok := args[i].(core.SymbolValue); ok && (string(sym) == ":level" || string(sym) == "level") {
+			// :level N (for relative imports)
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("import :level requires a number")
+			}
+			// For now, parse the level but don't use it yet
+			// TODO: Implement relative import resolution
+			if _, ok := args[i+1].(core.NumberValue); !ok {
+				return nil, fmt.Errorf("import :level must be a number")
+			}
+			// relativeLevel := int(levelNum)
+			i += 2
 		} else {
 			return nil, fmt.Errorf("unexpected import option: %v", args[i])
 		}

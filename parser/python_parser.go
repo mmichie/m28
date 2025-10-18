@@ -555,18 +555,18 @@ func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
 		ast.NewIdentifier(":from", p.makeLocation(tok), ast.SyntaxPython),
 	}
 
-	// Add relative level if it's a relative import
-	if relativeLevel > 0 {
-		elements = append(elements,
-			ast.NewIdentifier(":level", p.makeLocation(tok), ast.SyntaxPython),
-			ast.NewLiteral(core.NumberValue(relativeLevel), p.makeLocation(tok), ast.SyntaxPython),
-		)
-	}
-
 	// Check for '*' (import all)
 	if p.check(TOKEN_STAR) {
 		p.advance()
 		elements = append(elements, ast.NewIdentifier("*", p.makeLocation(tok), ast.SyntaxPython))
+
+		// Add relative level if it's a relative import
+		if relativeLevel > 0 {
+			elements = append(elements,
+				ast.NewIdentifier(":level", p.makeLocation(tok), ast.SyntaxPython),
+				ast.NewLiteral(core.NumberValue(relativeLevel), p.makeLocation(tok), ast.SyntaxPython),
+			)
+		}
 
 		// Consume newline
 		if p.check(TOKEN_NEWLINE) {
@@ -628,6 +628,14 @@ func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
 	// Create (list-literal name1 name2 ...) for the names
 	listLiteral := append([]ast.ASTNode{ast.NewIdentifier("list-literal", p.makeLocation(tok), ast.SyntaxPython)}, names...)
 	elements = append(elements, ast.NewSExpr(listLiteral, p.makeLocation(tok), ast.SyntaxPython))
+
+	// Add relative level after the names if it's a relative import
+	if relativeLevel > 0 {
+		elements = append(elements,
+			ast.NewIdentifier(":level", p.makeLocation(tok), ast.SyntaxPython),
+			ast.NewLiteral(core.NumberValue(relativeLevel), p.makeLocation(tok), ast.SyntaxPython),
+		)
+	}
 
 	// Consume newline
 	if p.check(TOKEN_NEWLINE) {
