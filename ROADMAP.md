@@ -77,6 +77,7 @@
 - [x] Decorators with `@` syntax (implemented for macros)
 - [ ] General decorator system for functions (not just macros)
 - [ ] `eval()` and `exec()`
+- [x] Walrus operator `:=` (assignment expressions)
 
 #### F-String Enhancements ✅
 - [x] Format specifications: `f"{pi:.2f}"`
@@ -89,6 +90,22 @@
 - [x] `frozenset`
 - [x] `decimal.Decimal`
 - [ ] Collections module types (deque, Counter, defaultdict)
+
+### Standard Library Modules
+- [x] `os` - Operating system interface
+- [x] `json` - JSON encoding/decoding
+- [x] `time` - Time access and conversions
+- [x] `datetime` - Date and time types
+- [x] `pathlib` - Object-oriented filesystem paths
+- [x] `random` - Random number generation
+- [x] `shutil` - High-level file operations
+- [x] `math` - Mathematical functions
+- [x] `collections` - Container datatypes (defaultdict, Counter, deque, namedtuple)
+- [x] `itertools` - Iterator building blocks (chain, cycle, islice, count, repeat, takewhile, dropwhile, compress, product, combinations)
+- [x] `functools` - Higher-order functions (reduce, partial, cache, lru_cache, cmp_to_key)
+- [x] `operator` - Standard operators as functions (add, mul, eq, lt, itemgetter, attrgetter, etc.)
+- [x] `copy` - Shallow and deep copy operations
+- [x] `heapq` - Heap queue algorithm (heappush, heappop, heapify, nsmallest, nlargest, heappushpop, heapreplace)
 
 ### Error Messages & Developer Experience
 - [x] Parser errors with source locations (via token position tracking)
