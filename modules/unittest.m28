@@ -1,5 +1,8 @@
 # unittest module - Basic TestCase implementation for M28
 
+# Define AssertionError as an alias for Exception
+(= AssertionError Exception)
+
 (class TestCase nil
   # Constructor
   (def __init__ (self)
