@@ -14,6 +14,61 @@ type importNameSpec struct {
 	alias string // empty if no alias
 }
 
+// resolveRelativeImport resolves a relative import to an absolute module name
+// level: number of dots in the import (1 for ".", 2 for "..", etc.)
+// moduleName: the module name after the dots (empty for "from . import")
+// ctx: context to get __package__ from
+func resolveRelativeImport(moduleName string, level int, ctx *core.Context) (string, error) {
+	// Get the current package from context
+	packageVal, err := ctx.Lookup("__package__")
+	if err != nil {
+		return "", fmt.Errorf("relative import attempted but __package__ not defined in context")
+	}
+
+	var currentPackage string
+	if pkgStr, ok := packageVal.(core.StringValue); ok {
+		currentPackage = string(pkgStr)
+	} else {
+		return "", fmt.Errorf("__package__ must be a string")
+	}
+
+	// If __package__ is empty, we're at the top level and can't do relative imports
+	if currentPackage == "" && level > 0 {
+		return "", fmt.Errorf("attempted relative import beyond top-level package")
+	}
+
+	// Split the current package by "."
+	var packageParts []string
+	if currentPackage != "" {
+		packageParts = strings.Split(currentPackage, ".")
+	}
+
+	// Go up (level - 1) levels
+	// Level 1 means current package, level 2 means parent, etc.
+	levelsUp := level - 1
+	if levelsUp > len(packageParts) {
+		return "", fmt.Errorf("attempted relative import beyond top-level package")
+	}
+
+	// Remove the last 'levelsUp' parts
+	if levelsUp > 0 {
+		packageParts = packageParts[:len(packageParts)-levelsUp]
+	}
+
+	// Build the resolved name
+	var resolved string
+	if len(packageParts) > 0 {
+		resolved = strings.Join(packageParts, ".")
+		if moduleName != "" {
+			resolved += "." + moduleName
+		}
+	} else {
+		resolved = moduleName
+	}
+
+	return resolved, nil
+}
+
 // enhancedImportForm implements advanced import forms:
 // (import module-name)                    - imports module as module-name
 // (import module-name as alias)           - imports module as alias
@@ -135,12 +190,17 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("import :level requires a number")
 			}
-			// For now, parse the level but don't use it yet
-			// TODO: Implement relative import resolution
-			if _, ok := args[i+1].(core.NumberValue); !ok {
+			if levelNum, ok := args[i+1].(core.NumberValue); !ok {
 				return nil, fmt.Errorf("import :level must be a number")
+			} else {
+				// Resolve relative import
+				level := int(levelNum)
+				resolved, err := resolveRelativeImport(moduleName, level, ctx)
+				if err != nil {
+					return nil, err
+				}
+				moduleName = resolved
 			}
-			// relativeLevel := int(levelNum)
 			i += 2
 		} else {
 			return nil, fmt.Errorf("unexpected import option: %v", args[i])
