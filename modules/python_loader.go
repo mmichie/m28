@@ -12,6 +12,7 @@ func init() {
 }
 
 // C extension modules that cannot be transpiled
+// These are either .so/.pyd files or built into the Python interpreter
 var cExtensionModules = map[string]bool{
 	"_io":              true,
 	"_collections":     true,
@@ -27,6 +28,10 @@ var cExtensionModules = map[string]bool{
 	"_struct":          true,
 	"_random":          true,
 	"_posixsubprocess": true,
+	"_weakref":         true, // Weak reference support (built-in)
+	"_abc":             true, // Abstract base class support
+	"sys":              true, // System functions (built-in)
+	"builtins":         true, // Built-in functions
 }
 
 // LoadPythonModule attempts to load a Python module by name

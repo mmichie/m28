@@ -372,9 +372,19 @@ PYTHONPATH=/tmp m28 -e '(import simple) (print simple.x) (print (simple.greet "W
 ```
 
 **Known Limitations:**
-- Complex stdlib modules like `typing` may fail due to advanced syntax features
-- C extensions are properly detected and rejected with clear error messages
+- **Parser hangs**: Some Python stdlib modules cause infinite loops in the parser (e.g., `abc.py`, `typing.py`)
+  - Issue tracked: Parser needs timeout/recursion limits
+  - Workaround: Use simple pure-Python modules only
+- **C extension chains**: Most stdlib modules transitively import C extensions
+  - Example: `abc` → `_py_abc` → `_weakrefset` → `_weakref` (C ext)
+  - Even "pure Python" modules often have C dependencies
+  - C extensions are properly detected and rejected with clear error messages
 - No disk caching yet (Phase 2)
+
+**What Works:**
+- Pure Python modules with no C dependencies (`keyword` ✓)
+- Custom .py files with classes, decorators, f-strings ✓
+- Functions and simple control flow ✓
 
 **Phase 2: Caching (Week 3)**
 - [ ] Disk cache with hash-based invalidation (~/.m28/cache/python/)
