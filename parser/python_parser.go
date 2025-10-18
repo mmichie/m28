@@ -146,6 +146,15 @@ func (p *PythonParser) check(typ TokenType) bool {
 	return p.peek().Type == typ
 }
 
+// checkAhead checks if the token at offset ahead matches the given type
+func (p *PythonParser) checkAhead(typ TokenType, offset int) bool {
+	idx := p.current + offset
+	if idx >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[idx].Type == typ
+}
+
 // match advances if the current token matches any of the given types
 func (p *PythonParser) match(types ...TokenType) bool {
 	for _, typ := range types {
@@ -359,6 +368,7 @@ func (p *PythonParser) parseReturnStatement() ast.ASTNode {
 }
 
 // parseYieldStatement parses: yield [expression] or yield from expression
+// Also handles implicit tuples: yield a, b, c
 func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_YIELD)
 
@@ -373,7 +383,28 @@ func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 
 	var args []ast.ASTNode
 	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
-		args = append(args, p.parseExpression())
+		// Parse first expression
+		first := p.parseExpression()
+
+		// Check for implicit tuple: yield a, b, c
+		if p.check(TOKEN_COMMA) {
+			values := []ast.ASTNode{first}
+
+			for p.check(TOKEN_COMMA) {
+				p.advance()
+				if p.check(TOKEN_NEWLINE) || p.isAtEnd() {
+					break
+				}
+				values = append(values, p.parseExpression())
+			}
+
+			// Create tuple: (tuple-literal elem1 elem2 ...)
+			tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+			allElements := append([]ast.ASTNode{tupleSym}, values...)
+			args = append(args, ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython))
+		} else {
+			args = append(args, first)
+		}
 	}
 
 	// Consume newline
@@ -1857,59 +1888,99 @@ func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode
 //   - Single variable: for x in ...
 //   - Parenthesized tuple: for (x, y) in ...
 //   - Unparenthesized tuple: for x, y in ...
+//   - Nested tuples: for key,(begin,end) in ...
 //
 // Returns the variable string in the format the evaluator expects.
 func (p *PythonParser) parseLoopVariables() string {
+	// Parse a single loop variable element (can be identifier or nested tuple)
+	parseVarElement := func() string {
+		if p.check(TOKEN_LPAREN) {
+			// Parenthesized tuple: (x, y) or (x, (y, z))
+			p.advance() // consume (
+
+			parts := []string{}
+			parts = append(parts, p.parseLoopVariableElement())
+
+			for p.check(TOKEN_COMMA) {
+				p.advance()
+				if p.check(TOKEN_RPAREN) {
+					break // Trailing comma
+				}
+				parts = append(parts, p.parseLoopVariableElement())
+			}
+
+			p.expect(TOKEN_RPAREN)
+
+			// Format as "(x, y, z)"
+			result := "(" + parts[0]
+			for i := 1; i < len(parts); i++ {
+				result += ", " + parts[i]
+			}
+			result += ")"
+			return result
+		}
+
+		// Simple identifier
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		return varTok.Lexeme
+	}
+
+	// Parse first element
+	first := parseVarElement()
+
+	// Check if this is a comma-separated list: for x, y in ... or for key,(begin,end) in ...
+	if p.check(TOKEN_COMMA) && !p.checkAhead(TOKEN_IN, 1) {
+		parts := []string{first}
+
+		for p.check(TOKEN_COMMA) && !p.checkAhead(TOKEN_IN, 1) {
+			p.advance()
+			parts = append(parts, parseVarElement())
+		}
+
+		// Format as "(x, y, z)" or "(key, (begin, end))"
+		result := "(" + parts[0]
+		for i := 1; i < len(parts); i++ {
+			result += ", " + parts[i]
+		}
+		result += ")"
+		return result
+	}
+
+	// Single variable or already parenthesized
+	return first
+}
+
+// parseLoopVariableElement parses a single element of loop variables (can be nested)
+func (p *PythonParser) parseLoopVariableElement() string {
 	if p.check(TOKEN_LPAREN) {
-		// Parenthesized tuple: for (x, y, z) in ...
+		// Nested tuple: (x, y)
 		p.advance() // consume (
 
-		vars := []string{}
-		varTok := p.expect(TOKEN_IDENTIFIER)
-		vars = append(vars, varTok.Lexeme)
+		parts := []string{}
+		parts = append(parts, p.parseLoopVariableElement())
 
 		for p.check(TOKEN_COMMA) {
 			p.advance()
-			varTok = p.expect(TOKEN_IDENTIFIER)
-			vars = append(vars, varTok.Lexeme)
+			if p.check(TOKEN_RPAREN) {
+				break // Trailing comma
+			}
+			parts = append(parts, p.parseLoopVariableElement())
 		}
 
 		p.expect(TOKEN_RPAREN)
 
-		// Format as "(x, y, z)"
-		variable := "(" + vars[0]
-		for i := 1; i < len(vars); i++ {
-			variable += ", " + vars[i]
+		// Format as "(x, y)"
+		result := "(" + parts[0]
+		for i := 1; i < len(parts); i++ {
+			result += ", " + parts[i]
 		}
-		variable += ")"
-		return variable
+		result += ")"
+		return result
 	}
 
-	// Parse first identifier
+	// Simple identifier
 	varTok := p.expect(TOKEN_IDENTIFIER)
-	firstVar := varTok.Lexeme
-
-	// Check if this is an unparenthesized tuple: for x, y in ...
-	if p.check(TOKEN_COMMA) {
-		vars := []string{firstVar}
-
-		for p.check(TOKEN_COMMA) {
-			p.advance()
-			varTok = p.expect(TOKEN_IDENTIFIER)
-			vars = append(vars, varTok.Lexeme)
-		}
-
-		// Format as "(x, y, z)"
-		variable := "(" + vars[0]
-		for i := 1; i < len(vars); i++ {
-			variable += ", " + vars[i]
-		}
-		variable += ")"
-		return variable
-	}
-
-	// Single variable
-	return firstVar
+	return varTok.Lexeme
 }
 
 func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
@@ -2226,18 +2297,11 @@ func (p *PythonParser) parseIfStatement() ast.ASTNode {
 func (p *PythonParser) parseForStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_FOR)
 
-	// Parse loop variables (can be single or tuple unpacking)
-	variables := []string{}
-
-	// First variable
-	varTok := p.expect(TOKEN_IDENTIFIER)
-	variables = append(variables, varTok.Lexeme)
-
-	// Check for additional variables (tuple unpacking)
-	for p.match(TOKEN_COMMA) {
-		varTok := p.expect(TOKEN_IDENTIFIER)
-		variables = append(variables, varTok.Lexeme)
-	}
+	// Parse loop variables using parseLoopVariables to support:
+	// - Single variable: for x in ...
+	// - Tuple unpacking: for x, y in ...
+	// - Nested tuples: for key,(begin,end) in ...
+	variable := p.parseLoopVariables()
 
 	p.expect(TOKEN_IN)
 
@@ -2255,7 +2319,7 @@ func (p *PythonParser) parseForStatement() ast.ASTNode {
 		elseBody = p.parseBlock()
 	}
 
-	return ast.NewForFormMulti(variables, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
+	return ast.NewForForm(variable, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseForIterable parses the iterable expression in a for loop
@@ -2424,9 +2488,26 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 			continue
 		}
 
-		// Check for *args
+		// Check for *args or keyword-only parameter separator (*)
 		if p.check(TOKEN_STAR) {
 			p.advance() // consume *
+
+			// Check if this is just a keyword-only separator (bare *)
+			// In that case, the next token is comma or rparen, not an identifier
+			if p.check(TOKEN_COMMA) || p.check(TOKEN_RPAREN) {
+				// Bare * - keyword-only parameter separator
+				// All parameters after this must be keyword-only
+				// For now, we don't enforce this, just skip the marker
+				if p.check(TOKEN_COMMA) {
+					p.advance()
+				}
+				if p.check(TOKEN_RPAREN) {
+					break
+				}
+				continue
+			}
+
+			// *args case
 			nameTok := p.expect(TOKEN_IDENTIFIER)
 			param := ast.Parameter{
 				Name:      "*" + nameTok.Lexeme, // Prefix with * to mark as varargs
