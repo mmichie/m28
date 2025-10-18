@@ -1347,9 +1347,29 @@ func (p *PythonParser) parsePrimary() ast.ASTNode {
 		p.advance()
 		return ast.NewIdentifier(tok.Lexeme, p.makeLocation(tok), ast.SyntaxPython)
 
-	case TOKEN_NUMBER, TOKEN_STRING:
+	case TOKEN_NUMBER:
 		p.advance()
 		return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_STRING:
+		p.advance()
+		// Handle implicit string concatenation (adjacent string literals)
+		// Python: "hello" "world" -> "helloworld"
+		strValue, ok := tok.Value.(core.StringValue)
+		if !ok {
+			return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
+		}
+
+		// Collect all adjacent string literals
+		concatenated := string(strValue)
+		for p.check(TOKEN_STRING) {
+			nextTok := p.advance()
+			if nextStr, ok := nextTok.Value.(core.StringValue); ok {
+				concatenated += string(nextStr)
+			}
+		}
+
+		return ast.NewLiteral(core.StringValue(concatenated), p.makeLocation(tok), ast.SyntaxPython)
 
 	case TOKEN_FSTRING:
 		p.advance()
