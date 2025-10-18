@@ -1662,6 +1662,11 @@ func (p *PythonParser) parseDecorators() []ast.ASTNode {
 		// Parse decorator expression (identifier or call)
 		decorator := p.parsePrimary()
 
+		// Handle attribute access (e.g., @contextlib.contextmanager)
+		for p.check(TOKEN_DOT) {
+			decorator = p.parseAttribute(decorator)
+		}
+
 		// If followed by (, it's a decorator call
 		if p.check(TOKEN_LPAREN) {
 			decorator = p.parseCall(decorator)

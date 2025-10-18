@@ -314,6 +314,13 @@ func (t *PythonTokenizer) scanToken() Token {
 		return t.scanIdentifier(start, startLine, startCol)
 	}
 
+	// Comments
+	if ch == '#' {
+		t.skipComment()
+		// After skipping comment, continue to next token
+		return t.scanToken()
+	}
+
 	// Operators and delimiters
 	return t.scanOperator(ch, start, startLine, startCol)
 }
