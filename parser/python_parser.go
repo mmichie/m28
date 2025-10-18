@@ -2578,7 +2578,7 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 		bodyNode = p.parseStatement()
 	}
 
-	return ast.NewDefForm(name, params, bodyNode, returnType, decorators, p.makeLocation(tok), ast.SyntaxPython)
+	return ast.NewDefForm(name, params, bodyNode, returnType, decorators, isAsync, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseParameters parses: (param (: type)? (= default)?, ...)*

@@ -126,6 +126,7 @@ type DefForm struct {
 	Body       ASTNode     // Function body
 	ReturnType *TypeInfo   // Return type annotation (optional)
 	Decorators []ASTNode   // Function decorators (e.g., @property, @staticmethod)
+	IsAsync    bool        // Whether this is an async function
 }
 
 // Type implements core.Value.Type
@@ -159,7 +160,7 @@ func (d *DefForm) String() string {
 
 // ToIR implements ASTNode.ToIR
 func (d *DefForm) ToIR() core.Value {
-	// Build (def name (params) body)
+	// Build (def name (params) body) or (async def name (params) body)
 	// Parameters with defaults are represented as (param default-value)
 	params := make(core.ListValue, len(d.Params))
 	for i, p := range d.Params {
@@ -175,11 +176,24 @@ func (d *DefForm) ToIR() core.Value {
 		}
 	}
 
-	result := core.ListValue{
-		core.SymbolValue("def"),
-		core.SymbolValue(d.Name),
-		params,
-		d.Body.ToIR(),
+	var result core.Value
+	if d.IsAsync {
+		// Build (async def name (params) body)
+		result = core.ListValue{
+			core.SymbolValue("async"),
+			core.SymbolValue("def"),
+			core.SymbolValue(d.Name),
+			params,
+			d.Body.ToIR(),
+		}
+	} else {
+		// Build (def name (params) body)
+		result = core.ListValue{
+			core.SymbolValue("def"),
+			core.SymbolValue(d.Name),
+			params,
+			d.Body.ToIR(),
+		}
 	}
 
 	// Handle decorators
@@ -207,7 +221,7 @@ func (d *DefForm) ToIR() core.Value {
 }
 
 // NewDefForm creates a new function definition node
-func NewDefForm(name string, params []Parameter, body ASTNode, returnType *TypeInfo, decorators []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *DefForm {
+func NewDefForm(name string, params []Parameter, body ASTNode, returnType *TypeInfo, decorators []ASTNode, isAsync bool, loc *core.SourceLocation, syntax SyntaxKind) *DefForm {
 	return &DefForm{
 		BaseNode: BaseNode{
 			Loc:    loc,
@@ -218,6 +232,7 @@ func NewDefForm(name string, params []Parameter, body ASTNode, returnType *TypeI
 		Body:       body,
 		ReturnType: returnType,
 		Decorators: decorators,
+		IsAsync:    isAsync,
 	}
 }
 

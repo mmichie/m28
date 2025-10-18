@@ -445,6 +445,96 @@ type recvCase struct {
 	ch chan Value
 }
 
+// Coroutine represents a Python coroutine object (unevaluated async function call)
+type Coroutine struct {
+	BaseObject
+	Function Value
+	Args     []Value
+	Name     string
+	closed   bool
+	registry *MethodRegistry
+}
+
+// NewCoroutine creates a new coroutine
+func NewCoroutine(function Value, args []Value, name string) *Coroutine {
+	c := &Coroutine{
+		BaseObject: *NewBaseObject(Type("coroutine")),
+		Function:   function,
+		Args:       args,
+		Name:       name,
+	}
+	c.registry = c.createRegistry()
+	return c
+}
+
+// Type returns the coroutine type
+func (c *Coroutine) Type() Type {
+	return Type("coroutine")
+}
+
+// String returns the string representation
+func (c *Coroutine) String() string {
+	if c.Name != "" {
+		return fmt.Sprintf("<coroutine object %s>", c.Name)
+	}
+	return "<coroutine object>"
+}
+
+// Close closes the coroutine (prevents it from being executed)
+func (c *Coroutine) Close() error {
+	c.closed = true
+	return nil
+}
+
+// createRegistry sets up all methods for coroutine
+func (c *Coroutine) createRegistry() *MethodRegistry {
+	registry := NewMethodRegistry()
+
+	registry.RegisterMethods(
+		MakeMethod("close", 0, "Close the coroutine",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				coro, err := TypedReceiver[*Coroutine](receiver, "close")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArity("close", args, 0); err != nil {
+					return nil, err
+				}
+				return Nil, coro.Close()
+			}),
+
+		MakeMethod("send", 1, "Send a value into the coroutine",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				// Simplified: just return None for now
+				// Full implementation would resume execution
+				return Nil, nil
+			}),
+
+		MakeMethod("throw", 1, "Throw an exception into the coroutine",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				// Simplified: just return None for now
+				return Nil, nil
+			}),
+	)
+
+	return registry
+}
+
+// GetRegistry implements AttributeProvider
+func (c *Coroutine) GetRegistry() *MethodRegistry {
+	return c.registry
+}
+
+// GetBaseObject implements AttributeProvider
+func (c *Coroutine) GetBaseObject() *BaseObject {
+	return &c.BaseObject
+}
+
+// GetAttr implements the new simplified GetAttr pattern
+func (c *Coroutine) GetAttr(name string) (Value, bool) {
+	return GetAttrWithRegistry(c, name)
+}
+
 // AsyncFunction wraps a function to run asynchronously
 type AsyncFunction struct {
 	BaseObject
@@ -474,11 +564,12 @@ func (af *AsyncFunction) String() string {
 	return "<async function>"
 }
 
-// Call creates and starts a new task
+// Call creates a coroutine object (does NOT execute the function)
+// This matches Python behavior where calling an async function returns a coroutine
 func (af *AsyncFunction) Call(args []Value, ctx *Context) (Value, error) {
-	task := NewTask(af.Name, af.Function, args)
-	task.Start(ctx)
-	return task, nil
+	// Return a coroutine object, not a running task
+	// The coroutine can be awaited later or closed
+	return NewCoroutine(af.Function, args, af.Name), nil
 }
 
 // Sleep pauses execution for the specified duration
