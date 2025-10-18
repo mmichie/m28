@@ -9,19 +9,29 @@ import (
 
 // PythonParser implements a recursive descent parser for Python syntax
 type PythonParser struct {
-	tokens  []Token
-	current int
-	errors  []error
-	panic   bool // panic mode for error recovery
+	tokens    []Token
+	current   int
+	errors    []error
+	panic     bool // panic mode for error recovery
+	depth     int  // recursion depth tracking
+	callCount int  // total parse calls (for detecting loops)
+	maxDepth  int  // maximum recursion depth allowed
+	maxCalls  int  // maximum parse calls allowed
+	debugMode bool // enable debug output
 }
 
 // NewPythonParser creates a new Python parser from a token stream
 func NewPythonParser(tokens []Token) *PythonParser {
 	return &PythonParser{
-		tokens:  tokens,
-		current: 0,
-		errors:  []error{},
-		panic:   false,
+		tokens:    tokens,
+		current:   0,
+		errors:    []error{},
+		panic:     false,
+		depth:     0,
+		callCount: 0,
+		maxDepth:  500,   // Maximum recursion depth
+		maxCalls:  10000, // Maximum total parse calls
+		debugMode: false, // Set to true to enable debug output
 	}
 }
 
@@ -30,6 +40,11 @@ func (p *PythonParser) Parse() ([]ast.ASTNode, error) {
 	statements := []ast.ASTNode{}
 
 	for !p.isAtEnd() {
+		// Check for runaway parsing
+		if p.callCount > p.maxCalls {
+			return nil, fmt.Errorf("parser exceeded maximum call limit (%d calls) - possible infinite loop at token %d", p.maxCalls, p.current)
+		}
+
 		// Skip any leading newlines
 		for p.check(TOKEN_NEWLINE) {
 			p.advance()
@@ -55,6 +70,36 @@ func (p *PythonParser) Parse() ([]ast.ASTNode, error) {
 	}
 
 	return statements, nil
+}
+
+// ============================================================================
+// Parse Tracking (for detecting infinite loops)
+// ============================================================================
+
+// enterParse should be called at the start of each parse method
+func (p *PythonParser) enterParse(name string) error {
+	p.depth++
+	p.callCount++
+
+	if p.debugMode && p.callCount%100 == 0 {
+		fmt.Printf("[PARSER] Call %d, Depth %d, Token %d/%d: %s\n",
+			p.callCount, p.depth, p.current, len(p.tokens), name)
+	}
+
+	if p.depth > p.maxDepth {
+		return fmt.Errorf("parser exceeded maximum recursion depth (%d) in %s at token %d", p.maxDepth, name, p.current)
+	}
+
+	if p.callCount > p.maxCalls {
+		return fmt.Errorf("parser exceeded maximum call limit (%d calls) in %s at token %d - infinite loop detected", p.maxCalls, name, p.current)
+	}
+
+	return nil
+}
+
+// exitParse should be called when leaving a parse method
+func (p *PythonParser) exitParse() {
+	p.depth--
 }
 
 // ============================================================================
@@ -174,6 +219,12 @@ func (p *PythonParser) makeLocation(tok Token) *core.SourceLocation {
 
 // parseStatement parses a single statement
 func (p *PythonParser) parseStatement() ast.ASTNode {
+	if err := p.enterParse("parseStatement"); err != nil {
+		p.errors = append(p.errors, err)
+		return nil
+	}
+	defer p.exitParse()
+
 	// Check for decorators first (can precede def or class)
 	if p.check(TOKEN_AT) {
 		decorators := p.parseDecorators()
@@ -440,6 +491,17 @@ func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
 		return ast.NewSExpr(elements, p.makeLocation(tok), ast.SyntaxPython)
 	}
 
+	// Check for parenthesized import list (multi-line imports)
+	hasParens := false
+	if p.check(TOKEN_LPAREN) {
+		hasParens = true
+		p.advance()
+		// Skip any newlines after opening paren
+		for p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+	}
+
 	// Parse import names (comma-separated)
 	// Each name can be either:
 	//   - just a name: symbol
@@ -454,9 +516,28 @@ func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
 	// Additional names
 	for p.check(TOKEN_COMMA) {
 		p.advance()
+		// Skip newlines after comma (for multi-line imports)
+		if hasParens {
+			for p.check(TOKEN_NEWLINE) {
+				p.advance()
+			}
+		}
+		// Allow trailing comma
+		if hasParens && p.check(TOKEN_RPAREN) {
+			break
+		}
 		nameTok := p.expect(TOKEN_IDENTIFIER)
 		nameNode := p.parseImportName(nameTok, tok)
 		names = append(names, nameNode)
+	}
+
+	// Close parentheses if we opened them
+	if hasParens {
+		// Skip any newlines before closing paren
+		for p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+		p.expect(TOKEN_RPAREN)
 	}
 
 	// Create (list-literal name1 name2 ...) for the names
@@ -643,6 +724,12 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 
 // parseExpression is the entry point for expression parsing
 func (p *PythonParser) parseExpression() ast.ASTNode {
+	if err := p.enterParse("parseExpression"); err != nil {
+		p.errors = append(p.errors, err)
+		return nil
+	}
+	defer p.exitParse()
+
 	// Lambda has lowest precedence, handle it first
 	if p.check(TOKEN_LAMBDA) {
 		return p.parseLambda()
