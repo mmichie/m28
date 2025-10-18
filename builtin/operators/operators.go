@@ -3,6 +3,7 @@ package operators
 
 import (
 	"math"
+	"reflect"
 	"strings"
 
 	"github.com/mmichie/m28/common/errors"
@@ -37,6 +38,8 @@ func RegisterAll(ctx *core.Context) {
 	ctx.Define("or", core.NewBuiltinFunction(Or()))
 	ctx.Define("in", core.NewBuiltinFunction(In()))
 	ctx.Define("not in", core.NewBuiltinFunction(NotIn()))
+	ctx.Define("is", core.NewBuiltinFunction(Is()))
+	ctx.Define("is not", core.NewBuiltinFunction(IsNot()))
 
 	// Bitwise operators
 	ctx.Define("<<", core.NewBuiltinFunction(LeftShift()))
@@ -1121,6 +1124,91 @@ func NotIn() func([]core.Value, *core.Context) (core.Value, error) {
 		}
 
 		return nil, errors.NewTypeError("not in", "in operator should return a boolean", string(result.Type()))
+	}
+}
+
+// Is implements the "is" operator for identity comparison
+// Checks if two values are the same object (not just equal)
+func Is() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("is", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		left := args[0]
+		right := args[1]
+
+		// Handle None specially - None is always identical to None
+		if types.IsNil(left) && types.IsNil(right) {
+			return core.BoolValue(true), nil
+		}
+		if types.IsNil(left) || types.IsNil(right) {
+			return core.BoolValue(false), nil
+		}
+
+		// Handle booleans - True is True, False is False
+		leftBool, leftIsBool := left.(core.BoolValue)
+		rightBool, rightIsBool := right.(core.BoolValue)
+		if leftIsBool && rightIsBool {
+			return core.BoolValue(leftBool == rightBool), nil
+		}
+		if leftIsBool || rightIsBool {
+			return core.BoolValue(false), nil
+		}
+
+		// Handle ListValue specially - slices can't be compared with ==
+		leftList, leftIsList := left.(core.ListValue)
+		rightList, rightIsList := right.(core.ListValue)
+		if leftIsList && rightIsList {
+			// For slices, check if they point to the same backing array
+			// Compare the slice pointers using reflect
+			leftPtr := reflect.ValueOf(leftList).Pointer()
+			rightPtr := reflect.ValueOf(rightList).Pointer()
+			return core.BoolValue(leftPtr == rightPtr && len(leftList) == len(rightList)), nil
+		}
+		if leftIsList || rightIsList {
+			return core.BoolValue(false), nil
+		}
+
+		// For reference types (dicts, sets, objects), use pointer comparison
+		switch left.(type) {
+		case *core.DictValue, *core.SetValue:
+			// Use pointer equality - checks if same object in memory
+			return core.BoolValue(left == right), nil
+		case core.Object:
+			// For objects, check if they're the same instance
+			return core.BoolValue(left == right), nil
+		}
+
+		// For value types (numbers, strings), Python interns small values
+		// For simplicity, we'll say they're only identical if equal
+		// In real Python: small ints (-5 to 256) and some strings are interned
+		return core.BoolValue(false), nil
+	}
+}
+
+// IsNot implements the "is not" operator
+func IsNot() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("is not", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		// Call the Is operator
+		isFunc := Is()
+		result, err := isFunc(args, ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Negate the result
+		if b, ok := result.(core.BoolValue); ok {
+			return core.BoolValue(!b), nil
+		}
+
+		return nil, errors.NewTypeError("is not", "is operator should return a boolean", string(result.Type()))
 	}
 }
 
