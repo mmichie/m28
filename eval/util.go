@@ -454,6 +454,77 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
+		// Check for star unpacking first: (= (a (*unpack b) c) expr)
+		// This happens when we have something like: a, *b, c = values
+		if symbolCount == 0 && len(args) == 2 {
+			if targetList, ok := args[0].(core.ListValue); ok {
+				// Check if any element is (*unpack ...)
+				starIndex := -1
+				for i, t := range targetList {
+					if tList, ok := t.(core.ListValue); ok && len(tList) == 2 {
+						if sym, ok := tList[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+							starIndex = i
+							break
+						}
+					}
+				}
+
+				if starIndex >= 0 {
+					// Star unpacking assignment
+					expr := args[1]
+					value, err := Eval(expr, ctx)
+					if err != nil {
+						return nil, err
+					}
+
+					// Convert value to a sequence
+					var values []core.Value
+					switch v := value.(type) {
+					case core.TupleValue:
+						values = []core.Value(v)
+					case core.ListValue:
+						values = []core.Value(v)
+					default:
+						return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
+					}
+
+					// Calculate minimum required length
+					minLen := len(targetList) - 1 // All targets except the star
+					if len(values) < minLen {
+						return nil, fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))
+					}
+
+					// Assign values
+					valIdx := 0
+					for i, target := range targetList {
+						if i == starIndex {
+							// Star unpacking: collect remaining values
+							starTarget := target.(core.ListValue)
+							starVar := starTarget[1].(core.SymbolValue)
+							remaining := len(values) - valIdx - (len(targetList) - i - 1)
+							starValues := values[valIdx : valIdx+remaining]
+							if err := assignVariable(ctx, string(starVar), core.ListValue(starValues)); err != nil {
+								return nil, err
+							}
+							valIdx += remaining
+						} else {
+							// Regular assignment
+							if sym, ok := target.(core.SymbolValue); ok {
+								if err := assignVariable(ctx, string(sym), values[valIdx]); err != nil {
+									return nil, err
+								}
+								valIdx++
+							} else {
+								return nil, fmt.Errorf("unpacking target must be a symbol")
+							}
+						}
+					}
+
+					return value, nil
+				}
+			}
+		}
+
 		// If we have multiple symbols followed by values, it's multiple assignment
 		if symbolCount > 1 && symbolCount < len(args) {
 			// Multiple assignment: (= a b c ... val1 val2 val3 ...)
@@ -706,17 +777,30 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
-		// Check if it's tuple unpacking
+		// Check if it's tuple unpacking (with possible star unpacking)
 		isTupleUnpacking := true
-		for _, elem := range t {
-			if _, ok := elem.(core.SymbolValue); !ok {
-				isTupleUnpacking = false
-				break
+		hasStarUnpack := false
+		starIndex := -1
+		for i, elem := range t {
+			if _, ok := elem.(core.SymbolValue); ok {
+				continue
 			}
+			// Check if it's (*unpack var)
+			if elemList, ok := elem.(core.ListValue); ok && len(elemList) == 2 {
+				if sym, ok := elemList[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+					if _, ok := elemList[1].(core.SymbolValue); ok {
+						hasStarUnpack = true
+						starIndex = i
+						continue
+					}
+				}
+			}
+			isTupleUnpacking = false
+			break
 		}
 
 		if isTupleUnpacking && len(t) > 0 {
-			// Tuple unpacking: (= (x, y) [10, 20])
+			// Tuple unpacking: (= (x, y) [10, 20]) or (= (a (*unpack b) c) [1, 2, 3, 4])
 			// The value must be a tuple or list
 			var values []core.Value
 			switch v := value.(type) {
@@ -728,19 +812,54 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
 			}
 
-			// Check that the number of targets matches the number of values
-			if len(t) != len(values) {
-				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(t), len(values))
-			}
-
-			// Assign each value to its corresponding target
-			for i, target := range t {
-				sym, ok := target.(core.SymbolValue)
-				if !ok {
-					return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
+			if hasStarUnpack {
+				// Star unpacking
+				minLen := len(t) - 1 // All targets except the star
+				if len(values) < minLen {
+					return nil, fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))
 				}
-				if err := assignVariable(ctx, string(sym), values[i]); err != nil {
-					return nil, err
+
+				// Assign values
+				valIdx := 0
+				for i, target := range t {
+					if i == starIndex {
+						// Star unpacking: collect remaining values
+						starTarget := target.(core.ListValue)
+						starVar := starTarget[1].(core.SymbolValue)
+						remaining := len(values) - valIdx - (len(t) - i - 1)
+						starValues := values[valIdx : valIdx+remaining]
+						if err := assignVariable(ctx, string(starVar), core.ListValue(starValues)); err != nil {
+							return nil, err
+						}
+						valIdx += remaining
+					} else {
+						// Regular assignment
+						if sym, ok := target.(core.SymbolValue); ok {
+							if err := assignVariable(ctx, string(sym), values[valIdx]); err != nil {
+								return nil, err
+							}
+							valIdx++
+						} else {
+							return nil, fmt.Errorf("unpacking target must be a symbol")
+						}
+					}
+				}
+			} else {
+				// Regular tuple unpacking (no star)
+				// Check that the number of targets matches the number of values
+				if len(t) != len(values) {
+					return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(t), len(values))
+				}
+
+				// Assign each value to its corresponding target
+				for i, target := range t {
+					sym, ok := target.(core.SymbolValue)
+					if !ok {
+						return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
+					}
+					if err := assignVariable(ctx, string(sym), values[i]); err != nil {
+						return nil, err
+					}
 				}
 			}
 

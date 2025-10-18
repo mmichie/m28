@@ -750,12 +750,24 @@ func (p *PythonParser) parseImportName(nameTok Token, baseTok Token) ast.ASTNode
 
 // parseExpressionStatement parses an expression or assignment statement
 func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
-	expr := p.parseExpression()
+	// Check if this starts with star unpacking: *a, b = ...
+	var expr ast.ASTNode
+	if p.check(TOKEN_STAR) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_IDENTIFIER {
+		// Star unpacking at start
+		starTok := p.advance()
+		varName := p.expect(TOKEN_IDENTIFIER)
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("*unpack", p.makeLocation(starTok), ast.SyntaxPython),
+			ast.NewIdentifier(varName.Lexeme, p.makeLocation(varName), ast.SyntaxPython),
+		}, p.makeLocation(starTok), ast.SyntaxPython)
+	} else {
+		expr = p.parseExpression()
+	}
 
 	// Check for comma (tuple formation on left side of assignment)
-	// e.g., x, y = 1, 2
+	// e.g., x, y = 1, 2 or a, *b, c = [1, 2, 3, 4]
 	if p.check(TOKEN_COMMA) {
-		// Collect all comma-separated expressions
+		// Collect all comma-separated expressions (with possible star unpacking)
 		elements := []ast.ASTNode{expr}
 		for p.check(TOKEN_COMMA) {
 			p.advance() // consume comma
@@ -763,7 +775,20 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 				// Trailing comma before assignment or end of line
 				break
 			}
-			elements = append(elements, p.parseExpression())
+
+			// Check for star unpacking: *rest
+			if p.check(TOKEN_STAR) {
+				starTok := p.advance()
+				varName := p.expect(TOKEN_IDENTIFIER)
+				// Create a marker for star unpacking: (*unpack varname)
+				starExpr := ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("*unpack", p.makeLocation(starTok), ast.SyntaxPython),
+					ast.NewIdentifier(varName.Lexeme, p.makeLocation(varName), ast.SyntaxPython),
+				}, p.makeLocation(starTok), ast.SyntaxPython)
+				elements = append(elements, starExpr)
+			} else {
+				elements = append(elements, p.parseExpression())
+			}
 		}
 
 		// If more than one element, it's a tuple pattern for unpacking
