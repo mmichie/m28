@@ -1003,10 +1003,11 @@ type ClassForm struct {
 	Bases      []ASTNode // Base classes
 	Body       []ASTNode // Methods and attributes
 	Decorators []ASTNode // Class decorators
+	Keywords   []ASTNode // Keyword arguments (e.g., metaclass=...)
 }
 
 // NewClassForm creates a new class definition
-func NewClassForm(name string, bases, body, decorators []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *ClassForm {
+func NewClassForm(name string, bases, body, decorators, keywords []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *ClassForm {
 	return &ClassForm{
 		BaseNode: BaseNode{
 			Loc:    loc,
@@ -1016,6 +1017,7 @@ func NewClassForm(name string, bases, body, decorators []ASTNode, loc *core.Sour
 		Bases:      bases,
 		Body:       body,
 		Decorators: decorators,
+		Keywords:   keywords,
 	}
 }
 

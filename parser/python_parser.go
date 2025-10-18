@@ -2060,14 +2060,30 @@ func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode
 	nameTok := p.expect(TOKEN_IDENTIFIER)
 	name := nameTok.Lexeme
 
-	// Parse optional base classes
+	// Parse optional base classes and keyword arguments (like metaclass=)
 	var bases []ast.ASTNode
+	var keywords []ast.ASTNode // keyword arguments like metaclass=...
 	if p.check(TOKEN_LPAREN) {
 		p.advance()
 
 		if !p.check(TOKEN_RPAREN) {
 			for {
-				bases = append(bases, p.parseExpression())
+				// Check for keyword argument: IDENTIFIER = expression
+				if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_ASSIGN {
+					nameTok := p.advance()
+					p.expect(TOKEN_ASSIGN)
+					value := p.parseExpression()
+
+					// Store as a keyword-value pair
+					kwPair := ast.NewSExpr([]ast.ASTNode{
+						ast.NewLiteral(core.StringValue(nameTok.Lexeme), p.makeLocation(nameTok), ast.SyntaxPython),
+						value,
+					}, p.makeLocation(nameTok), ast.SyntaxPython)
+					keywords = append(keywords, kwPair)
+				} else {
+					// Regular base class
+					bases = append(bases, p.parseExpression())
+				}
 
 				if !p.check(TOKEN_COMMA) {
 					break
@@ -2082,7 +2098,7 @@ func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode
 	// Parse body
 	body := p.parseBlock()
 
-	return ast.NewClassForm(name, bases, body, decorators, p.makeLocation(tok), ast.SyntaxPython)
+	return ast.NewClassForm(name, bases, body, decorators, keywords, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseTryStatement parses: try: block (except (type (as var))?: block)+ (else: block)? (finally: block)?
