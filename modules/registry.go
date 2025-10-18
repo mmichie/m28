@@ -23,6 +23,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"shutil":        InitShutilModule,
 	"math":          InitMathModule,
 	"_collections":  InitCollectionsModule, // C extension module for collections
+	"_weakref":      InitWeakrefModule,     // C extension module for weak references
 	"itertools":     InitItertoolsModule,
 	"functools":     InitFunctoolsModule,
 	"operator":      InitOperatorModule,

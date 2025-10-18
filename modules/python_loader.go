@@ -29,7 +29,7 @@ var cExtensionModules = map[string]bool{
 	"_struct":          true,
 	"_random":          true,
 	"_posixsubprocess": true,
-	"_weakref":         true, // Weak reference support (built-in)
+	// "_weakref" removed - provided as M28 stub module
 	// "_abc" removed - let it fail naturally to trigger fallback to _py_abc
 	"builtins": true, // Built-in functions
 }
