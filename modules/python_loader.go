@@ -17,8 +17,6 @@ func init() {
 // These are either .so/.pyd files or built into the Python interpreter
 var cExtensionModules = map[string]bool{
 	"_io":              true,
-	"_collections":     true,
-	"_collections_abc": true, // Collections ABC (part of collections)
 	"_thread":          true,
 	"_socket":          true,
 	"_ssl":             true,

@@ -22,7 +22,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"random":        InitRandomModule,
 	"shutil":        InitShutilModule,
 	"math":          InitMathModule,
-	"collections":   InitCollectionsModule,
+	"_collections":  InitCollectionsModule, // C extension module for collections
 	"itertools":     InitItertoolsModule,
 	"functools":     InitFunctoolsModule,
 	"operator":      InitOperatorModule,

@@ -904,12 +904,15 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 
 	// Check for augmented assignment (+=, -=, etc.)
 	if p.match(TOKEN_PLUS_ASSIGN, TOKEN_MINUS_ASSIGN, TOKEN_STAR_ASSIGN,
-		TOKEN_SLASH_ASSIGN, TOKEN_DOUBLESLASH_ASSIGN, TOKEN_PERCENT_ASSIGN) {
+		TOKEN_SLASH_ASSIGN, TOKEN_DOUBLESLASH_ASSIGN, TOKEN_PERCENT_ASSIGN,
+		TOKEN_PIPE_ASSIGN, TOKEN_AMPERSAND_ASSIGN, TOKEN_CARET_ASSIGN,
+		TOKEN_LSHIFT_ASSIGN, TOKEN_RSHIFT_ASSIGN) {
 		tok := p.previous()
 		value := p.parseExpression()
 
 		// Convert augmented assignment to regular assignment
 		// x += 1 → x = x + 1
+		// d |= x → d = d | x
 		var op string
 		switch tok.Type {
 		case TOKEN_PLUS_ASSIGN:
@@ -924,6 +927,16 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 			op = "//"
 		case TOKEN_PERCENT_ASSIGN:
 			op = "%"
+		case TOKEN_PIPE_ASSIGN:
+			op = "|"
+		case TOKEN_AMPERSAND_ASSIGN:
+			op = "&"
+		case TOKEN_CARET_ASSIGN:
+			op = "^"
+		case TOKEN_LSHIFT_ASSIGN:
+			op = "<<"
+		case TOKEN_RSHIFT_ASSIGN:
+			op = ">>"
 		}
 
 		opCall := ast.NewSExpr([]ast.ASTNode{
@@ -2148,30 +2161,41 @@ func (p *PythonParser) parseGeneratorExpressionNoParen(element ast.ASTNode, tok 
 	// expr for var in iter if condition (no closing paren)
 	// or: expr for (var1, var2) in iter
 	// or: expr for var1, var2 in iter
-	p.expect(TOKEN_FOR)
+	// or: expr for var1 in iter1 for var2 in iter2 (multiple for clauses)
 
-	variable := p.parseLoopVariables()
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
 
-	p.expect(TOKEN_IN)
-	// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
-	iterable := p.parseOr()
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
 
-	var condition ast.ASTNode
-	if p.check(TOKEN_IF) {
-		p.advance()
-		condition = p.parseOr()
+		variable := p.parseLoopVariables()
+
+		p.expect(TOKEN_IN)
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
+
+		var condition ast.ASTNode
+		if p.check(TOKEN_IF) {
+			p.advance()
+			condition = p.parseOr()
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
 	}
 
 	// Don't consume closing paren - let the caller handle it
 
-	return ast.NewComprehensionForm(
+	return ast.NewComprehensionFormMulti(
 		ast.GeneratorComp,
 		element, // Element expression
 		nil,     // KeyExpr (not used for generator)
 		nil,     // ValueExpr (not used for generator)
-		variable,
-		iterable,
-		condition,
+		clauses,
 		p.makeLocation(tok),
 		ast.SyntaxPython,
 	)
