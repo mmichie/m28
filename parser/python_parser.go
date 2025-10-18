@@ -278,6 +278,13 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 		return p.parseNonlocalStatement()
 	case TOKEN_DEL:
 		return p.parseDelStatement()
+	case TOKEN_IDENTIFIER:
+		// Check for soft keywords (match)
+		if p.peek().Lexeme == "match" {
+			return p.parseMatchStatement()
+		}
+		// Fall through to expression statement
+		return p.parseExpressionStatement()
 	default:
 		// Expression statement (could be assignment)
 		return p.parseExpressionStatement()
@@ -2238,6 +2245,112 @@ func (p *PythonParser) parseWithStatement() ast.ASTNode {
 	body := p.parseBlock()
 
 	return ast.NewWithForm(items, body, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseMatchStatement parses: match subject: case pattern: block ...
+func (p *PythonParser) parseMatchStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_IDENTIFIER) // "match" as soft keyword
+	if tok.Lexeme != "match" {
+		p.error("Expected 'match'")
+		return nil
+	}
+
+	// Parse subject expression
+	subject := p.parseExpression()
+
+	// Expect colon
+	p.expect(TOKEN_COLON)
+
+	// Parse block of case clauses
+	var cases []ast.CaseClause
+
+	// Expect NEWLINE and INDENT
+	p.expect(TOKEN_NEWLINE)
+	p.expect(TOKEN_INDENT)
+
+	// Parse case clauses
+	for p.check(TOKEN_IDENTIFIER) && p.peek().Lexeme == "case" {
+		p.advance() // consume 'case'
+
+		// Parse pattern
+		// For now, simplified pattern parsing:
+		// - Identifier: variable or class name
+		// - Literal: number, string, etc.
+		// - Call pattern: ClassName(args)
+		// - Wildcard: _
+		pattern := p.parsePattern()
+
+		// Check for optional guard (if condition)
+		var guard ast.ASTNode
+		if p.check(TOKEN_IF) {
+			p.advance()
+			guard = p.parseExpression()
+		}
+
+		// Expect colon
+		p.expect(TOKEN_COLON)
+
+		// Parse case body
+		body := p.parseBlock()
+
+		cases = append(cases, ast.CaseClause{
+			Pattern: pattern,
+			Guard:   guard,
+			Body:    body,
+		})
+	}
+
+	// Expect DEDENT
+	p.expect(TOKEN_DEDENT)
+
+	return ast.NewMatchForm(subject, cases, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parsePattern parses a pattern in a case clause
+// Patterns can be:
+// - Literal values: 1, "hello", True, None
+// - Wildcard: _
+// - Class patterns: Point(x, y), ast.Expr(expr)
+// - Or patterns: pattern1 | pattern2
+// For now, we handle simple patterns and class patterns
+func (p *PythonParser) parsePattern() ast.ASTNode {
+	// Check for literal patterns
+	tok := p.peek()
+
+	switch tok.Type {
+	case TOKEN_NUMBER, TOKEN_STRING, TOKEN_TRUE, TOKEN_FALSE, TOKEN_NIL:
+		p.advance()
+		return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_IDENTIFIER:
+		// Could be:
+		// - Wildcard: _
+		// - Variable binding
+		// - Class pattern: ClassName(...)
+		ident := p.advance()
+
+		// Check for class pattern (function call syntax)
+		if p.check(TOKEN_LPAREN) {
+			// Parse as a call pattern (treat like function call)
+			// ClassName(pattern1, pattern2, ...)
+			return p.parseCall(ast.NewIdentifier(ident.Lexeme, p.makeLocation(ident), ast.SyntaxPython))
+		}
+
+		// Simple identifier or wildcard
+		return ast.NewIdentifier(ident.Lexeme, p.makeLocation(ident), ast.SyntaxPython)
+
+	case TOKEN_LPAREN:
+		// Tuple pattern or grouped pattern
+		return p.parseParenthesized()
+
+	case TOKEN_LBRACKET:
+		// List pattern
+		return p.parseListLiteral()
+
+	default:
+		p.error(fmt.Sprintf("Unexpected token in pattern: %v", tok.Type))
+		return nil
+	}
 }
 
 // ============================================================================

@@ -120,6 +120,8 @@ const (
 	TOKEN_DEL      // del
 	TOKEN_GLOBAL   // global
 	TOKEN_NONLOCAL // nonlocal
+	TOKEN_MATCH    // match (Python 3.10+)
+	TOKEN_CASE     // case (Python 3.10+)
 
 	// Python-specific operators/tokens
 	TOKEN_ARROW    // -> (type hint arrow)
@@ -378,6 +380,10 @@ func (tt TokenType) String() string {
 		return "GLOBAL"
 	case TOKEN_NONLOCAL:
 		return "NONLOCAL"
+	case TOKEN_MATCH:
+		return "MATCH"
+	case TOKEN_CASE:
+		return "CASE"
 	case TOKEN_ARROW:
 		return "ARROW"
 	case TOKEN_ELLIPSIS:
