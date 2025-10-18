@@ -272,6 +272,10 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 		return p.parseRaiseStatement()
 	case TOKEN_ASSERT:
 		return p.parseAssertStatement()
+	case TOKEN_GLOBAL:
+		return p.parseGlobalStatement()
+	case TOKEN_NONLOCAL:
+		return p.parseNonlocalStatement()
 	case TOKEN_DEL:
 		return p.parseDelStatement()
 	default:
@@ -335,6 +339,62 @@ func (p *PythonParser) parsePassStatement() ast.ASTNode {
 	}
 
 	return ast.NewPassForm(p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseGlobalStatement parses: global name [, name2, ...]
+func (p *PythonParser) parseGlobalStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_GLOBAL)
+
+	// Parse comma-separated list of names
+	names := []ast.ASTNode{
+		ast.NewIdentifier("global", p.makeLocation(tok), ast.SyntaxPython),
+	}
+
+	// First name
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
+
+	// Additional names
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		nameTok := p.expect(TOKEN_IDENTIFIER)
+		names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
+	}
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewSExpr(names, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseNonlocalStatement parses: nonlocal name [, name2, ...]
+func (p *PythonParser) parseNonlocalStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_NONLOCAL)
+
+	// Parse comma-separated list of names
+	names := []ast.ASTNode{
+		ast.NewIdentifier("nonlocal", p.makeLocation(tok), ast.SyntaxPython),
+	}
+
+	// First name
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
+
+	// Additional names
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		nameTok := p.expect(TOKEN_IDENTIFIER)
+		names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
+	}
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewSExpr(names, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseRaiseStatement parses: raise [exception [from cause]]
@@ -462,20 +522,45 @@ func (p *PythonParser) parseImportModule(tok Token) ast.ASTNode {
 
 // parseFromImportStatement parses: from module import name [as alias] [, name2 [as alias2], ...]
 // or: from module import *
+// Also handles relative imports: from . import, from .module import, from ..module import
 func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_FROM)
 
-	// Parse module name
-	moduleName := p.parseModuleName()
+	// Check for relative imports (dots)
+	relativeLevel := 0
+	for p.check(TOKEN_DOT) {
+		p.advance()
+		relativeLevel++
+	}
+
+	// Parse optional module name after dots (or required if no dots)
+	var moduleName string
+	if p.check(TOKEN_IDENTIFIER) {
+		moduleName = p.parseModuleName()
+	} else if relativeLevel == 0 {
+		// No dots and no identifier means error
+		p.error("Expected module name in import statement")
+		return nil
+	}
 
 	// Expect 'import'
 	p.expect(TOKEN_IMPORT)
 
-	// Create base import form: (import "module" :from ...)
+	// Create base import form
+	// For relative imports: (import "module" :from ... :level N)
+	// For absolute imports: (import "module" :from ...)
 	elements := []ast.ASTNode{
 		ast.NewIdentifier("import", p.makeLocation(tok), ast.SyntaxPython),
 		ast.NewLiteral(core.StringValue(moduleName), p.makeLocation(tok), ast.SyntaxPython),
 		ast.NewIdentifier(":from", p.makeLocation(tok), ast.SyntaxPython),
+	}
+
+	// Add relative level if it's a relative import
+	if relativeLevel > 0 {
+		elements = append(elements,
+			ast.NewIdentifier(":level", p.makeLocation(tok), ast.SyntaxPython),
+			ast.NewLiteral(core.NumberValue(relativeLevel), p.makeLocation(tok), ast.SyntaxPython),
+		)
 	}
 
 	// Check for '*' (import all)
