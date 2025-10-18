@@ -172,6 +172,7 @@ func init() {
 		"dict-comp": DictCompForm,
 		"set-comp":  SetCompForm,
 		"gen-expr":  GenExprForm,
+		"gen-comp":  GenExprForm, // Alias for gen-expr
 
 		// List literal (evaluates contents)
 		"list-literal": listLiteralForm,
@@ -547,6 +548,24 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 			return core.StringValue(f.name), true
 		}
 		return core.StringValue("<anonymous>"), true
+	case "__code__":
+		// Return a simple code object
+		// Python's types.py uses __code__ to get the CodeType
+		codeObj := core.NewDict()
+		codeObj.Set("co_flags", core.NumberValue(0))
+		codeObj.Set("co_argcount", core.NumberValue(0)) // Could track this properly
+		return codeObj, true
+	case "__dict__":
+		// Return function's namespace/attributes as a dict
+		funcDict := core.NewDict()
+		// Could populate with actual function attributes if needed
+		return funcDict, true
+	case "__closure__":
+		// Return tuple of closure cells (or None for no closure)
+		// For now, return a tuple with a dummy cell to avoid subscript errors
+		dummyCell := core.NewDict()
+		dummyCell.Set("cell_contents", core.None)
+		return core.TupleValue{dummyCell}, true
 	default:
 		return f.BaseObject.GetAttr(name)
 	}
@@ -1553,13 +1572,66 @@ func setCompMultiClause(expr core.Value, clausesList core.ListValue, ctx *core.C
 // GenExprForm implements generator expressions
 // Forms:
 //
-//	(gen-expr expr var iterable)
-//	(gen-expr expr var iterable condition)
+//	Old format: (gen-expr expr var iterable [condition])
+//	Lambda format: (gen-comp (lambda (var) expr) iterable [(lambda (var) condition)])
 //
 // Returns a Generator object that lazily evaluates the expression
 func GenExprForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) < 2 || len(args) > 4 {
+		return nil, fmt.Errorf("gen-expr/gen-comp requires 2-4 arguments")
+	}
+
+	// Check if this is lambda format: first arg is a lambda
+	if lambdaList, ok := args[0].(core.ListValue); ok && len(lambdaList) > 0 {
+		if lambdaSym, ok := lambdaList[0].(core.SymbolValue); ok && string(lambdaSym) == "lambda" {
+			// Lambda format: (gen-comp (lambda (var) expr) iterable [(lambda (var) condition)])
+			if len(args) < 2 || len(args) > 3 {
+				return nil, fmt.Errorf("gen-comp lambda format requires 2 or 3 arguments")
+			}
+
+			// Extract variable name from lambda
+			if len(lambdaList) < 3 {
+				return nil, fmt.Errorf("invalid lambda in gen-comp")
+			}
+			params, ok := lambdaList[1].(core.ListValue)
+			if !ok || len(params) != 1 {
+				return nil, fmt.Errorf("gen-comp lambda must have exactly one parameter")
+			}
+			varSym, ok := params[0].(core.SymbolValue)
+			if !ok {
+				return nil, fmt.Errorf("gen-comp lambda parameter must be a symbol")
+			}
+			varName := string(varSym)
+
+			// Expression is the lambda body
+			expr := lambdaList[2]
+
+			// Evaluate the iterable
+			iterable, err := Eval(args[1], ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating iterable: %v", err)
+			}
+
+			// Optional condition (also a lambda)
+			var condition core.Value
+			if len(args) == 3 {
+				if condLambda, ok := args[2].(core.ListValue); ok && len(condLambda) >= 3 {
+					condition = condLambda[2] // lambda body
+				}
+			}
+
+			// Create generator
+			gen, err := core.NewGeneratorExpression("genexpr", expr, varName, iterable, condition, ctx, Eval)
+			if err != nil {
+				return nil, err
+			}
+			return gen, nil
+		}
+	}
+
+	// Old format: (gen-expr expr var iterable [condition])
 	if len(args) < 3 || len(args) > 4 {
-		return nil, fmt.Errorf("gen-expr requires 3 or 4 arguments")
+		return nil, fmt.Errorf("gen-expr old format requires 3 or 4 arguments")
 	}
 
 	// Get the variable name

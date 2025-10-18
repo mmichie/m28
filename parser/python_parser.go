@@ -57,6 +57,9 @@ func (p *PythonParser) Parse() ([]ast.ASTNode, error) {
 		stmt := p.parseStatement()
 		if stmt != nil {
 			statements = append(statements, stmt)
+		} else if len(p.errors) > 0 {
+			// parseStatement returned nil and we have errors - stop parsing
+			break
 		}
 
 		// If we hit an error, synchronize
@@ -229,9 +232,15 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 	if p.check(TOKEN_AT) {
 		decorators := p.parseDecorators()
 
-		// Decorators must be followed by def or class
+		// Decorators must be followed by def, async def, or class
+		isAsync := false
+		if p.check(TOKEN_ASYNC) {
+			isAsync = true
+			p.advance()
+		}
+
 		if p.check(TOKEN_DEF) {
-			return p.parseDefStatement(decorators)
+			return p.parseDefStatement(decorators, isAsync)
 		} else if p.check(TOKEN_CLASS) {
 			return p.parseClassStatement(decorators)
 		} else {
@@ -242,8 +251,11 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 
 	// Simple statements
 	switch p.peek().Type {
+	case TOKEN_ASYNC:
+		// async def, async for, async with
+		return p.parseAsyncStatement()
 	case TOKEN_DEF:
-		return p.parseDefStatement(nil)
+		return p.parseDefStatement(nil, false)
 	case TOKEN_CLASS:
 		return p.parseClassStatement(nil)
 	case TOKEN_IF:
@@ -262,6 +274,8 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 		return p.parseFromImportStatement()
 	case TOKEN_RETURN:
 		return p.parseReturnStatement()
+	case TOKEN_YIELD:
+		return p.parseYieldStatement()
 	case TOKEN_BREAK:
 		return p.parseBreakStatement()
 	case TOKEN_CONTINUE:
@@ -295,13 +309,37 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 // Simple Statement Parsing
 // ============================================================================
 
-// parseReturnStatement parses: return [expression]
+// parseReturnStatement parses: return [expression[, expression]*]
 func (p *PythonParser) parseReturnStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_RETURN)
 
 	var value ast.ASTNode
 	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
-		value = p.parseExpression()
+		// Parse first expression
+		first := p.parseExpression()
+
+		// Check for comma-separated expressions (implicit tuple)
+		if p.check(TOKEN_COMMA) {
+			values := []ast.ASTNode{first}
+
+			for p.check(TOKEN_COMMA) {
+				p.advance() // consume comma
+
+				// Trailing comma is allowed
+				if p.check(TOKEN_NEWLINE) || p.isAtEnd() {
+					break
+				}
+
+				values = append(values, p.parseExpression())
+			}
+
+			// Create tuple: (tuple-literal elem1 elem2 ...)
+			tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+			allElements := append([]ast.ASTNode{tupleSym}, values...)
+			value = ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+		} else {
+			value = first
+		}
 	}
 
 	// Consume newline
@@ -310,6 +348,26 @@ func (p *PythonParser) parseReturnStatement() ast.ASTNode {
 	}
 
 	return ast.NewReturnForm(value, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseYieldStatement parses: yield [expression]
+func (p *PythonParser) parseYieldStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_YIELD)
+
+	var args []ast.ASTNode
+	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
+		args = append(args, p.parseExpression())
+	}
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	// Emit (yield expr) form - we have full generator support
+	return ast.NewSExpr(append([]ast.ASTNode{
+		ast.NewIdentifier("yield", p.makeLocation(tok), ast.SyntaxPython),
+	}, args...), p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseBreakStatement parses: break
@@ -1165,6 +1223,19 @@ func (p *PythonParser) parseMultiplication() ast.ASTNode {
 // parseFactor parses: (-|+|~) factor | power
 // Python grammar: factor: ('+' | '-' | '~') factor | power
 func (p *PythonParser) parseFactor() ast.ASTNode {
+	// Handle await expression
+	if p.match(TOKEN_AWAIT) {
+		tok := p.previous()
+		expr := p.parseFactor()
+
+		// For now, await just evaluates the expression (no async runtime)
+		// Emit: (await expr)
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("await", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
 	if p.match(TOKEN_MINUS, TOKEN_PLUS, TOKEN_TILDE) {
 		tok := p.previous()
 		expr := p.parseFactor()
@@ -1287,7 +1358,16 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 					p.error("Positional argument after keyword argument")
 					return nil
 				}
-				args = append(args, p.parseExpression())
+				expr := p.parseExpression()
+
+				// Check if this is a generator expression: expr for var in iterable
+				if p.check(TOKEN_FOR) {
+					// Parse as generator expression (don't consume closing paren)
+					genExpr := p.parseGeneratorExpressionNoParen(expr, tok)
+					args = append(args, genExpr)
+				} else {
+					args = append(args, expr)
+				}
 			}
 
 			if !p.check(TOKEN_COMMA) {
@@ -1430,16 +1510,60 @@ func (p *PythonParser) parsePrimary() ast.ASTNode {
 			return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
 		}
 
-		// Collect all adjacent string literals
-		concatenated := string(strValue)
-		for p.check(TOKEN_STRING) {
+		// Check if there are any adjacent strings (regular or f-strings)
+		if !p.check(TOKEN_STRING) && !p.check(TOKEN_FSTRING) {
+			// No concatenation needed
+			return ast.NewLiteral(strValue, p.makeLocation(tok), ast.SyntaxPython)
+		}
+
+		// Collect all adjacent string literals (both STRING and FSTRING)
+		parts := []ast.ASTNode{ast.NewLiteral(strValue, p.makeLocation(tok), ast.SyntaxPython)}
+
+		for p.check(TOKEN_STRING) || p.check(TOKEN_FSTRING) {
 			nextTok := p.advance()
-			if nextStr, ok := nextTok.Value.(core.StringValue); ok {
-				concatenated += string(nextStr)
+			var nextNode ast.ASTNode
+
+			if nextTok.Type == TOKEN_STRING {
+				// Regular string
+				nextNode = ast.NewLiteral(nextTok.Value, p.makeLocation(nextTok), ast.SyntaxPython)
+			} else {
+				// F-string
+				nextFstring, err := p.parseFStringFromLexeme(nextTok.Lexeme)
+				if err != nil {
+					p.error(fmt.Sprintf("Error parsing f-string: %v", err))
+					return nil
+				}
+				nextNode = p.convertValueToASTNode(nextFstring, nextTok)
+			}
+			parts = append(parts, nextNode)
+		}
+
+		// If all parts are simple strings, concatenate at compile time
+		allSimple := true
+		for _, part := range parts {
+			if _, ok := part.(*ast.Literal); !ok {
+				allSimple = false
+				break
 			}
 		}
 
-		return ast.NewLiteral(core.StringValue(concatenated), p.makeLocation(tok), ast.SyntaxPython)
+		if allSimple {
+			// Concatenate all string literals
+			concatenated := ""
+			for _, part := range parts {
+				lit := part.(*ast.Literal)
+				if str, ok := lit.Value.(core.StringValue); ok {
+					concatenated += string(str)
+				}
+			}
+			return ast.NewLiteral(core.StringValue(concatenated), p.makeLocation(tok), ast.SyntaxPython)
+		}
+
+		// Mix of strings and f-strings - use runtime concatenation with +
+		concatArgs := append([]ast.ASTNode{
+			ast.NewIdentifier("+", p.makeLocation(tok), ast.SyntaxPython),
+		}, parts...)
+		return ast.NewSExpr(concatArgs, p.makeLocation(tok), ast.SyntaxPython)
 
 	case TOKEN_FSTRING:
 		p.advance()
@@ -1449,8 +1573,41 @@ func (p *PythonParser) parsePrimary() ast.ASTNode {
 			p.error(fmt.Sprintf("Error parsing f-string: %v", err))
 			return nil
 		}
-		// Return as SExpr to be evaluated (like dict-literal, etc.)
-		return p.convertValueToASTNode(fstringValue, tok)
+
+		// Check for adjacent string/f-string concatenation
+		firstNode := p.convertValueToASTNode(fstringValue, tok)
+
+		// Collect any adjacent strings or f-strings
+		parts := []ast.ASTNode{firstNode}
+		for p.check(TOKEN_STRING) || p.check(TOKEN_FSTRING) {
+			nextTok := p.advance()
+			var nextNode ast.ASTNode
+
+			if nextTok.Type == TOKEN_STRING {
+				// Regular string
+				nextNode = ast.NewLiteral(nextTok.Value, p.makeLocation(nextTok), ast.SyntaxPython)
+			} else {
+				// F-string
+				nextFstring, err := p.parseFStringFromLexeme(nextTok.Lexeme)
+				if err != nil {
+					p.error(fmt.Sprintf("Error parsing f-string: %v", err))
+					return nil
+				}
+				nextNode = p.convertValueToASTNode(nextFstring, nextTok)
+			}
+			parts = append(parts, nextNode)
+		}
+
+		// If we have multiple parts, concatenate them with +
+		if len(parts) == 1 {
+			return parts[0]
+		}
+
+		// Build concatenation: (+ part1 part2 part3 ...)
+		concatArgs := append([]ast.ASTNode{
+			ast.NewIdentifier("+", p.makeLocation(tok), ast.SyntaxPython),
+		}, parts...)
+		return ast.NewSExpr(concatArgs, p.makeLocation(tok), ast.SyntaxPython)
 
 	case TOKEN_TRUE:
 		p.advance()
@@ -1816,6 +1973,40 @@ func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) 
 	)
 }
 
+// parseGeneratorExpressionNoParen parses a generator expression without consuming closing paren
+// Used when generator is inside function call: func(expr for var in iter)
+func (p *PythonParser) parseGeneratorExpressionNoParen(element ast.ASTNode, tok Token) ast.ASTNode {
+	// expr for var in iter if condition (no closing paren)
+	p.expect(TOKEN_FOR)
+
+	varTok := p.expect(TOKEN_IDENTIFIER)
+	variable := varTok.Lexeme
+
+	p.expect(TOKEN_IN)
+	// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+	iterable := p.parseOr()
+
+	var condition ast.ASTNode
+	if p.check(TOKEN_IF) {
+		p.advance()
+		condition = p.parseOr()
+	}
+
+	// Don't consume closing paren - let the caller handle it
+
+	return ast.NewComprehensionForm(
+		ast.GeneratorComp,
+		element, // Element expression
+		nil,     // KeyExpr (not used for generator)
+		nil,     // ValueExpr (not used for generator)
+		variable,
+		iterable,
+		condition,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
+}
+
 // ============================================================================
 // Block and Decorator Parsing
 // ============================================================================
@@ -1841,6 +2032,9 @@ func (p *PythonParser) parseBlock() []ast.ASTNode {
 		stmt := p.parseStatement()
 		if stmt != nil {
 			statements = append(statements, stmt)
+		} else if len(p.errors) > 0 {
+			// parseStatement returned nil and we have errors - stop parsing
+			break
 		}
 
 		// If we hit an error, synchronize
@@ -2018,8 +2212,27 @@ func (p *PythonParser) parseWhileStatement() ast.ASTNode {
 	return ast.NewWhileForm(condition, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
 }
 
-// parseDefStatement parses: (@decorator)* def name(params) (-> type)?: block
-func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode) ast.ASTNode {
+// parseAsyncStatement parses: async (def|for|with)
+func (p *PythonParser) parseAsyncStatement() ast.ASTNode {
+	p.expect(TOKEN_ASYNC)
+
+	switch p.peek().Type {
+	case TOKEN_DEF:
+		return p.parseDefStatement(nil, true)
+	case TOKEN_FOR:
+		// async for - for now, treat like regular for
+		return p.parseForStatement()
+	case TOKEN_WITH:
+		// async with - for now, treat like regular with
+		return p.parseWithStatement()
+	default:
+		p.error(fmt.Sprintf("Expected 'def', 'for', or 'with' after 'async', got %v", p.peek().Type))
+		return nil
+	}
+}
+
+// parseDefStatement parses: (@decorator)* (async)? def name(params) (-> type)?: block
+func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool) ast.ASTNode {
 	tok := p.expect(TOKEN_DEF)
 
 	// Parse function name
@@ -2038,15 +2251,48 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode) ast.ASTNode {
 		returnType = p.parseTypeAnnotation()
 	}
 
-	// Parse body
-	body := p.parseBlock()
+	// Parse body - can be either indented block or inline statement
+	p.expect(TOKEN_COLON)
 
-	// Convert body to single node
 	var bodyNode ast.ASTNode
-	if len(body) == 1 {
-		bodyNode = body[0]
+	if p.check(TOKEN_NEWLINE) {
+		// Indented block
+		p.advance() // consume newline
+		p.expect(TOKEN_INDENT)
+
+		statements := []ast.ASTNode{}
+		for !p.check(TOKEN_DEDENT) && !p.isAtEnd() {
+			// Skip empty lines
+			for p.check(TOKEN_NEWLINE) {
+				p.advance()
+			}
+
+			if p.check(TOKEN_DEDENT) {
+				break
+			}
+
+			stmt := p.parseStatement()
+			if stmt != nil {
+				statements = append(statements, stmt)
+			} else if len(p.errors) > 0 {
+				break
+			}
+
+			if p.panic {
+				p.synchronize()
+			}
+		}
+
+		p.expect(TOKEN_DEDENT)
+
+		if len(statements) == 1 {
+			bodyNode = statements[0]
+		} else {
+			bodyNode = ast.NewBlockForm(statements, p.makeLocation(tok), ast.SyntaxPython)
+		}
 	} else {
-		bodyNode = ast.NewBlockForm(body, p.makeLocation(tok), ast.SyntaxPython)
+		// Inline statement: def f(): pass
+		bodyNode = p.parseStatement()
 	}
 
 	return ast.NewDefForm(name, params, bodyNode, returnType, decorators, p.makeLocation(tok), ast.SyntaxPython)

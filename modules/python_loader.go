@@ -2,6 +2,8 @@ package modules
 
 import (
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/mmichie/m28/core"
 )
@@ -16,6 +18,7 @@ func init() {
 var cExtensionModules = map[string]bool{
 	"_io":              true,
 	"_collections":     true,
+	"_collections_abc": true, // Collections ABC (part of collections)
 	"_thread":          true,
 	"_socket":          true,
 	"_ssl":             true,
@@ -36,6 +39,8 @@ var cExtensionModules = map[string]bool{
 // LoadPythonModule attempts to load a Python module by name
 // Returns (*DictValue, error) to match ModuleLoader interface
 func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, *core.Context) (core.Value, error)) (*core.DictValue, error) {
+	fmt.Fprintf(os.Stderr, "[PROFILE] LoadPythonModule called for '%s'\n", name)
+
 	// Check if this is a known C extension
 	if cExtensionModules[name] {
 		return nil, fmt.Errorf(
@@ -51,10 +56,15 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		return nil, fmt.Errorf("Python finder initialization failed: %w", err)
 	}
 
+	fmt.Fprintf(os.Stderr, "[PROFILE] Finding '%s'...\n", name)
 	pyPath, isPackage, err := finder.Find(name)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "[PROFILE] Find failed for '%s': %v\n", name, err)
 		return nil, err // Module not found
 	}
+	fmt.Fprintf(os.Stderr, "[PROFILE] Found '%s' at %s\n", name, pyPath)
+
+	startLoad := time.Now()
 
 	// Transpile the Python file
 	transpiler := GetPythonTranspiler()
@@ -90,13 +100,21 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	// Convert AST to IR
+	startToIR := time.Now()
 	ir := astNode.ToIR()
+	toIRTime := time.Since(startToIR)
 
 	// Evaluate the IR
+	startEval := time.Now()
 	_, err = evalFunc(ir, moduleCtx)
 	if err != nil {
 		return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w", name, pyPath, err)
 	}
+	evalTime := time.Since(startEval)
+
+	totalLoad := time.Since(startLoad)
+	fmt.Fprintf(os.Stderr, "[PROFILE] LoadModule %s: total=%v toIR=%v eval=%v\n",
+		name, totalLoad, toIRTime, evalTime)
 
 	// Create module dictionary with exports
 	moduleDict := core.NewDict()

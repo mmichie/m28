@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/mmichie/m28/core/ast"
 	"github.com/mmichie/m28/parser"
@@ -33,6 +34,8 @@ func GetPythonTranspiler() *PythonModuleTranspiler {
 
 // Transpile parses a Python file and returns its AST as a block
 func (t *PythonModuleTranspiler) Transpile(pyPath string) (ast.ASTNode, error) {
+	startTotal := time.Now()
+
 	// Check cache first
 	t.mu.RLock()
 	if cached, ok := t.cache[pyPath]; ok {
@@ -42,24 +45,30 @@ func (t *PythonModuleTranspiler) Transpile(pyPath string) (ast.ASTNode, error) {
 	t.mu.RUnlock()
 
 	// Read the Python source file
+	startRead := time.Now()
 	source, err := os.ReadFile(pyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Python file '%s': %w", pyPath, err)
 	}
+	readTime := time.Since(startRead)
 
 	// Tokenize Python source
+	startTokenize := time.Now()
 	tokenizer := parser.NewPythonTokenizer(string(source))
 	tokens, err := tokenizer.Tokenize()
 	if err != nil {
 		return nil, fmt.Errorf("failed to tokenize Python module '%s': %w", pyPath, err)
 	}
+	tokenizeTime := time.Since(startTokenize)
 
 	// Parse tokens into AST
+	startParse := time.Now()
 	pythonParser := parser.NewPythonParser(tokens)
 	nodes, err := pythonParser.Parse()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Python module '%s': %w", pyPath, err)
 	}
+	parseTime := time.Since(startParse)
 
 	// Wrap multiple statements in a BlockForm (do block)
 	var astNode ast.ASTNode
@@ -76,6 +85,12 @@ func (t *PythonModuleTranspiler) Transpile(pyPath string) (ast.ASTNode, error) {
 	t.mu.Lock()
 	t.cache[pyPath] = astNode
 	t.mu.Unlock()
+
+	totalTime := time.Since(startTotal)
+
+	// Always log timing for profiling
+	fmt.Fprintf(os.Stderr, "[PROFILE] Transpile %s: total=%v read=%v tokenize=%v parse=%v tokens=%d\n",
+		pyPath, totalTime, readTime, tokenizeTime, parseTime, len(tokens))
 
 	return astNode, nil
 }

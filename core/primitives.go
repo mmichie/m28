@@ -213,6 +213,22 @@ func (f *BuiltinFunction) createRegistry() *MethodRegistry {
 			}
 			return StringValue("<anonymous>"), nil
 		}),
+		MakeProperty("__dict__", "Function attributes", func(receiver Value) (Value, error) {
+			// Return an empty dict for builtin functions
+			return NewDict(), nil
+		}),
+		MakeProperty("__code__", "Function code object", func(receiver Value) (Value, error) {
+			// Return a simple code object
+			codeObj := NewDict()
+			codeObj.Set("co_flags", NumberValue(0))
+			codeObj.Set("co_argcount", NumberValue(0))
+			return codeObj, nil
+		}),
+		MakeProperty("__closure__", "Function closure", func(receiver Value) (Value, error) {
+			// Return None for builtin functions (no closure)
+			// Actually, Python returns None for functions without closure
+			return None, nil
+		}),
 	)
 
 	return registry

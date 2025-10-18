@@ -30,6 +30,13 @@ func InitSysModule() *core.DictValue {
 	// Add version info
 	sysModule.SetWithKey("version", core.StringValue("version"), core.StringValue("M28 0.1.0"))
 
+	// Add implementation namespace (SimpleNamespace-like object)
+	implDict := core.NewDict()
+	implDict.Set("name", core.StringValue("m28"))
+	implDict.Set("version", core.StringValue("0.1.0"))
+	implDict.Set("cache_tag", core.StringValue("m28"))
+	sysModule.SetWithKey("implementation", core.StringValue("implementation"), implDict)
+
 	return sysModule
 }
 
