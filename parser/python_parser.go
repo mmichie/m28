@@ -1244,8 +1244,26 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 	if !p.check(TOKEN_RPAREN) {
 		seenKeyword := false
 		for {
-			// Check for keyword argument: IDENTIFIER = expression
-			if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_ASSIGN {
+			// Check for **kwargs unpacking
+			if p.check(TOKEN_DOUBLESTAR) {
+				p.advance() // consume **
+				expr := p.parseExpression()
+				// Mark as kwargs unpacking by adding **unpack marker
+				args = append(args,
+					ast.NewIdentifier("**unpack", p.makeLocation(tok), ast.SyntaxPython),
+					expr,
+				)
+			} else if p.check(TOKEN_STAR) {
+				// Check for *args unpacking
+				p.advance() // consume *
+				expr := p.parseExpression()
+				// Mark as args unpacking by adding *unpack marker
+				args = append(args,
+					ast.NewIdentifier("*unpack", p.makeLocation(tok), ast.SyntaxPython),
+					expr,
+				)
+			} else if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_ASSIGN {
+				// Keyword argument: IDENTIFIER = expression
 				seenKeyword = true
 				nameTok := p.advance()
 				p.expect(TOKEN_ASSIGN)
