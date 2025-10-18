@@ -778,7 +778,7 @@ func (p *PythonParser) parseComparison() ast.ASTNode {
 	expr := p.parseAddition()
 
 	for p.match(TOKEN_EQUALEQUAL, TOKEN_NOTEQUAL, TOKEN_LESS, TOKEN_LESSEQUAL,
-		TOKEN_GREATER, TOKEN_GREATEREQUAL, TOKEN_IN, TOKEN_IS) {
+		TOKEN_GREATER, TOKEN_GREATEREQUAL, TOKEN_IN, TOKEN_NOT_IN, TOKEN_IS, TOKEN_IS_NOT) {
 		tok := p.previous()
 		right := p.parseAddition()
 
@@ -798,8 +798,12 @@ func (p *PythonParser) parseComparison() ast.ASTNode {
 			op = ">="
 		case TOKEN_IN:
 			op = "in"
+		case TOKEN_NOT_IN:
+			op = "not in"
 		case TOKEN_IS:
 			op = "is"
+		case TOKEN_IS_NOT:
+			op = "is not"
 		}
 
 		expr = ast.NewSExpr([]ast.ASTNode{

@@ -85,6 +85,9 @@ func (t *PythonTokenizer) Tokenize() ([]Token, error) {
 		}
 	}
 
+	// Combine compound operators (not in, is not)
+	t.combineCompoundOperators()
+
 	// Emit remaining DEDENT tokens at end of file
 	t.emitFinalDedents()
 
@@ -176,6 +179,58 @@ func (t *PythonTokenizer) emitFinalDedents() {
 			EndPos:   t.pos,
 		})
 	}
+}
+
+// combineCompoundOperators combines adjacent tokens into compound operators
+// "not" + "in" -> "not in"
+// "is" + "not" -> "is not"
+func (t *PythonTokenizer) combineCompoundOperators() {
+	result := make([]Token, 0, len(t.tokens))
+	i := 0
+
+	for i < len(t.tokens) {
+		current := t.tokens[i]
+
+		// Check for "not in"
+		if current.Type == TOKEN_NOT && i+1 < len(t.tokens) && t.tokens[i+1].Type == TOKEN_IN {
+			next := t.tokens[i+1]
+			// Combine into TOKEN_NOT_IN
+			combined := Token{
+				Type:     TOKEN_NOT_IN,
+				Lexeme:   current.Lexeme + " " + next.Lexeme,
+				Line:     current.Line,
+				Col:      current.Col,
+				StartPos: current.StartPos,
+				EndPos:   next.EndPos,
+			}
+			result = append(result, combined)
+			i += 2 // Skip both tokens
+			continue
+		}
+
+		// Check for "is not"
+		if current.Type == TOKEN_IS && i+1 < len(t.tokens) && t.tokens[i+1].Type == TOKEN_NOT {
+			next := t.tokens[i+1]
+			// Combine into TOKEN_IS_NOT
+			combined := Token{
+				Type:     TOKEN_IS_NOT,
+				Lexeme:   current.Lexeme + " " + next.Lexeme,
+				Line:     current.Line,
+				Col:      current.Col,
+				StartPos: current.StartPos,
+				EndPos:   next.EndPos,
+			}
+			result = append(result, combined)
+			i += 2 // Skip both tokens
+			continue
+		}
+
+		// No combination, keep the token as-is
+		result = append(result, current)
+		i++
+	}
+
+	t.tokens = result
 }
 
 // scanToken scans and returns the next token
