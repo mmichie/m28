@@ -247,6 +247,10 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 
 			parentModule, parentErr := loader.LoadModule(moduleName, ctx)
 			if parentErr != nil {
+				// If it's an ImportError, preserve it so try/except can catch it
+				if _, ok := parentErr.(*core.ImportError); ok {
+					return nil, parentErr
+				}
 				return nil, fmt.Errorf("cannot import name '%s' from '%s': %w", spec.name, moduleName, parentErr)
 			}
 

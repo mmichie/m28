@@ -851,6 +851,8 @@ func tryForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					matches = excType == "KeyError" || excType == "Exception"
 				case *core.IndexError:
 					matches = excType == "IndexError" || excType == "Exception"
+				case *core.ImportError:
+					matches = excType == "ImportError" || excType == "Exception"
 				default:
 					// Check if it's our custom Exception type
 					if exc, ok := baseErr.(*Exception); ok {

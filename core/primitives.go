@@ -151,6 +151,22 @@ var (
 	None = NilValue{} // Python-style alias
 )
 
+// EllipsisValue represents Python's Ellipsis literal (...)
+type EllipsisValue struct{}
+
+// Type implements Value.Type
+func (e EllipsisValue) Type() Type {
+	return "ellipsis"
+}
+
+// String implements Value.String
+func (e EllipsisValue) String() string {
+	return "Ellipsis"
+}
+
+// Predefined Ellipsis value
+var Ellipsis = EllipsisValue{}
+
 // BuiltinFunction represents a Go function that can be called from M28
 type BuiltinFunction struct {
 	BaseObject

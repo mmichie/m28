@@ -242,16 +242,22 @@ func (l *ModuleLoaderEnhanced) loadModuleContent(path string) (string, error) {
 func (l *ModuleLoaderEnhanced) tryLoadPythonModule(registry *ModuleRegistry, name, cacheName string, m28Err error) (*DictValue, error) {
 	// Check if Python loader is available
 	if pythonLoaderFunc == nil {
-		// Python loader not available, return original error
-		return nil, fmt.Errorf("module '%s' not found", name)
+		// Python loader not available, return ImportError
+		return nil, &ImportError{
+			ModuleName: name,
+			Message:    fmt.Sprintf("no module named '%s'", name),
+		}
 	}
 
 	// Try to load as Python module
 	moduleDict, err := pythonLoaderFunc(name, l.GetContext(), l.evalFunc)
 	if err != nil {
-		// If error mentions "not found", include original M28 error
+		// If error mentions "not found", return ImportError
 		if strings.Contains(err.Error(), "not found") {
-			return nil, fmt.Errorf("module '%s' not found as M28 module or Python module", name)
+			return nil, &ImportError{
+				ModuleName: name,
+				Message:    fmt.Sprintf("no module named '%s'", name),
+			}
 		}
 		// Other Python loading errors (transpilation, C extension, etc.)
 		return nil, err

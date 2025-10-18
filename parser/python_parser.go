@@ -1322,6 +1322,33 @@ func (p *PythonParser) parseFactor() ast.ASTNode {
 		}, p.makeLocation(tok), ast.SyntaxPython)
 	}
 
+	// Handle yield expression (used in expression context, not statement)
+	// Example: (yield), (yield x), foo((yield x))
+	if p.match(TOKEN_YIELD) {
+		tok := p.previous()
+
+		// Check for "yield from"
+		var yieldKeyword string
+		if p.check(TOKEN_FROM) {
+			p.advance() // consume FROM
+			yieldKeyword = "yield-from"
+		} else {
+			yieldKeyword = "yield"
+		}
+
+		var args []ast.ASTNode
+		// Parse optional value (not if at end of expression context)
+		if !p.check(TOKEN_RPAREN) && !p.check(TOKEN_COMMA) && !p.check(TOKEN_RBRACKET) &&
+			!p.check(TOKEN_RBRACE) && !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
+			args = append(args, p.parseFactor())
+		}
+
+		// Emit (yield expr) or (yield-from expr) form
+		return ast.NewSExpr(append([]ast.ASTNode{
+			ast.NewIdentifier(yieldKeyword, p.makeLocation(tok), ast.SyntaxPython),
+		}, args...), p.makeLocation(tok), ast.SyntaxPython)
+	}
+
 	if p.match(TOKEN_MINUS, TOKEN_PLUS, TOKEN_TILDE) {
 		tok := p.previous()
 		expr := p.parseFactor()
@@ -1460,6 +1487,11 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 				break
 			}
 			p.advance()
+
+			// Allow trailing comma before closing paren
+			if p.check(TOKEN_RPAREN) {
+				break
+			}
 		}
 	}
 
@@ -1707,6 +1739,10 @@ func (p *PythonParser) parsePrimary() ast.ASTNode {
 		p.advance()
 		return ast.NewLiteral(core.None, p.makeLocation(tok), ast.SyntaxPython)
 
+	case TOKEN_ELLIPSIS:
+		p.advance()
+		return ast.NewLiteral(core.EllipsisValue{}, p.makeLocation(tok), ast.SyntaxPython)
+
 	case TOKEN_LPAREN:
 		// Parenthesized expression or generator expression
 		return p.parseParenthesized()
@@ -1735,21 +1771,32 @@ func (p *PythonParser) parseParenthesized() ast.ASTNode {
 		return ast.NewLiteral(core.TupleValue{}, p.makeLocation(tok), ast.SyntaxPython)
 	}
 
-	// Parse first expression
-	elements := []ast.ASTNode{p.parseExpression()}
+	// Parse first element (could be star expression in tuple)
+	first := p.parseListElement()
 
-	// Check if it's a generator expression
+	// Check if it's a generator expression (star expressions not allowed)
 	if p.check(TOKEN_FOR) {
-		return p.parseGeneratorExpression(elements[0], tok)
+		// Star expressions not allowed in generator expressions
+		if sExpr, ok := first.(*ast.SExpr); ok {
+			if len(sExpr.Elements) > 0 {
+				if id, ok := sExpr.Elements[0].(*ast.Identifier); ok && id.Name == "*unpack-iter" {
+					p.error("Iterable unpacking (*) cannot be used in generator expression")
+					return nil
+				}
+			}
+		}
+		return p.parseGeneratorExpression(first, tok)
 	}
 
 	// Check for comma (tuple literal)
 	if p.check(TOKEN_COMMA) {
 		p.advance()
 
+		elements := []ast.ASTNode{first}
+
 		// Parse remaining elements (if any)
 		for !p.check(TOKEN_RPAREN) && !p.isAtEnd() {
-			elements = append(elements, p.parseExpression())
+			elements = append(elements, p.parseListElement())
 
 			if !p.check(TOKEN_COMMA) {
 				break
@@ -1764,9 +1811,38 @@ func (p *PythonParser) parseParenthesized() ast.ASTNode {
 		return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
 	}
 
-	// No comma - just a parenthesized expression
+	// No comma - just a parenthesized expression (or single-element with star, which is an error)
 	p.expect(TOKEN_RPAREN)
-	return elements[0]
+
+	// Check if it's a star expression without comma - that's an error
+	if sExpr, ok := first.(*ast.SExpr); ok {
+		if len(sExpr.Elements) > 0 {
+			if id, ok := sExpr.Elements[0].(*ast.Identifier); ok && id.Name == "*unpack-iter" {
+				p.error("Can't use starred expression here")
+				return nil
+			}
+		}
+	}
+
+	return first
+}
+
+// parseListElement parses a list/tuple element, which can include star expressions
+// Returns the element AST node
+func (p *PythonParser) parseListElement() ast.ASTNode {
+	// Check for star expression: *iterable
+	if p.check(TOKEN_STAR) {
+		starTok := p.advance()
+		expr := p.parseExpression()
+
+		// Create (*unpack-iter expr) to indicate unpacking in literal context
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("*unpack-iter", p.makeLocation(starTok), ast.SyntaxPython),
+			expr,
+		}, p.makeLocation(starTok), ast.SyntaxPython)
+	}
+
+	return p.parseExpression()
 }
 
 // parseListLiteral parses: [elements] or [expr for var in iter]
@@ -1780,10 +1856,19 @@ func (p *PythonParser) parseListLiteral() ast.ASTNode {
 	}
 
 	// Parse first element
-	first := p.parseExpression()
+	first := p.parseListElement()
 
-	// Check if it's a comprehension
+	// Check if it's a comprehension (only if first element is not a star expression)
 	if p.check(TOKEN_FOR) {
+		// Star expressions not allowed in comprehensions
+		if sExpr, ok := first.(*ast.SExpr); ok {
+			if len(sExpr.Elements) > 0 {
+				if id, ok := sExpr.Elements[0].(*ast.Identifier); ok && id.Name == "*unpack-iter" {
+					p.error("Iterable unpacking (*) cannot be used in comprehension")
+					return nil
+				}
+			}
+		}
 		return p.parseListComprehension(first, tok)
 	}
 
@@ -1795,7 +1880,7 @@ func (p *PythonParser) parseListLiteral() ast.ASTNode {
 		if p.check(TOKEN_RBRACKET) {
 			break // Trailing comma
 		}
-		elements = append(elements, p.parseExpression())
+		elements = append(elements, p.parseListElement())
 	}
 
 	p.expect(TOKEN_RBRACKET)
@@ -2126,30 +2211,41 @@ func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast
 
 func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) ast.ASTNode {
 	// (expr for var in iter if condition)
-	p.expect(TOKEN_FOR)
+	// (expr for var1 in iter1 for var2 in iter2)
 
-	variable := p.parseLoopVariables()
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
 
-	p.expect(TOKEN_IN)
-	// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
-	iterable := p.parseOr()
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
 
-	var condition ast.ASTNode
-	if p.check(TOKEN_IF) {
-		p.advance()
-		condition = p.parseOr()
+		variable := p.parseLoopVariables()
+
+		p.expect(TOKEN_IN)
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
+
+		var condition ast.ASTNode
+		if p.check(TOKEN_IF) {
+			p.advance()
+			condition = p.parseOr()
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
 	}
 
 	p.expect(TOKEN_RPAREN)
 
-	return ast.NewComprehensionForm(
+	return ast.NewComprehensionFormMulti(
 		ast.GeneratorComp,
 		element, // Element expression
 		nil,     // KeyExpr (not used for generator)
 		nil,     // ValueExpr (not used for generator)
-		variable,
-		iterable,
-		condition,
+		clauses,
 		p.makeLocation(tok),
 		ast.SyntaxPython,
 	)

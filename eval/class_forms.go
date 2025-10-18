@@ -102,8 +102,14 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Parent evaluated to: %T\n", parentVal)
 					}
 
-					parent, ok := parentVal.(*core.Class)
-					if !ok {
+					var parent *core.Class
+					switch p := parentVal.(type) {
+					case *core.Class:
+						parent = p
+					case interface{ GetClass() *core.Class }:
+						// Handle wrapper types that embed Class (like staticmethod, classmethod)
+						parent = p.GetClass()
+					default:
 						return nil, fmt.Errorf("parent must be a class, got %T", parentVal)
 					}
 

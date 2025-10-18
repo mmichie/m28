@@ -30,8 +30,8 @@ var cExtensionModules = map[string]bool{
 	"_random":          true,
 	"_posixsubprocess": true,
 	"_weakref":         true, // Weak reference support (built-in)
-	"_abc":             true, // Abstract base class support
-	"builtins":         true, // Built-in functions
+	// "_abc" removed - let it fail naturally to trigger fallback to _py_abc
+	"builtins": true, // Built-in functions
 }
 
 // LoadPythonModule attempts to load a Python module by name

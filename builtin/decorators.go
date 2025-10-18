@@ -13,14 +13,10 @@ func RegisterDecorators(ctx *core.Context) {
 	// Register the macro decorator
 	ctx.Define("macro", core.NewBuiltinFunction(macroDecorator()))
 
-	// property - converts a method into a property (getter)
-	ctx.Define("property", core.NewBuiltinFunction(propertyDecorator))
-
-	// staticmethod - makes a method static (no self parameter)
-	ctx.Define("staticmethod", core.NewBuiltinFunction(staticmethodDecorator))
-
-	// classmethod - makes a method receive the class as first parameter
-	ctx.Define("classmethod", core.NewBuiltinFunction(classmethodDecorator))
+	// property, staticmethod and classmethod as proper classes
+	ctx.Define("property", createPropertyClass())
+	ctx.Define("staticmethod", createStaticmethodClass())
+	ctx.Define("classmethod", createClassmethodClass())
 }
 
 // macroDecorator creates the built-in macro decorator
@@ -55,33 +51,56 @@ func macroDecorator() func(args []core.Value, ctx *core.Context) (core.Value, er
 	}
 }
 
-// propertyDecorator creates a property from a getter function
-// Usage: @property
-//
-//	def name(self): return self._name
-func propertyDecorator(args []core.Value, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("property() takes exactly 1 argument (%d given)", len(args))
+// PropertyType represents the property class
+type PropertyType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class (for inheritance support)
+func (p *PropertyType) GetClass() *core.Class {
+	return p.Class
+}
+
+// Call creates a PropertyValue instead of a generic instance
+func (p *PropertyType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("property() takes at least 1 argument (%d given)", len(args))
 	}
 
 	getter := args[0]
+	var setter, deleter core.Value
+
+	// property(fget=None, fset=None, fdel=None, doc=None)
+	if len(args) >= 2 {
+		setter = args[1]
+	}
+	if len(args) >= 3 {
+		deleter = args[2]
+	}
+	// doc parameter (args[3]) is ignored for now
 
 	// Create a property object
-	// A property is a special object that intercepts attribute access
 	prop := &core.PropertyValue{
 		Getter:  getter,
-		Setter:  nil,
-		Deleter: nil,
+		Setter:  setter,
+		Deleter: deleter,
 	}
 
 	return prop, nil
 }
 
-// staticmethodDecorator creates a static method
-// Usage: @staticmethod
-//
-//	def func(): pass
-func staticmethodDecorator(args []core.Value, ctx *core.Context) (core.Value, error) {
+// StaticmethodType represents the staticmethod class
+type StaticmethodType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class (for inheritance support)
+func (s *StaticmethodType) GetClass() *core.Class {
+	return s.Class
+}
+
+// Call creates a StaticMethodValue instead of a generic instance
+func (s *StaticmethodType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("staticmethod() takes exactly 1 argument (%d given)", len(args))
 	}
@@ -96,11 +115,18 @@ func staticmethodDecorator(args []core.Value, ctx *core.Context) (core.Value, er
 	return sm, nil
 }
 
-// classmethodDecorator creates a class method
-// Usage: @classmethod
-//
-//	def func(cls): pass
-func classmethodDecorator(args []core.Value, ctx *core.Context) (core.Value, error) {
+// ClassmethodType represents the classmethod class
+type ClassmethodType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class (for inheritance support)
+func (c *ClassmethodType) GetClass() *core.Class {
+	return c.Class
+}
+
+// Call creates a ClassMethodValue instead of a generic instance
+func (c *ClassmethodType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("classmethod() takes exactly 1 argument (%d given)", len(args))
 	}
@@ -113,4 +139,22 @@ func classmethodDecorator(args []core.Value, ctx *core.Context) (core.Value, err
 	}
 
 	return cm, nil
+}
+
+// createPropertyClass creates the property class
+func createPropertyClass() *PropertyType {
+	class := core.NewClass("property", nil)
+	return &PropertyType{Class: class}
+}
+
+// createStaticmethodClass creates the staticmethod class
+func createStaticmethodClass() *StaticmethodType {
+	class := core.NewClass("staticmethod", nil)
+	return &StaticmethodType{Class: class}
+}
+
+// createClassmethodClass creates the classmethod class
+func createClassmethodClass() *ClassmethodType {
+	class := core.NewClass("classmethod", nil)
+	return &ClassmethodType{Class: class}
 }
