@@ -294,8 +294,16 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 		return p.parseDelStatement()
 	case TOKEN_IDENTIFIER:
 		// Check for soft keywords (match)
+		// Only treat "match" as keyword if not followed by assignment
 		if p.peek().Lexeme == "match" {
-			return p.parseMatchStatement()
+			// Look ahead to see if this is a match statement or variable assignment
+			// match statement: match expr:
+			// variable: match = value
+			if p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type != TOKEN_ASSIGN {
+				// Not an assignment, could be match statement
+				// Parse and see what happens
+				return p.parseMatchStatement()
+			}
 		}
 		// Fall through to expression statement
 		return p.parseExpressionStatement()
@@ -2002,10 +2010,37 @@ func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) 
 // Used when generator is inside function call: func(expr for var in iter)
 func (p *PythonParser) parseGeneratorExpressionNoParen(element ast.ASTNode, tok Token) ast.ASTNode {
 	// expr for var in iter if condition (no closing paren)
+	// or: expr for (var1, var2) in iter
 	p.expect(TOKEN_FOR)
 
-	varTok := p.expect(TOKEN_IDENTIFIER)
-	variable := varTok.Lexeme
+	// Parse loop variable(s) - can be tuple unpacking
+	var variable string
+	if p.check(TOKEN_LPAREN) {
+		// Tuple unpacking: for (k, v) in items
+		p.advance() // consume (
+
+		vars := []string{}
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		vars = append(vars, varTok.Lexeme)
+
+		for p.check(TOKEN_COMMA) {
+			p.advance()
+			varTok = p.expect(TOKEN_IDENTIFIER)
+			vars = append(vars, varTok.Lexeme)
+		}
+
+		p.expect(TOKEN_RPAREN)
+
+		// Join with comma for now (evaluator will need to handle unpacking)
+		variable = "(" + vars[0]
+		for i := 1; i < len(vars); i++ {
+			variable += ", " + vars[i]
+		}
+		variable += ")"
+	} else {
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		variable = varTok.Lexeme
+	}
 
 	p.expect(TOKEN_IN)
 	// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
