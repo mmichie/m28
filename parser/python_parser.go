@@ -1945,6 +1945,7 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode) ast.ASTNode {
 }
 
 // parseParameters parses: (param (: type)? (= default)?, ...)*
+// Also handles *args and **kwargs
 func (p *PythonParser) parseParameters() []ast.Parameter {
 	params := []ast.Parameter{}
 
@@ -1953,7 +1954,49 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 	}
 
 	for {
-		// Parse parameter name
+		// Check for *args
+		if p.check(TOKEN_STAR) {
+			p.advance() // consume *
+			nameTok := p.expect(TOKEN_IDENTIFIER)
+			param := ast.Parameter{
+				Name:      "*" + nameTok.Lexeme, // Prefix with * to mark as varargs
+				IsVarArgs: true,
+			}
+			params = append(params, param)
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance()
+
+			if p.check(TOKEN_RPAREN) {
+				break
+			}
+			continue
+		}
+
+		// Check for **kwargs
+		if p.check(TOKEN_DOUBLESTAR) {
+			p.advance() // consume **
+			nameTok := p.expect(TOKEN_IDENTIFIER)
+			param := ast.Parameter{
+				Name:     "**" + nameTok.Lexeme, // Prefix with ** to mark as kwargs
+				IsKwargs: true,
+			}
+			params = append(params, param)
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance()
+
+			if p.check(TOKEN_RPAREN) {
+				break
+			}
+			continue
+		}
+
+		// Parse regular parameter name
 		nameTok := p.expect(TOKEN_IDENTIFIER)
 		param := ast.Parameter{Name: nameTok.Lexeme}
 

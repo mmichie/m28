@@ -129,7 +129,9 @@ func (b *BaseNode) TypeAnnotation() *TypeInfo {
 
 // Parameter represents a function parameter with optional type annotation and default value
 type Parameter struct {
-	Name    string    // Parameter name
-	Type    *TypeInfo // Type annotation (optional)
-	Default ASTNode   // Default value (optional)
+	Name      string    // Parameter name
+	Type      *TypeInfo // Type annotation (optional)
+	Default   ASTNode   // Default value (optional)
+	IsVarArgs bool      // True for *args parameters
+	IsKwargs  bool      // True for **kwargs parameters
 }
