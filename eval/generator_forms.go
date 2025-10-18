@@ -1,6 +1,8 @@
 package eval
 
 import (
+	"fmt"
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -19,6 +21,31 @@ func yieldForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Return a yield marker
 	return &core.YieldValue{Value: value}, nil
+}
+
+// yieldFromForm implements the yield from expression
+// For now, this is a simplified implementation that converts:
+//
+//	yield from iterable
+//
+// into:
+//
+//	for item in iterable: yield item
+func yieldFromForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("yield from requires an argument")
+	}
+
+	// Evaluate the iterable
+	iterable, err := Eval(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// For now, return a special marker that indicates yield-from
+	// The generator machinery will need to handle this specially
+	// As a simple implementation, we'll just iterate and yield each value
+	return &core.YieldFromValue{Iterable: iterable}, nil
 }
 
 // EvalGenerator evaluates a generator body and handles yields
@@ -65,8 +92,10 @@ func containsYield(expr core.Value) bool {
 	switch e := expr.(type) {
 	case core.ListValue:
 		if len(e) > 0 {
-			if sym, ok := e[0].(core.SymbolValue); ok && string(sym) == "yield" {
-				return true
+			if sym, ok := e[0].(core.SymbolValue); ok {
+				if string(sym) == "yield" || string(sym) == "yield-from" {
+					return true
+				}
 			}
 			// Recursively check all elements
 			for _, elem := range e {
@@ -77,7 +106,7 @@ func containsYield(expr core.Value) bool {
 		}
 	case core.SymbolValue:
 		// Check if it's a yield symbol (shouldn't happen but just in case)
-		if string(e) == "yield" {
+		if string(e) == "yield" || string(e) == "yield-from" {
 			return true
 		}
 	}
@@ -87,4 +116,5 @@ func containsYield(expr core.Value) bool {
 // RegisterGeneratorForms registers generator-related forms
 func RegisterGeneratorForms() {
 	RegisterSpecialForm("yield", yieldForm)
+	RegisterSpecialForm("yield-from", yieldFromForm)
 }

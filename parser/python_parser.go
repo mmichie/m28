@@ -358,9 +358,18 @@ func (p *PythonParser) parseReturnStatement() ast.ASTNode {
 	return ast.NewReturnForm(value, p.makeLocation(tok), ast.SyntaxPython)
 }
 
-// parseYieldStatement parses: yield [expression]
+// parseYieldStatement parses: yield [expression] or yield from expression
 func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_YIELD)
+
+	// Check for "yield from"
+	var yieldKeyword string
+	if p.check(TOKEN_FROM) {
+		p.advance() // consume FROM
+		yieldKeyword = "yield-from"
+	} else {
+		yieldKeyword = "yield"
+	}
 
 	var args []ast.ASTNode
 	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
@@ -372,9 +381,9 @@ func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 		p.advance()
 	}
 
-	// Emit (yield expr) form - we have full generator support
+	// Emit (yield expr) or (yield-from expr) form
 	return ast.NewSExpr(append([]ast.ASTNode{
-		ast.NewIdentifier("yield", p.makeLocation(tok), ast.SyntaxPython),
+		ast.NewIdentifier(yieldKeyword, p.makeLocation(tok), ast.SyntaxPython),
 	}, args...), p.makeLocation(tok), ast.SyntaxPython)
 }
 
@@ -1843,6 +1852,66 @@ func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode
 // Comprehension Parsing (stub - to be implemented)
 // ============================================================================
 
+// parseLoopVariables parses the loop variable(s) in a comprehension.
+// Handles:
+//   - Single variable: for x in ...
+//   - Parenthesized tuple: for (x, y) in ...
+//   - Unparenthesized tuple: for x, y in ...
+//
+// Returns the variable string in the format the evaluator expects.
+func (p *PythonParser) parseLoopVariables() string {
+	if p.check(TOKEN_LPAREN) {
+		// Parenthesized tuple: for (x, y, z) in ...
+		p.advance() // consume (
+
+		vars := []string{}
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		vars = append(vars, varTok.Lexeme)
+
+		for p.check(TOKEN_COMMA) {
+			p.advance()
+			varTok = p.expect(TOKEN_IDENTIFIER)
+			vars = append(vars, varTok.Lexeme)
+		}
+
+		p.expect(TOKEN_RPAREN)
+
+		// Format as "(x, y, z)"
+		variable := "(" + vars[0]
+		for i := 1; i < len(vars); i++ {
+			variable += ", " + vars[i]
+		}
+		variable += ")"
+		return variable
+	}
+
+	// Parse first identifier
+	varTok := p.expect(TOKEN_IDENTIFIER)
+	firstVar := varTok.Lexeme
+
+	// Check if this is an unparenthesized tuple: for x, y in ...
+	if p.check(TOKEN_COMMA) {
+		vars := []string{firstVar}
+
+		for p.check(TOKEN_COMMA) {
+			p.advance()
+			varTok = p.expect(TOKEN_IDENTIFIER)
+			vars = append(vars, varTok.Lexeme)
+		}
+
+		// Format as "(x, y, z)"
+		variable := "(" + vars[0]
+		for i := 1; i < len(vars); i++ {
+			variable += ", " + vars[i]
+		}
+		variable += ")"
+		return variable
+	}
+
+	// Single variable
+	return firstVar
+}
+
 func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
 	// [expr for var in iter if condition]
 	// [expr for var1 in iter1 for var2 in iter2 if condition]
@@ -1853,8 +1922,7 @@ func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) as
 	for p.check(TOKEN_FOR) {
 		p.advance() // consume FOR
 
-		varTok := p.expect(TOKEN_IDENTIFIER)
-		variable := varTok.Lexeme
+		variable := p.parseLoopVariables()
 
 		p.expect(TOKEN_IN)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
@@ -1898,8 +1966,7 @@ func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token)
 	for p.check(TOKEN_FOR) {
 		p.advance() // consume FOR
 
-		varTok := p.expect(TOKEN_IDENTIFIER)
-		variable := varTok.Lexeme
+		variable := p.parseLoopVariables()
 
 		p.expect(TOKEN_IN)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
@@ -1941,8 +2008,7 @@ func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast
 	for p.check(TOKEN_FOR) {
 		p.advance() // consume FOR
 
-		varTok := p.expect(TOKEN_IDENTIFIER)
-		variable := varTok.Lexeme
+		variable := p.parseLoopVariables()
 
 		p.expect(TOKEN_IN)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
@@ -1978,8 +2044,7 @@ func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) 
 	// (expr for var in iter if condition)
 	p.expect(TOKEN_FOR)
 
-	varTok := p.expect(TOKEN_IDENTIFIER)
-	variable := varTok.Lexeme
+	variable := p.parseLoopVariables()
 
 	p.expect(TOKEN_IN)
 	// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
@@ -2011,36 +2076,10 @@ func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) 
 func (p *PythonParser) parseGeneratorExpressionNoParen(element ast.ASTNode, tok Token) ast.ASTNode {
 	// expr for var in iter if condition (no closing paren)
 	// or: expr for (var1, var2) in iter
+	// or: expr for var1, var2 in iter
 	p.expect(TOKEN_FOR)
 
-	// Parse loop variable(s) - can be tuple unpacking
-	var variable string
-	if p.check(TOKEN_LPAREN) {
-		// Tuple unpacking: for (k, v) in items
-		p.advance() // consume (
-
-		vars := []string{}
-		varTok := p.expect(TOKEN_IDENTIFIER)
-		vars = append(vars, varTok.Lexeme)
-
-		for p.check(TOKEN_COMMA) {
-			p.advance()
-			varTok = p.expect(TOKEN_IDENTIFIER)
-			vars = append(vars, varTok.Lexeme)
-		}
-
-		p.expect(TOKEN_RPAREN)
-
-		// Join with comma for now (evaluator will need to handle unpacking)
-		variable = "(" + vars[0]
-		for i := 1; i < len(vars); i++ {
-			variable += ", " + vars[i]
-		}
-		variable += ")"
-	} else {
-		varTok := p.expect(TOKEN_IDENTIFIER)
-		variable = varTok.Lexeme
-	}
+	variable := p.parseLoopVariables()
 
 	p.expect(TOKEN_IN)
 	// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator

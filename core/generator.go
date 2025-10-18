@@ -315,6 +315,27 @@ func IsYield(v Value) (*YieldValue, bool) {
 	return y, ok
 }
 
+// YieldFromValue represents a yield from expression during generator execution
+type YieldFromValue struct {
+	Iterable Value
+}
+
+// Type implements Value.Type
+func (y *YieldFromValue) Type() Type {
+	return Type("yield-from")
+}
+
+// String implements Value.String
+func (y *YieldFromValue) String() string {
+	return fmt.Sprintf("<yield from %v>", y.Iterable)
+}
+
+// IsYieldFrom checks if a value is a yield-from marker
+func IsYieldFrom(v Value) (*YieldFromValue, bool) {
+	y, ok := v.(*YieldFromValue)
+	return y, ok
+}
+
 // StopIteration is the error raised when a generator is exhausted
 type StopIteration struct {
 	Message string

@@ -309,6 +309,12 @@ func (t *PythonTokenizer) scanToken() Token {
 		return t.scanBytesString(quote, start, startLine, startCol)
 	}
 
+	// Raw strings (r"..." or r'...')
+	if ch == 'r' && !t.isAtEnd() && (t.peek() == '"' || t.peek() == '\'') {
+		quote := t.advance()
+		return t.scanRawString(quote, start, startLine, startCol)
+	}
+
 	// Identifiers and keywords
 	if pythonIsAlpha(ch) {
 		return t.scanIdentifier(start, startLine, startCol)
@@ -861,6 +867,76 @@ func (t *PythonTokenizer) scanBytesString(quote byte, start, startLine, startCol
 		Type:     TOKEN_STRING,
 		Lexeme:   t.input[start:t.pos],
 		Value:    core.BytesValue(value),
+		Line:     startLine,
+		Col:      startCol,
+		StartPos: start,
+		EndPos:   t.pos,
+	}
+}
+
+// scanRawString scans a raw string literal (r"..." or r'...')
+// Raw strings don't process escape sequences except for the quote character
+func (t *PythonTokenizer) scanRawString(quote byte, start, startLine, startCol int) Token {
+	// Check for triple-quoted raw string
+	isTriple := false
+	if !t.isAtEnd() && t.peek() == quote {
+		if t.pos+1 < len(t.input) && t.input[t.pos+1] == quote {
+			isTriple = true
+			t.advance() // second quote
+			t.advance() // third quote
+		}
+	}
+
+	var value strings.Builder
+	for {
+		if t.isAtEnd() {
+			t.errors = append(t.errors, fmt.Errorf("unterminated raw string at line %d", startLine))
+			break
+		}
+
+		ch := t.peek()
+
+		// Check for end of string
+		if !isTriple && ch == quote {
+			t.advance()
+			break
+		}
+
+		if isTriple {
+			// Check for triple quote end
+			if ch == quote && t.pos+2 < len(t.input) &&
+				t.input[t.pos+1] == quote && t.input[t.pos+2] == quote {
+				t.advance()
+				t.advance()
+				t.advance()
+				break
+			}
+		}
+
+		// In raw strings, backslashes are literal (no escape processing)
+		// except for escaping the quote character itself
+		if ch == '\\' && !t.isAtEnd() && t.pos+1 < len(t.input) {
+			nextCh := t.input[t.pos+1]
+			if nextCh == quote {
+				// Escaped quote - include the quote, skip the backslash
+				t.advance() // skip backslash
+				value.WriteByte(quote)
+				t.advance() // consume quote
+			} else {
+				// Not an escaped quote - include backslash literally
+				value.WriteByte(ch)
+				t.advance()
+			}
+		} else {
+			value.WriteByte(ch)
+			t.advance()
+		}
+	}
+
+	return Token{
+		Type:     TOKEN_STRING,
+		Lexeme:   t.input[start:t.pos],
+		Value:    core.StringValue(value.String()),
 		Line:     startLine,
 		Col:      startCol,
 		StartPos: start,
