@@ -37,6 +37,19 @@ func (ts *TypeSwitch) Number(fn func(float64) (core.Value, error)) *TypeSwitch {
 	return ts
 }
 
+// Complex handles the case where value is a complex number
+func (ts *TypeSwitch) Complex(fn func(complex128) (core.Value, error)) *TypeSwitch {
+	if ts.handled {
+		return ts
+	}
+
+	if c, ok := AsComplex(ts.value); ok {
+		ts.result, ts.err = fn(c)
+		ts.handled = true
+	}
+	return ts
+}
+
 // String handles the case where value is a string
 func (ts *TypeSwitch) String(fn func(string) (core.Value, error)) *TypeSwitch {
 	if ts.handled {

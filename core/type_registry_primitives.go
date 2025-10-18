@@ -26,13 +26,19 @@ func registerNumberType() {
 						return nil, fmt.Errorf("__add__ takes exactly one argument")
 					}
 					a := float64(receiver.(NumberValue))
-					b, ok := args[0].(NumberValue)
-					if !ok {
-						// For cross-type operations, we should let the operator handle it
-						// But we can't return NotImplemented, so we return a specific error
-						return nil, fmt.Errorf("unsupported operand type(s) for +: 'number' and '%s'", args[0].Type())
+
+					// Handle NumberValue + NumberValue
+					if b, ok := args[0].(NumberValue); ok {
+						return NumberValue(a + float64(b)), nil
 					}
-					return NumberValue(a + float64(b)), nil
+
+					// Handle NumberValue + ComplexValue
+					if c, ok := args[0].(ComplexValue); ok {
+						return ComplexValue(complex(a, 0) + complex128(c)), nil
+					}
+
+					// For other cross-type operations, return error
+					return nil, fmt.Errorf("unsupported operand type(s) for +: 'number' and '%s'", args[0].Type())
 				},
 			},
 			"abs": {

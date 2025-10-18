@@ -34,6 +34,44 @@ func (n NumberValue) GetAttr(name string) (Value, bool) {
 	return nil, false
 }
 
+// ComplexValue represents a complex number value
+type ComplexValue complex128
+
+// Type implements Value.Type
+func (c ComplexValue) Type() Type {
+	return ComplexType
+}
+
+// String implements Value.String
+func (c ComplexValue) String() string {
+	real := real(complex128(c))
+	imag := imag(complex128(c))
+
+	// Format like Python: (1+2j), (1-2j), 2j, (1+0j)
+	if real == 0 {
+		// Pure imaginary: 2j
+		return fmt.Sprintf("%gj", imag)
+	}
+
+	// Complex with real part
+	if imag >= 0 {
+		return fmt.Sprintf("(%g+%gj)", real, imag)
+	}
+	return fmt.Sprintf("(%g%gj)", real, imag)
+}
+
+// GetAttr implements basic complex methods using TypeDescriptor
+func (c ComplexValue) GetAttr(name string) (Value, bool) {
+	desc := GetTypeDescriptor(ComplexType)
+	if desc != nil {
+		val, err := desc.GetAttribute(c, name)
+		if err == nil {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
 // StringValue represents a string value
 type StringValue string
 

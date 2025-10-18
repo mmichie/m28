@@ -106,10 +106,31 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 				Number(func(rightNum float64) (core.Value, error) {
 					return core.NumberValue(leftNum + rightNum), nil
 				}).
+				Complex(func(rightComplex complex128) (core.Value, error) {
+					// Number + Complex = Complex
+					return core.ComplexValue(complex(leftNum, 0) + rightComplex), nil
+				}).
 				Default(func(r core.Value) (core.Value, error) {
 					return nil, errors.NewTypeError("+",
 						"unsupported operand type(s)",
 						"'float' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
+		Complex(func(leftComplex complex128) (core.Value, error) {
+			return types.Switch(right).
+				Number(func(rightNum float64) (core.Value, error) {
+					// Complex + Number = Complex
+					return core.ComplexValue(leftComplex + complex(rightNum, 0)), nil
+				}).
+				Complex(func(rightComplex complex128) (core.Value, error) {
+					// Complex + Complex = Complex
+					return core.ComplexValue(leftComplex + rightComplex), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("+",
+						"unsupported operand type(s)",
+						"'complex' and '"+string(r.Type())+"'")
 				}).
 				Execute()
 		}).

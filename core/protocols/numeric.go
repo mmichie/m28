@@ -28,6 +28,9 @@ func (n *NumericOps) Add(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
 		return core.NumberValue(n.value + float64(v)), nil
+	case core.ComplexValue:
+		// Number + Complex = Complex
+		return core.ComplexValue(complex(n.value, 0) + complex128(v)), nil
 	default:
 		// Try __radd__ on other
 		if result, found, err := types.CallRadd(other, core.NumberValue(n.value), nil); found {
@@ -229,6 +232,8 @@ func GetNumericOps(v core.Value) (Numeric, bool) {
 	switch val := v.(type) {
 	case core.NumberValue:
 		return NewNumericOps(val), true
+	case core.ComplexValue:
+		return NewComplexNumericOps(val), true
 	default:
 		// Check if value has numeric dunder methods
 		if obj, ok := v.(core.Object); ok {
@@ -240,4 +245,121 @@ func GetNumericOps(v core.Value) (Numeric, bool) {
 		}
 		return nil, false
 	}
+}
+
+// ComplexNumericOps provides Numeric protocol implementation for ComplexValue
+type ComplexNumericOps struct {
+	value complex128
+}
+
+// NewComplexNumericOps creates a ComplexNumericOps wrapper for a complex number
+func NewComplexNumericOps(c core.ComplexValue) *ComplexNumericOps {
+	return &ComplexNumericOps{value: complex128(c)}
+}
+
+// Add implements Numeric.Add for complex numbers
+func (c *ComplexNumericOps) Add(other core.Value) (core.Value, error) {
+	switch v := other.(type) {
+	case core.NumberValue:
+		// Complex + Number = Complex
+		return core.ComplexValue(c.value + complex(float64(v), 0)), nil
+	case core.ComplexValue:
+		// Complex + Complex = Complex
+		return core.ComplexValue(c.value + complex128(v)), nil
+	default:
+		return nil, errors.NewTypeError("+", "unsupported operand type(s)",
+			fmt.Sprintf("'complex' and '%s'", other.Type()))
+	}
+}
+
+// Subtract implements Numeric.Subtract for complex numbers
+func (c *ComplexNumericOps) Subtract(other core.Value) (core.Value, error) {
+	switch v := other.(type) {
+	case core.NumberValue:
+		return core.ComplexValue(c.value - complex(float64(v), 0)), nil
+	case core.ComplexValue:
+		return core.ComplexValue(c.value - complex128(v)), nil
+	default:
+		return nil, errors.NewTypeError("-", "unsupported operand type(s)",
+			fmt.Sprintf("'complex' and '%s'", other.Type()))
+	}
+}
+
+// Multiply implements Numeric.Multiply for complex numbers
+func (c *ComplexNumericOps) Multiply(other core.Value) (core.Value, error) {
+	switch v := other.(type) {
+	case core.NumberValue:
+		return core.ComplexValue(c.value * complex(float64(v), 0)), nil
+	case core.ComplexValue:
+		return core.ComplexValue(c.value * complex128(v)), nil
+	default:
+		return nil, errors.NewTypeError("*", "unsupported operand type(s)",
+			fmt.Sprintf("'complex' and '%s'", other.Type()))
+	}
+}
+
+// Divide implements Numeric.Divide for complex numbers
+func (c *ComplexNumericOps) Divide(other core.Value) (core.Value, error) {
+	switch v := other.(type) {
+	case core.NumberValue:
+		if float64(v) == 0 {
+			return nil, errors.NewRuntimeError("division by zero", "")
+		}
+		return core.ComplexValue(c.value / complex(float64(v), 0)), nil
+	case core.ComplexValue:
+		if complex128(v) == 0 {
+			return nil, errors.NewRuntimeError("division by zero", "")
+		}
+		return core.ComplexValue(c.value / complex128(v)), nil
+	default:
+		return nil, errors.NewTypeError("/", "unsupported operand type(s)",
+			fmt.Sprintf("'complex' and '%s'", other.Type()))
+	}
+}
+
+// Modulo implements Numeric.Modulo for complex numbers (not supported)
+func (c *ComplexNumericOps) Modulo(other core.Value) (core.Value, error) {
+	return nil, errors.NewTypeError("%", "can't mod complex numbers", "")
+}
+
+// Power implements Numeric.Power for complex numbers
+func (c *ComplexNumericOps) Power(other core.Value) (core.Value, error) {
+	// For complex exponentiation, we use the formula: a^b = e^(b*ln(a))
+	// Go doesn't have built-in complex power, so we'll use math/cmplx if available
+	// For now, let's support only real number exponents
+	switch v := other.(type) {
+	case core.NumberValue:
+		// Use the formula: z^n where n is real
+		// This is a simplified version; full complex power needs cmplx package
+		if float64(v) == float64(int(v)) {
+			// Integer power - can do iteratively
+			n := int(v)
+			if n == 0 {
+				return core.ComplexValue(complex(1, 0)), nil
+			}
+			result := c.value
+			for i := 1; i < n; i++ {
+				result *= c.value
+			}
+			return core.ComplexValue(result), nil
+		}
+		return nil, errors.NewTypeError("**", "complex power with non-integer exponent not yet supported", "")
+	default:
+		return nil, errors.NewTypeError("**", "unsupported operand type(s)",
+			fmt.Sprintf("'complex' and '%s'", other.Type()))
+	}
+}
+
+// Negate implements Numeric.Negate for complex numbers
+func (c *ComplexNumericOps) Negate() (core.Value, error) {
+	return core.ComplexValue(-c.value), nil
+}
+
+// Absolute implements Numeric.Absolute for complex numbers
+func (c *ComplexNumericOps) Absolute() (core.Value, error) {
+	// Absolute value of complex number is its magnitude
+	real := real(c.value)
+	imag := imag(c.value)
+	magnitude := math.Sqrt(real*real + imag*imag)
+	return core.NumberValue(magnitude), nil
 }

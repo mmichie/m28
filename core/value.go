@@ -31,6 +31,7 @@ const (
 	BytesType     Type = "bytes"
 	ByteArrayType Type = "bytearray"
 	DecimalType   Type = "decimal"
+	ComplexType   Type = "complex"
 )
 
 // Value is the base interface for all values in the language

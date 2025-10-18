@@ -631,13 +631,36 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 		}
 	}
 
+	// Check for complex number suffix 'j' or 'J'
+	isComplex := false
+	if !t.isAtEnd() && (t.peek() == 'j' || t.peek() == 'J') {
+		t.advance() // consume 'j' or 'J'
+		isComplex = true
+	}
+
 	lexeme := t.input[start:t.pos]
 	// Remove underscores before parsing
 	cleanLexeme := strings.ReplaceAll(lexeme, "_", "")
+	if isComplex && (strings.HasSuffix(cleanLexeme, "j") || strings.HasSuffix(cleanLexeme, "J")) {
+		cleanLexeme = cleanLexeme[:len(cleanLexeme)-1] // remove j/J suffix
+	}
 
 	// Parse the number
 	var value core.Value
-	if strings.Contains(cleanLexeme, ".") || strings.ContainsAny(cleanLexeme, "eE") {
+	if isComplex {
+		// Complex number - imaginary part only (e.g., 2j, 3.5j)
+		var imagPart float64
+		if strings.Contains(cleanLexeme, ".") || strings.ContainsAny(cleanLexeme, "eE") {
+			if f, err := strconv.ParseFloat(cleanLexeme, 64); err == nil {
+				imagPart = f
+			}
+		} else {
+			if i, err := strconv.ParseInt(cleanLexeme, 10, 64); err == nil {
+				imagPart = float64(i)
+			}
+		}
+		value = core.ComplexValue(complex(0, imagPart))
+	} else if strings.Contains(cleanLexeme, ".") || strings.ContainsAny(cleanLexeme, "eE") {
 		// Float
 		if f, err := strconv.ParseFloat(cleanLexeme, 64); err == nil {
 			value = core.NumberValue(f)

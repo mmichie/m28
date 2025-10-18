@@ -224,6 +224,63 @@ func RegisterNumeric(ctx *core.Context) {
 
 	// max - maximum value (with kwargs support)
 	ctx.Define("max", NewKwargsBuiltinFunction("max", maxWithKwargs))
+
+	// complex - create a complex number
+	ctx.Define("complex", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("complex", args)
+		if err := v.Range(1, 2); err != nil {
+			return nil, err
+		}
+
+		// Get real part
+		realPart := v.Get(0)
+		var real float64
+
+		switch r := realPart.(type) {
+		case core.NumberValue:
+			real = float64(r)
+		case core.BoolValue:
+			if bool(r) {
+				real = 1.0
+			} else {
+				real = 0.0
+			}
+		case core.StringValue:
+			return nil, fmt.Errorf("complex() first argument cannot be a string")
+		case core.ComplexValue:
+			// If first arg is complex and no second arg, return it as-is
+			if v.Count() == 1 {
+				return r, nil
+			}
+			return nil, fmt.Errorf("complex() can't take second arg if first is complex")
+		default:
+			return nil, fmt.Errorf("complex() argument must be a number, not '%s'", realPart.Type())
+		}
+
+		// Get imaginary part (default to 0)
+		var imag float64
+		if v.Count() == 2 {
+			imagPart := v.Get(1)
+			switch i := imagPart.(type) {
+			case core.NumberValue:
+				imag = float64(i)
+			case core.BoolValue:
+				if bool(i) {
+					imag = 1.0
+				} else {
+					imag = 0.0
+				}
+			case core.StringValue:
+				return nil, fmt.Errorf("complex() second argument cannot be a string")
+			case core.ComplexValue:
+				return nil, fmt.Errorf("complex() second argument can't be complex")
+			default:
+				return nil, fmt.Errorf("complex() argument must be a number, not '%s'", imagPart.Type())
+			}
+		}
+
+		return core.ComplexValue(complex(real, imag)), nil
+	}))
 }
 
 // extremeWithKwargs is a helper for min/max with keyword argument support

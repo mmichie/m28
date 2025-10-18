@@ -15,6 +15,14 @@ func AsNumber(v core.Value) (float64, bool) {
 	return 0, false
 }
 
+// AsComplex extracts a complex128 from a ComplexValue
+func AsComplex(v core.Value) (complex128, bool) {
+	if c, ok := v.(core.ComplexValue); ok {
+		return complex128(c), true
+	}
+	return 0, false
+}
+
 // AsString extracts a string from a StringValue
 func AsString(v core.Value) (string, bool) {
 	if str, ok := v.(core.StringValue); ok {
