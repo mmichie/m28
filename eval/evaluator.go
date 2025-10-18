@@ -978,6 +978,42 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
+		// Check if it's an exception class
+		if class, ok := val.(*core.Class); ok {
+			// Instantiate the exception class
+			instance, err := class.Call([]core.Value{}, ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Add __traceback__ attribute to the instance
+			if inst, ok := instance.(*core.Instance); ok {
+				inst.SetAttr("__traceback__", core.NewTraceback())
+			}
+
+			// Return exception with class name as type
+			return nil, &Exception{
+				Type:    class.Name,
+				Message: "",
+				Value:   instance, // Store the instance
+			}
+		}
+
+		// Check if it's an exception instance
+		if inst, ok := val.(*core.Instance); ok {
+			// Get message if instance has a message attribute
+			var message string
+			if msgVal, found := inst.GetAttr("message"); found {
+				message = core.PrintValueWithoutQuotes(msgVal)
+			}
+
+			return nil, &Exception{
+				Type:    inst.Class.Name,
+				Message: message,
+				Value:   inst,
+			}
+		}
+
 		// Single string argument - generic exception with message
 		if msg, ok := val.(core.StringValue); ok {
 			return nil, &Exception{

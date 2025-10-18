@@ -56,3 +56,46 @@ func PrintErrorValue(err error) string {
 	}
 	return err.Error()
 }
+
+// TracebackType represents a Python traceback object
+type TracebackType struct {
+	BaseObject
+	Frame Value // tb_frame
+}
+
+// NewTraceback creates a new traceback object
+func NewTraceback() *TracebackType {
+	tb := &TracebackType{
+		BaseObject: *NewBaseObject(Type("traceback")),
+		Frame:      NewFrame(),
+	}
+	return tb
+}
+
+func (t *TracebackType) String() string {
+	return "<traceback object>"
+}
+
+// GetAttr implements Object.GetAttr for traceback
+func (t *TracebackType) GetAttr(name string) (Value, bool) {
+	if name == "tb_frame" {
+		return t.Frame, true
+	}
+	return t.BaseObject.GetAttr(name)
+}
+
+// FrameType represents a Python frame object
+type FrameType struct {
+	BaseObject
+}
+
+// NewFrame creates a new frame object
+func NewFrame() *FrameType {
+	return &FrameType{
+		BaseObject: *NewBaseObject(Type("frame")),
+	}
+}
+
+func (f *FrameType) String() string {
+	return "<frame object>"
+}
