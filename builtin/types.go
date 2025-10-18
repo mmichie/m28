@@ -131,6 +131,11 @@ func RegisterTypes(ctx *core.Context) {
 	// AFTER: ~8 lines with validation
 	ctx.Define("issubclass", core.NewBuiltinFunction(IsSubclassBuilder()))
 
+	// object - Base class for all Python objects
+	// Create the object class (no parent)
+	objectClass := core.NewClass("object", nil)
+	ctx.Define("object", objectClass)
+
 	// format - Python-style format(value, format_spec='')
 	// Calls __format__ dunder method for custom formatting
 	ctx.Define("format", core.NewBuiltinFunction(FormatBuilder()))

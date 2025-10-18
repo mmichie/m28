@@ -220,6 +220,35 @@ func InitFunctoolsModule() *core.DictValue {
 		return keyFunc, nil
 	}))
 
+	// wraps - Decorator that updates wrapper function to look like wrapped
+	// Simplified version that returns a decorator function
+	functoolsModule.Set("wraps", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("wraps", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		// In a full implementation, we would use this to copy metadata
+		_ = v.Get(0) // wrapped function
+
+		// Return a decorator function
+		decorator := core.NewBuiltinFunction(func(decoratorArgs []core.Value, decoratorCtx *core.Context) (core.Value, error) {
+			if len(decoratorArgs) != 1 {
+				return nil, errors.NewRuntimeError("wraps", "decorator takes exactly one argument")
+			}
+
+			wrapper := decoratorArgs[0]
+
+			// In a full implementation, we would copy __name__, __doc__, etc. from wrapped to wrapper
+			// For now, just return the wrapper as-is
+			// TODO: Copy metadata attributes if wrapper is a dict or has __dict__
+
+			return wrapper, nil
+		})
+
+		return decorator, nil
+	}))
+
 	return functoolsModule
 }
 

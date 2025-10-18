@@ -464,4 +464,5 @@ func RegisterIndexing() {
 	RegisterSpecialForm("set-item", SetItemForm)
 	RegisterSpecialForm("del-item", DelItemForm)
 	RegisterSpecialForm("__slice__", SliceForm) // Internal name to avoid conflict with slice() builtin
+	// Note: slice() builtin function is registered in builtin/collections.go
 }

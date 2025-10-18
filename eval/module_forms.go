@@ -213,28 +213,67 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 		return nil, fmt.Errorf("no module loader registered")
 	}
 
-	dictModule, err := loader.LoadModule(moduleName, ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	// Handle different import forms
 	if len(importNames) > 0 {
 		// Import specific names (with optional aliases)
+		// Try two strategies:
+		// 1. Load as submodule (for "from . import result" -> load "unittest.result")
+		// 2. Load parent and extract attribute (for "from unittest.result import TestResult")
 		for _, spec := range importNames {
-			// Get the value from the module using the original name
-			if val, ok := dictModule.Get(spec.name); ok {
-				// Define in context using the alias if provided, otherwise use the original name
+			// Build the full submodule name
+			var submoduleName string
+			if moduleName != "" {
+				submoduleName = moduleName + "." + spec.name
+			} else {
+				submoduleName = spec.name
+			}
+
+			// Try to load as a submodule first
+			submodule, err := loader.LoadModule(submoduleName, ctx)
+			if err == nil {
+				// Successfully loaded as submodule
 				targetName := spec.name
 				if spec.alias != "" {
 					targetName = spec.alias
 				}
-				ctx.Define(targetName, val)
-			} else {
-				return nil, fmt.Errorf("module '%s' has no export '%s'", moduleName, spec.name)
+				ctx.Define(targetName, submodule)
+				continue
 			}
+
+			// Not a submodule, try loading parent module and extracting the name
+			if moduleName == "" {
+				return nil, fmt.Errorf("cannot import name '%s': %w", spec.name, err)
+			}
+
+			parentModule, parentErr := loader.LoadModule(moduleName, ctx)
+			if parentErr != nil {
+				return nil, fmt.Errorf("cannot import name '%s' from '%s': %w", spec.name, moduleName, parentErr)
+			}
+
+			// Extract the name from the parent module
+			val, ok := parentModule.Get(spec.name)
+			if !ok {
+				// Also try with "s:" prefix (symbol key)
+				val, ok = parentModule.Get("s:" + spec.name)
+			}
+			if !ok {
+				return nil, fmt.Errorf("cannot import name '%s' from module '%s'", spec.name, moduleName)
+			}
+
+			// Define in context
+			targetName := spec.name
+			if spec.alias != "" {
+				targetName = spec.alias
+			}
+			ctx.Define(targetName, val)
 		}
+		return core.NilValue{}, nil
 	} else if importAll {
+		// For import *, we need to load the module and import all its exports
+		dictModule, err := loader.LoadModule(moduleName, ctx)
+		if err != nil {
+			return nil, err
+		}
 		// Import all exported names
 		for _, key := range dictModule.Keys() {
 			if val, ok := dictModule.Get(key); ok {
@@ -249,12 +288,16 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 				}
 			}
 		}
+		return dictModule, nil
 	} else {
 		// Import module as namespace
+		dictModule, err := loader.LoadModule(moduleName, ctx)
+		if err != nil {
+			return nil, err
+		}
 		ctx.Define(alias, dictModule)
+		return dictModule, nil
 	}
-
-	return dictModule, nil
 }
 
 // exportForm implements the export special form:

@@ -1316,16 +1316,79 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 	return ast.NewSExpr(args, p.makeLocation(tok), ast.SyntaxPython)
 }
 
-// parseSubscript parses: [index]
+// parseSubscript parses: [index] or [start:stop:step]
 func (p *PythonParser) parseSubscript(obj ast.ASTNode) ast.ASTNode {
 	tok := p.expect(TOKEN_LBRACKET)
-	index := p.parseExpression()
+
+	// Check for slice syntax by looking ahead for colon
+	// We need to handle: [:]  [:stop]  [start:]  [start:stop]  [start:stop:step]
+	var start, stop, step ast.ASTNode
+
+	// Parse start (optional)
+	if !p.check(TOKEN_COLON) && !p.check(TOKEN_RBRACKET) {
+		start = p.parseExpression()
+	}
+
+	// Check if this is a slice
+	if p.check(TOKEN_COLON) {
+		// It's a slice
+		p.advance() // consume first colon
+
+		// Parse stop (optional)
+		if !p.check(TOKEN_COLON) && !p.check(TOKEN_RBRACKET) {
+			stop = p.parseExpression()
+		}
+
+		// Parse step (optional)
+		if p.check(TOKEN_COLON) {
+			p.advance() // consume second colon
+			if !p.check(TOKEN_RBRACKET) {
+				step = p.parseExpression()
+			}
+		}
+
+		p.expect(TOKEN_RBRACKET)
+
+		// Create slice object: (slice start stop step)
+		// Use None (as nil literal) for missing components
+		if start == nil {
+			start = ast.NewLiteral(core.NilValue{}, p.makeLocation(tok), ast.SyntaxPython)
+		}
+		if stop == nil {
+			stop = ast.NewLiteral(core.NilValue{}, p.makeLocation(tok), ast.SyntaxPython)
+		}
+		if step == nil {
+			step = ast.NewLiteral(core.NilValue{}, p.makeLocation(tok), ast.SyntaxPython)
+		}
+
+		// Create (get-item obj (slice start stop step))
+		sliceObj := ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("slice", p.makeLocation(tok), ast.SyntaxPython),
+			start,
+			stop,
+			step,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("get-item", p.makeLocation(tok), ast.SyntaxPython),
+			obj,
+			sliceObj,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Not a slice, just regular indexing
 	p.expect(TOKEN_RBRACKET)
+
+	if start == nil {
+		// Empty brackets []
+		p.error("invalid syntax: empty brackets")
+		return nil
+	}
 
 	return ast.NewSExpr([]ast.ASTNode{
 		ast.NewIdentifier("get-item", p.makeLocation(tok), ast.SyntaxPython),
 		obj,
-		index,
+		start,
 	}, p.makeLocation(tok), ast.SyntaxPython)
 }
 
