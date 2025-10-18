@@ -1,0 +1,69 @@
+{
+  "python_version": "3.12",
+  "last_updated": "2025-10-17",
+  "summary": {
+    "total_tests": 0,
+    "passing": 0,
+    "failing": 0,
+    "not_implemented": 0,
+    "success_rate": 0
+  },
+  "tiers": {
+    "tier1_core": {
+      "description": "Core language features",
+      "priority": 1,
+      "tests": {
+        "test_grammar": {"status": "not_run", "source": "cpython/Lib/test/test_grammar.py"},
+        "test_types": {"status": "not_run", "source": "cpython/Lib/test/test_types.py"},
+        "test_builtin": {"status": "not_run", "source": "cpython/Lib/test/test_builtin.py"},
+        "test_operations": {"status": "not_run", "source": "cpython/Lib/test/test_operations.py"}
+      }
+    },
+    "tier2_data_structures": {
+      "description": "Data structures and collections",
+      "priority": 2,
+      "tests": {
+        "test_list": {"status": "not_run", "source": "cpython/Lib/test/test_list.py"},
+        "test_dict": {"status": "not_run", "source": "cpython/Lib/test/test_dict.py"},
+        "test_set": {"status": "not_run", "source": "cpython/Lib/test/test_set.py"},
+        "test_tuple": {"status": "not_run", "source": "cpython/Lib/test/test_tuple.py"},
+        "test_string": {"status": "not_run", "source": "cpython/Lib/test/test_string.py"}
+      }
+    },
+    "tier3_control_flow": {
+      "description": "Control flow structures",
+      "priority": 3,
+      "tests": {
+        "test_if": {"status": "not_run", "source": "cpython/Lib/test/test_if.py"},
+        "test_while": {"status": "not_run", "source": "cpython/Lib/test/test_while.py"},
+        "test_for": {"status": "not_run", "source": "cpython/Lib/test/test_for.py"},
+        "test_exceptions": {"status": "not_run", "source": "cpython/Lib/test/test_exceptions.py"}
+      }
+    },
+    "tier4_functions_oop": {
+      "description": "Functions and object-oriented programming",
+      "priority": 4,
+      "tests": {
+        "test_functools": {"status": "not_run", "source": "cpython/Lib/test/test_functools.py"},
+        "test_decorators": {"status": "not_run", "source": "cpython/Lib/test/test_decorators.py"},
+        "test_class": {"status": "not_run", "source": "cpython/Lib/test/test_class.py"},
+        "test_descr": {"status": "not_run", "source": "cpython/Lib/test/test_descr.py"}
+      }
+    },
+    "tier5_advanced": {
+      "description": "Advanced language features",
+      "priority": 5,
+      "tests": {
+        "test_generators": {"status": "not_run", "source": "cpython/Lib/test/test_generators.py"},
+        "test_itertools": {"status": "not_run", "source": "cpython/Lib/test/test_itertools.py"},
+        "test_comprehensions": {"status": "not_run", "source": "cpython/Lib/test/test_comprehensions.py"},
+        "test_contextlib": {"status": "not_run", "source": "cpython/Lib/test/test_contextlib.py"}
+      }
+    }
+  },
+  "notes": [
+    "Tests adapted from CPython 3.12 test suite",
+    "Focus on pure-Python language features, not implementation details",
+    "Tests simplified to remove CPython-specific assumptions"
+  ]
+}

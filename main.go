@@ -25,6 +25,8 @@ var (
 	modulePath  = flag.String("path", "", "Additional module search paths (colon-separated)")
 	interactive = flag.Bool("i", false, "Enter interactive mode after running file")
 	command     = flag.String("c", "", "Execute program passed as string")
+	parseOnly   = flag.Bool("parse", false, "Parse only, print AST and exit")
+	printAST    = flag.Bool("ast", false, "Print AST (same as -parse)")
 )
 
 const version = "0.1.0-fresh-start"
@@ -99,6 +101,16 @@ func main() {
 		}
 		globalCtx.Define("ARGV", argv)
 
+		// Parse-only mode: just parse and print AST
+		if *parseOnly || *printAST {
+			err := parseAndPrintAST(args[0])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
 		// Execute the file
 		err := executeFile(args[0], globalCtx, errorReporter)
 		if err != nil {
@@ -124,6 +136,8 @@ func printHelp() {
 	fmt.Println("  -e EXPR      Evaluate expression")
 	fmt.Println("  -c PROGRAM   Execute program string")
 	fmt.Println("  -i           Interactive mode after file execution")
+	fmt.Println("  -parse       Parse file and print AST (don't execute)")
+	fmt.Println("  -ast         Print AST (same as -parse)")
 	fmt.Println("  -path PATHS  Additional module search paths (colon-separated)")
 	fmt.Println("  -debug       Enable debug mode")
 	fmt.Println("  -version     Show version")
@@ -142,6 +156,7 @@ func printHelp() {
 	fmt.Println("  m28 script.py          Run Python script")
 	fmt.Println("  m28 -e '(+ 1 2)'       Evaluate expression")
 	fmt.Println("  m28 -i script.m28      Run script then enter REPL")
+	fmt.Println("  m28 -parse script.py   Parse and show AST")
 }
 
 // setupModulePaths sets up the module search paths
@@ -264,6 +279,59 @@ func executePythonFile(filename, content string, ctx *core.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// parseAndPrintAST parses a file and prints its AST representation
+func parseAndPrintAST(filename string) error {
+	// Read the file content
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("error reading file: %v", err)
+	}
+
+	// Detect file type
+	ext := filepath.Ext(filename)
+	isPython := ext == ".py"
+
+	if isPython {
+		// Parse Python file
+		tokenizer := parser.NewPythonTokenizer(string(content))
+		tokens, err := tokenizer.Tokenize()
+		if err != nil {
+			return fmt.Errorf("tokenization error: %v", err)
+		}
+
+		pythonParser := parser.NewPythonParser(tokens)
+		nodes, err := pythonParser.Parse()
+		if err != nil {
+			return fmt.Errorf("parse error: %v", err)
+		}
+
+		// Print AST nodes
+		fmt.Printf("=== Python AST for %s ===\n", filename)
+		for i, node := range nodes {
+			fmt.Printf("Statement %d:\n", i+1)
+			fmt.Printf("  Type: %T\n", node)
+			fmt.Printf("  AST: %s\n", node.String())
+			ir := node.ToIR()
+			fmt.Printf("  IR: %s\n", core.PrintValue(ir))
+			fmt.Println()
+		}
+	} else {
+		// Parse M28 file
+		p := parser.NewParser()
+		p.SetFilename(filename)
+		expr, err := p.Parse(string(content))
+		if err != nil {
+			return fmt.Errorf("parse error: %v", err)
+		}
+
+		// Print AST
+		fmt.Printf("=== M28 AST for %s ===\n", filename)
+		fmt.Println(core.PrintValue(expr))
 	}
 
 	return nil

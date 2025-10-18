@@ -21,12 +21,15 @@ if [[ "$1" == "--quick" ]]; then
     MODE="quick"
 elif [[ "$1" == "--full" ]]; then
     MODE="full"
+elif [[ "$1" == "--cpython" ]]; then
+    MODE="cpython"
 elif [[ "$1" == "--help" ]]; then
     echo "M28 Test Suite"
     echo "Usage: ./test.sh [options]"
-    echo "  --quick    Run only essential tests"
-    echo "  --full     Run all tests including stress tests"
-    echo "  --help     Show this help"
+    echo "  --quick      Run only essential tests"
+    echo "  --full       Run all tests including stress tests"
+    echo "  --cpython    Run CPython conformance tests"
+    echo "  --help       Show this help"
     exit 0
 fi
 
@@ -34,6 +37,13 @@ echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}        M28 Test Suite Runner         ${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
+
+# CPython mode - run CPython conformance tests
+if [[ "$MODE" == "cpython" ]]; then
+    echo -e "${BLUE}Running CPython Conformance Tests${NC}"
+    echo ""
+    exec ./tests/cpython/run_cpython_tests.sh
+fi
 
 # Build first
 echo -e "${YELLOW}Building M28...${NC}"

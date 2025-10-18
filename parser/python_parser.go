@@ -221,6 +221,8 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 		return p.parseRaiseStatement()
 	case TOKEN_ASSERT:
 		return p.parseAssertStatement()
+	case TOKEN_DEL:
+		return p.parseDelStatement()
 	default:
 		// Expression statement (could be assignment)
 		return p.parseExpressionStatement()
@@ -328,6 +330,29 @@ func (p *PythonParser) parseAssertStatement() ast.ASTNode {
 	}
 
 	return ast.NewAssertForm(condition, message, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseDelStatement parses: del target [, target2, ...]
+func (p *PythonParser) parseDelStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_DEL)
+
+	// Parse deletion targets (can be comma-separated)
+	targets := []ast.ASTNode{p.parseExpression()}
+
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		targets = append(targets, p.parseExpression())
+	}
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	// Create (del target1 target2 ...) form
+	delSym := ast.NewIdentifier("del", p.makeLocation(tok), ast.SyntaxPython)
+	allArgs := append([]ast.ASTNode{delSym}, targets...)
+	return ast.NewSExpr(allArgs, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseImportStatement parses: import module [as alias] [, module2 [as alias2], ...]
@@ -1034,10 +1059,31 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 	tok := p.expect(TOKEN_LPAREN)
 
 	args := []ast.ASTNode{callee}
+	var kwargs []ast.ASTNode // keyword arguments as (keyword value) pairs
 
 	if !p.check(TOKEN_RPAREN) {
+		seenKeyword := false
 		for {
-			args = append(args, p.parseExpression())
+			// Check for keyword argument: IDENTIFIER = expression
+			if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_ASSIGN {
+				seenKeyword = true
+				nameTok := p.advance()
+				p.expect(TOKEN_ASSIGN)
+				value := p.parseExpression()
+
+				// Store as a keyword-value pair
+				kwPair := ast.NewSExpr([]ast.ASTNode{
+					ast.NewLiteral(core.StringValue(nameTok.Lexeme), p.makeLocation(nameTok), ast.SyntaxPython),
+					value,
+				}, p.makeLocation(nameTok), ast.SyntaxPython)
+				kwargs = append(kwargs, kwPair)
+			} else {
+				if seenKeyword {
+					p.error("Positional argument after keyword argument")
+					return nil
+				}
+				args = append(args, p.parseExpression())
+			}
 
 			if !p.check(TOKEN_COMMA) {
 				break
@@ -1047,6 +1093,20 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 	}
 
 	p.expect(TOKEN_RPAREN)
+
+	// If we have keyword arguments, append them as a special **kwargs node
+	if len(kwargs) > 0 {
+		// Create a dict-literal for the keyword arguments
+		dictSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+		dictArgs := append([]ast.ASTNode{dictSym}, kwargs...)
+		kwDict := ast.NewSExpr(dictArgs, p.makeLocation(tok), ast.SyntaxPython)
+
+		// Append **kwargs marker and the dict
+		args = append(args,
+			ast.NewIdentifier("**kwargs", p.makeLocation(tok), ast.SyntaxPython),
+			kwDict,
+		)
+	}
 
 	return ast.NewSExpr(args, p.makeLocation(tok), ast.SyntaxPython)
 }
@@ -1797,8 +1857,19 @@ func (p *PythonParser) parseTryStatement() ast.ASTNode {
 
 		// Check if there's an exception type
 		if !p.check(TOKEN_COLON) {
-			typeTok := p.expect(TOKEN_IDENTIFIER)
-			exceptType = typeTok.Lexeme
+			// Exception type can be an identifier, parenthesized identifier, or tuple
+			// For now, just get the string representation
+			typeExpr := p.parseExpression()
+
+			// Convert AST node to string for storage
+			// This is a simplification - ideally we'd store the full AST node
+			if ident, ok := typeExpr.(*ast.Identifier); ok {
+				exceptType = ident.Name
+			} else {
+				// For complex types like (Exception) or (ValueError, TypeError),
+				// just convert to string representation
+				exceptType = typeExpr.String()
+			}
 
 			// Check for 'as variable'
 			if p.check(TOKEN_AS) {

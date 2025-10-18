@@ -2,9 +2,12 @@ package eval
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/mmichie/m28/core"
 )
+
+var debugClass = os.Getenv("M28_DEBUG_CLASS") != ""
 
 // classForm implements the class definition special form:
 // (class ClassName)                    - define a simple class
@@ -20,6 +23,10 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	className, ok := args[0].(core.SymbolValue)
 	if !ok {
 		return nil, fmt.Errorf("class name must be a symbol")
+	}
+
+	if debugClass {
+		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Defining class '%s' with %d args\n", className, len(args))
 	}
 
 	// Parse parent classes
@@ -78,11 +85,21 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				bodyStart = 2
 
 				// Get parent classes if specified
-				for _, parentElem := range parentList {
+				for i, parentElem := range parentList {
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating parent %d: %v\n", i, core.PrintValue(parentElem))
+					}
 					// Evaluate the parent expression (could be a symbol or dot expression)
 					parentVal, err := Eval(parentElem, ctx)
 					if err != nil {
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Error evaluating parent: %v\n", err)
+						}
 						return nil, fmt.Errorf("error evaluating parent class: %v", err)
+					}
+
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Parent evaluated to: %T\n", parentVal)
 					}
 
 					parent, ok := parentVal.(*core.Class)
@@ -106,9 +123,16 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		class = core.NewClass(string(className), nil)
 	}
 
+	if debugClass {
+		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Created class '%s', processing body from index %d to %d\n", className, bodyStart, len(args)-1)
+	}
+
 	// Process class body
 	for i := bodyStart; i < len(args); i++ {
 		stmt := args[i]
+		if debugClass {
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Processing body statement %d: %T\n", i, stmt)
+		}
 
 		// Handle different statement types
 		switch s := stmt.(type) {
@@ -167,6 +191,11 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				default:
 					// Evaluate other forms in class context
+					if debugClass {
+						if sym, ok := s[0].(core.SymbolValue); ok {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating form '%s' in class context\n", sym)
+						}
+					}
 					_, err := Eval(stmt, ctx)
 					if err != nil {
 						return nil, err
@@ -174,6 +203,9 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 			} else {
 				// Evaluate other forms in class context
+				if debugClass {
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating non-symbol list in class context\n")
+				}
 				_, err := Eval(stmt, ctx)
 				if err != nil {
 					return nil, err
@@ -181,6 +213,9 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		default:
 			// Evaluate the statement
+			if debugClass {
+				fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating non-list statement: %T\n", stmt)
+			}
 			_, err := Eval(stmt, ctx)
 			if err != nil {
 				return nil, err

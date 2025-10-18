@@ -24,3 +24,4 @@ go.work.sum
 bin/
 
 **/.claude/settings.local.json
+tests/cpython-source/
