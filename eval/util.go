@@ -6,6 +6,33 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// assignVariable handles variable assignment with global/nonlocal support
+// It checks if the variable is declared as global or nonlocal and assigns accordingly
+func assignVariable(ctx *core.Context, name string, value core.Value) error {
+	// Check if the variable is declared as global in this scope
+	if ctx.IsGlobal(name) {
+		// Assign to the global context
+		ctx.Global.Define(name, value)
+		return nil
+	}
+
+	// Check if the variable is declared as nonlocal in this scope
+	if ctx.IsNonlocal(name) {
+		// Find the nearest enclosing scope that has this variable
+		// We need to use Set() which searches up the scope chain
+		if err := ctx.Outer.Set(name, value); err != nil {
+			// If Set fails, it means the variable doesn't exist in any outer scope
+			// This shouldn't happen because DeclareNonlocal validates this
+			return fmt.Errorf("no binding for nonlocal '%s' found", name)
+		}
+		return nil
+	}
+
+	// Normal assignment: define in the current scope
+	ctx.Define(name, value)
+	return nil
+}
+
 // handleElifOrElse is a helper to process nested elif or else clauses
 func handleElifOrElse(clause core.Value, ctx *core.Context) (core.Value, error) {
 	// Check if it's another elif
@@ -461,7 +488,9 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Assign each value
 			for i, target := range targets {
 				if sym, ok := target.(core.SymbolValue); ok {
-					ctx.Define(string(sym), values[i])
+					if err := assignVariable(ctx, string(sym), values[i]); err != nil {
+						return nil, err
+					}
 				} else {
 					return nil, fmt.Errorf("multiple assignment target must be a symbol")
 				}
@@ -538,7 +567,9 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Assign each value
 				for i, target := range targets {
 					if sym, ok := target.(core.SymbolValue); ok {
-						ctx.Define(string(sym), values[i])
+						if err := assignVariable(ctx, string(sym), values[i]); err != nil {
+							return nil, err
+						}
 					}
 				}
 
@@ -572,7 +603,9 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Assign each value
 			for i, target := range targets {
 				if sym, ok := target.(core.SymbolValue); ok {
-					ctx.Define(string(sym), values[i])
+					if err := assignVariable(ctx, string(sym), values[i]); err != nil {
+						return nil, err
+					}
 				} else {
 					return nil, fmt.Errorf("multiple assignment target must be a symbol")
 				}
@@ -595,7 +628,9 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			if sym, ok := target.(core.SymbolValue); ok {
-				ctx.Define(string(sym), value)
+				if err := assignVariable(ctx, string(sym), value); err != nil {
+					return nil, err
+				}
 				lastValue = value
 			} else {
 				return nil, fmt.Errorf("assignment target must be a symbol")
@@ -615,8 +650,10 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Handle different assignment targets
 	switch t := target.(type) {
 	case core.SymbolValue:
-		// Variable assignment - define in current scope
-		ctx.Define(string(t), value)
+		// Variable assignment - handle global/nonlocal if declared
+		if err := assignVariable(ctx, string(t), value); err != nil {
+			return nil, err
+		}
 		return value, nil
 
 	case core.ListValue:
@@ -702,7 +739,9 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				if !ok {
 					return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
 				}
-				ctx.Define(string(sym), values[i])
+				if err := assignVariable(ctx, string(sym), values[i]); err != nil {
+					return nil, err
+				}
 			}
 
 			return value, nil
@@ -735,8 +774,10 @@ func WalrusForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
-	// Assign the value to the variable
-	ctx.Define(string(target), value)
+	// Assign the value to the variable - handle global/nonlocal if declared
+	if err := assignVariable(ctx, string(target), value); err != nil {
+		return nil, err
+	}
 
 	// Return the value (this is what makes it an expression)
 	return value, nil

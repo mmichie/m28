@@ -39,14 +39,22 @@ type Context struct {
 	// Metadata table for tracking source locations, types, comments
 	// This is shared across all contexts in a program
 	Metadata *IRMetadata
+
+	// Variables declared as global in this scope (Python global statement)
+	GlobalVars map[string]bool
+
+	// Variables declared as nonlocal in this scope (Python nonlocal statement)
+	NonlocalVars map[string]bool
 }
 
 // NewContext creates a new evaluation context
 func NewContext(outer *Context) *Context {
 	ctx := &Context{
-		Vars:      make(map[string]Value),
-		Outer:     outer,
-		CallStack: make([]TraceEntry, 0),
+		Vars:         make(map[string]Value),
+		Outer:        outer,
+		CallStack:    make([]TraceEntry, 0),
+		GlobalVars:   make(map[string]bool),
+		NonlocalVars: make(map[string]bool),
 	}
 
 	// If this is the global context, set Global to self and create new metadata
@@ -72,6 +80,8 @@ func (c *Context) WithMetadata(metadata *IRMetadata) *Context {
 		CallStack:       c.CallStack,
 		CurrentFunction: c.CurrentFunction,
 		Metadata:        metadata,
+		GlobalVars:      c.GlobalVars,
+		NonlocalVars:    c.NonlocalVars,
 	}
 	return newCtx
 }
@@ -225,4 +235,44 @@ func GetDuplicateBuiltins() []string {
 // GetDuplicateBuiltinDetails returns detailed information about duplicate builtin registrations
 func GetDuplicateBuiltinDetails() map[string][]string {
 	return builtinRegistry.GetDuplicates()
+}
+
+// DeclareGlobal marks a variable as global in the current scope
+// This means all assignments to this variable will modify the global scope
+func (c *Context) DeclareGlobal(name string) {
+	if c.GlobalVars == nil {
+		c.GlobalVars = make(map[string]bool)
+	}
+	c.GlobalVars[name] = true
+}
+
+// DeclareNonlocal marks a variable as nonlocal in the current scope
+// This means all assignments to this variable will modify the nearest enclosing scope
+func (c *Context) DeclareNonlocal(name string) error {
+	if c.NonlocalVars == nil {
+		c.NonlocalVars = make(map[string]bool)
+	}
+
+	// Check that the variable exists in an enclosing scope
+	if c.Outer == nil {
+		return fmt.Errorf("no binding for nonlocal '%s' found", name)
+	}
+
+	// Check outer scopes for the variable
+	if _, err := c.Outer.Lookup(name); err != nil {
+		return fmt.Errorf("no binding for nonlocal '%s' found", name)
+	}
+
+	c.NonlocalVars[name] = true
+	return nil
+}
+
+// IsGlobal checks if a variable is declared as global in this scope
+func (c *Context) IsGlobal(name string) bool {
+	return c.GlobalVars != nil && c.GlobalVars[name]
+}
+
+// IsNonlocal checks if a variable is declared as nonlocal in this scope
+func (c *Context) IsNonlocal(name string) bool {
+	return c.NonlocalVars != nil && c.NonlocalVars[name]
 }

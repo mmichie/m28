@@ -49,6 +49,12 @@ func registerDefinitionForms() {
 	// :=: Walrus operator (assignment expression)
 	eval.RegisterSpecialForm(":=", walrusForm)
 
+	// global: Mark variables as global
+	eval.RegisterSpecialForm("global", globalForm)
+
+	// nonlocal: Mark variables as nonlocal
+	eval.RegisterSpecialForm("nonlocal", nonlocalForm)
+
 	// quote: Quote an expression
 	eval.RegisterSpecialForm("quote", quoteForm)
 
@@ -142,4 +148,14 @@ func dictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 // listCompForm implements the 'list-comp' special form for list comprehensions
 func listCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.ListCompForm(args, ctx)
+}
+
+// globalForm implements the 'global' special form
+func globalForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.GlobalForm(args, ctx)
+}
+
+// nonlocalForm implements the 'nonlocal' special form
+func nonlocalForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.NonlocalForm(args, ctx)
 }
