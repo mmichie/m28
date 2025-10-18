@@ -1516,8 +1516,9 @@ func (p *PythonParser) parseForStatement() ast.ASTNode {
 
 	p.expect(TOKEN_IN)
 
-	// Parse iterable
-	iterable := p.parseExpression()
+	// Parse iterable expression
+	// Special handling for implicit tuple syntax: for x in 1, 2, 3:
+	iterable := p.parseForIterable()
 
 	// Parse body
 	body := p.parseBlock()
@@ -1530,6 +1531,39 @@ func (p *PythonParser) parseForStatement() ast.ASTNode {
 	}
 
 	return ast.NewForFormMulti(variables, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseForIterable parses the iterable expression in a for loop
+// Handles implicit tuple syntax: for x in 1, 2, 3: means for x in (1, 2, 3):
+// Parses comma-separated expressions until reaching ':'
+func (p *PythonParser) parseForIterable() ast.ASTNode {
+	startTok := p.peek()
+
+	// Parse first expression
+	exprs := []ast.ASTNode{p.parseExpression()}
+
+	// Check for comma-separated values (implicit tuple)
+	// Continue collecting expressions until we hit a colon
+	for p.check(TOKEN_COMMA) {
+		p.advance() // consume comma
+
+		// If we hit a colon after the comma, we have a trailing comma - stop here
+		if p.check(TOKEN_COLON) {
+			break
+		}
+
+		exprs = append(exprs, p.parseExpression())
+	}
+
+	// If we got multiple expressions, create an implicit tuple
+	if len(exprs) == 1 {
+		return exprs[0]
+	}
+
+	// Create tuple-literal form (similar to parseExpressionStatement)
+	tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(startTok), ast.SyntaxPython)
+	allElements := append([]ast.ASTNode{tupleSym}, exprs...)
+	return ast.NewSExpr(allElements, p.makeLocation(startTok), ast.SyntaxPython)
 }
 
 // parseWhileStatement parses: while expr: block (else: block)?
