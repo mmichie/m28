@@ -29,9 +29,9 @@ func NewPythonParser(tokens []Token) *PythonParser {
 		panic:     false,
 		depth:     0,
 		callCount: 0,
-		maxDepth:  500,   // Maximum recursion depth
-		maxCalls:  10000, // Maximum total parse calls
-		debugMode: false, // Set to true to enable debug output
+		maxDepth:  500,    // Maximum recursion depth
+		maxCalls:  100000, // Maximum total parse calls
+		debugMode: false,  // Set to true to enable debug output
 	}
 }
 
@@ -1992,6 +1992,23 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 	}
 
 	for {
+		// Check for / (positional-only parameter separator)
+		// In Python 3.8+: def f(a, b, /, c, d): means a, b are positional-only
+		// For now, we just skip it and treat all parameters normally
+		if p.check(TOKEN_SLASH) {
+			p.advance() // consume /
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance()
+
+			if p.check(TOKEN_RPAREN) {
+				break
+			}
+			continue
+		}
+
 		// Check for *args
 		if p.check(TOKEN_STAR) {
 			p.advance() // consume *

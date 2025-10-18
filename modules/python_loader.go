@@ -30,7 +30,6 @@ var cExtensionModules = map[string]bool{
 	"_posixsubprocess": true,
 	"_weakref":         true, // Weak reference support (built-in)
 	"_abc":             true, // Abstract base class support
-	"sys":              true, // System functions (built-in)
 	"builtins":         true, // Built-in functions
 }
 
