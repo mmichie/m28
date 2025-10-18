@@ -219,6 +219,8 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 		return p.parsePassStatement()
 	case TOKEN_RAISE:
 		return p.parseRaiseStatement()
+	case TOKEN_ASSERT:
+		return p.parseAssertStatement()
 	default:
 		// Expression statement (could be assignment)
 		return p.parseExpressionStatement()
@@ -304,6 +306,28 @@ func (p *PythonParser) parseRaiseStatement() ast.ASTNode {
 	}
 
 	return ast.NewRaiseForm(exception, cause, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseAssertStatement parses: assert condition [, message]
+func (p *PythonParser) parseAssertStatement() ast.ASTNode {
+	tok := p.expect(TOKEN_ASSERT)
+
+	// Parse condition (required)
+	condition := p.parseExpression()
+
+	var message ast.ASTNode
+	// Check for optional message after comma
+	if p.check(TOKEN_COMMA) {
+		p.advance()
+		message = p.parseExpression()
+	}
+
+	// Consume newline
+	if p.check(TOKEN_NEWLINE) {
+		p.advance()
+	}
+
+	return ast.NewAssertForm(condition, message, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseImportStatement parses: import module [as alias] [, module2 [as alias2], ...]

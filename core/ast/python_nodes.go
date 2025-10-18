@@ -195,6 +195,46 @@ func (p *PassForm) ToIR() core.Value {
 	return core.None
 }
 
+// AssertForm represents the assert statement
+type AssertForm struct {
+	BaseNode
+	Condition ASTNode // The condition to assert
+	Message   ASTNode // Optional message (nil if not provided)
+}
+
+// NewAssertForm creates a new assert statement
+func NewAssertForm(condition, message ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *AssertForm {
+	return &AssertForm{
+		BaseNode: BaseNode{
+			Loc:    loc,
+			Syntax: syntax,
+		},
+		Condition: condition,
+		Message:   message,
+	}
+}
+
+// Type implements core.Value.Type
+func (a *AssertForm) Type() core.Type {
+	return core.ListType
+}
+
+// String implements core.Value.String
+func (a *AssertForm) String() string {
+	if a.Message == nil {
+		return "(assert " + a.Condition.String() + ")"
+	}
+	return "(assert " + a.Condition.String() + " " + a.Message.String() + ")"
+}
+
+// ToIR lowers assert to IR
+func (a *AssertForm) ToIR() core.Value {
+	if a.Message == nil {
+		return core.ListValue{core.SymbolValue("assert"), a.Condition.ToIR()}
+	}
+	return core.ListValue{core.SymbolValue("assert"), a.Condition.ToIR(), a.Message.ToIR()}
+}
+
 // ============================================================================
 // Block Statement
 // ============================================================================

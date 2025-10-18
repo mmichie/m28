@@ -531,15 +531,15 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 	}
 
 	// Regular decimal number
-	// Scan integer part
-	for !t.isAtEnd() && isDigit(t.peek()) {
+	// Scan integer part (allow underscores for readability)
+	for !t.isAtEnd() && (isDigit(t.peek()) || t.peek() == '_') {
 		t.advance()
 	}
 
 	// Check for decimal point
 	if !t.isAtEnd() && t.peek() == '.' && t.pos+1 < len(t.input) && isDigit(t.input[t.pos+1]) {
 		t.advance() // consume '.'
-		for !t.isAtEnd() && isDigit(t.peek()) {
+		for !t.isAtEnd() && (isDigit(t.peek()) || t.peek() == '_') {
 			t.advance()
 		}
 	}
@@ -550,25 +550,27 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 		if !t.isAtEnd() && (t.peek() == '+' || t.peek() == '-') {
 			t.advance()
 		}
-		for !t.isAtEnd() && isDigit(t.peek()) {
+		for !t.isAtEnd() && (isDigit(t.peek()) || t.peek() == '_') {
 			t.advance()
 		}
 	}
 
 	lexeme := t.input[start:t.pos]
+	// Remove underscores before parsing
+	cleanLexeme := strings.ReplaceAll(lexeme, "_", "")
 
 	// Parse the number
 	var value core.Value
-	if strings.Contains(lexeme, ".") || strings.ContainsAny(lexeme, "eE") {
+	if strings.Contains(cleanLexeme, ".") || strings.ContainsAny(cleanLexeme, "eE") {
 		// Float
-		if f, err := strconv.ParseFloat(lexeme, 64); err == nil {
+		if f, err := strconv.ParseFloat(cleanLexeme, 64); err == nil {
 			value = core.NumberValue(f)
 		} else {
 			value = core.NumberValue(0.0)
 		}
 	} else {
 		// Integer
-		if i, err := strconv.ParseInt(lexeme, 10, 64); err == nil {
+		if i, err := strconv.ParseInt(cleanLexeme, 10, 64); err == nil {
 			value = core.NumberValue(i)
 		} else {
 			value = core.NumberValue(0)
