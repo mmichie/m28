@@ -303,6 +303,12 @@ func (t *PythonTokenizer) scanToken() Token {
 		return t.scanFString(quote, start, startLine, startCol)
 	}
 
+	// Bytes literals (b"..." or b'...')
+	if ch == 'b' && !t.isAtEnd() && (t.peek() == '"' || t.peek() == '\'') {
+		quote := t.advance()
+		return t.scanBytesString(quote, start, startLine, startCol)
+	}
+
 	// Identifiers and keywords
 	if pythonIsAlpha(ch) {
 		return t.scanIdentifier(start, startLine, startCol)
@@ -762,6 +768,115 @@ func (t *PythonTokenizer) scanString(quote byte, start, startLine, startCol int)
 		StartPos: start,
 		EndPos:   t.pos,
 	}
+}
+
+// scanBytesString scans a bytes literal (b"..." or b'...')
+func (t *PythonTokenizer) scanBytesString(quote byte, start, startLine, startCol int) Token {
+	var value []byte
+
+	for {
+		if t.isAtEnd() {
+			t.errors = append(t.errors, fmt.Errorf("unterminated bytes literal at line %d", startLine))
+			break
+		}
+
+		ch := t.peek()
+
+		// Check for end of string
+		if ch == quote {
+			t.advance()
+			break
+		}
+
+		// Handle escape sequences
+		if ch == '\\' {
+			t.advance()
+			if !t.isAtEnd() {
+				escaped := t.peek()
+				t.advance()
+
+				switch escaped {
+				case 'n':
+					value = append(value, '\n')
+				case 't':
+					value = append(value, '\t')
+				case 'r':
+					value = append(value, '\r')
+				case '\\':
+					value = append(value, '\\')
+				case '\'':
+					value = append(value, '\'')
+				case '"':
+					value = append(value, '"')
+				case 'x':
+					// Hex escape: \xNN
+					if t.pos+1 < len(t.input) {
+						hex1 := t.input[t.pos]
+						hex2 := t.input[t.pos+1]
+						if isHexDigit(hex1) && isHexDigit(hex2) {
+							hexVal := hexDigitValue(hex1)*16 + hexDigitValue(hex2)
+							value = append(value, byte(hexVal))
+							t.pos += 2
+						} else {
+							// Invalid hex escape, just include the literal characters
+							value = append(value, 'x')
+						}
+					} else {
+						value = append(value, 'x')
+					}
+				case '0', '1', '2', '3', '4', '5', '6', '7':
+					// Octal escape: \NNN (up to 3 digits)
+					octalVal := int(escaped - '0')
+					count := 1
+					for count < 3 && t.pos < len(t.input) && t.input[t.pos] >= '0' && t.input[t.pos] <= '7' {
+						octalVal = octalVal*8 + int(t.input[t.pos]-'0')
+						t.pos++
+						count++
+					}
+					if octalVal <= 255 {
+						value = append(value, byte(octalVal))
+					} else {
+						// Invalid octal value, just use modulo
+						value = append(value, byte(octalVal%256))
+					}
+				default:
+					// Unknown escape, include backslash and character
+					value = append(value, '\\', escaped)
+				}
+			}
+		} else {
+			value = append(value, ch)
+			t.advance()
+		}
+	}
+
+	return Token{
+		Type:     TOKEN_STRING,
+		Lexeme:   t.input[start:t.pos],
+		Value:    core.BytesValue(value),
+		Line:     startLine,
+		Col:      startCol,
+		StartPos: start,
+		EndPos:   t.pos,
+	}
+}
+
+// Helper functions for hex parsing
+func isHexDigit(ch byte) bool {
+	return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
+}
+
+func hexDigitValue(ch byte) int {
+	if ch >= '0' && ch <= '9' {
+		return int(ch - '0')
+	}
+	if ch >= 'a' && ch <= 'f' {
+		return int(ch-'a') + 10
+	}
+	if ch >= 'A' && ch <= 'F' {
+		return int(ch-'A') + 10
+	}
+	return 0
 }
 
 // Helper methods
