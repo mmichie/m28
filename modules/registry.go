@@ -22,6 +22,8 @@ var builtinModules = map[string]ModuleInitializer{
 	"math":        InitMathModule,
 	"collections": InitCollectionsModule,
 	"itertools":   InitItertoolsModule,
+	"functools":   InitFunctoolsModule,
+	"operator":    InitOperatorModule,
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
