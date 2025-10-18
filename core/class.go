@@ -140,6 +140,23 @@ func (c *Class) SetClassAttr(name string, value Value) {
 
 // GetAttr implements Object interface for classes
 func (c *Class) GetAttr(name string) (Value, bool) {
+	// Special handling for __dict__
+	if name == "__dict__" {
+		dict := NewDict()
+		// Add all methods with proper key conversion
+		for methodName, method := range c.Methods {
+			// Use SetWithKey to ensure proper key storage with original key tracking
+			keyStr := StringValue(methodName)
+			dict.SetWithKey(ValueToKey(keyStr), keyStr, method)
+		}
+		// Add all attributes with proper key conversion
+		for attrName, attr := range c.Attributes {
+			keyStr := StringValue(attrName)
+			dict.SetWithKey(ValueToKey(keyStr), keyStr, attr)
+		}
+		return dict, true
+	}
+
 	// First check methods
 	if method, ok := c.GetMethod(name); ok {
 		return method, true

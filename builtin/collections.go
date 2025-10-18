@@ -89,53 +89,10 @@ func RegisterCollections(ctx *core.Context) {
 		return core.TupleValue(args), nil
 	}))
 
-	// dict - create a new dictionary
-	ctx.Define("dict", NewKwargsBuiltinFunction("dict", func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-		dict := core.NewDict()
-
-		// Handle positional arguments
-		if len(args) > 1 {
-			return nil, fmt.Errorf("dict() takes at most 1 positional argument (%d given)", len(args))
-		}
-
-		if len(args) == 1 {
-			// Convert from another dict or iterable of pairs
-			switch v := args[0].(type) {
-			case *core.DictValue:
-				// Copy the dictionary
-				// Note: DictValue doesn't have a public Items() method
-				// We'll need to iterate using the dict methods
-				// For now, just create an empty dict
-				// TODO: Implement proper dict copying
-			case core.ListValue:
-				// Expect list of pairs
-				for i, item := range v {
-					pair, ok := item.(core.ListValue)
-					if !ok || len(pair) != 2 {
-						tuple, ok := item.(core.TupleValue)
-						if !ok || len(tuple) != 2 {
-							return nil, fmt.Errorf("dict update sequence element #%d is not a sequence", i)
-						}
-						pair = core.ListValue(tuple)
-					}
-					key, ok := pair[0].(core.StringValue)
-					if !ok {
-						return nil, fmt.Errorf("dict key must be string")
-					}
-					dict.Set(string(key), pair[1])
-				}
-			default:
-				return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
-			}
-		}
-
-		// Handle keyword arguments
-		for k, v := range kwargs {
-			dict.Set(k, v)
-		}
-
-		return dict, nil
-	}))
+	// dict - Python dict class
+	// Create as a class so dict.fromkeys and other class methods can be accessed
+	dictClass := createDictClass()
+	ctx.Define("dict", dictClass)
 
 	// set - create a new set
 	ctx.Define("set", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -332,4 +289,129 @@ func RegisterCollections(ctx *core.Context) {
 		}
 		return desc.Constructor(args, ctx)
 	}))
+}
+
+// DictType represents the dict class that can be called and has class methods
+type DictType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (d *DictType) GetClass() *core.Class {
+	return d.Class
+}
+
+// Call implements the callable interface for dict() construction
+func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	dict := core.NewDict()
+
+	// Handle different argument patterns:
+	// 1. dict() - empty dict
+	// 2. dict(iterable) - from iterable of pairs
+	// 3. dict(key1, val1, key2, val2, ...) - traditional key-value pairs
+
+	if len(args) == 0 {
+		// Empty dict
+		return dict, nil
+	}
+
+	// Check if args are key-value pairs (even number of args > 1)
+	if len(args) > 1 && len(args)%2 == 0 {
+		// Traditional key-value pairs syntax: dict("key1", val1, "key2", val2)
+		for i := 0; i < len(args); i += 2 {
+			keyVal := args[i]
+			value := args[i+1]
+
+			// Use SetValue for proper key conversion
+			if err := dict.SetValue(keyVal, value); err != nil {
+				return nil, err
+			}
+		}
+		return dict, nil
+	}
+
+	// Single argument - should be an iterable
+	if len(args) == 1 {
+		// Convert from another dict or iterable of pairs
+		switch v := args[0].(type) {
+		case *core.DictValue:
+			// Copy the dictionary
+			// TODO: Implement proper dict copying
+		case core.ListValue:
+			// Expect list of pairs
+			for i, item := range v {
+				pair, ok := item.(core.ListValue)
+				if !ok || len(pair) != 2 {
+					tuple, ok := item.(core.TupleValue)
+					if !ok || len(tuple) != 2 {
+						return nil, fmt.Errorf("dict update sequence element #%d is not a sequence", i)
+					}
+					pair = core.ListValue(tuple)
+				}
+				key, ok := pair[0].(core.StringValue)
+				if !ok {
+					return nil, fmt.Errorf("dict key must be string")
+				}
+				dict.Set(string(key), pair[1])
+			}
+		default:
+			return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
+		}
+		return dict, nil
+	}
+
+	// Odd number of args > 1
+	return nil, fmt.Errorf("dict() takes an even number of positional arguments for key-value pairs")
+}
+
+// createDictClass creates the dict class with class methods like fromkeys
+func createDictClass() *DictType {
+	class := core.NewClass("dict", nil)
+
+	// Add fromkeys class method
+	// dict.fromkeys(iterable, value=None) -> new dict with keys from iterable
+	class.SetMethod("fromkeys", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 || len(args) > 2 {
+			return nil, fmt.Errorf("fromkeys() takes 1 or 2 positional arguments (%d given)", len(args))
+		}
+
+		iterable := args[0]
+		var value core.Value = core.None
+		if len(args) == 2 {
+			value = args[1]
+		}
+
+		dict := core.NewDict()
+
+		// Convert iterable to list of keys
+		switch v := iterable.(type) {
+		case core.ListValue:
+			for _, key := range v {
+				keyStr, ok := key.(core.StringValue)
+				if !ok {
+					keyStr = core.StringValue(key.String())
+				}
+				dict.Set(string(keyStr), value)
+			}
+		case core.TupleValue:
+			for _, key := range v {
+				keyStr, ok := key.(core.StringValue)
+				if !ok {
+					keyStr = core.StringValue(key.String())
+				}
+				dict.Set(string(keyStr), value)
+			}
+		case core.StringValue:
+			// String is iterable in Python - each character is a key
+			for _, ch := range string(v) {
+				dict.Set(string(ch), value)
+			}
+		default:
+			return nil, fmt.Errorf("fromkeys() argument must be an iterable")
+		}
+
+		return dict, nil
+	}))
+
+	return &DictType{Class: class}
 }

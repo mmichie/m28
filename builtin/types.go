@@ -51,31 +51,10 @@ func RegisterTypes(ctx *core.Context) {
 		}
 	})))
 
-	// str - convert to string
-	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("str", args)
-		if err := v.Max(1); err != nil {
-			return nil, err
-		}
-
-		// Python str() with no args returns ""
-		if v.Count() == 0 {
-			return core.StringValue(""), nil
-		}
-
-		val := v.Get(0)
-
-		// Try __str__ dunder method first
-		if str, found, err := types.CallStr(val, ctx); found {
-			if err != nil {
-				return nil, err
-			}
-			return core.StringValue(str), nil
-		}
-
-		// Fall back to built-in String() method
-		return core.StringValue(val.String()), nil
-	}))
+	// str - Python str class
+	// Create as a class so str.join and other class methods can be accessed
+	strClass := createStrClass()
+	ctx.Define("str", strClass)
 
 	// bool - convert to boolean
 	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -134,6 +113,24 @@ func RegisterTypes(ctx *core.Context) {
 	// object - Base class for all Python objects
 	// Create the object class (no parent)
 	objectClass := core.NewClass("object", nil)
+
+	// Add __init__ method to object
+	// object.__init__(self, *args, **kwargs) - does nothing, accepts any arguments
+	objectClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// object.__init__ accepts self and any arguments, returns None
+		return core.None, nil
+	}))
+
+	// Add __str__ method to object
+	// object.__str__(self) - returns string representation
+	objectClass.SetMethod("__str__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__str__() missing 1 required positional argument: 'self'")
+		}
+		// Return a simple string representation
+		return core.StringValue(args[0].String()), nil
+	}))
+
 	ctx.Define("object", objectClass)
 
 	// format - Python-style format(value, format_spec='')
@@ -420,6 +417,72 @@ func FormatBuilder() builders.BuiltinFunc {
 		// For other types, use String() method
 		return core.StringValue(val.String()), nil
 	}
+}
+
+// StrType represents the str class that can be called and has class methods
+type StrType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (s *StrType) GetClass() *core.Class {
+	return s.Class
+}
+
+// Call implements the callable interface for str() conversion
+func (s *StrType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Python str() with no args returns ""
+	if len(args) == 0 {
+		return core.StringValue(""), nil
+	}
+
+	if len(args) > 1 {
+		return nil, errors.NewTypeError("str", "str() takes at most 1 argument", fmt.Sprintf("%d given", len(args)))
+	}
+
+	val := args[0]
+
+	// Try __str__ dunder method first
+	if str, found, err := types.CallStr(val, ctx); found {
+		if err != nil {
+			return nil, err
+		}
+		return core.StringValue(str), nil
+	}
+
+	// Fall back to built-in String() method
+	return core.StringValue(val.String()), nil
+}
+
+// createStrClass creates the str class with all string methods
+func createStrClass() *StrType {
+	class := core.NewClass("str", nil)
+
+	// Get the string type descriptor to access all string methods
+	td := core.GetTypeDescriptor("string")
+	if td != nil {
+		// Add all methods from the type descriptor as class methods
+		// Each method needs to be wrapped in a BuiltinFunction
+		for name, methodDesc := range td.Methods {
+			// Capture the handler in a closure
+			handler := methodDesc.Handler
+			// Create a BuiltinFunction that calls the handler
+			// The handler expects (receiver, args, ctx) but will be called with all args
+			// We need to make it an unbound method that can be called with str.method(...)
+			fn := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+				// For unbound methods, first arg should be the instance
+				if len(args) < 1 {
+					return nil, fmt.Errorf("%s() missing 1 required positional argument", name)
+				}
+				receiver := args[0]
+				methodArgs := args[1:]
+				return handler(receiver, methodArgs, ctx)
+			})
+			class.SetMethod(name, fn)
+		}
+	}
+
+	return &StrType{Class: class}
 }
 
 // Migration Statistics:

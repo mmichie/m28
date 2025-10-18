@@ -13,7 +13,8 @@ import (
 // RegisterDictFunctions registers dictionary-related functions in the global context
 func RegisterDictFunctions(ctx *core.Context) {
 	// Dictionary creation and access
-	ctx.Define("dict", core.NewBuiltinFunction(DictFunc))
+	// NOTE: dict is now defined as a class in collections.go, not a function
+	// ctx.Define("dict", core.NewBuiltinFunction(DictFunc))
 	ctx.Define("get", core.NewBuiltinFunction(GetFunc))
 	ctx.Define("dict-set", core.NewBuiltinFunction(SetFunc)) // Renamed to avoid conflict with set constructor
 	ctx.Define("delete", core.NewBuiltinFunction(DeleteFunc))

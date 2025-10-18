@@ -67,9 +67,28 @@ func RegisterErrors(ctx *core.Context) {
 		}
 
 		arg := v.Get(0)
-		if exc, ok := arg.(*core.ExceptionValue); ok {
+
+		// Check if arg is an exception class (should be instantiated)
+		if class, ok := arg.(*core.Class); ok {
+			// Instantiate the exception class
+			instance, err := class.Call([]core.Value{}, ctx)
+			if err != nil {
+				return nil, err
+			}
+			// Now raise the instance
+			if _, ok := instance.(*core.Instance); ok {
+				// Create an error from the instance
+				// For now, just use the class name as the error message
+				return nil, fmt.Errorf("%s", class.Name)
+			}
+			return nil, fmt.Errorf("failed to instantiate exception class")
+		} else if exc, ok := arg.(*core.ExceptionValue); ok {
 			// Raise the error
 			return nil, fmt.Errorf("%s", exc.Message)
+		} else if inst, ok := arg.(*core.Instance); ok {
+			// Raising an instance of an exception class
+			// For now, use the class name
+			return nil, fmt.Errorf("%s", inst.Class.Name)
 		} else if str, ok := types.AsString(arg); ok {
 			// Raise generic error with message
 			return nil, fmt.Errorf("%s", str)
@@ -79,6 +98,59 @@ func RegisterErrors(ctx *core.Context) {
 	}))
 
 	// assert - now registered in assert.go
+
+	// Define Python exception classes
+	// These are needed for Python code that references exception types
+	exceptionClass := core.NewClass("Exception", nil)
+	ctx.Define("Exception", exceptionClass)
+
+	// TypeError - raised when an operation or function is applied to an object of inappropriate type
+	typeErrorClass := core.NewClass("TypeError", exceptionClass)
+	ctx.Define("TypeError", typeErrorClass)
+
+	// ValueError - raised when an operation or function receives an argument with the right type but inappropriate value
+	valueErrorClass := core.NewClass("ValueError", exceptionClass)
+	ctx.Define("ValueError", valueErrorClass)
+
+	// NameError - raised when a local or global name is not found
+	nameErrorClass := core.NewClass("NameError", exceptionClass)
+	ctx.Define("NameError", nameErrorClass)
+
+	// KeyError - raised when a dictionary key is not found
+	keyErrorClass := core.NewClass("KeyError", exceptionClass)
+	ctx.Define("KeyError", keyErrorClass)
+
+	// IndexError - raised when a sequence subscript is out of range
+	indexErrorClass := core.NewClass("IndexError", exceptionClass)
+	ctx.Define("IndexError", indexErrorClass)
+
+	// AttributeError - raised when an attribute reference or assignment fails
+	attributeErrorClass := core.NewClass("AttributeError", exceptionClass)
+	ctx.Define("AttributeError", attributeErrorClass)
+
+	// ZeroDivisionError - raised when division or modulo by zero takes place
+	zeroDivisionErrorClass := core.NewClass("ZeroDivisionError", exceptionClass)
+	ctx.Define("ZeroDivisionError", zeroDivisionErrorClass)
+
+	// RuntimeError - raised when an error is detected that doesn't fall in any of the other categories
+	runtimeErrorClass := core.NewClass("RuntimeError", exceptionClass)
+	ctx.Define("RuntimeError", runtimeErrorClass)
+
+	// NotImplementedError - raised when an abstract method that should have been implemented is not
+	notImplementedErrorClass := core.NewClass("NotImplementedError", runtimeErrorClass)
+	ctx.Define("NotImplementedError", notImplementedErrorClass)
+
+	// ImportError - raised when an import statement fails
+	importErrorClass := core.NewClass("ImportError", exceptionClass)
+	ctx.Define("ImportError", importErrorClass)
+
+	// StopIteration - raised by next() and an iterator's __next__() to signal no more items
+	stopIterationClass := core.NewClass("StopIteration", exceptionClass)
+	ctx.Define("StopIteration", stopIterationClass)
+
+	// AssertionError - raised when an assert statement fails
+	assertionErrorClass := core.NewClass("AssertionError", exceptionClass)
+	ctx.Define("AssertionError", assertionErrorClass)
 }
 
 // Migration Statistics:
