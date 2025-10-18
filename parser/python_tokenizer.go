@@ -241,6 +241,27 @@ func (t *PythonTokenizer) scanToken() Token {
 
 	ch := t.advance()
 
+	// Handle backslash line continuation
+	if ch == '\\' {
+		// Check if next character is a newline
+		if t.peek() == '\n' {
+			t.advance() // consume the newline
+			// Skip any whitespace on the next line and continue scanning
+			t.skipWhitespaceExceptNewlines()
+			return t.scanToken()
+		}
+		// If not followed by newline, it's an error
+		t.errors = append(t.errors, fmt.Errorf("unexpected character '\\' at line %d", startLine))
+		return Token{
+			Type:     TOKEN_ERROR,
+			Lexeme:   "\\",
+			Line:     startLine,
+			Col:      startCol,
+			StartPos: start,
+			EndPos:   t.pos,
+		}
+	}
+
 	// Track parentheses depth
 	switch ch {
 	case '(', '[', '{':

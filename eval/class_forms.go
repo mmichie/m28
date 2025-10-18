@@ -39,15 +39,37 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Empty list means no parent but still a parent spec
 				isParentSpec = true
 			} else {
-				// Check if all elements are symbols (parent class names)
-				allSymbols := true
+				// Check if all elements look like class references
+				// (symbols or dot expressions)
+				allClassRefs := true
 				for _, elem := range parentList {
-					if _, ok := elem.(core.SymbolValue); !ok {
-						allSymbols = false
+					switch e := elem.(type) {
+					case core.SymbolValue:
+						// Simple class name
+						continue
+					case core.ListValue:
+						// Could be a dot expression like (. unittest TestCase)
+						// But NOT a special form like (def ...)
+						if len(e) > 0 {
+							if sym, ok := e[0].(core.SymbolValue); ok {
+								symStr := string(sym)
+								// Check if it's a special form - not a class reference
+								if symStr == "def" || symStr == "=" || symStr == "do" ||
+									symStr == "if" || symStr == "for" || symStr == "while" {
+									allClassRefs = false
+									break
+								}
+							}
+						}
+						// OK, could be dot expression
+						continue
+					default:
+						// Not a valid class reference
+						allClassRefs = false
 						break
 					}
 				}
-				if allSymbols {
+				if allClassRefs {
 					isParentSpec = true
 				}
 			}
@@ -57,17 +79,15 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				// Get parent classes if specified
 				for _, parentElem := range parentList {
-					parentName := parentElem.(core.SymbolValue)
-
-					// Look up parent class
-					parentVal, err := ctx.Lookup(string(parentName))
+					// Evaluate the parent expression (could be a symbol or dot expression)
+					parentVal, err := Eval(parentElem, ctx)
 					if err != nil {
-						return nil, fmt.Errorf("parent class '%s' not found", string(parentName))
+						return nil, fmt.Errorf("error evaluating parent class: %v", err)
 					}
 
 					parent, ok := parentVal.(*core.Class)
 					if !ok {
-						return nil, fmt.Errorf("'%s' is not a class", string(parentName))
+						return nil, fmt.Errorf("parent must be a class, got %T", parentVal)
 					}
 
 					parentClasses = append(parentClasses, parent)

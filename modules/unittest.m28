@@ -1,0 +1,106 @@
+# unittest module - Basic TestCase implementation for M28
+
+(class TestCase nil
+  # Constructor
+  (def __init__ (self)
+    (= self._testMethodName nil))
+
+  # Setup/teardown hooks
+  (def setUp (self)
+    nil)
+
+  (def tearDown (self)
+    nil)
+
+  # Core assertions
+  (def assertEqual (self first second msg)
+    (if (!= first second)
+      (do
+        (= message (or msg (+ (str first) " != " (str second))))
+        (raise (AssertionError message)))))
+
+  (def assertNotEqual (self first second msg)
+    (if (== first second)
+      (do
+        (= message (or msg (+ (str first) " == " (str second))))
+        (raise (AssertionError message)))))
+
+  (def assertTrue (self expr msg)
+    (if (not expr)
+      (do
+        (= message (or msg (+ "Expected True, got " (str expr))))
+        (raise (AssertionError message)))))
+
+  (def assertFalse (self expr msg)
+    (if expr
+      (do
+        (= message (or msg (+ "Expected False, got " (str expr))))
+        (raise (AssertionError message)))))
+
+  (def assertIs (self first second msg)
+    (if (is not first second)
+      (do
+        (= message (or msg (+ (str first) " is not " (str second))))
+        (raise (AssertionError message)))))
+
+  (def assertIsNot (self first second msg)
+    (if (is first second)
+      (do
+        (= message (or msg (+ (str first) " is " (str second))))
+        (raise (AssertionError message)))))
+
+  (def assertIsNone (self expr msg)
+    (if (is not expr None)
+      (do
+        (= message (or msg (+ "Expected None, got " (str expr))))
+        (raise (AssertionError message)))))
+
+  (def assertIsNotNone (self expr msg)
+    (if (is expr None)
+      (do
+        (= message (or msg "Expected non-None value"))
+        (raise (AssertionError message)))))
+
+  (def assertIn (self member container msg)
+    (if (not in member container)
+      (do
+        (= message (or msg (+ (str member) " not in " (str container))))
+        (raise (AssertionError message)))))
+
+  (def assertNotIn (self member container msg)
+    (if (in member container)
+      (do
+        (= message (or msg (+ (str member) " in " (str container))))
+        (raise (AssertionError message)))))
+
+  (def assertGreater (self a b msg)
+    (if (not (> a b))
+      (do
+        (= message (or msg (+ (str a) " not greater than " (str b))))
+        (raise (AssertionError message)))))
+
+  (def assertLess (self a b msg)
+    (if (not (< a b))
+      (do
+        (= message (or msg (+ (str a) " not less than " (str b))))
+        (raise (AssertionError message)))))
+
+  (def assertGreaterEqual (self a b msg)
+    (if (not (>= a b))
+      (do
+        (= message (or msg (+ (str a) " not greater than or equal to " (str b))))
+        (raise (AssertionError message)))))
+
+  (def assertLessEqual (self a b msg)
+    (if (not (<= a b))
+      (do
+        (= message (or msg (+ (str a) " not less than or equal to " (str b))))
+        (raise (AssertionError message))))))
+
+# Simple test runner placeholder
+(def main ()
+  (print "unittest.main() - test discovery not yet implemented")
+  (print "Run tests manually by instantiating TestCase subclasses"))
+
+# Export public API
+(= __exports__ ["TestCase" "main"])
