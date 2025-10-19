@@ -169,41 +169,56 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
-	// Create the class
-	var class *core.Class
-	if len(parentClasses) > 1 {
-		class = core.NewClassWithParents(string(className), parentClasses)
-	} else if len(parentClasses) == 1 {
-		class = core.NewClass(string(className), parentClasses[0])
-	} else {
-		class = core.NewClass(string(className), nil)
+	// If no metaclass was explicitly specified, check if we're creating a metaclass
+	// (i.e., if the parent is 'type' or a subclass of type)
+	if metaclass == nil && len(parentClasses) > 0 {
+		for _, parent := range parentClasses {
+			if parent.Name == "type" {
+				// This class inherits from type, so it's a metaclass
+				// Use type as the metaclass to create it
+				if typeClass, err := ctx.Lookup("type"); err == nil {
+					if tc, ok := typeClass.(*core.Class); ok {
+						metaclass = tc
+					} else if wrapper, ok := typeClass.(interface{ GetClass() *core.Class }); ok {
+						metaclass = wrapper.GetClass()
+					}
+				}
+				break
+			}
+		}
 	}
 
-	// If metaclass was specified, copy its methods to the class as class methods
-	// This simulates Python's metaclass behavior where metaclass methods become class methods
+	// Create the class
+	var class *core.Class
+
+	// If metaclass was specified, we need to use it to create the class
 	if metaclass != nil {
 		if debugClass {
-			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Applying metaclass '%s' to class '%s'\n", metaclass.Name, className)
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Creating class '%s' using metaclass '%s'\n", className, metaclass.Name)
 		}
 
-		// Copy methods from metaclass to class
-		for methodName, method := range metaclass.Methods {
-			// Don't copy special methods like __new__
-			if methodName != "__new__" && methodName != "__init__" {
-				// Wrap the method so it receives the class as first argument
-				if callable, ok := method.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					boundMethod := createBoundClassMethod(class, callable)
-					class.SetMethod(methodName, boundMethod)
-					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Copied method '%s' from metaclass\n", methodName)
-					}
-				} else {
-					// Not callable, just copy as-is
-					class.SetMethod(methodName, method)
-				}
-			}
+		// First, create a basic class to collect body elements
+		// We'll process the body first to build the namespace dict
+		var tempClass *core.Class
+		if len(parentClasses) > 1 {
+			tempClass = core.NewClassWithParents(string(className), parentClasses)
+		} else if len(parentClasses) == 1 {
+			tempClass = core.NewClass(string(className), parentClasses[0])
+		} else {
+			tempClass = core.NewClass(string(className), nil)
+		}
+
+		// We'll process the body later and collect namespace, then call metaclass.__new__
+		// For now, use the tempClass and we'll call __new__ after processing body
+		class = tempClass
+	} else {
+		// No metaclass, create class normally
+		if len(parentClasses) > 1 {
+			class = core.NewClassWithParents(string(className), parentClasses)
+		} else if len(parentClasses) == 1 {
+			class = core.NewClass(string(className), parentClasses[0])
+		} else {
+			class = core.NewClass(string(className), nil)
 		}
 	}
 
@@ -315,6 +330,82 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// If metaclass was specified, call its __new__ method to finalize the class
+	if metaclass != nil {
+		if debugClass {
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Calling metaclass.__new__ for class '%s'\n", className)
+		}
+
+		// Check if metaclass has __new__ method
+		if newMethod, hasNew := metaclass.GetMethod("__new__"); hasNew {
+			if callable, ok := newMethod.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				// Build namespace dict from class methods and attributes
+				namespace := core.NewDict()
+				for name, method := range class.Methods {
+					namespace.Set(name, method)
+				}
+				for name, attr := range class.Attributes {
+					namespace.Set(name, attr)
+				}
+
+				// Build bases tuple
+				bases := make(core.TupleValue, len(parentClasses))
+				for i, parent := range parentClasses {
+					bases[i] = parent
+				}
+
+				// Call metaclass.__new__(metaclass, name, bases, namespace)
+				args := []core.Value{
+					metaclass,                   // mcls
+					core.StringValue(className), // name
+					bases,                       // bases
+					namespace,                   // namespace
+				}
+
+				result, err := callable.Call(args, ctx)
+				if err != nil {
+					return nil, fmt.Errorf("error calling metaclass.__new__: %v", err)
+				}
+
+				// The result should be a class
+				if newClass, ok := result.(*core.Class); ok {
+					class = newClass
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned new class\n")
+					}
+				} else {
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned %T, keeping original class\n", result)
+					}
+				}
+			}
+		}
+
+		// After __new__, copy metaclass methods to the class as class methods
+		for methodName, method := range metaclass.Methods {
+			// Don't override methods created by __new__
+			if _, exists := class.Methods[methodName]; exists {
+				continue
+			}
+
+			// Skip __new__ and __init__
+			if methodName != "__new__" && methodName != "__init__" {
+				// Wrap the method so it receives the class as first argument
+				if callable, ok := method.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					boundMethod := createBoundClassMethod(class, callable)
+					class.SetMethod(methodName, boundMethod)
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Copied method '%s' from metaclass\n", methodName)
+					}
+				}
+			}
+		}
+	}
+
 	// Define the class in the context
 	ctx.Define(string(className), class)
 
@@ -392,32 +483,68 @@ func createMethod(name string, params core.ListValue, body []core.Value, ctx *co
 // superForm implements the super special form for backward compatibility
 // This handles the bare "super" syntax used in method definitions
 func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	// Special form super with no args - look up self
+	// Special form super with no args - look up self/cls/mcls
 	if len(args) == 0 {
-		// Look for self in context
-		selfVal, err := ctx.Lookup("self")
+		// Try to find the first parameter (could be self, cls, mcls, etc.)
+		// Try common names in order
+		var firstArg core.Value
+		var err error
+
+		// Try self first (for instance methods)
+		firstArg, err = ctx.Lookup("self")
 		if err != nil {
-			return nil, fmt.Errorf("super: no arguments given and cannot determine self")
+			// Try cls (for class methods)
+			firstArg, err = ctx.Lookup("cls")
+			if err != nil {
+				// Try mcls (for metaclass methods)
+				firstArg, err = ctx.Lookup("mcls")
+				if err != nil {
+					return nil, fmt.Errorf("super: no arguments given and cannot determine self/cls/mcls")
+				}
+			}
 		}
 
-		instance, ok := selfVal.(*core.Instance)
-		if !ok {
-			return nil, fmt.Errorf("super: self is not an instance")
+		// Check if it's an instance
+		if instance, ok := firstArg.(*core.Instance); ok {
+			// It's an instance, use its class
+			// Try to get __class__ from context, otherwise use instance's class
+			classVal, err := ctx.Lookup("__class__")
+			if err != nil {
+				// Use instance's class as fallback
+				return core.NewSuper(instance.Class, instance), nil
+			}
+
+			class, ok := classVal.(*core.Class)
+			if !ok {
+				return core.NewSuper(instance.Class, instance), nil
+			}
+
+			return core.NewSuper(class, instance), nil
 		}
 
-		// Try to get __class__ from context, otherwise use instance's class
-		classVal, err := ctx.Lookup("__class__")
-		if err != nil {
-			// Use instance's class as fallback
-			return core.NewSuper(instance.Class, instance), nil
+		// Check if it's a class (for class methods or metaclass methods)
+		if class, ok := firstArg.(*core.Class); ok {
+			// It's a class, use its parent
+			if class.Parent != nil {
+				// Return a super object for the parent class
+				// Pass nil as instance since we're in a class/metaclass method
+				return core.NewSuper(class.Parent, nil), nil
+			}
+			// No parent, can't use super
+			return nil, fmt.Errorf("super: class has no parent")
 		}
 
-		class, ok := classVal.(*core.Class)
-		if !ok {
-			return core.NewSuper(instance.Class, instance), nil
+		// Check for wrapper types
+		if wrapper, ok := firstArg.(interface{ GetClass() *core.Class }); ok {
+			class := wrapper.GetClass()
+			if class.Parent != nil {
+				// Pass nil as instance
+				return core.NewSuper(class.Parent, nil), nil
+			}
+			return nil, fmt.Errorf("super: class has no parent")
 		}
 
-		return core.NewSuper(class, instance), nil
+		return nil, fmt.Errorf("super: first argument must be an instance or class, got %T", firstArg)
 	}
 
 	// Legacy form with explicit class and instance
@@ -500,11 +627,31 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 	instance, isInst := obj.(*core.Instance)
 	class, isClass := classVal.(*core.Class)
 
+	// Handle wrapper types that have GetClass() method (like TypeType)
+	if !isClass {
+		if wrapper, ok := classVal.(interface{ GetClass() *core.Class }); ok {
+			class = wrapper.GetClass()
+			isClass = true
+		}
+	}
+
 	if !isClass {
 		return nil, fmt.Errorf("isinstance second argument must be a class or string type name")
 	}
 
 	if !isInst {
+		// Special case: isinstance(Foo, type) where Foo is a class
+		// type is the metaclass, so classes are instances of type
+		if class.Name == "type" {
+			// Check if obj is a class
+			if _, ok := obj.(*core.Class); ok {
+				return core.True, nil
+			}
+			// Also check wrapper types that are classes
+			if _, ok := obj.(interface{ GetClass() *core.Class }); ok {
+				return core.True, nil
+			}
+		}
 		return core.False, nil
 	}
 

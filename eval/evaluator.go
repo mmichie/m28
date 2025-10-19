@@ -1101,6 +1101,91 @@ func convertIterableToSlice(iterable core.Value) ([]core.Value, error) {
 	return items, nil
 }
 
+// unpackTuplePattern unpacks a value according to a pattern like "(x, y)" or "(x, (y, z))"
+// and binds the variables in the given context
+func unpackTuplePattern(pattern string, value core.Value, ctx *core.Context) error {
+	// Remove outer parentheses
+	pattern = strings.TrimSpace(pattern)
+	if !strings.HasPrefix(pattern, "(") || !strings.HasSuffix(pattern, ")") {
+		return fmt.Errorf("invalid tuple pattern: %s", pattern)
+	}
+	pattern = pattern[1 : len(pattern)-1]
+
+	// Parse variable names from the pattern
+	// Simple approach: split by comma at the top level
+	varNames := parseTuplePatternVars(pattern)
+
+	// Convert value to a slice
+	var values []core.Value
+	switch v := value.(type) {
+	case core.TupleValue:
+		values = []core.Value(v)
+	case core.ListValue:
+		values = []core.Value(v)
+	default:
+		return fmt.Errorf("cannot unpack non-sequence type %s", value.Type())
+	}
+
+	// Check length matches
+	if len(values) != len(varNames) {
+		return fmt.Errorf("cannot unpack %d values into %d variables", len(values), len(varNames))
+	}
+
+	// Bind each variable
+	for i, varName := range varNames {
+		varName = strings.TrimSpace(varName)
+		// Check if this is a nested pattern
+		if strings.HasPrefix(varName, "(") && strings.HasSuffix(varName, ")") {
+			// Recursive unpacking
+			if err := unpackTuplePattern(varName, values[i], ctx); err != nil {
+				return err
+			}
+		} else {
+			// Simple variable binding
+			ctx.Define(varName, values[i])
+		}
+	}
+
+	return nil
+}
+
+// parseTuplePatternVars splits a tuple pattern into variable names
+// Example: "x, y" -> ["x", "y"]
+// Example: "x, (y, z)" -> ["x", "(y, z)"]
+func parseTuplePatternVars(pattern string) []string {
+	var result []string
+	var current strings.Builder
+	depth := 0
+
+	for _, ch := range pattern {
+		switch ch {
+		case '(':
+			depth++
+			current.WriteRune(ch)
+		case ')':
+			depth--
+			current.WriteRune(ch)
+		case ',':
+			if depth == 0 {
+				// Top-level comma, split here
+				result = append(result, current.String())
+				current.Reset()
+			} else {
+				current.WriteRune(ch)
+			}
+		default:
+			current.WriteRune(ch)
+		}
+	}
+
+	// Add the last part
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+
+	return result
+}
+
 // comprehensionLoop executes a comprehension loop over items with optional filtering
 // The callback is called for each item that passes the condition (if provided)
 func comprehensionLoop(
@@ -1112,8 +1197,16 @@ func comprehensionLoop(
 ) error {
 	loopCtx := core.NewContext(ctx)
 	for _, item := range items {
-		// Bind the loop variable
-		loopCtx.Define(varName, item)
+		// Check if varName is a tuple pattern like "(x, y)" or "(x, (y, z))"
+		if strings.HasPrefix(varName, "(") && strings.HasSuffix(varName, ")") {
+			// Parse the tuple pattern and unpack the item
+			if err := unpackTuplePattern(varName, item, loopCtx); err != nil {
+				return fmt.Errorf("error unpacking loop variable: %v", err)
+			}
+		} else {
+			// Simple variable binding
+			loopCtx.Define(varName, item)
+		}
 
 		// Check condition if present
 		if condition != nil {

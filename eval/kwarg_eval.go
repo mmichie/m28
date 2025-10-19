@@ -56,8 +56,37 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 		if sym, ok := args[i].(core.SymbolValue); ok {
 			symStr := string(sym)
 
-			// Check for **kwargs unpacking
-			if strings.HasPrefix(symStr, "**") {
+			// Check for **unpack marker (parser creates: ["**unpack", <expr>])
+			if symStr == "**unpack" {
+				if i+1 >= len(args) {
+					return nil, fmt.Errorf("** unpacking requires an expression")
+				}
+				info.Elements = append(info.Elements, ArgumentElement{
+					IsKwUnpack: true,
+					Expr:       args[i+1],
+				})
+				i += 2 // Skip marker and expression
+				continue
+			}
+
+			// Check for *unpack marker (parser creates: ["*unpack", <expr>])
+			if symStr == "*unpack" {
+				if i+1 >= len(args) {
+					return nil, fmt.Errorf("* unpacking requires an expression")
+				}
+				if seenKeyword {
+					return nil, fmt.Errorf("* unpacking cannot follow keyword arguments")
+				}
+				info.Elements = append(info.Elements, ArgumentElement{
+					IsUnpack: true,
+					Expr:     args[i+1],
+				})
+				i += 2 // Skip marker and expression
+				continue
+			}
+
+			// Legacy support: Check for **kwargs unpacking (old style where expr is in the symbol)
+			if strings.HasPrefix(symStr, "**") && symStr != "**unpack" {
 				exprStr := strings.TrimPrefix(symStr, "**")
 				if exprStr == "" {
 					return nil, fmt.Errorf("** unpacking requires an expression")
@@ -70,8 +99,8 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 				continue
 			}
 
-			// Check for *args unpacking
-			if strings.HasPrefix(symStr, "*") && !strings.HasPrefix(symStr, "**") {
+			// Legacy support: Check for *args unpacking (old style)
+			if strings.HasPrefix(symStr, "*") && !strings.HasPrefix(symStr, "**") && symStr != "*unpack" {
 				exprStr := strings.TrimPrefix(symStr, "*")
 				if exprStr == "" {
 					return nil, fmt.Errorf("* unpacking requires an expression")

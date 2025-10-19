@@ -376,29 +376,41 @@ func (s *Super) Type() Type {
 
 // String returns the string representation
 func (s *Super) String() string {
+	if s.Instance == nil {
+		return fmt.Sprintf("<super: %s, <class>>", s.Class.Name)
+	}
 	return fmt.Sprintf("<super: %s, <%s object>>", s.Class.Name, s.Instance.Class.Name)
 }
 
 // GetAttr gets an attribute from the parent class
 func (s *Super) GetAttr(name string) (Value, bool) {
-	// Check if there are parent classes
-	if len(s.Class.Parents) == 0 && s.Class.Parent == nil {
-		return nil, false
+	// First, check in s.Class itself (the class we're looking in)
+	// This is important for super() calls in metaclass methods where
+	// s.Class is the metaclass parent (e.g., type)
+	if method, ok := s.Class.GetMethod(name); ok {
+		return method, true
 	}
 
-	// Look up in parent classes using MRO
+	// Also try GetAttr on s.Class for dynamically defined attributes
+	if method, ok := s.Class.GetAttr(name); ok {
+		return method, true
+	}
+
+	// If not found, look in parent classes using MRO
 	if len(s.Class.Parents) > 0 {
 		for _, parent := range s.Class.Parents {
 			if method, _, ok := parent.GetMethodWithClass(name); ok {
-				// Return the method unbound for backward compatibility
-				// The existing tests expect to pass self explicitly
 				return method, true
 			}
 		}
 	} else if s.Class.Parent != nil {
 		// Fallback to single parent for backward compatibility
 		if method, _, ok := s.Class.Parent.GetMethodWithClass(name); ok {
-			// Return the method unbound for backward compatibility
+			return method, true
+		}
+
+		// Also try GetAttr on the parent class
+		if method, ok := s.Class.Parent.GetAttr(name); ok {
 			return method, true
 		}
 	}

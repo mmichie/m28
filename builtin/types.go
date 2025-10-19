@@ -374,11 +374,29 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 		case core.Callable:
 			return typeName == "function"
 		}
+	case *TypeType:
+		// isinstance(obj, type) checks if obj is a class
+		// type is the metaclass, so instances of type are classes
+		switch obj.(type) {
+		case *core.Class:
+			return true
+		case *TypeType, *StrType, *DictType:
+			// These are wrapper types that are also classes
+			return true
+		}
 	case *core.Class:
 		// Check against user-defined classes
 		if inst, ok := obj.(*core.Instance); ok {
 			// Simple check - instance's class matches
 			return inst.Class == t || (inst.Class.Parent != nil && inst.Class.Parent == t)
+		}
+	default:
+		// Handle wrapper types that have GetClass() method
+		if wrapper, ok := typeVal.(interface{ GetClass() *core.Class }); ok {
+			classVal := wrapper.GetClass()
+			if inst, ok := obj.(*core.Instance); ok {
+				return inst.Class == classVal || (inst.Class.Parent != nil && inst.Class.Parent == classVal)
+			}
 		}
 	}
 	return false
@@ -482,6 +500,15 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 
 		// Return type class instead of string to support isinstance and attribute access
 		switch v := val.(type) {
+		case *TypeType:
+			// type(type) or type(any TypeType wrapper) returns type
+			return TypeMetaclass, nil
+		case *StrType:
+			// type(str) returns type
+			return TypeMetaclass, nil
+		case *DictType:
+			// type(dict) returns type
+			return TypeMetaclass, nil
 		case core.NumberValue:
 			return NumberTypeClass, nil
 		case core.StringValue:
@@ -506,11 +533,11 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			return SetTypeClass, nil
 		case *core.BuiltinFunction:
 			return FunctionTypeClass, nil
-		case core.Callable:
-			return FunctionTypeClass, nil
 		case *core.Class:
 			// type(SomeClass) returns type (the metaclass)
 			return TypeMetaclass, nil
+		case core.Callable:
+			return FunctionTypeClass, nil
 		case *core.Instance:
 			return v.Class, nil
 		default:
@@ -534,6 +561,77 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 // createTypeMetaclass creates the type metaclass
 func createTypeMetaclass() *TypeType {
 	class := core.NewClass("type", nil)
+
+	// Add __new__ method to type metaclass
+	// type.__new__(cls, name, bases, dict) creates a new class
+	class.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// type.__new__(cls, name, bases, dict, **kwargs)
+		// We need at least cls, name, bases, dict
+		if len(args) < 4 {
+			return nil, fmt.Errorf("type.__new__() takes at least 4 arguments (%d given)", len(args))
+		}
+
+		// args[0] is cls (the metaclass being used)
+		// args[1] is name (string)
+		// args[2] is bases (tuple of parent classes)
+		// args[3] is dict/namespace (dict of class members)
+
+		nameVal, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("type.__new__() argument 2 must be str, not %s", args[1].Type())
+		}
+		name := string(nameVal)
+
+		basesVal, ok := args[2].(core.TupleValue)
+		if !ok {
+			return nil, fmt.Errorf("type.__new__() argument 3 must be tuple, not %s", args[2].Type())
+		}
+
+		namespace, ok := args[3].(*core.DictValue)
+		if !ok {
+			return nil, fmt.Errorf("type.__new__() argument 4 must be dict, not %s", args[3].Type())
+		}
+
+		// Extract parent classes from bases tuple
+		var parentClasses []*core.Class
+		for _, base := range basesVal {
+			switch b := base.(type) {
+			case *core.Class:
+				parentClasses = append(parentClasses, b)
+			case interface{ GetClass() *core.Class }:
+				parentClasses = append(parentClasses, b.GetClass())
+			default:
+				return nil, fmt.Errorf("bases must be classes, not %T", base)
+			}
+		}
+
+		// Create the new class
+		var newClass *core.Class
+		if len(parentClasses) > 1 {
+			newClass = core.NewClassWithParents(name, parentClasses)
+		} else if len(parentClasses) == 1 {
+			newClass = core.NewClass(name, parentClasses[0])
+		} else {
+			newClass = core.NewClass(name, nil)
+		}
+
+		// Add methods and attributes from namespace
+		for _, keyStr := range namespace.Keys() {
+			value, _ := namespace.Get(keyStr)
+			if _, ok := value.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				// It's a callable, add as method
+				newClass.SetMethod(keyStr, value)
+			} else {
+				// Add as attribute
+				newClass.Attributes[keyStr] = value
+			}
+		}
+
+		return newClass, nil
+	}))
+
 	return &TypeType{Class: class}
 }
 
