@@ -143,6 +143,51 @@ func (c *Class) SetClassAttr(name string, value Value) {
 
 // GetAttr implements Object interface for classes
 func (c *Class) GetAttr(name string) (Value, bool) {
+	// Special handling for __mro__ (Method Resolution Order)
+	if name == "__mro__" {
+		// Build the MRO tuple: (CurrentClass, Parent, Grandparent, ..., object)
+		mro := []Value{c}
+
+		// Follow the parent chain
+		current := c.Parent
+		for current != nil {
+			mro = append(mro, current)
+			current = current.Parent
+		}
+
+		// Also include parents from multiple inheritance
+		// For simplicity, we'll add them after the main parent chain
+		if len(c.Parents) > 0 {
+			// Already have the main parent, now add any additional parents
+			for i, parent := range c.Parents {
+				if i == 0 && c.Parent != nil {
+					// Skip first if it's the same as c.Parent
+					continue
+				}
+				// Add this parent and its ancestors
+				p := parent
+				for p != nil {
+					// Check if already in MRO to avoid duplicates
+					found := false
+					for _, existing := range mro {
+						if existingClass, ok := existing.(*Class); ok {
+							if existingClass == p {
+								found = true
+								break
+							}
+						}
+					}
+					if !found {
+						mro = append(mro, p)
+					}
+					p = p.Parent
+				}
+			}
+		}
+
+		return TupleValue(mro), true
+	}
+
 	// Special handling for __dict__
 	if name == "__dict__" {
 		dict := NewDict()
