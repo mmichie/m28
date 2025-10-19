@@ -1045,11 +1045,18 @@ func (c *ClassForm) ToIR() core.Value {
 		bodyIR = append(bodyIR, item.ToIR())
 	}
 
-	// Basic class: (class Name [Base1 Base2] method1 method2 ...)
+	// Build keywords (e.g., metaclass=ABCMeta)
+	keywordsIR := make(core.ListValue, 0, len(c.Keywords))
+	for _, kw := range c.Keywords {
+		keywordsIR = append(keywordsIR, kw.ToIR())
+	}
+
+	// Basic class: (class Name [Base1 Base2] {keyword args} method1 method2 ...)
 	result := core.ListValue{
 		core.SymbolValue("class"),
 		core.SymbolValue(c.Name),
 		basesIR,
+		keywordsIR, // Add keywords as 4th element
 	}
 	result = append(result, bodyIR...)
 

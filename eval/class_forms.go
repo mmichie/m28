@@ -14,6 +14,7 @@ var debugClass = os.Getenv("M28_DEBUG_CLASS") != ""
 // (class ClassName (ParentClass))      - define a class with inheritance
 // (class ClassName () body...)         - define a class with methods/attributes
 // (class ClassName (ParentClass) body...) - full class definition
+// (class ClassName (ParentClass) (keywords) body...) - with keywords like metaclass
 func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("class requires at least a name")
@@ -29,8 +30,9 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Defining class '%s' with %d args\n", className, len(args))
 	}
 
-	// Parse parent classes
+	// Parse parent classes and keywords
 	var parentClasses []*core.Class
+	var metaclass *core.Class
 	bodyStart := 1
 
 	if len(args) > 1 {
@@ -119,6 +121,54 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// Parse keywords (e.g., metaclass=ABCMeta)
+	if len(args) > bodyStart {
+		if kwList, ok := args[bodyStart].(core.ListValue); ok {
+			// Check if this looks like a keywords list
+			// Keywords are represented as [("metaclass" ABCMeta), ...]
+			isKeywords := true
+			for _, kw := range kwList {
+				// Each keyword should be a 2-element list: (name, value)
+				if kwPair, ok := kw.(core.ListValue); ok && len(kwPair) == 2 {
+					// Good, looks like a keyword pair
+					continue
+				} else {
+					// Not a keyword pair, this is probably class body
+					isKeywords = false
+					break
+				}
+			}
+
+			if isKeywords && len(kwList) > 0 {
+				// This is a keywords list, process it
+				bodyStart++ // Skip past keywords in body processing
+
+				for _, kw := range kwList {
+					kwPair := kw.(core.ListValue)
+					kwName, ok := kwPair[0].(core.StringValue)
+					if !ok {
+						continue
+					}
+
+					if string(kwName) == "metaclass" {
+						// Evaluate the metaclass expression
+						metaclassVal, err := Eval(kwPair[1], ctx)
+						if err != nil {
+							return nil, fmt.Errorf("error evaluating metaclass: %v", err)
+						}
+
+						// Check if it's a class
+						if mc, ok := metaclassVal.(*core.Class); ok {
+							metaclass = mc
+						} else if wrapper, ok := metaclassVal.(interface{ GetClass() *core.Class }); ok {
+							metaclass = wrapper.GetClass()
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Create the class
 	var class *core.Class
 	if len(parentClasses) > 1 {
@@ -127,6 +177,34 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		class = core.NewClass(string(className), parentClasses[0])
 	} else {
 		class = core.NewClass(string(className), nil)
+	}
+
+	// If metaclass was specified, copy its methods to the class as class methods
+	// This simulates Python's metaclass behavior where metaclass methods become class methods
+	if metaclass != nil {
+		if debugClass {
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Applying metaclass '%s' to class '%s'\n", metaclass.Name, className)
+		}
+
+		// Copy methods from metaclass to class
+		for methodName, method := range metaclass.Methods {
+			// Don't copy special methods like __new__
+			if methodName != "__new__" && methodName != "__init__" {
+				// Wrap the method so it receives the class as first argument
+				if callable, ok := method.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					boundMethod := createBoundClassMethod(class, callable)
+					class.SetMethod(methodName, boundMethod)
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Copied method '%s' from metaclass\n", methodName)
+					}
+				} else {
+					// Not callable, just copy as-is
+					class.SetMethod(methodName, method)
+				}
+			}
+		}
 	}
 
 	if debugClass {
@@ -469,6 +547,18 @@ func issubclassForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 	}
 
 	return core.False, nil
+}
+
+// createBoundClassMethod creates a wrapper that binds a metaclass method to a class
+// When called, it automatically prepends the class as the first argument
+func createBoundClassMethod(class *core.Class, method interface {
+	Call([]core.Value, *core.Context) (core.Value, error)
+}) *core.BuiltinFunction {
+	return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Prepend the class as the first argument (cls parameter)
+		callArgs := append([]core.Value{class}, args...)
+		return method.Call(callArgs, ctx)
+	})
 }
 
 // RegisterClassForms registers class-related special forms
