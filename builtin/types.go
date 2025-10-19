@@ -22,6 +22,7 @@ var (
 	TupleTypeClass    *core.Class
 	SetTypeClass      *core.Class
 	FunctionTypeClass *core.Class
+	TypeMetaclass     *TypeType // The type metaclass (for class ABCMeta(type):)
 	StrTypeClass      *StrType  // Global str class instance
 	DictTypeClass     *DictType // Global dict class instance (set by RegisterCollections)
 	// Cache for dynamically created type classes
@@ -49,58 +50,12 @@ func RegisterTypes(ctx *core.Context) {
 	FunctionTypeClass.SetClassAttr("__code__", core.NewCodeObject(nil))
 	FunctionTypeClass.SetClassAttr("__globals__", core.NewDict())
 
-	// type - returns the type class of a value
-	ctx.Define("type", core.NewBuiltinFunction(builders.UnaryAny("type", func(val core.Value) (core.Value, error) {
-		// Return type class instead of string to support isinstance and attribute access
-		switch v := val.(type) {
-		case core.NumberValue:
-			// M28 uses a unified NumberValue for all numbers (int and float)
-			return NumberTypeClass, nil
-		case core.StringValue:
-			// Return the embedded class from the global str class
-			if StrTypeClass != nil {
-				return StrTypeClass.Class, nil
-			}
-			return core.NewClass("str", nil), nil
-		case core.BoolValue:
-			return BoolTypeClass, nil
-		case core.NilValue:
-			return NoneTypeClass, nil
-		case core.ListValue:
-			return ListTypeClass, nil
-		case *core.DictValue:
-			// Return the embedded class from the global dict class
-			if DictTypeClass != nil {
-				return DictTypeClass.Class, nil
-			}
-			return core.NewClass("dict", nil), nil
-		case core.TupleValue:
-			return TupleTypeClass, nil
-		case *core.SetValue:
-			return SetTypeClass, nil
-		case *core.BuiltinFunction:
-			return FunctionTypeClass, nil
-		case core.Callable:
-			// For any callable (including UserFunction from eval package)
-			return FunctionTypeClass, nil
-		case *core.Class:
-			// type(SomeClass) returns type (the metaclass)
-			// Cache it so all classes have the same type
-			if typeClassCache["type"] == nil {
-				typeClassCache["type"] = core.NewClass("type", nil)
-			}
-			return typeClassCache["type"], nil
-		case *core.Instance:
-			return v.Class, nil
-		default:
-			// For any custom types, create or get cached class with that name
-			typeName := string(val.Type())
-			if typeClassCache[typeName] == nil {
-				typeClassCache[typeName] = core.NewClass(typeName, nil)
-			}
-			return typeClassCache[typeName], nil
-		}
-	})))
+	// type - the type metaclass (can be inherited from)
+	// Create as a class with __call__ method so it can be used as:
+	// 1. type(obj) - returns the type of obj
+	// 2. class Meta(type): - can be inherited from for metaclasses
+	TypeMetaclass = createTypeMetaclass()
+	ctx.Define("type", TypeMetaclass)
 
 	// str - Python str class
 	// Create as a class so str.join and other class methods can be accessed
@@ -503,6 +458,83 @@ func (s *StrType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 
 	// Fall back to built-in String() method
 	return core.StringValue(val.String()), nil
+}
+
+// TypeType represents the type metaclass that can be called and inherited from
+type TypeType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (t *TypeType) GetClass() *core.Class {
+	return t.Class
+}
+
+// Call implements the callable interface for type() function
+func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// type() can be called in two ways:
+	// 1. type(obj) - returns the type of obj (1 argument)
+	// 2. type(name, bases, dict) - creates a new class (3 arguments)
+
+	if len(args) == 1 {
+		// type(obj) - return the type of the object
+		val := args[0]
+
+		// Return type class instead of string to support isinstance and attribute access
+		switch v := val.(type) {
+		case core.NumberValue:
+			return NumberTypeClass, nil
+		case core.StringValue:
+			if StrTypeClass != nil {
+				return StrTypeClass.Class, nil
+			}
+			return core.NewClass("str", nil), nil
+		case core.BoolValue:
+			return BoolTypeClass, nil
+		case core.NilValue:
+			return NoneTypeClass, nil
+		case core.ListValue:
+			return ListTypeClass, nil
+		case *core.DictValue:
+			if DictTypeClass != nil {
+				return DictTypeClass.Class, nil
+			}
+			return core.NewClass("dict", nil), nil
+		case core.TupleValue:
+			return TupleTypeClass, nil
+		case *core.SetValue:
+			return SetTypeClass, nil
+		case *core.BuiltinFunction:
+			return FunctionTypeClass, nil
+		case core.Callable:
+			return FunctionTypeClass, nil
+		case *core.Class:
+			// type(SomeClass) returns type (the metaclass)
+			return TypeMetaclass, nil
+		case *core.Instance:
+			return v.Class, nil
+		default:
+			// For any custom types, create or get cached class with that name
+			typeName := string(val.Type())
+			if typeClassCache[typeName] == nil {
+				typeClassCache[typeName] = core.NewClass(typeName, nil)
+			}
+			return typeClassCache[typeName], nil
+		}
+	} else if len(args) == 3 {
+		// type(name, bases, dict) - create a new class
+		// This is the 3-argument form used for dynamic class creation
+		// For now, return an error - we can implement this later if needed
+		return nil, fmt.Errorf("type() with 3 arguments (dynamic class creation) not yet implemented")
+	} else {
+		return nil, fmt.Errorf("type() takes 1 or 3 arguments, got %d", len(args))
+	}
+}
+
+// createTypeMetaclass creates the type metaclass
+func createTypeMetaclass() *TypeType {
+	class := core.NewClass("type", nil)
+	return &TypeType{Class: class}
 }
 
 // createStrClass creates the str class with all string methods
