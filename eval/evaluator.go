@@ -3,6 +3,7 @@ package eval
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/mmichie/m28/core"
@@ -1122,9 +1123,19 @@ func comprehensionLoop(
 				return fmt.Errorf("error evaluating condition: %v", err)
 			}
 
+			// Debug: print condition result
+			if debugComp := os.Getenv("DEBUG_COMP"); debugComp != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG_COMP] item=%v condition=%v result=%v truthy=%v\n",
+					item, condition, condResult, core.IsTruthy(condResult))
+			}
+
 			// Skip if condition is falsy
 			if !core.IsTruthy(condResult) {
 				continue
+			}
+		} else {
+			if debugComp := os.Getenv("DEBUG_COMP"); debugComp != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG_COMP] item=%v no condition\n", item)
 			}
 		}
 

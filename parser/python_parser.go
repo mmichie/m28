@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/core/ast"
@@ -2102,6 +2103,12 @@ func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) as
 			p.advance()
 			// Condition can use full expression parsing (including ternary if needed)
 			condition = p.parseOr()
+
+			// Debug: print the condition AST
+			if debugComp := os.Getenv("DEBUG_COMP_PARSE"); debugComp != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG_COMP_PARSE] Parsed condition AST: %#v\n", condition)
+				fmt.Fprintf(os.Stderr, "[DEBUG_COMP_PARSE] Condition string: %s\n", condition.String())
+			}
 		}
 
 		clauses = append(clauses, ast.ComprehensionClause{

@@ -71,8 +71,11 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		return nil, fmt.Errorf("failed to transpile Python module '%s': %w", name, err)
 	}
 
-	// Create module context
-	moduleCtx := core.NewContext(ctx.Global)
+	// Create module context as its own global scope
+	// Pass nil to make it a top-level context
+	moduleCtx := core.NewContext(nil)
+	// Keep a reference to the parent global so builtins are accessible
+	moduleCtx.Outer = ctx.Global
 	moduleCtx.Define("__name__", core.StringValue(name))
 	moduleCtx.Define("__file__", core.StringValue(pyPath))
 
@@ -121,6 +124,19 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	if allVal, err := moduleCtx.Lookup("__all__"); err == nil {
 		// __all__ is defined, only export listed names
 		if allList, ok := allVal.(core.ListValue); ok {
+			// Debug for types module
+			if name == "types" {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Module '%s' has __all__ with %d items\n", name, len(allList))
+				hasGenericAlias := false
+				for _, item := range allList {
+					if strVal, ok := item.(core.StringValue); ok && string(strVal) == "GenericAlias" {
+						hasGenericAlias = true
+						break
+					}
+				}
+				fmt.Fprintf(os.Stderr, "[DEBUG] __all__ contains GenericAlias: %v\n", hasGenericAlias)
+			}
+
 			for _, item := range allList {
 				var exportName string
 				switch v := item.(type) {
@@ -139,16 +155,32 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 	} else {
 		// No __all__, export all non-private, non-dunder variables
-		for name, value := range moduleCtx.Vars {
+		exportedCount := 0
+		for varName, value := range moduleCtx.Vars {
 			// Skip dunder variables (__name__, __file__, etc.)
-			if len(name) >= 2 && name[:2] == "__" && name[len(name)-2:] == "__" {
+			if len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__" {
 				continue
 			}
 			// Skip private variables (starting with _)
-			if len(name) > 0 && name[0] == '_' {
+			if len(varName) > 0 && varName[0] == '_' {
 				continue
 			}
-			moduleDict.Set(name, value)
+			moduleDict.Set(varName, value)
+			exportedCount++
+			// Debug: print first few exports for types module
+			if name == "types" && exportedCount <= 10 {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Exported '%s': %v (%T)\n", varName, value, value)
+			}
+		}
+		// Debug: for types module, print total count and check for GenericAlias
+		if name == "types" {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Module '%s' exported %d names total\n", name, exportedCount)
+			// Check specifically for GenericAlias
+			if val, err := moduleCtx.Lookup("GenericAlias"); err == nil {
+				fmt.Fprintf(os.Stderr, "[DEBUG] GenericAlias in moduleCtx: %v (%T)\n", val, val)
+			} else {
+				fmt.Fprintf(os.Stderr, "[DEBUG] GenericAlias NOT in moduleCtx: %v\n", err)
+			}
 		}
 	}
 

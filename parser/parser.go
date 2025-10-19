@@ -1842,10 +1842,36 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 				condition = condElements[0]
 			}
 		} else {
-			condExpr := make(core.ListValue, len(condElements)+1)
-			condExpr[0] = core.SymbolValue("do")
-			copy(condExpr[1:], condElements)
-			condition = condExpr
+			// Multiple elements - check if this is an infix expression
+			// e.g., [n for n in list if n != "_c"] → condElements = [n, !=, "_c"]
+			if len(condElements) == 3 {
+				// Check if middle element is an infix operator
+				if op, ok := condElements[1].(core.SymbolValue); ok {
+					opStr := string(op)
+					if isInfixOperator(opStr) {
+						// Construct proper infix expression: [op, left, right]
+						condition = core.ListValue{condElements[1], condElements[0], condElements[2]}
+					} else {
+						// Not an infix op, wrap in do
+						condExpr := make(core.ListValue, len(condElements)+1)
+						condExpr[0] = core.SymbolValue("do")
+						copy(condExpr[1:], condElements)
+						condition = condExpr
+					}
+				} else {
+					// Middle element not a symbol, wrap in do
+					condExpr := make(core.ListValue, len(condElements)+1)
+					condExpr[0] = core.SymbolValue("do")
+					copy(condExpr[1:], condElements)
+					condition = condExpr
+				}
+			} else {
+				// Not a simple 3-element infix expression, wrap in do
+				condExpr := make(core.ListValue, len(condElements)+1)
+				condExpr[0] = core.SymbolValue("do")
+				copy(condExpr[1:], condElements)
+				condition = condExpr
+			}
 		}
 	} else {
 		// No condition
