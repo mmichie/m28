@@ -131,7 +131,8 @@ func evalFunctionCall(expr core.ListValue, ctx *core.Context) (core.Value, error
 			return nil, core.WrapEvalError(err, err.Error(), ctx)
 		}
 
-		return nil, core.WrapEvalError(err, fmt.Sprintf("error in %s", funcName), ctx)
+		// Include the underlying error message for better debugging
+		return nil, core.WrapEvalError(err, fmt.Sprintf("error in %s: %v", funcName, err), ctx)
 	}
 
 	return result, nil
