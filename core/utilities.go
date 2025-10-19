@@ -25,6 +25,18 @@ func EqualValues(a, b Value) bool {
 		if bVal, ok := b.(StringValue); ok {
 			return string(aVal) == string(bVal)
 		}
+		// Also compare string to Class name for backwards compatibility
+		if bVal, ok := b.(*Class); ok {
+			return string(aVal) == bVal.Name
+		}
+	case *Class:
+		// Compare Class to StringValue or another Class
+		if bVal, ok := b.(StringValue); ok {
+			return aVal.Name == string(bVal)
+		}
+		if bVal, ok := b.(*Class); ok {
+			return aVal == bVal // Same class instance
+		}
 	case BoolValue:
 		if bVal, ok := b.(BoolValue); ok {
 			return bool(aVal) == bool(bVal)

@@ -167,6 +167,23 @@ func (e EllipsisValue) String() string {
 // Predefined Ellipsis value
 var Ellipsis = EllipsisValue{}
 
+// NotImplementedValue represents Python's NotImplemented singleton
+// Used to indicate that a comparison operation is not implemented
+type NotImplementedValue struct{}
+
+// Type implements Value.Type
+func (n NotImplementedValue) Type() Type {
+	return "NotImplementedType"
+}
+
+// String implements Value.String
+func (n NotImplementedValue) String() string {
+	return "NotImplemented"
+}
+
+// Predefined NotImplemented value
+var NotImplemented = NotImplementedValue{}
+
 // BuiltinFunction represents a Go function that can be called from M28
 type BuiltinFunction struct {
 	BaseObject
@@ -262,6 +279,38 @@ func (f *BuiltinFunction) GetBaseObject() *BaseObject {
 
 // GetAttr implements the new simplified GetAttr pattern
 func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
+	// Special handling for __getitem__ to support generic type syntax
+	// This allows list[int], dict[str, int], etc. for type hints
+	if name == "__getitem__" {
+		// Only provide __getitem__ for collection types
+		if f.name == "list" || f.name == "tuple" || f.name == "dict" ||
+			f.name == "set" || f.name == "frozenset" {
+			// Return a function that creates generic alias objects
+			return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+				// Create a generic alias with this function as the origin
+				// For now, we'll create a pseudo-class to wrap the builtin
+				class := NewClass(f.name, nil)
+				return NewGenericAlias(class, args), nil
+			}), true
+		}
+	}
+
+	// Special handling for __or__ to support union type syntax (int | str, etc.)
+	if name == "__or__" {
+		// Type constructor functions support union types
+		if f.name == "int" || f.name == "float" || f.name == "str" || f.name == "bool" ||
+			f.name == "list" || f.name == "tuple" || f.name == "dict" || f.name == "set" ||
+			f.name == "bytes" || f.name == "bytearray" {
+			// Return a function that creates union type objects
+			return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("__or__ takes exactly 1 argument")
+				}
+				return NewUnionType([]Value{f, args[0]}), nil
+			}), true
+		}
+	}
+
 	return GetAttrWithRegistry(f, name)
 }
 

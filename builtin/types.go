@@ -13,51 +13,102 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// Type classes for built-in types
+var (
+	NumberTypeClass   *core.Class // Single number type for M28's unified NumberValue
+	BoolTypeClass     *core.Class
+	NoneTypeClass     *core.Class
+	ListTypeClass     *core.Class
+	TupleTypeClass    *core.Class
+	SetTypeClass      *core.Class
+	FunctionTypeClass *core.Class
+	StrTypeClass      *StrType  // Global str class instance
+	DictTypeClass     *DictType // Global dict class instance (set by RegisterCollections)
+	// Cache for dynamically created type classes
+	typeClassCache = make(map[string]*core.Class)
+)
+
+// SetDictTypeClass is called by RegisterCollections to set the global dict class
+func SetDictTypeClass(dictClass *DictType) {
+	DictTypeClass = dictClass
+}
+
 // RegisterTypes registers all type conversion and checking functions using builders
 func RegisterTypes(ctx *core.Context) {
-	// type - returns the type of a value
-	// BEFORE: 15 lines with manual validation
-	// AFTER: 6 lines
+	// Create type classes for built-in types
+	NumberTypeClass = core.NewClass("number", nil) // M28 uses unified NumberValue for all numbers
+	BoolTypeClass = core.NewClass("bool", nil)
+	NoneTypeClass = core.NewClass("NoneType", nil)
+	ListTypeClass = core.NewClass("list", nil)
+	TupleTypeClass = core.NewClass("tuple", nil)
+	SetTypeClass = core.NewClass("set", nil)
+	FunctionTypeClass = core.NewClass("function", nil)
+
+	// Add __code__ and __globals__ as class attributes on function type
+	// These are descriptor objects that Python uses to access function attributes
+	FunctionTypeClass.SetClassAttr("__code__", core.NewCodeObject(nil))
+	FunctionTypeClass.SetClassAttr("__globals__", core.NewDict())
+
+	// type - returns the type class of a value
 	ctx.Define("type", core.NewBuiltinFunction(builders.UnaryAny("type", func(val core.Value) (core.Value, error) {
-		// Return type descriptor instead of string to support isinstance
+		// Return type class instead of string to support isinstance and attribute access
 		switch v := val.(type) {
 		case core.NumberValue:
-			return core.StringValue(string(core.NumberType)), nil
+			// M28 uses a unified NumberValue for all numbers (int and float)
+			return NumberTypeClass, nil
 		case core.StringValue:
-			return core.StringValue(string(core.StringType)), nil
+			// Return the embedded class from the global str class
+			if StrTypeClass != nil {
+				return StrTypeClass.Class, nil
+			}
+			return core.NewClass("str", nil), nil
 		case core.BoolValue:
-			return core.StringValue(string(core.BoolType)), nil
+			return BoolTypeClass, nil
 		case core.NilValue:
-			return core.StringValue(string(core.NilType)), nil
+			return NoneTypeClass, nil
 		case core.ListValue:
-			return core.StringValue(string(core.ListType)), nil
+			return ListTypeClass, nil
 		case *core.DictValue:
-			return core.StringValue(string(core.DictType)), nil
+			// Return the embedded class from the global dict class
+			if DictTypeClass != nil {
+				return DictTypeClass.Class, nil
+			}
+			return core.NewClass("dict", nil), nil
 		case core.TupleValue:
-			return core.StringValue(string(core.TupleType)), nil
+			return TupleTypeClass, nil
 		case *core.SetValue:
-			return core.StringValue(string(core.SetType)), nil
+			return SetTypeClass, nil
 		case *core.BuiltinFunction:
-			return core.StringValue("function"), nil
+			return FunctionTypeClass, nil
 		case core.Callable:
-			return core.StringValue("function"), nil
+			// For any callable (including UserFunction from eval package)
+			return FunctionTypeClass, nil
 		case *core.Class:
-			return v, nil // Classes are their own type
+			// type(SomeClass) returns type (the metaclass)
+			// Cache it so all classes have the same type
+			if typeClassCache["type"] == nil {
+				typeClassCache["type"] = core.NewClass("type", nil)
+			}
+			return typeClassCache["type"], nil
 		case *core.Instance:
 			return v.Class, nil
 		default:
-			// For any custom types
-			return core.StringValue(string(val.Type())), nil
+			// For any custom types, create or get cached class with that name
+			typeName := string(val.Type())
+			if typeClassCache[typeName] == nil {
+				typeClassCache[typeName] = core.NewClass(typeName, nil)
+			}
+			return typeClassCache[typeName], nil
 		}
 	})))
 
 	// str - Python str class
 	// Create as a class so str.join and other class methods can be accessed
-	strClass := createStrClass()
-	ctx.Define("str", strClass)
+	StrTypeClass = createStrClass()
+	ctx.Define("str", StrTypeClass)
 
 	// bool - convert to boolean
-	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("bool", core.NewNamedBuiltinFunction("bool", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("bool", args)
 		if err := v.Max(1); err != nil {
 			return nil, err
@@ -93,12 +144,12 @@ func RegisterTypes(ctx *core.Context) {
 	// int - convert to integer with optional base
 	// BEFORE: 36 lines
 	// AFTER: ~15 lines with custom builder
-	ctx.Define("int", core.NewBuiltinFunction(IntBuilder()))
+	ctx.Define("int", core.NewNamedBuiltinFunction("int", IntBuilder()))
 
 	// float - convert to float
 	// BEFORE: 23 lines
 	// AFTER: ~10 lines with custom builder
-	ctx.Define("float", core.NewBuiltinFunction(FloatBuilder()))
+	ctx.Define("float", core.NewNamedBuiltinFunction("float", FloatBuilder()))
 
 	// isinstance - check if object is instance of type(s)
 	// BEFORE: 20 lines
@@ -456,7 +507,7 @@ func (s *StrType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 
 // createStrClass creates the str class with all string methods
 func createStrClass() *StrType {
-	class := core.NewClass("str", nil)
+	class := core.NewClass("string", nil) // M28 uses "string" as the type name
 
 	// Get the string type descriptor to access all string methods
 	td := core.GetTypeDescriptor("string")

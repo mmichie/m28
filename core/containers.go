@@ -239,6 +239,34 @@ func (d *DictValue) OriginalKeys() []Value {
 	return result
 }
 
+// Iterator implements Iterable for dicts (iterates over keys)
+func (d *DictValue) Iterator() Iterator {
+	return &dictIterator{
+		dict:  d,
+		keys:  d.OriginalKeys(),
+		index: 0,
+	}
+}
+
+type dictIterator struct {
+	dict  *DictValue
+	keys  []Value
+	index int
+}
+
+func (it *dictIterator) Next() (Value, bool) {
+	if it.index >= len(it.keys) {
+		return nil, false
+	}
+	val := it.keys[it.index]
+	it.index++
+	return val, true
+}
+
+func (it *dictIterator) Reset() {
+	it.index = 0
+}
+
 // GetAttr implements Object interface using TypeDescriptor
 func (d *DictValue) GetAttr(name string) (Value, bool) {
 	// First try to find the key with string prefix

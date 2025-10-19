@@ -133,6 +133,10 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Created class '%s', processing body from index %d to %d\n", className, bodyStart, len(args)-1)
 	}
 
+	// Create a class-body context that allows accessing class members as they're defined
+	// This enables patterns like: __await__ = __iter__
+	classBodyCtx := core.NewContext(ctx)
+
 	// Process class body
 	for i := bodyStart; i < len(args); i++ {
 		stmt := args[i]
@@ -170,6 +174,8 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 								return nil, err
 							}
 							class.SetMethod(string(name), method)
+							// Also add to class body context so later statements can reference it
+							classBodyCtx.Define(string(name), method)
 							continue
 						}
 					}
@@ -188,12 +194,14 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						return nil, fmt.Errorf("class variable name must be a symbol")
 					}
 
-					// Evaluate the value
-					value, err := Eval(s[2], ctx)
+					// Evaluate the value in class body context (can reference previously defined methods/attrs)
+					value, err := Eval(s[2], classBodyCtx)
 					if err != nil {
 						return nil, err
 					}
 					class.SetClassAttr(string(name), value)
+					// Also add to class body context so later statements can reference it
+					classBodyCtx.Define(string(name), value)
 
 				default:
 					// Evaluate other forms in class context

@@ -38,6 +38,7 @@ func NewEnvironment(outer *Environment) *Environment {
 	env.Define("None", core.Nil)
 	env.Define("True", core.BoolValue(true))
 	env.Define("False", core.BoolValue(false))
+	env.Define("Ellipsis", core.Ellipsis)
 
 	// No need to register type constants in this version
 

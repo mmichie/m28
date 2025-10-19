@@ -549,12 +549,16 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		}
 		return core.StringValue("<anonymous>"), true
 	case "__code__":
-		// Return a simple code object
+		// Return a code object (CodeType)
 		// Python's types.py uses __code__ to get the CodeType
-		codeObj := core.NewDict()
-		codeObj.Set("co_flags", core.NumberValue(0))
-		codeObj.Set("co_argcount", core.NumberValue(0)) // Could track this properly
-		return codeObj, true
+		return core.NewCodeObject(f), true
+	case "__globals__":
+		// Return the function's global namespace
+		// This is the environment where the function was defined
+		globalsDict := core.NewDict()
+		// In a real implementation, we would populate this with the actual globals
+		// For now, return an empty dict to satisfy type() call in types.py
+		return globalsDict, true
 	case "__dict__":
 		// Return function's namespace/attributes as a dict
 		funcDict := core.NewDict()

@@ -287,7 +287,7 @@ func TestAsIterable(t *testing.T) {
 		{"list is iterable", list, true},
 		{"tuple is iterable", tuple, true},
 		{"string is iterable", str, false}, // StringValue doesn't implement Iterable directly
-		{"dict is iterable", dict, false},  // DictValue doesn't implement Iterable directly
+		{"dict is iterable", dict, true},   // DictValue now implements Iterable (iterates over keys)
 		{"set is iterable", set, true},
 		{"range is iterable", rng, true},
 		{"number not iterable", core.NumberValue(42), false},

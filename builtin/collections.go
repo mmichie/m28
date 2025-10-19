@@ -56,7 +56,7 @@ func convertToSlice(arg core.Value) ([]core.Value, error) {
 // RegisterCollections registers collection constructor functions
 func RegisterCollections(ctx *core.Context) {
 	// list - create a new list
-	ctx.Define("list", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("list", core.NewNamedBuiltinFunction("list", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.EmptyList, nil
 		}
@@ -73,7 +73,7 @@ func RegisterCollections(ctx *core.Context) {
 	}))
 
 	// tuple - create a new tuple
-	ctx.Define("tuple", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("tuple", core.NewNamedBuiltinFunction("tuple", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.EmptyTuple, nil
 		}
@@ -92,10 +92,11 @@ func RegisterCollections(ctx *core.Context) {
 	// dict - Python dict class
 	// Create as a class so dict.fromkeys and other class methods can be accessed
 	dictClass := createDictClass()
+	SetDictTypeClass(dictClass) // Store globally for type() function
 	ctx.Define("dict", dictClass)
 
 	// set - create a new set
-	ctx.Define("set", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("set", core.NewNamedBuiltinFunction("set", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("set", args)
 		if err := v.Max(1); err != nil {
 			return nil, err
@@ -149,7 +150,7 @@ func RegisterCollections(ctx *core.Context) {
 	}))
 
 	// frozenset - create a new immutable frozenset
-	ctx.Define("frozenset", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("frozenset", core.NewNamedBuiltinFunction("frozenset", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Use the type descriptor's constructor
 		desc := core.GetTypeDescriptor(core.FrozenSetType)
 		if desc != nil && desc.Constructor != nil {

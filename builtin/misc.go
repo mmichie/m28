@@ -260,6 +260,20 @@ func RegisterMisc(ctx *core.Context) {
 		}
 		return core.StringValue(fmt.Sprintf("0o%o", i)), nil
 	}))
+
+	// del - delete variables (for now, a no-op to satisfy Python code)
+	// Python's del statement is used to unbind names, but in types.py it's just cleanup
+	ctx.Define("del", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// In a full implementation, this would unbind the variables from the namespace
+		// For now, it's a no-op that returns None
+		return core.None, nil
+	}))
+
+	// Ellipsis - Python's ... literal
+	ctx.Define("Ellipsis", core.Ellipsis)
+
+	// NotImplemented - Python's NotImplemented singleton
+	ctx.Define("NotImplemented", core.NotImplemented)
 }
 
 // Migration Statistics:

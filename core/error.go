@@ -99,3 +99,21 @@ func NewFrame() *FrameType {
 func (f *FrameType) String() string {
 	return "<frame object>"
 }
+
+// CodeType represents a Python code object
+type CodeType struct {
+	BaseObject
+	Function Value // Reference to the function this code belongs to
+}
+
+// NewCodeObject creates a new code object for a function
+func NewCodeObject(fn Value) *CodeType {
+	return &CodeType{
+		BaseObject: *NewBaseObject(Type("code")),
+		Function:   fn,
+	}
+}
+
+func (c *CodeType) String() string {
+	return "<code object>"
+}
