@@ -199,6 +199,85 @@ func (s *StringIterator) String() string {
 	return "<str_iterator>"
 }
 
+// BytesIterator iterates over bytes
+type BytesIterator struct {
+	bytes []byte
+	index int
+}
+
+// NewBytesIterator creates an iterator for bytes
+func NewBytesIterator(b core.BytesValue) *BytesIterator {
+	return &BytesIterator{
+		bytes: []byte(b),
+		index: 0,
+	}
+}
+
+// Next returns the next byte as a NumberValue
+func (b *BytesIterator) Next() (core.Value, error) {
+	if b.index < len(b.bytes) {
+		val := core.NumberValue(b.bytes[b.index])
+		b.index++
+		return val, nil
+	}
+	return nil, &StopIteration{}
+}
+
+// HasNext checks if there are more bytes
+func (b *BytesIterator) HasNext() bool {
+	return b.index < len(b.bytes)
+}
+
+// Type implements Value.Type
+func (b *BytesIterator) Type() core.Type {
+	return "bytes_iterator"
+}
+
+// String implements Value.String
+func (b *BytesIterator) String() string {
+	return "<bytes_iterator>"
+}
+
+// ByteArrayIterator iterates over bytearray
+type ByteArrayIterator struct {
+	bytearray *core.ByteArrayValue
+	index     int
+}
+
+// NewByteArrayIterator creates an iterator for bytearray
+func NewByteArrayIterator(ba *core.ByteArrayValue) *ByteArrayIterator {
+	return &ByteArrayIterator{
+		bytearray: ba,
+		index:     0,
+	}
+}
+
+// Next returns the next byte as a NumberValue
+func (b *ByteArrayIterator) Next() (core.Value, error) {
+	data := b.bytearray.GetData()
+	if b.index < len(data) {
+		val := core.NumberValue(data[b.index])
+		b.index++
+		return val, nil
+	}
+	return nil, &StopIteration{}
+}
+
+// HasNext checks if there are more bytes
+func (b *ByteArrayIterator) HasNext() bool {
+	return b.index < len(b.bytearray.GetData())
+}
+
+// Type implements Value.Type
+func (b *ByteArrayIterator) Type() core.Type {
+	return "bytearray_iterator"
+}
+
+// String implements Value.String
+func (b *ByteArrayIterator) String() string {
+	return "<bytearray_iterator>"
+}
+
 // RangeIterator iterates over range values
 type RangeIterator struct {
 	rang    *core.RangeValue
@@ -394,6 +473,10 @@ func GetIterableOps(v core.Value) (Iterator, bool) {
 		return NewTupleIterator(val), true
 	case core.StringValue:
 		return NewStringIterator(val), true
+	case core.BytesValue:
+		return NewBytesIterator(val), true
+	case *core.ByteArrayValue:
+		return NewByteArrayIterator(val), true
 	case *core.RangeValue:
 		return NewRangeIterator(val), true
 	default:
