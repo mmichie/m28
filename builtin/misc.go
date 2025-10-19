@@ -2,7 +2,6 @@ package builtin
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
@@ -174,36 +173,11 @@ func RegisterMisc(ctx *core.Context) {
 			targetCtx = ctx
 		}
 
-		// Debug output BEFORE adding variables
-		if debugGlobals := os.Getenv("DEBUG_GLOBALS"); debugGlobals != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG_GLOBALS] targetCtx=%p ctx=%p ctx.Global=%p ctx.Outer=%p\n", targetCtx, ctx, ctx.Global, ctx.Outer)
-			fmt.Fprintf(os.Stderr, "[DEBUG_GLOBALS] targetCtx.Vars has %d entries\n", len(targetCtx.Vars))
-			fmt.Fprintf(os.Stderr, "[DEBUG_GLOBALS] ctx.Vars has %d entries\n", len(ctx.Vars))
-			if ctx.Outer != nil {
-				fmt.Fprintf(os.Stderr, "[DEBUG_GLOBALS] ctx.Outer.Vars has %d entries\n", len(ctx.Outer.Vars))
-			}
-			if moduleName, err := targetCtx.Lookup("__name__"); err == nil {
-				fmt.Fprintf(os.Stderr, "[DEBUG_GLOBALS] targetCtx.__name__=%v\n", moduleName)
-			}
-			if moduleName, err := ctx.Lookup("__name__"); err == nil {
-				fmt.Fprintf(os.Stderr, "[DEBUG_GLOBALS] ctx.__name__=%v\n", moduleName)
-			}
-		}
-
 		// Add all variables from the target context
 		for name, value := range targetCtx.Vars {
 			// Use SetWithKey to properly track original keys for iteration
 			keyVal := core.StringValue(name)
 			dict.SetWithKey(name, keyVal, value)
-		}
-
-		// Debug output
-		if moduleName, err := targetCtx.Lookup("__name__"); err == nil {
-			if strName, ok := moduleName.(core.StringValue); ok && string(strName) == "types" {
-				fmt.Fprintf(os.Stderr, "[DEBUG globals()] Module types: returning %d variables\n", dict.Size())
-				fmt.Fprintf(os.Stderr, "[DEBUG globals()] targetCtx == ctx: %v\n", targetCtx == ctx)
-				fmt.Fprintf(os.Stderr, "[DEBUG globals()] targetCtx == ctx.Global: %v\n", targetCtx == ctx.Global)
-			}
 		}
 
 		return dict, nil

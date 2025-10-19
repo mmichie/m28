@@ -124,19 +124,6 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	if allVal, err := moduleCtx.Lookup("__all__"); err == nil {
 		// __all__ is defined, only export listed names
 		if allList, ok := allVal.(core.ListValue); ok {
-			// Debug for types module
-			if name == "types" {
-				fmt.Fprintf(os.Stderr, "[DEBUG] Module '%s' has __all__ with %d items\n", name, len(allList))
-				hasGenericAlias := false
-				for _, item := range allList {
-					if strVal, ok := item.(core.StringValue); ok && string(strVal) == "GenericAlias" {
-						hasGenericAlias = true
-						break
-					}
-				}
-				fmt.Fprintf(os.Stderr, "[DEBUG] __all__ contains GenericAlias: %v\n", hasGenericAlias)
-			}
-
 			for _, item := range allList {
 				var exportName string
 				switch v := item.(type) {
@@ -155,7 +142,6 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 	} else {
 		// No __all__, export all non-private, non-dunder variables
-		exportedCount := 0
 		for varName, value := range moduleCtx.Vars {
 			// Skip dunder variables (__name__, __file__, etc.)
 			if len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__" {
@@ -166,21 +152,6 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 				continue
 			}
 			moduleDict.Set(varName, value)
-			exportedCount++
-			// Debug: print first few exports for types module
-			if name == "types" && exportedCount <= 10 {
-				fmt.Fprintf(os.Stderr, "[DEBUG] Exported '%s': %v (%T)\n", varName, value, value)
-			}
-		}
-		// Debug: for types module, print total count and check for GenericAlias
-		if name == "types" {
-			fmt.Fprintf(os.Stderr, "[DEBUG] Module '%s' exported %d names total\n", name, exportedCount)
-			// Check specifically for GenericAlias
-			if val, err := moduleCtx.Lookup("GenericAlias"); err == nil {
-				fmt.Fprintf(os.Stderr, "[DEBUG] GenericAlias in moduleCtx: %v (%T)\n", val, val)
-			} else {
-				fmt.Fprintf(os.Stderr, "[DEBUG] GenericAlias NOT in moduleCtx: %v\n", err)
-			}
 		}
 	}
 
