@@ -585,7 +585,37 @@ func createMethod(name string, params core.ListValue, body []core.Value, ctx *co
 func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Special form super with no args - look up self/cls/mcls
 	if len(args) == 0 {
-		// Try to find the first parameter (could be self, cls, mcls, etc.)
+		// First, check if __class__ is defined in the context
+		// This tells us which class's method we're currently executing in
+		classVal, classErr := ctx.Lookup("__class__")
+		if classErr == nil {
+			if class, ok := classVal.(*core.Class); ok {
+				// We know which class we're in, so use its parent
+				// Now determine if we're in an instance method or class method
+				// by checking for self/cls/mcls
+				if selfVal, err := ctx.Lookup("self"); err == nil {
+					if instance, ok := selfVal.(*core.Instance); ok {
+						// Instance method - return super for parent class with instance
+						if len(class.Parents) > 0 {
+							return core.NewSuper(class.Parents[0], instance), nil
+						} else if class.Parent != nil {
+							return core.NewSuper(class.Parent, instance), nil
+						}
+						return nil, fmt.Errorf("super: class has no parent")
+					}
+				}
+
+				// Class method or metaclass method - no instance
+				if len(class.Parents) > 0 {
+					return core.NewSuper(class.Parents[0], nil), nil
+				} else if class.Parent != nil {
+					return core.NewSuper(class.Parent, nil), nil
+				}
+				return nil, fmt.Errorf("super: class has no parent")
+			}
+		}
+
+		// Fallback: Try to find the first parameter (could be self, cls, mcls, etc.)
 		// Try common names in order
 		var firstArg core.Value
 		var err error
@@ -607,19 +637,7 @@ func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Check if it's an instance
 		if instance, ok := firstArg.(*core.Instance); ok {
 			// It's an instance, use its class
-			// Try to get __class__ from context, otherwise use instance's class
-			classVal, err := ctx.Lookup("__class__")
-			if err != nil {
-				// Use instance's class as fallback
-				return core.NewSuper(instance.Class, instance), nil
-			}
-
-			class, ok := classVal.(*core.Class)
-			if !ok {
-				return core.NewSuper(instance.Class, instance), nil
-			}
-
-			return core.NewSuper(class, instance), nil
+			return core.NewSuper(instance.Class, instance), nil
 		}
 
 		// Check if it's a class (for class methods or metaclass methods)

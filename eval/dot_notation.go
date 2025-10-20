@@ -138,7 +138,24 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 			}
 
-			return method.Call(evalArgs, ctx)
+			// If calling a method on a class or super object, inject __class__ into the context
+			// so that super() knows which class's method is being executed
+			callCtx := ctx
+			if class, ok := obj.(*core.Class); ok {
+				// Get the class where this method is defined
+				if _, definingClass, found := class.GetMethodWithClass(string(propName)); found && definingClass != nil {
+					// Create a new context with __class__ set to the defining class
+					callCtx = core.NewContext(ctx)
+					callCtx.Define("__class__", definingClass)
+				}
+			} else if superObj, ok := obj.(*core.Super); ok {
+				// When calling a method through super(), set __class__ to the super's class
+				// (which is the parent class where the method is defined)
+				callCtx = core.NewContext(ctx)
+				callCtx.Define("__class__", superObj.Class)
+			}
+
+			return method.Call(evalArgs, callCtx)
 		}
 
 		// Just property access

@@ -18,6 +18,7 @@ type ReadlineInput struct {
 	colorManager  *ColorManager
 	indentTracker *IndentationTracker
 	viMode        bool
+	pythonMode    bool
 }
 
 // NewReadlineInput creates a new readline input handler
@@ -161,10 +162,14 @@ func (ri *ReadlineInput) ReadMultiLine(firstLine string) (string, error) {
 	ri.indentTracker.Reset()
 	ri.indentTracker.UpdateLevel(firstLine)
 
+	// Use appropriate incomplete checker based on mode
+	incompleteChecker := isIncomplete
+	if ri.pythonMode {
+		incompleteChecker = isPythonIncomplete
+	}
+
 	for {
-		// Calculate continuation prompt with proper indentation
-		lastLine := lines[len(lines)-1]
-		ri.indentTracker.UpdateLevel(lastLine)
+		// Get current indentation level for the prompt
 		indent := ri.indentTracker.GetIndentation()
 		contPrompt := fmt.Sprintf("... %s", indent)
 		coloredPrompt := ri.colorManager.ColorizePrompt(contPrompt)
@@ -179,14 +184,36 @@ func (ri *ReadlineInput) ReadMultiLine(firstLine string) (string, error) {
 			return "", err
 		}
 
+		// Handle indentation for Python mode
+		trimmed := strings.TrimSpace(line)
+		if ri.pythonMode {
+			// If user provided their own indentation, respect it
+			if len(line) > 0 && line[0] == ' ' {
+				ri.indentTracker.SetLevelFromLine(line)
+			} else if trimmed != "" {
+				// Add our indentation to non-empty lines
+				line = indent + line
+			}
+		}
+
 		lines = append(lines, line)
+
+		// Update indentation level for next line based on what was just entered
+		if ri.pythonMode && trimmed != "" {
+			ri.indentTracker.UpdateLevel(trimmed)
+		}
 
 		// Check if we have a complete expression
 		fullInput := strings.Join(lines, "\n")
-		if !isIncomplete(fullInput) {
+		if !incompleteChecker(fullInput) {
 			return fullInput, nil
 		}
 	}
+}
+
+// SetPythonMode enables or disables Python syntax parsing mode
+func (ri *ReadlineInput) SetPythonMode(enabled bool) {
+	ri.pythonMode = enabled
 }
 
 // Close closes the readline instance

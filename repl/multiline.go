@@ -54,6 +54,63 @@ func isIncomplete(input string) bool {
 	return parenCount > 0 || bracketCount > 0 || braceCount > 0 || inString
 }
 
+// isPythonIncomplete checks if Python code is incomplete and needs more input
+func isPythonIncomplete(input string) bool {
+	// First check for unmatched brackets (reuse existing logic)
+	if isIncomplete(input) {
+		return true
+	}
+
+	lines := strings.Split(input, "\n")
+	if len(lines) == 0 {
+		return false
+	}
+
+	// Check if the last non-empty line ends with ':'
+	// This indicates a block start (if, for, while, def, class, try, except, etc.)
+	for i := len(lines) - 1; i >= 0; i-- {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed != "" {
+			// Check for colon at the end (ignoring comments)
+			if idx := strings.Index(trimmed, "#"); idx >= 0 {
+				trimmed = trimmed[:idx]
+				trimmed = strings.TrimSpace(trimmed)
+			}
+			if strings.HasSuffix(trimmed, ":") {
+				return true
+			}
+			break
+		}
+	}
+
+	// Check if we're inside an indented block
+	// If the last non-empty line is indented, we might need more input
+	if len(lines) > 1 {
+		lastNonEmpty := ""
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.TrimSpace(lines[i]) != "" {
+				lastNonEmpty = lines[i]
+				break
+			}
+		}
+
+		// If the last line is empty and the previous non-empty line was indented,
+		// we're done with the block
+		if lastNonEmpty != "" && len(lines[len(lines)-1]) == 0 {
+			return false
+		}
+	}
+
+	// Check for line continuation with backslash
+	lastLine := lines[len(lines)-1]
+	trimmed := strings.TrimRight(lastLine, " \t")
+	if strings.HasSuffix(trimmed, "\\") {
+		return true
+	}
+
+	return false
+}
+
 // readMultilineInput reads multi-line input until the expression is complete
 func (r *REPL) readMultilineInput(firstLine string) (string, error) {
 	var lines []string
@@ -63,7 +120,13 @@ func (r *REPL) readMultilineInput(firstLine string) (string, error) {
 	r.indentTracker.Reset()
 	r.indentTracker.UpdateLevel(firstLine)
 
-	for isIncomplete(strings.Join(lines, "\n")) {
+	// Use appropriate incomplete checker based on mode
+	incompleteChecker := isIncomplete
+	if r.pythonMode {
+		incompleteChecker = isPythonIncomplete
+	}
+
+	for incompleteChecker(strings.Join(lines, "\n")) {
 		// Print continuation prompt
 		fmt.Fprint(r.writer, r.executionState.FormatContinuationPrompt())
 

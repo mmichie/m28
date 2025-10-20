@@ -452,6 +452,12 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	// Create a new environment with the function's environment as parent
 	funcEnv := core.NewContext(f.env)
 
+	// If __class__ is defined in the call context, copy it to the function environment
+	// This allows super() to know which class's method is being executed
+	if classVal, err := ctx.Lookup("__class__"); err == nil {
+		funcEnv.Define("__class__", classVal)
+	}
+
 	// Use new signature-based binding if available
 	if f.signature != nil {
 		// For now, we don't support keyword arguments in calls, just positional
@@ -493,6 +499,12 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	// Create a new environment with the function's environment as parent
 	funcEnv := core.NewContext(f.env)
+
+	// If __class__ is defined in the call context, copy it to the function environment
+	// This allows super() to know which class's method is being executed
+	if classVal, err := ctx.Lookup("__class__"); err == nil {
+		funcEnv.Define("__class__", classVal)
+	}
 
 	// Use new signature-based binding if available
 	if f.signature != nil {

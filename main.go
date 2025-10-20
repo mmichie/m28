@@ -27,6 +27,7 @@ var (
 	command     = flag.String("c", "", "Execute program passed as string")
 	parseOnly   = flag.Bool("parse", false, "Parse only, print AST and exit")
 	printAST    = flag.Bool("ast", false, "Print AST (same as -parse)")
+	pythonMode  = flag.Bool("python", false, "Enable Python mode for REPL")
 )
 
 const version = "0.1.0-fresh-start"
@@ -125,6 +126,9 @@ func main() {
 
 	// Start the REPL (either no args or -i flag)
 	r := repl.NewREPL(globalCtx)
+	if *pythonMode {
+		r.SetPythonMode(true)
+	}
 	r.Start()
 }
 
@@ -136,6 +140,7 @@ func printHelp() {
 	fmt.Println("  -e EXPR      Evaluate expression")
 	fmt.Println("  -c PROGRAM   Execute program string")
 	fmt.Println("  -i           Interactive mode after file execution")
+	fmt.Println("  -python      Enable Python mode for REPL")
 	fmt.Println("  -parse       Parse file and print AST (don't execute)")
 	fmt.Println("  -ast         Print AST (same as -parse)")
 	fmt.Println("  -path PATHS  Additional module search paths (colon-separated)")
@@ -151,7 +156,8 @@ func printHelp() {
 	fmt.Println("  M28_PATH     Module search paths (colon-separated)")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  m28                    Start interactive REPL")
+	fmt.Println("  m28                    Start interactive REPL (M28 syntax)")
+	fmt.Println("  m28 -python            Start interactive REPL (Python syntax)")
 	fmt.Println("  m28 script.m28         Run M28 script")
 	fmt.Println("  m28 script.py          Run Python script")
 	fmt.Println("  m28 -e '(+ 1 2)'       Evaluate expression")

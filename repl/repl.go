@@ -29,6 +29,7 @@ type REPL struct {
 	colorManager   *ColorManager
 	readlineInput  *ReadlineInput // New field for readline support
 	useReadline    bool           // Flag to control readline usage
+	pythonMode     bool           // Flag to enable Python syntax parsing
 }
 
 // NewREPL creates a new REPL with the given context
@@ -106,9 +107,22 @@ func (r *REPL) IsReadlineEnabled() bool {
 	return r.useReadline && r.readlineInput != nil
 }
 
+// SetPythonMode enables or disables Python syntax parsing mode
+func (r *REPL) SetPythonMode(enabled bool) {
+	r.pythonMode = enabled
+	// Also set it on readline input if available
+	if r.readlineInput != nil {
+		r.readlineInput.SetPythonMode(enabled)
+	}
+}
+
 // Start starts the REPL
 func (r *REPL) Start() {
-	fmt.Fprintln(r.writer, "M28 REPL")
+	if r.pythonMode {
+		fmt.Fprintln(r.writer, "M28 REPL (Python Mode)")
+	} else {
+		fmt.Fprintln(r.writer, "M28 REPL")
+	}
 	fmt.Fprintln(r.writer, "Type 'exit' to quit, 'help' for more information")
 	fmt.Fprintln(r.writer)
 
@@ -190,7 +204,14 @@ func (r *REPL) Start() {
 
 		// Check for incomplete input (multi-line)
 		fullInput := line
-		if isIncomplete(line) {
+		needsMoreInput := false
+		if r.pythonMode {
+			needsMoreInput = isPythonIncomplete(line)
+		} else {
+			needsMoreInput = isIncomplete(line)
+		}
+
+		if needsMoreInput {
 			var multiLine string
 			var err error
 
@@ -212,12 +233,61 @@ func (r *REPL) Start() {
 		// Get the execution number for this command
 		execNum := r.executionState.NextExecutionNumber()
 
-		// Parse the input
-		p := parser.NewParser()
-		expr, err := p.Parse(fullInput)
-		if err != nil {
-			fmt.Fprintf(r.writer, "Parse error: %s\n", err)
+		// Parse the input based on mode
+		var expr core.Value
+
+		if r.pythonMode {
+			// Use Python parser
+			tokenizer := parser.NewPythonTokenizer(fullInput)
+			tokens, tokErr := tokenizer.Tokenize()
+			if tokErr != nil {
+				fmt.Fprintf(r.writer, "Tokenization error: %s\n", tokErr)
+				continue
+			}
+
+			pythonParser := parser.NewPythonParser(tokens)
+			nodes, parseErr := pythonParser.Parse()
+			if parseErr != nil {
+				fmt.Fprintf(r.writer, "Parse error: %s\n", parseErr)
+				continue
+			}
+
+			// Convert all Python AST nodes to IR and evaluate
+			// For REPL, we want to evaluate each statement and return the last value
+			var lastResult core.Value = core.NilValue{}
+			var evalErr error
+			for _, node := range nodes {
+				ir := node.ToIR()
+				lastResult, evalErr = eval.Eval(ir, r.ctx)
+				if evalErr != nil {
+					r.errorReporter.ReportError(evalErr, r.ctx, r.writer)
+					break
+				}
+			}
+
+			if evalErr != nil {
+				continue
+			}
+
+			// For REPL, we'll handle the result directly here when in Python mode
+			if lastResult != core.Nil {
+				r.executionState.StoreOutput(execNum, lastResult)
+				resultStr := core.Repr(lastResult)
+				outputPrompt := r.executionState.FormatOutputPrompt(execNum)
+				fmt.Fprintf(r.writer, "%s%s\n",
+					r.colorManager.ColorizeOutputPrompt(outputPrompt),
+					resultStr)
+			}
 			continue
+		} else {
+			// Use M28 parser
+			p := parser.NewParser()
+			var parseErr error
+			expr, parseErr = p.Parse(fullInput)
+			if parseErr != nil {
+				fmt.Fprintf(r.writer, "Parse error: %s\n", parseErr)
+				continue
+			}
 		}
 
 		// Start tracking output for duplicate detection
