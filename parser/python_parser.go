@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/core/ast"
@@ -2456,6 +2457,58 @@ func (p *PythonParser) parseIfStatement() ast.ASTNode {
 	return ast.NewIfForm(condition, thenNode, elseNode, p.makeLocation(tok), ast.SyntaxPython)
 }
 
+// splitLoopVariables splits a loop variable string into individual variables
+// Handles:
+//   - "(x, y, z)" -> ["x", "y", "z"]
+//   - "x" -> ["x"]
+//   - "(x, (y, z))" -> ["x", "(y, z)"] // nested tuples preserved
+func splitLoopVariables(varStr string) []string {
+	varStr = strings.TrimSpace(varStr)
+
+	// If no parentheses, return as-is
+	if !strings.HasPrefix(varStr, "(") {
+		return []string{varStr}
+	}
+
+	// Remove outer parentheses: "(x, y)" -> "x, y"
+	if strings.HasPrefix(varStr, "(") && strings.HasSuffix(varStr, ")") {
+		varStr = varStr[1 : len(varStr)-1]
+	}
+
+	// Split by comma, respecting nested parentheses
+	variables := []string{}
+	current := strings.Builder{}
+	depth := 0
+
+	for _, ch := range varStr {
+		switch ch {
+		case '(':
+			depth++
+			current.WriteRune(ch)
+		case ')':
+			depth--
+			current.WriteRune(ch)
+		case ',':
+			if depth == 0 {
+				// Top-level comma - split here
+				variables = append(variables, strings.TrimSpace(current.String()))
+				current.Reset()
+			} else {
+				current.WriteRune(ch)
+			}
+		default:
+			current.WriteRune(ch)
+		}
+	}
+
+	// Add last variable
+	if current.Len() > 0 {
+		variables = append(variables, strings.TrimSpace(current.String()))
+	}
+
+	return variables
+}
+
 // parseForStatement parses: for var[, var2, ...] in iterable: block (else: block)?
 func (p *PythonParser) parseForStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_FOR)
@@ -2482,7 +2535,16 @@ func (p *PythonParser) parseForStatement() ast.ASTNode {
 		elseBody = p.parseBlock()
 	}
 
-	return ast.NewForForm(variable, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
+	// Split variable string into individual variables
+	// e.g. "(index, name)" -> ["index", "name"]
+	//      "x" -> ["x"]
+	variables := splitLoopVariables(variable)
+
+	if len(variables) == 1 {
+		return ast.NewForForm(variables[0], iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
+	} else {
+		return ast.NewForFormMulti(variables, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
+	}
 }
 
 // parseForIterable parses the iterable expression in a for loop

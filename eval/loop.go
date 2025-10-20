@@ -145,18 +145,49 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	var body core.ListValue
 
 	// Check if first arg is a list (old syntax) or symbol (new syntax)
-	if binding, ok := args[0].(core.ListValue); ok && len(binding) >= 2 {
-		// Old syntax: (for (var sequence) body...) or (for (var1 var2 sequence) body...)
-		// Extract all symbols except the last element
-		for i := 0; i < len(binding)-1; i++ {
-			sym, ok := binding[i].(core.SymbolValue)
-			if !ok {
-				return nil, TypeError{Expected: "symbol", Got: binding[i].Type()}
+	if binding, ok := args[0].(core.ListValue); ok && len(binding) >= 1 {
+		// Check if next arg is 'in' keyword - if so, use Python-style syntax
+		if len(args) >= 3 {
+			if sym, ok := args[1].(core.SymbolValue); ok && string(sym) == "in" {
+				// Python-style: (for (var1 var2) in sequence body...)
+				for i := 0; i < len(binding); i++ {
+					varSym, ok := binding[i].(core.SymbolValue)
+					if !ok {
+						return nil, TypeError{Expected: "symbol", Got: binding[i].Type()}
+					}
+					varNames = append(varNames, varSym)
+				}
+				sequenceExpr = args[2]
+				body = args[3:]
+			} else if len(binding) >= 2 {
+				// Old syntax: (for (var sequence) body...) or (for (var1 var2 sequence) body...)
+				// Extract all symbols except the last element
+				for i := 0; i < len(binding)-1; i++ {
+					sym, ok := binding[i].(core.SymbolValue)
+					if !ok {
+						return nil, TypeError{Expected: "symbol", Got: binding[i].Type()}
+					}
+					varNames = append(varNames, sym)
+				}
+				sequenceExpr = binding[len(binding)-1]
+				body = args[1:]
+			} else {
+				return nil, ArgumentError{"for requires at least 2 elements in binding list"}
 			}
-			varNames = append(varNames, sym)
+		} else if len(binding) >= 2 {
+			// Old syntax with no 'in' keyword
+			for i := 0; i < len(binding)-1; i++ {
+				sym, ok := binding[i].(core.SymbolValue)
+				if !ok {
+					return nil, TypeError{Expected: "symbol", Got: binding[i].Type()}
+				}
+				varNames = append(varNames, sym)
+			}
+			sequenceExpr = binding[len(binding)-1]
+			body = args[1:]
+		} else {
+			return nil, ArgumentError{"for requires at least 2 elements in binding list"}
 		}
-		sequenceExpr = binding[len(binding)-1]
-		body = args[1:]
 	} else {
 		// New syntax: check for multiple vars with 'in' keyword
 		// Look for 'in' keyword
