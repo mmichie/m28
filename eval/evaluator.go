@@ -463,8 +463,10 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 
 	// If __class__ is defined in the call context, copy it to the function environment
 	// This allows super() to know which class's method is being executed
-	if classVal, err := ctx.Lookup("__class__"); err == nil {
-		funcEnv.Define("__class__", classVal)
+	if ctx != nil {
+		if classVal, err := ctx.Lookup("__class__"); err == nil {
+			funcEnv.Define("__class__", classVal)
+		}
 	}
 
 	// Use new signature-based binding if available

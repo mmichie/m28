@@ -122,35 +122,7 @@ func Init_FunctoolsModule() *core.DictValue {
 	}))
 
 	// partial - Create partial function with fixed arguments
-	functoolsModule.Set("partial", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("partial", args)
-		if err := v.Min(1); err != nil {
-			return nil, err
-		}
-
-		function, err := types.RequireCallable(v.Get(0), "partial() first argument")
-		if err != nil {
-			return nil, err
-		}
-
-		// Capture the fixed arguments
-		fixedArgs := make([]core.Value, v.Count()-1)
-		for i := 1; i < v.Count(); i++ {
-			fixedArgs[i-1] = v.Get(i)
-		}
-
-		// Create a new function that prepends the fixed arguments
-		partialFunc := core.NewBuiltinFunction(func(newArgs []core.Value, newCtx *core.Context) (core.Value, error) {
-			// Combine fixed args with new args
-			allArgs := make([]core.Value, 0, len(fixedArgs)+len(newArgs))
-			allArgs = append(allArgs, fixedArgs...)
-			allArgs = append(allArgs, newArgs...)
-
-			return function.Call(allArgs, newCtx)
-		})
-
-		return partialFunc, nil
-	}))
+	functoolsModule.Set("partial", &partialBuiltin{})
 
 	// cache - Simple memoization decorator (limited version)
 	functoolsModule.Set("cache", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -273,6 +245,114 @@ func makeCacheKey(args []core.Value) string {
 	key += ")"
 
 	return key
+}
+
+// partialBuiltin implements partial with keyword argument support
+type partialBuiltin struct {
+	core.BaseObject
+}
+
+func (p *partialBuiltin) Type() core.Type {
+	return core.FunctionType
+}
+
+func (p *partialBuiltin) String() string {
+	return "<built-in function partial>"
+}
+
+func (p *partialBuiltin) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return p.CallWithKeywords(args, nil, ctx)
+}
+
+func (p *partialBuiltin) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("partial", args)
+	if err := v.Min(1); err != nil {
+		return nil, err
+	}
+
+	function, err := types.RequireCallable(v.Get(0), "partial() first argument")
+	if err != nil {
+		return nil, err
+	}
+
+	// Capture the fixed positional arguments
+	fixedArgs := make([]core.Value, v.Count()-1)
+	for i := 1; i < v.Count(); i++ {
+		fixedArgs[i-1] = v.Get(i)
+	}
+
+	// Capture the fixed keyword arguments
+	fixedKwargs := make(map[string]core.Value)
+	if kwargs != nil {
+		for k, v := range kwargs {
+			fixedKwargs[k] = v
+		}
+	}
+
+	// Create a new function that prepends the fixed arguments
+	partialFunc := &partialFunction{
+		function:    function,
+		fixedArgs:   fixedArgs,
+		fixedKwargs: fixedKwargs,
+	}
+
+	return partialFunc, nil
+}
+
+// partialFunction is the result of calling partial()
+type partialFunction struct {
+	core.BaseObject
+	function    core.Callable
+	fixedArgs   []core.Value
+	fixedKwargs map[string]core.Value
+}
+
+func (pf *partialFunction) Type() core.Type {
+	return core.FunctionType
+}
+
+func (pf *partialFunction) String() string {
+	return fmt.Sprintf("functools.partial(%s, ...)", pf.function)
+}
+
+func (pf *partialFunction) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return pf.CallWithKeywords(args, nil, ctx)
+}
+
+func (pf *partialFunction) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// Combine fixed args with new args
+	allArgs := make([]core.Value, 0, len(pf.fixedArgs)+len(args))
+	allArgs = append(allArgs, pf.fixedArgs...)
+	allArgs = append(allArgs, args...)
+
+	// Combine fixed kwargs with new kwargs (new kwargs override fixed ones)
+	allKwargs := make(map[string]core.Value)
+	for k, v := range pf.fixedKwargs {
+		allKwargs[k] = v
+	}
+	if kwargs != nil {
+		for k, v := range kwargs {
+			allKwargs[k] = v
+		}
+	}
+
+	// Call the underlying function with combined args
+	// Try CallWithKwargs first (UserFunction)
+	if kwCallable, ok := pf.function.(interface {
+		CallWithKwargs([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+	}); ok && len(allKwargs) > 0 {
+		return kwCallable.CallWithKwargs(allArgs, allKwargs, ctx)
+	}
+
+	// Try CallWithKeywords (builtins)
+	if kwCallable, ok := pf.function.(interface {
+		CallWithKeywords([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+	}); ok && len(allKwargs) > 0 {
+		return kwCallable.CallWithKeywords(allArgs, allKwargs, ctx)
+	}
+
+	// Fall back to regular Call if no kwargs or function doesn't support them
+	return pf.function.Call(allArgs, ctx)
 }
 
 // lruCacheBuiltin implements lru_cache with keyword argument support
