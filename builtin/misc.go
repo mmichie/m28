@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
@@ -297,6 +298,29 @@ func RegisterMisc(ctx *core.Context) {
 		codeStr, err := v.GetString(0)
 		if err != nil {
 			return nil, err
+		}
+
+		// Transform Python lambda syntax to M28 syntax if needed
+		// Pattern: lambda params: body  ->  (lambda (params) body)
+		if strings.HasPrefix(strings.TrimSpace(codeStr), "lambda ") {
+			// Find the colon that separates params from body
+			colonIdx := strings.Index(codeStr, ":")
+			if colonIdx > 0 {
+				// Extract params and body
+				paramsStr := strings.TrimSpace(codeStr[6:colonIdx]) // Skip "lambda "
+				bodyStr := strings.TrimSpace(codeStr[colonIdx+1:])
+
+				// Convert params: "a, b, c" -> "(a b c)"
+				params := strings.Split(paramsStr, ",")
+				for i, p := range params {
+					params[i] = strings.TrimSpace(p)
+				}
+				paramsM28 := "(" + strings.Join(params, " ") + ")"
+
+				// Convert body: Pythonic calls to M28 calls
+				// For now, keep body as-is since M28 supports both syntaxes
+				codeStr = "(lambda " + paramsM28 + " " + bodyStr + ")"
+			}
 		}
 
 		// Get the globals dict (optional)

@@ -45,6 +45,47 @@ func RegisterTypes(ctx *core.Context) {
 	SetTypeClass = core.NewClass("set", nil)
 	FunctionTypeClass = core.NewClass("function", nil)
 
+	// Add __new__ classmethod to tuple
+	tupleNew := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// tuple.__new__(cls, iterable=())
+		// First arg is cls (the class), second is optional iterable
+		if len(args) < 1 {
+			return nil, fmt.Errorf("tuple.__new__() missing 1 required positional argument: 'cls'")
+		}
+
+		// If only cls provided, return empty tuple
+		if len(args) == 1 {
+			return core.TupleValue{}, nil
+		}
+
+		// Convert iterable to tuple
+		iterable := args[1]
+
+		// Handle different iterable types
+		switch v := iterable.(type) {
+		case core.TupleValue:
+			return v, nil
+		case core.ListValue:
+			return core.TupleValue(v), nil
+		case core.Iterable:
+			// Iterate and collect values
+			result := make([]core.Value, 0)
+			iter := v.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				result = append(result, val)
+			}
+			return core.TupleValue(result), nil
+		default:
+			return nil, fmt.Errorf("tuple.__new__() argument must be an iterable")
+		}
+	})
+	tupleNew.SetAttr("__name__", core.StringValue("__new__"))
+	TupleTypeClass.SetMethod("__new__", &core.ClassMethodValue{Function: tupleNew})
+
 	// Add __code__ and __globals__ as class attributes on function type
 	// These are descriptor objects that Python uses to access function attributes
 	FunctionTypeClass.SetClassAttr("__code__", core.NewCodeObject(nil))

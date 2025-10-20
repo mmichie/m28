@@ -72,8 +72,9 @@ func RegisterCollections(ctx *core.Context) {
 		return core.ListValue(args), nil
 	}))
 
-	// tuple - create a new tuple
-	ctx.Define("tuple", core.NewNamedBuiltinFunction("tuple", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// tuple - use the TupleTypeClass which has __new__ support
+	// Create a callable tuple constructor that exposes __new__
+	tupleFunc := core.NewNamedBuiltinFunction("tuple", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.EmptyTuple, nil
 		}
@@ -87,7 +88,14 @@ func RegisterCollections(ctx *core.Context) {
 		}
 		// Multiple arguments: create a tuple from all arguments
 		return core.TupleValue(args), nil
-	}))
+	})
+
+	// Add __new__ classmethod from TupleTypeClass
+	if newMethod, ok := TupleTypeClass.GetMethod("__new__"); ok {
+		tupleFunc.SetAttr("__new__", newMethod)
+	}
+
+	ctx.Define("tuple", tupleFunc)
 
 	// dict - Python dict class
 	// Create as a class so dict.fromkeys and other class methods can be accessed
