@@ -514,7 +514,7 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			return NumberTypeClass, nil
 		case core.StringValue:
 			if StrTypeClass != nil {
-				return StrTypeClass.Class, nil
+				return StrTypeClass, nil
 			}
 			return core.NewClass("str", nil), nil
 		case core.BoolValue:
@@ -525,7 +525,7 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			return ListTypeClass, nil
 		case *core.DictValue:
 			if DictTypeClass != nil {
-				return DictTypeClass.Class, nil
+				return DictTypeClass, nil
 			}
 			return core.NewClass("dict", nil), nil
 		case core.TupleValue:

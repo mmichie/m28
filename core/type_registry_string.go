@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // registerStringType registers the string type descriptor with all its methods
@@ -187,6 +188,16 @@ func getStringMethods() map[string]*MethodDescriptor {
 				return BoolValue(strings.Contains(s, string(sub))), nil
 			},
 		},
+		"__str__": {
+			Name:    "__str__",
+			Arity:   0,
+			Doc:     "Return string representation",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				// Return the raw string without quotes
+				return receiver, nil
+			},
+		},
 		"__add__": {
 			Name:    "__add__",
 			Arity:   1,
@@ -247,6 +258,33 @@ func getStringMethods() map[string]*MethodDescriptor {
 				return BytesValue([]byte(s)), nil
 			},
 		},
+		"isidentifier": {
+			Name:    "isidentifier",
+			Arity:   0,
+			Doc:     "Return True if the string is a valid Python identifier",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				s := string(receiver.(StringValue))
+				if len(s) == 0 {
+					return False, nil
+				}
+
+				// Check first character: must be letter or underscore
+				runes := []rune(s)
+				if !unicode.IsLetter(runes[0]) && runes[0] != '_' {
+					return False, nil
+				}
+
+				// Check remaining characters: must be letter, digit, or underscore
+				for _, r := range runes[1:] {
+					if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
+						return False, nil
+					}
+				}
+
+				return True, nil
+			},
+		},
 	}
 }
 
@@ -304,6 +342,8 @@ func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error)
 
 	// Convert iterable to list of strings
 	var parts []string
+
+	// Try to get an iterable - check concrete types first for efficiency
 	switch v := args[0].(type) {
 	case ListValue:
 		parts = make([]string, len(v))
@@ -324,7 +364,24 @@ func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error)
 			}
 		}
 	default:
-		return nil, fmt.Errorf("join() argument must be an iterable")
+		// Check if it implements Iterable interface
+		if iter, ok := args[0].(Iterable); ok {
+			parts = make([]string, 0)
+			iterator := iter.Iterator()
+			for {
+				item, hasNext := iterator.Next()
+				if !hasNext {
+					break
+				}
+				if s, ok := item.(StringValue); ok {
+					parts = append(parts, string(s))
+				} else {
+					return nil, fmt.Errorf("join() requires string elements")
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("join() argument must be an iterable (got %T, type=%s)", args[0], args[0].Type())
+		}
 	}
 
 	return StringValue(strings.Join(parts, sep)), nil

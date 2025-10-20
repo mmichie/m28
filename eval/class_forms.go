@@ -761,6 +761,53 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 		return nil, fmt.Errorf("isinstance second argument must be a class or string type name")
 	}
 
+	// Handle primitive types (StringValue, NumberValue, etc.) that are not Instances
+	if !isInst {
+		// Check if obj is a primitive and class matches its type
+		switch obj.(type) {
+		case core.StringValue:
+			// Check if class is the str class
+			if class.Name == "string" || class.Name == "str" {
+				return core.True, nil
+			}
+		case core.NumberValue:
+			// Check if class is the number/int/float class
+			if class.Name == "number" || class.Name == "int" || class.Name == "float" {
+				return core.True, nil
+			}
+		case core.BoolValue:
+			// Check if class is the bool class
+			if class.Name == "bool" {
+				return core.True, nil
+			}
+		case core.NilValue:
+			// Check if class is NoneType
+			if class.Name == "nil" || class.Name == "NoneType" {
+				return core.True, nil
+			}
+		case core.ListValue:
+			// Check if class is list
+			if class.Name == "list" {
+				return core.True, nil
+			}
+		case *core.DictValue:
+			// Check if class is dict
+			if class.Name == "dict" {
+				return core.True, nil
+			}
+		case core.TupleValue:
+			// Check if class is tuple
+			if class.Name == "tuple" {
+				return core.True, nil
+			}
+		case *core.SetValue:
+			// Check if class is set
+			if class.Name == "set" {
+				return core.True, nil
+			}
+		}
+	}
+
 	if !isInst {
 		// Special case: isinstance(Foo, type) where Foo is a class
 		// type is the metaclass, so classes are instances of type

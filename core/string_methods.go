@@ -401,7 +401,24 @@ func InitStringMethods() {
 					}
 				}
 			default:
-				return nil, fmt.Errorf("join() argument must be an iterable")
+				// Check if it implements Iterable interface
+				if iter, ok := args[0].(Iterable); ok {
+					parts = make([]string, 0)
+					iterator := iter.Iterator()
+					for {
+						item, hasNext := iterator.Next()
+						if !hasNext {
+							break
+						}
+						if s, ok := item.(StringValue); ok {
+							parts = append(parts, string(s))
+						} else {
+							parts = append(parts, PrintValueWithoutQuotes(item))
+						}
+					}
+				} else {
+					return nil, fmt.Errorf("join() argument must be an iterable")
+				}
 			}
 
 			return StringValue(strings.Join(parts, sep)), nil
