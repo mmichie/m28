@@ -37,6 +37,21 @@ func InitSysModule() *core.DictValue {
 	implDict.Set("cache_tag", core.StringValue("m28"))
 	sysModule.SetWithKey("implementation", core.StringValue("implementation"), implDict)
 
+	// intern function - intern strings for memory optimization
+	// In M28, we just return the same string since we don't have string interning yet
+	sysModule.SetWithKey("intern", core.StringValue("intern"), core.NewNamedBuiltinFunction("intern", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, core.NewTypeError("string", nil, "intern() argument")
+		}
+		str, ok := args[0].(core.StringValue)
+		if !ok {
+			return nil, core.NewTypeError("string", args[0], "intern() argument")
+		}
+		// TODO: Implement actual string interning
+		// For now, just return the string as-is
+		return str, nil
+	}))
+
 	return sysModule
 }
 

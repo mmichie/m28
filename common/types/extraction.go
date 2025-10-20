@@ -108,7 +108,53 @@ func AsIterable(v core.Value) (core.Iterable, bool) {
 	if iter, ok := v.(core.Iterable); ok {
 		return iter, true
 	}
+
+	// Handle strings specially - they are iterable in Python
+	if str, ok := v.(core.StringValue); ok {
+		return &stringIterableWrapper{str}, true
+	}
+
 	return nil, false
+}
+
+// stringIterableWrapper wraps a StringValue to implement core.Iterable
+type stringIterableWrapper struct {
+	str core.StringValue
+}
+
+func (w *stringIterableWrapper) Type() core.Type {
+	return core.StringType
+}
+
+func (w *stringIterableWrapper) String() string {
+	return w.str.String()
+}
+
+func (w *stringIterableWrapper) Iterator() core.Iterator {
+	runes := []rune(string(w.str))
+	return &stringIterator{
+		runes: runes,
+		index: 0,
+	}
+}
+
+// stringIterator implements core.Iterator for strings
+type stringIterator struct {
+	runes []rune
+	index int
+}
+
+func (si *stringIterator) Next() (core.Value, bool) {
+	if si.index >= len(si.runes) {
+		return nil, false
+	}
+	char := core.StringValue(string(si.runes[si.index]))
+	si.index++
+	return char, true
+}
+
+func (si *stringIterator) Reset() {
+	si.index = 0
 }
 
 // AsRange extracts a RangeValue
