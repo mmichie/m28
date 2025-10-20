@@ -751,6 +751,51 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 			if _, ok := obj.(interface{ GetClass() *core.Class }); ok {
 				return core.True, nil
 			}
+			// Check for builtin type constructors (like frozenset, set, list, tuple)
+			// These are BuiltinFunctions but should be considered types for isinstance(x, type)
+			if bf, ok := obj.(*core.BuiltinFunction); ok {
+				if nameAttr, hasName := bf.GetAttr("__name__"); hasName {
+					if nameStr, ok := nameAttr.(core.StringValue); ok {
+						typeName := string(nameStr)
+						// List of builtin type constructors
+						typeConstructors := map[string]bool{
+							"frozenset":    true,
+							"set":          true,
+							"list":         true,
+							"tuple":        true,
+							"bytes":        true,
+							"bytearray":    true,
+							"str":          true,
+							"int":          true,
+							"float":        true,
+							"bool":         true,
+							"dict":         true,
+							"range":        true,
+							"memoryview":   true,
+							"complex":      true,
+							"object":       true,
+							"property":     true,
+							"staticmethod": true,
+							"classmethod":  true,
+						}
+						if typeConstructors[typeName] {
+							if debugClass {
+								fmt.Fprintf(os.Stderr, "[DEBUG isinstance] Recognized %s as type constructor\n", typeName)
+							}
+							return core.True, nil
+						}
+					}
+				}
+			}
+			// Log what we're rejecting
+			if debugClass {
+				if bf, ok := obj.(*core.BuiltinFunction); ok {
+					name, hasName := getBuiltinName(bf)
+					fmt.Fprintf(os.Stderr, "[DEBUG isinstance] isinstance(?, type) returning False for builtin: %s (hasName=%v) (type %T)\n", name, hasName, obj)
+				} else {
+					fmt.Fprintf(os.Stderr, "[DEBUG isinstance] isinstance(?, type) returning False for: %v (type %T)\n", obj, obj)
+				}
+			}
 		}
 		return core.False, nil
 	}
@@ -776,9 +821,53 @@ func issubclassForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 		return nil, err
 	}
 
-	// Both must be classes
+	// Extract classes, handling wrapper types and builtin type constructors
 	subClass, ok1 := subClassVal.(*core.Class)
+	if !ok1 {
+		// Try wrapper types
+		if wrapper, ok := subClassVal.(interface{ GetClass() *core.Class }); ok {
+			subClass = wrapper.GetClass()
+			ok1 = true
+		}
+	}
+
 	baseClass, ok2 := baseClassVal.(*core.Class)
+	if !ok2 {
+		// Try wrapper types
+		if wrapper, ok := baseClassVal.(interface{ GetClass() *core.Class }); ok {
+			baseClass = wrapper.GetClass()
+			ok2 = true
+		}
+	}
+
+	// Special handling for builtin type constructors
+	// If either argument is a builtin type constructor, we can't really check subclass relationships
+	// but we can check for equality
+	if bf, ok := subClassVal.(*core.BuiltinFunction); ok && !ok1 {
+		// subclass is a builtin function, check if it's a type constructor
+		if isTypeConstructor(bf) {
+			// For builtin types, we can only check equality
+			if bf2, ok := baseClassVal.(*core.BuiltinFunction); ok {
+				// Both are builtin functions, check if they're the same
+				subName, _ := getBuiltinName(bf)
+				baseName, _ := getBuiltinName(bf2)
+				if subName == baseName {
+					return core.True, nil
+				}
+				return core.False, nil
+			}
+			// Can't determine subclass for builtin vs class
+			return core.False, nil
+		}
+	}
+
+	if bf, ok := baseClassVal.(*core.BuiltinFunction); ok && !ok2 {
+		// base is a builtin function, check if it's a type constructor
+		if isTypeConstructor(bf) {
+			// Can't be a subclass of a builtin type
+			return core.False, nil
+		}
+	}
 
 	if !ok1 || !ok2 {
 		return nil, fmt.Errorf("issubclass arguments must be classes")
@@ -794,6 +883,35 @@ func issubclassForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 	}
 
 	return core.False, nil
+}
+
+// isTypeConstructor checks if a builtin function is a type constructor
+func isTypeConstructor(bf *core.BuiltinFunction) bool {
+	if nameAttr, hasName := bf.GetAttr("__name__"); hasName {
+		if nameStr, ok := nameAttr.(core.StringValue); ok {
+			typeName := string(nameStr)
+			typeConstructors := map[string]bool{
+				"frozenset": true, "set": true, "list": true, "tuple": true,
+				"bytes": true, "bytearray": true, "str": true,
+				"int": true, "float": true, "bool": true, "dict": true,
+				"range": true, "memoryview": true, "complex": true,
+				"object": true, "property": true,
+				"staticmethod": true, "classmethod": true,
+			}
+			return typeConstructors[typeName]
+		}
+	}
+	return false
+}
+
+// getBuiltinName returns the __name__ of a builtin function
+func getBuiltinName(bf *core.BuiltinFunction) (string, bool) {
+	if nameAttr, hasName := bf.GetAttr("__name__"); hasName {
+		if nameStr, ok := nameAttr.(core.StringValue); ok {
+			return string(nameStr), true
+		}
+	}
+	return "", false
 }
 
 // createBoundClassMethod creates a wrapper that binds a metaclass method to a class
