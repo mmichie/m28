@@ -413,6 +413,12 @@ func (l *lruCacheBuiltin) CallWithKeywords(args []core.Value, kwargs map[string]
 		// Ignore 'typed' parameter for now
 	}
 
+	// If keyword arguments were provided, always return a decorator
+	// even if we also have positional args
+	if kwargs != nil && len(kwargs) > 0 {
+		return createLRUDecorator(maxsizeInt), nil
+	}
+
 	// If we have positional args and first arg is callable, decorate it directly
 	if len(args) > 0 {
 		if callable, ok := args[0].(core.Callable); ok {
@@ -461,7 +467,7 @@ func (l *lruCacheBuiltin) CallWithKeywords(args []core.Value, kwargs map[string]
 		}
 	}
 
-	// Called with keyword arguments or no positional args
+	// Called with no arguments or non-callable positional arg
 	// Return a decorator function
 	return createLRUDecorator(maxsizeInt), nil
 }

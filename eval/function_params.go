@@ -256,12 +256,25 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 	argIndex := 0
 
 	// Debug: print signature info
-	// fmt.Printf("DEBUG BindArguments: %d required, %d optional params\n", len(sig.RequiredParams), len(sig.OptionalParams))
+	// fmt.Printf("DEBUG BindArguments: %d args, %d kwargs, %d required, %d optional params\n",
+	// 	len(args), len(kwargs), len(sig.RequiredParams), len(sig.OptionalParams))
+	// for i, arg := range args {
+	// 	fmt.Printf("  arg[%d] = %T: %v\n", i, arg, arg)
+	// }
+	// for k, v := range kwargs {
+	// 	fmt.Printf("  kwarg %s = %T: %v\n", k, v, v)
+	// }
 	// for _, p := range sig.RequiredParams {
-	//     fmt.Printf("  Required: %s\n", p.Name)
+	// 	fmt.Printf("  Required: %s\n", p.Name)
 	// }
 	// for _, p := range sig.OptionalParams {
-	//     fmt.Printf("  Optional: %s (default=%v)\n", p.Name, p.DefaultValue)
+	// 	fmt.Printf("  Optional: %s (default=%v)\n", p.Name, p.DefaultValue)
+	// }
+	// if sig.RestParam != nil {
+	// 	fmt.Printf("  *args: %s\n", *sig.RestParam)
+	// }
+	// if sig.KeywordParam != nil {
+	// 	fmt.Printf("  **kwargs: %s\n", *sig.KeywordParam)
 	// }
 
 	// 1. Bind required positional parameters

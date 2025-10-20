@@ -200,12 +200,21 @@ func (d *DefForm) ToIR() core.Value {
 	// Handle decorators
 	// @decorator1 @decorator2 def foo(): pass
 	// → (= foo (decorator1 (decorator2 (def foo () ...))))
+	// @decorator(args) def foo(): pass
+	// → (= foo ((decorator args) (def foo () ...)))
 	if len(d.Decorators) > 0 {
 		// Apply decorators from bottom to top (innermost to outermost)
 		for i := len(d.Decorators) - 1; i >= 0; i-- {
 			decorator := d.Decorators[i]
+			decoratorIR := decorator.ToIR()
+
+			// Wrap the result with the decorator
+			// The decorator might be:
+			// - A simple name: decorator
+			// - A call: (decorator arg1 arg2 ...)
+			// In both cases, we need to call it with the function
 			result = core.NewList(
-				decorator.ToIR(),
+				decoratorIR,
 				result,
 			)
 		}
