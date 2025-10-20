@@ -52,6 +52,10 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 			"type", "isinstance", "issubclass", "hasattr", "getattr", "setattr", "delattr",
 			"callable", "dir", "vars", "id", "hash", "hex", "oct", "bin", "chr", "ord",
 			"bytes", "bytearray", "memoryview", "frozenset",
+			"property", "staticmethod", "classmethod",
+			"object", "super", "slice",
+			"eval", "exec", "compile",
+			"__import__", "__build_class__",
 		}
 
 		for _, fnName := range builtinNames {

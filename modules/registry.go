@@ -33,6 +33,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"traceback":     InitTracebackModule,
 	"unittest.util": InitUnittestUtilModule,
 	"types":         InitTypesModule,
+	"re":            InitReModule,
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
