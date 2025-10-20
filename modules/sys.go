@@ -52,6 +52,19 @@ func InitSysModule() *core.DictValue {
 		return str, nil
 	}))
 
+	// _getframemodulename function - get module name at given frame depth
+	// Used by difflib and other stdlib modules for introspection
+	sysModule.SetWithKey("_getframemodulename", core.StringValue("_getframemodulename"), core.NewNamedBuiltinFunction("_getframemodulename", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Takes one argument: depth (int)
+		// Returns module name (str) or None
+		// For now, always return "__main__" since we don't track frames yet
+		if len(args) < 1 {
+			return nil, core.NewTypeError("int", nil, "_getframemodulename() argument")
+		}
+		// Return None to indicate frame not found or use __main__
+		return core.StringValue("__main__"), nil
+	}))
+
 	return sysModule
 }
 

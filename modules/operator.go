@@ -100,6 +100,34 @@ func InitOperatorModule() *core.DictValue {
 		return core.BoolValue(!core.IsTruthy(v.Get(0))), nil
 	}))
 
+	operatorModule.Set("and_", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("and_", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		// Python's 'and' returns first falsy value or last value
+		a := v.Get(0)
+		if !core.IsTruthy(a) {
+			return a, nil
+		}
+		return v.Get(1), nil
+	}))
+
+	operatorModule.Set("or_", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("or_", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		// Python's 'or' returns first truthy value or last value
+		a := v.Get(0)
+		if core.IsTruthy(a) {
+			return a, nil
+		}
+		return v.Get(1), nil
+	}))
+
 	operatorModule.Set("truth", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("truth", args)
 		if err := v.Exact(1); err != nil {

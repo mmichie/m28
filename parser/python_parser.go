@@ -1563,6 +1563,24 @@ func (p *PythonParser) parseSubscript(obj ast.ASTNode) ast.ASTNode {
 	// Parse start (optional)
 	if !p.check(TOKEN_COLON) && !p.check(TOKEN_RBRACKET) {
 		start = p.parseExpression()
+
+		// Check for implicit tuple syntax: dict[a, b, c] means dict[(a, b, c)]
+		if p.check(TOKEN_COMMA) {
+			// Collect all comma-separated expressions into a tuple
+			elements := []ast.ASTNode{start}
+			for p.check(TOKEN_COMMA) {
+				p.advance() // consume comma
+				if p.check(TOKEN_RBRACKET) {
+					break // trailing comma
+				}
+				elements = append(elements, p.parseExpression())
+			}
+
+			// Create implicit tuple: (tuple-literal elem1 elem2 ...)
+			tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+			allElements := append([]ast.ASTNode{tupleSym}, elements...)
+			start = ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+		}
 	}
 
 	// Check if this is a slice
