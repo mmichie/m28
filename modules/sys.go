@@ -2,11 +2,19 @@
 package modules
 
 import (
+	"fmt"
 	"os"
 	"runtime"
 
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
+)
+
+// Global variables for sys module state
+var (
+	recursionLimit = 1000
+	sysModules     = core.NewDict()                        // Tracks loaded modules
+	sysPath        = core.ListValue{core.StringValue(".")} // Module search path
 )
 
 // InitSysModule registers the sys module
@@ -22,28 +30,86 @@ func InitSysModule() *core.DictValue {
 	sysModule.SetWithKey("stderr", core.StringValue("stderr"), stderr)
 	sysModule.SetWithKey("stdin", core.StringValue("stdin"), stdin)
 
-	// exc_info function
+	// Exception handling
 	sysModule.SetWithKey("exc_info", core.StringValue("exc_info"), core.NewBuiltinFunction(excInfo))
+	sysModule.SetWithKey("excepthook", core.StringValue("excepthook"), core.NewBuiltinFunction(excepthook))
 
-	// Add argv (empty list for now)
+	// Command line arguments (empty list for now, populated by main)
 	sysModule.SetWithKey("argv", core.StringValue("argv"), core.ListValue{})
 
-	// Add version info
+	// Version information
 	sysModule.SetWithKey("version", core.StringValue("version"), core.StringValue("M28 0.1.0"))
+	versionInfo := core.NewDict()
+	versionInfo.Set("major", core.NumberValue(0))
+	versionInfo.Set("minor", core.NumberValue(1))
+	versionInfo.Set("micro", core.NumberValue(0))
+	versionInfo.Set("releaselevel", core.StringValue("alpha"))
+	versionInfo.Set("serial", core.NumberValue(0))
+	sysModule.SetWithKey("version_info", core.StringValue("version_info"), versionInfo)
 
-	// Add platform info (matches Python's sys.platform)
-	// Use Go's runtime.GOOS which returns "darwin", "linux", "windows", etc.
-	sysModule.SetWithKey(
-		core.ValueToKey(core.StringValue("platform")),
-		core.StringValue("platform"),
-		core.StringValue(runtime.GOOS))
-
-	// Add implementation namespace (SimpleNamespace-like object)
+	// Implementation info
 	implDict := core.NewDict()
 	implDict.Set("name", core.StringValue("m28"))
 	implDict.Set("version", core.StringValue("0.1.0"))
 	implDict.Set("cache_tag", core.StringValue("m28"))
 	sysModule.SetWithKey("implementation", core.StringValue("implementation"), implDict)
+
+	// Platform information
+	sysModule.SetWithKey("platform", core.StringValue("platform"), core.StringValue(runtime.GOOS))
+	execPath, _ := os.Executable()
+	sysModule.SetWithKey("executable", core.StringValue("executable"), core.StringValue(execPath))
+	sysModule.SetWithKey("prefix", core.StringValue("prefix"), core.StringValue("/usr/local"))
+	sysModule.SetWithKey("exec_prefix", core.StringValue("exec_prefix"), core.StringValue("/usr/local"))
+
+	// System constants
+	sysModule.SetWithKey("maxsize", core.StringValue("maxsize"), core.NumberValue(int64(^uint(0)>>1)))
+	if runtime.GOARCH == "386" || runtime.GOARCH == "arm" {
+		sysModule.SetWithKey("byteorder", core.StringValue("byteorder"), core.StringValue("little"))
+	} else if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
+		sysModule.SetWithKey("byteorder", core.StringValue("byteorder"), core.StringValue("little"))
+	} else {
+		sysModule.SetWithKey("byteorder", core.StringValue("byteorder"), core.StringValue("little"))
+	}
+
+	// Module tracking
+	sysModule.SetWithKey("modules", core.StringValue("modules"), sysModules)
+	sysModule.SetWithKey("path", core.StringValue("path"), sysPath)
+
+	// Builtin module names - static list matching registry.go
+	builtinNamesList := core.ListValue{
+		core.StringValue("os"),
+		core.StringValue("sys"),
+		core.StringValue("io"),
+		core.StringValue("json"),
+		core.StringValue("time"),
+		core.StringValue("datetime"),
+		core.StringValue("pathlib"),
+		core.StringValue("random"),
+		core.StringValue("shutil"),
+		core.StringValue("math"),
+		core.StringValue("_collections"),
+		core.StringValue("_weakref"),
+		core.StringValue("_thread"),
+		core.StringValue("itertools"),
+		core.StringValue("_functools"),
+		core.StringValue("operator"),
+		core.StringValue("copy"),
+		core.StringValue("heapq"),
+		core.StringValue("traceback"),
+		core.StringValue("unittest.util"),
+		core.StringValue("types"),
+		core.StringValue("re"),
+		core.StringValue("dataclasses"),
+		core.StringValue("warnings"),
+	}
+	sysModule.SetWithKey("builtin_module_names", core.StringValue("builtin_module_names"), builtinNamesList)
+
+	// Functions
+	sysModule.SetWithKey("exit", core.StringValue("exit"), core.NewBuiltinFunction(exitFunc))
+	sysModule.SetWithKey("getrecursionlimit", core.StringValue("getrecursionlimit"), core.NewBuiltinFunction(getRecursionLimit))
+	sysModule.SetWithKey("setrecursionlimit", core.StringValue("setrecursionlimit"), core.NewBuiltinFunction(setRecursionLimit))
+	sysModule.SetWithKey("getdefaultencoding", core.StringValue("getdefaultencoding"), core.NewBuiltinFunction(getDefaultEncoding))
+	sysModule.SetWithKey("getsizeof", core.StringValue("getsizeof"), core.NewBuiltinFunction(getSizeOf))
 
 	// intern function - intern strings for memory optimization
 	// In M28, we just return the same string since we don't have string interning yet
@@ -131,4 +197,99 @@ func excInfo(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// For now, return (None, None, None) - we'll enhance this when needed
 	noneTuple := core.TupleValue{core.None, core.None, core.None}
 	return noneTuple, nil
+}
+
+// excepthook is the default exception hook
+func excepthook(args []core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("excepthook", args)
+	if err := v.Exact(3); err != nil {
+		return nil, err
+	}
+
+	// args: type, value, traceback
+	// For now, just print the exception
+	excType := args[0]
+	excValue := args[1]
+
+	fmt.Fprintf(os.Stderr, "%s: %s\n", excType, excValue)
+	return core.NilValue{}, nil
+}
+
+// exitFunc exits the program
+func exitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("exit", args)
+
+	code := 0
+	if len(args) > 0 {
+		numVal, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
+		}
+		code = int(numVal)
+	}
+
+	os.Exit(code)
+	return core.NilValue{}, nil
+}
+
+// getRecursionLimit returns the current recursion limit
+func getRecursionLimit(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return core.NumberValue(int64(recursionLimit)), nil
+}
+
+// setRecursionLimit sets the recursion limit
+func setRecursionLimit(args []core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("setrecursionlimit", args)
+	if err := v.Exact(1); err != nil {
+		return nil, err
+	}
+
+	limit, err := v.GetNumber(0)
+	if err != nil {
+		return nil, err
+	}
+
+	if limit < 1 {
+		return nil, fmt.Errorf("recursion limit must be at least 1")
+	}
+
+	recursionLimit = int(limit)
+	return core.NilValue{}, nil
+}
+
+// getDefaultEncoding returns the default string encoding
+func getDefaultEncoding(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return core.StringValue("utf-8"), nil
+}
+
+// getSizeOf returns the size of an object in bytes (approximate)
+func getSizeOf(args []core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("getsizeof", args)
+	if err := v.Min(1); err != nil {
+		return nil, err
+	}
+
+	obj := args[0]
+
+	// Approximate size calculation
+	var size int64 = 16 // Base object overhead
+
+	switch val := obj.(type) {
+	case core.StringValue:
+		size += int64(len(val))
+	case core.NumberValue:
+		size += 8
+	case core.BoolValue:
+		size += 1
+	case core.ListValue:
+		size += int64(len(val) * 8)
+	case *core.DictValue:
+		size += int64(val.Size() * 16)
+	case core.TupleValue:
+		size += int64(len(val) * 8)
+	default:
+		size = 64 // Default size for unknown types
+	}
+
+	return core.NumberValue(size), nil
 }
