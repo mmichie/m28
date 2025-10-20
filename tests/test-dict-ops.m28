@@ -179,7 +179,8 @@
 
 # Filter based on type
 (= mixed-vals {"a": 1 "b": "hello" "c": 2 "d": "world" "e": 3})
-(= numbers-only (filter-values mixed-vals (lambda (v) (== (type v) "number"))))
+(= number-type (type 0))  # Get the number type once
+(= numbers-only (filter-values mixed-vals (lambda (v) (== (type v) number-type))))
 (print (+ "Numbers only: " (str numbers-only)))
 (assert (== (len numbers-only) 3) "filter-values can filter by type")
 
@@ -200,10 +201,11 @@
 })
 
 # Extract user fields, rename them, and transform to uppercase
+(= string-type (type ""))  # Get the string type once
 (= result (-> data
               (select-keys ["user_name" "user_email" "user_age"])
               (rename-keys {"user_name": "name" "user_email": "email" "user_age": "age"})
-              (map-values (lambda (v) (if (== (type v) "string") (v.upper) v)))))
+              (map-values (lambda (v) (if (== (type v) string-type) (v.upper) v)))))
 
 (print (+ "Composed result: " (str result)))
 (assert (== (len result) 3) "Composition works")

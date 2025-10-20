@@ -240,25 +240,40 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	// Provide default magic methods that Python classes automatically have
 	switch name {
 	case "__eq__":
-		// Default __eq__ uses identity comparison
+		// Default __eq__ for classes
+		// Note: Called via protocol, so only receives 'other' argument (self is implicit)
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 2 {
-				return nil, fmt.Errorf("__eq__ requires exactly 2 arguments")
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__eq__ requires exactly 1 argument")
 			}
-			// Default: compare by identity (pointer equality)
-			return BoolValue(args[0] == args[1]), nil
+			other := args[0]
+
+			// Compare classes by name if both are classes
+			if otherClass, ok := other.(*Class); ok {
+				return BoolValue(c.Name == otherClass.Name), nil
+			}
+
+			// Check if other has GetClass() method (for type wrappers like StrType, TypeType, etc.)
+			if classGetter, ok := other.(interface{ GetClass() *Class }); ok {
+				otherClass := classGetter.GetClass()
+				return BoolValue(c.Name == otherClass.Name), nil
+			}
+
+			// For other types, use pointer equality
+			return BoolValue(Value(c) == other), nil
 		}), true
 	case "__ne__":
 		// Default __ne__ is negation of __eq__
+		// Note: Called via protocol, so only receives 'other' argument (self is implicit)
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 2 {
-				return nil, fmt.Errorf("__ne__ requires exactly 2 arguments")
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__ne__ requires exactly 1 argument")
 			}
 			// Get __eq__ method
 			eqMethod, ok := c.GetAttr("__eq__")
 			if !ok {
 				// Fallback to identity comparison
-				return BoolValue(args[0] != args[1]), nil
+				return BoolValue(Value(c) != args[0]), nil
 			}
 			// Call __eq__ and negate the result
 			if callable, ok := eqMethod.(interface {
@@ -270,7 +285,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 				}
 				return BoolValue(!IsTruthy(result)), nil
 			}
-			return BoolValue(args[0] != args[1]), nil
+			return BoolValue(Value(c) != args[0]), nil
 		}), true
 	case "__repr__":
 		// Default __repr__ returns a placeholder function

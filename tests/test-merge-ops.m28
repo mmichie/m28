@@ -166,13 +166,15 @@
 (= dict3 {"x": {"nested": true}})
 (= dict4 {"x": [1 2 3]})
 (= result2 (deep-merge dict3 dict4))
-(assert (== (type (get-item result2 "x")) "list") "deep-merge: list replaces dict")
+(= list-type (type []))  # Get list type
+(assert (== (type (get-item result2 "x")) list-type) "deep-merge: list replaces dict")
 
 # List replaced by dict
 (= dict5 {"y": [1 2 3]})
 (= dict6 {"y": {"new": "value"}})
 (= result3 (deep-merge dict5 dict6))
-(assert (== (type (get-item result3 "y")) "dict") "deep-merge: dict replaces list")
+(= dict-type (type {}))  # Get dict type
+(assert (== (type (get-item result3 "y")) dict-type) "deep-merge: dict replaces list")
 
 (print "✓ deep-merge with type mismatches works (later wins)")
 

@@ -1,5 +1,9 @@
 # Test bytes and bytearray types
 
+# Get type objects once for comparison
+(= bytes-type (type (bytes)))
+(= bytearray-type (type (bytearray)))
+
 # Test bytes creation
 (print "=== Testing bytes creation ===")
 
@@ -7,25 +11,25 @@
 (= b1 (bytes))
 (print "Type of b1:" (type b1))
 (print "Expected type: bytes")
-(assert (== (type b1) "bytes") "Empty bytes type check failed")
+(assert (== (type b1) bytes-type) "Empty bytes type check failed")
 (assert (== (len b1) 0) "Empty bytes length failed")
 (assert (== (str b1) "b''") "Empty bytes string representation failed")
 
 # Create bytes from string
 (= b2 (bytes "hello"))
-(assert (== (type b2) "bytes") "bytes from string type check failed")
+(assert (== (type b2) bytes-type) "bytes from string type check failed")
 (assert (== (len b2) 5) "bytes from string length failed")
 (assert (== (str b2) "b'hello'") "bytes from string representation failed")
 
 # Create bytes from list of numbers
 (= b3 (bytes [72 101 108 108 111]))  # "Hello" in ASCII
-(assert (== (type b3) "bytes") "bytes from list type check failed")
+(assert (== (type b3) bytes-type) "bytes from list type check failed")
 (assert (== (len b3) 5) "bytes from list length failed")
 (assert (== (str b3) "b'Hello'") "bytes from list representation failed")
 
 # Create bytes with encoding
 (= b4 (bytes "hello" "utf-8"))
-(assert (== (type b4) "bytes") "bytes with encoding type check failed")
+(assert (== (type b4) bytes-type) "bytes with encoding type check failed")
 (assert (== (len b4) 5) "bytes with encoding length failed")
 
 # Test bytes with special characters
@@ -78,7 +82,7 @@
 # Test string encode
 (= s "hello")
 (= b (s.encode))
-(assert (== (type b) "bytes") "string encode() type failed")
+(assert (== (type b) bytes-type) "string encode() type failed")
 (assert (== (str b) "b'hello'") "string encode() value failed")
 (assert (== (s.encode "utf-8") b) "string encode('utf-8') failed")
 
@@ -87,25 +91,25 @@
 
 # Create empty bytearray
 (= ba1 (bytearray))
-(assert (== (type ba1) "bytearray") "Empty bytearray type check failed")
+(assert (== (type ba1) bytearray-type) "Empty bytearray type check failed")
 (assert (== (len ba1) 0) "Empty bytearray length failed")
 (assert (== (str ba1) "bytearray(b'')") "Empty bytearray string representation failed")
 
 # Create bytearray from string
 (= ba2 (bytearray "hello"))
-(assert (== (type ba2) "bytearray") "bytearray from string type check failed")
+(assert (== (type ba2) bytearray-type) "bytearray from string type check failed")
 (assert (== (len ba2) 5) "bytearray from string length failed")
 (assert (== (str ba2) "bytearray(b'hello')") "bytearray from string representation failed")
 
 # Create bytearray from list
 (= ba3 (bytearray [72 101 108 108 111]))
-(assert (== (type ba3) "bytearray") "bytearray from list type check failed")
+(assert (== (type ba3) bytearray-type) "bytearray from list type check failed")
 (assert (== (len ba3) 5) "bytearray from list length failed")
 
 # Create bytearray from bytes
 (= b (bytes "test"))
 (= ba4 (bytearray b))
-(assert (== (type ba4) "bytearray") "bytearray from bytes type check failed")
+(assert (== (type ba4) bytearray-type) "bytearray from bytes type check failed")
 (assert (== (len ba4) 4) "bytearray from bytes length failed")
 
 # Test bytearray operations
@@ -207,13 +211,13 @@
 # bytes to bytearray
 (= b (bytes "test"))
 (= ba (bytearray b))
-(assert (== (type ba) "bytearray") "bytes to bytearray conversion failed")
+(assert (== (type ba) bytearray-type) "bytes to bytearray conversion failed")
 (assert (== (str ba) "bytearray(b'test')") "bytes to bytearray value failed")
 
 # bytearray to bytes
 (= ba (bytearray "test"))
 (= b (bytes ba))
-(assert (== (type b) "bytes") "bytearray to bytes conversion failed")
+(assert (== (type b) bytes-type) "bytearray to bytes conversion failed")
 (assert (== (str b) "b'test'") "bytearray to bytes value failed")
 
 # Round-trip encode/decode
