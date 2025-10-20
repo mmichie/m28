@@ -341,6 +341,21 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 		}
 	}
 
+	// Special handling for __repr__
+	// This allows pprint and other modules to use function.__repr__ as a type marker
+	if name == "__repr__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__repr__ requires exactly 1 argument")
+			}
+			funcName := f.name
+			if funcName == "" {
+				funcName = "builtin_function"
+			}
+			return StringValue(fmt.Sprintf("<%s object>", funcName)), nil
+		}), true
+	}
+
 	return GetAttrWithRegistry(f, name)
 }
 

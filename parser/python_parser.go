@@ -309,11 +309,15 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 		if p.peek().Lexeme == "match" {
 			// Look ahead to see if this is a match statement or variable assignment
 			// match statement: match expr:
-			// variable: match = value
-			if p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type != TOKEN_ASSIGN {
-				// Not an assignment, could be match statement
-				// Parse and see what happens
-				return p.parseMatchStatement()
+			// variable: match = value or match, rest = value (tuple unpacking)
+			if p.current+1 < len(p.tokens) {
+				nextToken := p.tokens[p.current+1].Type
+				// If next token is = or , (tuple unpacking), it's an assignment, not match statement
+				if nextToken != TOKEN_ASSIGN && nextToken != TOKEN_COMMA {
+					// Not an assignment, could be match statement
+					// Parse and see what happens
+					return p.parseMatchStatement()
+				}
 			}
 		}
 		// Fall through to expression statement
@@ -2366,6 +2370,17 @@ func (p *PythonParser) parseGeneratorExpressionNoParen(element ast.ASTNode, tok 
 // parseBlock parses a colon-delimited block: COLON NEWLINE INDENT statements DEDENT
 func (p *PythonParser) parseBlock() []ast.ASTNode {
 	p.expect(TOKEN_COLON)
+
+	// Support single-line statements: if condition: return value
+	if !p.check(TOKEN_NEWLINE) {
+		// Parse a single statement on the same line
+		stmt := p.parseStatement()
+		if stmt != nil {
+			return []ast.ASTNode{stmt}
+		}
+		return []ast.ASTNode{}
+	}
+
 	p.expect(TOKEN_NEWLINE)
 	p.expect(TOKEN_INDENT)
 
@@ -2844,6 +2859,16 @@ func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode
 
 		if !p.check(TOKEN_RPAREN) {
 			for {
+				// Skip newlines in multi-line base class list
+				for p.check(TOKEN_NEWLINE) {
+					p.advance()
+				}
+
+				// Check if we've reached the end (trailing comma case)
+				if p.check(TOKEN_RPAREN) {
+					break
+				}
+
 				// Check for keyword argument: IDENTIFIER = expression
 				if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_ASSIGN {
 					nameTok := p.advance()

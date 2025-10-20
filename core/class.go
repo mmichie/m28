@@ -272,6 +272,16 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 			}
 			return BoolValue(args[0] != args[1]), nil
 		}), true
+	case "__repr__":
+		// Default __repr__ returns a placeholder function
+		// Classes use this as a type marker (e.g., dict.__repr__, list.__repr__)
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__repr__ requires exactly 1 argument")
+			}
+			// Return a representation string
+			return StringValue(fmt.Sprintf("<%s object>", c.Name)), nil
+		}), true
 	}
 
 	// Finally check base object

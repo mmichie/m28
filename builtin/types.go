@@ -608,7 +608,7 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 
 		// Call with type (cls) as first argument, then the 3 provided args
 		newArgs := make([]core.Value, 4)
-		newArgs[0] = t // cls argument
+		newArgs[0] = t       // cls argument
 		newArgs[1] = args[0] // name
 		newArgs[2] = args[1] // bases
 		newArgs[3] = args[2] // dict

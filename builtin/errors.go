@@ -119,7 +119,35 @@ func RegisterErrors(ctx *core.Context) {
 
 	// Define Python exception classes
 	// These are needed for Python code that references exception types
-	exceptionClass := core.NewClass("Exception", nil)
+
+	// BaseException - the base of all exceptions in Python
+	baseExceptionClass := core.NewClass("BaseException", nil)
+
+	// Add __init__ method to BaseException to store args
+	baseExceptionClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__init__ requires at least 1 argument (self)")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("__init__ first argument must be an instance")
+		}
+
+		// Store all arguments after self as a tuple in the 'args' attribute
+		exceptionArgs := make(core.TupleValue, len(args)-1)
+		for i := 1; i < len(args); i++ {
+			exceptionArgs[i-1] = args[i]
+		}
+		self.Attributes["args"] = exceptionArgs
+
+		return core.None, nil
+	}))
+
+	ctx.Define("BaseException", baseExceptionClass)
+
+	// Exception inherits from BaseException
+	exceptionClass := core.NewClass("Exception", baseExceptionClass)
 
 	// Add __init__ method to Exception to store args
 	exceptionClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -191,6 +219,18 @@ func RegisterErrors(ctx *core.Context) {
 	// AssertionError - raised when an assert statement fails
 	assertionErrorClass := core.NewClass("AssertionError", exceptionClass)
 	ctx.Define("AssertionError", assertionErrorClass)
+
+	// Warning - base class for warning categories
+	warningClass := core.NewClass("Warning", baseExceptionClass)
+	ctx.Define("Warning", warningClass)
+
+	// DeprecationWarning - raised for deprecated features
+	deprecationWarningClass := core.NewClass("DeprecationWarning", warningClass)
+	ctx.Define("DeprecationWarning", deprecationWarningClass)
+
+	// UserWarning - user-generated warning
+	userWarningClass := core.NewClass("UserWarning", warningClass)
+	ctx.Define("UserWarning", userWarningClass)
 }
 
 // Migration Statistics:

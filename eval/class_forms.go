@@ -352,24 +352,40 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					return nil, fmt.Errorf("def can only be used for method definitions in classes")
 
 				case "=":
-					// Class variable definition
+					// Class variable definition or subscript assignment
 					if len(s) != 3 {
 						return nil, fmt.Errorf("= requires exactly 2 arguments in class definition")
 					}
 
+					// Check if this is a simple variable assignment or subscript assignment
 					name, ok := s[1].(core.SymbolValue)
-					if !ok {
-						return nil, fmt.Errorf("class variable name must be a symbol")
+					if ok {
+						// Simple variable assignment: x = value
+						value, err := Eval(s[2], classBodyCtx)
+						if err != nil {
+							return nil, err
+						}
+						class.SetClassAttr(string(name), value)
+						// Also add to class body context so later statements can reference it
+						classBodyCtx.Define(string(name), value)
+					} else {
+						// Could be subscript assignment: obj[key] = value
+						// Check if s[1] is a list starting with get-item
+						if lhs, isList := s[1].(core.ListValue); isList && len(lhs) >= 3 {
+							if sym, isSymbol := lhs[0].(core.SymbolValue); isSymbol && string(sym) == "get-item" {
+								// This is obj[key] = value, evaluate it as a setitem operation
+								// Evaluate the whole assignment as an expression
+								_, err := Eval(stmt, classBodyCtx)
+								if err != nil {
+									return nil, err
+								}
+								// Continue to next statement
+								continue
+							}
+						}
+						// If we get here, it's an unsupported assignment pattern
+						return nil, fmt.Errorf("class variable name must be a symbol or subscript expression, got %T", s[1])
 					}
-
-					// Evaluate the value in class body context (can reference previously defined methods/attrs)
-					value, err := Eval(s[2], classBodyCtx)
-					if err != nil {
-						return nil, err
-					}
-					class.SetClassAttr(string(name), value)
-					// Also add to class body context so later statements can reference it
-					classBodyCtx.Define(string(name), value)
 
 				default:
 					// Evaluate other forms in class context
