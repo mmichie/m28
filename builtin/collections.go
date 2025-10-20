@@ -55,22 +55,10 @@ func convertToSlice(arg core.Value) ([]core.Value, error) {
 
 // RegisterCollections registers collection constructor functions
 func RegisterCollections(ctx *core.Context) {
-	// list - create a new list
-	ctx.Define("list", core.NewNamedBuiltinFunction("list", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return core.EmptyList, nil
-		}
-		if len(args) == 1 {
-			// Python-style: Convert iterable to list
-			items, err := convertToSlice(args[0])
-			if err != nil {
-				return nil, err
-			}
-			return core.ListValue(items), nil
-		}
-		// Multiple arguments: create a list from all arguments
-		return core.ListValue(args), nil
-	}))
+	// list - Python list class
+	// Create as a class so it can be used as a base class for inheritance
+	listClass := createListClass()
+	ctx.Define("list", listClass)
 
 	// tuple - use the TupleTypeClass which has __new__ support
 	// Create a callable tuple constructor that exposes __new__
@@ -312,6 +300,33 @@ func RegisterCollections(ctx *core.Context) {
 	}))
 }
 
+// ListType represents the list class that can be called and used as a base class
+type ListType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (l *ListType) GetClass() *core.Class {
+	return l.Class
+}
+
+// Call implements the callable interface for list() construction
+func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return core.EmptyList, nil
+	}
+	if len(args) == 1 {
+		// Python-style: Convert iterable to list
+		items, err := convertToSlice(args[0])
+		if err != nil {
+			return nil, err
+		}
+		return core.ListValue(items), nil
+	}
+	// Multiple arguments: create a list from all arguments
+	return core.ListValue(args), nil
+}
+
 // DictType represents the dict class that can be called and has class methods
 type DictType struct {
 	*core.Class
@@ -383,6 +398,14 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 
 	// Odd number of args > 1
 	return nil, fmt.Errorf("dict() takes an even number of positional arguments for key-value pairs")
+}
+
+// createListClass creates the list class that can be used as a base class
+func createListClass() *ListType {
+	class := core.NewClass("list", nil)
+	// List doesn't have class methods like dict.fromkeys currently
+	// But having it as a Class allows it to be inherited from
+	return &ListType{Class: class}
 }
 
 // createDictClass creates the dict class with class methods like fromkeys

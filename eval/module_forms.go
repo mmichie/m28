@@ -261,7 +261,11 @@ func enhancedImportForm(args core.ListValue, ctx *core.Context) (core.Value, err
 				val, ok = parentModule.Get("s:" + spec.name)
 			}
 			if !ok {
-				return nil, fmt.Errorf("cannot import name '%s' from module '%s'", spec.name, moduleName)
+				// Return an ImportError so it can be caught by try/except
+				return nil, &core.ImportError{
+					ModuleName: moduleName,
+					Message:    fmt.Sprintf("cannot import name '%s' from module '%s'", spec.name, moduleName),
+				}
 			}
 
 			// Define in context

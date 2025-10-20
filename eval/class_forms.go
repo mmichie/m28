@@ -113,7 +113,7 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						// Handle wrapper types that embed Class (like staticmethod, classmethod)
 						parent = p.GetClass()
 					default:
-						return nil, fmt.Errorf("parent must be a class, got %T", parentVal)
+						return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentList[i])
 					}
 
 					parentClasses = append(parentClasses, parent)
