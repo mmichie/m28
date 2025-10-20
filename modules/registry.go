@@ -26,7 +26,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_weakref":      InitWeakrefModule,     // C extension module for weak references
 	"_thread":       InitThreadModule,      // C extension module for threading
 	"itertools":     InitItertoolsModule,
-	"functools":     InitFunctoolsModule,
+	"_functools":    Init_FunctoolsModule, // C module stub for Python's functools.py
 	"operator":      InitOperatorModule,
 	"copy":          InitCopyModule,
 	"heapq":         InitHeapqModule,

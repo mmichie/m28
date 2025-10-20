@@ -86,11 +86,26 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 			}
 
 			// Legacy support: Check for **kwargs unpacking (old style where expr is in the symbol)
+			// Also handles parser-generated **kwargs markers followed by dict-literal
 			if strings.HasPrefix(symStr, "**") && symStr != "**unpack" {
 				exprStr := strings.TrimPrefix(symStr, "**")
 				if exprStr == "" {
 					return nil, fmt.Errorf("** unpacking requires an expression")
 				}
+
+				// Check if next argument is the expression to unpack (parser style)
+				// Parser generates: ["**kwargs", (dict-literal ...)]
+				if i+1 < len(args) {
+					// Use the next argument as the dict expression
+					info.Elements = append(info.Elements, ArgumentElement{
+						IsKwUnpack: true,
+						Expr:       args[i+1],
+					})
+					i += 2 // Skip marker and dict expression
+					continue
+				}
+
+				// Old legacy style where variable name is embedded
 				info.Elements = append(info.Elements, ArgumentElement{
 					IsKwUnpack: true,
 					Expr:       core.SymbolValue(exprStr),

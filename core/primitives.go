@@ -225,6 +225,16 @@ func (f *BuiltinFunction) Call(args []Value, ctx *Context) (Value, error) {
 	return f.fn(args, ctx)
 }
 
+// CallWithKeywords implements keyword argument support for BuiltinFunction
+// By default, it rejects keyword arguments, but can be overridden
+func (f *BuiltinFunction) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	// Default behavior: reject keyword arguments
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("builtin function does not support keyword arguments")
+	}
+	return f.fn(args, ctx)
+}
+
 // String implements Value.String
 func (f *BuiltinFunction) String() string {
 	if f.name != "" {

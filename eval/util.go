@@ -434,14 +434,51 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 		}
 	}
 
-	// Flat format - original behavior
-	// Arguments should be key-value pairs
-	if len(args)%2 != 0 {
-		return nil, fmt.Errorf("dict-literal requires an even number of arguments (key-value pairs)")
-	}
+	// Flat format - can contain regular key-value pairs and **unpack markers
+	// Process entries sequentially
+	i := 0
+	for i < len(args) {
+		// Check for **unpack marker
+		if sym, ok := args[i].(core.SymbolValue); ok && string(sym) == "**unpack" {
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("**unpack requires a dict expression")
+			}
 
-	// Process key-value pairs
-	for i := 0; i < len(args); i += 2 {
+			// Evaluate the dict to unpack
+			unpackVal, err := Eval(args[i+1], ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating **unpack dict: %v", err)
+			}
+
+			// Must be a dict
+			unpackDict, ok := unpackVal.(*core.DictValue)
+			if !ok {
+				return nil, fmt.Errorf("**unpack requires a dict, got %s", unpackVal.Type())
+			}
+
+			// Merge all key-value pairs from unpacked dict
+			for _, keyRepr := range unpackDict.Keys() {
+				val, _ := unpackDict.Get(keyRepr)
+
+				// Find the original key
+				origKeys := unpackDict.OriginalKeys()
+				for _, origKey := range origKeys {
+					if core.ValueToKey(origKey) == keyRepr {
+						dict.SetWithKey(keyRepr, origKey, val)
+						break
+					}
+				}
+			}
+
+			i += 2 // Skip marker and dict expression
+			continue
+		}
+
+		// Regular key-value pair
+		if i+1 >= len(args) {
+			return nil, fmt.Errorf("dict-literal requires key-value pairs (odd number of arguments after unpacking)")
+		}
+
 		// Evaluate the key
 		key, err := Eval(args[i], ctx)
 		if err != nil {
@@ -464,6 +501,8 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 
 		// Set the key-value pair
 		dict.SetWithKey(keyStr, key, value)
+
+		i += 2
 	}
 
 	return dict, nil

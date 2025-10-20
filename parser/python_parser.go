@@ -1963,6 +1963,11 @@ func (p *PythonParser) parseDictOrSetLiteral() ast.ASTNode {
 		return ast.NewLiteral(core.NewDict(), p.makeLocation(tok), ast.SyntaxPython)
 	}
 
+	// Check for ** unpacking - if so, it's definitely a dict
+	if p.check(TOKEN_DOUBLESTAR) {
+		return p.parseDictLiteral(nil, tok)
+	}
+
 	// Parse first element
 	first := p.parseExpression()
 
@@ -1974,36 +1979,71 @@ func (p *PythonParser) parseDictOrSetLiteral() ast.ASTNode {
 	}
 }
 
-// parseDictLiteral parses the rest of: {k: v, ...}
+// parseDictLiteral parses the rest of: {k: v, ...} or {**d, ...}
+// If firstKey is nil, starts parsing from the beginning (used when ** is first)
 func (p *PythonParser) parseDictLiteral(firstKey ast.ASTNode, tok Token) ast.ASTNode {
-	p.expect(TOKEN_COLON)
-	firstValue := p.parseExpression()
+	var entries []ast.ASTNode // Mix of key-value pairs and **unpack markers
 
-	// Check if it's a dict comprehension
-	if p.check(TOKEN_FOR) {
-		return p.parseDictComprehension(firstKey, firstValue, tok)
-	}
+	// Handle first key-value pair if provided
+	if firstKey != nil {
+		p.expect(TOKEN_COLON)
+		firstValue := p.parseExpression()
 
-	// Regular dict - collect key-value pairs as AST nodes
-	keyValuePairs := []ast.ASTNode{firstKey, firstValue}
-
-	for p.check(TOKEN_COMMA) {
-		p.advance()
-		if p.check(TOKEN_RBRACE) {
-			break // Trailing comma
+		// Check if it's a dict comprehension
+		if p.check(TOKEN_FOR) {
+			return p.parseDictComprehension(firstKey, firstValue, tok)
 		}
 
-		key := p.parseExpression()
-		p.expect(TOKEN_COLON)
-		value := p.parseExpression()
-		keyValuePairs = append(keyValuePairs, key, value)
+		entries = append(entries, firstKey, firstValue)
+
+		// If no comma, we're done
+		if !p.check(TOKEN_COMMA) {
+			p.expect(TOKEN_RBRACE)
+
+			// Create (dict-literal key1 value1 ...) form
+			dictLiteralSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+			allElements := append([]ast.ASTNode{dictLiteralSym}, entries...)
+			return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+		}
+		p.advance() // consume comma
+	}
+
+	// Parse remaining entries (regular key:value or **dict)
+	for !p.check(TOKEN_RBRACE) {
+		// Check for **dict unpacking
+		if p.check(TOKEN_DOUBLESTAR) {
+			p.advance() // consume **
+			dictExpr := p.parseExpression()
+			// Add **unpack marker followed by the dict expression
+			entries = append(entries,
+				ast.NewIdentifier("**unpack", p.makeLocation(tok), ast.SyntaxPython),
+				dictExpr,
+			)
+		} else {
+			// Regular key: value pair
+			key := p.parseExpression()
+			p.expect(TOKEN_COLON)
+			value := p.parseExpression()
+			entries = append(entries, key, value)
+		}
+
+		// Check for comma
+		if !p.check(TOKEN_COMMA) {
+			break
+		}
+		p.advance()
+
+		// Allow trailing comma
+		if p.check(TOKEN_RBRACE) {
+			break
+		}
 	}
 
 	p.expect(TOKEN_RBRACE)
 
-	// Create (dict-literal key1 value1 key2 value2 ...) form
+	// Create (dict-literal key1 value1 **unpack dict1 ...) form
 	dictLiteralSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
-	allElements := append([]ast.ASTNode{dictLiteralSym}, keyValuePairs...)
+	allElements := append([]ast.ASTNode{dictLiteralSym}, entries...)
 
 	return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
 }
