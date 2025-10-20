@@ -774,7 +774,7 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 	}
 
 	if !isClass {
-		return nil, fmt.Errorf("isinstance second argument must be a class or string type name")
+		return nil, fmt.Errorf("isinstance second argument must be a class or string type name, got %T: %v", classVal, classVal)
 	}
 
 	// Handle primitive types (StringValue, NumberValue, etc.) that are not Instances

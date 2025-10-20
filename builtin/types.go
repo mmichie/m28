@@ -137,15 +137,15 @@ func RegisterTypes(ctx *core.Context) {
 		return core.BoolValue(isNil), nil
 	})))
 
-	// int - convert to integer with optional base
-	// BEFORE: 36 lines
-	// AFTER: ~15 lines with custom builder
-	ctx.Define("int", core.NewNamedBuiltinFunction("int", IntBuilder()))
+	// int - Python int class
+	// Create as a class so it can be used with isinstance
+	intClass := createIntClass()
+	ctx.Define("int", intClass)
 
-	// float - convert to float
-	// BEFORE: 23 lines
-	// AFTER: ~10 lines with custom builder
-	ctx.Define("float", core.NewNamedBuiltinFunction("float", FloatBuilder()))
+	// float - Python float class
+	// Create as a class so it can be used with isinstance
+	floatClass := createFloatClass()
+	ctx.Define("float", floatClass)
 
 	// isinstance - check if object is instance of type(s)
 	// BEFORE: 20 lines
@@ -788,6 +788,52 @@ func createStrClass() *StrType {
 	}))
 
 	return &StrType{Class: class}
+}
+
+// IntType represents the int class that can be called and used with isinstance
+type IntType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (i *IntType) GetClass() *core.Class {
+	return i.Class
+}
+
+// Call implements the callable interface for int() construction
+func (i *IntType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return IntBuilder()(args, ctx)
+}
+
+// createIntClass creates the int class that can be used with isinstance
+func createIntClass() *IntType {
+	class := core.NewClass("int", nil)
+	// Int doesn't have class methods currently
+	// But having it as a Class allows isinstance checks
+	return &IntType{Class: class}
+}
+
+// FloatType represents the float class that can be called and used with isinstance
+type FloatType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (f *FloatType) GetClass() *core.Class {
+	return f.Class
+}
+
+// Call implements the callable interface for float() construction
+func (f *FloatType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return FloatBuilder()(args, ctx)
+}
+
+// createFloatClass creates the float class that can be used with isinstance
+func createFloatClass() *FloatType {
+	class := core.NewClass("float", nil)
+	// Float doesn't have class methods currently
+	// But having it as a Class allows isinstance checks
+	return &FloatType{Class: class}
 }
 
 // Migration Statistics:
