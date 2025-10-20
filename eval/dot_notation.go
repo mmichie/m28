@@ -89,6 +89,18 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
+		// If the object is a Super, wrap the method to inject __class__ when called
+		if superObj, ok := obj.(*core.Super); ok {
+			if _, ok := value.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				value = &core.BoundSuperMethod{
+					Method: value,
+					Class:  superObj.Class,
+				}
+			}
+		}
+
 		// If there are more arguments (even if just __call__ marker), it's a method call
 		if len(args) > 2 {
 			// Check if it's just the __call__ marker (method with no args)

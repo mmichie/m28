@@ -405,6 +405,38 @@ type Super struct {
 	Instance *Instance
 }
 
+// BoundSuperMethod wraps a method from a Super object to inject __class__ when called
+type BoundSuperMethod struct {
+	BaseObject
+	Method Value  // The underlying method
+	Class  *Class // The class to set as __class__
+}
+
+// Call implements Callable interface for BoundSuperMethod
+func (bsm *BoundSuperMethod) Call(args []Value, ctx *Context) (Value, error) {
+	// Create a new context with __class__ set
+	methodCtx := NewContext(ctx)
+	methodCtx.Define("__class__", bsm.Class)
+
+	// Call the underlying method
+	if callable, ok := bsm.Method.(interface {
+		Call([]Value, *Context) (Value, error)
+	}); ok {
+		return callable.Call(args, methodCtx)
+	}
+	return nil, fmt.Errorf("bound super method is not callable")
+}
+
+// Type returns the bound super method type
+func (bsm *BoundSuperMethod) Type() Type {
+	return MethodType
+}
+
+// String returns the string representation
+func (bsm *BoundSuperMethod) String() string {
+	return fmt.Sprintf("<bound super method of %s>", bsm.Class.Name)
+}
+
 // NewSuper creates a new super object
 func NewSuper(class *Class, instance *Instance) *Super {
 	return &Super{

@@ -439,7 +439,11 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					namespace,                   // namespace
 				}
 
-				result, err := callable.Call(args, ctx)
+				// Create a new context with __class__ set for super() support
+				callCtx := core.NewContext(ctx)
+				callCtx.Define("__class__", metaclass)
+
+				result, err := callable.Call(args, callCtx)
 				if err != nil {
 					return nil, fmt.Errorf("error calling metaclass.__new__: %v", err)
 				}
