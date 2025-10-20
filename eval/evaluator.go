@@ -561,6 +561,30 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 			return core.StringValue(f.name), true
 		}
 		return core.StringValue("<anonymous>"), true
+	case "__qualname__":
+		// Check if __qualname__ was explicitly set
+		if val, ok := f.BaseObject.GetAttr("__qualname__"); ok {
+			return val, true
+		}
+		// Default to same as __name__
+		if f.name != "" {
+			return core.StringValue(f.name), true
+		}
+		return core.StringValue("<anonymous>"), true
+	case "__module__":
+		// Check if __module__ was explicitly set
+		if val, ok := f.BaseObject.GetAttr("__module__"); ok {
+			return val, true
+		}
+		// Default to "__main__" for user-defined functions
+		return core.StringValue("__main__"), true
+	case "__doc__":
+		// Check if __doc__ was explicitly set
+		if val, ok := f.BaseObject.GetAttr("__doc__"); ok {
+			return val, true
+		}
+		// Default to None for no docstring
+		return core.None, true
 	case "__code__":
 		// Return a code object (CodeType)
 		// Python's types.py uses __code__ to get the CodeType

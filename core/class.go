@@ -237,6 +237,43 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return attr, true
 	}
 
+	// Provide default magic methods that Python classes automatically have
+	switch name {
+	case "__eq__":
+		// Default __eq__ uses identity comparison
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 2 {
+				return nil, fmt.Errorf("__eq__ requires exactly 2 arguments")
+			}
+			// Default: compare by identity (pointer equality)
+			return BoolValue(args[0] == args[1]), nil
+		}), true
+	case "__ne__":
+		// Default __ne__ is negation of __eq__
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 2 {
+				return nil, fmt.Errorf("__ne__ requires exactly 2 arguments")
+			}
+			// Get __eq__ method
+			eqMethod, ok := c.GetAttr("__eq__")
+			if !ok {
+				// Fallback to identity comparison
+				return BoolValue(args[0] != args[1]), nil
+			}
+			// Call __eq__ and negate the result
+			if callable, ok := eqMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				result, err := callable.Call(args, ctx)
+				if err != nil {
+					return nil, err
+				}
+				return BoolValue(!IsTruthy(result)), nil
+			}
+			return BoolValue(args[0] != args[1]), nil
+		}), true
+	}
+
 	// Finally check base object
 	return c.BaseObject.GetAttr(name)
 }

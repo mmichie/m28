@@ -89,7 +89,7 @@ func RegisterTypeCheckingFunctions(ctx *core.Context) {
 	}))
 
 	// str() - convert to string
-	ctx.Define("str", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	strFunc := core.NewNamedBuiltinFunction("str", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("str", args)
 		if err := v.Max(1); err != nil {
 			return nil, err
@@ -101,7 +101,56 @@ func RegisterTypeCheckingFunctions(ctx *core.Context) {
 
 		// Use the string representation
 		return core.StringValue(core.PrintValueWithoutQuotes(args[0])), nil
+	})
+
+	// Add maketrans as a class method
+	// maketrans(x[, y[, z]]) creates a translation table
+	strFunc.SetAttr("maketrans", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("maketrans", args)
+		if err := v.Range(1, 3); err != nil {
+			return nil, err
+		}
+
+		// Simple implementation: create a dict mapping
+		table := core.NewDict()
+
+		if v.Count() == 1 {
+			// Single argument: must be a dict mapping chars to replacement strings or None
+			if dict, ok := args[0].(*core.DictValue); ok {
+				return dict, nil
+			}
+			return nil, core.NewTypeError("dict", args[0], "maketrans() argument")
+		}
+
+		// Two or three arguments
+		x, okx := args[0].(core.StringValue)
+		y, oky := args[1].(core.StringValue)
+		if !okx || !oky {
+			return nil, core.NewTypeError("string", args[0], "maketrans() arguments")
+		}
+
+		if len(x) != len(y) {
+			return nil, fmt.Errorf("maketrans: the first two maketrans arguments must have equal length")
+		}
+
+		// Build the translation table
+		for i, char := range string(x) {
+			table.Set(string(char), core.StringValue(string([]rune(string(y))[i])))
+		}
+
+		// If there's a third argument, it's characters to delete (map to None)
+		if v.Count() == 3 {
+			if z, ok := args[2].(core.StringValue); ok {
+				for _, char := range string(z) {
+					table.Set(string(char), core.None)
+				}
+			}
+		}
+
+		return table, nil
 	}))
+
+	ctx.Define("str", strFunc)
 
 	// bool() - convert to boolean
 	ctx.Define("bool", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

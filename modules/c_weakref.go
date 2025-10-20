@@ -31,5 +31,21 @@ func InitWeakrefModule() *core.DictValue {
 		return obj, nil
 	}))
 
+	// proxy(object[, callback]) - create a weak proxy to object
+	// For now, we return the object itself as a "proxy" since M28 doesn't have weak references
+	// A real proxy would forward all operations to the referent and raise ReferenceError when dead
+	module.Set("proxy", core.NewNamedBuiltinFunction("proxy", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, core.NewTypeError("proxy", nil, "proxy() takes at least 1 argument (0 given)")
+		}
+
+		// For now, just return the object itself
+		// In a full implementation, this would wrap the object in a WeakProxy type
+		// that transparently forwards all operations to the referent
+		obj := args[0]
+
+		return obj, nil
+	}))
+
 	return module
 }

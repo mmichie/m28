@@ -31,13 +31,38 @@ var cExtensionModules = map[string]bool{
 	"_posixsubprocess": true,
 	// "_weakref" removed - provided as M28 stub module
 	// "_abc" removed - let it fail naturally to trigger fallback to _py_abc
-	"builtins": true, // Built-in functions
+	// "builtins" removed - handled specially in LoadPythonModule
 }
 
 // LoadPythonModule attempts to load a Python module by name
 // Returns (*DictValue, error) to match ModuleLoader interface
 func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, *core.Context) (core.Value, error)) (*core.DictValue, error) {
 	fmt.Fprintf(os.Stderr, "[PROFILE] LoadPythonModule called for '%s'\n", name)
+
+	// Special case: builtins module - return a dict with builtin functions
+	if name == "builtins" {
+		builtinsModule := core.NewDict()
+
+		// Expose the most commonly used builtin functions
+		// These are already defined in the global context
+		builtinNames := []string{
+			"repr", "str", "int", "float", "bool", "list", "dict", "tuple", "set",
+			"len", "range", "enumerate", "zip", "map", "filter", "sum", "min", "max",
+			"abs", "all", "any", "sorted", "reversed", "print", "input",
+			"type", "isinstance", "issubclass", "hasattr", "getattr", "setattr", "delattr",
+			"callable", "dir", "vars", "id", "hash", "hex", "oct", "bin", "chr", "ord",
+			"bytes", "bytearray", "memoryview", "frozenset",
+		}
+
+		for _, fnName := range builtinNames {
+			val, err := ctx.Lookup(fnName)
+			if err == nil {
+				builtinsModule.Set(fnName, val)
+			}
+		}
+
+		return builtinsModule, nil
+	}
 
 	// Check if this is a known C extension
 	if cExtensionModules[name] {

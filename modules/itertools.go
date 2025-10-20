@@ -409,5 +409,66 @@ func InitItertoolsModule() *core.DictValue {
 		return result, nil
 	}))
 
+	// starmap - map function over iterable where each item is unpacked as function arguments
+	// starmap(pow, [(2,5), (3,2), (10,3)]) --> 32 9 1000
+	itertoolsModule.Set("starmap", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("starmap", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		function, err := types.RequireCallable(v.Get(0), "starmap() first argument")
+		if err != nil {
+			return nil, err
+		}
+
+		iterable, err := types.RequireIterable(v.Get(1), "starmap() second argument")
+		if err != nil {
+			return nil, err
+		}
+
+		result := make(core.ListValue, 0)
+		iter := iterable.Iterator()
+
+		for {
+			val, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+
+			// Unpack the value as arguments
+			var callArgs []core.Value
+			switch item := val.(type) {
+			case core.ListValue:
+				callArgs = item
+			case core.TupleValue:
+				callArgs = []core.Value(item)
+			case core.Iterable:
+				// Convert iterable to list
+				callArgs = make([]core.Value, 0)
+				itemIter := item.Iterator()
+				for {
+					elem, hasElem := itemIter.Next()
+					if !hasElem {
+						break
+					}
+					callArgs = append(callArgs, elem)
+				}
+			default:
+				return nil, fmt.Errorf("starmap() argument after * must be an iterable, not %s", val.Type())
+			}
+
+			// Call function with unpacked arguments
+			funcResult, err := function.Call(callArgs, ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			result = append(result, funcResult)
+		}
+
+		return result, nil
+	}))
+
 	return itertoolsModule
 }

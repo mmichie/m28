@@ -96,6 +96,117 @@ func InitCollectionsModule() *core.DictValue {
 		return dq, nil
 	}))
 
+	// Register _deque_iterator type (constructor function)
+	// This is the type returned by iter(deque)
+	collectionsModule.Set("_deque_iterator", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("_deque_iterator() requires exactly 1 argument")
+		}
+		dq, ok := args[0].(*Deque)
+		if !ok {
+			return nil, fmt.Errorf("_deque_iterator() argument must be a deque")
+		}
+		return NewDequeIterator(dq), nil
+	}))
+
+	// Register OrderedDict class
+	collectionsModule.Set("OrderedDict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		od := NewOrderedDict()
+
+		// If there's an argument, it should be a dict or iterable of pairs
+		if len(args) > 0 {
+			if dict, ok := args[0].(*core.DictValue); ok {
+				for _, key := range dict.Keys() {
+					if val, ok := dict.Get(key); ok {
+						od.dict.Set(key, val)
+					}
+				}
+			}
+		}
+
+		return od, nil
+	}))
+
+	// Register _tuplegetter type (for namedtuple field access)
+	// This is a callable that retrieves a specific index from a tuple
+	collectionsModule.Set("_tuplegetter", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("_tuplegetter() requires at least 1 argument (index)")
+		}
+		index, ok := args[0].(core.NumberValue)
+		if !ok {
+			return nil, fmt.Errorf("_tuplegetter() index must be a number")
+		}
+
+		var doc string
+		if len(args) > 1 {
+			if docVal, ok := args[1].(core.StringValue); ok {
+				doc = string(docVal)
+			}
+		}
+
+		return NewTupleGetter(int(index), doc), nil
+	}))
+
+	// Register _count_elements helper function for Counter
+	// This tallies elements from an iterable into a mapping
+	collectionsModule.Set("_count_elements", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("_count_elements() requires exactly 2 arguments (mapping, iterable)")
+		}
+
+		// Get the mapping (should support __getitem__ and __setitem__)
+		mapping := args[0]
+
+		// Get the iterable
+		iterable, ok := args[1].(core.Iterable)
+		if !ok {
+			return nil, fmt.Errorf("_count_elements() second argument must be iterable")
+		}
+
+		// Iterate and count elements
+		iter := iterable.Iterator()
+		for {
+			elem, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+
+			// Get current count for this element
+			var count core.NumberValue = 0
+			if getitemAttr, ok := mapping.(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if getitem, ok := getitemAttr.GetAttr("__getitem__"); ok {
+					if callable, ok := getitem.(interface {
+						Call([]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						if val, err := callable.Call([]core.Value{elem}, ctx); err == nil {
+							if num, ok := val.(core.NumberValue); ok {
+								count = num
+							}
+						}
+					}
+				}
+			}
+
+			// Set new count
+			if setitemAttr, ok := mapping.(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if setitem, ok := setitemAttr.GetAttr("__setitem__"); ok {
+					if callable, ok := setitem.(interface {
+						Call([]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						callable.Call([]core.Value{elem, count + 1}, ctx)
+					}
+				}
+			}
+		}
+
+		return core.Nil, nil
+	}))
+
 	return collectionsModule
 }
 
@@ -536,4 +647,212 @@ func (dq *Deque) Rotate(n int) {
 	if n > 0 {
 		dq.items = append(dq.items[len(dq.items)-n:], dq.items[:len(dq.items)-n]...)
 	}
+}
+
+// DequeIterator is an iterator over deque elements
+type DequeIterator struct {
+	deque *Deque
+	index int
+}
+
+// NewDequeIterator creates a new deque iterator
+func NewDequeIterator(dq *Deque) *DequeIterator {
+	return &DequeIterator{
+		deque: dq,
+		index: 0,
+	}
+}
+
+// Type implements Value.Type
+func (di *DequeIterator) Type() core.Type {
+	return "_deque_iterator"
+}
+
+// String implements Value.String
+func (di *DequeIterator) String() string {
+	return "<deque_iterator>"
+}
+
+// Iterator implements Iterable.Iterator
+func (di *DequeIterator) Iterator() core.Iterator {
+	return di
+}
+
+// Next implements Iterator.Next
+func (di *DequeIterator) Next() (core.Value, bool) {
+	if di.index >= len(di.deque.items) {
+		return nil, false
+	}
+	val := di.deque.items[di.index]
+	di.index++
+	return val, true
+}
+
+// Reset implements Iterator.Reset
+func (di *DequeIterator) Reset() {
+	di.index = 0
+}
+
+// OrderedDict is a dictionary that maintains insertion order
+// Since M28's DictValue already maintains order, this is essentially a wrapper
+type OrderedDict struct {
+	dict *core.DictValue
+}
+
+// NewOrderedDict creates a new OrderedDict
+func NewOrderedDict() *OrderedDict {
+	return &OrderedDict{
+		dict: core.NewDict(),
+	}
+}
+
+// Type implements Value.Type
+func (od *OrderedDict) Type() core.Type {
+	return "OrderedDict"
+}
+
+// String implements Value.String
+func (od *OrderedDict) String() string {
+	return fmt.Sprintf("OrderedDict(%s)", od.dict.String())
+}
+
+// GetAttr implements attribute access
+func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__getitem__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__getitem__ requires exactly 1 argument")
+			}
+			key := core.ValueToKey(args[0])
+			if val, ok := od.dict.Get(key); ok {
+				return val, nil
+			}
+			return nil, fmt.Errorf("KeyError: %s", key)
+		}), true
+	case "__setitem__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 2 {
+				return nil, fmt.Errorf("__setitem__ requires exactly 2 arguments")
+			}
+			key := core.ValueToKey(args[0])
+			od.dict.Set(key, args[1])
+			return core.Nil, nil
+		}), true
+	case "keys":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			keys := od.dict.Keys()
+			result := make(core.ListValue, len(keys))
+			for i, k := range keys {
+				result[i] = core.StringValue(k)
+			}
+			return result, nil
+		}), true
+	case "values":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			values := make(core.ListValue, 0)
+			for _, key := range od.dict.Keys() {
+				if val, ok := od.dict.Get(key); ok {
+					values = append(values, val)
+				}
+			}
+			return values, nil
+		}), true
+	case "items":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			items := make(core.ListValue, 0)
+			for _, key := range od.dict.Keys() {
+				if val, ok := od.dict.Get(key); ok {
+					items = append(items, core.TupleValue{core.StringValue(key), val})
+				}
+			}
+			return items, nil
+		}), true
+	case "get":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("get() requires at least 1 argument")
+			}
+			key := core.ValueToKey(args[0])
+			if val, ok := od.dict.Get(key); ok {
+				return val, nil
+			}
+			if len(args) > 1 {
+				return args[1], nil // Return default
+			}
+			return core.None, nil
+		}), true
+	}
+	return nil, false
+}
+
+// SetAttr implements attribute setting
+func (od *OrderedDict) SetAttr(name string, value core.Value) error {
+	return fmt.Errorf("cannot set attribute '%s' on OrderedDict", name)
+}
+
+// TupleGetter is a callable that retrieves a specific index from a tuple
+// This is used by namedtuple for field access
+type TupleGetter struct {
+	index int
+	doc   string
+}
+
+// NewTupleGetter creates a new TupleGetter
+func NewTupleGetter(index int, doc string) *TupleGetter {
+	return &TupleGetter{
+		index: index,
+		doc:   doc,
+	}
+}
+
+// Type implements Value.Type
+func (tg *TupleGetter) Type() core.Type {
+	return "tuplegetter"
+}
+
+// String implements Value.String
+func (tg *TupleGetter) String() string {
+	return fmt.Sprintf("<tuplegetter index=%d>", tg.index)
+}
+
+// Call implements Callable.Call
+func (tg *TupleGetter) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("tuplegetter requires exactly 1 argument")
+	}
+
+	// Accept both tuples and lists
+	var items []core.Value
+	switch v := args[0].(type) {
+	case core.TupleValue:
+		items = []core.Value(v)
+	case core.ListValue:
+		items = []core.Value(v)
+	default:
+		return nil, fmt.Errorf("tuplegetter argument must be a tuple or list, not %s", v.Type())
+	}
+
+	if tg.index < 0 || tg.index >= len(items) {
+		return nil, fmt.Errorf("tuple index out of range")
+	}
+
+	return items[tg.index], nil
+}
+
+// GetAttr implements attribute access
+func (tg *TupleGetter) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__doc__":
+		if tg.doc != "" {
+			return core.StringValue(tg.doc), true
+		}
+		return core.None, true
+	}
+	return nil, false
+}
+
+// SetAttr implements attribute setting
+func (tg *TupleGetter) SetAttr(name string, value core.Value) error {
+	return fmt.Errorf("cannot set attribute '%s' on tuplegetter", name)
 }

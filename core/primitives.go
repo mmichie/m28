@@ -246,6 +246,36 @@ func (f *BuiltinFunction) createRegistry() *MethodRegistry {
 			}
 			return StringValue("<anonymous>"), nil
 		}),
+		MakeProperty("__qualname__", "Qualified name", func(receiver Value) (Value, error) {
+			fn := receiver.(*BuiltinFunction)
+			// Check if __qualname__ was set in BaseObject attrs
+			if val, ok := fn.BaseObject.GetAttr("__qualname__"); ok {
+				return val, nil
+			}
+			// Default to same as __name__
+			if fn.name != "" {
+				return StringValue(fn.name), nil
+			}
+			return StringValue("<anonymous>"), nil
+		}),
+		MakeProperty("__module__", "Module name", func(receiver Value) (Value, error) {
+			fn := receiver.(*BuiltinFunction)
+			// Check if __module__ was set in BaseObject attrs
+			if val, ok := fn.BaseObject.GetAttr("__module__"); ok {
+				return val, nil
+			}
+			// Default to "builtins" for builtin functions
+			return StringValue("builtins"), nil
+		}),
+		MakeProperty("__doc__", "Docstring", func(receiver Value) (Value, error) {
+			fn := receiver.(*BuiltinFunction)
+			// Check if __doc__ was set in BaseObject attrs
+			if val, ok := fn.BaseObject.GetAttr("__doc__"); ok {
+				return val, nil
+			}
+			// Default to None for no docstring
+			return None, nil
+		}),
 		MakeProperty("__dict__", "Function attributes", func(receiver Value) (Value, error) {
 			// Return an empty dict for builtin functions
 			return NewDict(), nil
