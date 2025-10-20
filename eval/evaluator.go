@@ -957,13 +957,29 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Extract exception information from the object
-			// For now, we'll create a basic exception with the type name
 			if sym, ok := list[0].(core.SymbolValue); ok {
 				excType := string(sym)
 
 				// Try to get message from the object
 				var message string
-				if obj, ok := excObj.(*core.DictValue); ok {
+				// Check if it's an exception instance
+				if inst, ok := excObj.(*core.Instance); ok {
+					// Try args attribute first (Python standard)
+					if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+						if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+							if msgStr, ok := argsTuple[0].(core.StringValue); ok {
+								message = string(msgStr)
+							}
+						}
+					}
+					// Fallback to message attribute
+					if message == "" {
+						if msgVal, found := inst.GetAttr("message"); found {
+							message = core.PrintValueWithoutQuotes(msgVal)
+						}
+					}
+				} else if obj, ok := excObj.(*core.DictValue); ok {
+					// Fallback for dict-based exceptions
 					if msgVal, exists := obj.Get("message"); exists {
 						message = core.PrintValueWithoutQuotes(msgVal)
 					}
@@ -1006,10 +1022,21 @@ func raiseForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Check if it's an exception instance
 		if inst, ok := val.(*core.Instance); ok {
-			// Get message if instance has a message attribute
+			// Get message from instance's args or message attribute
 			var message string
-			if msgVal, found := inst.GetAttr("message"); found {
-				message = core.PrintValueWithoutQuotes(msgVal)
+			// Try args attribute first (Python standard)
+			if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+				if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+					if msgStr, ok := argsTuple[0].(core.StringValue); ok {
+						message = string(msgStr)
+					}
+				}
+			}
+			// Fallback to message attribute
+			if message == "" {
+				if msgVal, found := inst.GetAttr("message"); found {
+					message = core.PrintValueWithoutQuotes(msgVal)
+				}
 			}
 
 			return nil, &Exception{

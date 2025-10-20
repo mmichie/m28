@@ -3,6 +3,7 @@ package eval
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 )
@@ -124,27 +125,101 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Parse keywords (e.g., metaclass=ABCMeta)
 	if len(args) > bodyStart {
 		if kwList, ok := args[bodyStart].(core.ListValue); ok {
+			if debugClass {
+				fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Checking potential keywords at index %d: %v\n", bodyStart, kwList)
+			}
+
+			// Handle bracket syntax: [[key val]] becomes [list-literal [list-literal key val]]
+			// Skip the first 'list-literal' symbol if present
+			startIdx := 0
+			if len(kwList) > 0 {
+				if sym, ok := kwList[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+					startIdx = 1
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Skipping list-literal marker\n")
+					}
+				}
+			}
+
 			// Check if this looks like a keywords list
 			// Keywords are represented as [("metaclass" ABCMeta), ...]
 			isKeywords := true
-			for _, kw := range kwList {
+			for i := startIdx; i < len(kwList); i++ {
+				kw := kwList[i]
+				if debugClass {
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] kwList[%d] = %v (type %T)\n", i, kw, kw)
+				}
+
+				// Handle nested list-literal for each keyword pair
+				var kwPair core.ListValue
+				if pair, ok := kw.(core.ListValue); ok {
+					// Skip list-literal if present
+					pairStartIdx := 0
+					if len(pair) > 0 {
+						if sym, ok := pair[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+							pairStartIdx = 1
+							if debugClass {
+								fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Found inner list-literal, pairStartIdx=%d\n", pairStartIdx)
+							}
+						}
+					}
+					// Extract the actual key-value pair
+					if len(pair)-pairStartIdx == 2 {
+						kwPair = pair[pairStartIdx:]
+					} else {
+						kwPair = pair
+					}
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Extracted kwPair: %v (len=%d)\n", kwPair, len(kwPair))
+					}
+				} else {
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] kw is not a ListValue: %T\n", kw)
+					}
+				}
+
 				// Each keyword should be a 2-element list: (name, value)
-				if kwPair, ok := kw.(core.ListValue); ok && len(kwPair) == 2 {
+				if len(kwPair) == 2 {
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Looks like keyword pair: %v\n", kwPair)
+					}
 					// Good, looks like a keyword pair
 					continue
 				} else {
 					// Not a keyword pair, this is probably class body
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Not a keyword pair (len=%d), treating as body\n", len(kwPair))
+					}
 					isKeywords = false
 					break
 				}
 			}
 
-			if isKeywords && len(kwList) > 0 {
+			if isKeywords && len(kwList) > startIdx {
 				// This is a keywords list, process it
 				bodyStart++ // Skip past keywords in body processing
 
-				for _, kw := range kwList {
-					kwPair := kw.(core.ListValue)
+				for i := startIdx; i < len(kwList); i++ {
+					kw := kwList[i]
+
+					// Extract keyword pair, handling list-literal markers
+					var kwPair core.ListValue
+					if pair, ok := kw.(core.ListValue); ok {
+						pairStartIdx := 0
+						if len(pair) > 0 {
+							if sym, ok := pair[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+								pairStartIdx = 1
+							}
+						}
+						kwPair = pair[pairStartIdx:]
+					} else {
+						continue
+					}
+
+					if len(kwPair) != 2 {
+						continue
+					}
+
 					kwName, ok := kwPair[0].(core.StringValue)
 					if !ok {
 						continue
@@ -384,6 +459,7 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// After __new__, copy metaclass methods to the class as class methods
+		// First check metaclass.Methods
 		for methodName, method := range metaclass.Methods {
 			// Don't override methods created by __new__
 			if _, exists := class.Methods[methodName]; exists {
@@ -399,8 +475,32 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					boundMethod := createBoundClassMethod(class, callable)
 					class.SetMethod(methodName, boundMethod)
 					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Copied method '%s' from metaclass\n", methodName)
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Copied method '%s' from metaclass.Methods\n", methodName)
 					}
+				}
+			}
+		}
+
+		// Also check metaclass.Attributes (for Python-defined metaclass methods in __dict__)
+		for attrName, attr := range metaclass.Attributes {
+			// Don't override existing methods
+			if _, exists := class.Methods[attrName]; exists {
+				continue
+			}
+
+			// Skip special attributes
+			if strings.HasPrefix(attrName, "__") && strings.HasSuffix(attrName, "__") {
+				continue
+			}
+
+			// Check if it's callable (a method)
+			if callable, ok := attr.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				boundMethod := createBoundClassMethod(class, callable)
+				class.SetMethod(attrName, boundMethod)
+				if debugClass {
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Copied method '%s' from metaclass.Attributes\n", attrName)
 				}
 			}
 		}

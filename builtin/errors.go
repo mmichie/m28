@@ -87,7 +87,25 @@ func RegisterErrors(ctx *core.Context) {
 			return nil, fmt.Errorf("%s", exc.Message)
 		} else if inst, ok := arg.(*core.Instance); ok {
 			// Raising an instance of an exception class
-			// For now, use the class name
+			// Try to get the message from the instance's args or message attribute
+			var message string
+			if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+				if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+					if msgStr, ok := argsTuple[0].(core.StringValue); ok {
+						message = string(msgStr)
+					}
+				}
+			}
+			if message == "" {
+				if msgAttr, hasMsg := inst.GetAttr("message"); hasMsg {
+					if msgStr, ok := msgAttr.(core.StringValue); ok {
+						message = string(msgStr)
+					}
+				}
+			}
+			if message != "" {
+				return nil, fmt.Errorf("%s: %s", inst.Class.Name, message)
+			}
 			return nil, fmt.Errorf("%s", inst.Class.Name)
 		} else if str, ok := types.AsString(arg); ok {
 			// Raise generic error with message
@@ -102,6 +120,28 @@ func RegisterErrors(ctx *core.Context) {
 	// Define Python exception classes
 	// These are needed for Python code that references exception types
 	exceptionClass := core.NewClass("Exception", nil)
+
+	// Add __init__ method to Exception to store args
+	exceptionClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__init__ requires at least 1 argument (self)")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("__init__ first argument must be an instance")
+		}
+
+		// Store all arguments after self as a tuple in the 'args' attribute
+		exceptionArgs := make(core.TupleValue, len(args)-1)
+		for i := 1; i < len(args); i++ {
+			exceptionArgs[i-1] = args[i]
+		}
+		self.Attributes["args"] = exceptionArgs
+
+		return core.None, nil
+	}))
+
 	ctx.Define("Exception", exceptionClass)
 
 	// TypeError - raised when an operation or function is applied to an object of inappropriate type
