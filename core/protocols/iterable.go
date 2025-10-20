@@ -76,6 +76,16 @@ func (l *ListIterator) String() string {
 	return fmt.Sprintf("<list_iterator at %d>", l.index)
 }
 
+// GetAttr implements Object interface for iterator protocol
+func (l *ListIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return l.Next()
+		}), true
+	}
+	return nil, false
+}
+
 // DictIterator iterates over dict keys (Python behavior)
 type DictIterator struct {
 	dict  *core.DictValue
@@ -121,6 +131,16 @@ func (d *DictIterator) String() string {
 	return "<dict_keyiterator>"
 }
 
+// GetAttr implements Object interface for iterator protocol
+func (d *DictIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return d.Next()
+		}), true
+	}
+	return nil, false
+}
+
 // TupleIterator iterates over tuple elements
 type TupleIterator struct {
 	tuple core.TupleValue
@@ -155,6 +175,16 @@ func (t *TupleIterator) Type() core.Type {
 // String implements Value.String
 func (t *TupleIterator) String() string {
 	return fmt.Sprintf("<tuple_iterator at %d>", t.index)
+}
+
+// GetAttr implements Object interface for iterator protocol
+func (t *TupleIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return t.Next()
+		}), true
+	}
+	return nil, false
 }
 
 // StringIterator iterates over string characters
@@ -199,6 +229,16 @@ func (s *StringIterator) String() string {
 	return "<str_iterator>"
 }
 
+// GetAttr implements Object interface for iterator protocol
+func (s *StringIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return s.Next()
+		}), true
+	}
+	return nil, false
+}
+
 // BytesIterator iterates over bytes
 type BytesIterator struct {
 	bytes []byte
@@ -236,6 +276,16 @@ func (b *BytesIterator) Type() core.Type {
 // String implements Value.String
 func (b *BytesIterator) String() string {
 	return "<bytes_iterator>"
+}
+
+// GetAttr implements Object interface for iterator protocol
+func (b *BytesIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return b.Next()
+		}), true
+	}
+	return nil, false
 }
 
 // ByteArrayIterator iterates over bytearray
@@ -276,6 +326,16 @@ func (b *ByteArrayIterator) Type() core.Type {
 // String implements Value.String
 func (b *ByteArrayIterator) String() string {
 	return "<bytearray_iterator>"
+}
+
+// GetAttr implements Object interface for iterator protocol
+func (b *ByteArrayIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return b.Next()
+		}), true
+	}
+	return nil, false
 }
 
 // RangeIterator iterates over range values
@@ -326,6 +386,16 @@ func (r *RangeIterator) Type() core.Type {
 // String implements Value.String
 func (r *RangeIterator) String() string {
 	return "<range_iterator>"
+}
+
+// GetAttr implements Object interface for iterator protocol
+func (r *RangeIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return r.Next()
+		}), true
+	}
+	return nil, false
 }
 
 // DunderIterator wraps objects with __iter__/__next__ methods
