@@ -34,6 +34,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"unittest.util": InitUnittestUtilModule,
 	"types":         InitTypesModule,
 	"re":            InitReModule,
+	"dataclasses":   InitDataclassesModule,
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
