@@ -222,6 +222,48 @@ func (bm *BoundMethod) Call(args []Value, ctx *Context) (Value, error) {
 	return bm.Method.Handler(bm.Receiver, args, ctx)
 }
 
+// GetAttr implements attribute access for bound methods
+// Provides default values for standard function attributes
+func (bm *BoundMethod) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "__name__":
+		if bm.Method != nil {
+			return StringValue(bm.Method.Name), true
+		}
+		return StringValue("<method>"), true
+	case "__qualname__":
+		if bm.Method != nil && bm.TypeDesc != nil {
+			return StringValue(fmt.Sprintf("%s.%s", bm.TypeDesc.PythonName, bm.Method.Name)), true
+		}
+		return StringValue("<method>"), true
+	case "__module__":
+		// Bound methods inherit module from their class
+		if bm.TypeDesc != nil {
+			return StringValue("__main__"), true
+		}
+		return StringValue("builtins"), true
+	case "__doc__":
+		if bm.Method != nil && bm.Method.Doc != "" {
+			return StringValue(bm.Method.Doc), true
+		}
+		return None, true
+	case "__annotations__":
+		return NewDict(), true
+	case "__type_params__":
+		return TupleValue{}, true
+	case "__dict__":
+		return NewDict(), true
+	case "__self__":
+		// Return the bound object
+		return bm.Receiver, true
+	case "__func__":
+		// In Python, this would return the underlying function
+		// For now, return a placeholder
+		return None, true
+	}
+	return nil, false
+}
+
 // Standard type representations
 func defaultRepr(v Value) string {
 	return v.String()

@@ -460,6 +460,78 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 	return bm.Method.Call(callArgs, methodCtx)
 }
 
+// GetAttr implements attribute access for bound instance methods
+// Provides default values for standard function attributes
+func (bm *BoundInstanceMethod) GetAttr(name string) (Value, bool) {
+	// Try to get attributes from the underlying method first
+	if methodWithAttrs, ok := bm.Method.(interface {
+		GetAttr(string) (Value, bool)
+	}); ok {
+		if val, ok := methodWithAttrs.GetAttr(name); ok {
+			return val, true
+		}
+	}
+
+	// Provide default values for standard function attributes
+	switch name {
+	case "__name__":
+		// Try to get name from underlying method
+		if methodWithAttrs, ok := bm.Method.(interface {
+			GetAttr(string) (Value, bool)
+		}); ok {
+			if val, ok := methodWithAttrs.GetAttr("__name__"); ok {
+				return val, true
+			}
+		}
+		return StringValue("<method>"), true
+	case "__qualname__":
+		// Include class name in qualified name
+		if bm.DefiningClass != nil {
+			if methodWithAttrs, ok := bm.Method.(interface {
+				GetAttr(string) (Value, bool)
+			}); ok {
+				if nameVal, ok := methodWithAttrs.GetAttr("__name__"); ok {
+					if nameStr, ok := nameVal.(StringValue); ok {
+						return StringValue(fmt.Sprintf("%s.%s", bm.DefiningClass.Name, string(nameStr))), true
+					}
+				}
+			}
+		}
+		return StringValue("<method>"), true
+	case "__module__":
+		// Bound instance methods inherit module from their defining class or default to __main__
+		return StringValue("__main__"), true
+	case "__doc__":
+		// Try to get doc from underlying method
+		if methodWithAttrs, ok := bm.Method.(interface {
+			GetAttr(string) (Value, bool)
+		}); ok {
+			if val, ok := methodWithAttrs.GetAttr("__doc__"); ok {
+				return val, true
+			}
+		}
+		return None, true
+	case "__annotations__":
+		return NewDict(), true
+	case "__type_params__":
+		return TupleValue{}, true
+	case "__dict__":
+		return NewDict(), true
+	case "__self__":
+		// Return the bound instance
+		return bm.Instance, true
+	case "__func__":
+		// Return the underlying function if it's a Value
+		if methodVal, ok := bm.Method.(Value); ok {
+			return methodVal, true
+		}
+		// Otherwise return None
+		return None, true
+	}
+
+	return nil, false
+}
+
 // Super represents access to parent class methods
 type Super struct {
 	BaseObject
