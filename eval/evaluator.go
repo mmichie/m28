@@ -34,14 +34,6 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 			return core.EmptyList, nil
 		}
 
-		// Debug: check for **kwargs marker
-		if v.Len() > 1 {
-			if sym, ok := v.Items()[1].(core.SymbolValue); ok && string(sym) == "**kwargs" {
-				items := v.Items()
-				fmt.Printf("DEBUG Eval: **kwargs marker, len=%d, first=%T\n", v.Len(), items[0])
-			}
-		}
-
 		// Check if it's a decorator form (@decorator ...)
 		if isDecoratorForm(v) {
 			return evalDecoratorForm(v, ctx)
@@ -62,23 +54,7 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Otherwise it's a function call
-		// Debug
-		if v.Len() > 1 {
-			if sym, ok := v.Items()[1].(core.SymbolValue); ok && string(sym) == "**kwargs" {
-				fmt.Printf("DEBUG: Calling evalFunctionCallWithKeywords\n")
-			}
-		}
-		result, err := evalFunctionCallWithKeywords(v, ctx)
-		if v.Len() > 1 {
-			if sym, ok := v.Items()[1].(core.SymbolValue); ok && string(sym) == "**kwargs" {
-				if err != nil {
-					fmt.Printf("DEBUG: Error from evalFunctionCallWithKeywords: %v\n", err)
-				} else {
-					fmt.Printf("DEBUG: Result type: %T\n", result)
-				}
-			}
-		}
-		return result, err
+		return evalFunctionCallWithKeywords(v, ctx)
 
 	default:
 		// Other values evaluate to themselves

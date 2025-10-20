@@ -172,29 +172,50 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 
 // evalFunctionCallWithKeywords evaluates a function call with keyword argument support
 func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core.Value, error) {
-	// Debug
-	if expr.Len() == 4 {
-		if _, ok := expr.Items()[0].(*core.ListValue); ok {
-			fmt.Printf("DEBUG: Found problematic 4-element call!\n")
-			for i, item := range expr.Items() {
-				fmt.Printf("  [%d] %T: %v\n", i, item, item)
-			}
-		}
-	}
-	fmt.Printf("DEBUG evalFunctionCallWithKeywords: expr.Len()=%d, first=%T\n", expr.Len(), expr.Items()[0])
-
 	// Check if the function is referenced by a symbol (for better error messages)
 	var symbolName string
 	if sym, ok := expr.Items()[0].(core.SymbolValue); ok {
 		symbolName = string(sym)
 	}
 
+	// Debug: check for empty list calls
+	if listVal, ok := expr.Items()[0].(*core.ListValue); ok {
+		if listVal.Len() == 0 {
+			fmt.Printf("DEBUG: Attempting to call empty list! expr.Len()=%d\n", expr.Len())
+			for i, item := range expr.Items() {
+				fmt.Printf("  [%d] %T: %v\n", i, item, item)
+			}
+		} else {
+			fmt.Printf("DEBUG: About to eval ListValue with %d elements\n", listVal.Len())
+			for i, item := range listVal.Items() {
+				fmt.Printf("  listVal[%d] %T: %v\n", i, item, item)
+			}
+		}
+	}
+
 	// Evaluate the function
-	fmt.Printf("DEBUG: About to Eval first element\n")
 	fn, err := Eval(expr.Items()[0], ctx)
-	fmt.Printf("DEBUG: After Eval, fn=%T, err=%v\n", fn, err)
 	if err != nil {
 		return nil, err
+	}
+
+	// Debug: check if we got an empty list
+	if listVal, ok := fn.(*core.ListValue); ok && listVal.Len() == 0 {
+		fmt.Printf("DEBUG: Eval returned empty list! Original expr[0]=%T\n", expr.Items()[0])
+		if origListVal, ok := expr.Items()[0].(*core.ListValue); ok {
+			fmt.Printf("  Original expr[0] has %d elements:\n", origListVal.Len())
+			for i, item := range origListVal.Items() {
+				fmt.Printf("    [%d] %T: %v\n", i, item, item)
+			}
+		}
+		fmt.Printf("  Full call expr:\n")
+		for i, item := range expr.Items() {
+			fmt.Printf("  [%d] %T: %v\n", i, item, item)
+		}
+		// Let's try evaluating it again manually
+		fmt.Printf("DEBUG: Trying to re-eval expr[0]...\n")
+		testVal, testErr := Eval(expr.Items()[0], ctx)
+		fmt.Printf("  Result: %T, err=%v\n", testVal, testErr)
 	}
 
 	// Parse arguments including unpacking
@@ -372,15 +393,6 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 	// Call as normal with just positional arguments
 	callable, ok := fn.(core.Callable)
 	if !ok {
-		// Debug: print what fn actually is
-		fmt.Printf("DEBUG: fn is not callable! Type=%T, Value=%v\n", fn, fn)
-		fmt.Printf("DEBUG: symbolName=%s, expr.Len()=%d\n", symbolName, expr.Len())
-		if listVal, ok := fn.(*core.ListValue); ok {
-			fmt.Printf("DEBUG: fn is a ListValue with %d elements:\n", listVal.Len())
-			for i, item := range listVal.Items() {
-				fmt.Printf("  [%d] %T: %v\n", i, item, item)
-			}
-		}
 		return nil, core.NewTypeError("callable", fn, "function call")
 	}
 
