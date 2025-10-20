@@ -149,39 +149,19 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	// Create module dictionary with exports
 	moduleDict := core.NewDict()
 
-	// Check for __all__ to determine what to export
-	if allVal, err := moduleCtx.Lookup("__all__"); err == nil {
-		// __all__ is defined, only export listed names
-		if allList, ok := allVal.(core.ListValue); ok {
-			for _, item := range allList {
-				var exportName string
-				switch v := item.(type) {
-				case core.StringValue:
-					exportName = string(v)
-				case core.SymbolValue:
-					exportName = string(v)
-				default:
-					continue
-				}
-
-				if val, err := moduleCtx.Lookup(exportName); err == nil {
-					moduleDict.Set(exportName, val)
-				}
-			}
+	// Export all variables except dunder variables
+	// Note: In Python, __all__ only controls "from module import *", not direct attribute access.
+	// So we export everything (except dunders) to allow module.name access to work correctly.
+	// We include underscore-prefixed names (like _splitext) because Python stdlib
+	// uses them for internal functions that other modules import.
+	for varName, value := range moduleCtx.Vars {
+		// Skip dunder variables (__name__, __file__, etc.)
+		if len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__" {
+			continue
 		}
-	} else {
-		// No __all__, export all non-private, non-dunder variables
-		for varName, value := range moduleCtx.Vars {
-			// Skip dunder variables (__name__, __file__, etc.)
-			if len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__" {
-				continue
-			}
-			// Skip private variables (starting with _)
-			if len(varName) > 0 && varName[0] == '_' {
-				continue
-			}
-			moduleDict.Set(varName, value)
-		}
+		// Use SetWithKey to enable both dict and attribute access
+		key := core.ValueToKey(core.StringValue(varName))
+		moduleDict.SetWithKey(key, core.StringValue(varName), value)
 	}
 
 	return moduleDict, nil

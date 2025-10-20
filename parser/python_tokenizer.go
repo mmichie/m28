@@ -303,6 +303,24 @@ func (t *PythonTokenizer) scanToken() Token {
 		return t.scanFString(quote, start, startLine, startCol)
 	}
 
+	// Raw bytes literals (br"..." or rb"..." or br'...' or rb'...')
+	if (ch == 'b' || ch == 'r') && !t.isAtEnd() {
+		next := t.peek()
+		if (next == 'r' || next == 'b') && next != ch {
+			// We have br or rb
+			t.advance() // consume second prefix
+			if !t.isAtEnd() && (t.peek() == '"' || t.peek() == '\'') {
+				quote := t.advance()
+				// Both br and rb are raw bytes strings
+				return t.scanRawBytesString(quote, start, startLine, startCol)
+			}
+			// Not a string after br/rb, backtrack
+			t.pos = start
+			t.line = startLine
+			t.col = startCol
+		}
+	}
+
 	// Bytes literals (b"..." or b'...')
 	if ch == 'b' && !t.isAtEnd() && (t.peek() == '"' || t.peek() == '\'') {
 		quote := t.advance()
@@ -914,29 +932,127 @@ func (t *PythonTokenizer) scanRawString(quote byte, start, startLine, startCol i
 		}
 
 		// In raw strings, backslashes are literal (no escape processing)
-		// except for escaping the quote character itself
-		if ch == '\\' && !t.isAtEnd() && t.pos+1 < len(t.input) {
-			nextCh := t.input[t.pos+1]
-			if nextCh == quote {
-				// Escaped quote - include the quote, skip the backslash
-				t.advance() // skip backslash
-				value.WriteByte(quote)
-				t.advance() // consume quote
-			} else {
-				// Not an escaped quote - include backslash literally
+		// But we need to handle the special case where \ appears before the closing quote
+		// Count consecutive backslashes to determine if the quote is escaped:
+		// - r'\'  is unterminated (odd number of backslashes before quote)
+		// - r'\\' is valid (even number of backslashes, quote closes string)
+
+		// Check if we're at a quote that might close the string
+		if !isTriple && ch == quote {
+			// Count preceding backslashes
+			backslashCount := 0
+			checkPos := t.pos - 1
+			for checkPos >= 0 && t.input[checkPos] == '\\' {
+				backslashCount++
+				checkPos--
+			}
+
+			// If odd number of backslashes, the quote is escaped (part of string content)
+			if backslashCount%2 == 1 {
+				// Quote is escaped - include it literally
 				value.WriteByte(ch)
 				t.advance()
+				continue
 			}
-		} else {
-			value.WriteByte(ch)
+
+			// Even number of backslashes (including 0) - quote closes the string
 			t.advance()
+			break
 		}
+
+		// Regular character - include literally
+		value.WriteByte(ch)
+		t.advance()
 	}
 
 	return Token{
 		Type:     TOKEN_STRING,
 		Lexeme:   t.input[start:t.pos],
 		Value:    core.StringValue(value.String()),
+		Line:     startLine,
+		Col:      startCol,
+		StartPos: start,
+		EndPos:   t.pos,
+	}
+}
+
+// scanRawBytesString scans a raw bytes literal (br"..." or rb"...")
+// Combines raw string behavior (no escape processing) with bytes value return
+func (t *PythonTokenizer) scanRawBytesString(quote byte, start, startLine, startCol int) Token {
+	// Check for triple-quoted raw bytes string
+	isTriple := false
+	if !t.isAtEnd() && t.peek() == quote {
+		if t.pos+1 < len(t.input) && t.input[t.pos+1] == quote {
+			isTriple = true
+			t.advance() // second quote
+			t.advance() // third quote
+		}
+	}
+
+	var value []byte
+	for {
+		if t.isAtEnd() {
+			t.errors = append(t.errors, fmt.Errorf("unterminated raw bytes literal at line %d", startLine))
+			break
+		}
+
+		ch := t.peek()
+
+		// Check for end of string
+		if !isTriple && ch == quote {
+			t.advance()
+			break
+		}
+
+		if isTriple {
+			// Check for triple quote end
+			if ch == quote && t.pos+2 < len(t.input) &&
+				t.input[t.pos+1] == quote && t.input[t.pos+2] == quote {
+				t.advance()
+				t.advance()
+				t.advance()
+				break
+			}
+		}
+
+		// In raw bytes strings, backslashes are literal (no escape processing)
+		// But we need to handle the special case where \ appears before the closing quote
+		// Count consecutive backslashes to determine if the quote is escaped:
+		// - br'\'  is unterminated (odd number of backslashes before quote)
+		// - br'\\' is valid (even number of backslashes, quote closes string)
+
+		// Check if we're at a quote that might close the string
+		if !isTriple && ch == quote {
+			// Count preceding backslashes
+			backslashCount := 0
+			checkPos := t.pos - 1
+			for checkPos >= 0 && t.input[checkPos] == '\\' {
+				backslashCount++
+				checkPos--
+			}
+
+			// If odd number of backslashes, the quote is escaped (part of string content)
+			if backslashCount%2 == 1 {
+				// Quote is escaped - include it literally
+				value = append(value, ch)
+				t.advance()
+				continue
+			}
+
+			// Even number of backslashes (including 0) - quote closes the string
+			t.advance()
+			break
+		}
+
+		// Regular character - include literally
+		value = append(value, ch)
+		t.advance()
+	}
+
+	return Token{
+		Type:     TOKEN_STRING,
+		Lexeme:   t.input[start:t.pos],
+		Value:    core.BytesValue(value),
 		Line:     startLine,
 		Col:      startCol,
 		StartPos: start,

@@ -390,13 +390,55 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // DictLiteralForm provides the implementation of the dict-literal special form
 func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Create a new dictionary
+	dict := core.NewDict()
+
+	// Check if arguments are wrapped pairs or flat
+	// Wrapped: (dict-literal (key1 val1) (key2 val2))
+	// Flat: (dict-literal key1 val1 key2 val2)
+
+	// If first arg is a ListValue with 2 elements, assume wrapped pairs
+	if len(args) > 0 {
+		if pair, ok := args[0].(core.ListValue); ok && len(pair) == 2 {
+			// Wrapped pairs format - used by Python keyword arguments
+			for _, arg := range args {
+				pairList, ok := arg.(core.ListValue)
+				if !ok || len(pairList) != 2 {
+					return nil, fmt.Errorf("dict-literal with wrapped pairs: expected (key value) pairs")
+				}
+
+				// Evaluate the key
+				key, err := Eval(pairList[0], ctx)
+				if err != nil {
+					return nil, fmt.Errorf("error evaluating dict key: %v", err)
+				}
+
+				// Check if key is hashable
+				if !core.IsHashable(key) {
+					return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
+				}
+
+				// Convert key to string representation
+				keyStr := core.ValueToKey(key)
+
+				// Evaluate the value
+				value, err := Eval(pairList[1], ctx)
+				if err != nil {
+					return nil, fmt.Errorf("error evaluating dict value for key %v: %v", key, err)
+				}
+
+				// Set the key-value pair
+				dict.SetWithKey(keyStr, key, value)
+			}
+			return dict, nil
+		}
+	}
+
+	// Flat format - original behavior
 	// Arguments should be key-value pairs
 	if len(args)%2 != 0 {
 		return nil, fmt.Errorf("dict-literal requires an even number of arguments (key-value pairs)")
 	}
-
-	// Create a new dictionary
-	dict := core.NewDict()
 
 	// Process key-value pairs
 	for i := 0; i < len(args); i += 2 {

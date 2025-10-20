@@ -9,6 +9,62 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// createLRUDecorator creates a decorator function for lru_cache
+func createLRUDecorator(maxsizeInt int) core.Value {
+	return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, errors.NewRuntimeError("lru_cache", "decorator takes exactly one function argument")
+		}
+
+		function, ok := args[0].(core.Callable)
+		if !ok {
+			return nil, errors.NewRuntimeError("lru_cache", "argument must be callable")
+		}
+
+		// Create cache for this function
+		cache := make(map[string]core.Value)
+		order := make([]string, 0, maxsizeInt)
+
+		cachedFunc := core.NewBuiltinFunction(func(callArgs []core.Value, callCtx *core.Context) (core.Value, error) {
+			key := makeCacheKey(callArgs)
+
+			// Check cache
+			if cached, found := cache[key]; found {
+				// Move to end (most recently used)
+				for i, k := range order {
+					if k == key {
+						order = append(order[:i], order[i+1:]...)
+						break
+					}
+				}
+				order = append(order, key)
+				return cached, nil
+			}
+
+			// Call function
+			result, err := function.Call(callArgs, callCtx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Add to cache
+			if len(cache) >= maxsizeInt {
+				// Remove least recently used
+				oldest := order[0]
+				delete(cache, oldest)
+				order = order[1:]
+			}
+
+			cache[key] = result
+			order = append(order, key)
+
+			return result, nil
+		})
+
+		return cachedFunc, nil
+	})
+}
+
 // InitFunctoolsModule creates and returns the functools module
 func InitFunctoolsModule() *core.DictValue {
 	functoolsModule := core.NewDict()
@@ -134,21 +190,54 @@ func InitFunctoolsModule() *core.DictValue {
 	}))
 
 	// lru_cache - LRU cache decorator with size limit
+	// Can be used as @lru_cache or @lru_cache(maxsize=N, typed=True)
 	functoolsModule.Set("lru_cache", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("lru_cache", args)
-		if err := v.Range(1, 2); err != nil {
-			return nil, err
+		// Check if first arg is a function (direct decoration) or not (parameterized decorator)
+		// If args is empty or first arg is not callable, this is a parameterized call
+		// Return a decorator function
+
+		var maxsizeInt int = 128 // default
+		var function core.Callable
+
+		if len(args) == 0 {
+			// Called as @lru_cache() with parens but no args - return decorator
+			return createLRUDecorator(maxsizeInt), nil
 		}
 
-		function, err := types.RequireCallable(v.Get(0), "lru_cache() first argument")
-		if err != nil {
-			return nil, err
+		// Check for **kwargs marker (keyword arguments from Python decorator)
+		// Format: [SymbolValue("**kwargs"), DictValue{...}]
+		if len(args) >= 2 {
+			if sym, ok := args[0].(core.SymbolValue); ok && string(sym) == "**kwargs" {
+				// Extract maxsize from kwargs dict if present
+				if dict, ok := args[1].(*core.DictValue); ok {
+					if maxsizeVal, found := dict.GetAttr("maxsize"); found {
+						if maxsize, ok := maxsizeVal.(core.NumberValue); ok {
+							maxsizeInt = int(maxsize)
+						}
+					}
+				}
+				// Return a decorator function
+				return createLRUDecorator(maxsizeInt), nil
+			}
 		}
 
-		maxsize, _ := v.GetNumberOrDefault(1, 128)
-		maxsizeInt := int(maxsize)
+		// Check if first arg is callable
+		if callable, ok := args[0].(core.Callable); ok {
+			// Direct decoration: @lru_cache (no parens)
+			function = callable
+			if len(args) > 1 {
+				if maxsize, ok := args[1].(core.NumberValue); ok {
+					maxsizeInt = int(maxsize)
+				}
+			}
+		} else {
+			// Not callable - this is @lru_cache(maxsize=N, ...) which passes params
+			// For now, ignore the params and return a decorator
+			// In the future, we should parse keyword arguments properly
+			return createLRUDecorator(maxsizeInt), nil
+		}
 
-		// Simple LRU cache using a map and list
+		// Apply the cache to the function
 		cache := make(map[string]core.Value)
 		order := make([]string, 0, maxsizeInt)
 

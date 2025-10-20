@@ -3,6 +3,7 @@ package modules
 
 import (
 	"os"
+	"runtime"
 
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
@@ -29,6 +30,13 @@ func InitSysModule() *core.DictValue {
 
 	// Add version info
 	sysModule.SetWithKey("version", core.StringValue("version"), core.StringValue("M28 0.1.0"))
+
+	// Add platform info (matches Python's sys.platform)
+	// Use Go's runtime.GOOS which returns "darwin", "linux", "windows", etc.
+	sysModule.SetWithKey(
+		core.ValueToKey(core.StringValue("platform")),
+		core.StringValue("platform"),
+		core.StringValue(runtime.GOOS))
 
 	// Add implementation namespace (SimpleNamespace-like object)
 	implDict := core.NewDict()
