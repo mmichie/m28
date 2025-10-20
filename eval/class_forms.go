@@ -799,6 +799,9 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 							"dict_keys":   true,
 							"dict_values": true,
 							"dict_items":  true,
+							// Special types
+							"ellipsis":     true,
+							"mappingproxy": true,
 						}
 						if typeConstructors[typeName] {
 							if debugClass {
@@ -809,13 +812,17 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 					}
 				}
 			}
-			// Log what we're rejecting
+			// Log what we're rejecting (only in debug mode)
 			if debugClass {
 				if bf, ok := obj.(*core.BuiltinFunction); ok {
-					name, hasName := getBuiltinName(bf)
-					fmt.Fprintf(os.Stderr, "[DEBUG isinstance] isinstance(?, type) returning False for builtin: __name__='%s' (hasName=%v) (type %T) (repr: %v)\n", name, hasName, obj, obj)
+					name, _ := getBuiltinName(bf)
+					if name == "<anonymous>" {
+						fmt.Fprintf(os.Stderr, "[DEBUG isinstance] ANONYMOUS builtin rejected: String()=%s Type()=%s\n", bf.String(), bf.Type())
+					} else {
+						fmt.Fprintf(os.Stderr, "[DEBUG isinstance] builtin __name__='%s' rejected\n", name)
+					}
 				} else {
-					fmt.Fprintf(os.Stderr, "[DEBUG isinstance] isinstance(?, type) returning False for: %v (type %T)\n", obj, obj)
+					fmt.Fprintf(os.Stderr, "[DEBUG isinstance] non-builtin %T rejected\n", obj)
 				}
 			}
 		}
@@ -930,6 +937,8 @@ func isTypeConstructor(bf *core.BuiltinFunction) bool {
 				"zip_iterator": true,
 				// Dict view types
 				"dict_keys": true, "dict_values": true, "dict_items": true,
+				// Special types
+				"ellipsis": true, "mappingproxy": true,
 			}
 			return typeConstructors[typeName]
 		}
