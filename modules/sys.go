@@ -75,7 +75,7 @@ func InitSysModule() *core.DictValue {
 	sysModule.SetWithKey("modules", core.StringValue("modules"), sysModules)
 	sysModule.SetWithKey("path", core.StringValue("path"), sysPath)
 
-	// Builtin module names - static list to avoid initialization cycle
+	// Builtin module names - static list matching registry.go
 	builtinNamesList := core.ListValue{
 		core.StringValue("os"),
 		core.StringValue("sys"),
@@ -91,7 +91,7 @@ func InitSysModule() *core.DictValue {
 		core.StringValue("_weakref"),
 		core.StringValue("_thread"),
 		core.StringValue("itertools"),
-		core.StringValue("functools"),
+		core.StringValue("_functools"),
 		core.StringValue("operator"),
 		core.StringValue("copy"),
 		core.StringValue("heapq"),
