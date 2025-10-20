@@ -272,7 +272,7 @@ func RegisterCollections(ctx *core.Context) {
 	}))
 
 	// bytes - create a new bytes object
-	ctx.Define("bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("bytes", core.NewNamedBuiltinFunction("bytes", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Get the type descriptor for bytes to use its constructor
 		desc := core.GetTypeDescriptor(core.BytesType)
 		if desc == nil {
@@ -282,7 +282,7 @@ func RegisterCollections(ctx *core.Context) {
 	}))
 
 	// bytearray - create a new bytearray object
-	ctx.Define("bytearray", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("bytearray", core.NewNamedBuiltinFunction("bytearray", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Get the type descriptor for bytearray to use its constructor
 		desc := core.GetTypeDescriptor(core.ByteArrayType)
 		if desc == nil {

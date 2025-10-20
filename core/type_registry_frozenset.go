@@ -385,12 +385,10 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
-				// Convert to list for iteration
-				items := make(ListValue, 0, len(fs.items))
-				for _, v := range fs.items {
-					items = append(items, v)
-				}
-				return items, nil
+				// Return the iterator (it now implements Value with __next__ support)
+				iter := fs.Iterator()
+				// Cast to *setIterator which is a Value
+				return iter.(*setIterator), nil
 			},
 		},
 		"__hash__": {

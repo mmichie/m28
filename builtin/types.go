@@ -384,6 +384,7 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 			// These are wrapper types that are also classes
 			return true
 		}
+		return false
 	case *core.Class:
 		// Check against user-defined classes
 		if inst, ok := obj.(*core.Instance); ok {
@@ -544,7 +545,10 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			// For any custom types, create or get cached class with that name
 			typeName := string(val.Type())
 			if typeClassCache[typeName] == nil {
-				typeClassCache[typeName] = core.NewClass(typeName, nil)
+				cls := core.NewClass(typeName, nil)
+				// Set __name__ attribute so isinstance(type_obj, type) works
+				cls.SetClassAttr("__name__", core.StringValue(typeName))
+				typeClassCache[typeName] = cls
 			}
 			return typeClassCache[typeName], nil
 		}

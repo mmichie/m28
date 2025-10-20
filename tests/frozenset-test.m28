@@ -115,11 +115,12 @@
 
 # Test iteration
 (print "\n=== Iteration ===")
-# Note: for loops with sets/frozensets currently have an issue
-# Using __iter__ method directly instead
-(= fs_iter (fs1.__iter__))
-(print "Items from iteration:" fs_iter)
-(assert (== (len fs_iter) 3) "Should iterate over 3 items")
+# Test that iteration works
+(= items (list))
+(for item fs1
+  (= items (+ items [item])))
+(print "Items from iteration:" items)
+(assert (== (len items) 3) "Should iterate over 3 items")
 
 # Test copy
 (print "\n=== Copy ===")

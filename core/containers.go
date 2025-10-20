@@ -552,6 +552,39 @@ func (it *setIterator) Reset() {
 	it.index = 0
 }
 
+// Type implements Value.Type
+func (it *setIterator) Type() Type {
+	return "set_iterator"
+}
+
+// String implements Value.String
+func (it *setIterator) String() string {
+	return "<set_iterator>"
+}
+
+// stopIterationError is a local type to signal iterator exhaustion
+// This matches protocols.StopIteration but avoids circular imports
+type stopIterationError struct{}
+
+func (e *stopIterationError) Error() string {
+	return "StopIteration"
+}
+
+// GetAttr implements Object interface for iterator protocol
+func (it *setIterator) GetAttr(name string) (Value, bool) {
+	if name == "__next__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			val, ok := it.Next()
+			if !ok {
+				// Return StopIteration error
+				return nil, &stopIterationError{}
+			}
+			return val, nil
+		}), true
+	}
+	return nil, false
+}
+
 // FrozenSetValue represents an immutable set of unique values
 type FrozenSetValue struct {
 	BaseObject

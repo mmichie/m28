@@ -6,7 +6,22 @@ import (
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/core/protocols"
+	"strings"
 )
+
+// isStopIteration checks if an error is a StopIteration exception
+// Handles both protocols.StopIteration and errors with "StopIteration" in message
+func isStopIteration(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for protocols.StopIteration type
+	if _, ok := err.(*protocols.StopIteration); ok {
+		return true
+	}
+	// Check for StopIteration in error message (for core.stopIterationError)
+	return strings.Contains(err.Error(), "StopIteration")
+}
 
 // Break signals a break from a loop
 type BreakValue struct {
@@ -321,6 +336,13 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, err
 			}
 
+			// Debug: log what __iter__ returned
+			if list, ok := iter.(core.ListValue); ok && len(list) == 1 {
+				if str, ok := list[0].(core.StringValue); ok && str == "__iter__" {
+					return nil, fmt.Errorf("BUG: __iter__ on %T returned [\"__iter__\"] instead of an iterator - this suggests a method call problem", sequence)
+				}
+			}
+
 			// Check if the iterator actually has __next__
 			// This handles cases where __iter__ returns self but doesn't implement __next__
 			if _, hasNext := types.GetDunder(iter, "__next__"); !hasNext {
@@ -329,7 +351,7 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					for {
 						item, err := pIter.Next()
 						if err != nil {
-							if _, isStop := err.(*protocols.StopIteration); isStop {
+							if isStopIteration(err) {
 								break
 							}
 							return nil, err
@@ -353,7 +375,7 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						lastResult = result
 					}
 				} else {
-					return nil, fmt.Errorf("iterator has no __next__ method")
+					return nil, fmt.Errorf("sequence type %T (value: %v) returned from __iter__ has no __next__ and no protocol support", iter, iter)
 				}
 			} else {
 				// Use the iterator returned by __iter__
@@ -362,14 +384,14 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					item, found, err := types.CallNext(iter, ctx)
 					if err != nil {
 						// Check if it's StopIteration
-						if _, isStop := err.(*protocols.StopIteration); isStop {
+						if isStopIteration(err) {
 							break
 						}
 						return nil, err
 					}
 					if !found {
 						// No __next__ method - shouldn't happen if __iter__ worked
-						return nil, fmt.Errorf("iterator has no __next__ method")
+						return nil, fmt.Errorf("iterator type %T (value: %v) has no __next__ method", iter, iter)
 					}
 
 					result, err := bodyFunc(item)
@@ -396,7 +418,7 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				item, err := pIter.Next()
 				if err != nil {
 					// Check if it's StopIteration
-					if _, isStop := err.(*protocols.StopIteration); isStop {
+					if isStopIteration(err) {
 						break
 					}
 					return nil, err

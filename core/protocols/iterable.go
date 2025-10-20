@@ -436,11 +436,11 @@ func NewDunderIterator(obj core.Value, ctx *core.Context) (*DunderIterator, erro
 	// Verify the iterator has __next__ method
 	iteratorObj, ok := iterator.(core.Object)
 	if !ok {
-		return nil, fmt.Errorf("__iter__ did not return an object with __next__")
+		return nil, fmt.Errorf("__iter__ returned non-object type %T (cannot check for __next__)", iterator)
 	}
 
 	if _, hasNext := iteratorObj.GetAttr("__next__"); !hasNext {
-		return nil, fmt.Errorf("iterator has no __next__ method")
+		return nil, fmt.Errorf("iterator type %T (value: %v) has no __next__ method", iterator, iterator)
 	}
 
 	return &DunderIterator{
