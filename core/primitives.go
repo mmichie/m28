@@ -366,7 +366,36 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 		}), true
 	}
 
-	return GetAttrWithRegistry(f, name)
+	// Try registry and base object
+	if val, ok := GetAttrWithRegistry(f, name); ok {
+		return val, true
+	}
+
+	// Provide default values for standard function attributes
+	switch name {
+	case "__name__":
+		if f.name != "" {
+			return StringValue(f.name), true
+		}
+		return StringValue("<builtin_function>"), true
+	case "__qualname__":
+		if f.name != "" {
+			return StringValue(f.name), true
+		}
+		return StringValue("<builtin_function>"), true
+	case "__module__":
+		return StringValue("builtins"), true
+	case "__doc__":
+		return None, true
+	case "__annotations__":
+		return NewDict(), true
+	case "__type_params__":
+		return TupleValue{}, true
+	case "__dict__":
+		return NewDict(), true
+	}
+
+	return nil, false
 }
 
 // SetAttr implements attribute setting for builtin functions

@@ -355,6 +355,35 @@ func (pf *partialFunction) CallWithKeywords(args []core.Value, kwargs map[string
 	return pf.function.Call(allArgs, ctx)
 }
 
+// GetAttr implements attribute access for partial functions
+// Provides default values for standard function attributes
+func (pf *partialFunction) GetAttr(name string) (core.Value, bool) {
+	// First check explicitly set attributes
+	if val, ok := pf.BaseObject.GetAttr(name); ok {
+		return val, true
+	}
+
+	// Provide defaults for standard function attributes
+	switch name {
+	case "__name__":
+		return core.StringValue("partial"), true
+	case "__qualname__":
+		return core.StringValue("functools.partial"), true
+	case "__module__":
+		return core.StringValue("functools"), true
+	case "__doc__":
+		return core.StringValue("partial(func, *args, **keywords) - new function with partial application"), true
+	case "__annotations__":
+		return core.NewDict(), true
+	case "__type_params__":
+		return core.TupleValue{}, true
+	case "__dict__":
+		return core.NewDict(), true
+	}
+
+	return nil, false
+}
+
 // lruCacheBuiltin implements lru_cache with keyword argument support
 type lruCacheBuiltin struct {
 	core.BaseObject

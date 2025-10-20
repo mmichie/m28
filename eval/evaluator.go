@@ -618,6 +618,20 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		dummyCell := core.NewDict()
 		dummyCell.Set("cell_contents", core.None)
 		return core.TupleValue{dummyCell}, true
+	case "__annotations__":
+		// Check if __annotations__ was explicitly set
+		if val, ok := f.BaseObject.GetAttr("__annotations__"); ok {
+			return val, true
+		}
+		// Return empty dict for annotations by default
+		return core.NewDict(), true
+	case "__type_params__":
+		// Check if __type_params__ was explicitly set
+		if val, ok := f.BaseObject.GetAttr("__type_params__"); ok {
+			return val, true
+		}
+		// Return empty tuple for type parameters by default
+		return core.TupleValue{}, true
 	default:
 		return f.BaseObject.GetAttr(name)
 	}
@@ -633,7 +647,7 @@ func (f *UserFunction) SetAttr(name string, value core.Value) error {
 			f.name = string(str)
 		}
 		return f.BaseObject.SetAttr(name, value)
-	case "__qualname__", "__module__", "__doc__":
+	case "__qualname__", "__module__", "__doc__", "__annotations__", "__type_params__":
 		// Store in BaseObject for later retrieval
 		return f.BaseObject.SetAttr(name, value)
 	default:
