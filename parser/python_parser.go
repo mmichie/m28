@@ -1512,6 +1512,42 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 		)
 	}
 
+	// Special handling: if callee is an attribute access (. obj "name"),
+	// convert it to a method call form: (. obj "name" args...)
+	// This handles: {}.keys() -> (. {} "keys" __call__) instead of ((. {} "keys"))
+	if sexpr, ok := callee.(*ast.SExpr); ok {
+		if len(sexpr.Elements) >= 3 {
+			if ident, ok := sexpr.Elements[0].(*ast.Identifier); ok && ident.Name == "." {
+				// It's an attribute access: (. obj "name")
+				// Check if this is a simple method call (no unpacking markers)
+				hasUnpacking := false
+				for _, arg := range args[1:] {
+					if id, ok := arg.(*ast.Identifier); ok {
+						if id.Name == "**unpack" || id.Name == "*unpack" || id.Name == "**kwargs" {
+							hasUnpacking = true
+							break
+						}
+					}
+				}
+
+				// Only use dot notation for simple cases (no unpacking)
+				if !hasUnpacking {
+					// No args (empty call): convert to (. obj "name" __call__)
+					if len(args) == 1 && len(kwargs) == 0 {
+						return ast.NewSExpr(append(sexpr.Elements,
+							ast.NewIdentifier("__call__", p.makeLocation(tok), ast.SyntaxPython)),
+							p.makeLocation(tok), ast.SyntaxPython)
+					}
+					// Has simple args: convert to (. obj "name" arg1 arg2 ...)
+					if len(args) > 1 {
+						result := append(sexpr.Elements, args[1:]...)
+						return ast.NewSExpr(result, p.makeLocation(tok), ast.SyntaxPython)
+					}
+				}
+			}
+		}
+	}
+
 	return ast.NewSExpr(args, p.makeLocation(tok), ast.SyntaxPython)
 }
 

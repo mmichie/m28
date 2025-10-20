@@ -290,6 +290,18 @@ func RegisterCollections(ctx *core.Context) {
 		}
 		return desc.Constructor(args, ctx)
 	}))
+
+	// memoryview - create a memoryview object (stub implementation)
+	// For now, just return the input object wrapped as a memoryview-like type
+	ctx.Define("memoryview", core.NewNamedBuiltinFunction("memoryview", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("memoryview() takes exactly 1 argument (%d given)", len(args))
+		}
+		// For now, just return a simple wrapper
+		// Python's memoryview is mainly used for buffer protocol
+		// We can implement more functionality later if needed
+		return args[0], nil
+	}))
 }
 
 // DictType represents the dict class that can be called and has class methods

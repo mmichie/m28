@@ -757,8 +757,9 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 				if nameAttr, hasName := bf.GetAttr("__name__"); hasName {
 					if nameStr, ok := nameAttr.(core.StringValue); ok {
 						typeName := string(nameStr)
-						// List of builtin type constructors
+						// List of builtin type constructors and iterator types
 						typeConstructors := map[string]bool{
+							// Basic types
 							"frozenset":    true,
 							"set":          true,
 							"list":         true,
@@ -777,6 +778,27 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 							"property":     true,
 							"staticmethod": true,
 							"classmethod":  true,
+							"function":     true,
+							"generator":    true,
+							"coroutine":    true,
+							// Iterator types
+							"bytes_iterator":       true,
+							"bytearray_iterator":   true,
+							"dict_keyiterator":     true,
+							"dict_valueiterator":   true,
+							"dict_itemiterator":    true,
+							"list_iterator":        true,
+							"list_reverseiterator": true,
+							"range_iterator":       true,
+							"longrange_iterator":   true,
+							"set_iterator":         true,
+							"str_iterator":         true,
+							"tuple_iterator":       true,
+							"zip_iterator":         true,
+							// Dict view types
+							"dict_keys":   true,
+							"dict_values": true,
+							"dict_items":  true,
 						}
 						if typeConstructors[typeName] {
 							if debugClass {
@@ -791,7 +813,7 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 			if debugClass {
 				if bf, ok := obj.(*core.BuiltinFunction); ok {
 					name, hasName := getBuiltinName(bf)
-					fmt.Fprintf(os.Stderr, "[DEBUG isinstance] isinstance(?, type) returning False for builtin: %s (hasName=%v) (type %T)\n", name, hasName, obj)
+					fmt.Fprintf(os.Stderr, "[DEBUG isinstance] isinstance(?, type) returning False for builtin: __name__='%s' (hasName=%v) (type %T) (repr: %v)\n", name, hasName, obj, obj)
 				} else {
 					fmt.Fprintf(os.Stderr, "[DEBUG isinstance] isinstance(?, type) returning False for: %v (type %T)\n", obj, obj)
 				}
@@ -891,12 +913,23 @@ func isTypeConstructor(bf *core.BuiltinFunction) bool {
 		if nameStr, ok := nameAttr.(core.StringValue); ok {
 			typeName := string(nameStr)
 			typeConstructors := map[string]bool{
+				// Basic types
 				"frozenset": true, "set": true, "list": true, "tuple": true,
 				"bytes": true, "bytearray": true, "str": true,
 				"int": true, "float": true, "bool": true, "dict": true,
 				"range": true, "memoryview": true, "complex": true,
 				"object": true, "property": true,
 				"staticmethod": true, "classmethod": true,
+				"function": true, "generator": true, "coroutine": true,
+				// Iterator types
+				"bytes_iterator": true, "bytearray_iterator": true,
+				"dict_keyiterator": true, "dict_valueiterator": true, "dict_itemiterator": true,
+				"list_iterator": true, "list_reverseiterator": true,
+				"range_iterator": true, "longrange_iterator": true,
+				"set_iterator": true, "str_iterator": true, "tuple_iterator": true,
+				"zip_iterator": true,
+				// Dict view types
+				"dict_keys": true, "dict_values": true, "dict_items": true,
 			}
 			return typeConstructors[typeName]
 		}
