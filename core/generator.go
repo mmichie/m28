@@ -414,3 +414,48 @@ func (gf *GeneratorFunction) Call(args []Value, ctx *Context) (Value, error) {
 
 	return gen, nil
 }
+
+// GetAttr implements attribute access for generator functions
+// Provides default values for standard function attributes
+func (gf *GeneratorFunction) GetAttr(name string) (Value, bool) {
+	// First check explicitly set attributes
+	if val, ok := gf.BaseObject.GetAttr(name); ok {
+		return val, true
+	}
+
+	// Try to delegate to the underlying function if it has GetAttr
+	if funcWithAttrs, ok := gf.Function.(interface {
+		GetAttr(string) (Value, bool)
+	}); ok {
+		if val, ok := funcWithAttrs.GetAttr(name); ok {
+			return val, true
+		}
+	}
+
+	// Provide defaults for standard function attributes
+	switch name {
+	case "__name__":
+		if gf.Name != "" {
+			return StringValue(gf.Name), true
+		}
+		return StringValue("<generator>"), true
+	case "__qualname__":
+		if gf.Name != "" {
+			return StringValue(gf.Name), true
+		}
+		return StringValue("<generator>"), true
+	case "__module__":
+		return StringValue("__main__"), true
+	case "__doc__":
+		return None, true
+	case "__annotations__":
+		return NewDict(), true
+	case "__type_params__":
+		return TupleValue{}, true
+	case "__dict__":
+		// Return the attrs map as a dict
+		return NewDict(), true
+	}
+
+	return nil, false
+}
