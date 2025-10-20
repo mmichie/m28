@@ -6,6 +6,7 @@ import (
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/parser"
 )
 
 // RegisterMisc registers miscellaneous functions
@@ -282,6 +283,93 @@ func RegisterMisc(ctx *core.Context) {
 		// In a full implementation, this would unbind the variables from the namespace
 		// For now, it's a no-op that returns None
 		return core.None, nil
+	}))
+
+	// eval - evaluate a string as code
+	// eval(expression, globals=None, locals=None)
+	ctx.Define("eval", core.NewNamedBuiltinFunction("eval", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("eval", args)
+		if err := v.Range(1, 3); err != nil {
+			return nil, err
+		}
+
+		// Get the code string
+		codeStr, err := v.GetString(0)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get the globals dict (optional)
+		var globalsDict *core.DictValue
+		if v.Count() >= 2 && v.Get(1) != core.None {
+			globalsDict, err = types.RequireDict(v.Get(1), "eval() globals")
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Get the locals dict (optional)
+		var localsDict *core.DictValue
+		if v.Count() >= 3 && v.Get(2) != core.None {
+			localsDict, err = types.RequireDict(v.Get(2), "eval() locals")
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Parse the code string
+		p := parser.NewParser()
+		parsed, err := p.Parse(codeStr)
+		if err != nil {
+			return nil, fmt.Errorf("eval() syntax error: %v", err)
+		}
+
+		// Create a new context for evaluation
+		evalCtx := core.NewContext(ctx)
+
+		// If globals dict provided, populate the context
+		if globalsDict != nil {
+			iter := globalsDict.Iterator()
+			for {
+				keyVal, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				if keyStr, ok := keyVal.(core.StringValue); ok {
+					value, _ := globalsDict.Get(string(keyStr))
+					evalCtx.Define(string(keyStr), value)
+				}
+			}
+		}
+
+		// If locals dict provided, add those too (locals override globals)
+		if localsDict != nil {
+			iter := localsDict.Iterator()
+			for {
+				keyVal, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				if keyStr, ok := keyVal.(core.StringValue); ok {
+					value, _ := localsDict.Get(string(keyStr))
+					evalCtx.Define(string(keyStr), value)
+				}
+			}
+		}
+
+		// Evaluate the parsed code
+		// Note: We need access to the Eval function from eval package
+		// For now, use core.EvalHook if it exists
+		if core.EvalHook == nil {
+			return nil, fmt.Errorf("eval() not available: evaluation engine not initialized")
+		}
+
+		result, err := core.EvalHook(parsed, evalCtx)
+		if err != nil {
+			return nil, err
+		}
+
+		return result, nil
 	}))
 
 	// Ellipsis - Python's ... literal

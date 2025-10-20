@@ -8,6 +8,11 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+func init() {
+	// Set the EvalHook so that builtin eval() can work
+	core.EvalHook = Eval
+}
+
 // Eval evaluates an expression in a context
 func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 	switch v := expr.(type) {
@@ -609,6 +614,25 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		return core.TupleValue{dummyCell}, true
 	default:
 		return f.BaseObject.GetAttr(name)
+	}
+}
+
+// SetAttr implements attribute setting for user functions
+func (f *UserFunction) SetAttr(name string, value core.Value) error {
+	// Allow setting special attributes
+	switch name {
+	case "__name__":
+		// Update the function name
+		if str, ok := value.(core.StringValue); ok {
+			f.name = string(str)
+		}
+		return f.BaseObject.SetAttr(name, value)
+	case "__qualname__", "__module__", "__doc__":
+		// Store in BaseObject for later retrieval
+		return f.BaseObject.SetAttr(name, value)
+	default:
+		// Allow setting arbitrary attributes
+		return f.BaseObject.SetAttr(name, value)
 	}
 }
 

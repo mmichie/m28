@@ -152,3 +152,7 @@ func (o *BaseObject) CallMethod(name string, args []Value, ctx *Context) (Value,
 
 	return callable.Call(args, ctx)
 }
+
+// EvalHook is a function that can be set by the eval package to provide eval() functionality
+// This avoids circular dependencies between core and eval packages
+var EvalHook func(Value, *Context) (Value, error)

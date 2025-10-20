@@ -105,6 +105,15 @@ func (c *ClassMethodValue) String() string {
 	return "<classmethod>"
 }
 
+// GetAttr implements attribute access for classmethods
+func (c *ClassMethodValue) GetAttr(name string) (Value, bool) {
+	// Expose __func__ to get the underlying function
+	if name == "__func__" {
+		return c.Function, true
+	}
+	return nil, false
+}
+
 // BoundClassMethod represents a class method bound to a specific class
 type BoundClassMethod struct {
 	Class    Value

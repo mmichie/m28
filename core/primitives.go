@@ -344,6 +344,13 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 	return GetAttrWithRegistry(f, name)
 }
 
+// SetAttr implements attribute setting for builtin functions
+func (f *BuiltinFunction) SetAttr(name string, value Value) error {
+	// Allow setting special attributes like __name__, __doc__, __qualname__
+	// Delegate to BaseObject which stores them in the attrs map
+	return f.BaseObject.SetAttr(name, value)
+}
+
 // BuiltinMethod represents a method that's implemented in Go
 type BuiltinMethod struct {
 	BaseObject
