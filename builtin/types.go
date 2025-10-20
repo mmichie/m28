@@ -595,9 +595,24 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		}
 	} else if len(args) == 3 {
 		// type(name, bases, dict) - create a new class
-		// This is the 3-argument form used for dynamic class creation
-		// For now, return an error - we can implement this later if needed
-		return nil, fmt.Errorf("type() with 3 arguments (dynamic class creation) not yet implemented")
+		// Delegate to type.__new__(type, name, bases, dict)
+		newMethod, found := t.Class.GetMethod("__new__")
+		if !found {
+			return nil, fmt.Errorf("type.__new__ not found")
+		}
+
+		callable, ok := newMethod.(core.Callable)
+		if !ok {
+			return nil, fmt.Errorf("type.__new__ is not callable")
+		}
+
+		// Call with type (cls) as first argument, then the 3 provided args
+		newArgs := make([]core.Value, 4)
+		newArgs[0] = t // cls argument
+		newArgs[1] = args[0] // name
+		newArgs[2] = args[1] // bases
+		newArgs[3] = args[2] // dict
+		return callable.Call(newArgs, ctx)
 	} else {
 		return nil, fmt.Errorf("type() takes 1 or 3 arguments, got %d", len(args))
 	}
@@ -645,8 +660,25 @@ func createTypeMetaclass() *TypeType {
 				parentClasses = append(parentClasses, b)
 			case interface{ GetClass() *core.Class }:
 				parentClasses = append(parentClasses, b.GetClass())
+			case *core.BuiltinFunction:
+				// Type constructors like object, str, etc. are callable but also valid bases
+				// Try to get the class associated with this type name
+				typeName := "object"
+				if nameAttr, ok := b.GetAttr("__name__"); ok {
+					if nameStr, ok := nameAttr.(core.StringValue); ok {
+						typeName = string(nameStr)
+					}
+				}
+				// Look up or create a class for this type
+				baseClass := typeClassCache[typeName]
+				if baseClass == nil {
+					baseClass = core.NewClass(typeName, nil)
+					baseClass.SetClassAttr("__name__", core.StringValue(typeName))
+					typeClassCache[typeName] = baseClass
+				}
+				parentClasses = append(parentClasses, baseClass)
 			default:
-				return nil, fmt.Errorf("bases must be classes, not %T", base)
+				return nil, fmt.Errorf("bases must be classes, not %T (name: %v)", base, base)
 			}
 		}
 
