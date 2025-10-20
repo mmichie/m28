@@ -165,7 +165,7 @@ func RegisterList(ctx *core.Context) {
 	// range - creates a range object
 	// BEFORE: 56 lines
 	// AFTER: Custom builder
-	ctx.Define("range", core.NewBuiltinFunction(RangeBuilder()))
+	ctx.Define("range", core.NewNamedBuiltinFunction("range", RangeBuilder()))
 
 	// sorted - returns sorted copy (basic version without kwargs)
 	// BEFORE: Part of 70 lines with kwargs
