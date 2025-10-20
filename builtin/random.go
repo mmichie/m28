@@ -85,11 +85,11 @@ func RegisterRandomModule() {
 
 		arg := v.Get(0)
 		if list, ok := types.AsList(arg); ok {
-			if len(list) == 0 {
+			if list.Len() == 0 {
 				return nil, fmt.Errorf("choice() cannot choose from an empty sequence")
 			}
-			idx := rng.Intn(len(list))
-			return list[idx], nil
+			idx := rng.Intn(list.Len())
+			return list.Items()[idx], nil
 		} else if tuple, ok := types.AsTuple(arg); ok {
 			if len(tuple) == 0 {
 				return nil, fmt.Errorf("choice() cannot choose from an empty sequence")
@@ -121,9 +121,9 @@ func RegisterRandomModule() {
 		}
 
 		// Shuffle the list in place using Fisher-Yates
-		for i := len(list) - 1; i > 0; i-- {
+		for i := list.Len() - 1; i > 0; i-- {
 			j := rng.Intn(i + 1)
-			list[i], list[j] = list[j], list[i]
+			list.Items()[i], list.Items()[j] = list.Items()[j], list.Items()[i]
 		}
 
 		// Python's shuffle returns None
@@ -163,7 +163,7 @@ func RegisterRandomModule() {
 		var population []core.Value
 		arg0 := v.Get(0)
 		if list, ok := types.AsList(arg0); ok {
-			population = list
+			population = list.Items()
 		} else if tuple, ok := types.AsTuple(arg0); ok {
 			population = tuple
 		} else if str, ok := types.AsString(arg0); ok {
@@ -201,9 +201,9 @@ func RegisterRandomModule() {
 		}
 
 		// Return the first k elements
-		result := make(core.ListValue, k)
+		result := make([]core.Value, k)
 		copy(result, populationCopy[:k])
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// Register in the global module registry

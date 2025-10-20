@@ -329,7 +329,7 @@ func MergeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return nil, errors.NewRuntimeError("merge", "keys did not return a list")
 		}
 
-		for _, keyVal := range keys {
+		for _, keyVal := range keys.Items() {
 			keyStr, ok := types.AsString(keyVal)
 			if !ok {
 				return nil, errors.NewRuntimeError("merge", "key is not a string")

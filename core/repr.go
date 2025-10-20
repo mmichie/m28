@@ -61,7 +61,7 @@ func reprBuiltinType(val Value) string {
 		return reprBool(v)
 	case NilValue:
 		return "None"
-	case ListValue:
+	case *ListValue:
 		return formatListRepr(v)
 	case TupleValue:
 		return formatTupleRepr(v)
@@ -156,13 +156,13 @@ func reprNamedCallable(val Value) string {
 	return fmt.Sprintf("<function %s at %p>", name, val)
 }
 
-func formatListRepr(list ListValue) string {
-	if len(list) == 0 {
+func formatListRepr(list *ListValue) string {
+	if list.Len() == 0 {
 		return "[]"
 	}
 
 	result := "["
-	for i, item := range list {
+	for i, item := range list.Items() {
 		if i > 0 {
 			result += ", "
 		}

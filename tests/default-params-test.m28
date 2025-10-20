@@ -31,7 +31,7 @@
 (def make_list (item (count 3))
   (= result (list))
   (for i (range count)
-    (= result (result.append item)))
+    (result.append item))
   result)
 
 (print "\nTesting expression as default:")

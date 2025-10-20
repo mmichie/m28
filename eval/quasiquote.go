@@ -9,28 +9,28 @@ import (
 // quasiquoteForm implements the quasiquote special form
 // Syntax: (quasiquote expr)
 // Like quote, but allows selective evaluation via unquote and unquote-splicing
-func quasiquoteForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
+func quasiquoteForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 1 {
 		return nil, fmt.Errorf("quasiquote requires exactly 1 argument")
 	}
 
-	return expandQuasiquote(args[0], ctx)
+	return expandQuasiquote(args.Items()[0], ctx)
 }
 
 // expandQuasiquote recursively expands a quasiquoted expression
 func expandQuasiquote(expr core.Value, ctx *core.Context) (core.Value, error) {
 	switch v := expr.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		// Check if it's an unquote or unquote-splicing form
-		if len(v) > 0 {
-			if sym, ok := v[0].(core.SymbolValue); ok {
+		if v.Len() > 0 {
+			if sym, ok := v.Items()[0].(core.SymbolValue); ok {
 				switch string(sym) {
 				case "unquote":
 					// (unquote expr) - evaluate the expression
-					if len(v) != 2 {
+					if v.Len() != 2 {
 						return nil, fmt.Errorf("unquote requires exactly 1 argument")
 					}
-					return Eval(v[1], ctx)
+					return Eval(v.Items()[1], ctx)
 
 				case "unquote-splicing":
 					// unquote-splicing can only appear inside a list context
@@ -41,18 +41,18 @@ func expandQuasiquote(expr core.Value, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Regular list - recursively expand elements
-		result := make(core.ListValue, 0, len(v))
-		for _, elem := range v {
+		result := make([]core.Value, 0, v.Len())
+		for _, elem := range v.Items() {
 			// Check if this element is unquote-splicing
-			if list, ok := elem.(core.ListValue); ok && len(list) > 0 {
-				if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "unquote-splicing" {
+			if list, ok := elem.(*core.ListValue); ok && list.Len() > 0 {
+				if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "unquote-splicing" {
 					// (unquote-splicing expr) - evaluate and splice
-					if len(list) != 2 {
+					if list.Len() != 2 {
 						return nil, fmt.Errorf("unquote-splicing requires exactly 1 argument")
 					}
 
 					// Evaluate the expression
-					val, err := Eval(list[1], ctx)
+					val, err := Eval(list.Items()[1], ctx)
 					if err != nil {
 						return nil, err
 					}
@@ -64,7 +64,7 @@ func expandQuasiquote(expr core.Value, ctx *core.Context) (core.Value, error) {
 					}
 
 					// Splice the elements
-					result = append(result, spliced...)
+					result = append(result, spliced.Items()...)
 					continue
 				}
 			}
@@ -76,7 +76,7 @@ func expandQuasiquote(expr core.Value, ctx *core.Context) (core.Value, error) {
 			}
 			result = append(result, expanded)
 		}
-		return result, nil
+		return core.NewList(result...), nil
 
 	default:
 		// Self-evaluating values (numbers, strings, bools, symbols, nil)
@@ -86,15 +86,15 @@ func expandQuasiquote(expr core.Value, ctx *core.Context) (core.Value, error) {
 }
 
 // valueToListForSplicing converts a value to a list for splicing
-func valueToListForSplicing(val core.Value) (core.ListValue, error) {
+func valueToListForSplicing(val core.Value) (*core.ListValue, error) {
 	switch v := val.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		return v, nil
 	case core.TupleValue:
-		return core.ListValue(v), nil
+		return core.NewList(v...), nil
 	case *core.SetValue:
 		// Convert set to list
-		list := make(core.ListValue, 0)
+		list := make([]core.Value, 0)
 		iter := v.Iterator()
 		for {
 			item, hasNext := iter.Next()
@@ -103,7 +103,7 @@ func valueToListForSplicing(val core.Value) (core.ListValue, error) {
 			}
 			list = append(list, item)
 		}
-		return list, nil
+		return core.NewList(list...), nil
 	default:
 		return nil, fmt.Errorf("can only splice sequences, got %s", val.Type())
 	}

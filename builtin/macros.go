@@ -45,15 +45,15 @@ func unlessMacro() *core.BuiltinFunction {
 		body := v.Get(1)
 
 		// Build: (if (not condition) body nil)
-		result := core.ListValue{
+		result := core.NewList(
 			core.SymbolValue("if"),
-			core.ListValue{
+			core.NewList(
 				core.SymbolValue("not"),
 				condition,
-			},
+			),
 			body,
 			core.Nil,
-		}
+		)
 
 		return result, nil
 	})
@@ -72,12 +72,12 @@ func whenMacro() *core.BuiltinFunction {
 		body := v.Get(1)
 
 		// Build: (if condition body nil)
-		result := core.ListValue{
+		result := core.NewList(
 			core.SymbolValue("if"),
 			condition,
 			body,
 			core.Nil,
-		}
+		)
 
 		return result, nil
 	})
@@ -99,16 +99,16 @@ func threadFirstMacro() *core.BuiltinFunction {
 		// Thread through each form
 		for _, form := range args[1:] {
 			// If form is a list, insert result as first argument after the function
-			if list, ok := form.(core.ListValue); ok && len(list) > 0 {
+			if list, ok := form.(*core.ListValue); ok && list.Len() > 0 {
 				// (f a b) with result x => (f x a b)
-				threaded := make(core.ListValue, 0, len(list)+1)
-				threaded = append(threaded, list[0])     // function
-				threaded = append(threaded, result)      // insert value
-				threaded = append(threaded, list[1:]...) // rest of args
-				result = threaded
+				threaded := make([]core.Value, 0, list.Len()+1)
+				threaded = append(threaded, list.Items()[0])     // function
+				threaded = append(threaded, result)              // insert value
+				threaded = append(threaded, list.Items()[1:]...) // rest of args
+				result = core.NewList(threaded...)
 			} else {
 				// If form is a symbol, create a function call: f => (f result)
-				result = core.ListValue{form, result}
+				result = core.NewList(form, result)
 			}
 		}
 
@@ -132,15 +132,15 @@ func threadLastMacro() *core.BuiltinFunction {
 		// Thread through each form
 		for _, form := range args[1:] {
 			// If form is a list, append result as last argument
-			if list, ok := form.(core.ListValue); ok && len(list) > 0 {
+			if list, ok := form.(*core.ListValue); ok && list.Len() > 0 {
 				// (f a b) with result x => (f a b x)
-				threaded := make(core.ListValue, 0, len(list)+1)
-				threaded = append(threaded, list...) // function and args
-				threaded = append(threaded, result)  // append value at end
-				result = threaded
+				threaded := make([]core.Value, 0, list.Len()+1)
+				threaded = append(threaded, list.Items()...) // function and args
+				threaded = append(threaded, result)          // append value at end
+				result = core.NewList(threaded...)
 			} else {
 				// If form is a symbol, create a function call: f => (f result)
-				result = core.ListValue{form, result}
+				result = core.NewList(form, result)
 			}
 		}
 

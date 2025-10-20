@@ -234,11 +234,11 @@ func (f *File) ReadLines() (Value, error) {
 		return nil, fmt.Errorf("file not open for reading")
 	}
 
-	var lines ListValue
+	lines := NewList()
 	scanner := bufio.NewScanner(f.reader)
 
 	for scanner.Scan() {
-		lines = append(lines, StringValue(scanner.Text()+"\n"))
+		lines.Append(StringValue(scanner.Text() + "\n"))
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -414,8 +414,8 @@ func (f *File) createRegistry() *MethodRegistry {
 				// Get the lines to write
 				var lines []Value
 				switch v := args[0].(type) {
-				case ListValue:
-					lines = v
+				case *ListValue:
+					lines = v.Items()
 				case TupleValue:
 					lines = v
 				default:

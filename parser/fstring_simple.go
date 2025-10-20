@@ -59,10 +59,10 @@ func (p *Parser) parseFStringEnhancedSimple(quoteChar rune) (core.Value, error) 
 			}
 
 			// Create format expression
-			formatExpr := make(core.ListValue, 0, len(parts)+1)
+			formatExpr := make([]core.Value, 0, len(parts)+1)
 			formatExpr = append(formatExpr, core.SymbolValue("str-format"))
 			formatExpr = append(formatExpr, parts...)
-			return formatExpr, nil
+			return core.NewList(formatExpr...), nil
 		} else if ch == '{' {
 			// Check for escaped brace
 			if p.pos+1 < len(p.input) && p.input[p.pos+1] == '{' {
@@ -96,11 +96,11 @@ func (p *Parser) parseFStringEnhancedSimple(quoteChar rune) (core.Value, error) 
 			// Add the expression with format spec if present
 			if formatSpec != "" {
 				// Create a format expression with the spec
-				formatExpr := core.ListValue{
+				formatExpr := core.NewList(
 					core.SymbolValue("format-expr"),
 					expr,
 					core.StringValue(formatSpec),
-				}
+				)
 				parts = append(parts, formatExpr)
 			} else {
 				parts = append(parts, expr)

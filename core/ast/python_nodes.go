@@ -40,7 +40,7 @@ func (b *BreakForm) String() string {
 
 // ToIR lowers break to IR
 func (b *BreakForm) ToIR() core.Value {
-	return core.ListValue{core.SymbolValue("break")}
+	return core.NewList(core.SymbolValue("break"))
 }
 
 // ContinueForm represents the continue statement
@@ -70,7 +70,7 @@ func (c *ContinueForm) String() string {
 
 // ToIR lowers continue to IR
 func (c *ContinueForm) ToIR() core.Value {
-	return core.ListValue{core.SymbolValue("continue")}
+	return core.NewList(core.SymbolValue("continue"))
 }
 
 // ReturnForm represents the return statement
@@ -106,9 +106,9 @@ func (r *ReturnForm) String() string {
 // ToIR lowers return to IR
 func (r *ReturnForm) ToIR() core.Value {
 	if r.Value == nil {
-		return core.ListValue{core.SymbolValue("return"), core.None}
+		return core.NewList(core.SymbolValue("return"), core.None)
 	}
-	return core.ListValue{core.SymbolValue("return"), r.Value.ToIR()}
+	return core.NewList(core.SymbolValue("return"), r.Value.ToIR())
 }
 
 // RaiseForm represents the raise statement
@@ -150,19 +150,19 @@ func (r *RaiseForm) String() string {
 func (r *RaiseForm) ToIR() core.Value {
 	if r.Exception == nil {
 		// Bare raise (re-raise current exception)
-		return core.ListValue{core.SymbolValue("raise")}
+		return core.NewList(core.SymbolValue("raise"))
 	}
 	if r.Cause != nil {
 		// raise X from Y
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("raise"),
 			r.Exception.ToIR(),
 			core.SymbolValue("from"),
 			r.Cause.ToIR(),
-		}
+		)
 	}
 	// raise X
-	return core.ListValue{core.SymbolValue("raise"), r.Exception.ToIR()}
+	return core.NewList(core.SymbolValue("raise"), r.Exception.ToIR())
 }
 
 // PassForm represents the pass statement
@@ -230,9 +230,9 @@ func (a *AssertForm) String() string {
 // ToIR lowers assert to IR
 func (a *AssertForm) ToIR() core.Value {
 	if a.Message == nil {
-		return core.ListValue{core.SymbolValue("assert"), a.Condition.ToIR()}
+		return core.NewList(core.SymbolValue("assert"), a.Condition.ToIR())
 	}
-	return core.ListValue{core.SymbolValue("assert"), a.Condition.ToIR(), a.Message.ToIR()}
+	return core.NewList(core.SymbolValue("assert"), a.Condition.ToIR(), a.Message.ToIR())
 }
 
 // ============================================================================
@@ -272,12 +272,12 @@ func (b *BlockForm) String() string {
 
 // ToIR lowers block to IR (do ...)
 func (b *BlockForm) ToIR() core.Value {
-	ir := make(core.ListValue, 0, len(b.Statements)+1)
+	ir := make([]core.Value, 0, len(b.Statements)+1)
 	ir = append(ir, core.SymbolValue("do"))
 	for _, stmt := range b.Statements {
 		ir = append(ir, stmt.ToIR())
 	}
-	return ir
+	return core.NewList(ir...)
 }
 
 // ============================================================================
@@ -343,25 +343,25 @@ func (f *ForForm) String() string {
 // ToIR lowers for loop to IR
 func (f *ForForm) ToIR() core.Value {
 	// Build body block
-	bodyIR := make(core.ListValue, 0, len(f.Body)+1)
+	bodyIR := make([]core.Value, 0, len(f.Body)+1)
 	bodyIR = append(bodyIR, core.SymbolValue("do"))
 	for _, stmt := range f.Body {
 		bodyIR = append(bodyIR, stmt.ToIR())
 	}
 
-	var result core.ListValue
+	var result []core.Value
 
 	if len(f.Variables) == 1 {
 		// Single variable: (for var iterable body)
-		result = core.ListValue{
+		result = []core.Value{
 			core.SymbolValue("for"),
 			core.SymbolValue(f.Variables[0]),
 			f.Iterable.ToIR(),
-			bodyIR,
+			core.NewList(bodyIR...),
 		}
 	} else {
 		// Multiple variables (tuple unpacking): (for var1 var2 ... in iterable body)
-		result = core.ListValue{core.SymbolValue("for")}
+		result = []core.Value{core.SymbolValue("for")}
 
 		// Add all variables
 		for _, v := range f.Variables {
@@ -373,22 +373,22 @@ func (f *ForForm) ToIR() core.Value {
 
 		// Add iterable and body
 		result = append(result, f.Iterable.ToIR())
-		result = append(result, bodyIR)
+		result = append(result, core.NewList(bodyIR...))
 	}
 
 	// If there's an else clause, we need to handle it
 	// Python's for...else runs if loop completes without break
 	// This could be: (for var iterable body else-body)
 	if len(f.ElseBody) > 0 {
-		elseIR := make(core.ListValue, 0, len(f.ElseBody)+1)
+		elseIR := make([]core.Value, 0, len(f.ElseBody)+1)
 		elseIR = append(elseIR, core.SymbolValue("do"))
 		for _, stmt := range f.ElseBody {
 			elseIR = append(elseIR, stmt.ToIR())
 		}
-		result = append(result, elseIR)
+		result = append(result, core.NewList(elseIR...))
 	}
 
-	return result
+	return core.NewList(result...)
 }
 
 // WhileForm represents a while loop
@@ -425,30 +425,30 @@ func (w *WhileForm) String() string {
 // ToIR lowers while loop to IR
 func (w *WhileForm) ToIR() core.Value {
 	// Build body block
-	bodyIR := make(core.ListValue, 0, len(w.Body)+1)
+	bodyIR := make([]core.Value, 0, len(w.Body)+1)
 	bodyIR = append(bodyIR, core.SymbolValue("do"))
 	for _, stmt := range w.Body {
 		bodyIR = append(bodyIR, stmt.ToIR())
 	}
 
 	// Basic while loop: (while condition body)
-	result := core.ListValue{
+	result := []core.Value{
 		core.SymbolValue("while"),
 		w.Condition.ToIR(),
-		bodyIR,
+		core.NewList(bodyIR...),
 	}
 
 	// Handle else clause
 	if len(w.ElseBody) > 0 {
-		elseIR := make(core.ListValue, 0, len(w.ElseBody)+1)
+		elseIR := make([]core.Value, 0, len(w.ElseBody)+1)
 		elseIR = append(elseIR, core.SymbolValue("do"))
 		for _, stmt := range w.ElseBody {
 			elseIR = append(elseIR, stmt.ToIR())
 		}
-		result = append(result, elseIR)
+		result = append(result, core.NewList(elseIR...))
 	}
 
-	return result
+	return core.NewList(result...)
 }
 
 // ============================================================================
@@ -579,23 +579,23 @@ func (c *ComprehensionForm) ToIR() core.Value {
 
 		if len(c.Clauses) > 1 {
 			// Multi-clause (nested) comprehension
-			clausesIR := make(core.ListValue, 0, len(c.Clauses))
+			clausesIR := make([]core.Value, 0, len(c.Clauses))
 			for _, clause := range c.Clauses {
-				clauseIR := core.ListValue{
+				clauseIR := []core.Value{
 					core.SymbolValue(clause.Variable),
 					clause.Iterable.ToIR(),
 				}
 				if clause.Condition != nil {
 					clauseIR = append(clauseIR, clause.Condition.ToIR())
 				}
-				clausesIR = append(clausesIR, clauseIR)
+				clausesIR = append(clausesIR, core.NewList(clauseIR...))
 			}
 
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("list-comp"),
 				c.Element.ToIR(),
-				clausesIR,
-			}
+				core.NewList(clausesIR...),
+			)
 		}
 
 		// Single clause (backward compatible)
@@ -615,21 +615,21 @@ func (c *ComprehensionForm) ToIR() core.Value {
 		}
 
 		if condition != nil {
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("list-comp"),
 				c.Element.ToIR(),
 				core.SymbolValue(variable),
 				iterable.ToIR(),
 				condition.ToIR(),
-			}
+			)
 		}
 
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("list-comp"),
 			c.Element.ToIR(),
 			core.SymbolValue(variable),
 			iterable.ToIR(),
-		}
+		)
 
 	case DictComp:
 		// Single: {k: v*2 for k in items}
@@ -640,24 +640,24 @@ func (c *ComprehensionForm) ToIR() core.Value {
 
 		if len(c.Clauses) > 1 {
 			// Multi-clause (nested) dict comprehension
-			clausesIR := make(core.ListValue, 0, len(c.Clauses))
+			clausesIR := make([]core.Value, 0, len(c.Clauses))
 			for _, clause := range c.Clauses {
-				clauseIR := core.ListValue{
+				clauseIR := []core.Value{
 					core.SymbolValue(clause.Variable),
 					clause.Iterable.ToIR(),
 				}
 				if clause.Condition != nil {
 					clauseIR = append(clauseIR, clause.Condition.ToIR())
 				}
-				clausesIR = append(clausesIR, clauseIR)
+				clausesIR = append(clausesIR, core.NewList(clauseIR...))
 			}
 
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("dict-comp"),
 				c.KeyExpr.ToIR(),
 				c.ValueExpr.ToIR(),
-				clausesIR,
-			}
+				core.NewList(clausesIR...),
+			)
 		}
 
 		// Single clause (backward compatible)
@@ -675,23 +675,23 @@ func (c *ComprehensionForm) ToIR() core.Value {
 		}
 
 		if condition != nil {
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("dict-comp"),
 				c.KeyExpr.ToIR(),
 				c.ValueExpr.ToIR(),
 				core.SymbolValue(variable),
 				iterable.ToIR(),
 				condition.ToIR(),
-			}
+			)
 		}
 
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("dict-comp"),
 			c.KeyExpr.ToIR(),
 			c.ValueExpr.ToIR(),
 			core.SymbolValue(variable),
 			iterable.ToIR(),
-		}
+		)
 
 	case SetComp:
 		// Single: {x for x in data if x > 10}
@@ -702,23 +702,23 @@ func (c *ComprehensionForm) ToIR() core.Value {
 
 		if len(c.Clauses) > 1 {
 			// Multi-clause (nested) set comprehension
-			clausesIR := make(core.ListValue, 0, len(c.Clauses))
+			clausesIR := make([]core.Value, 0, len(c.Clauses))
 			for _, clause := range c.Clauses {
-				clauseIR := core.ListValue{
+				clauseIR := []core.Value{
 					core.SymbolValue(clause.Variable),
 					clause.Iterable.ToIR(),
 				}
 				if clause.Condition != nil {
 					clauseIR = append(clauseIR, clause.Condition.ToIR())
 				}
-				clausesIR = append(clausesIR, clauseIR)
+				clausesIR = append(clausesIR, core.NewList(clauseIR...))
 			}
 
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("set-comp"),
 				c.Element.ToIR(),
-				clausesIR,
-			}
+				core.NewList(clausesIR...),
+			)
 		}
 
 		// Single clause (backward compatible)
@@ -736,50 +736,50 @@ func (c *ComprehensionForm) ToIR() core.Value {
 		}
 
 		if condition != nil {
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("set-comp"),
 				c.Element.ToIR(),
 				core.SymbolValue(variable),
 				iterable.ToIR(),
 				condition.ToIR(),
-			}
+			)
 		}
 
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("set-comp"),
 			c.Element.ToIR(),
 			core.SymbolValue(variable),
 			iterable.ToIR(),
-		}
+		)
 
 	case GeneratorComp:
 		// (x*x for x in range(10))
 		// → (gen-comp (lambda (x) (* x x)) (range 10))
-		elemLambda := core.ListValue{
+		elemLambda := core.NewList(
 			core.SymbolValue("lambda"),
-			core.ListValue{core.SymbolValue(c.Variable)},
+			core.NewList(core.SymbolValue(c.Variable)),
 			c.Element.ToIR(),
-		}
+		)
 
 		if c.Condition != nil {
-			filterLambda := core.ListValue{
+			filterLambda := core.NewList(
 				core.SymbolValue("lambda"),
-				core.ListValue{core.SymbolValue(c.Variable)},
+				core.NewList(core.SymbolValue(c.Variable)),
 				c.Condition.ToIR(),
-			}
-			return core.ListValue{
+			)
+			return core.NewList(
 				core.SymbolValue("gen-comp"),
 				elemLambda,
 				c.Iterable.ToIR(),
 				filterLambda,
-			}
+			)
 		}
 
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("gen-comp"),
 			elemLambda,
 			c.Iterable.ToIR(),
-		}
+		)
 
 	default:
 		return core.None
@@ -828,7 +828,7 @@ func (w *WithForm) String() string {
 // ToIR lowers with statement to IR
 func (w *WithForm) ToIR() core.Value {
 	// Build body block
-	bodyIR := make(core.ListValue, 0, len(w.Body)+1)
+	bodyIR := make([]core.Value, 0, len(w.Body)+1)
 	bodyIR = append(bodyIR, core.SymbolValue("do"))
 	for _, stmt := range w.Body {
 		bodyIR = append(bodyIR, stmt.ToIR())
@@ -839,41 +839,41 @@ func (w *WithForm) ToIR() core.Value {
 	if len(w.Items) == 1 {
 		item := w.Items[0]
 		if item.Variable != "" {
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("with"),
 				item.Context.ToIR(),
 				core.SymbolValue(item.Variable),
-				bodyIR,
-			}
+				core.NewList(bodyIR...),
+			)
 		}
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("with"),
 			item.Context.ToIR(),
 			core.None,
-			bodyIR,
-		}
+			core.NewList(bodyIR...),
+		)
 	}
 
 	// Multiple context managers: nest them
 	// with x as a, y as b: body
 	// → (with x a (with y b body))
-	result := bodyIR
+	result := core.NewList(bodyIR...)
 	for i := len(w.Items) - 1; i >= 0; i-- {
 		item := w.Items[i]
 		if item.Variable != "" {
-			result = core.ListValue{
+			result = core.NewList(
 				core.SymbolValue("with"),
 				item.Context.ToIR(),
 				core.SymbolValue(item.Variable),
 				result,
-			}
+			)
 		} else {
-			result = core.ListValue{
+			result = core.NewList(
 				core.SymbolValue("with"),
 				item.Context.ToIR(),
 				core.None,
 				result,
-			}
+			)
 		}
 	}
 
@@ -928,18 +928,18 @@ func (t *TryForm) String() string {
 // ToIR lowers try statement to IR
 func (t *TryForm) ToIR() core.Value {
 	// Build try body
-	tryIR := make(core.ListValue, 0, len(t.TryBody)+1)
+	tryIR := make([]core.Value, 0, len(t.TryBody)+1)
 	tryIR = append(tryIR, core.SymbolValue("do"))
 	for _, stmt := range t.TryBody {
 		tryIR = append(tryIR, stmt.ToIR())
 	}
 
 	// Start building result: (try body ...)
-	result := core.ListValue{core.SymbolValue("try"), tryIR}
+	result := []core.Value{core.SymbolValue("try"), core.NewList(tryIR...)}
 
 	// Add except clauses
 	for _, except := range t.ExceptClauses {
-		exceptBody := make(core.ListValue, 0, len(except.Body)+1)
+		exceptBody := make([]core.Value, 0, len(except.Body)+1)
 		exceptBody = append(exceptBody, core.SymbolValue("do"))
 		for _, stmt := range except.Body {
 			exceptBody = append(exceptBody, stmt.ToIR())
@@ -947,49 +947,49 @@ func (t *TryForm) ToIR() core.Value {
 
 		if except.ExceptionType != "" && except.Variable != "" {
 			// except ValueError as e: ...
-			result = append(result, core.ListValue{
+			result = append(result, core.NewList(
 				core.SymbolValue("except"),
 				core.SymbolValue(except.ExceptionType),
 				core.SymbolValue(except.Variable),
-				exceptBody,
-			})
+				core.NewList(exceptBody...),
+			))
 		} else if except.ExceptionType != "" {
 			// except ValueError: ...
-			result = append(result, core.ListValue{
+			result = append(result, core.NewList(
 				core.SymbolValue("except"),
 				core.SymbolValue(except.ExceptionType),
-				exceptBody,
-			})
+				core.NewList(exceptBody...),
+			))
 		} else {
 			// except: ... (bare except)
-			result = append(result, core.ListValue{
+			result = append(result, core.NewList(
 				core.SymbolValue("except"),
-				exceptBody,
-			})
+				core.NewList(exceptBody...),
+			))
 		}
 	}
 
 	// Add else clause if present
 	if len(t.ElseBody) > 0 {
-		elseIR := make(core.ListValue, 0, len(t.ElseBody)+1)
+		elseIR := make([]core.Value, 0, len(t.ElseBody)+1)
 		elseIR = append(elseIR, core.SymbolValue("do"))
 		for _, stmt := range t.ElseBody {
 			elseIR = append(elseIR, stmt.ToIR())
 		}
-		result = append(result, core.ListValue{core.SymbolValue("else"), elseIR})
+		result = append(result, core.NewList(core.SymbolValue("else"), core.NewList(elseIR...)))
 	}
 
 	// Add finally clause if present
 	if len(t.FinallyBody) > 0 {
-		finallyIR := make(core.ListValue, 0, len(t.FinallyBody)+1)
+		finallyIR := make([]core.Value, 0, len(t.FinallyBody)+1)
 		finallyIR = append(finallyIR, core.SymbolValue("do"))
 		for _, stmt := range t.FinallyBody {
 			finallyIR = append(finallyIR, stmt.ToIR())
 		}
-		result = append(result, core.ListValue{core.SymbolValue("finally"), finallyIR})
+		result = append(result, core.NewList(core.SymbolValue("finally"), core.NewList(finallyIR...)))
 	}
 
-	return result
+	return core.NewList(result...)
 }
 
 // ============================================================================
@@ -1034,29 +1034,29 @@ func (c *ClassForm) String() string {
 // ToIR lowers class definition to IR
 func (c *ClassForm) ToIR() core.Value {
 	// Build base class list
-	basesIR := make(core.ListValue, 0, len(c.Bases))
+	basesIR := make([]core.Value, 0, len(c.Bases))
 	for _, base := range c.Bases {
 		basesIR = append(basesIR, base.ToIR())
 	}
 
 	// Build body
-	bodyIR := make(core.ListValue, 0, len(c.Body))
+	bodyIR := make([]core.Value, 0, len(c.Body))
 	for _, item := range c.Body {
 		bodyIR = append(bodyIR, item.ToIR())
 	}
 
 	// Build keywords (e.g., metaclass=ABCMeta)
-	keywordsIR := make(core.ListValue, 0, len(c.Keywords))
+	keywordsIR := make([]core.Value, 0, len(c.Keywords))
 	for _, kw := range c.Keywords {
 		keywordsIR = append(keywordsIR, kw.ToIR())
 	}
 
 	// Basic class: (class Name [Base1 Base2] {keyword args} method1 method2 ...)
-	result := core.ListValue{
+	result := []core.Value{
 		core.SymbolValue("class"),
 		core.SymbolValue(c.Name),
-		basesIR,
-		keywordsIR, // Add keywords as 4th element
+		core.NewList(basesIR...),
+		core.NewList(keywordsIR...), // Add keywords as 4th element
 	}
 	result = append(result, bodyIR...)
 
@@ -1064,22 +1064,22 @@ func (c *ClassForm) ToIR() core.Value {
 	// @decorator class Foo: ... → (= Foo (decorator (class Foo ...)))
 	for i := len(c.Decorators) - 1; i >= 0; i-- {
 		decorator := c.Decorators[i]
-		result = core.ListValue{
+		result = []core.Value{
 			decorator.ToIR(),
-			result,
+			core.NewList(result...),
 		}
 	}
 
 	// If there are decorators, wrap in assignment
 	if len(c.Decorators) > 0 {
-		result = core.ListValue{
+		result = []core.Value{
 			core.SymbolValue("="),
 			core.SymbolValue(c.Name),
-			result,
+			core.NewList(result...),
 		}
 	}
 
-	return result
+	return core.NewList(result...)
 }
 
 // ============================================================================
@@ -1154,7 +1154,7 @@ func (m *MatchForm) ToIR() core.Value {
 		caseClause := m.Cases[idx]
 
 		// Build case body
-		bodyIR := make(core.ListValue, 0, len(caseClause.Body)+1)
+		bodyIR := make([]core.Value, 0, len(caseClause.Body)+1)
 		bodyIR = append(bodyIR, core.SymbolValue("do"))
 		for _, stmt := range caseClause.Body {
 			bodyIR = append(bodyIR, stmt.ToIR())
@@ -1172,42 +1172,42 @@ func (m *MatchForm) ToIR() core.Value {
 		} else {
 			// Equality check
 			patternIR := caseClause.Pattern.ToIR()
-			condition = core.ListValue{
+			condition = core.NewList(
 				core.SymbolValue("=="),
 				subjectVar,
 				patternIR,
-			}
+			)
 		}
 
 		// Add guard if present
 		if caseClause.Guard != nil {
 			guardIR := caseClause.Guard.ToIR()
-			condition = core.ListValue{
+			condition = core.NewList(
 				core.SymbolValue("and"),
 				condition,
 				guardIR,
-			}
+			)
 		}
 
 		// Build if statement
 		elseClause := buildCases(idx + 1)
 
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("if"),
 			condition,
-			bodyIR,
+			core.NewList(bodyIR...),
 			elseClause,
-		}
+		)
 	}
 
 	// Wrap in let binding
 	ifChain := buildCases(0)
 
-	return core.ListValue{
+	return core.NewList(
 		core.SymbolValue("let"),
-		core.ListValue{
-			core.ListValue{subjectVar, subjectIR},
-		},
+		core.NewList(
+			core.NewList(subjectVar, subjectIR),
+		),
 		ifChain,
-	}
+	)
 }

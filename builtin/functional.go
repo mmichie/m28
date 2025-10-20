@@ -62,7 +62,7 @@ func MapBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 
 		// TODO: Return map iterator when implemented
 		// For now, return a simple list implementation
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		// This is a simplified implementation for demonstration
 		if len(iterables) > 0 {
 			// Just handle single iterable case for now
@@ -79,7 +79,7 @@ func MapBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 				result = append(result, mapped)
 			}
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}
 }
 
@@ -110,7 +110,7 @@ func FilterBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 
 		// TODO: Return filter iterator when implemented
 		// For now, return a simple list implementation
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		for {
 			val, hasNext := iter.Next()
@@ -132,7 +132,7 @@ func FilterBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 				}
 			}
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}
 }
 

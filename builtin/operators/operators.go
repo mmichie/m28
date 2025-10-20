@@ -145,13 +145,13 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 				}).
 				Execute()
 		}).
-		List(func(leftList core.ListValue) (core.Value, error) {
+		List(func(leftList *core.ListValue) (core.Value, error) {
 			return types.Switch(right).
-				List(func(rightList core.ListValue) (core.Value, error) {
-					result := make(core.ListValue, 0, len(leftList)+len(rightList))
-					result = append(result, leftList...)
-					result = append(result, rightList...)
-					return result, nil
+				List(func(rightList *core.ListValue) (core.Value, error) {
+					result := make([]core.Value, 0, leftList.Len()+rightList.Len())
+					result = append(result, leftList.Items()...)
+					result = append(result, rightList.Items()...)
+					return core.NewList(result...), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
 					return nil, errors.NewTypeError("+",
@@ -331,11 +331,11 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 			if rightList, ok := types.AsList(right); ok {
 				if leftNum == float64(int(leftNum)) && leftNum >= 0 {
 					count := int(leftNum)
-					result := make(core.ListValue, 0, len(rightList)*count)
+					result := make([]core.Value, 0, rightList.Len()*count)
 					for i := 0; i < count; i++ {
-						result = append(result, rightList...)
+						result = append(result, rightList.Items()...)
 					}
-					return result, nil
+					return core.NewList(result...), nil
 				}
 				return nil, errors.NewTypeError("*",
 					"can't multiply sequence by non-int of type 'float'", "")
@@ -361,16 +361,16 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 			return nil, errors.NewTypeError("*",
 				"can't multiply sequence of type 'str' by non-int of type '"+string(right.Type())+"'", "")
 		}).
-		List(func(leftList core.ListValue) (core.Value, error) {
+		List(func(leftList *core.ListValue) (core.Value, error) {
 			// List * Number (repetition)
 			if rightNum, ok := types.AsNumber(right); ok {
 				if rightNum == float64(int(rightNum)) && rightNum >= 0 {
 					count := int(rightNum)
-					result := make(core.ListValue, 0, len(leftList)*count)
+					result := make([]core.Value, 0, leftList.Len()*count)
 					for i := 0; i < count; i++ {
-						result = append(result, leftList...)
+						result = append(result, leftList.Items()...)
 					}
-					return result, nil
+					return core.NewList(result...), nil
 				}
 				return nil, errors.NewTypeError("*",
 					"can't multiply sequence by non-int of type 'float'", "")
@@ -1094,8 +1094,8 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 			}
 			return core.BoolValue(false), nil
 
-		case core.ListValue:
-			for _, item := range c {
+		case *core.ListValue:
+			for _, item := range c.Items() {
 				if core.EqualValues(value, item) {
 					return core.BoolValue(true), nil
 				}
@@ -1179,14 +1179,14 @@ func Is() func([]core.Value, *core.Context) (core.Value, error) {
 		}
 
 		// Handle ListValue specially - slices can't be compared with ==
-		leftList, leftIsList := left.(core.ListValue)
-		rightList, rightIsList := right.(core.ListValue)
+		leftList, leftIsList := left.(*core.ListValue)
+		rightList, rightIsList := right.(*core.ListValue)
 		if leftIsList && rightIsList {
 			// For slices, check if they point to the same backing array
 			// Compare the slice pointers using reflect
 			leftPtr := reflect.ValueOf(leftList).Pointer()
 			rightPtr := reflect.ValueOf(rightList).Pointer()
-			return core.BoolValue(leftPtr == rightPtr && len(leftList) == len(rightList)), nil
+			return core.BoolValue(leftPtr == rightPtr && leftList.Len() == rightList.Len()), nil
 		}
 		if leftIsList || rightIsList {
 			return core.BoolValue(false), nil

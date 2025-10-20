@@ -22,7 +22,7 @@ type ArgumentInfo struct {
 // parseKeywordArguments extracts keyword arguments from a function call
 // It looks for patterns like: symbol = value in the argument list
 // Also handles *args and **kwargs unpacking
-func parseKeywordArguments(args core.ListValue) ([]core.Value, map[string]core.Value, error) {
+func parseKeywordArguments(args *core.ListValue) ([]core.Value, map[string]core.Value, error) {
 	info, err := parseArgumentsWithUnpacking(args)
 	if err != nil {
 		return nil, nil, err
@@ -42,7 +42,7 @@ func parseKeywordArguments(args core.ListValue) ([]core.Value, map[string]core.V
 }
 
 // parseArgumentsWithUnpacking extracts all argument information including unpacking
-func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
+func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 	info := &ArgumentInfo{
 		Elements:     []ArgumentElement{},
 		KeywordExprs: make(map[string]core.Value),
@@ -51,19 +51,19 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 	i := 0
 	seenKeyword := false
 
-	for i < len(args) {
+	for i < args.Len() {
 		// Check for unpacking operators
-		if sym, ok := args[i].(core.SymbolValue); ok {
+		if sym, ok := args.Items()[i].(core.SymbolValue); ok {
 			symStr := string(sym)
 
 			// Check for **unpack marker (parser creates: ["**unpack", <expr>])
 			if symStr == "**unpack" {
-				if i+1 >= len(args) {
+				if i+1 >= args.Len() {
 					return nil, fmt.Errorf("** unpacking requires an expression")
 				}
 				info.Elements = append(info.Elements, ArgumentElement{
 					IsKwUnpack: true,
-					Expr:       args[i+1],
+					Expr:       args.Items()[i+1],
 				})
 				i += 2 // Skip marker and expression
 				continue
@@ -71,7 +71,7 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 
 			// Check for *unpack marker (parser creates: ["*unpack", <expr>])
 			if symStr == "*unpack" {
-				if i+1 >= len(args) {
+				if i+1 >= args.Len() {
 					return nil, fmt.Errorf("* unpacking requires an expression")
 				}
 				if seenKeyword {
@@ -79,7 +79,7 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 				}
 				info.Elements = append(info.Elements, ArgumentElement{
 					IsUnpack: true,
-					Expr:     args[i+1],
+					Expr:     args.Items()[i+1],
 				})
 				i += 2 // Skip marker and expression
 				continue
@@ -95,11 +95,11 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 
 				// Check if next argument is the expression to unpack (parser style)
 				// Parser generates: ["**kwargs", (dict-literal ...)]
-				if i+1 < len(args) {
+				if i+1 < args.Len() {
 					// Use the next argument as the dict expression
 					info.Elements = append(info.Elements, ArgumentElement{
 						IsKwUnpack: true,
-						Expr:       args[i+1],
+						Expr:       args.Items()[i+1],
 					})
 					i += 2 // Skip marker and dict expression
 					continue
@@ -133,12 +133,12 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 		}
 
 		// Check if this is a keyword argument pattern: symbol = value
-		if i+2 < len(args) {
-			if sym, ok := args[i].(core.SymbolValue); ok {
-				if eq, ok := args[i+1].(core.SymbolValue); ok && string(eq) == "=" {
+		if i+2 < args.Len() {
+			if sym, ok := args.Items()[i].(core.SymbolValue); ok {
+				if eq, ok := args.Items()[i+1].(core.SymbolValue); ok && string(eq) == "=" {
 					// This is a keyword argument
 					paramName := string(sym)
-					paramValue := args[i+2]
+					paramValue := args.Items()[i+2]
 					seenKeyword = true
 
 					// Check for duplicate keyword arguments
@@ -162,7 +162,7 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 		info.Elements = append(info.Elements, ArgumentElement{
 			IsUnpack:   false,
 			IsKwUnpack: false,
-			Expr:       args[i],
+			Expr:       args.Items()[i],
 		})
 		i++
 	}
@@ -171,21 +171,21 @@ func parseArgumentsWithUnpacking(args core.ListValue) (*ArgumentInfo, error) {
 }
 
 // evalFunctionCallWithKeywords evaluates a function call with keyword argument support
-func evalFunctionCallWithKeywords(expr core.ListValue, ctx *core.Context) (core.Value, error) {
+func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Check if the function is referenced by a symbol (for better error messages)
 	var symbolName string
-	if sym, ok := expr[0].(core.SymbolValue); ok {
+	if sym, ok := expr.Items()[0].(core.SymbolValue); ok {
 		symbolName = string(sym)
 	}
 
 	// Evaluate the function
-	fn, err := Eval(expr[0], ctx)
+	fn, err := Eval(expr.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Parse arguments including unpacking
-	argInfo, err := parseArgumentsWithUnpacking(expr[1:])
+	argInfo, err := parseArgumentsWithUnpacking(core.NewList(expr.Items()[1:]...))
 	if err != nil {
 		return nil, err
 	}
@@ -207,8 +207,8 @@ func evalFunctionCallWithKeywords(expr core.ListValue, ctx *core.Context) (core.
 
 			// Unpack based on type
 			switch v := val.(type) {
-			case core.ListValue:
-				positionalArgs = append(positionalArgs, []core.Value(v)...)
+			case *core.ListValue:
+				positionalArgs = append(positionalArgs, v.Items()...)
 			case core.TupleValue:
 				positionalArgs = append(positionalArgs, []core.Value(v)...)
 			case *core.SetValue:

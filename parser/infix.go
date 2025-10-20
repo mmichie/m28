@@ -171,7 +171,7 @@ func parseInfixWithPrecedence(elements []core.Value, pos int, minPrec int) (core
 		pos = newPos
 
 		// Build AST node: (op left right)
-		left = core.ListValue{op, left, right}
+		left = core.NewList(op, left, right)
 	}
 
 	return left, pos, nil

@@ -96,11 +96,11 @@ func (s *SExpr) String() string {
 
 // ToIR implements ASTNode.ToIR
 func (s *SExpr) ToIR() core.Value {
-	vals := make(core.ListValue, len(s.Elements))
+	vals := make([]core.Value, len(s.Elements))
 	for i, elem := range s.Elements {
 		vals[i] = elem.ToIR()
 	}
-	return vals
+	return core.NewList(vals...)
 }
 
 // NewSExpr creates a new S-expression node
@@ -162,38 +162,39 @@ func (d *DefForm) String() string {
 func (d *DefForm) ToIR() core.Value {
 	// Build (def name (params) body) or (async def name (params) body)
 	// Parameters with defaults are represented as (param default-value)
-	params := make(core.ListValue, len(d.Params))
+	params := make([]core.Value, len(d.Params))
 	for i, p := range d.Params {
 		if p.Default != nil {
 			// Parameter with default: (param-name default-value)
-			params[i] = core.ListValue{
+			params[i] = core.NewList(
 				core.SymbolValue(p.Name),
 				p.Default.ToIR(),
-			}
+			)
 		} else {
 			// Parameter without default: just the symbol
 			params[i] = core.SymbolValue(p.Name)
 		}
 	}
 
+	paramsList := core.NewList(params...)
 	var result core.Value
 	if d.IsAsync {
 		// Build (async def name (params) body)
-		result = core.ListValue{
+		result = core.NewList(
 			core.SymbolValue("async"),
 			core.SymbolValue("def"),
 			core.SymbolValue(d.Name),
-			params,
+			paramsList,
 			d.Body.ToIR(),
-		}
+		)
 	} else {
 		// Build (def name (params) body)
-		result = core.ListValue{
+		result = core.NewList(
 			core.SymbolValue("def"),
 			core.SymbolValue(d.Name),
-			params,
+			paramsList,
 			d.Body.ToIR(),
-		}
+		)
 	}
 
 	// Handle decorators
@@ -203,18 +204,18 @@ func (d *DefForm) ToIR() core.Value {
 		// Apply decorators from bottom to top (innermost to outermost)
 		for i := len(d.Decorators) - 1; i >= 0; i-- {
 			decorator := d.Decorators[i]
-			result = core.ListValue{
+			result = core.NewList(
 				decorator.ToIR(),
 				result,
-			}
+			)
 		}
 
 		// Wrap in assignment
-		result = core.ListValue{
+		result = core.NewList(
 			core.SymbolValue("="),
 			core.SymbolValue(d.Name),
 			result,
-		}
+		)
 	}
 
 	return result
@@ -259,11 +260,11 @@ func (a *AssignForm) String() string {
 
 // ToIR implements ASTNode.ToIR
 func (a *AssignForm) ToIR() core.Value {
-	return core.ListValue{
+	return core.NewList(
 		core.SymbolValue("="),
 		a.Target.ToIR(),
 		a.Value.ToIR(),
-	}
+	)
 }
 
 // NewAssignForm creates a new assignment node
@@ -312,7 +313,7 @@ func (i *IfForm) String() string {
 
 // ToIR implements ASTNode.ToIR
 func (i *IfForm) ToIR() core.Value {
-	result := core.ListValue{
+	result := []core.Value{
 		core.SymbolValue("if"),
 		i.Condition.ToIR(),
 		i.ThenBranch.ToIR(),
@@ -320,7 +321,7 @@ func (i *IfForm) ToIR() core.Value {
 	if i.ElseBranch != nil {
 		result = append(result, i.ElseBranch.ToIR())
 	}
-	return result
+	return core.NewList(result...)
 }
 
 // NewIfForm creates a new if expression node

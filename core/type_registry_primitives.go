@@ -352,10 +352,10 @@ func registerBytesType() {
 				switch v := val.(type) {
 				case StringValue:
 					return BytesValue([]byte(string(v))), nil
-				case ListValue:
+				case *ListValue:
 					// Convert list of numbers to bytes
-					result := make([]byte, len(v))
-					for i, val := range v {
+					result := make([]byte, v.Len())
+					for i, val := range v.Items() {
 						num, ok := val.(NumberValue)
 						if !ok {
 							return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
@@ -487,8 +487,8 @@ func registerByteArrayType() {
 						b.data = append(b.data, v...)
 					case *ByteArrayValue:
 						b.data = append(b.data, v.data...)
-					case ListValue:
-						for _, val := range v {
+					case *ListValue:
+						for _, val := range v.Items() {
 							num, ok := val.(NumberValue)
 							if !ok {
 								return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
@@ -599,10 +599,10 @@ func registerByteArrayType() {
 				switch v := args[0].(type) {
 				case StringValue:
 					return NewByteArray([]byte(string(v))), nil
-				case ListValue:
+				case *ListValue:
 					// Convert list of numbers to bytearray
-					result := make([]byte, len(v))
-					for i, val := range v {
+					result := make([]byte, v.Len())
+					for i, val := range v.Items() {
 						num, ok := val.(NumberValue)
 						if !ok {
 							return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())

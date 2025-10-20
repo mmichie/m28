@@ -224,12 +224,12 @@ func osListdir(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("os.listdir: %v", readErr)
 	}
 
-	result := make(core.ListValue, len(entries))
+	result := make([]core.Value, len(entries))
 	for i, entry := range entries {
 		result[i] = core.StringValue(entry.Name())
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }
 
 // osMkdir creates a directory

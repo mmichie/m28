@@ -135,10 +135,10 @@ func (p *Parser) parseRawSString(quoteChar rune) (core.Value, error) {
 		} else if ch == quoteChar {
 			p.advance()
 			// Return as raw s-string form
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("s-string-raw"),
 				core.StringValue(builder.String()),
-			}, nil
+			), nil
 		} else {
 			builder.WriteRune(ch)
 			p.advance()
@@ -286,18 +286,18 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 // Returns: (s-string template-string interp1 interp2 ...)
 // Where each interpN is: (interp-type expr)
 func (p *Parser) buildSStringAST(template string, interpolations []Interpolation) (core.Value, error) {
-	result := make(core.ListValue, 0, len(interpolations)*2+2)
+	result := make([]core.Value, 0, len(interpolations)*2+2)
 	result = append(result, core.SymbolValue("s-string"))
 	result = append(result, core.StringValue(template))
 
 	// Add interpolations as pairs: (type expr)
 	for _, interp := range interpolations {
-		interpForm := core.ListValue{
+		interpForm := core.NewList(
 			core.StringValue(string(interp.Type)),
 			interp.Expr,
-		}
+		)
 		result = append(result, interpForm)
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }

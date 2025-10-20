@@ -76,86 +76,86 @@ func registerModuleForms() {
 }
 
 // ifForm implements the 'if' special form
-func ifForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func ifForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.IfForm(args, ctx)
 }
 
 // doForm implements the 'do' and 'begin' special forms
-func doForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func doForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.DoForm(args, ctx)
 }
 
 // defForm implements the 'def' special form
-func defForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func defForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.DefForm(args, ctx)
 }
 
 // assignForm implements the '=' special form
-func assignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.AssignForm(args, ctx)
 }
 
 // walrusForm implements the ':=' special form (walrus operator)
-func walrusForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func walrusForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.WalrusForm(args, ctx)
 }
 
 // quoteForm implements the 'quote' special form
-func quoteForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func quoteForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.QuoteForm(args, ctx)
 }
 
 // importForm implements the 'import' special form
-func importForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func importForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.ImportForm(args, ctx)
 }
 
 // returnForm implements the 'return' special form
-func returnForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func returnForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.ReturnForm(args, ctx)
 }
 
 // whileForm implements the 'while' special form
-func whileForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func whileForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.WhileFormHandler(args, ctx)
 }
 
 // forForm implements the 'for' special form
-func forForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func forForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.ForFormHandler(args, ctx)
 }
 
 // breakForm implements the 'break' special form
-func breakForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func breakForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.BreakFormHandler(args, ctx)
 }
 
 // continueForm implements the 'continue' special form
-func continueForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func continueForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.ContinueFormHandler(args, ctx)
 }
 
 // dotForm implements the '.' special form for property access
-func dotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func dotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.DotForm(args, ctx)
 }
 
 // dictLiteralForm implements the 'dict-literal' special form for dictionary construction
-func dictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func dictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.DictLiteralForm(args, ctx)
 }
 
 // listCompForm implements the 'list-comp' special form for list comprehensions
-func listCompForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func listCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.ListCompForm(args, ctx)
 }
 
 // globalForm implements the 'global' special form
-func globalForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func globalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.GlobalForm(args, ctx)
 }
 
 // nonlocalForm implements the 'nonlocal' special form
-func nonlocalForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func nonlocalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.NonlocalForm(args, ctx)
 }

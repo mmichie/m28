@@ -43,22 +43,22 @@ func (s *StringContainer) IsEmpty() bool {
 
 // ListContainer adapts ListValue to Container protocol
 type ListContainer struct {
-	list core.ListValue
+	list *core.ListValue
 }
 
 // NewListContainer creates a Container adapter for lists
-func NewListContainer(list core.ListValue) Container {
+func NewListContainer(list *core.ListValue) Container {
 	return &ListContainer{list: list}
 }
 
 // Size returns the number of elements
 func (l *ListContainer) Size() int {
-	return len(l.list)
+	return l.list.Len()
 }
 
 // Contains checks if the list contains an item
 func (l *ListContainer) Contains(item core.Value) bool {
-	for _, elem := range l.list {
+	for _, elem := range l.list.Items() {
 		if core.EqualValues(elem, item) {
 			return true
 		}
@@ -68,7 +68,7 @@ func (l *ListContainer) Contains(item core.Value) bool {
 
 // IsEmpty checks if the list is empty
 func (l *ListContainer) IsEmpty() bool {
-	return len(l.list) == 0
+	return l.list.Len() == 0
 }
 
 // DictContainer adapts DictValue to Container protocol
@@ -160,7 +160,7 @@ func GetContainer(v core.Value) (Container, bool) {
 	switch val := v.(type) {
 	case core.StringValue:
 		return NewStringContainer(val), true
-	case core.ListValue:
+	case *core.ListValue:
 		return NewListContainer(val), true
 	case *core.DictValue:
 		return NewDictContainer(val), true

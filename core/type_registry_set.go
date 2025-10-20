@@ -28,8 +28,8 @@ func registerSetType() {
 					for _, item := range v.items {
 						result.Add(item)
 					}
-				case ListValue:
-					for _, item := range v {
+				case *ListValue:
+					for _, item := range v.Items() {
 						result.Add(item)
 					}
 				case TupleValue:
@@ -428,11 +428,11 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				set := receiver.(*SetValue)
 				// Convert to list for iteration
-				items := make(ListValue, 0, len(set.items))
+				items := make([]Value, 0, len(set.items))
 				for _, v := range set.items {
 					items = append(items, v)
 				}
-				return items, nil
+				return NewList(items...), nil
 			},
 		},
 		"__sub__": {

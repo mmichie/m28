@@ -36,26 +36,26 @@ func assignVariable(ctx *core.Context, name string, value core.Value) error {
 // handleElifOrElse is a helper to process nested elif or else clauses
 func handleElifOrElse(clause core.Value, ctx *core.Context) (core.Value, error) {
 	// Check if it's another elif
-	if list, ok := clause.(core.ListValue); ok && len(list) > 0 {
-		if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "elif" {
+	if list, ok := clause.(*core.ListValue); ok && list.Len() > 0 {
+		if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "elif" {
 			// Recursive elif
-			if len(list) < 3 {
+			if list.Len() < 3 {
 				return nil, ErrArgCount("elif requires condition and expression")
 			}
 
 			// Evaluate condition
-			cond, err := Eval(list[1], ctx)
+			cond, err := Eval(list.Items()[1], ctx)
 			if err != nil {
 				return nil, err
 			}
 
 			if core.IsTruthy(cond) {
-				return Eval(list[2], ctx)
+				return Eval(list.Items()[2], ctx)
 			}
 
 			// Check for more elif/else
-			if len(list) > 3 {
-				return handleElifOrElse(list[3], ctx)
+			if list.Len() > 3 {
+				return handleElifOrElse(list.Items()[3], ctx)
 			}
 
 			return core.Nil, nil
@@ -67,50 +67,50 @@ func handleElifOrElse(clause core.Value, ctx *core.Context) (core.Value, error) 
 }
 
 // IfForm provides the implementation of the if special form with elif support
-func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
+func IfForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 2 {
 		return nil, ErrArgCount("if requires at least 2 arguments")
 	}
 
 	// Evaluate the first condition
-	condition, err := Eval(args[0], ctx)
+	condition, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// If truthy, evaluate and return the then-branch
 	if core.IsTruthy(condition) {
-		return Eval(args[1], ctx)
+		return Eval(args.Items()[1], ctx)
 	}
 
 	// Check for elif or else
-	if len(args) <= 2 {
+	if args.Len() <= 2 {
 		// No else clause, return nil
 		return core.Nil, nil
 	}
 
 	// Check if the third argument is a list starting with elif
-	if list, ok := args[2].(core.ListValue); ok && len(list) > 0 {
-		if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "elif" {
+	if list, ok := args.Items()[2].(*core.ListValue); ok && list.Len() > 0 {
+		if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "elif" {
 			// Nested elif structure: (elif condition expr else-clause)
-			if len(list) < 3 {
+			if list.Len() < 3 {
 				return nil, ErrArgCount("elif requires condition and expression")
 			}
 
 			// Evaluate elif condition
-			elifCond, err := Eval(list[1], ctx)
+			elifCond, err := Eval(list.Items()[1], ctx)
 			if err != nil {
 				return nil, err
 			}
 
 			if core.IsTruthy(elifCond) {
-				return Eval(list[2], ctx)
+				return Eval(list.Items()[2], ctx)
 			}
 
 			// Check if there's an else clause (4th element) or another elif
-			if len(list) > 3 {
+			if list.Len() > 3 {
 				// The 4th element could be another elif or an else expression
-				return handleElifOrElse(list[3], ctx)
+				return handleElifOrElse(list.Items()[3], ctx)
 			}
 
 			// No else clause
@@ -119,10 +119,10 @@ func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check if the third argument is elif symbol (flat structure)
-	if sym, ok := args[2].(core.SymbolValue); ok && string(sym) == "elif" {
+	if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "elif" {
 		// Handle flat elif chain
 		// Structure: (if cond1 expr1 elif cond2 expr2 elif cond3 expr3 else expr4)
-		elifArgs := args[2:] // Skip "if" condition and expression
+		elifArgs := args.Items()[2:] // Skip "if" condition and expression
 
 		for len(elifArgs) > 0 {
 			// Check if current element is elif
@@ -159,13 +159,13 @@ func IfForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return core.Nil, nil
 	} else {
 		// Traditional if-else (third argument is the else expression)
-		return Eval(args[2], ctx)
+		return Eval(args.Items()[2], ctx)
 	}
 }
 
 // DoForm provides the implementation of the do special form
-func DoForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) == 0 {
+func DoForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() == 0 {
 		return core.Nil, nil
 	}
 
@@ -173,7 +173,7 @@ func DoForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	var result core.Value = core.Nil
 	var err error
 
-	for _, expr := range args {
+	for _, expr := range args.Items() {
 		result, err = Eval(expr, ctx)
 		if err != nil {
 			return nil, err
@@ -190,28 +190,28 @@ func DoForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // DefForm provides the implementation of the def special form
-func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
+func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 2 {
 		return nil, ErrArgCount("def requires at least 2 arguments")
 	}
 
 	// Check for alternative function definition form: (def (name args...) body...)
-	if fnDef, ok := args[0].(core.ListValue); ok && len(fnDef) > 0 {
+	if fnDef, ok := args.Items()[0].(*core.ListValue); ok && fnDef.Len() > 0 {
 		// Get function name from the first element of the list
-		name, ok := fnDef[0].(core.SymbolValue)
+		name, ok := fnDef.Items()[0].(core.SymbolValue)
 		if !ok {
-			return nil, TypeError{Expected: "symbol for function name", Got: fnDef[0].Type()}
+			return nil, TypeError{Expected: "symbol for function name", Got: fnDef.Items()[0].Type()}
 		}
 
 		// Get parameter list (the rest of the elements after the name)
-		paramList := core.ListValue(fnDef[1:])
+		paramListSlice := fnDef.Items()[1:]
 
 		// Try to parse as new-style parameter list with defaults
-		signature, err := ParseParameterList(paramList)
+		signature, err := ParseParameterList(paramListSlice)
 		if err != nil {
 			// Fall back to legacy simple parameter parsing
-			params := make([]core.SymbolValue, 0, len(fnDef)-1)
-			for _, param := range fnDef[1:] {
+			params := make([]core.SymbolValue, 0, fnDef.Len()-1)
+			for _, param := range fnDef.Items()[1:] {
 				if sym, ok := param.(core.SymbolValue); ok {
 					params = append(params, sym)
 				} else {
@@ -220,7 +220,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Create function body (implicit do)
-			body := args[1:]
+			body := args.Items()[1:]
 			var functionBody core.Value
 
 			if len(body) == 1 {
@@ -228,7 +228,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				functionBody = body[0]
 			} else {
 				// Multi-expression body, wrap in do
-				functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+				functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
 			}
 
 			function := &UserFunction{
@@ -247,7 +247,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Create function body (implicit do) for new-style function
-		body := args[1:]
+		body := args.Items()[1:]
 		var functionBody core.Value
 
 		if len(body) == 1 {
@@ -255,7 +255,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			functionBody = body[0]
 		} else {
 			// Multi-expression body, wrap in do
-			functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+			functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
 		}
 
 		// Create the function with signature
@@ -275,24 +275,24 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Standard form: (def name ...)
-	name, ok := args[0].(core.SymbolValue)
+	name, ok := args.Items()[0].(core.SymbolValue)
 	if !ok {
-		return nil, TypeError{Expected: "symbol", Got: args[0].Type()}
+		return nil, TypeError{Expected: "symbol", Got: args.Items()[0].Type()}
 	}
 
 	// Check different definition forms
-	if len(args) >= 3 {
+	if args.Len() >= 3 {
 		// Check for function definition: (def name (params) body...)
 		// First form: (def name (arg1 arg2...) body...)
-		if paramList, ok := args[1].(core.ListValue); ok {
+		if paramList, ok := args.Items()[1].(*core.ListValue); ok {
 			// It's a function definition with parameter list
 
 			// Try to parse as new-style parameter list with defaults
-			signature, err := ParseParameterList(paramList)
+			signature, err := ParseParameterList(paramList.Items())
 			if err != nil {
 				// Fall back to legacy simple parameter parsing
-				params := make([]core.SymbolValue, 0, len(paramList))
-				for _, param := range paramList {
+				params := make([]core.SymbolValue, 0, paramList.Len())
+				for _, param := range paramList.Items() {
 					if sym, ok := param.(core.SymbolValue); ok {
 						params = append(params, sym)
 					} else {
@@ -301,7 +301,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 
 				// Create function body (implicit do)
-				body := args[2:]
+				body := args.Items()[2:]
 				var functionBody core.Value
 
 				if len(body) == 1 {
@@ -309,7 +309,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					functionBody = body[0]
 				} else {
 					// Multi-expression body, wrap in do
-					functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+					functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
 				}
 
 				function := &UserFunction{
@@ -329,7 +329,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// New-style function with signature
 			// Create function body (implicit do)
-			body := args[2:]
+			body := args.Items()[2:]
 			var functionBody core.Value
 
 			if len(body) == 1 {
@@ -337,7 +337,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				functionBody = body[0]
 			} else {
 				// Multi-expression body, wrap in do
-				functionBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+				functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
 			}
 
 			// Build legacy params list for backward compatibility
@@ -368,7 +368,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Second form: (def name value)
 	// Check if it's a lambda/function value
-	value, err := Eval(args[1], ctx)
+	value, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func DefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // DictLiteralForm provides the implementation of the dict-literal special form
-func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Create a new dictionary
 	dict := core.NewDict()
 
@@ -398,17 +398,17 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 	// Flat: (dict-literal key1 val1 key2 val2)
 
 	// If first arg is a ListValue with 2 elements, assume wrapped pairs
-	if len(args) > 0 {
-		if pair, ok := args[0].(core.ListValue); ok && len(pair) == 2 {
+	if args.Len() > 0 {
+		if pair, ok := args.Items()[0].(*core.ListValue); ok && pair.Len() == 2 {
 			// Wrapped pairs format - used by Python keyword arguments
-			for _, arg := range args {
-				pairList, ok := arg.(core.ListValue)
-				if !ok || len(pairList) != 2 {
+			for _, arg := range args.Items() {
+				pairList, ok := arg.(*core.ListValue)
+				if !ok || pairList.Len() != 2 {
 					return nil, fmt.Errorf("dict-literal with wrapped pairs: expected (key value) pairs")
 				}
 
 				// Evaluate the key
-				key, err := Eval(pairList[0], ctx)
+				key, err := Eval(pairList.Items()[0], ctx)
 				if err != nil {
 					return nil, fmt.Errorf("error evaluating dict key: %v", err)
 				}
@@ -422,7 +422,7 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 				keyStr := core.ValueToKey(key)
 
 				// Evaluate the value
-				value, err := Eval(pairList[1], ctx)
+				value, err := Eval(pairList.Items()[1], ctx)
 				if err != nil {
 					return nil, fmt.Errorf("error evaluating dict value for key %v: %v", key, err)
 				}
@@ -437,15 +437,15 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 	// Flat format - can contain regular key-value pairs and **unpack markers
 	// Process entries sequentially
 	i := 0
-	for i < len(args) {
+	for i < args.Len() {
 		// Check for **unpack marker
-		if sym, ok := args[i].(core.SymbolValue); ok && string(sym) == "**unpack" {
-			if i+1 >= len(args) {
+		if sym, ok := args.Items()[i].(core.SymbolValue); ok && string(sym) == "**unpack" {
+			if i+1 >= args.Len() {
 				return nil, fmt.Errorf("**unpack requires a dict expression")
 			}
 
 			// Evaluate the dict to unpack
-			unpackVal, err := Eval(args[i+1], ctx)
+			unpackVal, err := Eval(args.Items()[i+1], ctx)
 			if err != nil {
 				return nil, fmt.Errorf("error evaluating **unpack dict: %v", err)
 			}
@@ -475,12 +475,12 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 		}
 
 		// Regular key-value pair
-		if i+1 >= len(args) {
+		if i+1 >= args.Len() {
 			return nil, fmt.Errorf("dict-literal requires key-value pairs (odd number of arguments after unpacking)")
 		}
 
 		// Evaluate the key
-		key, err := Eval(args[i], ctx)
+		key, err := Eval(args.Items()[i], ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating dict key: %v", err)
 		}
@@ -494,7 +494,7 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 		keyStr := core.ValueToKey(key)
 
 		// Evaluate the value
-		value, err := Eval(args[i+1], ctx)
+		value, err := Eval(args.Items()[i+1], ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating dict value for key %v: %v", key, err)
 		}
@@ -509,16 +509,16 @@ func DictLiteralForm(args core.ListValue, ctx *core.Context) (core.Value, error)
 }
 
 // AssignForm provides the implementation of the = special form
-func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Debug: Print what we received
-	// fmt.Printf("DEBUG AssignForm: received %d args: %v\n", len(args), args)
+	// fmt.Printf("DEBUG AssignForm: received %d args: %v\n", args.Len(), args)
 
-	if len(args) < 2 {
+	if args.Len() < 2 {
 		return nil, ErrArgCount("= requires at least 2 arguments")
 	}
 
 	// Check for multiple assignment (= a b expr) or (= a b c d ...)
-	if len(args) > 2 {
+	if args.Len() > 2 {
 		// Multiple assignment
 		// Two cases:
 		// 1. (= a b expr) where expr returns multiple values
@@ -527,8 +527,8 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// First, check if we have multiple symbols followed by values
 		// Count leading symbols
 		symbolCount := 0
-		for i := 0; i < len(args); i++ {
-			if _, ok := args[i].(core.SymbolValue); ok {
+		for i := 0; i < args.Len(); i++ {
+			if _, ok := args.Items()[i].(core.SymbolValue); ok {
 				symbolCount++
 			} else {
 				break
@@ -537,13 +537,13 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Check for star unpacking first: (= (a (*unpack b) c) expr)
 		// This happens when we have something like: a, *b, c = values
-		if symbolCount == 0 && len(args) == 2 {
-			if targetList, ok := args[0].(core.ListValue); ok {
+		if symbolCount == 0 && args.Len() == 2 {
+			if targetList, ok := args.Items()[0].(*core.ListValue); ok {
 				// Check if any element is (*unpack ...)
 				starIndex := -1
-				for i, t := range targetList {
-					if tList, ok := t.(core.ListValue); ok && len(tList) == 2 {
-						if sym, ok := tList[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+				for i, t := range targetList.Items() {
+					if tList, ok := t.(*core.ListValue); ok && tList.Len() == 2 {
+						if sym, ok := tList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
 							starIndex = i
 							break
 						}
@@ -552,7 +552,7 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				if starIndex >= 0 {
 					// Star unpacking assignment
-					expr := args[1]
+					expr := args.Items()[1]
 					value, err := Eval(expr, ctx)
 					if err != nil {
 						return nil, err
@@ -563,28 +563,28 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					switch v := value.(type) {
 					case core.TupleValue:
 						values = []core.Value(v)
-					case core.ListValue:
-						values = []core.Value(v)
+					case *core.ListValue:
+						values = v.Items()
 					default:
 						return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
 					}
 
 					// Calculate minimum required length
-					minLen := len(targetList) - 1 // All targets except the star
+					minLen := targetList.Len() - 1 // All targets except the star
 					if len(values) < minLen {
 						return nil, fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))
 					}
 
 					// Assign values
 					valIdx := 0
-					for i, target := range targetList {
+					for i, target := range targetList.Items() {
 						if i == starIndex {
 							// Star unpacking: collect remaining values
-							starTarget := target.(core.ListValue)
-							starVar := starTarget[1].(core.SymbolValue)
-							remaining := len(values) - valIdx - (len(targetList) - i - 1)
+							starTarget := target.(*core.ListValue)
+							starVar := starTarget.Items()[1].(core.SymbolValue)
+							remaining := len(values) - valIdx - (targetList.Len() - i - 1)
 							starValues := values[valIdx : valIdx+remaining]
-							if err := assignVariable(ctx, string(starVar), core.ListValue(starValues)); err != nil {
+							if err := assignVariable(ctx, string(starVar), core.NewList(starValues...)); err != nil {
 								return nil, err
 							}
 							valIdx += remaining
@@ -607,10 +607,10 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// If we have multiple symbols followed by values, it's multiple assignment
-		if symbolCount > 1 && symbolCount < len(args) {
+		if symbolCount > 1 && symbolCount < args.Len() {
 			// Multiple assignment: (= a b c ... val1 val2 val3 ...)
-			targets := args[:symbolCount]
-			valueExprs := args[symbolCount:]
+			targets := args.Items()[:symbolCount]
+			valueExprs := args.Items()[symbolCount:]
 
 			// Evaluate all value expressions
 			values := make([]core.Value, 0, len(valueExprs))
@@ -627,8 +627,8 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				switch v := values[0].(type) {
 				case core.TupleValue:
 					values = []core.Value(v)
-				case core.ListValue:
-					values = []core.Value(v)
+				case *core.ListValue:
+					values = v.Items()
 				}
 			}
 
@@ -654,8 +654,8 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Check if all but last are symbols (old case 1)
 		allSymbols := true
-		for i := 0; i < len(args)-1; i++ {
-			if _, ok := args[i].(core.SymbolValue); !ok {
+		for i := 0; i < args.Len()-1; i++ {
+			if _, ok := args.Items()[i].(core.SymbolValue); !ok {
 				allSymbols = false
 				break
 			}
@@ -663,8 +663,8 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		if allSymbols && symbolCount > 1 {
 			// Case 1: (= a b expr) - special handling for tuple unpacking
-			targets := args[:len(args)-1]
-			expr := args[len(args)-1]
+			targets := args.Items()[:args.Len()-1]
+			expr := args.Items()[args.Len()-1]
 
 			// Special case: (= a b (+ a b)) for Fibonacci-style assignment
 			// We need to build a tuple of the current values first
@@ -699,8 +699,8 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				switch v := value.(type) {
 				case core.TupleValue:
 					values = v
-				case core.ListValue:
-					values = v
+				case *core.ListValue:
+					values = v.Items()
 				default:
 					// Single value case: (= a b expr) means a=b, b=expr
 					// This matches Python's a, b = b, expr
@@ -740,8 +740,8 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			switch v := value.(type) {
 			case core.TupleValue:
 				values = v
-			case core.ListValue:
-				values = v
+			case *core.ListValue:
+				values = v.Items()
 			default:
 				// If not a sequence, error
 				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
@@ -767,14 +767,14 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Case 2: (= a b c d) - pairwise assignment
-		if len(args)%2 != 0 {
+		if args.Len()%2 != 0 {
 			return nil, fmt.Errorf("= with multiple arguments requires an even number of arguments")
 		}
 
 		var lastValue core.Value
-		for i := 0; i < len(args); i += 2 {
-			target := args[i]
-			value, err := Eval(args[i+1], ctx)
+		for i := 0; i < args.Len(); i += 2 {
+			target := args.Items()[i]
+			value, err := Eval(args.Items()[i+1], ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -793,8 +793,8 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Single assignment (original logic)
-	target := args[0]
-	value, err := Eval(args[1], ctx)
+	target := args.Items()[0]
+	value, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -808,22 +808,22 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 		return value, nil
 
-	case core.ListValue:
+	case *core.ListValue:
 		// Check if it's a special form first (get-item or dot notation)
-		if len(t) >= 3 {
+		if t.Len() >= 3 {
 			// Check if it's a dot notation expression
-			if dotSym, ok := t[0].(core.SymbolValue); ok && string(dotSym) == "." {
+			if dotSym, ok := t.Items()[0].(core.SymbolValue); ok && string(dotSym) == "." {
 				// Dot notation assignment: (. obj prop) = value
 				// Evaluate the object
-				obj, err := Eval(t[1], ctx)
+				obj, err := Eval(t.Items()[1], ctx)
 				if err != nil {
 					return nil, err
 				}
 
 				// Get the property name
-				propName, ok := t[2].(core.StringValue)
+				propName, ok := t.Items()[2].(core.StringValue)
 				if !ok {
-					return nil, TypeError{Expected: "string property name", Got: t[2].Type()}
+					return nil, TypeError{Expected: "string property name", Got: t.Items()[2].Type()}
 				}
 
 				// Set the attribute
@@ -847,11 +847,11 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Check if it's an index expression
-			if len(t) == 3 {
-				if getItemSym, ok := t[0].(core.SymbolValue); ok && string(getItemSym) == "get-item" {
+			if t.Len() == 3 {
+				if getItemSym, ok := t.Items()[0].(core.SymbolValue); ok && string(getItemSym) == "get-item" {
 					// Index assignment: (get-item obj index) = value
 					// Convert to (set-item obj index value)
-					setItemArgs := core.ListValue{t[1], t[2], value}
+					setItemArgs := core.NewList(t.Items()[1], t.Items()[2], value)
 					// fmt.Printf("DEBUG: Converting index assignment to set-item with args: %v\n", setItemArgs)
 					return SetItemForm(setItemArgs, ctx)
 				}
@@ -862,14 +862,14 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		isTupleUnpacking := true
 		hasStarUnpack := false
 		starIndex := -1
-		for i, elem := range t {
+		for i, elem := range t.Items() {
 			if _, ok := elem.(core.SymbolValue); ok {
 				continue
 			}
 			// Check if it's (*unpack var)
-			if elemList, ok := elem.(core.ListValue); ok && len(elemList) == 2 {
-				if sym, ok := elemList[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
-					if _, ok := elemList[1].(core.SymbolValue); ok {
+			if elemList, ok := elem.(*core.ListValue); ok && elemList.Len() == 2 {
+				if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+					if _, ok := elemList.Items()[1].(core.SymbolValue); ok {
 						hasStarUnpack = true
 						starIndex = i
 						continue
@@ -880,36 +880,36 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			break
 		}
 
-		if isTupleUnpacking && len(t) > 0 {
+		if isTupleUnpacking && t.Len() > 0 {
 			// Tuple unpacking: (= (x, y) [10, 20]) or (= (a (*unpack b) c) [1, 2, 3, 4])
 			// The value must be a tuple or list
 			var values []core.Value
 			switch v := value.(type) {
 			case core.TupleValue:
 				values = []core.Value(v)
-			case core.ListValue:
-				values = []core.Value(v)
+			case *core.ListValue:
+				values = v.Items()
 			default:
 				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
 			}
 
 			if hasStarUnpack {
 				// Star unpacking
-				minLen := len(t) - 1 // All targets except the star
+				minLen := t.Len() - 1 // All targets except the star
 				if len(values) < minLen {
 					return nil, fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))
 				}
 
 				// Assign values
 				valIdx := 0
-				for i, target := range t {
+				for i, target := range t.Items() {
 					if i == starIndex {
 						// Star unpacking: collect remaining values
-						starTarget := target.(core.ListValue)
-						starVar := starTarget[1].(core.SymbolValue)
-						remaining := len(values) - valIdx - (len(t) - i - 1)
+						starTarget := target.(*core.ListValue)
+						starVar := starTarget.Items()[1].(core.SymbolValue)
+						remaining := len(values) - valIdx - (t.Len() - i - 1)
 						starValues := values[valIdx : valIdx+remaining]
-						if err := assignVariable(ctx, string(starVar), core.ListValue(starValues)); err != nil {
+						if err := assignVariable(ctx, string(starVar), core.NewList(starValues...)); err != nil {
 							return nil, err
 						}
 						valIdx += remaining
@@ -928,12 +928,12 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			} else {
 				// Regular tuple unpacking (no star)
 				// Check that the number of targets matches the number of values
-				if len(t) != len(values) {
-					return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(t), len(values))
+				if t.Len() != len(values) {
+					return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", t.Len(), len(values))
 				}
 
 				// Assign each value to its corresponding target
-				for i, target := range t {
+				for i, target := range t.Items() {
 					sym, ok := target.(core.SymbolValue)
 					if !ok {
 						return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
@@ -957,19 +957,19 @@ func AssignForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // WalrusForm provides the implementation of the walrus operator (:=)
 // The walrus operator is an assignment expression that returns the assigned value
 // Usage: (if (:= n (len data)) (> n 10))
-func WalrusForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
+func WalrusForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 2 {
 		return nil, ErrArgCount(":= requires exactly 2 arguments (variable and value)")
 	}
 
 	// First argument must be a symbol
-	target, ok := args[0].(core.SymbolValue)
+	target, ok := args.Items()[0].(core.SymbolValue)
 	if !ok {
-		return nil, TypeError{Expected: "symbol", Got: args[0].Type()}
+		return nil, TypeError{Expected: "symbol", Got: args.Items()[0].Type()}
 	}
 
 	// Evaluate the expression
-	value, err := Eval(args[1], ctx)
+	value, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -984,26 +984,26 @@ func WalrusForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // QuoteForm provides the implementation of the quote special form
-func QuoteForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
+func QuoteForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 1 {
 		return nil, ErrArgCount("quote requires 1 argument")
 	}
 
 	// Return the argument unevaluated
-	return args[0], nil
+	return args.Items()[0], nil
 }
 
 // ReturnForm provides the implementation of the return special form
-func ReturnForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) > 1 {
+func ReturnForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() > 1 {
 		return nil, ErrArgCount("return takes at most 1 argument")
 	}
 
 	var value core.Value = core.Nil
 	var err error
 
-	if len(args) == 1 {
-		value, err = Eval(args[0], ctx)
+	if args.Len() == 1 {
+		value, err = Eval(args.Items()[0], ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1013,20 +1013,20 @@ func ReturnForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // ImportForm provides the implementation of the import special form
-func ImportForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
+func ImportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 1 {
 		return nil, ErrArgCount("import requires 1 argument")
 	}
 
 	// Get the module name
 	var moduleName string
-	switch name := args[0].(type) {
+	switch name := args.Items()[0].(type) {
 	case core.StringValue:
 		moduleName = string(name)
 	case core.SymbolValue:
 		moduleName = string(name)
 	default:
-		return nil, TypeError{Expected: "string or symbol", Got: args[0].Type()}
+		return nil, TypeError{Expected: "string or symbol", Got: args.Items()[0].Type()}
 	}
 
 	// Get the module loader

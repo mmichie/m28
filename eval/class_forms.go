@@ -16,19 +16,19 @@ var debugClass = os.Getenv("M28_DEBUG_CLASS") != ""
 // (class ClassName () body...)         - define a class with methods/attributes
 // (class ClassName (ParentClass) body...) - full class definition
 // (class ClassName (ParentClass) (keywords) body...) - with keywords like metaclass
-func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 {
+func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 1 {
 		return nil, fmt.Errorf("class requires at least a name")
 	}
 
 	// Get class name
-	className, ok := args[0].(core.SymbolValue)
+	className, ok := args.Items()[0].(core.SymbolValue)
 	if !ok {
 		return nil, fmt.Errorf("class name must be a symbol")
 	}
 
 	if debugClass {
-		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Defining class '%s' with %d args\n", className, len(args))
+		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Defining class '%s' with %d args\n", className, args.Len())
 	}
 
 	// Parse parent classes and keywords
@@ -36,32 +36,32 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	var metaclass *core.Class
 	bodyStart := 1
 
-	if len(args) > 1 {
+	if args.Len() > 1 {
 		// Check if second argument is parent class specification
 		// Parent class spec is a list that either:
 		// - Is empty: ()
 		// - Contains one or more symbols: (ParentClass) or (Parent1, Parent2)
 		// - Does NOT start with a special form like "def"
-		if parentList, ok := args[1].(core.ListValue); ok {
+		if parentList, ok := args.Items()[1].(*core.ListValue); ok {
 			isParentSpec := false
 
-			if len(parentList) == 0 {
+			if parentList.Len() == 0 {
 				// Empty list means no parent but still a parent spec
 				isParentSpec = true
 			} else {
 				// Check if all elements look like class references
 				// (symbols or dot expressions)
 				allClassRefs := true
-				for _, elem := range parentList {
+				for _, elem := range parentList.Items() {
 					switch e := elem.(type) {
 					case core.SymbolValue:
 						// Simple class name
 						continue
-					case core.ListValue:
+					case *core.ListValue:
 						// Could be a dot expression like (. unittest TestCase)
 						// But NOT a special form like (def ...)
-						if len(e) > 0 {
-							if sym, ok := e[0].(core.SymbolValue); ok {
+						if e.Len() > 0 {
+							if sym, ok := e.Items()[0].(core.SymbolValue); ok {
 								symStr := string(sym)
 								// Check if it's a special form - not a class reference
 								if symStr == "def" || symStr == "=" || symStr == "do" ||
@@ -88,7 +88,8 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				bodyStart = 2
 
 				// Get parent classes if specified
-				for i, parentElem := range parentList {
+				parentItems := parentList.Items()
+				for i, parentElem := range parentItems {
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating parent %d: %v\n", i, core.PrintValue(parentElem))
 					}
@@ -112,8 +113,20 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					case interface{ GetClass() *core.Class }:
 						// Handle wrapper types that embed Class (like staticmethod, classmethod)
 						parent = p.GetClass()
+					case *core.BuiltinFunction:
+						// TEMPORARY: Allow builtin types as base classes
+						// TODO: Make list/int/float proper classes
+						if nameVal, ok := p.GetAttr("__name__"); ok {
+							if nameStr, ok := nameVal.(core.StringValue); ok {
+								parent = core.NewClass(string(nameStr), nil)
+							} else {
+								return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])
+							}
+						} else {
+							return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])
+						}
 					default:
-						return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentList[i])
+						return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])
 					}
 
 					parentClasses = append(parentClasses, parent)
@@ -123,17 +136,18 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Parse keywords (e.g., metaclass=ABCMeta)
-	if len(args) > bodyStart {
-		if kwList, ok := args[bodyStart].(core.ListValue); ok {
+	if args.Len() > bodyStart {
+		if kwList, ok := args.Items()[bodyStart].(*core.ListValue); ok {
 			if debugClass {
 				fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Checking potential keywords at index %d: %v\n", bodyStart, kwList)
 			}
 
 			// Handle bracket syntax: [[key val]] becomes [list-literal [list-literal key val]]
 			// Skip the first 'list-literal' symbol if present
+			kwItems := kwList.Items()
 			startIdx := 0
-			if len(kwList) > 0 {
-				if sym, ok := kwList[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+			if kwList.Len() > 0 {
+				if sym, ok := kwItems[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
 					startIdx = 1
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Skipping list-literal marker\n")
@@ -144,19 +158,20 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Check if this looks like a keywords list
 			// Keywords are represented as [("metaclass" ABCMeta), ...]
 			isKeywords := true
-			for i := startIdx; i < len(kwList); i++ {
-				kw := kwList[i]
+			for i := startIdx; i < kwList.Len(); i++ {
+				kw := kwItems[i]
 				if debugClass {
 					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] kwList[%d] = %v (type %T)\n", i, kw, kw)
 				}
 
 				// Handle nested list-literal for each keyword pair
-				var kwPair core.ListValue
-				if pair, ok := kw.(core.ListValue); ok {
+				var kwPair *core.ListValue
+				if pair, ok := kw.(*core.ListValue); ok {
 					// Skip list-literal if present
+					pairItems := pair.Items()
 					pairStartIdx := 0
-					if len(pair) > 0 {
-						if sym, ok := pair[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+					if pair.Len() > 0 {
+						if sym, ok := pairItems[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
 							pairStartIdx = 1
 							if debugClass {
 								fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Found inner list-literal, pairStartIdx=%d\n", pairStartIdx)
@@ -164,13 +179,13 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						}
 					}
 					// Extract the actual key-value pair
-					if len(pair)-pairStartIdx == 2 {
-						kwPair = pair[pairStartIdx:]
+					if pair.Len()-pairStartIdx == 2 {
+						kwPair = core.NewList(pairItems[pairStartIdx:]...)
 					} else {
 						kwPair = pair
 					}
 					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Extracted kwPair: %v (len=%d)\n", kwPair, len(kwPair))
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Extracted kwPair: %v (len=%d)\n", kwPair, kwPair.Len())
 					}
 				} else {
 					if debugClass {
@@ -179,7 +194,7 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 
 				// Each keyword should be a 2-element list: (name, value)
-				if len(kwPair) == 2 {
+				if kwPair != nil && kwPair.Len() == 2 {
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Looks like keyword pair: %v\n", kwPair)
 					}
@@ -188,46 +203,56 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				} else {
 					// Not a keyword pair, this is probably class body
 					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Not a keyword pair (len=%d), treating as body\n", len(kwPair))
+						kwLen := 0
+						if kwPair != nil {
+							kwLen = kwPair.Len()
+						}
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Not a keyword pair (len=%d), treating as body\n", kwLen)
 					}
 					isKeywords = false
 					break
 				}
 			}
 
-			if isKeywords && len(kwList) > startIdx {
+			if isKeywords && kwList.Len() > startIdx {
 				// This is a keywords list, process it
 				bodyStart++ // Skip past keywords in body processing
 
-				for i := startIdx; i < len(kwList); i++ {
-					kw := kwList[i]
+				for i := startIdx; i < kwList.Len(); i++ {
+					kw := kwItems[i]
 
 					// Extract keyword pair, handling list-literal markers
-					var kwPair core.ListValue
-					if pair, ok := kw.(core.ListValue); ok {
+					var kwPair *core.ListValue
+					if pair, ok := kw.(*core.ListValue); ok {
+						pairItems := pair.Items()
 						pairStartIdx := 0
-						if len(pair) > 0 {
-							if sym, ok := pair[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+						if pair.Len() > 0 {
+							if sym, ok := pairItems[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
 								pairStartIdx = 1
 							}
 						}
-						kwPair = pair[pairStartIdx:]
+						if pair.Len()-pairStartIdx == 2 {
+							kwPair = core.NewList(pairItems[pairStartIdx:]...)
+						} else {
+							kwPair = pair
+						}
 					} else {
 						continue
 					}
 
-					if len(kwPair) != 2 {
+					if kwPair.Len() != 2 {
 						continue
 					}
 
-					kwName, ok := kwPair[0].(core.StringValue)
+					kwPairItems := kwPair.Items()
+					kwName, ok := kwPairItems[0].(core.StringValue)
 					if !ok {
 						continue
 					}
 
 					if string(kwName) == "metaclass" {
 						// Evaluate the metaclass expression
-						metaclassVal, err := Eval(kwPair[1], ctx)
+						metaclassVal, err := Eval(kwPairItems[1], ctx)
 						if err != nil {
 							return nil, fmt.Errorf("error evaluating metaclass: %v", err)
 						}
@@ -298,7 +323,7 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	if debugClass {
-		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Created class '%s', processing body from index %d to %d\n", className, bodyStart, len(args)-1)
+		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Created class '%s', processing body from index %d to %d\n", className, bodyStart, args.Len()-1)
 	}
 
 	// Create a class-body context that allows accessing class members as they're defined
@@ -306,38 +331,40 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	classBodyCtx := core.NewContext(ctx)
 
 	// Process class body
-	for i := bodyStart; i < len(args); i++ {
-		stmt := args[i]
+	argsItems := args.Items()
+	for i := bodyStart; i < args.Len(); i++ {
+		stmt := argsItems[i]
 		if debugClass {
 			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Processing body statement %d: %T\n", i, stmt)
 		}
 
 		// Handle different statement types
 		switch s := stmt.(type) {
-		case core.ListValue:
-			if len(s) == 0 {
+		case *core.ListValue:
+			if s.Len() == 0 {
 				continue
 			}
 
+			sItems := s.Items()
 			// Check for def form (methods) or = form (class variables)
-			if sym, ok := s[0].(core.SymbolValue); ok {
+			if sym, ok := sItems[0].(core.SymbolValue); ok {
 				switch string(sym) {
 				case "def":
 					// Method definition
-					if len(s) < 3 {
+					if s.Len() < 3 {
 						return nil, fmt.Errorf("def requires at least name and value")
 					}
 
-					name, ok := s[1].(core.SymbolValue)
+					name, ok := sItems[1].(core.SymbolValue)
 					if !ok {
 						return nil, fmt.Errorf("def name must be a symbol")
 					}
 
 					// Check if it's a method definition
-					if len(s) >= 3 {
-						if paramList, ok := s[2].(core.ListValue); ok {
+					if s.Len() >= 3 {
+						if paramList, ok := sItems[2].(*core.ListValue); ok {
 							// It's a method definition
-							method, err := createMethod(string(name), paramList, s[3:], ctx)
+							method, err := createMethod(string(name), paramList, sItems[3:], ctx)
 							if err != nil {
 								return nil, err
 							}
@@ -353,15 +380,15 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				case "=":
 					// Class variable definition or subscript assignment
-					if len(s) != 3 {
+					if s.Len() != 3 {
 						return nil, fmt.Errorf("= requires exactly 2 arguments in class definition")
 					}
 
 					// Check if this is a simple variable assignment or subscript assignment
-					name, ok := s[1].(core.SymbolValue)
+					name, ok := sItems[1].(core.SymbolValue)
 					if ok {
 						// Simple variable assignment: x = value
-						value, err := Eval(s[2], classBodyCtx)
+						value, err := Eval(sItems[2], classBodyCtx)
 						if err != nil {
 							return nil, err
 						}
@@ -370,9 +397,9 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 						classBodyCtx.Define(string(name), value)
 					} else {
 						// Could be subscript assignment: obj[key] = value
-						// Check if s[1] is a list starting with get-item
-						if lhs, isList := s[1].(core.ListValue); isList && len(lhs) >= 3 {
-							if sym, isSymbol := lhs[0].(core.SymbolValue); isSymbol && string(sym) == "get-item" {
+						// Check if sItems[1] is a list starting with get-item
+						if lhs, isList := sItems[1].(*core.ListValue); isList && lhs.Len() >= 3 {
+							if sym, isSymbol := lhs.Items()[0].(core.SymbolValue); isSymbol && string(sym) == "get-item" {
 								// This is obj[key] = value, evaluate it as a setitem operation
 								// Evaluate the whole assignment as an expression
 								_, err := Eval(stmt, classBodyCtx)
@@ -384,13 +411,13 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 							}
 						}
 						// If we get here, it's an unsupported assignment pattern
-						return nil, fmt.Errorf("class variable name must be a symbol or subscript expression, got %T", s[1])
+						return nil, fmt.Errorf("class variable name must be a symbol or subscript expression, got %T", sItems[1])
 					}
 
 				default:
 					// Evaluate other forms in class context
 					if debugClass {
-						if sym, ok := s[0].(core.SymbolValue); ok {
+						if sym, ok := sItems[0].(core.SymbolValue); ok {
 							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating form '%s' in class context\n", sym)
 						}
 					}
@@ -533,13 +560,13 @@ func classForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // createMethod creates a method from a parameter list and body
-func createMethod(name string, params core.ListValue, body []core.Value, ctx *core.Context) (*UserFunction, error) {
+func createMethod(name string, params *core.ListValue, body []core.Value, ctx *core.Context) (*UserFunction, error) {
 	// Try to parse as new-style parameter list with defaults
-	signature, err := ParseParameterList(params)
+	signature, err := ParseParameterList(params.Items())
 	if err != nil {
 		// Fall back to legacy simple parameter parsing
-		paramSyms := make([]core.SymbolValue, 0, len(params))
-		for _, p := range params {
+		paramSyms := make([]core.SymbolValue, 0, params.Len())
+		for _, p := range params.Items() {
 			sym, ok := p.(core.SymbolValue)
 			if !ok {
 				return nil, fmt.Errorf("method parameters must be symbols")
@@ -553,7 +580,7 @@ func createMethod(name string, params core.ListValue, body []core.Value, ctx *co
 			methodBody = body[0]
 		} else {
 			// Wrap in do
-			methodBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+			methodBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
 		}
 
 		// Create the method with legacy params
@@ -575,7 +602,7 @@ func createMethod(name string, params core.ListValue, body []core.Value, ctx *co
 		methodBody = body[0]
 	} else {
 		// Wrap in do
-		methodBody = core.ListValue(append([]core.Value{core.SymbolValue("do")}, body...))
+		methodBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
 	}
 
 	// Build legacy params list for backward compatibility
@@ -602,9 +629,9 @@ func createMethod(name string, params core.ListValue, body []core.Value, ctx *co
 
 // superForm implements the super special form for backward compatibility
 // This handles the bare "super" syntax used in method definitions
-func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Special form super with no args - look up self/cls/mcls
-	if len(args) == 0 {
+	if args.Len() == 0 {
 		// First, check if __class__ is defined in the context
 		// This tells us which class's method we're currently executing in
 		classVal, classErr := ctx.Lookup("__class__")
@@ -686,12 +713,12 @@ func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Legacy form with explicit class and instance
-	if len(args) != 2 {
+	if args.Len() != 2 {
 		return nil, fmt.Errorf("super requires 0 or 2 arguments")
 	}
 
 	// Get class
-	classVal, err := Eval(args[0], ctx)
+	classVal, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -702,7 +729,7 @@ func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get instance
-	instanceVal, err := Eval(args[1], ctx)
+	instanceVal, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -716,19 +743,19 @@ func superForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // isinstanceForm checks if an object is an instance of a class
-func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
+func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 2 {
 		return nil, fmt.Errorf("isinstance requires 2 arguments")
 	}
 
 	// Evaluate object
-	obj, err := Eval(args[0], ctx)
+	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Evaluate class
-	classVal, err := Eval(args[1], ctx)
+	classVal, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -758,6 +785,35 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 			return core.BoolValue(actualType == "set"), nil
 		default:
 			return core.BoolValue(actualType == expectedType), nil
+		}
+	}
+
+	// Handle BuiltinFunction type constructors (list, int, float, etc.)
+	if builtinFunc, ok := classVal.(*core.BuiltinFunction); ok {
+		// Check the function's name to determine what type to check
+		if nameVal, hasName := builtinFunc.GetAttr("__name__"); hasName {
+			if nameStr, ok := nameVal.(core.StringValue); ok {
+				typeName := string(nameStr)
+				actualType := string(obj.Type())
+
+				// Map builtin function names to type checks
+				switch typeName {
+				case "list":
+					return core.BoolValue(actualType == "list"), nil
+				case "int", "float":
+					return core.BoolValue(actualType == "number"), nil
+				case "str":
+					return core.BoolValue(actualType == "string"), nil
+				case "bool":
+					return core.BoolValue(actualType == "bool"), nil
+				case "tuple":
+					return core.BoolValue(actualType == "tuple"), nil
+				case "dict":
+					return core.BoolValue(actualType == "dict"), nil
+				case "set":
+					return core.BoolValue(actualType == "set"), nil
+				}
+			}
 		}
 	}
 
@@ -801,7 +857,7 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 			if class.Name == "nil" || class.Name == "NoneType" {
 				return core.True, nil
 			}
-		case core.ListValue:
+		case *core.ListValue:
 			// Check if class is list
 			if class.Name == "list" {
 				return core.True, nil
@@ -919,18 +975,18 @@ func isinstanceForm(args core.ListValue, ctx *core.Context) (core.Value, error) 
 }
 
 // issubclassForm checks if a class is a subclass of another
-func issubclassForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
+func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 2 {
 		return nil, fmt.Errorf("issubclass requires 2 arguments")
 	}
 
 	// Evaluate both arguments
-	subClassVal, err := Eval(args[0], ctx)
+	subClassVal, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	baseClassVal, err := Eval(args[1], ctx)
+	baseClassVal, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
 	}

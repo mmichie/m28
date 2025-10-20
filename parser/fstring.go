@@ -346,7 +346,7 @@ func (p *Parser) parseFStringEnhanced(quoteChar rune) (core.Value, error) {
 			// Add the expression with format info
 			if spec.HasSpec || spec.Conversion != "" || spec.Debug {
 				// Create a format expression node
-				formatExpr := core.ListValue{
+				formatExpr := []core.Value{
 					core.SymbolValue("format-expr"),
 					expr,
 				}
@@ -366,7 +366,7 @@ func (p *Parser) parseFStringEnhanced(quoteChar rune) (core.Value, error) {
 					formatExpr = append(formatExpr, core.StringValue("="+debugExpr))
 				}
 
-				parts = append(parts, formatExpr)
+				parts = append(parts, core.NewList(formatExpr...))
 			} else {
 				parts = append(parts, expr)
 			}
@@ -392,10 +392,10 @@ func (p *Parser) parseFStringEnhanced(quoteChar rune) (core.Value, error) {
 // Helper functions
 
 func createFormatExpression(parts []core.Value) core.Value {
-	result := make(core.ListValue, 0, len(parts)+1)
+	result := make([]core.Value, 0, len(parts)+1)
 	result = append(result, core.SymbolValue("str-format"))
 	result = append(result, parts...)
-	return result
+	return core.NewList(result...)
 }
 
 func createFormatSpecValue(spec *FormatSpec) core.Value {

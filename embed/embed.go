@@ -203,8 +203,8 @@ func (m *M28Engine) ExecuteFile(filename string) error {
 	ctx := core.NewContext(m.ctx)
 
 	// Check if we got multiple expressions as a list
-	if exprList, ok := expr.(core.ListValue); ok {
-		for _, subExpr := range exprList {
+	if exprList, ok := expr.(*core.ListValue); ok {
+		for _, subExpr := range exprList.Items() {
 			_, err = eval.Eval(subExpr, ctx)
 			if err != nil {
 				return fmt.Errorf("error executing file: %v", err)

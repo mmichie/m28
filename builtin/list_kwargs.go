@@ -63,9 +63,9 @@ func SortedWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core
 	// First argument is the sequence to sort
 	var items []core.Value
 	switch v := args[0].(type) {
-	case core.ListValue:
-		items = make([]core.Value, len(v))
-		copy(items, v)
+	case *core.ListValue:
+		items = make([]core.Value, v.Len())
+		copy(items, v.Items())
 	case core.TupleValue:
 		items = make([]core.Value, len(v))
 		copy(items, v)
@@ -115,7 +115,7 @@ func SortedWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core
 		result[i] = ki.value
 	}
 
-	return core.ListValue(result), nil
+	return core.NewList(result...), nil
 }
 
 // MinWithKwargs is the keyword-argument version of min
@@ -145,11 +145,11 @@ func MinWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Co
 	var values []core.Value
 	if len(args) == 1 {
 		switch v := args[0].(type) {
-		case core.ListValue:
-			if len(v) == 0 {
+		case *core.ListValue:
+			if v.Len() == 0 {
 				return nil, fmt.Errorf("min() arg is an empty sequence")
 			}
-			values = v
+			values = v.Items()
 		case core.TupleValue:
 			if len(v) == 0 {
 				return nil, fmt.Errorf("min() arg is an empty sequence")
@@ -211,11 +211,11 @@ func MaxWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Co
 	var values []core.Value
 	if len(args) == 1 {
 		switch v := args[0].(type) {
-		case core.ListValue:
-			if len(v) == 0 {
+		case *core.ListValue:
+			if v.Len() == 0 {
 				return nil, fmt.Errorf("max() arg is an empty sequence")
 			}
-			values = v
+			values = v.Items()
 		case core.TupleValue:
 			if len(v) == 0 {
 				return nil, fmt.Errorf("max() arg is an empty sequence")

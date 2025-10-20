@@ -142,12 +142,12 @@ func (a *Args) GetBool(index int) (bool, error) {
 }
 
 // GetList extracts a list from the argument at the given index.
-func (a *Args) GetList(index int) (core.ListValue, error) {
+func (a *Args) GetList(index int) (*core.ListValue, error) {
 	if index >= len(a.args) || index < 0 {
 		return nil, errors.NewArgumentError(a.function, index+1, len(a.args))
 	}
 
-	if list, ok := a.args[index].(core.ListValue); ok {
+	if list, ok := a.args[index].(*core.ListValue); ok {
 		return list, nil
 	}
 
@@ -189,7 +189,7 @@ func (a *Args) GetSequence(index int) (core.Value, error) {
 
 	val := a.args[index]
 	switch val.(type) {
-	case core.ListValue, core.TupleValue, core.StringValue:
+	case *core.ListValue, core.TupleValue, core.StringValue:
 		return val, nil
 	default:
 		return nil, errors.NewTypeError(a.function, "sequence", string(val.Type()))
@@ -211,7 +211,7 @@ func (a *Args) GetIterable(index int) (core.Value, error) {
 
 	// Check for types that are iterable but might not implement the interface
 	switch val.(type) {
-	case core.ListValue, core.TupleValue, core.StringValue, *core.DictValue, *core.SetValue:
+	case *core.ListValue, core.TupleValue, core.StringValue, *core.DictValue, *core.SetValue:
 		return val, nil
 	default:
 		// Check if it has __iter__ method

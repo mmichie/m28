@@ -159,12 +159,12 @@ func extractModuleExports(moduleCtx *Context) *DictValue {
 
 // exportNamedVars exports only variables listed in __exports__
 func exportNamedVars(moduleDict *DictValue, moduleCtx *Context, exportsVal Value) {
-	exportsList, ok := exportsVal.(ListValue)
+	exportsList, ok := exportsVal.(*ListValue)
 	if !ok {
 		return
 	}
 
-	for _, item := range exportsList {
+	for _, item := range exportsList.Items() {
 		name := getExportName(item)
 		if name == "" {
 			continue

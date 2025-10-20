@@ -7,12 +7,12 @@ import (
 )
 
 // yieldForm implements the yield expression
-func yieldForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func yieldForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	var value core.Value = core.Nil
 
-	if len(args) > 0 {
+	if args.Len() > 0 {
 		// Evaluate the yielded value
-		val, err := Eval(args[0], ctx)
+		val, err := Eval(args.Items()[0], ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -31,13 +31,13 @@ func yieldForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // into:
 //
 //	for item in iterable: yield item
-func yieldFromForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) == 0 {
+func yieldFromForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() == 0 {
 		return nil, fmt.Errorf("yield from requires an argument")
 	}
 
 	// Evaluate the iterable
-	iterable, err := Eval(args[0], ctx)
+	iterable, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -90,15 +90,15 @@ func makeGeneratorFunction(fn *UserFunction) core.Value {
 // containsYield checks if an expression contains yield statements
 func containsYield(expr core.Value) bool {
 	switch e := expr.(type) {
-	case core.ListValue:
-		if len(e) > 0 {
-			if sym, ok := e[0].(core.SymbolValue); ok {
+	case *core.ListValue:
+		if e.Len() > 0 {
+			if sym, ok := e.Items()[0].(core.SymbolValue); ok {
 				if string(sym) == "yield" || string(sym) == "yield-from" {
 					return true
 				}
 			}
 			// Recursively check all elements
-			for _, elem := range e {
+			for _, elem := range e.Items() {
 				if containsYield(elem) {
 					return true
 				}

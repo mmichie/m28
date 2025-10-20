@@ -450,13 +450,13 @@ func TestParseListLiteral(t *testing.T) {
 				t.Fatalf("Expected Literal for empty list %q, got %T", tt.source, nodes[0])
 			}
 
-			list, ok := literal.Value.(core.ListValue)
+			list, ok := literal.Value.(*core.ListValue)
 			if !ok {
 				t.Fatalf("Expected ListValue for %q, got %T", tt.source, literal.Value)
 			}
 
-			if len(list) != 0 {
-				t.Errorf("Expected empty list for %q, got %d elements", tt.source, len(list))
+			if list.Len() != 0 {
+				t.Errorf("Expected empty list for %q, got %d elements", tt.source, list.Len())
 			}
 		} else {
 			// List literals are now SExpr nodes representing (list-literal ...)

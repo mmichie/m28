@@ -130,7 +130,7 @@ func ReadJSONLBuilder() builders.BuiltinFunc {
 
 		// Read lines
 		scanner := bufio.NewScanner(file)
-		var results core.ListValue
+		results := make([]core.Value, 0)
 		lineNum := 0
 
 		for scanner.Scan() {
@@ -170,7 +170,7 @@ func ReadJSONLBuilder() builders.BuiltinFunc {
 			return nil, fmt.Errorf("read-jsonl: error reading file: %w", err)
 		}
 
-		return results, nil
+		return core.NewList(results...), nil
 	}
 }
 
@@ -225,7 +225,7 @@ func WriteJSONLBuilder() builders.BuiltinFunc {
 
 		// Write each object as JSONL
 		writer := bufio.NewWriter(file)
-		for i, obj := range data {
+		for i, obj := range data.Items() {
 			// Convert to Go value
 			goValue, err := m28ValueToGo(obj)
 			if err != nil {
@@ -314,7 +314,7 @@ func goToM28Value(v interface{}) (core.Value, error) {
 	case string:
 		return core.StringValue(val), nil
 	case []interface{}:
-		result := make(core.ListValue, len(val))
+		result := make([]core.Value, len(val))
 		for i, item := range val {
 			m28Item, err := goToM28Value(item)
 			if err != nil {
@@ -322,7 +322,7 @@ func goToM28Value(v interface{}) (core.Value, error) {
 			}
 			result[i] = m28Item
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	case map[string]interface{}:
 		dict := core.NewDict()
 		for key, value := range val {
@@ -356,8 +356,8 @@ func m28ValueToGo(v core.Value) (interface{}, error) {
 		return s, nil
 	}
 	if list, ok := types.AsList(v); ok {
-		result := make([]interface{}, len(list))
-		for i, item := range list {
+		result := make([]interface{}, list.Len())
+		for i, item := range list.Items() {
 			goItem, err := m28ValueToGo(item)
 			if err != nil {
 				return nil, err

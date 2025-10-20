@@ -98,7 +98,7 @@ func InitWarningsModule() *core.DictValue {
 	warningsModule.Set("ResourceWarning", resourceWarningClass)
 
 	// filters list
-	warningsModule.Set("filters", core.ListValue{})
+	warningsModule.Set("filters", core.NewList())
 
 	// _defaultaction
 	warningsModule.Set("_defaultaction", core.StringValue("default"))

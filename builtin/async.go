@@ -94,7 +94,7 @@ func RegisterAsyncBuiltins(ctx *core.Context) {
 		}
 
 		// Wait for all tasks and collect results
-		results := make(core.ListValue, len(tasks))
+		results := make([]core.Value, len(tasks))
 		for i, task := range tasks {
 			result, err := task.Wait()
 			if err != nil {
@@ -103,7 +103,7 @@ func RegisterAsyncBuiltins(ctx *core.Context) {
 			results[i] = result
 		}
 
-		return results, nil
+		return core.NewList(results...), nil
 	}))
 
 	// create_task - create a task from a callable

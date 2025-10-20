@@ -48,7 +48,7 @@ func InitHeapqModule() *core.DictValue {
 			return nil, errors.NewTypeError("heappop", "list", string(v.Get(0).Type()))
 		}
 
-		if len(list) == 0 {
+		if list.Len() == 0 {
 			return nil, errors.NewRuntimeError("heappop", "heap is empty")
 		}
 
@@ -93,11 +93,11 @@ func InitHeapqModule() *core.DictValue {
 		item := v.Get(1)
 
 		// If heap is empty or item is smaller than smallest, just return item
-		if len(list) == 0 {
+		if list.Len() == 0 {
 			return item, nil
 		}
 
-		if compareValues(item, list[0]) < 0 {
+		if compareValues(item, list.Items()[0]) < 0 {
 			return item, nil
 		}
 
@@ -119,7 +119,7 @@ func InitHeapqModule() *core.DictValue {
 			return nil, errors.NewTypeError("heapreplace", "list", string(v.Get(0).Type()))
 		}
 
-		if len(list) == 0 {
+		if list.Len() == 0 {
 			return nil, errors.NewRuntimeError("heapreplace", "heap is empty")
 		}
 
@@ -151,7 +151,7 @@ func InitHeapqModule() *core.DictValue {
 		}
 
 		// Collect all items
-		items := make(core.ListValue, 0)
+		items := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		for {
 			val, hasNext := iter.Next()
@@ -170,7 +170,7 @@ func InitHeapqModule() *core.DictValue {
 			nInt = len(sortedItems)
 		}
 
-		return sortedItems[:nInt], nil
+		return core.NewList(sortedItems[:nInt]...), nil
 	}))
 
 	// nsmallest - Return n smallest elements
@@ -191,7 +191,7 @@ func InitHeapqModule() *core.DictValue {
 		}
 
 		// Collect all items
-		items := make(core.ListValue, 0)
+		items := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		for {
 			val, hasNext := iter.Next()
@@ -210,7 +210,7 @@ func InitHeapqModule() *core.DictValue {
 			nInt = len(sortedItems)
 		}
 
-		return sortedItems[:nInt], nil
+		return core.NewList(sortedItems[:nInt]...), nil
 	}))
 
 	return heapqModule
@@ -218,28 +218,31 @@ func InitHeapqModule() *core.DictValue {
 
 // minHeap implements heap.Interface for M28 values
 type minHeap struct {
-	items core.ListValue
+	items *core.ListValue
 }
 
-func (h minHeap) Len() int { return len(h.items) }
+func (h minHeap) Len() int { return h.items.Len() }
 
 func (h minHeap) Less(i, j int) bool {
-	return compareValues(h.items[i], h.items[j]) < 0
+	items := h.items.Items()
+	return compareValues(items[i], items[j]) < 0
 }
 
 func (h minHeap) Swap(i, j int) {
-	h.items[i], h.items[j] = h.items[j], h.items[i]
+	items := h.items.Items()
+	items[i], items[j] = items[j], items[i]
 }
 
 func (h *minHeap) Push(x interface{}) {
-	h.items = append(h.items, x.(core.Value))
+	h.items.Append(x.(core.Value))
 }
 
 func (h *minHeap) Pop() interface{} {
-	old := h.items
-	n := len(old)
-	x := old[n-1]
-	h.items = old[0 : n-1]
+	items := h.items.Items()
+	n := len(items)
+	x := items[n-1]
+	// Truncate the list by setting items to a new slice
+	h.items = core.NewList(items[0 : n-1]...)
 	return x
 }
 
@@ -282,9 +285,9 @@ func compareValues(a, b core.Value) int {
 }
 
 // sortValues sorts a list of values
-func sortValues(items core.ListValue, descending bool) core.ListValue {
+func sortValues(items []core.Value, descending bool) []core.Value {
 	// Create a copy to avoid modifying original
-	sorted := make(core.ListValue, len(items))
+	sorted := make([]core.Value, len(items))
 	copy(sorted, items)
 
 	// Simple bubble sort (good enough for nlargest/nsmallest)

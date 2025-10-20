@@ -220,8 +220,8 @@ func iterableToSlice(val core.Value) ([]core.Value, error) {
 	// This would be implemented to convert various iterable types to a slice
 	// For now, just handle basic cases
 	switch v := val.(type) {
-	case core.ListValue:
-		return []core.Value(v), nil
+	case *core.ListValue:
+		return v.Items(), nil
 	case core.TupleValue:
 		return []core.Value(v), nil
 	default:

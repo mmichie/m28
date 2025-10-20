@@ -19,12 +19,12 @@ func InitListMethods() {
 		Doc:     "Remove first occurrence of value. Raises ValueError if not found.",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			list := receiver.(ListValue)
+			list := receiver.(*ListValue)
 			value := args[0]
 
 			// Find the first occurrence
 			index := -1
-			for i, item := range list {
+			for i, item := range list.Items() {
 				if EqualValues(item, value) {
 					index = i
 					break
@@ -35,12 +35,10 @@ func InitListMethods() {
 				return nil, fmt.Errorf("list.remove(x): x not in list")
 			}
 
-			// Create new list without the item
-			newList := make(ListValue, 0, len(list)-1)
-			newList = append(newList, list[:index]...)
-			newList = append(newList, list[index+1:]...)
+			// Mutate the list by removing the item
+			list.items = append(list.items[:index], list.items[index+1:]...)
 
-			return newList, nil
+			return None, nil
 		},
 	}
 
@@ -48,11 +46,13 @@ func InitListMethods() {
 	listType.Methods["clear"] = &MethodDescriptor{
 		Name:    "clear",
 		Arity:   0,
-		Doc:     "Remove all items from the list (returns empty list).",
+		Doc:     "Remove all items from the list.",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			// Return a new empty list
-			return make(ListValue, 0), nil
+			list := receiver.(*ListValue)
+			// Mutate the list to be empty
+			list.items = make([]Value, 0)
+			return None, nil
 		},
 	}
 
@@ -63,10 +63,10 @@ func InitListMethods() {
 		Doc:     "Return a shallow copy of the list.",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			list := receiver.(ListValue)
-			newList := make(ListValue, len(list))
-			copy(newList, list)
-			return newList, nil
+			list := receiver.(*ListValue)
+			items := make([]Value, len(list.items))
+			copy(items, list.items)
+			return NewList(items...), nil
 		},
 	}
 }

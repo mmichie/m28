@@ -58,8 +58,8 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 
 		// Handle specific types that might not pass the interface check
 		switch v := args[0].(type) {
-		case core.ListValue:
-			for _, item := range v {
+		case *core.ListValue:
+			for _, item := range v.Items() {
 				if !core.IsTruthy(item) {
 					return core.False, nil
 				}
@@ -113,8 +113,8 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 
 		// Handle specific types that might not pass the interface check
 		switch v := args[0].(type) {
-		case core.ListValue:
-			for _, item := range v {
+		case *core.ListValue:
+			for _, item := range v.Items() {
 				if core.IsTruthy(item) {
 					return core.True, nil
 				}

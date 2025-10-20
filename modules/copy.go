@@ -35,11 +35,11 @@ func InitCopyModule() *core.DictValue {
 // shallowCopy creates a shallow copy of a value
 func shallowCopy(val core.Value) (core.Value, error) {
 	switch v := val.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		// Create new list with same elements
-		newList := make(core.ListValue, len(v))
-		copy(newList, v)
-		return newList, nil
+		newList := make([]core.Value, v.Len())
+		copy(newList, v.Items())
+		return core.NewList(newList...), nil
 
 	case core.TupleValue:
 		// Tuples are immutable, but create new one anyway for consistency
@@ -84,17 +84,17 @@ func shallowCopy(val core.Value) (core.Value, error) {
 // deepCopy creates a deep copy of a value
 func deepCopy(val core.Value) (core.Value, error) {
 	switch v := val.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		// Recursively copy all elements
-		newList := make(core.ListValue, len(v))
-		for i, elem := range v {
+		newList := make([]core.Value, v.Len())
+		for i, elem := range v.Items() {
 			copied, err := deepCopy(elem)
 			if err != nil {
 				return nil, err
 			}
 			newList[i] = copied
 		}
-		return newList, nil
+		return core.NewList(newList...), nil
 
 	case core.TupleValue:
 		// Recursively copy all elements

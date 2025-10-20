@@ -126,7 +126,7 @@ func (p *Parser) Parse(input string) (core.Value, error) {
 
 // parseProgram parses a complete program (multiple expressions)
 func (p *Parser) parseProgram() (core.Value, error) {
-	expressions := make(core.ListValue, 0)
+	expressions := make([]core.Value, 0)
 
 	// Parse expressions until EOF
 	for !p.matchToken(TOKEN_EOF) {
@@ -155,10 +155,10 @@ func (p *Parser) parseProgram() (core.Value, error) {
 	}
 
 	// Otherwise, wrap expressions in an implicit do form
-	return core.ListValue(append(
+	return core.NewList(append(
 		[]core.Value{core.SymbolValue("do")},
 		expressions...,
-	)), nil
+	)...), nil
 }
 
 // isAssignmentOperator checks if a token type is an assignment operator
@@ -188,11 +188,11 @@ func (p *Parser) parseExpr() (core.Value, error) {
 				}
 
 				// Build (= name value)
-				return core.ListValue{
+				return core.NewList(
 					core.SymbolValue("="),
 					core.SymbolValue(nameTok.Lexeme),
 					value,
-				}, nil
+				), nil
 			}
 		}
 	}
@@ -354,12 +354,12 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 					}
 
 					// Build (def name (params) body)
-					return core.ListValue{
+					return core.NewList(
 						core.SymbolValue("def"),
 						core.SymbolValue(funcNameTok.Lexeme),
 						params,
 						body,
-					}, nil
+					), nil
 				}
 			}
 
@@ -382,9 +382,9 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 				}
 
 				// Build (name arg1 arg2 ...)
-				result := core.ListValue{core.SymbolValue(name)}
+				result := []core.Value{core.SymbolValue(name)}
 				result = append(result, args...)
-				return result, nil
+				return core.NewList(result...), nil
 			}
 		}
 
@@ -419,7 +419,7 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 		if err != nil {
 			return nil, p.tokenError(fmt.Sprintf("error parsing expression after backtick: %v", err), tok)
 		}
-		return core.ListValue{core.SymbolValue("quasiquote"), expr}, nil
+		return core.NewList(core.SymbolValue("quasiquote"), expr), nil
 
 	case TOKEN_COMMA:
 		p.advanceToken()
@@ -430,14 +430,14 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 			if err != nil {
 				return nil, p.tokenError(fmt.Sprintf("error parsing expression after ,@: %v", err), tok)
 			}
-			return core.ListValue{core.SymbolValue("unquote-splicing"), expr}, nil
+			return core.NewList(core.SymbolValue("unquote-splicing"), expr), nil
 		}
 		// Regular unquote
 		expr, err := p.parseExpr()
 		if err != nil {
 			return nil, p.tokenError(fmt.Sprintf("error parsing expression after comma: %v", err), tok)
 		}
-		return core.ListValue{core.SymbolValue("unquote"), expr}, nil
+		return core.NewList(core.SymbolValue("unquote"), expr), nil
 
 	case TOKEN_COMMA_AT:
 		p.advanceToken()
@@ -445,7 +445,7 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 		if err != nil {
 			return nil, p.tokenError(fmt.Sprintf("error parsing expression after ,@: %v", err), tok)
 		}
-		return core.ListValue{core.SymbolValue("unquote-splicing"), expr}, nil
+		return core.NewList(core.SymbolValue("unquote-splicing"), expr), nil
 
 	// Dot by itself is a symbol
 	case TOKEN_DOT:
@@ -536,7 +536,7 @@ func (p *Parser) parseUnaryOpFromToken() (core.Value, error) {
 	}
 
 	// Build (op operand)
-	return core.ListValue{core.SymbolValue(opSymbol), operand}, nil
+	return core.NewList(core.SymbolValue(opSymbol), operand), nil
 }
 
 // parseListFromToken parses a list expression (...) using tokens
@@ -547,7 +547,7 @@ func (p *Parser) parseListFromToken() (core.Value, error) {
 		return nil, err
 	}
 
-	elements := make(core.ListValue, 0)
+	elements := make([]core.Value, 0)
 
 	// Parse elements until closing parenthesis
 	for !p.matchToken(TOKEN_RPAREN) {
@@ -595,7 +595,7 @@ func (p *Parser) parseListFromToken() (core.Value, error) {
 		return p.parseGeneratorExpression(elements)
 	}
 
-	return elements, nil
+	return core.NewList(elements...), nil
 }
 
 // parseVectorLiteralFromToken parses a vector literal [...] using tokens
@@ -612,7 +612,7 @@ func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
 	p.inPythonicCall = false
 	defer func() { p.inPythonicCall = oldInPythonicCall }()
 
-	elements := make(core.ListValue, 0)
+	elements := make([]core.Value, 0)
 
 	// Parse elements until closing bracket
 	for !p.matchToken(TOKEN_RBRACKET) {
@@ -651,7 +651,7 @@ func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
 	}
 
 	// Return a list-literal form that evaluates its contents
-	return core.ListValue(append([]core.Value{core.SymbolValue("list-literal")}, elements...)), nil
+	return core.NewList(append([]core.Value{core.SymbolValue("list-literal")}, elements...)...), nil
 }
 
 // parseDictLiteralFromToken parses a dictionary literal {...} using tokens
@@ -666,10 +666,10 @@ func (p *Parser) parseDictLiteralFromToken() (core.Value, error) {
 	if p.matchToken(TOKEN_RBRACE) {
 		p.advanceToken()
 		// Empty {} is a dict
-		return core.ListValue([]core.Value{core.SymbolValue("dict-literal")}), nil
+		return core.NewList(core.SymbolValue("dict-literal")), nil
 	}
 
-	elements := make(core.ListValue, 0)
+	elements := make([]core.Value, 0)
 	hasColon := false
 	colonPositions := make(map[int]bool)
 
@@ -725,7 +725,7 @@ func (p *Parser) parseDictLiteralFromToken() (core.Value, error) {
 			return p.parseDictComprehension(elements, colonPositions)
 		}
 		// Regular dict literal
-		return core.ListValue(append([]core.Value{core.SymbolValue("dict-literal")}, elements...)), nil
+		return core.NewList(append([]core.Value{core.SymbolValue("dict-literal")}, elements...)...), nil
 	} else {
 		// Check for set comprehension: {x for ...}
 		if p.isSetComprehension(elements) {
@@ -733,10 +733,10 @@ func (p *Parser) parseDictLiteralFromToken() (core.Value, error) {
 		}
 		// Regular set literal
 		listLiteral := append([]core.Value{core.SymbolValue("list-literal")}, elements...)
-		return core.ListValue([]core.Value{
+		return core.NewList(
 			core.SymbolValue("set"),
-			core.ListValue(listLiteral),
-		}), nil
+			core.NewList(listLiteral...),
+		), nil
 	}
 }
 
@@ -812,11 +812,11 @@ func (p *Parser) parseDotAccessFromToken(base core.Value) (core.Value, error) {
 		// If there's whitespace, it's not a method call
 		if prevTok.EndPos < parenTok.StartPos {
 			// Property access, not method call
-			return core.ListValue{
+			return core.NewList(
 				core.SymbolValue("."),
 				base,
 				core.StringValue(propName),
-			}, nil
+			), nil
 		}
 
 		// It's a method call - parse arguments
@@ -826,7 +826,7 @@ func (p *Parser) parseDotAccessFromToken(base core.Value) (core.Value, error) {
 		}
 
 		// Build (. base method arg1 arg2...)
-		result := core.ListValue{
+		result := []core.Value{
 			core.SymbolValue("."),
 			base,
 			core.StringValue(propName),
@@ -837,30 +837,30 @@ func (p *Parser) parseDotAccessFromToken(base core.Value) (core.Value, error) {
 		} else {
 			result = append(result, args...)
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}
 
 	// Just property access - build (. base prop)
-	return core.ListValue{
+	return core.NewList(
 		core.SymbolValue("."),
 		base,
 		core.StringValue(propName),
-	}, nil
+	), nil
 }
 
 // parseFunctionParams parses function parameters for def syntax
-func (p *Parser) parseFunctionParams() (core.ListValue, error) {
+func (p *Parser) parseFunctionParams() (core.Value, error) {
 	// Consume opening parenthesis
 	if _, err := p.expectToken(TOKEN_LPAREN); err != nil {
 		return nil, err
 	}
 
-	params := core.ListValue{}
+	params := []core.Value{}
 
 	// Check for empty params
 	if p.matchToken(TOKEN_RPAREN) {
 		p.advanceToken()
-		return params, nil
+		return core.NewList(params...), nil
 	}
 
 	// Parse comma-separated parameters
@@ -889,7 +889,7 @@ func (p *Parser) parseFunctionParams() (core.ListValue, error) {
 		p.advanceToken() // consume comma
 	}
 
-	return params, nil
+	return core.NewList(params...), nil
 }
 
 // parseMethodArgsFromToken parses method call arguments using tokens
@@ -959,11 +959,11 @@ func (p *Parser) parseIndexAccessFromToken(base core.Value) (core.Value, error) 
 	if p.matchToken(TOKEN_RBRACKET) {
 		// Simple index access
 		p.advanceToken()
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("get-item"),
 			base,
 			first,
-		}, nil
+		), nil
 	}
 
 	if p.matchToken(TOKEN_COLON) {
@@ -987,7 +987,7 @@ func (p *Parser) parseIndexOrSliceValue() (core.Value, error) {
 			return nil, err
 		}
 		// Build (- val)
-		return core.ListValue{core.SymbolValue("-"), val}, nil
+		return core.NewList(core.SymbolValue("-"), val), nil
 	}
 
 	// Otherwise use standard atom parsing
@@ -1030,7 +1030,7 @@ func (p *Parser) parseSliceFromToken(base core.Value, start core.Value) (core.Va
 
 	// Build slice form: (__slice__ base start end step)
 	// Always provide all 4 arguments (base, start, end, step)
-	result := core.ListValue{core.SymbolValue("__slice__"), base}
+	result := []core.Value{core.SymbolValue("__slice__"), base}
 
 	if start != nil {
 		result = append(result, start)
@@ -1050,7 +1050,7 @@ func (p *Parser) parseSliceFromToken(base core.Value, start core.Value) (core.Va
 		result = append(result, core.None)
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }
 
 // parseFStringFromLexeme parses an f-string from its full lexeme (e.g., f"hello {x}")
@@ -1277,7 +1277,7 @@ func (p *Parser) parseList() (core.Value, error) {
 	// Skip opening parenthesis
 	p.advance()
 
-	elements := make(core.ListValue, 0)
+	elements := make([]core.Value, 0)
 
 	// Skip whitespace after the opening paren
 	p.skipWhitespaceAndComments()
@@ -1337,7 +1337,7 @@ func (p *Parser) parseList() (core.Value, error) {
 		return p.parseGeneratorExpression(elements)
 	}
 
-	return elements, nil
+	return core.NewList(elements...), nil
 }
 
 // parseVectorLiteral parses a vector literal [...] or list comprehension
@@ -1345,7 +1345,7 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 	// Skip opening bracket
 	p.advance()
 
-	elements := make(core.ListValue, 0)
+	elements := make([]core.Value, 0)
 
 	// Skip whitespace after the opening bracket
 	p.skipWhitespaceAndComments()
@@ -1391,7 +1391,7 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 
 	// Return a list-literal form that evaluates its contents
 	// This allows expressions inside [...] to be evaluated
-	return core.ListValue(append([]core.Value{core.SymbolValue("list-literal")}, elements...)), nil
+	return core.NewList(append([]core.Value{core.SymbolValue("list-literal")}, elements...)...), nil
 }
 
 // parseDictLiteral parses a dictionary literal {...}, set literal {1, 2, 3},
@@ -1407,11 +1407,11 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 	if p.pos < len(p.input) && p.input[p.pos] == '}' {
 		p.advance()
 		// Empty {} is a dict
-		return core.ListValue([]core.Value{core.SymbolValue("dict-literal")}), nil
+		return core.NewList(core.SymbolValue("dict-literal")), nil
 	}
 
 	// Parse all elements first to determine what kind of structure this is
-	elements := make(core.ListValue, 0)
+	elements := make([]core.Value, 0)
 	hasColon := false
 	colonPositions := make(map[int]bool) // Track which element positions have colons after them
 
@@ -1469,7 +1469,7 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 			return p.parseDictComprehension(elements, colonPositions)
 		}
 		// Regular dict literal
-		return core.ListValue(append([]core.Value{core.SymbolValue("dict-literal")}, elements...)), nil
+		return core.NewList(append([]core.Value{core.SymbolValue("dict-literal")}, elements...)...), nil
 	} else {
 		// Check for set comprehension: {x for ...}
 		if p.isSetComprehension(elements) {
@@ -1478,10 +1478,10 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 		// Regular set literal
 		// Return (set (list-literal elements...))
 		listLiteral := append([]core.Value{core.SymbolValue("list-literal")}, elements...)
-		return core.ListValue([]core.Value{
+		return core.NewList(
 			core.SymbolValue("set"),
-			core.ListValue(listLiteral),
-		}), nil
+			core.NewList(listLiteral...),
+		), nil
 	}
 }
 
@@ -1677,10 +1677,10 @@ func (p *Parser) parseFString() (core.Value, error) {
 			}
 
 			// Create (str-format part1 part2 ...)
-			formatExpr := make(core.ListValue, 0, len(parts)+1)
+			formatExpr := make([]core.Value, 0, len(parts)+1)
 			formatExpr = append(formatExpr, core.SymbolValue("str-format"))
 			formatExpr = append(formatExpr, parts...)
-			return formatExpr, nil
+			return core.NewList(formatExpr...), nil
 		} else if ch == '{' {
 			// Start of expression
 			if currentString.Len() > 0 {
@@ -1719,7 +1719,7 @@ func (p *Parser) parseFString() (core.Value, error) {
 }
 
 // isListComprehension checks if the elements form a list comprehension pattern
-func (p *Parser) isListComprehension(elements core.ListValue) bool {
+func (p *Parser) isListComprehension(elements []core.Value) bool {
 	// Need at least 5 elements: expr for var in iterable
 	if len(elements) < 5 {
 		return false
@@ -1746,7 +1746,7 @@ func (p *Parser) isListComprehension(elements core.ListValue) bool {
 }
 
 // parseListComprehension converts comprehension elements into a comprehension form
-func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, error) {
+func (p *Parser) parseListComprehension(elements []core.Value) (core.Value, error) {
 	// Find the positions of "for" and "in"
 	forIndex := -1
 	inIndex := -1
@@ -1774,7 +1774,7 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 	var expr core.Value
 	if forIndex == 1 {
 		// Single element - check if it's a list that should be unquoted
-		if list, ok := elements[0].(core.ListValue); ok && len(list) > 0 {
+		if list, ok := elements[0].(*core.ListValue); ok && list.Len() > 0 {
 			// This was a parenthesized expression like (* x 2)
 			// It's already a list, use it directly as an expression
 			expr = list
@@ -1783,10 +1783,10 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 		}
 	} else {
 		// Multiple elements - wrap in a do block
-		exprElements := make(core.ListValue, forIndex+1)
+		exprElements := make([]core.Value, forIndex+1)
 		exprElements[0] = core.SymbolValue("do")
 		copy(exprElements[1:], elements[:forIndex])
-		expr = exprElements
+		expr = core.NewList(exprElements...)
 	}
 
 	// Get the variable (between "for" and "in")
@@ -1818,16 +1818,16 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 		// Iterable is everything before "if"
 		if ifIndex == 1 {
 			// Check if it's a list that should be unquoted
-			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := remainingElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				iterable = list
 			} else {
 				iterable = remainingElements[0]
 			}
 		} else {
-			iterElements := make(core.ListValue, ifIndex+1)
+			iterElements := make([]core.Value, ifIndex+1)
 			iterElements[0] = core.SymbolValue("do")
 			copy(iterElements[1:], remainingElements[:ifIndex])
-			iterable = iterElements
+			iterable = core.NewList(iterElements...)
 		}
 
 		// Condition is everything after "if"
@@ -1836,7 +1836,7 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 			return nil, fmt.Errorf("missing condition after 'if' in list comprehension")
 		} else if len(condElements) == 1 {
 			// Check if it's a list that should be unquoted
-			if list, ok := condElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := condElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				condition = list
 			} else {
 				condition = condElements[0]
@@ -1850,49 +1850,49 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 					opStr := string(op)
 					if isInfixOperator(opStr) {
 						// Construct proper infix expression: [op, left, right]
-						condition = core.ListValue{condElements[1], condElements[0], condElements[2]}
+						condition = core.NewList(condElements[1], condElements[0], condElements[2])
 					} else {
 						// Not an infix op, wrap in do
-						condExpr := make(core.ListValue, len(condElements)+1)
+						condExpr := make([]core.Value, len(condElements)+1)
 						condExpr[0] = core.SymbolValue("do")
 						copy(condExpr[1:], condElements)
-						condition = condExpr
+						condition = core.NewList(condExpr...)
 					}
 				} else {
 					// Middle element not a symbol, wrap in do
-					condExpr := make(core.ListValue, len(condElements)+1)
+					condExpr := make([]core.Value, len(condElements)+1)
 					condExpr[0] = core.SymbolValue("do")
 					copy(condExpr[1:], condElements)
-					condition = condExpr
+					condition = core.NewList(condExpr...)
 				}
 			} else {
 				// Not a simple 3-element infix expression, wrap in do
-				condExpr := make(core.ListValue, len(condElements)+1)
+				condExpr := make([]core.Value, len(condElements)+1)
 				condExpr[0] = core.SymbolValue("do")
 				copy(condExpr[1:], condElements)
-				condition = condExpr
+				condition = core.NewList(condExpr...)
 			}
 		}
 	} else {
 		// No condition
 		if len(remainingElements) == 1 {
 			// Check if it's a list that should be unquoted
-			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := remainingElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				iterable = list
 			} else {
 				iterable = remainingElements[0]
 			}
 		} else {
-			iterElements := make(core.ListValue, len(remainingElements)+1)
+			iterElements := make([]core.Value, len(remainingElements)+1)
 			iterElements[0] = core.SymbolValue("do")
 			copy(iterElements[1:], remainingElements)
-			iterable = iterElements
+			iterable = core.NewList(iterElements...)
 		}
 	}
 
 	// Build the list-comp form
 	// (list-comp expr var iterable) or (list-comp expr var iterable condition)
-	result := make(core.ListValue, 0, 5)
+	result := make([]core.Value, 0, 5)
 	result = append(result, core.SymbolValue("list-comp"))
 	result = append(result, expr)
 	result = append(result, variable)
@@ -1901,12 +1901,12 @@ func (p *Parser) parseListComprehension(elements core.ListValue) (core.Value, er
 		result = append(result, condition)
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }
 
 // isGeneratorExpression checks if the elements form a generator expression pattern
 // Pattern: (expr for var in iterable) or (expr for var in iterable if condition)
-func (p *Parser) isGeneratorExpression(elements core.ListValue) bool {
+func (p *Parser) isGeneratorExpression(elements []core.Value) bool {
 	// Need at least 5 elements: expr for var in iterable
 	if len(elements) < 5 {
 		return false
@@ -1935,7 +1935,7 @@ func (p *Parser) isGeneratorExpression(elements core.ListValue) bool {
 // parseGeneratorExpression converts comprehension elements into a generator expression form
 // Pattern: (expr for var in iterable) or (expr for var in iterable if condition)
 // Returns: (gen-expr expr var iterable) or (gen-expr expr var iterable condition)
-func (p *Parser) parseGeneratorExpression(elements core.ListValue) (core.Value, error) {
+func (p *Parser) parseGeneratorExpression(elements []core.Value) (core.Value, error) {
 	// Find the positions of "for" and "in"
 	forIndex := -1
 	inIndex := -1
@@ -1958,17 +1958,17 @@ func (p *Parser) parseGeneratorExpression(elements core.ListValue) (core.Value, 
 	var expr core.Value
 	if forIndex == 1 {
 		// Single element
-		if list, ok := elements[0].(core.ListValue); ok && len(list) > 0 {
+		if list, ok := elements[0].(*core.ListValue); ok && list.Len() > 0 {
 			expr = list
 		} else {
 			expr = elements[0]
 		}
 	} else {
 		// Multiple elements - wrap in a do block
-		exprElements := make(core.ListValue, forIndex+1)
+		exprElements := make([]core.Value, forIndex+1)
 		exprElements[0] = core.SymbolValue("do")
 		copy(exprElements[1:], elements[:forIndex])
-		expr = exprElements
+		expr = core.NewList(exprElements...)
 	}
 
 	// Get the variable (between "for" and "in")
@@ -1999,16 +1999,16 @@ func (p *Parser) parseGeneratorExpression(elements core.ListValue) (core.Value, 
 
 		// Iterable is everything before "if"
 		if ifIndex == 1 {
-			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := remainingElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				iterable = list
 			} else {
 				iterable = remainingElements[0]
 			}
 		} else {
-			iterElements := make(core.ListValue, ifIndex+1)
+			iterElements := make([]core.Value, ifIndex+1)
 			iterElements[0] = core.SymbolValue("do")
 			copy(iterElements[1:], remainingElements[:ifIndex])
-			iterable = iterElements
+			iterable = core.NewList(iterElements...)
 		}
 
 		// Condition is everything after "if"
@@ -2016,36 +2016,36 @@ func (p *Parser) parseGeneratorExpression(elements core.ListValue) (core.Value, 
 		if len(condElements) == 0 {
 			return nil, fmt.Errorf("missing condition after 'if' in generator expression")
 		} else if len(condElements) == 1 {
-			if list, ok := condElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := condElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				condition = list
 			} else {
 				condition = condElements[0]
 			}
 		} else {
-			condExpr := make(core.ListValue, len(condElements)+1)
+			condExpr := make([]core.Value, len(condElements)+1)
 			condExpr[0] = core.SymbolValue("do")
 			copy(condExpr[1:], condElements)
-			condition = condExpr
+			condition = core.NewList(condExpr...)
 		}
 	} else {
 		// No condition
 		if len(remainingElements) == 1 {
-			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := remainingElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				iterable = list
 			} else {
 				iterable = remainingElements[0]
 			}
 		} else {
-			iterElements := make(core.ListValue, len(remainingElements)+1)
+			iterElements := make([]core.Value, len(remainingElements)+1)
 			iterElements[0] = core.SymbolValue("do")
 			copy(iterElements[1:], remainingElements)
-			iterable = iterElements
+			iterable = core.NewList(iterElements...)
 		}
 	}
 
 	// Build the gen-expr form
 	// (gen-expr expr var iterable) or (gen-expr expr var iterable condition)
-	result := make(core.ListValue, 0, 5)
+	result := make([]core.Value, 0, 5)
 	result = append(result, core.SymbolValue("gen-expr"))
 	result = append(result, expr)
 	result = append(result, variable)
@@ -2054,12 +2054,12 @@ func (p *Parser) parseGeneratorExpression(elements core.ListValue) (core.Value, 
 		result = append(result, condition)
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }
 
 // isSetComprehension checks if the elements form a set comprehension pattern
 // Pattern: {expr for var in iterable} or {expr for var in iterable if condition}
-func (p *Parser) isSetComprehension(elements core.ListValue) bool {
+func (p *Parser) isSetComprehension(elements []core.Value) bool {
 	// Need at least 5 elements: expr for var in iterable
 	if len(elements) < 5 {
 		return false
@@ -2088,7 +2088,7 @@ func (p *Parser) isSetComprehension(elements core.ListValue) bool {
 // parseSetComprehension converts set comprehension elements into a comprehension form
 // Pattern: {expr for var in iterable} -> (set-comp expr var iterable)
 // Pattern: {expr for var in iterable if condition} -> (set-comp expr var iterable condition)
-func (p *Parser) parseSetComprehension(elements core.ListValue) (core.Value, error) {
+func (p *Parser) parseSetComprehension(elements []core.Value) (core.Value, error) {
 	// Reuse the same logic as list comprehension parsing
 	// Find the positions of "for" and "in"
 	forIndex := -1
@@ -2111,16 +2111,16 @@ func (p *Parser) parseSetComprehension(elements core.ListValue) (core.Value, err
 	// Get the expression (everything before "for")
 	var expr core.Value
 	if forIndex == 1 {
-		if list, ok := elements[0].(core.ListValue); ok && len(list) > 0 {
+		if list, ok := elements[0].(*core.ListValue); ok && list.Len() > 0 {
 			expr = list
 		} else {
 			expr = elements[0]
 		}
 	} else {
-		exprElements := make(core.ListValue, forIndex+1)
+		exprElements := make([]core.Value, forIndex+1)
 		exprElements[0] = core.SymbolValue("do")
 		copy(exprElements[1:], elements[:forIndex])
-		expr = exprElements
+		expr = core.NewList(exprElements...)
 	}
 
 	// Get the variable (between "for" and "in")
@@ -2149,50 +2149,50 @@ func (p *Parser) parseSetComprehension(elements core.ListValue) (core.Value, err
 		}
 
 		if ifIndex == 1 {
-			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := remainingElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				iterable = list
 			} else {
 				iterable = remainingElements[0]
 			}
 		} else {
-			iterElements := make(core.ListValue, ifIndex+1)
+			iterElements := make([]core.Value, ifIndex+1)
 			iterElements[0] = core.SymbolValue("do")
 			copy(iterElements[1:], remainingElements[:ifIndex])
-			iterable = iterElements
+			iterable = core.NewList(iterElements...)
 		}
 
 		condElements := remainingElements[ifIndex+1:]
 		if len(condElements) == 0 {
 			return nil, fmt.Errorf("missing condition after 'if' in set comprehension")
 		} else if len(condElements) == 1 {
-			if list, ok := condElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := condElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				condition = list
 			} else {
 				condition = condElements[0]
 			}
 		} else {
-			condExpr := make(core.ListValue, len(condElements)+1)
+			condExpr := make([]core.Value, len(condElements)+1)
 			condExpr[0] = core.SymbolValue("do")
 			copy(condExpr[1:], condElements)
-			condition = condExpr
+			condition = core.NewList(condExpr...)
 		}
 	} else {
 		if len(remainingElements) == 1 {
-			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := remainingElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				iterable = list
 			} else {
 				iterable = remainingElements[0]
 			}
 		} else {
-			iterElements := make(core.ListValue, len(remainingElements)+1)
+			iterElements := make([]core.Value, len(remainingElements)+1)
 			iterElements[0] = core.SymbolValue("do")
 			copy(iterElements[1:], remainingElements)
-			iterable = iterElements
+			iterable = core.NewList(iterElements...)
 		}
 	}
 
 	// Build the set-comp form
-	result := make(core.ListValue, 0, 5)
+	result := make([]core.Value, 0, 5)
 	result = append(result, core.SymbolValue("set-comp"))
 	result = append(result, expr)
 	result = append(result, variable)
@@ -2201,12 +2201,12 @@ func (p *Parser) parseSetComprehension(elements core.ListValue) (core.Value, err
 		result = append(result, condition)
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }
 
 // isDictComprehension checks if elements form a dict comprehension pattern
 // Pattern: {k: v for var in iterable} or {k: v for var in iterable if condition}
-func (p *Parser) isDictComprehension(elements core.ListValue, colonPositions map[int]bool) bool {
+func (p *Parser) isDictComprehension(elements []core.Value, colonPositions map[int]bool) bool {
 	// Need at least 6 elements: key value for var in iterable
 	// (colon is consumed during parsing, so it's not in elements)
 	if len(elements) < 6 {
@@ -2241,7 +2241,7 @@ func (p *Parser) isDictComprehension(elements core.ListValue, colonPositions map
 // parseDictComprehension converts dict comprehension elements into a comprehension form
 // Pattern: {k: v for var in iterable} -> (dict-comp k v var iterable)
 // Pattern: {k: v for var in iterable if condition} -> (dict-comp k v var iterable condition)
-func (p *Parser) parseDictComprehension(elements core.ListValue, colonPositions map[int]bool) (core.Value, error) {
+func (p *Parser) parseDictComprehension(elements []core.Value, colonPositions map[int]bool) (core.Value, error) {
 	// Find the positions of "for" and "in"
 	forIndex := -1
 	inIndex := -1
@@ -2290,51 +2290,51 @@ func (p *Parser) parseDictComprehension(elements core.ListValue, colonPositions 
 		}
 
 		if ifIndex == 1 {
-			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := remainingElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				iterable = list
 			} else {
 				iterable = remainingElements[0]
 			}
 		} else {
-			iterElements := make(core.ListValue, ifIndex+1)
+			iterElements := make([]core.Value, ifIndex+1)
 			iterElements[0] = core.SymbolValue("do")
 			copy(iterElements[1:], remainingElements[:ifIndex])
-			iterable = iterElements
+			iterable = core.NewList(iterElements...)
 		}
 
 		condElements := remainingElements[ifIndex+1:]
 		if len(condElements) == 0 {
 			return nil, fmt.Errorf("missing condition after 'if' in dict comprehension")
 		} else if len(condElements) == 1 {
-			if list, ok := condElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := condElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				condition = list
 			} else {
 				condition = condElements[0]
 			}
 		} else {
-			condExpr := make(core.ListValue, len(condElements)+1)
+			condExpr := make([]core.Value, len(condElements)+1)
 			condExpr[0] = core.SymbolValue("do")
 			copy(condExpr[1:], condElements)
-			condition = condExpr
+			condition = core.NewList(condExpr...)
 		}
 	} else {
 		if len(remainingElements) == 1 {
-			if list, ok := remainingElements[0].(core.ListValue); ok && len(list) > 0 {
+			if list, ok := remainingElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				iterable = list
 			} else {
 				iterable = remainingElements[0]
 			}
 		} else {
-			iterElements := make(core.ListValue, len(remainingElements)+1)
+			iterElements := make([]core.Value, len(remainingElements)+1)
 			iterElements[0] = core.SymbolValue("do")
 			copy(iterElements[1:], remainingElements)
-			iterable = iterElements
+			iterable = core.NewList(iterElements...)
 		}
 	}
 
 	// Build the dict-comp form
 	// (dict-comp key-expr value-expr var iterable) or (dict-comp key-expr value-expr var iterable condition)
-	result := make(core.ListValue, 0, 6)
+	result := make([]core.Value, 0, 6)
 	result = append(result, core.SymbolValue("dict-comp"))
 	result = append(result, keyExpr)
 	result = append(result, valueExpr)
@@ -2344,7 +2344,7 @@ func (p *Parser) parseDictComprehension(elements core.ListValue, colonPositions 
 		result = append(result, condition)
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }
 
 // parseNumber parses a numeric literal
@@ -2424,10 +2424,10 @@ func (p *Parser) parseBacktickQuasiquote() (core.Value, error) {
 	}
 
 	// Wrap in (quasiquote expr)
-	return core.ListValue{
+	return core.NewList(
 		core.SymbolValue("quasiquote"),
 		expr,
-	}, nil
+	), nil
 }
 
 // parseCommaUnquote parses comma reader macro for unquote and unquote-splicing
@@ -2455,15 +2455,15 @@ func (p *Parser) parseCommaUnquote() (core.Value, error) {
 
 	// Wrap in (unquote expr) or (unquote-splicing expr)
 	if isSplicing {
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("unquote-splicing"),
 			expr,
-		}, nil
+		), nil
 	}
-	return core.ListValue{
+	return core.NewList(
 		core.SymbolValue("unquote"),
 		expr,
-	}, nil
+	), nil
 }
 
 // skipWhitespaceAndComments skips whitespace and comments

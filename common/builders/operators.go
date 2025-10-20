@@ -175,20 +175,20 @@ func StringHandler(fn func([]string) (core.Value, error)) OperatorHandler {
 }
 
 // ListHandler creates a handler for list operations
-func ListHandler(fn func([]core.ListValue) (core.Value, error)) OperatorHandler {
+func ListHandler(fn func([]*core.ListValue) (core.Value, error)) OperatorHandler {
 	return OperatorHandler{
 		Check: func(args []core.Value) bool {
 			for _, arg := range args {
-				if _, ok := arg.(core.ListValue); !ok {
+				if _, ok := arg.(*core.ListValue); !ok {
 					return false
 				}
 			}
 			return true
 		},
 		Handle: func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			lists := make([]core.ListValue, len(args))
+			lists := make([]*core.ListValue, len(args))
 			for i, arg := range args {
-				lists[i] = arg.(core.ListValue)
+				lists[i] = arg.(*core.ListValue)
 			}
 			return fn(lists)
 		},
@@ -253,12 +253,12 @@ func Add() BuiltinFunc {
 			}
 			return core.StringValue(result), nil
 		})).
-		WithHandler(ListHandler(func(lists []core.ListValue) (core.Value, error) {
-			result := make(core.ListValue, 0)
+		WithHandler(ListHandler(func(lists []*core.ListValue) (core.Value, error) {
+			result := make([]core.Value, 0)
 			for _, list := range lists {
-				result = append(result, list...)
+				result = append(result, list.Items()...)
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		})).
 		Build()
 }
@@ -294,33 +294,33 @@ func Multiply() BuiltinFunc {
 					return false
 				}
 				// list * number or number * list
-				_, listFirst := args[0].(core.ListValue)
+				_, listFirst := args[0].(*core.ListValue)
 				_, numSecond := args[1].(core.NumberValue)
 				_, numFirst := args[0].(core.NumberValue)
-				_, listSecond := args[1].(core.ListValue)
+				_, listSecond := args[1].(*core.ListValue)
 				return (listFirst && numSecond) || (numFirst && listSecond)
 			},
 			Handle: func(args []core.Value, ctx *core.Context) (core.Value, error) {
-				var list core.ListValue
+				var list *core.ListValue
 				var num int
 
-				if l, ok := args[0].(core.ListValue); ok {
+				if l, ok := args[0].(*core.ListValue); ok {
 					list = l
 					num = int(args[1].(core.NumberValue))
 				} else {
 					num = int(args[0].(core.NumberValue))
-					list = args[1].(core.ListValue)
+					list = args[1].(*core.ListValue)
 				}
 
 				if num < 0 {
-					return core.ListValue{}, nil
+					return core.NewList(), nil
 				}
 
-				result := make(core.ListValue, 0, len(list)*num)
+				result := make([]core.Value, 0, list.Len()*num)
 				for i := 0; i < num; i++ {
-					result = append(result, list...)
+					result = append(result, list.Items()...)
 				}
-				return result, nil
+				return core.NewList(result...), nil
 			},
 		}).
 		Build()
@@ -614,8 +614,8 @@ func In() BuiltinFunc {
 			}
 			return core.BoolValue(false), nil
 
-		case core.ListValue:
-			for _, item := range c {
+		case *core.ListValue:
+			for _, item := range c.Items() {
 				if core.EqualValues(value, item) {
 					return core.BoolValue(true), nil
 				}

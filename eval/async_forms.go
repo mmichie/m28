@@ -9,21 +9,21 @@ import (
 // asyncForm wraps a function to run asynchronously
 // (async def name (args) body...)  - defines an async function
 // (async (lambda (args) body...))   - creates an async lambda
-func asyncForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 {
+func asyncForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 1 {
 		return nil, fmt.Errorf("async requires at least 1 argument")
 	}
 
 	// Check if it's async def
-	if len(args) >= 2 {
-		if sym, ok := args[0].(core.SymbolValue); ok && string(sym) == "def" {
+	if args.Len() >= 2 {
+		if sym, ok := args.Items()[0].(core.SymbolValue); ok && string(sym) == "def" {
 			// async def form
-			return asyncDefForm(args[1:], ctx)
+			return asyncDefForm(args.Items()[1:], ctx)
 		}
 	}
 
 	// Otherwise, wrap the expression as async
-	expr, err := Eval(args[0], ctx)
+	expr, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func asyncForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // asyncDefForm handles async def
-func asyncDefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func asyncDefForm(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// Similar to regular def but creates an async function
 	if len(args) < 3 {
 		return nil, fmt.Errorf("async def requires name, params, and body")
@@ -54,14 +54,14 @@ func asyncDefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("function name must be a symbol")
 	}
 
-	params, ok := args[1].(core.ListValue)
+	params, ok := args[1].(*core.ListValue)
 	if !ok {
 		return nil, fmt.Errorf("parameters must be a list")
 	}
 
 	// Create a regular function first
-	defArgs := append(core.ListValue{name, params}, args[2:]...)
-	fn, err := DefForm(defArgs, ctx)
+	defArgs := append([]core.Value{name, params}, args[2:]...)
+	fn, err := DefForm(core.NewList(defArgs...), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -74,13 +74,13 @@ func asyncDefForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // awaitForm waits for an async task to complete
-func awaitForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
+func awaitForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 1 {
 		return nil, fmt.Errorf("await requires exactly 1 argument")
 	}
 
 	// Evaluate the expression
-	expr, err := Eval(args[0], ctx)
+	expr, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -97,12 +97,12 @@ func awaitForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // channelForm creates a new channel
 // (channel)      - unbuffered channel
 // (channel 10)   - buffered channel with capacity 10
-func channelForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func channelForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	capacity := 0
 
-	if len(args) > 0 {
+	if args.Len() > 0 {
 		// Evaluate capacity
-		capVal, err := Eval(args[0], ctx)
+		capVal, err := Eval(args.Items()[0], ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -122,13 +122,13 @@ func channelForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // sendForm sends a value to a channel (blocking)
 // (send! channel value)
-func sendForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
+func sendForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 2 {
 		return nil, fmt.Errorf("send! requires 2 arguments: channel and value")
 	}
 
 	// Evaluate channel
-	chVal, err := Eval(args[0], ctx)
+	chVal, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func sendForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Evaluate value
-	value, err := Eval(args[1], ctx)
+	value, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -155,13 +155,13 @@ func sendForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // receiveForm receives a value from a channel (blocking)
 // (recv! channel)
-func receiveForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
+func receiveForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 1 {
 		return nil, fmt.Errorf("recv! requires 1 argument: channel")
 	}
 
 	// Evaluate channel
-	chVal, err := Eval(args[0], ctx)
+	chVal, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -181,24 +181,24 @@ func receiveForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 //	((recv! ch1) (lambda (val) ...))
 //	((send! ch2 value) (lambda () ...))
 //	(default (lambda () ...)))
-func selectForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) == 0 {
+func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() == 0 {
 		return nil, fmt.Errorf("select requires at least one case")
 	}
 
 	var cases []core.SelectCase
 	var defaultCase func() (core.Value, error)
 
-	for _, arg := range args {
-		caseList, ok := arg.(core.ListValue)
-		if !ok || len(caseList) != 2 {
+	for _, arg := range args.Items() {
+		caseList, ok := arg.(*core.ListValue)
+		if !ok || caseList.Len() != 2 {
 			return nil, fmt.Errorf("select case must be a list of (channel-op handler)")
 		}
 
 		// Check for default case
-		if sym, ok := caseList[0].(core.SymbolValue); ok && string(sym) == "default" {
+		if sym, ok := caseList.Items()[0].(core.SymbolValue); ok && string(sym) == "default" {
 			// Default case
-			handler, err := Eval(caseList[1], ctx)
+			handler, err := Eval(caseList.Items()[1], ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -216,18 +216,18 @@ func selectForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Parse channel operation
-		opList, ok := caseList[0].(core.ListValue)
-		if !ok || len(opList) < 1 {
+		opList, ok := caseList.Items()[0].(*core.ListValue)
+		if !ok || opList.Len() < 1 {
 			return nil, fmt.Errorf("invalid channel operation in select")
 		}
 
-		opSym, ok := opList[0].(core.SymbolValue)
+		opSym, ok := opList.Items()[0].(core.SymbolValue)
 		if !ok {
 			return nil, fmt.Errorf("channel operation must start with a symbol")
 		}
 
 		// Get handler
-		handler, err := Eval(caseList[1], ctx)
+		handler, err := Eval(caseList.Items()[1], ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -241,11 +241,11 @@ func selectForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		switch string(opSym) {
 		case "recv!", "receive":
-			if len(opList) != 2 {
+			if opList.Len() != 2 {
 				return nil, fmt.Errorf("recv! requires 1 argument")
 			}
 
-			chVal, err := Eval(opList[1], ctx)
+			chVal, err := Eval(opList.Items()[1], ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -264,11 +264,11 @@ func selectForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			})
 
 		case "send!", "send":
-			if len(opList) != 3 {
+			if opList.Len() != 3 {
 				return nil, fmt.Errorf("send! requires 2 arguments")
 			}
 
-			chVal, err := Eval(opList[1], ctx)
+			chVal, err := Eval(opList.Items()[1], ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -278,7 +278,7 @@ func selectForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("send! first argument must be a channel")
 			}
 
-			value, err := Eval(opList[2], ctx)
+			value, err := Eval(opList.Items()[2], ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -303,8 +303,8 @@ func selectForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // goForm starts a goroutine
 // (go expr) - evaluates expr in a new goroutine
-func goForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
+func goForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 1 {
 		return nil, fmt.Errorf("go requires exactly 1 argument")
 	}
 
@@ -322,7 +322,7 @@ func goForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Evaluate in a new context
 		goCtx := core.NewContext(ctx)
-		result, err := Eval(args[0], goCtx)
+		result, err := Eval(args.Items()[0], goCtx)
 
 		task.Mu.Lock()
 		task.Result = result
@@ -339,13 +339,13 @@ func goForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // sleepForm pauses execution
 // (sleep seconds)
-func sleepForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
+func sleepForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 1 {
 		return nil, fmt.Errorf("sleep requires exactly 1 argument")
 	}
 
 	// Evaluate duration
-	durVal, err := Eval(args[0], ctx)
+	durVal, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}

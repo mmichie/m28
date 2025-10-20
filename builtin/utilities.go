@@ -43,7 +43,7 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 		// Get the arguments list
 		var fnArgs []core.Value
 		if list, ok := types.AsList(v.Get(1)); ok {
-			fnArgs = list
+			fnArgs = list.Items()
 		} else if tuple, ok := types.AsTuple(v.Get(1)); ok {
 			fnArgs = tuple
 		} else {

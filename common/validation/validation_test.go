@@ -11,7 +11,7 @@ import (
 func num(n float64) core.Value              { return core.NumberValue(n) }
 func str(s string) core.Value               { return core.StringValue(s) }
 func boolean(b bool) core.Value             { return core.BoolValue(b) }
-func list(values ...core.Value) core.Value  { return core.ListValue(values) }
+func list(values ...core.Value) core.Value  { return core.NewList(values...) }
 func tuple(values ...core.Value) core.Value { return core.TupleValue(values) }
 
 func TestArgs_Exact(t *testing.T) {
@@ -450,8 +450,8 @@ func TestArgs_GetList(t *testing.T) {
 				t.Errorf("GetList() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			if !tt.wantErr && len(got) != tt.wantLen {
-				t.Errorf("GetList() returned list of length %v, want %v", len(got), tt.wantLen)
+			if !tt.wantErr && got.Len() != tt.wantLen {
+				t.Errorf("GetList() returned list of length %v, want %v", got.Len(), tt.wantLen)
 			}
 
 			if err != nil && tt.errMsg != "" && err.Error() != tt.errMsg {

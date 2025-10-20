@@ -96,11 +96,11 @@ func main() {
 	args := flag.Args()
 	if len(args) > 0 {
 		// Store script arguments in sys.argv
-		argv := make(core.ListValue, len(args))
+		argvSlice := make([]core.Value, len(args))
 		for i, arg := range args {
-			argv[i] = core.StringValue(arg)
+			argvSlice[i] = core.StringValue(arg)
 		}
-		globalCtx.Define("ARGV", argv)
+		globalCtx.Define("ARGV", core.NewList(argvSlice...))
 
 		// Parse-only mode: just parse and print AST
 		if *parseOnly || *printAST {

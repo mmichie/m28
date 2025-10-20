@@ -28,7 +28,7 @@ func InitCollectionsModule() *core.DictValue {
 						}
 					}
 				}
-			} else if _, ok := arg.(core.ListValue); ok {
+			} else if _, ok := arg.(*core.ListValue); ok {
 				// Count elements from iterable
 				counter.Update([]core.Value{arg})
 			} else if str, ok := arg.(core.StringValue); ok {
@@ -37,7 +37,7 @@ func InitCollectionsModule() *core.DictValue {
 				for _, ch := range string(str) {
 					chars = append(chars, core.StringValue(string(ch)))
 				}
-				counter.Update([]core.Value{core.ListValue(chars)})
+				counter.Update([]core.Value{core.NewList(chars...)})
 			}
 		}
 
@@ -75,8 +75,8 @@ func InitCollectionsModule() *core.DictValue {
 
 		// If there's an iterable argument, add all items
 		if len(args) > 0 {
-			if list, ok := args[0].(core.ListValue); ok {
-				for _, item := range list {
+			if list, ok := args[0].(*core.ListValue); ok {
+				for _, item := range list.Items() {
 					dq.Append(item)
 				}
 			}
@@ -298,8 +298,8 @@ func (c *Counter) Update(args []core.Value) {
 	arg := args[0]
 
 	// If it's a list, count each element
-	if list, ok := arg.(core.ListValue); ok {
-		for _, item := range list {
+	if list, ok := arg.(*core.ListValue); ok {
+		for _, item := range list.Items() {
 			key := core.ValueToKey(item)
 			count := core.NumberValue(0)
 			if val, ok := c.counts.Get(key); ok {
@@ -340,19 +340,19 @@ func (c *Counter) MostCommon(n int) core.Value {
 	}
 
 	// Convert to list of tuples
-	result := make(core.ListValue, len(pairs))
+	result := make([]core.Value, len(pairs))
 	for i, p := range pairs {
 		// Reconstruct the key as a Value
 		keyVal := core.StringValue(p.key) // Simplified - assumes string keys
 		result[i] = core.TupleValue{keyVal, core.NumberValue(p.value)}
 	}
 
-	return result
+	return core.NewList(result...)
 }
 
 // Elements returns an iterator over elements repeating each as many times as its count
 func (c *Counter) Elements() core.Value {
-	result := make(core.ListValue, 0)
+	result := make([]core.Value, 0)
 	for _, key := range c.counts.Keys() {
 		if val, ok := c.counts.Get(key); ok {
 			if num, ok := val.(core.NumberValue); ok {
@@ -365,7 +365,7 @@ func (c *Counter) Elements() core.Value {
 			}
 		}
 	}
-	return result
+	return core.NewList(result...)
 }
 
 // Total returns the sum of all counts
@@ -427,21 +427,21 @@ func (dd *DefaultDict) GetAttr(name string) (core.Value, bool) {
 	case "keys":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			keys := dd.dict.Keys()
-			result := make(core.ListValue, len(keys))
+			result := make([]core.Value, len(keys))
 			for i, k := range keys {
 				result[i] = core.StringValue(k)
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}), true
 	case "values":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			values := make(core.ListValue, 0)
+			values := make([]core.Value, 0)
 			for _, key := range dd.dict.Keys() {
 				if val, ok := dd.dict.Get(key); ok {
 					values = append(values, val)
 				}
 			}
-			return values, nil
+			return core.NewList(values...), nil
 		}), true
 	}
 	return nil, false
@@ -495,7 +495,7 @@ func (dq *Deque) Type() core.Type {
 
 // String implements Value.String
 func (dq *Deque) String() string {
-	return fmt.Sprintf("deque(%v)", core.ListValue(dq.items).String())
+	return fmt.Sprintf("deque(%v)", core.NewList(dq.items...).String())
 }
 
 // GetAttr implements attribute access
@@ -530,8 +530,8 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("extend() requires exactly 1 argument")
 			}
-			if list, ok := args[0].(core.ListValue); ok {
-				for _, item := range list {
+			if list, ok := args[0].(*core.ListValue); ok {
+				for _, item := range list.Items() {
 					dq.Append(item)
 				}
 			}
@@ -542,8 +542,8 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("extendleft() requires exactly 1 argument")
 			}
-			if list, ok := args[0].(core.ListValue); ok {
-				for _, item := range list {
+			if list, ok := args[0].(*core.ListValue); ok {
+				for _, item := range list.Items() {
 					dq.AppendLeft(item)
 				}
 			}
@@ -742,31 +742,31 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 	case "keys":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			keys := od.dict.Keys()
-			result := make(core.ListValue, len(keys))
+			result := make([]core.Value, len(keys))
 			for i, k := range keys {
 				result[i] = core.StringValue(k)
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}), true
 	case "values":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			values := make(core.ListValue, 0)
+			values := make([]core.Value, 0)
 			for _, key := range od.dict.Keys() {
 				if val, ok := od.dict.Get(key); ok {
 					values = append(values, val)
 				}
 			}
-			return values, nil
+			return core.NewList(values...), nil
 		}), true
 	case "items":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			items := make(core.ListValue, 0)
+			items := make([]core.Value, 0)
 			for _, key := range od.dict.Keys() {
 				if val, ok := od.dict.Get(key); ok {
 					items = append(items, core.TupleValue{core.StringValue(key), val})
 				}
 			}
-			return items, nil
+			return core.NewList(items...), nil
 		}), true
 	case "get":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -827,8 +827,8 @@ func (tg *TupleGetter) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	switch v := args[0].(type) {
 	case core.TupleValue:
 		items = []core.Value(v)
-	case core.ListValue:
-		items = []core.Value(v)
+	case *core.ListValue:
+		items = v.Items()
 	default:
 		return nil, fmt.Errorf("tuplegetter argument must be a tuple or list, not %s", v.Type())
 	}

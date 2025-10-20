@@ -14,8 +14,8 @@ func convertToSlice(arg core.Value) ([]core.Value, error) {
 	// Try to convert from different types
 	if list, ok := types.AsList(arg); ok {
 		// Copy the list
-		result := make([]core.Value, len(list))
-		copy(result, list)
+		result := make([]core.Value, list.Len())
+		copy(result, list.Items())
 		return result, nil
 	}
 
@@ -55,10 +55,22 @@ func convertToSlice(arg core.Value) ([]core.Value, error) {
 
 // RegisterCollections registers collection constructor functions
 func RegisterCollections(ctx *core.Context) {
-	// list - Python list class
-	// Create as a class so it can be used as a base class for inheritance
-	listClass := createListClass()
-	ctx.Define("list", listClass)
+	// list - Python list constructor
+	ctx.Define("list", core.NewNamedBuiltinFunction("list", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.EmptyList, nil
+		}
+		if len(args) == 1 {
+			// Python-style: Convert iterable to list
+			items, err := convertToSlice(args[0])
+			if err != nil {
+				return nil, err
+			}
+			return core.NewList(items...), nil
+		}
+		// Multiple arguments: create a list from all arguments
+		return core.NewList(args...), nil
+	}))
 
 	// tuple - use the TupleTypeClass which has __new__ support
 	// Create a callable tuple constructor that exposes __new__
@@ -107,7 +119,7 @@ func RegisterCollections(ctx *core.Context) {
 		arg := args[0]
 
 		if list, ok := types.AsList(arg); ok {
-			for _, elem := range list {
+			for _, elem := range list.Items() {
 				set.Add(elem)
 			}
 			return set, nil
@@ -252,7 +264,7 @@ func RegisterCollections(ctx *core.Context) {
 			return core.NumberValue(len(str)), nil
 		}
 		if list, ok := types.AsList(arg); ok {
-			return core.NumberValue(len(list)), nil
+			return core.NumberValue(list.Len()), nil
 		}
 		if tuple, ok := types.AsTuple(arg); ok {
 			return core.NumberValue(len(tuple)), nil
@@ -321,10 +333,10 @@ func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		if err != nil {
 			return nil, err
 		}
-		return core.ListValue(items), nil
+		return core.NewList(items...), nil
 	}
 	// Multiple arguments: create a list from all arguments
-	return core.ListValue(args), nil
+	return core.NewList(args...), nil
 }
 
 // DictType represents the dict class that can be called and has class methods
@@ -373,22 +385,22 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		case *core.DictValue:
 			// Copy the dictionary
 			// TODO: Implement proper dict copying
-		case core.ListValue:
+		case *core.ListValue:
 			// Expect list of pairs
-			for i, item := range v {
-				pair, ok := item.(core.ListValue)
-				if !ok || len(pair) != 2 {
+			for i, item := range v.Items() {
+				pair, ok := item.(*core.ListValue)
+				if !ok || pair.Len() != 2 {
 					tuple, ok := item.(core.TupleValue)
 					if !ok || len(tuple) != 2 {
 						return nil, fmt.Errorf("dict update sequence element #%d is not a sequence", i)
 					}
-					pair = core.ListValue(tuple)
+					pair = core.NewList(tuple)
 				}
-				key, ok := pair[0].(core.StringValue)
+				key, ok := pair.Items()[0].(core.StringValue)
 				if !ok {
 					return nil, fmt.Errorf("dict key must be string")
 				}
-				dict.Set(string(key), pair[1])
+				dict.Set(string(key), pair.Items()[1])
 			}
 		default:
 			return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
@@ -429,8 +441,8 @@ func createDictClass() *DictType {
 
 		// Convert iterable to list of keys
 		switch v := iterable.(type) {
-		case core.ListValue:
-			for _, key := range v {
+		case *core.ListValue:
+			for _, key := range v.Items() {
 				keyStr, ok := key.(core.StringValue)
 				if !ok {
 					keyStr = core.StringValue(key.String())

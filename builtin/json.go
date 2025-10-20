@@ -185,8 +185,8 @@ func m28ToGo(v core.Value) (interface{}, error) {
 		return s, nil
 	}
 	if list, ok := types.AsList(v); ok {
-		result := make([]interface{}, len(list))
-		for i, item := range list {
+		result := make([]interface{}, list.Len())
+		for i, item := range list.Items() {
 			goItem, err := m28ToGo(item)
 			if err != nil {
 				return nil, err
@@ -254,7 +254,7 @@ func goToM28(v interface{}) (core.Value, error) {
 	case string:
 		return core.StringValue(val), nil
 	case []interface{}:
-		result := make(core.ListValue, len(val))
+		result := make([]core.Value, len(val))
 		for i, item := range val {
 			m28Item, err := goToM28(item)
 			if err != nil {
@@ -262,7 +262,7 @@ func goToM28(v interface{}) (core.Value, error) {
 			}
 			result[i] = m28Item
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	case map[string]interface{}:
 		dict := core.NewDict()
 		for key, value := range val {

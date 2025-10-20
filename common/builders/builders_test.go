@@ -13,7 +13,7 @@ import (
 // Test helpers
 func num(n float64) core.Value             { return core.NumberValue(n) }
 func str(s string) core.Value              { return core.StringValue(s) }
-func list(values ...core.Value) core.Value { return core.ListValue(values) }
+func list(values ...core.Value) core.Value { return core.NewList(values...) }
 
 func TestUnaryNumber(t *testing.T) {
 	// Test simple unary number function
@@ -488,8 +488,8 @@ func TestUnarySequence(t *testing.T) {
 	// Test unary sequence function
 	length := builders.UnarySequence("len", func(seq core.Value) (core.Value, error) {
 		switch v := seq.(type) {
-		case core.ListValue:
-			return core.NumberValue(len(v)), nil
+		case *core.ListValue:
+			return core.NumberValue(v.Len()), nil
 		case core.StringValue:
 			return core.NumberValue(len(v)), nil
 		default:
@@ -556,7 +556,7 @@ func TestUnarySequence(t *testing.T) {
 
 func TestUnaryAny(t *testing.T) {
 	// Test unary any function
-	typeOf := builders.UnaryAny("type", func(val core.Value) (core.Value, error) {
+	typeOf := builders.UnaryAny("type_of", func(val core.Value) (core.Value, error) {
 		return core.StringValue(val.Type()), nil
 	})
 

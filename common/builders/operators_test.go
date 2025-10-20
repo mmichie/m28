@@ -141,15 +141,17 @@ func TestOperatorAdd(t *testing.T) {
 					} else {
 						t.Errorf("Add() returned non-string: %v", got)
 					}
-				case core.ListValue:
-					if l, ok := got.(core.ListValue); ok {
-						if len(l) != len(want) {
-							t.Errorf("Add() returned list of length %v, want %v", len(l), len(want))
+				case *core.ListValue:
+					if l, ok := got.(*core.ListValue); ok {
+						if l.Len() != want.Len() {
+							t.Errorf("Add() returned list of length %v, want %v", l.Len(), want.Len())
 						}
 						// Simple comparison for test
-						for i := range l {
-							if ln, ok := l[i].(core.NumberValue); ok {
-								if wn, ok := want[i].(core.NumberValue); ok {
+						lItems := l.Items()
+						wItems := want.Items()
+						for i := range lItems {
+							if ln, ok := lItems[i].(core.NumberValue); ok {
+								if wn, ok := wItems[i].(core.NumberValue); ok {
 									if float64(ln) != float64(wn) {
 										t.Errorf("Add() list[%d] = %v, want %v", i, float64(ln), float64(wn))
 									}
@@ -316,14 +318,16 @@ func TestOperatorMultiply(t *testing.T) {
 					} else {
 						t.Errorf("Multiply() returned non-string: %v", got)
 					}
-				case core.ListValue:
-					if l, ok := got.(core.ListValue); ok {
-						if len(l) != len(want) {
-							t.Errorf("Multiply() list length = %v, want %v", len(l), len(want))
+				case *core.ListValue:
+					if l, ok := got.(*core.ListValue); ok {
+						if l.Len() != want.Len() {
+							t.Errorf("Multiply() list length = %v, want %v", l.Len(), want.Len())
 						} else {
-							for i := range l {
-								if !core.EqualValues(l[i], want[i]) {
-									t.Errorf("Multiply() list[%d] = %v, want %v", i, l[i], want[i])
+							lItems := l.Items()
+							wItems := want.Items()
+							for i := range lItems {
+								if !core.EqualValues(lItems[i], wItems[i]) {
+									t.Errorf("Multiply() list[%d] = %v, want %v", i, lItems[i], wItems[i])
 								}
 							}
 						}
@@ -428,11 +432,11 @@ func TestOperatorBuilder(t *testing.T) {
 func TestHandlers(t *testing.T) {
 	// Test ListHandler
 	listOp := builders.NewOperator("list_op", "").
-		WithHandler(builders.ListHandler(func(lists []core.ListValue) (core.Value, error) {
+		WithHandler(builders.ListHandler(func(lists []*core.ListValue) (core.Value, error) {
 			// Return length of all lists combined
 			total := 0
 			for _, list := range lists {
-				total += len(list)
+				total += list.Len()
 			}
 			return core.NumberValue(total), nil
 		})).

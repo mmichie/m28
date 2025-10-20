@@ -166,11 +166,11 @@ func SplitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// Default: split on whitespace
 	if v.Count() == 1 {
 		fields := strings.Fields(str)
-		result := make(core.ListValue, len(fields))
+		result := make([]core.Value, len(fields))
 		for i, field := range fields {
 			result[i] = core.StringValue(field)
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}
 
 	// Get delimiter
@@ -198,12 +198,12 @@ func SplitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Convert to ListValue
-	result := make(core.ListValue, len(parts))
+	result := make([]core.Value, len(parts))
 	for i, part := range parts {
 		result[i] = core.StringValue(part)
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }
 
 // JoinFunc joins a list of strings with a separator
@@ -224,8 +224,8 @@ func JoinFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Convert list elements to strings
-	strs := make([]string, len(list))
-	for i, elem := range list {
+	strs := make([]string, list.Len())
+	for i, elem := range list.Items() {
 		switch v := elem.(type) {
 		case core.StringValue:
 			strs[i] = string(v)

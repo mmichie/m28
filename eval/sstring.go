@@ -19,19 +19,19 @@ var (
 // sStringForm implements the s-string special form for code generation
 // AST structure: (s-string template-string (type expr) (type expr) ...)
 // Types: "value", "code", "splice", "dict-splice", "gensym"
-func sStringForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 1 {
+func sStringForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 1 {
 		return nil, fmt.Errorf("s-string requires at least a template string")
 	}
 
 	// Get the template string
-	template, ok := args[0].(core.StringValue)
+	template, ok := args.Items()[0].(core.StringValue)
 	if !ok {
-		return nil, fmt.Errorf("s-string: first argument must be a string, got %v", args[0].Type())
+		return nil, fmt.Errorf("s-string: first argument must be a string, got %v", args.Items()[0].Type())
 	}
 
 	// If there are no interpolations, just parse and return the template
-	if len(args) == 1 {
+	if args.Len() == 1 {
 		result, err := parseTemplate(string(template))
 		if err != nil {
 			return nil, fmt.Errorf("s-string: error parsing template: %v", err)
@@ -43,24 +43,24 @@ func sStringForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	gensymMap := make(map[string]string)
 
 	// Process each interpolation
-	interpolatedValues := make(map[int]string, len(args)-1)
-	splicedLists := make(map[int]core.ListValue)
+	interpolatedValues := make(map[int]string, args.Len()-1)
+	splicedLists := make(map[int]*core.ListValue)
 
-	for i, interpArg := range args[1:] {
+	for i, interpArg := range args.Items()[1:] {
 		// Each interpolation is a list: (type expr)
-		interpList, ok := interpArg.(core.ListValue)
-		if !ok || len(interpList) != 2 {
+		interpList, ok := interpArg.(*core.ListValue)
+		if !ok || interpList.Len() != 2 {
 			return nil, fmt.Errorf("s-string: invalid interpolation format at position %d", i)
 		}
 
 		// Get interpolation type
-		interpType, ok := interpList[0].(core.StringValue)
+		interpType, ok := interpList.Items()[0].(core.StringValue)
 		if !ok {
 			return nil, fmt.Errorf("s-string: interpolation type must be a string at position %d", i)
 		}
 
 		// Get expression to interpolate
-		expr := interpList[1]
+		expr := interpList.Items()[1]
 
 		// Handle different interpolation types
 		switch string(interpType) {
@@ -126,15 +126,15 @@ func sStringForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // sStringRawForm handles raw s-strings (no interpolation)
 // AST structure: (s-string-raw literal-string)
 // Raw s-strings return the literal string value, not parsed code
-func sStringRawForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 1 {
+func sStringRawForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 1 {
 		return nil, fmt.Errorf("s-string-raw requires exactly 1 argument")
 	}
 
 	// Get the literal string
-	literal, ok := args[0].(core.StringValue)
+	literal, ok := args.Items()[0].(core.StringValue)
 	if !ok {
-		return nil, fmt.Errorf("s-string-raw: argument must be a string, got %v", args[0].Type())
+		return nil, fmt.Errorf("s-string-raw: argument must be a string, got %v", args.Items()[0].Type())
 	}
 
 	// Return the literal string as-is (no parsing, no interpolation)
@@ -159,10 +159,10 @@ func valueToCode(val core.Value) string {
 	case core.SymbolValue:
 		// Symbols need to be quoted in code
 		return fmt.Sprintf("'%s", string(v))
-	case core.ListValue:
+	case *core.ListValue:
 		// Convert list to code representation
-		elements := make([]string, len(v))
-		for i, elem := range v {
+		elements := make([]string, v.Len())
+		for i, elem := range v.Items() {
 			elements[i] = valueToCode(elem)
 		}
 		return fmt.Sprintf("(%s)", strings.Join(elements, " "))
@@ -179,9 +179,9 @@ func exprToCode(expr core.Value) string {
 		return string(v)
 	case core.NumberValue, core.StringValue, core.BoolValue, core.NilValue:
 		return valueToCode(v)
-	case core.ListValue:
-		elements := make([]string, len(v))
-		for i, elem := range v {
+	case *core.ListValue:
+		elements := make([]string, v.Len())
+		for i, elem := range v.Items() {
 			elements[i] = exprToCode(elem)
 		}
 		return fmt.Sprintf("(%s)", strings.Join(elements, " "))
@@ -191,15 +191,15 @@ func exprToCode(expr core.Value) string {
 }
 
 // valueToList converts a value to a list for splicing
-func valueToList(val core.Value) (core.ListValue, error) {
+func valueToList(val core.Value) (*core.ListValue, error) {
 	switch v := val.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		return v, nil
 	case core.TupleValue:
-		return core.ListValue(v), nil
+		return core.NewList(v...), nil
 	case *core.SetValue:
 		// Convert set to list using iterator
-		list := make(core.ListValue, 0)
+		list := make([]core.Value, 0)
 		iter := v.Iterator()
 		for {
 			item, hasNext := iter.Next()
@@ -208,11 +208,11 @@ func valueToList(val core.Value) (core.ListValue, error) {
 			}
 			list = append(list, item)
 		}
-		return list, nil
+		return core.NewList(list...), nil
 	default:
 		// Try to use iterator
 		if iterable, ok := val.(core.Iterable); ok {
-			list := make(core.ListValue, 0)
+			list := make([]core.Value, 0)
 			iter := iterable.Iterator()
 			for {
 				item, hasNext := iter.Next()
@@ -221,7 +221,7 @@ func valueToList(val core.Value) (core.ListValue, error) {
 				}
 				list = append(list, item)
 			}
-			return list, nil
+			return core.NewList(list...), nil
 		}
 		return nil, fmt.Errorf("cannot convert %v to list", val.Type())
 	}
@@ -245,7 +245,7 @@ func generateGensym(base string, gensymMap map[string]string) string {
 }
 
 // expandTemplate replaces placeholders in template with interpolated values
-func expandTemplate(template string, values map[int]string, spliced map[int]core.ListValue) (string, error) {
+func expandTemplate(template string, values map[int]string, spliced map[int]*core.ListValue) (string, error) {
 	// Pattern to match placeholders like {0}, {1}, etc.
 	re := regexp.MustCompile(`\{(\d+)\}`)
 
@@ -258,8 +258,8 @@ func expandTemplate(template string, values map[int]string, spliced map[int]core
 		// Check if this is a splice
 		if splicedList, ok := spliced[idx]; ok {
 			// Convert list elements to code strings
-			elements := make([]string, len(splicedList))
-			for i, elem := range splicedList {
+			elements := make([]string, splicedList.Len())
+			for i, elem := range splicedList.Items() {
 				elements[i] = valueToCode(elem)
 			}
 			// Splice elements directly (no outer parens)

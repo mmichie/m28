@@ -152,8 +152,8 @@ func SumBuilder() builders.BuiltinFunc {
 		// Get the iterable
 		var items []core.Value
 		switch val := v.Get(0).(type) {
-		case core.ListValue:
-			items = val
+		case *core.ListValue:
+			items = val.Items()
 		case core.TupleValue:
 			items = val
 		case core.Iterable:

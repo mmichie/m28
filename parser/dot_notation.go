@@ -58,7 +58,7 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 		// Build (. base method arg1 arg2...)
 		// For method calls, we need to distinguish from property access
 		// even when there are no args, so we add a special marker
-		result := core.ListValue{
+		result := []core.Value{
 			core.SymbolValue("."),
 			base,
 			core.StringValue(propName),
@@ -70,18 +70,18 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 		} else {
 			result = append(result, args...)
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}
 
 	// Not a method call - restore position to before whitespace skip
 	p.pos = startPos
 
 	// Just property access - build (. base prop)
-	return core.ListValue{
+	return core.NewList(
 		core.SymbolValue("."),
 		base,
 		core.StringValue(propName),
-	}, nil
+	), nil
 }
 
 // parseMethodArgs parses the arguments of a method call

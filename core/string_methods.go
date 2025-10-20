@@ -382,9 +382,9 @@ func InitStringMethods() {
 			// Handle different iterable types
 			var parts []string
 			switch v := args[0].(type) {
-			case ListValue:
-				parts = make([]string, len(v))
-				for i, item := range v {
+			case *ListValue:
+				parts = make([]string, v.Len())
+				for i, item := range v.Items() {
 					if s, ok := item.(StringValue); ok {
 						parts[i] = string(s)
 					} else {
@@ -735,11 +735,11 @@ func InitStringMethods() {
 				parts = strings.SplitN(s, sep, limit)
 			}
 
-			result := make(ListValue, len(parts))
+			result := make([]Value, len(parts))
 			for i, part := range parts {
 				result[i] = StringValue(part)
 			}
-			return result, nil
+			return NewList(result...), nil
 		},
 	}
 

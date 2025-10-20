@@ -40,11 +40,11 @@ func (p *Parser) parseIndexAccess(base core.Value) (core.Value, error) {
 	if p.input[p.pos] == ']' {
 		// Simple index access
 		p.pos++ // consume ']'
-		return core.ListValue{
+		return core.NewList(
 			core.SymbolValue("get-item"),
 			base,
 			first,
-		}, nil
+		), nil
 	}
 
 	if p.input[p.pos] == ':' {
@@ -108,11 +108,11 @@ func (p *Parser) parseSlice(base core.Value, start core.Value) (core.Value, erro
 		step = core.None
 	}
 
-	return core.ListValue{
+	return core.NewList(
 		core.SymbolValue("__slice__"), // Use internal name to avoid conflict with slice() builtin
 		base,
 		start,
 		end,
 		step,
-	}, nil
+	), nil
 }

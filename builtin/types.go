@@ -65,8 +65,8 @@ func RegisterTypes(ctx *core.Context) {
 		switch v := iterable.(type) {
 		case core.TupleValue:
 			return v, nil
-		case core.ListValue:
-			return core.TupleValue(v), nil
+		case *core.ListValue:
+			return core.TupleValue(v.Items()), nil
 		case core.Iterable:
 			// Iterate and collect values
 			result := make([]core.Value, 0)
@@ -137,15 +137,11 @@ func RegisterTypes(ctx *core.Context) {
 		return core.BoolValue(isNil), nil
 	})))
 
-	// int - Python int class
-	// Create as a class so it can be used with isinstance
-	intClass := createIntClass()
-	ctx.Define("int", intClass)
+	// int - Python int constructor
+	ctx.Define("int", core.NewNamedBuiltinFunction("int", IntBuilder()))
 
-	// float - Python float class
-	// Create as a class so it can be used with isinstance
-	floatClass := createFloatClass()
-	ctx.Define("float", floatClass)
+	// float - Python float constructor
+	ctx.Define("float", core.NewNamedBuiltinFunction("float", FloatBuilder()))
 
 	// isinstance - check if object is instance of type(s)
 	// BEFORE: 20 lines
@@ -402,7 +398,7 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 			return typeName == string(core.BoolType) || typeName == "bool"
 		case core.NilValue:
 			return typeName == string(core.NilType) || typeName == "NoneType"
-		case core.ListValue:
+		case *core.ListValue:
 			return typeName == string(core.ListType) || typeName == "list"
 		case *core.DictValue:
 			return typeName == string(core.DictType) || typeName == "dict"
@@ -431,6 +427,30 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 		if inst, ok := obj.(*core.Instance); ok {
 			// Simple check - instance's class matches
 			return inst.Class == t || (inst.Class.Parent != nil && inst.Class.Parent == t)
+		}
+	case *core.BuiltinFunction:
+		// Handle builtin type constructors like list, int, float, etc.
+		// Check the function's name attribute if available
+		if nameVal, ok := t.GetAttr("__name__"); ok {
+			if nameStr, ok := nameVal.(core.StringValue); ok {
+				typeName := string(nameStr)
+				switch obj.(type) {
+				case *core.ListValue:
+					return typeName == "list"
+				case core.NumberValue:
+					return typeName == "int" || typeName == "float"
+				case core.StringValue:
+					return typeName == "str"
+				case core.BoolValue:
+					return typeName == "bool"
+				case core.TupleValue:
+					return typeName == "tuple"
+				case *core.DictValue:
+					return typeName == "dict"
+				case *core.SetValue:
+					return typeName == "set"
+				}
+			}
 		}
 	default:
 		// Handle wrapper types that have GetClass() method
@@ -562,7 +582,7 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			return BoolTypeClass, nil
 		case core.NilValue:
 			return NoneTypeClass, nil
-		case core.ListValue:
+		case *core.ListValue:
 			return ListTypeClass, nil
 		case *core.DictValue:
 			if DictTypeClass != nil {

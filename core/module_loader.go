@@ -98,8 +98,8 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	// Check if __exports__ is defined
 	if exportsVal, err := moduleCtx.Lookup("__exports__"); err == nil {
 		// __exports__ is defined, only export listed names
-		if exportsList, ok := exportsVal.(ListValue); ok {
-			for _, item := range exportsList {
+		if exportsList, ok := exportsVal.(*ListValue); ok {
+			for _, item := range exportsList.Items() {
 				if nameStr, ok := item.(StringValue); ok {
 					name := string(nameStr)
 					if val, err := moduleCtx.Lookup(name); err == nil {

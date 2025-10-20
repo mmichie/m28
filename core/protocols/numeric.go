@@ -79,15 +79,15 @@ func (n *NumericOps) Multiply(other core.Value) (core.Value, error) {
 			return core.StringValue(result), nil
 		}
 		return nil, errors.NewTypeError("*", "can't multiply sequence by non-int of type 'float'", "")
-	case core.ListValue:
+	case *core.ListValue:
 		// Support list repetition: 3 * [1,2] = [1,2,1,2,1,2]
 		if n.value == float64(int(n.value)) && n.value >= 0 {
 			count := int(n.value)
-			result := make(core.ListValue, 0, len(v)*count)
+			result := make([]core.Value, 0, v.Len()*count)
 			for i := 0; i < count; i++ {
-				result = append(result, v...)
+				result = append(result, v.Items()...)
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}
 		return nil, errors.NewTypeError("*", "can't multiply sequence by non-int of type 'float'", "")
 	default:

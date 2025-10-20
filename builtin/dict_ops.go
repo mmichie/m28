@@ -37,7 +37,7 @@ func SelectKeysBuilder() builders.BuiltinFunc {
 
 		// Get keys list
 		keysArg := v.Get(1)
-		keysList, ok := keysArg.(core.ListValue)
+		keysList, ok := keysArg.(*core.ListValue)
 		if !ok {
 			return nil, fmt.Errorf("select-keys requires list as second argument, got %s", keysArg.Type())
 		}
@@ -45,7 +45,7 @@ func SelectKeysBuilder() builders.BuiltinFunc {
 		// Build result dict - skip missing keys
 		result := core.NewDict()
 
-		for _, keyVal := range keysList {
+		for _, keyVal := range keysList.Items() {
 			// Get the value from dict
 			value, exists := dict.GetValue(keyVal)
 

@@ -74,8 +74,8 @@ func NewGeneratorExpression(name string, expr Value, varName string, iterable Va
 	// Convert iterable to a sequence of items
 	var items []Value
 	switch v := iterable.(type) {
-	case ListValue:
-		items = v
+	case *ListValue:
+		items = v.Items()
 	case TupleValue:
 		items = v
 	case StringValue:
@@ -409,7 +409,7 @@ func (gf *GeneratorFunction) Call(args []Value, ctx *Context) (Value, error) {
 	gen := NewGenerator(gf.Name, gf.Function, ctx)
 
 	// Store the arguments and the function for later execution
-	gen.SetAttr("__args__", ListValue(args))
+	gen.SetAttr("__args__", NewList(args...))
 	gen.SetAttr("__function__", gf.Function)
 
 	return gen, nil

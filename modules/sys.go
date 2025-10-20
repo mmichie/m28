@@ -13,8 +13,8 @@ import (
 // Global variables for sys module state
 var (
 	recursionLimit = 1000
-	sysModules     = core.NewDict()                        // Tracks loaded modules
-	sysPath        = core.ListValue{core.StringValue(".")} // Module search path
+	sysModules     = core.NewDict()                      // Tracks loaded modules
+	sysPath        = core.NewList(core.StringValue(".")) // Module search path
 )
 
 // InitSysModule registers the sys module
@@ -35,7 +35,7 @@ func InitSysModule() *core.DictValue {
 	sysModule.SetWithKey("excepthook", core.StringValue("excepthook"), core.NewBuiltinFunction(excepthook))
 
 	// Command line arguments (empty list for now, populated by main)
-	sysModule.SetWithKey("argv", core.StringValue("argv"), core.ListValue{})
+	sysModule.SetWithKey("argv", core.StringValue("argv"), core.NewList())
 
 	// Version information
 	sysModule.SetWithKey("version", core.StringValue("version"), core.StringValue("M28 0.1.0"))
@@ -76,7 +76,7 @@ func InitSysModule() *core.DictValue {
 	sysModule.SetWithKey("path", core.StringValue("path"), sysPath)
 
 	// Builtin module names - static list matching registry.go
-	builtinNamesList := core.ListValue{
+	builtinNamesList := core.NewList(
 		core.StringValue("os"),
 		core.StringValue("sys"),
 		core.StringValue("io"),
@@ -101,7 +101,7 @@ func InitSysModule() *core.DictValue {
 		core.StringValue("re"),
 		core.StringValue("dataclasses"),
 		core.StringValue("warnings"),
-	}
+	)
 	sysModule.SetWithKey("builtin_module_names", core.StringValue("builtin_module_names"), builtinNamesList)
 
 	// Functions
@@ -281,8 +281,8 @@ func getSizeOf(args []core.Value, ctx *core.Context) (core.Value, error) {
 		size += 8
 	case core.BoolValue:
 		size += 1
-	case core.ListValue:
-		size += int64(len(val) * 8)
+	case *core.ListValue:
+		size += int64(val.Len() * 8)
 	case *core.DictValue:
 		size += int64(val.Size() * 16)
 	case core.TupleValue:

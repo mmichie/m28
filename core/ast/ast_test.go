@@ -88,26 +88,27 @@ func TestSExpr(t *testing.T) {
 
 	// Test ToIR conversion
 	ir := sexpr.ToIR()
-	list, ok := ir.(core.ListValue)
+	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	if len(list) != 3 {
-		t.Errorf("Expected 3 elements, got %d", len(list))
+	items := list.Items()
+	if len(items) != 3 {
+		t.Errorf("Expected 3 elements, got %d", len(items))
 	}
 
 	// Check elements
-	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "+" {
-		t.Errorf("Expected first element to be '+', got %v", list[0])
+	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "+" {
+		t.Errorf("Expected first element to be '+', got %v", items[0])
 	}
 
-	if num, ok := list[1].(core.NumberValue); !ok || num != 1 {
-		t.Errorf("Expected second element to be 1, got %v", list[1])
+	if num, ok := items[1].(core.NumberValue); !ok || num != 1 {
+		t.Errorf("Expected second element to be 1, got %v", items[1])
 	}
 
-	if num, ok := list[2].(core.NumberValue); !ok || num != 2 {
-		t.Errorf("Expected third element to be 2, got %v", list[2])
+	if num, ok := items[2].(core.NumberValue); !ok || num != 2 {
+		t.Errorf("Expected third element to be 2, got %v", items[2])
 	}
 }
 
@@ -133,44 +134,47 @@ func TestDefForm(t *testing.T) {
 
 	// Test ToIR conversion
 	ir := def.ToIR()
-	list, ok := ir.(core.ListValue)
+	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	if len(list) != 4 {
-		t.Errorf("Expected 4 elements (def name params body), got %d", len(list))
+	items := list.Items()
+	if len(items) != 4 {
+		t.Errorf("Expected 4 elements (def name params body), got %d", len(items))
 	}
 
 	// Check def symbol
-	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "def" {
-		t.Errorf("Expected 'def', got %v", list[0])
+	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "def" {
+		t.Errorf("Expected 'def', got %v", items[0])
 	}
 
 	// Check function name
-	if sym, ok := list[1].(core.SymbolValue); !ok || string(sym) != "double" {
-		t.Errorf("Expected 'double', got %v", list[1])
+	if sym, ok := items[1].(core.SymbolValue); !ok || string(sym) != "double" {
+		t.Errorf("Expected 'double', got %v", items[1])
 	}
 
 	// Check params list
-	paramList, ok := list[2].(core.ListValue)
+	paramList, ok := items[2].(*core.ListValue)
 	if !ok {
-		t.Fatalf("Expected params to be ListValue, got %T", list[2])
+		t.Fatalf("Expected params to be ListValue, got %T", items[2])
 	}
-	if len(paramList) != 1 {
-		t.Errorf("Expected 1 parameter, got %d", len(paramList))
+	paramItems := paramList.Items()
+	if len(paramItems) != 1 {
+		t.Errorf("Expected 1 parameter, got %d", len(paramItems))
 	}
-	if sym, ok := paramList[0].(core.SymbolValue); !ok || string(sym) != "x" {
-		t.Errorf("Expected parameter 'x', got %v", paramList[0])
+	if sym, ok := paramItems[0].(core.SymbolValue); !ok || string(sym) != "x" {
+		t.Errorf("Expected parameter 'x', got %v", paramItems[0])
 	}
 
 	// Check body
-	bodyList, ok := list[3].(core.ListValue)
+	bodyList, ok := items[3].(*core.ListValue)
 	if !ok {
-		t.Fatalf("Expected body to be ListValue, got %T", list[3])
+		t.Fatalf("Expected body to be ListValue, got %T", items[3])
 	}
-	if len(bodyList) != 3 {
-		t.Errorf("Expected body to have 3 elements, got %d", len(bodyList))
+	bodyItems := bodyList.Items()
+	if len(bodyItems) != 3 {
+		t.Errorf("Expected body to have 3 elements, got %d", len(bodyItems))
 	}
 }
 
@@ -207,13 +211,14 @@ func TestDefFormWithTypes(t *testing.T) {
 	// ToIR should still produce standard Lisp form
 	// (type annotations are preserved in metadata, not IR)
 	ir := def.ToIR()
-	list, ok := ir.(core.ListValue)
+	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "def" {
-		t.Errorf("Expected 'def', got %v", list[0])
+	items := list.Items()
+	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "def" {
+		t.Errorf("Expected 'def', got %v", items[0])
 	}
 }
 
@@ -231,17 +236,18 @@ func TestAssignForm(t *testing.T) {
 
 	// Test ToIR conversion
 	ir := assign.ToIR()
-	list, ok := ir.(core.ListValue)
+	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	if len(list) != 3 {
-		t.Errorf("Expected 3 elements, got %d", len(list))
+	items := list.Items()
+	if len(items) != 3 {
+		t.Errorf("Expected 3 elements, got %d", len(items))
 	}
 
-	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "=" {
-		t.Errorf("Expected '=', got %v", list[0])
+	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "=" {
+		t.Errorf("Expected '=', got %v", items[0])
 	}
 }
 
@@ -266,17 +272,18 @@ func TestIfForm(t *testing.T) {
 
 	// Test ToIR conversion
 	ir := ifForm.ToIR()
-	list, ok := ir.(core.ListValue)
+	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	if len(list) != 4 {
-		t.Errorf("Expected 4 elements (if condition then else), got %d", len(list))
+	items := list.Items()
+	if len(items) != 4 {
+		t.Errorf("Expected 4 elements (if condition then else), got %d", len(items))
 	}
 
-	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "if" {
-		t.Errorf("Expected 'if', got %v", list[0])
+	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "if" {
+		t.Errorf("Expected 'if', got %v", items[0])
 	}
 }
 

@@ -56,23 +56,23 @@ func performAugmentedOp(op string, currentValue, augValue core.Value, ctx *core.
 	}
 
 	// Create the operation expression and evaluate it
-	opExpr := core.ListValue{
+	opExpr := core.NewList(
 		core.SymbolValue(baseOp),
 		currentValue,
 		augValue,
-	}
+	)
 	return Eval(opExpr, ctx)
 }
 
 // AugmentedAssignForm handles augmented assignment operators
 // (+= x y) -> tries __iadd__ first, then falls back to (= x (+ x y))
-func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("%s requires exactly 2 arguments, got %d", op, len(args))
+func AugmentedAssignForm(op string, args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 2 {
+		return nil, fmt.Errorf("%s requires exactly 2 arguments, got %d", op, args.Len())
 	}
 
-	target := args[0]
-	augValue := args[1]
+	target := args.Items()[0]
+	augValue := args.Items()[1]
 
 	// Handle different target types
 	switch t := target.(type) {
@@ -100,10 +100,10 @@ func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (cor
 		ctx.Define(string(t), result)
 		return result, nil
 
-	case core.ListValue:
+	case *core.ListValue:
 		// Could be indexing or dot notation
-		if len(t) >= 3 {
-			if sym, ok := t[0].(core.SymbolValue); ok {
+		if t.Len() >= 3 {
+			if sym, ok := t.Items()[0].(core.SymbolValue); ok {
 				switch string(sym) {
 				case "get-item":
 					// Index assignment: lst[i] += y
@@ -122,14 +122,15 @@ func AugmentedAssignForm(op string, args core.ListValue, ctx *core.Context) (cor
 }
 
 // augmentedIndexAssign handles lst[i] += value
-func augmentedIndexAssign(indexExpr core.ListValue, op string, augValue core.Value, ctx *core.Context) (core.Value, error) {
+func augmentedIndexAssign(indexExpr *core.ListValue, op string, augValue core.Value, ctx *core.Context) (core.Value, error) {
 	// indexExpr is (get-item obj key)
-	if len(indexExpr) != 3 {
+	if indexExpr.Len() != 3 {
 		return nil, fmt.Errorf("invalid index expression")
 	}
 
+	items := indexExpr.Items()
 	// Get current value
-	currentValue, err := GetItemForm(core.ListValue{indexExpr[1], indexExpr[2]}, ctx)
+	currentValue, err := GetItemForm(core.NewList(items[1], items[2]), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -147,13 +148,13 @@ func augmentedIndexAssign(indexExpr core.ListValue, op string, augValue core.Val
 	}
 
 	// Set the new value
-	return SetItemForm(core.ListValue{indexExpr[1], indexExpr[2], result}, ctx)
+	return SetItemForm(core.NewList(items[1], items[2], result), ctx)
 }
 
 // augmentedPropertyAssign handles obj.prop += value
-func augmentedPropertyAssign(dotExpr core.ListValue, op string, augValue core.Value, ctx *core.Context) (core.Value, error) {
+func augmentedPropertyAssign(dotExpr *core.ListValue, op string, augValue core.Value, ctx *core.Context) (core.Value, error) {
 	// dotExpr is (. obj "prop")
-	if len(dotExpr) < 3 {
+	if dotExpr.Len() < 3 {
 		return nil, fmt.Errorf("invalid property expression")
 	}
 
@@ -176,12 +177,12 @@ func augmentedPropertyAssign(dotExpr core.ListValue, op string, augValue core.Va
 	}
 
 	// Create assignment expression and evaluate it
-	assignExpr := core.ListValue{
+	assignExpr := core.NewList(
 		core.SymbolValue("="),
 		dotExpr,
 		result,
-	}
-	return AssignForm(assignExpr[1:], ctx)
+	)
+	return AssignForm(core.NewList(assignExpr.Items()[1:]...), ctx)
 }
 
 // RegisterAugmentedAssignment registers all augmented assignment operators
@@ -189,7 +190,7 @@ func RegisterAugmentedAssignment() {
 	for op := range augmentedOps {
 		// Capture op in closure
 		operator := op
-		RegisterSpecialForm(operator, func(args core.ListValue, ctx *core.Context) (core.Value, error) {
+		RegisterSpecialForm(operator, func(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			return AugmentedAssignForm(operator, args, ctx)
 		})
 	}

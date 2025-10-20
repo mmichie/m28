@@ -7,25 +7,58 @@ import (
 	"strings"
 )
 
-// ListValue represents a list of values
-type ListValue []Value
+// ListValue represents a mutable list of values
+type ListValue struct {
+	BaseObject
+	items []Value
+}
+
+// NewList creates a new mutable list from values
+func NewList(values ...Value) *ListValue {
+	return &ListValue{
+		BaseObject: *NewBaseObject(ListType),
+		items:      values,
+	}
+}
+
+// EmptyList is a shared empty list value
+var EmptyList = NewList()
+
+// Len returns the length of the list
+func (l *ListValue) Len() int {
+	if l == nil {
+		return 0
+	}
+	return len(l.items)
+}
+
+// Items returns the underlying slice (for iteration)
+func (l *ListValue) Items() []Value {
+	if l == nil {
+		return nil
+	}
+	return l.items
+}
 
 // Type implements Value.Type
-func (l ListValue) Type() Type {
+func (l *ListValue) Type() Type {
 	return ListType
 }
 
 // String implements Value.String
-func (l ListValue) String() string {
-	elements := make([]string, len(l))
-	for i, v := range l {
+func (l *ListValue) String() string {
+	if l == nil {
+		return "[]"
+	}
+	elements := make([]string, len(l.items))
+	for i, v := range l.items {
 		elements[i] = PrintValue(v)
 	}
 	return "[" + strings.Join(elements, ", ") + "]"
 }
 
 // GetAttr implements Object interface using TypeDescriptor
-func (l ListValue) GetAttr(name string) (Value, bool) {
+func (l *ListValue) GetAttr(name string) (Value, bool) {
 	desc := GetTypeDescriptor(ListType)
 	if desc != nil {
 		val, err := desc.GetAttribute(l, name)
@@ -37,12 +70,12 @@ func (l ListValue) GetAttr(name string) (Value, bool) {
 }
 
 // SetAttr implements Object.SetAttr (not supported for lists)
-func (l ListValue) SetAttr(name string, value Value) error {
+func (l *ListValue) SetAttr(name string, value Value) error {
 	return fmt.Errorf("cannot set attributes on lists")
 }
 
 // CallMethod implements Object.CallMethod
-func (l ListValue) CallMethod(name string, args []Value, ctx *Context) (Value, error) {
+func (l *ListValue) CallMethod(name string, args []Value, ctx *Context) (Value, error) {
 	desc := GetTypeDescriptor(ListType)
 	if desc != nil {
 		return desc.CallMethod(l, name, args, ctx)
@@ -51,30 +84,97 @@ func (l ListValue) CallMethod(name string, args []Value, ctx *Context) (Value, e
 }
 
 // GetItem gets an item by index
-func (l ListValue) GetItem(index int) (Value, error) {
+func (l *ListValue) GetItem(index int) (Value, error) {
+	if l == nil {
+		return nil, &IndexError{Index: index, Length: 0}
+	}
 	if index < 0 {
-		index = len(l) + index
+		index = len(l.items) + index
 	}
-	if index < 0 || index >= len(l) {
-		return nil, &IndexError{Index: index, Length: len(l)}
+	if index < 0 || index >= len(l.items) {
+		return nil, &IndexError{Index: index, Length: len(l.items)}
 	}
-	return l[index], nil
+	return l.items[index], nil
 }
 
-// SetItem sets an item by index
-func (l ListValue) SetItem(index int, value Value) error {
+// SetItem sets an item by index (mutates the list)
+func (l *ListValue) SetItem(index int, value Value) error {
+	if l == nil {
+		return fmt.Errorf("cannot set item on nil list")
+	}
 	if index < 0 {
-		index = len(l) + index
+		index = len(l.items) + index
 	}
-	if index < 0 || index >= len(l) {
-		return &IndexError{Index: index, Length: len(l)}
+	if index < 0 || index >= len(l.items) {
+		return &IndexError{Index: index, Length: len(l.items)}
 	}
-	l[index] = value
+	l.items[index] = value
 	return nil
 }
 
+// SetSlice sets a slice of items (mutates the list) - implements x[start:end] = values
+func (l *ListValue) SetSlice(start, end *int, values *ListValue) error {
+	if l == nil {
+		return fmt.Errorf("cannot set slice on nil list")
+	}
+
+	length := len(l.items)
+
+	// Handle nil (unbounded) slice indices
+	startIdx := 0
+	if start != nil {
+		startIdx = *start
+		if startIdx < 0 {
+			startIdx = length + startIdx
+		}
+		if startIdx < 0 {
+			startIdx = 0
+		}
+		if startIdx > length {
+			startIdx = length
+		}
+	}
+
+	endIdx := length
+	if end != nil {
+		endIdx = *end
+		if endIdx < 0 {
+			endIdx = length + endIdx
+		}
+		if endIdx < 0 {
+			endIdx = 0
+		}
+		if endIdx > length {
+			endIdx = length
+		}
+	}
+
+	// Replace the slice
+	newItems := make([]Value, 0, len(l.items)-endIdx+startIdx+len(values.items))
+	newItems = append(newItems, l.items[:startIdx]...)
+	newItems = append(newItems, values.items...)
+	newItems = append(newItems, l.items[endIdx:]...)
+	l.items = newItems
+
+	return nil
+}
+
+// Append adds an item to the end (mutates the list)
+func (l *ListValue) Append(value Value) {
+	if l != nil {
+		l.items = append(l.items, value)
+	}
+}
+
+// Extend adds multiple items to the end (mutates the list)
+func (l *ListValue) Extend(values []Value) {
+	if l != nil {
+		l.items = append(l.items, values...)
+	}
+}
+
 // Iterator implements Iterable
-func (l ListValue) Iterator() Iterator {
+func (l *ListValue) Iterator() Iterator {
 	return &listIterator{
 		list:  l,
 		index: 0,
@@ -82,15 +182,15 @@ func (l ListValue) Iterator() Iterator {
 }
 
 type listIterator struct {
-	list  ListValue
+	list  *ListValue
 	index int
 }
 
 func (it *listIterator) Next() (Value, bool) {
-	if it.index >= len(it.list) {
+	if it.list == nil || it.index >= len(it.list.items) {
 		return nil, false
 	}
-	val := it.list[it.index]
+	val := it.list.items[it.index]
 	it.index++
 	return val, true
 }
@@ -701,6 +801,5 @@ func (fs *FrozenSetValue) Iterator() Iterator {
 
 // Predefined empty collections
 var (
-	EmptyList  = ListValue{}
 	EmptyTuple = TupleValue{}
 )

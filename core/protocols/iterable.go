@@ -42,19 +42,19 @@ func (i *IteratorAdapter) HasNext() bool {
 
 // ListIterator iterates over list elements
 type ListIterator struct {
-	list  core.ListValue
+	list  *core.ListValue
 	index int
 }
 
 // NewListIterator creates an iterator for lists
-func NewListIterator(list core.ListValue) *ListIterator {
+func NewListIterator(list *core.ListValue) *ListIterator {
 	return &ListIterator{list: list, index: 0}
 }
 
 // Next returns the next value
 func (l *ListIterator) Next() (core.Value, error) {
-	if l.index < len(l.list) {
-		val := l.list[l.index]
+	if l.index < l.list.Len() {
+		val := l.list.Items()[l.index]
 		l.index++
 		return val, nil
 	}
@@ -63,7 +63,7 @@ func (l *ListIterator) Next() (core.Value, error) {
 
 // HasNext checks if there are more values
 func (l *ListIterator) HasNext() bool {
-	return l.index < len(l.list)
+	return l.index < l.list.Len()
 }
 
 // Type implements Value.Type
@@ -535,7 +535,7 @@ func (d *DunderIterator) String() string {
 // GetIterableOps returns an iterator for a value if possible
 func GetIterableOps(v core.Value) (Iterator, bool) {
 	switch val := v.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		return NewListIterator(val), true
 	case *core.DictValue:
 		return NewDictIterator(val), true

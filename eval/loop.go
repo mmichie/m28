@@ -61,14 +61,14 @@ var (
 
 // WhileForm implements the while loop special form
 // Syntax: (while condition body...)
-func WhileForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
+func WhileForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 2 {
 		return nil, ErrArgCount("while requires at least 2 arguments (condition and body)")
 	}
 
 	// Extract condition and body
-	condition := args[0]
-	body := args[1:]
+	condition := args.Items()[0]
+	body := args.Items()[1:]
 
 	// Create a body function that evaluates all expressions
 	bodyFunc := func() (core.Value, error) {
@@ -135,56 +135,56 @@ func WhileForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // ForForm implements the for loop special form
 // Syntax: (for (var sequence) body...) or (for var sequence body...) or (for var1 var2 ... in sequence body...)
-func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
+func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 2 {
 		return nil, ErrArgCount("for requires at least 2 arguments")
 	}
 
 	var varNames []core.SymbolValue
 	var sequenceExpr core.Value
-	var body core.ListValue
+	var body []core.Value
 
 	// Check if first arg is a list (old syntax) or symbol (new syntax)
-	if binding, ok := args[0].(core.ListValue); ok && len(binding) >= 1 {
+	if binding, ok := args.Items()[0].(*core.ListValue); ok && binding.Len() >= 1 {
 		// Check if next arg is 'in' keyword - if so, use Python-style syntax
-		if len(args) >= 3 {
-			if sym, ok := args[1].(core.SymbolValue); ok && string(sym) == "in" {
+		if args.Len() >= 3 {
+			if sym, ok := args.Items()[1].(core.SymbolValue); ok && string(sym) == "in" {
 				// Python-style: (for (var1 var2) in sequence body...)
-				for i := 0; i < len(binding); i++ {
-					varSym, ok := binding[i].(core.SymbolValue)
+				for i := 0; i < binding.Len(); i++ {
+					varSym, ok := binding.Items()[i].(core.SymbolValue)
 					if !ok {
-						return nil, TypeError{Expected: "symbol", Got: binding[i].Type()}
+						return nil, TypeError{Expected: "symbol", Got: binding.Items()[i].Type()}
 					}
 					varNames = append(varNames, varSym)
 				}
-				sequenceExpr = args[2]
-				body = args[3:]
-			} else if len(binding) >= 2 {
+				sequenceExpr = args.Items()[2]
+				body = args.Items()[3:]
+			} else if binding.Len() >= 2 {
 				// Old syntax: (for (var sequence) body...) or (for (var1 var2 sequence) body...)
 				// Extract all symbols except the last element
-				for i := 0; i < len(binding)-1; i++ {
-					sym, ok := binding[i].(core.SymbolValue)
+				for i := 0; i < binding.Len()-1; i++ {
+					sym, ok := binding.Items()[i].(core.SymbolValue)
 					if !ok {
-						return nil, TypeError{Expected: "symbol", Got: binding[i].Type()}
+						return nil, TypeError{Expected: "symbol", Got: binding.Items()[i].Type()}
 					}
 					varNames = append(varNames, sym)
 				}
-				sequenceExpr = binding[len(binding)-1]
-				body = args[1:]
+				sequenceExpr = binding.Items()[binding.Len()-1]
+				body = args.Items()[1:]
 			} else {
 				return nil, ArgumentError{"for requires at least 2 elements in binding list"}
 			}
-		} else if len(binding) >= 2 {
+		} else if binding.Len() >= 2 {
 			// Old syntax with no 'in' keyword
-			for i := 0; i < len(binding)-1; i++ {
-				sym, ok := binding[i].(core.SymbolValue)
+			for i := 0; i < binding.Len()-1; i++ {
+				sym, ok := binding.Items()[i].(core.SymbolValue)
 				if !ok {
-					return nil, TypeError{Expected: "symbol", Got: binding[i].Type()}
+					return nil, TypeError{Expected: "symbol", Got: binding.Items()[i].Type()}
 				}
 				varNames = append(varNames, sym)
 			}
-			sequenceExpr = binding[len(binding)-1]
-			body = args[1:]
+			sequenceExpr = binding.Items()[binding.Len()-1]
+			body = args.Items()[1:]
 		} else {
 			return nil, ArgumentError{"for requires at least 2 elements in binding list"}
 		}
@@ -192,29 +192,29 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		// New syntax: check for multiple vars with 'in' keyword
 		// Look for 'in' keyword
 		inIndex := -1
-		for i := 1; i < len(args); i++ {
-			if sym, ok := args[i].(core.SymbolValue); ok && string(sym) == "in" {
+		for i := 1; i < args.Len(); i++ {
+			if sym, ok := args.Items()[i].(core.SymbolValue); ok && string(sym) == "in" {
 				inIndex = i
 				break
 			}
 		}
 
-		if inIndex > 0 && inIndex < len(args)-1 {
+		if inIndex > 0 && inIndex < args.Len()-1 {
 			// Found 'in': (for var1 var2 ... in sequence body...)
 			for i := 0; i < inIndex; i++ {
-				sym, ok := args[i].(core.SymbolValue)
+				sym, ok := args.Items()[i].(core.SymbolValue)
 				if !ok {
-					return nil, TypeError{Expected: "symbol", Got: args[i].Type()}
+					return nil, TypeError{Expected: "symbol", Got: args.Items()[i].Type()}
 				}
 				varNames = append(varNames, sym)
 			}
-			sequenceExpr = args[inIndex+1]
-			body = args[inIndex+2:]
-		} else if sym, ok := args[0].(core.SymbolValue); ok && len(args) >= 3 {
+			sequenceExpr = args.Items()[inIndex+1]
+			body = args.Items()[inIndex+2:]
+		} else if sym, ok := args.Items()[0].(core.SymbolValue); ok && args.Len() >= 3 {
 			// Single var syntax: (for var sequence body...)
 			varNames = []core.SymbolValue{sym}
-			sequenceExpr = args[1]
-			body = args[2:]
+			sequenceExpr = args.Items()[1]
+			body = args.Items()[2:]
 		} else {
 			return nil, ArgumentError{"for requires (var sequence) or var sequence or var1 var2 ... in sequence syntax"}
 		}
@@ -234,8 +234,8 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			var values []core.Value
 
 			switch v := item.(type) {
-			case core.ListValue:
-				values = v
+			case *core.ListValue:
+				values = v.Items()
 			case core.TupleValue:
 				values = v
 			default:
@@ -297,9 +297,9 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Handle different sequence types
 	switch seq := sequence.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		// Iterate through list items
-		for _, item := range seq {
+		for _, item := range seq.Items() {
 			result, err := bodyFunc(item)
 			if err != nil {
 				return nil, err
@@ -368,8 +368,8 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Debug: log what __iter__ returned
-			if list, ok := iter.(core.ListValue); ok && len(list) == 1 {
-				if str, ok := list[0].(core.StringValue); ok && str == "__iter__" {
+			if list, ok := iter.(*core.ListValue); ok && list.Len() == 1 {
+				if str, ok := list.Items()[0].(core.StringValue); ok && str == "__iter__" {
 					return nil, fmt.Errorf("BUG: __iter__ on %T returned [\"__iter__\"] instead of an iterator - this suggests a method call problem", sequence)
 				}
 			}
@@ -507,37 +507,37 @@ func ForForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // BreakForm implements the break special form
-func BreakForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 0 {
+func BreakForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 0 {
 		return nil, ErrArgCount("break takes no arguments")
 	}
 	return Break, nil
 }
 
 // ContinueForm implements the continue special form
-func ContinueForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 0 {
+func ContinueForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 0 {
 		return nil, ErrArgCount("continue takes no arguments")
 	}
 	return Continue, nil
 }
 
 // External function to expose WhileForm for registration
-func WhileFormHandler(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func WhileFormHandler(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return WhileForm(args, ctx)
 }
 
 // External function to expose ForForm for registration
-func ForFormHandler(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func ForFormHandler(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return ForForm(args, ctx)
 }
 
 // External function to expose BreakForm for registration
-func BreakFormHandler(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func BreakFormHandler(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return BreakForm(args, ctx)
 }
 
 // External function to expose ContinueForm for registration
-func ContinueFormHandler(args core.ListValue, ctx *core.Context) (core.Value, error) {
+func ContinueFormHandler(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return ContinueForm(args, ctx)
 }

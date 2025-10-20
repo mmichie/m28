@@ -36,7 +36,7 @@ func TestIsString(t *testing.T) {
 		{"string is string", core.StringValue("hello"), true},
 		{"empty string is string", core.StringValue(""), true},
 		{"number not string", core.NumberValue(42), false},
-		{"list not string", core.ListValue([]core.Value{}), false},
+		{"list not string", core.NewList(), false},
 	}
 
 	for _, tt := range tests {
@@ -75,7 +75,7 @@ func TestIsContainer(t *testing.T) {
 		input core.Value
 		want  bool
 	}{
-		{"list is container", core.ListValue([]core.Value{}), true},
+		{"list is container", core.NewList(), true},
 		{"tuple is container", core.TupleValue([]core.Value{}), true},
 		{"dict is container", core.NewDict(), true},
 		{"set is container", core.NewSet(), true},
@@ -98,7 +98,7 @@ func TestIsSequence(t *testing.T) {
 		input core.Value
 		want  bool
 	}{
-		{"list is sequence", core.ListValue([]core.Value{}), true},
+		{"list is sequence", core.NewList(), true},
 		{"tuple is sequence", core.TupleValue([]core.Value{}), true},
 		{"string is sequence", core.StringValue("hello"), true},
 		{"range is sequence", &core.RangeValue{Start: 0, Stop: 10, Step: 1}, true},
@@ -123,7 +123,7 @@ func TestIsMapping(t *testing.T) {
 		want  bool
 	}{
 		{"dict is mapping", core.NewDict(), true},
-		{"list not mapping", core.ListValue([]core.Value{}), false},
+		{"list not mapping", core.NewList(), false},
 		{"set not mapping", core.NewSet(), false},
 	}
 
@@ -175,7 +175,7 @@ func TestIsCallable(t *testing.T) {
 		{"instance without __call__ not callable", regularInstance, false},
 		{"number not callable", core.NumberValue(42), false},
 		{"string not callable", core.StringValue("hello"), false},
-		{"list not callable", core.ListValue([]core.Value{}), false},
+		{"list not callable", core.NewList(), false},
 	}
 
 	for _, tt := range tests {
@@ -193,7 +193,7 @@ func TestIsIterable(t *testing.T) {
 		input core.Value
 		want  bool
 	}{
-		{"list is iterable", core.ListValue([]core.Value{}), true},
+		{"list is iterable", core.NewList(), true},
 		{"tuple is iterable", core.TupleValue([]core.Value{}), true},
 		{"string is iterable", core.StringValue("hello"), false}, // StringValue doesn't implement Iterable directly
 		{"dict is iterable", core.NewDict(), true},               // DictValue now implements Iterable (iterates over keys)
@@ -223,7 +223,7 @@ func TestIsNil(t *testing.T) {
 		{"number not nil", core.NumberValue(0), false},
 		{"empty string not nil", core.StringValue(""), false},
 		{"false not nil", core.BoolValue(false), false},
-		{"empty list not nil", core.ListValue([]core.Value{}), false},
+		{"empty list not nil", core.NewList(), false},
 	}
 
 	for _, tt := range tests {
@@ -245,7 +245,7 @@ func TestIsHashable(t *testing.T) {
 		{"string is hashable", core.StringValue("hello"), true},
 		{"bool is hashable", core.BoolValue(true), true},
 		{"tuple is hashable", core.TupleValue([]core.Value{core.NumberValue(1)}), true},
-		{"list not hashable", core.ListValue([]core.Value{}), false},
+		{"list not hashable", core.NewList(), false},
 		{"dict not hashable", core.NewDict(), false},
 		{"set not hashable", core.NewSet(), false},
 	}
@@ -271,8 +271,8 @@ func TestIsTruthy(t *testing.T) {
 		{"zero is not truthy", core.NumberValue(0), false},
 		{"non-empty string is truthy", core.StringValue("hello"), true},
 		{"empty string is not truthy", core.StringValue(""), false},
-		{"non-empty list is truthy", core.ListValue([]core.Value{core.NumberValue(1)}), true},
-		{"empty list is not truthy", core.ListValue([]core.Value{}), false},
+		{"non-empty list is truthy", core.NewList(core.NumberValue(1)), true},
+		{"empty list is not truthy", core.NewList(), false},
 		{"nil is not truthy", core.Nil, false},
 	}
 

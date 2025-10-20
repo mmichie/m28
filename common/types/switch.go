@@ -77,7 +77,7 @@ func (ts *TypeSwitch) Bool(fn func(bool) (core.Value, error)) *TypeSwitch {
 }
 
 // List handles the case where value is a list
-func (ts *TypeSwitch) List(fn func(core.ListValue) (core.Value, error)) *TypeSwitch {
+func (ts *TypeSwitch) List(fn func(*core.ListValue) (core.Value, error)) *TypeSwitch {
 	if ts.handled {
 		return ts
 	}

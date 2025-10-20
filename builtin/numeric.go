@@ -199,8 +199,8 @@ func RegisterNumeric(ctx *core.Context) {
 		// Extract items from the iterable
 		var items []core.Value
 		switch v := iterable.(type) {
-		case core.ListValue:
-			items = v
+		case *core.ListValue:
+			items = v.Items()
 		case core.TupleValue:
 			items = v
 		default:
@@ -317,8 +317,8 @@ func extremeWithKwargs(funcName string, isMin bool) func([]core.Value, map[strin
 		if len(args) == 1 {
 			var items []core.Value
 			switch v := args[0].(type) {
-			case core.ListValue:
-				items = v
+			case *core.ListValue:
+				items = v.Items()
 			case core.TupleValue:
 				items = v
 			default:

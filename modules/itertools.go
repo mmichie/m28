@@ -15,7 +15,7 @@ func InitItertoolsModule() *core.DictValue {
 
 	// chain - chain multiple iterables together
 	itertoolsModule.Set("chain", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		for _, arg := range args {
 			iterable, err := types.RequireIterable(arg, "chain() argument")
 			if err != nil {
@@ -30,7 +30,7 @@ func InitItertoolsModule() *core.DictValue {
 				result = append(result, val)
 			}
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// cycle - repeat elements from iterable n times (limited version)
@@ -52,7 +52,7 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		// Collect items
-		items := make(core.ListValue, 0)
+		items := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		for {
 			val, hasNext := iter.Next()
@@ -63,11 +63,11 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		// Repeat items
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		for i := 0; i < int(cycles); i++ {
 			result = append(result, items...)
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// islice - slice an iterable
@@ -132,7 +132,7 @@ func InitItertoolsModule() *core.DictValue {
 			}
 		}
 
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		index := 0
 
@@ -148,7 +148,7 @@ func InitItertoolsModule() *core.DictValue {
 			index++
 		}
 
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// count - count from start with step (returns list of n values)
@@ -162,13 +162,13 @@ func InitItertoolsModule() *core.DictValue {
 		step, _ := v.GetNumberOrDefault(1, 1)
 		n, _ := v.GetNumberOrDefault(2, 10) // Default to 10 values for safety
 
-		result := make(core.ListValue, 0, int(n))
+		result := make([]core.Value, 0, int(n))
 		current := start
 		for i := 0; i < int(n); i++ {
 			result = append(result, core.NumberValue(current))
 			current += step
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// repeat - repeat an object n times
@@ -181,11 +181,11 @@ func InitItertoolsModule() *core.DictValue {
 		value := v.Get(0)
 		times, _ := v.GetNumberOrDefault(1, 10) // Default to 10 for safety
 
-		result := make(core.ListValue, 0, int(times))
+		result := make([]core.Value, 0, int(times))
 		for i := 0; i < int(times); i++ {
 			result = append(result, value)
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// takewhile - yield elements while predicate is true
@@ -205,7 +205,7 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 
 		for {
@@ -227,7 +227,7 @@ func InitItertoolsModule() *core.DictValue {
 			result = append(result, val)
 		}
 
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// dropwhile - drop elements while predicate is true, then yield all
@@ -247,7 +247,7 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		dropping := true
 
@@ -273,7 +273,7 @@ func InitItertoolsModule() *core.DictValue {
 			}
 		}
 
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// compress - filter iterable by selectors
@@ -293,7 +293,7 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		dataIter := data.Iterator()
 		selectorsIter := selectors.Iterator()
 
@@ -310,7 +310,7 @@ func InitItertoolsModule() *core.DictValue {
 			}
 		}
 
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// product - Cartesian product of input iterables
@@ -321,14 +321,14 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		// Convert all arguments to lists
-		lists := make([]core.ListValue, v.Count())
+		lists := make([][]core.Value, v.Count())
 		for i := 0; i < v.Count(); i++ {
 			iterable, err := types.RequireIterable(v.Get(i), fmt.Sprintf("product() argument %d", i))
 			if err != nil {
 				return nil, err
 			}
 
-			list := make(core.ListValue, 0)
+			list := make([]core.Value, 0)
 			iter := iterable.Iterator()
 			for {
 				val, hasNext := iter.Next()
@@ -341,9 +341,9 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		// Generate Cartesian product
-		result := make(core.ListValue, 0)
-		var generate func(int, core.ListValue)
-		generate = func(depth int, current core.ListValue) {
+		result := make([]core.Value, 0)
+		var generate func(int, []core.Value)
+		generate = func(depth int, current []core.Value) {
 			if depth == len(lists) {
 				tuple := make(core.TupleValue, len(current))
 				copy(tuple, current)
@@ -356,8 +356,8 @@ func InitItertoolsModule() *core.DictValue {
 			}
 		}
 
-		generate(0, core.ListValue{})
-		return result, nil
+		generate(0, []core.Value{})
+		return core.NewList(result...), nil
 	}))
 
 	// combinations - r-length tuples from input iterable
@@ -379,7 +379,7 @@ func InitItertoolsModule() *core.DictValue {
 		rInt := int(r)
 
 		// Convert to list
-		items := make(core.ListValue, 0)
+		items := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		for {
 			val, hasNext := iter.Next()
@@ -390,9 +390,9 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		// Generate combinations
-		result := make(core.ListValue, 0)
-		var generate func(int, int, core.ListValue)
-		generate = func(start, depth int, current core.ListValue) {
+		result := make([]core.Value, 0)
+		var generate func(int, int, []core.Value)
+		generate = func(start, depth int, current []core.Value) {
 			if depth == rInt {
 				tuple := make(core.TupleValue, len(current))
 				copy(tuple, current)
@@ -405,8 +405,8 @@ func InitItertoolsModule() *core.DictValue {
 			}
 		}
 
-		generate(0, 0, core.ListValue{})
-		return result, nil
+		generate(0, 0, []core.Value{})
+		return core.NewList(result...), nil
 	}))
 
 	// starmap - map function over iterable where each item is unpacked as function arguments
@@ -427,7 +427,7 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 
 		for {
@@ -439,8 +439,8 @@ func InitItertoolsModule() *core.DictValue {
 			// Unpack the value as arguments
 			var callArgs []core.Value
 			switch item := val.(type) {
-			case core.ListValue:
-				callArgs = item
+			case *core.ListValue:
+				callArgs = item.Items()
 			case core.TupleValue:
 				callArgs = []core.Value(item)
 			case core.Iterable:
@@ -467,7 +467,7 @@ func InitItertoolsModule() *core.DictValue {
 			result = append(result, funcResult)
 		}
 
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	return itertoolsModule

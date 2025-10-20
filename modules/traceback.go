@@ -33,7 +33,7 @@ func newTracebackException(args []core.Value, ctx *core.Context) (core.Value, er
 	obj.SetWithKey("format", core.StringValue("format"),
 		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Return empty list of formatted lines
-			return core.ListValue{}, nil
+			return core.NewList(), nil
 		}))
 
 	return obj, nil

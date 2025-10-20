@@ -10,19 +10,19 @@ import (
 
 // GetItemForm implements the get-item special form for index access
 // (get-item obj key) -> value at index/key
-func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("get-item requires exactly 2 arguments, got %d", len(args))
+func GetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 2 {
+		return nil, fmt.Errorf("get-item requires exactly 2 arguments, got %d", args.Len())
 	}
 
 	// Evaluate the object
-	obj, err := Eval(args[0], ctx)
+	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating object: %v", err)
 	}
 
 	// Evaluate the key/index
-	key, err := Eval(args[1], ctx)
+	key, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating key: %v", err)
 	}
@@ -49,23 +49,23 @@ func GetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // SetItemForm implements the set-item special form for index assignment
 // (set-item obj key value) -> value
-func SetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 3 {
-		return nil, fmt.Errorf("set-item requires exactly 3 arguments, got %d", len(args))
+func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 3 {
+		return nil, fmt.Errorf("set-item requires exactly 3 arguments, got %d", args.Len())
 	}
 
 	// Evaluate all arguments
-	obj, err := Eval(args[0], ctx)
+	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating object: %v", err)
 	}
 
-	key, err := Eval(args[1], ctx)
+	key, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating key: %v", err)
 	}
 
-	value, err := Eval(args[2], ctx)
+	value, err := Eval(args.Items()[2], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating value: %v", err)
 	}
@@ -97,13 +97,13 @@ func SetItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // SliceForm implements the slice special form
 // (slice obj start end step) -> sliced object
-func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 4 {
-		return nil, fmt.Errorf("slice requires exactly 4 arguments, got %d", len(args))
+func SliceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 4 {
+		return nil, fmt.Errorf("slice requires exactly 4 arguments, got %d", args.Len())
 	}
 
 	// Evaluate the object
-	obj, err := Eval(args[0], ctx)
+	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating object: %v", err)
 	}
@@ -130,18 +130,18 @@ func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get slice parameters
-	start, err := getInt(args[1], nil)
+	start, err := getInt(args.Items()[1], nil)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating start: %v", err)
 	}
 
-	end, err := getInt(args[2], nil)
+	end, err := getInt(args.Items()[2], nil)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating end: %v", err)
 	}
 
 	defaultStep := 1
-	step, err := getInt(args[3], &defaultStep)
+	step, err := getInt(args.Items()[3], &defaultStep)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating step: %v", err)
 	}
@@ -152,17 +152,17 @@ func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Handle different object types
 	switch v := obj.(type) {
-	case core.ListValue:
-		return sliceList(v, start, end, step)
+	case *core.ListValue:
+		return sliceList(v.Items(), start, end, step)
 
 	case core.TupleValue:
-		result, err := sliceList(core.ListValue(v), start, end, step)
+		result, err := sliceList(v, start, end, step)
 		if err != nil {
 			return nil, err
 		}
 		// Convert back to tuple
-		if list, ok := result.(core.ListValue); ok {
-			return core.TupleValue(list), nil
+		if list, ok := result.(*core.ListValue); ok {
+			return core.TupleValue(list.Items()), nil
 		}
 		return result, nil
 
@@ -181,14 +181,14 @@ func SliceForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // sliceList performs slicing on a list
-func sliceList(list core.ListValue, start, end, step *int) (core.Value, error) {
+func sliceList(list []core.Value, start, end, step *int) (core.Value, error) {
 	length := len(list)
 
 	// Normalize indices
 	startIdx, endIdx, stepVal := normalizeSliceIndices(length, start, end, step)
 
 	// Build result
-	result := make(core.ListValue, 0)
+	result := make([]core.Value, 0)
 
 	if stepVal > 0 {
 		for i := startIdx; i < endIdx; i += stepVal {
@@ -204,7 +204,7 @@ func sliceList(list core.ListValue, start, end, step *int) (core.Value, error) {
 		}
 	}
 
-	return result, nil
+	return core.NewList(result...), nil
 }
 
 // sliceString performs slicing on a string
@@ -395,16 +395,16 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 
 	// Handle different object types
 	switch v := obj.(type) {
-	case core.ListValue:
-		return sliceList(v, start, stop, step)
+	case *core.ListValue:
+		return sliceList(v.Items(), start, stop, step)
 	case core.TupleValue:
-		result, err := sliceList(core.ListValue(v), start, stop, step)
+		result, err := sliceList(v, start, stop, step)
 		if err != nil {
 			return nil, err
 		}
 		// Convert result back to tuple
-		if list, ok := result.(core.ListValue); ok {
-			return core.TupleValue(list), nil
+		if list, ok := result.(*core.ListValue); ok {
+			return core.TupleValue(list.Items()), nil
 		}
 		return result, nil
 	case core.StringValue:
@@ -420,19 +420,19 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 
 // DelItemForm implements the del-item special form for index deletion
 // (del-item obj key) -> nil
-func DelItemForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("del-item requires exactly 2 arguments, got %d", len(args))
+func DelItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() != 2 {
+		return nil, fmt.Errorf("del-item requires exactly 2 arguments, got %d", args.Len())
 	}
 
 	// Evaluate the object
-	obj, err := Eval(args[0], ctx)
+	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating object: %v", err)
 	}
 
 	// Evaluate the key/index
-	key, err := Eval(args[1], ctx)
+	key, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating key: %v", err)
 	}

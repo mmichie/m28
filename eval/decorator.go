@@ -9,15 +9,15 @@ import (
 
 // decoratorForm handles decorator application: (@decorator form)
 // Evaluates form first, then applies decorator to the result
-func decoratorForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
+func decoratorForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 2 {
 		return nil, fmt.Errorf("decorator requires at least a decorator and a form")
 	}
 
 	// First argument should be the decorator symbol (starting with @)
-	decoratorSym, ok := args[0].(core.SymbolValue)
+	decoratorSym, ok := args.Items()[0].(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("decorator: first argument must be a symbol, got %v", args[0].Type())
+		return nil, fmt.Errorf("decorator: first argument must be a symbol, got %v", args.Items()[0].Type())
 	}
 
 	decoratorName := string(decoratorSym)
@@ -30,7 +30,7 @@ func decoratorForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Evaluate the form to be decorated (usually a def)
 	// This will define the function and return it
-	decorated, err := Eval(args[1], ctx)
+	decorated, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating decorated form: %v", err)
 	}
@@ -55,18 +55,18 @@ func decoratorForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// If the decorated form was a function definition, we need to re-assign it
 	// Check if the original form was a (def name ...) form
-	if defForm, ok := args[1].(core.ListValue); ok && len(defForm) > 0 {
-		if sym, ok := defForm[0].(core.SymbolValue); ok && string(sym) == "def" {
+	if defForm, ok := args.Items()[1].(*core.ListValue); ok && defForm.Len() > 0 {
+		if sym, ok := defForm.Items()[0].(core.SymbolValue); ok && string(sym) == "def" {
 			// Extract the function name from the def form
 			var funcName string
-			if len(defForm) > 1 {
+			if defForm.Len() > 1 {
 				// Check different def forms
-				if nameSym, ok := defForm[1].(core.SymbolValue); ok {
+				if nameSym, ok := defForm.Items()[1].(core.SymbolValue); ok {
 					// (def name ...)
 					funcName = string(nameSym)
-				} else if nameList, ok := defForm[1].(core.ListValue); ok && len(nameList) > 0 {
+				} else if nameList, ok := defForm.Items()[1].(*core.ListValue); ok && nameList.Len() > 0 {
 					// (def (name args) ...)
-					if nameSym, ok := nameList[0].(core.SymbolValue); ok {
+					if nameSym, ok := nameList.Items()[0].(core.SymbolValue); ok {
 						funcName = string(nameSym)
 					}
 				}
@@ -90,13 +90,13 @@ func RegisterDecoratorForms() {
 }
 
 // isDecoratorForm checks if a list is a decorator application
-func isDecoratorForm(list core.ListValue) bool {
-	if len(list) < 2 {
+func isDecoratorForm(list *core.ListValue) bool {
+	if list.Len() < 2 {
 		return false
 	}
 
 	// Check if first element is a symbol starting with @
-	if sym, ok := list[0].(core.SymbolValue); ok {
+	if sym, ok := list.Items()[0].(core.SymbolValue); ok {
 		return strings.HasPrefix(string(sym), "@")
 	}
 
@@ -104,7 +104,7 @@ func isDecoratorForm(list core.ListValue) bool {
 }
 
 // evalDecoratorForm evaluates a decorator form
-func evalDecoratorForm(list core.ListValue, ctx *core.Context) (core.Value, error) {
+func evalDecoratorForm(list *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return decoratorForm(list, ctx)
 }
 
@@ -131,13 +131,13 @@ func isMacroCall(sym core.SymbolValue, ctx *core.Context) bool {
 }
 
 // evalMacroCall evaluates a macro call by expanding it first
-func evalMacroCall(list core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(list) == 0 {
+func evalMacroCall(list *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if list.Len() == 0 {
 		return nil, fmt.Errorf("empty macro call")
 	}
 
 	// Get the macro function
-	macroSym, ok := list[0].(core.SymbolValue)
+	macroSym, ok := list.Items()[0].(core.SymbolValue)
 	if !ok {
 		return nil, fmt.Errorf("macro name must be a symbol")
 	}
@@ -155,8 +155,8 @@ func evalMacroCall(list core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Call the macro with UNEVALUATED arguments
 	// This is the key difference from regular functions
-	args := make([]core.Value, len(list)-1)
-	for i, arg := range list[1:] {
+	args := make([]core.Value, list.Len()-1)
+	for i, arg := range list.Items()[1:] {
 		args[i] = arg // Pass raw AST, not evaluated
 	}
 

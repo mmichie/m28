@@ -174,7 +174,7 @@ func InitDictMethods() {
 				items = append(items, pair)
 			}
 
-			return ListValue(items), nil
+			return NewList(items...), nil
 		},
 	}
 
@@ -197,7 +197,7 @@ func InitDictMethods() {
 					keyValues[i] = StringValue(k)
 				}
 			}
-			return ListValue(keyValues), nil
+			return NewList(keyValues...), nil
 		},
 	}
 
@@ -216,7 +216,7 @@ func InitDictMethods() {
 				values = append(values, v)
 			}
 
-			return ListValue(values), nil
+			return NewList(values...), nil
 		},
 	}
 

@@ -107,7 +107,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				dict := receiver.(*DictValue)
-				keys := make(ListValue, 0, dict.Size())
+				keys := make([]Value, 0, dict.Size())
 				for k := range dict.entries {
 					// Convert back from internal key representation
 					if strings.HasPrefix(k, "s:") {
@@ -119,7 +119,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 					}
 					// TODO: Handle other key types
 				}
-				return keys, nil
+				return NewList(keys...), nil
 			},
 		},
 		"values": {
@@ -129,11 +129,11 @@ func getDictMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				dict := receiver.(*DictValue)
-				values := make(ListValue, 0, dict.Size())
+				values := make([]Value, 0, dict.Size())
 				for _, v := range dict.entries {
 					values = append(values, v)
 				}
-				return values, nil
+				return NewList(values...), nil
 			},
 		},
 		"items": {
@@ -143,7 +143,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				dict := receiver.(*DictValue)
-				items := make(ListValue, 0, dict.Size())
+				items := make([]Value, 0, dict.Size())
 				for k, v := range dict.entries {
 					// Convert back from internal key representation
 					var key Value
@@ -157,7 +157,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 					// Create a tuple for the key-value pair
 					items = append(items, TupleValue{key, v})
 				}
-				return items, nil
+				return NewList(items...), nil
 			},
 		},
 		"pop": {
@@ -336,7 +336,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				// For now, return the keys as a list
 				dict := receiver.(*DictValue)
-				keys := make(ListValue, 0, dict.Size())
+				keys := make([]Value, 0, dict.Size())
 				for k := range dict.entries {
 					// Convert back from internal key representation
 					if strings.HasPrefix(k, "s:") {
@@ -348,7 +348,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 					}
 					// TODO: Handle other key types
 				}
-				return keys, nil
+				return NewList(keys...), nil
 			},
 		},
 	}

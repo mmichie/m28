@@ -8,10 +8,10 @@
     (= result [])
     (for idx in (range (len arr))
       (if (== idx i)
-        (= result (result.append (nth arr j)))
+        (result.append (nth arr j))
         (if (== idx j)
-          (= result (result.append (nth arr i)))
-          (= result (result.append (nth arr idx))))))
+          (result.append (nth arr i))
+          (result.append (nth arr idx)))))
     result)
   
   (def bubble_pass (arr n)
@@ -44,10 +44,10 @@
     (= result [])
     (for idx in (range (len arr))
       (if (== idx i)
-        (= result (result.append (nth arr j)))
+        (result.append (nth arr j))
         (if (== idx j)
-          (= result (result.append (nth arr i)))
-          (= result (result.append (nth arr idx))))))
+          (result.append (nth arr i))
+          (result.append (nth arr idx)))))
     result)
   
   (= arr lst)
@@ -110,19 +110,19 @@
   (while (and (< i (len left)) (< j (len right)))
     (if (<= (nth left i) (nth right j))
       (do
-        (= result (result.append (nth left i)))
+        (result.append (nth left i))
         (= i (+ i 1)))
       (do
-        (= result (result.append (nth right j)))
+        (result.append (nth right j))
         (= j (+ j 1)))))
   
   # Add remaining elements
   (while (< i (len left))
-    (= result (result.append (nth left i)))
+    (result.append (nth left i))
     (= i (+ i 1)))
   
   (while (< j (len right))
-    (= result (result.append (nth right j)))
+    (result.append (nth right j))
     (= j (+ j 1)))
   
   result)

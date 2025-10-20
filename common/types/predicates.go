@@ -24,7 +24,7 @@ func IsBool(v core.Value) bool {
 
 // IsList checks if value is a ListValue
 func IsList(v core.Value) bool {
-	_, ok := v.(core.ListValue)
+	_, ok := v.(*core.ListValue)
 	return ok
 }
 
@@ -72,7 +72,7 @@ func IsNil(v core.Value) bool {
 // IsContainer checks if value is any container type (List, Tuple, Dict, Set)
 func IsContainer(v core.Value) bool {
 	switch v.(type) {
-	case core.ListValue, core.TupleValue, *core.DictValue, *core.SetValue:
+	case *core.ListValue, core.TupleValue, *core.DictValue, *core.SetValue:
 		return true
 	default:
 		return false
@@ -82,7 +82,7 @@ func IsContainer(v core.Value) bool {
 // IsSequence checks if value is a sequence type (List, Tuple, String, Range)
 func IsSequence(v core.Value) bool {
 	switch v.(type) {
-	case core.ListValue, core.TupleValue, core.StringValue, *core.RangeValue:
+	case *core.ListValue, core.TupleValue, core.StringValue, *core.RangeValue:
 		return true
 	default:
 		return false

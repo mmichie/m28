@@ -25,9 +25,9 @@ func registerTupleType() {
 					copy(result, tuple)
 					return result, nil
 				}
-				if list, ok := arg.(ListValue); ok {
-					result := make(TupleValue, len(list))
-					copy(result, []Value(list))
+				if list, ok := arg.(*ListValue); ok {
+					result := make(TupleValue, list.Len())
+					copy(result, list.Items())
 					return result, nil
 				}
 				// Try to iterate

@@ -33,8 +33,8 @@ func registerFrozenSetType() {
 					for _, item := range v.items {
 						result.Add(item)
 					}
-				case ListValue:
-					for _, item := range v {
+				case *ListValue:
+					for _, item := range v.Items() {
 						result.Add(item)
 					}
 				case TupleValue:

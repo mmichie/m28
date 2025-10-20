@@ -299,16 +299,16 @@ func TestComprehensionForm_ListComp_NoFilter(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if list.Len() != 4 {
-		t.Fatalf("Expected 4 elements, got %d", list.Len())
+	if len(list) != 4 {
+		t.Fatalf("Expected 4 elements, got %d", len(list))
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "list-comp" {
-		t.Errorf("Expected 'list-comp' symbol, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "list-comp" {
+		t.Errorf("Expected 'list-comp' symbol, got %v", list[0])
 	}
 
 	// Check variable symbol
-	if sym, ok := list.Items()[2].(core.SymbolValue); !ok || string(sym) != "x" {
-		t.Errorf("Expected variable 'x' symbol, got %v", list.Items()[2])
+	if sym, ok := list[2].(core.SymbolValue); !ok || string(sym) != "x" {
+		t.Errorf("Expected variable 'x' symbol, got %v", list[2])
 	}
 }
 
@@ -326,8 +326,8 @@ func TestComprehensionForm_ListComp_WithFilter(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if list.Len() != 5 {
-		t.Fatalf("Expected 5 elements (with filter), got %d", list.Len())
+	if len(list) != 5 {
+		t.Fatalf("Expected 5 elements (with filter), got %d", len(list))
 	}
 }
 
@@ -345,15 +345,15 @@ func TestComprehensionForm_DictComp(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if list.Len() != 5 {
-		t.Fatalf("Expected 5 elements (dict-comp, key-expr, value-expr, var, iterable), got %d", list.Len())
+	if len(list) != 5 {
+		t.Fatalf("Expected 5 elements (dict-comp, key-expr, value-expr, var, iterable), got %d", len(list))
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "dict-comp" {
-		t.Errorf("Expected 'dict-comp' symbol, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "dict-comp" {
+		t.Errorf("Expected 'dict-comp' symbol, got %v", list[0])
 	}
 	// Verify variable is a symbol
-	if sym, ok := list.Items()[3].(core.SymbolValue); !ok || string(sym) != "k" {
-		t.Errorf("Expected variable 'k', got %v", list.Items()[3])
+	if sym, ok := list[3].(core.SymbolValue); !ok || string(sym) != "k" {
+		t.Errorf("Expected variable 'k', got %v", list[3])
 	}
 }
 
@@ -370,8 +370,8 @@ func TestComprehensionForm_SetComp(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "set-comp" {
-		t.Errorf("Expected 'set-comp' symbol, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "set-comp" {
+		t.Errorf("Expected 'set-comp' symbol, got %v", list[0])
 	}
 }
 
@@ -388,8 +388,8 @@ func TestComprehensionForm_GeneratorComp(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "gen-comp" {
-		t.Errorf("Expected 'gen-comp' symbol, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "gen-comp" {
+		t.Errorf("Expected 'gen-comp' symbol, got %v", list[0])
 	}
 }
 
@@ -411,14 +411,14 @@ func TestWithForm_Single(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if list.Len() != 4 {
-		t.Fatalf("Expected 4 elements, got %d", list.Len())
+	if len(list) != 4 {
+		t.Fatalf("Expected 4 elements, got %d", len(list))
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "with" {
-		t.Errorf("Expected 'with' symbol, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "with" {
+		t.Errorf("Expected 'with' symbol, got %v", list[0])
 	}
-	if sym, ok := list.Items()[2].(core.SymbolValue); !ok || string(sym) != "f" {
-		t.Errorf("Expected 'f' variable, got %v", list.Items()[2])
+	if sym, ok := list[2].(core.SymbolValue); !ok || string(sym) != "f" {
+		t.Errorf("Expected 'f' variable, got %v", list[2])
 	}
 }
 
@@ -436,8 +436,8 @@ func TestWithForm_NoVariable(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if list.Items()[2] != core.None {
-		t.Errorf("Expected None for missing variable, got %v", list.Items()[2])
+	if list[2] != core.None {
+		t.Errorf("Expected None for missing variable, got %v", list[2])
 	}
 }
 
@@ -459,17 +459,17 @@ func TestWithForm_Multiple(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "with" {
-		t.Errorf("Expected 'with' symbol, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "with" {
+		t.Errorf("Expected 'with' symbol, got %v", list[0])
 	}
 
 	// Check nested structure
-	innerWith, ok := list.Items()[3].(*core.ListValue)
+	innerWith, ok := list[3].(core.ListValue)
 	if !ok {
-		t.Fatalf("Expected nested with, got %T", list.Items()[3])
+		t.Fatalf("Expected nested with, got %T", list[3])
 	}
-	if sym, ok := innerWith.Items()[0].(core.SymbolValue); !ok || string(sym) != "with" {
-		t.Errorf("Expected nested 'with' symbol, got %v", innerWith.Items()[0])
+	if sym, ok := innerWith[0].(core.SymbolValue); !ok || string(sym) != "with" {
+		t.Errorf("Expected nested 'with' symbol, got %v", innerWith[0])
 	}
 }
 
@@ -496,20 +496,20 @@ func TestTryForm_SimpleExcept(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if list.Len() != 3 {
-		t.Fatalf("Expected 3 elements, got %d", list.Len())
+	if len(list) != 3 {
+		t.Fatalf("Expected 3 elements, got %d", len(list))
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "try" {
-		t.Errorf("Expected 'try' symbol, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "try" {
+		t.Errorf("Expected 'try' symbol, got %v", list[0])
 	}
 
 	// Check except clause
-	exceptClause, ok := list.Items()[2].(*core.ListValue)
+	exceptClause, ok := list[2].(core.ListValue)
 	if !ok {
-		t.Fatalf("Expected except clause ListValue, got %T", list.Items()[2])
+		t.Fatalf("Expected except clause ListValue, got %T", list[2])
 	}
-	if sym, ok := exceptClause.Items()[0].(core.SymbolValue); !ok || string(sym) != "except" {
-		t.Errorf("Expected 'except' symbol, got %v", exceptClause.Items()[0])
+	if sym, ok := exceptClause[0].(core.SymbolValue); !ok || string(sym) != "except" {
+		t.Errorf("Expected 'except' symbol, got %v", exceptClause[0])
 	}
 }
 
@@ -533,12 +533,12 @@ func TestTryForm_ExceptWithVariable(t *testing.T) {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	exceptClause, ok := list.Items()[2].(*core.ListValue)
+	exceptClause, ok := list[2].(core.ListValue)
 	if !ok {
-		t.Fatalf("Expected except clause ListValue, got %T", list.Items()[2])
+		t.Fatalf("Expected except clause ListValue, got %T", list[2])
 	}
-	if exceptClause.Len() != 4 {
-		t.Fatalf("Expected 4 elements in except (except Type var body), got %d", exceptClause.Len())
+	if len(exceptClause) != 4 {
+		t.Fatalf("Expected 4 elements in except (except Type var body), got %d", len(exceptClause))
 	}
 }
 
@@ -562,12 +562,12 @@ func TestTryForm_BareExcept(t *testing.T) {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	exceptClause, ok := list.Items()[2].(*core.ListValue)
+	exceptClause, ok := list[2].(core.ListValue)
 	if !ok {
-		t.Fatalf("Expected except clause ListValue, got %T", list.Items()[2])
+		t.Fatalf("Expected except clause ListValue, got %T", list[2])
 	}
-	if exceptClause.Len() != 2 {
-		t.Fatalf("Expected 2 elements in bare except (except body), got %d", exceptClause.Len())
+	if len(exceptClause) != 2 {
+		t.Fatalf("Expected 2 elements in bare except (except body), got %d", len(exceptClause))
 	}
 }
 
@@ -587,9 +587,9 @@ func TestTryForm_WithFinally(t *testing.T) {
 
 	// Should have try body and finally clause
 	found := false
-	for _, item := range list.Items() {
-		if itemList, ok := item.(*core.ListValue); ok && itemList.Len() > 0 {
-			if sym, ok := itemList.Items()[0].(core.SymbolValue); ok && string(sym) == "finally" {
+	for _, item := range list {
+		if itemList, ok := item.(*core.ListValue); ok && len(itemList) > 0 {
+			if sym, ok := itemList[0].(core.SymbolValue); ok && string(sym) == "finally" {
 				found = true
 				break
 			}
@@ -621,9 +621,9 @@ func TestTryForm_WithElse(t *testing.T) {
 	}
 
 	found := false
-	for _, item := range list.Items() {
-		if itemList, ok := item.(*core.ListValue); ok && itemList.Len() > 0 {
-			if sym, ok := itemList.Items()[0].(core.SymbolValue); ok && string(sym) == "else" {
+	for _, item := range list {
+		if itemList, ok := item.(*core.ListValue); ok && len(itemList) > 0 {
+			if sym, ok := itemList[0].(core.SymbolValue); ok && string(sym) == "else" {
 				found = true
 				break
 			}
@@ -658,9 +658,9 @@ func TestTryForm_MultipleExcept(t *testing.T) {
 	}
 
 	exceptCount := 0
-	for _, item := range list.Items() {
-		if itemList, ok := item.(*core.ListValue); ok && itemList.Len() > 0 {
-			if sym, ok := itemList.Items()[0].(core.SymbolValue); ok && string(sym) == "except" {
+	for _, item := range list {
+		if itemList, ok := item.(*core.ListValue); ok && len(itemList) > 0 {
+			if sym, ok := itemList[0].(core.SymbolValue); ok && string(sym) == "except" {
 				exceptCount++
 			}
 		}
@@ -691,11 +691,11 @@ func TestClassForm_Simple(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "class" {
-		t.Errorf("Expected 'class' symbol, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "class" {
+		t.Errorf("Expected 'class' symbol, got %v", list[0])
 	}
-	if sym, ok := list.Items()[1].(core.SymbolValue); !ok || string(sym) != "Foo" {
-		t.Errorf("Expected 'Foo' class name, got %v", list.Items()[1])
+	if sym, ok := list[1].(core.SymbolValue); !ok || string(sym) != "Foo" {
+		t.Errorf("Expected 'Foo' class name, got %v", list[1])
 	}
 }
 
@@ -713,13 +713,13 @@ func TestClassForm_WithBase(t *testing.T) {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	// list.Items()[2] should be the bases list
-	bases, ok := list.Items()[2].(*core.ListValue)
+	// list[2] should be the bases list
+	bases, ok := list[2].(core.ListValue)
 	if !ok {
-		t.Fatalf("Expected bases ListValue, got %T", list.Items()[2])
+		t.Fatalf("Expected bases ListValue, got %T", list[2])
 	}
-	if bases.Len() != 1 {
-		t.Errorf("Expected 1 base class, got %d", bases.Len())
+	if len(bases) != 1 {
+		t.Errorf("Expected 1 base class, got %d", len(bases))
 	}
 }
 
@@ -736,8 +736,8 @@ func TestClassForm_WithDecorator(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "=" {
-		t.Errorf("Expected '=' assignment for decorated class, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "=" {
+		t.Errorf("Expected '=' assignment for decorated class, got %v", list[0])
 	}
 }
 
@@ -755,8 +755,8 @@ func TestClassForm_WithMultipleDecorators(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
-	if sym, ok := list.Items()[0].(core.SymbolValue); !ok || string(sym) != "=" {
-		t.Errorf("Expected '=' for decorated class, got %v", list.Items()[0])
+	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "=" {
+		t.Errorf("Expected '=' for decorated class, got %v", list[0])
 	}
 }
 

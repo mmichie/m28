@@ -1912,7 +1912,7 @@ func (p *PythonParser) parseListLiteral() ast.ASTNode {
 	if p.check(TOKEN_RBRACKET) {
 		// Empty list
 		p.advance()
-		return ast.NewLiteral(core.ListValue{}, p.makeLocation(tok), ast.SyntaxPython)
+		return ast.NewLiteral(core.NewList(), p.makeLocation(tok), ast.SyntaxPython)
 	}
 
 	// Parse first element
@@ -3190,11 +3190,11 @@ func (p *PythonParser) convertValueToASTNode(value core.Value, tok Token) ast.AS
 		// Simple string result - return as literal
 		return ast.NewLiteral(v, p.makeLocation(tok), ast.SyntaxPython)
 
-	case core.ListValue:
+	case *core.ListValue:
 		// F-string with interpolations returns a list like (format ...)
 		// Convert to SExpr
-		nodes := make([]ast.ASTNode, len(v))
-		for i, elem := range v {
+		nodes := make([]ast.ASTNode, v.Len())
+		for i, elem := range v.Items() {
 			nodes[i] = p.convertValueToASTNode(elem, tok)
 		}
 		return ast.NewSExpr(nodes, p.makeLocation(tok), ast.SyntaxPython)

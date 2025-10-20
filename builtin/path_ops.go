@@ -43,10 +43,10 @@ func parsePath(pathValue core.Value) ([]interface{}, error) {
 		}
 		return segments, nil
 
-	case core.ListValue:
+	case *core.ListValue:
 		// Use list path as-is: ["user", 0, "name"]
-		segments := make([]interface{}, len(p))
-		for i, seg := range p {
+		segments := make([]interface{}, p.Len())
+		for i, seg := range p.Items() {
 			switch s := seg.(type) {
 			case core.StringValue:
 				segments[i] = string(s)
@@ -94,11 +94,11 @@ func getAtPath(data core.Value, segments []interface{}) (core.Value, bool) {
 
 		case int:
 			// Try list/tuple index access
-			if list, ok := current.(core.ListValue); ok {
-				if seg < 0 || seg >= len(list) {
+			if list, ok := current.(*core.ListValue); ok {
+				if seg < 0 || seg >= list.Len() {
 					return nil, false
 				}
-				current = list[seg]
+				current = list.Items()[seg]
 				continue
 			}
 
@@ -175,17 +175,17 @@ func setAtPath(data core.Value, segments []interface{}, value core.Value) (core.
 
 	case int:
 		// Handle list
-		if list, ok := data.(core.ListValue); ok {
-			if seg < 0 || seg >= len(list) {
+		if list, ok := data.(*core.ListValue); ok {
+			if seg < 0 || seg >= list.Len() {
 				return nil, fmt.Errorf("list index out of range: %d", seg)
 			}
 
 			// Clone list
-			newList := make(core.ListValue, len(list))
-			copy(newList, list)
+			newList := make([]core.Value, list.Len())
+			copy(newList, list.Items())
 
 			// Get current value at index
-			current := list[seg]
+			current := list.Items()[seg]
 
 			// Recursively set on remaining path
 			newValue, err := setAtPath(current, remaining, value)
@@ -194,7 +194,7 @@ func setAtPath(data core.Value, segments []interface{}, value core.Value) (core.
 			}
 
 			newList[seg] = newValue
-			return newList, nil
+			return core.NewList(newList...), nil
 		}
 
 		return nil, fmt.Errorf("cannot use integer index %d on %s", seg, data.Type())

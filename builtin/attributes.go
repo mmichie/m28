@@ -33,7 +33,7 @@ func RegisterAttributes(ctx *core.Context) {
 						return nil, err
 					}
 					// Ensure it returns a list
-					if list, ok := result.(core.ListValue); ok {
+					if list, ok := result.(*core.ListValue); ok {
 						return list, nil
 					}
 					return nil, fmt.Errorf("__dir__() must return a list, not %s", result.Type())
@@ -50,7 +50,7 @@ func RegisterAttributes(ctx *core.Context) {
 
 		// Get all attribute names
 		names := desc.GetAttributeNames()
-		result := make(core.ListValue, len(names))
+		result := make([]core.Value, len(names))
 		for i, name := range names {
 			result[i] = core.StringValue(name)
 		}
@@ -60,7 +60,7 @@ func RegisterAttributes(ctx *core.Context) {
 			return string(result[i].(core.StringValue)) < string(result[j].(core.StringValue))
 		})
 
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// callable - check if object is callable

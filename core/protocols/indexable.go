@@ -8,11 +8,11 @@ import (
 
 // ListIndexable adapts ListValue to Indexable protocol
 type ListIndexable struct {
-	list core.ListValue
+	list *core.ListValue
 }
 
 // NewListIndexable creates an Indexable adapter for lists
-func NewListIndexable(list core.ListValue) Indexable {
+func NewListIndexable(list *core.ListValue) Indexable {
 	return &ListIndexable{list: list}
 }
 
@@ -25,14 +25,14 @@ func (l *ListIndexable) GetIndex(index core.Value) (core.Value, error) {
 
 	i := int(idx)
 	if i < 0 {
-		i = len(l.list) + i
+		i = l.list.Len() + i
 	}
 
-	if i < 0 || i >= len(l.list) {
-		return nil, &core.IndexError{Index: i, Length: len(l.list)}
+	if i < 0 || i >= l.list.Len() {
+		return nil, &core.IndexError{Index: i, Length: l.list.Len()}
 	}
 
-	return l.list[i], nil
+	return l.list.Items()[i], nil
 }
 
 // SetIndex returns error as lists are immutable
@@ -49,10 +49,10 @@ func (l *ListIndexable) HasIndex(index core.Value) bool {
 
 	i := int(idx)
 	if i < 0 {
-		i = len(l.list) + i
+		i = l.list.Len() + i
 	}
 
-	return i >= 0 && i < len(l.list)
+	return i >= 0 && i < l.list.Len()
 }
 
 // DeleteIndex returns error as lists are immutable
@@ -380,7 +380,7 @@ func (d *DunderIndexable) DeleteIndex(index core.Value) error {
 // GetIndexableOps returns an Indexable implementation for a value if possible
 func GetIndexableOps(v core.Value) (Indexable, bool) {
 	switch val := v.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		return NewListIndexable(val), true
 	case *core.DictValue:
 		return NewDictIndexable(val), true

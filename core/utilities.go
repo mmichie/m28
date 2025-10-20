@@ -44,13 +44,15 @@ func EqualValues(a, b Value) bool {
 	case NilValue:
 		_, ok := b.(NilValue)
 		return ok
-	case ListValue:
-		if bVal, ok := b.(ListValue); ok {
-			if len(aVal) != len(bVal) {
+	case *ListValue:
+		if bVal, ok := b.(*ListValue); ok {
+			if aVal.Len() != bVal.Len() {
 				return false
 			}
-			for i := range aVal {
-				if !EqualValues(aVal[i], bVal[i]) {
+			aItems := aVal.Items()
+			bItems := bVal.Items()
+			for i := range aItems {
+				if !EqualValues(aItems[i], bItems[i]) {
 					return false
 				}
 			}
@@ -229,8 +231,8 @@ func IsTruthy(v Value) bool {
 		return float64(val) != 0
 	case StringValue:
 		return string(val) != ""
-	case ListValue:
-		return len(val) > 0
+	case *ListValue:
+		return val.Len() > 0
 	case TupleValue:
 		return len(val) > 0
 	case NilValue:

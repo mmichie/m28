@@ -228,7 +228,7 @@ func (p *Path) createRegistry() *core.MethodRegistry {
 					result[i] = NewPath(match)
 				}
 
-				return core.ListValue(result), nil
+				return core.NewList(result...), nil
 			}),
 
 		// joinpath method

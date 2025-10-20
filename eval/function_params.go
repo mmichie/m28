@@ -37,7 +37,7 @@ func (sig *FunctionSignature) MaxArgs() int {
 
 // ParseParameterList parses a parameter list into a FunctionSignature
 // Supports: (a b c=10 d=20 *args **kwargs)
-func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
+func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 	// Debug: print what we received
 	// fmt.Printf("DEBUG ParseParameterList: received %d params\n", len(paramList))
 	// for i, p := range paramList {
@@ -46,7 +46,7 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 
 	// First, transform Python-style parameters (name=value) to M28 style ((name value))
 	// Also handle (* args) and (** kwargs) parsed as separate tokens
-	transformedParams := make(core.ListValue, 0, len(paramList))
+	transformedParams := make([]core.Value, 0, len(paramList))
 
 	i := 0
 	for i < len(paramList) {
@@ -104,7 +104,7 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 					defaultValue = core.SymbolValue(valueStr)
 				}
 
-				defaultParam := core.ListValue{paramName, defaultValue}
+				defaultParam := core.NewList(paramName, defaultValue)
 				transformedParams = append(transformedParams, defaultParam)
 				i++
 				continue
@@ -114,7 +114,7 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 				// This is Python-style: name= value
 				// Transform to M28 style: (name value)
 				paramName := core.SymbolValue(symStr[:len(symStr)-1]) // Remove the =
-				defaultParam := core.ListValue{paramName, paramList[i+1]}
+				defaultParam := core.NewList(paramName, paramList[i+1])
 				transformedParams = append(transformedParams, defaultParam)
 				i += 2 // Skip name= and value
 				continue
@@ -126,7 +126,7 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 			if eq, ok := paramList[i+1].(core.SymbolValue); ok && string(eq) == "=" {
 				// This is Python-style: name = value
 				// Transform to M28 style: (name value)
-				defaultParam := core.ListValue{sym, paramList[i+2]}
+				defaultParam := core.NewList(sym, paramList[i+2])
 				transformedParams = append(transformedParams, defaultParam)
 				i += 3 // Skip name, =, and value
 				continue
@@ -192,12 +192,12 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 				HasDefault: false,
 			})
 
-		case core.ListValue:
+		case *core.ListValue:
 			// Check if this is a varargs parameter parsed as (* args) or (** kwargs)
-			if len(p) == 2 {
-				if star, ok := p[0].(core.SymbolValue); ok && string(star) == "*" {
+			if p.Len() == 2 {
+				if star, ok := p.Items()[0].(core.SymbolValue); ok && string(star) == "*" {
 					// This is (*args) - varargs parameter
-					if argSym, ok := p[1].(core.SymbolValue); ok {
+					if argSym, ok := p.Items()[1].(core.SymbolValue); ok {
 						if seenRest {
 							return nil, fmt.Errorf("multiple *args parameters not allowed")
 						}
@@ -209,9 +209,9 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 						continue
 					}
 				}
-				if dstar, ok := p[0].(core.SymbolValue); ok && string(dstar) == "**" {
+				if dstar, ok := p.Items()[0].(core.SymbolValue); ok && string(dstar) == "**" {
 					// This is (**kwargs) - keyword args parameter
-					if kwargSym, ok := p[1].(core.SymbolValue); ok {
+					if kwargSym, ok := p.Items()[1].(core.SymbolValue); ok {
 						if seenKeyword {
 							return nil, fmt.Errorf("multiple **kwargs parameters not allowed")
 						}
@@ -223,19 +223,19 @@ func ParseParameterList(paramList core.ListValue) (*FunctionSignature, error) {
 			}
 
 			// Parameter with default: (name default-value)
-			if len(p) != 2 {
+			if p.Len() != 2 {
 				return nil, fmt.Errorf("invalid parameter with default: expected (name value)")
 			}
 
-			sym, ok := p[0].(core.SymbolValue)
+			sym, ok := p.Items()[0].(core.SymbolValue)
 			if !ok {
-				return nil, fmt.Errorf("parameter name must be a symbol, got %T", p[0])
+				return nil, fmt.Errorf("parameter name must be a symbol, got %T", p.Items()[0])
 			}
 
 			seenDefault = true
 			sig.OptionalParams = append(sig.OptionalParams, ParameterInfo{
 				Name:         sym,
-				DefaultValue: p[1], // Store the unevaluated default expression
+				DefaultValue: p.Items()[1], // Store the unevaluated default expression
 				HasDefault:   true,
 			})
 
@@ -311,11 +311,11 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 
 	// 3. Collect remaining positional arguments into *args if present
 	if sig.RestParam != nil {
-		restArgs := core.ListValue{}
+		restArgs := make([]core.Value, 0)
 		for ; argIndex < len(args); argIndex++ {
 			restArgs = append(restArgs, args[argIndex])
 		}
-		bindCtx.Define(string(*sig.RestParam), restArgs)
+		bindCtx.Define(string(*sig.RestParam), core.NewList(restArgs...))
 	} else if argIndex < len(args) {
 		// Too many positional arguments
 		return fmt.Errorf("too many positional arguments: expected at most %d, got %d",

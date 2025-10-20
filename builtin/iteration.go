@@ -144,7 +144,7 @@ func EnumerateBuilder() builders.BuiltinFunc {
 
 		// TODO: Return proper enumerate iterator when implemented
 		// For now, return a simple implementation
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		index := start
 		for {
@@ -155,7 +155,7 @@ func EnumerateBuilder() builders.BuiltinFunc {
 			result = append(result, core.TupleValue{core.NumberValue(index), val})
 			index++
 		}
-		return result, nil
+		return core.NewList(result...), nil
 	}
 }
 
@@ -166,7 +166,7 @@ func ZipBuilder() builders.BuiltinFunc {
 
 		// zip() with no arguments returns empty list
 		if v.Count() == 0 {
-			return core.ListValue{}, nil
+			return core.NewList(), nil
 		}
 
 		// Convert all arguments to iterables
@@ -182,10 +182,10 @@ func ZipBuilder() builders.BuiltinFunc {
 		// TODO: Return proper zip iterator when implemented
 		// For now, return a simple implementation
 		if len(iterables) == 0 {
-			return core.ListValue{}, nil
+			return core.NewList(), nil
 		}
 
-		result := make(core.ListValue, 0)
+		result := make([]core.Value, 0)
 		iters := make([]core.Iterator, len(iterables))
 		for i, iterable := range iterables {
 			iters[i] = iterable.Iterator()
@@ -196,7 +196,7 @@ func ZipBuilder() builders.BuiltinFunc {
 			for i, iter := range iters {
 				val, hasNext := iter.Next()
 				if !hasNext {
-					return result, nil
+					return core.NewList(result...), nil
 				}
 				values[i] = val
 			}
@@ -247,30 +247,30 @@ func ReversedBuilder() builders.BuiltinFunc {
 		// If it's a built-in sequence type, we can reverse it directly
 		if list, ok := types.AsList(obj); ok {
 			// Create reversed list
-			result := make(core.ListValue, len(list))
-			for i := 0; i < len(list); i++ {
-				result[i] = list[len(list)-1-i]
+			result := make([]core.Value, list.Len())
+			for i := 0; i < list.Len(); i++ {
+				result[i] = list.Items()[list.Len()-1-i]
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}
 
 		if tuple, ok := types.AsTuple(obj); ok {
 			// Create reversed list (Python's reversed() returns iterator, but for simplicity return list)
-			result := make(core.ListValue, len(tuple))
+			result := make([]core.Value, len(tuple))
 			for i := 0; i < len(tuple); i++ {
 				result[i] = tuple[len(tuple)-1-i]
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}
 
 		if str, ok := types.AsString(obj); ok {
 			// Create reversed string as list of characters
 			runes := []rune(str)
-			result := make(core.ListValue, len(runes))
+			result := make([]core.Value, len(runes))
 			for i := 0; i < len(runes); i++ {
 				result[i] = core.StringValue(string(runes[len(runes)-1-i]))
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}
 
 		// If object has __len__ and __getitem__, we could implement reverse iteration

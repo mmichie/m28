@@ -25,7 +25,7 @@ func TestTypeSwitch(t *testing.T) {
 		},
 		{
 			name:     "list case",
-			value:    core.ListValue{core.NumberValue(1), core.NumberValue(2)},
+			value:    core.NewList(core.NumberValue(1), core.NumberValue(2)),
 			expected: core.NumberValue(2), // length
 		},
 		{
@@ -44,8 +44,8 @@ func TestTypeSwitch(t *testing.T) {
 				String(func(s string) (core.Value, error) {
 					return core.StringValue(s + s), nil
 				}).
-				List(func(l core.ListValue) (core.Value, error) {
-					return core.NumberValue(float64(len(l))), nil
+				List(func(l *core.ListValue) (core.Value, error) {
+					return core.NumberValue(float64(l.Len())), nil
 				}).
 				Nil(func() (core.Value, error) {
 					return core.StringValue("was nil"), nil

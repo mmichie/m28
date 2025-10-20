@@ -305,7 +305,7 @@ func stringMethodSplit(receiver Value, args []Value, ctx *Context) (Value, error
 			for i, field := range fields {
 				result[i] = StringValue(field)
 			}
-			return ListValue(result), nil
+			return NewList(result...), nil
 		} else {
 			return nil, fmt.Errorf("sep must be a string")
 		}
@@ -330,7 +330,7 @@ func stringMethodSplit(receiver Value, args []Value, ctx *Context) (Value, error
 	for i, part := range parts {
 		result[i] = StringValue(part)
 	}
-	return ListValue(result), nil
+	return NewList(result...), nil
 }
 
 func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error) {
@@ -345,9 +345,9 @@ func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error)
 
 	// Try to get an iterable - check concrete types first for efficiency
 	switch v := args[0].(type) {
-	case ListValue:
-		parts = make([]string, len(v))
-		for i, item := range v {
+	case *ListValue:
+		parts = make([]string, v.Len())
+		for i, item := range v.Items() {
 			if s, ok := item.(StringValue); ok {
 				parts[i] = string(s)
 			} else {

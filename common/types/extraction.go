@@ -40,11 +40,11 @@ func AsBool(v core.Value) (bool, bool) {
 }
 
 // AsList extracts a ListValue
-func AsList(v core.Value) (core.ListValue, bool) {
-	if list, ok := v.(core.ListValue); ok {
+func AsList(v core.Value) (*core.ListValue, bool) {
+	if list, ok := v.(*core.ListValue); ok {
 		return list, true
 	}
-	return core.ListValue{}, false
+	return nil, false
 }
 
 // AsDict extracts a DictValue
@@ -192,11 +192,11 @@ func RequireBool(v core.Value, context string) (bool, error) {
 }
 
 // RequireList extracts a ListValue or returns a type error
-func RequireList(v core.Value, context string) (core.ListValue, error) {
+func RequireList(v core.Value, context string) (*core.ListValue, error) {
 	if list, ok := AsList(v); ok {
 		return list, nil
 	}
-	return core.ListValue{}, errors.NewTypeError(context, "list", string(v.Type()))
+	return nil, errors.NewTypeError(context, "list", string(v.Type()))
 }
 
 // RequireDict extracts a DictValue or returns a type error

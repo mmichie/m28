@@ -18,7 +18,7 @@ func TestAsNumber(t *testing.T) {
 		{"integer number", core.NumberValue(10), 10.0, true},
 		{"string value", core.StringValue("hello"), 0, false},
 		{"nil value", core.Nil, 0, false},
-		{"list value", core.ListValue([]core.Value{}), 0, false},
+		{"list value", core.NewList(), 0, false},
 	}
 
 	for _, tt := range tests {
@@ -81,7 +81,7 @@ func TestAsBool(t *testing.T) {
 }
 
 func TestAsList(t *testing.T) {
-	list := core.ListValue([]core.Value{core.NumberValue(1), core.NumberValue(2)})
+	list := core.NewList(core.NumberValue(1), core.NumberValue(2))
 
 	tests := []struct {
 		name   string
@@ -89,7 +89,7 @@ func TestAsList(t *testing.T) {
 		wantOk bool
 	}{
 		{"list value", list, true},
-		{"empty list", core.ListValue([]core.Value{}), true},
+		{"empty list", core.NewList(), true},
 		{"tuple value", core.TupleValue([]core.Value{}), false},
 		{"string value", core.StringValue("list"), false},
 	}
@@ -101,7 +101,7 @@ func TestAsList(t *testing.T) {
 				t.Errorf("AsList(%v) ok = %v; want %v", tt.input, gotOk, tt.wantOk)
 			}
 			if gotOk && tt.name == "list value" {
-				if len(gotList) != 2 {
+				if gotList.Len() != 2 {
 					t.Errorf("AsList(%v) returned list with wrong length", tt.input)
 				}
 			}
@@ -118,7 +118,7 @@ func TestAsDict(t *testing.T) {
 		wantOk bool
 	}{
 		{"dict value", dict, true},
-		{"list value", core.ListValue([]core.Value{}), false},
+		{"list value", core.NewList(), false},
 		{"string value", core.StringValue("dict"), false},
 	}
 
@@ -230,7 +230,7 @@ func TestRequireString(t *testing.T) {
 }
 
 func TestRequireList(t *testing.T) {
-	list := core.ListValue([]core.Value{core.NumberValue(1)})
+	list := core.NewList(core.NumberValue(1))
 
 	tests := []struct {
 		name    string
@@ -272,7 +272,7 @@ func TestRequireList(t *testing.T) {
 
 func TestAsIterable(t *testing.T) {
 	// Create test values
-	list := core.ListValue([]core.Value{})
+	list := core.NewList()
 	tuple := core.TupleValue([]core.Value{})
 	str := core.StringValue("hello")
 	dict := core.NewDict()
@@ -314,7 +314,7 @@ func TestRequireIterable(t *testing.T) {
 	}{
 		{
 			name:    "valid iterable",
-			input:   core.ListValue([]core.Value{}),
+			input:   core.NewList(),
 			context: "map",
 			wantErr: false,
 		},

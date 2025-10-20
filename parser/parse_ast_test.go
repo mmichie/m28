@@ -234,25 +234,26 @@ func TestParseToAST_ToIR(t *testing.T) {
 	ir := astNode.ToIR()
 
 	// Check IR is correct
-	list, ok := ir.(core.ListValue)
+	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
 	}
 
-	if len(list) != 3 {
-		t.Fatalf("Expected 3 elements in IR, got %d", len(list))
+	items := list.Items()
+	if len(items) != 3 {
+		t.Fatalf("Expected 3 elements in IR, got %d", len(items))
 	}
 
 	// Check elements
-	if sym, ok := list[0].(core.SymbolValue); !ok || string(sym) != "+" {
-		t.Errorf("Expected '+', got %v", list[0])
+	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "+" {
+		t.Errorf("Expected '+', got %v", items[0])
 	}
 
-	if num, ok := list[1].(core.NumberValue); !ok || num != 1 {
-		t.Errorf("Expected 1, got %v", list[1])
+	if num, ok := items[1].(core.NumberValue); !ok || num != 1 {
+		t.Errorf("Expected 1, got %v", items[1])
 	}
 
-	if num, ok := list[2].(core.NumberValue); !ok || num != 2 {
-		t.Errorf("Expected 2, got %v", list[2])
+	if num, ok := items[2].(core.NumberValue); !ok || num != 2 {
+		t.Errorf("Expected 2, got %v", items[2])
 	}
 }

@@ -10,21 +10,21 @@ import (
 // DotForm implements the dot notation special form
 // (. obj property) -> property access
 // (. obj method arg1 arg2...) -> method call
-func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("dot notation requires at least 2 arguments, got %d", len(args))
+func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 2 {
+		return nil, fmt.Errorf("dot notation requires at least 2 arguments, got %d", args.Len())
 	}
 
 	// Evaluate the object
-	obj, err := Eval(args[0], ctx)
+	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating object: %v", err)
 	}
 
 	// Get the property name
-	propName, ok := args[1].(core.StringValue)
+	propName, ok := args.Items()[1].(core.StringValue)
 	if !ok {
-		return nil, fmt.Errorf("property name must be a string, got %T", args[1])
+		return nil, fmt.Errorf("property name must be a string, got %T", args.Items()[1])
 	}
 
 	// Check if it's a numeric index
@@ -102,11 +102,11 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// If there are more arguments (even if just __call__ marker), it's a method call
-		if len(args) > 2 {
+		if args.Len() > 2 {
 			// Check if it's just the __call__ marker (method with no args)
 			hasCallMarker := false
-			if len(args) == 3 {
-				if sym, ok := args[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+			if args.Len() == 3 {
+				if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "__call__" {
 					hasCallMarker = true
 				}
 			}
@@ -123,8 +123,8 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 					if hasCallMarker {
 						evalArgs = []core.Value{} // No args
 					} else {
-						evalArgs = make([]core.Value, len(args)-2)
-						for i, arg := range args[2:] {
+						evalArgs = make([]core.Value, args.Len()-2)
+						for i, arg := range args.Items()[2:] {
 							evalArgs[i], err = Eval(arg, ctx)
 							if err != nil {
 								return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
@@ -141,8 +141,8 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 			if hasCallMarker {
 				evalArgs = []core.Value{} // No args
 			} else {
-				evalArgs = make([]core.Value, len(args)-2)
-				for i, arg := range args[2:] {
+				evalArgs = make([]core.Value, args.Len()-2)
+				for i, arg := range args.Items()[2:] {
 					evalArgs[i], err = Eval(arg, ctx)
 					if err != nil {
 						return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
@@ -180,24 +180,24 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Special handling for basic types that don't implement Object
 	// Check if it's a method call (has args or __call__ marker)
-	isMethodCall := len(args) > 2
-	methodArgs := args[2:]
+	isMethodCall := args.Len() > 2
+	methodArgs := args.Items()[2:]
 
 	// Check for __call__ marker
-	if isMethodCall && len(args) == 3 {
-		if sym, ok := args[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+	if isMethodCall && args.Len() == 3 {
+		if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "__call__" {
 			// It's a method call with no args
-			methodArgs = core.ListValue{}
+			methodArgs = []core.Value{}
 		}
 	}
 
 	switch v := obj.(type) {
-	case core.ListValue:
-		return getListAttr(v, string(propName), isMethodCall, methodArgs, ctx)
+	case *core.ListValue:
+		return getListAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
 	case core.StringValue:
-		return getStringAttr(v, string(propName), isMethodCall, methodArgs, ctx)
+		return getStringAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
 	case *core.DictValue:
-		return getDictAttr(v, string(propName), isMethodCall, methodArgs, ctx)
+		return getDictAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
 	default:
 		return nil, fmt.Errorf("%s does not support attribute access", obj.Type())
 	}
@@ -206,14 +206,14 @@ func DotForm(args core.ListValue, ctx *core.Context) (core.Value, error) {
 // getByIndex gets a value by numeric index
 func getByIndex(obj core.Value, idx int) (core.Value, error) {
 	switch v := obj.(type) {
-	case core.ListValue:
+	case *core.ListValue:
 		if idx < 0 {
-			idx = len(v) + idx
+			idx = v.Len() + idx
 		}
-		if idx < 0 || idx >= len(v) {
-			return nil, &core.IndexError{Index: idx, Length: len(v)}
+		if idx < 0 || idx >= v.Len() {
+			return nil, &core.IndexError{Index: idx, Length: v.Len()}
 		}
-		return v[idx], nil
+		return v.Items()[idx], nil
 
 	case core.StringValue:
 		s := string(v)
@@ -240,7 +240,7 @@ func getByIndex(obj core.Value, idx int) (core.Value, error) {
 }
 
 // getListAttr handles attribute access for lists
-func getListAttr(lst core.ListValue, attr string, isCall bool, args core.ListValue, ctx *core.Context) (core.Value, error) {
+func getListAttr(lst *core.ListValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Check for list methods
 	switch attr {
 	case "append":
@@ -249,21 +249,23 @@ func getListAttr(lst core.ListValue, attr string, isCall bool, args core.ListVal
 				if len(args) != 1 {
 					return nil, fmt.Errorf("append() takes exactly one argument")
 				}
-				return append(lst, args[0]), nil
+				lst.Append(args[0])
+				return core.Nil, nil
 			}), nil
 		}
 		// Direct call
-		if len(args) != 1 {
+		if args.Len() != 1 {
 			return nil, fmt.Errorf("append() takes exactly one argument")
 		}
-		val, err := Eval(args[0], ctx)
+		val, err := Eval(args.Items()[0], ctx)
 		if err != nil {
 			return nil, err
 		}
-		return append(lst, val), nil
+		lst.Append(val)
+		return core.Nil, nil
 
 	case "length", "len":
-		return core.NumberValue(len(lst)), nil
+		return core.NumberValue(lst.Len()), nil
 
 	default:
 		return nil, fmt.Errorf("list has no attribute '%s'", attr)
@@ -271,7 +273,7 @@ func getListAttr(lst core.ListValue, attr string, isCall bool, args core.ListVal
 }
 
 // getStringAttr handles attribute access for strings
-func getStringAttr(str core.StringValue, attr string, isCall bool, args core.ListValue, ctx *core.Context) (core.Value, error) {
+func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Get the type descriptor for string
 	td := core.GetTypeDescriptor("string")
 	if td != nil {
@@ -286,8 +288,8 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args core.Lis
 			}
 			// Direct call
 			if method.Handler != nil {
-				evalArgs := make([]core.Value, len(args))
-				for i, arg := range args {
+				evalArgs := make([]core.Value, args.Len())
+				for i, arg := range args.Items() {
 					var err error
 					evalArgs[i], err = Eval(arg, ctx)
 					if err != nil {
@@ -309,7 +311,7 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args core.Lis
 }
 
 // getDictAttr handles attribute access for dicts
-func getDictAttr(dict *core.DictValue, attr string, isCall bool, args core.ListValue, ctx *core.Context) (core.Value, error) {
+func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// First, check if it's a dictionary key access
 	if val, exists := dict.Get(attr); exists {
 		return val, nil
@@ -329,8 +331,8 @@ func getDictAttr(dict *core.DictValue, attr string, isCall bool, args core.ListV
 			}
 			// Direct call
 			if method.Handler != nil {
-				evalArgs := make([]core.Value, len(args))
-				for i, arg := range args {
+				evalArgs := make([]core.Value, args.Len())
+				for i, arg := range args.Items() {
 					var err error
 					evalArgs[i], err = Eval(arg, ctx)
 					if err != nil {

@@ -45,10 +45,10 @@ func StrFormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			result.WriteString(str)
 		} else if list, ok := types.AsList(arg); ok {
 			// Check if this is a format expression
-			if len(list) >= 2 {
-				if sym, ok := list[0].(core.SymbolValue); ok && string(sym) == "format-expr" {
+			if list.Len() >= 2 {
+				if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "format-expr" {
 					// Handle format expression
-					formatted, err := formatExpression(list[1:], ctx)
+					formatted, err := formatExpression(list.Items()[1:], ctx)
 					if err != nil {
 						return nil, err
 					}

@@ -167,10 +167,10 @@ func InitOperatorModule() *core.DictValue {
 		// Handle lists
 		if list1, ok := types.AsList(v.Get(0)); ok {
 			if list2, ok := types.AsList(v.Get(1)); ok {
-				result := make(core.ListValue, 0, len(list1)+len(list2))
-				result = append(result, list1...)
-				result = append(result, list2...)
-				return result, nil
+				result := make([]core.Value, 0, list1.Len()+list2.Len())
+				result = append(result, list1.Items()...)
+				result = append(result, list2.Items()...)
+				return core.NewList(result...), nil
 			}
 		}
 
@@ -206,7 +206,7 @@ func InitOperatorModule() *core.DictValue {
 
 		// For lists, check manually
 		if list, ok := types.AsList(container); ok {
-			for _, elem := range list {
+			for _, elem := range list.Items() {
 				if core.EqualValues(elem, item) {
 					return core.BoolValue(true), nil
 				}
@@ -291,10 +291,10 @@ func InitOperatorModule() *core.DictValue {
 				return nil, err
 			}
 			idx := int(index)
-			if idx < 0 || idx >= len(list) {
+			if idx < 0 || idx >= list.Len() {
 				return nil, errors.NewRuntimeError("getitem", "index out of range")
 			}
-			return list[idx], nil
+			return list.Items()[idx], nil
 		}
 
 		// Handle dicts
@@ -382,7 +382,7 @@ func InitOperatorModule() *core.DictValue {
 				}
 			}
 
-			return result, nil
+			return core.NewList(result...), nil
 		})
 
 		return getter, nil
@@ -412,10 +412,10 @@ func InitOperatorModule() *core.DictValue {
 				if list, ok := types.AsList(obj); ok {
 					if idx, ok := types.AsNumber(keys[0]); ok {
 						index := int(idx)
-						if index < 0 || index >= len(list) {
+						if index < 0 || index >= list.Len() {
 							return nil, errors.NewRuntimeError("itemgetter", "index out of range")
 						}
-						return list[index], nil
+						return list.Items()[index], nil
 					}
 				}
 				if dict, ok := obj.(*core.DictValue); ok {
@@ -436,10 +436,10 @@ func InitOperatorModule() *core.DictValue {
 				if list, ok := types.AsList(obj); ok {
 					if idx, ok := types.AsNumber(key); ok {
 						index := int(idx)
-						if index < 0 || index >= len(list) {
+						if index < 0 || index >= list.Len() {
 							return nil, errors.NewRuntimeError("itemgetter", "index out of range")
 						}
-						result[i] = list[index]
+						result[i] = list.Items()[index]
 					}
 				} else if dict, ok := obj.(*core.DictValue); ok {
 					if keyStr, ok := types.AsString(key); ok {
@@ -452,7 +452,7 @@ func InitOperatorModule() *core.DictValue {
 				}
 			}
 
-			return result, nil
+			return core.NewList(result...), nil
 		})
 
 		return getter, nil

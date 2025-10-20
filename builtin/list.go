@@ -28,11 +28,11 @@ func RegisterList(ctx *core.Context) {
 		}
 
 		// Append all remaining arguments
-		result := make(core.ListValue, len(lst), len(lst)+len(args)-1)
-		copy(result, lst)
+		result := make([]core.Value, lst.Len(), lst.Len()+len(args)-1)
+		copy(result, lst.Items())
 		result = append(result, args[1:]...)
 
-		return result, nil
+		return core.NewList(result...), nil
 	}))
 
 	// length - returns length of any sequence
@@ -44,7 +44,7 @@ func RegisterList(ctx *core.Context) {
 			return core.NumberValue(len(str)), nil
 		}
 		if list, ok := types.AsList(seq); ok {
-			return core.NumberValue(len(list)), nil
+			return core.NumberValue(list.Len()), nil
 		}
 		if tuple, ok := types.AsTuple(seq); ok {
 			return core.NumberValue(len(tuple)), nil
@@ -82,10 +82,10 @@ func RegisterList(ctx *core.Context) {
 			return core.StringValue(str[0:1]), nil
 		}
 		if list, ok := types.AsList(seq); ok {
-			if len(list) == 0 {
+			if list.Len() == 0 {
 				return nil, errors.NewRuntimeError("first", "list index out of range")
 			}
-			return list[0], nil
+			return list.Items()[0], nil
 		}
 		if tuple, ok := types.AsTuple(seq); ok {
 			if len(tuple) == 0 {
@@ -107,10 +107,10 @@ func RegisterList(ctx *core.Context) {
 			return core.StringValue(str[1:]), nil
 		}
 		if list, ok := types.AsList(seq); ok {
-			if len(list) == 0 {
-				return core.ListValue{}, nil
+			if list.Len() == 0 {
+				return core.NewList(), nil
 			}
-			return core.ListValue(list[1:]), nil
+			return core.NewList(list.Items()[1:]...), nil
 		}
 		if tuple, ok := types.AsTuple(seq); ok {
 			if len(tuple) == 0 {
@@ -140,11 +140,11 @@ func RegisterList(ctx *core.Context) {
 		}
 		if list, ok := types.AsList(seq); ok {
 			// Reverse list
-			result := make(core.ListValue, len(list))
-			for i, j := 0, len(list)-1; i < len(list); i, j = i+1, j-1 {
-				result[i] = list[j]
+			result := make([]core.Value, list.Len())
+			for i, j := 0, list.Len()-1; i < list.Len(); i, j = i+1, j-1 {
+				result[i] = list.Items()[j]
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}
 		if tuple, ok := types.AsTuple(seq); ok {
 			// Reverse tuple
@@ -152,7 +152,7 @@ func RegisterList(ctx *core.Context) {
 			for i, j := 0, len(tuple)-1; i < len(tuple); i, j = i+1, j-1 {
 				result[i] = tuple[j]
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}
 		return nil, errors.NewTypeError("reversed", "sequence", string(seq.Type()))
 	})))
@@ -198,12 +198,12 @@ func NthBuilder() builders.BuiltinFunc {
 		}
 		if list, ok := types.AsList(seq); ok {
 			if idx < 0 {
-				idx = len(list) + idx
+				idx = list.Len() + idx
 			}
-			if idx < 0 || idx >= len(list) {
+			if idx < 0 || idx >= list.Len() {
 				return nil, errors.NewRuntimeError("nth", "list index out of range")
 			}
-			return list[idx], nil
+			return list.Items()[idx], nil
 		}
 		if tuple, ok := types.AsTuple(seq); ok {
 			if idx < 0 {
@@ -232,7 +232,7 @@ func ConcatBuilder() builders.BuiltinFunc {
 		v := validation.NewArgs("concat", args)
 
 		if v.Count() == 0 {
-			return core.ListValue{}, nil
+			return core.NewList(), nil
 		}
 
 		// Determine result type from first argument
@@ -252,16 +252,16 @@ func ConcatBuilder() builders.BuiltinFunc {
 
 		if list, ok := types.AsList(first); ok {
 			// Concatenate lists
-			result := make(core.ListValue, 0)
-			result = append(result, list...)
+			result := make([]core.Value, 0)
+			result = append(result, list.Items()...)
 			for i := 1; i < v.Count(); i++ {
 				lst, ok := types.AsList(v.Get(i))
 				if !ok {
 					return nil, errors.NewTypeError("concat", "list", string(v.Get(i).Type()))
 				}
-				result = append(result, lst...)
+				result = append(result, lst.Items()...)
 			}
-			return result, nil
+			return core.NewList(result...), nil
 		}
 
 		if tuple, ok := types.AsTuple(first); ok {
@@ -351,8 +351,8 @@ func SortedBuilder() builders.BuiltinFunc {
 		seq := v.Get(0)
 
 		if list, ok := types.AsList(seq); ok {
-			items = make([]core.Value, len(list))
-			copy(items, list)
+			items = make([]core.Value, list.Len())
+			copy(items, list.Items())
 		} else if tuple, ok := types.AsTuple(seq); ok {
 			items = make([]core.Value, len(tuple))
 			copy(items, tuple)
@@ -388,7 +388,7 @@ func SortedBuilder() builders.BuiltinFunc {
 			return items[i].String() < items[j].String()
 		})
 
-		return core.ListValue(items), nil
+		return core.NewList(items...), nil
 	}
 }
 

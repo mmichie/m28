@@ -51,7 +51,7 @@
 (def build-squares (n)
   (= result [])
   (for i (range n)
-    (= result (result.append (* i i))))
+    (result.append (* i i)))
   result)
 
 (print "  Squares of 0-5:" (build-squares 6))
