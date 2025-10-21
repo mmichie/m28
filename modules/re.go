@@ -14,21 +14,21 @@ func InitReModule() *core.DictValue {
 
 	// Python re module flag constants
 	// These match Python's re module flags (https://docs.python.org/3/library/re.html#flags)
-	reModule.Set("IGNORECASE", core.NumberValue(2))   // re.I
-	reModule.Set("I", core.NumberValue(2))            // alias
-	reModule.Set("MULTILINE", core.NumberValue(8))    // re.M
-	reModule.Set("M", core.NumberValue(8))            // alias
-	reModule.Set("DOTALL", core.NumberValue(16))      // re.S
-	reModule.Set("S", core.NumberValue(16))           // alias
-	reModule.Set("VERBOSE", core.NumberValue(64))     // re.X
-	reModule.Set("X", core.NumberValue(64))           // alias
-	reModule.Set("ASCII", core.NumberValue(256))      // re.A
-	reModule.Set("A", core.NumberValue(256))          // alias
-	reModule.Set("LOCALE", core.NumberValue(4))       // re.L
-	reModule.Set("L", core.NumberValue(4))            // alias
-	reModule.Set("UNICODE", core.NumberValue(32))     // re.U
-	reModule.Set("U", core.NumberValue(32))           // alias
-	reModule.Set("DEBUG", core.NumberValue(128))      // re.DEBUG
+	reModule.Set("IGNORECASE", core.NumberValue(2)) // re.I
+	reModule.Set("I", core.NumberValue(2))          // alias
+	reModule.Set("MULTILINE", core.NumberValue(8))  // re.M
+	reModule.Set("M", core.NumberValue(8))          // alias
+	reModule.Set("DOTALL", core.NumberValue(16))    // re.S
+	reModule.Set("S", core.NumberValue(16))         // alias
+	reModule.Set("VERBOSE", core.NumberValue(64))   // re.X
+	reModule.Set("X", core.NumberValue(64))         // alias
+	reModule.Set("ASCII", core.NumberValue(256))    // re.A
+	reModule.Set("A", core.NumberValue(256))        // alias
+	reModule.Set("LOCALE", core.NumberValue(4))     // re.L
+	reModule.Set("L", core.NumberValue(4))          // alias
+	reModule.Set("UNICODE", core.NumberValue(32))   // re.U
+	reModule.Set("U", core.NumberValue(32))         // alias
+	reModule.Set("DEBUG", core.NumberValue(128))    // re.DEBUG
 
 	// compile - compile a regex pattern
 	reModule.Set("compile", core.NewNamedBuiltinFunction("compile", func(args []core.Value, ctx *core.Context) (core.Value, error) {

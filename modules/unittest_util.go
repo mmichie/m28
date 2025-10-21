@@ -31,6 +31,10 @@ func InitUnittestUtilModule() *core.DictValue {
 	utilModule.SetWithKey("_common_shorten_repr", core.StringValue("_common_shorten_repr"),
 		core.NewBuiltinFunction(commonShortenRepr))
 
+	// three_way_cmp - three-way comparison function
+	utilModule.SetWithKey("three_way_cmp", core.StringValue("three_way_cmp"),
+		core.NewBuiltinFunction(threeWayCmp))
+
 	return utilModule
 }
 
@@ -130,4 +134,51 @@ func commonShortenRepr(args []core.Value, ctx *core.Context) (core.Value, error)
 
 	// Return tuple of (shortened_s1, shortened_s2)
 	return core.TupleValue{core.StringValue(s1), core.StringValue(s2)}, nil
+}
+
+func threeWayCmp(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// three_way_cmp(x, y) returns -1 if x < y, 0 if x == y, 1 if x > y
+	if len(args) < 2 {
+		return nil, fmt.Errorf("three_way_cmp() requires 2 arguments")
+	}
+
+	x := args[0]
+	y := args[1]
+
+	// Try to compare as numbers first
+	if xNum, xOk := x.(core.NumberValue); xOk {
+		if yNum, yOk := y.(core.NumberValue); yOk {
+			if xNum < yNum {
+				return core.NumberValue(-1), nil
+			} else if xNum > yNum {
+				return core.NumberValue(1), nil
+			} else {
+				return core.NumberValue(0), nil
+			}
+		}
+	}
+
+	// Try to compare as strings
+	if xStr, xOk := x.(core.StringValue); xOk {
+		if yStr, yOk := y.(core.StringValue); yOk {
+			if xStr < yStr {
+				return core.NumberValue(-1), nil
+			} else if xStr > yStr {
+				return core.NumberValue(1), nil
+			} else {
+				return core.NumberValue(0), nil
+			}
+		}
+	}
+
+	// For other types, use string comparison as fallback
+	xStr := x.String()
+	yStr := y.String()
+	if xStr < yStr {
+		return core.NumberValue(-1), nil
+	} else if xStr > yStr {
+		return core.NumberValue(1), nil
+	} else {
+		return core.NumberValue(0), nil
+	}
 }
