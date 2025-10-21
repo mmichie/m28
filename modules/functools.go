@@ -224,6 +224,10 @@ func Init_FunctoolsModule() *core.DictValue {
 		return decorator, nil
 	}))
 
+	// _lru_cache_wrapper - Internal LRU cache wrapper class
+	// Used by lru_cache implementation in functools.py
+	functoolsModule.Set("_lru_cache_wrapper", &lruCacheBuiltin{})
+
 	return functoolsModule
 }
 
