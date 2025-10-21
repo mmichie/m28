@@ -39,10 +39,12 @@ var cExtensionModules = map[string]bool{
 func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, *core.Context) (core.Value, error)) (*core.DictValue, error) {
 	fmt.Fprintf(os.Stderr, "[PROFILE] LoadPythonModule called for '%s'\n", name)
 
-	// Special case: builtins module - return a dict with builtin functions
-	if name == "builtins" {
-		builtinsModule := core.NewDict()
+	// Note: Circular import handling is done by ModuleLoaderEnhanced
+	// This function just loads and returns the module content
 
+	// Special case: builtins module - create a dict with builtin functions
+	if name == "builtins" {
+		moduleDict := core.NewDict()
 		// Expose the most commonly used builtin functions
 		// These are already defined in the global context
 		builtinNames := []string{
@@ -61,11 +63,11 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		for _, fnName := range builtinNames {
 			val, err := ctx.Lookup(fnName)
 			if err == nil {
-				builtinsModule.Set(fnName, val)
+				moduleDict.Set(fnName, val)
 			}
 		}
 
-		return builtinsModule, nil
+		return moduleDict, nil
 	}
 
 	// Check if this is a known C extension

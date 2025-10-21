@@ -52,18 +52,38 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	}
 
 	// Check if the module is currently being loaded (circular dependency)
+	// In Python, circular imports are allowed - return the partial module
 	if registry.IsLoading(cacheName) {
-		return nil, fmt.Errorf("circular import detected: module '%s' is already being loaded", name)
+		fmt.Fprintf(os.Stderr, "[DEBUG] Circular import detected for '%s', returning partial module\n", cacheName)
+		// Return the partial module that's currently being loaded
+		if partialModule, found := registry.GetModule(cacheName); found {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Found partial module in registry with %d keys\n", len(partialModule.Keys()))
+			return partialModule, nil
+		}
+		// If not in registry yet, return empty dict (will be populated later)
+		fmt.Fprintf(os.Stderr, "[DEBUG] Partial module not in registry, returning empty dict\n")
+		return NewDict(), nil
 	}
 
 	// Mark the module as being loaded
 	registry.SetLoading(cacheName, true)
 	defer registry.SetLoading(cacheName, false)
+	fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: marked '%s' as loading\n", cacheName)
+
+	// Create a dictionary for the module exports BEFORE evaluation
+	// This allows circular imports to access the partial module
+	moduleDict := NewDict()
+
+	// Store the partial module in registry before evaluation
+	// This enables circular imports to find it
+	registry.StoreModule(cacheName, moduleDict, "", []string{})
+	fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: stored partial module '%s' in registry\n", cacheName)
 
 	// Resolve the module path
 	path, err := registry.ResolveModulePath(name)
 	if err != nil {
 		// M28 module not found, try Python module
+		fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: M28 module '%s' not found, trying Python\n", cacheName)
 		return l.tryLoadPythonModule(cacheName, ctx, err)
 	}
 
@@ -92,8 +112,9 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 		return nil, fmt.Errorf("failed to evaluate module: %v", err)
 	}
 
-	// Create a dictionary for the module exports
-	moduleDict := NewDict()
+	// Populate the module dictionary with exports
+	// Note: moduleDict was already created and stored in registry before evaluation
+	// to support circular imports
 
 	// Check if __exports__ is defined
 	if exportsVal, err := moduleCtx.Lookup("__exports__"); err == nil {

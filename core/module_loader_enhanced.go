@@ -45,13 +45,19 @@ func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue
 	registry.SetLoading(cacheName, true)
 	defer registry.SetLoading(cacheName, false)
 
+	// Create a partial module and store it in registry BEFORE loading
+	// This allows circular imports to access the partial module
+	partialModule := NewDict()
+	registry.StoreModule(cacheName, partialModule, "", []string{})
+	fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: stored partial module '%s' in registry\n", cacheName)
+
 	// Try to load as builtin module
 	if module := l.tryLoadBuiltinModule(registry, cacheName); module != nil {
 		return module, nil
 	}
 
 	// Load from file system
-	return l.loadFileModule(registry, name, cacheName)
+	return l.loadFileModule(registry, name, cacheName, partialModule)
 }
 
 // normalizeCacheName removes .m28 extension for caching
@@ -69,9 +75,18 @@ func (l *ModuleLoaderEnhanced) checkModuleCache(registry *ModuleRegistry, cacheN
 		return module, nil
 	}
 
-	// Check for circular dependency
+	// Check for circular dependency - return partial module
+	// In Python, circular imports are allowed
 	if registry.IsLoading(cacheName) {
-		return nil, fmt.Errorf("circular import detected: module '%s' is already being loaded", name)
+		fmt.Fprintf(os.Stderr, "[DEBUG] Circular import detected for '%s', returning partial module\n", cacheName)
+		// Return the partial module that's currently being loaded
+		if partialModule, found := registry.GetModule(cacheName); found {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Found partial module in registry with %d keys\n", len(partialModule.Keys()))
+			return partialModule, nil
+		}
+		// If not in registry yet, return empty dict (will be populated later)
+		fmt.Fprintf(os.Stderr, "[DEBUG] Partial module not in registry, returning empty dict\n")
+		return NewDict(), nil
 	}
 
 	return nil, nil
@@ -93,12 +108,13 @@ func (l *ModuleLoaderEnhanced) tryLoadBuiltinModule(registry *ModuleRegistry, ca
 }
 
 // loadFileModule loads a module from the file system
-func (l *ModuleLoaderEnhanced) loadFileModule(registry *ModuleRegistry, name, cacheName string) (*DictValue, error) {
+func (l *ModuleLoaderEnhanced) loadFileModule(registry *ModuleRegistry, name, cacheName string, partialModule *DictValue) (*DictValue, error) {
 	// Resolve module path
 	path, err := registry.ResolveModulePath(name)
 	if err != nil {
 		// M28 module not found, try Python module
-		return l.tryLoadPythonModule(registry, name, cacheName, err)
+		// Python loader will handle filling the partialModule
+		return l.tryLoadPythonModule(registry, name, cacheName, partialModule, err)
 	}
 
 	// Load module content
@@ -113,11 +129,13 @@ func (l *ModuleLoaderEnhanced) loadFileModule(registry *ModuleRegistry, name, ca
 		return nil, err
 	}
 
-	// Extract and register module exports
-	moduleDict := extractModuleExports(moduleCtx)
-	registry.StoreModule(cacheName, moduleDict, path, []string{})
+	// Extract module exports and populate the partial module
+	exportModuleVars(partialModule, moduleCtx)
 
-	return moduleDict, nil
+	// Update registry with complete module
+	registry.StoreModule(cacheName, partialModule, path, []string{})
+
+	return partialModule, nil
 }
 
 // createModuleContext creates a new context for module execution
@@ -146,15 +164,18 @@ func (l *ModuleLoaderEnhanced) parseAndEvaluateModule(content string, moduleCtx 
 // extractModuleExports extracts module exports from context
 func extractModuleExports(moduleCtx *Context) *DictValue {
 	moduleDict := NewDict()
+	exportModuleVars(moduleDict, moduleCtx)
+	return moduleDict
+}
 
+// exportModuleVars populates a module dict with exports from context
+func exportModuleVars(moduleDict *DictValue, moduleCtx *Context) {
 	// Check if __exports__ is defined
 	if exportsVal, err := moduleCtx.Lookup("__exports__"); err == nil {
 		exportNamedVars(moduleDict, moduleCtx, exportsVal)
 	} else {
 		exportAllPublicVars(moduleDict, moduleCtx)
 	}
-
-	return moduleDict
 }
 
 // exportNamedVars exports only variables listed in __exports__
@@ -239,7 +260,7 @@ func (l *ModuleLoaderEnhanced) loadModuleContent(path string) (string, error) {
 }
 
 // tryLoadPythonModule attempts to load a Python module as a fallback
-func (l *ModuleLoaderEnhanced) tryLoadPythonModule(registry *ModuleRegistry, name, cacheName string, m28Err error) (*DictValue, error) {
+func (l *ModuleLoaderEnhanced) tryLoadPythonModule(registry *ModuleRegistry, name, cacheName string, partialModule *DictValue, m28Err error) (*DictValue, error) {
 	// Check if Python loader is available
 	if pythonLoaderFunc == nil {
 		// Python loader not available, return ImportError
@@ -250,6 +271,7 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModule(registry *ModuleRegistry, nam
 	}
 
 	// Try to load as Python module
+	// The Python loader will populate the partialModule that's already in the registry
 	moduleDict, err := pythonLoaderFunc(name, l.GetContext(), l.evalFunc)
 	if err != nil {
 		// If error mentions "not found", return ImportError
@@ -263,8 +285,16 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModule(registry *ModuleRegistry, nam
 		return nil, err
 	}
 
-	// Successfully loaded Python module, register it
-	registry.StoreModule(cacheName, moduleDict, fmt.Sprintf("<Python module '%s'>", name), []string{})
+	// Copy contents from moduleDict returned by Python loader to the partial module
+	// This ensures that circular imports see the same dict object
+	for _, key := range moduleDict.Keys() {
+		if val, ok := moduleDict.Get(key); ok {
+			partialModule.Set(key, val)
+		}
+	}
 
-	return moduleDict, nil
+	// Successfully loaded Python module, update registry
+	registry.StoreModule(cacheName, partialModule, fmt.Sprintf("<Python module '%s'>", name), []string{})
+
+	return partialModule, nil
 }
