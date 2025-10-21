@@ -178,7 +178,6 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 		symbolName = string(sym)
 	}
 
-
 	// Evaluate the function
 	fn, err := Eval(expr.Items()[0], ctx)
 	if err != nil {

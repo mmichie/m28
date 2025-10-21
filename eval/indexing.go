@@ -8,6 +8,80 @@ import (
 	"github.com/mmichie/m28/core/protocols"
 )
 
+// handleSliceAssignment handles slice assignment (obj[start:end] = values)
+func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Value) (core.Value, error) {
+	// Only support slice assignment for lists
+	list, ok := obj.(*core.ListValue)
+	if !ok {
+		return nil, fmt.Errorf("slice assignment only supported for lists, not %s", obj.Type())
+	}
+
+	// Extract slice parameters
+	var start, stop *int
+
+	// Convert slice values to integers
+	if slice.Start != nil && slice.Start != core.Nil {
+		val, err := types.ToIndex(slice.Start, nil)
+		if err != nil {
+			return nil, err
+		}
+		start = &val
+	}
+
+	if slice.Stop != nil && slice.Stop != core.Nil {
+		val, err := types.ToIndex(slice.Stop, nil)
+		if err != nil {
+			return nil, err
+		}
+		stop = &val
+	}
+
+	// For now, only support step=None (which means step=1)
+	if slice.Step != nil && slice.Step != core.Nil {
+		return nil, fmt.Errorf("slice assignment with step not yet supported")
+	}
+
+	// Convert value to a list of values to insert
+	var valuesList *core.ListValue
+	switch v := value.(type) {
+	case *core.ListValue:
+		valuesList = v
+	case core.TupleValue:
+		valuesList = core.NewList([]core.Value(v)...)
+	case core.StringValue:
+		// String unpacking: each character becomes an element
+		items := make([]core.Value, 0, len(string(v)))
+		for _, ch := range string(v) {
+			items = append(items, core.StringValue(string(ch)))
+		}
+		valuesList = core.NewList(items...)
+	default:
+		// Try to iterate
+		if iterable, ok := value.(core.Iterable); ok {
+			items := make([]core.Value, 0)
+			iter := iterable.Iterator()
+			for {
+				item, ok := iter.Next()
+				if !ok {
+					break
+				}
+				items = append(items, item)
+			}
+			valuesList = core.NewList(items...)
+		} else {
+			return nil, fmt.Errorf("can only assign an iterable to a slice")
+		}
+	}
+
+	// Use the built-in SetSlice method
+	err := list.SetSlice(start, stop, valuesList)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
+}
+
 // GetItemForm implements the get-item special form for index access
 // (get-item obj key) -> value at index/key
 func GetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
@@ -82,6 +156,11 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	value, err := Eval(valueArg, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating value: %v", err)
+	}
+
+	// Handle slice assignment (obj[start:end] = values)
+	if sliceVal, ok := key.(*core.SliceValue); ok {
+		return handleSliceAssignment(obj, sliceVal, value)
 	}
 
 	// fmt.Printf("DEBUG SetItemForm: obj type=%s, key=%v, value=%v\n", obj.Type(), key, value)
