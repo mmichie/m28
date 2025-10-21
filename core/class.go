@@ -614,6 +614,10 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 
 	// super() should SKIP s.Class and look in parent classes only
 	// This is the key difference from instance.GetAttr which checks the instance's class first
+	//
+	// HOWEVER: For special methods like __new__ that exist on the root metaclass (type),
+	// we need to check s.Class itself if it has no parents. This handles the case where
+	// a metaclass calls super().__new__() and the metaclass's parent is type.
 
 	// Look in parent classes using MRO
 	if len(s.Class.Parents) > 0 {
@@ -631,6 +635,14 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 		// Also try GetAttr on the parent class
 		if method, ok := s.Class.Parent.GetAttr(name); ok {
 			return bindMethod(method, s.Class.Parent), true
+		}
+	} else {
+		// No parents - this is the root class (like 'type' or 'object')
+		// For special methods, check the class itself
+		// This is needed because type.__new__ exists on type, and when a metaclass
+		// inherits from type and calls super().__new__(), we need to find type.__new__
+		if method, ok := s.Class.GetMethod(name); ok {
+			return bindMethod(method, s.Class), true
 		}
 	}
 
