@@ -192,8 +192,8 @@ func (l *DefaultModuleLoader) tryLoadPythonModule(name string, ctx *Context, m28
 		return nil, fmt.Errorf("failed to resolve module path: %v", m28Err)
 	}
 
-	// Try to load as Python module
-	moduleDict, err := pythonLoaderFunc(name, ctx, l.evalFunc)
+	// Try to load as Python module (no partial module for legacy loader)
+	moduleDict, err := pythonLoaderFunc(name, ctx, l.evalFunc, nil)
 	if err != nil {
 		// If error mentions "not found", include original M28 error
 		if strings.Contains(err.Error(), "not found") {
@@ -212,9 +212,10 @@ func (l *DefaultModuleLoader) tryLoadPythonModule(name string, ctx *Context, m28
 
 // pythonLoaderFunc is a function variable that will be set by the modules package
 // to avoid circular dependency
-var pythonLoaderFunc func(string, *Context, func(Value, *Context) (Value, error)) (*DictValue, error)
+// Signature: (name, context, evalFunc, partialModule) -> (moduleDict, error)
+var pythonLoaderFunc func(string, *Context, func(Value, *Context) (Value, error), *DictValue) (*DictValue, error)
 
 // SetPythonLoader sets the Python module loader function
-func SetPythonLoader(loader func(string, *Context, func(Value, *Context) (Value, error)) (*DictValue, error)) {
+func SetPythonLoader(loader func(string, *Context, func(Value, *Context) (Value, error), *DictValue) (*DictValue, error)) {
 	pythonLoaderFunc = loader
 }

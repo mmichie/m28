@@ -45,6 +45,10 @@ type Context struct {
 
 	// Variables declared as nonlocal in this scope (Python nonlocal statement)
 	NonlocalVars map[string]bool
+
+	// Optional module dict to sync definitions to (for circular import support)
+	// When set, Define() will also update this dict in real-time
+	ModuleDict *DictValue
 }
 
 // NewContext creates a new evaluation context
@@ -103,6 +107,22 @@ func (c *Context) Define(name string, value Value) {
 		}
 	}
 	c.Vars[name] = value
+
+	// If this context has a ModuleDict, sync the definition to it in real-time
+	// This enables circular imports to see partially-populated modules
+	if c.ModuleDict != nil {
+		// Skip dunder variables (__name__, __file__, etc.) - they're internal
+		if len(name) >= 2 && name[:2] == "__" && name[len(name)-2:] == "__" {
+			return
+		}
+		// Skip private vars (starting with _) for module exports
+		if len(name) > 0 && name[0] == '_' {
+			return
+		}
+		// Add to module dict with proper key formatting
+		key := ValueToKey(StringValue(name))
+		c.ModuleDict.SetWithKey(key, StringValue(name), value)
+	}
 }
 
 // DefineBuiltin defines a builtin function with duplicate tracking

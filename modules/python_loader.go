@@ -36,11 +36,17 @@ var cExtensionModules = map[string]bool{
 
 // LoadPythonModule attempts to load a Python module by name
 // Returns (*DictValue, error) to match ModuleLoader interface
-func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, *core.Context) (core.Value, error)) (*core.DictValue, error) {
+// If partialModule is provided, it will be populated during evaluation for circular import support
+func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, *core.Context) (core.Value, error), partialModule *core.DictValue) (*core.DictValue, error) {
 	fmt.Fprintf(os.Stderr, "[PROFILE] LoadPythonModule called for '%s'\n", name)
 
+	// Create partial module if not provided
+	if partialModule == nil {
+		partialModule = core.NewDict()
+	}
+
 	// Note: Circular import handling is done by ModuleLoaderEnhanced
-	// This function just loads and returns the module content
+	// This function loads content and populates partialModule during evaluation
 
 	// Special case: builtins module - create a dict with builtin functions
 	if name == "builtins" {
@@ -107,6 +113,11 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	moduleCtx := core.NewContext(nil)
 	// Keep a reference to the parent global so builtins are accessible
 	moduleCtx.Outer = ctx.Global
+
+	// Link to partial module for real-time syncing during evaluation
+	// This enables circular imports to see partially-populated modules
+	moduleCtx.ModuleDict = partialModule
+
 	moduleCtx.Define("__name__", core.StringValue(name))
 	moduleCtx.Define("__file__", core.StringValue(pyPath))
 
@@ -148,23 +159,22 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	fmt.Fprintf(os.Stderr, "[PROFILE] LoadModule %s: total=%v toIR=%v eval=%v\n",
 		name, totalLoad, toIRTime, evalTime)
 
-	// Create module dictionary with exports
-	moduleDict := core.NewDict()
+	// Note: Module dict was already populated during evaluation via Context.ModuleDict
+	// Context.Define() automatically syncs public names to partialModule
+	// We need to also add private names (starting with _) that Python stdlib uses
 
-	// Export all variables except dunder variables
-	// Note: In Python, __all__ only controls "from module import *", not direct attribute access.
-	// So we export everything (except dunders) to allow module.name access to work correctly.
-	// We include underscore-prefixed names (like _splitext) because Python stdlib
-	// uses them for internal functions that other modules import.
+	// Add underscore-prefixed names that are used internally by Python stdlib
 	for varName, value := range moduleCtx.Vars {
 		// Skip dunder variables (__name__, __file__, etc.)
 		if len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__" {
 			continue
 		}
-		// Use SetWithKey to enable both dict and attribute access
-		key := core.ValueToKey(core.StringValue(varName))
-		moduleDict.SetWithKey(key, core.StringValue(varName), value)
+		// Only process private names (starting with _) - public names already synced
+		if len(varName) > 0 && varName[0] == '_' {
+			key := core.ValueToKey(core.StringValue(varName))
+			partialModule.SetWithKey(key, core.StringValue(varName), value)
+		}
 	}
 
-	return moduleDict, nil
+	return partialModule, nil
 }

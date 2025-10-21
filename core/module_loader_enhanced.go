@@ -121,13 +121,14 @@ func (l *ModuleLoaderEnhanced) loadM28Module(registry *ModuleRegistry, cacheName
 	}
 
 	// Create module context and execute
-	moduleCtx := l.createModuleContext(cacheName, path)
+	// Pass partialModule so context syncs definitions to it in real-time
+	moduleCtx := l.createModuleContext(cacheName, path, partialModule)
 	if err := l.parseAndEvaluateModule(content, moduleCtx); err != nil {
 		return nil, err
 	}
 
-	// Extract module exports and populate the partial module
-	exportModuleVars(partialModule, moduleCtx)
+	// Note: No need to call exportModuleVars here anymore
+	// The module dict was populated in real-time during evaluation via Context.Define()
 
 	// Update registry with complete module
 	registry.StoreModule(cacheName, partialModule, path, []string{})
@@ -136,7 +137,7 @@ func (l *ModuleLoaderEnhanced) loadM28Module(registry *ModuleRegistry, cacheName
 }
 
 // tryLoadPythonModuleWithoutPartial attempts to load a Python module
-// Python loader will create and store partial module if the file exists
+// Creates a partial module for circular import support before loading
 func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *ModuleRegistry, name, cacheName string, m28Err error) (*DictValue, error) {
 	// Check if Python loader is available
 	if pythonLoaderFunc == nil {
@@ -147,15 +148,18 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 		}
 	}
 
+	// Create partial module and store in registry BEFORE loading
+	// This enables circular imports to access the partial module during evaluation
+	partialModule := NewDict()
+	registry.StoreModule(cacheName, partialModule, "", []string{})
+	fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: stored partial Python module '%s' in registry\n", cacheName)
+
 	// Try to load as Python module
-	// Python loader (LoadPythonModule in python_loader.go) will:
-	// 1. Check if the Python file exists
-	// 2. If yes, transpile and evaluate it
-	// 3. Return the module dict (or error)
-	// We don't create a partial module here because if the Python file doesn't exist,
-	// we want to return an error, not an empty module
-	moduleDict, err := pythonLoaderFunc(name, l.GetContext(), l.evalFunc)
+	// Python loader will populate partialModule during evaluation via Context.ModuleDict
+	moduleDict, err := pythonLoaderFunc(name, l.GetContext(), l.evalFunc, partialModule)
 	if err != nil {
+		// Loading failed - remove the partial module from registry
+		registry.ReloadModule(cacheName)
 		// If error mentions "not found", return ImportError
 		if strings.Contains(err.Error(), "not found") {
 			return nil, &ImportError{
@@ -167,15 +171,18 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 		return nil, err
 	}
 
-	// Successfully loaded Python module, register it
+	// Successfully loaded Python module, update registry with full path
 	registry.StoreModule(cacheName, moduleDict, fmt.Sprintf("<Python module '%s'>", name), []string{})
 
 	return moduleDict, nil
 }
 
 // createModuleContext creates a new context for module execution
-func (l *ModuleLoaderEnhanced) createModuleContext(cacheName, path string) *Context {
+// partialModule is the dict that will be populated during evaluation for circular import support
+func (l *ModuleLoaderEnhanced) createModuleContext(cacheName, path string, partialModule *DictValue) *Context {
 	moduleCtx := NewContext(l.ctx.Global)
+	// Link the context to the partial module dict for real-time syncing
+	moduleCtx.ModuleDict = partialModule
 	moduleCtx.Define("__name__", StringValue(cacheName))
 	moduleCtx.Define("__file__", StringValue(path))
 	return moduleCtx
