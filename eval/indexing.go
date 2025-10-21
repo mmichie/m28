@@ -54,6 +54,20 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("set-item requires exactly 3 arguments, got %d", args.Len())
 	}
 
+	// WORKAROUND: Check if value argument is a list literal that lost its "list-literal" symbol
+	// This can happen due to a transpiler bug with slice assignment
+	// Only wrap if the first element is NOT a symbol (i.e., it's definitely data, not code)
+	valueArg := args.Items()[2]
+	if listVal, ok := valueArg.(*core.ListValue); ok {
+		if listVal.Len() > 0 {
+			// Only wrap if first element is NOT a symbol
+			if _, ok := listVal.Items()[0].(core.SymbolValue); !ok {
+				// First element is not a symbol, so this is a list literal with data
+				valueArg = core.NewList(append([]core.Value{core.SymbolValue("list-literal")}, listVal.Items()...)...)
+			}
+		}
+	}
+
 	// Evaluate all arguments
 	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
@@ -65,7 +79,7 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("error evaluating key: %v", err)
 	}
 
-	value, err := Eval(args.Items()[2], ctx)
+	value, err := Eval(valueArg, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating value: %v", err)
 	}

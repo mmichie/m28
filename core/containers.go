@@ -15,9 +15,12 @@ type ListValue struct {
 
 // NewList creates a new mutable list from values
 func NewList(values ...Value) *ListValue {
+	// Create a copy of the values slice to prevent external mutation
+	items := make([]Value, len(values))
+	copy(items, values)
 	return &ListValue{
 		BaseObject: *NewBaseObject(ListType),
-		items:      values,
+		items:      items,
 	}
 }
 
@@ -32,12 +35,15 @@ func (l *ListValue) Len() int {
 	return len(l.items)
 }
 
-// Items returns the underlying slice (for iteration)
+// Items returns a copy of the underlying slice (for safe iteration)
 func (l *ListValue) Items() []Value {
 	if l == nil {
 		return nil
 	}
-	return l.items
+	// Return a copy to prevent external mutation
+	items := make([]Value, len(l.items))
+	copy(items, l.items)
+	return items
 }
 
 // Type implements Value.Type

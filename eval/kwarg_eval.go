@@ -178,20 +178,6 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 		symbolName = string(sym)
 	}
 
-	// Debug: check for empty list calls
-	if listVal, ok := expr.Items()[0].(*core.ListValue); ok {
-		if listVal.Len() == 0 {
-			fmt.Printf("DEBUG: Attempting to call empty list! expr.Len()=%d\n", expr.Len())
-			for i, item := range expr.Items() {
-				fmt.Printf("  [%d] %T: %v\n", i, item, item)
-			}
-		} else {
-			fmt.Printf("DEBUG: About to eval ListValue with %d elements\n", listVal.Len())
-			for i, item := range listVal.Items() {
-				fmt.Printf("  listVal[%d] %T: %v\n", i, item, item)
-			}
-		}
-	}
 
 	// Evaluate the function
 	fn, err := Eval(expr.Items()[0], ctx)
@@ -199,27 +185,10 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 		return nil, err
 	}
 
-	// Debug: check if we got an empty list
-	if listVal, ok := fn.(*core.ListValue); ok && listVal.Len() == 0 {
-		fmt.Printf("DEBUG: Eval returned empty list! Original expr[0]=%T\n", expr.Items()[0])
-		if origListVal, ok := expr.Items()[0].(*core.ListValue); ok {
-			fmt.Printf("  Original expr[0] has %d elements:\n", origListVal.Len())
-			for i, item := range origListVal.Items() {
-				fmt.Printf("    [%d] %T: %v\n", i, item, item)
-			}
-		}
-		fmt.Printf("  Full call expr:\n")
-		for i, item := range expr.Items() {
-			fmt.Printf("  [%d] %T: %v\n", i, item, item)
-		}
-		// Let's try evaluating it again manually
-		fmt.Printf("DEBUG: Trying to re-eval expr[0]...\n")
-		testVal, testErr := Eval(expr.Items()[0], ctx)
-		fmt.Printf("  Result: %T, err=%v\n", testVal, testErr)
-	}
-
 	// Parse arguments including unpacking
-	argInfo, err := parseArgumentsWithUnpacking(core.NewList(expr.Items()[1:]...))
+	argsList := core.NewList(expr.Items()[1:]...)
+
+	argInfo, err := parseArgumentsWithUnpacking(argsList)
 	if err != nil {
 		return nil, err
 	}

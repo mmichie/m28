@@ -40,17 +40,11 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if objWithAttrs, ok := obj.(core.Object); ok {
 		// Full Object interface
 		value, found = objWithAttrs.GetAttr(string(propName))
-		if found && string(propName) == "lru_cache" {
-			fmt.Printf("DEBUG DotForm: Found lru_cache via Object interface, value=%T: %v\n", value, value)
-		}
 	} else if objWithGetAttr, ok := obj.(interface {
 		GetAttr(string) (core.Value, bool)
 	}); ok {
 		// Just GetAttr method
 		value, found = objWithGetAttr.GetAttr(string(propName))
-		if found && string(propName) == "lru_cache" {
-			fmt.Printf("DEBUG DotForm: Found lru_cache via GetAttr, value=%T: %v\n", value, value)
-		}
 	}
 
 	if found {
@@ -177,9 +171,6 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Just property access
-		if string(propName) == "lru_cache" {
-			fmt.Printf("DEBUG DotForm: Returning lru_cache as property, value=%T: %v\n", value, value)
-		}
 		return value, nil
 	}
 
