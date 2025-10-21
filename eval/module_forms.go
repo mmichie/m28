@@ -236,7 +236,9 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				if spec.alias != "" {
 					targetName = spec.alias
 				}
-				ctx.Define(targetName, submodule)
+				// Wrap as Module object for attribute access
+				moduleObj := wrapDictAsModule(submoduleName, submodule)
+				ctx.Define(targetName, moduleObj)
 				continue
 			}
 
@@ -303,9 +305,32 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 		if err != nil {
 			return nil, err
 		}
-		ctx.Define(alias, dictModule)
+
+		// Wrap the dict as a Module object to support attribute access
+		moduleObj := wrapDictAsModule(moduleName, dictModule)
+		ctx.Define(alias, moduleObj)
 		return dictModule, nil
 	}
+}
+
+// wrapDictAsModule wraps a DictValue as a Module object
+// This allows attribute access like `module.function` to work properly
+func wrapDictAsModule(name string, dict *core.DictValue) *core.Module {
+	module := core.NewModule(name, "")
+
+	// Copy all items from dict to module exports
+	for _, key := range dict.Keys() {
+		if val, ok := dict.Get(key); ok {
+			// Remove prefix if present
+			cleanKey := key
+			if strings.HasPrefix(key, "s:") {
+				cleanKey = key[2:]
+			}
+			module.Export(cleanKey, val)
+		}
+	}
+
+	return module
 }
 
 // exportForm implements the export special form:
