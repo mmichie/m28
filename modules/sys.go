@@ -60,6 +60,8 @@ func InitSysModule() *core.DictValue {
 	sysModule.SetWithKey("executable", core.StringValue("executable"), core.StringValue(execPath))
 	sysModule.SetWithKey("prefix", core.StringValue("prefix"), core.StringValue("/usr/local"))
 	sysModule.SetWithKey("exec_prefix", core.StringValue("exec_prefix"), core.StringValue("/usr/local"))
+	sysModule.SetWithKey("base_prefix", core.StringValue("base_prefix"), core.StringValue("/usr/local"))
+	sysModule.SetWithKey("base_exec_prefix", core.StringValue("base_exec_prefix"), core.StringValue("/usr/local"))
 
 	// System constants
 	sysModule.SetWithKey("maxsize", core.StringValue("maxsize"), core.NumberValue(int64(^uint(0)>>1)))
