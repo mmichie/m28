@@ -595,34 +595,42 @@ func (s *Super) String() string {
 
 // GetAttr gets an attribute from the parent class
 func (s *Super) GetAttr(name string) (Value, bool) {
-	// First, check in s.Class itself (the class we're looking in)
-	// This is important for super() calls in metaclass methods where
-	// s.Class is the metaclass parent (e.g., type)
-	if method, ok := s.Class.GetMethod(name); ok {
-		return method, true
+	// Helper function to bind method to instance
+	bindMethod := func(method Value, defClass *Class) Value {
+		if callable, ok := method.(interface {
+			Call([]Value, *Context) (Value, error)
+		}); ok {
+			// Create bound method if we have an instance
+			if s.Instance != nil {
+				return &BoundInstanceMethod{
+					Instance:      s.Instance,
+					Method:        callable,
+					DefiningClass: defClass,
+				}
+			}
+		}
+		return method
 	}
 
-	// Also try GetAttr on s.Class for dynamically defined attributes
-	if method, ok := s.Class.GetAttr(name); ok {
-		return method, true
-	}
+	// super() should SKIP s.Class and look in parent classes only
+	// This is the key difference from instance.GetAttr which checks the instance's class first
 
-	// If not found, look in parent classes using MRO
+	// Look in parent classes using MRO
 	if len(s.Class.Parents) > 0 {
 		for _, parent := range s.Class.Parents {
-			if method, _, ok := parent.GetMethodWithClass(name); ok {
-				return method, true
+			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
+				return bindMethod(method, defClass), true
 			}
 		}
 	} else if s.Class.Parent != nil {
 		// Fallback to single parent for backward compatibility
-		if method, _, ok := s.Class.Parent.GetMethodWithClass(name); ok {
-			return method, true
+		if method, defClass, ok := s.Class.Parent.GetMethodWithClass(name); ok {
+			return bindMethod(method, defClass), true
 		}
 
 		// Also try GetAttr on the parent class
 		if method, ok := s.Class.Parent.GetAttr(name); ok {
-			return method, true
+			return bindMethod(method, s.Class.Parent), true
 		}
 	}
 
