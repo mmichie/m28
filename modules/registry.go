@@ -12,31 +12,32 @@ type ModuleInitializer func() *core.DictValue
 
 // builtinModules maps module names to their initializers
 var builtinModules = map[string]ModuleInitializer{
-	"os":            InitOSModule,
-	"sys":           InitSysModule,
-	"io":            InitIOModule,
-	"json":          InitJSONModule,
-	"time":          InitTimeModule,
-	"datetime":      InitDatetimeModule,
-	"pathlib":       InitPathlibModule,
-	"random":        InitRandomModule,
-	"shutil":        InitShutilModule,
-	"math":          InitMathModule,
-	"_collections":  InitCollectionsModule, // C extension module for collections
-	"_weakref":      InitWeakrefModule,     // C extension module for weak references
-	"_thread":       InitThreadModule,      // C extension module for threading
-	"itertools":     InitItertoolsModule,
-	"_functools":    Init_FunctoolsModule, // C module stub for Python's functools.py
-	"operator":      InitOperatorModule,
-	"copy":          InitCopyModule,
-	"heapq":         InitHeapqModule,
-	"traceback":     InitTracebackModule,
-	"unittest.util": InitUnittestUtilModule,
-	"types":         InitTypesModule,
-	"re":            InitReModule,
-	"dataclasses":   InitDataclassesModule,
-	"warnings":      InitWarningsModule,
-	"_signal":       Init_SignalModule, // C extension module for signal handling
+	"os":               InitOSModule,
+	"sys":              InitSysModule,
+	"io":               InitIOModule,
+	"json":             InitJSONModule,
+	"time":             InitTimeModule,
+	"datetime":         InitDatetimeModule,
+	"pathlib":          InitPathlibModule,
+	"random":           InitRandomModule,
+	"shutil":           InitShutilModule,
+	"math":             InitMathModule,
+	"_collections":     InitCollectionsModule, // C extension module for collections
+	"_weakref":         InitWeakrefModule,     // C extension module for weak references
+	"_thread":          InitThreadModule,      // C extension module for threading
+	"itertools":        InitItertoolsModule,
+	"_functools":       Init_FunctoolsModule, // C module stub for Python's functools.py
+	"operator":         InitOperatorModule,
+	"copy":             InitCopyModule,
+	"heapq":            InitHeapqModule,
+	"traceback":        InitTracebackModule,
+	"unittest.util":    InitUnittestUtilModule,
+	"unittest.signals": InitUnittestSignalsModule,
+	"types":            InitTypesModule,
+	"re":               InitReModule,
+	"dataclasses":      InitDataclassesModule,
+	"warnings":         InitWarningsModule,
+	"_signal":          Init_SignalModule, // C extension module for signal handling
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
