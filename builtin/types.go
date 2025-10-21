@@ -171,6 +171,11 @@ func RegisterTypes(ctx *core.Context) {
 			return nil, fmt.Errorf("__str__() missing 1 required positional argument: 'self'")
 		}
 		// Return a simple string representation
+		// For instances, format directly without calling String() to avoid recursion
+		if inst, ok := args[0].(*core.Instance); ok {
+			return core.StringValue(fmt.Sprintf("<%s instance at %p>", inst.Class.Name, inst)), nil
+		}
+		// For other types, use String() method
 		return core.StringValue(args[0].String()), nil
 	}))
 
