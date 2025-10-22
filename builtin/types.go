@@ -179,6 +179,15 @@ func RegisterTypes(ctx *core.Context) {
 		return core.StringValue(args[0].String()), nil
 	}))
 
+	// Add __init_subclass__ as a classmethod
+	// This is called when a subclass is created
+	// Python's object.__init_subclass__(cls) is a no-op, but must exist
+	objectClass.SetMethod("__init_subclass__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// args[0] is the class (cls parameter)
+		// Just return None - this is a no-op in Python too
+		return core.None, nil
+	}))
+
 	ctx.Define("object", objectClass)
 
 	// format - Python-style format(value, format_spec='')

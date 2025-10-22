@@ -11,18 +11,18 @@ func TestLazyLoading(t *testing.T) {
 	moduleCache = make(map[string]*core.DictValue)
 
 	// First call should initialize the module
-	module1, ok := GetBuiltinModule("json")
+	module1, ok := GetBuiltinModule("math")
 	if !ok {
-		t.Fatal("json module not found")
+		t.Fatal("math module not found")
 	}
 	if module1 == nil {
-		t.Fatal("json module is nil")
+		t.Fatal("math module is nil")
 	}
 
 	// Second call should return the cached module
-	module2, ok := GetBuiltinModule("json")
+	module2, ok := GetBuiltinModule("math")
 	if !ok {
-		t.Fatal("json module not found on second call")
+		t.Fatal("math module not found on second call")
 	}
 
 	// Should be the same instance
@@ -43,11 +43,11 @@ func TestNonExistentModule(t *testing.T) {
 
 func BenchmarkGetBuiltinModule(b *testing.B) {
 	// Pre-populate cache to test cached performance
-	GetBuiltinModule("json")
+	GetBuiltinModule("math")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		GetBuiltinModule("json")
+		GetBuiltinModule("math")
 	}
 }
 
@@ -56,6 +56,6 @@ func BenchmarkGetBuiltinModuleUncached(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Clear cache to force re-initialization
 		moduleCache = make(map[string]*core.DictValue)
-		GetBuiltinModule("json")
+		GetBuiltinModule("math")
 	}
 }

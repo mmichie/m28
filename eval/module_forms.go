@@ -241,10 +241,21 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				ctx.Define(targetName, moduleObj)
 				continue
 			}
-			// Debug: log why submodule loading failed
-			core.DebugLog("[DEBUG] Failed to load '%s' as submodule: %v\n", submoduleName, err)
 
-			// Not a submodule, try loading parent module and extracting the name
+			// Check if the error indicates the submodule file was found but failed to load
+			// In that case, propagate the error rather than falling back to attribute lookup
+			// Only propagate if "error in Python module" - other errors likely mean file not found
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "error in Python module") {
+				// The submodule exists but failed to load - propagate the error
+				core.DebugLog("[DEBUG] Submodule '%s' found but failed to load: %v\n", submoduleName, err)
+				return nil, err
+			}
+
+			// Debug: log why submodule loading failed (file not found)
+			core.DebugLog("[DEBUG] Submodule '%s' not found, trying attribute lookup: %v\n", submoduleName, err)
+
+			// Not a submodule file, try loading parent module and extracting the name
 			if moduleName == "" {
 				return nil, fmt.Errorf("cannot import name '%s': %w", spec.name, err)
 			}

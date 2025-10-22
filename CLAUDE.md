@@ -69,6 +69,38 @@ m28 -e 'def double(x): x*2 print(double(5))'
 
 **Mix styles freely**: Use whichever makes your code clearer!
 
+## CPython Standard Library Philosophy
+
+**CRITICAL**: When working with CPython's standard library:
+
+1. **ONLY stub/rewrite C extension modules** (modules that contain C code)
+   - C extensions typically have names starting with `_` (e.g., `_string`, `_collections`, `_thread`)
+   - Implement these in Go under `modules/` directory
+   - Example: `modules/c_string.go` for `_string` module
+
+2. **Let pure Python stdlib modules run directly**
+   - CPython's `.py` files should "just work" in M28
+   - DO NOT create Go stubs for pure Python modules
+   - Example: `abc.py`, `functools.py`, `unittest.py` should use CPython's files
+
+3. **ONLY stub pure Python modules if they use unsupported features**
+   - Example: `textwrap.py` uses regex features Go doesn't support
+   - Example: `string.py` uses advanced regex `(?a:...)` syntax
+   - Document WHY in the module comment
+   - Keep stubs minimal - only what's needed
+
+4. **Fix M28 language features instead of stubbing**
+   - If a pure Python module fails, the problem is likely in M28's implementation
+   - Fix the language feature (e.g., iterator protocol, import system, super())
+   - Don't work around language issues by stubbing stdlib modules
+
+**Examples:**
+- ✅ GOOD: Implement `_string` C extension in Go
+- ✅ GOOD: Use CPython's `abc.py` directly
+- ✅ GOOD: Stub `string.py` because it uses `(?a:...)` regex M28 doesn't support
+- ❌ BAD: Stub `abc.py` to avoid fixing metaclass issues
+- ❌ BAD: Stub `functools.py` to avoid fixing decorator issues
+
 ## Build/Test Commands
 - Build: `make build`
 - Run all tests: `make test`

@@ -11,38 +11,23 @@ import (
 type ModuleInitializer func() *core.DictValue
 
 // builtinModules maps module names to their initializers
+// Following CPython philosophy: ONLY stub C extension modules (starting with _ or built-in)
+// Pure Python stdlib modules (.py files) should run directly without stubs
 var builtinModules = map[string]ModuleInitializer{
-	"posix": InitPosixModule, // C extension for Unix - used by Python's os.py
-	// Note: "os" is not here - we use Python's os.py from stdlib which imports posix
-	"sys":              InitSysModule,
-	"io":               InitIOModule,
-	"json":             InitJSONModule,
-	"time":             InitTimeModule,
-	"datetime":         InitDatetimeModule,
-	"pathlib":          InitPathlibModule,
-	"random":           InitRandomModule,
-	"shutil":           InitShutilModule,
-	"math":             InitMathModule,
-	"_collections":     InitCollectionsModule, // C extension module for collections
-	"_weakref":         InitWeakrefModule,     // C extension module for weak references
-	"_thread":          InitThreadModule,      // C extension module for threading
-	"itertools":        InitItertoolsModule,
-	"_functools":       Init_FunctoolsModule, // C module stub for Python's functools.py
-	"operator":         InitOperatorModule,
-	"copy":             InitCopyModule,
-	"heapq":            InitHeapqModule,
-	"traceback":        InitTracebackModule,
-	"unittest.util":    InitUnittestUtilModule,
-	"unittest.signals": InitUnittestSignalsModule,
-	"types":            InitTypesModule,
-	"re":               InitReModule,
-	"dataclasses":      InitDataclassesModule,
-	"warnings":         InitWarningsModule,
-	"_signal":          Init_SignalModule,   // C extension module for signal handling
-	"sysconfig":        InitSysconfigModule, // Stub for test.support compatibility
-	"textwrap":         InitTextwrapModule,  // Stub - Python's textwrap.py uses regex features Go doesn't support
-	"errno":            InitErrnoModule,     // Error codes module
-	"_string":          Init_StringModule,   // C extension for string.py
+	// Built-in C extension modules
+	"posix":        InitPosixModule,       // C extension for Unix - used by Python's os.py
+	"sys":          InitSysModule,         // Built-in module
+	"io":           InitIOModule,          // Built-in module
+	"time":         InitTimeModule,        // Built-in C module
+	"math":         InitMathModule,        // Built-in C module
+	"errno":        InitErrnoModule,       // Built-in C module
+	"itertools":    InitItertoolsModule,   // Built-in C module
+	"_collections": InitCollectionsModule, // C extension module for collections.py
+	"_weakref":     InitWeakrefModule,     // C extension module for weakref.py
+	"_thread":      InitThreadModule,      // C extension module for threading.py
+	"_functools":   Init_FunctoolsModule,  // C extension module for functools.py
+	"_signal":      Init_SignalModule,     // C extension module for signal.py
+	"_string":      Init_StringModule,     // C extension module for string.py
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
