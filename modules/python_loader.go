@@ -153,11 +153,38 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	ir := astNode.ToIR()
 	toIRTime := time.Since(startToIR)
 
-	// Evaluate the IR
+	// Evaluate the IR with timeout
 	startEval := time.Now()
-	_, err = evalFunc(ir, moduleCtx)
-	if err != nil {
-		return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w", name, pyPath, err)
+	evalTimeout := 5 * time.Second // 5 second timeout for module evaluation
+
+	type evalResult struct {
+		val core.Value
+		err error
+	}
+	resultChan := make(chan evalResult, 1)
+
+	go func() {
+		val, err := evalFunc(ir, moduleCtx)
+		resultChan <- evalResult{val, err}
+	}()
+
+	var evalErr error
+	select {
+	case result := <-resultChan:
+		evalErr = result.err
+	case <-time.After(evalTimeout):
+		return nil, fmt.Errorf(
+			"timeout evaluating Python module '%s' (transpiled from %s):\n"+
+				"  Module evaluation exceeded %v timeout.\n"+
+				"  This often indicates:\n"+
+				"  - Missing C extension dependency\n"+
+				"  - Infinite loop in module initialization\n"+
+				"  - Complex import chain requiring unavailable modules",
+			name, pyPath, evalTimeout)
+	}
+
+	if evalErr != nil {
+		return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w", name, pyPath, evalErr)
 	}
 	evalTime := time.Since(startEval)
 
