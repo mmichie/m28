@@ -393,6 +393,17 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 		return TupleValue{}, true
 	case "__dict__":
 		return NewDict(), true
+	case "__hash__":
+		// Return a hash function for the function
+		// Builtin functions are hashable by identity (pointer address)
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// Use the function's memory address as hash
+			hashStr := fmt.Sprintf("%p", f)
+			// Convert hex string to number (simple hash)
+			var hashNum int64
+			fmt.Sscanf(hashStr, "%x", &hashNum)
+			return NumberValue(float64(hashNum)), nil
+		}), true
 	}
 
 	return nil, false

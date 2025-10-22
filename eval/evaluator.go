@@ -632,6 +632,18 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		}
 		// Return empty tuple for type parameters by default
 		return core.TupleValue{}, true
+	case "__hash__":
+		// Return a hash function for the function
+		// Python functions are hashable by identity (pointer address)
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Use the function's memory address as hash
+			// This makes functions hashable so they can be dict keys
+			hashStr := fmt.Sprintf("%p", f)
+			// Convert hex string to number (simple hash)
+			var hashNum int64
+			fmt.Sscanf(hashStr, "%x", &hashNum)
+			return core.NumberValue(float64(hashNum)), nil
+		}), true
 	default:
 		return f.BaseObject.GetAttr(name)
 	}
