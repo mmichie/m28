@@ -73,6 +73,7 @@ const (
 	TOKEN_CARET_EQ        // ^=
 	TOKEN_DOUBLE_LT_EQ    // <<=
 	TOKEN_DOUBLE_GT_EQ    // >>=
+	TOKEN_AT_EQ           // @=
 
 	// Delimiters
 	TOKEN_LPAREN     // (
@@ -298,6 +299,8 @@ func (tt TokenType) String() string {
 		return "DOUBLE_LT_EQ"
 	case TOKEN_DOUBLE_GT_EQ:
 		return "DOUBLE_GT_EQ"
+	case TOKEN_AT_EQ:
+		return "AT_EQ"
 	case TOKEN_LPAREN:
 		return "LPAREN"
 	case TOKEN_RPAREN:

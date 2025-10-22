@@ -240,6 +240,7 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 	defer p.exitParse()
 
 	// Check for decorators first (can precede def or class)
+	// Note: @= is TOKEN_AT_EQ, not TOKEN_AT, so this won't match augmented assignment
 	if p.check(TOKEN_AT) {
 		decorators := p.parseDecorators()
 
@@ -917,8 +918,8 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 	// Check for augmented assignment (+=, -=, etc.)
 	if p.match(TOKEN_PLUS_ASSIGN, TOKEN_MINUS_ASSIGN, TOKEN_STAR_ASSIGN,
 		TOKEN_SLASH_ASSIGN, TOKEN_DOUBLESLASH_ASSIGN, TOKEN_PERCENT_ASSIGN,
-		TOKEN_PIPE_ASSIGN, TOKEN_AMPERSAND_ASSIGN, TOKEN_CARET_ASSIGN,
-		TOKEN_LSHIFT_ASSIGN, TOKEN_RSHIFT_ASSIGN) {
+		TOKEN_DOUBLESTAR_ASSIGN, TOKEN_PIPE_ASSIGN, TOKEN_AMPERSAND_ASSIGN,
+		TOKEN_CARET_ASSIGN, TOKEN_LSHIFT_ASSIGN, TOKEN_RSHIFT_ASSIGN, TOKEN_AT_EQ) {
 		tok := p.previous()
 		value := p.parseExpression()
 
@@ -939,6 +940,8 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 			op = "//"
 		case TOKEN_PERCENT_ASSIGN:
 			op = "%"
+		case TOKEN_DOUBLESTAR_ASSIGN:
+			op = "**"
 		case TOKEN_PIPE_ASSIGN:
 			op = "|"
 		case TOKEN_AMPERSAND_ASSIGN:
@@ -949,6 +952,8 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 			op = "<<"
 		case TOKEN_RSHIFT_ASSIGN:
 			op = ">>"
+		case TOKEN_AT_EQ:
+			op = "@"
 		}
 
 		opCall := ast.NewSExpr([]ast.ASTNode{
@@ -1336,7 +1341,7 @@ func (p *PythonParser) parseAddition() ast.ASTNode {
 func (p *PythonParser) parseMultiplication() ast.ASTNode {
 	expr := p.parseFactor()
 
-	for p.match(TOKEN_STAR, TOKEN_SLASH, TOKEN_DOUBLESLASH, TOKEN_PERCENT) {
+	for p.match(TOKEN_STAR, TOKEN_SLASH, TOKEN_DOUBLESLASH, TOKEN_PERCENT, TOKEN_AT) {
 		tok := p.previous()
 		right := p.parseFactor()
 
@@ -1350,6 +1355,8 @@ func (p *PythonParser) parseMultiplication() ast.ASTNode {
 			op = "//"
 		case TOKEN_PERCENT:
 			op = "%"
+		case TOKEN_AT:
+			op = "@"
 		}
 
 		expr = ast.NewSExpr([]ast.ASTNode{

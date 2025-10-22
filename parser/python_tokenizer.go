@@ -470,6 +470,10 @@ func (t *PythonTokenizer) scanOperator(ch byte, start, startLine, startCol int) 
 		}
 		return makeToken(TOKEN_COLON)
 	case '@':
+		// Check for @= (matrix multiply assign)
+		if t.match('=') {
+			return makeToken(TOKEN_AT_EQ)
+		}
 		return makeToken(TOKEN_AT)
 
 	case '+':

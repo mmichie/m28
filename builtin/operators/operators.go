@@ -2,6 +2,7 @@
 package operators
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -23,6 +24,7 @@ func RegisterAll(ctx *core.Context) {
 	ctx.Define("//", core.NewBuiltinFunction(FloorDivide()))
 	ctx.Define("%", core.NewBuiltinFunction(Modulo()))
 	ctx.Define("**", core.NewBuiltinFunction(Power()))
+	ctx.Define("@", core.NewBuiltinFunction(MatMul()))
 
 	// Comparison operators
 	ctx.Define("==", core.NewBuiltinFunction(Equal()))
@@ -423,6 +425,36 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 				"'"+string(l.Type())+"'")
 		}).
 		Execute()
+}
+
+// MatMul implements the @ operator (matrix multiplication) using protocol-based dispatch
+func MatMul() func([]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("@", args)
+
+		// @ operator requires exactly 2 arguments
+		if v.Count() != 2 {
+			return nil, fmt.Errorf("@ requires exactly 2 arguments, got %d", v.Count())
+		}
+
+		left := args[0]
+		right := args[1]
+
+		// Try __matmul__ on left operand
+		if result, found, err := types.CallDunder(left, "__matmul__", []core.Value{right}, ctx); found {
+			return result, err
+		}
+
+		// Try __rmatmul__ on right operand
+		if result, found, err := types.CallDunder(right, "__rmatmul__", []core.Value{left}, ctx); found {
+			return result, err
+		}
+
+		// No __matmul__ or __rmatmul__ method found
+		return nil, errors.NewTypeError("@",
+			"unsupported operand type(s) for @",
+			"'"+string(left.Type())+"' and '"+string(right.Type())+"'")
+	}
 }
 
 // Divide implements the / operator using protocol-based dispatch

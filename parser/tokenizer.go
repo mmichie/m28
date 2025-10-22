@@ -142,6 +142,10 @@ func (t *Tokenizer) scanToken() Token {
 	case '`':
 		return t.makeToken(TOKEN_BACKTICK, start, startLine, startCol)
 	case '@':
+		if !t.isAtEnd() && t.peek() == '=' {
+			t.advance()
+			return t.makeToken(TOKEN_AT_EQ, start, startLine, startCol)
+		}
 		return t.makeToken(TOKEN_AT, start, startLine, startCol)
 
 	// Operators with potential multi-char variants
