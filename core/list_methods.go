@@ -5,6 +5,35 @@ import (
 	"log"
 )
 
+// simpleListIterator is a simple list iterator for __iter__
+type simpleListIterator struct {
+	list  *ListValue
+	index int
+}
+
+func (s *simpleListIterator) Type() Type {
+	return "list_iterator"
+}
+
+func (s *simpleListIterator) String() string {
+	return fmt.Sprintf("<list_iterator at %d>", s.index)
+}
+
+func (s *simpleListIterator) GetAttr(name string) (Value, bool) {
+	if name == "__next__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if s.index < s.list.Len() {
+				val := s.list.Items()[s.index]
+				s.index++
+				return val, nil
+			}
+			// Return StopIteration error
+			return nil, fmt.Errorf("StopIteration")
+		}), true
+	}
+	return nil, false
+}
+
 // InitListMethods adds additional methods to the list type descriptor
 func InitListMethods() {
 	listType := GetTypeDescriptor("list")
@@ -67,6 +96,18 @@ func InitListMethods() {
 			items := make([]Value, len(list.items))
 			copy(items, list.items)
 			return NewList(items...), nil
+		},
+	}
+
+	// Add __iter__ method
+	listType.Methods["__iter__"] = &MethodDescriptor{
+		Name:    "__iter__",
+		Arity:   0,
+		Doc:     "Return an iterator over the list.",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			list := receiver.(*ListValue)
+			return &simpleListIterator{list: list, index: 0}, nil
 		},
 	}
 }

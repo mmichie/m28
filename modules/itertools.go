@@ -9,6 +9,31 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// countIterator implements itertools.count() - infinite iterator
+type countIterator struct {
+	current float64
+	step    float64
+}
+
+func (c *countIterator) Type() core.Type {
+	return "count_iterator"
+}
+
+func (c *countIterator) String() string {
+	return fmt.Sprintf("<count object at %.0f>", c.current)
+}
+
+func (c *countIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			val := c.current
+			c.current += c.step
+			return core.NumberValue(val), nil
+		}), true
+	}
+	return nil, false
+}
+
 // InitItertoolsModule creates and returns the itertools module
 func InitItertoolsModule() *core.DictValue {
 	itertoolsModule := core.NewDict()
@@ -154,21 +179,15 @@ func InitItertoolsModule() *core.DictValue {
 	// count - count from start with step (returns list of n values)
 	itertoolsModule.Set("count", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("count", args)
-		if err := v.Range(0, 3); err != nil {
+		if err := v.Range(0, 2); err != nil {
 			return nil, err
 		}
 
 		start, _ := v.GetNumberOrDefault(0, 0)
 		step, _ := v.GetNumberOrDefault(1, 1)
-		n, _ := v.GetNumberOrDefault(2, 10) // Default to 10 values for safety
 
-		result := make([]core.Value, 0, int(n))
-		current := start
-		for i := 0; i < int(n); i++ {
-			result = append(result, core.NumberValue(current))
-			current += step
-		}
-		return core.NewList(result...), nil
+		// Return an infinite count iterator
+		return &countIterator{current: start, step: step}, nil
 	}))
 
 	// repeat - repeat an object n times
