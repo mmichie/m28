@@ -862,6 +862,8 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 					return core.BoolValue(actualType == "dict"), nil
 				case "set":
 					return core.BoolValue(actualType == "set"), nil
+				case "bytes":
+					return core.BoolValue(actualType == "bytes"), nil
 				}
 			}
 		}

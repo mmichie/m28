@@ -28,6 +28,10 @@ func InitOSModule() *core.DictValue {
 	pathModule.SetWithKey("getsize", core.StringValue("getsize"), core.NewBuiltinFunction(osPathGetsize))
 	pathModule.SetWithKey("getmtime", core.StringValue("getmtime"), core.NewBuiltinFunction(osPathGetmtime))
 
+	// Register os attributes
+	// os.name should be 'posix' on Unix/Linux/macOS or 'nt' on Windows
+	osModule.SetWithKey("name", core.StringValue("name"), core.StringValue("posix"))
+
 	// Register os functions
 	osModule.SetWithKey("path", core.StringValue("path"), pathModule)
 	osModule.SetWithKey("getcwd", core.StringValue("getcwd"), core.NewBuiltinFunction(osGetcwd))

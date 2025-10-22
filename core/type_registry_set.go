@@ -674,5 +674,123 @@ func getSetMethods() map[string]*MethodDescriptor {
 				return Nil, nil
 			},
 		},
+		"__le__": {
+			Name:    "__le__",
+			Arity:   1,
+			Doc:     "Check if this set is a subset of another (self <= other)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("__le__ takes exactly one argument")
+				}
+
+				set := receiver.(*SetValue)
+				other, ok := args[0].(*SetValue)
+				if !ok {
+					return nil, NewTypeError("set", args[0], "__le__ argument")
+				}
+
+				// Check if all items in this set are in other
+				for _, item := range set.items {
+					if !other.Contains(item) {
+						return False, nil
+					}
+				}
+				return True, nil
+			},
+		},
+		"__ge__": {
+			Name:    "__ge__",
+			Arity:   1,
+			Doc:     "Check if this set is a superset of another (self >= other)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("__ge__ takes exactly one argument")
+				}
+
+				set := receiver.(*SetValue)
+				other, ok := args[0].(*SetValue)
+				if !ok {
+					return nil, NewTypeError("set", args[0], "__ge__ argument")
+				}
+
+				// Check if all items in other are in this set
+				for _, item := range other.items {
+					if !set.Contains(item) {
+						return False, nil
+					}
+				}
+				return True, nil
+			},
+		},
+		"__lt__": {
+			Name:    "__lt__",
+			Arity:   1,
+			Doc:     "Check if this set is a proper subset of another (self < other)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("__lt__ takes exactly one argument")
+				}
+
+				set := receiver.(*SetValue)
+				other, ok := args[0].(*SetValue)
+				if !ok {
+					return nil, NewTypeError("set", args[0], "__lt__ argument")
+				}
+
+				// Must be subset AND not equal
+				isSubset := true
+				for _, item := range set.items {
+					if !other.Contains(item) {
+						isSubset = false
+						break
+					}
+				}
+				if !isSubset {
+					return False, nil
+				}
+				// Check they're not equal (other must have more items)
+				if set.Size() >= other.Size() {
+					return False, nil
+				}
+				return True, nil
+			},
+		},
+		"__gt__": {
+			Name:    "__gt__",
+			Arity:   1,
+			Doc:     "Check if this set is a proper superset of another (self > other)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("__gt__ takes exactly one argument")
+				}
+
+				set := receiver.(*SetValue)
+				other, ok := args[0].(*SetValue)
+				if !ok {
+					return nil, NewTypeError("set", args[0], "__gt__ argument")
+				}
+
+				// Must be superset AND not equal
+				isSuperset := true
+				for _, item := range other.items {
+					if !set.Contains(item) {
+						isSuperset = false
+						break
+					}
+				}
+				if !isSuperset {
+					return False, nil
+				}
+				// Check they're not equal (this set must have more items)
+				if set.Size() <= other.Size() {
+					return False, nil
+				}
+				return True, nil
+			},
+		},
 	}
 }

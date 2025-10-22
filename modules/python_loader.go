@@ -75,6 +75,13 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		return moduleDict, nil
 	}
 
+	// Special case: os.path should import posixpath (on Unix) or ntpath (on Windows)
+	// For now, we always use posixpath
+	if name == "os.path" {
+		core.DebugLog("[DEBUG] Redirecting os.path import to posixpath\n")
+		return LoadPythonModule("posixpath", ctx, evalFunc, partialModule)
+	}
+
 	// Check if this is a known C extension
 	if cExtensionModules[name] {
 		return nil, fmt.Errorf(

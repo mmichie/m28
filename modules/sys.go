@@ -82,7 +82,7 @@ func InitSysModule() *core.DictValue {
 
 	// Builtin module names - static list matching registry.go
 	builtinNamesList := core.NewList(
-		core.StringValue("os"),
+		core.StringValue("posix"), // C extension - used by Python's os.py
 		core.StringValue("sys"),
 		core.StringValue("io"),
 		core.StringValue("json"),
@@ -115,6 +115,8 @@ func InitSysModule() *core.DictValue {
 	sysModule.SetWithKey("getrecursionlimit", core.StringValue("getrecursionlimit"), core.NewBuiltinFunction(getRecursionLimit))
 	sysModule.SetWithKey("setrecursionlimit", core.StringValue("setrecursionlimit"), core.NewBuiltinFunction(setRecursionLimit))
 	sysModule.SetWithKey("getdefaultencoding", core.StringValue("getdefaultencoding"), core.NewBuiltinFunction(getDefaultEncoding))
+	sysModule.SetWithKey("getfilesystemencoding", core.StringValue("getfilesystemencoding"), core.NewBuiltinFunction(getFilesystemEncoding))
+	sysModule.SetWithKey("getfilesystemencodeerrors", core.StringValue("getfilesystemencodeerrors"), core.NewBuiltinFunction(getFilesystemEncodeErrors))
 	sysModule.SetWithKey("getsizeof", core.StringValue("getsizeof"), core.NewBuiltinFunction(getSizeOf))
 
 	// intern function - intern strings for memory optimization
@@ -266,6 +268,16 @@ func setRecursionLimit(args []core.Value, ctx *core.Context) (core.Value, error)
 // getDefaultEncoding returns the default string encoding
 func getDefaultEncoding(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.StringValue("utf-8"), nil
+}
+
+// getFilesystemEncoding returns the filesystem encoding
+func getFilesystemEncoding(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return core.StringValue("utf-8"), nil
+}
+
+// getFilesystemEncodeErrors returns the filesystem encoding error handling strategy
+func getFilesystemEncodeErrors(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return core.StringValue("surrogateescape"), nil
 }
 
 // getSizeOf returns the size of an object in bytes (approximate)

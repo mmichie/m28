@@ -12,7 +12,8 @@ type ModuleInitializer func() *core.DictValue
 
 // builtinModules maps module names to their initializers
 var builtinModules = map[string]ModuleInitializer{
-	"os":               InitOSModule,
+	"posix": InitPosixModule, // C extension for Unix - used by Python's os.py
+	// Note: "os" is not here - we use Python's os.py from stdlib which imports posix
 	"sys":              InitSysModule,
 	"io":               InitIOModule,
 	"json":             InitJSONModule,
