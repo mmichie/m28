@@ -47,5 +47,45 @@ func InitWeakrefModule() *core.DictValue {
 		return obj, nil
 	}))
 
+	// getweakrefcount(object) - return the number of weak references to object
+	// For now, always return 0 since we don't have weak references yet
+	module.Set("getweakrefcount", core.NewNamedBuiltinFunction("getweakrefcount", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, core.NewTypeError("getweakrefcount", nil, "getweakrefcount() takes exactly 1 argument")
+		}
+		// Since we don't have real weak references, always return 0
+		return core.NumberValue(0), nil
+	}))
+
+	// getweakrefs(object) - return a list of weak references to object
+	// For now, always return empty list since we don't have weak references yet
+	module.Set("getweakrefs", core.NewNamedBuiltinFunction("getweakrefs", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, core.NewTypeError("getweakrefs", nil, "getweakrefs() takes exactly 1 argument")
+		}
+		// Since we don't have real weak references, always return empty list
+		return core.NewList(), nil
+	}))
+
+	// ReferenceError - exception raised when weak ref proxy is used after referent is gone
+	refErrorClass := core.NewClassWithParents("ReferenceError", []*core.Class{})
+	module.Set("ReferenceError", refErrorClass)
+
+	// Type objects for weak references - these are just class stubs for now
+	// In a full implementation, these would be actual types that instances could be checked against
+	module.Set("ReferenceType", core.NewClassWithParents("ReferenceType", []*core.Class{}))
+	module.Set("ProxyType", core.NewClassWithParents("ProxyType", []*core.Class{}))
+	module.Set("CallableProxyType", core.NewClassWithParents("CallableProxyType", []*core.Class{}))
+
+	// _remove_dead_weakref(dct, key) - internal function to remove dead weak refs from dict
+	// For now, this is a no-op since we don't have real weak references
+	module.Set("_remove_dead_weakref", core.NewNamedBuiltinFunction("_remove_dead_weakref", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, core.NewTypeError("_remove_dead_weakref", nil, "_remove_dead_weakref() takes exactly 2 arguments")
+		}
+		// Since we don't have real weak references, do nothing
+		return core.Nil, nil
+	}))
+
 	return module
 }

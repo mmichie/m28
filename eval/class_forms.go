@@ -346,9 +346,59 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			sItems := s.Items()
-			// Check for def form (methods) or = form (class variables)
+			// Check for def form (methods), = form (class variables), or if form (conditional defs)
 			if sym, ok := sItems[0].(core.SymbolValue); ok {
 				switch string(sym) {
+				case "if":
+					// Special handling for if statements at class level
+					// Evaluate the if statement, then check if any new methods/attrs were defined
+					beforeMethods := make(map[string]core.Value)
+					for k, v := range class.Methods {
+						beforeMethods[k] = v
+					}
+					beforeAttrs := make(map[string]core.Value)
+					for k, v := range class.Attributes {
+						beforeAttrs[k] = v
+					}
+
+					// Create a temporary context that inherits from classBodyCtx
+					// and tracks definitions
+					ifCtx := core.NewContext(classBodyCtx)
+
+					// Store a reference to the class so inner defs can register themselves
+					ifCtx.Define("__defining_class__", class)
+
+					// Evaluate the if statement in this context
+					_, err := Eval(stmt, ifCtx)
+					if err != nil {
+						return nil, err
+					}
+
+					// Check for any newly defined values in ifCtx
+					for name, value := range ifCtx.Vars {
+						// Skip special names
+						if strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") {
+							continue
+						}
+
+						// Check if it's a function (method)
+						if fn, ok := value.(*UserFunction); ok {
+							class.SetMethod(name, fn)
+							classBodyCtx.Define(name, value)
+							if debugClass {
+								fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Added conditional method '%s' to class\n", name)
+							}
+						} else {
+							// It's a class attribute
+							class.SetClassAttr(name, value)
+							classBodyCtx.Define(name, value)
+							if debugClass {
+								fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Added conditional attribute '%s' to class\n", name)
+							}
+						}
+					}
+					continue
+
 				case "def":
 					// Method definition
 					if s.Len() < 3 {
