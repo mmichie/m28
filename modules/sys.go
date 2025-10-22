@@ -37,6 +37,9 @@ func InitSysModule() *core.DictValue {
 	// Command line arguments (empty list for now, populated by main)
 	sysModule.SetWithKey("argv", core.StringValue("argv"), core.NewList())
 
+	// Warning options (empty list for now)
+	sysModule.SetWithKey("warnoptions", core.StringValue("warnoptions"), core.NewList())
+
 	// Version information
 	sysModule.SetWithKey("version", core.StringValue("version"), core.StringValue("M28 0.1.0"))
 	versionInfo := core.NewDict()
