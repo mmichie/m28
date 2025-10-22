@@ -1225,10 +1225,16 @@ func (t *PythonTokenizer) makeUnterminatedStringError(
 	endLine := t.line
 	endCol := t.col
 
+	// Show opening quote(s) correctly
+	openingQuotes := quoteChar
+	if isTriple {
+		openingQuotes = quoteChar + quoteChar + quoteChar
+	}
+
 	return fmt.Errorf(
 		"unterminated %s: started at line %d, col %d with %s, reached EOF at line %d, col %d"+
 			"\n  Expected closing: %s"+
 			"\n  Parsed content: %q%s",
-		stringType, startLine, startCol, quoteChar+quoteChar+quoteChar, endLine, endCol,
+		stringType, startLine, startCol, openingQuotes, endLine, endCol,
 		expectedEnd, preview, contextTokens)
 }
