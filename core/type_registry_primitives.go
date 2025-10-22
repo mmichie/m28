@@ -149,7 +149,106 @@ func registerBoolType() {
 		Name:       "bool",
 		PythonName: "bool",
 		BaseType:   BoolType,
-		Methods:    map[string]*MethodDescriptor{},
+		Methods: map[string]*MethodDescriptor{
+			// Comparison operators - bools compare as ints (False=0, True=1)
+			"__lt__": {
+				Name:    "__lt__",
+				Arity:   1,
+				Doc:     "Return self<value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					a := 0
+					if bool(receiver.(BoolValue)) {
+						a = 1
+					}
+					// Handle bool < bool or bool < number
+					var b int
+					switch v := args[0].(type) {
+					case BoolValue:
+						if bool(v) {
+							b = 1
+						}
+					case NumberValue:
+						b = int(v)
+					default:
+						return nil, fmt.Errorf("'<' not supported between instances of 'bool' and '%s'", args[0].Type())
+					}
+					return BoolValue(a < b), nil
+				},
+			},
+			"__le__": {
+				Name:    "__le__",
+				Arity:   1,
+				Doc:     "Return self<=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					a := 0
+					if bool(receiver.(BoolValue)) {
+						a = 1
+					}
+					var b int
+					switch v := args[0].(type) {
+					case BoolValue:
+						if bool(v) {
+							b = 1
+						}
+					case NumberValue:
+						b = int(v)
+					default:
+						return nil, fmt.Errorf("'<=' not supported between instances of 'bool' and '%s'", args[0].Type())
+					}
+					return BoolValue(a <= b), nil
+				},
+			},
+			"__gt__": {
+				Name:    "__gt__",
+				Arity:   1,
+				Doc:     "Return self>value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					a := 0
+					if bool(receiver.(BoolValue)) {
+						a = 1
+					}
+					var b int
+					switch v := args[0].(type) {
+					case BoolValue:
+						if bool(v) {
+							b = 1
+						}
+					case NumberValue:
+						b = int(v)
+					default:
+						return nil, fmt.Errorf("'>' not supported between instances of 'bool' and '%s'", args[0].Type())
+					}
+					return BoolValue(a > b), nil
+				},
+			},
+			"__ge__": {
+				Name:    "__ge__",
+				Arity:   1,
+				Doc:     "Return self>=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					a := 0
+					if bool(receiver.(BoolValue)) {
+						a = 1
+					}
+					var b int
+					switch v := args[0].(type) {
+					case BoolValue:
+						if bool(v) {
+							b = 1
+						}
+					case NumberValue:
+						b = int(v)
+					default:
+						return nil, fmt.Errorf("'>=' not supported between instances of 'bool' and '%s'", args[0].Type())
+					}
+					return BoolValue(a >= b), nil
+				},
+			},
+		},
 		Constructor: func(args []Value, ctx *Context) (Value, error) {
 			if len(args) == 0 {
 				return False, nil

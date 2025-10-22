@@ -113,6 +113,18 @@ func (b BoolValue) String() string {
 	return "False"
 }
 
+// GetAttr implements basic bool methods using TypeDescriptor
+func (b BoolValue) GetAttr(name string) (Value, bool) {
+	desc := GetTypeDescriptor(BoolType)
+	if desc != nil {
+		val, err := desc.GetAttribute(b, name)
+		if err == nil {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
 // Pre-defined boolean constants
 var (
 	True  = BoolValue(true)
