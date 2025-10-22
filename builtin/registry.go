@@ -45,6 +45,9 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	// Register decimal module (Decimal type)
 	modules.RegisterDecimalModule(ctx)
 
+	// Register time module
+	RegisterTimeModule(ctx)
+
 	// Also register functions from other files that haven't been migrated yet
 	RegisterStringFunctions(ctx)
 	RegisterDictFunctions(ctx)
