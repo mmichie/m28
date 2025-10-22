@@ -739,7 +739,8 @@ func (t *PythonTokenizer) scanString(quote byte, start, startLine, startCol int)
 	var value strings.Builder
 	for {
 		if t.isAtEnd() {
-			t.errors = append(t.errors, fmt.Errorf("unterminated string at line %d", startLine))
+			t.errors = append(t.errors, t.makeUnterminatedStringError(
+				startLine, startCol, start, quote, isTriple, value.String()))
 			break
 		}
 
@@ -807,7 +808,8 @@ func (t *PythonTokenizer) scanBytesString(quote byte, start, startLine, startCol
 
 	for {
 		if t.isAtEnd() {
-			t.errors = append(t.errors, fmt.Errorf("unterminated bytes literal at line %d", startLine))
+			t.errors = append(t.errors, t.makeUnterminatedStringError(
+				startLine, startCol, start, quote, false, "b"+string(value)))
 			break
 		}
 
@@ -908,7 +910,8 @@ func (t *PythonTokenizer) scanRawString(quote byte, start, startLine, startCol i
 	var value strings.Builder
 	for {
 		if t.isAtEnd() {
-			t.errors = append(t.errors, fmt.Errorf("unterminated raw string at line %d", startLine))
+			t.errors = append(t.errors, t.makeUnterminatedStringError(
+				startLine, startCol, start, quote, isTriple, "r"+value.String()))
 			break
 		}
 
@@ -992,7 +995,8 @@ func (t *PythonTokenizer) scanRawBytesString(quote byte, start, startLine, start
 	var value []byte
 	for {
 		if t.isAtEnd() {
-			t.errors = append(t.errors, fmt.Errorf("unterminated raw bytes literal at line %d", startLine))
+			t.errors = append(t.errors, t.makeUnterminatedStringError(
+				startLine, startCol, start, quote, isTriple, "br"+string(value)))
 			break
 		}
 
@@ -1139,7 +1143,8 @@ func (t *PythonTokenizer) scanFString(quote byte, start, startLine, startCol int
 	var value strings.Builder
 	for {
 		if t.isAtEnd() {
-			t.errors = append(t.errors, fmt.Errorf("unterminated f-string at line %d", startLine))
+			t.errors = append(t.errors, t.makeUnterminatedStringError(
+				startLine, startCol, start, quote, false, "f"+value.String()))
 			break
 		}
 
@@ -1172,4 +1177,58 @@ func pythonIsAlpha(ch byte) bool {
 // pythonIsAlphaNumeric checks if a character can be in an identifier
 func pythonIsAlphaNumeric(ch byte) bool {
 	return pythonIsAlpha(ch) || isDigit(ch)
+}
+
+// makeUnterminatedStringError creates a detailed error message for unterminated strings
+func (t *PythonTokenizer) makeUnterminatedStringError(
+	startLine, startCol, startPos int, quote byte, isTriple bool, partialValue string) error {
+
+	quoteChar := string(quote)
+	stringType := "string"
+	expectedEnd := quoteChar
+
+	if isTriple {
+		stringType = "triple-quoted string"
+		expectedEnd = quoteChar + quoteChar + quoteChar
+	}
+
+	// Get a preview of the string content (first 50 chars)
+	preview := partialValue
+	if len(preview) > 50 {
+		preview = preview[:50] + "..."
+	}
+
+	// Get context: last few tokens before this string
+	contextTokens := ""
+	if len(t.tokens) > 0 {
+		startIdx := len(t.tokens) - 3
+		if startIdx < 0 {
+			startIdx = 0
+		}
+		recentTokens := []string{}
+		for i := startIdx; i < len(t.tokens); i++ {
+			tok := t.tokens[i]
+			if tok.Type == TOKEN_NEWLINE {
+				recentTokens = append(recentTokens, "NEWLINE")
+			} else if len(tok.Lexeme) > 20 {
+				recentTokens = append(recentTokens, tok.Lexeme[:20]+"...")
+			} else {
+				recentTokens = append(recentTokens, tok.Lexeme)
+			}
+		}
+		if len(recentTokens) > 0 {
+			contextTokens = fmt.Sprintf("\n  Context: previous tokens were: %v", recentTokens)
+		}
+	}
+
+	// Show where we started and where we ended
+	endLine := t.line
+	endCol := t.col
+
+	return fmt.Errorf(
+		"unterminated %s: started at line %d, col %d with %s, reached EOF at line %d, col %d"+
+			"\n  Expected closing: %s"+
+			"\n  Parsed content: %q%s",
+		stringType, startLine, startCol, quoteChar+quoteChar+quoteChar, endLine, endCol,
+		expectedEnd, preview, contextTokens)
 }
