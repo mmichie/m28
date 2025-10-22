@@ -291,6 +291,20 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Create the class
 	var class *core.Class
 
+	// If no parent classes specified, default to object (like Python)
+	// But not for the object class itself to avoid circular reference
+	if len(parentClasses) == 0 && string(className) != "object" {
+		// Try to look up object class
+		if objectVal, err := ctx.Lookup("object"); err == nil {
+			if objectClass, ok := objectVal.(*core.Class); ok {
+				parentClasses = []*core.Class{objectClass}
+				if debugClass {
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Using object as default parent for class '%s'\n", className)
+				}
+			}
+		}
+	}
+
 	// If metaclass was specified, we need to use it to create the class
 	if metaclass != nil {
 		if debugClass {
@@ -418,9 +432,19 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 							if err != nil {
 								return nil, err
 							}
-							class.SetMethod(string(name), method)
+
+							// Special methods that are implicitly classmethods
+							// __init_subclass__ and __class_getitem__ automatically receive the class as first arg
+							methodName := string(name)
+							var finalMethod core.Value = method
+							if methodName == "__init_subclass__" || methodName == "__class_getitem__" {
+								// Wrap as a classmethod that receives the class as first argument
+								finalMethod = createBoundClassMethod(class, method)
+							}
+
+							class.SetMethod(methodName, finalMethod)
 							// Also add to class body context so later statements can reference it
-							classBodyCtx.Define(string(name), method)
+							classBodyCtx.Define(methodName, finalMethod)
 							continue
 						}
 					}

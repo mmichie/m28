@@ -417,12 +417,22 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				set := receiver.(*SetValue)
-				// Convert to list for iteration
+				// Convert to list and return its iterator (not the list!)
 				items := make([]Value, 0, len(set.items))
 				for _, v := range set.items {
 					items = append(items, v)
 				}
-				return NewList(items...), nil
+				list := NewList(items...)
+				// Get a proper iterator from the list
+				if iter, ok := list.GetAttr("__iter__"); ok {
+					if callable, ok := iter.(interface {
+						Call([]Value, *Context) (Value, error)
+					}); ok {
+						return callable.Call([]Value{}, ctx)
+					}
+				}
+				// Fallback
+				return list, nil
 			},
 		},
 		"__sub__": {

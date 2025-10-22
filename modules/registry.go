@@ -42,6 +42,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"sysconfig":        InitSysconfigModule, // Stub for test.support compatibility
 	"textwrap":         InitTextwrapModule,  // Stub - Python's textwrap.py uses regex features Go doesn't support
 	"errno":            InitErrnoModule,     // Error codes module
+	"_string":          Init_StringModule,   // C extension for string.py
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

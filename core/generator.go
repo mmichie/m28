@@ -138,6 +138,18 @@ func (g *Generator) createRegistry() *MethodRegistry {
 
 	// Register methods
 	registry.RegisterMethods(
+		// __iter__ method - per Python iterator protocol, returns self
+		MakeMethod("__iter__", 0, "Return the iterator object itself", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			gen, err := TypedReceiver[*Generator](receiver, "__iter__")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("__iter__", args, 0); err != nil {
+				return nil, err
+			}
+			return gen, nil // Return self
+		}),
+
 		// __next__ / next method
 		MakeMethod("__next__", 0, "Retrieve the next value from the generator", func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			gen, err := TypedReceiver[*Generator](receiver, "__next__")

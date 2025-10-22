@@ -368,15 +368,23 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Debug: log what __iter__ returned
-			if list, ok := iter.(*core.ListValue); ok && list.Len() == 1 {
-				if str, ok := list.Items()[0].(core.StringValue); ok && str == "__iter__" {
-					return nil, fmt.Errorf("BUG: __iter__ on %T returned [\"__iter__\"] instead of an iterator - this suggests a method call problem", sequence)
+			core.DebugLog("[FOR LOOP] CallIter on %T returned %T (found=%v)\n", sequence, iter, found)
+			if list, ok := iter.(*core.ListValue); ok {
+				core.DebugLog("[FOR LOOP] WARNING: __iter__ returned a *core.ListValue with %d items: %v\n", list.Len(), list)
+				if list.Len() == 1 {
+					if str, ok := list.Items()[0].(core.StringValue); ok && str == "__iter__" {
+						return nil, fmt.Errorf("BUG: __iter__ on %T returned [\"__iter__\"] instead of an iterator - this suggests a method call problem", sequence)
+					}
 				}
 			}
 
 			// Check if the iterator actually has __next__
 			// This handles cases where __iter__ returns self but doesn't implement __next__
 			if _, hasNext := types.GetDunder(iter, "__next__"); !hasNext {
+				// Debug: log what we got
+				core.DebugLog("[FOR LOOP] __iter__ returned %T (value: %v) which has no __next__ method\n", iter, iter)
+				core.DebugLog("[FOR LOOP] Original sequence was %T\n", sequence)
+
 				// Try protocol-based iteration on the original sequence
 				if pIter, ok := protocols.GetIterableOps(sequence); ok {
 					for {

@@ -306,8 +306,18 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				tuple := receiver.(TupleValue)
-				// Return the tuple itself as it implements Iterable
-				return tuple, nil
+				// Per Python iterator protocol: return an iterator object with __iter__ and __next__
+				// Convert to list and get its iterator
+				list := NewList(tuple...)
+				if iter, ok := list.GetAttr("__iter__"); ok {
+					if callable, ok := iter.(interface {
+						Call([]Value, *Context) (Value, error)
+					}); ok {
+						return callable.Call([]Value{}, ctx)
+					}
+				}
+				// Fallback: return the list (shouldn't happen)
+				return list, nil
 			},
 		},
 		"__hash__": {

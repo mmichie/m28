@@ -20,6 +20,12 @@ func (s *simpleListIterator) String() string {
 }
 
 func (s *simpleListIterator) GetAttr(name string) (Value, bool) {
+	if name == "__iter__" {
+		// Per Python iterator protocol: __iter__ returns the iterator itself
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return s, nil
+		}), true
+	}
 	if name == "__next__" {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			if s.index < s.list.Len() {

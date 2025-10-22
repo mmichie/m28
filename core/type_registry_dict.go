@@ -334,7 +334,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 			Doc:     "Return an iterator over the keys",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				// For now, return the keys as a list
+				// Return a proper iterator, not a list
 				dict := receiver.(*DictValue)
 				keys := make([]Value, 0, dict.Size())
 				for k := range dict.entries {
@@ -348,7 +348,18 @@ func getDictMethods() map[string]*MethodDescriptor {
 					}
 					// TODO: Handle other key types
 				}
-				return NewList(keys...), nil
+				// Create a list and return its iterator (not the list itself!)
+				keysList := NewList(keys...)
+				// Call __iter__ on the list to get a proper iterator
+				if iter, ok := keysList.GetAttr("__iter__"); ok {
+					if callable, ok := iter.(interface {
+						Call([]Value, *Context) (Value, error)
+					}); ok {
+						return callable.Call([]Value{}, ctx)
+					}
+				}
+				// Fallback: return the list if __iter__ not found (shouldn't happen)
+				return keysList, nil
 			},
 		},
 	}
