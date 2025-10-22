@@ -1731,67 +1731,95 @@ func (p *PythonParser) parsePrimary() ast.ASTNode {
 
 	case TOKEN_STRING:
 		p.advance()
-		// Handle implicit string concatenation (adjacent string literals)
+		// Handle implicit string/bytes concatenation (adjacent literals)
 		// Python: "hello" "world" -> "helloworld"
-		strValue, ok := tok.Value.(core.StringValue)
-		if !ok {
+		// Python: b'\xae\xd5' b'\xed\xb2\x80' -> b'\xae\xd5\xed\xb2\x80'
+
+		// Check if this is a string or bytes literal
+		if strValue, ok := tok.Value.(core.StringValue); ok {
+			// String literal - handle string concatenation
+			// Check if there are any adjacent strings (regular or f-strings)
+			if !p.check(TOKEN_STRING) && !p.check(TOKEN_FSTRING) {
+				// No concatenation needed
+				return ast.NewLiteral(strValue, p.makeLocation(tok), ast.SyntaxPython)
+			}
+
+			// Collect all adjacent string literals (both STRING and FSTRING)
+			parts := []ast.ASTNode{ast.NewLiteral(strValue, p.makeLocation(tok), ast.SyntaxPython)}
+
+			for p.check(TOKEN_STRING) || p.check(TOKEN_FSTRING) {
+				nextTok := p.advance()
+				var nextNode ast.ASTNode
+
+				if nextTok.Type == TOKEN_STRING {
+					// Regular string
+					nextNode = ast.NewLiteral(nextTok.Value, p.makeLocation(nextTok), ast.SyntaxPython)
+				} else {
+					// F-string
+					nextFstring, err := p.parseFStringFromLexeme(nextTok.Lexeme)
+					if err != nil {
+						p.error(fmt.Sprintf("Error parsing f-string: %v", err))
+						return nil
+					}
+					nextNode = p.convertValueToASTNode(nextFstring, nextTok)
+				}
+				parts = append(parts, nextNode)
+			}
+
+			// If all parts are simple strings, concatenate at compile time
+			allSimple := true
+			for _, part := range parts {
+				if _, ok := part.(*ast.Literal); !ok {
+					allSimple = false
+					break
+				}
+			}
+
+			if allSimple {
+				// Concatenate all string literals
+				concatenated := ""
+				for _, part := range parts {
+					lit := part.(*ast.Literal)
+					if str, ok := lit.Value.(core.StringValue); ok {
+						concatenated += string(str)
+					}
+				}
+				return ast.NewLiteral(core.StringValue(concatenated), p.makeLocation(tok), ast.SyntaxPython)
+			}
+
+			// Mix of strings and f-strings - use runtime concatenation with +
+			concatArgs := append([]ast.ASTNode{
+				ast.NewIdentifier("+", p.makeLocation(tok), ast.SyntaxPython),
+			}, parts...)
+			return ast.NewSExpr(concatArgs, p.makeLocation(tok), ast.SyntaxPython)
+		} else if bytesValue, ok := tok.Value.(core.BytesValue); ok {
+			// Bytes literal - handle bytes concatenation
+			// Check if there are any adjacent bytes literals
+			if !p.check(TOKEN_STRING) {
+				// No concatenation needed
+				return ast.NewLiteral(bytesValue, p.makeLocation(tok), ast.SyntaxPython)
+			}
+
+			// Collect all adjacent bytes literals
+			concatenated := []byte(bytesValue)
+
+			for p.check(TOKEN_STRING) {
+				nextTok := p.peek()
+				// Check if next token is also a bytes literal
+				if nextBytes, ok := nextTok.Value.(core.BytesValue); ok {
+					p.advance()
+					concatenated = append(concatenated, []byte(nextBytes)...)
+				} else {
+					// Next token is a string, not bytes - stop here
+					break
+				}
+			}
+
+			return ast.NewLiteral(core.BytesValue(concatenated), p.makeLocation(tok), ast.SyntaxPython)
+		} else {
+			// Unknown token value type
 			return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
 		}
-
-		// Check if there are any adjacent strings (regular or f-strings)
-		if !p.check(TOKEN_STRING) && !p.check(TOKEN_FSTRING) {
-			// No concatenation needed
-			return ast.NewLiteral(strValue, p.makeLocation(tok), ast.SyntaxPython)
-		}
-
-		// Collect all adjacent string literals (both STRING and FSTRING)
-		parts := []ast.ASTNode{ast.NewLiteral(strValue, p.makeLocation(tok), ast.SyntaxPython)}
-
-		for p.check(TOKEN_STRING) || p.check(TOKEN_FSTRING) {
-			nextTok := p.advance()
-			var nextNode ast.ASTNode
-
-			if nextTok.Type == TOKEN_STRING {
-				// Regular string
-				nextNode = ast.NewLiteral(nextTok.Value, p.makeLocation(nextTok), ast.SyntaxPython)
-			} else {
-				// F-string
-				nextFstring, err := p.parseFStringFromLexeme(nextTok.Lexeme)
-				if err != nil {
-					p.error(fmt.Sprintf("Error parsing f-string: %v", err))
-					return nil
-				}
-				nextNode = p.convertValueToASTNode(nextFstring, nextTok)
-			}
-			parts = append(parts, nextNode)
-		}
-
-		// If all parts are simple strings, concatenate at compile time
-		allSimple := true
-		for _, part := range parts {
-			if _, ok := part.(*ast.Literal); !ok {
-				allSimple = false
-				break
-			}
-		}
-
-		if allSimple {
-			// Concatenate all string literals
-			concatenated := ""
-			for _, part := range parts {
-				lit := part.(*ast.Literal)
-				if str, ok := lit.Value.(core.StringValue); ok {
-					concatenated += string(str)
-				}
-			}
-			return ast.NewLiteral(core.StringValue(concatenated), p.makeLocation(tok), ast.SyntaxPython)
-		}
-
-		// Mix of strings and f-strings - use runtime concatenation with +
-		concatArgs := append([]ast.ASTNode{
-			ast.NewIdentifier("+", p.makeLocation(tok), ast.SyntaxPython),
-		}, parts...)
-		return ast.NewSExpr(concatArgs, p.makeLocation(tok), ast.SyntaxPython)
 
 	case TOKEN_FSTRING:
 		p.advance()
