@@ -2,7 +2,6 @@ package modules
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/mmichie/m28/core"
@@ -38,7 +37,7 @@ var cExtensionModules = map[string]bool{
 // Returns (*DictValue, error) to match ModuleLoader interface
 // If partialModule is provided, it will be populated during evaluation for circular import support
 func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, *core.Context) (core.Value, error), partialModule *core.DictValue) (*core.DictValue, error) {
-	fmt.Fprintf(os.Stderr, "[PROFILE] LoadPythonModule called for '%s'\n", name)
+	core.DebugLog("[PROFILE] LoadPythonModule called for '%s'\n", name)
 
 	// Create partial module if not provided
 	if partialModule == nil {
@@ -91,13 +90,13 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		return nil, fmt.Errorf("Python finder initialization failed: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "[PROFILE] Finding '%s'...\n", name)
+	core.DebugLog("[PROFILE] Finding '%s'...\n", name)
 	pyPath, isPackage, err := finder.Find(name)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[PROFILE] Find failed for '%s': %v\n", name, err)
+		core.DebugLog("[PROFILE] Find failed for '%s': %v\n", name, err)
 		return nil, err // Module not found
 	}
-	fmt.Fprintf(os.Stderr, "[PROFILE] Found '%s' at %s\n", name, pyPath)
+	core.DebugLog("[PROFILE] Found '%s' at %s\n", name, pyPath)
 
 	startLoad := time.Now()
 
@@ -156,7 +155,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	evalTime := time.Since(startEval)
 
 	totalLoad := time.Since(startLoad)
-	fmt.Fprintf(os.Stderr, "[PROFILE] LoadModule %s: total=%v toIR=%v eval=%v\n",
+	core.DebugLog("[PROFILE] LoadModule %s: total=%v toIR=%v eval=%v\n",
 		name, totalLoad, toIRTime, evalTime)
 
 	// Note: Module dict was already populated during evaluation via Context.ModuleDict

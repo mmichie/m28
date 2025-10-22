@@ -2,7 +2,6 @@ package eval
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -243,7 +242,7 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				continue
 			}
 			// Debug: log why submodule loading failed
-			fmt.Fprintf(os.Stderr, "[DEBUG] Failed to load '%s' as submodule: %v\n", submoduleName, err)
+			core.DebugLog("[DEBUG] Failed to load '%s' as submodule: %v\n", submoduleName, err)
 
 			// Not a submodule, try loading parent module and extracting the name
 			if moduleName == "" {

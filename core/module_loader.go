@@ -7,6 +7,16 @@ import (
 	"strings"
 )
 
+// Module loading debug flag - controlled by M28_MODULE_DEBUG environment variable
+var moduleDebugEnabled = os.Getenv("M28_MODULE_DEBUG") != ""
+
+// DebugLog prints debug messages only if module debug is enabled
+func DebugLog(format string, args ...interface{}) {
+	if moduleDebugEnabled {
+		fmt.Fprintf(os.Stderr, format, args...)
+	}
+}
+
 // DefaultModuleLoader is the default implementation of ModuleLoader
 type DefaultModuleLoader struct {
 	ctx *Context
@@ -54,21 +64,21 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	// Check if the module is currently being loaded (circular dependency)
 	// In Python, circular imports are allowed - return the partial module
 	if registry.IsLoading(cacheName) {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Circular import detected for '%s', returning partial module\n", cacheName)
+		DebugLog("[DEBUG] Circular import detected for '%s', returning partial module\n", cacheName)
 		// Return the partial module that's currently being loaded
 		if partialModule, found := registry.GetModule(cacheName); found {
-			fmt.Fprintf(os.Stderr, "[DEBUG] Found partial module in registry with %d keys\n", len(partialModule.Keys()))
+			DebugLog("[DEBUG] Found partial module in registry with %d keys\n", len(partialModule.Keys()))
 			return partialModule, nil
 		}
 		// If not in registry yet, return empty dict (will be populated later)
-		fmt.Fprintf(os.Stderr, "[DEBUG] Partial module not in registry, returning empty dict\n")
+		DebugLog("[DEBUG] Partial module not in registry, returning empty dict\n")
 		return NewDict(), nil
 	}
 
 	// Mark the module as being loaded
 	registry.SetLoading(cacheName, true)
 	defer registry.SetLoading(cacheName, false)
-	fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: marked '%s' as loading\n", cacheName)
+	DebugLog("[DEBUG] LoadModule: marked '%s' as loading\n", cacheName)
 
 	// Create a dictionary for the module exports BEFORE evaluation
 	// This allows circular imports to access the partial module
@@ -77,13 +87,13 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	// Store the partial module in registry before evaluation
 	// This enables circular imports to find it
 	registry.StoreModule(cacheName, moduleDict, "", []string{})
-	fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: stored partial module '%s' in registry\n", cacheName)
+	DebugLog("[DEBUG] LoadModule: stored partial module '%s' in registry\n", cacheName)
 
 	// Resolve the module path
 	path, err := registry.ResolveModulePath(name)
 	if err != nil {
 		// M28 module not found, try Python module
-		fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: M28 module '%s' not found, trying Python\n", cacheName)
+		DebugLog("[DEBUG] LoadModule: M28 module '%s' not found, trying Python\n", cacheName)
 		return l.tryLoadPythonModule(cacheName, ctx, err)
 	}
 

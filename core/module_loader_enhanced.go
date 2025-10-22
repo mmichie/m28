@@ -56,7 +56,7 @@ func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue
 		// It's an M28 module - create partial module for circular import support
 		partialModule := NewDict()
 		registry.StoreModule(cacheName, partialModule, "", []string{})
-		fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: stored partial M28 module '%s' in registry\n", cacheName)
+		DebugLog("[DEBUG] LoadModule: stored partial M28 module '%s' in registry\n", cacheName)
 		return l.loadM28Module(registry, cacheName, path, partialModule)
 	}
 
@@ -83,14 +83,14 @@ func (l *ModuleLoaderEnhanced) checkModuleCache(registry *ModuleRegistry, cacheN
 	// Check for circular dependency - return partial module
 	// In Python, circular imports are allowed
 	if registry.IsLoading(cacheName) {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Circular import detected for '%s', returning partial module\n", cacheName)
+		DebugLog("[DEBUG] Circular import detected for '%s', returning partial module\n", cacheName)
 		// Return the partial module that's currently being loaded
 		if partialModule, found := registry.GetModule(cacheName); found {
-			fmt.Fprintf(os.Stderr, "[DEBUG] Found partial module in registry with %d keys\n", len(partialModule.Keys()))
+			DebugLog("[DEBUG] Found partial module in registry with %d keys\n", len(partialModule.Keys()))
 			return partialModule, nil
 		}
 		// If not in registry yet, return empty dict (will be populated later)
-		fmt.Fprintf(os.Stderr, "[DEBUG] Partial module not in registry, returning empty dict\n")
+		DebugLog("[DEBUG] Partial module not in registry, returning empty dict\n")
 		return NewDict(), nil
 	}
 
@@ -152,7 +152,7 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 	// This enables circular imports to access the partial module during evaluation
 	partialModule := NewDict()
 	registry.StoreModule(cacheName, partialModule, "", []string{})
-	fmt.Fprintf(os.Stderr, "[DEBUG] LoadModule: stored partial Python module '%s' in registry\n", cacheName)
+	DebugLog("[DEBUG] LoadModule: stored partial Python module '%s' in registry\n", cacheName)
 
 	// Try to load as Python module
 	// Python loader will populate partialModule during evaluation via Context.ModuleDict

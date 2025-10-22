@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/core/ast"
 	"github.com/mmichie/m28/parser"
 )
@@ -89,7 +90,7 @@ func (t *PythonModuleTranspiler) Transpile(pyPath string) (ast.ASTNode, error) {
 	totalTime := time.Since(startTotal)
 
 	// Always log timing for profiling
-	fmt.Fprintf(os.Stderr, "[PROFILE] Transpile %s: total=%v read=%v tokenize=%v parse=%v tokens=%d\n",
+	core.DebugLog("[PROFILE] Transpile %s: total=%v read=%v tokenize=%v parse=%v tokens=%d\n",
 		pyPath, totalTime, readTime, tokenizeTime, parseTime, len(tokens))
 
 	return astNode, nil
