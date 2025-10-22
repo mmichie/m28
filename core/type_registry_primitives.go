@@ -32,6 +32,15 @@ func registerNumberType() {
 						return NumberValue(a + float64(b)), nil
 					}
 
+					// Handle NumberValue + BoolValue (Python: bools behave like ints)
+					if b, ok := args[0].(BoolValue); ok {
+						bNum := 0.0
+						if bool(b) {
+							bNum = 1.0
+						}
+						return NumberValue(a + bNum), nil
+					}
+
 					// Handle NumberValue + ComplexValue
 					if c, ok := args[0].(ComplexValue); ok {
 						return ComplexValue(complex(a, 0) + complex128(c)), nil
