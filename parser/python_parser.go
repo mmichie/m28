@@ -3438,11 +3438,18 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 		}
 	}
 
-	// Build format expression: (str-concat part1 part2 ...)
-	// Use str-concat to concatenate string parts and evaluated expressions
-	result := core.NewList(core.SymbolValue("str-concat"))
+	// Build format expression: (+ (str part1) (str part2) ...)
+	// Use + operator for string concatenation, wrapping non-strings in str()
+	result := core.NewList(core.SymbolValue("+"))
 	for _, part := range parts {
-		result.Append(part)
+		// If the part is already a string literal, use it directly
+		if _, isString := part.(core.StringValue); isString {
+			result.Append(part)
+		} else {
+			// Wrap in str() call to convert to string
+			strCall := core.NewList(core.SymbolValue("str"), part)
+			result.Append(strCall)
+		}
 	}
 	return result, nil
 }
@@ -3468,10 +3475,96 @@ func (p *PythonParser) astNodeToValue(node ast.ASTNode) (core.Value, error) {
 			elements = append(elements, val)
 		}
 		return core.NewList(elements...), nil
+	case *ast.ComprehensionForm:
+		// Convert comprehension to IR: (comprehension kind element iterable [condition])
+		return p.comprehensionToValue(n)
+	case *ast.AssignForm:
+		// Convert assignment: (= target value)
+		target, err := p.astNodeToValue(n.Target)
+		if err != nil {
+			return nil, err
+		}
+		value, err := p.astNodeToValue(n.Value)
+		if err != nil {
+			return nil, err
+		}
+		return core.NewList(core.SymbolValue("="), target, value), nil
 	default:
 		// For other node types, try to convert via the IR
 		return nil, fmt.Errorf("unsupported AST node type in f-string: %T", node)
 	}
+}
+
+// comprehensionToValue converts a ComprehensionForm to a core.Value
+func (p *PythonParser) comprehensionToValue(comp *ast.ComprehensionForm) (core.Value, error) {
+	// Build comprehension IR based on kind
+	var kindSym string
+	switch comp.Kind {
+	case ast.ListComp:
+		kindSym = "list-comp"
+	case ast.SetComp:
+		kindSym = "set-comp"
+	case ast.DictComp:
+		kindSym = "dict-comp"
+	case ast.GeneratorComp:
+		kindSym = "generator-exp"
+	default:
+		return nil, fmt.Errorf("unknown comprehension kind: %v", comp.Kind)
+	}
+
+	// Convert element/key/value expressions
+	var exprValue core.Value
+	var err error
+
+	if comp.Kind == ast.DictComp {
+		// Dict comprehension: {key: value for ...}
+		keyVal, err := p.astNodeToValue(comp.KeyExpr)
+		if err != nil {
+			return nil, err
+		}
+		valVal, err := p.astNodeToValue(comp.ValueExpr)
+		if err != nil {
+			return nil, err
+		}
+		exprValue = core.NewList(keyVal, valVal)
+	} else {
+		// List/set/generator: [expr for ...]
+		exprValue, err = p.astNodeToValue(comp.Element)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Build the comprehension form
+	// Format: (list-comp expr (for var iterable [condition]) ...)
+	result := core.NewList(core.SymbolValue(kindSym), exprValue)
+
+	// Add for clauses
+	for _, clause := range comp.Clauses {
+		iterVal, err := p.astNodeToValue(clause.Iterable)
+		if err != nil {
+			return nil, err
+		}
+
+		forClause := core.NewList(
+			core.SymbolValue("for"),
+			core.SymbolValue(clause.Variable),
+			iterVal,
+		)
+
+		// Add condition if present
+		if clause.Condition != nil {
+			condVal, err := p.astNodeToValue(clause.Condition)
+			if err != nil {
+				return nil, err
+			}
+			forClause.Append(condVal)
+		}
+
+		result.Append(forClause)
+	}
+
+	return result, nil
 }
 
 // convertValueToASTNode converts a core.Value to an ASTNode
