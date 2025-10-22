@@ -38,7 +38,8 @@ var builtinModules = map[string]ModuleInitializer{
 	"re":               InitReModule,
 	"dataclasses":      InitDataclassesModule,
 	"warnings":         InitWarningsModule,
-	"_signal":          Init_SignalModule, // C extension module for signal handling
+	"_signal":          Init_SignalModule,   // C extension module for signal handling
+	"sysconfig":        InitSysconfigModule, // Stub for test.support compatibility
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

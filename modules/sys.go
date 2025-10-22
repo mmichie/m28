@@ -107,6 +107,7 @@ func InitSysModule() *core.DictValue {
 		core.StringValue("dataclasses"),
 		core.StringValue("warnings"),
 		core.StringValue("_signal"),
+		core.StringValue("sysconfig"),
 	)
 	sysModule.SetWithKey("builtin_module_names", core.StringValue("builtin_module_names"), builtinNamesList)
 
