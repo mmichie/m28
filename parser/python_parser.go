@@ -3281,18 +3281,24 @@ func (p *PythonParser) parsePattern() ast.ASTNode {
 		// Could be:
 		// - Wildcard: _
 		// - Variable binding
-		// - Class pattern: ClassName(...)
+		// - Class pattern: ClassName(...) or ast.Expr(...)
 		ident := p.advance()
+		var node ast.ASTNode = ast.NewIdentifier(ident.Lexeme, p.makeLocation(ident), ast.SyntaxPython)
+
+		// Handle dotted attribute access (e.g., ast.Expr)
+		for p.check(TOKEN_DOT) {
+			node = p.parseAttribute(node)
+		}
 
 		// Check for class pattern (function call syntax)
 		if p.check(TOKEN_LPAREN) {
 			// Parse as a call pattern (treat like function call)
-			// ClassName(pattern1, pattern2, ...)
-			return p.parseCall(ast.NewIdentifier(ident.Lexeme, p.makeLocation(ident), ast.SyntaxPython))
+			// ClassName(pattern1, pattern2, ...) or ast.Expr(pattern1, ...)
+			return p.parseCall(node)
 		}
 
 		// Simple identifier or wildcard
-		return ast.NewIdentifier(ident.Lexeme, p.makeLocation(ident), ast.SyntaxPython)
+		return node
 
 	case TOKEN_LPAREN:
 		// Tuple pattern or grouped pattern
