@@ -297,6 +297,24 @@ func (t *PythonTokenizer) scanToken() Token {
 		return t.scanString(ch, start, startLine, startCol)
 	}
 
+	// Raw f-strings (fr"..." or rf"...")
+	if (ch == 'f' || ch == 'r') && !t.isAtEnd() {
+		next := t.peek()
+		if (next == 'r' || next == 'f') && next != ch {
+			// We have fr or rf
+			t.advance() // consume second prefix
+			if !t.isAtEnd() && (t.peek() == '"' || t.peek() == '\'') {
+				quote := t.advance()
+				// Both fr and rf are raw f-strings - treat as regular f-strings for now
+				return t.scanFString(quote, start, startLine, startCol)
+			}
+			// Not a string after fr/rf, backtrack
+			t.pos = start
+			t.line = startLine
+			t.col = startCol
+		}
+	}
+
 	// F-strings
 	if ch == 'f' && !t.isAtEnd() && (t.peek() == '"' || t.peek() == '\'') {
 		quote := t.advance()
@@ -1138,22 +1156,105 @@ func (t *PythonTokenizer) skipComment() {
 
 // scanFString is a simplified version - delegates to existing implementation
 func (t *PythonTokenizer) scanFString(quote byte, start, startLine, startCol int) Token {
-	// For now, use the existing M28 f-string scanner
-	// In a full implementation, this would need Python-specific f-string parsing
+	// Proper f-string scanner following PEP 498 and PEP 701
+	// Handles nested quotes, expressions in braces, escape sequences
+
 	var value strings.Builder
+	isTriple := false
+
+	// Check if this is a triple-quoted f-string
+	if !t.isAtEnd() && t.peek() == quote {
+		t.advance()
+		if !t.isAtEnd() && t.peek() == quote {
+			t.advance()
+			isTriple = true
+		} else {
+			// Just two quotes - empty f-string
+			return Token{
+				Type:     TOKEN_FSTRING,
+				Lexeme:   t.input[start:t.pos],
+				Value:    core.StringValue(""),
+				Line:     startLine,
+				Col:      startCol,
+				StartPos: start,
+				EndPos:   t.pos,
+			}
+		}
+	}
+
 	for {
 		if t.isAtEnd() {
 			t.errors = append(t.errors, t.makeUnterminatedStringError(
-				startLine, startCol, start, quote, false, "f"+value.String()))
+				startLine, startCol, start, quote, isTriple, "f"+value.String()))
 			break
 		}
 
 		ch := t.peek()
+
+		// Check for closing quote(s)
 		if ch == quote {
-			t.advance()
-			break
+			if isTriple {
+				// Need three consecutive quotes
+				if t.pos+2 < len(t.input) && t.input[t.pos+1] == quote && t.input[t.pos+2] == quote {
+					t.advance() // first quote
+					t.advance() // second quote
+					t.advance() // third quote
+					break
+				}
+				// Single quote in triple-quoted string - just part of content
+				value.WriteByte(ch)
+				t.advance()
+				continue
+			} else {
+				// Single-quoted f-string ending
+				t.advance()
+				break
+			}
 		}
 
+		// Handle escape sequences in string portions
+		if ch == '\\' && !isTriple {
+			value.WriteByte(ch)
+			t.advance()
+			if !t.isAtEnd() {
+				value.WriteByte(t.peek())
+				t.advance()
+			}
+			continue
+		}
+
+		// Handle braces for expressions
+		if ch == '{' {
+			t.advance()
+			// Check for escaped brace {{
+			if !t.isAtEnd() && t.peek() == '{' {
+				value.WriteByte('{')
+				value.WriteByte('{')
+				t.advance()
+				continue
+			}
+			// Start of expression - scan until matching }
+			value.WriteByte('{')
+			t.scanFStringExpression(&value, quote)
+			value.WriteByte('}')
+			continue
+		}
+
+		// Handle closing brace }} (escaped)
+		if ch == '}' {
+			t.advance()
+			if !t.isAtEnd() && t.peek() == '}' {
+				value.WriteByte('}')
+				value.WriteByte('}')
+				t.advance()
+				continue
+			}
+			// Single } in f-string literal is an error, but we'll allow it for now
+			value.WriteByte('}')
+			continue
+		}
+
+		// Regular character
 		value.WriteByte(ch)
 		t.advance()
 	}
@@ -1166,6 +1267,67 @@ func (t *PythonTokenizer) scanFString(quote byte, start, startLine, startCol int
 		Col:      startCol,
 		StartPos: start,
 		EndPos:   t.pos,
+	}
+}
+
+// scanFStringExpression scans the expression portion inside { } in an f-string
+// This allows nested quotes, nested braces, and any Python expression
+func (t *PythonTokenizer) scanFStringExpression(value *strings.Builder, outerQuote byte) {
+	braceDepth := 1 // We've already seen the opening {
+
+	for braceDepth > 0 && !t.isAtEnd() {
+		ch := t.peek()
+
+		// Handle nested braces
+		if ch == '{' {
+			braceDepth++
+			value.WriteByte(ch)
+			t.advance()
+			continue
+		}
+
+		if ch == '}' {
+			braceDepth--
+			if braceDepth > 0 {
+				value.WriteByte(ch)
+			}
+			t.advance()
+			continue
+		}
+
+		// Handle strings inside expressions - they can use any quote type
+		if ch == '"' || ch == '\'' {
+			quoteChar := ch
+			value.WriteByte(ch)
+			t.advance()
+
+			// Scan the string inside the expression
+			for !t.isAtEnd() {
+				ch := t.peek()
+				value.WriteByte(ch)
+
+				if ch == '\\' {
+					t.advance()
+					if !t.isAtEnd() {
+						value.WriteByte(t.peek())
+						t.advance()
+					}
+					continue
+				}
+
+				if ch == quoteChar {
+					t.advance()
+					break
+				}
+
+				t.advance()
+			}
+			continue
+		}
+
+		// Regular character in expression
+		value.WriteByte(ch)
+		t.advance()
 	}
 }
 
