@@ -2861,6 +2861,13 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 				Name:      "*" + nameTok.Lexeme, // Prefix with * to mark as varargs
 				IsVarArgs: true,
 			}
+
+			// Parse optional type annotation for *args
+			if p.check(TOKEN_COLON) {
+				p.advance()
+				param.Type = p.parseTypeAnnotation()
+			}
+
 			params = append(params, param)
 
 			if !p.check(TOKEN_COMMA) {
@@ -2882,6 +2889,13 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 				Name:     "**" + nameTok.Lexeme, // Prefix with ** to mark as kwargs
 				IsKwargs: true,
 			}
+
+			// Parse optional type annotation for **kwargs
+			if p.check(TOKEN_COLON) {
+				p.advance()
+				param.Type = p.parseTypeAnnotation()
+			}
+
 			params = append(params, param)
 
 			if !p.check(TOKEN_COMMA) {
@@ -2929,8 +2943,24 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 
 // parseTypeAnnotation parses a type name (simplified - no generics yet)
 func (p *PythonParser) parseTypeAnnotation() *ast.TypeInfo {
-	nameTok := p.expect(TOKEN_IDENTIFIER)
-	typeName := nameTok.Lexeme
+	// Type annotations can be identifiers or special constants like None, True, False
+	var typeName string
+	if p.check(TOKEN_IDENTIFIER) {
+		nameTok := p.advance()
+		typeName = nameTok.Lexeme
+	} else if p.check(TOKEN_NIL) {
+		p.advance()
+		typeName = "None"
+	} else if p.check(TOKEN_TRUE) {
+		p.advance()
+		typeName = "True"
+	} else if p.check(TOKEN_FALSE) {
+		p.advance()
+		typeName = "False"
+	} else {
+		p.error("Expected type name in type annotation")
+		return &ast.TypeInfo{Name: "object"} // fallback
+	}
 
 	// Handle generic types like dict[str, object] or list[int]
 	// For now, we parse the brackets and contents but don't use them
@@ -2953,8 +2983,13 @@ func (p *PythonParser) parseTypeArguments() {
 	}
 
 	for {
-		// Parse one type argument
-		p.expect(TOKEN_IDENTIFIER)
+		// Parse one type argument - can be identifier or special constant
+		if p.check(TOKEN_IDENTIFIER) || p.check(TOKEN_NIL) || p.check(TOKEN_TRUE) || p.check(TOKEN_FALSE) {
+			p.advance()
+		} else {
+			p.error("Expected type name in type argument")
+			break
+		}
 
 		// Handle nested generics like List[Dict[str, int]]
 		if p.check(TOKEN_LBRACKET) {
