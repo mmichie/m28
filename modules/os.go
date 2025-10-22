@@ -46,6 +46,9 @@ func InitOSModule() *core.DictValue {
 	osModule.SetWithKey("isfile", core.StringValue("isfile"), core.NewBuiltinFunction(osPathIsFile))
 	osModule.SetWithKey("isdir", core.StringValue("isdir"), core.NewBuiltinFunction(osPathIsDir))
 
+	// Add all extended os module functions for full CPython compatibility
+	addExtendedOSFunctions(osModule)
+
 	return osModule
 }
 

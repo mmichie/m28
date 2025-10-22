@@ -161,6 +161,10 @@ func InitSysModule() *core.DictValue {
 		return core.StringValue("__main__"), nil
 	}))
 
+	// Add all extended sys module attributes and functions for full CPython compatibility
+	addExtendedSysAttributes(sysModule)
+	addExtendedSysFunctions(sysModule)
+
 	return sysModule
 }
 

@@ -40,6 +40,62 @@ func InitPosixModule() *core.DictValue {
 	copyFunction("isfile")
 	copyFunction("isdir")
 
+	// System info
+	copyFunction("uname")
+	copyFunction("getpid")
+	copyFunction("getppid")
+	copyFunction("getuid")
+	copyFunction("geteuid")
+	copyFunction("getgid")
+	copyFunction("getegid")
+	copyFunction("getgroups")
+	copyFunction("getlogin")
+
+	// File operations
+	copyFunction("open")
+	copyFunction("close")
+	copyFunction("read")
+	copyFunction("write")
+	copyFunction("lseek")
+	copyFunction("fstat")
+
+	// More file operations
+	copyFunction("unlink")
+	copyFunction("rmdir")
+	copyFunction("symlink")
+	copyFunction("readlink")
+
+	// System
+	copyFunction("urandom")
+	copyFunction("cpu_count")
+	copyFunction("system")
+
+	// Path operations
+	copyFunction("fspath")
+	copyFunction("fsencode")
+	copyFunction("fsdecode")
+
+	// Environment manipulation
+	copyFunction("putenv")
+	copyFunction("unsetenv")
+
+	// Constants
+	copyFunction("F_OK")
+	copyFunction("R_OK")
+	copyFunction("W_OK")
+	copyFunction("X_OK")
+	copyFunction("O_RDONLY")
+	copyFunction("O_WRONLY")
+	copyFunction("O_RDWR")
+	copyFunction("O_APPEND")
+	copyFunction("O_CREATE")
+	copyFunction("O_EXCL")
+	copyFunction("O_TRUNC")
+	copyFunction("sep")
+	copyFunction("pathsep")
+	copyFunction("linesep")
+	copyFunction("devnull")
+
 	// Add stat function (simplified version - returns a minimal stat result)
 	posixModule.SetWithKey("stat", core.StringValue("stat"), core.NewBuiltinFunction(posixStat))
 	posixModule.SetWithKey("lstat", core.StringValue("lstat"), core.NewBuiltinFunction(posixStat)) // lstat same as stat for now
