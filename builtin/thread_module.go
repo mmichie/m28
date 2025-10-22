@@ -170,6 +170,15 @@ func RegisterThreadModule(ctx *core.Context) {
 			return core.NumberValue(0), nil
 		}))
 
+	// _HAVE_THREAD_NATIVE_ID - indicates if get_native_id() is supported
+	// Set to False for now to avoid issues with _set_native_id
+	threadModule.SetWithKey("_HAVE_THREAD_NATIVE_ID", core.StringValue("_HAVE_THREAD_NATIVE_ID"),
+		core.BoolValue(false))
+
+	// HAVE_THREAD_NATIVE_ID - public version (alias)
+	threadModule.SetWithKey("HAVE_THREAD_NATIVE_ID", core.StringValue("HAVE_THREAD_NATIVE_ID"),
+		core.BoolValue(false))
+
 	// error - exception type for thread errors
 	errorClass := core.NewClassWithParents("error", []*core.Class{})
 	threadModule.SetWithKey("error", core.StringValue("error"), errorClass)
@@ -264,6 +273,7 @@ func (l *ThreadLock) GetAttr(name string) (core.Value, bool) {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			l.mu.Lock()
 			l.locked = true
+			l.mu.Unlock()
 			return core.Value(l), nil
 		}), true
 

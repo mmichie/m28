@@ -99,13 +99,9 @@ func getSetMethods() map[string]*MethodDescriptor {
 					return nil, fmt.Errorf("add() takes exactly one argument")
 				}
 				set := receiver.(*SetValue)
-				// Create a new set with the element added
-				result := NewSet()
-				for _, item := range set.items {
-					result.Add(item)
-				}
-				result.Add(args[0])
-				return result, nil
+				// Mutate in-place
+				set.Add(args[0])
+				return Nil, nil
 			},
 		},
 		"remove": {
@@ -121,14 +117,9 @@ func getSetMethods() map[string]*MethodDescriptor {
 				if !set.Contains(args[0]) {
 					return nil, fmt.Errorf("KeyError: %v", args[0])
 				}
-				// Create a new set without the element
-				result := NewSet()
-				for _, item := range set.items {
-					if !EqualValues(item, args[0]) {
-						result.Add(item)
-					}
-				}
-				return result, nil
+				// Mutate in-place
+				set.Remove(args[0])
+				return Nil, nil
 			},
 		},
 		"discard": {
@@ -141,14 +132,9 @@ func getSetMethods() map[string]*MethodDescriptor {
 					return nil, fmt.Errorf("discard() takes exactly one argument")
 				}
 				set := receiver.(*SetValue)
-				// Create a new set without the element
-				result := NewSet()
-				for _, item := range set.items {
-					if !EqualValues(item, args[0]) {
-						result.Add(item)
-					}
-				}
-				return result, nil
+				// Mutate in-place
+				set.Remove(args[0])
+				return Nil, nil
 			},
 		},
 		"pop": {
@@ -161,8 +147,9 @@ func getSetMethods() map[string]*MethodDescriptor {
 				if set.Size() == 0 {
 					return nil, fmt.Errorf("pop from an empty set")
 				}
-				// Return the first element (get any key from the map)
-				for _, v := range set.items {
+				// Return and remove the first element (get any key from the map)
+				for k, v := range set.items {
+					delete(set.items, k)
 					return v, nil
 				}
 				// Should never reach here since we checked size > 0
@@ -175,7 +162,10 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Remove all elements from the set",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				return NewSet(), nil
+				set := receiver.(*SetValue)
+				// Mutate in-place
+				set.items = make(map[string]Value)
+				return Nil, nil
 			},
 		},
 		"copy": {
@@ -544,6 +534,144 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				return result, nil
+			},
+		},
+		"update": {
+			Name:    "update",
+			Arity:   -1,
+			Doc:     "Update the set, adding elements from all iterables",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				set := receiver.(*SetValue)
+				// Add items from other iterables
+				for _, arg := range args {
+					if other, ok := arg.(*SetValue); ok {
+						for _, item := range other.items {
+							set.Add(item)
+						}
+					} else if iterable, ok := arg.(Iterable); ok {
+						iter := iterable.Iterator()
+						for {
+							val, ok := iter.Next()
+							if !ok {
+								break
+							}
+							set.Add(val)
+						}
+					} else {
+						return nil, fmt.Errorf("update() argument must be an iterable")
+					}
+				}
+				return Nil, nil
+			},
+		},
+		"difference_update": {
+			Name:    "difference_update",
+			Arity:   -1,
+			Doc:     "Remove all elements of other iterables from this set",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				set := receiver.(*SetValue)
+				// Remove items that are in any other iterable
+				for _, arg := range args {
+					if other, ok := arg.(*SetValue); ok {
+						for _, item := range other.items {
+							set.Remove(item)
+						}
+					} else if iterable, ok := arg.(Iterable); ok {
+						iter := iterable.Iterator()
+						for {
+							val, ok := iter.Next()
+							if !ok {
+								break
+							}
+							set.Remove(val)
+						}
+					} else {
+						return nil, fmt.Errorf("difference_update() argument must be an iterable")
+					}
+				}
+				return Nil, nil
+			},
+		},
+		"intersection_update": {
+			Name:    "intersection_update",
+			Arity:   -1,
+			Doc:     "Update the set, keeping only elements found in it and all others",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) == 0 {
+					return Nil, nil
+				}
+
+				set := receiver.(*SetValue)
+				// Check each item in this set
+				toRemove := make([]Value, 0)
+				for _, item := range set.items {
+					inAll := true
+					// Check if it's in all other sets
+					for _, arg := range args {
+						other, ok := arg.(*SetValue)
+						if !ok {
+							return nil, fmt.Errorf("intersection_update() argument must be a set")
+						}
+						if !other.Contains(item) {
+							inAll = false
+							break
+						}
+					}
+					if !inAll {
+						toRemove = append(toRemove, item)
+					}
+				}
+				// Remove items not in all sets
+				for _, item := range toRemove {
+					set.Remove(item)
+				}
+				return Nil, nil
+			},
+		},
+		"symmetric_difference_update": {
+			Name:    "symmetric_difference_update",
+			Arity:   1,
+			Doc:     "Update the set, keeping only elements found in either set, but not in both",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("symmetric_difference_update() takes exactly one argument")
+				}
+
+				set := receiver.(*SetValue)
+				other, ok := args[0].(*SetValue)
+				if !ok {
+					return nil, fmt.Errorf("symmetric_difference_update() argument must be a set")
+				}
+
+				// Items to add (in other but not in set)
+				toAdd := make([]Value, 0)
+				for _, item := range other.items {
+					if !set.Contains(item) {
+						toAdd = append(toAdd, item)
+					}
+				}
+
+				// Items to remove (in both sets)
+				toRemove := make([]Value, 0)
+				for _, item := range set.items {
+					if other.Contains(item) {
+						toRemove = append(toRemove, item)
+					}
+				}
+
+				// Apply changes
+				for _, item := range toRemove {
+					set.Remove(item)
+				}
+				for _, item := range toAdd {
+					set.Add(item)
+				}
+
+				return Nil, nil
 			},
 		},
 	}
