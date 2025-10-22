@@ -158,6 +158,18 @@ func RegisterThreadModule(ctx *core.Context) {
 			return core.NumberValue(1), nil
 		}))
 
+	// stack_size([size]) - get/set thread stack size
+	threadModule.SetWithKey("stack_size", core.StringValue("stack_size"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			v := validation.NewArgs("stack_size", args)
+			if err := v.Range(0, 1); err != nil {
+				return nil, err
+			}
+			// If called with no args, return current stack size (stub: 0)
+			// If called with arg, set stack size and return previous (stub: ignore)
+			return core.NumberValue(0), nil
+		}))
+
 	// error - exception type for thread errors
 	errorClass := core.NewClassWithParents("error", []*core.Class{})
 	threadModule.SetWithKey("error", core.StringValue("error"), errorClass)

@@ -19,6 +19,8 @@ func InitTracebackModule() *core.DictValue {
 		core.NewBuiltinFunction(formatExc))
 	tracebackModule.SetWithKey("print_exc", core.StringValue("print_exc"),
 		core.NewBuiltinFunction(printExc))
+	tracebackModule.SetWithKey("print_exception", core.StringValue("print_exception"),
+		core.NewBuiltinFunction(printException))
 
 	return tracebackModule
 }
@@ -46,5 +48,11 @@ func formatExc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 func printExc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// No-op for now
+	return core.NilValue{}, nil
+}
+
+func printException(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// print_exception(exc_type, exc_value, exc_tb, limit=None, file=None, chain=True)
+	// No-op stub for now - just returns None
 	return core.NilValue{}, nil
 }
