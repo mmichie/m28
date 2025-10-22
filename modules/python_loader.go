@@ -164,8 +164,9 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	// Add underscore-prefixed names that are used internally by Python stdlib
 	for varName, value := range moduleCtx.Vars {
-		// Skip dunder variables (__name__, __file__, etc.)
-		if len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__" {
+		// Skip dunder variables (__name__, __file__, etc.) except __all__
+		// __all__ is a special variable that defines the public API and must be exported
+		if varName != "__all__" && len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__" {
 			continue
 		}
 		// Only process private names (starting with _) - public names already synced

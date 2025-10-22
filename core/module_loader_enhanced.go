@@ -262,6 +262,10 @@ func exportAllPublicVars(moduleDict *DictValue, moduleCtx *Context) {
 
 // isPrivateVar checks if a variable name is private (special or starts with _)
 func isPrivateVar(name string) bool {
+	// __all__ is a special variable that should be exported (defines public API)
+	if name == "__all__" {
+		return false
+	}
 	// Skip special vars like __name__ and __file__
 	if len(name) >= 2 && name[:2] == "__" && name[len(name)-2:] == "__" {
 		return true
