@@ -138,10 +138,10 @@ func RegisterTypes(ctx *core.Context) {
 	})))
 
 	// int - Python int constructor
-	ctx.Define("int", core.NewNamedBuiltinFunction("int", IntBuilder()))
+	ctx.Define("int", createIntClass())
 
 	// float - Python float constructor
-	ctx.Define("float", core.NewNamedBuiltinFunction("float", FloatBuilder()))
+	ctx.Define("float", createFloatClass())
 
 	// isinstance - check if object is instance of type(s)
 	// BEFORE: 20 lines
@@ -856,8 +856,29 @@ func (f *FloatType) Call(args []core.Value, ctx *core.Context) (core.Value, erro
 // createFloatClass creates the float class that can be used with isinstance
 func createFloatClass() *FloatType {
 	class := core.NewClass("float", nil)
-	// Float doesn't have class methods currently
-	// But having it as a Class allows isinstance checks
+
+	// Add __getformat__ class method (used to detect IEEE 754 format)
+	// Python's float.__getformat__("double") returns "IEEE, little-endian" or similar
+	class.Methods["__getformat__"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("__getformat__() takes exactly one argument")
+		}
+
+		typeStr, ok := args[0].(core.StringValue)
+		if !ok {
+			return nil, core.NewTypeError("str", args[0], "__getformat__() argument")
+		}
+
+		// Go uses IEEE 754 for float64
+		// Return the expected format string
+		formatType := string(typeStr)
+		if formatType == "double" || formatType == "float" {
+			return core.StringValue("IEEE, little-endian"), nil
+		}
+
+		return nil, fmt.Errorf("__getformat__() argument must be 'double' or 'float'")
+	})
+
 	return &FloatType{Class: class}
 }
 

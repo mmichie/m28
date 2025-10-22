@@ -204,5 +204,22 @@ func InitReModule() *core.DictValue {
 		return matchObj, nil
 	}))
 
+	// escape - escape special regex characters
+	reModule.Set("escape", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("escape", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		pattern, err := v.GetString(0)
+		if err != nil {
+			return nil, err
+		}
+
+		// Use Go's QuoteMeta to escape regex special characters
+		escaped := regexp.QuoteMeta(pattern)
+		return core.StringValue(escaped), nil
+	}))
+
 	return reModule
 }

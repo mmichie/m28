@@ -43,7 +43,61 @@ func InitTimeModule() *core.DictValue {
 		return core.Nil, nil
 	}))
 
+	// strftime() - format time according to a format string
+	timeModule.SetWithKey("strftime", core.StringValue("strftime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("strftime", args)
+		if err := v.Range(1, 2); err != nil {
+			return nil, err
+		}
+
+		formatStr, err := v.GetString(0)
+		if err != nil {
+			return nil, err
+		}
+
+		// If no time tuple provided, use current time
+		var t time.Time
+		if v.Count() == 1 {
+			t = time.Now()
+		} else {
+			// For now, just use current time
+			// Full implementation would parse the time tuple argument
+			t = time.Now()
+		}
+
+		// Simple conversion of common Python strftime formats to Go formats
+		// This is a basic implementation - Python's strftime has many more format codes
+		goFormat := formatStr
+		goFormat = replaceStrftimeFormat(goFormat, "%Y", "2006")
+		goFormat = replaceStrftimeFormat(goFormat, "%4Y", "2006") // glibc extension
+		goFormat = replaceStrftimeFormat(goFormat, "%m", "01")
+		goFormat = replaceStrftimeFormat(goFormat, "%d", "02")
+		goFormat = replaceStrftimeFormat(goFormat, "%H", "15")
+		goFormat = replaceStrftimeFormat(goFormat, "%M", "04")
+		goFormat = replaceStrftimeFormat(goFormat, "%S", "05")
+
+		result := t.Format(goFormat)
+		return core.StringValue(result), nil
+	}))
+
 	return timeModule
+}
+
+// replaceStrftimeFormat is a helper to replace Python strftime format codes with Go format codes
+func replaceStrftimeFormat(s, pythonFmt, goFmt string) string {
+	// Simple string replacement - more sophisticated implementation would handle edge cases
+	result := ""
+	i := 0
+	for i < len(s) {
+		if i+len(pythonFmt) <= len(s) && s[i:i+len(pythonFmt)] == pythonFmt {
+			result += goFmt
+			i += len(pythonFmt)
+		} else {
+			result += string(s[i])
+			i++
+		}
+	}
+	return result
 }
 
 // Migration Statistics:

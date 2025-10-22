@@ -40,6 +40,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"warnings":         InitWarningsModule,
 	"_signal":          Init_SignalModule,   // C extension module for signal handling
 	"sysconfig":        InitSysconfigModule, // Stub for test.support compatibility
+	"textwrap":         InitTextwrapModule,  // Stub - Python's textwrap.py uses regex features Go doesn't support
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

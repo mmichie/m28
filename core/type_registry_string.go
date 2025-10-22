@@ -137,6 +137,23 @@ func getStringMethods() map[string]*MethodDescriptor {
 				return NumberValue(strings.Index(s, string(sub))), nil
 			},
 		},
+		"rfind": {
+			Name:    "rfind",
+			Arity:   1,
+			Doc:     "Return the highest index where substring is found, or -1 if not found",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("rfind() takes exactly one argument")
+				}
+				s := string(receiver.(StringValue))
+				sub, ok := args[0].(StringValue)
+				if !ok {
+					return nil, fmt.Errorf("rfind() argument must be str")
+				}
+				return NumberValue(strings.LastIndex(s, string(sub))), nil
+			},
+		},
 		"count": {
 			Name:    "count",
 			Arity:   1,

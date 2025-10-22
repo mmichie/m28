@@ -254,9 +254,13 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 
 // formatStringWithPercent implements Python's % string formatting
 func formatStringWithPercent(formatStr string, values Value) (Value, error) {
-	// Convert single value to tuple for uniform handling
+	// Check if using dictionary-based formatting
+	var valueDict *DictValue
 	var valueTuple []Value
-	if tuple, ok := values.(TupleValue); ok {
+
+	if dict, ok := values.(*DictValue); ok {
+		valueDict = dict
+	} else if tuple, ok := values.(TupleValue); ok {
 		valueTuple = []Value(tuple)
 	} else {
 		valueTuple = []Value{values}
@@ -286,43 +290,106 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			continue
 		}
 
-		// Parse format specifier (simplified version)
-		// Full format: %[flags][width][.precision]type
-		// For now, just handle the type and ignore flags/width/precision
+		var value Value
+		var fmtType byte
 
-		// Skip optional flags (-, +, 0, space, #)
-		for i < len(formatStr) && (formatStr[i] == '-' || formatStr[i] == '+' ||
-			formatStr[i] == '0' || formatStr[i] == ' ' || formatStr[i] == '#') {
-			i++
-		}
+		// Check for %(name)s dictionary-style formatting
+		if formatStr[i] == '(' {
+			if valueDict == nil {
+				return nil, fmt.Errorf("format requires a mapping")
+			}
 
-		// Skip optional width
-		for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
-			i++
-		}
+			// Find the closing )
+			i++ // skip (
+			keyStart := i
+			for i < len(formatStr) && formatStr[i] != ')' {
+				i++
+			}
+			if i >= len(formatStr) {
+				return nil, fmt.Errorf("incomplete format key")
+			}
 
-		// Skip optional .precision
-		if i < len(formatStr) && formatStr[i] == '.' {
-			i++
+			keyName := formatStr[keyStart:i]
+			i++ // skip )
+
+			// Parse format specifier after )
+			// Skip optional flags (-, +, 0, space, #)
+			for i < len(formatStr) && (formatStr[i] == '-' || formatStr[i] == '+' ||
+				formatStr[i] == '0' || formatStr[i] == ' ' || formatStr[i] == '#') {
+				i++
+			}
+
+			// Skip optional width
 			for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
 				i++
 			}
-		}
 
-		if i >= len(formatStr) {
-			return nil, fmt.Errorf("incomplete format")
-		}
+			// Skip optional .precision
+			if i < len(formatStr) && formatStr[i] == '.' {
+				i++
+				for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+					i++
+				}
+			}
 
-		// Get format type
-		fmtType := formatStr[i]
-		i++
+			if i >= len(formatStr) {
+				return nil, fmt.Errorf("incomplete format")
+			}
 
-		// Get the value to format
-		if valueIdx >= len(valueTuple) {
-			return nil, fmt.Errorf("not enough arguments for format string")
+			fmtType = formatStr[i]
+			i++
+
+			// Look up the value in the dictionary
+			var found bool
+			keyStr := ValueToKey(StringValue(keyName))
+			value, found = valueDict.Get(keyStr)
+			if !found {
+				return nil, fmt.Errorf("KeyError: '%s'", keyName)
+			}
+		} else {
+			// Positional formatting
+			if valueDict != nil {
+				return nil, fmt.Errorf("format requires a sequence, not a dict")
+			}
+
+			// Parse format specifier (simplified version)
+			// Full format: %[flags][width][.precision]type
+			// For now, just handle the type and ignore flags/width/precision
+
+			// Skip optional flags (-, +, 0, space, #)
+			for i < len(formatStr) && (formatStr[i] == '-' || formatStr[i] == '+' ||
+				formatStr[i] == '0' || formatStr[i] == ' ' || formatStr[i] == '#') {
+				i++
+			}
+
+			// Skip optional width
+			for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+				i++
+			}
+
+			// Skip optional .precision
+			if i < len(formatStr) && formatStr[i] == '.' {
+				i++
+				for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+					i++
+				}
+			}
+
+			if i >= len(formatStr) {
+				return nil, fmt.Errorf("incomplete format")
+			}
+
+			// Get format type
+			fmtType = formatStr[i]
+			i++
+
+			// Get the value to format
+			if valueIdx >= len(valueTuple) {
+				return nil, fmt.Errorf("not enough arguments for format string")
+			}
+			value = valueTuple[valueIdx]
+			valueIdx++
 		}
-		value := valueTuple[valueIdx]
-		valueIdx++
 
 		// Format the value based on type
 		var formatted string
@@ -382,7 +449,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		result.WriteString(formatted)
 	}
 
-	if valueIdx < len(valueTuple) {
+	if valueDict == nil && valueIdx < len(valueTuple) {
 		return nil, fmt.Errorf("not all arguments converted during string formatting")
 	}
 

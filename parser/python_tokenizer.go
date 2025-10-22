@@ -935,12 +935,6 @@ func (t *PythonTokenizer) scanRawString(quote byte, start, startLine, startCol i
 
 		ch := t.peek()
 
-		// Check for end of string
-		if !isTriple && ch == quote {
-			t.advance()
-			break
-		}
-
 		if isTriple {
 			// Check for triple quote end
 			if ch == quote && t.pos+2 < len(t.input) &&
@@ -1019,12 +1013,6 @@ func (t *PythonTokenizer) scanRawBytesString(quote byte, start, startLine, start
 		}
 
 		ch := t.peek()
-
-		// Check for end of string
-		if !isTriple && ch == quote {
-			t.advance()
-			break
-		}
 
 		if isTriple {
 			// Check for triple quote end
