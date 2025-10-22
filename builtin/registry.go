@@ -48,6 +48,9 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	// Register time module
 	RegisterTimeModule(ctx)
 
+	// Register _thread module (minimal threading support)
+	RegisterThreadModule(ctx)
+
 	// Also register functions from other files that haven't been migrated yet
 	RegisterStringFunctions(ctx)
 	RegisterDictFunctions(ctx)
