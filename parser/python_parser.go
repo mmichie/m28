@@ -2880,7 +2880,45 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 // parseTypeAnnotation parses a type name (simplified - no generics yet)
 func (p *PythonParser) parseTypeAnnotation() *ast.TypeInfo {
 	nameTok := p.expect(TOKEN_IDENTIFIER)
-	return &ast.TypeInfo{Name: nameTok.Lexeme}
+	typeName := nameTok.Lexeme
+
+	// Handle generic types like dict[str, object] or list[int]
+	// For now, we parse the brackets and contents but don't use them
+	// Just consume tokens to allow the syntax
+	if p.check(TOKEN_LBRACKET) {
+		p.advance() // consume [
+		// Parse type arguments (can be nested: Dict[str, List[int]])
+		p.parseTypeArguments()
+		p.expect(TOKEN_RBRACKET)
+	}
+
+	return &ast.TypeInfo{Name: typeName}
+}
+
+// parseTypeArguments parses the contents of generic type brackets
+// e.g., "str, object" in dict[str, object]
+func (p *PythonParser) parseTypeArguments() {
+	if p.check(TOKEN_RBRACKET) {
+		return // empty brackets
+	}
+
+	for {
+		// Parse one type argument
+		p.expect(TOKEN_IDENTIFIER)
+
+		// Handle nested generics like List[Dict[str, int]]
+		if p.check(TOKEN_LBRACKET) {
+			p.advance()
+			p.parseTypeArguments()
+			p.expect(TOKEN_RBRACKET)
+		}
+
+		// Check for more arguments
+		if !p.check(TOKEN_COMMA) {
+			break
+		}
+		p.advance() // consume comma
+	}
 }
 
 // parseClassStatement parses: (@decorator)* class name (bases)?: block
