@@ -3278,7 +3278,7 @@ func (p *PythonParser) parsePattern() ast.ASTNode {
 // ============================================================================
 
 // parseFStringFromLexeme parses an f-string from its full lexeme (e.g., f"hello {x}" or fr"raw {x}")
-// by delegating to M28's existing f-string parser
+// using Python expression syntax for expressions inside {}
 func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error) {
 	// Find the quote character (skip past prefix: f, fr, rf, etc.)
 	if len(lexeme) < 2 {
@@ -3295,7 +3295,7 @@ func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error)
 		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
 	}
 
-	var quoteChar rune
+	var quoteChar byte
 	if lexeme[quoteIdx] == '"' {
 		quoteChar = '"'
 	} else if lexeme[quoteIdx] == '\'' {
@@ -3304,18 +3304,174 @@ func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error)
 		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
 	}
 
-	// Create a temporary M28 parser to handle the f-string
-	// For now, treat raw f-strings (fr/rf) as regular f-strings by normalizing to f"..."
-	normalizedLexeme := "f" + lexeme[quoteIdx:]
+	// Extract the string content (without quotes and prefix)
+	quoteIdx++ // skip opening quote
+	var endIdx int
+	if quoteIdx < len(lexeme) && lexeme[quoteIdx] == quoteChar && lexeme[quoteIdx+1] == quoteChar {
+		// Triple-quoted string
+		quoteIdx += 2            // skip next two quotes
+		endIdx = len(lexeme) - 3 // before closing """
+	} else {
+		endIdx = len(lexeme) - 1 // before closing quote
+	}
 
-	m28Parser := NewParser()
-	m28Parser.input = normalizedLexeme
-	m28Parser.pos = 0
-	m28Parser.line = 1
-	m28Parser.col = 1
+	content := lexeme[quoteIdx:endIdx]
 
-	// Parse using M28's existing f-string logic
-	return m28Parser.parseFStringEnhancedSimple(quoteChar)
+	// Parse the f-string content using Python expression parser
+	return p.parsePythonFString(content)
+}
+
+// parsePythonFString parses f-string content and returns a format expression
+func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
+	var parts []core.Value
+	i := 0
+
+	for i < len(content) {
+		// Look for {
+		if content[i] != '{' {
+			// Find the next { or end of string
+			start := i
+			for i < len(content) && content[i] != '{' && content[i] != '}' {
+				i++
+			}
+
+			// Handle }} (escaped })
+			if i < len(content) && content[i] == '}' {
+				if i+1 < len(content) && content[i+1] == '}' {
+					parts = append(parts, core.StringValue(content[start:i+1]))
+					i += 2
+					continue
+				}
+				return nil, fmt.Errorf("single '}' is not allowed in f-string")
+			}
+
+			// Add literal string part
+			if i > start {
+				parts = append(parts, core.StringValue(content[start:i]))
+			}
+			continue
+		}
+
+		// Found {
+		// Check for {{ (escaped {)
+		if i+1 < len(content) && content[i+1] == '{' {
+			parts = append(parts, core.StringValue("{"))
+			i += 2
+			continue
+		}
+
+		// Parse expression
+		i++ // skip {
+		exprStart := i
+		depth := 1
+		inString := false
+		var stringChar byte
+
+		// Find matching }
+		for i < len(content) && depth > 0 {
+			ch := content[i]
+
+			if inString {
+				if ch == '\\' {
+					i += 2 // skip escaped character
+					continue
+				}
+				if ch == stringChar {
+					inString = false
+				}
+				i++
+				continue
+			}
+
+			if ch == '"' || ch == '\'' {
+				inString = true
+				stringChar = ch
+				i++
+				continue
+			}
+
+			if ch == '{' {
+				depth++
+			} else if ch == '}' {
+				depth--
+			}
+			i++
+		}
+
+		if depth != 0 {
+			return nil, fmt.Errorf("unmatched '{' in f-string")
+		}
+
+		// Extract expression (i points after the closing })
+		exprStr := content[exprStart : i-1]
+
+		// Parse the expression using Python parser
+		// Create a temporary tokenizer and parser for the expression
+		tempTokenizer := NewPythonTokenizer(exprStr)
+		tokens, err := tempTokenizer.Tokenize()
+		if err != nil {
+			return nil, fmt.Errorf("error tokenizing f-string expression: %v", err)
+		}
+
+		tempParser := NewPythonParser(tokens)
+		exprNode := tempParser.parseExpression()
+		if len(tempParser.errors) > 0 {
+			return nil, fmt.Errorf("error parsing f-string expression: %v", tempParser.errors[0])
+		}
+
+		// Convert AST node to IR for evaluation
+		exprValue, err := p.astNodeToValue(exprNode)
+		if err != nil {
+			return nil, fmt.Errorf("error converting f-string expression: %v", err)
+		}
+
+		parts = append(parts, exprValue)
+	}
+
+	// If no expressions, return simple string
+	if len(parts) == 0 {
+		return core.StringValue(""), nil
+	}
+	if len(parts) == 1 {
+		if str, ok := parts[0].(core.StringValue); ok {
+			return str, nil
+		}
+	}
+
+	// Build format expression: (str-concat part1 part2 ...)
+	// Use str-concat to concatenate string parts and evaluated expressions
+	result := core.NewList(core.SymbolValue("str-concat"))
+	for _, part := range parts {
+		result.Append(part)
+	}
+	return result, nil
+}
+
+// astNodeToValue converts an AST node to a core.Value for f-string expressions
+func (p *PythonParser) astNodeToValue(node ast.ASTNode) (core.Value, error) {
+	if node == nil {
+		return nil, fmt.Errorf("nil AST node")
+	}
+
+	switch n := node.(type) {
+	case *ast.Literal:
+		return n.Value, nil
+	case *ast.Identifier:
+		return core.SymbolValue(n.Name), nil
+	case *ast.SExpr:
+		var elements []core.Value
+		for _, elem := range n.Elements {
+			val, err := p.astNodeToValue(elem)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, val)
+		}
+		return core.NewList(elements...), nil
+	default:
+		// For other node types, try to convert via the IR
+		return nil, fmt.Errorf("unsupported AST node type in f-string: %T", node)
+	}
 }
 
 // convertValueToASTNode converts a core.Value to an ASTNode
