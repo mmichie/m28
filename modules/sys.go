@@ -76,6 +76,19 @@ func InitSysModule() *core.DictValue {
 		sysModule.SetWithKey("byteorder", core.StringValue("byteorder"), core.StringValue("little"))
 	}
 
+	// hash_info - information about the hash implementation
+	hashInfo := core.NewDict()
+	hashInfo.Set("width", core.NumberValue(64))
+	hashInfo.Set("modulus", core.NumberValue(2305843009213693951))
+	hashInfo.Set("inf", core.NumberValue(314159))
+	hashInfo.Set("nan", core.NumberValue(0))
+	hashInfo.Set("imag", core.NumberValue(1000003))
+	hashInfo.Set("algorithm", core.StringValue("siphash13"))
+	hashInfo.Set("hash_bits", core.NumberValue(64))
+	hashInfo.Set("seed_bits", core.NumberValue(128))
+	hashInfo.Set("cutoff", core.NumberValue(0))
+	sysModule.SetWithKey("hash_info", core.StringValue("hash_info"), hashInfo)
+
 	// Module tracking
 	sysModule.SetWithKey("modules", core.StringValue("modules"), sysModules)
 	sysModule.SetWithKey("path", core.StringValue("path"), sysPath)

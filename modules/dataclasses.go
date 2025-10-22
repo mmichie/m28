@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"github.com/mmichie/m28/builtin"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
@@ -33,11 +34,11 @@ func InitDataclassesModule() *core.DictValue {
 	}))
 
 	// dataclass - decorator to create a dataclass
-	dataclassesModule.Set("dataclass", core.NewNamedBuiltinFunction("dataclass", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// Can be called as @dataclass or @dataclass(...)
-		// For now, just return a passthrough decorator
+	dataclassesModule.Set("dataclass", builtin.NewKwargsBuiltinFunction("dataclass", func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		// Can be called as @dataclass or @dataclass(init=True, repr=True, ...)
+		// For now, just return a passthrough decorator that ignores all kwargs
 		if len(args) == 0 {
-			// Called with arguments: @dataclass(init=True, ...)
+			// Called with keyword arguments only: @dataclass(init=True, ...)
 			// Return a function that takes a class and returns it
 			return core.NewBuiltinFunction(func(classArgs []core.Value, classCtx *core.Context) (core.Value, error) {
 				if len(classArgs) != 1 {
@@ -48,15 +49,16 @@ func InitDataclassesModule() *core.DictValue {
 			}), nil
 		}
 
-		// Called without arguments: @dataclass
+		// Called without keyword arguments, or with a class as first arg: @dataclass
 		// args[0] is the class, return it unchanged
 		return args[0], nil
 	}))
 
 	// field - define a field with metadata
-	dataclassesModule.Set("field", core.NewNamedBuiltinFunction("field", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	dataclassesModule.Set("field", builtin.NewKwargsBuiltinFunction("field", func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 		// Return a simple dict representing a field
 		// This is called like: field(default=None, init=True, repr=True)
+		// For now, ignore all kwargs and just return an empty dict
 		return core.NewDict(), nil
 	}))
 

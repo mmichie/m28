@@ -53,5 +53,48 @@ func InitTypesModule() *core.DictValue {
 		return core.None, nil
 	}))
 
+	// FunctionType - type of user-defined functions
+	// This is the type returned by type(lambda: None)
+	typesModule.Set("FunctionType", core.NewClass("FunctionType", nil))
+
+	// LambdaType - alias for FunctionType
+	typesModule.Set("LambdaType", core.NewClass("FunctionType", nil))
+
+	// CodeType - type of code objects
+	typesModule.Set("CodeType", core.NewClass("CodeType", nil))
+
+	// BuiltinFunctionType - type of built-in functions
+	typesModule.Set("BuiltinFunctionType", core.NewClass("BuiltinFunctionType", nil))
+
+	// BuiltinMethodType - alias for BuiltinFunctionType
+	typesModule.Set("BuiltinMethodType", core.NewClass("BuiltinFunctionType", nil))
+
+	// ModuleType - type of modules
+	typesModule.Set("ModuleType", core.NewClass("ModuleType", nil))
+
+	// GeneratorType - type of generator objects
+	typesModule.Set("GeneratorType", core.NewClass("GeneratorType", nil))
+
+	// CoroutineType - type of coroutine objects
+	typesModule.Set("CoroutineType", core.NewClass("CoroutineType", nil))
+
+	// AsyncGeneratorType - type of async generator objects
+	typesModule.Set("AsyncGeneratorType", core.NewClass("AsyncGeneratorType", nil))
+
+	// FrameType - type of frame objects
+	typesModule.Set("FrameType", core.NewClass("FrameType", nil))
+
+	// TracebackType - type of traceback objects
+	typesModule.Set("TracebackType", core.NewClass("TracebackType", nil))
+
+	// NoneType - type of None
+	typesModule.Set("NoneType", core.NewClass("NoneType", nil))
+
+	// NotImplementedType - type of NotImplemented
+	typesModule.Set("NotImplementedType", core.NewClass("NotImplementedType", nil))
+
+	// EllipsisType - type of Ellipsis (...)
+	typesModule.Set("EllipsisType", core.NewClass("EllipsisType", nil))
+
 	return typesModule
 }

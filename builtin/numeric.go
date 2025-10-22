@@ -329,9 +329,44 @@ func extremeWithKwargs(funcName string, isMin bool) func([]core.Value, map[strin
 				items = v.Items()
 			case core.TupleValue:
 				items = v
+			case *core.SetValue:
+				// Convert set to slice by iterating
+				iter := v.Iterator()
+				items = make([]core.Value, 0)
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					items = append(items, val)
+				}
+			case *core.FrozenSetValue:
+				// Convert frozenset to slice by iterating
+				iter := v.Iterator()
+				items = make([]core.Value, 0)
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					items = append(items, val)
+				}
 			default:
-				// Not an iterable, treat as single value
-				items = args
+				// Try to use as iterable if it implements the interface
+				if iterable, ok := v.(core.Iterable); ok {
+					iter := iterable.Iterator()
+					items = make([]core.Value, 0)
+					for {
+						val, hasNext := iter.Next()
+						if !hasNext {
+							break
+						}
+						items = append(items, val)
+					}
+				} else {
+					// Not an iterable, treat as single value
+					items = args
+				}
 			}
 
 			if len(items) == 0 {

@@ -242,7 +242,11 @@ func (f *BuiltinFunction) Call(args []Value, ctx *Context) (Value, error) {
 func (f *BuiltinFunction) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
 	// Default behavior: reject keyword arguments
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("builtin function does not support keyword arguments")
+		funcName := "unknown"
+		if f.name != "" {
+			funcName = f.name
+		}
+		return nil, fmt.Errorf("builtin function '%s' does not support keyword arguments", funcName)
 	}
 	return f.fn(args, ctx)
 }

@@ -228,6 +228,23 @@ func Init_FunctoolsModule() *core.DictValue {
 	// Used by lru_cache implementation in functools.py
 	functoolsModule.Set("_lru_cache_wrapper", &lruCacheBuiltin{})
 
+	// total_ordering - Class decorator that fills in missing ordering methods
+	// Takes a class with __eq__ and one ordering method and generates the rest
+	functoolsModule.Set("total_ordering", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("total_ordering", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		// For now, just return the class unchanged
+		// A full implementation would:
+		// 1. Check which comparison methods are defined
+		// 2. Generate the missing ones based on __eq__ and the defined one
+		// For our stub, we'll assume classes already have all methods they need
+		cls := v.Get(0)
+		return cls, nil
+	}))
+
 	return functoolsModule
 }
 
