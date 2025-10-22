@@ -143,6 +143,7 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Break/Continue" "tests/break-continue-test.m28"
     run_test "Repr Function" "tests/repr-test-simple.m28"
     run_test "Bool Protocol" "tests/bool-protocol-test.m28"
+    run_test "CPython Bool Tests" "tests/test_bool.py"
     run_test "Len Protocol" "tests/len-protocol-test.m28"
     run_test "Contains Protocol" "tests/contains-protocol-test.m28"
     run_test "Not In Operator" "tests/not-in-test.m28"
