@@ -252,6 +252,143 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 	return result, nil
 }
 
+// formatStringWithPercent implements Python's % string formatting
+func formatStringWithPercent(formatStr string, values Value) (Value, error) {
+	// Convert single value to tuple for uniform handling
+	var valueTuple []Value
+	if tuple, ok := values.(TupleValue); ok {
+		valueTuple = []Value(tuple)
+	} else {
+		valueTuple = []Value{values}
+	}
+
+	var result strings.Builder
+	valueIdx := 0
+	i := 0
+
+	for i < len(formatStr) {
+		if formatStr[i] != '%' {
+			result.WriteByte(formatStr[i])
+			i++
+			continue
+		}
+
+		// Found % - check next character
+		i++
+		if i >= len(formatStr) {
+			return nil, fmt.Errorf("incomplete format")
+		}
+
+		// %% means literal %
+		if formatStr[i] == '%' {
+			result.WriteByte('%')
+			i++
+			continue
+		}
+
+		// Parse format specifier (simplified version)
+		// Full format: %[flags][width][.precision]type
+		// For now, just handle the type and ignore flags/width/precision
+
+		// Skip optional flags (-, +, 0, space, #)
+		for i < len(formatStr) && (formatStr[i] == '-' || formatStr[i] == '+' ||
+			formatStr[i] == '0' || formatStr[i] == ' ' || formatStr[i] == '#') {
+			i++
+		}
+
+		// Skip optional width
+		for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+			i++
+		}
+
+		// Skip optional .precision
+		if i < len(formatStr) && formatStr[i] == '.' {
+			i++
+			for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+				i++
+			}
+		}
+
+		if i >= len(formatStr) {
+			return nil, fmt.Errorf("incomplete format")
+		}
+
+		// Get format type
+		fmtType := formatStr[i]
+		i++
+
+		// Get the value to format
+		if valueIdx >= len(valueTuple) {
+			return nil, fmt.Errorf("not enough arguments for format string")
+		}
+		value := valueTuple[valueIdx]
+		valueIdx++
+
+		// Format the value based on type
+		var formatted string
+		switch fmtType {
+		case 's': // String
+			if str, ok := value.(StringValue); ok {
+				formatted = string(str)
+			} else {
+				formatted = PrintValueWithoutQuotes(value)
+			}
+		case 'd', 'i': // Integer
+			if num, ok := value.(NumberValue); ok {
+				formatted = fmt.Sprintf("%d", int64(num))
+			} else {
+				return nil, fmt.Errorf("%%d format: a number is required, not %s", value.Type())
+			}
+		case 'f', 'F': // Float
+			if num, ok := value.(NumberValue); ok {
+				formatted = fmt.Sprintf("%f", float64(num))
+			} else {
+				return nil, fmt.Errorf("%%f format: a number is required, not %s", value.Type())
+			}
+		case 'r': // Repr
+			formatted = value.String()
+		case 'c': // Character
+			if num, ok := value.(NumberValue); ok {
+				formatted = string(rune(int(num)))
+			} else if str, ok := value.(StringValue); ok {
+				if len(str) == 1 {
+					formatted = string(str)
+				} else {
+					return nil, fmt.Errorf("%%c requires int or char")
+				}
+			} else {
+				return nil, fmt.Errorf("%%c requires int or char")
+			}
+		case 'x', 'X': // Hex
+			if num, ok := value.(NumberValue); ok {
+				if fmtType == 'x' {
+					formatted = fmt.Sprintf("%x", int64(num))
+				} else {
+					formatted = fmt.Sprintf("%X", int64(num))
+				}
+			} else {
+				return nil, fmt.Errorf("%%%c format: a number is required", fmtType)
+			}
+		case 'o': // Octal
+			if num, ok := value.(NumberValue); ok {
+				formatted = fmt.Sprintf("%o", int64(num))
+			} else {
+				return nil, fmt.Errorf("%%o format: a number is required")
+			}
+		default:
+			return nil, fmt.Errorf("unsupported format character '%c'", fmtType)
+		}
+
+		result.WriteString(formatted)
+	}
+
+	if valueIdx < len(valueTuple) {
+		return nil, fmt.Errorf("not all arguments converted during string formatting")
+	}
+
+	return StringValue(result.String()), nil
+}
+
 // InitStringMethods adds additional string methods to the string type descriptor
 func InitStringMethods() {
 	// Get the string type descriptor
@@ -966,6 +1103,22 @@ func InitStringMethods() {
 
 			padding := w - len(s) - len(sign)
 			return StringValue(sign + strings.Repeat("0", padding) + s), nil
+		},
+	}
+
+	// Add __mod__ for % string formatting
+	td.Methods["__mod__"] = &MethodDescriptor{
+		Name:    "__mod__",
+		Arity:   1,
+		Doc:     "String formatting using % operator",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__mod__() takes exactly 1 argument (%d given)", len(args))
+			}
+
+			formatStr := string(receiver.(StringValue))
+			return formatStringWithPercent(formatStr, args[0])
 		},
 	}
 }
