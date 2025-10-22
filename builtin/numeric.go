@@ -34,6 +34,14 @@ func RegisterNumeric(ctx *core.Context) {
 			return numOps.Absolute()
 		}
 
+		// Handle bool values explicitly (Python: abs(True) = 1, abs(False) = 0)
+		if boolVal, ok := val.(core.BoolValue); ok {
+			if bool(boolVal) {
+				return core.NumberValue(1), nil
+			}
+			return core.NumberValue(0), nil
+		}
+
 		// Fall back to direct number conversion
 		num, err := v.GetNumber(0)
 		if err != nil {

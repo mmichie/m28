@@ -28,6 +28,13 @@ func (n *NumericOps) Add(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
 		return core.NumberValue(n.value + float64(v)), nil
+	case core.BoolValue:
+		// Python: bools behave like ints (True=1, False=0)
+		otherNum := 0.0
+		if bool(v) {
+			otherNum = 1.0
+		}
+		return core.NumberValue(n.value + otherNum), nil
 	case core.ComplexValue:
 		// Number + Complex = Complex
 		return core.ComplexValue(complex(n.value, 0) + complex128(v)), nil
@@ -40,7 +47,7 @@ func (n *NumericOps) Add(other core.Value) (core.Value, error) {
 			return result, nil
 		}
 		return nil, errors.NewTypeError("+", "unsupported operand type(s)",
-			fmt.Sprintf("'float' and '%s'", other.Type()))
+			fmt.Sprintf("'number' and '%s'", other.Type()))
 	}
 }
 
@@ -49,6 +56,13 @@ func (n *NumericOps) Subtract(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
 		return core.NumberValue(n.value - float64(v)), nil
+	case core.BoolValue:
+		// Python: bools behave like ints (True=1, False=0)
+		otherNum := 0.0
+		if bool(v) {
+			otherNum = 1.0
+		}
+		return core.NumberValue(n.value - otherNum), nil
 	default:
 		// Try __rsub__ on other
 		if result, found, err := types.CallRsub(other, core.NumberValue(n.value), nil); found {
@@ -58,7 +72,7 @@ func (n *NumericOps) Subtract(other core.Value) (core.Value, error) {
 			return result, nil
 		}
 		return nil, errors.NewTypeError("-", "unsupported operand type(s)",
-			fmt.Sprintf("'float' and '%s'", other.Type()))
+			fmt.Sprintf("'number' and '%s'", other.Type()))
 	}
 }
 
@@ -67,6 +81,13 @@ func (n *NumericOps) Multiply(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
 		return core.NumberValue(n.value * float64(v)), nil
+	case core.BoolValue:
+		// Python: bools behave like ints (True=1, False=0)
+		otherNum := 0.0
+		if bool(v) {
+			otherNum = 1.0
+		}
+		return core.NumberValue(n.value * otherNum), nil
 	case core.StringValue:
 		// Support string repetition: 3 * "ab" = "ababab"
 		if n.value == float64(int(n.value)) && n.value >= 0 {
@@ -232,6 +253,12 @@ func GetNumericOps(v core.Value) (Numeric, bool) {
 	switch val := v.(type) {
 	case core.NumberValue:
 		return NewNumericOps(val), true
+	case core.BoolValue:
+		// Python: bools behave like ints in arithmetic (True=1, False=0)
+		if bool(val) {
+			return NewNumericOps(core.NumberValue(1)), true
+		}
+		return NewNumericOps(core.NumberValue(0)), true
 	case core.ComplexValue:
 		return NewComplexNumericOps(val), true
 	default:

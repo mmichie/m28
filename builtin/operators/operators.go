@@ -106,6 +106,14 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 				Number(func(rightNum float64) (core.Value, error) {
 					return core.NumberValue(leftNum + rightNum), nil
 				}).
+				Bool(func(rightBool bool) (core.Value, error) {
+					// Python: bools behave like ints (True=1, False=0)
+					rightNum := 0.0
+					if rightBool {
+						rightNum = 1.0
+					}
+					return core.NumberValue(leftNum + rightNum), nil
+				}).
 				Complex(func(rightComplex complex128) (core.Value, error) {
 					// Number + Complex = Complex
 					return core.ComplexValue(complex(leftNum, 0) + rightComplex), nil
@@ -156,6 +164,30 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 				Default(func(r core.Value) (core.Value, error) {
 					return nil, errors.NewTypeError("+",
 						"can only concatenate list (not \""+string(r.Type())+"\") to list", "")
+				}).
+				Execute()
+		}).
+		Bool(func(leftBool bool) (core.Value, error) {
+			// Python: bools behave like ints in arithmetic (True=1, False=0)
+			leftNum := 0.0
+			if leftBool {
+				leftNum = 1.0
+			}
+			return types.Switch(right).
+				Number(func(rightNum float64) (core.Value, error) {
+					return core.NumberValue(leftNum + rightNum), nil
+				}).
+				Bool(func(rightBool bool) (core.Value, error) {
+					rightNum := 0.0
+					if rightBool {
+						rightNum = 1.0
+					}
+					return core.NumberValue(leftNum + rightNum), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("+",
+						"unsupported operand type(s)",
+						"'bool' and '"+string(r.Type())+"'")
 				}).
 				Execute()
 		}).
@@ -212,6 +244,13 @@ func negateValue(value core.Value, ctx *core.Context) (core.Value, error) {
 	return types.Switch(value).
 		Number(func(n float64) (core.Value, error) {
 			return core.NumberValue(-n), nil
+		}).
+		Bool(func(b bool) (core.Value, error) {
+			// Python: -True returns -1, -False returns 0 (as int, not bool)
+			if b {
+				return core.NumberValue(-1), nil
+			}
+			return core.NumberValue(0), nil
 		}).
 		Default(func(v core.Value) (core.Value, error) {
 			return nil, errors.NewTypeError("-",
@@ -1242,10 +1281,17 @@ func positiveValue(value core.Value, ctx *core.Context) (core.Value, error) {
 		return result, err
 	}
 
-	// For numeric types, return the value as-is
+	// For numeric types and bools, convert to number
 	return types.Switch(value).
 		Number(func(n float64) (core.Value, error) {
 			return core.NumberValue(n), nil
+		}).
+		Bool(func(b bool) (core.Value, error) {
+			// Python: +True returns 1, +False returns 0 (as int, not bool)
+			if b {
+				return core.NumberValue(1), nil
+			}
+			return core.NumberValue(0), nil
 		}).
 		Default(func(v core.Value) (core.Value, error) {
 			return nil, errors.NewTypeError("+",
