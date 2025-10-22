@@ -366,7 +366,7 @@ func listMethodRemove(receiver Value, args []Value, ctx *Context) (Value, error)
 func listMethodPop(receiver Value, args []Value, ctx *Context) (Value, error) {
 	list := receiver.(*ListValue)
 	if list.Len() == 0 {
-		return nil, fmt.Errorf("pop from empty list")
+		return nil, &IndexError{Index: -1, Length: 0}
 	}
 
 	idx := list.Len() - 1
