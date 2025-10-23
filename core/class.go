@@ -403,16 +403,101 @@ func (i *Instance) String() string {
 }
 
 // GetAttr implements Object interface for instances
+// Implements Python's descriptor protocol lookup order:
+// 1. Data descriptors from class (has __set__ or __delete__)
+// 2. Instance __dict__
+// 3. Non-data descriptors from class (has __get__ only)
+// 4. Class attributes
 func (i *Instance) GetAttr(name string) (Value, bool) {
-	// First check instance attributes
+	// Check special attributes first
+	if name == "__class__" {
+		return i.Class, true
+	}
+
+	// Step 1: Check for data descriptor in class
+	// A data descriptor has __set__ or __delete__ methods
+	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
+		// Check if it's a data descriptor (has __set__ or __delete__)
+		hasSet := false
+		hasDelete := false
+		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+			if _, exists := obj.GetAttr("__set__"); exists {
+				hasSet = true
+			}
+			if _, exists := obj.GetAttr("__delete__"); exists {
+				hasDelete = true
+			}
+		}
+
+		// If it's a data descriptor, invoke __get__
+		if hasSet || hasDelete {
+			if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+				if getMethod, exists := obj.GetAttr("__get__"); exists {
+					if callable, ok := getMethod.(Callable); ok {
+						// Call descriptor.__get__(instance, type)
+						result, err := callable.Call([]Value{i, i.Class}, nil)
+						if err == nil {
+							return result, true
+						}
+					}
+				}
+			}
+			// If __get__ doesn't exist or fails, return the descriptor itself
+			return classAttr, true
+		}
+	} else if classAttr, ok := i.Class.GetClassAttr(name); ok {
+		// Check class attributes for data descriptors too
+		hasSet := false
+		hasDelete := false
+		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+			if _, exists := obj.GetAttr("__set__"); exists {
+				hasSet = true
+			}
+			if _, exists := obj.GetAttr("__delete__"); exists {
+				hasDelete = true
+			}
+		}
+
+		// If it's a data descriptor, invoke __get__
+		if hasSet || hasDelete {
+			if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+				if getMethod, exists := obj.GetAttr("__get__"); exists {
+					if callable, ok := getMethod.(Callable); ok {
+						// Call descriptor.__get__(instance, type)
+						result, err := callable.Call([]Value{i, i.Class}, nil)
+						if err == nil {
+							return result, true
+						}
+					}
+				}
+			}
+			// If __get__ doesn't exist or fails, return the descriptor itself
+			return classAttr, true
+		}
+	}
+
+	// Step 2: Check instance __dict__
 	if attr, ok := i.Attributes[name]; ok {
 		return attr, true
 	}
 
-	// Then check class methods
-	if method, defClass, ok := i.Class.GetMethodWithClass(name); ok {
-		// Bind method to instance if it's callable
-		if callable, ok := method.(interface {
+	// Step 3: Check for non-data descriptor in class (has __get__ but not __set__ or __delete__)
+	if classAttr, defClass, ok := i.Class.GetMethodWithClass(name); ok {
+		// Check if it has __get__ (making it a non-data descriptor)
+		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+			if getMethod, exists := obj.GetAttr("__get__"); exists {
+				if callable, ok := getMethod.(Callable); ok {
+					// Call descriptor.__get__(instance, type)
+					result, err := callable.Call([]Value{i, i.Class}, nil)
+					if err == nil {
+						return result, true
+					}
+				}
+			}
+		}
+
+		// Not a descriptor, check if it's a regular method that needs binding
+		if callable, ok := classAttr.(interface {
 			Call([]Value, *Context) (Value, error)
 		}); ok {
 			// Create bound method
@@ -423,24 +508,59 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 			}
 			return boundMethod, true
 		}
-		return method, true
+		return classAttr, true
 	}
 
-	// Then check class attributes
+	// Step 4: Check class attributes (non-descriptors)
 	if attr, ok := i.Class.GetClassAttr(name); ok {
+		// Check if it has __get__
+		if obj, ok := attr.(interface{ GetAttr(string) (Value, bool) }); ok {
+			if getMethod, exists := obj.GetAttr("__get__"); exists {
+				if callable, ok := getMethod.(Callable); ok {
+					// Call descriptor.__get__(instance, type)
+					result, err := callable.Call([]Value{i, i.Class}, nil)
+					if err == nil {
+						return result, true
+					}
+				}
+			}
+		}
 		return attr, true
-	}
-
-	// Check special attributes
-	if name == "__class__" {
-		return i.Class, true
 	}
 
 	return nil, false
 }
 
 // SetAttr implements Object interface for instances
+// Implements Python's descriptor protocol for setting:
+// 1. Check for data descriptor with __set__ in class
+// 2. Set in instance __dict__
 func (i *Instance) SetAttr(name string, value Value) error {
+	// Check for data descriptor in class with __set__
+	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
+		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+			if setMethod, exists := obj.GetAttr("__set__"); exists {
+				if callable, ok := setMethod.(Callable); ok {
+					// Call descriptor.__set__(instance, value)
+					_, err := callable.Call([]Value{i, value}, nil)
+					return err
+				}
+			}
+		}
+	} else if classAttr, ok := i.Class.GetClassAttr(name); ok {
+		// Check class attributes for descriptors with __set__
+		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+			if setMethod, exists := obj.GetAttr("__set__"); exists {
+				if callable, ok := setMethod.(Callable); ok {
+					// Call descriptor.__set__(instance, value)
+					_, err := callable.Call([]Value{i, value}, nil)
+					return err
+				}
+			}
+		}
+	}
+
+	// No descriptor with __set__, set in instance __dict__
 	i.Attributes[name] = value
 	return nil
 }

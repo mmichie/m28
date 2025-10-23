@@ -254,6 +254,39 @@ func CallCall(obj core.Value, args []core.Value, ctx *core.Context) (core.Value,
 	return CallDunder(obj, "__call__", args, ctx)
 }
 
+// CallGet calls __get__ on a descriptor (descriptor protocol)
+// descriptor.__get__(instance, owner_type)
+func CallGet(descriptor, instance, ownerType core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(descriptor, "__get__", []core.Value{instance, ownerType}, ctx)
+}
+
+// CallSet calls __set__ on a descriptor (descriptor protocol)
+// descriptor.__set__(instance, value)
+func CallSet(descriptor, instance, value core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(descriptor, "__set__", []core.Value{instance, value}, ctx)
+}
+
+// CallDelete calls __delete__ on a descriptor (descriptor protocol)
+// descriptor.__delete__(instance)
+func CallDelete(descriptor, instance core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(descriptor, "__delete__", []core.Value{instance}, ctx)
+}
+
+// HasSet checks if a descriptor has __set__ method (data descriptor check)
+func HasSet(obj core.Value) bool {
+	return HasDunder(obj, "__set__")
+}
+
+// HasDelete checks if a descriptor has __delete__ method (data descriptor check)
+func HasDelete(obj core.Value) bool {
+	return HasDunder(obj, "__delete__")
+}
+
+// HasGet checks if a descriptor has __get__ method
+func HasGet(obj core.Value) bool {
+	return HasDunder(obj, "__get__")
+}
+
 // CallEq calls __eq__ on an object (self == other)
 func CallEq(self, other core.Value, ctx *core.Context) (bool, bool, error) {
 	result, found, err := CallDunder(self, "__eq__", []core.Value{other}, ctx)

@@ -131,10 +131,20 @@
     - tests/test-augmented-assignment.m28 (comprehensive augmented assignment tests)
   - Completed: 2025-01-23
 
-- [ ] **Descriptors protocol** (core/protocols/descriptors.go)
-  - No `__get__`, `__set__`, `__delete__` protocol
-  - Prevents proper `@property`, `@classmethod`, `@staticmethod`
-  - Impact: HIGH - fundamental OOP feature
+- [x] **Descriptors protocol** (core/class.go, common/types/dunder.go) ✅ COMPLETE
+  - Implemented `__get__`, `__set__`, `__delete__` protocol
+  - Enables proper `@property`, `@classmethod`, `@staticmethod`
+  - Python-compliant descriptor lookup order:
+    1. Data descriptors from class (has `__set__` or `__delete__`)
+    2. Instance `__dict__`
+    3. Non-data descriptors (has `__get__` only)
+    4. Class attributes
+  - Added CallGet(), CallSet(), CallDelete() helpers to dunder.go
+  - Modified Instance.GetAttr() to invoke `__get__` with proper data/non-data distinction
+  - Modified Instance.SetAttr() to invoke `__set__` before instance dict
+  - property, staticmethod, classmethod decorators now work correctly
+  - Custom descriptors fully supported
+  - Completed: 2025-01-23
 
 - [ ] **Pattern matching (`match`/`case`)** (eval/pattern_forms.go)
   - Tokens exist (TOKEN_MATCH, TOKEN_CASE) but no implementation
@@ -768,10 +778,10 @@ Numeric Extended: `__round__`, `__divmod__`, `__rdivmod__`
 - [ ] `__missing__` - For dict subclasses when key not found
 - [ ] `__length_hint__` - Length hint for optimization
 
-**Descriptors:**
-- [ ] `__get__` - Descriptor getter
-- [ ] `__set__` - Descriptor setter
-- [ ] `__delete__` - Descriptor deleter
+**Descriptors:** ✅
+- [x] `__get__` - Descriptor getter (core/class.go Instance.GetAttr)
+- [x] `__set__` - Descriptor setter (core/class.go Instance.SetAttr)
+- [x] `__delete__` - Descriptor deleter (helpers in dunder.go, not yet used in DelAttr)
 - [ ] `__set_name__` - Descriptor name binding
 
 **Copy Protocol:**
