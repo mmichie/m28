@@ -178,7 +178,7 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 		return val, nil
 	}
 
-	// Also check ModuleDict if it exists
+	// Also check ModuleDict if it exists on current context
 	// This allows globals().update({...}) to work - names added to the module dict
 	// via .update() will be accessible even if they weren't added via Define()
 	if c.ModuleDict != nil {
@@ -192,6 +192,16 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 	// Check outer scopes
 	if c.Outer != nil {
 		return c.Outer.lookupWithDepth(name, depth+1)
+	}
+
+	// If we reached the end of the scope chain and have a Global context,
+	// check its ModuleDict as a last resort. This allows functions to access
+	// module-level variables that were defined after the function was created.
+	if c.Global != nil && c.Global.ModuleDict != nil && c.Global != c {
+		key := ValueToKey(StringValue(name))
+		if val, ok := c.Global.ModuleDict.Get(key); ok {
+			return val, nil
+		}
 	}
 
 	return nil, &NameError{Name: name}
