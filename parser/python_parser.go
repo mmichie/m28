@@ -3228,11 +3228,6 @@ func (p *PythonParser) parseMatchStatement() ast.ASTNode {
 		p.advance() // consume 'case'
 
 		// Parse pattern
-		// For now, simplified pattern parsing:
-		// - Identifier: variable or class name
-		// - Literal: number, string, etc.
-		// - Call pattern: ClassName(args)
-		// - Wildcard: _
 		pattern := p.parsePattern()
 
 		// Check for optional guard (if condition)
@@ -3242,10 +3237,7 @@ func (p *PythonParser) parseMatchStatement() ast.ASTNode {
 			guard = p.parseExpression()
 		}
 
-		// Expect colon
-		p.expect(TOKEN_COLON)
-
-		// Parse case body
+		// Parse case body (parseBlock expects and consumes the colon itself)
 		body := p.parseBlock()
 
 		cases = append(cases, ast.CaseClause{
