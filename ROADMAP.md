@@ -94,11 +94,14 @@
   - Comprehensive test coverage (tests/test-global-nonlocal.m28)
   - Completed: 2025-01-23
 
-- [ ] **Walrus operator (`:=`) semantics** (parser/infix.go, eval/evaluator.go)
-  - TOKEN_COLONEQUAL exists but no implementation
+- [x] **Walrus operator (`:=`) semantics** (parser/tokenizer.go, parser/parser.go, eval/util.go) ✅ COMPLETE
+  - Tokenizer recognizes := as TOKEN_COLONEQUAL
+  - Parser converts TOKEN_COLONEQUAL to symbol
+  - WalrusForm evaluates assignment and returns value
   - Assignment expressions: `if (n := len(items)) > 5:`
-  - Works in comprehensions, if statements, while loops
-  - Impact: HIGH - Python 3.8+ feature, widely used
+  - Works in comprehensions, if statements, while loops, with global/nonlocal
+  - Comprehensive test coverage (tests/test-walrus-operator.m28)
+  - Completed: 2025-01-23
 
 - [ ] **`del` statement** (eval/special_forms.go)
   - TOKEN_DEL exists but no handler

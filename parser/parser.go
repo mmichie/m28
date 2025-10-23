@@ -452,6 +452,11 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 		p.advanceToken()
 		return core.SymbolValue("."), nil
 
+	// Walrus operator := as a symbol
+	case TOKEN_COLONEQUAL:
+		p.advanceToken()
+		return core.SymbolValue(":="), nil
+
 	default:
 		// Special case: unary minus followed by a number is a negative literal
 		// BUT NOT when - is the first element of an S-expression (after '(')

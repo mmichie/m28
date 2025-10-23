@@ -136,6 +136,11 @@ func (t *Tokenizer) scanToken() Token {
 	case '.':
 		return t.makeToken(TOKEN_DOT, start, startLine, startCol)
 	case ':':
+		// Check for := (walrus operator)
+		if !t.isAtEnd() && t.peek() == '=' {
+			t.advance()
+			return t.makeToken(TOKEN_COLONEQUAL, start, startLine, startCol)
+		}
 		return t.makeToken(TOKEN_COLON, start, startLine, startCol)
 	case ';':
 		return t.makeToken(TOKEN_SEMICOLON, start, startLine, startCol)

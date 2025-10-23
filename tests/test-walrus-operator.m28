@@ -1,0 +1,115 @@
+# Test walrus operator (:=)
+# Python 3.8+ assignment expressions
+# The walrus operator assigns a value and returns it in a single expression
+
+# Test 1: Basic walrus operator assignment
+(:= x 10)
+(assert (== x 10) "walrus operator should assign value")
+
+# Test 2: Walrus in if condition
+(if (:= y 5)
+  (assert (== y 5) "walrus should assign in if condition")
+  (assert False "should not reach here"))
+
+# Test 3: Walrus with comparison
+(if (> (:= z 7) 5)
+  (assert (== z 7) "walrus should assign before comparison")
+  (assert False "should not reach here"))
+
+# Test 4: Walrus in while loop
+(= count 0)
+(= total 0)
+(while (< (:= count (+ count 1)) 5)
+  (= total (+ total count)))
+(assert (== count 5) "walrus should update count in while condition")
+(assert (== total 10) "while loop with walrus should compute correct sum")
+
+# Test 5: Walrus in list comprehension
+(= squares [(* n n) for n in range(5) if (> (:= doubled (* n 2)) 4)])
+(assert (== (len squares) 2) "walrus in comprehension should work")
+(assert (== (get-item squares 0) 9) "walrus should not affect comprehension result")
+(assert (== (get-item squares 1) 16) "walrus should not affect comprehension result")
+
+# Test 6: Walrus with function call
+(def get_value () 42)
+(if (:= result (get_value))
+  (assert (== result 42) "walrus should work with function calls")
+  (assert False "should not reach here"))
+
+# Test 7: Walrus returns the assigned value
+(assert (== (:= a 100) 100) "walrus should return the assigned value")
+(assert (== a 100) "variable should be assigned")
+
+# Test 8: Walrus with list
+(if (:= items [1, 2, 3])
+  (assert (== (len items) 3) "walrus should work with lists")
+  (assert False "should not reach here"))
+
+# Test 9: Walrus with dict
+(if (:= data {"key": "value"})
+  (assert (== (get-item data "key") "value") "walrus should work with dicts")
+  (assert False "should not reach here"))
+
+# Test 10: Walrus in nested if
+(if (> (:= outer 10) 5)
+  (if (< (:= inner 3) 5)
+    (assert (and (== outer 10) (== inner 3)) "nested walrus should work")
+    (assert False "should not reach here"))
+  (assert False "should not reach here"))
+
+# Test 11: Walrus with string
+(if (:= text "hello")
+  (assert (== (len text) 5) "walrus should work with strings")
+  (assert False "should not reach here"))
+
+# Test 12: Walrus in and/or expressions
+(if (and (:= p 1) (:= q 2))
+  (assert (and (== p 1) (== q 2)) "walrus in and should work")
+  (assert False "should not reach here"))
+
+# Test 13: Walrus with arithmetic
+(assert (== (+ (:= val 5) 3) 8) "walrus should work in arithmetic expressions")
+(assert (== val 5) "variable should be assigned from walrus in arithmetic")
+
+# Test 14: Walrus with global
+(global walrus_global)
+(def test_walrus_with_global ()
+  (global walrus_global)
+  (if (:= walrus_global 99)
+    walrus_global
+    0))
+
+(assert (== (test_walrus_with_global) 99) "walrus should work with global")
+(assert (== walrus_global 99) "walrus should assign to global variable")
+
+# Test 15: Walrus with nonlocal
+(def outer_walrus ()
+  (= walrus_local 5)
+
+  (def inner_walrus ()
+    (nonlocal walrus_local)
+    (if (:= walrus_local 25)
+      walrus_local
+      0))
+
+  (inner_walrus)
+  walrus_local)
+
+(assert (== (outer_walrus) 25) "walrus should work with nonlocal")
+
+# Test 16: Multiple walrus in same expression
+(if (and (> (:= m 10) 5) (< (:= n 3) 5))
+  (assert (and (== m 10) (== n 3)) "multiple walrus in same expression should work")
+  (assert False "should not reach here"))
+
+# Test 17: Walrus with boolean
+(if (:= flag True)
+  (assert (== flag True) "walrus should work with booleans")
+  (assert False "should not reach here"))
+
+# Test 18: Walrus with None
+(if (is (:= nothing None) None)
+  (assert (is nothing None) "walrus should work with None")
+  (assert False "should not reach here"))
+
+print("All walrus operator tests passed!")
