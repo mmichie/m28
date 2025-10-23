@@ -15,32 +15,39 @@ func InitDictMethods() {
 	// Add update method
 	dictType.Methods["update"] = &MethodDescriptor{
 		Name:    "update",
-		Arity:   1,
-		Doc:     "Update dict with key/value pairs from another dict, returning new dict",
+		Arity:   -1, // 0 or 1 args
+		Doc:     "Update dict with key/value pairs from another dict (mutates in place, returns None)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
+
+			// If no args, just return None
+			if len(args) == 0 {
+				return None, nil
+			}
+
+			if len(args) > 1 {
+				return nil, fmt.Errorf("update() takes at most 1 argument (%d given)", len(args))
+			}
+
 			other, ok := args[0].(*DictValue)
 			if !ok {
 				return nil, fmt.Errorf("update expects a dict, got %s", args[0].Type())
 			}
 
-			// Create new dict with updates
-			newDict := NewDict()
-
-			// Copy all from original
-			for _, k := range dict.Keys() {
-				v, _ := dict.Get(k)
-				newDict.Set(k, v)
-			}
-
-			// Update/add from other
+			// Update dict in place by copying all entries from other
 			for _, k := range other.Keys() {
 				v, _ := other.Get(k)
-				newDict.Set(k, v)
+				// Also copy the original key value
+				if origKey, exists := other.keys[k]; exists {
+					dict.SetWithKey(k, origKey, v)
+				} else {
+					dict.Set(k, v)
+				}
 			}
 
-			return newDict, nil
+			// Return None (Python's dict.update() returns None)
+			return None, nil
 		},
 	}
 

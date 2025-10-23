@@ -104,9 +104,28 @@ func EqualValues(a, b Value) bool {
 
 // IsHashable determines if a value can be used as a dictionary key
 func IsHashable(v Value) bool {
-	switch v.(type) {
+	switch val := v.(type) {
 	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue:
 		return true
+	case *Instance:
+		// Instances of int, str, bool subclasses are hashable
+		// Check if the instance's class inherits from a hashable type
+		if val.Class != nil {
+			// Check if it's a subclass of int, str, or bool
+			// For now, we'll check the class name or inheritance
+			// TODO: Implement proper inheritance checking
+			className := val.Class.Name
+			if className == "int" || className == "str" || className == "bool" {
+				return true
+			}
+			// Check if class has int, str, or bool as a parent
+			for _, parent := range val.Class.Parents {
+				if parent.Name == "int" || parent.Name == "str" || parent.Name == "bool" {
+					return true
+				}
+			}
+		}
+		return false
 	default:
 		return false
 	}
@@ -133,6 +152,22 @@ func ValueToKey(v Value) string {
 	case *FrozenSetValue:
 		// For frozensets, use the hash value
 		return fmt.Sprintf("fs:%d", val.Hash())
+	case *Instance:
+		// For instances of hashable types (like int subclasses),
+		// use the underlying value if available
+		if val.Class != nil {
+			// Check if it's an int subclass
+			for _, parent := range val.Class.Parents {
+				if parent.Name == "int" {
+					// Get the __value__ attribute which stores the actual int value
+					if numVal, ok := val.Attributes["__value__"].(NumberValue); ok {
+						return fmt.Sprintf("n:%g", float64(numVal))
+					}
+				}
+			}
+		}
+		// For other instances, use pointer address
+		return fmt.Sprintf("p:%p", v)
 	default:
 		// For non-hashable types, use pointer address
 		return fmt.Sprintf("p:%p", v)

@@ -168,6 +168,17 @@ func (c *Context) Lookup(name string) (Value, error) {
 		return val, nil
 	}
 
+	// Also check ModuleDict if it exists
+	// This allows globals().update({...}) to work - names added to the module dict
+	// via .update() will be accessible even if they weren't added via Define()
+	if c.ModuleDict != nil {
+		// Convert name to the internal key representation used by dict
+		key := ValueToKey(StringValue(name))
+		if val, ok := c.ModuleDict.Get(key); ok {
+			return val, nil
+		}
+	}
+
 	// Check outer scopes
 	if c.Outer != nil {
 		return c.Outer.Lookup(name)

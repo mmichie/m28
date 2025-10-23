@@ -163,9 +163,6 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
-		// Convert global context variables to dict
-		dict := core.NewDict()
-
 		// In Python, globals() returns the current module's top-level namespace
 		// ctx.Global points to the global scope for the current execution context
 		// For modules, ctx.Global == the module context itself
@@ -175,11 +172,25 @@ func RegisterMisc(ctx *core.Context) {
 			targetCtx = ctx
 		}
 
-		// Add all variables from the target context
+		// If the target context has a ModuleDict, use it as the base
+		// This allows globals().update() to actually modify the module namespace
+		// which is critical for patterns like: globals().update({...})
+		var dict *core.DictValue
+		if targetCtx.ModuleDict != nil {
+			dict = targetCtx.ModuleDict
+		} else {
+			// Create a new dict and save it to the context
+			// so subsequent calls to globals() return the same dict
+			dict = core.NewDict()
+			targetCtx.ModuleDict = dict
+		}
+
+		// Also add ALL variables from ctx.Vars to ensure globals() is complete
+		// This includes private and dunder names that aren't in ModuleDict
 		for name, value := range targetCtx.Vars {
 			// Use SetWithKey to properly track original keys for iteration
 			keyVal := core.StringValue(name)
-			dict.SetWithKey(name, keyVal, value)
+			dict.SetWithKey(core.ValueToKey(keyVal), keyVal, value)
 		}
 
 		return dict, nil
