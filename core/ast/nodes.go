@@ -96,10 +96,14 @@ func (s *SExpr) String() string {
 
 // ToIR implements ASTNode.ToIR
 func (s *SExpr) ToIR() core.Value {
+	core.DebugLog("[ToIR] SExpr.ToIR: %d elements\n", len(s.Elements))
 	vals := make([]core.Value, len(s.Elements))
 	for i, elem := range s.Elements {
+		core.DebugLog("[ToIR] Converting element %d: %T\n", i, elem)
 		vals[i] = elem.ToIR()
+		core.DebugLog("[ToIR] Element %d converted to: %T\n", i, vals[i])
 	}
+	core.DebugLog("[ToIR] SExpr.ToIR complete, creating list\n")
 	return core.NewList(vals...)
 }
 

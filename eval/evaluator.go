@@ -34,14 +34,19 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 			return core.EmptyList, nil
 		}
 
+		core.DebugLog("[EVAL-LIST] Evaluating list with %d elements, first: %T\n", v.Len(), v.Items()[0])
+
 		// Check if it's a decorator form (@decorator ...)
 		if isDecoratorForm(v) {
+			core.DebugLog("[EVAL-LIST] Is decorator form\n")
 			return evalDecoratorForm(v, ctx)
 		}
 
 		// Check if it's a special form first (if, def, etc.)
 		if sym, ok := v.Items()[0].(core.SymbolValue); ok {
+			core.DebugLog("[EVAL-LIST] First element is symbol: %s\n", string(sym))
 			if handler, ok := specialForms[string(sym)]; ok {
+				core.DebugLog("[EVAL-LIST] Is special form: %s\n", string(sym))
 				return handler(core.NewList(v.Items()[1:]...), ctx)
 			}
 		}
@@ -49,11 +54,13 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		// Check if it's a macro call (function with __macro__ attribute)
 		if sym, ok := v.Items()[0].(core.SymbolValue); ok {
 			if isMacroCall(sym, ctx) {
+				core.DebugLog("[EVAL-LIST] Is macro call: %s\n", string(sym))
 				return evalMacroCall(v, ctx)
 			}
 		}
 
 		// Otherwise it's a function call
+		core.DebugLog("[EVAL-LIST] Treating as function call\n")
 		return evalFunctionCallWithKeywords(v, ctx)
 
 	default:

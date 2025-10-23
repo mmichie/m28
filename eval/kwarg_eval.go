@@ -177,20 +177,25 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 	if sym, ok := expr.Items()[0].(core.SymbolValue); ok {
 		symbolName = string(sym)
 	}
+	core.DebugLog("[KWCALL] evalFunctionCallWithKeywords: %s, %d args\n", symbolName, expr.Len()-1)
 
 	// Evaluate the function
+	core.DebugLog("[KWCALL] Evaluating function expression\n")
 	fn, err := Eval(expr.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
+	core.DebugLog("[KWCALL] Function evaluated: %T\n", fn)
 
 	// Parse arguments including unpacking
+	core.DebugLog("[KWCALL] Parsing arguments with unpacking\n")
 	argsList := core.NewList(expr.Items()[1:]...)
 
 	argInfo, err := parseArgumentsWithUnpacking(argsList)
 	if err != nil {
 		return nil, err
 	}
+	core.DebugLog("[KWCALL] Arguments parsed, processing positional args\n")
 
 	// Process all positional elements in order
 	positionalArgs := make([]core.Value, 0)
