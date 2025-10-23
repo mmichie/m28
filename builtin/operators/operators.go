@@ -169,6 +169,23 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 				}).
 				Execute()
 		}).
+		Type(core.BytesType, func(leftVal core.Value) (core.Value, error) {
+			// Bytes + Bytes (concatenation)
+			leftBytes := leftVal.(core.BytesValue)
+			return types.Switch(right).
+				Type(core.BytesType, func(rightVal core.Value) (core.Value, error) {
+					rightBytes := rightVal.(core.BytesValue)
+					result := make([]byte, 0, len(leftBytes)+len(rightBytes))
+					result = append(result, leftBytes...)
+					result = append(result, rightBytes...)
+					return core.BytesValue(result), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("+",
+						"can only concatenate bytes (not \""+string(r.Type())+"\") to bytes", "")
+				}).
+				Execute()
+		}).
 		Bool(func(leftBool bool) (core.Value, error) {
 			// Python: bools behave like ints in arithmetic (True=1, False=0)
 			leftNum := 0.0
@@ -381,6 +398,19 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 				return nil, errors.NewTypeError("*",
 					"can't multiply sequence by non-int of type 'float'", "")
 			}
+			// Number * Bytes (repetition)
+			if rightBytes, ok := right.(core.BytesValue); ok {
+				if leftNum == float64(int(leftNum)) && leftNum >= 0 {
+					count := int(leftNum)
+					result := make([]byte, 0, len(rightBytes)*count)
+					for i := 0; i < count; i++ {
+						result = append(result, rightBytes...)
+					}
+					return core.BytesValue(result), nil
+				}
+				return nil, errors.NewTypeError("*",
+					"can't multiply sequence by non-int of type 'float'", "")
+			}
 			return nil, errors.NewTypeError("*",
 				"unsupported operand type(s)",
 				"'float' and '"+string(right.Type())+"'")
@@ -418,6 +448,24 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 			}
 			return nil, errors.NewTypeError("*",
 				"can't multiply sequence of type 'list' by non-int of type '"+string(right.Type())+"'", "")
+		}).
+		Type(core.BytesType, func(leftVal core.Value) (core.Value, error) {
+			// Bytes * Number (repetition)
+			leftBytes := leftVal.(core.BytesValue)
+			if rightNum, ok := types.AsNumber(right); ok {
+				if rightNum == float64(int(rightNum)) && rightNum >= 0 {
+					count := int(rightNum)
+					result := make([]byte, 0, len(leftBytes)*count)
+					for i := 0; i < count; i++ {
+						result = append(result, leftBytes...)
+					}
+					return core.BytesValue(result), nil
+				}
+				return nil, errors.NewTypeError("*",
+					"can't multiply sequence by non-int of type 'float'", "")
+			}
+			return nil, errors.NewTypeError("*",
+				"can't multiply sequence of type 'bytes' by non-int of type '"+string(right.Type())+"'", "")
 		}).
 		Default(func(l core.Value) (core.Value, error) {
 			return nil, errors.NewTypeError("*",
