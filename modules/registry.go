@@ -29,6 +29,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_signal":      Init_SignalModule,     // C extension module for signal.py
 	"_string":      Init_StringModule,     // C extension module for string.py
 	"_codecs":      InitCodecsModule,      // C extension module for codecs.py
+	"enum":         InitEnumModule,        // Stub for enum.py (provides basic enum support)
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
