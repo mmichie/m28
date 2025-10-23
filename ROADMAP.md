@@ -79,6 +79,58 @@
 - [ ] `eval()` and `exec()`
 - [x] Walrus operator `:=` (assignment expressions)
 
+#### Python Language Reference Compliance (P0 - Critical Gaps) 🔴 HIGH PRIORITY
+
+**Goal:** Achieve full compliance with Python Language Reference for core features
+
+**Status:** ~60-70% compliant, critical gaps identified from systematic review
+
+**Priority 0 - Must Fix:**
+- [x] **`global` and `nonlocal` statements** (eval/scope_forms.go) ✅ COMPLETE
+  - Fully implemented with GlobalForm and NonlocalForm
+  - assignVariable() properly handles global and nonlocal declarations
+  - Critical for proper scope resolution (LEGB)
+  - Enables modification of outer scope variables
+  - Comprehensive test coverage (tests/test-global-nonlocal.m28)
+  - Completed: 2025-01-23
+
+- [ ] **Walrus operator (`:=`) semantics** (parser/infix.go, eval/evaluator.go)
+  - TOKEN_COLONEQUAL exists but no implementation
+  - Assignment expressions: `if (n := len(items)) > 5:`
+  - Works in comprehensions, if statements, while loops
+  - Impact: HIGH - Python 3.8+ feature, widely used
+
+- [ ] **`del` statement** (eval/special_forms.go)
+  - TOKEN_DEL exists but no handler
+  - Must support: `del var`, `del obj.attr`, `del list[i]`, `del dict[key]`
+  - Impact: MEDIUM - can't delete variables, attributes, items
+
+- [ ] **Complete dunder method support** (core/protocols/, builtin/operators/)
+  - Missing: `__add__`, `__sub__`, `__mul__`, `__truediv__` for user classes
+  - Missing reflected operations: `__radd__`, `__rsub__`, etc.
+  - Missing in-place operations: `__iadd__`, `__isub__`, etc.
+  - Missing rich comparison: `__lt__`, `__le__`, `__gt__`, `__ge__`
+  - Impact: HIGH - can't create custom numeric types
+
+- [ ] **Descriptors protocol** (core/protocols/descriptors.go)
+  - No `__get__`, `__set__`, `__delete__` protocol
+  - Prevents proper `@property`, `@classmethod`, `@staticmethod`
+  - Impact: HIGH - fundamental OOP feature
+
+- [ ] **Pattern matching (`match`/`case`)** (eval/pattern_forms.go)
+  - Tokens exist (TOKEN_MATCH, TOKEN_CASE) but no implementation
+  - Python 3.10+ structural pattern matching
+  - Impact: HIGH - major missing language feature
+
+**Priority 1 - Should Fix:**
+- [ ] Annotated assignments: `x: int = 5`
+- [ ] Exception chaining: `raise ... from ...`
+- [ ] Starred expressions everywhere: `x, *rest = values`
+- [ ] Short-circuit evaluation verification
+- [ ] `yield from` for generator delegation
+
+**See:** Detailed analysis in compliance report (generated 2025-01-23)
+
 #### F-String Enhancements ✅
 - [x] Format specifications: `f"{pi:.2f}"`
 - [x] Alignment: `f"{text:>10}"`

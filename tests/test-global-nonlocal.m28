@@ -1,0 +1,130 @@
+# Test global and nonlocal statements
+# Tests Python's scope resolution (LEGB: Local, Enclosing, Global, Builtin)
+
+# Test 1: Global variable modification
+(= global_x 10)
+
+(def test_global ()
+  (global global_x)
+  (= global_x 20))
+
+(test_global)
+(assert (== global_x 20) "global statement should modify global variable")
+
+# Test 2: Multiple global variables
+(= global_a 1)
+(= global_b 2)
+
+(def test_multiple_global ()
+  (global global_a global_b)
+  (= global_a 100)
+  (= global_b 200))
+
+(test_multiple_global)
+(assert (== global_a 100) "global statement should work with multiple variables (a)")
+(assert (== global_b 200) "global statement should work with multiple variables (b)")
+
+# Test 3: Nonlocal variable modification
+(def outer_func ()
+  (= x 5)
+
+  (def inner_func ()
+    (nonlocal x)
+    (= x 15))
+
+  (inner_func)
+  x)
+
+(assert (== (outer_func) 15) "nonlocal statement should modify enclosing scope variable")
+
+# Test 4: Nested nonlocal
+(def outer_nested ()
+  (= y 1)
+
+  (def middle ()
+    (def inner ()
+      (nonlocal y)
+      (= y 10))
+    (inner)
+    y)
+
+  (middle))
+
+(assert (== (outer_nested) 10) "nonlocal should work through multiple nesting levels")
+
+# Test 5: Global vs local without declaration
+(= global_z 100)
+
+(def test_local_shadow ()
+  (= global_z 200)  # Creates local variable, doesn't affect global
+  global_z)
+
+(assert (== (test_local_shadow) 200) "local assignment should create local variable")
+(assert (== global_z 100) "global variable should not be affected without global declaration")
+
+# Test 6: Nonlocal with multiple variables
+(def outer_multiple ()
+  (= a 1)
+  (= b 2)
+  (= c 3)
+
+  (def inner ()
+    (nonlocal a b)
+    (= a 10)
+    (= b 20)
+    (= c 30))  # c is local, not nonlocal
+
+  (inner)
+  (list a b c))
+
+(= result (outer_multiple))
+(assert (== (get-item result 0) 10) "nonlocal should work with first variable")
+(assert (== (get-item result 1) 20) "nonlocal should work with second variable")
+(assert (== (get-item result 2) 3) "local variable should not be affected")
+
+# Test 7: Global and nonlocal together
+(= global_mixed 5)
+
+(def outer_mixed ()
+  (= local_mixed 10)
+
+  (def inner_mixed ()
+    (global global_mixed)
+    (nonlocal local_mixed)
+    (= global_mixed 50)
+    (= local_mixed 100))
+
+  (inner_mixed)
+  local_mixed)
+
+(assert (== (outer_mixed) 100) "nonlocal should work when used with global")
+(assert (== global_mixed 50) "global should work when used with nonlocal")
+
+# Test 8: Global creates variable if it doesn't exist
+(def test_global_create ()
+  (global new_global_var)
+  (= new_global_var 42))
+
+(test_global_create)
+(assert (== new_global_var 42) "global should allow creating new global variable")
+
+# Test 9: Closure capture with nonlocal
+(def make_counter ()
+  (= count 0)
+
+  (def increment ()
+    (nonlocal count)
+    (= count (+ count 1))
+    count)
+
+  increment)
+
+(= counter1 (make_counter))
+(assert (== (counter1) 1) "counter should increment to 1")
+(assert (== (counter1) 2) "counter should increment to 2")
+(assert (== (counter1) 3) "counter should increment to 3")
+
+(= counter2 (make_counter))
+(assert (== (counter2) 1) "new counter should start at 1")
+
+print("All global/nonlocal tests passed!")
