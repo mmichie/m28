@@ -802,18 +802,27 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("first argument to super must be a class")
 	}
 
-	// Get instance
-	instanceVal, err := Eval(args.Items()[1], ctx)
+	// Get instance or class (second argument)
+	// In __new__, the second argument is a class (cls parameter)
+	// In regular methods, it's an instance (self parameter)
+	secondArgVal, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	instance, ok := instanceVal.(*core.Instance)
-	if !ok {
-		return nil, fmt.Errorf("second argument to super must be an instance")
+	// Check if it's an instance
+	if instance, ok := secondArgVal.(*core.Instance); ok {
+		return core.NewSuper(class, instance), nil
 	}
 
-	return core.NewSuper(class, instance), nil
+	// Check if it's a class (for use in __new__ or classmethods)
+	if secondClass, ok := secondArgVal.(*core.Class); ok {
+		// Create a super proxy for class-level lookups
+		// This is used in __new__ where cls is passed instead of self
+		return core.NewSuperForClass(class, secondClass), nil
+	}
+
+	return nil, fmt.Errorf("second argument to super must be an instance or class, got %T", secondArgVal)
 }
 
 // isinstanceForm checks if an object is an instance of a class

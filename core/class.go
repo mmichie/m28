@@ -312,20 +312,49 @@ func (c *Class) SetAttr(name string, value Value) error {
 
 // Call implements Callable interface for classes (instantiation)
 func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
-	// Create new instance
-	instance := NewInstance(c)
+	// Python instance creation flow:
+	// 1. Call __new__ to create the instance
+	// 2. If __new__ returns an instance of the class, call __init__ on it
+	// 3. Return the instance
 
-	// Call __init__ if it exists
-	if initMethod, ok := c.GetMethod("__init__"); ok {
-		// Create bound method for __init__
-		if callable, ok := initMethod.(interface {
+	var instance Value
+
+	// Check for __new__ method
+	if newMethod, ok := c.GetMethod("__new__"); ok {
+		// __new__ is a static method that takes the class as first argument
+		if callable, ok := newMethod.(interface {
 			Call([]Value, *Context) (Value, error)
 		}); ok {
-			// Prepend instance as first argument (self)
-			initArgs := append([]Value{instance}, args...)
-			_, err := callable.Call(initArgs, ctx)
+			// Prepend class as first argument
+			newArgs := append([]Value{c}, args...)
+			result, err := callable.Call(newArgs, ctx)
 			if err != nil {
-				return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
+				return nil, fmt.Errorf("error in %s.__new__: %v", c.Name, err)
+			}
+			instance = result
+		} else {
+			// __new__ exists but isn't callable, fall back to default
+			instance = NewInstance(c)
+		}
+	} else {
+		// No __new__, use default instance creation
+		instance = NewInstance(c)
+	}
+
+	// Call __init__ if it exists and instance is of the right type
+	// Only call __init__ if __new__ returned an instance of this class
+	if inst, ok := instance.(*Instance); ok && inst.Class == c {
+		if initMethod, ok := c.GetMethod("__init__"); ok {
+			// Create bound method for __init__
+			if callable, ok := initMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				// Prepend instance as first argument (self)
+				initArgs := append([]Value{instance}, args...)
+				_, err := callable.Call(initArgs, ctx)
+				if err != nil {
+					return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
+				}
 			}
 		}
 	}
@@ -535,8 +564,9 @@ func (bm *BoundInstanceMethod) GetAttr(name string) (Value, bool) {
 // Super represents access to parent class methods
 type Super struct {
 	BaseObject
-	Class    *Class
-	Instance *Instance
+	Class       *Class
+	Instance    *Instance // For instance methods (self)
+	TargetClass *Class    // For class methods/__new__ (cls)
 }
 
 // BoundSuperMethod wraps a method from a Super object to inject __class__ when called
@@ -571,12 +601,21 @@ func (bsm *BoundSuperMethod) String() string {
 	return fmt.Sprintf("<bound super method of %s>", bsm.Class.Name)
 }
 
-// NewSuper creates a new super object
+// NewSuper creates a new super object for instance methods
 func NewSuper(class *Class, instance *Instance) *Super {
 	return &Super{
 		BaseObject: *NewBaseObject(Type("super")),
 		Class:      class,
 		Instance:   instance,
+	}
+}
+
+// NewSuperForClass creates a new super object for class methods and __new__
+func NewSuperForClass(class *Class, targetClass *Class) *Super {
+	return &Super{
+		BaseObject:  *NewBaseObject(Type("super")),
+		Class:       class,
+		TargetClass: targetClass,
 	}
 }
 

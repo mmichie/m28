@@ -137,25 +137,25 @@ func RegisterTypes(ctx *core.Context) {
 		return core.BoolValue(isNil), nil
 	})))
 
-	// int - Python int constructor
-	ctx.Define("int", createIntClass())
-
-	// float - Python float constructor
-	ctx.Define("float", createFloatClass())
-
-	// isinstance - check if object is instance of type(s)
-	// BEFORE: 20 lines
-	// AFTER: ~12 lines with custom builder
-	ctx.Define("isinstance", core.NewBuiltinFunction(IsInstanceBuilder()))
-
-	// issubclass - check if class is subclass of another
-	// BEFORE: 7 lines
-	// AFTER: ~8 lines with validation
-	ctx.Define("issubclass", core.NewBuiltinFunction(IsSubclassBuilder()))
-
 	// object - Base class for all Python objects
-	// Create the object class (no parent)
+	// Must be defined before other types that inherit from it
 	objectClass := core.NewClass("object", nil)
+
+	// Add __new__ method to object
+	// object.__new__(cls) - creates a new instance of the class
+	// This is a static method that's called before __init__
+	objectClass.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
+		}
+		// First argument should be the class
+		cls, ok := args[0].(*core.Class)
+		if !ok {
+			return nil, fmt.Errorf("__new__() argument 1 must be a class, not %T", args[0])
+		}
+		// Create a new instance of the class
+		return core.NewInstance(cls), nil
+	}))
 
 	// Add __init__ method to object
 	// object.__init__(self, *args, **kwargs) - does nothing, accepts any arguments
@@ -189,6 +189,23 @@ func RegisterTypes(ctx *core.Context) {
 	}))
 
 	ctx.Define("object", objectClass)
+
+	// int - Python int constructor
+	// Defined after object so it can inherit from it
+	ctx.Define("int", createIntClass(objectClass))
+
+	// float - Python float constructor
+	ctx.Define("float", createFloatClass())
+
+	// isinstance - check if object is instance of type(s)
+	// BEFORE: 20 lines
+	// AFTER: ~12 lines with custom builder
+	ctx.Define("isinstance", core.NewBuiltinFunction(IsInstanceBuilder()))
+
+	// issubclass - check if class is subclass of another
+	// BEFORE: 7 lines
+	// AFTER: ~8 lines with validation
+	ctx.Define("issubclass", core.NewBuiltinFunction(IsSubclassBuilder()))
 
 	// format - Python-style format(value, format_spec='')
 	// Calls __format__ dunder method for custom formatting
@@ -840,10 +857,49 @@ func (i *IntType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 }
 
 // createIntClass creates the int class that can be used with isinstance
-func createIntClass() *IntType {
-	class := core.NewClass("int", nil)
-	// Int doesn't have class methods currently
-	// But having it as a Class allows isinstance checks
+func createIntClass(objectClass *core.Class) *IntType {
+	class := core.NewClass("int", objectClass)
+
+	// Add __new__ method to int
+	// int.__new__(cls, value=0, base=10) - creates a new int instance
+	class.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
+		}
+
+		// First argument is the class
+		cls, ok := args[0].(*core.Class)
+		if !ok {
+			return nil, fmt.Errorf("__new__() argument 1 must be a class, not %T", args[0])
+		}
+
+		// For int subclasses, we need to handle the value argument
+		// args[1] is the value (if provided)
+		// args[2] is the base (if provided)
+
+		var value core.NumberValue
+		if len(args) > 1 {
+			// Convert the value argument to an int
+			result, err := IntBuilder()(args[1:], ctx)
+			if err != nil {
+				return nil, err
+			}
+			if num, ok := result.(core.NumberValue); ok {
+				value = num
+			}
+		}
+
+		// If this is exactly int, return the NumberValue directly
+		if cls.Name == "int" {
+			return value, nil
+		}
+
+		// For subclasses, create an instance and store the value
+		instance := core.NewInstance(cls)
+		instance.Attributes["__value__"] = value
+		return instance, nil
+	}))
+
 	return &IntType{Class: class}
 }
 
