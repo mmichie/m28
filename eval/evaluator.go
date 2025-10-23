@@ -69,22 +69,28 @@ func evalFunctionCall(expr *core.ListValue, ctx *core.Context) (core.Value, erro
 	if sym, ok := expr.Items()[0].(core.SymbolValue); ok {
 		symbolName = string(sym)
 	}
+	core.DebugLog("[EVAL] evalFunctionCall: %s with %d args\n", symbolName, expr.Len()-1)
 
 	// Evaluate the function
+	core.DebugLog("[EVAL] Evaluating function expression\n")
 	fn, err := Eval(expr.Items()[0], ctx)
 	if err != nil {
 		return nil, err
 	}
+	core.DebugLog("[EVAL] Function evaluated to: %T\n", fn)
 
 	// Evaluate the arguments
 	args := make([]core.Value, 0, expr.Len()-1)
-	for _, arg := range expr.Items()[1:] {
+	for i, arg := range expr.Items()[1:] {
+		core.DebugLog("[EVAL] Evaluating arg %d\n", i)
 		evalArg, err := Eval(arg, ctx)
 		if err != nil {
 			return nil, err
 		}
+		core.DebugLog("[EVAL] Arg %d evaluated to: %T\n", i, evalArg)
 		args = append(args, evalArg)
 	}
+	core.DebugLog("[EVAL] All args evaluated\n")
 
 	// Call the function
 	callable, ok := fn.(core.Callable)
@@ -458,14 +464,22 @@ type UserFunction struct {
 
 // Call implements Callable.Call
 func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Debug logging for function calls
+	core.DebugLog("[CALL] UserFunction.Call: %s with %d args\n", f.name, len(args))
+
 	// Create a new environment with the function's environment as parent
 	funcEnv := core.NewContext(f.env)
+	core.DebugLog("[CALL] Created funcEnv for %s\n", f.name)
 
 	// If __class__ is defined in the call context, copy it to the function environment
 	// This allows super() to know which class's method is being executed
 	if ctx != nil {
+		core.DebugLog("[CALL] Checking for __class__ in context\n")
 		if classVal, err := ctx.Lookup("__class__"); err == nil {
+			core.DebugLog("[CALL] Found __class__, defining in funcEnv\n")
 			funcEnv.Define("__class__", classVal)
+		} else {
+			core.DebugLog("[CALL] No __class__ found (error: %v)\n", err)
 		}
 	}
 
@@ -603,9 +617,29 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 	case "__globals__":
 		// Return the function's global namespace
 		// This is the environment where the function was defined
-		globalsDict := core.NewDict()
-		// In a real implementation, we would populate this with the actual globals
-		// For now, return an empty dict to satisfy type() call in types.py
+		var globalsDict *core.DictValue
+
+		// Get the global context for this function
+		globalCtx := f.env
+		if globalCtx != nil && globalCtx.Global != nil {
+			globalCtx = globalCtx.Global
+		}
+
+		// If the global context has a ModuleDict, use it
+		if globalCtx != nil && globalCtx.ModuleDict != nil {
+			globalsDict = globalCtx.ModuleDict
+		} else if globalCtx != nil {
+			// Otherwise, create a dict from the global Vars
+			globalsDict = core.NewDict()
+			for name, value := range globalCtx.Vars {
+				keyVal := core.StringValue(name)
+				globalsDict.SetWithKey(core.ValueToKey(keyVal), keyVal, value)
+			}
+		} else {
+			// No global context, return empty dict
+			globalsDict = core.NewDict()
+		}
+
 		return globalsDict, true
 	case "__dict__":
 		// Return function's namespace/attributes as a dict

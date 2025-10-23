@@ -163,6 +163,16 @@ func (c *Context) Set(name string, value Value) error {
 
 // Lookup finds a variable in the current or outer scopes
 func (c *Context) Lookup(name string) (Value, error) {
+	return c.lookupWithDepth(name, 0)
+}
+
+func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
+	// Prevent infinite loops in context chain
+	if depth > 100 {
+		log.Printf("ERROR: Lookup depth exceeded for '%s' - possible circular context chain", name)
+		return nil, &NameError{Name: name}
+	}
+
 	// Check current scope
 	if val, ok := c.Vars[name]; ok {
 		return val, nil
@@ -181,7 +191,7 @@ func (c *Context) Lookup(name string) (Value, error) {
 
 	// Check outer scopes
 	if c.Outer != nil {
-		return c.Outer.Lookup(name)
+		return c.Outer.lookupWithDepth(name, depth+1)
 	}
 
 	return nil, &NameError{Name: name}

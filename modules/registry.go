@@ -31,6 +31,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_codecs":      InitCodecsModule,      // C extension module for codecs.py
 	"enum":         InitEnumModule,        // Stub for enum.py (provides basic enum support)
 	"_sre":         Init_SREModule,        // C extension module for re (regex engine)
+	"re._parser":   Init_REParserModule,   // C extension module for re._parser
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
