@@ -1988,6 +1988,7 @@ func listLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 
 // Track recursion depth for tuple literal evaluation to prevent infinite loops
 var tupleLiteralDepth = 0
+
 const maxTupleLiteralDepth = 1000
 
 // tupleLiteralForm implements the tuple-literal special form

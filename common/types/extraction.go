@@ -7,10 +7,19 @@ import (
 
 // Basic type extractors - return the value and a boolean indicating success
 
-// AsNumber extracts a float64 from a NumberValue
+// AsNumber extracts a float64 from a NumberValue or int subclass instance
 func AsNumber(v core.Value) (float64, bool) {
 	if num, ok := v.(core.NumberValue); ok {
 		return float64(num), true
+	}
+	// Check for int subclass instances (like _NamedIntConstant)
+	// These are Instance objects with __value__ attribute
+	if inst, ok := v.(*core.Instance); ok {
+		if valueAttr, exists := inst.Attributes["__value__"]; exists {
+			if num, ok := valueAttr.(core.NumberValue); ok {
+				return float64(num), true
+			}
+		}
 	}
 	return 0, false
 }
