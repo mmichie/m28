@@ -116,7 +116,15 @@ func RegisterAttributes(ctx *core.Context) {
 			}
 		}
 
-		// For now, we don't support attribute deletion on built-in types
+		// For Instance objects, use DelAttr which handles descriptor protocol
+		if instance, ok := obj.(*core.Instance); ok {
+			if err := instance.DelAttr(string(nameVal)); err != nil {
+				return nil, err
+			}
+			return core.None, nil
+		}
+
+		// For other types, we don't support attribute deletion
 		desc := core.GetTypeDescriptorForValue(obj)
 		typeName := "object"
 		if desc != nil {

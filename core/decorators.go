@@ -58,6 +58,64 @@ func (p *PropertyValue) GetAttr(name string) (Value, bool) {
 				Deleter: args[0],
 			}, nil
 		}), true
+	case "__get__":
+		// Descriptor protocol __get__ method
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) < 2 {
+				return nil, fmt.Errorf("__get__() takes at least 2 arguments")
+			}
+			instance := args[0]
+			// If called on class, return the descriptor itself
+			if instance == None {
+				return p, nil
+			}
+			// Call the getter with the instance
+			if p.Getter == nil {
+				return nil, fmt.Errorf("unreadable attribute")
+			}
+			callable, ok := p.Getter.(Callable)
+			if !ok {
+				return nil, fmt.Errorf("property getter is not callable")
+			}
+			return callable.Call([]Value{instance}, ctx)
+		}), true
+	case "__set__":
+		// Descriptor protocol __set__ method
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 2 {
+				return nil, fmt.Errorf("__set__() takes exactly 2 arguments")
+			}
+			instance := args[0]
+			value := args[1]
+			// Call the setter with the instance and value
+			if p.Setter == nil {
+				return nil, fmt.Errorf("can't set attribute")
+			}
+			callable, ok := p.Setter.(Callable)
+			if !ok {
+				return nil, fmt.Errorf("property setter is not callable")
+			}
+			_, err := callable.Call([]Value{instance, value}, ctx)
+			return None, err
+		}), true
+	case "__delete__":
+		// Descriptor protocol __delete__ method
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__delete__() takes exactly 1 argument")
+			}
+			instance := args[0]
+			// Call the deleter with the instance
+			if p.Deleter == nil {
+				return nil, fmt.Errorf("can't delete attribute")
+			}
+			callable, ok := p.Deleter.(Callable)
+			if !ok {
+				return nil, fmt.Errorf("property deleter is not callable")
+			}
+			_, err := callable.Call([]Value{instance}, ctx)
+			return None, err
+		}), true
 	}
 	return nil, false
 }

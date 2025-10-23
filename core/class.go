@@ -565,6 +565,43 @@ func (i *Instance) SetAttr(name string, value Value) error {
 	return nil
 }
 
+// DelAttr deletes an attribute from the instance
+// Implements Python's descriptor protocol for deletion:
+// 1. Check for descriptor with __delete__ in class
+// 2. Delete from instance __dict__
+func (i *Instance) DelAttr(name string) error {
+	// Check for descriptor in class with __delete__
+	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
+		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+			if deleteMethod, exists := obj.GetAttr("__delete__"); exists {
+				if callable, ok := deleteMethod.(Callable); ok {
+					// Call descriptor.__delete__(instance)
+					_, err := callable.Call([]Value{i}, nil)
+					return err
+				}
+			}
+		}
+	} else if classAttr, ok := i.Class.GetClassAttr(name); ok {
+		// Check class attributes for descriptors with __delete__
+		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
+			if deleteMethod, exists := obj.GetAttr("__delete__"); exists {
+				if callable, ok := deleteMethod.(Callable); ok {
+					// Call descriptor.__delete__(instance)
+					_, err := callable.Call([]Value{i}, nil)
+					return err
+				}
+			}
+		}
+	}
+
+	// No descriptor with __delete__, delete from instance __dict__
+	if _, ok := i.Attributes[name]; !ok {
+		return fmt.Errorf("'%s' object has no attribute '%s'", i.Class.Name, name)
+	}
+	delete(i.Attributes, name)
+	return nil
+}
+
 // BoundInstanceMethod represents a method bound to an instance
 type BoundInstanceMethod struct {
 	Instance *Instance

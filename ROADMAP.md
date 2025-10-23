@@ -131,7 +131,7 @@
     - tests/test-augmented-assignment.m28 (comprehensive augmented assignment tests)
   - Completed: 2025-01-23
 
-- [x] **Descriptors protocol** (core/class.go, common/types/dunder.go) ✅ COMPLETE
+- [x] **Descriptors protocol** (core/class.go, core/decorators.go, common/types/dunder.go, builtin/attributes.go) ✅ COMPLETE
   - Implemented `__get__`, `__set__`, `__delete__` protocol
   - Enables proper `@property`, `@classmethod`, `@staticmethod`
   - Python-compliant descriptor lookup order:
@@ -142,8 +142,12 @@
   - Added CallGet(), CallSet(), CallDelete() helpers to dunder.go
   - Modified Instance.GetAttr() to invoke `__get__` with proper data/non-data distinction
   - Modified Instance.SetAttr() to invoke `__set__` before instance dict
+  - Added Instance.DelAttr() to invoke `__delete__` before instance dict
+  - Updated delattr() builtin to use Instance.DelAttr()
+  - Added __get__, __set__, __delete__ methods to PropertyValue
   - property, staticmethod, classmethod decorators now work correctly
   - Custom descriptors fully supported
+  - delattr() with property deleters and custom __delete__ works
   - Completed: 2025-01-23
 
 - [ ] **Pattern matching (`match`/`case`)** (eval/pattern_forms.go)
@@ -779,9 +783,9 @@ Numeric Extended: `__round__`, `__divmod__`, `__rdivmod__`
 - [ ] `__length_hint__` - Length hint for optimization
 
 **Descriptors:** ✅
-- [x] `__get__` - Descriptor getter (core/class.go Instance.GetAttr)
-- [x] `__set__` - Descriptor setter (core/class.go Instance.SetAttr)
-- [x] `__delete__` - Descriptor deleter (helpers in dunder.go, not yet used in DelAttr)
+- [x] `__get__` - Descriptor getter (core/class.go Instance.GetAttr, core/decorators.go PropertyValue)
+- [x] `__set__` - Descriptor setter (core/class.go Instance.SetAttr, core/decorators.go PropertyValue)
+- [x] `__delete__` - Descriptor deleter (core/class.go Instance.DelAttr, core/decorators.go PropertyValue)
 - [ ] `__set_name__` - Descriptor name binding
 
 **Copy Protocol:**
