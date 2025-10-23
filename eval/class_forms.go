@@ -920,11 +920,103 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 
 			// Handle class types
 			if class, ok := typeVal.(*core.Class); ok {
+				// Check if obj is an instance of this class
 				if instance, ok := obj.(*core.Instance); ok {
 					if instance.Class == class || (instance.Class.Parent != nil && instance.Class.Parent == class) {
 						return core.True, nil
 					}
 				}
+				// Also handle primitive types that aren't Instances
+				switch obj.(type) {
+				case core.StringValue:
+					if class.Name == "string" || class.Name == "str" {
+						return core.True, nil
+					}
+				case core.NumberValue:
+					if class.Name == "number" || class.Name == "int" || class.Name == "float" {
+						return core.True, nil
+					}
+				case core.BoolValue:
+					if class.Name == "bool" {
+						return core.True, nil
+					}
+				case core.NilValue:
+					if class.Name == "nil" || class.Name == "NoneType" {
+						return core.True, nil
+					}
+				case *core.ListValue:
+					if class.Name == "list" {
+						return core.True, nil
+					}
+				case *core.DictValue:
+					if class.Name == "dict" {
+						return core.True, nil
+					}
+				case core.TupleValue:
+					if class.Name == "tuple" {
+						return core.True, nil
+					}
+				case *core.SetValue:
+					if class.Name == "set" {
+						return core.True, nil
+					}
+				case core.BytesValue:
+					if class.Name == "bytes" {
+						return core.True, nil
+					}
+				}
+				continue
+			}
+
+			// Handle wrapper types that have GetClass() method
+			if wrapper, ok := typeVal.(interface{ GetClass() *core.Class }); ok {
+				class := wrapper.GetClass()
+				// Check if obj is an instance of this class
+				if instance, ok := obj.(*core.Instance); ok {
+					if instance.Class == class || (instance.Class.Parent != nil && instance.Class.Parent == class) {
+						return core.True, nil
+					}
+				}
+				// Also handle primitive types
+				switch obj.(type) {
+				case core.StringValue:
+					if class.Name == "string" || class.Name == "str" {
+						return core.True, nil
+					}
+				case core.NumberValue:
+					if class.Name == "number" || class.Name == "int" || class.Name == "float" {
+						return core.True, nil
+					}
+				case core.BoolValue:
+					if class.Name == "bool" {
+						return core.True, nil
+					}
+				case core.NilValue:
+					if class.Name == "nil" || class.Name == "NoneType" {
+						return core.True, nil
+					}
+				case *core.ListValue:
+					if class.Name == "list" {
+						return core.True, nil
+					}
+				case *core.DictValue:
+					if class.Name == "dict" {
+						return core.True, nil
+					}
+				case core.TupleValue:
+					if class.Name == "tuple" {
+						return core.True, nil
+					}
+				case *core.SetValue:
+					if class.Name == "set" {
+						return core.True, nil
+					}
+				case core.BytesValue:
+					if class.Name == "bytes" {
+						return core.True, nil
+					}
+				}
+				continue
 			}
 		}
 		// If none matched, return false
