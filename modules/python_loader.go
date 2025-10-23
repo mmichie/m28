@@ -55,7 +55,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		builtinNames := []string{
 			"repr", "str", "int", "float", "bool", "list", "dict", "tuple", "set",
 			"len", "range", "enumerate", "zip", "map", "filter", "sum", "min", "max",
-			"abs", "all", "any", "sorted", "reversed", "print", "input",
+			"abs", "all", "any", "sorted", "reversed", "print", "input", "open",
 			"type", "isinstance", "issubclass", "hasattr", "getattr", "setattr", "delattr",
 			"callable", "dir", "vars", "id", "hash", "hex", "oct", "bin", "chr", "ord",
 			"bytes", "bytearray", "memoryview", "frozenset",

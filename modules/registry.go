@@ -28,6 +28,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_functools":   Init_FunctoolsModule,  // C extension module for functools.py
 	"_signal":      Init_SignalModule,     // C extension module for signal.py
 	"_string":      Init_StringModule,     // C extension module for string.py
+	"_codecs":      InitCodecsModule,      // C extension module for codecs.py
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

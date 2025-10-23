@@ -17,6 +17,8 @@ func InitIOModule() *core.DictValue {
 	ioModule.SetWithKey("StringIO", core.StringValue("StringIO"), core.NewBuiltinFunction(newStringIO))
 	// Register BytesIO class
 	ioModule.SetWithKey("BytesIO", core.StringValue("BytesIO"), core.NewBuiltinFunction(newBytesIO))
+	// Register TextIOWrapper class
+	ioModule.SetWithKey("TextIOWrapper", core.StringValue("TextIOWrapper"), core.NewBuiltinFunction(newTextIOWrapper))
 
 	return ioModule
 }
@@ -136,4 +138,83 @@ func (b *BytesIO) getvalue(args []core.Value, ctx *core.Context) (core.Value, er
 
 func (b *BytesIO) close(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.NilValue{}, nil
+}
+
+// TextIOWrapper wraps a binary stream and provides text I/O
+type TextIOWrapper struct {
+	buffer    strings.Builder
+	pos       int
+	buffer_io core.Value // Underlying binary stream
+}
+
+func newTextIOWrapper(args []core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("TextIOWrapper", args)
+
+	// TextIOWrapper(buffer, encoding=None, errors=None, newline=None, line_buffering=False)
+	// For now, we only care about the buffer argument
+	if err := v.Range(1, 5); err != nil {
+		return nil, err
+	}
+
+	t := &TextIOWrapper{
+		pos:       0,
+		buffer_io: args[0],
+	}
+
+	// Create dict with methods
+	obj := core.NewDict()
+	obj.SetWithKey("write", core.StringValue("write"), core.NewBuiltinFunction(t.write))
+	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(t.read))
+	obj.SetWithKey("readline", core.StringValue("readline"), core.NewBuiltinFunction(t.readline))
+	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(t.close))
+	obj.SetWithKey("flush", core.StringValue("flush"), core.NewBuiltinFunction(t.flush))
+	obj.SetWithKey("__enter__", core.StringValue("__enter__"), core.NewBuiltinFunction(t.enter))
+	obj.SetWithKey("__exit__", core.StringValue("__exit__"), core.NewBuiltinFunction(t.exit))
+
+	return obj, nil
+}
+
+func (t *TextIOWrapper) write(args []core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("write", args)
+	if err := v.Exact(1); err != nil {
+		return nil, err
+	}
+
+	str, err := v.GetString(0)
+	if err != nil {
+		return nil, err
+	}
+
+	n, _ := t.buffer.WriteString(str)
+	return core.NumberValue(n), nil
+}
+
+func (t *TextIOWrapper) read(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return core.StringValue(t.buffer.String()), nil
+}
+
+func (t *TextIOWrapper) readline(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// For now, just return empty string
+	// In a real implementation, this would read one line from the buffer
+	return core.StringValue(""), nil
+}
+
+func (t *TextIOWrapper) close(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return core.None, nil
+}
+
+func (t *TextIOWrapper) flush(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return core.None, nil
+}
+
+func (t *TextIOWrapper) enter(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Return self for context manager protocol
+	// We need to return the wrapper object itself
+	// For now, return None as we don't have easy access to self
+	return core.None, nil
+}
+
+func (t *TextIOWrapper) exit(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Close on exit
+	return t.close(args, ctx)
 }

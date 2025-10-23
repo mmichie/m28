@@ -204,6 +204,10 @@ func RegisterErrors(ctx *core.Context) {
 	runtimeErrorClass := core.NewClass("RuntimeError", exceptionClass)
 	ctx.Define("RuntimeError", runtimeErrorClass)
 
+	// SystemError - raised when the interpreter finds an internal error
+	systemErrorClass := core.NewClass("SystemError", exceptionClass)
+	ctx.Define("SystemError", systemErrorClass)
+
 	// NotImplementedError - raised when an abstract method that should have been implemented is not
 	notImplementedErrorClass := core.NewClass("NotImplementedError", runtimeErrorClass)
 	ctx.Define("NotImplementedError", notImplementedErrorClass)
