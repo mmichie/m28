@@ -82,6 +82,11 @@ func (ob *OperatorBuilder) Build() BuiltinFunc {
 							if err != nil {
 								return nil, err
 							}
+							// Check if the method returned NotImplemented
+							// If so, fall through to try other handlers
+							if result == core.NotImplemented {
+								goto tryHandlers
+							}
 							// Update callable for next iteration if needed
 							if i < len(args)-1 {
 								if obj, ok := result.(interface {
@@ -100,6 +105,8 @@ func (ob *OperatorBuilder) Build() BuiltinFunc {
 				}
 			}
 		}
+
+	tryHandlers:
 
 		// Try type-specific handlers
 		for _, handler := range ob.handlers {

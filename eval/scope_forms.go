@@ -137,7 +137,9 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 			}
 
 			// Try __delattr__ dunder method first
-			if objWithDelAttr, ok := obj.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+			if objWithDelAttr, ok := obj.(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
 				if method, exists := objWithDelAttr.GetAttr("__delattr__"); exists {
 					// Call the method
 					if callable, ok := method.(core.Callable); ok {

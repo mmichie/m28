@@ -33,6 +33,13 @@ func CallDunder(obj core.Value, method string, args []core.Value, ctx *core.Cont
 
 	// Call the method
 	result, err := callable.Call(args, ctx)
+
+	// If the method returns NotImplemented, treat it as not found
+	// This allows the reflected operation to be tried
+	if err == nil && result == core.NotImplemented {
+		return nil, false, nil
+	}
+
 	return result, true, err
 }
 

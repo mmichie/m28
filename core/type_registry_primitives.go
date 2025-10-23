@@ -46,8 +46,9 @@ func registerNumberType() {
 						return ComplexValue(complex(a, 0) + complex128(c)), nil
 					}
 
-					// For other cross-type operations, return error
-					return nil, fmt.Errorf("unsupported operand type(s) for +: 'number' and '%s'", args[0].Type())
+					// For other cross-type operations, return NotImplemented
+					// This allows the reflected operation (__radd__) to be tried
+					return NotImplemented, nil
 				},
 			},
 			"abs": {

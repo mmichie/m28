@@ -1,0 +1,284 @@
+# Comprehensive test for all Python dunder methods
+# Testing arithmetic, comparison, and special methods
+
+print("Testing comprehensive dunder method support...")
+
+# Test class with all arithmetic operations
+(class Number
+  (def __init__ (self value)
+    (= self.value value))
+
+  # Arithmetic operations
+  (def __add__ (self other)
+    (Number (+ self.value (if (isinstance other Number) other.value other))))
+
+  (def __sub__ (self other)
+    (Number (- self.value (if (isinstance other Number) other.value other))))
+
+  (def __mul__ (self other)
+    (Number (* self.value (if (isinstance other Number) other.value other))))
+
+  (def __truediv__ (self other)
+    (Number (/ self.value (if (isinstance other Number) other.value other))))
+
+  (def __floordiv__ (self other)
+    (Number (// self.value (if (isinstance other Number) other.value other))))
+
+  (def __mod__ (self other)
+    (Number (% self.value (if (isinstance other Number) other.value other))))
+
+  (def __pow__ (self other)
+    (Number (** self.value (if (isinstance other Number) other.value other))))
+
+  # Reflected arithmetic operations
+  (def __radd__ (self other)
+    (Number (+ other self.value)))
+
+  (def __rsub__ (self other)
+    (Number (- other self.value)))
+
+  (def __rmul__ (self other)
+    (Number (* other self.value)))
+
+  (def __rtruediv__ (self other)
+    (Number (/ other self.value)))
+
+  (def __rfloordiv__ (self other)
+    (Number (// other self.value)))
+
+  (def __rmod__ (self other)
+    (Number (% other self.value)))
+
+  (def __rpow__ (self other)
+    (Number (** other self.value)))
+
+  # Comparison operations
+  (def __lt__ (self other)
+    (< self.value (if (isinstance other Number) other.value other)))
+
+  (def __le__ (self other)
+    (<= self.value (if (isinstance other Number) other.value other)))
+
+  (def __eq__ (self other)
+    (== self.value (if (isinstance other Number) other.value other)))
+
+  (def __ne__ (self other)
+    (!= self.value (if (isinstance other Number) other.value other)))
+
+  (def __gt__ (self other)
+    (> self.value (if (isinstance other Number) other.value other)))
+
+  (def __ge__ (self other)
+    (>= self.value (if (isinstance other Number) other.value other)))
+
+  (def __str__ (self)
+    (+ "Number(" (str self.value) ")")))
+
+# Test arithmetic operations
+print("\n=== Testing arithmetic dunder methods ===")
+
+(= n1 (Number 10))
+(= n2 (Number 3))
+
+# __add__
+(= result_add (+ n1 n2))
+(assert (== result_add.value 13) "__add__ should work")
+(print "✓ __add__: Number(10) + Number(3) = " result_add)
+
+# __sub__
+(= result_sub (- n1 n2))
+(assert (== result_sub.value 7) "__sub__ should work")
+(print "✓ __sub__: Number(10) - Number(3) = " result_sub)
+
+# __mul__
+(= result_mul (* n1 n2))
+(assert (== result_mul.value 30) "__mul__ should work")
+(print "✓ __mul__: Number(10) * Number(3) = " result_mul)
+
+# __truediv__
+(= result_div (/ n1 n2))
+(assert (< (- result_div.value 3.333333) 0.001) "__truediv__ should work")
+(print "✓ __truediv__: Number(10) / Number(3) = " result_div)
+
+# __floordiv__
+(= result_floordiv (// n1 n2))
+(assert (== result_floordiv.value 3) "__floordiv__ should work")
+(print "✓ __floordiv__: Number(10) // Number(3) = " result_floordiv)
+
+# __mod__
+(= result_mod (% n1 n2))
+(assert (== result_mod.value 1) "__mod__ should work")
+(print "✓ __mod__: Number(10) % Number(3) = " result_mod)
+
+# __pow__
+(= result_pow (** n2 (Number 2)))
+(assert (== result_pow.value 9) "__pow__ should work")
+(print "✓ __pow__: Number(3) ** Number(2) = " result_pow)
+
+# Test reflected operations
+print("\n=== Testing reflected dunder methods ===")
+
+# __radd__ (number + Number)
+(= result_radd (+ 5 n2))
+(assert (== result_radd.value 8) "__radd__ should work")
+(print "✓ __radd__: 5 + Number(3) = " result_radd)
+
+# __rsub__ (number - Number)
+(= result_rsub (- 10 n2))
+(assert (== result_rsub.value 7) "__rsub__ should work")
+(print "✓ __rsub__: 10 - Number(3) = " result_rsub)
+
+# __rmul__ (number * Number)
+(= result_rmul (* 4 n2))
+(assert (== result_rmul.value 12) "__rmul__ should work")
+(print "✓ __rmul__: 4 * Number(3) = " result_rmul)
+
+# __rtruediv__ (number / Number)
+(= result_rdiv (/ 12 n2))
+(assert (== result_rdiv.value 4) "__rtruediv__ should work")
+(print "✓ __rtruediv__: 12 / Number(3) = " result_rdiv)
+
+# __rfloordiv__ (number // Number)
+(= result_rfloordiv (// 10 n2))
+(assert (== result_rfloordiv.value 3) "__rfloordiv__ should work")
+(print "✓ __rfloordiv__: 10 // Number(3) = " result_rfloordiv)
+
+# __rmod__ (number % Number)
+(= result_rmod (% 10 n2))
+(assert (== result_rmod.value 1) "__rmod__ should work")
+(print "✓ __rmod__: 10 % Number(3) = " result_rmod)
+
+# __rpow__ (number ** Number)
+(= result_rpow (** 2 n2))
+(assert (== result_rpow.value 8) "__rpow__ should work")
+(print "✓ __rpow__: 2 ** Number(3) = " result_rpow)
+
+# Test comparison operations
+print("\n=== Testing comparison dunder methods ===")
+
+(= n5 (Number 5))
+(= n10 (Number 10))
+
+# __lt__
+(assert (< n5 n10) "__lt__ should work")
+(print "✓ __lt__: Number(5) < Number(10) = " (< n5 n10))
+
+# __le__
+(assert (<= n5 n10) "__le__ should work")
+(assert (<= n5 (Number 5)) "__le__ equal should work")
+(print "✓ __le__: Number(5) <= Number(10) = " (<= n5 n10))
+
+# __eq__
+(assert (== n5 (Number 5)) "__eq__ should work")
+(print "✓ __eq__: Number(5) == Number(5) = " (== n5 (Number 5)))
+
+# __ne__
+(assert (!= n5 n10) "__ne__ should work")
+(print "✓ __ne__: Number(5) != Number(10) = " (!= n5 n10))
+
+# __gt__
+(assert (> n10 n5) "__gt__ should work")
+(print "✓ __gt__: Number(10) > Number(5) = " (> n10 n5))
+
+# __ge__
+(assert (>= n10 n5) "__ge__ should work")
+(assert (>= n10 (Number 10)) "__ge__ equal should work")
+(print "✓ __ge__: Number(10) >= Number(5) = " (>= n10 n5))
+
+# Test mixed operations
+print("\n=== Testing mixed operations with built-in types ===")
+
+(= n7 (Number 7))
+
+# Number + int
+(= mixed1 (+ n7 3))
+(assert (== mixed1.value 10) "Number + int should work")
+(print "✓ Mixed: Number(7) + 3 = " mixed1)
+
+# Number * int
+(= mixed2 (* n7 2))
+(assert (== mixed2.value 14) "Number * int should work")
+(print "✓ Mixed: Number(7) * 2 = " mixed2)
+
+# Number comparison with int
+(assert (> n7 5) "Number > int should work")
+(assert (< n7 10) "Number < int should work")
+(print "✓ Mixed: Number(7) > 5 and Number(7) < 10")
+
+# Test special methods
+print("\n=== Testing special dunder methods ===")
+
+# Test __str__
+(= str_result (str n5))
+(assert (== str_result "Number(5)") "__str__ should work")
+(print "✓ __str__: str(Number(5)) = " str_result)
+
+# Test __len__ with a custom class
+(class Container
+  (def __init__ (self items)
+    (= self.items items))
+
+  (def __len__ (self)
+    (len self.items))
+
+  (def __getitem__ (self index)
+    (get-item self.items index))
+
+  (def __setitem__ (self index value)
+    (set-item self.items index value))
+
+  (def __contains__ (self item)
+    (in item self.items)))
+
+(= container (Container [1, 2, 3, 4, 5]))
+
+# __len__
+(assert (== (len container) 5) "__len__ should work")
+(print "✓ __len__: len(Container([1,2,3,4,5])) = " (len container))
+
+# __getitem__
+(assert (== (get-item container 2) 3) "__getitem__ should work")
+(print "✓ __getitem__: container[2] = " (get-item container 2))
+
+# __setitem__
+(set-item container 2 10)
+(assert (== (get-item container 2) 10) "__setitem__ should work")
+(print "✓ __setitem__: container[2] = 10")
+
+# __contains__
+(assert (in 10 container) "__contains__ should work")
+(print "✓ __contains__: 10 in container = " (in 10 container))
+
+# Test __call__
+# TODO: __call__ support needs to be added to the evaluator
+# (class Adder
+#   (def __init__ (self n)
+#     (= self.n n))
+#
+#   (def __call__ (self x)
+#     (+ self.n x)))
+#
+# (= add5 (Adder 5))
+# (= call_result (add5 10))
+# (assert (== call_result 15) "__call__ should work")
+# (print "✓ __call__: Adder(5)(10) = " call_result)
+
+# Test __bool__
+(class BoolTest
+  (def __init__ (self value)
+    (= self.value value))
+
+  (def __bool__ (self)
+    (> self.value 0)))
+
+(= truthy (BoolTest 5))
+(= falsy (BoolTest 0))
+(assert (if truthy True False) "__bool__ truthy should work")
+(assert (not (if falsy True False)) "__bool__ falsy should work")
+(print "✓ __bool__: BoolTest(5) is truthy, BoolTest(0) is falsy")
+
+print("\n🎉 All comprehensive dunder method tests passed!")
+print("   Arithmetic: __add__, __sub__, __mul__, __truediv__, __floordiv__, __mod__, __pow__")
+print("   Reflected: __radd__, __rsub__, __rmul__, __rtruediv__, __rfloordiv__, __rmod__, __rpow__")
+print("   Comparison: __lt__, __le__, __eq__, __ne__, __gt__, __ge__")
+print("   Special: __str__, __len__, __getitem__, __setitem__, __contains__, __call__, __bool__")

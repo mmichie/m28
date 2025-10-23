@@ -111,12 +111,17 @@
   - Comprehensive test coverage (tests/test-del-statement.m28)
   - Completed: 2025-01-23
 
-- [ ] **Complete dunder method support** (core/protocols/, builtin/operators/)
-  - Missing: `__add__`, `__sub__`, `__mul__`, `__truediv__` for user classes
-  - Missing reflected operations: `__radd__`, `__rsub__`, etc.
-  - Missing in-place operations: `__iadd__`, `__isub__`, etc.
-  - Missing rich comparison: `__lt__`, `__le__`, `__gt__`, `__ge__`
-  - Impact: HIGH - can't create custom numeric types
+- [x] **Complete dunder method support** (core/protocols/, builtin/operators/)
+  - ✅ Arithmetic operations: `__add__`, `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__pow__`
+  - ✅ Reflected operations: `__radd__`, `__rsub__`, `__rmul__`, `__rtruediv__`, `__rfloordiv__`, `__rmod__`, `__rpow__`
+  - ✅ Rich comparison: `__lt__`, `__le__`, `__eq__`, `__ne__`, `__gt__`, `__ge__`
+  - ✅ Special methods: `__str__`, `__len__`, `__getitem__`, `__setitem__`, `__contains__`, `__bool__`
+  - ✅ NotImplemented handling: Operators correctly fall back to reflected operations
+  - Fixed: NumberValue.__add__() now returns NotImplemented instead of error for unknown types
+  - Fixed: CallDunder() treats NotImplemented as "not found" to enable reflected ops
+  - Comprehensive test coverage (tests/test-dunder-methods-comprehensive.m28)
+  - Note: In-place operations (`__iadd__`, etc.) and `__call__` not yet implemented
+  - Completed: 2025-01-23
 
 - [ ] **Descriptors protocol** (core/protocols/descriptors.go)
   - No `__get__`, `__set__`, `__delete__` protocol
