@@ -47,8 +47,8 @@ func (p *PythonParser) Parse() ([]ast.ASTNode, error) {
 			return nil, fmt.Errorf("parser exceeded maximum call limit (%d calls) - possible infinite loop at token %d", p.maxCalls, p.current)
 		}
 
-		// Skip any leading newlines
-		for p.check(TOKEN_NEWLINE) {
+		// Skip any leading newlines or semicolons
+		for p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 			p.advance()
 		}
 
@@ -905,8 +905,8 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 					result = ast.NewAssignForm(targets[i], result, p.makeLocation(tok), ast.SyntaxPython)
 				}
 
-				// Consume newline
-				if p.check(TOKEN_NEWLINE) {
+				// Consume newline or semicolon
+				if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 					p.advance()
 				}
 
@@ -962,8 +962,8 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 			value,
 		}, p.makeLocation(tok), ast.SyntaxPython)
 
-		// Consume newline
-		if p.check(TOKEN_NEWLINE) {
+		// Consume newline or semicolon
+		if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 			p.advance()
 		}
 
@@ -971,8 +971,8 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 	}
 
 	// Bare expression statement
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
