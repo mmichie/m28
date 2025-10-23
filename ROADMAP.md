@@ -103,10 +103,13 @@
   - Comprehensive test coverage (tests/test-walrus-operator.m28)
   - Completed: 2025-01-23
 
-- [ ] **`del` statement** (eval/special_forms.go)
-  - TOKEN_DEL exists but no handler
-  - Must support: `del var`, `del obj.attr`, `del list[i]`, `del dict[key]`
-  - Impact: MEDIUM - can't delete variables, attributes, items
+- [x] **`del` statement** (eval/scope_forms.go, core/context.go) ✅ COMPLETE
+  - Fully implemented with DelForm and Context.Delete()
+  - Supports: `del var`, `del list[i]`, `del dict[key]`
+  - Works with global and nonlocal scope declarations
+  - Handles __delitem__ dunder method for custom types
+  - Comprehensive test coverage (tests/test-del-statement.m28)
+  - Completed: 2025-01-23
 
 - [ ] **Complete dunder method support** (core/protocols/, builtin/operators/)
   - Missing: `__add__`, `__sub__`, `__mul__`, `__truediv__` for user classes

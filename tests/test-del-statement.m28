@@ -1,0 +1,169 @@
+# Test del statement
+# Python's del statement for deleting variables, attributes, and items
+
+# Test 1: Delete variable
+(= x 10)
+(assert (== x 10) "variable should exist")
+(del x)
+(try
+  (begin
+    x
+    (assert False "accessing deleted variable should raise NameError"))
+  (except NameError e
+    (print "✓ del variable raises NameError as expected")))
+
+# Test 2: Delete multiple variables
+(= a 1)
+(= b 2)
+(= c 3)
+(del a b)
+(assert (== c 3) "non-deleted variable should still exist")
+(try
+  (begin
+    a
+    (assert False "deleted variable 'a' should not exist"))
+  (except NameError e
+    True))
+(try
+  (begin
+    b
+    (assert False "deleted variable 'b' should not exist"))
+  (except NameError e
+    (print "✓ del multiple variables works")))
+
+# Test 3: Delete list item
+(= lst [1, 2, 3, 4, 5])
+(del (get-item lst 2))
+(assert (== (len lst) 4) "list should have 4 items after deletion")
+(assert (== (get-item lst 0) 1) "first item should be 1")
+(assert (== (get-item lst 1) 2) "second item should be 2")
+(assert (== (get-item lst 2) 4) "third item should be 4 (was 4th)")
+(assert (== (get-item lst 3) 5) "fourth item should be 5")
+(print "✓ del list[i] works")
+
+# Test 4: Delete list item with negative index
+(= lst2 [10, 20, 30, 40])
+(del (get-item lst2 -1))
+(assert (== (len lst2) 3) "list should have 3 items")
+(assert (== (get-item lst2 -1) 30) "last item should now be 30")
+(print "✓ del list[-1] works")
+
+# Test 5: Delete dict item
+(= d {"a": 1, "b": 2, "c": 3})
+(del (get-item d "b"))
+(assert (== (len d) 2) "dict should have 2 items")
+(assert (== (get-item d "a") 1) "key 'a' should still exist")
+(assert (== (get-item d "c") 3) "key 'c' should still exist")
+(assert (not (in "b" d)) "deleted key should not be in dict")
+(print "✓ del dict[key] works")
+
+# Test 6: Delete multiple list items (one at a time)
+(= lst3 [1, 2, 3, 4, 5])
+(del (get-item lst3 1))
+(del (get-item lst3 2))  # Now deletes what was originally at index 3
+(assert (== (len lst3) 3) "list should have 3 items")
+(assert (== (get-item lst3 0) 1) "first item should be 1")
+(assert (== (get-item lst3 1) 3) "second item should be 3")
+(assert (== (get-item lst3 2) 5) "third item should be 5")
+(print "✓ del multiple list items works")
+
+# Test 7: Delete in local scope
+(def test_del_local ()
+  (= local_x 100)
+  (assert (== local_x 100) "local variable should exist")
+  (del local_x)
+  (try
+    (begin
+      local_x
+      (assert False "deleted local should not exist"))
+    (except NameError e
+      True)))
+(test_del_local)
+(print "✓ del in local scope works")
+
+# Test 8: Delete with global
+(= global_var 42)
+(def test_del_global ()
+  (global global_var)
+  (del global_var))
+(test_del_global)
+(try
+  (begin
+    global_var
+    (assert False "deleted global should not exist"))
+  (except NameError e
+    (print "✓ del with global works")))
+
+# Test 9: Try to delete undefined variable (should error)
+(try
+  (begin
+    (del undefined_var)
+    (assert False "deleting undefined variable should raise error"))
+  (except e
+    (print "✓ del undefined variable raises NameError")))
+
+# Test 10: Delete list item out of range (should error)
+(= lst4 [1, 2, 3])
+(try
+  (begin
+    (del (get-item lst4 10))
+    (assert False "deleting out of range index should raise error"))
+  (except e
+    (print "✓ del list[out_of_range] raises error")))
+
+# Test 11: Delete from empty list (should error)
+(= empty_lst [])
+(try
+  (begin
+    (del (get-item empty_lst 0))
+    (assert False "deleting from empty list should raise error"))
+  (except e
+    (print "✓ del from empty list raises error")))
+
+# Test 12: Delete non-existent dict key (should error)
+(= d2 {"x": 1})
+(try
+  (begin
+    (del (get-item d2 "nonexistent"))
+    (assert False "deleting non-existent key should raise error"))
+  (except e
+    (print "✓ del dict[nonexistent_key] raises KeyError")))
+
+# Test 13: Delete variable then recreate it
+(= temp_var "original")
+(del temp_var)
+(= temp_var "new")
+(assert (== temp_var "new") "recreated variable should have new value")
+(print "✓ del then recreate variable works")
+
+# Test 14: Delete in comprehension scope (should be local to comprehension)
+(= comp_var "outer")
+(= result [x for x in range(3)])
+(assert (== comp_var "outer") "outer variable should not be affected by comprehension")
+(print "✓ del scope isolation works")
+
+# Test 15: Delete with multiple targets in sequence
+(= m 1)
+(= n 2)
+(= p 3)
+(del m n p)
+(try
+  (begin
+    m
+    (assert False "m should be deleted"))
+  (except NameError e
+    True))
+(try
+  (begin
+    n
+    (assert False "n should be deleted"))
+  (except NameError e
+    True))
+(try
+  (begin
+    p
+    (assert False "p should be deleted"))
+  (except NameError e
+    (print "✓ del with multiple targets works")))
+
+print("All del statement tests passed!")

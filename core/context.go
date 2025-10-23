@@ -161,6 +161,19 @@ func (c *Context) Set(name string, value Value) error {
 	return fmt.Errorf("variable not defined: %s", name)
 }
 
+// Delete removes a variable from the current scope
+// Returns error if variable doesn't exist in current scope
+func (c *Context) Delete(name string) error {
+	// Check if variable exists in current scope
+	if _, ok := c.Vars[name]; ok {
+		delete(c.Vars, name)
+		return nil
+	}
+
+	// Variable not found in current scope
+	return &NameError{Name: name}
+}
+
 // Lookup finds a variable in the current or outer scopes
 func (c *Context) Lookup(name string) (Value, error) {
 	return c.lookupWithDepth(name, 0)

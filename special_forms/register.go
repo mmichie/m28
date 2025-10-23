@@ -55,6 +55,9 @@ func registerDefinitionForms() {
 	// nonlocal: Mark variables as nonlocal
 	eval.RegisterSpecialForm("nonlocal", nonlocalForm)
 
+	// del: Delete variables, attributes, or items
+	eval.RegisterSpecialForm("del", delForm)
+
 	// quote: Quote an expression
 	eval.RegisterSpecialForm("quote", quoteForm)
 
@@ -158,4 +161,9 @@ func globalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // nonlocalForm implements the 'nonlocal' special form
 func nonlocalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.NonlocalForm(args, ctx)
+}
+
+// delForm implements the 'del' special form
+func delForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.DelForm(args, ctx)
 }
