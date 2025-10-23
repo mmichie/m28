@@ -114,15 +114,21 @@
 - [x] **Complete dunder method support** (core/protocols/, builtin/operators/)
   - ✅ Arithmetic operations: `__add__`, `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__pow__`
   - ✅ Reflected operations: `__radd__`, `__rsub__`, `__rmul__`, `__rtruediv__`, `__rfloordiv__`, `__rmod__`, `__rpow__`
+  - ✅ In-place operations: `__iadd__`, `__isub__`, `__imul__`, `__itruediv__`, `__ifloordiv__`, `__imod__`, `__ipow__`
+  - ✅ Bitwise in-place: `__iand__`, `__ior__`, `__ixor__`, `__ilshift__`, `__irshift__`
   - ✅ Rich comparison: `__lt__`, `__le__`, `__eq__`, `__ne__`, `__gt__`, `__ge__`
   - ✅ Special methods: `__str__`, `__len__`, `__getitem__`, `__setitem__`, `__contains__`, `__bool__`, `__call__`
   - ✅ NotImplemented handling: Operators correctly fall back to reflected operations
   - ✅ `__call__` support: Objects with `__call__` method can be invoked as functions
+  - ✅ Augmented assignment: `+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `**=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
+  - Implementation: eval/augmented_assign.go handles all augmented assignment operators
+  - Tries in-place dunder method first (e.g., `__iadd__`), falls back to regular operation
   - Fixed: NumberValue.__add__() now returns NotImplemented instead of error for unknown types
   - Fixed: CallDunder() treats NotImplemented as "not found" to enable reflected ops
   - Fixed: Added `__call__` checks in evaluator.go and kwarg_eval.go for callable instances
-  - Comprehensive test coverage (tests/test-dunder-methods-comprehensive.m28)
-  - Note: In-place operations (`__iadd__`, etc.) not yet implemented
+  - Comprehensive test coverage:
+    - tests/test-dunder-methods-comprehensive.m28 (36 tests for dunder methods)
+    - tests/test-augmented-assignment.m28 (comprehensive augmented assignment tests)
   - Completed: 2025-01-23
 
 - [ ] **Descriptors protocol** (core/protocols/descriptors.go)

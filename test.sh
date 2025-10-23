@@ -158,6 +158,7 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Walrus Operator" "tests/test-walrus-operator.m28"
     run_test "Del Statement" "tests/test-del-statement.m28"
     run_test "Dunder Methods" "tests/test-dunder-methods-comprehensive.m28"
+    run_test "Augmented Assignment" "tests/test-augmented-assignment.m28"
 fi
 
 if [[ "$MODE" != "quick" ]]; then
