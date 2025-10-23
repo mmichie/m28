@@ -990,7 +990,7 @@ func (p *PythonParser) parseAnnotatedAssignment() ast.ASTNode {
 	colonTok := p.expect(TOKEN_COLON)
 
 	// Parse type annotation
-	_ = p.parseTypeAnnotation() // Type annotation parsed but not used in runtime
+	annotation := p.parseTypeAnnotation()
 
 	// Check for optional assignment
 	if p.check(TOKEN_ASSIGN) {
@@ -1002,25 +1002,19 @@ func (p *PythonParser) parseAnnotatedAssignment() ast.ASTNode {
 			p.advance()
 		}
 
-		// Create assignment: (= identifier value)
-		// For now, we ignore the type annotation in the runtime
-		return ast.NewAssignForm(name, value, p.makeLocation(colonTok), ast.SyntaxPython)
+		// Create annotated assignment: (annotated-assign identifier annotation value)
+		return ast.NewAnnotatedAssignForm(name, annotation, value, p.makeLocation(colonTok), ast.SyntaxPython)
 	}
 
 	// No assignment - just a type annotation
-	// In Python, this creates a variable with no value (or doesn't create it)
-	// For now, we'll treat it as assignment to None
+	// In Python 3.6+, bare annotations only add to __annotations__, don't create variable
 	// Consume newline
 	if p.check(TOKEN_NEWLINE) {
 		p.advance()
 	}
 
-	// Return assignment to None (or we could just return a no-op)
-	// Actually, in Python 3.6+, bare annotations don't create the variable
-	// So we should probably just return a no-op statement
-	// For now, let's create the variable with None
-	noneValue := ast.NewIdentifier("None", p.makeLocation(colonTok), ast.SyntaxPython)
-	return ast.NewAssignForm(name, noneValue, p.makeLocation(colonTok), ast.SyntaxPython)
+	// Return annotated assignment without value: (annotated-assign identifier annotation)
+	return ast.NewAnnotatedAssignForm(name, annotation, nil, p.makeLocation(colonTok), ast.SyntaxPython)
 }
 
 // ============================================================================

@@ -184,10 +184,11 @@ func init() {
 
 		// Definitions
 		// Note: "def" is registered by special_forms/register.go
-		"=":      assignForm,
-		"quote":  quoteForm,
-		"lambda": lambdaForm,
-		"fn":     lambdaForm, // Alias for lambda
+		"=":                assignForm,
+		"annotated-assign": annotatedAssignForm,
+		"quote":            quoteForm,
+		"lambda":           lambdaForm,
+		"fn":               lambdaForm, // Alias for lambda
 
 		// Module system (will be overridden by enhanced version)
 		// "import": importForm,
@@ -369,6 +370,66 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	symName := string(sym)
 	ctx.Define(symName, value)
 	return value, nil
+}
+
+// annotatedAssignForm implements annotated assignment (PEP 526): x: int = 5
+// Syntax: (annotated-assign target annotation [value])
+func annotatedAssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 2 || args.Len() > 3 {
+		return nil, fmt.Errorf("annotated-assign requires 2 or 3 arguments, got %d", args.Len())
+	}
+
+	// Get the target (should be a symbol)
+	target := args.Items()[0]
+	sym, ok := target.(core.SymbolValue)
+	if !ok {
+		return nil, fmt.Errorf("annotated assignment target must be a symbol, got %v", target.Type())
+	}
+	targetName := string(sym)
+
+	// Get the annotation (should be a string)
+	annotationVal := args.Items()[1]
+	annotationStr, ok := annotationVal.(core.StringValue)
+	if !ok {
+		return nil, fmt.Errorf("annotation must be a string, got %v", annotationVal.Type())
+	}
+	annotation := string(annotationStr)
+
+	// Ensure __annotations__ dict exists in current scope
+	var annotationsDict *core.DictValue
+	annVal, err := ctx.Lookup("__annotations__")
+	if err == nil {
+		// __annotations__ exists
+		if dict, isDict := annVal.(*core.DictValue); isDict {
+			annotationsDict = dict
+		} else {
+			// __annotations__ exists but is not a dict, replace it
+			annotationsDict = core.NewDict()
+			ctx.Define("__annotations__", annotationsDict)
+		}
+	} else {
+		// Create __annotations__ dict
+		annotationsDict = core.NewDict()
+		ctx.Define("__annotations__", annotationsDict)
+	}
+
+	// Store the annotation
+	annotationsDict.Set(targetName, core.StringValue(annotation))
+
+	// If there's a value, evaluate and assign it
+	if args.Len() == 3 {
+		value, err := Eval(args.Items()[2], ctx)
+		if err != nil {
+			return nil, err
+		}
+		ctx.Define(targetName, value)
+		return value, nil
+	}
+
+	// No value - just annotation
+	// In Python, bare annotations don't create the variable
+	// Return None to indicate success
+	return core.Nil, nil
 }
 
 // quoteForm implements the quote special form

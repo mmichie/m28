@@ -292,6 +292,59 @@ func NewAssignForm(target ASTNode, value ASTNode, loc *core.SourceLocation, synt
 	}
 }
 
+// AnnotatedAssignForm represents an annotated assignment (PEP 526): x: int = 5
+type AnnotatedAssignForm struct {
+	BaseNode
+	Target     ASTNode    // What to assign to (usually Identifier)
+	Annotation *TypeInfo  // Type annotation
+	Value      ASTNode    // Value to assign (nil for annotation-only: x: int)
+}
+
+// Type implements core.Value.Type
+func (a *AnnotatedAssignForm) Type() core.Type {
+	return core.ListType
+}
+
+// String implements core.Value.String
+func (a *AnnotatedAssignForm) String() string {
+	if a.Value != nil {
+		return fmt.Sprintf("(annotated-assign %s %s %s)", a.Target.String(), a.Annotation.Name, a.Value.String())
+	}
+	return fmt.Sprintf("(annotated-assign %s %s)", a.Target.String(), a.Annotation.Name)
+}
+
+// ToIR implements ASTNode.ToIR
+func (a *AnnotatedAssignForm) ToIR() core.Value {
+	if a.Value != nil {
+		// With value: (annotated-assign target annotation value)
+		return core.NewList(
+			core.SymbolValue("annotated-assign"),
+			a.Target.ToIR(),
+			core.StringValue(a.Annotation.Name),
+			a.Value.ToIR(),
+		)
+	}
+	// Without value: (annotated-assign target annotation)
+	return core.NewList(
+		core.SymbolValue("annotated-assign"),
+		a.Target.ToIR(),
+		core.StringValue(a.Annotation.Name),
+	)
+}
+
+// NewAnnotatedAssignForm creates a new annotated assignment node
+func NewAnnotatedAssignForm(target ASTNode, annotation *TypeInfo, value ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *AnnotatedAssignForm {
+	return &AnnotatedAssignForm{
+		BaseNode: BaseNode{
+			Loc:    loc,
+			Syntax: syntax,
+		},
+		Target:     target,
+		Annotation: annotation,
+		Value:      value,
+	}
+}
+
 // IfForm represents a conditional expression
 // Examples:
 //

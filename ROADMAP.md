@@ -156,7 +156,16 @@
   - Impact: HIGH - major missing language feature
 
 **Priority 1 - Should Fix:**
-- [ ] Annotated assignments: `x: int = 5`
+- [x] **Annotated assignments: `x: int = 5`** (core/ast/nodes.go, parser/python_parser.go, eval/evaluator.go) ✅ COMPLETE
+  - Created AnnotatedAssignForm AST node for PEP 526 support
+  - Updated Python parser to use AnnotatedAssignForm instead of AssignForm
+  - Implemented annotatedAssignForm special form handler
+  - Creates/updates __annotations__ dict in current scope
+  - Supports both `x: int = value` and bare `x: int` forms
+  - Bare annotations only add to __annotations__, don't create variable
+  - Annotations stored as strings in __annotations__ dict
+  - Foundation for future type system work
+  - Completed: 2025-01-23
 - [x] **Exception chaining: `raise ... from ...`** (eval/evaluator.go, repl/error_reporter.go) ✅ COMPLETE
   - Added `Cause` and `Context` fields to Exception struct
   - Implemented `raise exception from cause` syntax support
