@@ -295,9 +295,9 @@ func NewAssignForm(target ASTNode, value ASTNode, loc *core.SourceLocation, synt
 // AnnotatedAssignForm represents an annotated assignment (PEP 526): x: int = 5
 type AnnotatedAssignForm struct {
 	BaseNode
-	Target     ASTNode    // What to assign to (usually Identifier)
-	Annotation *TypeInfo  // Type annotation
-	Value      ASTNode    // Value to assign (nil for annotation-only: x: int)
+	Target     ASTNode   // What to assign to (usually Identifier)
+	Annotation *TypeInfo // Type annotation
+	Value      ASTNode   // Value to assign (nil for annotation-only: x: int)
 }
 
 // Type implements core.Value.Type

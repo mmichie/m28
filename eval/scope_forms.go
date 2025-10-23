@@ -72,6 +72,43 @@ func DelForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return core.Nil, nil
 }
 
+// resolveSlice converts a SliceValue to start/stop/step indices for deletion
+func resolveSlice(slice *core.SliceValue, length int) (start, stop, step int, err error) {
+	// Convert slice values to integers
+	var startPtr, stopPtr, stepPtr *int
+
+	if slice.Start != nil && slice.Start != core.Nil {
+		val, e := types.ToIndex(slice.Start, nil)
+		if e != nil {
+			return 0, 0, 0, e
+		}
+		startPtr = &val
+	}
+
+	if slice.Stop != nil && slice.Stop != core.Nil {
+		val, e := types.ToIndex(slice.Stop, nil)
+		if e != nil {
+			return 0, 0, 0, e
+		}
+		stopPtr = &val
+	}
+
+	if slice.Step != nil && slice.Step != core.Nil {
+		val, e := types.ToIndex(slice.Step, nil)
+		if e != nil {
+			return 0, 0, 0, e
+		}
+		if val == 0 {
+			return 0, 0, 0, fmt.Errorf("slice step cannot be zero")
+		}
+		stepPtr = &val
+	}
+
+	// Use the same normalization logic as slicing (from indexing.go)
+	start, stop, step = normalizeSliceIndices(length, startPtr, stopPtr, stepPtr)
+	return start, stop, step, nil
+}
+
 // deleteTarget handles deletion of a single target
 func deleteTarget(target core.Value, ctx *core.Context) error {
 	switch t := target.(type) {
@@ -199,9 +236,44 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 
 			// Try list deletion
 			if list, ok := obj.(*core.ListValue); ok {
+				// Handle slice deletion: del list[start:stop:step]
+				if slice, ok := key.(*core.SliceValue); ok {
+					// Calculate slice bounds
+					length := list.Len()
+					start, stop, step, err := resolveSlice(slice, length)
+					if err != nil {
+						return fmt.Errorf("error resolving slice: %v", err)
+					}
+
+					// Create set of indices to delete
+					indicesToDelete := make(map[int]bool)
+					if step > 0 {
+						for i := start; i < stop; i += step {
+							indicesToDelete[i] = true
+						}
+					} else {
+						for i := start; i > stop; i += step {
+							indicesToDelete[i] = true
+						}
+					}
+
+					// Create new list without deleted elements
+					newItems := make([]core.Value, 0, length-len(indicesToDelete))
+					for i, item := range list.Items() {
+						if !indicesToDelete[i] {
+							newItems = append(newItems, item)
+						}
+					}
+
+					// Replace list items
+					*list = *core.NewList(newItems...)
+					return nil
+				}
+
+				// Handle single index deletion: del list[i]
 				idx, ok := key.(core.NumberValue)
 				if !ok {
-					return fmt.Errorf("list indices must be integers, not %s", key.Type())
+					return fmt.Errorf("list indices must be integers or slices, not %s", key.Type())
 				}
 				intIdx := int(idx)
 				if intIdx < 0 {

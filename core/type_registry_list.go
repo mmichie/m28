@@ -577,9 +577,72 @@ func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error
 	}
 
 	list := receiver.(*ListValue)
+
+	// Handle slice deletion: del list[start:stop:step]
+	if slice, ok := args[0].(*SliceValue); ok {
+		length := list.Len()
+
+		// Convert slice to indices
+		var start, stop, step *int
+
+		if slice.Start != nil && slice.Start != Nil {
+			val, err := toIndex(slice.Start, ctx)
+			if err != nil {
+				return nil, err
+			}
+			start = &val
+		}
+
+		if slice.Stop != nil && slice.Stop != Nil {
+			val, err := toIndex(slice.Stop, ctx)
+			if err != nil {
+				return nil, err
+			}
+			stop = &val
+		}
+
+		if slice.Step != nil && slice.Step != Nil {
+			val, err := toIndex(slice.Step, ctx)
+			if err != nil {
+				return nil, err
+			}
+			if val == 0 {
+				return nil, fmt.Errorf("slice step cannot be zero")
+			}
+			step = &val
+		}
+
+		// Normalize indices (using same logic as slicing)
+		startIdx, stopIdx, stepVal := normalizeSliceIndicesForDel(length, start, stop, step)
+
+		// Create set of indices to delete
+		indicesToDelete := make(map[int]bool)
+		if stepVal > 0 {
+			for i := startIdx; i < stopIdx; i += stepVal {
+				indicesToDelete[i] = true
+			}
+		} else {
+			for i := startIdx; i > stopIdx; i += stepVal {
+				indicesToDelete[i] = true
+			}
+		}
+
+		// Mutate the list by removing deleted indices
+		newItems := make([]Value, 0, length-len(indicesToDelete))
+		for i, item := range list.items {
+			if !indicesToDelete[i] {
+				newItems = append(newItems, item)
+			}
+		}
+		list.items = newItems
+
+		return None, nil
+	}
+
+	// Handle single index deletion: del list[i]
 	idx, ok := args[0].(NumberValue)
 	if !ok {
-		return nil, fmt.Errorf("list indices must be integers")
+		return nil, fmt.Errorf("list indices must be integers or slices, not %s", args[0].Type())
 	}
 
 	i := int(idx)
@@ -595,6 +658,78 @@ func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error
 	list.items = append(list.items[:i], list.items[i+1:]...)
 
 	return None, nil
+}
+
+// normalizeSliceIndicesForDel normalizes slice indices for deletion
+func normalizeSliceIndicesForDel(length int, start, end, step *int) (int, int, int) {
+	stepVal := 1
+	if step != nil {
+		stepVal = *step
+	}
+
+	var startIdx, endIdx int
+
+	if stepVal > 0 {
+		startIdx = 0
+		endIdx = length
+
+		if start != nil {
+			startIdx = *start
+			if startIdx < 0 {
+				startIdx += length
+			}
+			if startIdx < 0 {
+				startIdx = 0
+			}
+			if startIdx > length {
+				startIdx = length
+			}
+		}
+
+		if end != nil {
+			endIdx = *end
+			if endIdx < 0 {
+				endIdx += length
+			}
+			if endIdx < 0 {
+				endIdx = 0
+			}
+			if endIdx > length {
+				endIdx = length
+			}
+		}
+	} else {
+		startIdx = length - 1
+		endIdx = -length - 1
+
+		if start != nil {
+			startIdx = *start
+			if startIdx < 0 {
+				startIdx += length
+			}
+			if startIdx < -length-1 {
+				startIdx = -length - 1
+			}
+			if startIdx >= length {
+				startIdx = length - 1
+			}
+		}
+
+		if end != nil {
+			endIdx = *end
+			if endIdx < 0 {
+				endIdx += length
+			}
+			if endIdx < -length-1 {
+				endIdx = -length - 1
+			}
+			if endIdx >= length {
+				endIdx = length - 1
+			}
+		}
+	}
+
+	return startIdx, endIdx, stepVal
 }
 
 // toIndex converts a value to an integer index using __index__ if available

@@ -867,9 +867,13 @@ func createIntClass(objectClass *core.Class) *IntType {
 			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
 		}
 
-		// First argument is the class
-		cls, ok := args[0].(*core.Class)
-		if !ok {
+		// First argument is the class - handle both Class and IntType
+		var cls *core.Class
+		if c, ok := args[0].(*core.Class); ok {
+			cls = c
+		} else if it, ok := args[0].(*IntType); ok {
+			cls = it.Class
+		} else {
 			return nil, fmt.Errorf("__new__() argument 1 must be a class, not %T", args[0])
 		}
 
@@ -898,6 +902,105 @@ func createIntClass(objectClass *core.Class) *IntType {
 		instance := core.NewInstance(cls)
 		instance.Attributes["__value__"] = value
 		return instance, nil
+	}))
+
+	// Add __int__ method - needed for int() builtin and int subclasses
+	class.SetMethod("__int__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("__int__() takes exactly 1 argument (%d given)", len(args))
+		}
+		// The receiver is passed as the first argument
+		receiver := args[0]
+
+		// Handle NumberValue directly
+		if n, ok := receiver.(core.NumberValue); ok {
+			return core.NumberValue(float64(int(n))), nil
+		}
+
+		// Handle int subclass instances that store __value__
+		if inst, ok := receiver.(*core.Instance); ok {
+			if val, exists := inst.Attributes["__value__"]; exists {
+				if n, ok := val.(core.NumberValue); ok {
+					return core.NumberValue(float64(int(n))), nil
+				}
+			}
+			return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+		}
+
+		return nil, fmt.Errorf("__int__() argument must be int, not %s", receiver.Type())
+	}))
+
+	// Add __index__ method - needed for slicing
+	class.SetMethod("__index__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("__index__() takes exactly 1 argument (%d given)", len(args))
+		}
+		receiver := args[0]
+
+		// Handle NumberValue directly
+		if n, ok := receiver.(core.NumberValue); ok {
+			intVal := int(n)
+			if float64(intVal) != float64(n) {
+				return nil, fmt.Errorf("__index__ returned non-integer value")
+			}
+			return core.NumberValue(float64(n)), nil
+		}
+
+		// Handle int subclass instances that store __value__
+		if inst, ok := receiver.(*core.Instance); ok {
+			if val, exists := inst.Attributes["__value__"]; exists {
+				if n, ok := val.(core.NumberValue); ok {
+					intVal := int(n)
+					if float64(intVal) != float64(n) {
+						return nil, fmt.Errorf("__index__ returned non-integer value")
+					}
+					return core.NumberValue(float64(n)), nil
+				}
+			}
+			return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+		}
+
+		return nil, fmt.Errorf("__index__() argument must be int, not %s", receiver.Type())
+	}))
+
+	// Add __add__ method - needed for arithmetic
+	class.SetMethod("__add__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, fmt.Errorf("__add__() takes exactly 2 arguments (%d given)", len(args))
+		}
+		receiver := args[0]
+		other := args[1]
+
+		// Extract numeric value from receiver
+		var a float64
+		if n, ok := receiver.(core.NumberValue); ok {
+			a = float64(n)
+		} else if inst, ok := receiver.(*core.Instance); ok {
+			if val, exists := inst.Attributes["__value__"]; exists {
+				if n, ok := val.(core.NumberValue); ok {
+					a = float64(n)
+				} else {
+					return core.NotImplemented, nil
+				}
+			} else {
+				return core.NotImplemented, nil
+			}
+		} else {
+			return core.NotImplemented, nil
+		}
+
+		// Extract numeric value from other
+		if b, ok := other.(core.NumberValue); ok {
+			return core.NumberValue(a + float64(b)), nil
+		} else if inst, ok := other.(*core.Instance); ok {
+			if val, exists := inst.Attributes["__value__"]; exists {
+				if b, ok := val.(core.NumberValue); ok {
+					return core.NumberValue(a + float64(b)), nil
+				}
+			}
+		}
+
+		return core.NotImplemented, nil
 	}))
 
 	return &IntType{Class: class}

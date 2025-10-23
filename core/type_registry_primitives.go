@@ -25,11 +25,37 @@ func registerNumberType() {
 					if len(args) != 1 {
 						return nil, fmt.Errorf("__add__ takes exactly one argument")
 					}
-					a := float64(receiver.(NumberValue))
+
+					// Extract numeric value from receiver (handle both NumberValue and int subclass instances)
+					var a float64
+					if n, ok := receiver.(NumberValue); ok {
+						a = float64(n)
+					} else if inst, ok := receiver.(*Instance); ok {
+						if val, exists := inst.Attributes["__value__"]; exists {
+							if n, ok := val.(NumberValue); ok {
+								a = float64(n)
+							} else {
+								return NotImplemented, nil
+							}
+						} else {
+							return NotImplemented, nil
+						}
+					} else {
+						return NotImplemented, nil
+					}
 
 					// Handle NumberValue + NumberValue
 					if b, ok := args[0].(NumberValue); ok {
 						return NumberValue(a + float64(b)), nil
+					}
+
+					// Handle addition with int subclass instances
+					if inst, ok := args[0].(*Instance); ok {
+						if val, exists := inst.Attributes["__value__"]; exists {
+							if b, ok := val.(NumberValue); ok {
+								return NumberValue(a + float64(b)), nil
+							}
+						}
 					}
 
 					// Handle NumberValue + BoolValue (Python: bools behave like ints)
@@ -87,13 +113,56 @@ func registerNumberType() {
 				Doc:     "Return self converted to an integer (for use in slicing/indexing)",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					n := float64(receiver.(NumberValue))
-					intVal := int(n)
-					// Check if the number is actually an integer
-					if float64(intVal) != n {
-						return nil, fmt.Errorf("__index__ returned non-integer value")
+					// Handle NumberValue directly
+					if n, ok := receiver.(NumberValue); ok {
+						intVal := int(n)
+						// Check if the number is actually an integer
+						if float64(intVal) != float64(n) {
+							return nil, fmt.Errorf("__index__ returned non-integer value")
+						}
+						return NumberValue(float64(n)), nil
 					}
-					return NumberValue(n), nil
+
+					// Handle int subclass instances that store __value__
+					if inst, ok := receiver.(*Instance); ok {
+						if val, exists := inst.Attributes["__value__"]; exists {
+							if n, ok := val.(NumberValue); ok {
+								intVal := int(n)
+								// Check if the number is actually an integer
+								if float64(intVal) != float64(n) {
+									return nil, fmt.Errorf("__index__ returned non-integer value")
+								}
+								return NumberValue(float64(n)), nil
+							}
+						}
+						return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+					}
+
+					return nil, fmt.Errorf("__index__ called on non-int receiver: %s", receiver.Type())
+				},
+			},
+			"__int__": {
+				Name:    "__int__",
+				Arity:   0,
+				Doc:     "Return int(self) - truncate to integer",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					// Handle NumberValue directly
+					if n, ok := receiver.(NumberValue); ok {
+						return NumberValue(float64(int(n))), nil
+					}
+
+					// Handle int subclass instances that store __value__
+					if inst, ok := receiver.(*Instance); ok {
+						if val, exists := inst.Attributes["__value__"]; exists {
+							if n, ok := val.(NumberValue); ok {
+								return NumberValue(float64(int(n))), nil
+							}
+						}
+						return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+					}
+
+					return nil, fmt.Errorf("__int__ called on non-int receiver: %s", receiver.Type())
 				},
 			},
 		},
