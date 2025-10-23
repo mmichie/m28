@@ -843,6 +843,94 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		return nil, err
 	}
 
+	// Handle tuple of types - check if obj is instance of any type in the tuple
+	if tuple, ok := classVal.(core.TupleValue); ok {
+		for _, typeVal := range tuple {
+			// Check each type in the tuple without recursion
+			// We need to check if obj matches typeVal
+
+			// Handle string type names
+			if typeName, ok := typeVal.(core.StringValue); ok {
+				actualType := string(obj.Type())
+				expectedType := string(typeName)
+
+				// Handle Python type name aliases
+				match := false
+				switch expectedType {
+				case "int", "float":
+					match = actualType == "number"
+				case "str":
+					match = actualType == "string"
+				case "bool":
+					match = actualType == "bool"
+				case "NoneType":
+					match = actualType == "nil"
+				case "list":
+					match = actualType == "list"
+				case "dict":
+					match = actualType == "dict"
+				case "tuple":
+					match = actualType == "tuple"
+				case "set":
+					match = actualType == "set"
+				case "bytes":
+					match = actualType == "bytes"
+				default:
+					match = actualType == expectedType
+				}
+				if match {
+					return core.True, nil
+				}
+				continue
+			}
+
+			// Handle BuiltinFunction type constructors
+			if builtinFunc, ok := typeVal.(*core.BuiltinFunction); ok {
+				if nameVal, hasName := builtinFunc.GetAttr("__name__"); hasName {
+					if nameStr, ok := nameVal.(core.StringValue); ok {
+						typeName := string(nameStr)
+						actualType := string(obj.Type())
+
+						match := false
+						switch typeName {
+						case "list":
+							match = actualType == "list"
+						case "int", "float":
+							match = actualType == "number"
+						case "str":
+							match = actualType == "string"
+						case "bool":
+							match = actualType == "bool"
+						case "tuple":
+							match = actualType == "tuple"
+						case "dict":
+							match = actualType == "dict"
+						case "set":
+							match = actualType == "set"
+						case "bytes":
+							match = actualType == "bytes"
+						}
+						if match {
+							return core.True, nil
+						}
+					}
+				}
+				continue
+			}
+
+			// Handle class types
+			if class, ok := typeVal.(*core.Class); ok {
+				if instance, ok := obj.(*core.Instance); ok {
+					if instance.Class == class || (instance.Class.Parent != nil && instance.Class.Parent == class) {
+						return core.True, nil
+					}
+				}
+			}
+		}
+		// If none matched, return false
+		return core.False, nil
+	}
+
 	// Handle string type names
 	if typeName, ok := classVal.(core.StringValue); ok {
 		actualType := string(obj.Type())

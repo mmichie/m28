@@ -4,6 +4,18 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// simpleEnumWithKwargs wraps a BuiltinFunction to accept keyword arguments
+type simpleEnumWithKwargs struct {
+	*core.BuiltinFunction
+}
+
+// CallWithKeywords implements keyword argument support for _simple_enum
+func (s *simpleEnumWithKwargs) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// _simple_enum accepts keyword arguments but we ignore them in the stub
+	// Just call the underlying function with positional args only
+	return s.BuiltinFunction.Call(args, ctx)
+}
+
 // InitEnumModule initializes a stub enum module
 // This provides minimal enum support for Python stdlib modules like re
 func InitEnumModule() *core.DictValue {
@@ -71,8 +83,8 @@ func InitEnumModule() *core.DictValue {
 
 	// _simple_enum decorator factory
 	// Returns a decorator that returns the class unchanged
-	module.Set("_simple_enum", core.NewNamedBuiltinFunction("_simple_enum", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// _simple_enum(etype=Enum, *, boundary=None, use_args=None)
+	// _simple_enum(etype=Enum, *, boundary=None, use_args=None)
+	simpleEnumFunc := core.NewNamedBuiltinFunction("_simple_enum", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Returns a decorator function
 		decorator := core.NewNamedBuiltinFunction("_simple_enum_decorator", func(decoratorArgs []core.Value, decoratorCtx *core.Context) (core.Value, error) {
 			if len(decoratorArgs) < 1 {
@@ -82,7 +94,12 @@ func InitEnumModule() *core.DictValue {
 			return decoratorArgs[0], nil
 		})
 		return decorator, nil
-	}))
+	})
+	// Create a wrapper that implements CallWithKeywords
+	simpleEnumWrapper := &simpleEnumWithKwargs{
+		BuiltinFunction: simpleEnumFunc,
+	}
+	module.Set("_simple_enum", simpleEnumWrapper)
 
 	// auto() function - returns incrementing integers
 	autoCounter := 0
