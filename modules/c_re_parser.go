@@ -12,6 +12,7 @@ func Init_REParserModule() *core.DictValue {
 	// parse - parse a regex pattern string into a parsed pattern object
 	// parse(str, flags=0, state=None)
 	module.Set("parse", core.NewNamedBuiltinFunction("parse", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		core.DebugLog("[RE-PARSER] parse() called with %d args\n", len(args))
 		if len(args) < 1 {
 			return nil, core.NewTypeError("parse", nil, "parse() takes at least 1 argument")
 		}
@@ -21,6 +22,7 @@ func Init_REParserModule() *core.DictValue {
 		if !ok {
 			return nil, core.NewTypeError("parse", args[0], "pattern must be a string")
 		}
+		core.DebugLog("[RE-PARSER] pattern: %s\n", string(patternStr))
 
 		// Get flags (default 0)
 		flags := core.NumberValue(0)
@@ -29,8 +31,10 @@ func Init_REParserModule() *core.DictValue {
 				flags = f
 			}
 		}
+		core.DebugLog("[RE-PARSER] flags: %v\n", flags)
 
 		// Create a State object (minimal stub)
+		core.DebugLog("[RE-PARSER] Creating state dict\n")
 		state := core.NewDict()
 		state.Set("flags", flags)
 		state.Set("str", patternStr)
@@ -41,17 +45,21 @@ func Init_REParserModule() *core.DictValue {
 
 		// Create a SubPattern object (minimal stub)
 		// SubPattern needs: .state, .data, .width
+		core.DebugLog("[RE-PARSER] Creating subPattern dict\n")
 		subPattern := core.NewDict()
 		subPattern.Set("state", state)
 		subPattern.Set("data", core.NewList()) // Empty list of pattern operations
 		subPattern.Set("width", core.TupleValue{core.NumberValue(0), core.NumberValue(65535)})
 
 		// Add getwidth method
+		core.DebugLog("[RE-PARSER] Adding getwidth method\n")
 		subPattern.Set("getwidth", core.NewNamedBuiltinFunction("getwidth", func(getwidthArgs []core.Value, getwidthCtx *core.Context) (core.Value, error) {
+			core.DebugLog("[RE-PARSER] getwidth() called\n")
 			// Return (min_width, max_width)
 			return core.TupleValue{core.NumberValue(0), core.NumberValue(65535)}, nil
 		}))
 
+		core.DebugLog("[RE-PARSER] parse() returning subPattern\n")
 		return subPattern, nil
 	}))
 

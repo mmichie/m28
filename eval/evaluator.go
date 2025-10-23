@@ -1975,19 +1975,35 @@ func listLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 	return core.NewList(result...), nil
 }
 
+// Track recursion depth for tuple literal evaluation to prevent infinite loops
+var tupleLiteralDepth = 0
+const maxTupleLiteralDepth = 1000
+
 // tupleLiteralForm implements the tuple-literal special form
 // Usage: (tuple-literal elem1 elem2 ...)
 func tupleLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Increment depth counter and check for infinite recursion
+	tupleLiteralDepth++
+	defer func() { tupleLiteralDepth-- }()
+
+	if tupleLiteralDepth > maxTupleLiteralDepth {
+		return nil, fmt.Errorf("tuple literal evaluation depth exceeded %d - possible infinite loop", maxTupleLiteralDepth)
+	}
+
+	core.DebugLog("[TUPLE-LIT] tupleLiteralForm with %d args (depth: %d)\n", args.Len(), tupleLiteralDepth)
 	result := make(core.TupleValue, 0, args.Len())
 
 	// Evaluate each element
-	for _, arg := range args.Items() {
+	for i, arg := range args.Items() {
+		core.DebugLog("[TUPLE-LIT] Evaluating element %d: %T\n", i, arg)
 		val, err := Eval(arg, ctx)
 		if err != nil {
 			return nil, err
 		}
+		core.DebugLog("[TUPLE-LIT] Element %d evaluated to: %T\n", i, val)
 		result = append(result, val)
 	}
 
+	core.DebugLog("[TUPLE-LIT] Returning tuple with %d elements\n", len(result))
 	return result, nil
 }
