@@ -321,6 +321,83 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 		// Wrap the dict as a Module object to support attribute access
 		moduleObj := wrapDictAsModule(moduleName, dictModule)
+
+		// Handle dotted imports: for "import a.b.c", we need to:
+		// 1. Define 'a' in the current namespace (or create a stub if it doesn't exist)
+		// 2. Ensure a.b and a.b.c are accessible as attributes
+		// Exception: if an explicit alias is provided (import a.b.c as x), use the alias instead
+		if strings.Contains(moduleName, ".") {
+			// Check if user provided an explicit alias
+			hasExplicitAlias := (alias != filepath.Base(moduleName))
+
+			if hasExplicitAlias {
+				// User provided explicit alias like "import a.b.c as x"
+				// Just define the alias and return
+				ctx.Define(alias, moduleObj)
+				return dictModule, nil
+			}
+
+			// No explicit alias, use Python's dotted import behavior
+			parts := strings.Split(moduleName, ".")
+			topLevelName := parts[0]
+
+			// Check if top-level module is already imported
+			topLevelVal, err := ctx.Lookup(topLevelName)
+			var topLevelModule *core.Module
+
+			if err != nil {
+				// Top-level not imported yet
+				// Try to load it, but if it fails, create a stub package module
+				topLevelDict, err := loader.LoadModule(topLevelName, ctx)
+				if err != nil {
+					// Failed to load top-level module, create a stub package
+					core.DebugLog("[DEBUG] Failed to load top-level module '%s', creating stub: %v\n", topLevelName, err)
+					topLevelModule = core.NewModule(topLevelName, "")
+					ctx.Define(topLevelName, topLevelModule)
+				} else {
+					topLevelModule = wrapDictAsModule(topLevelName, topLevelDict)
+					ctx.Define(topLevelName, topLevelModule)
+				}
+			} else {
+				// Top-level already imported, verify it's a module
+				var ok bool
+				topLevelModule, ok = topLevelVal.(*core.Module)
+				if !ok {
+					return nil, fmt.Errorf("name '%s' is already defined as non-module", topLevelName)
+				}
+			}
+
+			// Build the chain: for "a.b.c", ensure a.b exists and has c as attribute
+			currentModule := topLevelModule
+			for i := 1; i < len(parts); i++ {
+				partialName := strings.Join(parts[:i+1], ".")
+				part := parts[i]
+
+				// Check if this submodule is already an attribute
+				if subVal, exists := currentModule.GetAttr(part); exists {
+					// Already exists, use it
+					if subModule, ok := subVal.(*core.Module); ok {
+						currentModule = subModule
+						continue
+					}
+				}
+
+				// Load the submodule
+				subDict, err := loader.LoadModule(partialName, ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load submodule '%s': %w", partialName, err)
+				}
+				subModule := wrapDictAsModule(partialName, subDict)
+
+				// Set it as an attribute of the parent
+				currentModule.SetAttr(part, subModule)
+				currentModule = subModule
+			}
+
+			return dictModule, nil
+		}
+
+		// Non-dotted import: just define the module with the alias
 		ctx.Define(alias, moduleObj)
 		return dictModule, nil
 	}
