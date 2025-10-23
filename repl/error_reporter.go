@@ -30,6 +30,24 @@ func (er *ErrorReporter) AddSource(filename, source string) {
 
 // ReportError reports an error with context
 func (er *ErrorReporter) ReportError(err error, ctx *core.Context, w io.Writer) {
+	// Check if it's an Exception with chaining (import eval to avoid circular dependency)
+	// We need to use type assertion carefully here
+	if excErr, ok := err.(interface {
+		Error() string
+		ErrorWithChain() string
+	}); ok {
+		// Check if it has chaining (Cause or Context)
+		chainedMsg := excErr.ErrorWithChain()
+		if chainedMsg != excErr.Error() {
+			// Has chaining, show full chain
+			fmt.Fprintln(w, er.colorManager.ColorizeError(chainedMsg))
+			if ctx != nil && len(ctx.CallStack) > 0 {
+				fmt.Fprint(w, ctx.FormatStackTrace())
+			}
+			return
+		}
+	}
+
 	// Check if it's a structured error
 	if evalErr, ok := err.(*core.EvalError); ok {
 		// Check if EvalError wraps a NameError

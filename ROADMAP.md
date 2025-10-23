@@ -157,7 +157,14 @@
 
 **Priority 1 - Should Fix:**
 - [ ] Annotated assignments: `x: int = 5`
-- [ ] Exception chaining: `raise ... from ...`
+- [x] **Exception chaining: `raise ... from ...`** (eval/evaluator.go, repl/error_reporter.go) ✅ COMPLETE
+  - Added `Cause` and `Context` fields to Exception struct
+  - Implemented `raise exception from cause` syntax support
+  - raiseForm() handles 3+ arguments for chaining
+  - ErrorWithChain() displays full exception chain
+  - Error reporter shows chained exceptions with clear messages
+  - __cause__ attribute set on exception instances
+  - Completed: 2025-01-23
 - [ ] Starred expressions everywhere: `x, *rest = values`
 - [ ] Short-circuit evaluation verification
 - [ ] `yield from` for generator delegation

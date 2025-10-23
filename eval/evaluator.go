@@ -809,6 +809,8 @@ type Exception struct {
 	Type    string
 	Message string
 	Value   core.Value
+	Cause   *Exception // Explicit cause (from "raise ... from ...")
+	Context *Exception // Implicit context (exception during handling)
 }
 
 func (e *Exception) Error() string {
@@ -816,6 +818,24 @@ func (e *Exception) Error() string {
 		return fmt.Sprintf("%s: %s", e.Type, e.Message)
 	}
 	return e.Type
+}
+
+// ErrorWithChain returns the error string with the full exception chain
+func (e *Exception) ErrorWithChain() string {
+	var parts []string
+	parts = append(parts, e.Error())
+
+	// Show explicit cause first
+	if e.Cause != nil {
+		parts = append(parts, "\nThe above exception was the direct cause of the following exception:\n")
+		parts = append(parts, e.Cause.ErrorWithChain())
+	} else if e.Context != nil {
+		// Show implicit context if no explicit cause
+		parts = append(parts, "\nDuring handling of the above exception, another exception occurred:\n")
+		parts = append(parts, e.Context.ErrorWithChain())
+	}
+
+	return strings.Join(parts, "")
 }
 
 // isExceptionType checks if a string is a known exception type
@@ -1241,6 +1261,104 @@ func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, &Exception{
 			Type:    excType,
 			Message: excMsg,
+		}
+	}
+
+	// Three or more arguments - check for "raise X from Y"
+	if args.Len() >= 3 {
+		// Check if second argument is the "from" keyword
+		if fromSym, ok := args.Items()[1].(core.SymbolValue); ok && string(fromSym) == "from" {
+			// Evaluate the exception
+			excVal, err := Eval(args.Items()[0], ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Evaluate the cause
+			causeVal, err := Eval(args.Items()[2], ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Create the main exception
+			mainExc := &Exception{
+				Type:    "Exception",
+				Message: "",
+			}
+
+			// Extract exception info from excVal
+			if inst, ok := excVal.(*core.Instance); ok {
+				mainExc.Type = inst.Class.Name
+				// Try to get message
+				if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+					if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+						if msgStr, ok := argsTuple[0].(core.StringValue); ok {
+							mainExc.Message = string(msgStr)
+						}
+					}
+				}
+				if mainExc.Message == "" {
+					if msgVal, found := inst.GetAttr("message"); found {
+						mainExc.Message = core.PrintValueWithoutQuotes(msgVal)
+					}
+				}
+				mainExc.Value = inst
+			} else if class, ok := excVal.(*core.Class); ok {
+				// Exception class - instantiate it
+				instance, err := class.Call([]core.Value{}, ctx)
+				if err != nil {
+					return nil, err
+				}
+				mainExc.Type = class.Name
+				mainExc.Value = instance
+			} else if msg, ok := excVal.(core.StringValue); ok {
+				mainExc.Message = string(msg)
+			}
+
+			// Extract cause info
+			cause := &Exception{
+				Type:    "Exception",
+				Message: "",
+			}
+			if inst, ok := causeVal.(*core.Instance); ok {
+				cause.Type = inst.Class.Name
+				// Try to get message
+				if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+					if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+						if msgStr, ok := argsTuple[0].(core.StringValue); ok {
+							cause.Message = string(msgStr)
+						}
+					}
+				}
+				if cause.Message == "" {
+					if msgVal, found := inst.GetAttr("message"); found {
+						cause.Message = core.PrintValueWithoutQuotes(msgVal)
+					}
+				}
+				cause.Value = inst
+			} else if class, ok := causeVal.(*core.Class); ok {
+				// Exception class - instantiate it
+				instance, err := class.Call([]core.Value{}, ctx)
+				if err != nil {
+					return nil, err
+				}
+				cause.Type = class.Name
+				cause.Value = instance
+			} else if msg, ok := causeVal.(core.StringValue); ok {
+				cause.Message = string(msg)
+			}
+
+			// Set __cause__ attribute on main exception's value if it's an instance
+			if mainInst, ok := mainExc.Value.(*core.Instance); ok {
+				if causeInst, ok := cause.Value.(*core.Instance); ok {
+					mainInst.SetAttr("__cause__", causeInst)
+				}
+			}
+
+			// Link the cause
+			mainExc.Cause = cause
+
+			return nil, mainExc
 		}
 	}
 
