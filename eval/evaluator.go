@@ -267,15 +267,18 @@ func ifForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // assignForm implements the = special form for assignment
 func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	core.DebugLog("[ASSIGN] assignForm called with %d args\n", args.Len())
 	if args.Len() != 2 {
 		return nil, fmt.Errorf("= requires 2 arguments, got %d", args.Len())
 	}
 
 	// Get the target
 	target := args.Items()[0]
+	core.DebugLog("[ASSIGN] Target type: %T\n", target)
 
 	// Check if target is a list
 	if targetList, ok := target.(*core.ListValue); ok {
+		core.DebugLog("[ASSIGN] Target is a list with %d elements\n", targetList.Len())
 		// Check if it's a special form (indexed or property assignment)
 		if targetList.Len() > 0 {
 			if sym, ok := targetList.Items()[0].(core.SymbolValue); ok {
@@ -302,18 +305,23 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Tuple unpacking: (= (x, y) (10, 20))
+		core.DebugLog("[ASSIGN] Tuple unpacking: %d targets\n", targetList.Len())
 		// Evaluate the value
+		core.DebugLog("[ASSIGN] Evaluating right-hand side\n")
 		value, err := Eval(args.Items()[1], ctx)
 		if err != nil {
 			return nil, err
 		}
+		core.DebugLog("[ASSIGN] RHS evaluated to %T\n", value)
 
 		// The value must be a tuple or list
 		var values []core.Value
 		switch v := value.(type) {
 		case core.TupleValue:
+			core.DebugLog("[ASSIGN] Unpacking tuple with %d elements\n", len(v))
 			values = []core.Value(v)
 		case *core.ListValue:
+			core.DebugLog("[ASSIGN] Unpacking list with %d elements\n", v.Len())
 			values = v.Items()
 		default:
 			return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
@@ -325,14 +333,17 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Assign each value to its corresponding target
+		core.DebugLog("[ASSIGN] Assigning %d values to targets\n", len(values))
 		for i, t := range targetList.Items() {
 			sym, ok := t.(core.SymbolValue)
 			if !ok {
 				return nil, fmt.Errorf("assignment target must be a symbol, got %v", t.Type())
 			}
+			core.DebugLog("[ASSIGN] Defining %s = %T\n", string(sym), values[i])
 			ctx.Define(string(sym), values[i])
 		}
 
+		core.DebugLog("[ASSIGN] Tuple unpacking complete\n")
 		return value, nil
 	}
 
