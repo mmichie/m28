@@ -115,12 +115,14 @@
   - ✅ Arithmetic operations: `__add__`, `__sub__`, `__mul__`, `__truediv__`, `__floordiv__`, `__mod__`, `__pow__`
   - ✅ Reflected operations: `__radd__`, `__rsub__`, `__rmul__`, `__rtruediv__`, `__rfloordiv__`, `__rmod__`, `__rpow__`
   - ✅ Rich comparison: `__lt__`, `__le__`, `__eq__`, `__ne__`, `__gt__`, `__ge__`
-  - ✅ Special methods: `__str__`, `__len__`, `__getitem__`, `__setitem__`, `__contains__`, `__bool__`
+  - ✅ Special methods: `__str__`, `__len__`, `__getitem__`, `__setitem__`, `__contains__`, `__bool__`, `__call__`
   - ✅ NotImplemented handling: Operators correctly fall back to reflected operations
+  - ✅ `__call__` support: Objects with `__call__` method can be invoked as functions
   - Fixed: NumberValue.__add__() now returns NotImplemented instead of error for unknown types
   - Fixed: CallDunder() treats NotImplemented as "not found" to enable reflected ops
+  - Fixed: Added `__call__` checks in evaluator.go and kwarg_eval.go for callable instances
   - Comprehensive test coverage (tests/test-dunder-methods-comprehensive.m28)
-  - Note: In-place operations (`__iadd__`, etc.) and `__call__` not yet implemented
+  - Note: In-place operations (`__iadd__`, etc.) not yet implemented
   - Completed: 2025-01-23
 
 - [ ] **Descriptors protocol** (core/protocols/descriptors.go)

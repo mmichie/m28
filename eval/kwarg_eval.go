@@ -2,8 +2,10 @@ package eval
 
 import (
 	"fmt"
-	"github.com/mmichie/m28/core"
 	"strings"
+
+	"github.com/mmichie/m28/common/types"
+	"github.com/mmichie/m28/core"
 )
 
 // ArgumentElement represents a single argument element (regular or unpacking)
@@ -366,6 +368,11 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 	// Call as normal with just positional arguments
 	callable, ok := fn.(core.Callable)
 	if !ok {
+		// Check if object has __call__ method
+		if result, found, err := types.CallCall(fn, positionalArgs, ctx); found {
+			return result, err
+		}
+
 		return nil, core.NewTypeError("callable", fn, "function call")
 	}
 

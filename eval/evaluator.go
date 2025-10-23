@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 )
 
@@ -102,6 +103,11 @@ func evalFunctionCall(expr *core.ListValue, ctx *core.Context) (core.Value, erro
 	// Call the function
 	callable, ok := fn.(core.Callable)
 	if !ok {
+		// Check if object has __call__ method
+		if result, found, err := types.CallCall(fn, args, ctx); found {
+			return result, err
+		}
+
 		errMsg := "function call"
 		if symbolName != "" {
 			errMsg = fmt.Sprintf("calling '%s'", symbolName)

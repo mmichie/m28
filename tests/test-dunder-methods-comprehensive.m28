@@ -250,18 +250,17 @@ print("\n=== Testing special dunder methods ===")
 (print "✓ __contains__: 10 in container = " (in 10 container))
 
 # Test __call__
-# TODO: __call__ support needs to be added to the evaluator
-# (class Adder
-#   (def __init__ (self n)
-#     (= self.n n))
-#
-#   (def __call__ (self x)
-#     (+ self.n x)))
-#
-# (= add5 (Adder 5))
-# (= call_result (add5 10))
-# (assert (== call_result 15) "__call__ should work")
-# (print "✓ __call__: Adder(5)(10) = " call_result)
+(class Adder
+  (def __init__ (self n)
+    (= self.n n))
+
+  (def __call__ (self x)
+    (+ self.n x)))
+
+(= add5 (Adder 5))
+(= call_result (add5 10))
+(assert (== call_result 15) "__call__ should work")
+(print "✓ __call__: Adder(5)(10) = " call_result)
 
 # Test __bool__
 (class BoolTest
