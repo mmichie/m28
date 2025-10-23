@@ -174,7 +174,16 @@
   - Error reporter shows chained exceptions with clear messages
   - __cause__ attribute set on exception instances
   - Completed: 2025-01-23
-- [ ] Starred expressions everywhere: `x, *rest = values`
+- [x] **Starred expressions everywhere** (parser/python_parser.go, eval/evaluator.go) ✅ COMPLETE
+  - Assignment unpacking already working: `a, *b, c = [1,2,3,4,5]`
+  - Function call unpacking already working: `func(*args)`
+  - Dict literal unpacking already working: `{**d1, **d2}`
+  - Implemented list literal unpacking: `[0, *list1, *list2, 5]`
+  - Implemented tuple literal unpacking: `(0, *t1, *t2, 5)`
+  - Implemented set literal unpacking: `{0, *s1, *s2, 5}`
+  - Parser generates `(*unpack-iter expr)` markers
+  - Evaluator unpacks iterables in literal contexts
+  - Completed: 2025-01-23
 - [ ] Short-circuit evaluation verification
 - [ ] `yield from` for generator delegation
 

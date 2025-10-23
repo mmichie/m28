@@ -2156,11 +2156,31 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // listLiteralForm implements the list-literal special form
 // It evaluates all arguments and returns them as a list
+// Supports starred expressions: [1, *other_list, 3]
 func listLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	result := make([]core.Value, 0, args.Len())
 
 	// Evaluate each element
 	for _, arg := range args.Items() {
+		// Check if this is an unpacking expression: (*unpack-iter expr)
+		if list, ok := arg.(*core.ListValue); ok && list.Len() == 2 {
+			if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack-iter" {
+				// Evaluate the expression to unpack
+				val, err := Eval(list.Items()[1], ctx)
+				if err != nil {
+					return nil, err
+				}
+				// Unpack the iterable into the result
+				items, err := convertIterableToSlice(val)
+				if err != nil {
+					return nil, fmt.Errorf("cannot unpack non-iterable: %v", err)
+				}
+				result = append(result, items...)
+				continue
+			}
+		}
+
+		// Regular element - evaluate and append
 		val, err := Eval(arg, ctx)
 		if err != nil {
 			return nil, err
@@ -2178,6 +2198,7 @@ const maxTupleLiteralDepth = 1000
 
 // tupleLiteralForm implements the tuple-literal special form
 // Usage: (tuple-literal elem1 elem2 ...)
+// Supports starred expressions: (1, *other_tuple, 3)
 func tupleLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Increment depth counter and check for infinite recursion
 	tupleLiteralDepth++
@@ -2193,6 +2214,26 @@ func tupleLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, erro
 	// Evaluate each element
 	for i, arg := range args.Items() {
 		core.DebugLog("[TUPLE-LIT] Evaluating element %d: %T\n", i, arg)
+
+		// Check if this is an unpacking expression: (*unpack-iter expr)
+		if list, ok := arg.(*core.ListValue); ok && list.Len() == 2 {
+			if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack-iter" {
+				// Evaluate the expression to unpack
+				val, err := Eval(list.Items()[1], ctx)
+				if err != nil {
+					return nil, err
+				}
+				// Unpack the iterable into the result
+				items, err := convertIterableToSlice(val)
+				if err != nil {
+					return nil, fmt.Errorf("cannot unpack non-iterable: %v", err)
+				}
+				result = append(result, items...)
+				continue
+			}
+		}
+
+		// Regular element - evaluate and append
 		val, err := Eval(arg, ctx)
 		if err != nil {
 			return nil, err

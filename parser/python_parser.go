@@ -2047,6 +2047,12 @@ func (p *PythonParser) parseDictOrSetLiteral() ast.ASTNode {
 		return p.parseDictLiteral(nil, tok)
 	}
 
+	// Check for * unpacking - if so, it's definitely a set
+	if p.check(TOKEN_STAR) {
+		first := p.parseListElement()
+		return p.parseSetLiteral(first, tok)
+	}
+
 	// Parse first element
 	first := p.parseExpression()
 
@@ -2128,9 +2134,19 @@ func (p *PythonParser) parseDictLiteral(firstKey ast.ASTNode, tok Token) ast.AST
 }
 
 // parseSetLiteral parses the rest of: {elem, ...}
+// Supports starred expressions: {1, *other_set, 3}
 func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode {
-	// Check if it's a set comprehension
+	// Check if it's a set comprehension (only if first element is not a star expression)
 	if p.check(TOKEN_FOR) {
+		// Star expressions not allowed in comprehensions
+		if sExpr, ok := first.(*ast.SExpr); ok {
+			if len(sExpr.Elements) > 0 {
+				if id, ok := sExpr.Elements[0].(*ast.Identifier); ok && id.Name == "*unpack-iter" {
+					p.error("Iterable unpacking (*) cannot be used in comprehension")
+					return nil
+				}
+			}
+		}
 		return p.parseSetComprehension(first, tok)
 	}
 
@@ -2142,7 +2158,7 @@ func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode
 		if p.check(TOKEN_RBRACE) {
 			break // Trailing comma
 		}
-		elements = append(elements, p.parseExpression())
+		elements = append(elements, p.parseListElement())
 	}
 
 	p.expect(TOKEN_RBRACE)
