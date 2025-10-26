@@ -179,9 +179,10 @@ func DoForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
-		// Check for return value
-		if ret, ok := result.(*ReturnValue); ok {
-			return ret.Value, nil
+		// Check for return value - propagate it, don't unwrap!
+		// The unwrapping should only happen at function boundaries
+		if _, ok := result.(*ReturnValue); ok {
+			return result, nil
 		}
 	}
 

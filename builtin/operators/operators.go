@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/mmichie/m28/common/errors"
 	"github.com/mmichie/m28/common/types"
@@ -14,42 +15,71 @@ import (
 	"github.com/mmichie/m28/core/protocols"
 )
 
+// Global operator registry for fast lookup without context traversal
+var (
+	operatorRegistry   = make(map[string]core.Value)
+	operatorRegistryMu sync.RWMutex
+)
+
+func init() {
+	// Set the hook so context.Lookup can check the operator registry
+	core.GetOperatorFunc = GetOperator
+}
+
+// GetOperator returns an operator from the global registry (fast path)
+// Returns (operator, true) if found, (nil, false) otherwise
+func GetOperator(name string) (core.Value, bool) {
+	operatorRegistryMu.RLock()
+	defer operatorRegistryMu.RUnlock()
+	op, exists := operatorRegistry[name]
+	return op, exists
+}
+
+// registerOperator adds an operator to both context and global registry
+func registerOperator(ctx *core.Context, name string, op core.Value) {
+	ctx.Define(name, op)
+
+	operatorRegistryMu.Lock()
+	operatorRegistry[name] = op
+	operatorRegistryMu.Unlock()
+}
+
 // RegisterAll registers all operators
 func RegisterAll(ctx *core.Context) {
 	// Arithmetic operators
-	ctx.Define("+", core.NewBuiltinFunction(Add()))
-	ctx.Define("-", core.NewBuiltinFunction(Subtract()))
-	ctx.Define("*", core.NewBuiltinFunction(Multiply()))
-	ctx.Define("/", core.NewBuiltinFunction(Divide()))
-	ctx.Define("//", core.NewBuiltinFunction(FloorDivide()))
-	ctx.Define("%", core.NewBuiltinFunction(Modulo()))
-	ctx.Define("**", core.NewBuiltinFunction(Power()))
-	ctx.Define("@", core.NewBuiltinFunction(MatMul()))
+	registerOperator(ctx, "+", core.NewBuiltinFunction(Add()))
+	registerOperator(ctx, "-", core.NewBuiltinFunction(Subtract()))
+	registerOperator(ctx, "*", core.NewBuiltinFunction(Multiply()))
+	registerOperator(ctx, "/", core.NewBuiltinFunction(Divide()))
+	registerOperator(ctx, "//", core.NewBuiltinFunction(FloorDivide()))
+	registerOperator(ctx, "%", core.NewBuiltinFunction(Modulo()))
+	registerOperator(ctx, "**", core.NewBuiltinFunction(Power()))
+	registerOperator(ctx, "@", core.NewBuiltinFunction(MatMul()))
 
 	// Comparison operators
-	ctx.Define("==", core.NewBuiltinFunction(Equal()))
-	ctx.Define("!=", core.NewBuiltinFunction(NotEqual()))
-	ctx.Define("<", core.NewBuiltinFunction(LessThan()))
-	ctx.Define("<=", core.NewBuiltinFunction(LessThanOrEqual()))
-	ctx.Define(">", core.NewBuiltinFunction(GreaterThan()))
-	ctx.Define(">=", core.NewBuiltinFunction(GreaterThanOrEqual()))
+	registerOperator(ctx, "==", core.NewBuiltinFunction(Equal()))
+	registerOperator(ctx, "!=", core.NewBuiltinFunction(NotEqual()))
+	registerOperator(ctx, "<", core.NewBuiltinFunction(LessThan()))
+	registerOperator(ctx, "<=", core.NewBuiltinFunction(LessThanOrEqual()))
+	registerOperator(ctx, ">", core.NewBuiltinFunction(GreaterThan()))
+	registerOperator(ctx, ">=", core.NewBuiltinFunction(GreaterThanOrEqual()))
 
 	// Logical operators
-	ctx.Define("not", core.NewBuiltinFunction(Not()))
-	ctx.Define("and", core.NewBuiltinFunction(And()))
-	ctx.Define("or", core.NewBuiltinFunction(Or()))
-	ctx.Define("in", core.NewBuiltinFunction(In()))
-	ctx.Define("not in", core.NewBuiltinFunction(NotIn()))
-	ctx.Define("is", core.NewBuiltinFunction(Is()))
-	ctx.Define("is not", core.NewBuiltinFunction(IsNot()))
+	registerOperator(ctx, "not", core.NewBuiltinFunction(Not()))
+	registerOperator(ctx, "and", core.NewBuiltinFunction(And()))
+	registerOperator(ctx, "or", core.NewBuiltinFunction(Or()))
+	registerOperator(ctx, "in", core.NewBuiltinFunction(In()))
+	registerOperator(ctx, "not in", core.NewBuiltinFunction(NotIn()))
+	registerOperator(ctx, "is", core.NewBuiltinFunction(Is()))
+	registerOperator(ctx, "is not", core.NewBuiltinFunction(IsNot()))
 
 	// Bitwise operators
-	ctx.Define("<<", core.NewBuiltinFunction(LeftShift()))
-	ctx.Define(">>", core.NewBuiltinFunction(RightShift()))
-	ctx.Define("&", core.NewBuiltinFunction(BitwiseAnd()))
-	ctx.Define("|", core.NewBuiltinFunction(BitwiseOr()))
-	ctx.Define("^", core.NewBuiltinFunction(BitwiseXor()))
-	ctx.Define("~", core.NewBuiltinFunction(BitwiseInvert()))
+	registerOperator(ctx, "<<", core.NewBuiltinFunction(LeftShift()))
+	registerOperator(ctx, ">>", core.NewBuiltinFunction(RightShift()))
+	registerOperator(ctx, "&", core.NewBuiltinFunction(BitwiseAnd()))
+	registerOperator(ctx, "|", core.NewBuiltinFunction(BitwiseOr()))
+	registerOperator(ctx, "^", core.NewBuiltinFunction(BitwiseXor()))
+	registerOperator(ctx, "~", core.NewBuiltinFunction(BitwiseInvert()))
 }
 
 // Arithmetic Operators

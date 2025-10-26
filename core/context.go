@@ -8,6 +8,10 @@ import (
 
 var debugLookups = os.Getenv("M28_DEBUG_LOOKUPS") != ""
 
+// GetOperatorFunc is a hook to the operator registry's GetOperator function
+// This avoids circular imports while allowing fast operator lookup
+var GetOperatorFunc func(string) (Value, bool)
+
 // builtinRegistry tracks all builtin registrations
 var builtinRegistry = NewRegistry("builtin")
 
@@ -179,6 +183,14 @@ func (c *Context) Delete(name string) error {
 
 // Lookup finds a variable in the current or outer scopes
 func (c *Context) Lookup(name string) (Value, error) {
+	// Fast path: Check global operator registry first (no context traversal)
+	// This is critical for performance when operators are used in deeply nested contexts
+	// Import is done via GetOperatorFunc to avoid circular dependency
+	if GetOperatorFunc != nil {
+		if op, isOperator := GetOperatorFunc(name); isOperator {
+			return op, nil
+		}
+	}
 	return c.lookupWithDepth(name, 0)
 }
 
