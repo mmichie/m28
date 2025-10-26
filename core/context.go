@@ -3,7 +3,10 @@ package core
 import (
 	"fmt"
 	"log"
+	"os"
 )
+
+var debugLookups = os.Getenv("M28_DEBUG_LOOKUPS") != ""
 
 // builtinRegistry tracks all builtin registrations
 var builtinRegistry = NewRegistry("builtin")
@@ -186,8 +189,22 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 		return nil, &NameError{Name: name}
 	}
 
+	// DEBUG: Log lookups that exceed a certain depth
+	if depth > 50 {
+		log.Printf("WARN: Deep lookup for '%s' at depth %d", name, depth)
+	}
+
+	// DEBUG: Detailed lookup logging if enabled
+	if debugLookups && depth < 5 {
+		log.Printf("LOOKUP[%d]: '%s' in context %p (vars=%d, outer=%p, global=%p)",
+			depth, name, c, len(c.Vars), c.Outer, c.Global)
+	}
+
 	// Check current scope
 	if val, ok := c.Vars[name]; ok {
+		if debugLookups && depth < 5 {
+			log.Printf("  FOUND in local scope")
+		}
 		return val, nil
 	}
 
