@@ -45,7 +45,7 @@ func RegisterAttributes(ctx *core.Context) {
 		desc := core.GetTypeDescriptorForValue(val)
 		if desc == nil {
 			// Return empty list for types without descriptors
-			return core.EmptyList, nil
+			return core.NewList(), nil
 		}
 
 		// Get all attribute names

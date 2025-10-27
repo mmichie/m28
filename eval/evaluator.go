@@ -30,9 +30,9 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		return val, nil
 
 	case *core.ListValue:
-		// Empty list evaluates to itself
+		// Empty list evaluates to a fresh empty list (avoid shared mutable state)
 		if v.Len() == 0 {
-			return core.EmptyList, nil
+			return core.NewList(), nil
 		}
 
 		core.DebugLog("[EVAL-LIST] Evaluating list with %d elements, first: %T\n", v.Len(), v.Items()[0])

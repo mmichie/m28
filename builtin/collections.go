@@ -58,7 +58,7 @@ func RegisterCollections(ctx *core.Context) {
 	// list - Python list constructor
 	ctx.Define("list", core.NewNamedBuiltinFunction("list", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
-			return core.EmptyList, nil
+			return core.NewList(), nil
 		}
 		if len(args) == 1 {
 			// Python-style: Convert iterable to list
@@ -304,7 +304,7 @@ func (l *ListType) GetClass() *core.Class {
 // Call implements the callable interface for list() construction
 func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
-		return core.EmptyList, nil
+		return core.NewList(), nil
 	}
 	if len(args) == 1 {
 		// Python-style: Convert iterable to list
