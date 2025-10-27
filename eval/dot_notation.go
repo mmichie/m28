@@ -64,6 +64,31 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			return nil, fmt.Errorf("property getter is not callable")
 		}
 
+		// Handle generic descriptor protocol (e.g., TupleGetter)
+		// Check if value has __get__ method
+		if valueWithGetAttr, ok := value.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			if getMethod, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
+				// It's a descriptor - call __get__(self, instance, owner)
+				if getter, ok := getMethod.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					// Get the owner class if possible
+					var owner core.Value = core.None
+					if objWithClass, ok := obj.(interface {
+						GetAttr(string) (core.Value, bool)
+					}); ok {
+						if classVal, ok := objWithClass.GetAttr("__class__"); ok {
+							owner = classVal
+						}
+					}
+					// Call __get__(descriptor, instance, owner)
+					return getter.Call([]core.Value{value, obj, owner}, ctx)
+				}
+			}
+		}
+
 		// Handle staticmethod - unwrap to the underlying function
 		if sm, ok := value.(*core.StaticMethodValue); ok {
 			value = sm.Function

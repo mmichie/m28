@@ -771,14 +771,35 @@ func createTypeMetaclass() *TypeType {
 		// Add methods and attributes from namespace
 		for _, keyStr := range namespace.Keys() {
 			value, _ := namespace.Get(keyStr)
-			if _, ok := value.(interface {
+
+			// Strip the "s:" prefix from string keys to get the actual attribute name
+			keyName := keyStr
+			if strings.HasPrefix(keyStr, "s:") {
+				keyName = keyStr[2:] // Remove "s:" prefix
+			}
+
+			// Check if it's a descriptor (has __get__ method)
+			// Descriptors should be stored as attributes, not methods
+			isDescriptor := false
+			if valueWithGetAttr, ok := value.(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if _, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
+					isDescriptor = true
+				}
+			}
+
+			if isDescriptor {
+				// Add as attribute (descriptor)
+				newClass.SetClassAttr(keyName, value)
+			} else if _, ok := value.(interface {
 				Call([]core.Value, *core.Context) (core.Value, error)
 			}); ok {
 				// It's a callable, add as method
-				newClass.SetMethod(keyStr, value)
+				newClass.SetMethod(keyName, value)
 			} else {
 				// Add as attribute
-				newClass.Attributes[keyStr] = value
+				newClass.SetClassAttr(keyName, value)
 			}
 		}
 

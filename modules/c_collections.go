@@ -848,6 +848,32 @@ func (tg *TupleGetter) GetAttr(name string) (core.Value, bool) {
 			return core.StringValue(tg.doc), true
 		}
 		return core.None, true
+	case "__get__":
+		// Implement descriptor protocol
+		// __get__(self, instance, owner) -> value
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// args[0] is self (the TupleGetter)
+			// args[1] is instance (the namedtuple instance or None)
+			// args[2] is owner (the namedtuple class) - optional
+			if len(args) < 2 {
+				return nil, fmt.Errorf("__get__ requires at least 2 arguments")
+			}
+
+			instance := args[1]
+
+			// If instance is None/Nil or is a Class, return the descriptor itself
+			// This happens when accessing the attribute from the class (e.g., Point.x)
+			// rather than from an instance (e.g., p.x)
+			if instance == core.None || instance == core.Nil {
+				return tg, nil
+			}
+			if _, isClass := instance.(*core.Class); isClass {
+				return tg, nil
+			}
+
+			// Call the tuplegetter with the instance
+			return tg.Call([]core.Value{instance}, ctx)
+		}), true
 	}
 	return nil, false
 }
