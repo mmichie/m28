@@ -72,30 +72,9 @@ func RegisterCollections(ctx *core.Context) {
 		return core.NewList(args...), nil
 	}))
 
-	// tuple - use the TupleTypeClass which has __new__ support
-	// Create a callable tuple constructor that exposes __new__
-	tupleFunc := core.NewNamedBuiltinFunction("tuple", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return core.EmptyTuple, nil
-		}
-		if len(args) == 1 {
-			// Python-style: Convert iterable to tuple
-			items, err := convertToSlice(args[0])
-			if err != nil {
-				return nil, err
-			}
-			return core.TupleValue(items), nil
-		}
-		// Multiple arguments: create a tuple from all arguments
-		return core.TupleValue(args), nil
-	})
-
-	// Add __new__ classmethod from TupleTypeClass
-	if newMethod, ok := TupleTypeClass.GetMethod("__new__"); ok {
-		tupleFunc.SetAttr("__new__", newMethod)
-	}
-
-	ctx.Define("tuple", tupleFunc)
+	// tuple - create as a class (like dict) so tuple.__new__ works correctly
+	tupleClass := &TupleType{Class: TupleTypeClass}
+	ctx.Define("tuple", tupleClass)
 
 	// dict - Python dict class
 	// Create as a class so dict.fromkeys and other class methods can be accessed
@@ -337,6 +316,43 @@ func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 	}
 	// Multiple arguments: create a list from all arguments
 	return core.NewList(args...), nil
+}
+
+// TupleType represents the tuple class that can be called and has __new__
+type TupleType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (t *TupleType) GetClass() *core.Class {
+	return t.Class
+}
+
+// Call implements the callable interface for tuple() construction
+func (t *TupleType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) == 0 {
+		return core.EmptyTuple, nil
+	}
+	if len(args) == 1 {
+		// Python-style: Convert iterable to tuple
+		items, err := convertToSlice(args[0])
+		if err != nil {
+			return nil, err
+		}
+		return core.TupleValue(items), nil
+	}
+	// Multiple arguments: create a tuple from all arguments
+	return core.TupleValue(args), nil
+}
+
+// Type returns the type of the TupleType
+func (t *TupleType) Type() core.Type {
+	return core.ClassType
+}
+
+// String returns the string representation
+func (t *TupleType) String() string {
+	return "<class 'tuple'>"
 }
 
 // DictType represents the dict class that can be called and has class methods

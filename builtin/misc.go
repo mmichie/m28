@@ -333,30 +333,32 @@ func RegisterMisc(ctx *core.Context) {
 
 		// If globals dict provided, populate the context
 		if globalsDict != nil {
-			iter := globalsDict.Iterator()
-			for {
-				keyVal, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				if keyStr, ok := keyVal.(core.StringValue); ok {
-					value, _ := globalsDict.Get(string(keyStr))
-					evalCtx.Define(string(keyStr), value)
+			// Use Keys() to iterate over all keys in the dict
+			for _, keyStr := range globalsDict.Keys() {
+				value, exists := globalsDict.Get(keyStr)
+				if exists {
+					// Strip "s:" prefix if present (for string keys)
+					cleanKey := keyStr
+					if len(keyStr) > 2 && keyStr[0:2] == "s:" {
+						cleanKey = keyStr[2:]
+					}
+					evalCtx.Define(cleanKey, value)
 				}
 			}
 		}
 
 		// If locals dict provided, add those too (locals override globals)
 		if localsDict != nil {
-			iter := localsDict.Iterator()
-			for {
-				keyVal, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				if keyStr, ok := keyVal.(core.StringValue); ok {
-					value, _ := localsDict.Get(string(keyStr))
-					evalCtx.Define(string(keyStr), value)
+			// Use Keys() to iterate over all keys in the dict
+			for _, keyStr := range localsDict.Keys() {
+				value, exists := localsDict.Get(keyStr)
+				if exists {
+					// Strip "s:" prefix if present (for string keys)
+					cleanKey := keyStr
+					if len(keyStr) > 2 && keyStr[0:2] == "s:" {
+						cleanKey = keyStr[2:]
+					}
+					evalCtx.Define(cleanKey, value)
 				}
 			}
 		}

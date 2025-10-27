@@ -822,12 +822,14 @@ func (tg *TupleGetter) Call(args []core.Value, ctx *core.Context) (core.Value, e
 		return nil, fmt.Errorf("tuplegetter requires exactly 1 argument")
 	}
 
-	// Accept both tuples and lists
+	// Accept tuples, lists, and tuple instances (namedtuples)
 	var items []core.Value
 	switch v := args[0].(type) {
 	case core.TupleValue:
 		items = []core.Value(v)
 	case *core.ListValue:
+		items = v.Items()
+	case *core.TupleInstance:
 		items = v.Items()
 	default:
 		return nil, fmt.Errorf("tuplegetter argument must be a tuple or list, not %s", v.Type())

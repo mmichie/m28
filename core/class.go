@@ -378,6 +378,58 @@ func NewInstance(class *Class) *Instance {
 	}
 }
 
+// TupleInstance represents a tuple that is an instance of a class (e.g., namedtuple)
+type TupleInstance struct {
+	Data  TupleValue // The underlying tuple data
+	Class *Class     // The class this tuple is an instance of
+}
+
+// NewTupleInstance creates a new tuple instance of a class
+func NewTupleInstance(class *Class, data TupleValue) *TupleInstance {
+	return &TupleInstance{
+		Data:  data,
+		Class: class,
+	}
+}
+
+// Type returns the type of the tuple instance
+func (t *TupleInstance) Type() Type {
+	return Type(t.Class.Name)
+}
+
+// String returns the string representation
+func (t *TupleInstance) String() string {
+	return t.Data.String()
+}
+
+// Iterator returns an iterator for the tuple
+func (t *TupleInstance) Iterator() Iterator {
+	return t.Data.Iterator()
+}
+
+// Len returns the length of the tuple
+func (t *TupleInstance) Len() int {
+	return len(t.Data)
+}
+
+// Items returns the tuple items
+func (t *TupleInstance) Items() []Value {
+	return t.Data
+}
+
+// GetAttr gets an attribute from the tuple's class
+func (t *TupleInstance) GetAttr(name string) (Value, bool) {
+	// Special case for __class__
+	if name == "__class__" {
+		return t.Class, true
+	}
+	// Look up in the class
+	if attr, found := t.Class.GetAttr(name); found {
+		return attr, true
+	}
+	return nil, false
+}
+
 // Type returns the instance type
 func (i *Instance) Type() Type {
 	return Type(i.Class.Name)

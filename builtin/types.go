@@ -53,35 +53,52 @@ func RegisterTypes(ctx *core.Context) {
 			return nil, fmt.Errorf("tuple.__new__() missing 1 required positional argument: 'cls'")
 		}
 
-		// If only cls provided, return empty tuple
+		cls := args[0]
+
+		// Convert iterable to tuple data
+		var tupleData core.TupleValue
+
 		if len(args) == 1 {
-			return core.TupleValue{}, nil
-		}
+			// If only cls provided, create empty tuple
+			tupleData = core.TupleValue{}
+		} else {
+			// Convert iterable to tuple
+			iterable := args[1]
 
-		// Convert iterable to tuple
-		iterable := args[1]
-
-		// Handle different iterable types
-		switch v := iterable.(type) {
-		case core.TupleValue:
-			return v, nil
-		case *core.ListValue:
-			return core.TupleValue(v.Items()), nil
-		case core.Iterable:
-			// Iterate and collect values
-			result := make([]core.Value, 0)
-			iter := v.Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
+			// Handle different iterable types
+			switch v := iterable.(type) {
+			case core.TupleValue:
+				tupleData = v
+			case *core.ListValue:
+				tupleData = core.TupleValue(v.Items())
+			case core.Iterable:
+				// Iterate and collect values
+				result := make([]core.Value, 0)
+				iter := v.Iterator()
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					result = append(result, val)
 				}
-				result = append(result, val)
+				tupleData = core.TupleValue(result)
+			default:
+				return nil, fmt.Errorf("tuple.__new__() argument must be an iterable")
 			}
-			return core.TupleValue(result), nil
-		default:
-			return nil, fmt.Errorf("tuple.__new__() argument must be an iterable")
 		}
+
+		// If cls is a subclass of tuple (like a namedtuple), create a TupleInstance
+		// Otherwise, return a plain TupleValue
+		if class, ok := cls.(*core.Class); ok {
+			// Check if it's a tuple subclass (not the base tuple class)
+			if class != TupleTypeClass && class.Name != "tuple" {
+				return core.NewTupleInstance(class, tupleData), nil
+			}
+		}
+
+		// Return plain tuple for base tuple class
+		return tupleData, nil
 	})
 	tupleNew.SetAttr("__name__", core.StringValue("__new__"))
 	TupleTypeClass.SetMethod("__new__", &core.ClassMethodValue{Function: tupleNew})

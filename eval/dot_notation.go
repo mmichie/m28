@@ -96,21 +96,44 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Handle classmethod - bind to the class
 		if cm, ok := value.(*core.ClassMethodValue); ok {
-			// Get the class - either the object itself (if accessing from class)
-			// or the object's __class__ attribute (if accessing from instance)
-			cls := obj
-			if objWithClass, ok := obj.(interface {
-				GetAttr(string) (core.Value, bool)
-			}); ok {
-				if classVal, found := objWithClass.GetAttr("__class__"); found {
-					cls = classVal
+			// Special case for __new__: return the underlying function without binding
+			// This matches CPython behavior where Class.__new__ is an unbound method
+			if string(propName) == "__new__" {
+				// Check if we're accessing from a class (not an instance)
+				if _, isClass := obj.(*core.Class); isClass {
+					value = cm.Function
+				} else if _, isTupleType := obj.(interface{ GetClass() *core.Class }); isTupleType {
+					// Also handle TupleType, DictType, etc.
+					value = cm.Function
+				} else {
+					// For instances, still create bound classmethod
+					cls := obj
+					if objWithClass, ok := obj.(interface {
+						GetAttr(string) (core.Value, bool)
+					}); ok {
+						if classVal, found := objWithClass.GetAttr("__class__"); found {
+							cls = classVal
+						}
+					}
+					value = &core.BoundClassMethod{
+						Class:    cls,
+						Function: cm.Function,
+					}
 				}
-			}
-
-			// Create a bound classmethod that will inject the class as first argument
-			value = &core.BoundClassMethod{
-				Class:    cls,
-				Function: cm.Function,
+			} else {
+				// For other classmethods, create bound classmethod normally
+				cls := obj
+				if objWithClass, ok := obj.(interface {
+					GetAttr(string) (core.Value, bool)
+				}); ok {
+					if classVal, found := objWithClass.GetAttr("__class__"); found {
+						cls = classVal
+					}
+				}
+				value = &core.BoundClassMethod{
+					Class:    cls,
+					Function: cm.Function,
+				}
 			}
 		}
 
