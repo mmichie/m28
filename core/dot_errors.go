@@ -159,11 +159,18 @@ func (e *ImportError) Error() string {
 
 // NewTypeError creates a new type error
 func NewTypeError(expected string, got Value, context string) *TypeError {
-	gotType := string(got.Type())
+	var gotType string
+	if got == nil {
+		gotType = "nil"
+	} else {
+		gotType = string(got.Type())
+	}
 
-	// Use TypeDescriptor for better type names
-	if desc := GetTypeDescriptorForValue(got); desc != nil {
-		gotType = desc.PythonName
+	// Use TypeDescriptor for better type names (only if got is not nil)
+	if got != nil {
+		if desc := GetTypeDescriptorForValue(got); desc != nil {
+			gotType = desc.PythonName
+		}
 	}
 
 	return &TypeError{

@@ -2,12 +2,11 @@ package builtin
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
-	"github.com/mmichie/m28/parser"
+	"github.com/mmichie/m28/eval"
 )
 
 // RegisterMisc registers miscellaneous functions
@@ -311,29 +310,6 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
-		// Transform Python lambda syntax to M28 syntax if needed
-		// Pattern: lambda params: body  ->  (lambda (params) body)
-		if strings.HasPrefix(strings.TrimSpace(codeStr), "lambda ") {
-			// Find the colon that separates params from body
-			colonIdx := strings.Index(codeStr, ":")
-			if colonIdx > 0 {
-				// Extract params and body
-				paramsStr := strings.TrimSpace(codeStr[6:colonIdx]) // Skip "lambda "
-				bodyStr := strings.TrimSpace(codeStr[colonIdx+1:])
-
-				// Convert params: "a, b, c" -> "(a b c)"
-				params := strings.Split(paramsStr, ",")
-				for i, p := range params {
-					params[i] = strings.TrimSpace(p)
-				}
-				paramsM28 := "(" + strings.Join(params, " ") + ")"
-
-				// Convert body: Pythonic calls to M28 calls
-				// For now, keep body as-is since M28 supports both syntaxes
-				codeStr = "(lambda " + paramsM28 + " " + bodyStr + ")"
-			}
-		}
-
 		// Get the globals dict (optional)
 		var globalsDict *core.DictValue
 		if v.Count() >= 2 && v.Get(1) != core.None {
@@ -350,13 +326,6 @@ func RegisterMisc(ctx *core.Context) {
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		// Parse the code string
-		p := parser.NewParser()
-		parsed, err := p.Parse(codeStr)
-		if err != nil {
-			return nil, fmt.Errorf("eval() syntax error: %v", err)
 		}
 
 		// Create a new context for evaluation
@@ -392,19 +361,8 @@ func RegisterMisc(ctx *core.Context) {
 			}
 		}
 
-		// Evaluate the parsed code
-		// Note: We need access to the Eval function from eval package
-		// For now, use core.EvalHook if it exists
-		if core.EvalHook == nil {
-			return nil, fmt.Errorf("eval() not available: evaluation engine not initialized")
-		}
-
-		result, err := core.EvalHook(parsed, evalCtx)
-		if err != nil {
-			return nil, err
-		}
-
-		return result, nil
+		// Use EvalString which properly handles Python syntax including lambdas
+		return eval.EvalString(codeStr, evalCtx)
 	}))
 
 	// Ellipsis - Python's ... literal
