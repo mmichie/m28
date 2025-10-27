@@ -819,16 +819,11 @@ func createTypeMetaclass() *TypeType {
 						if callable, ok := setNameMethod.(interface {
 							Call([]core.Value, *core.Context) (core.Value, error)
 						}); ok {
-							// Call __set_name__(self, owner, name) for unbound methods
-							// or __set_name__(owner, name) for bound methods
-							// Try with 3 args first (self, owner, name)
-							_, err := callable.Call([]core.Value{value, newClass, core.StringValue(keyName)}, ctx)
+							// Call __set_name__(owner, name)
+							// GetAttr already returns a bound method for Python instances
+							_, err := callable.Call([]core.Value{newClass, core.StringValue(keyName)}, ctx)
 							if err != nil {
-								// If that fails, try with 2 args (owner, name) assuming it's bound
-								_, err = callable.Call([]core.Value{newClass, core.StringValue(keyName)}, ctx)
-								if err != nil {
-									return nil, fmt.Errorf("error calling __set_name__ for %s: %v", keyName, err)
-								}
+								return nil, fmt.Errorf("error calling __set_name__ for %s: %v", keyName, err)
 							}
 						}
 					}

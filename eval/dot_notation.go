@@ -66,25 +66,31 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Handle generic descriptor protocol (e.g., TupleGetter)
 		// Check if value has __get__ method
-		if valueWithGetAttr, ok := value.(interface {
-			GetAttr(string) (core.Value, bool)
-		}); ok {
-			if getMethod, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
-				// It's a descriptor - call __get__(self, instance, owner)
-				if getter, ok := getMethod.(interface {
-					Call([]core.Value, *core.Context) (core.Value, error)
-				}); ok {
-					// Get the owner class if possible
-					var owner core.Value = core.None
-					if objWithClass, ok := obj.(interface {
-						GetAttr(string) (core.Value, bool)
+		// BUT: Don't invoke __get__ if the value is a Class - classes themselves are not descriptors
+		// when accessed from modules or other containers, even if they define __get__
+		if _, isClass := value.(*core.Class); !isClass {
+			if valueWithGetAttr, ok := value.(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if getMethod, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
+					// It's a descriptor - call __get__(self, instance, owner)
+					if getter, ok := getMethod.(interface {
+						Call([]core.Value, *core.Context) (core.Value, error)
 					}); ok {
-						if classVal, ok := objWithClass.GetAttr("__class__"); ok {
-							owner = classVal
+						// Get the owner class if possible
+						var owner core.Value = core.None
+						if objWithClass, ok := obj.(interface {
+							GetAttr(string) (core.Value, bool)
+						}); ok {
+							if classVal, ok := objWithClass.GetAttr("__class__"); ok {
+								owner = classVal
+							}
 						}
+						// Call __get__(instance, owner)
+						// Note: getter is already a bound method (bound to the descriptor instance),
+						// so we don't pass the descriptor as the first arg
+						return getter.Call([]core.Value{obj, owner}, ctx)
 					}
-					// Call __get__(descriptor, instance, owner)
-					return getter.Call([]core.Value{value, obj, owner}, ctx)
 				}
 			}
 		}
