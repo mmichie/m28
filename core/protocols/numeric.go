@@ -3,6 +3,7 @@ package protocols
 import (
 	"fmt"
 	"math"
+	"math/big"
 
 	"github.com/mmichie/m28/common/errors"
 	"github.com/mmichie/m28/common/types"
@@ -163,7 +164,39 @@ func (n *NumericOps) Modulo(other core.Value) (core.Value, error) {
 func (n *NumericOps) Power(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
-		return core.NumberValue(math.Pow(n.value, float64(v))), nil
+		leftNum := n.value
+		rightNum := float64(v)
+
+		// Check if this is integer exponentiation that needs BigInt
+		leftIsInt := core.IsInteger(leftNum)
+		rightIsInt := core.IsInteger(rightNum)
+
+		if leftIsInt && rightIsInt && rightNum >= 0 && rightNum <= 10000 {
+			// For integer exponentiation, estimate if result needs BigInt
+			// BEFORE computing with float64 to avoid precision loss
+			if leftNum != 0 && math.Abs(leftNum) > 1 {
+				// Estimate: log2(result) = exp * log2(abs(base))
+				// If this exceeds 53 bits, use BigInt for precise computation
+				estimatedBits := rightNum * math.Log2(math.Abs(leftNum))
+				if estimatedBits > 53 {
+					// Promote to BigInt and compute
+					leftBig := core.PromoteToBigInt(core.NumberValue(leftNum))
+					rightBig := core.PromoteToBigInt(core.NumberValue(rightNum))
+					result := new(big.Int).Exp(leftBig.GetBigInt(), rightBig.GetBigInt(), nil)
+					bigIntResult := core.NewBigInt(result)
+
+					// Try to demote to NumberValue if it fits
+					if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
+						return numVal, nil
+					}
+
+					return bigIntResult, nil
+				}
+			}
+		}
+
+		// Safe to use float64
+		return core.NumberValue(math.Pow(leftNum, rightNum)), nil
 	default:
 		return nil, errors.NewTypeError("**", "unsupported operand type(s)",
 			fmt.Sprintf("'float' and '%s'", other.Type()))

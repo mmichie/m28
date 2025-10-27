@@ -96,6 +96,11 @@ func (a *Args) GetNumber(index int) (float64, error) {
 		return float64(num), nil
 	}
 
+	// Also accept BigIntValue and convert to float64 (may lose precision for large values)
+	if bigInt, ok := a.args[index].(core.BigIntValue); ok {
+		return bigInt.ToFloat64(), nil
+	}
+
 	return 0, errors.NewTypeError(a.function, "number", string(a.args[index].Type()))
 }
 

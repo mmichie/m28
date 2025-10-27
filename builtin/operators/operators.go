@@ -4,6 +4,7 @@ package operators
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"reflect"
 	"strings"
 	"sync"
@@ -319,6 +320,41 @@ func subtractTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 	// Try __rsub__ on right operand
 	if result, found, err := types.CallDunder(right, "__rsub__", []core.Value{left}, ctx); found {
 		return result, err
+	}
+
+	// Check if we have BigInt operands
+	leftBig, leftIsBig := left.(core.BigIntValue)
+	rightBig, rightIsBig := right.(core.BigIntValue)
+
+	if leftIsBig || rightIsBig {
+		// Promote both to BigInt if needed
+		if !leftIsBig {
+			if leftNum, ok := left.(core.NumberValue); ok {
+				leftBig = core.PromoteToBigInt(leftNum)
+			} else {
+				return nil, errors.NewTypeError("-", "unsupported operand type(s)",
+					"'"+string(left.Type())+"' and '"+string(right.Type())+"'")
+			}
+		}
+		if !rightIsBig {
+			if rightNum, ok := right.(core.NumberValue); ok {
+				rightBig = core.PromoteToBigInt(rightNum)
+			} else {
+				return nil, errors.NewTypeError("-", "unsupported operand type(s)",
+					"'"+string(left.Type())+"' and '"+string(right.Type())+"'")
+			}
+		}
+
+		// Compute with BigInt
+		result := new(big.Int).Sub(leftBig.GetBigInt(), rightBig.GetBigInt())
+		bigIntResult := core.NewBigInt(result)
+
+		// Try to demote to NumberValue if it fits
+		if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
+			return numVal, nil
+		}
+
+		return bigIntResult, nil
 	}
 
 	// Try protocol-based numeric operations
@@ -767,6 +803,14 @@ func powerTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 		return leftNum.Power(right)
 	}
 
+	// Check if we have BigInt operands
+	_, leftIsBig := left.(core.BigIntValue)
+	_, rightIsBig := right.(core.BigIntValue)
+
+	if leftIsBig || rightIsBig {
+		return bigIntPower(left, right)
+	}
+
 	// Fall back to numeric power
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
@@ -776,6 +820,36 @@ func powerTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					if leftNum == 0 && rightNum == 0 {
 						return core.NumberValue(1), nil
 					}
+
+					// Check if this is integer exponentiation
+					leftIsInt := core.IsInteger(leftNum)
+					rightIsInt := core.IsInteger(rightNum)
+
+					if leftIsInt && rightIsInt && rightNum >= 0 && rightNum <= 10000 {
+						// For integer exponentiation, estimate if result needs BigInt
+						// BEFORE computing with float64 to avoid precision loss
+						if leftNum != 0 && math.Abs(leftNum) > 1 {
+							// Estimate: log2(result) = exp * log2(abs(base))
+							// If this exceeds 53 bits, use BigInt for precise computation
+							estimatedBits := rightNum * math.Log2(math.Abs(leftNum))
+							if estimatedBits > 53 {
+								// Use BigInt to preserve precision
+								return bigIntPower(left, right)
+							}
+						}
+
+						// Safe to use float64
+						result := math.Pow(leftNum, rightNum)
+
+						// Double-check if result overflowed or needs BigInt
+						if math.IsInf(result, 0) {
+							return bigIntPower(left, right)
+						}
+
+						return core.NumberValue(result), nil
+					}
+
+					// For non-integer or negative exponents, use float math
 					result := math.Pow(leftNum, rightNum)
 					return core.NumberValue(result), nil
 				}).
@@ -792,6 +866,70 @@ func powerTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 				"'"+string(l.Type())+"'")
 		}).
 		Execute()
+}
+
+// bigIntPower computes power using arbitrary precision integers
+func bigIntPower(left, right core.Value) (core.Value, error) {
+	// Convert both operands to big.Int
+	var leftBig, rightBig *big.Int
+
+	switch l := left.(type) {
+	case core.BigIntValue:
+		leftBig = l.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(l)) {
+			return nil, errors.NewTypeError("**",
+				"unsupported operand type(s)",
+				"'float' (for BigInt power)")
+		}
+		leftBig = core.PromoteToBigInt(l).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("**",
+			"unsupported operand type(s)",
+			"'"+string(left.Type())+"'")
+	}
+
+	switch r := right.(type) {
+	case core.BigIntValue:
+		rightBig = r.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(r)) {
+			return nil, errors.NewTypeError("**",
+				"unsupported operand type(s)",
+				"'float' (for BigInt power)")
+		}
+		rightBig = core.PromoteToBigInt(r).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("**",
+			"unsupported operand type(s)",
+			"'"+string(right.Type())+"'")
+	}
+
+	// Check exponent is non-negative
+	if rightBig.Sign() < 0 {
+		// Python allows negative exponents but returns float
+		// base^(-n) = 1 / base^n
+		leftFloat, _ := new(big.Float).SetInt(leftBig).Float64()
+		rightFloat, _ := new(big.Float).SetInt(rightBig).Float64()
+		result := math.Pow(leftFloat, rightFloat)
+		return core.NumberValue(result), nil
+	}
+
+	// Check exponent is reasonable size (prevent DoS)
+	if rightBig.BitLen() > 31 {
+		return nil, fmt.Errorf("exponent too large")
+	}
+
+	// Compute base^exp using big.Int
+	result := new(big.Int).Exp(leftBig, rightBig, nil)
+	bigIntResult := core.NewBigInt(result)
+
+	// Try to demote to NumberValue if it fits
+	if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
+		return numVal, nil
+	}
+
+	return bigIntResult, nil
 }
 
 // Comparison Operators
@@ -886,6 +1024,44 @@ func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, err
 		if err == nil {
 			return core.BoolValue(cmp < 0), nil
 		}
+	}
+
+	// Handle BigInt comparison
+	leftBig, leftIsBig := left.(core.BigIntValue)
+	rightBig, rightIsBig := right.(core.BigIntValue)
+
+	if leftIsBig || rightIsBig {
+		// Convert both to BigInt for comparison
+		if !leftIsBig {
+			if leftNum, ok := left.(core.NumberValue); ok {
+				if !core.IsInteger(float64(leftNum)) {
+					return nil, errors.NewTypeError("<",
+						"'<' not supported between instances of",
+						"'float' and 'int'")
+				}
+				leftBig = core.PromoteToBigInt(leftNum)
+			} else {
+				return nil, errors.NewTypeError("<",
+					"'<' not supported between instances of",
+					"'"+string(left.Type())+"' and 'int'")
+			}
+		}
+		if !rightIsBig {
+			if rightNum, ok := right.(core.NumberValue); ok {
+				if !core.IsInteger(float64(rightNum)) {
+					return nil, errors.NewTypeError("<",
+						"'<' not supported between instances of",
+						"'int' and 'float'")
+				}
+				rightBig = core.PromoteToBigInt(rightNum)
+			} else {
+				return nil, errors.NewTypeError("<",
+					"'<' not supported between instances of",
+					"'int' and '"+string(right.Type())+"'")
+			}
+		}
+
+		return core.BoolValue(leftBig.GetBigInt().Cmp(rightBig.GetBigInt()) < 0), nil
 	}
 
 	// Fall back to type-based comparison
@@ -1018,6 +1194,44 @@ func compareGreaterThan(left, right core.Value, ctx *core.Context) (core.Value, 
 		if err == nil {
 			return core.BoolValue(cmp > 0), nil
 		}
+	}
+
+	// Handle BigInt comparison
+	leftBig, leftIsBig := left.(core.BigIntValue)
+	rightBig, rightIsBig := right.(core.BigIntValue)
+
+	if leftIsBig || rightIsBig {
+		// Convert both to BigInt for comparison
+		if !leftIsBig {
+			if leftNum, ok := left.(core.NumberValue); ok {
+				if !core.IsInteger(float64(leftNum)) {
+					return nil, errors.NewTypeError(">",
+						"'>' not supported between instances of",
+						"'float' and 'int'")
+				}
+				leftBig = core.PromoteToBigInt(leftNum)
+			} else {
+				return nil, errors.NewTypeError(">",
+					"'>' not supported between instances of",
+					"'"+string(left.Type())+"' and 'int'")
+			}
+		}
+		if !rightIsBig {
+			if rightNum, ok := right.(core.NumberValue); ok {
+				if !core.IsInteger(float64(rightNum)) {
+					return nil, errors.NewTypeError(">",
+						"'>' not supported between instances of",
+						"'int' and 'float'")
+				}
+				rightBig = core.PromoteToBigInt(rightNum)
+			} else {
+				return nil, errors.NewTypeError(">",
+					"'>' not supported between instances of",
+					"'int' and '"+string(right.Type())+"'")
+			}
+		}
+
+		return core.BoolValue(leftBig.GetBigInt().Cmp(rightBig.GetBigInt()) > 0), nil
 	}
 
 	// Fall back to type-based comparison
@@ -1474,23 +1688,44 @@ func leftShiftTwo(left, right core.Value, ctx *core.Context) (core.Value, error)
 		return result, err
 	}
 
+	// Check for BigInt operands
+	_, leftIsBig := left.(core.BigIntValue)
+	_, rightIsBig := right.(core.BigIntValue)
+
+	if leftIsBig || rightIsBig {
+		return bigIntLeftShift(left, right)
+	}
+
 	// Fall back to integer left shift
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
 			return types.Switch(right).
 				Number(func(rightNum float64) (core.Value, error) {
-					// Check both are integers
-					if leftNum != float64(int(leftNum)) {
+					// Validate integer and shift amount
+					if !core.IsInteger(leftNum) || !core.IsInteger(rightNum) || rightNum < 0 {
 						return nil, errors.NewTypeError("<<",
 							"unsupported operand type(s)",
-							"'float' and '"+string(right.Type())+"'")
+							"'float' or negative shift")
 					}
-					if rightNum != float64(int(rightNum)) || rightNum < 0 {
-						return nil, errors.NewTypeError("<<",
-							"unsupported operand type(s)",
-							"'int' and 'float'")
+
+					// If number is too large for int64, promote to BigInt
+					if core.ShouldPromoteToBigInt(leftNum) {
+						return bigIntLeftShift(left, right)
 					}
-					result := int(leftNum) << uint(rightNum)
+
+					// Check if result would overflow - estimate bits needed
+					shiftAmount := uint64(rightNum)
+					if leftNum != 0 {
+						// Result will be approximately leftNum * 2^shiftAmount
+						// If this would exceed int64, use BigInt
+						bitsNeeded := math.Log2(math.Abs(leftNum)) + float64(shiftAmount)
+						if bitsNeeded > 53 {
+							return bigIntLeftShift(left, right)
+						}
+					}
+
+					// Safe int64 shift
+					result := int64(leftNum) << shiftAmount
 					return core.NumberValue(float64(result)), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
@@ -1506,6 +1741,56 @@ func leftShiftTwo(left, right core.Value, ctx *core.Context) (core.Value, error)
 				"'"+string(l.Type())+"' and '"+string(right.Type())+"'")
 		}).
 		Execute()
+}
+
+// bigIntLeftShift performs left shift using arbitrary precision integers
+func bigIntLeftShift(left, right core.Value) (core.Value, error) {
+	// Convert left to big.Int
+	var leftBig *big.Int
+	switch l := left.(type) {
+	case core.BigIntValue:
+		leftBig = l.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(l)) {
+			return nil, errors.NewTypeError("<<", "unsupported operand", "'float'")
+		}
+		leftBig = core.PromoteToBigInt(l).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("<<", "unsupported operand type", string(left.Type()))
+	}
+
+	// Get shift amount as uint
+	var shiftAmount uint
+	switch r := right.(type) {
+	case core.BigIntValue:
+		if r.Sign() < 0 {
+			return nil, errors.NewTypeError("<<", "negative shift count", "")
+		}
+		// Check if it fits in uint
+		if val, ok := r.ToInt64(); ok && val >= 0 {
+			shiftAmount = uint(val)
+		} else {
+			return nil, errors.NewTypeError("<<", "shift count too large", "")
+		}
+	case core.NumberValue:
+		if !core.IsInteger(float64(r)) || float64(r) < 0 {
+			return nil, errors.NewTypeError("<<", "invalid shift count", "")
+		}
+		shiftAmount = uint(r)
+	default:
+		return nil, errors.NewTypeError("<<", "unsupported operand type", string(right.Type()))
+	}
+
+	// Perform the shift
+	result := new(big.Int).Lsh(leftBig, shiftAmount)
+	bigIntResult := core.NewBigInt(result)
+
+	// Try to demote to NumberValue if it fits
+	if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
+		return numVal, nil
+	}
+
+	return bigIntResult, nil
 }
 
 // RightShift implements the >> operator
@@ -1532,23 +1817,34 @@ func rightShiftTwo(left, right core.Value, ctx *core.Context) (core.Value, error
 		return result, err
 	}
 
+	// Check for BigInt operands
+	_, leftIsBig := left.(core.BigIntValue)
+	_, rightIsBig := right.(core.BigIntValue)
+
+	if leftIsBig || rightIsBig {
+		return bigIntRightShift(left, right)
+	}
+
 	// Fall back to integer right shift
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
 			return types.Switch(right).
 				Number(func(rightNum float64) (core.Value, error) {
-					// Check both are integers
-					if leftNum != float64(int(leftNum)) {
+					// Validate integer and shift amount
+					if !core.IsInteger(leftNum) || !core.IsInteger(rightNum) || rightNum < 0 {
 						return nil, errors.NewTypeError(">>",
 							"unsupported operand type(s)",
-							"'float' and '"+string(right.Type())+"'")
+							"'float' or negative shift")
 					}
-					if rightNum != float64(int(rightNum)) || rightNum < 0 {
-						return nil, errors.NewTypeError(">>",
-							"unsupported operand type(s)",
-							"'int' and 'float'")
+
+					// If number is too large for int64, promote to BigInt
+					if core.ShouldPromoteToBigInt(leftNum) {
+						return bigIntRightShift(left, right)
 					}
-					result := int(leftNum) >> uint(rightNum)
+
+					// Safe int64 shift
+					shiftAmount := uint64(rightNum)
+					result := int64(leftNum) >> shiftAmount
 					return core.NumberValue(float64(result)), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
@@ -1564,6 +1860,56 @@ func rightShiftTwo(left, right core.Value, ctx *core.Context) (core.Value, error
 				"'"+string(l.Type())+"' and '"+string(right.Type())+"'")
 		}).
 		Execute()
+}
+
+// bigIntRightShift performs right shift using arbitrary precision integers
+func bigIntRightShift(left, right core.Value) (core.Value, error) {
+	// Convert left to big.Int
+	var leftBig *big.Int
+	switch l := left.(type) {
+	case core.BigIntValue:
+		leftBig = l.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(l)) {
+			return nil, errors.NewTypeError(">>", "unsupported operand", "'float'")
+		}
+		leftBig = core.PromoteToBigInt(l).GetBigInt()
+	default:
+		return nil, errors.NewTypeError(">>", "unsupported operand type", string(left.Type()))
+	}
+
+	// Get shift amount as uint
+	var shiftAmount uint
+	switch r := right.(type) {
+	case core.BigIntValue:
+		if r.Sign() < 0 {
+			return nil, errors.NewTypeError(">>", "negative shift count", "")
+		}
+		// Check if it fits in uint
+		if val, ok := r.ToInt64(); ok && val >= 0 {
+			shiftAmount = uint(val)
+		} else {
+			return nil, errors.NewTypeError(">>", "shift count too large", "")
+		}
+	case core.NumberValue:
+		if !core.IsInteger(float64(r)) || float64(r) < 0 {
+			return nil, errors.NewTypeError(">>", "invalid shift count", "")
+		}
+		shiftAmount = uint(r)
+	default:
+		return nil, errors.NewTypeError(">>", "unsupported operand type", string(right.Type()))
+	}
+
+	// Perform the shift
+	result := new(big.Int).Rsh(leftBig, shiftAmount)
+	bigIntResult := core.NewBigInt(result)
+
+	// Try to demote to NumberValue if it fits
+	if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
+		return numVal, nil
+	}
+
+	return bigIntResult, nil
 }
 
 // BitwiseAnd implements the & operator
@@ -1739,18 +2085,33 @@ func bitwiseXorTwo(left, right core.Value, ctx *core.Context) (core.Value, error
 		return result, err
 	}
 
+	// Check for BigInt operands
+	_, leftIsBig := left.(core.BigIntValue)
+	_, rightIsBig := right.(core.BigIntValue)
+
+	if leftIsBig || rightIsBig {
+		return bigIntXor(left, right)
+	}
+
 	// Fall back to integer bitwise XOR
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
 			return types.Switch(right).
 				Number(func(rightNum float64) (core.Value, error) {
-					// Check both are integers
-					if leftNum != float64(int(leftNum)) || rightNum != float64(int(rightNum)) {
+					// Check if both are integers
+					if !core.IsInteger(leftNum) || !core.IsInteger(rightNum) {
 						return nil, errors.NewTypeError("^",
 							"unsupported operand type(s)",
 							"'float' and 'float'")
 					}
-					result := int(leftNum) ^ int(rightNum)
+
+					// If either number is too large, promote to BigInt
+					if core.ShouldPromoteToBigInt(leftNum) || core.ShouldPromoteToBigInt(rightNum) {
+						return bigIntXor(left, right)
+					}
+
+					// Normal case: use int64
+					result := int64(leftNum) ^ int64(rightNum)
 					return core.NumberValue(float64(result)), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
@@ -1766,4 +2127,45 @@ func bitwiseXorTwo(left, right core.Value, ctx *core.Context) (core.Value, error
 				"'"+string(l.Type())+"' and '"+string(right.Type())+"'")
 		}).
 		Execute()
+}
+
+// bigIntXor performs XOR using arbitrary precision integers
+func bigIntXor(left, right core.Value) (core.Value, error) {
+	// Convert both to big.Int
+	var leftBig, rightBig *big.Int
+
+	switch l := left.(type) {
+	case core.BigIntValue:
+		leftBig = l.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(l)) {
+			return nil, errors.NewTypeError("^", "unsupported operand", "'float'")
+		}
+		leftBig = core.PromoteToBigInt(l).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("^", "unsupported operand type", string(left.Type()))
+	}
+
+	switch r := right.(type) {
+	case core.BigIntValue:
+		rightBig = r.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(r)) {
+			return nil, errors.NewTypeError("^", "unsupported operand", "'float'")
+		}
+		rightBig = core.PromoteToBigInt(r).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("^", "unsupported operand type", string(right.Type()))
+	}
+
+	// Perform XOR
+	result := new(big.Int).Xor(leftBig, rightBig)
+	bigIntResult := core.NewBigInt(result)
+
+	// Try to demote to NumberValue if it fits
+	if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
+		return numVal, nil
+	}
+
+	return bigIntResult, nil
 }

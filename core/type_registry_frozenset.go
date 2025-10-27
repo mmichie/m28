@@ -274,14 +274,44 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 
 				fs := receiver.(*FrozenSetValue)
 
-				var otherContains func(Value) bool
+				// Convert argument to a set of items for comparison
+				var otherItems map[string]Value
 				switch other := args[0].(type) {
 				case *FrozenSetValue:
-					otherContains = other.Contains
+					otherItems = other.items
 				case *SetValue:
-					otherContains = other.Contains
+					otherItems = other.items
+				case StringValue:
+					// String is iterable - each character becomes an item
+					otherItems = make(map[string]Value)
+					for _, ch := range string(other) {
+						charVal := StringValue(string(ch))
+						key := PrintValue(charVal)
+						otherItems[key] = charVal
+					}
+				case *ListValue:
+					// Convert list to set
+					otherItems = make(map[string]Value)
+					for _, item := range other.Items() {
+						key := PrintValue(item)
+						otherItems[key] = item
+					}
+				case TupleValue:
+					// Convert tuple to set
+					otherItems = make(map[string]Value)
+					for _, item := range other {
+						key := PrintValue(item)
+						otherItems[key] = item
+					}
 				default:
-					return nil, fmt.Errorf("issubset() argument must be a set or frozenset")
+					return nil, fmt.Errorf("issubset() argument must be an iterable")
+				}
+
+				// Create a lookup function
+				otherContains := func(v Value) bool {
+					key := PrintValue(v)
+					_, exists := otherItems[key]
+					return exists
 				}
 
 				// Check if all items in this frozenset are in other
@@ -305,14 +335,37 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 
 				fs := receiver.(*FrozenSetValue)
 
+				// Convert argument to a set of items for comparison
 				var otherItems map[string]Value
 				switch other := args[0].(type) {
 				case *FrozenSetValue:
 					otherItems = other.items
 				case *SetValue:
 					otherItems = other.items
+				case StringValue:
+					// String is iterable - each character becomes an item
+					otherItems = make(map[string]Value)
+					for _, ch := range string(other) {
+						charVal := StringValue(string(ch))
+						key := PrintValue(charVal)
+						otherItems[key] = charVal
+					}
+				case *ListValue:
+					// Convert list to set
+					otherItems = make(map[string]Value)
+					for _, item := range other.Items() {
+						key := PrintValue(item)
+						otherItems[key] = item
+					}
+				case TupleValue:
+					// Convert tuple to set
+					otherItems = make(map[string]Value)
+					for _, item := range other {
+						key := PrintValue(item)
+						otherItems[key] = item
+					}
 				default:
-					return nil, fmt.Errorf("issuperset() argument must be a set or frozenset")
+					return nil, fmt.Errorf("issuperset() argument must be an iterable")
 				}
 
 				// Check if all items in other are in this frozenset

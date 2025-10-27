@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"math"
+	"math/big"
 	"strconv"
 
 	"github.com/shopspring/decimal"
@@ -32,6 +34,149 @@ func (n NumberValue) GetAttr(name string) (Value, bool) {
 		}
 	}
 	return nil, false
+}
+
+// BigIntValue represents an arbitrary precision integer (Python's int type)
+// This is used when integers exceed float64's safe integer range (2^53)
+type BigIntValue struct {
+	value *big.Int
+}
+
+// NewBigInt creates a BigIntValue from a big.Int (makes a copy)
+func NewBigInt(i *big.Int) BigIntValue {
+	return BigIntValue{value: new(big.Int).Set(i)}
+}
+
+// NewBigIntFromInt64 creates a BigIntValue from an int64
+func NewBigIntFromInt64(i int64) BigIntValue {
+	return BigIntValue{value: big.NewInt(i)}
+}
+
+// NewBigIntFromString creates a BigIntValue from a string in the given base
+func NewBigIntFromString(s string, base int) (BigIntValue, error) {
+	bi := new(big.Int)
+	_, ok := bi.SetString(s, base)
+	if !ok {
+		return BigIntValue{}, fmt.Errorf("invalid integer: %s", s)
+	}
+	return BigIntValue{value: bi}, nil
+}
+
+// Type implements Value.Type
+func (b BigIntValue) Type() Type {
+	return BigIntType
+}
+
+// String implements Value.String - returns the decimal representation
+func (b BigIntValue) String() string {
+	if b.value == nil {
+		return "0"
+	}
+	return b.value.String()
+}
+
+// ToFloat64 converts to float64 (may lose precision for large values)
+func (b BigIntValue) ToFloat64() float64 {
+	if b.value == nil {
+		return 0
+	}
+	f, _ := new(big.Float).SetInt(b.value).Float64()
+	return f
+}
+
+// ToInt64 converts to int64 if it fits, otherwise returns error
+func (b BigIntValue) ToInt64() (int64, bool) {
+	if b.value == nil {
+		return 0, true
+	}
+	if !b.value.IsInt64() {
+		return 0, false
+	}
+	return b.value.Int64(), true
+}
+
+// FitsInFloat64 checks if the value can be safely represented as float64
+// without precision loss (i.e., fits in range -2^53 to 2^53)
+func (b BigIntValue) FitsInFloat64() bool {
+	if b.value == nil {
+		return true
+	}
+	// Check if -2^53 <= value <= 2^53
+	maxSafeInt := new(big.Int).Lsh(big.NewInt(1), 53) // 2^53
+	minSafeInt := new(big.Int).Neg(maxSafeInt)
+	return b.value.Cmp(minSafeInt) >= 0 && b.value.Cmp(maxSafeInt) <= 0
+}
+
+// GetBigInt returns the underlying big.Int (for operators)
+func (b BigIntValue) GetBigInt() *big.Int {
+	if b.value == nil {
+		return big.NewInt(0)
+	}
+	return b.value
+}
+
+// Sign returns -1, 0, or 1 depending on whether the value is negative, zero, or positive
+func (b BigIntValue) Sign() int {
+	if b.value == nil {
+		return 0
+	}
+	return b.value.Sign()
+}
+
+// GetAttr implements basic int methods using TypeDescriptor
+func (b BigIntValue) GetAttr(name string) (Value, bool) {
+	desc := GetTypeDescriptor(BigIntType)
+	if desc != nil {
+		val, err := desc.GetAttribute(b, name)
+		if err == nil {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
+// Promotion constants for NumberValue -> BigIntValue conversion
+const (
+	MaxSafeInt float64 = 9007199254740992  // 2^53
+	MinSafeInt float64 = -9007199254740992 // -2^53
+)
+
+// IsInteger checks if a float64 represents an integer value
+func IsInteger(f float64) bool {
+	return f == math.Floor(f) && !math.IsInf(f, 0) && !math.IsNaN(f)
+}
+
+// IsInSafeRange checks if an integer value fits precisely in float64
+func IsInSafeRange(f float64) bool {
+	return f >= MinSafeInt && f <= MaxSafeInt
+}
+
+// ShouldPromoteToBigInt determines if a NumberValue should be promoted to BigIntValue
+func ShouldPromoteToBigInt(f float64) bool {
+	return IsInteger(f) && !IsInSafeRange(f)
+}
+
+// PromoteToBigInt converts a NumberValue to BigIntValue
+// For large floats, uses string conversion to preserve precision
+func PromoteToBigInt(n NumberValue) BigIntValue {
+	f := float64(n)
+	if ShouldPromoteToBigInt(f) {
+		// Use string conversion for large numbers to preserve all digits
+		s := fmt.Sprintf("%.0f", f)
+		bi, _ := NewBigIntFromString(s, 10)
+		return bi
+	}
+	// Safe to convert via int64
+	return NewBigIntFromInt64(int64(f))
+}
+
+// DemoteToNumber converts BigIntValue to NumberValue if it fits safely
+// Returns (NumberValue, true) if demotion is safe, (0, false) otherwise
+func DemoteToNumber(b BigIntValue) (NumberValue, bool) {
+	if b.FitsInFloat64() {
+		return NumberValue(b.ToFloat64()), true
+	}
+	return 0, false
 }
 
 // ComplexValue represents a complex number value

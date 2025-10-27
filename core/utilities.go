@@ -21,6 +21,21 @@ func EqualValues(a, b Value) bool {
 		if bVal, ok := b.(NumberValue); ok {
 			return float64(aVal) == float64(bVal)
 		}
+		// Allow comparison with BigInt
+		if bVal, ok := b.(BigIntValue); ok {
+			// Convert NumberValue to BigInt and compare
+			aB := PromoteToBigInt(aVal)
+			return aB.GetBigInt().Cmp(bVal.GetBigInt()) == 0
+		}
+	case BigIntValue:
+		if bVal, ok := b.(BigIntValue); ok {
+			return aVal.GetBigInt().Cmp(bVal.GetBigInt()) == 0
+		}
+		// Allow comparison with NumberValue
+		if bVal, ok := b.(NumberValue); ok {
+			bBig := PromoteToBigInt(bVal)
+			return aVal.GetBigInt().Cmp(bBig.GetBigInt()) == 0
+		}
 	case StringValue:
 		if bVal, ok := b.(StringValue); ok {
 			return string(aVal) == string(bVal)

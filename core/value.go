@@ -12,6 +12,7 @@ type Type string
 // Predefined type constants
 const (
 	NumberType    Type = "number"
+	BigIntType    Type = "int" // Arbitrary precision integer (Python: int)
 	StringType    Type = "string"
 	BoolType      Type = "bool"
 	NilType       Type = "nil"
