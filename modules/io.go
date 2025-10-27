@@ -16,6 +16,20 @@ func InitIOModule() *core.DictValue {
 	// Constants
 	ioModule.Set("DEFAULT_BUFFER_SIZE", core.NumberValue(8192))
 
+	// Base I/O classes - these are abstract base classes in Python
+	// They define the interface but don't provide implementations
+	ioBaseClass := core.NewClass("IOBase", nil)
+	ioModule.Set("IOBase", ioBaseClass)
+
+	rawIOBaseClass := core.NewClass("RawIOBase", ioBaseClass)
+	ioModule.Set("RawIOBase", rawIOBaseClass)
+
+	bufferedIOBaseClass := core.NewClass("BufferedIOBase", ioBaseClass)
+	ioModule.Set("BufferedIOBase", bufferedIOBaseClass)
+
+	textIOBaseClass := core.NewClass("TextIOBase", ioBaseClass)
+	ioModule.Set("TextIOBase", textIOBaseClass)
+
 	// Register StringIO class
 	ioModule.SetWithKey("StringIO", core.StringValue("StringIO"), core.NewBuiltinFunction(newStringIO))
 	// Register BytesIO class

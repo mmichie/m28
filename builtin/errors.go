@@ -216,6 +216,29 @@ func RegisterErrors(ctx *core.Context) {
 	importErrorClass := core.NewClass("ImportError", exceptionClass)
 	ctx.Define("ImportError", importErrorClass)
 
+	// OSError - raised when a system function returns a system-related error
+	osErrorClass := core.NewClass("OSError", exceptionClass)
+	ctx.Define("OSError", osErrorClass)
+
+	// IOError - alias for OSError (deprecated but still used)
+	ctx.Define("IOError", osErrorClass)
+
+	// FileNotFoundError - raised when a file or directory is requested but doesn't exist
+	fileNotFoundErrorClass := core.NewClass("FileNotFoundError", osErrorClass)
+	ctx.Define("FileNotFoundError", fileNotFoundErrorClass)
+
+	// PermissionError - raised when trying to run an operation without adequate access rights
+	permissionErrorClass := core.NewClass("PermissionError", osErrorClass)
+	ctx.Define("PermissionError", permissionErrorClass)
+
+	// IsADirectoryError - raised when a file operation is requested on a directory
+	isADirectoryErrorClass := core.NewClass("IsADirectoryError", osErrorClass)
+	ctx.Define("IsADirectoryError", isADirectoryErrorClass)
+
+	// NotADirectoryError - raised when a directory operation is requested on a non-directory
+	notADirectoryErrorClass := core.NewClass("NotADirectoryError", osErrorClass)
+	ctx.Define("NotADirectoryError", notADirectoryErrorClass)
+
 	// StopIteration - raised by next() and an iterator's __next__() to signal no more items
 	stopIterationClass := core.NewClass("StopIteration", exceptionClass)
 	ctx.Define("StopIteration", stopIterationClass)
@@ -235,6 +258,38 @@ func RegisterErrors(ctx *core.Context) {
 	// UserWarning - user-generated warning
 	userWarningClass := core.NewClass("UserWarning", warningClass)
 	ctx.Define("UserWarning", userWarningClass)
+
+	// PendingDeprecationWarning - warning about features that will be deprecated
+	pendingDeprecationWarningClass := core.NewClass("PendingDeprecationWarning", warningClass)
+	ctx.Define("PendingDeprecationWarning", pendingDeprecationWarningClass)
+
+	// SyntaxWarning - warning about dubious syntax
+	syntaxWarningClass := core.NewClass("SyntaxWarning", warningClass)
+	ctx.Define("SyntaxWarning", syntaxWarningClass)
+
+	// RuntimeWarning - warning about dubious runtime behavior
+	runtimeWarningClass := core.NewClass("RuntimeWarning", warningClass)
+	ctx.Define("RuntimeWarning", runtimeWarningClass)
+
+	// FutureWarning - warning about constructs that will change semantically in the future
+	futureWarningClass := core.NewClass("FutureWarning", warningClass)
+	ctx.Define("FutureWarning", futureWarningClass)
+
+	// ImportWarning - warning about probable mistakes in module imports
+	importWarningClass := core.NewClass("ImportWarning", warningClass)
+	ctx.Define("ImportWarning", importWarningClass)
+
+	// UnicodeWarning - warning related to Unicode
+	unicodeWarningClass := core.NewClass("UnicodeWarning", warningClass)
+	ctx.Define("UnicodeWarning", unicodeWarningClass)
+
+	// BytesWarning - warning related to bytes and bytearray
+	bytesWarningClass := core.NewClass("BytesWarning", warningClass)
+	ctx.Define("BytesWarning", bytesWarningClass)
+
+	// ResourceWarning - warning about resource usage
+	resourceWarningClass := core.NewClass("ResourceWarning", warningClass)
+	ctx.Define("ResourceWarning", resourceWarningClass)
 }
 
 // Migration Statistics:

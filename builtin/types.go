@@ -1003,6 +1003,68 @@ func createIntClass(objectClass *core.Class) *IntType {
 		return core.NotImplemented, nil
 	}))
 
+	// Add from_bytes class method - converts bytes to int
+	// int.from_bytes(bytes, byteorder, *, signed=False)
+	class.SetMethod("from_bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("int.from_bytes() missing required arguments")
+		}
+
+		// Get the bytes argument - can be bytes, str, or iterable of integers
+		var bytesData []byte
+		if bytesVal, ok := args[0].(core.BytesValue); ok {
+			bytesData = []byte(bytesVal)
+		} else if strVal, ok := args[0].(core.StringValue); ok {
+			bytesData = []byte(strVal)
+		} else if listVal, ok := args[0].(*core.ListValue); ok {
+			// Handle list of integers (from map() or other iterables)
+			items := listVal.Items()
+			bytesData = make([]byte, len(items))
+			for i, item := range items {
+				if num, ok := item.(core.NumberValue); ok {
+					bytesData[i] = byte(int(num))
+				} else {
+					return nil, fmt.Errorf("int.from_bytes() list elements must be integers")
+				}
+			}
+		} else if tupleVal, ok := args[0].(core.TupleValue); ok {
+			// Handle tuple of integers
+			bytesData = make([]byte, len(tupleVal))
+			for i, val := range tupleVal {
+				if num, ok := val.(core.NumberValue); ok {
+					bytesData[i] = byte(int(num))
+				} else {
+					return nil, fmt.Errorf("int.from_bytes() tuple elements must be integers")
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("int.from_bytes() argument 1 must be bytes, str, or iterable of ints, not %s", args[0].Type())
+		}
+
+		// Get byteorder argument
+		byteorder, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("int.from_bytes() argument 2 must be str, not %s", args[1].Type())
+		}
+
+		// For simplicity, implement basic big-endian and little-endian conversion
+		// Ignore the signed parameter for now
+		var result uint64
+		if string(byteorder) == "big" {
+			for _, b := range bytesData {
+				result = (result << 8) | uint64(b)
+			}
+		} else if string(byteorder) == "little" {
+			for i := len(bytesData) - 1; i >= 0; i-- {
+				result = (result << 8) | uint64(bytesData[i])
+			}
+		} else {
+			return nil, fmt.Errorf("int.from_bytes() byteorder must be 'big' or 'little', not %s", byteorder)
+		}
+
+		return core.NumberValue(float64(result)), nil
+	}))
+
 	return &IntType{Class: class}
 }
 

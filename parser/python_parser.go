@@ -3019,6 +3019,25 @@ func (p *PythonParser) parseTypeAnnotation() *ast.TypeInfo {
 		p.expect(TOKEN_RBRACKET)
 	}
 
+	// Handle union types with | (Python 3.10+)
+	// e.g., bytes | bytearray | str
+	// For now, we just consume the tokens and use the first type
+	for p.check(TOKEN_PIPE) {
+		p.advance() // consume |
+		// Parse the next type in the union
+		if p.check(TOKEN_IDENTIFIER) {
+			p.advance()
+		} else if p.check(TOKEN_NIL) || p.check(TOKEN_TRUE) || p.check(TOKEN_FALSE) {
+			p.advance()
+		}
+		// Handle generics in union members
+		if p.check(TOKEN_LBRACKET) {
+			p.advance()
+			p.parseTypeArguments()
+			p.expect(TOKEN_RBRACKET)
+		}
+	}
+
 	return &ast.TypeInfo{Name: typeName}
 }
 

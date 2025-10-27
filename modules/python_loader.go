@@ -28,6 +28,9 @@ var cExtensionModules = map[string]bool{
 	"_struct":          true,
 	"_random":          true,
 	"_posixsubprocess": true,
+	"_bz2":             true,
+	"_lzma":            true,
+	"zlib":             true,
 	// "_weakref" removed - provided as M28 stub module
 	// "_abc" removed - let it fail naturally to trigger fallback to _py_abc
 	// "builtins" removed - handled specially in LoadPythonModule
@@ -84,11 +87,15 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	// Check if this is a known C extension
 	if cExtensionModules[name] {
-		return nil, fmt.Errorf(
-			"module '%s' is a C extension and cannot be auto-imported.\n"+
-				"Consider implementing a native M28 version in builtin/ or modules/",
-			name,
-		)
+		// Return ImportError so Python code can catch it
+		return nil, &core.ImportError{
+			ModuleName: name,
+			Message: fmt.Sprintf(
+				"module '%s' is a C extension and cannot be auto-imported.\n"+
+					"Consider implementing a native M28 version in builtin/ or modules/",
+				name,
+			),
+		}
 	}
 
 	// Find the Python file
@@ -184,6 +191,12 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	if evalErr != nil {
+		// If it's an ImportError, return it directly so it can be caught by try/except
+		// This allows modules like shutil to check for optional dependencies
+		if _, ok := evalErr.(*core.ImportError); ok {
+			return nil, evalErr
+		}
+		// For other errors, wrap with context
 		return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w", name, pyPath, evalErr)
 	}
 	evalTime := time.Since(startEval)
@@ -207,6 +220,67 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		if len(varName) > 0 && varName[0] == '_' {
 			key := core.ValueToKey(core.StringValue(varName))
 			partialModule.SetWithKey(key, core.StringValue(varName), value)
+		}
+	}
+
+	// Special post-load fixes for specific modules
+	// Debug: always print which module is being loaded
+	fmt.Printf("[DEBUG] Post-processing module: %s\n", name)
+	if name == "re" {
+		fmt.Printf("[DEBUG] Applying post-load fix for 're' module\n")
+		core.DebugLog("[PYTHON_LOADER] Applying post-load fix for 're' module\n")
+		// The @enum.global_enum decorator in re/__init__.py doesn't work in M28
+		// It's supposed to export enum members to module level, but fails
+		// Manually add the missing T and DEBUG flags from _compiler
+		compilerKey := core.ValueToKey(core.StringValue("_compiler"))
+		fmt.Printf("[DEBUG] Looking for _compiler with key: %s\n", compilerKey)
+		if compilerVal, ok := partialModule.Get(compilerKey); ok {
+			fmt.Printf("[DEBUG] Found _compiler in re module, type: %T\n", compilerVal)
+
+			// _compiler can be either a *core.Module or *core.DictValue
+			var getCompilerAttr func(string) (core.Value, bool)
+
+			if compilerModule, ok := compilerVal.(*core.Module); ok {
+				fmt.Printf("[DEBUG] _compiler is a Module, checking exports\n")
+				getCompilerAttr = func(name string) (core.Value, bool) {
+					return compilerModule.GetExport(name)
+				}
+			} else if compilerDict, ok := compilerVal.(*core.DictValue); ok {
+				fmt.Printf("[DEBUG] _compiler is a DictValue\n")
+				getCompilerAttr = func(name string) (core.Value, bool) {
+					key := core.ValueToKey(core.StringValue(name))
+					return compilerDict.Get(key)
+				}
+			} else {
+				fmt.Printf("[DEBUG] _compiler is neither Module nor DictValue\n")
+				getCompilerAttr = nil
+			}
+
+			if getCompilerAttr != nil {
+				// Add T = TEMPLATE = SRE_FLAG_TEMPLATE
+				if templateFlag, ok := getCompilerAttr("SRE_FLAG_TEMPLATE"); ok {
+					fmt.Printf("[DEBUG] Found SRE_FLAG_TEMPLATE: %v, adding T and TEMPLATE\n", templateFlag)
+					partialModule.Set("T", templateFlag)
+					partialModule.Set("TEMPLATE", templateFlag)
+					// Also add to module context so functions can access it
+					if moduleCtx != nil {
+						moduleCtx.Define("T", templateFlag)
+						moduleCtx.Define("TEMPLATE", templateFlag)
+					}
+				} else {
+					fmt.Printf("[DEBUG] SRE_FLAG_TEMPLATE not found in _compiler\n")
+				}
+				// Add DEBUG = SRE_FLAG_DEBUG
+				if debugFlag, ok := getCompilerAttr("SRE_FLAG_DEBUG"); ok {
+					fmt.Printf("[DEBUG] Found SRE_FLAG_DEBUG, adding DEBUG\n")
+					partialModule.Set("DEBUG", debugFlag)
+					if moduleCtx != nil {
+						moduleCtx.Define("DEBUG", debugFlag)
+					}
+				}
+			}
+		} else {
+			fmt.Printf("[DEBUG] WARNING: _compiler not found in re module\n")
 		}
 	}
 

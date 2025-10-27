@@ -868,11 +868,20 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				continue
 			}
 			// Check if it's (*unpack var)
-			if elemList, ok := elem.(*core.ListValue); ok && elemList.Len() == 2 {
-				if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
-					if _, ok := elemList.Items()[1].(core.SymbolValue); ok {
-						hasStarUnpack = true
-						starIndex = i
+			if elemList, ok := elem.(*core.ListValue); ok {
+				if elemList.Len() == 2 {
+					if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+						if _, ok := elemList.Items()[1].(core.SymbolValue); ok {
+							hasStarUnpack = true
+							starIndex = i
+							continue
+						}
+					}
+				}
+				// Check if it's dot notation (. obj attr)
+				if elemList.Len() == 3 {
+					if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "." {
+						// This is a dot notation target like self.a
 						continue
 					}
 				}
@@ -921,9 +930,51 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 								return nil, err
 							}
 							valIdx++
-						} else {
-							return nil, fmt.Errorf("unpacking target must be a symbol")
+							continue
 						}
+
+						// Check if it's dot notation
+						if targetList, ok := target.(*core.ListValue); ok && targetList.Len() == 3 {
+							if sym, ok := targetList.Items()[0].(core.SymbolValue); ok && string(sym) == "." {
+								// Evaluate the object
+								obj, err := Eval(targetList.Items()[1], ctx)
+								if err != nil {
+									return nil, err
+								}
+
+								// Get the attribute name
+								var attrName string
+								if strName, ok := targetList.Items()[2].(core.StringValue); ok {
+									attrName = string(strName)
+								} else if symName, ok := targetList.Items()[2].(core.SymbolValue); ok {
+									attrName = string(symName)
+								} else {
+									return nil, fmt.Errorf("attribute name must be a string or symbol")
+								}
+
+								// Set the attribute
+								if objWithAttrs, ok := obj.(interface {
+									SetAttr(string, core.Value) error
+								}); ok {
+									if err := objWithAttrs.SetAttr(attrName, values[valIdx]); err != nil {
+										return nil, err
+									}
+									valIdx++
+									continue
+								}
+
+								// Special handling for dicts
+								if dict, ok := obj.(*core.DictValue); ok {
+									dict.Set(attrName, values[valIdx])
+									valIdx++
+									continue
+								}
+
+								return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+							}
+						}
+
+						return nil, fmt.Errorf("unpacking target must be a symbol or dot notation")
 					}
 				}
 			} else {
@@ -935,13 +986,59 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				// Assign each value to its corresponding target
 				for i, target := range t.Items() {
-					sym, ok := target.(core.SymbolValue)
-					if !ok {
-						return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
+					// Check if target is a simple symbol
+					if sym, ok := target.(core.SymbolValue); ok {
+						if err := assignVariable(ctx, string(sym), values[i]); err != nil {
+							return nil, err
+						}
+						continue
 					}
-					if err := assignVariable(ctx, string(sym), values[i]); err != nil {
-						return nil, err
+
+					// Check if target is dot notation (attribute access)
+					if targetList, ok := target.(*core.ListValue); ok && targetList.Len() > 0 {
+						if sym, ok := targetList.Items()[0].(core.SymbolValue); ok && string(sym) == "." {
+							// This is attribute assignment like self.a = value
+							if targetList.Len() != 3 {
+								return nil, fmt.Errorf("invalid dot notation in assignment target")
+							}
+
+							// Evaluate the object
+							obj, err := Eval(targetList.Items()[1], ctx)
+							if err != nil {
+								return nil, err
+							}
+
+							// Get the attribute name (can be StringValue or SymbolValue)
+							var attrName string
+							if strName, ok := targetList.Items()[2].(core.StringValue); ok {
+								attrName = string(strName)
+							} else if symName, ok := targetList.Items()[2].(core.SymbolValue); ok {
+								attrName = string(symName)
+							} else {
+								return nil, fmt.Errorf("attribute name must be a string or symbol")
+							}
+
+							// Set the attribute
+							if objWithAttrs, ok := obj.(interface {
+								SetAttr(string, core.Value) error
+							}); ok {
+								if err := objWithAttrs.SetAttr(attrName, values[i]); err != nil {
+									return nil, err
+								}
+								continue
+							}
+
+							// Special handling for dicts
+							if dict, ok := obj.(*core.DictValue); ok {
+								dict.Set(attrName, values[i])
+								continue
+							}
+
+							return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+						}
 					}
+
+					return nil, fmt.Errorf("assignment target must be a symbol or dot notation, got %v", target.Type())
 				}
 			}
 

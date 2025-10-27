@@ -342,12 +342,62 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Assign each value to its corresponding target
 		core.DebugLog("[ASSIGN] Assigning %d values to targets\n", len(values))
 		for i, t := range targetList.Items() {
-			sym, ok := t.(core.SymbolValue)
-			if !ok {
-				return nil, fmt.Errorf("assignment target must be a symbol, got %v", t.Type())
+			// Check if target is a symbol (simple variable)
+			if sym, ok := t.(core.SymbolValue); ok {
+				core.DebugLog("[ASSIGN] Defining %s = %T\n", string(sym), values[i])
+				ctx.Define(string(sym), values[i])
+				continue
 			}
-			core.DebugLog("[ASSIGN] Defining %s = %T\n", string(sym), values[i])
-			ctx.Define(string(sym), values[i])
+
+			// Check if target is dot notation (attribute access)
+			if targetList2, ok := t.(*core.ListValue); ok && targetList2.Len() > 0 {
+				if sym, ok := targetList2.Items()[0].(core.SymbolValue); ok && string(sym) == "." {
+					// This is attribute assignment like self.a = value
+					// Use the same logic as single attribute assignment
+					// Evaluate to get the (object, attribute) pair, then set it
+					if targetList2.Len() != 3 {
+						return nil, fmt.Errorf("invalid dot notation in assignment target")
+					}
+
+					// Evaluate the object
+					obj, err := Eval(targetList2.Items()[1], ctx)
+					if err != nil {
+						return nil, err
+					}
+
+					// Get the attribute name (can be StringValue or SymbolValue)
+					var attrName string
+					if strName, ok := targetList2.Items()[2].(core.StringValue); ok {
+						attrName = string(strName)
+					} else if symName, ok := targetList2.Items()[2].(core.SymbolValue); ok {
+						attrName = string(symName)
+					} else {
+						return nil, fmt.Errorf("attribute name must be a string or symbol")
+					}
+
+					// Set the attribute using the same pattern as util.go
+					if objWithAttrs, ok := obj.(interface {
+						SetAttr(string, core.Value) error
+					}); ok {
+						err := objWithAttrs.SetAttr(attrName, values[i])
+						if err != nil {
+							return nil, err
+						}
+						continue
+					}
+
+					// Special handling for dicts
+					if dict, ok := obj.(*core.DictValue); ok {
+						dict.Set(attrName, values[i])
+						continue
+					}
+
+					return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+				}
+			}
+
+			// Target is neither a symbol nor dot notation
+			return nil, fmt.Errorf("assignment target must be a symbol or dot notation, got %v", t.Type())
 		}
 
 		core.DebugLog("[ASSIGN] Tuple unpacking complete\n")
@@ -514,6 +564,11 @@ func importForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Load the module
 	module, err := loader.LoadModule(moduleName, ctx)
 	if err != nil {
+		// If it's already an ImportError, return it directly so it can be caught by try/except
+		if _, ok := err.(*core.ImportError); ok {
+			return nil, err
+		}
+		// Otherwise wrap with context
 		return nil, fmt.Errorf("failed to import module %s: %v", moduleName, err)
 	}
 

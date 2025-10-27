@@ -136,6 +136,11 @@ func InitPosixModule() *core.DictValue {
 	posixModule.SetWithKey("supports_fd", core.StringValue("supports_fd"), emptySet)
 	posixModule.SetWithKey("supports_follow_symlinks", core.StringValue("supports_follow_symlinks"), emptySet)
 
+	// Add stat_result class
+	// This is used by shutil to check for platform-specific attributes
+	statResultClass := core.NewClass("stat_result", nil)
+	posixModule.SetWithKey("stat_result", core.StringValue("stat_result"), statResultClass)
+
 	// Add __all__ list with exported function names
 	exportsList := core.NewList(
 		core.StringValue("getcwd"),
@@ -149,6 +154,7 @@ func InitPosixModule() *core.DictValue {
 		core.StringValue("environ"),
 		core.StringValue("stat"),
 		core.StringValue("lstat"),
+		core.StringValue("stat_result"),
 	)
 	posixModule.SetWithKey("__all__", core.StringValue("__all__"), exportsList)
 

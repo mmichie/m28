@@ -302,6 +302,28 @@ func getStringMethods() map[string]*MethodDescriptor {
 				return True, nil
 			},
 		},
+		"isascii": {
+			Name:    "isascii",
+			Arity:   0,
+			Doc:     "Return True if all characters in the string are ASCII",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				s := string(receiver.(StringValue))
+				// Empty string is ASCII
+				if len(s) == 0 {
+					return True, nil
+				}
+
+				// Check if all characters are in ASCII range (0-127)
+				for _, r := range s {
+					if r > 127 {
+						return False, nil
+					}
+				}
+
+				return True, nil
+			},
+		},
 	}
 }
 
