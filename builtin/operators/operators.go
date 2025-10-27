@@ -932,6 +932,84 @@ func bigIntPower(left, right core.Value) (core.Value, error) {
 	return bigIntResult, nil
 }
 
+// bigIntBitwiseAnd computes bitwise AND using arbitrary precision integers
+func bigIntBitwiseAnd(left, right core.Value) (core.Value, error) {
+	var leftBig, rightBig *big.Int
+
+	switch l := left.(type) {
+	case core.BigIntValue:
+		leftBig = l.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(l)) {
+			return nil, errors.NewTypeError("&", "unsupported operand type(s)", "'float'")
+		}
+		leftBig = core.PromoteToBigInt(l).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("&", "unsupported operand type(s)", "'"+string(left.Type())+"'")
+	}
+
+	switch r := right.(type) {
+	case core.BigIntValue:
+		rightBig = r.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(r)) {
+			return nil, errors.NewTypeError("&", "unsupported operand type(s)", "'float'")
+		}
+		rightBig = core.PromoteToBigInt(r).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("&", "unsupported operand type(s)", "'"+string(right.Type())+"'")
+	}
+
+	result := new(big.Int).And(leftBig, rightBig)
+	bigIntResult := core.NewBigInt(result)
+
+	// Try to demote to NumberValue if it fits
+	if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
+		return numVal, nil
+	}
+
+	return bigIntResult, nil
+}
+
+// bigIntBitwiseOr computes bitwise OR using arbitrary precision integers
+func bigIntBitwiseOr(left, right core.Value) (core.Value, error) {
+	var leftBig, rightBig *big.Int
+
+	switch l := left.(type) {
+	case core.BigIntValue:
+		leftBig = l.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(l)) {
+			return nil, errors.NewTypeError("|", "unsupported operand type(s)", "'float'")
+		}
+		leftBig = core.PromoteToBigInt(l).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("|", "unsupported operand type(s)", "'"+string(left.Type())+"'")
+	}
+
+	switch r := right.(type) {
+	case core.BigIntValue:
+		rightBig = r.GetBigInt()
+	case core.NumberValue:
+		if !core.IsInteger(float64(r)) {
+			return nil, errors.NewTypeError("|", "unsupported operand type(s)", "'float'")
+		}
+		rightBig = core.PromoteToBigInt(r).GetBigInt()
+	default:
+		return nil, errors.NewTypeError("|", "unsupported operand type(s)", "'"+string(right.Type())+"'")
+	}
+
+	result := new(big.Int).Or(leftBig, rightBig)
+	bigIntResult := core.NewBigInt(result)
+
+	// Try to demote to NumberValue if it fits
+	if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
+		return numVal, nil
+	}
+
+	return bigIntResult, nil
+}
+
 // Comparison Operators
 
 // Equal implements the == operator using protocol-based dispatch
@@ -1936,6 +2014,13 @@ func bitwiseAndTwo(left, right core.Value, ctx *core.Context) (core.Value, error
 		return result, err
 	}
 
+	// Check for BigInt operands
+	_, leftIsBigInt := left.(core.BigIntValue)
+	_, rightIsBigInt := right.(core.BigIntValue)
+	if leftIsBigInt || rightIsBigInt {
+		return bigIntBitwiseAnd(left, right)
+	}
+
 	// Fall back to integer bitwise AND
 	return types.Switch(left).
 		Bool(func(leftBool bool) (core.Value, error) {
@@ -2030,6 +2115,13 @@ func bitwiseOrTwo(left, right core.Value, ctx *core.Context) (core.Value, error)
 	// Try __ror__ on right operand
 	if result, found, err := types.CallDunder(right, "__ror__", []core.Value{left}, ctx); found {
 		return result, err
+	}
+
+	// Check for BigInt operands
+	_, leftIsBigInt := left.(core.BigIntValue)
+	_, rightIsBigInt := right.(core.BigIntValue)
+	if leftIsBigInt || rightIsBigInt {
+		return bigIntBitwiseOr(left, right)
 	}
 
 	// Fall back to integer bitwise OR

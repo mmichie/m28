@@ -236,16 +236,26 @@ func IntBuilder() builders.BuiltinFunc {
 		// No base specified - simple conversion
 		if v.Count() == 1 {
 			// Try __int__ dunder method first
-			if intVal, found, err := types.CallInt(val, ctx); found {
+			if result, found, err := types.CallDunder(val, "__int__", []core.Value{}, ctx); found {
 				if err != nil {
 					return nil, err
 				}
-				return core.NumberValue(float64(intVal)), nil
+				// __int__ can return NumberValue or BigIntValue
+				switch r := result.(type) {
+				case core.NumberValue:
+					return core.NumberValue(float64(int(r))), nil
+				case core.BigIntValue:
+					return r, nil // Return BigIntValue as-is
+				default:
+					return nil, errors.NewTypeError("int", "int or bigint", string(result.Type()))
+				}
 			}
 
 			switch x := val.(type) {
 			case core.NumberValue:
 				return core.NumberValue(float64(int(x))), nil
+			case core.BigIntValue:
+				return x, nil // Already a BigInt, return as-is
 			case core.StringValue:
 				// Try to parse as integer
 				s := strings.TrimSpace(string(x))
@@ -423,6 +433,8 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 		switch obj.(type) {
 		case core.NumberValue:
 			return typeName == string(core.NumberType) || typeName == "int" || typeName == "float"
+		case core.BigIntValue:
+			return typeName == string(core.BigIntType) || typeName == "int"
 		case core.StringValue:
 			return typeName == string(core.StringType) || typeName == "str"
 		case core.BoolValue:
@@ -470,6 +482,8 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 					return typeName == "list"
 				case core.NumberValue:
 					return typeName == "int" || typeName == "float"
+				case core.BigIntValue:
+					return typeName == "int"
 				case core.StringValue:
 					return typeName == "str"
 				case core.BoolValue:
@@ -483,6 +497,17 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 				}
 			}
 		}
+	case *IntType:
+		// Special handling for int type to match both NumberValue and BigIntValue
+		switch obj.(type) {
+		case core.NumberValue, core.BigIntValue:
+			return true
+		case *core.Instance:
+			// Also match int subclass instances
+			inst := obj.(*core.Instance)
+			return inst.Class == t.Class || (inst.Class.Parent != nil && inst.Class.Parent == t.Class)
+		}
+		return false
 	default:
 		// Handle wrapper types that have GetClass() method
 		if wrapper, ok := typeVal.(interface{ GetClass() *core.Class }); ok {
