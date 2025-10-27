@@ -90,7 +90,8 @@ type Parser struct {
 	tokenPos int     // Current position in token stream
 
 	// Context flags for parsing
-	inPythonicCall bool // True when parsing arguments to a Pythonic function call
+	inPythonicCall       bool // True when parsing arguments to a Pythonic function call
+	allowInfixWithSpaces bool // True when infix operators with spaces should be allowed (e.g., in assignment RHS)
 }
 
 // NewParser creates a new parser
@@ -182,6 +183,12 @@ func (p *Parser) parseExpr() (core.Value, error) {
 				p.advanceToken() // consume identifier
 				p.advanceToken() // consume =
 
+				// Allow infix operators with spaces in RHS (e.g., x = 2 ** 10)
+				// But don't enable Pythonic call syntax to avoid breaking (expr) grouping
+				oldAllowInfix := p.allowInfixWithSpaces
+				p.allowInfixWithSpaces = true
+				defer func() { p.allowInfixWithSpaces = oldAllowInfix }()
+
 				value, err := p.parseExpr()
 				if err != nil {
 					return nil, err
@@ -237,8 +244,8 @@ func (p *Parser) parseExpr() (core.Value, error) {
 		}
 	}
 
-	// Allow infix if in Pythonic call (with spaces) or no whitespace (anywhere)
-	allowInfix := p.inPythonicCall || prevTok.EndPos == tok.StartPos
+	// Allow infix if in Pythonic call (with spaces), explicitly allowed, or no whitespace (anywhere)
+	allowInfix := p.inPythonicCall || p.allowInfixWithSpaces || prevTok.EndPos == tok.StartPos
 
 	if tok.IsOperator() && !isAssignmentOperator(tok.Type) && !baseIsOperatorSymbol && allowInfix {
 		// This is an infix expression - collect all elements
@@ -552,6 +559,12 @@ func (p *Parser) parseListFromToken() (core.Value, error) {
 		return nil, err
 	}
 
+	// Reset allowInfixWithSpaces inside lists to avoid affecting nested parsing
+	// This prevents (expr) from being treated differently than expr when parsing list contents
+	oldAllowInfix := p.allowInfixWithSpaces
+	p.allowInfixWithSpaces = false
+	defer func() { p.allowInfixWithSpaces = oldAllowInfix }()
+
 	elements := make([]core.Value, 0)
 
 	// Parse elements until closing parenthesis
@@ -617,6 +630,11 @@ func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
 	p.inPythonicCall = false
 	defer func() { p.inPythonicCall = oldInPythonicCall }()
 
+	// Also reset allowInfixWithSpaces to avoid affecting comprehension parsing
+	oldAllowInfix := p.allowInfixWithSpaces
+	p.allowInfixWithSpaces = false
+	defer func() { p.allowInfixWithSpaces = oldAllowInfix }()
+
 	elements := make([]core.Value, 0)
 
 	// Parse elements until closing bracket
@@ -673,6 +691,11 @@ func (p *Parser) parseDictLiteralFromToken() (core.Value, error) {
 		// Empty {} is a dict
 		return core.NewList(core.SymbolValue("dict-literal")), nil
 	}
+
+	// Reset allowInfixWithSpaces to avoid affecting dict comprehension parsing
+	oldAllowInfix := p.allowInfixWithSpaces
+	p.allowInfixWithSpaces = false
+	defer func() { p.allowInfixWithSpaces = oldAllowInfix }()
 
 	elements := make([]core.Value, 0)
 	hasColon := false
