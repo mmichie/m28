@@ -2890,7 +2890,9 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 			if p.check(TOKEN_COMMA) || p.check(TOKEN_RPAREN) {
 				// Bare * - keyword-only parameter separator
 				// All parameters after this must be keyword-only
-				// For now, we don't enforce this, just skip the marker
+				// Add a parameter with name "*" to mark the transition
+				params = append(params, ast.Parameter{Name: "*"})
+
 				if p.check(TOKEN_COMMA) {
 					p.advance()
 				}

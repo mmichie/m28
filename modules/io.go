@@ -13,6 +13,9 @@ import (
 func InitIOModule() *core.DictValue {
 	ioModule := core.NewDict()
 
+	// Constants
+	ioModule.Set("DEFAULT_BUFFER_SIZE", core.NumberValue(8192))
+
 	// Register StringIO class
 	ioModule.SetWithKey("StringIO", core.StringValue("StringIO"), core.NewBuiltinFunction(newStringIO))
 	// Register BytesIO class

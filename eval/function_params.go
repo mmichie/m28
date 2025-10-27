@@ -12,6 +12,7 @@ type ParameterInfo struct {
 	Name         core.SymbolValue
 	DefaultValue core.Value // nil if no default
 	HasDefault   bool
+	KeywordOnly  bool // true if parameter can only be passed by keyword (after *)
 }
 
 // FunctionSignature holds the full signature of a function
@@ -38,11 +39,6 @@ func (sig *FunctionSignature) MaxArgs() int {
 // ParseParameterList parses a parameter list into a FunctionSignature
 // Supports: (a b c=10 d=20 *args **kwargs)
 func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
-	// Debug: print what we received
-	// fmt.Printf("DEBUG ParseParameterList: received %d params\n", len(paramList))
-	// for i, p := range paramList {
-	// 	fmt.Printf("  [%d] %T: %v\n", i, p, p)
-	// }
 
 	// First, transform Python-style parameters (name=value) to M28 style ((name value))
 	// Also handle (* args) and (** kwargs) parsed as separate tokens
@@ -57,9 +53,29 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 			symStr := string(sym)
 
 			// Handle (* args) - varargs parameter split into two tokens
+			// vs bare * (keyword-only separator)
 			if symStr == "*" && i+1 < len(paramList) {
 				if nextSym, ok := paramList[i+1].(core.SymbolValue); ok {
-					// Combine into single *args symbol
+					// Check if this is bare * (keyword-only separator) or *args (varargs)
+					// Heuristic: if there are more parameters after the next symbol,
+					// or if the next-next token is **, then * is a separator
+					hasMoreParams := i+2 < len(paramList)
+					if hasMoreParams {
+						// Check if next-next is ** (would make this: *, param, **kwargs)
+						if i+2 < len(paramList) {
+							if nextNext, ok := paramList[i+2].(core.SymbolValue); ok && string(nextNext) == "**" {
+								// Bare * separator: *, param, **kwargs
+								transformedParams = append(transformedParams, sym) // Keep bare *
+								i++                                                // Skip just the *
+								continue
+							}
+						}
+						// Bare * separator: *, param1, param2, ...
+						transformedParams = append(transformedParams, sym) // Keep bare *
+						i++                                                // Skip just the *
+						continue
+					}
+					// This is *args style (last parameter or before **)
 					transformedParams = append(transformedParams, core.SymbolValue("*"+string(nextSym)))
 					i += 2 // Skip both * and args
 					continue
@@ -146,11 +162,19 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 	seenDefault := false
 	seenRest := false
 	seenKeyword := false
+	keywordOnly := false // Track if we're after * (keyword-only separator)
 
 	for _, param := range transformedParams {
 		switch p := param.(type) {
 		case core.SymbolValue:
 			name := string(p)
+
+			// Check for bare * (keyword-only separator)
+			if name == "*" {
+				// Following parameters are keyword-only
+				keywordOnly = true
+				continue
+			}
 
 			// Check for special parameters
 			if name == "*args" || (len(name) > 1 && name[0] == '*' && name[1] != '*') {
@@ -161,6 +185,7 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 					return nil, fmt.Errorf("*args must come before **kwargs")
 				}
 				seenRest = true
+				keywordOnly = true                      // Parameters after *args are also keyword-only
 				paramName := core.SymbolValue(name[1:]) // Remove *
 				if paramName == "" {
 					paramName = "args"
@@ -183,13 +208,15 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 			}
 
 			// Regular parameter without default
-			if seenDefault && !seenRest {
+			// In Python, you can have required parameters after optional ones if they're keyword-only (after *)
+			if seenDefault && !seenRest && !keywordOnly {
 				return nil, fmt.Errorf("non-default parameter %s after default parameter", name)
 			}
 
 			sig.RequiredParams = append(sig.RequiredParams, ParameterInfo{
-				Name:       p,
-				HasDefault: false,
+				Name:        p,
+				HasDefault:  false,
+				KeywordOnly: keywordOnly,
 			})
 
 		case *core.ListValue:
@@ -237,6 +264,7 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 				Name:         sym,
 				DefaultValue: p.Items()[1], // Store the unevaluated default expression
 				HasDefault:   true,
+				KeywordOnly:  keywordOnly,
 			})
 
 		default:
@@ -277,7 +305,7 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 	// 	fmt.Printf("  **kwargs: %s\n", *sig.KeywordParam)
 	// }
 
-	// 1. Bind required positional parameters
+	// 1. Bind required parameters
 	for _, param := range sig.RequiredParams {
 		paramName := string(param.Name)
 
@@ -286,8 +314,11 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
 			delete(kwargs, paramName)
+		} else if param.KeywordOnly {
+			// Keyword-only parameters cannot be bound from positional arguments
+			return fmt.Errorf("missing required keyword-only argument: %s", paramName)
 		} else if argIndex < len(args) {
-			// Bind from positional arguments
+			// Bind from positional arguments (only for non-keyword-only params)
 			bindCtx.Define(paramName, args[argIndex])
 			boundParams[paramName] = true
 			argIndex++
@@ -305,8 +336,8 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
 			delete(kwargs, paramName)
-		} else if argIndex < len(args) {
-			// Bind from positional arguments
+		} else if !param.KeywordOnly && argIndex < len(args) {
+			// Bind from positional arguments (only for non-keyword-only params)
 			bindCtx.Define(paramName, args[argIndex])
 			boundParams[paramName] = true
 			argIndex++
