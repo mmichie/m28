@@ -143,6 +143,11 @@ func (c *Class) SetClassAttr(name string, value Value) {
 
 // GetAttr implements Object interface for classes
 func (c *Class) GetAttr(name string) (Value, bool) {
+	// Special handling for __name__
+	if name == "__name__" {
+		return StringValue(c.Name), true
+	}
+
 	// Special handling for __mro__ (Method Resolution Order)
 	if name == "__mro__" {
 		// Build the MRO tuple: (CurrentClass, Parent, Grandparent, ..., object)

@@ -809,6 +809,30 @@ func createTypeMetaclass() *TypeType {
 			if isDescriptor {
 				// Add as attribute (descriptor)
 				newClass.SetClassAttr(keyName, value)
+
+				// Call __set_name__ if the descriptor has it (PEP 487)
+				// This allows descriptors like cached_property to know their attribute name
+				if valueWithGetAttr, ok := value.(interface {
+					GetAttr(string) (core.Value, bool)
+				}); ok {
+					if setNameMethod, hasSetName := valueWithGetAttr.GetAttr("__set_name__"); hasSetName {
+						if callable, ok := setNameMethod.(interface {
+							Call([]core.Value, *core.Context) (core.Value, error)
+						}); ok {
+							// Call __set_name__(self, owner, name) for unbound methods
+							// or __set_name__(owner, name) for bound methods
+							// Try with 3 args first (self, owner, name)
+							_, err := callable.Call([]core.Value{value, newClass, core.StringValue(keyName)}, ctx)
+							if err != nil {
+								// If that fails, try with 2 args (owner, name) assuming it's bound
+								_, err = callable.Call([]core.Value{newClass, core.StringValue(keyName)}, ctx)
+								if err != nil {
+									return nil, fmt.Errorf("error calling __set_name__ for %s: %v", keyName, err)
+								}
+							}
+						}
+					}
+				}
 			} else if _, ok := value.(interface {
 				Call([]core.Value, *core.Context) (core.Value, error)
 			}); ok {
