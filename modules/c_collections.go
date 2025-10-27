@@ -882,5 +882,18 @@ func (tg *TupleGetter) GetAttr(name string) (core.Value, bool) {
 
 // SetAttr implements attribute setting
 func (tg *TupleGetter) SetAttr(name string, value core.Value) error {
+	// Allow setting __doc__ to support Python's pattern of setting docstrings on namedtuple fields
+	if name == "__doc__" {
+		if docStr, ok := value.(core.StringValue); ok {
+			tg.doc = string(docStr)
+			return nil
+		}
+		// Allow setting to None
+		if value == core.None || value == core.Nil {
+			tg.doc = ""
+			return nil
+		}
+		return fmt.Errorf("__doc__ must be a string or None, not %s", value.Type())
+	}
 	return fmt.Errorf("cannot set attribute '%s' on tuplegetter", name)
 }

@@ -592,7 +592,7 @@ func InitStringMethods() {
 					if s, ok := item.(StringValue); ok {
 						parts[i] = string(s)
 					} else {
-						parts[i] = PrintValueWithoutQuotes(item)
+						return nil, fmt.Errorf("sequence item %d: expected str instance, %s found", i, item.Type())
 					}
 				}
 			case TupleValue:
@@ -601,7 +601,7 @@ func InitStringMethods() {
 					if s, ok := item.(StringValue); ok {
 						parts[i] = string(s)
 					} else {
-						parts[i] = PrintValueWithoutQuotes(item)
+						return nil, fmt.Errorf("sequence item %d: expected str instance, %s found", i, item.Type())
 					}
 				}
 			default:
@@ -609,6 +609,7 @@ func InitStringMethods() {
 				if iter, ok := args[0].(Iterable); ok {
 					parts = make([]string, 0)
 					iterator := iter.Iterator()
+					idx := 0
 					for {
 						item, hasNext := iterator.Next()
 						if !hasNext {
@@ -617,8 +618,9 @@ func InitStringMethods() {
 						if s, ok := item.(StringValue); ok {
 							parts = append(parts, string(s))
 						} else {
-							parts = append(parts, PrintValueWithoutQuotes(item))
+							return nil, fmt.Errorf("sequence item %d: expected str instance, %s found", idx, item.Type())
 						}
+						idx++
 					}
 				} else {
 					return nil, fmt.Errorf("join() argument must be an iterable")

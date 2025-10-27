@@ -555,6 +555,36 @@ func registerBytesType() {
 					result := make([]byte, len(v))
 					copy(result, v)
 					return BytesValue(result), nil
+				case *SetValue:
+					// Convert set to bytes - iterate and collect byte values
+					result := make([]byte, 0, v.Size())
+					for _, val := range v.items {
+						num, ok := val.(NumberValue)
+						if !ok {
+							return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
+						}
+						intVal := int(num)
+						if intVal < 0 || intVal > 255 {
+							return nil, fmt.Errorf("bytes must be in range(0, 256)")
+						}
+						result = append(result, byte(intVal))
+					}
+					return BytesValue(result), nil
+				case *FrozenSetValue:
+					// Convert frozenset to bytes - iterate and collect byte values
+					result := make([]byte, 0, v.Size())
+					for _, val := range v.items {
+						num, ok := val.(NumberValue)
+						if !ok {
+							return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
+						}
+						intVal := int(num)
+						if intVal < 0 || intVal > 255 {
+							return nil, fmt.Errorf("bytes must be in range(0, 256)")
+						}
+						result = append(result, byte(intVal))
+					}
+					return BytesValue(result), nil
 				default:
 					return nil, fmt.Errorf("cannot convert '%s' object to bytes", v.Type())
 				}
