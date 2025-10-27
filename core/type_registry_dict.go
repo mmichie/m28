@@ -179,7 +179,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 				if len(args) == 2 {
 					return args[1], nil
 				}
-				return nil, fmt.Errorf("KeyError: %v", args[0])
+				return nil, &KeyError{Key: args[0]}
 			},
 		},
 		"clear": {
@@ -276,7 +276,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 				if val, exists := dict.entries[key]; exists {
 					return val, nil
 				}
-				return nil, fmt.Errorf("KeyError: %v", args[0])
+				return nil, &KeyError{Key: args[0]}
 			},
 		},
 		"__setitem__": {
@@ -306,7 +306,7 @@ func getDictMethods() map[string]*MethodDescriptor {
 				dict := receiver.(*DictValue)
 				key := ValueToKey(args[0])
 				if _, exists := dict.entries[key]; !exists {
-					return nil, fmt.Errorf("KeyError: %v", args[0])
+					return nil, &KeyError{Key: args[0]}
 				}
 				// Delete the key from the dictionary in place
 				delete(dict.entries, key)
