@@ -852,16 +852,16 @@ func (tg *TupleGetter) GetAttr(name string) (core.Value, bool) {
 		return core.None, true
 	case "__get__":
 		// Implement descriptor protocol
-		// __get__(self, instance, owner) -> value
+		// __get__(instance, owner) -> value
+		// Note: self (tg) is captured by the closure, not passed as an argument
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			// args[0] is self (the TupleGetter)
-			// args[1] is instance (the namedtuple instance or None)
-			// args[2] is owner (the namedtuple class) - optional
-			if len(args) < 2 {
-				return nil, fmt.Errorf("__get__ requires at least 2 arguments")
+			// args[0] is instance (the namedtuple instance or None)
+			// args[1] is owner (the namedtuple class) - optional
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__get__ requires at least 1 argument")
 			}
 
-			instance := args[1]
+			instance := args[0]
 
 			// If instance is None/Nil or is a Class, return the descriptor itself
 			// This happens when accessing the attribute from the class (e.g., Point.x)
