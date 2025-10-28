@@ -207,15 +207,10 @@ func RegisterCollections(ctx *core.Context) {
 		return desc.Constructor(args, ctx)
 	}))
 
-	// bytearray - create a new bytearray object
-	ctx.Define("bytearray", core.NewNamedBuiltinFunction("bytearray", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// Get the type descriptor for bytearray to use its constructor
-		desc := core.GetTypeDescriptor(core.ByteArrayType)
-		if desc == nil {
-			return nil, fmt.Errorf("bytearray type not registered")
-		}
-		return desc.Constructor(args, ctx)
-	}))
+	// bytearray - Python bytearray class
+	// Create as a class so bytearray.copy can be accessed
+	bytearrayClass := createByteArrayClass()
+	ctx.Define("bytearray", bytearrayClass)
 
 	// memoryview - create a memoryview object (stub implementation)
 	// For now, just return the input object wrapped as a memoryview-like type
@@ -368,6 +363,36 @@ func (s *SetType) String() string {
 	return "<class 'set'>"
 }
 
+// ByteArrayTypeClass represents the bytearray class that can be called and used as a base class
+type ByteArrayTypeClass struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (b *ByteArrayTypeClass) GetClass() *core.Class {
+	return b.Class
+}
+
+// Call implements the callable interface for bytearray() construction
+func (b *ByteArrayTypeClass) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Get the type descriptor for bytearray to use its constructor
+	desc := core.GetTypeDescriptor(core.ByteArrayType)
+	if desc == nil {
+		return nil, fmt.Errorf("bytearray type not registered")
+	}
+	return desc.Constructor(args, ctx)
+}
+
+// Type returns the type of ByteArrayTypeClass
+func (b *ByteArrayTypeClass) Type() core.Type {
+	return core.ClassType
+}
+
+// String returns the string representation
+func (b *ByteArrayTypeClass) String() string {
+	return "<class 'bytearray'>"
+}
+
 // DictType represents the dict class that can be called and has class methods
 type DictType struct {
 	*core.Class
@@ -449,6 +474,40 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 
 	// Odd number of args > 1
 	return nil, fmt.Errorf("dict() takes an even number of positional arguments for key-value pairs")
+}
+
+// createByteArrayClass creates the bytearray class that can be used as a base class
+func createByteArrayClass() *ByteArrayTypeClass {
+	class := core.NewClass("bytearray", nil)
+
+	// Add .copy unbound method that can be accessed as bytearray.copy
+	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("descriptor 'copy' of 'bytearray' object needs an argument")
+		}
+
+		// Get the bytearray instance
+		baInst, ok := args[0].(*core.ByteArrayValue)
+		if !ok {
+			return nil, fmt.Errorf("descriptor 'copy' for 'bytearray' objects doesn't apply to '%s' object", args[0].Type())
+		}
+
+		// Return a shallow copy by using the .copy() instance method if it exists
+		if copyMethod, ok := baInst.GetAttr("copy"); ok {
+			if callable, ok := copyMethod.(core.Callable); ok {
+				return callable.Call([]core.Value{}, ctx)
+			}
+		}
+
+		// If no instance method, create a copy manually
+		// Get the data and make a copy
+		data := baInst.GetData()
+		newData := make([]byte, len(data))
+		copy(newData, data)
+		return core.NewByteArray(newData), nil
+	}))
+
+	return &ByteArrayTypeClass{Class: class}
 }
 
 // createSetClass creates the set class that can be used as a base class
