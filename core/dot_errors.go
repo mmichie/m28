@@ -157,6 +157,25 @@ func (e *ImportError) Error() string {
 	return msg
 }
 
+// AttributeError represents an attribute access error
+type AttributeError struct {
+	ObjType  string
+	AttrName string
+	Message  string
+	Location *SourceLocation
+}
+
+func (e *AttributeError) Error() string {
+	msg := e.Message
+	if msg == "" {
+		msg = fmt.Sprintf("'%s' object has no attribute '%s'", e.ObjType, e.AttrName)
+	}
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
+}
+
 // NewTypeError creates a new type error
 func NewTypeError(expected string, got Value, context string) *TypeError {
 	var gotType string

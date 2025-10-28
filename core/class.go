@@ -14,6 +14,7 @@ type Class struct {
 	Methods     map[string]Value  // Class methods
 	Attributes  map[string]Value  // Class attributes
 	Constructor *MethodDescriptor // __init__ method
+	SlotNames   []string          // __slots__ attribute (if defined)
 }
 
 // NewClass creates a new class
@@ -371,16 +372,28 @@ func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 type Instance struct {
 	BaseObject
 	Class      *Class           // The class this is an instance of
-	Attributes map[string]Value // Instance attributes
+	Attributes map[string]Value // Instance attributes (__dict__)
+	SlotValues []Value          // Slot values (if class uses __slots__)
 }
 
 // NewInstance creates a new instance of a class
 func NewInstance(class *Class) *Instance {
-	return &Instance{
+	inst := &Instance{
 		BaseObject: *NewBaseObject(Type("instance")),
 		Class:      class,
 		Attributes: make(map[string]Value),
 	}
+
+	// If class has __slots__, initialize slot values
+	if class.HasSlots() {
+		inst.SlotValues = make([]Value, len(class.SlotNames))
+		// Initialize all slots to nil (unset)
+		for i := range inst.SlotValues {
+			inst.SlotValues[i] = nil
+		}
+	}
+
+	return inst
 }
 
 // TupleInstance represents a tuple that is an instance of a class (e.g., namedtuple)
@@ -924,6 +937,21 @@ func IsInstanceOf(instance *Instance, class *Class) bool {
 		current = current.Parent
 	}
 	return false
+}
+
+// HasSlots returns true if a class uses __slots__
+func (c *Class) HasSlots() bool {
+	return len(c.SlotNames) > 0
+}
+
+// GetSlotIndex returns the index of a slot by name, or -1 if not found
+func (c *Class) GetSlotIndex(name string) int {
+	for i, slotName := range c.SlotNames {
+		if slotName == name {
+			return i
+		}
+	}
+	return -1
 }
 
 // GenericAlias represents a parameterized generic type like list[int] or dict[str, int]

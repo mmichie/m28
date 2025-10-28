@@ -522,6 +522,20 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// Check for __slots__ and set up slot descriptors
+	if slotsAttr, hasSlots := class.GetClassAttr("__slots__"); hasSlots {
+		if debugClass {
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Setting up __slots__ for class '%s'\n", className)
+		}
+		err := core.SetupSlots(class, slotsAttr)
+		if err != nil {
+			return nil, fmt.Errorf("error setting up __slots__ for class '%s': %v", className, err)
+		}
+		if debugClass {
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] __slots__ setup complete with %d slots\n", len(class.SlotNames))
+		}
+	}
+
 	// If metaclass was specified, call its __new__ method to finalize the class
 	if metaclass != nil {
 		if debugClass {

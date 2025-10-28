@@ -11,8 +11,8 @@
     (= result (+ counter 1))
     (= counter (+ counter 1))
     (print "Counter:" counter "Result:" result))
-  
-  (if (= counter 5)
+
+  (if (== counter 5)
     (print "PASS: while loop iterated 5 times as expected")
     (print "FAIL: while loop failed, counter =" counter))
 )
@@ -27,8 +27,8 @@
   (for (num numbers)
     (= sum (+ sum num))
     (print "Number:" num "Running sum:" sum))
-  
-  (if (= sum 15)
+
+  (if (== sum 15)
     (print "PASS: for loop correctly summed list to 15")
     (print "FAIL: for loop sum =" sum))
 )
@@ -45,8 +45,8 @@
     (if (>= counter 3)
       (break))
   )
-  
-  (if (= counter 3)
+
+  (if (== counter 3)
     (print "PASS: break correctly exited the loop after 3 iterations")
     (print "FAIL: break failed, counter =" counter))
 )
@@ -61,12 +61,12 @@
   (while (< counter 5)
     (= counter (+ counter 1))
     # Check if counter is odd using a simpler approach: 1, 3, 5 = odd
-    (if (or (= counter 1) (= counter 3) (= counter 5))
+    (if (or (== counter 1) (== counter 3) (== counter 5))
       (continue))
     (= evens (+ evens 1))
     (print "Found even number:" counter))
-  
-  (if (= evens 2)
+
+  (if (== evens 2)
     (print "PASS: continue correctly skipped odd numbers")
     (print "FAIL: continue failed, evens =" evens))
 )

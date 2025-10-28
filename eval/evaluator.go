@@ -305,8 +305,50 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				case ".":
 					// Property assignment: obj.prop = value
-					// This is handled by dot notation already
-					break
+					if targetList.Len() != 3 {
+						return nil, fmt.Errorf("invalid dot notation in assignment target")
+					}
+
+					// Evaluate the object
+					obj, err := Eval(targetList.Items()[1], ctx)
+					if err != nil {
+						return nil, err
+					}
+
+					// Get the attribute name (can be StringValue or SymbolValue)
+					var attrName string
+					if strName, ok := targetList.Items()[2].(core.StringValue); ok {
+						attrName = string(strName)
+					} else if symName, ok := targetList.Items()[2].(core.SymbolValue); ok {
+						attrName = string(symName)
+					} else {
+						return nil, fmt.Errorf("attribute name must be a string or symbol")
+					}
+
+					// Evaluate the value
+					value, err := Eval(args.Items()[1], ctx)
+					if err != nil {
+						return nil, err
+					}
+
+					// Set the attribute
+					if objWithAttrs, ok := obj.(interface {
+						SetAttr(string, core.Value) error
+					}); ok {
+						err := objWithAttrs.SetAttr(attrName, value)
+						if err != nil {
+							return nil, err
+						}
+						return value, nil
+					}
+
+					// Special handling for dicts
+					if dict, ok := obj.(*core.DictValue); ok {
+						dict.Set(attrName, value)
+						return value, nil
+					}
+
+					return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
 				}
 			}
 		}
@@ -1145,6 +1187,8 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					matches = excType == "IndexError" || excType == "Exception"
 				case *core.ImportError:
 					matches = excType == "ImportError" || excType == "Exception"
+				case *core.AttributeError:
+					matches = excType == "AttributeError" || excType == "Exception"
 				default:
 					// Check if it's our custom Exception type
 					if exc, ok := baseErr.(*Exception); ok {
