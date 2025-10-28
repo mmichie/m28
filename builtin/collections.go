@@ -55,22 +55,10 @@ func convertToSlice(arg core.Value) ([]core.Value, error) {
 
 // RegisterCollections registers collection constructor functions
 func RegisterCollections(ctx *core.Context) {
-	// list - Python list constructor
-	ctx.Define("list", core.NewNamedBuiltinFunction("list", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) == 0 {
-			return core.NewList(), nil
-		}
-		if len(args) == 1 {
-			// Python-style: Convert iterable to list
-			items, err := convertToSlice(args[0])
-			if err != nil {
-				return nil, err
-			}
-			return core.NewList(items...), nil
-		}
-		// Multiple arguments: create a list from all arguments
-		return core.NewList(args...), nil
-	}))
+	// list - Python list class
+	// Create as a class so list.copy and other class methods can be accessed
+	listClass := createListClass()
+	ctx.Define("list", listClass)
 
 	// tuple - create as a class (like dict) so tuple.__new__ works correctly
 	tupleClass := &TupleType{Class: TupleTypeClass}
@@ -82,59 +70,10 @@ func RegisterCollections(ctx *core.Context) {
 	SetDictTypeClass(dictClass) // Store globally for type() function
 	ctx.Define("dict", dictClass)
 
-	// set - create a new set
-	ctx.Define("set", core.NewNamedBuiltinFunction("set", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("set", args)
-		if err := v.Max(1); err != nil {
-			return nil, err
-		}
-
-		if v.Count() == 0 {
-			return core.NewSet(), nil
-		}
-
-		// Convert iterable to set
-		set := core.NewSet()
-		arg := args[0]
-
-		if list, ok := types.AsList(arg); ok {
-			for _, elem := range list.Items() {
-				set.Add(elem)
-			}
-			return set, nil
-		}
-
-		if tuple, ok := types.AsTuple(arg); ok {
-			for _, elem := range tuple {
-				set.Add(elem)
-			}
-			return set, nil
-		}
-
-		if str, ok := types.AsString(arg); ok {
-			// Convert string to set of characters
-			for _, ch := range str {
-				charVal := core.StringValue(string(ch))
-				set.Add(charVal)
-			}
-			return set, nil
-		}
-
-		// Check if it implements Iterable interface
-		if iterable, ok := types.AsIterable(arg); ok {
-			iter := iterable.Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				set.Add(val)
-			}
-			return set, nil
-		}
-
-		return nil, fmt.Errorf("set() argument must be an iterable, not '%s'", arg.Type())
-	}))
+	// set - Python set class
+	// Create as a class so set.copy and other class methods can be accessed
+	setClass := createSetClass()
+	ctx.Define("set", setClass)
 
 	// frozenset - create a new immutable frozenset
 	ctx.Define("frozenset", core.NewNamedBuiltinFunction("frozenset", func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -355,6 +294,80 @@ func (t *TupleType) String() string {
 	return "<class 'tuple'>"
 }
 
+// SetType represents the set class that can be called and used as a base class
+type SetType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (s *SetType) GetClass() *core.Class {
+	return s.Class
+}
+
+// Call implements the callable interface for set() construction
+func (s *SetType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("set", args)
+	if err := v.Max(1); err != nil {
+		return nil, err
+	}
+
+	if v.Count() == 0 {
+		return core.NewSet(), nil
+	}
+
+	// Convert iterable to set
+	set := core.NewSet()
+	arg := args[0]
+
+	if list, ok := types.AsList(arg); ok {
+		for _, elem := range list.Items() {
+			set.Add(elem)
+		}
+		return set, nil
+	}
+
+	if tuple, ok := types.AsTuple(arg); ok {
+		for _, elem := range tuple {
+			set.Add(elem)
+		}
+		return set, nil
+	}
+
+	if str, ok := types.AsString(arg); ok {
+		// Convert string to set of characters
+		for _, ch := range str {
+			charVal := core.StringValue(string(ch))
+			set.Add(charVal)
+		}
+		return set, nil
+	}
+
+	// Check if it implements Iterable interface
+	if iterable, ok := types.AsIterable(arg); ok {
+		iter := iterable.Iterator()
+		for {
+			val, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+			set.Add(val)
+		}
+		return set, nil
+	}
+
+	return nil, fmt.Errorf("set() argument must be an iterable, not '%s'", arg.Type())
+}
+
+// Type returns the type of SetType
+func (s *SetType) Type() core.Type {
+	return core.ClassType
+}
+
+// String returns the string representation
+func (s *SetType) String() string {
+	return "<class 'set'>"
+}
+
 // DictType represents the dict class that can be called and has class methods
 type DictType struct {
 	*core.Class
@@ -438,17 +451,88 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 	return nil, fmt.Errorf("dict() takes an even number of positional arguments for key-value pairs")
 }
 
+// createSetClass creates the set class that can be used as a base class
+func createSetClass() *SetType {
+	class := core.NewClass("set", nil)
+
+	// Add .copy unbound method that can be accessed as set.copy
+	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("descriptor 'copy' of 'set' object needs an argument")
+		}
+
+		// Get the set instance
+		setInst, ok := args[0].(*core.SetValue)
+		if !ok {
+			return nil, fmt.Errorf("descriptor 'copy' for 'set' objects doesn't apply to '%s' object", args[0].Type())
+		}
+
+		// Return a shallow copy by using the .copy() instance method
+		if copyMethod, ok := setInst.GetAttr("copy"); ok {
+			if callable, ok := copyMethod.(core.Callable); ok {
+				return callable.Call([]core.Value{}, ctx)
+			}
+		}
+		return nil, fmt.Errorf("set.copy method not found")
+	}))
+
+	return &SetType{Class: class}
+}
+
 // createListClass creates the list class that can be used as a base class
 func createListClass() *ListType {
 	class := core.NewClass("list", nil)
-	// List doesn't have class methods like dict.fromkeys currently
-	// But having it as a Class allows it to be inherited from
+
+	// Add .copy unbound method that can be accessed as list.copy
+	// This returns a descriptor-like object that can be called
+	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("descriptor 'copy' of 'list' object needs an argument")
+		}
+
+		// Get the list instance
+		listInst, ok := args[0].(*core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("descriptor 'copy' for 'list' objects doesn't apply to '%s' object", args[0].Type())
+		}
+
+		// Return a shallow copy by using the .copy() instance method
+		if copyMethod, ok := listInst.GetAttr("copy"); ok {
+			if callable, ok := copyMethod.(core.Callable); ok {
+				return callable.Call([]core.Value{}, ctx)
+			}
+		}
+		return nil, fmt.Errorf("list.copy method not found")
+	}))
+
 	return &ListType{Class: class}
 }
 
 // createDictClass creates the dict class with class methods like fromkeys
 func createDictClass() *DictType {
 	class := core.NewClass("dict", nil)
+
+	// Add .copy unbound method that can be accessed as dict.copy
+	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("descriptor 'copy' of 'dict' object needs an argument")
+		}
+
+		// Get the dict instance
+		dictInst, ok := args[0].(*core.DictValue)
+		if !ok {
+			return nil, fmt.Errorf("descriptor 'copy' for 'dict' objects doesn't apply to '%s' object", args[0].Type())
+		}
+
+		// Return a shallow copy by using the .copy() instance method
+		// which is already implemented on DictValue
+		if copyMethod, ok := dictInst.GetAttr("copy"); ok {
+			if callable, ok := copyMethod.(core.Callable); ok {
+				return callable.Call([]core.Value{}, ctx)
+			}
+		}
+		return nil, fmt.Errorf("dict.copy method not found")
+	}))
 
 	// Add fromkeys class method
 	// dict.fromkeys(iterable, value=None) -> new dict with keys from iterable
