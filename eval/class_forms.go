@@ -484,6 +484,28 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					// def should only be used for functions
 					return nil, fmt.Errorf("def can only be used for method definitions in classes")
 
+				case "del":
+					// Delete class variable or attribute
+					// Evaluate the del statement in class body context
+					_, err := Eval(stmt, classBodyCtx)
+					if err != nil {
+						return nil, err
+					}
+
+					// Also remove from class attributes for each target
+					// del can have multiple targets: del x, y, z
+					for i := 1; i < s.Len(); i++ {
+						if sym, ok := sItems[i].(core.SymbolValue); ok {
+							attrName := string(sym)
+							// Remove from class attributes
+							delete(class.Attributes, attrName)
+							if debugClass {
+								fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Deleted class attribute '%s'\n", attrName)
+							}
+						}
+					}
+					continue
+
 				case "=":
 					// Class variable definition or subscript assignment
 					if s.Len() != 3 {
@@ -521,33 +543,36 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 
 				default:
-					// Evaluate other forms in class context
+					// Evaluate other forms in class body context (not outer context)
+					// This allows access to class variables during construction
 					if debugClass {
 						if sym, ok := sItems[0].(core.SymbolValue); ok {
-							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating form '%s' in class context\n", sym)
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating form '%s' in class body context\n", sym)
 						}
 					}
-					_, err := Eval(stmt, ctx)
+					_, err := Eval(stmt, classBodyCtx)
 					if err != nil {
 						return nil, err
 					}
 				}
 			} else {
-				// Evaluate other forms in class context
+				// Evaluate other forms in class body context (not outer context)
+				// This allows access to class variables during construction
 				if debugClass {
-					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating non-symbol list in class context\n")
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating non-symbol list in class body context\n")
 				}
-				_, err := Eval(stmt, ctx)
+				_, err := Eval(stmt, classBodyCtx)
 				if err != nil {
 					return nil, err
 				}
 			}
 		default:
-			// Evaluate the statement
+			// Evaluate the statement in class body context (not outer context)
+			// This allows access to class variables during construction
 			if debugClass {
 				fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating non-list statement: %T\n", stmt)
 			}
-			_, err := Eval(stmt, ctx)
+			_, err := Eval(stmt, classBodyCtx)
 			if err != nil {
 				return nil, err
 			}
