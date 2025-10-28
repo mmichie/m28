@@ -165,6 +165,89 @@ func registerNumberType() {
 					return nil, fmt.Errorf("__int__ called on non-int receiver: %s", receiver.Type())
 				},
 			},
+			"to_bytes": {
+				Name:    "to_bytes",
+				Arity:   2,
+				Doc:     "Return an array of bytes representing an integer",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					if len(args) != 2 {
+						return nil, fmt.Errorf("to_bytes() takes exactly 2 arguments (%d given)", len(args))
+					}
+
+					// Get the integer value
+					var num int64
+					if n, ok := receiver.(NumberValue); ok {
+						num = int64(n)
+						// Check if it's actually an integer
+						if float64(num) != float64(n) {
+							return nil, fmt.Errorf("'float' object cannot be interpreted as an integer")
+						}
+					} else if inst, ok := receiver.(*Instance); ok {
+						if val, exists := inst.Attributes["__value__"]; exists {
+							if n, ok := val.(NumberValue); ok {
+								num = int64(n)
+								if float64(num) != float64(n) {
+									return nil, fmt.Errorf("'float' object cannot be interpreted as an integer")
+								}
+							} else {
+								return nil, fmt.Errorf("to_bytes() requires an integer")
+							}
+						} else {
+							return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+						}
+					} else {
+						return nil, fmt.Errorf("to_bytes() requires an integer")
+					}
+
+					// Get length argument
+					lengthVal, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, fmt.Errorf("to_bytes() length argument must be an integer")
+					}
+					length := int(lengthVal)
+					if float64(length) != float64(lengthVal) || length < 0 {
+						return nil, fmt.Errorf("to_bytes() length argument must be a non-negative integer")
+					}
+
+					// Get byteorder argument
+					byteorder, ok := args[1].(StringValue)
+					if !ok {
+						return nil, fmt.Errorf("to_bytes() byteorder argument must be a string")
+					}
+					order := string(byteorder)
+					if order != "little" && order != "big" {
+						return nil, fmt.Errorf("byteorder must be either 'little' or 'big'")
+					}
+
+					// Check if number is negative
+					if num < 0 {
+						return nil, fmt.Errorf("can't convert negative int to unsigned")
+					}
+
+					// Check if number fits in the specified length
+					maxVal := int64(1) << uint(length*8)
+					if num >= maxVal {
+						return nil, fmt.Errorf("int too big to convert")
+					}
+
+					// Convert to bytes
+					result := make([]byte, length)
+					if order == "little" {
+						// Little-endian: least significant byte first
+						for i := 0; i < length; i++ {
+							result[i] = byte(num >> uint(i*8))
+						}
+					} else {
+						// Big-endian: most significant byte first
+						for i := 0; i < length; i++ {
+							result[length-1-i] = byte(num >> uint(i*8))
+						}
+					}
+
+					return BytesValue(result), nil
+				},
+			},
 		},
 		Constructor: func(args []Value, ctx *Context) (Value, error) {
 			if len(args) == 0 {
