@@ -27,6 +27,13 @@ func EqualValues(a, b Value) bool {
 			aB := PromoteToBigInt(aVal)
 			return aB.GetBigInt().Cmp(bVal.GetBigInt()) == 0
 		}
+		// Python bool is a subclass of int, so 0 == False and 1 == True
+		if bVal, ok := b.(BoolValue); ok {
+			if bool(bVal) {
+				return float64(aVal) == 1.0
+			}
+			return float64(aVal) == 0.0
+		}
 	case BigIntValue:
 		if bVal, ok := b.(BigIntValue); ok {
 			return aVal.GetBigInt().Cmp(bVal.GetBigInt()) == 0
@@ -55,6 +62,13 @@ func EqualValues(a, b Value) bool {
 	case BoolValue:
 		if bVal, ok := b.(BoolValue); ok {
 			return bool(aVal) == bool(bVal)
+		}
+		// Python bool is a subclass of int, so False == 0 and True == 1
+		if bVal, ok := b.(NumberValue); ok {
+			if bool(aVal) {
+				return float64(bVal) == 1.0
+			}
+			return float64(bVal) == 0.0
 		}
 	case NilValue:
 		_, ok := b.(NilValue)
