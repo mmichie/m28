@@ -336,6 +336,26 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// Debug for Path classes
+	if string(className) == "Path" || string(className) == "PosixPath" || string(className) == "PurePath" {
+		fmt.Printf("[DEBUG classForm] Created class '%s' with %d parents\n", className, len(parentClasses))
+		for i, p := range parentClasses {
+			fmt.Printf("[DEBUG classForm]   Parent[%d] = %s\n", i, p.Name)
+		}
+		fmt.Printf("[DEBUG classForm] %s.Parents = %v\n", className, func() []string {
+			names := make([]string, len(class.Parents))
+			for i, p := range class.Parents {
+				names[i] = p.Name
+			}
+			return names
+		}())
+		if class.Parent != nil {
+			fmt.Printf("[DEBUG classForm] %s.Parent = %s\n", className, class.Parent.Name)
+		} else {
+			fmt.Printf("[DEBUG classForm] %s.Parent = nil\n", className)
+		}
+	}
+
 	if debugClass {
 		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Created class '%s', processing body from index %d to %d\n", className, bodyStart, args.Len()-1)
 	}
@@ -440,6 +460,11 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 							if methodName == "__init_subclass__" || methodName == "__class_getitem__" {
 								// Wrap as a classmethod that receives the class as first argument
 								finalMethod = createBoundClassMethod(class, method)
+							}
+
+							// Debug for PurePath.__init__
+							if (string(className) == "PurePath" || string(className) == "Path") && methodName == "__init__" {
+								fmt.Printf("[DEBUG classForm] Setting method %s.%s via SetMethod\n", className, methodName)
 							}
 
 							class.SetMethod(methodName, finalMethod)
@@ -649,6 +674,14 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // createMethod creates a method from a parameter list and body
 func createMethod(name string, params *core.ListValue, body []core.Value, ctx *core.Context) (*UserFunction, error) {
+	// Debug for __init__
+	if name == "__init__" {
+		fmt.Printf("[DEBUG createMethod] Creating __init__ with %d body items\n", len(body))
+		for i, item := range body {
+			fmt.Printf("  Body[%d]: %T = %v\n", i, item, item)
+		}
+	}
+
 	// Try to parse as new-style parameter list with defaults
 	signature, err := ParseParameterList(params.Items())
 	if err != nil {
@@ -730,6 +763,17 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// by checking for self/cls/mcls
 				if selfVal, err := ctx.Lookup("self"); err == nil {
 					if instance, ok := selfVal.(*core.Instance); ok {
+						// Debug for pathlib classes
+						if class.Name == "PosixPath" || class.Name == "Path" || class.Name == "PurePath" || class.Name == "PurePosixPath" {
+							fmt.Printf("[DEBUG super] __class__=%s, instance.Class=%s\n", class.Name, instance.Class.Name)
+							if len(class.Parents) > 0 {
+								fmt.Printf("[DEBUG super] %s -> Parents[0] = %s\n", class.Name, class.Parents[0].Name)
+							} else if class.Parent != nil {
+								fmt.Printf("[DEBUG super] %s -> Parent = %s\n", class.Name, class.Parent.Name)
+							} else {
+								fmt.Printf("[DEBUG super] %s has NO parent!\n", class.Name)
+							}
+						}
 						// Instance method - return super for parent class with instance
 						if len(class.Parents) > 0 {
 							return core.NewSuper(class.Parents[0], instance), nil

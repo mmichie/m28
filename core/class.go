@@ -86,9 +86,22 @@ func (c *Class) GetMethod(name string) (Value, bool) {
 
 // GetMethodWithClass looks up a method and returns the class where it was defined
 func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
+	// Debug for PurePath.__init__
+	if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
+		fmt.Printf("[DEBUG GetMethodWithClass] Looking for %s.%s, in Methods: %v\n", c.Name, name, c.Methods[name] != nil)
+	}
+
 	// Check this class first
 	if method, ok := c.Methods[name]; ok {
+		if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
+			fmt.Printf("[DEBUG GetMethodWithClass] FOUND %s.%s in Methods\n", c.Name, name)
+		}
 		return method, c, true
+	}
+
+	// Debug when not found
+	if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
+		fmt.Printf("[DEBUG GetMethodWithClass] NOT found in %s.Methods, checking parents\n", c.Name)
 	}
 
 	// Check parent classes using MRO (Method Resolution Order)
@@ -109,7 +122,17 @@ func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
 
 // SetMethod adds a method to the class
 func (c *Class) SetMethod(name string, method Value) {
+	// Debug for PurePath.__init__
+	if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
+		fmt.Printf("[DEBUG SetMethod] %s.%s being set in Methods map (before: %v, after: will be %T)\n", c.Name, name, c.Methods[name] != nil, method)
+	}
+
 	c.Methods[name] = method
+
+	// Debug verification
+	if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
+		fmt.Printf("[DEBUG SetMethod] %s.%s set complete, now in Methods: %v\n", c.Name, name, c.Methods[name] != nil)
+	}
 
 	// Special handling for __init__
 	// Constructor is set when creating instances
@@ -348,19 +371,34 @@ func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 	}
 
 	// Call __init__ if it exists and instance is of the right type
-	// Only call __init__ if __new__ returned an instance of this class
-	if inst, ok := instance.(*Instance); ok && inst.Class == c {
+	// Call __init__ if __new__ returned an instance of this class or a subclass
+	if inst, ok := instance.(*Instance); ok && IsInstanceOf(inst, c) {
 		if initMethod, ok := c.GetMethod("__init__"); ok {
 			// Create bound method for __init__
 			if callable, ok := initMethod.(interface {
 				Call([]Value, *Context) (Value, error)
 			}); ok {
+				// Debug for pathlib classes
+				if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
+					fmt.Printf("[DEBUG Class.Call] Calling %s.__init__ with %d args\n", c.Name, len(args))
+				}
+				// Create a new context with __class__ set to the class whose __init__ we're calling
+				// This allows super() to work correctly inside __init__
+				initCtx := NewContext(ctx)
+				initCtx.Define("__class__", c)
 				// Prepend instance as first argument (self)
 				initArgs := append([]Value{instance}, args...)
-				_, err := callable.Call(initArgs, ctx)
+				_, err := callable.Call(initArgs, initCtx)
 				if err != nil {
 					return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
 				}
+			}
+		}
+	} else {
+		// Debug: Log when __init__ is NOT called
+		if inst, ok := instance.(*Instance); ok {
+			if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
+				fmt.Printf("[DEBUG Class.Call] SKIPPING __init__ for %s because inst.Class=%s != c=%s\n", c.Name, inst.Class.Name, c.Name)
 			}
 		}
 	}
@@ -390,6 +428,11 @@ func NewInstance(class *Class) *Instance {
 		// Initialize all slots to nil (unset)
 		for i := range inst.SlotValues {
 			inst.SlotValues[i] = nil
+		}
+
+		// Debug for Path-related classes
+		if class.Name == "PosixPath" || class.Name == "Path" || class.Name == "PurePath" {
+			fmt.Printf("[DEBUG NewInstance] %s: %d slots - %v\n", class.Name, len(class.SlotNames), class.SlotNames)
 		}
 	}
 
@@ -606,6 +649,11 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 // 1. Check for data descriptor with __set__ in class
 // 2. Set in instance __dict__
 func (i *Instance) SetAttr(name string, value Value) error {
+	// Debug for PosixPath._raw_paths
+	if (i.Class.Name == "PosixPath" || i.Class.Name == "PurePath" || i.Class.Name == "Path") && name == "_raw_paths" {
+		fmt.Printf("[DEBUG SetAttr] %s.%s = %v\n", i.Class.Name, name, value)
+	}
+
 	// Check for data descriptor in class with __set__
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
 		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
@@ -631,6 +679,10 @@ func (i *Instance) SetAttr(name string, value Value) error {
 	}
 
 	// No descriptor with __set__, set in instance __dict__
+	// Debug for Path-related classes
+	if (i.Class.Name == "PosixPath" || i.Class.Name == "Path" || i.Class.Name == "PurePath") && name == "_raw_paths" {
+		fmt.Printf("[DEBUG SetAttr] %s.%s being set in Attributes dict (no descriptor found)\n", i.Class.Name, name)
+	}
 	i.Attributes[name] = value
 	return nil
 }
@@ -805,6 +857,10 @@ type BoundSuperMethod struct {
 
 // Call implements Callable interface for BoundSuperMethod
 func (bsm *BoundSuperMethod) Call(args []Value, ctx *Context) (Value, error) {
+	// Debug for pathlib classes
+	if bsm.Class.Name == "PurePath" || bsm.Class.Name == "Path" || bsm.Class.Name == "PosixPath" {
+		fmt.Printf("[DEBUG BoundSuperMethod.Call] Calling method from %s with %d args\n", bsm.Class.Name, len(args))
+	}
 	// Create a new context with __class__ set
 	methodCtx := NewContext(ctx)
 	methodCtx.Define("__class__", bsm.Class)
@@ -868,28 +924,76 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 		}); ok {
 			// Create bound method if we have an instance
 			if s.Instance != nil {
-				return &BoundInstanceMethod{
-					Instance:      s.Instance,
-					Method:        callable,
-					DefiningClass: defClass,
+				// Debug for pathlib classes
+				if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+					fmt.Printf("[DEBUG Super.GetAttr] Binding __init__ from class %s for instance %s (method type: %T)\n", defClass.Name, s.Instance.Class.Name, method)
+				}
+				// Use BoundSuperMethod to ensure __class__ is set correctly
+				// This allows super() to work correctly in parent class methods
+				return &BoundSuperMethod{
+					BaseObject: *NewBaseObject(MethodType),
+					Method: &BoundInstanceMethod{
+						Instance:      s.Instance,
+						Method:        callable,
+						DefiningClass: defClass,
+					},
+					Class: defClass,
 				}
 			}
 		}
 		return method
 	}
 
-	// super() should SKIP s.Class and look in parent classes only
-	// This is the key difference from instance.GetAttr which checks the instance's class first
+	// super() returns a proxy that looks up methods starting from s.Class
+	// When you call super().__init__() inside Path.__init__:
+	// 1. superForm() creates Super(class=PurePath) - skipping Path itself
+	// 2. Super.GetAttr("__init__") should look IN PurePath (not PurePath's parents)
+	// 3. If not found in PurePath, then check PurePath's parents
 	//
-	// HOWEVER: For special methods like __new__ that exist on the root metaclass (type),
-	// we need to check s.Class itself if it has no parents. This handles the case where
-	// a metaclass calls super().__new__() and the metaclass's parent is type.
+	// The key: s.Class is ALREADY the parent to start searching from,
+	// so we need to check s.Class itself first, then s.Class's parents.
 
-	// Look in parent classes using MRO
+	// First check s.Class itself (the starting point for MRO)
+	if method, defClass, ok := s.Class.GetMethodWithClass(name); ok {
+		return bindMethod(method, defClass), true
+	}
+	if method, ok := s.Class.GetAttr(name); ok {
+		return bindMethod(method, s.Class), true
+	}
+
+	// Then look in s.Class's parent classes using MRO
 	if len(s.Class.Parents) > 0 {
+		// Debug for pathlib
+		if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+			fmt.Printf("[DEBUG Super.GetAttr] s.Class=%s, s.Class.Parents=%v\n", s.Class.Name, func() []string {
+				names := make([]string, len(s.Class.Parents))
+				for i, p := range s.Class.Parents {
+					names[i] = p.Name
+				}
+				return names
+			}())
+		}
 		for _, parent := range s.Class.Parents {
+			// Debug for pathlib
+			if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+				fmt.Printf("[DEBUG Super.GetAttr] Checking parent %s for __init__\n", parent.Name)
+			}
+			// First try GetMethodWithClass (faster, checks Methods map)
 			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
+				if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+					fmt.Printf("[DEBUG Super.GetAttr] Found __init__ in %s.Methods\n", defClass.Name)
+				}
 				return bindMethod(method, defClass), true
+			}
+			// Fallback to GetAttr to check Attributes (for Python-defined methods)
+			if method, ok := parent.GetAttr(name); ok {
+				if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+					fmt.Printf("[DEBUG Super.GetAttr] Found __init__ in %s via GetAttr\n", parent.Name)
+				}
+				return bindMethod(method, parent), true
+			}
+			if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+				fmt.Printf("[DEBUG Super.GetAttr] __init__ NOT found in parent %s\n", parent.Name)
 			}
 		}
 	} else if s.Class.Parent != nil {
