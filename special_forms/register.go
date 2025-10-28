@@ -10,6 +10,9 @@ func RegisterAllForms() {
 	// Register basic control flow forms
 	registerControlFlowForms()
 
+	// Register logical operator forms (and, or)
+	registerLogicalForms()
+
 	// Register definition forms
 	registerDefinitionForms()
 
@@ -36,6 +39,15 @@ func registerControlFlowForms() {
 	eval.RegisterSpecialForm("for", forForm)
 	eval.RegisterSpecialForm("break", breakForm)
 	eval.RegisterSpecialForm("continue", continueForm)
+}
+
+// registerLogicalForms registers special forms for logical operators
+func registerLogicalForms() {
+	// and: Short-circuit and operator
+	eval.RegisterSpecialForm("and", andForm)
+
+	// or: Short-circuit or operator
+	eval.RegisterSpecialForm("or", orForm)
 }
 
 // registerDefinitionForms registers special forms for definitions
@@ -166,4 +178,14 @@ func nonlocalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // delForm implements the 'del' special form
 func delForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.DelForm(args, ctx)
+}
+
+// andForm implements the 'and' special form with short-circuit evaluation
+func andForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.AndForm(args, ctx)
+}
+
+// orForm implements the 'or' special form with short-circuit evaluation
+func orForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.OrForm(args, ctx)
 }
