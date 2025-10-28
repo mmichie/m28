@@ -96,11 +96,27 @@ func getStringMethods() map[string]*MethodDescriptor {
 					return nil, fmt.Errorf("startswith() takes exactly one argument")
 				}
 				s := string(receiver.(StringValue))
-				prefix, ok := args[0].(StringValue)
-				if !ok {
-					return nil, fmt.Errorf("startswith() argument must be str")
+
+				// Handle single string prefix
+				if prefix, ok := args[0].(StringValue); ok {
+					return BoolValue(strings.HasPrefix(s, string(prefix))), nil
 				}
-				return BoolValue(strings.HasPrefix(s, string(prefix))), nil
+
+				// Handle tuple of string prefixes
+				if prefixTuple, ok := args[0].(TupleValue); ok {
+					for _, prefixVal := range prefixTuple {
+						prefix, ok := prefixVal.(StringValue)
+						if !ok {
+							return nil, fmt.Errorf("tuple for startswith must contain only strings")
+						}
+						if strings.HasPrefix(s, string(prefix)) {
+							return BoolValue(true), nil
+						}
+					}
+					return BoolValue(false), nil
+				}
+
+				return nil, fmt.Errorf("startswith() argument must be a string or tuple of strings")
 			},
 		},
 		"endswith": {
@@ -113,11 +129,27 @@ func getStringMethods() map[string]*MethodDescriptor {
 					return nil, fmt.Errorf("endswith() takes exactly one argument")
 				}
 				s := string(receiver.(StringValue))
-				suffix, ok := args[0].(StringValue)
-				if !ok {
-					return nil, fmt.Errorf("endswith() argument must be str")
+
+				// Handle single string suffix
+				if suffix, ok := args[0].(StringValue); ok {
+					return BoolValue(strings.HasSuffix(s, string(suffix))), nil
 				}
-				return BoolValue(strings.HasSuffix(s, string(suffix))), nil
+
+				// Handle tuple of string suffixes
+				if suffixTuple, ok := args[0].(TupleValue); ok {
+					for _, suffixVal := range suffixTuple {
+						suffix, ok := suffixVal.(StringValue)
+						if !ok {
+							return nil, fmt.Errorf("tuple for endswith must contain only strings")
+						}
+						if strings.HasSuffix(s, string(suffix)) {
+							return BoolValue(true), nil
+						}
+					}
+					return BoolValue(false), nil
+				}
+
+				return nil, fmt.Errorf("endswith() argument must be a string or tuple of strings")
 			},
 		},
 		"find": {
