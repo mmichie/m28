@@ -1,19 +1,18 @@
-# Advanced File Operations in M28 (Working Version)
-# File manipulation, directory operations, and path handling
+# Safe File Operations in M28
+# Uses /tmp for all file creation to avoid polluting the project directory
 
 (import os)
-(import shutil)
 (import pathlib)
 
-# File existence and properties
+(print "=== SAFE FILE OPERATIONS TEST ===\n")
+
+# File existence and properties (read-only on existing files)
 (def file_info (filepath)
   (if (os.path.exists filepath)
     (begin
       (print f"File: {filepath}")
       (print f"Size: {(os.path.getsize filepath)} bytes")
-      (print f"Is file: {(os.path.isfile filepath)}")
-      (print f"Is directory: {(os.path.isdir filepath)}")
-      (print f"Last modified: {(os.path.getmtime filepath)}"))
+      (print f"Exists: {(os.path.exists filepath)}"))
     (print f"File does not exist: {filepath}")))
 
 (file_info "README.md")
@@ -22,132 +21,67 @@
 (= current_dir (os.getcwd))
 (print f"\nCurrent directory: {current_dir}")
 
-# Join paths properly
-(= data_dir (os.path.join current_dir "data"))
-(= file_path (os.path.join data_dir "myfile.txt"))
-(print f"Full path: {file_path}")
-
 # Path manipulation with pathlib
-(= path (pathlib.Path "examples/06_file_io/file_operations.m28"))
-(print f"\nPath info:")
-(print f"Name: {path.name}")          # file_operations.m28
-(print f"Stem: {path.stem}")          # file_operations
-(print f"Suffix: {path.suffix}")      # .m28
-(print f"Parent: {path.parent}")      # examples/06_file_io
-
-# Create directories (without keyword args)
-(def create_directory (dirpath)
-  (try
-    (os.makedirs dirpath)
-    (print f"\nCreated directory: {dirpath}")
-    (except Exception e
-      # Directory might already exist
-      (if (os.path.isdir dirpath)
-        (print f"Directory already exists: {dirpath}")
-        (print f"Error creating directory: {e}")))))
-
-(create_directory "output")
-(create_directory "output/reports")
-(create_directory "output/reports/2024")
-
-# List directory contents (without default parameter)
-(def list_files (directory pattern)
-  (= path (pathlib.Path directory))
-  (if (path.exists)
-    (begin
-      (print f"\n{directory}:")
-      (= files (path.glob pattern))
-      (for file files
-        (= file_type (if (file.is_dir) "dir" "file"))
-        (print f"  {file.name} ({file_type})")))
-    (print f"Directory not found: {directory}")))
-
-(print "\nFiles in current directory:")
-(list_files "." "*.m28")
-
-(print "\nAll files in examples:")
-(list_files "examples" "*")
-
-# Copy files
-(def copy_file (source dest)
-  (try
-    (shutil.copy2 source dest)  # copy2 preserves metadata
-    (print f"\nCopied {source} to {dest}")
-    (except Exception e
-      (print f"Error copying file: {e}"))))
-
-# Test copy (only if source exists)
 (if (os.path.exists "README.md")
-  (copy_file "README.md" "output/README_copy.md"))
+  (begin
+    (= path (pathlib.Path "README.md"))
+    (print f"\nPath info:")
+    (print f"Name: {path.name}")
+    (print f"Stem: {path.stem}")
+    (print f"Suffix: {path.suffix}")
+    (print f"Parent: {path.parent}")))
 
-# Move/rename files
-(def move_file (source dest)
+# Use /tmp for all file creation
+(= test_dir "/tmp/m28_filetest")
+
+# Create test directory in /tmp
+(def create_test_dir ()
   (try
-    (shutil.move source dest)
-    (print f"\nMoved {source} to {dest}")
+    (if (not (os.path.exists test_dir))
+      (do
+        (os.makedirs test_dir)
+        (print f"\nCreated test directory: {test_dir}"))
+      (print f"\nTest directory already exists: {test_dir}"))
     (except Exception e
-      (print f"Error moving file: {e}"))))
+      (print f"Error creating directory: {e}"))))
 
-# Delete files and directories
-(def delete_file (filepath)
-  (try
-    (if (os.path.isfile filepath)
-      (begin
-        (os.remove filepath)
-        (print f"\nDeleted file: {filepath}"))
-      (if (os.path.isdir filepath)
-        (begin
-          (shutil.rmtree filepath)
-          (print f"Deleted directory: {filepath}"))
-        (print f"Path not found: {filepath}")))
-    (except Exception e
-      (print f"Error deleting: {e}"))))
+(create_test_dir)
 
-# File searching (simplified without rglob)
-(def find_files (directory pattern)
-  (= matches [])
-  (= path (pathlib.Path directory))
-  # Just search current directory for now
-  (= files (path.glob pattern))
-  (for file files
-    (= matches (+ matches [file])))
-  (return matches))
-
-# Find all .m28 files in current directory
-(= m28_files (find_files "." "*.m28"))
-(print f"\nFound {(len m28_files)} M28 files in current directory")
-(for f m28_files
-  (print f"  - {(str f)}"))
-
-# Working with Path objects
-(print "\nPath operations:")
-(= p (pathlib.Path "."))
-(print f"Current path: {p}")
-(print f"Absolute path: {(p.resolve)}")
-(print f"Exists: {(p.exists)}")
-(print f"Is directory: {(p.is_dir)}")
-
-# Create a test file and manipulate it
-(= test_file (pathlib.Path "output/test.txt"))
+# Test file operations in /tmp
+(= test_file (os.path.join test_dir "test.txt"))
 (print f"\nCreating test file: {test_file}")
-(test_file.write_text "Hello from M28!\nThis is a test file.\n")
-(print f"File size: {(os.path.getsize (str test_file))} bytes")
 
-# Read it back
-(print f"Contents: {(test_file.read_text)}")
+# Write test (in /tmp only)
+(try
+  (= f (open test_file "w"))
+  (f.write "Hello from M28!\n")
+  (f.write "This is a test file.\n")
+  (f.close)
+  (print f"File size: {(os.path.getsize test_file)} bytes")
+  (except Exception e
+    (print f"Error writing file: {e}")))
 
-# Clean up test files
+# Read test
+(try
+  (= f (open test_file "r"))
+  (= content (f.read))
+  (f.close)
+  (print f"Contents: {content}")
+  (except Exception e
+    (print f"Error reading file: {e}")))
+
+# Clean up (delete test files and directory)
 (print "\nCleaning up...")
-(if (test_file.exists)
-  (test_file.unlink))
-(if (os.path.exists "output/README_copy.md")
-  (os.remove "output/README_copy.md"))
+(try
+  (if (os.path.exists test_file)
+    (do
+      (os.remove test_file)
+      (print f"Deleted: {test_file}")))
+  (if (os.path.exists test_dir)
+    (do
+      (os.rmdir test_dir)
+      (print f"Deleted: {test_dir}")))
+  (except Exception e
+    (print f"Error during cleanup: {e}")))
 
-# Note: The following features are not yet supported:
-# - tempfile module for temporary files
-# - zipfile module for compression
-# - time.sleep for file watching
-# - keyword arguments (e.g., exist_ok=True)
-# - Path.rglob for recursive globbing
-
-(print "\nFile operations demo complete!")
+(print "\n=== TEST COMPLETE ===")
