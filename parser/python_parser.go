@@ -874,16 +874,21 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 			// Check for comma on right side (tuple formation)
 			if p.check(TOKEN_COMMA) {
 				elements := []ast.ASTNode{nextExpr}
+				hasTrailingComma := false
 				for p.check(TOKEN_COMMA) {
 					p.advance() // consume comma
 					if p.check(TOKEN_ASSIGN) || p.check(TOKEN_NEWLINE) {
+						// Trailing comma before assignment or end of line
+						hasTrailingComma = true
 						break
 					}
 					elements = append(elements, p.parseExpression())
 				}
 
 				// Create tuple for right side
-				if len(elements) > 1 {
+				// Python rule: comma creates tuple even with single element if there's a trailing comma
+				// e.g., x = 'win', creates tuple ('win',)
+				if len(elements) > 1 || hasTrailingComma {
 					tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
 					allElements := append([]ast.ASTNode{tupleSym}, elements...)
 					nextExpr = ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
