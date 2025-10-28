@@ -221,8 +221,16 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 			case core.TupleValue:
 				positionalArgs = append(positionalArgs, []core.Value(v)...)
 			case *core.SetValue:
-				// Sets are not directly iterable for unpacking in Python either
-				return nil, fmt.Errorf("* unpacking does not support sets, convert to list first")
+				// Sets can be unpacked in Python 3.5+
+				// Note: order is not guaranteed for sets
+				iter := v.Iterator()
+				for {
+					item, ok := iter.Next()
+					if !ok {
+						break
+					}
+					positionalArgs = append(positionalArgs, item)
+				}
 			case core.StringValue:
 				// String unpacking: each character becomes an argument
 				for _, ch := range string(v) {

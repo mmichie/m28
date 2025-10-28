@@ -167,10 +167,105 @@ func RegisterList(ctx *core.Context) {
 	// AFTER: Custom builder
 	ctx.Define("range", core.NewNamedBuiltinFunction("range", RangeBuilder()))
 
-	// sorted - returns sorted copy (basic version without kwargs)
-	// BEFORE: Part of 70 lines with kwargs
-	// AFTER: Using custom builder
-	ctx.Define("sorted", core.NewBuiltinFunction(SortedBuilder()))
+	// sorted - returns sorted copy with optional reverse and key parameters
+	// sorted(iterable, *, key=None, reverse=False)
+	ctx.Define("sorted", NewKwargsBuiltinFunction("sorted", func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, errors.NewArgumentError("sorted", 1, len(args))
+		}
+
+		// Convert iterable to list
+		var items []core.Value
+		seq := args[0]
+
+		if list, ok := types.AsList(seq); ok {
+			items = make([]core.Value, list.Len())
+			copy(items, list.Items())
+		} else if tuple, ok := types.AsTuple(seq); ok {
+			items = make([]core.Value, len(tuple))
+			copy(items, tuple)
+		} else if set, ok := types.AsSet(seq); ok {
+			items = make([]core.Value, 0, set.Size())
+			iter := set.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				items = append(items, val)
+			}
+		} else if str, ok := types.AsString(seq); ok {
+			items = make([]core.Value, len(str))
+			for i, ch := range str {
+				items[i] = core.StringValue(string(ch))
+			}
+		} else if iterable, ok := types.AsIterable(seq); ok {
+			iter := iterable.Iterator()
+			items = make([]core.Value, 0)
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				items = append(items, val)
+			}
+		} else {
+			return nil, errors.NewTypeError("sorted", "iterable", string(seq.Type()))
+		}
+
+		// Handle reverse parameter (default is False)
+		reverse := false
+		if reverseVal, ok := kwargs["reverse"]; ok {
+			reverse = core.IsTruthy(reverseVal)
+		}
+
+		// Handle key parameter (default is None)
+		// For now, we'll keep the simple string-based sort if no key is provided
+		var keyFunc core.Callable
+		if keyVal, ok := kwargs["key"]; ok {
+			if keyVal != core.Nil && keyVal != core.None {
+				if callable, ok := keyVal.(core.Callable); ok {
+					keyFunc = callable
+				} else {
+					return nil, errors.NewTypeError("sorted", "callable or None for key parameter", string(keyVal.Type()))
+				}
+			}
+		}
+
+		// Sort using the appropriate comparison
+		if keyFunc != nil {
+			// Sort using key function
+			// First, compute all keys
+			keys := make([]core.Value, len(items))
+			for i, item := range items {
+				keyResult, err := keyFunc.Call([]core.Value{item}, ctx)
+				if err != nil {
+					return nil, err
+				}
+				keys[i] = keyResult
+			}
+
+			// Sort based on keys
+			sort.Slice(items, func(i, j int) bool {
+				cmp := keys[i].String() < keys[j].String()
+				if reverse {
+					return !cmp
+				}
+				return cmp
+			})
+		} else {
+			// Sort without key function
+			sort.Slice(items, func(i, j int) bool {
+				cmp := items[i].String() < items[j].String()
+				if reverse {
+					return !cmp
+				}
+				return cmp
+			})
+		}
+
+		return core.NewList(items...), nil
+	}))
 }
 
 // Custom builders for complex list operations

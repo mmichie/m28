@@ -489,5 +489,71 @@ func InitItertoolsModule() *core.DictValue {
 		return core.NewList(result...), nil
 	}))
 
+	// permutations - r-length permutations from input iterable
+	// permutations(iterable, r=None) -> iterator of tuples
+	itertoolsModule.Set("permutations", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("permutations", args)
+		if err := v.Range(1, 2); err != nil {
+			return nil, err
+		}
+
+		iterable, err := types.RequireIterable(v.Get(0), "permutations() first argument")
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert to list
+		items := make([]core.Value, 0)
+		iter := iterable.Iterator()
+		for {
+			val, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+			items = append(items, val)
+		}
+
+		// Get r (default is length of items)
+		rInt := len(items)
+		if v.Count() == 2 {
+			r, err := v.GetNumber(1)
+			if err != nil {
+				return nil, err
+			}
+			rInt = int(r)
+		}
+
+		// Generate permutations
+		result := make([]core.Value, 0)
+		var generate func([]int, []core.Value)
+		generate = func(used []int, current []core.Value) {
+			if len(current) == rInt {
+				tuple := make(core.TupleValue, len(current))
+				copy(tuple, current)
+				result = append(result, tuple)
+				return
+			}
+
+			for i := 0; i < len(items); i++ {
+				// Check if index is already used
+				alreadyUsed := false
+				for _, u := range used {
+					if u == i {
+						alreadyUsed = true
+						break
+					}
+				}
+				if alreadyUsed {
+					continue
+				}
+
+				generate(append(used, i), append(current, items[i]))
+			}
+		}
+
+		generate([]int{}, []core.Value{})
+		return core.NewList(result...), nil
+	}))
+
 	return itertoolsModule
 }

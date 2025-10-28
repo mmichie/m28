@@ -32,6 +32,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"enum":         InitEnumModule,        // Stub for enum.py (provides basic enum support)
 	"_sre":         Init_SREModule,        // C extension module for re (regex engine)
 	"re._parser":   Init_REParserModule,   // C extension module for re._parser
+	"_tokenize":    Init_TokenizeModule,   // C extension module for tokenize.py
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

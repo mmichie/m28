@@ -9,20 +9,26 @@ import (
 func Init_REParserModule() *core.DictValue {
 	module := core.NewDict()
 
-	// parse - parse a regex pattern string into a parsed pattern object
-	// parse(str, flags=0, state=None)
+	// parse - parse a regex pattern string or bytes into a parsed pattern object
+	// parse(str|bytes, flags=0, state=None)
 	module.Set("parse", core.NewNamedBuiltinFunction("parse", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		core.DebugLog("[RE-PARSER] parse() called with %d args\n", len(args))
 		if len(args) < 1 {
 			return nil, core.NewTypeError("parse", nil, "parse() takes at least 1 argument")
 		}
 
-		// Get pattern string
-		patternStr, ok := args[0].(core.StringValue)
-		if !ok {
-			return nil, core.NewTypeError("parse", args[0], "pattern must be a string")
+		// Get pattern - can be string or bytes
+		var pattern core.Value
+		switch p := args[0].(type) {
+		case core.StringValue:
+			pattern = p
+			core.DebugLog("[RE-PARSER] pattern (string): %s\n", string(p))
+		case core.BytesValue:
+			pattern = p
+			core.DebugLog("[RE-PARSER] pattern (bytes): %v\n", []byte(p))
+		default:
+			return nil, core.NewTypeError("parse", args[0], "pattern must be a string or bytes")
 		}
-		core.DebugLog("[RE-PARSER] pattern: %s\n", string(patternStr))
 
 		// Get flags (default 0)
 		flags := core.NumberValue(0)
@@ -37,7 +43,7 @@ func Init_REParserModule() *core.DictValue {
 		core.DebugLog("[RE-PARSER] Creating state dict\n")
 		state := core.NewDict()
 		state.Set("flags", flags)
-		state.Set("str", patternStr)
+		state.Set("str", pattern)
 		state.Set("groups", core.NumberValue(1)) // At least 1 group (the whole match)
 		state.Set("groupdict", core.NewDict())
 		state.Set("grouprefpos", core.NewDict())

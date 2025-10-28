@@ -257,25 +257,34 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 			}
 
 			if getCompilerAttr != nil {
-				// Add T = TEMPLATE = SRE_FLAG_TEMPLATE
-				if templateFlag, ok := getCompilerAttr("SRE_FLAG_TEMPLATE"); ok {
-					fmt.Printf("[DEBUG] Found SRE_FLAG_TEMPLATE: %v, adding T and TEMPLATE\n", templateFlag)
-					partialModule.Set("T", templateFlag)
-					partialModule.Set("TEMPLATE", templateFlag)
-					// Also add to module context so functions can access it
-					if moduleCtx != nil {
-						moduleCtx.Define("T", templateFlag)
-						moduleCtx.Define("TEMPLATE", templateFlag)
-					}
-				} else {
-					fmt.Printf("[DEBUG] SRE_FLAG_TEMPLATE not found in _compiler\n")
+				// The @enum.global_enum decorator doesn't work in M28, so we manually
+				// export all the regex flags from _compiler to the re module level
+				flagMappings := []struct {
+					srcName  string   // name in _compiler
+					dstNames []string // names to export to re module
+				}{
+					{"SRE_FLAG_TEMPLATE", []string{"T", "TEMPLATE"}},
+					{"SRE_FLAG_DEBUG", []string{"DEBUG"}},
+					{"SRE_FLAG_ASCII", []string{"A", "ASCII"}},
+					{"SRE_FLAG_IGNORECASE", []string{"I", "IGNORECASE"}},
+					{"SRE_FLAG_LOCALE", []string{"L", "LOCALE"}},
+					{"SRE_FLAG_MULTILINE", []string{"M", "MULTILINE"}},
+					{"SRE_FLAG_DOTALL", []string{"S", "DOTALL"}},
+					{"SRE_FLAG_UNICODE", []string{"U", "UNICODE"}},
+					{"SRE_FLAG_VERBOSE", []string{"X", "VERBOSE"}},
 				}
-				// Add DEBUG = SRE_FLAG_DEBUG
-				if debugFlag, ok := getCompilerAttr("SRE_FLAG_DEBUG"); ok {
-					fmt.Printf("[DEBUG] Found SRE_FLAG_DEBUG, adding DEBUG\n")
-					partialModule.Set("DEBUG", debugFlag)
-					if moduleCtx != nil {
-						moduleCtx.Define("DEBUG", debugFlag)
+
+				for _, mapping := range flagMappings {
+					if flagVal, ok := getCompilerAttr(mapping.srcName); ok {
+						fmt.Printf("[DEBUG] Found %s: %v, adding %v\n", mapping.srcName, flagVal, mapping.dstNames)
+						for _, dstName := range mapping.dstNames {
+							partialModule.Set(dstName, flagVal)
+							if moduleCtx != nil {
+								moduleCtx.Define(dstName, flagVal)
+							}
+						}
+					} else {
+						fmt.Printf("[DEBUG] %s not found in _compiler\n", mapping.srcName)
 					}
 				}
 			}
