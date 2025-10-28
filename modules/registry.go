@@ -18,6 +18,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"posix":        InitPosixModule,       // C extension for Unix - used by Python's os.py
 	"sys":          InitSysModule,         // Built-in module
 	"io":           InitIOModule,          // Built-in module
+	"_io":          InitIOModule,          // C extension for io.py (same as io for now)
 	"time":         InitTimeModule,        // Built-in C module
 	"math":         InitMathModule,        // Built-in C module
 	"errno":        InitErrnoModule,       // Built-in C module
@@ -33,6 +34,10 @@ var builtinModules = map[string]ModuleInitializer{
 	"_sre":         Init_SREModule,        // C extension module for re (regex engine)
 	"re._parser":   Init_REParserModule,   // C extension module for re._parser
 	"_tokenize":    Init_TokenizeModule,   // C extension module for tokenize.py
+	"_ast":         Init_ASTModule,        // C extension module for ast.py (AST node types)
+	"_imp":         Init_ImpModule,        // C extension module for import machinery
+	"_warnings":    Init_WarningsModule,   // C extension module for warnings.py
+	"marshal":      InitMarshalModule,     // C extension module for bytecode serialization
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

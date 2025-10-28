@@ -120,7 +120,7 @@ func EqualValues(a, b Value) bool {
 // IsHashable determines if a value can be used as a dictionary key
 func IsHashable(v Value) bool {
 	switch val := v.(type) {
-	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue:
+	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class:
 		return true
 	case *Instance:
 		// Instances of int, str, bool subclasses are hashable
@@ -142,6 +142,10 @@ func IsHashable(v Value) bool {
 		}
 		return false
 	default:
+		// Check if it's a Callable (function) - functions are hashable by identity
+		if _, ok := v.(Callable); ok {
+			return true
+		}
 		return false
 	}
 }
@@ -167,6 +171,10 @@ func ValueToKey(v Value) string {
 	case *FrozenSetValue:
 		// For frozensets, use the hash value
 		return fmt.Sprintf("fs:%d", val.Hash())
+	case *Class:
+		// For classes, use the class name and pointer address for uniqueness
+		// Classes are hashable by identity in Python
+		return fmt.Sprintf("cls:%s:%p", val.Name, v)
 	case *Instance:
 		// For instances of hashable types (like int subclasses),
 		// use the underlying value if available
@@ -184,6 +192,10 @@ func ValueToKey(v Value) string {
 		// For other instances, use pointer address
 		return fmt.Sprintf("p:%p", v)
 	default:
+		// Check if it's a Callable (function) - use pointer address for identity
+		if _, ok := v.(Callable); ok {
+			return fmt.Sprintf("fn:%p", v)
+		}
 		// For non-hashable types, use pointer address
 		return fmt.Sprintf("p:%p", v)
 	}

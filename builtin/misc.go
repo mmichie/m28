@@ -32,6 +32,44 @@ func RegisterMisc(ctx *core.Context) {
 		return core.StringValue(core.Repr(val)), nil
 	}))
 
+	// ascii - return ASCII-only string representation
+	ctx.Define("ascii", core.NewNamedBuiltinFunction("ascii", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("ascii", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		val := v.Get(0)
+
+		// Try __repr__ dunder method first (ascii uses repr internally)
+		var reprStr string
+		if str, found, err := types.CallRepr(val, ctx); found {
+			if err != nil {
+				return nil, err
+			}
+			reprStr = str
+		} else {
+			// Use core.Repr which handles special representations properly
+			reprStr = core.Repr(val)
+		}
+
+		// Escape non-ASCII characters
+		result := ""
+		for _, r := range reprStr {
+			if r < 128 {
+				result += string(r)
+			} else if r < 256 {
+				result += fmt.Sprintf("\\x%02x", r)
+			} else if r < 65536 {
+				result += fmt.Sprintf("\\u%04x", r)
+			} else {
+				result += fmt.Sprintf("\\U%08x", r)
+			}
+		}
+
+		return core.StringValue(result), nil
+	}))
+
 	// hash - return hash of object
 	ctx.Define("hash", core.NewNamedBuiltinFunction("hash", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("hash", args)
