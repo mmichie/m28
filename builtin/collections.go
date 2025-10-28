@@ -404,19 +404,29 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		case *core.ListValue:
 			// Expect list of pairs
 			for i, item := range v.Items() {
-				pair, ok := item.(*core.ListValue)
-				if !ok || pair.Len() != 2 {
-					tuple, ok := item.(core.TupleValue)
-					if !ok || len(tuple) != 2 {
-						return nil, fmt.Errorf("dict update sequence element #%d is not a sequence", i)
+				var key, value core.Value
+
+				// Item can be a list or tuple
+				if pair, ok := item.(*core.ListValue); ok {
+					if pair.Len() != 2 {
+						return nil, fmt.Errorf("dict update sequence element #%d has length %d; 2 is required", i, pair.Len())
 					}
-					pair = core.NewList(tuple)
+					key = pair.Items()[0]
+					value = pair.Items()[1]
+				} else if tuple, ok := item.(core.TupleValue); ok {
+					if len(tuple) != 2 {
+						return nil, fmt.Errorf("dict update sequence element #%d has length %d; 2 is required", i, len(tuple))
+					}
+					key = tuple[0]
+					value = tuple[1]
+				} else {
+					return nil, fmt.Errorf("dict update sequence element #%d is not a sequence", i)
 				}
-				key, ok := pair.Items()[0].(core.StringValue)
-				if !ok {
-					return nil, fmt.Errorf("dict key must be string")
+
+				// Use SetValue for proper key handling (supports any hashable type)
+				if err := dict.SetValue(key, value); err != nil {
+					return nil, fmt.Errorf("error setting dict key: %v", err)
 				}
-				dict.Set(string(key), pair.Items()[1])
 			}
 		default:
 			return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
