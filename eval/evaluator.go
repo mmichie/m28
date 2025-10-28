@@ -46,6 +46,7 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		// Check if it's a special form first (if, def, etc.)
 		if sym, ok := v.Items()[0].(core.SymbolValue); ok {
 			core.DebugLog("[EVAL-LIST] First element is symbol: %s\n", string(sym))
+
 			if handler, ok := specialForms[string(sym)]; ok {
 				core.DebugLog("[EVAL-LIST] Is special form: %s\n", string(sym))
 				return handler(core.NewList(v.Items()[1:]...), ctx)
@@ -274,7 +275,29 @@ func ifForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // assignForm implements the = special form for assignment
 func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	fmt.Printf("[DEBUG assignForm] Called with %d args\n", args.Len())
+	if args.Len() >= 1 {
+		fmt.Printf("[DEBUG assignForm] First arg type: %T\n", args.Items()[0])
+	}
+
 	core.DebugLog("[ASSIGN] assignForm called with %d args\n", args.Len())
+
+	// Check if this is ANY attribute assignment to log it
+	if args.Len() == 2 {
+		if targetList, ok := args.Items()[0].(*core.ListValue); ok && targetList.Len() == 3 {
+			if dotSym, ok := targetList.Items()[0].(core.SymbolValue); ok && string(dotSym) == "." {
+				var attrName string
+				if str, ok := targetList.Items()[2].(core.StringValue); ok {
+					attrName = string(str)
+				} else if sym, ok := targetList.Items()[2].(core.SymbolValue); ok {
+					attrName = string(sym)
+				}
+				// Log ALL attribute assignments
+				fmt.Printf("[DEBUG assignForm] Attribute assignment: .%s\n", attrName)
+			}
+		}
+	}
+
 	if args.Len() != 2 {
 		return nil, fmt.Errorf("= requires 2 arguments, got %d", args.Len())
 	}
@@ -323,6 +346,11 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						attrName = string(symName)
 					} else {
 						return nil, fmt.Errorf("attribute name must be a string or symbol")
+					}
+
+					// Debug for _raw_paths
+					if attrName == "_raw_paths" {
+						fmt.Printf("[DEBUG assignForm dot] Setting %s on %T\n", attrName, obj)
 					}
 
 					// Evaluate the value
@@ -544,17 +572,44 @@ func doForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	var result core.Value = core.Nil
 	var err error
 
-	for _, expr := range args.Items() {
+	// Debug: Check if we're in PurePath.__init__
+	inPurePathInit := false
+	if self, lookupErr := ctx.Lookup("self"); lookupErr == nil && self != nil {
+		if inst, ok := self.(*core.Instance); ok {
+			if inst.Class.Name == "PurePath" || inst.Class.Name == "PosixPath" || inst.Class.Name == "Path" {
+				inPurePathInit = true
+				fmt.Printf("[DEBUG doForm] Executing %s.__init__ with %d statements\n", inst.Class.Name, args.Len())
+			}
+		}
+	}
+
+	for i, expr := range args.Items() {
+		if inPurePathInit {
+			fmt.Printf("[DEBUG doForm]   Statement %d: %T = %v\n", i, expr, expr)
+		}
 		result, err = Eval(expr, ctx)
 		if err != nil {
+			if inPurePathInit {
+				fmt.Printf("[DEBUG doForm]   Statement %d ERROR: %v\n", i, err)
+			}
 			return nil, err
+		}
+		if inPurePathInit {
+			fmt.Printf("[DEBUG doForm]   Statement %d result: %T = %v\n", i, result, result)
 		}
 
 		// Check for return value - propagate it, don't unwrap!
 		// The unwrapping should only happen at function boundaries
 		if _, ok := result.(*ReturnValue); ok {
+			if inPurePathInit {
+				fmt.Printf("[DEBUG doForm]   Statement %d returned early\n", i)
+			}
 			return result, nil
 		}
+	}
+
+	if inPurePathInit {
+		fmt.Printf("[DEBUG doForm] %s.__init__ completed all %d statements\n", "PurePath", args.Len())
 	}
 
 	// Return the value of the last expression
@@ -650,6 +705,31 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	// Debug logging for function calls
 	core.DebugLog("[CALL] UserFunction.Call: %s with %d args\n", f.name, len(args))
 
+	// Special debug for __init__
+	if f.name == "__init__" {
+		// Try to figure out which class this is for
+		var className string = "unknown"
+		var funcClassName string = "unknown"
+		if len(args) > 0 {
+			if inst, ok := args[0].(*core.Instance); ok {
+				className = inst.Class.Name
+			}
+		}
+		// Also get the function's defining class from __class__ if available
+		if f.env != nil {
+			if classVal, err := f.env.Lookup("__class__"); err == nil {
+				if cls, ok := classVal.(*core.Class); ok {
+					funcClassName = cls.Name
+				}
+			}
+		}
+		if className == "PurePath" || className == "PurePosixPath" || className == "PosixPath" || className == "Path" || funcClassName == "PurePath" || funcClassName == "Path" || funcClassName == "PosixPath" {
+			fmt.Printf("[DEBUG UserFunction.Call] Calling __init__ for instance.Class=%s, func.__class__=%s, with %d args\n", className, funcClassName, len(args))
+			fmt.Printf("[DEBUG UserFunction.Call] Body type: %T\n", f.body)
+			fmt.Printf("[DEBUG UserFunction.Call] Body value: %v\n", f.body)
+		}
+	}
+
 	// Create a new environment with the function's environment as parent
 	funcEnv := core.NewContext(f.env)
 	core.DebugLog("[CALL] Created funcEnv for %s\n", f.name)
@@ -661,8 +741,24 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 		if classVal, err := ctx.Lookup("__class__"); err == nil {
 			core.DebugLog("[CALL] Found __class__, defining in funcEnv\n")
 			funcEnv.Define("__class__", classVal)
+			// Debug for pathlib classes
+			if f.name == "__init__" && classVal != nil {
+				if cls, ok := classVal.(*core.Class); ok {
+					if cls.Name == "PosixPath" || cls.Name == "Path" || cls.Name == "PurePath" {
+						fmt.Printf("[DEBUG] Setting __class__ to %s in %s.__init__\n", cls.Name, f.name)
+					}
+				}
+			}
 		} else {
 			core.DebugLog("[CALL] No __class__ found (error: %v)\n", err)
+			// Debug for pathlib classes
+			if f.name == "__init__" && len(args) > 0 {
+				if inst, ok := args[0].(*core.Instance); ok {
+					if inst.Class.Name == "PosixPath" || inst.Class.Name == "Path" || inst.Class.Name == "PurePath" {
+						fmt.Printf("[DEBUG] NO __class__ found for %s instance in __init__\n", inst.Class.Name)
+					}
+				}
+			}
 		}
 	}
 
@@ -685,7 +781,29 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	}
 
 	// Evaluate the body in the new environment
+	if f.name == "__init__" {
+		var className string = "unknown"
+		if len(args) > 0 {
+			if inst, ok := args[0].(*core.Instance); ok {
+				className = inst.Class.Name
+			}
+		}
+		if className == "PurePath" || className == "PurePosixPath" || className == "PosixPath" || className == "Path" {
+			fmt.Printf("[DEBUG UserFunction.Call] About to eval %s.__init__ body\n", className)
+		}
+	}
 	result, err := Eval(f.body, funcEnv)
+	if f.name == "__init__" {
+		var className string = "unknown"
+		if len(args) > 0 {
+			if inst, ok := args[0].(*core.Instance); ok {
+				className = inst.Class.Name
+			}
+		}
+		if className == "PurePath" || className == "PurePosixPath" || className == "PosixPath" || className == "Path" {
+			fmt.Printf("[DEBUG UserFunction.Call] %s.__init__ body eval returned, err=%v\n", className, err)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -724,7 +842,14 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 	} else {
 		// Legacy: simple parameter binding - no kwargs support
 		if len(kwargs) > 0 {
-			return nil, fmt.Errorf("function does not support keyword arguments")
+			// Debug: identify which function is being called
+			funcName := "unknown"
+			if f.name != "" {
+				funcName = f.name
+			}
+			fmt.Printf("[DEBUG] Function %s called with kwargs but has no signature\n", funcName)
+			fmt.Printf("[DEBUG] kwargs: %v\n", kwargs)
+			return nil, fmt.Errorf("function %s does not support keyword arguments", funcName)
 		}
 		if len(args) != len(f.params) {
 			return nil, fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
@@ -747,6 +872,11 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 	}
 
 	return result, nil
+}
+
+// CallWithKeywords is an alias for CallWithKwargs for interface compatibility
+func (f *UserFunction) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	return f.CallWithKwargs(args, kwargs, ctx)
 }
 
 // String implements Value.String

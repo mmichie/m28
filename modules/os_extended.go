@@ -188,24 +188,8 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return result, nil
 	}))
 
-	osModule.Set("stat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, core.NewTypeError("str", nil, "stat() argument")
-		}
-		path, ok := args[0].(core.StringValue)
-		if !ok {
-			return nil, core.NewTypeError("str", args[0], "stat() argument")
-		}
-		info, err := os.Stat(string(path))
-		if err != nil {
-			return nil, err
-		}
-		result := core.NewDict()
-		result.Set("st_mode", core.NumberValue(info.Mode()))
-		result.Set("st_size", core.NumberValue(info.Size()))
-		result.Set("st_mtime", core.NumberValue(info.ModTime().Unix()))
-		return result, nil
-	}))
+	// os.stat with keyword argument support for follow_symlinks
+	osModule.Set("stat", &KwargsOSStat{})
 
 	osModule.Set("lstat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
@@ -399,4 +383,59 @@ func addOSProcessStubs(osModule *core.DictValue) {
 	osModule.Set("chown", core.NewBuiltinFunction(stub))
 	osModule.Set("umask", core.NewBuiltinFunction(stub))
 	osModule.Set("sync", core.NewBuiltinFunction(stub))
+}
+
+// KwargsOSStat implements os.stat with follow_symlinks keyword argument support
+type KwargsOSStat struct {
+	core.BaseObject
+}
+
+func (f *KwargsOSStat) Type() core.Type {
+	return core.FunctionType
+}
+
+func (f *KwargsOSStat) String() string {
+	return "<builtin function stat>"
+}
+
+// Call implements regular Call interface
+func (f *KwargsOSStat) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return f.CallWithKeywords(args, nil, ctx)
+}
+
+// CallWithKeywords implements keyword argument support
+func (f *KwargsOSStat) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) != 1 {
+		return nil, core.NewTypeError("str", nil, "stat() argument")
+	}
+	path, ok := args[0].(core.StringValue)
+	if !ok {
+		return nil, core.NewTypeError("str", args[0], "stat() argument")
+	}
+
+	// Check follow_symlinks keyword argument (default: true)
+	followSymlinks := true
+	if val, ok := kwargs["follow_symlinks"]; ok {
+		if boolVal, ok := val.(core.BoolValue); ok {
+			followSymlinks = bool(boolVal)
+		}
+	}
+
+	// Use os.Lstat if follow_symlinks=false, otherwise os.Stat
+	var info os.FileInfo
+	var err error
+	if followSymlinks {
+		info, err = os.Stat(string(path))
+	} else {
+		info, err = os.Lstat(string(path))
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	result := core.NewDict()
+	result.Set("st_mode", core.NumberValue(info.Mode()))
+	result.Set("st_size", core.NumberValue(info.Size()))
+	result.Set("st_mtime", core.NumberValue(info.ModTime().Unix()))
+	return result, nil
 }

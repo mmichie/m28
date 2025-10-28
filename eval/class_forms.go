@@ -459,7 +459,14 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 							var finalMethod core.Value = method
 							if methodName == "__init_subclass__" || methodName == "__class_getitem__" {
 								// Wrap as a classmethod that receives the class as first argument
-								finalMethod = createBoundClassMethod(class, method)
+								// Type assert to get the callable interface
+								if callable, ok := method.(interface {
+									Call([]core.Value, *core.Context) (core.Value, error)
+								}); ok {
+									finalMethod = createBoundClassMethod(class, callable)
+								} else {
+									return nil, fmt.Errorf("method %s is not callable", methodName)
+								}
 							}
 
 							// Debug for PurePath.__init__
@@ -673,7 +680,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // createMethod creates a method from a parameter list and body
-func createMethod(name string, params *core.ListValue, body []core.Value, ctx *core.Context) (*UserFunction, error) {
+// Returns core.Value to support both UserFunction and GeneratorFunction
+func createMethod(name string, params *core.ListValue, body []core.Value, ctx *core.Context) (core.Value, error) {
 	// Debug for __init__
 	if name == "__init__" {
 		fmt.Printf("[DEBUG createMethod] Creating __init__ with %d body items\n", len(body))
@@ -713,7 +721,8 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 			name:       name,
 		}
 
-		return method, nil
+		// Check if this is a generator function (contains yield) and wrap it
+		return makeGeneratorFunction(method), nil
 	}
 
 	// New-style method with signature
@@ -745,7 +754,8 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 		name:       name,
 	}
 
-	return method, nil
+	// Check if this is a generator function (contains yield) and wrap it
+	return makeGeneratorFunction(method), nil
 }
 
 // superForm implements the super special form for backward compatibility
@@ -868,16 +878,31 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
+	// super(SomeClass, obj) means: skip SomeClass, start from SomeClass's parent
+	// So we need to get the parent class to start the MRO search from
+	var parentClass *core.Class
+	if len(class.Parents) > 0 {
+		parentClass = class.Parents[0]
+	} else {
+		parentClass = class.Parent
+	}
+
+	if parentClass == nil {
+		return nil, fmt.Errorf("super: class %s has no parent", class.Name)
+	}
+
 	// Check if it's an instance
 	if instance, ok := secondArgVal.(*core.Instance); ok {
-		return core.NewSuper(class, instance), nil
+		// Return super starting from parentClass
+		return core.NewSuper(parentClass, instance), nil
 	}
 
 	// Check if it's a class (for use in __new__ or classmethods)
 	if secondClass, ok := secondArgVal.(*core.Class); ok {
 		// Create a super proxy for class-level lookups
 		// This is used in __new__ where cls is passed instead of self
-		return core.NewSuperForClass(class, secondClass), nil
+		// Start from parentClass, not class itself
+		return core.NewSuperForClass(parentClass, secondClass), nil
 	}
 
 	return nil, fmt.Errorf("second argument to super must be an instance or class, got %T", secondArgVal)

@@ -323,6 +323,20 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			boundParams[paramName] = true
 			argIndex++
 		} else {
+			// Debug for missing argument issues - print stack trace
+			fmt.Printf("[DEBUG BindArguments] Missing required argument: %s\n", paramName)
+			fmt.Printf("[DEBUG BindArguments] args=%d, argIndex=%d\n", len(args), argIndex)
+			fmt.Printf("[DEBUG BindArguments] RequiredParams=%v\n", func() []string {
+				names := make([]string, len(sig.RequiredParams))
+				for i, p := range sig.RequiredParams {
+					names[i] = string(p.Name)
+				}
+				return names
+			}())
+			fmt.Printf("[DEBUG BindArguments] Provided args:\n")
+			for i, arg := range args {
+				fmt.Printf("  args[%d]: %T = %v\n", i, arg, arg)
+			}
 			return fmt.Errorf("missing required argument: %s", paramName)
 		}
 	}

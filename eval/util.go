@@ -511,27 +511,6 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 
 // AssignForm provides the implementation of the = special form
 func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
-	fmt.Printf("[DEBUG util.AssignForm] Called with %d args\n", args.Len())
-
-	// Debug: Print what we received
-	if args.Len() >= 2 {
-		// Check if this is a dot expression with _raw_paths
-		if list, ok := args.Items()[0].(*core.ListValue); ok && list.Len() == 3 {
-			if dotSym, ok := list.Items()[0].(core.SymbolValue); ok && string(dotSym) == "." {
-				if attrName, ok := list.Items()[2].(core.StringValue); ok && string(attrName) == "_raw_paths" {
-					fmt.Printf("[DEBUG] AssignForm: FOUND _raw_paths assignment!\n")
-					fmt.Printf("[DEBUG] Full target: %v\n", args.Items()[0])
-					fmt.Printf("[DEBUG] Object: %v\n", list.Items()[1])
-				}
-				if attrName, ok := list.Items()[2].(core.SymbolValue); ok && string(attrName) == "_raw_paths" {
-					fmt.Printf("[DEBUG] AssignForm: FOUND _raw_paths assignment (symbol)!\n")
-					fmt.Printf("[DEBUG] Full target: %v\n", args.Items()[0])
-					fmt.Printf("[DEBUG] Object: %v\n", list.Items()[1])
-				}
-			}
-		}
-	}
-
 	if args.Len() < 2 {
 		return nil, ErrArgCount("= requires at least 2 arguments")
 	}
@@ -828,13 +807,10 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return value, nil
 
 	case *core.ListValue:
-		fmt.Printf("[DEBUG util.AssignForm] Target is ListValue with %d items\n", t.Len())
 		// Check if it's a special form first (get-item or dot notation)
 		if t.Len() >= 3 {
-			fmt.Printf("[DEBUG util.AssignForm] t.Len() >= 3, checking for dot\n")
 			// Check if it's a dot notation expression
 			if dotSym, ok := t.Items()[0].(core.SymbolValue); ok && string(dotSym) == "." {
-				fmt.Printf("[DEBUG util.AssignForm] Found dot notation!\n")
 				// Dot notation assignment: (. obj prop) = value
 				// Evaluate the object
 				obj, err := Eval(t.Items()[1], ctx)
@@ -849,12 +825,8 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				} else if symName, ok := t.Items()[2].(core.SymbolValue); ok {
 					propName = string(symName)
 				} else {
-					fmt.Printf("[DEBUG] AssignForm - property name type: %T, value: %v\n", t.Items()[2], t.Items()[2])
 					return nil, TypeError{Expected: "string or symbol property name", Got: t.Items()[2].Type()}
 				}
-
-				// Debug: Log ALL attribute assignments during pathlib load
-				fmt.Printf("[DEBUG util.AssignForm] Setting attribute: %s on %T\n", propName, obj)
 
 				// Set the attribute
 				if objWithAttrs, ok := obj.(interface {

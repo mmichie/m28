@@ -768,6 +768,46 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 	return bm.Method.Call(callArgs, methodCtx)
 }
 
+// CallWithKeywords implements keyword argument support for bound instance methods
+func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	// Create a new context with __class__ set for super() support
+	methodCtx := NewContext(ctx)
+
+	// Determine the class to use for super
+	classForSuper := bm.DefiningClass
+	if classForSuper == nil {
+		// If DefiningClass is not set, use the instance's class
+		classForSuper = bm.Instance.Class
+	}
+
+	methodCtx.Define("__class__", classForSuper)
+	// Always define super as a value for bare super access
+	methodCtx.Define("super", NewSuper(classForSuper, bm.Instance))
+
+	// Prepend instance as first argument (self)
+	callArgs := append([]Value{bm.Instance}, args...)
+
+	// Check if the underlying method supports keyword arguments
+	if kwargsMethod, ok := bm.Method.(interface {
+		CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+	}); ok {
+		return kwargsMethod.CallWithKeywords(callArgs, kwargs, methodCtx)
+	}
+
+	// If method doesn't support kwargs but is a Callable, try calling it with kwargs as positional
+	// This handles cases where the method's Call interface may internally support kwargs
+	if len(kwargs) > 0 {
+		// Try to use eval.EvalKwargCall which handles UserFunctions with signatures
+		fmt.Printf("[DEBUG BoundInstanceMethod] Method type: %T\n", bm.Method)
+		fmt.Printf("[DEBUG BoundInstanceMethod] Falling back to regular Call - kwargs will be lost\n")
+		// For now, we just error. TODO: integrate with kwarg_eval
+		return nil, fmt.Errorf("method does not support keyword arguments")
+	}
+
+	// Fall back to regular Call
+	return bm.Method.Call(callArgs, methodCtx)
+}
+
 // GetAttr implements attribute access for bound instance methods
 // Provides default values for standard function attributes
 func (bm *BoundInstanceMethod) GetAttr(name string) (Value, bool) {

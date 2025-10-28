@@ -273,10 +273,32 @@ func (a *AssignForm) String() string {
 
 // ToIR implements ASTNode.ToIR
 func (a *AssignForm) ToIR() core.Value {
+	targetIR := a.Target.ToIR()
+	valueIR := a.Value.ToIR()
+
+	// Debug: check if this is an attribute assignment
+	if list, ok := targetIR.(*core.ListValue); ok && list.Len() == 3 {
+		if dotSym, ok := list.Items()[0].(core.SymbolValue); ok && string(dotSym) == "." {
+			if attrName, ok := list.Items()[2].(core.StringValue); ok && string(attrName) == "_raw_paths" {
+				result := core.NewList(
+					core.SymbolValue("="),
+					targetIR,
+					valueIR,
+				)
+				fmt.Printf("[DEBUG AssignForm.ToIR] _raw_paths assignment detected\n")
+				fmt.Printf("  Target IR: %v\n", targetIR)
+				fmt.Printf("  Value IR: %v\n", valueIR)
+				fmt.Printf("  Result IR: %v\n", result)
+				fmt.Printf("  Result[0] type: %T, value: %v\n", result.Items()[0], result.Items()[0])
+				return result
+			}
+		}
+	}
+
 	return core.NewList(
 		core.SymbolValue("="),
-		a.Target.ToIR(),
-		a.Value.ToIR(),
+		targetIR,
+		valueIR,
 	)
 }
 

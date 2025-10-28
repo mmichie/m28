@@ -4,6 +4,17 @@ import (
 	"fmt"
 )
 
+// GeneratorExecutor is an interface for executing generator functions
+// This allows eval package to provide the implementation without circular dependency
+type GeneratorExecutor interface {
+	Next() (Value, error)
+	Send(Value) (Value, error)
+}
+
+// GeneratorExecFactory creates a GeneratorExecutor for a given function and arguments
+// This is set by the eval package to avoid circular dependency
+var GeneratorExecFactory func(function Value, args []Value, ctx *Context) (GeneratorExecutor, error)
+
 // Generator represents a generator object
 type Generator struct {
 	BaseObject
@@ -15,6 +26,9 @@ type Generator struct {
 	locals   map[string]Value // Local variables
 	position int              // Current position in execution
 	registry *MethodRegistry  // Method registry
+
+	// Generator function execution state (set by eval package)
+	execState GeneratorExecutor
 
 	// Fields for generator expressions
 	expr         Value                                // Expression to evaluate
@@ -264,8 +278,18 @@ func (g *Generator) Next() (Value, error) {
 		return nil, &StopIteration{}
 	}
 
-	// Generator functions with yield are not yet implemented
-	return nil, &StopIteration{Message: "generator functions with yield not yet implemented"}
+	// Handle generator functions with execState (new execution model)
+	if g.execState != nil {
+		return g.execState.Next()
+	}
+
+	// Fallback for generators without execution state
+	return nil, &StopIteration{Message: "generator has no execution state"}
+}
+
+// SetExecState sets the execution state for generator functions
+func (g *Generator) SetExecState(state GeneratorExecutor) {
+	g.execState = state
 }
 
 // Send sends a value into the generator
@@ -274,7 +298,12 @@ func (g *Generator) Send(value Value) (Value, error) {
 		return nil, fmt.Errorf("can't send non-None value to a just-started generator")
 	}
 
-	// Store the sent value for yield expressions
+	// If we have an exec state, delegate to it
+	if g.execState != nil {
+		return g.execState.Send(value)
+	}
+
+	// Store the sent value for yield expressions (for generator expressions)
 	g.yielded = value
 
 	return g.Next()
@@ -420,9 +449,18 @@ func (gf *GeneratorFunction) Call(args []Value, ctx *Context) (Value, error) {
 	// Create a new generator with the function's code
 	gen := NewGenerator(gf.Name, gf.Function, ctx)
 
-	// Store the arguments and the function for later execution
-	gen.SetAttr("__args__", NewList(args...))
-	gen.SetAttr("__function__", gf.Function)
+	// If we have a factory, create execution state
+	if GeneratorExecFactory != nil {
+		execState, err := GeneratorExecFactory(gf.Function, args, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create generator execution state: %v", err)
+		}
+		gen.SetExecState(execState)
+	} else {
+		// Fallback: Store the arguments for old-style execution
+		gen.SetAttr("__args__", NewList(args...))
+		gen.SetAttr("__function__", gf.Function)
+	}
 
 	return gen, nil
 }

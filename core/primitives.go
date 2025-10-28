@@ -391,6 +391,9 @@ func (f *BuiltinFunction) CallWithKeywords(args []Value, kwargs map[string]Value
 		if f.name != "" {
 			funcName = f.name
 		}
+		fmt.Printf("[DEBUG BuiltinFunction] Function name: %s\n", funcName)
+		fmt.Printf("[DEBUG BuiltinFunction] Function: %v\n", f)
+		fmt.Printf("[DEBUG BuiltinFunction] kwargs: %v\n", kwargs)
 		return nil, fmt.Errorf("builtin function '%s' does not support keyword arguments", funcName)
 	}
 	return f.fn(args, ctx)

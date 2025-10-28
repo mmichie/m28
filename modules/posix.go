@@ -96,9 +96,9 @@ func InitPosixModule() *core.DictValue {
 	copyFunction("linesep")
 	copyFunction("devnull")
 
-	// Add stat function (simplified version - returns a minimal stat result)
-	posixModule.SetWithKey("stat", core.StringValue("stat"), core.NewBuiltinFunction(posixStat))
-	posixModule.SetWithKey("lstat", core.StringValue("lstat"), core.NewBuiltinFunction(posixStat)) // lstat same as stat for now
+	// Add stat function with keyword argument support
+	posixModule.SetWithKey("stat", core.StringValue("stat"), &KwargsPosixStat{followSymlinks: true})
+	posixModule.SetWithKey("lstat", core.StringValue("lstat"), &KwargsPosixStat{followSymlinks: false})
 
 	// Add scandir - returns iterator of directory entries
 	posixModule.SetWithKey("scandir", core.StringValue("scandir"), core.NewBuiltinFunction(posixScandir))
@@ -161,19 +161,63 @@ func InitPosixModule() *core.DictValue {
 	return posixModule
 }
 
-// posixStat implements a simplified stat function
-// Returns a stat_result-like object with basic file information
-func posixStat(args []core.Value, ctx *core.Context) (core.Value, error) {
+// KwargsPosixStat implements posix.stat with follow_symlinks keyword argument support
+type KwargsPosixStat struct {
+	core.BaseObject
+	followSymlinks bool // Default behavior for this instance (true for stat, false for lstat)
+}
+
+func (f *KwargsPosixStat) Type() core.Type {
+	return core.FunctionType
+}
+
+func (f *KwargsPosixStat) String() string {
+	if f.followSymlinks {
+		return "<built-in function stat>"
+	}
+	return "<built-in function lstat>"
+}
+
+// Call implements regular Call interface
+func (f *KwargsPosixStat) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return f.CallWithKeywords(args, nil, ctx)
+}
+
+// CallWithKeywords implements keyword argument support
+func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("stat() missing required argument: 'path'")
 	}
 
 	path, ok := args[0].(core.StringValue)
 	if !ok {
-		return nil, fmt.Errorf("stat() path must be a string")
+		// Try to convert to string if it's not already
+		pathStr, ok := args[0].(fmt.Stringer)
+		if ok {
+			path = core.StringValue(pathStr.String())
+		} else {
+			fmt.Printf("[DEBUG KwargsPosixStat] args[0] type: %T\n", args[0])
+			fmt.Printf("[DEBUG KwargsPosixStat] args[0] value: %v\n", args[0])
+			return nil, fmt.Errorf("stat() path must be a string, got %T", args[0])
+		}
 	}
 
-	info, err := os.Stat(string(path))
+	// Check follow_symlinks keyword argument (default from instance)
+	followSymlinks := f.followSymlinks
+	if val, ok := kwargs["follow_symlinks"]; ok {
+		if boolVal, ok := val.(core.BoolValue); ok {
+			followSymlinks = bool(boolVal)
+		}
+	}
+
+	// Use os.Lstat if follow_symlinks=false, otherwise os.Stat
+	var info os.FileInfo
+	var err error
+	if followSymlinks {
+		info, err = os.Stat(string(path))
+	} else {
+		info, err = os.Lstat(string(path))
+	}
 	if err != nil {
 		return nil, fmt.Errorf("FileNotFoundError: %v", err)
 	}
@@ -184,7 +228,7 @@ func posixStat(args []core.Value, ctx *core.Context) (core.Value, error) {
 	statResult.SetWithKey("st_mtime", core.StringValue("st_mtime"), core.NumberValue(float64(info.ModTime().Unix())))
 	statResult.SetWithKey("st_mode", core.StringValue("st_mode"), core.NumberValue(float64(info.Mode())))
 
-	// Add is_dir and is_file methods
+	// Add is_dir method
 	isDir := info.IsDir()
 	statResult.SetWithKey("st_isdir", core.StringValue("st_isdir"), core.BoolValue(isDir))
 

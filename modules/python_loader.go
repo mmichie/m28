@@ -282,6 +282,13 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		} else {
 			fmt.Printf("[DEBUG] WARNING: _compiler not found in re module\n")
 		}
+
+		// Add NOFLAG = 0 (defined in re/__init__.py but not exported by @enum.global_enum)
+		fmt.Printf("[DEBUG] Adding NOFLAG = 0\n")
+		partialModule.Set("NOFLAG", core.NumberValue(0))
+		if moduleCtx != nil {
+			moduleCtx.Define("NOFLAG", core.NumberValue(0))
+		}
 	}
 
 	return partialModule, nil

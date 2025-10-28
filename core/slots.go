@@ -76,6 +76,13 @@ func (sd *SlotDescriptor) GetAttr(name string) (Value, bool) {
 			instance := args[0]
 			value := args[1]
 
+			// Debug for _raw_paths
+			if sd.Name == "_raw_paths" {
+				if inst, ok := instance.(*Instance); ok {
+					fmt.Printf("[DEBUG SlotDescriptor.__set__] Setting %s (index %d) on %s instance\n", sd.Name, sd.SlotIndex, inst.Class.Name)
+				}
+			}
+
 			// Set the slot value on the instance
 			if inst, ok := instance.(*Instance); ok {
 				if inst.SlotValues == nil {
