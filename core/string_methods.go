@@ -946,29 +946,51 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			s := string(receiver.(StringValue))
-			sep := " "
+			var parts []string
 			limit := -1
 
-			if len(args) > 0 {
-				if sepStr, ok := args[0].(StringValue); ok {
-					sep = string(sepStr)
-				} else {
-					return nil, fmt.Errorf("sep must be a string")
-				}
-			}
+			// Check if separator is provided
+			hasSep := len(args) > 0 && args[0] != Nil
+
 			if len(args) > 1 {
 				if maxSplit, ok := args[1].(NumberValue); ok {
-					limit = int(maxSplit) + 1
+					limit = int(maxSplit)
+					if limit < 0 {
+						limit = -1
+					}
 				} else {
 					return nil, fmt.Errorf("maxsplit must be a number")
 				}
 			}
 
-			var parts []string
-			if limit == -1 {
-				parts = strings.Split(s, sep)
+			if !hasSep {
+				// Python behavior: split on any whitespace and remove empty strings
+				// This is different from splitting on a single space!
+				if limit == -1 {
+					parts = strings.Fields(s)
+				} else {
+					// Manual implementation of FieldsN (doesn't exist in Go)
+					parts = strings.Fields(s)
+					if len(parts) > limit+1 {
+						// Rejoin the parts beyond the limit
+						remainder := strings.Join(parts[limit:], " ")
+						parts = append(parts[:limit], remainder)
+					}
+				}
 			} else {
-				parts = strings.SplitN(s, sep, limit)
+				// Separator provided - use normal split
+				sep := ""
+				if sepStr, ok := args[0].(StringValue); ok {
+					sep = string(sepStr)
+				} else if args[0] != Nil {
+					return nil, fmt.Errorf("sep must be a string or None")
+				}
+
+				if limit == -1 {
+					parts = strings.Split(s, sep)
+				} else {
+					parts = strings.SplitN(s, sep, limit+1)
+				}
 			}
 
 			result := make([]Value, len(parts))

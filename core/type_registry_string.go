@@ -363,38 +363,54 @@ func getStringMethods() map[string]*MethodDescriptor {
 
 func stringMethodSplit(receiver Value, args []Value, ctx *Context) (Value, error) {
 	s := string(receiver.(StringValue))
-	sep := " "
 	maxSplit := -1
+	hasSep := false
+	sep := ""
 
 	if len(args) > 0 {
 		if sepStr, ok := args[0].(StringValue); ok {
 			sep = string(sepStr)
+			hasSep = true
 		} else if args[0] == Nil {
-			// None means split on whitespace
-			fields := strings.Fields(s)
-			result := make([]Value, len(fields))
-			for i, field := range fields {
-				result[i] = StringValue(field)
-			}
-			return NewList(result...), nil
+			// None means split on whitespace - same as no argument
+			hasSep = false
 		} else {
-			return nil, fmt.Errorf("sep must be a string")
+			return nil, fmt.Errorf("sep must be a string or None")
 		}
 	}
 
 	if len(args) > 1 {
 		if n, ok := args[1].(NumberValue); ok {
 			maxSplit = int(n)
+			if maxSplit < 0 {
+				maxSplit = -1
+			}
 		} else {
 			return nil, fmt.Errorf("maxsplit must be an integer")
 		}
 	}
 
 	var parts []string
-	if maxSplit < 0 {
-		parts = strings.Split(s, sep)
+	if !hasSep {
+		// Split on any whitespace and remove empty strings (Python default behavior)
+		if maxSplit < 0 {
+			parts = strings.Fields(s)
+		} else {
+			// Manual implementation since Go doesn't have FieldsN
+			parts = strings.Fields(s)
+			if len(parts) > maxSplit+1 {
+				// Rejoin the parts beyond the limit
+				remainder := strings.Join(parts[maxSplit:], " ")
+				parts = append(parts[:maxSplit], remainder)
+			}
+		}
 	} else {
-		parts = strings.SplitN(s, sep, maxSplit+1)
+		// Separator provided - use normal split (keeps empty strings)
+		if maxSplit < 0 {
+			parts = strings.Split(s, sep)
+		} else {
+			parts = strings.SplitN(s, sep, maxSplit+1)
+		}
 	}
 
 	result := make([]Value, len(parts))
