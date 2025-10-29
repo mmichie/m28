@@ -19,14 +19,15 @@ func InitCodecsModule() *core.DictValue {
 	errorHandlerRegistry := core.NewDict()
 
 	// Register default error handlers
-	errorHandlerRegistry.Set("strict", core.NewNamedBuiltinFunction("strict_errors", strictErrorHandler))
-	errorHandlerRegistry.Set("ignore", core.NewNamedBuiltinFunction("ignore_errors", ignoreErrorHandler))
-	errorHandlerRegistry.Set("replace", core.NewNamedBuiltinFunction("replace_errors", replaceErrorHandler))
-	errorHandlerRegistry.Set("xmlcharrefreplace", core.NewNamedBuiltinFunction("xmlcharrefreplace_errors", replaceErrorHandler))
-	errorHandlerRegistry.Set("backslashreplace", core.NewNamedBuiltinFunction("backslashreplace_errors", replaceErrorHandler))
-	errorHandlerRegistry.Set("namereplace", core.NewNamedBuiltinFunction("namereplace_errors", replaceErrorHandler))
-	errorHandlerRegistry.Set("surrogateescape", core.NewNamedBuiltinFunction("surrogateescape_errors", ignoreErrorHandler))
-	errorHandlerRegistry.Set("surrogatepass", core.NewNamedBuiltinFunction("surrogatepass_errors", ignoreErrorHandler))
+	// Use SetValue to properly handle string keys with M28 value semantics
+	errorHandlerRegistry.SetValue(core.StringValue("strict"), core.NewNamedBuiltinFunction("strict_errors", strictErrorHandler))
+	errorHandlerRegistry.SetValue(core.StringValue("ignore"), core.NewNamedBuiltinFunction("ignore_errors", ignoreErrorHandler))
+	errorHandlerRegistry.SetValue(core.StringValue("replace"), core.NewNamedBuiltinFunction("replace_errors", replaceErrorHandler))
+	errorHandlerRegistry.SetValue(core.StringValue("xmlcharrefreplace"), core.NewNamedBuiltinFunction("xmlcharrefreplace_errors", replaceErrorHandler))
+	errorHandlerRegistry.SetValue(core.StringValue("backslashreplace"), core.NewNamedBuiltinFunction("backslashreplace_errors", replaceErrorHandler))
+	errorHandlerRegistry.SetValue(core.StringValue("namereplace"), core.NewNamedBuiltinFunction("namereplace_errors", replaceErrorHandler))
+	errorHandlerRegistry.SetValue(core.StringValue("surrogateescape"), core.NewNamedBuiltinFunction("surrogateescape_errors", ignoreErrorHandler))
+	errorHandlerRegistry.SetValue(core.StringValue("surrogatepass"), core.NewNamedBuiltinFunction("surrogatepass_errors", ignoreErrorHandler))
 
 	// register(search_function) - register a codec search function
 	module.Set("register", core.NewNamedBuiltinFunction("register", func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -132,7 +133,10 @@ func InitCodecsModule() *core.DictValue {
 			return nil, core.NewTypeError("register_error", args[0], "error handler name must be a string")
 		}
 
-		errorHandlerRegistry.Set(string(name), args[1])
+		// Use SetValue to properly handle M28 StringValue keys
+		if err := errorHandlerRegistry.SetValue(name, args[1]); err != nil {
+			return nil, err
+		}
 		return core.None, nil
 	}))
 
@@ -147,7 +151,8 @@ func InitCodecsModule() *core.DictValue {
 			return nil, core.NewTypeError("lookup_error", args[0], "error handler name must be a string")
 		}
 
-		handler, exists := errorHandlerRegistry.Get(string(name))
+		// Use GetValue to properly handle M28 StringValue keys
+		handler, exists := errorHandlerRegistry.GetValue(name)
 		if !exists {
 			return nil, fmt.Errorf("unknown error handler name '%s'", name)
 		}

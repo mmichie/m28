@@ -264,10 +264,7 @@ func (d *DictValue) Get(key string) (Value, bool) {
 // INTERNAL: Use SetWithKey for proper key tracking
 // Deprecated: This method doesn't track original keys
 func (d *DictValue) Set(key string, value Value) {
-	// Convert string key to proper format for consistency
-	// This ensures `module.Set("ref", val)` and `"ref" in module` work correctly
-	keyRepr := ValueToKey(StringValue(key))
-	d.SetWithKey(keyRepr, StringValue(key), value)
+	d.entries[key] = value
 }
 
 // SetWithKey sets a value with both key representation and original key
