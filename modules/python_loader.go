@@ -2,10 +2,14 @@ package modules
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/mmichie/m28/core"
 )
+
+var debugImportLoader = os.Getenv("M28_DEBUG_IMPORT") != ""
 
 func init() {
 	// Register Python module loader with core
@@ -43,11 +47,17 @@ var cExtensionModules = map[string]bool{
 // Returns (*DictValue, error) to match ModuleLoader interface
 // If partialModule is provided, it will be populated during evaluation for circular import support
 func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, *core.Context) (core.Value, error), partialModule *core.DictValue) (*core.DictValue, error) {
+	if debugImportLoader {
+		log.Printf("[IMPORT] LoadPythonModule('%s') called", name)
+	}
 	core.DebugLog("[PROFILE] LoadPythonModule called for '%s'\n", name)
 
 	// Create partial module if not provided
 	if partialModule == nil {
 		partialModule = core.NewDict()
+		if debugImportLoader {
+			log.Printf("[IMPORT] LoadPythonModule('%s') -> created new partial module", name)
+		}
 	}
 
 	// Note: Circular import handling is done by ModuleLoaderEnhanced
@@ -106,6 +116,9 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	// Check if this is a known C extension
 	if cExtensionModules[name] {
+		if debugImportLoader {
+			log.Printf("[IMPORT] LoadPythonModule('%s') -> C extension, cannot load", name)
+		}
 		// Return ImportError so Python code can catch it
 		return nil, &core.ImportError{
 			ModuleName: name,
@@ -118,18 +131,33 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	// Find the Python file
+	if debugImportLoader {
+		log.Printf("[IMPORT] LoadPythonModule('%s') -> getting Python finder", name)
+	}
 	finder, err := GetPythonFinder()
 	if err != nil {
+		if debugImportLoader {
+			log.Printf("[IMPORT] LoadPythonModule('%s') -> finder init FAILED: %v", name, err)
+		}
 		return nil, fmt.Errorf("Python finder initialization failed: %w", err)
 	}
 
+	if debugImportLoader {
+		log.Printf("[IMPORT] LoadPythonModule('%s') -> calling finder.Find()", name)
+	}
 	core.DebugLog("[PROFILE] Finding '%s'...\n", name)
 	pyPath, isPackage, err := finder.Find(name)
 	if err != nil {
 		core.DebugLog("[PROFILE] Find failed for '%s': %v\n", name, err)
+		if debugImportLoader {
+			log.Printf("[IMPORT] LoadPythonModule('%s') -> finder.Find() FAILED: %v", name, err)
+		}
 		return nil, err // Module not found
 	}
 	core.DebugLog("[PROFILE] Found '%s' at %s\n", name, pyPath)
+	if debugImportLoader {
+		log.Printf("[IMPORT] LoadPythonModule('%s') -> found at: %s (package=%v)", name, pyPath, isPackage)
+	}
 
 	startLoad := time.Now()
 

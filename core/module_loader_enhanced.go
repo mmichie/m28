@@ -2,10 +2,13 @@ package core
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+var debugImportEnhanced = os.Getenv("M28_DEBUG_IMPORT") != ""
 
 // ModuleLoaderEnhanced is an enhanced module loader that supports builtin Go modules
 type ModuleLoaderEnhanced struct {
@@ -33,11 +36,26 @@ func NewModuleLoaderEnhanced(
 
 // LoadModule loads a module by name and returns its content
 func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue, error) {
+	if debugImportEnhanced {
+		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') called", name)
+	}
+
 	registry := GetModuleRegistry()
 	cacheName := normalizeCacheName(name)
 
+	if debugImportEnhanced {
+		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> cacheName: %s", name, cacheName)
+	}
+
 	// Check cache and circular dependencies
 	if module, err := l.checkModuleCache(registry, cacheName, name); module != nil || err != nil {
+		if debugImportEnhanced {
+			if err != nil {
+				log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> cache check returned error: %v", name, err)
+			} else {
+				log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> found in cache", name)
+			}
+		}
 		return module, err
 	}
 
@@ -46,6 +64,9 @@ func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue
 	DebugLog("[DEBUG] LoadModule: checking sys.modules for '%s'\n", name)
 	if module := l.checkSysModules(name); module != nil {
 		DebugLog("[DEBUG] LoadModule: found '%s' in sys.modules, returning it\n", name)
+		if debugImportEnhanced {
+			log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> found in sys.modules", name)
+		}
 		// Cache it in registry for faster lookups next time
 		registry.StoreModule(cacheName, module, "<from sys.modules>", []string{})
 		return module, nil
@@ -57,13 +78,25 @@ func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue
 	defer registry.SetLoading(cacheName, false)
 
 	// Try to load as builtin module
+	if debugImportEnhanced {
+		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> trying builtin", name)
+	}
 	if module := l.tryLoadBuiltinModule(registry, cacheName); module != nil {
+		if debugImportEnhanced {
+			log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> loaded as builtin", name)
+		}
 		return module, nil
 	}
 
 	// Check if it's an M28 module
+	if debugImportEnhanced {
+		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> checking if M28 module", name)
+	}
 	path, err := registry.ResolveModulePath(name)
 	if err == nil {
+		if debugImportEnhanced {
+			log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> loading as M28 module from: %s", name, path)
+		}
 		// It's an M28 module - create partial module for circular import support
 		partialModule := NewDict()
 		registry.StoreModule(cacheName, partialModule, "", []string{})
@@ -73,6 +106,9 @@ func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue
 
 	// Not an M28 module, try Python
 	// Python loader will create partial module if the Python file exists
+	if debugImportEnhanced {
+		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> not M28 module (err: %v), trying Python", name, err)
+	}
 	return l.tryLoadPythonModuleWithoutPartial(registry, name, cacheName, err)
 }
 

@@ -2,12 +2,15 @@ package modules
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 )
+
+var debugImport = os.Getenv("M28_DEBUG_IMPORT") != ""
 
 // PythonModuleFinder locates Python modules in the standard library
 type PythonModuleFinder struct {
@@ -97,41 +100,68 @@ func discoverPythonPaths() ([]string, error) {
 // - path: full path to .py file or __init__.py
 // - isPackage: true if module is a package (has __init__.py)
 func (f *PythonModuleFinder) Find(moduleName string) (string, bool, error) {
+	if debugImport {
+		log.Printf("[IMPORT] PythonFinder.Find('%s') called", moduleName)
+	}
+
 	// Check cache first
 	f.mu.RLock()
 	if cached, ok := f.pathCache[moduleName]; ok {
 		f.mu.RUnlock()
 		// Determine if it's a package
 		isPackage := strings.HasSuffix(cached, "__init__.py")
+		if debugImport {
+			log.Printf("[IMPORT] PythonFinder.Find('%s') -> found in cache: %s (package=%v)", moduleName, cached, isPackage)
+		}
 		return cached, isPackage, nil
 	}
 	f.mu.RUnlock()
 
 	// Convert module name to path (e.g., "os.path" → "os/path")
 	modulePath := strings.ReplaceAll(moduleName, ".", string(filepath.Separator))
+	if debugImport {
+		log.Printf("[IMPORT] PythonFinder.Find('%s') -> searching for: %s.py or %s/__init__.py", moduleName, modulePath, modulePath)
+	}
 
 	// Search in all paths
-	for _, searchPath := range f.searchPaths {
+	for i, searchPath := range f.searchPaths {
 		// Try as module: name.py
 		modulePyPath := filepath.Join(searchPath, modulePath+".py")
+		if debugImport {
+			log.Printf("[IMPORT] PythonFinder.Find('%s') -> trying [%d/%d]: %s", moduleName, i+1, len(f.searchPaths), modulePyPath)
+		}
 		if fileExists(modulePyPath) {
 			f.mu.Lock()
 			f.pathCache[moduleName] = modulePyPath
 			f.mu.Unlock()
+			if debugImport {
+				log.Printf("[IMPORT] PythonFinder.Find('%s') -> FOUND module: %s", moduleName, modulePyPath)
+			}
 			return modulePyPath, false, nil
 		}
 
 		// Try as package: name/__init__.py
 		packageInitPath := filepath.Join(searchPath, modulePath, "__init__.py")
+		if debugImport {
+			log.Printf("[IMPORT] PythonFinder.Find('%s') -> trying package: %s", moduleName, packageInitPath)
+		}
 		if fileExists(packageInitPath) {
 			f.mu.Lock()
 			f.pathCache[moduleName] = packageInitPath
 			f.mu.Unlock()
+			if debugImport {
+				log.Printf("[IMPORT] PythonFinder.Find('%s') -> FOUND package: %s", moduleName, packageInitPath)
+			}
 			return packageInitPath, true, nil
 		}
 	}
 
-	return "", false, fmt.Errorf("Python module '%s' not found in stdlib paths", moduleName)
+	err := fmt.Errorf("Python module '%s' not found in stdlib paths", moduleName)
+	if debugImport {
+		log.Printf("[IMPORT] PythonFinder.Find('%s') -> NOT FOUND: %v", moduleName, err)
+		log.Printf("[IMPORT] PythonFinder.Find('%s') -> searched %d paths: %v", moduleName, len(f.searchPaths), f.searchPaths)
+	}
+	return "", false, err
 }
 
 // GetSearchPaths returns the list of Python search paths
