@@ -88,6 +88,22 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		return LoadPythonModule("posixpath", ctx, evalFunc, partialModule)
 	}
 
+	// Special case: importlib requires _thread, _warnings, and _weakref to be pre-loaded
+	// The _bootstrap._setup() function expects to find these in sys.modules
+	if name == "importlib" {
+		loader := core.GetModuleLoader()
+		if loader != nil {
+			// Pre-load the required builtin modules so they're in sys.modules
+			// _setup() will find them there and won't try to use BuiltinImporter
+			for _, modName := range []string{"_thread", "_warnings", "_weakref"} {
+				if _, err := loader.LoadModule(modName, ctx); err != nil {
+					// Log but continue - _setup() will handle the error
+					core.DebugLog("[DEBUG] Failed to pre-load %s for importlib: %v\n", modName, err)
+				}
+			}
+		}
+	}
+
 	// Check if this is a known C extension
 	if cExtensionModules[name] {
 		// Return ImportError so Python code can catch it

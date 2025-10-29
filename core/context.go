@@ -212,23 +212,25 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 			depth, name, c, len(c.Vars), c.Outer, c.Global)
 	}
 
-	// Check current scope
+	// For module contexts (those with ModuleDict), check ModuleDict FIRST
+	// This ensures dynamic updates to module.__dict__ are visible to functions
+	// This is critical for Python's importlib._setup() which dynamically injects globals
+	if c.ModuleDict != nil {
+		key := ValueToKey(StringValue(name))
+		if val, ok := c.ModuleDict.Get(key); ok {
+			if debugLookups && depth < 5 {
+				log.Printf("  FOUND in ModuleDict")
+			}
+			return val, nil
+		}
+	}
+
+	// Then check current scope Vars (for true local variables)
 	if val, ok := c.Vars[name]; ok {
 		if debugLookups && depth < 5 {
 			log.Printf("  FOUND in local scope")
 		}
 		return val, nil
-	}
-
-	// Also check ModuleDict if it exists on current context
-	// This allows globals().update({...}) to work - names added to the module dict
-	// via .update() will be accessible even if they weren't added via Define()
-	if c.ModuleDict != nil {
-		// Convert name to the internal key representation used by dict
-		key := ValueToKey(StringValue(name))
-		if val, ok := c.ModuleDict.Get(key); ok {
-			return val, nil
-		}
 	}
 
 	// Check outer scopes
