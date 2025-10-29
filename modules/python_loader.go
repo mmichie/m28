@@ -229,8 +229,6 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	// Special post-load fixes for specific modules
-	// Debug: always print which module is being loaded
-	fmt.Printf("[DEBUG] Post-processing module: %s\n", name)
 	if name == "re" {
 		fmt.Printf("[DEBUG] Applying post-load fix for 're' module\n")
 		core.DebugLog("[PYTHON_LOADER] Applying post-load fix for 're' module\n")
@@ -314,25 +312,20 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 // registerModuleInSysModules registers a loaded module in sys.modules
 func registerModuleInSysModules(name string, moduleDict *core.DictValue) {
-	fmt.Printf("[REGISTER] Attempting to register module '%s'\n", name)
-
 	// Get sys module from builtin registry
 	sysModule, ok := GetBuiltinModule("sys")
 	if !ok {
-		fmt.Printf("[REGISTER] sys module not available\n")
 		return // sys not available yet
 	}
 
 	// Get sys.modules dict
 	sysModulesVal, ok := sysModule.Get("modules")
 	if !ok {
-		fmt.Printf("[REGISTER] sys.modules not found (tried key 'modules')\n")
 		return // sys.modules not available
 	}
 
 	sysModulesDict, ok := sysModulesVal.(*core.DictValue)
 	if !ok {
-		fmt.Printf("[REGISTER] sys.modules is not a dict (type: %T)\n", sysModulesVal)
 		return // sys.modules is not a dict
 	}
 
@@ -340,5 +333,5 @@ func registerModuleInSysModules(name string, moduleDict *core.DictValue) {
 	// Use ValueToKey to generate the proper key format (e.g., "s:importlib._bootstrap")
 	key := core.ValueToKey(core.StringValue(name))
 	sysModulesDict.SetWithKey(key, core.StringValue(name), moduleDict)
-	fmt.Printf("[REGISTER] Successfully registered module '%s' in sys.modules (key=%s)\n", name, key)
+	core.DebugLog("[DEBUG] Registered module '%s' in sys.modules\n", name)
 }
