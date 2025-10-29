@@ -15,6 +15,7 @@ type Module struct {
 	Context *Context         // Module's execution context
 	Exports map[string]Value // Explicitly exported values
 	All     []string         // Names to export with * import
+	Dict    *DictValue       // Backing dict for dynamic attribute lookups (optional)
 }
 
 // NewModule creates a new module
@@ -82,12 +83,22 @@ func (m *Module) SetAll(names []string) {
 
 // GetAttr implements object attribute access for modules
 func (m *Module) GetAttr(name string) (Value, bool) {
-	// First check exports
+	// First check backing dict for most up-to-date values
+	// This allows Python's importlib._setup() to dynamically inject module globals
+	// Dict takes priority over Exports to support dynamic attribute updates via setattr()
+	if m.Dict != nil {
+		key := ValueToKey(StringValue(name))
+		if val, ok := m.Dict.Get(key); ok {
+			return val, true
+		}
+	}
+
+	// Then check exports (for modules without backing dict or non-exported names)
 	if val, ok := m.Exports[name]; ok {
 		return val, true
 	}
 
-	// Then check base object attributes
+	// Finally check base object attributes
 	return m.BaseObject.GetAttr(name)
 }
 

@@ -408,6 +408,11 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 func wrapDictAsModule(name string, dict *core.DictValue) *core.Module {
 	module := core.NewModule(name, "")
 
+	// Keep a reference to the dict for dynamic lookups
+	// This allows Python code to use setattr() on the module and have
+	// those updates be visible when accessing module attributes
+	module.Dict = dict
+
 	// Copy all items from dict to module exports
 	for _, key := range dict.Keys() {
 		if val, ok := dict.Get(key); ok {
