@@ -41,6 +41,17 @@ func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue
 		return module, err
 	}
 
+	// Check sys.modules dict before trying to load
+	// This allows Python code to manually set sys.modules['importlib._bootstrap'] etc.
+	DebugLog("[DEBUG] LoadModule: checking sys.modules for '%s'\n", name)
+	if module := l.checkSysModules(name); module != nil {
+		DebugLog("[DEBUG] LoadModule: found '%s' in sys.modules, returning it\n", name)
+		// Cache it in registry for faster lookups next time
+		registry.StoreModule(cacheName, module, "<from sys.modules>", []string{})
+		return module, nil
+	}
+	DebugLog("[DEBUG] LoadModule: '%s' not in sys.modules, will try to load\n", name)
+
 	// Mark module as loading
 	registry.SetLoading(cacheName, true)
 	defer registry.SetLoading(cacheName, false)
@@ -95,6 +106,55 @@ func (l *ModuleLoaderEnhanced) checkModuleCache(registry *ModuleRegistry, cacheN
 	}
 
 	return nil, nil
+}
+
+// checkSysModules checks if module is in sys.modules dict
+// This allows Python code to manually register modules like sys.modules['importlib._bootstrap']
+func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
+	// Get sys module from builtin registry
+	sysModule, isBuiltin := l.getBuiltinModule("sys")
+	if !isBuiltin {
+		return nil
+	}
+
+	// Get sys.modules dict
+	sysModulesKey := ValueToKey(StringValue("modules"))
+	sysModulesVal, ok := sysModule.Get(sysModulesKey)
+	if !ok {
+		return nil
+	}
+
+	sysModulesDict, ok := sysModulesVal.(*DictValue)
+	if !ok {
+		return nil
+	}
+
+	// Check if module exists in sys.modules
+	moduleKey := ValueToKey(StringValue(name))
+	moduleVal, ok := sysModulesDict.Get(moduleKey)
+	if !ok {
+		return nil
+	}
+
+	// Module exists - verify it's a dict (module dict) or Module
+	if moduleDict, ok := moduleVal.(*DictValue); ok {
+		DebugLog("[DEBUG] Found module '%s' in sys.modules (DictValue)\n", name)
+		return moduleDict
+	}
+
+	if module, ok := moduleVal.(*Module); ok {
+		// Convert Module to DictValue by extracting exports
+		DebugLog("[DEBUG] Found module '%s' in sys.modules (Module), converting to DictValue\n", name)
+		dict := NewDict()
+		for name, val := range module.Exports {
+			dict.Set(name, val)
+		}
+		return dict
+	}
+
+	// Not a dict or Module - ignore it
+	DebugLog("[DEBUG] Found '%s' in sys.modules but it's not a dict/module (type: %T)\n", name, moduleVal)
+	return nil
 }
 
 // tryLoadBuiltinModule attempts to load a builtin Go module

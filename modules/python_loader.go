@@ -31,6 +31,9 @@ var cExtensionModules = map[string]bool{
 	"_bz2":             true,
 	"_lzma":            true,
 	"zlib":             true,
+	// Frozen modules (compiled into CPython interpreter)
+	"_frozen_importlib":          true,
+	"_frozen_importlib_external": true,
 	// "_weakref" removed - provided as M28 stub module
 	// "_abc" removed - let it fail naturally to trigger fallback to _py_abc
 	// "builtins" removed - handled specially in LoadPythonModule
@@ -211,9 +214,11 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	// Add underscore-prefixed names that are used internally by Python stdlib
 	for varName, value := range moduleCtx.Vars {
-		// Skip dunder variables (__name__, __file__, etc.) except __all__
-		// __all__ is a special variable that defines the public API and must be exported
-		if varName != "__all__" && len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__" {
+		// Skip dunder variables (__name__, __file__, etc.) except special ones
+		// __all__ defines the public API and must be exported
+		// __import__ and __build_class__ are special functions from importlib._bootstrap
+		isDunder := len(varName) >= 2 && varName[:2] == "__" && varName[len(varName)-2:] == "__"
+		if isDunder && varName != "__all__" && varName != "__import__" && varName != "__build_class__" {
 			continue
 		}
 		// Only process private names (starting with _) - public names already synced
@@ -300,5 +305,40 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 	}
 
+	// Register the module in sys.modules so Python code can find it
+	// This is essential for importlib and other modules that check sys.modules
+	registerModuleInSysModules(name, partialModule)
+
 	return partialModule, nil
+}
+
+// registerModuleInSysModules registers a loaded module in sys.modules
+func registerModuleInSysModules(name string, moduleDict *core.DictValue) {
+	fmt.Printf("[REGISTER] Attempting to register module '%s'\n", name)
+
+	// Get sys module from builtin registry
+	sysModule, ok := GetBuiltinModule("sys")
+	if !ok {
+		fmt.Printf("[REGISTER] sys module not available\n")
+		return // sys not available yet
+	}
+
+	// Get sys.modules dict
+	sysModulesVal, ok := sysModule.Get("modules")
+	if !ok {
+		fmt.Printf("[REGISTER] sys.modules not found (tried key 'modules')\n")
+		return // sys.modules not available
+	}
+
+	sysModulesDict, ok := sysModulesVal.(*core.DictValue)
+	if !ok {
+		fmt.Printf("[REGISTER] sys.modules is not a dict (type: %T)\n", sysModulesVal)
+		return // sys.modules is not a dict
+	}
+
+	// Register the module
+	// Use ValueToKey to generate the proper key format (e.g., "s:importlib._bootstrap")
+	key := core.ValueToKey(core.StringValue(name))
+	sysModulesDict.SetWithKey(key, core.StringValue(name), moduleDict)
+	fmt.Printf("[REGISTER] Successfully registered module '%s' in sys.modules (key=%s)\n", name, key)
 }
