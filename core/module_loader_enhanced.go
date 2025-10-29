@@ -108,6 +108,37 @@ func (l *ModuleLoaderEnhanced) checkModuleCache(registry *ModuleRegistry, cacheN
 	return nil, nil
 }
 
+// registerInSysModules registers a module in sys.modules
+// This is needed for both builtin and Python modules so Python code can find them
+func (l *ModuleLoaderEnhanced) registerInSysModules(name string, module *DictValue) {
+	// Skip if getBuiltinModule is not set (happens during early initialization)
+	if l.getBuiltinModule == nil {
+		return
+	}
+
+	// Get sys module
+	sysModule, ok := l.getBuiltinModule("sys")
+	if !ok {
+		return // sys not available yet
+	}
+
+	// Get sys.modules dict
+	sysModulesVal, ok := sysModule.Get("modules")
+	if !ok {
+		return // sys.modules not available
+	}
+
+	sysModulesDict, ok := sysModulesVal.(*DictValue)
+	if !ok {
+		return // sys.modules is not a dict
+	}
+
+	// Register the module with proper key format
+	key := ValueToKey(StringValue(name))
+	sysModulesDict.SetWithKey(key, StringValue(name), module)
+	DebugLog("[DEBUG] Registered module '%s' in sys.modules\n", name)
+}
+
 // checkSysModules checks if module is in sys.modules dict
 // This allows Python code to manually register modules like sys.modules['importlib._bootstrap']
 func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
@@ -169,6 +200,11 @@ func (l *ModuleLoaderEnhanced) tryLoadBuiltinModule(registry *ModuleRegistry, ca
 	}
 
 	registry.StoreModule(cacheName, module, "<builtin>", []string{})
+
+	// Register builtin modules in sys.modules so Python code can find them
+	// This is essential for importlib._setup() which looks for _thread, _weakref, _warnings
+	l.registerInSysModules(cacheName, module)
+
 	return module
 }
 
