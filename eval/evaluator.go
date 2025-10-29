@@ -1147,6 +1147,33 @@ func isExceptionType(name string) bool {
 }
 
 // tryForm implements the try/except/finally special form
+// createPythonExceptionInstance creates a proper Python exception instance
+// instead of a string, so that caught exceptions have the correct type and attributes
+func createPythonExceptionInstance(ctx *core.Context, exceptionType string, message string) core.Value {
+	// Try to get the exception class from context
+	exceptionClass, err := ctx.Lookup(exceptionType)
+	if err != nil {
+		// Fall back to string if class not found
+		return core.StringValue(message)
+	}
+
+	// Check if it's a class
+	class, ok := exceptionClass.(*core.Class)
+	if !ok {
+		// Fall back to string if not a class
+		return core.StringValue(message)
+	}
+
+	// Instantiate the exception class with the message
+	instance, err := class.Call([]core.Value{core.StringValue(message)}, ctx)
+	if err != nil {
+		// Fall back to string if instantiation fails
+		return core.StringValue(message)
+	}
+
+	return instance
+}
+
 // Forms:
 //
 //	(try body)
@@ -1347,17 +1374,42 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if exc.Value != nil {
 						excValue = exc.Value
 					} else {
-						excValue = core.StringValue(exc.Error())
-					}
-				} else if evalErr, ok := tryErr.(*core.EvalError); ok {
-					// Extract the message without the stack trace
-					if evalErr.Wrapped != nil {
-						excValue = core.StringValue(evalErr.Wrapped.Error())
-					} else {
-						excValue = core.StringValue(evalErr.Message)
+						excValue = createPythonExceptionInstance(ctx, exc.Type, exc.Error())
 					}
 				} else {
-					excValue = core.StringValue(tryErr.Error())
+					// Extract the underlying error and create proper Python exception instance
+					var baseErr error = tryErr
+					var errMsg string
+
+					if evalErr, ok := tryErr.(*core.EvalError); ok && evalErr.Wrapped != nil {
+						baseErr = evalErr.Wrapped
+						errMsg = evalErr.Wrapped.Error()
+					} else if evalErr, ok := tryErr.(*core.EvalError); ok {
+						errMsg = evalErr.Message
+					} else {
+						errMsg = tryErr.Error()
+					}
+
+					// Create proper Python exception instance based on error type
+					switch baseErr.(type) {
+					case *core.NameError:
+						excValue = createPythonExceptionInstance(ctx, "NameError", errMsg)
+					case *core.TypeError:
+						excValue = createPythonExceptionInstance(ctx, "TypeError", errMsg)
+					case *core.ZeroDivisionError:
+						excValue = createPythonExceptionInstance(ctx, "ZeroDivisionError", errMsg)
+					case *core.KeyError:
+						excValue = createPythonExceptionInstance(ctx, "KeyError", errMsg)
+					case *core.IndexError:
+						excValue = createPythonExceptionInstance(ctx, "IndexError", errMsg)
+					case *core.ImportError:
+						excValue = createPythonExceptionInstance(ctx, "ImportError", errMsg)
+					case *core.AttributeError:
+						excValue = createPythonExceptionInstance(ctx, "AttributeError", errMsg)
+					default:
+						// Generic exception
+						excValue = createPythonExceptionInstance(ctx, "Exception", errMsg)
+					}
 				}
 
 				handlerCtx.Define(excVar, excValue)

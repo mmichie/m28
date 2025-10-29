@@ -144,6 +144,56 @@ func RegisterErrors(ctx *core.Context) {
 		return core.None, nil
 	}))
 
+	// Add __str__ method to BaseException to show the first arg
+	baseExceptionClass.SetMethod("__str__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__str__() missing 1 required positional argument: 'self'")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.StringValue(""), nil
+		}
+
+		// Get the args attribute
+		if argsVal, hasArgs := self.Attributes["args"]; hasArgs {
+			if argsTuple, ok := argsVal.(core.TupleValue); ok && len(argsTuple) > 0 {
+				// Return the first argument as the string representation
+				return core.StringValue(argsTuple[0].String()), nil
+			}
+		}
+
+		// Fall back to empty string
+		return core.StringValue(""), nil
+	}))
+
+	// Add __repr__ method to BaseException for proper repr() output
+	baseExceptionClass.SetMethod("__repr__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__repr__() missing 1 required positional argument: 'self'")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.StringValue(""), nil
+		}
+
+		// Get class name
+		className := self.Class.Name
+
+		// Get the args attribute for display
+		if argsVal, hasArgs := self.Attributes["args"]; hasArgs {
+			if argsTuple, ok := argsVal.(core.TupleValue); ok && len(argsTuple) > 0 {
+				// Format like: ImportError('message')
+				msg := argsTuple[0].String()
+				return core.StringValue(fmt.Sprintf("%s(%s)", className, msg)), nil
+			}
+		}
+
+		// Fall back to just class name with empty parens
+		return core.StringValue(fmt.Sprintf("%s()", className)), nil
+	}))
+
 	ctx.Define("BaseException", baseExceptionClass)
 
 	// Exception inherits from BaseException
