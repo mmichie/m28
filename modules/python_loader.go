@@ -209,7 +209,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	// Evaluate the IR with timeout
 	startEval := time.Now()
-	evalTimeout := 5 * time.Second // 5 second timeout for module evaluation
+	evalTimeout := 30 * time.Second // 30 second timeout for module evaluation
 
 	type evalResult struct {
 		val core.Value

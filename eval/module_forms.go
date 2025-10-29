@@ -216,11 +216,46 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 	// Handle different import forms
 	if len(importNames) > 0 {
 		// Import specific names (with optional aliases)
-		// Try two strategies:
-		// 1. Load as submodule (for "from . import result" -> load "unittest.result")
-		// 2. Load parent and extract attribute (for "from unittest.result import TestResult")
+		// Python's import semantics for "from X import Y":
+		// 1. First check if Y is an attribute of module X
+		// 2. Only if not found, try to load Y as a submodule X.Y
+
+		// First, load the parent module (if specified)
+		var parentModule *core.DictValue
+		var parentErr error
+		if moduleName != "" {
+			parentModule, parentErr = loader.LoadModule(moduleName, ctx)
+			if parentErr != nil {
+				// If it's an ImportError, preserve it so try/except can catch it
+				if _, ok := parentErr.(*core.ImportError); ok {
+					return nil, parentErr
+				}
+				return nil, fmt.Errorf("cannot import from '%s': %w", moduleName, parentErr)
+			}
+		}
+
 		for _, spec := range importNames {
-			// Build the full submodule name
+			// Strategy 1: Try to get as an attribute from parent module (most common case)
+			if parentModule != nil {
+				// Try to extract the name from the parent module
+				val, ok := parentModule.Get(spec.name)
+				if !ok {
+					// Also try with "s:" prefix (symbol key format)
+					val, ok = parentModule.Get("s:" + spec.name)
+				}
+				if ok {
+					// Found as attribute - define in context
+					targetName := spec.name
+					if spec.alias != "" {
+						targetName = spec.alias
+					}
+					ctx.Define(targetName, val)
+					continue
+				}
+			}
+
+			// Strategy 2: Try to load as a submodule (for package imports)
+			// Example: "from . import result" -> load "unittest.result" as a file
 			var submoduleName string
 			if moduleName != "" {
 				submoduleName = moduleName + "." + spec.name
@@ -228,7 +263,6 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				submoduleName = spec.name
 			}
 
-			// Try to load as a submodule first
 			submodule, err := loader.LoadModule(submoduleName, ctx)
 			if err == nil {
 				// Successfully loaded as submodule
@@ -242,53 +276,17 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				continue
 			}
 
-			// Check if the error indicates the submodule file was found but failed to load
-			// In that case, propagate the error rather than falling back to attribute lookup
-			// Only propagate if "error in Python module" - other errors likely mean file not found
-			errMsg := err.Error()
-			if strings.Contains(errMsg, "error in Python module") {
-				// The submodule exists but failed to load - propagate the error
-				core.DebugLog("[DEBUG] Submodule '%s' found but failed to load: %v\n", submoduleName, err)
-				return nil, err
-			}
-
-			// Debug: log why submodule loading failed (file not found)
-			core.DebugLog("[DEBUG] Submodule '%s' not found, trying attribute lookup: %v\n", submoduleName, err)
-
-			// Not a submodule file, try loading parent module and extracting the name
+			// Both strategies failed - return ImportError
 			if moduleName == "" {
-				return nil, fmt.Errorf("cannot import name '%s': %w", spec.name, err)
-			}
-
-			parentModule, parentErr := loader.LoadModule(moduleName, ctx)
-			if parentErr != nil {
-				// If it's an ImportError, preserve it so try/except can catch it
-				if _, ok := parentErr.(*core.ImportError); ok {
-					return nil, parentErr
-				}
-				return nil, fmt.Errorf("cannot import name '%s' from '%s': %w", spec.name, moduleName, parentErr)
-			}
-
-			// Extract the name from the parent module
-			val, ok := parentModule.Get(spec.name)
-			if !ok {
-				// Also try with "s:" prefix (symbol key)
-				val, ok = parentModule.Get("s:" + spec.name)
-			}
-			if !ok {
-				// Return an ImportError so it can be caught by try/except
 				return nil, &core.ImportError{
-					ModuleName: moduleName,
-					Message:    fmt.Sprintf("cannot import name '%s' from module '%s'", spec.name, moduleName),
+					ModuleName: spec.name,
+					Message:    fmt.Sprintf("no module named '%s'", spec.name),
 				}
 			}
-
-			// Define in context
-			targetName := spec.name
-			if spec.alias != "" {
-				targetName = spec.alias
+			return nil, &core.ImportError{
+				ModuleName: moduleName,
+				Message:    fmt.Sprintf("cannot import name '%s' from '%s'", spec.name, moduleName),
 			}
-			ctx.Define(targetName, val)
 		}
 		return core.NilValue{}, nil
 	} else if importAll {
