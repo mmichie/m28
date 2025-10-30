@@ -145,6 +145,16 @@ func InitEnumModule() *core.DictValue {
 
 	// IntEnum class
 	intEnumClass := core.NewClassWithParents("IntEnum", []*core.Class{enumClass})
+
+	// Add _convert_() classmethod to IntEnum
+	// This is used by signal.py to convert module-level constants into enum members
+	// For our minimal stub, we just return None to indicate success
+	intEnumClass.SetMethod("_convert_", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// signal.py calls: _IntEnum._convert_('Signals', __name__, lambda_filter)
+		// We don't need to actually do anything - just return None to indicate success
+		return core.None, nil
+	}))
+
 	module.Set("IntEnum", intEnumClass)
 
 	// unique decorator - ensures all enum values are unique
