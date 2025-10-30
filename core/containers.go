@@ -640,6 +640,20 @@ func (s *SetValue) Iterator() Iterator {
 	}
 }
 
+// IteratorValue returns the iterator as a Value
+func (s *SetValue) IteratorValue() Value {
+	// Create a slice of values from the set
+	values := make([]Value, 0, len(s.items))
+	for _, v := range s.items {
+		values = append(values, v)
+	}
+
+	return &setIterator{
+		values: values,
+		index:  0,
+	}
+}
+
 type setIterator struct {
 	values []Value
 	index  int
