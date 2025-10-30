@@ -1189,6 +1189,7 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	var tryBody []core.Value
 	var exceptClauses []*core.ListValue
+	var elseClause *core.ListValue
 	var finallyClause *core.ListValue
 
 	// Parse the try form
@@ -1202,6 +1203,12 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 					exceptClauses = append(exceptClauses, list)
 					continue
+				case "else":
+					if i == 0 {
+						return nil, fmt.Errorf("try must have a body before else")
+					}
+					elseClause = list
+					continue
 				case "finally":
 					if i == 0 {
 						return nil, fmt.Errorf("try must have a body before finally")
@@ -1212,8 +1219,8 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
-		// If we haven't seen except or finally yet, it's part of the try body
-		if len(exceptClauses) == 0 && finallyClause == nil {
+		// If we haven't seen except, else, or finally yet, it's part of the try body
+		if len(exceptClauses) == 0 && elseClause == nil && finallyClause == nil {
 			tryBody = append(tryBody, arg)
 		}
 	}
@@ -1242,8 +1249,23 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
-	// If no error, run finally and return
+	// If no error, run else clause (if present), then finally, and return
 	if tryErr == nil {
+		// Execute else clause if present (only runs when no exception occurred)
+		if elseClause != nil && elseClause.Len() > 1 {
+			for _, expr := range elseClause.Items()[1:] {
+				var elseErr error
+				result, elseErr = Eval(expr, ctx)
+				if elseErr != nil {
+					// Error in else clause becomes the new error
+					if err := runFinally(); err != nil {
+						return nil, err
+					}
+					return nil, elseErr
+				}
+			}
+		}
+
 		if err := runFinally(); err != nil {
 			return nil, err
 		}

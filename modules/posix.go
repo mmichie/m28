@@ -141,6 +141,54 @@ func InitPosixModule() *core.DictValue {
 	statResultClass := core.NewClass("stat_result", nil)
 	posixModule.SetWithKey("stat_result", core.StringValue("stat_result"), statResultClass)
 
+	// Add missing functions/attributes that Python expects
+
+	// _exit(status) - exit without cleanup
+	posixModule.SetWithKey("_exit", core.StringValue("_exit"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		status := 0
+		if len(args) > 0 {
+			if num, ok := args[0].(core.NumberValue); ok {
+				status = int(num)
+			}
+		}
+		os.Exit(status)
+		return core.NilValue{}, nil
+	}))
+
+	// _path_normpath(path) - normalize a pathname
+	posixModule.SetWithKey("_path_normpath", core.StringValue("_path_normpath"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("_path_normpath() takes exactly 1 argument")
+		}
+		pathStr, ok := args[0].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("_path_normpath() argument must be a string")
+		}
+		// Simple normalization - in a real implementation this would handle .., ., etc.
+		// For now just return the path as-is
+		return pathStr, nil
+	}))
+
+	// _have_functions - set of supported optional functions (as a frozenset-like object)
+	haveFuncs := core.NewList(
+		core.StringValue("HAVE_FACCESSAT"),
+		core.StringValue("HAVE_FCHMODAT"),
+		core.StringValue("HAVE_FCHOWNAT"),
+		core.StringValue("HAVE_FSTATAT"),
+		core.StringValue("HAVE_FUTIMESAT"),
+		core.StringValue("HAVE_LINKAT"),
+		core.StringValue("HAVE_MKDIRAT"),
+		core.StringValue("HAVE_MKFIFOAT"),
+		core.StringValue("HAVE_MKNODAT"),
+		core.StringValue("HAVE_OPENAT"),
+		core.StringValue("HAVE_READLINKAT"),
+		core.StringValue("HAVE_RENAMEAT"),
+		core.StringValue("HAVE_SYMLINKAT"),
+		core.StringValue("HAVE_UNLINKAT"),
+		core.StringValue("HAVE_UTIMENSAT"),
+	)
+	posixModule.SetWithKey("_have_functions", core.StringValue("_have_functions"), haveFuncs)
+
 	// Add __all__ list with exported function names
 	exportsList := core.NewList(
 		core.StringValue("getcwd"),
@@ -155,6 +203,9 @@ func InitPosixModule() *core.DictValue {
 		core.StringValue("stat"),
 		core.StringValue("lstat"),
 		core.StringValue("stat_result"),
+		core.StringValue("_exit"),
+		core.StringValue("_path_normpath"),
+		core.StringValue("_have_functions"),
 	)
 	posixModule.SetWithKey("__all__", core.StringValue("__all__"), exportsList)
 

@@ -341,6 +341,13 @@ func (c *Class) SetAttr(name string, value Value) error {
 
 // Call implements Callable interface for classes (instantiation)
 func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
+	// Delegate to CallWithKeywords with no keyword arguments
+	return c.CallWithKeywords(args, nil, ctx)
+}
+
+// CallWithKeywords implements keyword argument support for class instantiation
+// This is the generic solution that unlocks full Python compatibility for all classes
+func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
 	// Python instance creation flow:
 	// 1. Call __new__ to create the instance
 	// 2. If __new__ returns an instance of the class, call __init__ on it
@@ -351,11 +358,15 @@ func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 	// Check for __new__ method
 	if newMethod, ok := c.GetMethod("__new__"); ok {
 		// __new__ is a static method that takes the class as first argument
+		// Prepend class as first argument
+		newArgs := append([]Value{c}, args...)
+
+		// Call __new__ with positional args only
+		// In Python, __new__ typically only receives positional args,
+		// while keyword args are handled by __init__
 		if callable, ok := newMethod.(interface {
 			Call([]Value, *Context) (Value, error)
 		}); ok {
-			// Prepend class as first argument
-			newArgs := append([]Value{c}, args...)
 			result, err := callable.Call(newArgs, ctx)
 			if err != nil {
 				return nil, fmt.Errorf("error in %s.__new__: %v", c.Name, err)
@@ -374,20 +385,35 @@ func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 	// Call __init__ if __new__ returned an instance of this class or a subclass
 	if inst, ok := instance.(*Instance); ok && IsInstanceOf(inst, c) {
 		if initMethod, ok := c.GetMethod("__init__"); ok {
-			// Create bound method for __init__
-			if callable, ok := initMethod.(interface {
+			// Debug for pathlib classes
+			if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
+				fmt.Printf("[DEBUG Class.CallWithKeywords] Calling %s.__init__ with %d args, %d kwargs\n", c.Name, len(args), len(kwargs))
+			}
+
+			// Create a new context with __class__ set to the class whose __init__ we're calling
+			// This allows super() to work correctly inside __init__
+			initCtx := NewContext(ctx)
+			initCtx.Define("__class__", c)
+
+			// Prepend instance as first argument (self)
+			initArgs := append([]Value{instance}, args...)
+
+			// Try CallWithKeywords first if method supports it
+			if kwargsCallable, ok := initMethod.(interface {
+				CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+			}); ok {
+				_, err := kwargsCallable.CallWithKeywords(initArgs, kwargs, initCtx)
+				if err != nil {
+					return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
+				}
+			} else if callable, ok := initMethod.(interface {
 				Call([]Value, *Context) (Value, error)
 			}); ok {
-				// Debug for pathlib classes
-				if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
-					fmt.Printf("[DEBUG Class.Call] Calling %s.__init__ with %d args\n", c.Name, len(args))
+				// __init__ doesn't support kwargs - call with positional args only
+				// If kwargs were provided, this is an error
+				if len(kwargs) > 0 {
+					return nil, fmt.Errorf("%s.__init__ does not support keyword arguments (method type: %T)", c.Name, initMethod)
 				}
-				// Create a new context with __class__ set to the class whose __init__ we're calling
-				// This allows super() to work correctly inside __init__
-				initCtx := NewContext(ctx)
-				initCtx.Define("__class__", c)
-				// Prepend instance as first argument (self)
-				initArgs := append([]Value{instance}, args...)
 				_, err := callable.Call(initArgs, initCtx)
 				if err != nil {
 					return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
@@ -398,7 +424,7 @@ func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 		// Debug: Log when __init__ is NOT called
 		if inst, ok := instance.(*Instance); ok {
 			if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
-				fmt.Printf("[DEBUG Class.Call] SKIPPING __init__ for %s because inst.Class=%s != c=%s\n", c.Name, inst.Class.Name, c.Name)
+				fmt.Printf("[DEBUG Class.CallWithKeywords] SKIPPING __init__ for %s because inst.Class=%s != c=%s\n", c.Name, inst.Class.Name, c.Name)
 			}
 		}
 	}

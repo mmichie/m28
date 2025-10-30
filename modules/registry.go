@@ -38,6 +38,10 @@ var builtinModules = map[string]ModuleInitializer{
 	"_imp":         Init_ImpModule,        // C extension module for import machinery
 	"_warnings":    Init_WarningsModule,   // C extension module for warnings.py
 	"marshal":      InitMarshalModule,     // C extension module for bytecode serialization
+	"_opcode":      InitOpcodeModule,      // C extension module for bytecode opcodes
+	"_operator":    InitOperatorModule,    // C extension module for operator functions
+	"_stat":        InitStatModule,        // C extension module for file stat constants
+	"_abc":         InitAbcModule,         // C extension module for abstract base classes
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

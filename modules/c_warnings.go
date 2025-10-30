@@ -31,5 +31,11 @@ func Init_WarningsModule() *core.DictValue {
 	// _onceregistry - registry for "once" warnings
 	warningsModule.Set("_onceregistry", core.NewDict())
 
+	// _filters_mutated - called when filters list is modified
+	warningsModule.Set("_filters_mutated", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// No-op for now - would normally invalidate warning caches
+		return core.NilValue{}, nil
+	}))
+
 	return warningsModule
 }
