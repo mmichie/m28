@@ -13,9 +13,54 @@ import (
 // Global variables for sys module state
 var (
 	recursionLimit = 1000
-	sysModules     = core.NewDict()                      // Tracks loaded modules
-	sysPath        = core.NewList(core.StringValue(".")) // Module search path
+	sysModules     = core.NewDict() // Tracks loaded modules
+	sysPath        = initSysPath()  // Module search path
 )
+
+// initSysPath initializes sys.path with reasonable defaults
+// including the Python standard library if it can be found
+func initSysPath() *core.ListValue {
+	paths := core.NewList(core.StringValue("."))
+
+	// Try to find Python standard library
+	// Look for common Python installation locations
+	pythonLibPaths := []string{
+		"/usr/lib/python3.12",
+		"/usr/lib/python3.11",
+		"/usr/lib/python3.10",
+		"/usr/local/lib/python3.12",
+		"/usr/local/lib/python3.11",
+		"/usr/local/lib/python3.10",
+	}
+
+	// Also check if PYENV_ROOT is set
+	if pyenvRoot := os.Getenv("PYENV_ROOT"); pyenvRoot != "" {
+		pythonLibPaths = append([]string{
+			pyenvRoot + "/versions/3.12.0/lib/python3.12",
+			pyenvRoot + "/versions/3.11.0/lib/python3.11",
+			pyenvRoot + "/versions/3.10.0/lib/python3.10",
+		}, pythonLibPaths...)
+	}
+
+	// Check HOME/.pyenv for pyenv installations
+	if home := os.Getenv("HOME"); home != "" {
+		pythonLibPaths = append([]string{
+			home + "/.pyenv/versions/3.12.0/lib/python3.12",
+			home + "/.pyenv/versions/3.11.0/lib/python3.11",
+			home + "/.pyenv/versions/3.10.0/lib/python3.10",
+		}, pythonLibPaths...)
+	}
+
+	// Add the first existing Python lib path to sys.path
+	for _, libPath := range pythonLibPaths {
+		if _, err := os.Stat(libPath); err == nil {
+			paths.Append(core.StringValue(libPath))
+			break
+		}
+	}
+
+	return paths
+}
 
 // InitSysModule registers the sys module
 func InitSysModule() *core.DictValue {
