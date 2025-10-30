@@ -795,6 +795,14 @@ func (b *ByteArrayValue) Iterator() Iterator {
 	}
 }
 
+// IteratorValue returns the iterator as a Value
+func (b *ByteArrayValue) IteratorValue() Value {
+	return &bytearrayIterator{
+		bytearray: b,
+		index:     0,
+	}
+}
+
 // GetData returns the internal byte data
 func (b *ByteArrayValue) GetData() []byte {
 	return b.data
@@ -816,6 +824,16 @@ func (it *bytearrayIterator) Next() (Value, bool) {
 
 func (it *bytearrayIterator) Reset() {
 	it.index = 0
+}
+
+// Type implements Value.Type for bytearrayIterator
+func (it *bytearrayIterator) Type() Type {
+	return "bytearray_iterator"
+}
+
+// String implements Value.String for bytearrayIterator
+func (it *bytearrayIterator) String() string {
+	return "<bytearray_iterator>"
 }
 
 // DecimalValue represents a high-precision decimal number

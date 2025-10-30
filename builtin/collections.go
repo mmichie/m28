@@ -383,6 +383,17 @@ func (b *ByteArrayTypeClass) Call(args []core.Value, ctx *core.Context) (core.Va
 	return desc.Constructor(args, ctx)
 }
 
+// CallWithKeywords overrides the embedded Class's CallWithKeywords
+// to ensure our custom Call is used instead of the generic class instantiation
+func (b *ByteArrayTypeClass) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// For bytearray, keyword arguments are not supported in the constructor
+	// Just ignore kwargs and call our custom Call method
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("bytearray() does not accept keyword arguments")
+	}
+	return b.Call(args, ctx)
+}
+
 // Type returns the type of ByteArrayTypeClass
 func (b *ByteArrayTypeClass) Type() core.Type {
 	return core.ClassType

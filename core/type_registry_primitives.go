@@ -705,6 +705,17 @@ func registerByteArrayType() {
 		PythonName: "bytearray",
 		BaseType:   ByteArrayType,
 		Methods: map[string]*MethodDescriptor{
+			"__iter__": {
+				Name:    "__iter__",
+				Arity:   0,
+				Doc:     "Return an iterator object",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(*ByteArrayValue)
+					// Use IteratorValue() which returns the iterator as a Value
+					return b.IteratorValue(), nil
+				},
+			},
 			"decode": {
 				Name:    "decode",
 				Arity:   -1, // Variable args
