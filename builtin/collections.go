@@ -252,6 +252,17 @@ func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 	return core.NewList(args...), nil
 }
 
+// CallWithKeywords overrides the embedded Class's CallWithKeywords
+// to ensure our custom Call is used instead of the generic class instantiation
+func (l *ListType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// For list, keyword arguments are not supported in the constructor
+	// Just ignore kwargs and call our custom Call method
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("list() does not accept keyword arguments")
+	}
+	return l.Call(args, ctx)
+}
+
 // TupleType represents the tuple class that can be called and has __new__
 type TupleType struct {
 	*core.Class
@@ -277,6 +288,17 @@ func (t *TupleType) Call(args []core.Value, ctx *core.Context) (core.Value, erro
 	}
 	// Multiple arguments: create a tuple from all arguments
 	return core.TupleValue(args), nil
+}
+
+// CallWithKeywords overrides the embedded Class's CallWithKeywords
+// to ensure our custom Call is used instead of the generic class instantiation
+func (t *TupleType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// For tuple, keyword arguments are not supported in the constructor
+	// Just ignore kwargs and call our custom Call method
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("tuple() does not accept keyword arguments")
+	}
+	return t.Call(args, ctx)
 }
 
 // Type returns the type of the TupleType
@@ -496,6 +518,17 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 
 	// Odd number of args > 1
 	return nil, fmt.Errorf("dict() takes an even number of positional arguments for key-value pairs")
+}
+
+// CallWithKeywords overrides the embedded Class's CallWithKeywords
+// to ensure our custom Call is used instead of the generic class instantiation
+func (d *DictType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// For dict, keyword arguments are not supported in the constructor
+	// Just ignore kwargs and call our custom Call method
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("dict() does not accept keyword arguments")
+	}
+	return d.Call(args, ctx)
 }
 
 // createByteArrayClass creates the bytearray class that can be used as a base class

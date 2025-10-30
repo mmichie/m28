@@ -139,10 +139,8 @@ func InitSysModule() *core.DictValue {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("string", nil, "intern() argument")
 		}
-		fmt.Fprintf(os.Stderr, "[sys.intern] Called with type %T\n", args[0])
 		str, ok := args[0].(core.StringValue)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "[sys.intern] Type assertion failed! Expected core.StringValue, got %T\n", args[0])
 			return nil, core.NewTypeError("string", args[0], "intern() argument")
 		}
 		// TODO: Implement actual string interning

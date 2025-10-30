@@ -613,6 +613,17 @@ func (s *StrType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 	return core.StringValue(val.String()), nil
 }
 
+// CallWithKeywords overrides the embedded Class's CallWithKeywords
+// to ensure our custom Call is used instead of the generic class instantiation
+func (s *StrType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// For str, keyword arguments are not supported in the constructor
+	// Just ignore kwargs and call our custom Call method
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("str() does not accept keyword arguments")
+	}
+	return s.Call(args, ctx)
+}
+
 // TypeType represents the type metaclass that can be called and inherited from
 type TypeType struct {
 	*core.Class
@@ -1009,6 +1020,15 @@ func (i *IntType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 	return IntBuilder()(args, ctx)
 }
 
+// CallWithKeywords delegates to Call since int() doesn't accept keyword arguments
+// This prevents primitive ints from being wrapped in Instance objects
+func (i *IntType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("int() does not accept keyword arguments")
+	}
+	return i.Call(args, ctx)
+}
+
 // createIntClass creates the int class that can be used with isinstance
 func createIntClass(objectClass *core.Class) *IntType {
 	class := core.NewClass("int", objectClass)
@@ -1234,6 +1254,15 @@ func (f *FloatType) GetClass() *core.Class {
 // Call implements the callable interface for float() construction
 func (f *FloatType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return FloatBuilder()(args, ctx)
+}
+
+// CallWithKeywords delegates to Call since float() doesn't accept keyword arguments
+// This prevents primitive floats from being wrapped in Instance objects
+func (f *FloatType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("float() does not accept keyword arguments")
+	}
+	return f.Call(args, ctx)
 }
 
 // createFloatClass creates the float class that can be used with isinstance

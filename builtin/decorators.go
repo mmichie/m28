@@ -89,6 +89,15 @@ func (p *PropertyType) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	return prop, nil
 }
 
+// CallWithKeywords delegates to Call since property() doesn't accept keyword arguments
+// This prevents property descriptors from being wrapped in Instance objects
+func (p *PropertyType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("property() does not accept keyword arguments")
+	}
+	return p.Call(args, ctx)
+}
+
 // StaticmethodType represents the staticmethod class
 type StaticmethodType struct {
 	*core.Class
@@ -115,6 +124,15 @@ func (s *StaticmethodType) Call(args []core.Value, ctx *core.Context) (core.Valu
 	return sm, nil
 }
 
+// CallWithKeywords delegates to Call since staticmethod() doesn't accept keyword arguments
+// This prevents static methods from being wrapped in Instance objects
+func (s *StaticmethodType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("staticmethod() does not accept keyword arguments")
+	}
+	return s.Call(args, ctx)
+}
+
 // ClassmethodType represents the classmethod class
 type ClassmethodType struct {
 	*core.Class
@@ -139,6 +157,15 @@ func (c *ClassmethodType) Call(args []core.Value, ctx *core.Context) (core.Value
 	}
 
 	return cm, nil
+}
+
+// CallWithKeywords delegates to Call since classmethod() doesn't accept keyword arguments
+// This prevents class methods from being wrapped in Instance objects
+func (c *ClassmethodType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("classmethod() does not accept keyword arguments")
+	}
+	return c.Call(args, ctx)
 }
 
 // createPropertyClass creates the property class
