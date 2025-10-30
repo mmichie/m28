@@ -353,6 +353,17 @@ func (s *SetType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 	return nil, fmt.Errorf("set() argument must be an iterable, not '%s'", arg.Type())
 }
 
+// CallWithKeywords overrides the embedded Class's CallWithKeywords
+// to ensure our custom Call is used instead of the generic class instantiation
+func (s *SetType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// For set, keyword arguments are not supported in the constructor
+	// Just ignore kwargs and call our custom Call method
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("set() does not accept keyword arguments")
+	}
+	return s.Call(args, ctx)
+}
+
 // Type returns the type of SetType
 func (s *SetType) Type() core.Type {
 	return core.ClassType
