@@ -623,6 +623,21 @@ func (t *TypeType) GetClass() *core.Class {
 	return t.Class
 }
 
+// CallWithKeywords implements keyword argument support for type()
+// This takes precedence over Class.CallWithKeywords
+func (t *TypeType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// For type(), keyword arguments are only valid when creating a new class (3+ args)
+	// For type(obj), ignore kwargs
+	if len(args) == 1 && len(kwargs) == 0 {
+		return t.Call(args, ctx)
+	} else if len(args) == 3 {
+		// type(name, bases, dict, **kwargs) - delegate to type.__new__
+		return t.Call(args, ctx)
+	} else {
+		return t.Call(args, ctx)
+	}
+}
+
 // Call implements the callable interface for type() function
 func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// type() can be called in two ways:
@@ -675,6 +690,14 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			return FunctionTypeClass, nil
 		case *core.Instance:
 			return v.Class, nil
+		case *core.GenericAlias:
+			// type(list[int]) returns GenericAlias class
+			// Create or get cached GenericAlias class with __new__ method
+			if typeClassCache["GenericAlias"] == nil {
+				cls := createGenericAliasClass()
+				typeClassCache["GenericAlias"] = cls
+			}
+			return typeClassCache["GenericAlias"], nil
 		default:
 			// For any custom types, create or get cached class with that name
 			typeName := string(val.Type())
@@ -711,136 +734,184 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 	}
 }
 
+// createGenericAliasClass creates the GenericAlias class with __new__ method
+func createGenericAliasClass() *core.Class {
+	cls := core.NewClass("GenericAlias", nil)
+	cls.SetClassAttr("__name__", core.StringValue("GenericAlias"))
+
+	// Add __new__ method that accepts (cls, origin, args)
+	cls.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// GenericAlias.__new__(cls, origin, args)
+		if len(args) < 3 {
+			return nil, fmt.Errorf("GenericAlias.__new__() missing required arguments")
+		}
+
+		// args[0] is cls
+		// args[1] is origin (the base type like list, dict)
+		// args[2] is args (the type parameters as a tuple or single value)
+
+		origin := args[1]
+		typeArgs := args[2]
+
+		// Convert typeArgs to a slice
+		var argsSlice []core.Value
+		if tuple, ok := typeArgs.(core.TupleValue); ok {
+			argsSlice = []core.Value(tuple)
+		} else {
+			argsSlice = []core.Value{typeArgs}
+		}
+
+		// Get the origin class
+		var originClass *core.Class
+		switch o := origin.(type) {
+		case *core.Class:
+			originClass = o
+		case interface{ GetClass() *core.Class }:
+			originClass = o.GetClass()
+		default:
+			return nil, fmt.Errorf("GenericAlias origin must be a class, got %T", origin)
+		}
+
+		// Create the GenericAlias
+		return core.NewGenericAlias(originClass, argsSlice), nil
+	}))
+
+	return cls
+}
+
 // createTypeMetaclass creates the type metaclass
 func createTypeMetaclass() *TypeType {
 	class := core.NewClass("type", nil)
 
 	// Add __new__ method to type metaclass
-	// type.__new__(cls, name, bases, dict) creates a new class
-	class.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// type.__new__(cls, name, bases, dict, **kwargs)
-		// We need at least cls, name, bases, dict
-		if len(args) < 4 {
-			return nil, fmt.Errorf("type.__new__() takes at least 4 arguments (%d given)", len(args))
-		}
+	// type.__new__(cls, name, bases, dict, **kwargs) creates a new class
+	// Create a wrapper that supports keyword arguments
+	typeNewFunc := NewKwargsBuiltinFunction("type.__new__", func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			// type.__new__(cls, name, bases, dict, **kwargs)
+			// We need at least cls, name, bases, dict
+			if len(args) < 4 {
+				return nil, fmt.Errorf("type.__new__() takes at least 4 arguments (%d given)", len(args))
+			}
 
-		// args[0] is cls (the metaclass being used)
-		// args[1] is name (string)
-		// args[2] is bases (tuple of parent classes)
-		// args[3] is dict/namespace (dict of class members)
+			// args[0] is cls (the metaclass being used)
+			// args[1] is name (string)
+			// args[2] is bases (tuple of parent classes)
+			// args[3] is dict/namespace (dict of class members)
+			// kwargs contains any additional keyword arguments (e.g., metaclass params)
 
-		nameVal, ok := args[1].(core.StringValue)
-		if !ok {
-			return nil, fmt.Errorf("type.__new__() argument 2 must be str, not %s", args[1].Type())
-		}
-		name := string(nameVal)
+			nameVal, ok := args[1].(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("type.__new__() argument 2 must be str, not %s", args[1].Type())
+			}
+			name := string(nameVal)
 
-		basesVal, ok := args[2].(core.TupleValue)
-		if !ok {
-			return nil, fmt.Errorf("type.__new__() argument 3 must be tuple, not %s", args[2].Type())
-		}
+			basesVal, ok := args[2].(core.TupleValue)
+			if !ok {
+				return nil, fmt.Errorf("type.__new__() argument 3 must be tuple, not %s", args[2].Type())
+			}
 
-		namespace, ok := args[3].(*core.DictValue)
-		if !ok {
-			return nil, fmt.Errorf("type.__new__() argument 4 must be dict, not %s", args[3].Type())
-		}
+			namespace, ok := args[3].(*core.DictValue)
+			if !ok {
+				return nil, fmt.Errorf("type.__new__() argument 4 must be dict, not %s", args[3].Type())
+			}
 
-		// Extract parent classes from bases tuple
-		var parentClasses []*core.Class
-		for _, base := range basesVal {
-			switch b := base.(type) {
-			case *core.Class:
-				parentClasses = append(parentClasses, b)
-			case interface{ GetClass() *core.Class }:
-				parentClasses = append(parentClasses, b.GetClass())
-			case *core.BuiltinFunction:
-				// Type constructors like object, str, etc. are callable but also valid bases
-				// Try to get the class associated with this type name
-				typeName := "object"
-				if nameAttr, ok := b.GetAttr("__name__"); ok {
-					if nameStr, ok := nameAttr.(core.StringValue); ok {
-						typeName = string(nameStr)
+			// Extract parent classes from bases tuple
+			var parentClasses []*core.Class
+			for _, base := range basesVal {
+				switch b := base.(type) {
+				case *core.Class:
+					parentClasses = append(parentClasses, b)
+				case interface{ GetClass() *core.Class }:
+					parentClasses = append(parentClasses, b.GetClass())
+				case *core.BuiltinFunction:
+					// Type constructors like object, str, etc. are callable but also valid bases
+					// Try to get the class associated with this type name
+					typeName := "object"
+					if nameAttr, ok := b.GetAttr("__name__"); ok {
+						if nameStr, ok := nameAttr.(core.StringValue); ok {
+							typeName = string(nameStr)
+						}
 					}
-				}
-				// Look up or create a class for this type
-				baseClass := typeClassCache[typeName]
-				if baseClass == nil {
-					baseClass = core.NewClass(typeName, nil)
-					baseClass.SetClassAttr("__name__", core.StringValue(typeName))
-					typeClassCache[typeName] = baseClass
-				}
-				parentClasses = append(parentClasses, baseClass)
-			default:
-				return nil, fmt.Errorf("bases must be classes, not %T (name: %v)", base, base)
-			}
-		}
-
-		// Create the new class
-		var newClass *core.Class
-		if len(parentClasses) > 1 {
-			newClass = core.NewClassWithParents(name, parentClasses)
-		} else if len(parentClasses) == 1 {
-			newClass = core.NewClass(name, parentClasses[0])
-		} else {
-			newClass = core.NewClass(name, nil)
-		}
-
-		// Add methods and attributes from namespace
-		for _, keyStr := range namespace.Keys() {
-			value, _ := namespace.Get(keyStr)
-
-			// Strip the "s:" prefix from string keys to get the actual attribute name
-			keyName := keyStr
-			if strings.HasPrefix(keyStr, "s:") {
-				keyName = keyStr[2:] // Remove "s:" prefix
-			}
-
-			// Check if it's a descriptor (has __get__ method)
-			// Descriptors should be stored as attributes, not methods
-			isDescriptor := false
-			if valueWithGetAttr, ok := value.(interface {
-				GetAttr(string) (core.Value, bool)
-			}); ok {
-				if _, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
-					isDescriptor = true
+					// Look up or create a class for this type
+					baseClass := typeClassCache[typeName]
+					if baseClass == nil {
+						baseClass = core.NewClass(typeName, nil)
+						baseClass.SetClassAttr("__name__", core.StringValue(typeName))
+						typeClassCache[typeName] = baseClass
+					}
+					parentClasses = append(parentClasses, baseClass)
+				default:
+					return nil, fmt.Errorf("bases must be classes, not %T (name: %v)", base, base)
 				}
 			}
 
-			if isDescriptor {
-				// Add as attribute (descriptor)
-				newClass.SetClassAttr(keyName, value)
+			// Create the new class
+			var newClass *core.Class
+			if len(parentClasses) > 1 {
+				newClass = core.NewClassWithParents(name, parentClasses)
+			} else if len(parentClasses) == 1 {
+				newClass = core.NewClass(name, parentClasses[0])
+			} else {
+				newClass = core.NewClass(name, nil)
+			}
 
-				// Call __set_name__ if the descriptor has it (PEP 487)
-				// This allows descriptors like cached_property to know their attribute name
+			// Add methods and attributes from namespace
+			for _, keyStr := range namespace.Keys() {
+				value, _ := namespace.Get(keyStr)
+
+				// Strip the "s:" prefix from string keys to get the actual attribute name
+				keyName := keyStr
+				if strings.HasPrefix(keyStr, "s:") {
+					keyName = keyStr[2:] // Remove "s:" prefix
+				}
+
+				// Check if it's a descriptor (has __get__ method)
+				// Descriptors should be stored as attributes, not methods
+				isDescriptor := false
 				if valueWithGetAttr, ok := value.(interface {
 					GetAttr(string) (core.Value, bool)
 				}); ok {
-					if setNameMethod, hasSetName := valueWithGetAttr.GetAttr("__set_name__"); hasSetName {
-						if callable, ok := setNameMethod.(interface {
-							Call([]core.Value, *core.Context) (core.Value, error)
-						}); ok {
-							// Call __set_name__(owner, name)
-							// GetAttr already returns a bound method for Python instances
-							_, err := callable.Call([]core.Value{newClass, core.StringValue(keyName)}, ctx)
-							if err != nil {
-								return nil, fmt.Errorf("error calling __set_name__ for %s: %v", keyName, err)
+					if _, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
+						isDescriptor = true
+					}
+				}
+
+				if isDescriptor {
+					// Add as attribute (descriptor)
+					newClass.SetClassAttr(keyName, value)
+
+					// Call __set_name__ if the descriptor has it (PEP 487)
+					// This allows descriptors like cached_property to know their attribute name
+					if valueWithGetAttr, ok := value.(interface {
+						GetAttr(string) (core.Value, bool)
+					}); ok {
+						if setNameMethod, hasSetName := valueWithGetAttr.GetAttr("__set_name__"); hasSetName {
+							if callable, ok := setNameMethod.(interface {
+								Call([]core.Value, *core.Context) (core.Value, error)
+							}); ok {
+								// Call __set_name__(owner, name)
+								// GetAttr already returns a bound method for Python instances
+								_, err := callable.Call([]core.Value{newClass, core.StringValue(keyName)}, ctx)
+								if err != nil {
+									return nil, fmt.Errorf("error calling __set_name__ for %s: %v", keyName, err)
+								}
 							}
 						}
 					}
+				} else if _, ok := value.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					// It's a callable, add as method
+					newClass.SetMethod(keyName, value)
+				} else {
+					// Add as attribute
+					newClass.SetClassAttr(keyName, value)
 				}
-			} else if _, ok := value.(interface {
-				Call([]core.Value, *core.Context) (core.Value, error)
-			}); ok {
-				// It's a callable, add as method
-				newClass.SetMethod(keyName, value)
-			} else {
-				// Add as attribute
-				newClass.SetClassAttr(keyName, value)
 			}
-		}
 
-		return newClass, nil
-	}))
+			return newClass, nil
+		})
+	class.SetMethod("__new__", typeNewFunc)
 
 	return &TypeType{Class: class}
 }
