@@ -42,7 +42,9 @@ func InitOSModule() *core.DictValue {
 	osModule.SetWithKey("remove", core.StringValue("remove"), core.NewBuiltinFunction(osRemove))
 	osModule.SetWithKey("rename", core.StringValue("rename"), core.NewBuiltinFunction(osRename))
 	osModule.SetWithKey("getenv", core.StringValue("getenv"), core.NewBuiltinFunction(osGetenv))
-	osModule.SetWithKey("environ", core.StringValue("environ"), core.NewBuiltinFunction(osEnviron))
+	// Initialize environ as a dict (will be wrapped by _Environ class in Python's os.py)
+	environDict := osEnvironDict()
+	osModule.SetWithKey("environ", core.StringValue("environ"), environDict)
 	osModule.SetWithKey("isfile", core.StringValue("isfile"), core.NewBuiltinFunction(osPathIsFile))
 	osModule.SetWithKey("isdir", core.StringValue("isdir"), core.NewBuiltinFunction(osPathIsDir))
 
@@ -404,13 +406,9 @@ func osGetenv(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.StringValue(value), nil
 }
 
-// os.environ
-func osEnviron(args []core.Value, ctx *core.Context) (core.Value, error) {
-	v := validation.NewArgs("os.environ", args)
-	if err := v.Exact(0); err != nil {
-		return nil, err
-	}
-
+// osEnvironDict returns the environment as a dict
+// This is used to initialize os.environ (not as a callable function)
+func osEnvironDict() *core.DictValue {
 	env := os.Environ()
 	result := core.NewDict()
 
@@ -425,5 +423,5 @@ func osEnviron(args []core.Value, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
-	return result, nil
+	return result
 }

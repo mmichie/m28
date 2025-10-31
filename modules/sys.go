@@ -87,12 +87,16 @@ func InitSysModule() *core.DictValue {
 
 	// Version information
 	sysModule.SetWithKey("version", core.StringValue("version"), core.StringValue("M28 0.1.0"))
-	versionInfo := core.NewDict()
-	versionInfo.Set("major", core.NumberValue(0))
-	versionInfo.Set("minor", core.NumberValue(1))
-	versionInfo.Set("micro", core.NumberValue(0))
-	versionInfo.Set("releaselevel", core.StringValue("alpha"))
-	versionInfo.Set("serial", core.NumberValue(0))
+	// version_info should be a tuple that supports both subscripting and attribute access
+	// For now, use Python 3.12 version to match the stdlib we're using
+	// Format: (major, minor, micro, releaselevel, serial)
+	versionInfo := core.TupleValue{
+		core.NumberValue(3),       // major - use 3.12 to match CPython stdlib
+		core.NumberValue(12),      // minor
+		core.NumberValue(0),       // micro
+		core.StringValue("final"), // releaselevel
+		core.NumberValue(0),       // serial
+	}
 	sysModule.SetWithKey("version_info", core.StringValue("version_info"), versionInfo)
 
 	// Implementation info
@@ -110,6 +114,10 @@ func InitSysModule() *core.DictValue {
 	sysModule.SetWithKey("exec_prefix", core.StringValue("exec_prefix"), core.StringValue("/usr/local"))
 	sysModule.SetWithKey("base_prefix", core.StringValue("base_prefix"), core.StringValue("/usr/local"))
 	sysModule.SetWithKey("base_exec_prefix", core.StringValue("base_exec_prefix"), core.StringValue("/usr/local"))
+
+	// Framework info (for macOS Python framework builds)
+	// Set to False since M28 is not a framework build
+	sysModule.SetWithKey("_framework", core.StringValue("_framework"), core.BoolValue(false))
 
 	// System constants
 	sysModule.SetWithKey("maxsize", core.StringValue("maxsize"), core.NumberValue(int64(^uint(0)>>1)))
