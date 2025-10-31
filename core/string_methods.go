@@ -583,12 +583,12 @@ func InitStringMethods() {
 
 	td.Methods["find"] = &MethodDescriptor{
 		Name:    "find",
-		Arity:   1,
-		Doc:     "Return the lowest index where substring is found, or -1 if not found",
+		Arity:   -1, // Variable arity: 1-3 args (sub, start=0, end=len)
+		Doc:     "Return the lowest index where substring is found, or -1 if not found. Optional start and end positions",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, fmt.Errorf("find() takes exactly one argument (%d given)", len(args))
+			if len(args) < 1 || len(args) > 3 {
+				return nil, fmt.Errorf("find() takes 1 to 3 arguments (%d given)", len(args))
 			}
 
 			s := string(receiver.(StringValue))
@@ -597,7 +597,45 @@ func InitStringMethods() {
 				return nil, fmt.Errorf("find() argument must be a string")
 			}
 
-			return NumberValue(strings.Index(s, string(sub))), nil
+			// Optional start parameter (default 0)
+			start := 0
+			if len(args) >= 2 {
+				startNum, ok := args[1].(NumberValue)
+				if !ok {
+					return nil, fmt.Errorf("find() start position must be an integer")
+				}
+				start = int(startNum)
+				if start < 0 {
+					start = 0
+				}
+				if start > len(s) {
+					start = len(s)
+				}
+			}
+
+			// Optional end parameter (default len(s))
+			end := len(s)
+			if len(args) >= 3 {
+				endNum, ok := args[2].(NumberValue)
+				if !ok {
+					return nil, fmt.Errorf("find() end position must be an integer")
+				}
+				end = int(endNum)
+				if end < 0 {
+					end = 0
+				}
+				if end > len(s) {
+					end = len(s)
+				}
+			}
+
+			// Search within the slice
+			substr := s[start:end]
+			idx := strings.Index(substr, string(sub))
+			if idx == -1 {
+				return NumberValue(-1), nil
+			}
+			return NumberValue(start + idx), nil
 		},
 	}
 
