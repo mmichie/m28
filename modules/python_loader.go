@@ -238,6 +238,9 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	if evalErr != nil {
+		if debugImportLoader {
+			log.Printf("[IMPORT] LoadPythonModule('%s') -> evaluation FAILED: %v", name, evalErr)
+		}
 		// If it's an ImportError, return it directly so it can be caught by try/except
 		// This allows modules like shutil to check for optional dependencies
 		if _, ok := evalErr.(*core.ImportError); ok {
@@ -245,6 +248,9 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 		// For other errors, wrap with context
 		return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w", name, pyPath, evalErr)
+	}
+	if debugImportLoader {
+		log.Printf("[IMPORT] LoadPythonModule('%s') -> evaluation SUCCESS, returning module dict", name)
 	}
 	evalTime := time.Since(startEval)
 

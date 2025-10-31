@@ -290,6 +290,9 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 	// Python loader will populate partialModule during evaluation via Context.ModuleDict
 	moduleDict, err := pythonLoaderFunc(name, l.GetContext(), l.evalFunc, partialModule)
 	if err != nil {
+		if debugImportEnhanced {
+			log.Printf("[IMPORT] ModuleLoaderEnhanced.tryLoadPythonModuleWithoutPartial('%s') -> pythonLoaderFunc returned error: %v", name, err)
+		}
 		// Loading failed - remove the partial module from registry
 		registry.ReloadModule(cacheName)
 		// If error mentions "not found", return ImportError
@@ -301,6 +304,9 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 		}
 		// Other Python loading errors (transpilation, C extension, etc.)
 		return nil, err
+	}
+	if debugImportEnhanced {
+		log.Printf("[IMPORT] ModuleLoaderEnhanced.tryLoadPythonModuleWithoutPartial('%s') -> pythonLoaderFunc SUCCESS", name)
 	}
 
 	// Successfully loaded Python module, update registry with full path

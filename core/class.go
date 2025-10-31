@@ -231,6 +231,40 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 			keyStr := StringValue(attrName)
 			dict.SetWithKey(ValueToKey(keyStr), keyStr, attr)
 		}
+
+		// Add special class attributes that are computed on-the-fly
+		// These must be included in __dict__ for CPython compatibility
+
+		// __name__
+		nameKey := ValueToKey(StringValue("__name__"))
+		dict.SetWithKey(nameKey, StringValue("__name__"), StringValue(c.Name))
+
+		// __mro__ - Method Resolution Order
+		// Use a descriptor so that type.__dict__['__mro__'].__get__ works
+		mroDescriptor := NewMRODescriptor(c)
+		mroKey := ValueToKey(StringValue("__mro__"))
+		dict.SetWithKey(mroKey, StringValue("__mro__"), mroDescriptor)
+
+		// __dict__ - Add a descriptor for __dict__ itself
+		// This allows type.__dict__['__dict__'].__get__ to work (used by inspect.py)
+		dictDescriptor := NewDictDescriptor()
+		dictKey := ValueToKey(StringValue("__dict__"))
+		dict.SetWithKey(dictKey, StringValue("__dict__"), dictDescriptor)
+
+		// __bases__ - Direct parent classes
+		var bases []Value
+		if c.Parent != nil {
+			bases = append(bases, c.Parent)
+		}
+		for i, parent := range c.Parents {
+			if i == 0 && c.Parent != nil {
+				continue
+			}
+			bases = append(bases, parent)
+		}
+		basesKey := ValueToKey(StringValue("__bases__"))
+		dict.SetWithKey(basesKey, StringValue("__bases__"), TupleValue(bases))
+
 		return dict, true
 	}
 
@@ -1219,4 +1253,147 @@ func (ut *UnionType) GetAttr(name string) (Value, bool) {
 		}), true
 	}
 	return ut.BaseObject.GetAttr(name)
+}
+
+// MRODescriptor is a descriptor for accessing __mro__ attribute
+// It implements the descriptor protocol with __get__ method
+type MRODescriptor struct {
+	BaseObject
+	class *Class // The class whose MRO this descriptor provides
+}
+
+// NewMRODescriptor creates a new MRO descriptor
+func NewMRODescriptor(class *Class) *MRODescriptor {
+	return &MRODescriptor{
+		BaseObject: *NewBaseObject(Type("getset_descriptor")),
+		class:      class,
+	}
+}
+
+// GetAttr implements attribute access for MRODescriptor
+func (m *MRODescriptor) GetAttr(name string) (Value, bool) {
+	if name == "__get__" {
+		// Return a function that implements the __get__ method of the descriptor protocol
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// __get__(self, obj, type=None)
+			// For class-level access, obj will be None
+			// Return the MRO tuple
+			mro := []Value{m.class}
+			current := m.class.Parent
+			for current != nil {
+				mro = append(mro, current)
+				current = current.Parent
+			}
+			// Also include parents from multiple inheritance
+			if len(m.class.Parents) > 0 {
+				for i, parent := range m.class.Parents {
+					if i == 0 && m.class.Parent != nil {
+						continue
+					}
+					p := parent
+					for p != nil {
+						alreadyInMRO := false
+						for _, existing := range mro {
+							if existingClass, ok := existing.(*Class); ok {
+								if existingClass == p {
+									alreadyInMRO = true
+									break
+								}
+							}
+						}
+						if !alreadyInMRO {
+							mro = append(mro, p)
+						}
+						p = p.Parent
+					}
+				}
+			}
+			return TupleValue(mro), nil
+		}), true
+	}
+	return m.BaseObject.GetAttr(name)
+}
+
+// DictDescriptor is a descriptor for accessing __dict__ attribute of classes
+// It implements the descriptor protocol with __get__ method
+type DictDescriptor struct {
+	BaseObject
+}
+
+// NewDictDescriptor creates a new __dict__ descriptor
+func NewDictDescriptor() *DictDescriptor {
+	return &DictDescriptor{
+		BaseObject: *NewBaseObject(Type("getset_descriptor")),
+	}
+}
+
+// GetAttr implements attribute access for DictDescriptor
+func (d *DictDescriptor) GetAttr(name string) (Value, bool) {
+	if name == "__get__" {
+		// Return a function that implements the __get__ method of the descriptor protocol
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// __get__(self, obj, type=None)
+			// args[0] is the instance (or None for class-level access)
+			// args[1] is the type (optional)
+
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__get__ requires at least 1 argument")
+			}
+
+			obj := args[0]
+
+			// If accessing from a class (obj is None), we need to get the class from args[1]
+			// If accessing from an instance, obj is the instance
+			if obj == None || obj == nil {
+				// Class-level access: type.__dict__['__dict__']
+				// Need to get the class from args[1]
+				if len(args) < 2 {
+					return nil, fmt.Errorf("__get__ on None requires type argument")
+				}
+				targetClass, ok := args[1].(*Class)
+				if !ok {
+					return nil, fmt.Errorf("__get__ second argument must be a class")
+				}
+				// Build the class's __dict__ directly (don't call GetAttr to avoid recursion)
+				dict := NewDict()
+				for methodName, method := range targetClass.Methods {
+					keyStr := StringValue(methodName)
+					dict.SetWithKey(ValueToKey(keyStr), keyStr, method)
+				}
+				for attrName, attr := range targetClass.Attributes {
+					keyStr := StringValue(attrName)
+					dict.SetWithKey(ValueToKey(keyStr), keyStr, attr)
+				}
+				return dict, nil
+			}
+
+			// Instance access: instance.__dict__
+			// Return the instance's __dict__
+			if instance, ok := obj.(*Instance); ok {
+				dict := NewDict()
+				for attrName, attrValue := range instance.Attributes {
+					keyStr := StringValue(attrName)
+					dict.SetWithKey(ValueToKey(keyStr), keyStr, attrValue)
+				}
+				return dict, nil
+			}
+
+			// For classes accessed as instances
+			if class, ok := obj.(*Class); ok {
+				dict := NewDict()
+				for methodName, method := range class.Methods {
+					keyStr := StringValue(methodName)
+					dict.SetWithKey(ValueToKey(keyStr), keyStr, method)
+				}
+				for attrName, attr := range class.Attributes {
+					keyStr := StringValue(attrName)
+					dict.SetWithKey(ValueToKey(keyStr), keyStr, attr)
+				}
+				return dict, nil
+			}
+
+			return nil, fmt.Errorf("object has no __dict__")
+		}), true
+	}
+	return d.BaseObject.GetAttr(name)
 }
