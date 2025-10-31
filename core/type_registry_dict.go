@@ -362,5 +362,58 @@ func getDictMethods() map[string]*MethodDescriptor {
 				return keysList, nil
 			},
 		},
+		"__or__": {
+			Name:    "__or__",
+			Arity:   1,
+			Doc:     "Return a new dictionary with merged keys from self and other (d1 | d2). Python 3.9+",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("__or__ takes exactly one argument")
+				}
+
+				dict := receiver.(*DictValue)
+				other, ok := args[0].(*DictValue)
+				if !ok {
+					return nil, fmt.Errorf("TypeError: |: expected unsupported operand type(s), got 'dict' and '%s'", args[0].Type())
+				}
+
+				// Create new dict with merged keys (other's values win on conflicts)
+				result := NewDict()
+				// First, copy all entries from self
+				for k, v := range dict.entries {
+					result.entries[k] = v
+				}
+				// Then, add/overwrite with entries from other
+				for k, v := range other.entries {
+					result.entries[k] = v
+				}
+				return result, nil
+			},
+		},
+		"__ior__": {
+			Name:    "__ior__",
+			Arity:   1,
+			Doc:     "Update dictionary in-place with keys from other (d1 |= d2). Python 3.9+",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, fmt.Errorf("__ior__ takes exactly one argument")
+				}
+
+				dict := receiver.(*DictValue)
+				other, ok := args[0].(*DictValue)
+				if !ok {
+					return nil, fmt.Errorf("TypeError: |=: expected unsupported operand type(s), got 'dict' and '%s'", args[0].Type())
+				}
+
+				// Update dict in-place with entries from other
+				for k, v := range other.entries {
+					dict.entries[k] = v
+				}
+				// Return the modified dict (like Python does)
+				return dict, nil
+			},
+		},
 	}
 }
