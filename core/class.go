@@ -10,6 +10,7 @@ type Class struct {
 	BaseObject
 	Name        string            // Class name
 	Module      string            // Module name (__module__ attribute)
+	Doc         string            // Docstring (__doc__ attribute)
 	Parent      *Class            // Parent class (for inheritance) - deprecated, use Parents
 	Parents     []*Class          // Parent classes (for multiple inheritance)
 	Methods     map[string]Value  // Class methods
@@ -178,6 +179,15 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	// Special handling for __module__
 	if name == "__module__" {
 		return StringValue(c.Module), true
+	}
+
+	// Special handling for __doc__
+	if name == "__doc__" {
+		if c.Doc != "" {
+			return StringValue(c.Doc), true
+		}
+		// Return None if no docstring
+		return None, true
 	}
 
 	// Special handling for __mro__ (Method Resolution Order)

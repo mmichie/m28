@@ -364,8 +364,44 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// This enables patterns like: __await__ = __iter__
 	classBodyCtx := core.NewContext(ctx)
 
-	// Process class body
+	// Check for docstring: first non-empty statement in class body that's a string literal
+	// Skip over any empty lists that might have been inserted by the parser
 	argsItems := args.Items()
+	docstringIndex := -1
+	for i := bodyStart; i < args.Len(); i++ {
+		stmt := argsItems[i]
+		// Skip empty lists
+		if list, ok := stmt.(*core.ListValue); ok && list.Len() == 0 {
+			continue
+		}
+		// Check if it's a string (docstring)
+		if str, ok := stmt.(core.StringValue); ok {
+			class.Doc = string(str)
+			docstringIndex = i
+			if debugClass {
+				fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Class '%s' has docstring at index %d: %q\n", className, i, class.Doc)
+			}
+			break
+		}
+		// If we hit a non-empty, non-string statement, there's no docstring
+		break
+	}
+
+	// Adjust bodyStart to skip empty lists and docstring
+	if docstringIndex >= 0 {
+		bodyStart = docstringIndex + 1
+	} else {
+		// Skip empty lists even if no docstring found
+		for bodyStart < args.Len() {
+			if list, ok := argsItems[bodyStart].(*core.ListValue); ok && list.Len() == 0 {
+				bodyStart++
+			} else {
+				break
+			}
+		}
+	}
+
+	// Process class body
 	for i := bodyStart; i < args.Len(); i++ {
 		stmt := argsItems[i]
 		if debugClass {
@@ -707,13 +743,6 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // createMethod creates a method from a parameter list and body
 // Returns core.Value to support both UserFunction and GeneratorFunction
 func createMethod(name string, params *core.ListValue, body []core.Value, ctx *core.Context) (core.Value, error) {
-	// Debug for __init__
-	if name == "__init__" {
-		fmt.Printf("[DEBUG createMethod] Creating __init__ with %d body items\n", len(body))
-		for i, item := range body {
-			fmt.Printf("  Body[%d]: %T = %v\n", i, item, item)
-		}
-	}
 
 	// Try to parse as new-style parameter list with defaults
 	signature, err := ParseParameterList(params.Items())
