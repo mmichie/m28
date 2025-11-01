@@ -257,6 +257,9 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// Check if we have the right number of values
 			if len(values) != len(varNames) {
+				if len(values) < len(varNames) {
+					return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(varNames), len(values))
+				}
 				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(varNames), len(values))
 			}
 

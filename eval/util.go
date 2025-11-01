@@ -632,6 +632,9 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// Check length match
 			if len(targets) != len(values) {
+				if len(values) < len(targets) {
+					return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(targets), len(values))
+				}
 				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
 			}
 
@@ -747,6 +750,9 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// Check length match
 			if len(targets) != len(values) {
+				if len(values) < len(targets) {
+					return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(targets), len(values))
+				}
 				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
 			}
 
@@ -982,6 +988,9 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Regular tuple unpacking (no star)
 				// Check that the number of targets matches the number of values
 				if t.Len() != len(values) {
+					if len(values) < t.Len() {
+						return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", t.Len(), len(values))
+					}
 					return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", t.Len(), len(values))
 				}
 

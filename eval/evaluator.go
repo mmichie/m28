@@ -406,6 +406,9 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Check that the number of targets matches the number of values
 		if targetList.Len() != len(values) {
+			if len(values) < targetList.Len() {
+				return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", targetList.Len(), len(values))
+			}
 			return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", targetList.Len(), len(values))
 		}
 
