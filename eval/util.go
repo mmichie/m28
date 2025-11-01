@@ -402,36 +402,97 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 	if args.Len() > 0 {
 		if pair, ok := args.Items()[0].(*core.ListValue); ok && pair.Len() == 2 {
 			// Wrapped pairs format - used by Python keyword arguments
-			for _, arg := range args.Items() {
-				pairList, ok := arg.(*core.ListValue)
-				if !ok || pairList.Len() != 2 {
-					return nil, fmt.Errorf("dict-literal with wrapped pairs: expected (key value) pairs")
+			// But check if ALL args are actually wrapped pairs - if not, fall through to flat format
+			allWrapped := true
+			for i := 0; i < args.Len(); i++ {
+				arg := args.Items()[i]
+				// Allow **unpack markers
+				if sym, ok := arg.(core.SymbolValue); ok && string(sym) == "**unpack" {
+					if i+1 < args.Len() {
+						i++ // Skip the dict expression after **unpack
+					}
+					continue
 				}
-
-				// Evaluate the key
-				key, err := Eval(pairList.Items()[0], ctx)
-				if err != nil {
-					return nil, fmt.Errorf("error evaluating dict key: %v", err)
+				// Check if it's a wrapped pair
+				if pairList, ok := arg.(*core.ListValue); !ok || pairList.Len() != 2 {
+					allWrapped = false
+					break
 				}
-
-				// Check if key is hashable
-				if !core.IsHashable(key) {
-					return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
-				}
-
-				// Convert key to string representation
-				keyStr := core.ValueToKey(key)
-
-				// Evaluate the value
-				value, err := Eval(pairList.Items()[1], ctx)
-				if err != nil {
-					return nil, fmt.Errorf("error evaluating dict value for key %v: %v", key, err)
-				}
-
-				// Set the key-value pair
-				dict.SetWithKey(keyStr, key, value)
 			}
-			return dict, nil
+
+			// If not all wrapped, treat as flat format
+			if !allWrapped {
+				// Fall through to flat format handling below
+			} else {
+				// Process as wrapped pairs
+				for i := 0; i < args.Len(); i++ {
+					arg := args.Items()[i]
+
+					// Check for **unpack marker
+					if sym, ok := arg.(core.SymbolValue); ok && string(sym) == "**unpack" {
+						if i+1 >= args.Len() {
+							return nil, fmt.Errorf("**unpack requires a dict expression")
+						}
+
+						// Evaluate the dict to unpack
+						unpackVal, err := Eval(args.Items()[i+1], ctx)
+						if err != nil {
+							return nil, fmt.Errorf("error evaluating **unpack dict: %v", err)
+						}
+
+						// Must be a dict
+						unpackDict, ok := unpackVal.(*core.DictValue)
+						if !ok {
+							return nil, fmt.Errorf("**unpack requires a dict, got %s", unpackVal.Type())
+						}
+
+						// Merge all key-value pairs from unpacked dict
+						for _, keyRepr := range unpackDict.Keys() {
+							val, _ := unpackDict.Get(keyRepr)
+							origKeys := unpackDict.OriginalKeys()
+							for _, origKey := range origKeys {
+								if core.ValueToKey(origKey) == keyRepr {
+									dict.SetWithKey(keyRepr, origKey, val)
+									break
+								}
+							}
+						}
+
+						i++ // Skip the next item (the unpacked dict)
+						continue
+					}
+
+					// Regular wrapped pair
+					pairList, ok := arg.(*core.ListValue)
+					if !ok || pairList.Len() != 2 {
+						return nil, fmt.Errorf("dict-literal with wrapped pairs: expected (key value) pairs or **unpack")
+					}
+
+					// Evaluate the key
+					key, err := Eval(pairList.Items()[0], ctx)
+					if err != nil {
+						return nil, fmt.Errorf("error evaluating dict key: %v", err)
+					}
+
+					// Check if key is hashable
+					if !core.IsHashable(key) {
+						return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
+					}
+
+					// Convert key to string representation
+					keyStr := core.ValueToKey(key)
+
+					// Evaluate the value
+					value, err := Eval(pairList.Items()[1], ctx)
+					if err != nil {
+						return nil, fmt.Errorf("error evaluating dict value for key %v: %v", key, err)
+					}
+
+					// Set the key-value pair
+					dict.SetWithKey(keyStr, key, value)
+				}
+				return dict, nil
+			}
 		}
 	}
 
