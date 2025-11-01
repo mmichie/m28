@@ -176,6 +176,36 @@ func (e *AttributeError) Error() string {
 	return msg
 }
 
+// OSError represents an operating system error
+type OSError struct {
+	Message  string
+	Errno    int // Optional: errno number
+	Filename string
+	Location *SourceLocation
+}
+
+func (e *OSError) Error() string {
+	msg := e.Message
+	if msg == "" {
+		msg = "OS error"
+	}
+	if e.Filename != "" {
+		msg = fmt.Sprintf("%s: %s", msg, e.Filename)
+	}
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
+}
+
+// NewOSError creates a new OS error
+func NewOSError(message string, filename string) *OSError {
+	return &OSError{
+		Message:  message,
+		Filename: filename,
+	}
+}
+
 // NewTypeError creates a new type error
 func NewTypeError(expected string, got Value, context string) *TypeError {
 	var gotType string

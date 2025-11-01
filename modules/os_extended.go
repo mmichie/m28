@@ -273,7 +273,8 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		}
 		target, err := os.Readlink(string(path))
 		if err != nil {
-			return nil, err
+			// Wrap OS errors as Python OSError
+			return nil, core.NewOSError(err.Error(), string(path))
 		}
 		return core.StringValue(target), nil
 	}))
