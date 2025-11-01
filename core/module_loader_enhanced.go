@@ -286,6 +286,11 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 	registry.StoreModule(cacheName, partialModule, "", []string{})
 	DebugLog("[DEBUG] LoadModule: stored partial Python module '%s' in registry\n", cacheName)
 
+	// Register partial module in sys.modules BEFORE evaluation
+	// This allows circular imports to find the module via sys.modules
+	// matching Python's behavior exactly
+	l.registerInSysModules(name, partialModule)
+
 	// Try to load as Python module
 	// Python loader will populate partialModule during evaluation via Context.ModuleDict
 	moduleDict, err := pythonLoaderFunc(name, l.GetContext(), l.evalFunc, partialModule)
