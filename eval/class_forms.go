@@ -1262,23 +1262,26 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		return core.False, nil
 	}
 
-	// Handle other Callable objects that aren't classes (like partialBuiltin)
-	// If classVal is callable but not a class, we can't do isinstance check
-	// Return False to allow code to continue without error
-	if _, ok := classVal.(core.Callable); ok {
-		// Not a class, so isinstance should return False
-		return core.False, nil
-	}
-
 	// Check if obj is an instance and classVal is a class
 	instance, isInst := obj.(*core.Instance)
 	class, isClass := classVal.(*core.Class)
 
-	// Handle wrapper types that have GetClass() method (like TypeType)
+	// Handle wrapper types that have GetClass() method (like IntType, TypeType)
 	if !isClass {
 		if wrapper, ok := classVal.(interface{ GetClass() *core.Class }); ok {
 			class = wrapper.GetClass()
 			isClass = true
+		}
+	}
+
+	// Handle other Callable objects that aren't classes (like partialBuiltin)
+	// This check must come AFTER GetClass() check since types like IntType are callable
+	// If classVal is callable but not a class, we can't do isinstance check
+	// Return False to allow code to continue without error
+	if !isClass {
+		if _, ok := classVal.(core.Callable); ok {
+			// Not a class, so isinstance should return False
+			return core.False, nil
 		}
 	}
 
