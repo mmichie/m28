@@ -6,6 +6,70 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// parseVariablePattern converts a variable string into a pattern structure for unpacking.
+// Examples:
+//
+//	"x" → SymbolValue("x")
+//	"(x, y)" → ListValue([SymbolValue("x"), SymbolValue("y")])
+//	"(x, (y, z))" → ListValue([SymbolValue("x"), ListValue([SymbolValue("y"), SymbolValue("z")])])
+func parseVariablePattern(varStr string) core.Value {
+	varStr = strings.TrimSpace(varStr)
+
+	// If no parentheses, it's a simple symbol
+	if !strings.HasPrefix(varStr, "(") {
+		return core.SymbolValue(varStr)
+	}
+
+	// Remove outer parentheses
+	if strings.HasPrefix(varStr, "(") && strings.HasSuffix(varStr, ")") {
+		varStr = varStr[1 : len(varStr)-1]
+	}
+
+	// Split by comma, respecting nested parentheses
+	parts := []string{}
+	current := strings.Builder{}
+	depth := 0
+
+	for _, ch := range varStr {
+		switch ch {
+		case '(':
+			depth++
+			current.WriteRune(ch)
+		case ')':
+			depth--
+			current.WriteRune(ch)
+		case ',':
+			if depth == 0 {
+				// Top-level comma - split here
+				parts = append(parts, strings.TrimSpace(current.String()))
+				current.Reset()
+			} else {
+				current.WriteRune(ch)
+			}
+		case ' ', '\t':
+			// Skip whitespace at depth 0, keep it otherwise
+			if depth > 0 || current.Len() > 0 {
+				current.WriteRune(ch)
+			}
+		default:
+			current.WriteRune(ch)
+		}
+	}
+
+	// Add last part
+	if current.Len() > 0 {
+		parts = append(parts, strings.TrimSpace(current.String()))
+	}
+
+	// Recursively parse each part
+	patterns := make([]core.Value, len(parts))
+	for i, part := range parts {
+		patterns[i] = parseVariablePattern(part)
+	}
+
+	return core.NewList(patterns...)
+}
+
 // Python-specific AST nodes
 // These nodes represent Python constructs that don't have direct Lisp equivalents
 
@@ -353,9 +417,11 @@ func (f *ForForm) ToIR() core.Value {
 
 	if len(f.Variables) == 1 {
 		// Single variable: (for var iterable body)
+		// Variable might be nested tuple like "(x, y)"
+		varPattern := parseVariablePattern(f.Variables[0])
 		result = []core.Value{
 			core.SymbolValue("for"),
-			core.SymbolValue(f.Variables[0]),
+			varPattern,
 			f.Iterable.ToIR(),
 			core.NewList(bodyIR...),
 		}
@@ -363,9 +429,9 @@ func (f *ForForm) ToIR() core.Value {
 		// Multiple variables (tuple unpacking): (for var1 var2 ... in iterable body)
 		result = []core.Value{core.SymbolValue("for")}
 
-		// Add all variables
+		// Add all variables, parsing nested tuples
 		for _, v := range f.Variables {
-			result = append(result, core.SymbolValue(v))
+			result = append(result, parseVariablePattern(v))
 		}
 
 		// Add 'in' keyword
