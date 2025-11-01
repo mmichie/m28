@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/mmichie/m28/core"
@@ -248,6 +249,16 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		// This allows modules like shutil to check for optional dependencies
 		if _, ok := evalErr.(*core.ImportError); ok {
 			return nil, evalErr
+		}
+		// For NameError, provide more context - unwrap to find the deepest NameError
+		if nameErr, ok := evalErr.(*core.NameError); ok {
+			return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  NameError: name '%s' is not defined\n  Note: Check if this is from a submodule import", name, pyPath, nameErr.Name)
+		}
+		// Check if wrapped error contains NameError
+		errStr := evalErr.Error()
+		if strings.Contains(errStr, "NameError") && strings.Contains(errStr, "not defined") {
+			// Error is already wrapped, just add current module context
+			return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w\n  Note: Error may be from a submodule", name, pyPath, evalErr)
 		}
 		// For other errors, wrap with context
 		return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w", name, pyPath, evalErr)
