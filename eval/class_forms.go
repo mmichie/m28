@@ -336,6 +336,11 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// Set __qualname__ attribute (qualified name)
+	// For now, just use the class name (simple case)
+	// TODO: Handle nested classes (e.g., "Outer.Inner") and local classes (e.g., "func.<locals>.Local")
+	class.SetClassAttr("__qualname__", core.StringValue(string(className)))
+
 	// Debug for Path classes
 	if string(className) == "Path" || string(className) == "PosixPath" || string(className) == "PurePath" {
 		fmt.Printf("[DEBUG classForm] Created class '%s' with %d parents\n", className, len(parentClasses))
