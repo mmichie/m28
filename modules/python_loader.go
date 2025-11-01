@@ -209,7 +209,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	// Evaluate the IR with timeout
 	startEval := time.Now()
-	evalTimeout := 30 * time.Second // 30 second timeout for module evaluation
+	evalTimeout := 120 * time.Second // 120 second timeout for module evaluation (increased for test.support)
 
 	type evalResult struct {
 		val core.Value
@@ -227,14 +227,17 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	case result := <-resultChan:
 		evalErr = result.err
 	case <-time.After(evalTimeout):
+		// Provide diagnostic info about where evaluation stopped
+		evalCount := moduleCtx.EvalCount
 		return nil, fmt.Errorf(
 			"timeout evaluating Python module '%s' (transpiled from %s):\n"+
 				"  Module evaluation exceeded %v timeout.\n"+
+				"  Evaluation count: %d operations\n"+
 				"  This often indicates:\n"+
 				"  - Missing C extension dependency\n"+
 				"  - Infinite loop in module initialization\n"+
 				"  - Complex import chain requiring unavailable modules",
-			name, pyPath, evalTimeout)
+			name, pyPath, evalTimeout, evalCount)
 	}
 
 	if evalErr != nil {

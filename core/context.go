@@ -56,6 +56,9 @@ type Context struct {
 	// Optional module dict to sync definitions to (for circular import support)
 	// When set, Define() will also update this dict in real-time
 	ModuleDict *DictValue
+
+	// Evaluation counter for debugging and progress tracking
+	EvalCount uint64
 }
 
 // NewContext creates a new evaluation context

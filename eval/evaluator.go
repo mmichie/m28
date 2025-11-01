@@ -3,6 +3,7 @@ package eval
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/mmichie/m28/common/types"
@@ -16,6 +17,39 @@ func init() {
 
 // Eval evaluates an expression in a context
 func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
+	// Increment evaluation counter and log progress periodically
+	if ctx != nil {
+		ctx.EvalCount++
+		if ctx.EvalCount%1000 == 0 {
+			// Show progress every 100 evaluations (lowered for debugging slow modules)
+			exprStr := core.PrintValue(expr)
+			if len(exprStr) > 150 {
+				exprStr = exprStr[:150] + "..."
+			}
+
+			// Show module/function context for debugging
+			contextInfo := fmt.Sprintf(" [ctx:%p]", ctx)
+
+			// Check ctx.Vars directly to avoid ValueToKey recursion issues
+			if nameVal, ok := ctx.Vars["__name__"]; ok {
+				if nameStr, ok := nameVal.(core.StringValue); ok {
+					contextInfo += fmt.Sprintf(" [module:%s]", string(nameStr))
+				}
+			} else if ctx.CurrentFunction != "" {
+				contextInfo += fmt.Sprintf(" [func:%s]", ctx.CurrentFunction)
+			} else if ctx.Global != nil && ctx.Global != ctx {
+				// Check parent module
+				if nameVal, ok := ctx.Global.Vars["__name__"]; ok {
+					if nameStr, ok := nameVal.(core.StringValue); ok {
+						contextInfo += fmt.Sprintf(" [parent_module:%s]", string(nameStr))
+					}
+				}
+			}
+
+			log.Printf("[EVAL-PROGRESS] %d evals%s expr=%s", ctx.EvalCount, contextInfo, exprStr)
+		}
+	}
+
 	switch v := expr.(type) {
 	case core.NumberValue, core.StringValue, core.BoolValue, core.NilValue:
 		// Self-evaluating primitives
