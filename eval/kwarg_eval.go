@@ -312,8 +312,16 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 				}
 			}
 
+			// If original key not tracked, try to reconstruct it from the internal key
 			if !found {
-				return nil, fmt.Errorf("internal error: could not find original key for %s", keyRepr)
+				// Strip type prefix to get clean parameter name
+				if len(keyRepr) > 2 && keyRepr[1] == ':' {
+					paramName = keyRepr[2:]
+					found = true
+				} else {
+					paramName = keyRepr
+					found = true
+				}
 			}
 
 			// Check for duplicates

@@ -3346,6 +3346,51 @@ func (p *PythonParser) parsePattern() ast.ASTNode {
 // F-String Support
 // ============================================================================
 
+// interpretFStringEscapes interprets Python escape sequences in an f-string literal part
+// This handles \n, \t, \\, etc. in the non-expression parts of f-strings
+func (p *PythonParser) interpretFStringEscapes(s string) string {
+	var result strings.Builder
+	i := 0
+	for i < len(s) {
+		if s[i] == '\\' && i+1 < len(s) {
+			i++ // skip backslash
+			switch s[i] {
+			case 'n':
+				result.WriteByte('\n')
+			case 't':
+				result.WriteByte('\t')
+			case 'r':
+				result.WriteByte('\r')
+			case '\\':
+				result.WriteByte('\\')
+			case '\'':
+				result.WriteByte('\'')
+			case '"':
+				result.WriteByte('"')
+			case 'a':
+				result.WriteByte('\a')
+			case 'b':
+				result.WriteByte('\b')
+			case 'f':
+				result.WriteByte('\f')
+			case 'v':
+				result.WriteByte('\v')
+			case '0':
+				result.WriteByte('\x00')
+			default:
+				// Unknown escape - include backslash and character
+				result.WriteByte('\\')
+				result.WriteByte(s[i])
+			}
+			i++
+		} else {
+			result.WriteByte(s[i])
+			i++
+		}
+	}
+	return result.String()
+}
+
 // parseFStringFromLexeme parses an f-string from its full lexeme (e.g., f"hello {x}" or fr"raw {x}")
 // using Python expression syntax for expressions inside {}
 func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error) {
@@ -3407,16 +3452,19 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 			// Handle }} (escaped })
 			if i < len(content) && content[i] == '}' {
 				if i+1 < len(content) && content[i+1] == '}' {
-					parts = append(parts, core.StringValue(content[start:i+1]))
+					// Interpret escapes in the string part before }}
+					interpretedStr := p.interpretFStringEscapes(content[start : i+1])
+					parts = append(parts, core.StringValue(interpretedStr))
 					i += 2
 					continue
 				}
 				return nil, fmt.Errorf("single '}' is not allowed in f-string")
 			}
 
-			// Add literal string part
+			// Add literal string part (with escape sequences interpreted)
 			if i > start {
-				parts = append(parts, core.StringValue(content[start:i]))
+				interpretedStr := p.interpretFStringEscapes(content[start:i])
+				parts = append(parts, core.StringValue(interpretedStr))
 			}
 			continue
 		}

@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"log"
+	"strconv"
 )
 
 // InitDictMethods adds additional methods to the dict type descriptor
@@ -200,8 +201,41 @@ func InitDictMethods() {
 				if origKey, exists := dict.keys[k]; exists {
 					keyValues[i] = origKey
 				} else {
-					// Fallback to string representation if original key not found
-					keyValues[i] = StringValue(k)
+					// Fallback: reconstruct original key from internal representation
+					// This handles cases where keys weren't tracked (legacy code paths)
+					var cleanKey Value
+					if len(k) > 2 && k[1] == ':' {
+						// Has a type prefix like "s:", "i:", "f:", etc.
+						prefix := k[0:2]
+						keyStr := k[2:]
+						switch prefix {
+						case "s:":
+							cleanKey = StringValue(keyStr)
+						case "i:":
+							// Try to parse back to int
+							if i, err := strconv.ParseInt(keyStr, 10, 64); err == nil {
+								cleanKey = NumberValue(i)
+							} else {
+								cleanKey = StringValue(keyStr)
+							}
+						case "f:":
+							// Try to parse back to float
+							if f, err := strconv.ParseFloat(keyStr, 64); err == nil {
+								cleanKey = NumberValue(f)
+							} else {
+								cleanKey = StringValue(keyStr)
+							}
+						case "b:":
+							cleanKey = BoolValue(keyStr == "true")
+						case "n:":
+							cleanKey = Nil
+						default:
+							cleanKey = StringValue(k)
+						}
+					} else {
+						cleanKey = StringValue(k)
+					}
+					keyValues[i] = cleanKey
 				}
 			}
 			return NewList(keyValues...), nil

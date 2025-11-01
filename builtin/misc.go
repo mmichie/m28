@@ -187,8 +187,17 @@ func RegisterMisc(ctx *core.Context) {
 		}
 
 		// Convert context variables to dict
+		// In Python, locals() returns the current scope's namespace
+		// Unlike globals(), locals() returns a fresh dict snapshot of the current scope
 		dict := core.NewDict()
-		// TODO: Implement proper locals() that returns current scope variables
+
+		// Add all variables from the current context
+		for name, value := range ctx.Vars {
+			// Use SetWithKey to properly track original keys for iteration
+			keyVal := core.StringValue(name)
+			keyRepr := core.ValueToKey(keyVal)
+			dict.SetWithKey(keyRepr, keyVal, value)
+		}
 
 		return dict, nil
 	}))
@@ -481,6 +490,17 @@ func RegisterMisc(ctx *core.Context) {
 		_, err = eval.EvalString(codeStr, execCtx)
 		if err != nil {
 			return nil, err
+		}
+
+		// Copy all variables from execCtx back to localsDict (if provided)
+		// This is critical for patterns like: exec("def fn(): pass", {}, ns)
+		// where the defined function needs to appear in ns
+		if localsDict != nil {
+			for name, value := range execCtx.Vars {
+				keyVal := core.StringValue(name)
+				keyRepr := core.ValueToKey(keyVal)
+				localsDict.SetWithKey(keyRepr, keyVal, value)
+			}
 		}
 
 		// exec always returns None

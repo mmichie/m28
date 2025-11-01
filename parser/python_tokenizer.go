@@ -251,6 +251,25 @@ func (t *PythonTokenizer) scanToken() Token {
 			return t.scanToken()
 		}
 		// If not followed by newline, it's an error
+		// Debug: show context around the backslash
+		contextStart := start - 20
+		if contextStart < 0 {
+			contextStart = 0
+		}
+		contextEnd := start + 20
+		if contextEnd > len(t.input) {
+			contextEnd = len(t.input)
+		}
+		context := t.input[contextStart:contextEnd]
+		fmt.Printf("[TOKENIZER ERROR] Unexpected backslash at line %d, pos %d\n", startLine, start)
+		fmt.Printf("  Full input length: %d\n", len(t.input))
+		if len(t.input) < 500 {
+			fmt.Printf("  Full input: %q\n", t.input)
+		} else {
+			fmt.Printf("  First 200 chars: %q\n", t.input[:200])
+		}
+		fmt.Printf("  Context: %q\n", context)
+		fmt.Printf("  Next char: %q\n", t.peek())
 		t.errors = append(t.errors, fmt.Errorf("unexpected character '\\' at line %d", startLine))
 		return Token{
 			Type:     TOKEN_ERROR,
@@ -1205,12 +1224,40 @@ func (t *PythonTokenizer) scanFString(quote byte, start, startLine, startCol int
 		}
 
 		// Handle escape sequences in string portions
-		if ch == '\\' && !isTriple {
-			value.WriteByte(ch)
+		// F-strings should interpret escape sequences just like regular strings
+		if ch == '\\' {
 			t.advance()
 			if !t.isAtEnd() {
-				value.WriteByte(t.peek())
-				t.advance()
+				escaped := t.advance()
+				switch escaped {
+				case 'n':
+					value.WriteByte('\n')
+				case 't':
+					value.WriteByte('\t')
+				case 'r':
+					value.WriteByte('\r')
+				case '\\':
+					value.WriteByte('\\')
+				case '\'':
+					value.WriteByte('\'')
+				case '"':
+					value.WriteByte('"')
+				case 'a':
+					value.WriteByte('\a') // bell
+				case 'b':
+					value.WriteByte('\b') // backspace
+				case 'f':
+					value.WriteByte('\f') // form feed
+				case 'v':
+					value.WriteByte('\v') // vertical tab
+				case '0':
+					value.WriteByte('\x00') // null
+				default:
+					// For unknown escapes, include the backslash and character
+					// This matches Python's behavior for invalid escape sequences
+					value.WriteByte('\\')
+					value.WriteByte(escaped)
+				}
 			}
 			continue
 		}

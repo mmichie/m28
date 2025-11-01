@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -261,10 +262,49 @@ func (d *DictValue) Get(key string) (Value, bool) {
 }
 
 // Set sets a value by internal key representation
-// INTERNAL: Use SetWithKey for proper key tracking
-// Deprecated: This method doesn't track original keys
+// INTERNAL: Use SetWithKey for proper key tracking when you have the original key
+// This method will reconstruct the original key from the internal representation
 func (d *DictValue) Set(key string, value Value) {
 	d.entries[key] = value
+	// Reconstruct original key from internal representation if not already tracked
+	if _, exists := d.keys[key]; !exists {
+		// Extract original key by stripping type prefix
+		var origKey Value
+		if len(key) > 2 && key[1] == ':' {
+			// Has a type prefix like "s:", "i:", "f:", etc.
+			prefix := key[0:2]
+			cleanKey := key[2:]
+			switch prefix {
+			case "s:":
+				origKey = StringValue(cleanKey)
+			case "i:":
+				// Try to parse back to int
+				if i, err := strconv.ParseInt(cleanKey, 10, 64); err == nil {
+					origKey = NumberValue(i)
+				} else {
+					origKey = StringValue(cleanKey) // Fallback
+				}
+			case "f:":
+				// Try to parse back to float
+				if f, err := strconv.ParseFloat(cleanKey, 64); err == nil {
+					origKey = NumberValue(f)
+				} else {
+					origKey = StringValue(cleanKey) // Fallback
+				}
+			case "b:":
+				origKey = BoolValue(cleanKey == "true")
+			case "n:":
+				origKey = Nil
+			default:
+				// Unknown prefix - use string
+				origKey = StringValue(key)
+			}
+		} else {
+			// No prefix - use as string
+			origKey = StringValue(key)
+		}
+		d.keys[key] = origKey
+	}
 }
 
 // SetWithKey sets a value with both key representation and original key
