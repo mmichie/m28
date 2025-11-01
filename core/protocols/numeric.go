@@ -130,7 +130,7 @@ func (n *NumericOps) Divide(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
 		if float64(v) == 0 {
-			return nil, errors.NewRuntimeError("division by zero", "")
+			return nil, core.NewZeroDivisionError()
 		}
 		return core.NumberValue(n.value / float64(v)), nil
 	default:
@@ -363,12 +363,12 @@ func (c *ComplexNumericOps) Divide(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
 		if float64(v) == 0 {
-			return nil, errors.NewRuntimeError("division by zero", "")
+			return nil, core.NewZeroDivisionError()
 		}
 		return core.ComplexValue(c.value / complex(float64(v), 0)), nil
 	case core.ComplexValue:
 		if complex128(v) == 0 {
-			return nil, errors.NewRuntimeError("division by zero", "")
+			return nil, core.NewZeroDivisionError()
 		}
 		return core.ComplexValue(c.value / complex128(v)), nil
 	default:

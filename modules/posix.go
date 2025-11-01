@@ -270,7 +270,11 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs map[string]
 		info, err = os.Lstat(string(path))
 	}
 	if err != nil {
-		return nil, fmt.Errorf("FileNotFoundError: %v", err)
+		// Return proper error types for CPython compatibility
+		if os.IsNotExist(err) {
+			return nil, core.NewFileNotFoundError(err.Error(), string(path))
+		}
+		return nil, core.NewOSError(err.Error(), string(path))
 	}
 
 	// Create a stat_result object (as a dict for now)
@@ -300,7 +304,11 @@ func posixScandir(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return nil, fmt.Errorf("FileNotFoundError: %v", err)
+		// Return proper error types for CPython compatibility
+		if os.IsNotExist(err) {
+			return nil, core.NewFileNotFoundError(err.Error(), path)
+		}
+		return nil, core.NewOSError(err.Error(), path)
 	}
 
 	// Create a list of DirEntry-like objects

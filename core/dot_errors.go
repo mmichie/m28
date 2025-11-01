@@ -139,6 +139,11 @@ func (e *ZeroDivisionError) Error() string {
 	return msg
 }
 
+// NewZeroDivisionError creates a new zero division error
+func NewZeroDivisionError() *ZeroDivisionError {
+	return &ZeroDivisionError{}
+}
+
 // ImportError represents a module import error
 type ImportError struct {
 	ModuleName string
@@ -201,6 +206,36 @@ func (e *OSError) Error() string {
 // NewOSError creates a new OS error
 func NewOSError(message string, filename string) *OSError {
 	return &OSError{
+		Message:  message,
+		Filename: filename,
+	}
+}
+
+// FileNotFoundError represents a file not found error (subclass of OSError in Python)
+type FileNotFoundError struct {
+	Message  string
+	Errno    int // Optional: errno number
+	Filename string
+	Location *SourceLocation
+}
+
+func (e *FileNotFoundError) Error() string {
+	msg := e.Message
+	if msg == "" {
+		msg = "No such file or directory"
+	}
+	if e.Filename != "" {
+		msg = fmt.Sprintf("%s: %s", msg, e.Filename)
+	}
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
+}
+
+// NewFileNotFoundError creates a new file not found error
+func NewFileNotFoundError(message string, filename string) *FileNotFoundError {
+	return &FileNotFoundError{
 		Message:  message,
 		Filename: filename,
 	}

@@ -9,6 +9,7 @@ import (
 type Class struct {
 	BaseObject
 	Name        string            // Class name
+	Module      string            // Module name (__module__ attribute)
 	Parent      *Class            // Parent class (for inheritance) - deprecated, use Parents
 	Parents     []*Class          // Parent classes (for multiple inheritance)
 	Methods     map[string]Value  // Class methods
@@ -26,7 +27,8 @@ func NewClass(name string, parent *Class) *Class {
 	return &Class{
 		BaseObject: *NewBaseObject(Type("class")),
 		Name:       name,
-		Parent:     parent, // Keep for backward compatibility
+		Module:     "__main__", // Default module
+		Parent:     parent,     // Keep for backward compatibility
 		Parents:    parents,
 		Methods:    make(map[string]Value),
 		Attributes: make(map[string]Value),
@@ -42,6 +44,7 @@ func NewClassWithParents(name string, parents []*Class) *Class {
 	return &Class{
 		BaseObject: *NewBaseObject(Type("class")),
 		Name:       name,
+		Module:     "__main__", // Default module
 		Parent:     parent,
 		Parents:    parents,
 		Methods:    make(map[string]Value),
@@ -170,6 +173,11 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	// Special handling for __name__
 	if name == "__name__" {
 		return StringValue(c.Name), true
+	}
+
+	// Special handling for __module__
+	if name == "__module__" {
+		return StringValue(c.Module), true
 	}
 
 	// Special handling for __mro__ (Method Resolution Order)

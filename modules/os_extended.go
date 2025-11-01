@@ -201,7 +201,12 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		}
 		info, err := os.Lstat(string(path))
 		if err != nil {
-			return nil, err
+			// Check if it's a "file not found" error
+			if os.IsNotExist(err) {
+				return nil, core.NewFileNotFoundError(err.Error(), string(path))
+			}
+			// Other OS errors
+			return nil, core.NewOSError(err.Error(), string(path))
 		}
 		result := core.NewDict()
 		result.Set("st_mode", core.NumberValue(info.Mode()))
