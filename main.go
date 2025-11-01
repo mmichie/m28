@@ -57,6 +57,14 @@ func main() {
 	// Initialize the global context with built-in values and functions
 	initializeGlobalContext(globalCtx)
 
+	// Initialize sys.argv with program name (will be overridden if script is provided)
+	// Access sys module directly from the builtin modules cache
+	if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
+		// Default: just the program name
+		defaultArgv := core.NewList(core.StringValue(""))
+		sysDict.SetWithKey("argv", core.StringValue("argv"), defaultArgv)
+	}
+
 	// Register all special forms
 	special_forms.RegisterAllForms()
 
@@ -95,12 +103,18 @@ func main() {
 	// Get the file to execute from positional arguments
 	args := flag.Args()
 	if len(args) > 0 {
-		// Store script arguments in sys.argv
+		// Store script arguments in sys.argv and ARGV
 		argvSlice := make([]core.Value, len(args))
 		for i, arg := range args {
 			argvSlice[i] = core.StringValue(arg)
 		}
-		globalCtx.Define("ARGV", core.NewList(argvSlice...))
+		argsList := core.NewList(argvSlice...)
+		globalCtx.Define("ARGV", argsList)
+
+		// Also populate sys.argv directly in the builtin module cache
+		if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
+			sysDict.SetWithKey("argv", core.StringValue("argv"), argsList)
+		}
 
 		// Parse-only mode: just parse and print AST
 		if *parseOnly || *printAST {
