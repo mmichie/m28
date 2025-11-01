@@ -229,7 +229,10 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	if !found {
-		return nil, fmt.Errorf("%s has no attribute '%s'", obj.Type(), string(propName))
+		return nil, &core.AttributeError{
+			ObjType:  string(obj.Type()),
+			AttrName: string(propName),
+		}
 	}
 
 	// Special handling for basic types that don't implement Object
@@ -322,7 +325,10 @@ func getListAttr(lst *core.ListValue, attr string, isCall bool, args *core.ListV
 		return core.NumberValue(lst.Len()), nil
 
 	default:
-		return nil, fmt.Errorf("list has no attribute '%s'", attr)
+		return nil, &core.AttributeError{
+			ObjType:  "list",
+			AttrName: attr,
+		}
 	}
 }
 
@@ -360,7 +366,10 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.Li
 	case "length", "len":
 		return core.NumberValue(len(string(str))), nil
 	default:
-		return nil, fmt.Errorf("string has no attribute '%s'", attr)
+		return nil, &core.AttributeError{
+			ObjType:  "string",
+			AttrName: attr,
+		}
 	}
 }
 
@@ -398,7 +407,10 @@ func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.List
 		}
 	}
 
-	return nil, fmt.Errorf("dict has no attribute '%s'", attr)
+	return nil, &core.AttributeError{
+		ObjType:  "dict",
+		AttrName: attr,
+	}
 }
 
 // RegisterDotNotation registers the dot notation special form

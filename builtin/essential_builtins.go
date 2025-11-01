@@ -257,7 +257,10 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			return args[2], nil
 		}
 
-		return nil, fmt.Errorf("'%s' object has no attribute '%s'", obj.Type(), name)
+		return nil, &core.AttributeError{
+			ObjType:  string(obj.Type()),
+			AttrName: name,
+		}
 	}))
 
 	// setattr() - set attribute on object
