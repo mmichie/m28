@@ -601,7 +601,18 @@ func (s *StrType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 
 	val := args[0]
 
-	// Try __str__ dunder method first
+	// Special case: if val is a Class, don't try to call its __str__ method
+	// Classes should use their own String() method for representation
+	if _, isClass := val.(*core.Class); isClass {
+		return core.StringValue(val.String()), nil
+	}
+
+	// For wrapper types that embed Class (like StrType, IntType, etc.)
+	if _, hasGetClass := val.(interface{ GetClass() *core.Class }); hasGetClass {
+		return core.StringValue(val.String()), nil
+	}
+
+	// Try __str__ dunder method first (for instances)
 	if str, found, err := types.CallStr(val, ctx); found {
 		if err != nil {
 			return nil, err
