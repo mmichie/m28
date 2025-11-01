@@ -405,6 +405,88 @@ func RegisterMisc(ctx *core.Context) {
 		return eval.EvalString(codeStr, evalCtx)
 	}))
 
+	// exec - execute a string of code
+	// exec(object, globals=None, locals=None)
+	// Unlike eval, exec can execute statements and always returns None
+	ctx.Define("exec", core.NewNamedBuiltinFunction("exec", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("exec", args)
+		if err := v.Range(1, 3); err != nil {
+			return nil, err
+		}
+
+		// Get the code string
+		codeStr, err := v.GetString(0)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get the globals dict (optional)
+		var globalsDict *core.DictValue
+		if v.Count() >= 2 && v.Get(1) != core.None {
+			globalsDict, err = types.RequireDict(v.Get(1), "exec() globals")
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Get the locals dict (optional)
+		var localsDict *core.DictValue
+		if v.Count() >= 3 && v.Get(2) != core.None {
+			localsDict, err = types.RequireDict(v.Get(2), "exec() locals")
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Create a new context for execution only if globals or locals are provided
+		// Otherwise, use the current context so variables are visible
+		execCtx := ctx
+		if globalsDict != nil || localsDict != nil {
+			execCtx = core.NewContext(ctx)
+		}
+
+		// If globals dict provided, populate the context
+		if globalsDict != nil {
+			// Use Keys() to iterate over all keys in the dict
+			for _, keyStr := range globalsDict.Keys() {
+				value, exists := globalsDict.Get(keyStr)
+				if exists {
+					// Strip "s:" prefix if present (for string keys)
+					cleanKey := keyStr
+					if len(keyStr) > 2 && keyStr[0:2] == "s:" {
+						cleanKey = keyStr[2:]
+					}
+					execCtx.Define(cleanKey, value)
+				}
+			}
+		}
+
+		// If locals dict provided, add those too (locals override globals)
+		if localsDict != nil {
+			// Use Keys() to iterate over all keys in the dict
+			for _, keyStr := range localsDict.Keys() {
+				value, exists := localsDict.Get(keyStr)
+				if exists {
+					// Strip "s:" prefix if present (for string keys)
+					cleanKey := keyStr
+					if len(keyStr) > 2 && keyStr[0:2] == "s:" {
+						cleanKey = keyStr[2:]
+					}
+					execCtx.Define(cleanKey, value)
+				}
+			}
+		}
+
+		// Execute the code using EvalString
+		_, err = eval.EvalString(codeStr, execCtx)
+		if err != nil {
+			return nil, err
+		}
+
+		// exec always returns None
+		return core.None, nil
+	}))
+
 	// Ellipsis - Python's ... literal
 	ctx.Define("Ellipsis", core.Ellipsis)
 
