@@ -20,7 +20,9 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 	// Increment evaluation counter and log progress periodically
 	if ctx != nil {
 		ctx.EvalCount++
-		if ctx.EvalCount%1000 == 0 {
+		// Disable debug logging for normal operation
+		logThis := false
+		if logThis {
 			// Show progress every 100 evaluations (lowered for debugging slow modules)
 			exprStr := core.PrintValue(expr)
 			if len(exprStr) > 150 {

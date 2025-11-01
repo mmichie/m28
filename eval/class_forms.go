@@ -1274,13 +1274,27 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		}
 	}
 
-	// Handle other Callable objects that aren't classes (like partialBuiltin)
+	// Handle other Callable objects that aren't classes (like type constructors)
 	// This check must come AFTER GetClass() check since types like IntType are callable
-	// If classVal is callable but not a class, we can't do isinstance check
-	// Return False to allow code to continue without error
 	if !isClass {
-		if _, ok := classVal.(core.Callable); ok {
-			// Not a class, so isinstance should return False
+		if callable, ok := classVal.(core.Callable); ok {
+			// Check if it's a type object (like types.FunctionType)
+			// Type objects have type "type" and their string representation is the type name
+			callableType := callable.Type()
+			objType := obj.Type()
+
+			if string(callableType) == "type" {
+				// It's a type object - compare its string representation with obj's type
+				typeStr := core.PrintValue(classVal)
+				if string(objType) == typeStr {
+					return core.True, nil
+				}
+			} else if callableType == objType {
+				// Both have the same type, they're compatible
+				return core.True, nil
+			}
+
+			// Not a match, return False
 			return core.False, nil
 		}
 	}
@@ -1338,6 +1352,12 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 			if class.Name == "set" {
 				return core.True, nil
 			}
+		}
+
+		// Generic fallback: check if the object's type matches the class name
+		objTypeName := string(obj.Type())
+		if class.Name == objTypeName {
+			return core.True, nil
 		}
 	}
 

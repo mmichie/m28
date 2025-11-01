@@ -22,9 +22,10 @@ var (
 	TupleTypeClass    *core.Class
 	SetTypeClass      *core.Class
 	FunctionTypeClass *core.Class
-	TypeMetaclass     *TypeType // The type metaclass (for class ABCMeta(type):)
-	StrTypeClass      *StrType  // Global str class instance
-	DictTypeClass     *DictType // Global dict class instance (set by RegisterCollections)
+	MethodTypeClass   *core.Class // For bound methods
+	TypeMetaclass     *TypeType   // The type metaclass (for class ABCMeta(type):)
+	StrTypeClass      *StrType    // Global str class instance
+	DictTypeClass     *DictType   // Global dict class instance (set by RegisterCollections)
 	// Cache for dynamically created type classes
 	typeClassCache = make(map[string]*core.Class)
 )
@@ -44,6 +45,7 @@ func RegisterTypes(ctx *core.Context) {
 	TupleTypeClass = core.NewClass("tuple", nil)
 	SetTypeClass = core.NewClass("set", nil)
 	FunctionTypeClass = core.NewClass("function", nil)
+	MethodTypeClass = core.NewClass("method", nil) // For bound methods
 
 	// Add __new__ classmethod to tuple
 	tupleNew := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -705,6 +707,10 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			return SetTypeClass, nil
 		case *core.BuiltinFunction:
 			return FunctionTypeClass, nil
+		case *core.BoundMethod:
+			return MethodTypeClass, nil
+		case *core.BoundInstanceMethod:
+			return MethodTypeClass, nil
 		case *core.Class:
 			// type(SomeClass) returns type (the metaclass)
 			return TypeMetaclass, nil
