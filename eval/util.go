@@ -537,10 +537,6 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// This happens when we have something like: a, *b, c = values
 		if symbolCount == 0 && args.Len() == 2 {
 			if targetList, ok := args.Items()[0].(*core.ListValue); ok {
-				core.DebugLog("[ASSIGN-STAR] Checking for star unpacking in targetList: %v (len=%d)\n", targetList, targetList.Len())
-				for i, t := range targetList.Items() {
-					core.DebugLog("[ASSIGN-STAR]   Item[%d]: %T = %v\n", i, t, t)
-				}
 				// Check if any element is (*unpack ...)
 				starIndex := -1
 				for i, t := range targetList.Items() {
@@ -552,7 +548,6 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 				}
 
-				core.DebugLog("[ASSIGN-STAR] starIndex=%d\n", starIndex)
 				if starIndex >= 0 {
 					// Star unpacking assignment
 					expr := args.Items()[1]
@@ -898,12 +893,33 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		if isTupleUnpacking && t.Len() > 0 {
+			// Check if this is a tuple-literal form: (tuple-literal elem1 elem2 ...)
+			// If so, skip the tuple-literal marker and use the rest as the pattern
+			actualPattern := t
+			if t.Len() > 0 {
+				if sym, ok := t.Items()[0].(core.SymbolValue); ok && string(sym) == "tuple-literal" {
+					// Skip the tuple-literal marker
+					actualPattern = core.NewList(t.Items()[1:]...)
+					// Re-check for star unpacking in the actual pattern
+					hasStarUnpack = false
+					starIndex = -1
+					for i, elem := range actualPattern.Items() {
+						if elemList, ok := elem.(*core.ListValue); ok {
+							if elemList.Len() == 2 {
+								if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+									hasStarUnpack = true
+									starIndex = i
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+			t = actualPattern
+
 			// Tuple unpacking: (= (x, y) [10, 20]) or (= (a (*unpack b) c) [1, 2, 3, 4])
 			// The value must be a tuple or list
-			core.DebugLog("[ASSIGN-UTIL] Tuple unpacking detected, t.Items()=%v\n", t.Items())
-			for i, item := range t.Items() {
-				core.DebugLog("[ASSIGN-UTIL]   Item[%d]: %T = %v\n", i, item, item)
-			}
 			var values []core.Value
 			switch v := value.(type) {
 			case core.TupleValue:
@@ -990,7 +1006,6 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 			} else {
 				// Regular tuple unpacking (no star)
-				core.DebugLog("[ASSIGN] Tuple unpacking: targets=%v (len=%d), values=%v (len=%d)\n", t, t.Len(), values, len(values))
 				// Check that the number of targets matches the number of values
 				if t.Len() != len(values) {
 					if len(values) < t.Len() {

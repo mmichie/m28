@@ -20,16 +20,23 @@ import (
 // value: the value to unpack (must be iterable if pattern is a list)
 // ctx: the context to bind variables in
 func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) error {
-	core.DebugLog("[UNPACK] pattern=%T(%v), value=%T(%v)\n", pattern, pattern, value, value)
-
 	switch p := pattern.(type) {
 	case core.SymbolValue:
 		// Simple binding: just assign value to variable
-		core.DebugLog("[UNPACK] Binding %s = %v\n", string(p), value)
 		ctx.Define(string(p), value)
 		return nil
 
 	case *core.ListValue:
+		// Check if this is a tuple-literal form: (tuple-literal elem1 elem2 ...)
+		// If so, skip the tuple-literal marker and use the rest as the pattern
+		actualPattern := p
+		if p.Len() > 0 {
+			if sym, ok := p.Items()[0].(core.SymbolValue); ok && string(sym) == "tuple-literal" {
+				// Skip the tuple-literal marker
+				actualPattern = core.NewList(p.Items()[1:]...)
+			}
+		}
+
 		// Tuple/list unpacking: value must be a sequence
 		// Extract sequence elements from value
 		values, err := extractSequenceValues(value)
@@ -38,16 +45,15 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 		}
 
 		// Check length match
-		core.DebugLog("[UNPACK] Length check: pattern.Len()=%d, values.Len()=%d\n", p.Len(), len(values))
-		if len(values) != p.Len() {
-			if len(values) < p.Len() {
-				return fmt.Errorf("[UNPACK] not enough values to unpack (expected %d, got %d)", p.Len(), len(values))
+		if len(values) != actualPattern.Len() {
+			if len(values) < actualPattern.Len() {
+				return fmt.Errorf("not enough values to unpack (expected %d, got %d)", actualPattern.Len(), len(values))
 			}
-			return fmt.Errorf("[UNPACK] too many values to unpack (expected %d, got %d)", p.Len(), len(values))
+			return fmt.Errorf("too many values to unpack (expected %d, got %d)", actualPattern.Len(), len(values))
 		}
 
 		// Recursively unpack each sub-pattern with its corresponding value
-		for i, subPattern := range p.Items() {
+		for i, subPattern := range actualPattern.Items() {
 			if err := UnpackPattern(subPattern, values[i], ctx); err != nil {
 				return err
 			}

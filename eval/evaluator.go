@@ -275,11 +275,6 @@ func ifForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // assignForm implements the = special form for assignment
 func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
-	fmt.Printf("[DEBUG assignForm] Called with %d args\n", args.Len())
-	if args.Len() >= 1 {
-		fmt.Printf("[DEBUG assignForm] First arg type: %T\n", args.Items()[0])
-	}
-
 	core.DebugLog("[ASSIGN] assignForm called with %d args\n", args.Len())
 
 	// Check if this is ANY attribute assignment to log it
@@ -405,7 +400,6 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Check that the number of targets matches the number of values
-		core.DebugLog("[ASSIGN-EVAL] Tuple unpacking: targetList=%v (len=%d), values=%v (len=%d)\n", targetList, targetList.Len(), values, len(values))
 		if targetList.Len() != len(values) {
 			if len(values) < targetList.Len() {
 				return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", targetList.Len(), len(values))
