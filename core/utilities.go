@@ -2,7 +2,10 @@ package core
 
 import (
 	"fmt"
+	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 // EqualValues compares two values for equality
@@ -164,8 +167,48 @@ func IsHashable(v Value) bool {
 	}
 }
 
+// getGoroutineID returns a unique identifier for the current goroutine
+func getGoroutineID() uint64 {
+	b := make([]byte, 64)
+	b = b[:runtime.Stack(b, false)]
+	// Format: "goroutine 123 [running]:"
+	b = b[len("goroutine "):]
+	b = b[:strings.IndexByte(string(b), ' ')]
+	n, _ := strconv.ParseUint(string(b), 10, 64)
+	return n
+}
+
+// Thread-local recursion guard for ValueToKey
+// Use a simple counter per goroutine
+var valueToKeyInProgress sync.Map // map[goroutineID]int
+
 // ValueToKey converts a value to a string key for use in sets and dicts
 func ValueToKey(v Value) string {
+	// Get goroutine ID (approximation using stack pointer)
+	goid := getGoroutineID()
+
+	// Check if we're already inside ValueToKey for this goroutine
+	val, _ := valueToKeyInProgress.Load(goid)
+	depth := 0
+	if val != nil {
+		depth = val.(int)
+	}
+
+	if depth > 5 {
+		// Too deep - use simple pointer representation
+		return "p:recursive"
+	}
+
+	valueToKeyInProgress.Store(goid, depth+1)
+	defer func() {
+		if depth == 0 {
+			valueToKeyInProgress.Delete(goid)
+		} else {
+			valueToKeyInProgress.Store(goid, depth)
+		}
+	}()
+
+	// For primitive types
 	switch val := v.(type) {
 	case NumberValue:
 		return fmt.Sprintf("n:%g", float64(val))
@@ -175,6 +218,9 @@ func ValueToKey(v Value) string {
 		return fmt.Sprintf("b:%t", bool(val))
 	case NilValue:
 		return "nil"
+	}
+
+	switch val := v.(type) {
 	case TupleValue:
 		// For tuples, create a key based on their content
 		elements := make([]string, len(val))
