@@ -1227,6 +1227,49 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		}
 	}
 
+	// Handle BuiltinFunction and other callable type constructors
+	// This includes functools.partial, list, int, etc.
+	if builtinFunc, ok := classVal.(*core.BuiltinFunction); ok {
+		// Check if it has __name__ attribute to identify the type
+		if nameVal, hasName := builtinFunc.GetAttr("__name__"); hasName {
+			if nameStr, ok := nameVal.(core.StringValue); ok {
+				typeName := string(nameStr)
+				actualType := string(obj.Type())
+
+				match := false
+				switch typeName {
+				case "list":
+					match = actualType == "list"
+				case "int", "float":
+					match = actualType == "number" || (typeName == "int" && actualType == "bigint")
+				case "str":
+					match = actualType == "string"
+				case "bool":
+					match = actualType == "bool"
+				case "tuple":
+					match = actualType == "tuple"
+				case "dict":
+					match = actualType == "dict"
+				case "set":
+					match = actualType == "set"
+				case "bytes":
+					match = actualType == "bytes"
+				}
+				return core.BoolValue(match), nil
+			}
+		}
+		// If BuiltinFunction without __name__, return False
+		return core.False, nil
+	}
+
+	// Handle other Callable objects that aren't classes (like partialBuiltin)
+	// If classVal is callable but not a class, we can't do isinstance check
+	// Return False to allow code to continue without error
+	if _, ok := classVal.(core.Callable); ok {
+		// Not a class, so isinstance should return False
+		return core.False, nil
+	}
+
 	// Check if obj is an instance and classVal is a class
 	instance, isInst := obj.(*core.Instance)
 	class, isClass := classVal.(*core.Class)
