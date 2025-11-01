@@ -38,11 +38,12 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 		}
 
 		// Check length match
+		core.DebugLog("[UNPACK] Length check: pattern.Len()=%d, values.Len()=%d\n", p.Len(), len(values))
 		if len(values) != p.Len() {
 			if len(values) < p.Len() {
-				return fmt.Errorf("not enough values to unpack (expected %d, got %d)", p.Len(), len(values))
+				return fmt.Errorf("[UNPACK] not enough values to unpack (expected %d, got %d)", p.Len(), len(values))
 			}
-			return fmt.Errorf("too many values to unpack (expected %d, got %d)", p.Len(), len(values))
+			return fmt.Errorf("[UNPACK] too many values to unpack (expected %d, got %d)", p.Len(), len(values))
 		}
 
 		// Recursively unpack each sub-pattern with its corresponding value

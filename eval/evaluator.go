@@ -405,6 +405,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Check that the number of targets matches the number of values
+		core.DebugLog("[ASSIGN-EVAL] Tuple unpacking: targetList=%v (len=%d), values=%v (len=%d)\n", targetList, targetList.Len(), values, len(values))
 		if targetList.Len() != len(values) {
 			if len(values) < targetList.Len() {
 				return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", targetList.Len(), len(values))
@@ -467,10 +468,17 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 					return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
 				}
+
+				// Not dot notation - must be nested unpacking pattern like (a, b)
+				// Use generic unpacking
+				if err := UnpackPattern(targetList2, values[i], ctx); err != nil {
+					return nil, err
+				}
+				continue
 			}
 
-			// Target is neither a symbol nor dot notation
-			return nil, fmt.Errorf("assignment target must be a symbol or dot notation, got %v", t.Type())
+			// Target is neither a symbol, dot notation, nor tuple pattern
+			return nil, fmt.Errorf("assignment target must be a symbol, dot notation, or tuple pattern, got %v", t.Type())
 		}
 
 		core.DebugLog("[ASSIGN] Tuple unpacking complete\n")

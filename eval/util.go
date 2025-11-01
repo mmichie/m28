@@ -537,6 +537,10 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// This happens when we have something like: a, *b, c = values
 		if symbolCount == 0 && args.Len() == 2 {
 			if targetList, ok := args.Items()[0].(*core.ListValue); ok {
+				core.DebugLog("[ASSIGN-STAR] Checking for star unpacking in targetList: %v (len=%d)\n", targetList, targetList.Len())
+				for i, t := range targetList.Items() {
+					core.DebugLog("[ASSIGN-STAR]   Item[%d]: %T = %v\n", i, t, t)
+				}
 				// Check if any element is (*unpack ...)
 				starIndex := -1
 				for i, t := range targetList.Items() {
@@ -548,6 +552,7 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 				}
 
+				core.DebugLog("[ASSIGN-STAR] starIndex=%d\n", starIndex)
 				if starIndex >= 0 {
 					// Star unpacking assignment
 					expr := args.Items()[1]
@@ -638,14 +643,10 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
 			}
 
-			// Assign each value
+			// Assign each value using generic unpacking
 			for i, target := range targets {
-				if sym, ok := target.(core.SymbolValue); ok {
-					if err := assignVariable(ctx, string(sym), values[i]); err != nil {
-						return nil, err
-					}
-				} else {
-					return nil, fmt.Errorf("multiple assignment target must be a symbol")
+				if err := UnpackPattern(target, values[i], ctx); err != nil {
+					return nil, err
 				}
 			}
 
@@ -756,14 +757,10 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
 			}
 
-			// Assign each value
+			// Assign each value using generic unpacking
 			for i, target := range targets {
-				if sym, ok := target.(core.SymbolValue); ok {
-					if err := assignVariable(ctx, string(sym), values[i]); err != nil {
-						return nil, err
-					}
-				} else {
-					return nil, fmt.Errorf("multiple assignment target must be a symbol")
+				if err := UnpackPattern(target, values[i], ctx); err != nil {
+					return nil, err
 				}
 			}
 
@@ -892,6 +889,9 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						continue
 					}
 				}
+				// Otherwise, it's a nested unpacking pattern like (b, c)
+				// This is valid for tuple unpacking
+				continue
 			}
 			isTupleUnpacking = false
 			break
@@ -900,6 +900,10 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if isTupleUnpacking && t.Len() > 0 {
 			// Tuple unpacking: (= (x, y) [10, 20]) or (= (a (*unpack b) c) [1, 2, 3, 4])
 			// The value must be a tuple or list
+			core.DebugLog("[ASSIGN-UTIL] Tuple unpacking detected, t.Items()=%v\n", t.Items())
+			for i, item := range t.Items() {
+				core.DebugLog("[ASSIGN-UTIL]   Item[%d]: %T = %v\n", i, item, item)
+			}
 			var values []core.Value
 			switch v := value.(type) {
 			case core.TupleValue:
@@ -986,6 +990,7 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 			} else {
 				// Regular tuple unpacking (no star)
+				core.DebugLog("[ASSIGN] Tuple unpacking: targets=%v (len=%d), values=%v (len=%d)\n", t, t.Len(), values, len(values))
 				// Check that the number of targets matches the number of values
 				if t.Len() != len(values) {
 					if len(values) < t.Len() {
@@ -1046,9 +1051,16 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 							return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
 						}
+
+						// Not dot notation - must be nested unpacking pattern like (a, b)
+						// Use generic unpacking
+						if err := UnpackPattern(targetList, values[i], ctx); err != nil {
+							return nil, err
+						}
+						continue
 					}
 
-					return nil, fmt.Errorf("assignment target must be a symbol or dot notation, got %v", target.Type())
+					return nil, fmt.Errorf("assignment target must be a symbol, dot notation, or tuple pattern, got %v", target.Type())
 				}
 			}
 
