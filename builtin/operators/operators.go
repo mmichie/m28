@@ -1739,6 +1739,15 @@ func invertValue(value core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Fall back to integer bitwise inversion
 	return types.Switch(value).
+		Bool(func(b bool) (core.Value, error) {
+			// In Python, bool is a subclass of int, so True is 1 and False is 0
+			// ~False = ~0 = -1, ~True = ~1 = -2
+			intVal := 0
+			if b {
+				intVal = 1
+			}
+			return core.NumberValue(float64(^intVal)), nil
+		}).
 		Number(func(n float64) (core.Value, error) {
 			// Check if it's an integer
 			if n != float64(int(n)) {
