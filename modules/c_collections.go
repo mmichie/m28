@@ -115,11 +115,67 @@ func InitCollectionsModule() *core.DictValue {
 
 		// If there's an argument, it should be a dict or iterable of pairs
 		if len(args) > 0 {
-			if dict, ok := args[0].(*core.DictValue); ok {
-				for _, key := range dict.Keys() {
-					if val, ok := dict.Get(key); ok {
+			switch v := args[0].(type) {
+			case *core.DictValue:
+				// Copy from existing dict
+				for _, key := range v.Keys() {
+					if val, ok := v.Get(key); ok {
 						od.dict.Set(key, val)
 					}
+				}
+			case *core.ListValue:
+				// Build from list of pairs
+				for i, item := range v.Items() {
+					var key, value core.Value
+					if pair, ok := item.(*core.ListValue); ok {
+						if pair.Len() != 2 {
+							return nil, fmt.Errorf("OrderedDict update sequence element #%d has length %d; 2 is required", i, pair.Len())
+						}
+						key = pair.Items()[0]
+						value = pair.Items()[1]
+					} else if tuple, ok := item.(core.TupleValue); ok {
+						if len(tuple) != 2 {
+							return nil, fmt.Errorf("OrderedDict update sequence element #%d has length %d; 2 is required", i, len(tuple))
+						}
+						key = tuple[0]
+						value = tuple[1]
+					} else {
+						return nil, fmt.Errorf("OrderedDict update sequence element #%d is not a sequence", i)
+					}
+					od.dict.SetValue(key, value)
+				}
+			default:
+				// Try to treat as a general iterable (handles generators, iterators, etc.)
+				if iterable, ok := args[0].(core.Iterable); ok {
+					iter := iterable.Iterator()
+					i := 0
+					for {
+						item, hasNext := iter.Next()
+						if !hasNext {
+							break
+						}
+						// Item should be a pair (tuple or list)
+						var key, value core.Value
+						if pair, ok := item.(*core.ListValue); ok {
+							if pair.Len() != 2 {
+								return nil, fmt.Errorf("OrderedDict update sequence element #%d has length %d; 2 is required", i, pair.Len())
+							}
+							key = pair.Items()[0]
+							value = pair.Items()[1]
+						} else if tuple, ok := item.(core.TupleValue); ok {
+							if len(tuple) != 2 {
+								return nil, fmt.Errorf("OrderedDict update sequence element #%d has length %d; 2 is required", i, len(tuple))
+							}
+							key = tuple[0]
+							value = tuple[1]
+						} else {
+							return nil, fmt.Errorf("OrderedDict update sequence element #%d is not a sequence", i)
+						}
+						od.dict.SetValue(key, value)
+						i++
+					}
+				} else {
+					return nil, fmt.Errorf("OrderedDict() argument must be a dict or iterable of pairs")
 				}
 			}
 		}

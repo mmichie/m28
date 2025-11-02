@@ -555,6 +555,41 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 					}
 				}
 			}
+
+			// Try to treat as a general iterable (handles generators, iterators, etc.)
+			if iterable, ok := args[0].(core.Iterable); ok {
+				iter := iterable.Iterator()
+				i := 0
+				for {
+					item, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					// Item should be a pair (tuple or list)
+					var key, value core.Value
+					if pair, ok := item.(*core.ListValue); ok {
+						if pair.Len() != 2 {
+							return nil, fmt.Errorf("dict update sequence element #%d has length %d; 2 is required", i, pair.Len())
+						}
+						key = pair.Items()[0]
+						value = pair.Items()[1]
+					} else if tuple, ok := item.(core.TupleValue); ok {
+						if len(tuple) != 2 {
+							return nil, fmt.Errorf("dict update sequence element #%d has length %d; 2 is required", i, len(tuple))
+						}
+						key = tuple[0]
+						value = tuple[1]
+					} else {
+						return nil, fmt.Errorf("dict update sequence element #%d is not a sequence", i)
+					}
+					if err := dict.SetValue(key, value); err != nil {
+						return nil, fmt.Errorf("error setting dict key: %v", err)
+					}
+					i++
+				}
+				return dict, nil
+			}
+
 			return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
 		}
 		return dict, nil
