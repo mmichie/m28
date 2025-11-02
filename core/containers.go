@@ -209,16 +209,18 @@ func (it *listIterator) Reset() {
 // DictValue represents a dictionary mapping keys to values
 type DictValue struct {
 	BaseObject
-	entries map[string]Value
-	keys    map[string]Value // Maps string representation to original key value
+	entries     map[string]Value
+	keys        map[string]Value // Maps string representation to original key value
+	orderedKeys []string         // Tracks insertion order of keys
 }
 
 // NewDict creates a new dictionary
 func NewDict() *DictValue {
 	return &DictValue{
-		BaseObject: *NewBaseObject(DictType),
-		entries:    make(map[string]Value),
-		keys:       make(map[string]Value),
+		BaseObject:  *NewBaseObject(DictType),
+		entries:     make(map[string]Value),
+		keys:        make(map[string]Value),
+		orderedKeys: make([]string, 0),
 	}
 }
 
@@ -233,15 +235,9 @@ func (d *DictValue) String() string {
 		return "{}"
 	}
 
-	// Sort keys for consistent output
-	keys := make([]string, 0, len(d.entries))
-	for k := range d.entries {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	parts := make([]string, 0, len(keys))
-	for _, k := range keys {
+	// Use insertion order for consistent output (Python 3.7+ behavior)
+	parts := make([]string, 0, len(d.orderedKeys))
+	for _, k := range d.orderedKeys {
 		v := d.entries[k]
 		// Use original key if available, otherwise use string representation
 		if origKey, hasOrig := d.keys[k]; hasOrig {
@@ -265,6 +261,10 @@ func (d *DictValue) Get(key string) (Value, bool) {
 // INTERNAL: Use SetWithKey for proper key tracking when you have the original key
 // This method will reconstruct the original key from the internal representation
 func (d *DictValue) Set(key string, value Value) {
+	// Track insertion order for new keys
+	if _, exists := d.entries[key]; !exists {
+		d.orderedKeys = append(d.orderedKeys, key)
+	}
 	d.entries[key] = value
 	// Reconstruct original key from internal representation if not already tracked
 	if _, exists := d.keys[key]; !exists {
@@ -310,6 +310,10 @@ func (d *DictValue) Set(key string, value Value) {
 // SetWithKey sets a value with both key representation and original key
 // This is the preferred method for setting dict values
 func (d *DictValue) SetWithKey(keyRepr string, origKey Value, value Value) {
+	// Track insertion order for new keys
+	if _, exists := d.entries[keyRepr]; !exists {
+		d.orderedKeys = append(d.orderedKeys, keyRepr)
+	}
 	d.entries[keyRepr] = value
 	d.keys[keyRepr] = origKey
 }
@@ -319,17 +323,20 @@ func (d *DictValue) SetWithKey(keyRepr string, origKey Value, value Value) {
 func (d *DictValue) Delete(key string) {
 	delete(d.entries, key)
 	delete(d.keys, key)
+	// Remove from orderedKeys
+	for i, k := range d.orderedKeys {
+		if k == key {
+			d.orderedKeys = append(d.orderedKeys[:i], d.orderedKeys[i+1:]...)
+			break
+		}
+	}
 }
 
-// Keys returns all internal key representations
+// Keys returns all internal key representations in insertion order
 // INTERNAL: Use dict.keys() method instead which returns original keys
 func (d *DictValue) Keys() []string {
-	keys := make([]string, 0, len(d.entries))
-	for k := range d.entries {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	// Return keys in insertion order (Python 3.7+ behavior)
+	return d.orderedKeys
 }
 
 // Size returns the number of entries in the dictionary

@@ -400,7 +400,33 @@ func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 // CallWithKeywords implements keyword argument support for class instantiation
 // This is the generic solution that unlocks full Python compatibility for all classes
 func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
-	// Python instance creation flow:
+	// Python metaclass protocol:
+	// If the class has a metaclass with __call__, invoke that first
+	// This allows metaclasses to control instance creation (e.g., for enum singletons)
+	if metaclassVal, ok := c.GetClassAttr("__class__"); ok {
+		if metaclass, ok := metaclassVal.(*Class); ok {
+			if callMethod, ok := metaclass.GetMethod("__call__"); ok {
+				// Prepend the class as first argument to __call__
+				callArgs := append([]Value{c}, args...)
+
+				// Try CallWithKeywords first if method supports it
+				if kwargsCallable, ok := callMethod.(interface {
+					CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+				}); ok {
+					return kwargsCallable.CallWithKeywords(callArgs, kwargs, ctx)
+				} else if callable, ok := callMethod.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); ok {
+					if len(kwargs) > 0 {
+						return nil, fmt.Errorf("metaclass __call__ does not support keyword arguments")
+					}
+					return callable.Call(callArgs, ctx)
+				}
+			}
+		}
+	}
+
+	// Default Python instance creation flow:
 	// 1. Call __new__ to create the instance
 	// 2. If __new__ returns an instance of the class, call __init__ on it
 	// 3. Return the instance

@@ -172,6 +172,8 @@ func InitEnumModule() *core.DictValue {
 
 		// Create the enum class
 		enumClass := core.NewClassWithParents(string(className), parents)
+		// Set the metaclass so that calling the enum class goes through EnumType.__call__
+		enumClass.SetClassAttr("__class__", args[0]) // args[0] is the metaclass (EnumType)
 
 		// Check if this is an IntEnum (inherits from IntEnum or has int in bases)
 		isIntEnum := false
@@ -381,7 +383,55 @@ func InitEnumModule() *core.DictValue {
 		// Set __members__ on the class
 		enumClass.SetAttr("__members__", members)
 
+		// Create a value-to-member map for singleton lookup
+		// This enables Color(1) to return the existing Color.RED instance
+		valueMap := core.NewDict()
+		for _, keyStr := range members.Keys() {
+			if member, ok := members.Get(keyStr); ok {
+				if memberObj, ok := member.(core.Object); ok {
+					if val, ok := memberObj.GetAttr("value"); ok {
+						valueMap.SetValue(val, member)
+					}
+				}
+			}
+		}
+		enumClass.SetClassAttr("_value2member_map_", valueMap)
+
 		return enumClass, nil
+	}))
+
+	// Implement __call__ on EnumType metaclass to return singleton instances
+	// When you call Color(1), Python calls EnumType.__call__(Color, 1)
+	enumTypeClass.SetMethod("__call__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Args: (cls, value)
+		if len(args) < 2 {
+			return nil, fmt.Errorf("enum() takes at least 1 argument")
+		}
+
+		cls := args[0]
+		value := args[1]
+
+		// If value is already an instance of this enum class, return it unchanged
+		// This allows Parameter("self", POSITIONAL_OR_KEYWORD) to work
+		if inst, ok := value.(*core.Instance); ok {
+			if inst.Class == cls {
+				return value, nil
+			}
+		}
+
+		// Get the _value2member_map_ from the class
+		if classObj, ok := cls.(core.Object); ok {
+			if valueMapVal, ok := classObj.GetAttr("_value2member_map_"); ok {
+				if valueMap, ok := valueMapVal.(*core.DictValue); ok {
+					// Look up member by value
+					if member, ok := valueMap.GetValue(value); ok {
+						return member, nil
+					}
+				}
+			}
+		}
+
+		return nil, fmt.Errorf("'%v' is not a valid enum value", value)
 	}))
 
 	module.Set("EnumType", enumTypeClass)

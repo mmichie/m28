@@ -129,6 +129,26 @@ func EqualValues(a, b Value) bool {
 			}
 			return true
 		}
+	case *Instance:
+		// For instances, check if they have a custom __eq__ method
+		if eqMethod, ok := aVal.GetAttr("__eq__"); ok {
+			if callable, ok := eqMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				// Call __eq__(a, b)
+				result, err := callable.Call([]Value{b}, NewContext(nil))
+				if err == nil {
+					if boolResult, ok := result.(BoolValue); ok {
+						return bool(boolResult)
+					}
+				}
+			}
+		}
+		// For enum instances (and other singletons), use identity comparison
+		// This is correct for IntEnum which uses singleton pattern
+		if bVal, ok := b.(*Instance); ok {
+			return aVal == bVal
+		}
 	}
 
 	return false
