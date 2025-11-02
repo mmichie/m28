@@ -156,28 +156,15 @@ func EqualValues(a, b Value) bool {
 
 // IsHashable determines if a value can be used as a dictionary key
 func IsHashable(v Value) bool {
-	switch val := v.(type) {
+	switch v.(type) {
 	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class:
 		return true
 	case *Instance:
-		// Instances of int, str, bool subclasses are hashable
-		// Check if the instance's class inherits from a hashable type
-		if val.Class != nil {
-			// Check if it's a subclass of int, str, or bool
-			// For now, we'll check the class name or inheritance
-			// TODO: Implement proper inheritance checking
-			className := val.Class.Name
-			if className == "int" || className == "str" || className == "bool" {
-				return true
-			}
-			// Check if class has int, str, or bool as a parent
-			for _, parent := range val.Class.Parents {
-				if parent.Name == "int" || parent.Name == "str" || parent.Name == "bool" {
-					return true
-				}
-			}
-		}
-		return false
+		// In Python, instances are hashable by default (using object ID)
+		// unless they define __hash__ = None or __eq__ without __hash__
+		// For now, we make all instances hashable by default
+		// TODO: Check for __hash__ = None or missing __hash__ with custom __eq__
+		return true
 	default:
 		// Check if it's a Callable (function) - functions are hashable by identity
 		if _, ok := v.(Callable); ok {
