@@ -293,7 +293,31 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	// Special post-load fixes for specific modules
-	if name == "re" {
+	if name == "inspect" {
+		// Set object.__signature__ to an empty Signature for inspect.signature() compatibility
+		// This allows inspect.signature(SomeClass) to work for classes with no custom __init__
+		core.DebugLog("[PYTHON_LOADER] Applying post-load fix for 'inspect' module\n")
+
+		// Get Signature class from the inspect module
+		sigKey := core.ValueToKey(core.StringValue("Signature"))
+		if sigClass, ok := partialModule.Get(sigKey); ok {
+			// Create an empty Signature instance
+			if callable, ok := sigClass.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				if emptySig, err := callable.Call([]core.Value{}, ctx); err == nil {
+					// Get object class from builtins
+					objectClass, err := ctx.Lookup("object")
+					if err == nil {
+						if obj, ok := objectClass.(core.Object); ok {
+							obj.SetAttr("__signature__", emptySig)
+							core.DebugLog("[PYTHON_LOADER] Set object.__signature__ to empty Signature\n")
+						}
+					}
+				}
+			}
+		}
+	} else if name == "re" {
 		fmt.Printf("[DEBUG] Applying post-load fix for 're' module\n")
 		core.DebugLog("[PYTHON_LOADER] Applying post-load fix for 're' module\n")
 		// The @enum.global_enum decorator in re/__init__.py doesn't work in M28

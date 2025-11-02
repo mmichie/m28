@@ -38,11 +38,20 @@ func (c *countIterator) GetAttr(name string) (core.Value, bool) {
 func InitItertoolsModule() *core.DictValue {
 	itertoolsModule := core.NewDict()
 
-	// chain - chain multiple iterables together
-	itertoolsModule.Set("chain", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// chain - chain multiple iterables together (class with from_iterable classmethod)
+	chainClass := core.NewClass("chain", nil)
+
+	// __new__ method handles chain(*iterables)
+	chainClass.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// args[0] is the class itself
+		if len(args) < 1 {
+			return nil, fmt.Errorf("chain() missing class argument")
+		}
+
+		// Collect all values from all iterables
 		result := make([]core.Value, 0)
-		for _, arg := range args {
-			iterable, err := types.RequireIterable(arg, "chain() argument")
+		for i := 1; i < len(args); i++ {
+			iterable, err := types.RequireIterable(args[i], "chain() argument")
 			if err != nil {
 				return nil, err
 			}
@@ -57,6 +66,48 @@ func InitItertoolsModule() *core.DictValue {
 		}
 		return core.NewList(result...), nil
 	}))
+
+	// from_iterable classmethod handles chain.from_iterable(iterable_of_iterables)
+	fromIterableFunc := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// args[0] is the iterable of iterables
+		if len(args) < 1 {
+			return nil, fmt.Errorf("from_iterable() missing required argument")
+		}
+
+		iterableOfIterables, err := types.RequireIterable(args[0], "from_iterable() argument")
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]core.Value, 0)
+		outerIter := iterableOfIterables.Iterator()
+		for {
+			iterableVal, hasNext := outerIter.Next()
+			if !hasNext {
+				break
+			}
+
+			iterable, err := types.RequireIterable(iterableVal, "from_iterable() argument item")
+			if err != nil {
+				return nil, err
+			}
+
+			iter := iterable.Iterator()
+			for {
+				val, hasInner := iter.Next()
+				if !hasInner {
+					break
+				}
+				result = append(result, val)
+			}
+		}
+		return core.NewList(result...), nil
+	})
+
+	// Wrap the function as a classmethod
+	chainClass.SetClassAttr("from_iterable", fromIterableFunc)
+
+	itertoolsModule.Set("chain", chainClass)
 
 	// cycle - repeat elements from iterable n times (limited version)
 	itertoolsModule.Set("cycle", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -552,6 +603,47 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		generate([]int{}, []core.Value{})
+		return core.NewList(result...), nil
+	}))
+
+	// filterfalse - filter elements where predicate is false
+	itertoolsModule.Set("filterfalse", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("filterfalse", args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+
+		predicate, err := types.RequireCallable(v.Get(0), "filterfalse() first argument")
+		if err != nil {
+			return nil, err
+		}
+
+		iterable, err := types.RequireIterable(v.Get(1), "filterfalse() second argument")
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]core.Value, 0)
+		iter := iterable.Iterator()
+
+		for {
+			val, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+
+			// Call predicate
+			predicateResult, err := predicate.Call([]core.Value{val}, ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Include element if predicate is FALSE
+			if !core.IsTruthy(predicateResult) {
+				result = append(result, val)
+			}
+		}
+
 		return core.NewList(result...), nil
 	}))
 

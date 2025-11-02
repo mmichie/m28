@@ -190,6 +190,22 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return None, true
 	}
 
+	// Special handling for __bases__ (Direct parent classes)
+	if name == "__bases__" {
+		var bases []Value
+		if c.Parent != nil {
+			bases = append(bases, c.Parent)
+		}
+		for i, parent := range c.Parents {
+			if i == 0 && c.Parent != nil {
+				// Skip first if it's the same as c.Parent
+				continue
+			}
+			bases = append(bases, parent)
+		}
+		return TupleValue(bases), true
+	}
+
 	// Special handling for __mro__ (Method Resolution Order)
 	if name == "__mro__" {
 		// Build the MRO tuple: (CurrentClass, Parent, Grandparent, ..., object)

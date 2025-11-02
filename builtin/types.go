@@ -160,10 +160,14 @@ func RegisterTypes(ctx *core.Context) {
 	// Must be defined before other types that inherit from it
 	objectClass := core.NewClass("object", nil)
 
+	// Note: We set __signature__ instead of __text_signature__ because M28's
+	// _signature_fromstr doesn't fully support text signature parsing yet.
+	// The __signature__ will be set later after inspect module is available.
+
 	// Add __new__ method to object
 	// object.__new__(cls) - creates a new instance of the class
 	// This is a static method that's called before __init__
-	objectClass.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	objectNew := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
 		}
@@ -174,7 +178,10 @@ func RegisterTypes(ctx *core.Context) {
 		}
 		// Create a new instance of the class
 		return core.NewInstance(cls), nil
-	}))
+	})
+	// Note: We don't add __text_signature__ to object.__new__ because M28's
+	// _signature_fromstr doesn't fully support it yet.
+	objectClass.SetMethod("__new__", objectNew)
 
 	// Add __init__ method to object
 	// object.__init__(self, *args, **kwargs) - does nothing, accepts any arguments
@@ -202,6 +209,9 @@ func RegisterTypes(ctx *core.Context) {
 	codeObj.SetAttr("co_firstlineno", core.NumberValue(0))
 	codeObj.SetAttr("co_lnotab", core.StringValue(""))
 	objectInit.SetAttr("__code__", codeObj)
+
+	// Note: We don't add __text_signature__ to object.__init__ because M28's
+	// _signature_fromstr doesn't fully support it yet. Instead, we rely on __code__.
 
 	objectClass.SetMethod("__init__", objectInit)
 
