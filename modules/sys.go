@@ -201,6 +201,29 @@ func InitSysModule() *core.DictValue {
 		return str, nil
 	}))
 
+	// _getframe function - get frame object at given depth
+	// Used by traceback and other stdlib modules for introspection
+	// Returns a minimal frame object to avoid errors in stdlib code
+	sysModule.SetWithKey("_getframe", core.StringValue("_getframe"), core.NewNamedBuiltinFunction("_getframe", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Takes optional depth argument (defaults to 0)
+		// Returns a frame object with minimal attributes
+
+		// Create a minimal frame object as a dict
+		frame := core.NewDict()
+
+		// Add required frame attributes that traceback expects
+		frame.Set("f_code", core.NewDict())        // code object (minimal)
+		frame.Set("f_lineno", core.NumberValue(1)) // line number
+		frame.Set("f_locals", core.NewDict())      // local vars
+		frame.Set("f_globals", core.NewDict())     // global vars
+		frame.Set("f_back", core.None)             // previous frame (None = top of stack)
+
+		// Add tb_frame attribute that some code expects
+		frame.Set("tb_frame", frame)
+
+		return frame, nil
+	}))
+
 	// _getframemodulename function - get module name at given frame depth
 	// Used by difflib and other stdlib modules for introspection
 	sysModule.SetWithKey("_getframemodulename", core.StringValue("_getframemodulename"), core.NewNamedBuiltinFunction("_getframemodulename", func(args []core.Value, ctx *core.Context) (core.Value, error) {
