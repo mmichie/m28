@@ -468,6 +468,13 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		case 'd', 'i': // Integer
 			if num, ok := value.(NumberValue); ok {
 				formatted = fmt.Sprintf("%d", int64(num))
+			} else if b, ok := value.(BoolValue); ok {
+				// In Python, bool is a subclass of int, so True is 1 and False is 0
+				if b {
+					formatted = "1"
+				} else {
+					formatted = "0"
+				}
 			} else {
 				return nil, fmt.Errorf("%%d format: a number is required, not %s", value.Type())
 			}

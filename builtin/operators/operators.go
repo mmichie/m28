@@ -2150,8 +2150,52 @@ func bitwiseOrTwo(left, right core.Value, ctx *core.Context) (core.Value, error)
 
 	// Fall back to integer bitwise OR
 	return types.Switch(left).
+		Bool(func(leftBool bool) (core.Value, error) {
+			// Convert bool to int (True=1, False=0)
+			leftInt := 0
+			if leftBool {
+				leftInt = 1
+			}
+			return types.Switch(right).
+				Bool(func(rightBool bool) (core.Value, error) {
+					rightInt := 0
+					if rightBool {
+						rightInt = 1
+					}
+					result := leftInt | rightInt
+					return core.NumberValue(float64(result)), nil
+				}).
+				Number(func(rightNum float64) (core.Value, error) {
+					if rightNum != float64(int(rightNum)) {
+						return nil, errors.NewTypeError("|",
+							"unsupported operand type(s)",
+							"'bool' and 'float'")
+					}
+					result := leftInt | int(rightNum)
+					return core.NumberValue(float64(result)), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("|",
+						"unsupported operand type(s)",
+						"'bool' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
 		Number(func(leftNum float64) (core.Value, error) {
 			return types.Switch(right).
+				Bool(func(rightBool bool) (core.Value, error) {
+					rightInt := 0
+					if rightBool {
+						rightInt = 1
+					}
+					if leftNum != float64(int(leftNum)) {
+						return nil, errors.NewTypeError("|",
+							"unsupported operand type(s)",
+							"'float' and 'bool'")
+					}
+					result := int(leftNum) | rightInt
+					return core.NumberValue(float64(result)), nil
+				}).
 				Number(func(rightNum float64) (core.Value, error) {
 					// Check both are integers
 					if leftNum != float64(int(leftNum)) || rightNum != float64(int(rightNum)) {
