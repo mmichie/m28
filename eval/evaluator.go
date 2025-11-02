@@ -183,7 +183,18 @@ func evalFunctionCall(expr *core.ListValue, ctx *core.Context) (core.Value, erro
 	ctx.PushStack(funcName, "", 0, 0)
 	defer ctx.PopStack()
 
+	// Trace function call BEFORE execution
+	core.TraceEnterFunction(funcName, args)
+
 	result, err := callable.Call(args, ctx)
+
+	// Trace function exit AFTER execution
+	if err != nil {
+		core.TraceExitFunction(funcName, nil, err)
+	} else {
+		core.TraceExitFunction(funcName, result, nil)
+	}
+
 	if err != nil {
 		// Check if this is already a well-formatted error (e.g., from assert)
 		// Don't wrap errors that are already EvalError or have specific messages
@@ -743,6 +754,9 @@ type UserFunction struct {
 
 // Call implements Callable.Call
 func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Trace function entry
+	core.TraceEnterFunction(f.name, args)
+
 	// Debug logging for function calls
 	core.DebugLog("[CALL] UserFunction.Call: %s with %d args\n", f.name, len(args))
 
@@ -864,6 +878,9 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 
 // CallWithKwargs calls the function with positional and keyword arguments
 func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// Trace function entry
+	core.TraceEnterFunction(f.name, args)
+
 	// Create a new environment with the function's environment as parent
 	funcEnv := core.NewContext(f.env)
 
@@ -878,6 +895,7 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 		// Signature supports keyword arguments
 		err := f.signature.BindArguments(args, kwargs, f.env, funcEnv)
 		if err != nil {
+			core.TraceExitFunction(f.name, nil, err)
 			return nil, err
 		}
 	} else {
@@ -890,10 +908,14 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 			}
 			fmt.Printf("[DEBUG] Function %s called with kwargs but has no signature\n", funcName)
 			fmt.Printf("[DEBUG] kwargs: %v\n", kwargs)
-			return nil, fmt.Errorf("function %s does not support keyword arguments", funcName)
+			err := fmt.Errorf("function %s does not support keyword arguments", funcName)
+			core.TraceExitFunction(f.name, nil, err)
+			return nil, err
 		}
 		if len(args) != len(f.params) {
-			return nil, fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
+			err := fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
+			core.TraceExitFunction(f.name, nil, err)
+			return nil, err
 		}
 
 		for i, param := range f.params {
@@ -904,14 +926,17 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 	// Evaluate the body in the new environment
 	result, err := Eval(f.body, funcEnv)
 	if err != nil {
+		core.TraceExitFunction(f.name, nil, err)
 		return nil, err
 	}
 
 	// Handle return values
 	if ret, ok := result.(*ReturnValue); ok {
+		core.TraceExitFunction(f.name, ret.Value, nil)
 		return ret.Value, nil
 	}
 
+	core.TraceExitFunction(f.name, result, nil)
 	return result, nil
 }
 

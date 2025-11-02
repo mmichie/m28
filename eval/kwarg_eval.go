@@ -333,38 +333,8 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 		}
 	}
 
-	// Check if it's a UserFunction that supports keyword arguments
-	if userFunc, ok := fn.(*UserFunction); ok && userFunc.signature != nil {
-		// Create a new context for the function
-		funcEnv := core.NewContext(userFunc.env)
-
-		// Debug: Print what we're passing
-		// fmt.Printf("DEBUG: Passing %d positional args and %d keyword args\n", len(positionalArgs), len(keywordArgs))
-		// for k, v := range keywordArgs {
-		//     fmt.Printf("  kwarg %s = %v\n", k, v)
-		// }
-
-		// Bind arguments using the signature
-		err := userFunc.signature.BindArguments(positionalArgs, keywordArgs, userFunc.env, funcEnv)
-		if err != nil {
-			return nil, err
-		}
-
-		// Evaluate the body in the new environment
-		result, err := Eval(userFunc.body, funcEnv)
-		if err != nil {
-			return nil, err
-		}
-
-		// Handle return values
-		if ret, ok := result.(*ReturnValue); ok {
-			return ret.Value, nil
-		}
-
-		return result, nil
-	}
-
-	// Check if it's a KwargsBuiltinFunction that supports keyword arguments
+	// Check if it's a function that supports keyword arguments
+	// This includes UserFunction (via CallWithKeywords) and KwargsBuiltinFunction
 	if kwargsFunc, ok := fn.(interface {
 		CallWithKeywords([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
 	}); ok {
