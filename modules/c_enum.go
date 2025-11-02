@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"fmt"
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -134,8 +136,254 @@ func InitEnumModule() *core.DictValue {
 		return args[0], nil
 	}))
 
-	// EnumType metaclass - for now, just return a stub
+	// EnumType metaclass - implements enum member creation logic
 	enumTypeClass := core.NewClassWithParents("EnumType", []*core.Class{})
+
+	// Implement __new__ method for enum metaclass
+	// This is called when creating an enum class: class MyEnum(IntEnum): A = 1
+	enumTypeClass.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Args: (mcls, name, bases, namespace)
+		if len(args) < 4 {
+			return nil, fmt.Errorf("EnumType.__new__() takes at least 4 arguments")
+		}
+
+		className, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("EnumType.__new__() class name must be a string")
+		}
+
+		bases, ok := args[2].(core.TupleValue)
+		if !ok {
+			return nil, fmt.Errorf("EnumType.__new__() bases must be a tuple")
+		}
+
+		namespace, ok := args[3].(*core.DictValue)
+		if !ok {
+			return nil, fmt.Errorf("EnumType.__new__() namespace must be a dict")
+		}
+
+		// Convert bases tuple to parent classes
+		var parents []*core.Class
+		for _, base := range bases {
+			if baseClass, ok := base.(*core.Class); ok {
+				parents = append(parents, baseClass)
+			}
+		}
+
+		// Create the enum class
+		enumClass := core.NewClassWithParents(string(className), parents)
+
+		// Check if this is an IntEnum (inherits from IntEnum or has int in bases)
+		isIntEnum := false
+		for _, parent := range parents {
+			if parent.Name == "IntEnum" || parent.Name == "Enum" {
+				isIntEnum = true
+				break
+			}
+		}
+
+		// Create __members__ dict to store enum members
+		members := core.NewDict()
+
+		// Process namespace to create enum members
+		memberCount := 0
+		for _, keyStr := range namespace.Keys() {
+			value, _ := namespace.Get(keyStr)
+
+			// Skip dunder methods and regular methods
+			if len(keyStr) >= 2 && keyStr[0] == '_' && keyStr[1] == '_' {
+				// Copy dunder attributes to class
+				enumClass.SetClassAttr(keyStr, value)
+				continue
+			}
+
+			// Skip if it's a function/method
+			if _, isFunc := value.(*core.BuiltinFunction); isFunc {
+				enumClass.SetMethod(keyStr, value)
+				continue
+			}
+
+			// This is an enum member - create an instance
+			member := core.NewInstance(enumClass)
+
+			// For IntEnum, use the provided value; for regular Enum, use auto-incrementing
+			var memberValue core.Value
+			if isIntEnum {
+				// Try to extract integer value
+				switch v := value.(type) {
+				case core.NumberValue:
+					memberValue = v
+				case core.StringValue:
+					// For _ParameterKind style where value is a description, use member count
+					memberValue = core.NumberValue(float64(memberCount))
+				default:
+					memberValue = core.NumberValue(float64(memberCount))
+				}
+			} else {
+				memberValue = value
+			}
+
+			// Set member attributes
+			member.SetAttr("name", core.StringValue(keyStr))
+			member.SetAttr("value", memberValue)
+			member.SetAttr("_value_", memberValue)
+			member.SetAttr("_name_", core.StringValue(keyStr))
+
+			// For IntEnum, make it support int operations
+			if isIntEnum {
+				if numVal, ok := memberValue.(core.NumberValue); ok {
+					// Add __int__ for int() conversion
+					member.SetAttr("__int__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+						return numVal, nil
+					}))
+
+					// Add __index__ for operator.index()
+					member.SetAttr("__index__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+						return numVal, nil
+					}))
+
+					// Add comparison operators
+					// __lt__ (<)
+					member.SetAttr("__lt__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+						if len(args) < 1 {
+							return nil, fmt.Errorf("__lt__() missing required argument")
+						}
+						// args[0] is other (self is already bound)
+						other := args[0]
+						// Try to get numeric value from other
+						var otherNum float64
+						if otherNumVal, ok := other.(core.NumberValue); ok {
+							otherNum = float64(otherNumVal)
+						} else if otherObj, ok := other.(core.Object); ok {
+							if val, ok := otherObj.GetAttr("value"); ok {
+								if valNum, ok := val.(core.NumberValue); ok {
+									otherNum = float64(valNum)
+								} else {
+									return core.BoolValue(false), nil
+								}
+							} else {
+								return core.BoolValue(false), nil
+							}
+						} else {
+							return core.BoolValue(false), nil
+						}
+						return core.BoolValue(float64(numVal) < otherNum), nil
+					}))
+
+					// __le__ (<=)
+					member.SetAttr("__le__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+						if len(args) < 1 {
+							return nil, fmt.Errorf("__le__() missing required argument")
+						}
+						other := args[0]
+						var otherNum float64
+						if otherNumVal, ok := other.(core.NumberValue); ok {
+							otherNum = float64(otherNumVal)
+						} else if otherObj, ok := other.(core.Object); ok {
+							if val, ok := otherObj.GetAttr("value"); ok {
+								if valNum, ok := val.(core.NumberValue); ok {
+									otherNum = float64(valNum)
+								} else {
+									return core.BoolValue(false), nil
+								}
+							} else {
+								return core.BoolValue(false), nil
+							}
+						} else {
+							return core.BoolValue(false), nil
+						}
+						return core.BoolValue(float64(numVal) <= otherNum), nil
+					}))
+
+					// __gt__ (>)
+					member.SetAttr("__gt__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+						if len(args) < 1 {
+							return nil, fmt.Errorf("__gt__() missing required argument")
+						}
+						other := args[0]
+						var otherNum float64
+						if otherNumVal, ok := other.(core.NumberValue); ok {
+							otherNum = float64(otherNumVal)
+						} else if otherObj, ok := other.(core.Object); ok {
+							if val, ok := otherObj.GetAttr("value"); ok {
+								if valNum, ok := val.(core.NumberValue); ok {
+									otherNum = float64(valNum)
+								} else {
+									return core.BoolValue(false), nil
+								}
+							} else {
+								return core.BoolValue(false), nil
+							}
+						} else {
+							return core.BoolValue(false), nil
+						}
+						return core.BoolValue(float64(numVal) > otherNum), nil
+					}))
+
+					// __ge__ (>=)
+					member.SetAttr("__ge__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+						if len(args) < 1 {
+							return nil, fmt.Errorf("__ge__() missing required argument")
+						}
+						other := args[0]
+						var otherNum float64
+						if otherNumVal, ok := other.(core.NumberValue); ok {
+							otherNum = float64(otherNumVal)
+						} else if otherObj, ok := other.(core.Object); ok {
+							if val, ok := otherObj.GetAttr("value"); ok {
+								if valNum, ok := val.(core.NumberValue); ok {
+									otherNum = float64(valNum)
+								} else {
+									return core.BoolValue(false), nil
+								}
+							} else {
+								return core.BoolValue(false), nil
+							}
+						} else {
+							return core.BoolValue(false), nil
+						}
+						return core.BoolValue(float64(numVal) >= otherNum), nil
+					}))
+
+					// __eq__ (==)
+					member.SetAttr("__eq__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+						if len(args) < 1 {
+							return nil, fmt.Errorf("__eq__() missing required argument")
+						}
+						other := args[0]
+						var otherNum float64
+						if otherNumVal, ok := other.(core.NumberValue); ok {
+							otherNum = float64(otherNumVal)
+						} else if otherObj, ok := other.(core.Object); ok {
+							if val, ok := otherObj.GetAttr("value"); ok {
+								if valNum, ok := val.(core.NumberValue); ok {
+									otherNum = float64(valNum)
+								} else {
+									return core.BoolValue(false), nil
+								}
+							} else {
+								return core.BoolValue(false), nil
+							}
+						} else {
+							return core.BoolValue(false), nil
+						}
+						return core.BoolValue(float64(numVal) == otherNum), nil
+					}))
+				}
+			}
+
+			// Add the member to the class and __members__ dict
+			enumClass.SetClassAttr(keyStr, member)
+			members.Set(keyStr, member)
+			memberCount++
+		}
+
+		// Set __members__ on the class
+		enumClass.SetAttr("__members__", members)
+
+		return enumClass, nil
+	}))
+
 	module.Set("EnumType", enumTypeClass)
 
 	// EnumMeta metaclass (alias for EnumType)
@@ -145,9 +393,14 @@ func InitEnumModule() *core.DictValue {
 	reprEnumClass := core.NewClassWithParents("ReprEnum", []*core.Class{enumClass})
 	module.Set("ReprEnum", reprEnumClass)
 
-	// IntEnum class
+	// IntEnum class - uses EnumType as metaclass
+	// IntEnum is a base class for creating integer-valued enums
+	// When you do `class MyEnum(IntEnum): A = 1`, EnumType.__new__ is called
 	intEnumClass := core.NewClassWithParents("IntEnum", []*core.Class{enumClass})
-	// Add __members__ as an empty dict
+	// Mark this class as using EnumType as its metaclass
+	// This will cause child classes to use EnumType.__new__
+	intEnumClass.SetClassAttr("__class__", enumTypeClass)
+	// Add __members__ as an empty dict (will be populated by subclasses)
 	intEnumClass.SetAttr("__members__", core.NewDict())
 
 	// Add _convert_() classmethod to IntEnum

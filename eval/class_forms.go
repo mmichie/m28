@@ -269,10 +269,23 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
-	// If no metaclass was explicitly specified, check if we're creating a metaclass
-	// (i.e., if the parent is 'type' or a subclass of type)
+	// If no metaclass was explicitly specified, infer it from parent classes
+	// Python rule: use the metaclass of the most derived base class
 	if metaclass == nil && len(parentClasses) > 0 {
 		for _, parent := range parentClasses {
+			// Check if parent has a custom metaclass
+			if parentMetaclass, ok := parent.GetClassAttr("__class__"); ok {
+				if pmc, ok := parentMetaclass.(*core.Class); ok {
+					// Use parent's metaclass for this class
+					metaclass = pmc
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Inheriting metaclass '%s' from parent '%s'\n", pmc.Name, parent.Name)
+					}
+					break
+				}
+			}
+
+			// Special case: if parent is 'type', use type as metaclass
 			if parent.Name == "type" {
 				// This class inherits from type, so it's a metaclass
 				// Use type as the metaclass to create it
