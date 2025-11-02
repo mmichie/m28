@@ -57,6 +57,19 @@ func InitTimeModule() *core.DictValue {
 		return core.NumberValue(elapsed.Seconds()), nil
 	}))
 
+	// perf_counter() - return performance counter in seconds (Python 3.3+)
+	// Similar to monotonic() but with highest available resolution
+	timeModule.SetWithKey("perf_counter", core.StringValue("perf_counter"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("perf_counter", args)
+		if err := v.Exact(0); err != nil {
+			return nil, err
+		}
+
+		// Return elapsed time since module load in seconds with nanosecond precision
+		elapsed := time.Since(startTime)
+		return core.NumberValue(elapsed.Seconds()), nil
+	}))
+
 	// strftime() - format time according to a format string
 	timeModule.SetWithKey("strftime", core.StringValue("strftime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("strftime", args)
