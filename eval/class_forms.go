@@ -596,6 +596,29 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						return nil, fmt.Errorf("class variable name must be a symbol or subscript expression, got %T", sItems[1])
 					}
 
+				case "class":
+					// Handle nested class definitions
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating nested class in class body\n")
+					}
+					// Evaluate the class statement in class body context
+					nestedClass, err := Eval(stmt, classBodyCtx)
+					if err != nil {
+						return nil, err
+					}
+					// Add the nested class as an attribute of the outer class
+					// The nested class name is sItems[1]
+					if len(sItems) > 1 {
+						if nestedClassName, ok := sItems[1].(core.SymbolValue); ok {
+							if debugClass {
+								fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Adding nested class '%s' to outer class attributes\n", nestedClassName)
+							}
+							class.Attributes[string(nestedClassName)] = nestedClass
+							// Also keep it in classBodyCtx for later references in the class body
+							classBodyCtx.Define(string(nestedClassName), nestedClass)
+						}
+					}
+
 				default:
 					// Evaluate other forms in class body context (not outer context)
 					// This allows access to class variables during construction
