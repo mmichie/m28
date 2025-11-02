@@ -23,6 +23,8 @@ func InitEnumModule() *core.DictValue {
 
 	// Create a simple Enum base class
 	enumClass := core.NewClassWithParents("Enum", []*core.Class{})
+	// Add __members__ as an empty dict (will be populated when enum members are created)
+	enumClass.SetAttr("__members__", core.NewDict())
 	module.Set("Enum", enumClass)
 
 	// Create IntFlag class (subclass of Enum)
@@ -145,6 +147,8 @@ func InitEnumModule() *core.DictValue {
 
 	// IntEnum class
 	intEnumClass := core.NewClassWithParents("IntEnum", []*core.Class{enumClass})
+	// Add __members__ as an empty dict
+	intEnumClass.SetAttr("__members__", core.NewDict())
 
 	// Add _convert_() classmethod to IntEnum
 	// This is used by signal.py to convert module-level constants into enum members

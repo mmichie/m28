@@ -965,9 +965,79 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		// Default to None for no docstring
 		return core.None, true
 	case "__code__":
-		// Return a code object (CodeType)
-		// Python's types.py uses __code__ to get the CodeType
-		return core.NewCodeObject(f), true
+		// Return a code object (CodeType) with proper signature metadata
+		// This is needed for inspect.signature() to work properly
+		codeObj := core.NewCodeObject(f)
+
+		// Extract parameter information from signature or legacy params
+		var argCount int
+		var varnames []core.Value
+		var kwonlyargcount int
+		var defaults []core.Value
+
+		if f.signature != nil {
+			// New-style function with signature
+			argCount = len(f.signature.RequiredParams) + len(f.signature.OptionalParams)
+			kwonlyargcount = 0 // M28 doesn't support keyword-only params yet
+
+			// Build varnames list
+			for _, param := range f.signature.RequiredParams {
+				varnames = append(varnames, core.StringValue(string(param.Name)))
+			}
+			for _, param := range f.signature.OptionalParams {
+				varnames = append(varnames, core.StringValue(string(param.Name)))
+			}
+			if f.signature.RestParam != nil {
+				varnames = append(varnames, core.StringValue(string(*f.signature.RestParam)))
+			}
+			if f.signature.KeywordParam != nil {
+				varnames = append(varnames, core.StringValue(string(*f.signature.KeywordParam)))
+			}
+
+			// Extract defaults
+			for _, param := range f.signature.OptionalParams {
+				if param.DefaultValue != nil {
+					defaults = append(defaults, param.DefaultValue)
+				}
+			}
+		} else {
+			// Legacy function with simple params
+			argCount = len(f.params)
+			kwonlyargcount = 0
+			for _, param := range f.params {
+				varnames = append(varnames, core.StringValue(string(param)))
+			}
+		}
+
+		// Set code object attributes that inspect.py expects
+		codeObj.SetAttr("co_argcount", core.NumberValue(float64(argCount)))
+		codeObj.SetAttr("co_posonlyargcount", core.NumberValue(0)) // M28 doesn't support positional-only params yet
+		codeObj.SetAttr("co_kwonlyargcount", core.NumberValue(float64(kwonlyargcount)))
+		codeObj.SetAttr("co_nlocals", core.NumberValue(float64(len(varnames))))
+		codeObj.SetAttr("co_stacksize", core.NumberValue(0))
+		// co_flags: 1=OPTIMIZED, 2=NEWLOCALS, 4=VARARGS, 8=VARKEYWORDS
+		flags := 3 // OPTIMIZED | NEWLOCALS
+		if f.signature != nil {
+			if f.signature.RestParam != nil {
+				flags |= 4 // VARARGS
+			}
+			if f.signature.KeywordParam != nil {
+				flags |= 8 // VARKEYWORDS
+			}
+		}
+		codeObj.SetAttr("co_flags", core.NumberValue(float64(flags)))
+		codeObj.SetAttr("co_code", core.StringValue(""))
+		codeObj.SetAttr("co_consts", core.TupleValue{})
+		codeObj.SetAttr("co_names", core.TupleValue{})
+		codeObj.SetAttr("co_varnames", core.TupleValue(varnames))
+		codeObj.SetAttr("co_freevars", core.TupleValue{})
+		codeObj.SetAttr("co_cellvars", core.TupleValue{})
+		codeObj.SetAttr("co_filename", core.StringValue("<lambda>"))
+		codeObj.SetAttr("co_name", core.StringValue(f.name))
+		codeObj.SetAttr("co_firstlineno", core.NumberValue(1))
+		codeObj.SetAttr("co_lnotab", core.StringValue(""))
+
+		return codeObj, true
 	case "__globals__":
 		// Return the function's global namespace
 		// This is the environment where the function was defined
@@ -1013,6 +1083,24 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		}
 		// Return empty dict for annotations by default
 		return core.NewDict(), true
+	case "__defaults__":
+		// Return default argument values as a tuple
+		if f.signature != nil {
+			var defaults []core.Value
+			for _, param := range f.signature.OptionalParams {
+				if param.DefaultValue != nil {
+					defaults = append(defaults, param.DefaultValue)
+				}
+			}
+			if len(defaults) > 0 {
+				return core.TupleValue(defaults), true
+			}
+		}
+		return core.None, true
+	case "__kwdefaults__":
+		// Return keyword-only default argument values as a dict
+		// M28 doesn't support keyword-only params yet, so always return None
+		return core.None, true
 	case "__type_params__":
 		// Check if __type_params__ was explicitly set
 		if val, ok := f.BaseObject.GetAttr("__type_params__"); ok {

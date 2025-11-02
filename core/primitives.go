@@ -467,11 +467,11 @@ func (f *BuiltinFunction) createRegistry() *MethodRegistry {
 			codeObj.SetAttr("co_stacksize", NumberValue(0))          // Required stack size
 			codeObj.SetAttr("co_flags", NumberValue(0))              // CO_* flags
 			codeObj.SetAttr("co_code", StringValue(""))              // Bytecode (empty for builtins)
-			codeObj.SetAttr("co_consts", NewList())                  // Constants used
-			codeObj.SetAttr("co_names", NewList())                   // Names used
-			codeObj.SetAttr("co_varnames", NewList())                // Local variable names (empty for builtins)
-			codeObj.SetAttr("co_freevars", NewList())                // Free variables
-			codeObj.SetAttr("co_cellvars", NewList())                // Cell variables
+			codeObj.SetAttr("co_consts", TupleValue{})               // Constants used
+			codeObj.SetAttr("co_names", TupleValue{})                // Names used
+			codeObj.SetAttr("co_varnames", TupleValue{})             // Local variable names (empty for builtins)
+			codeObj.SetAttr("co_freevars", TupleValue{})             // Free variables
+			codeObj.SetAttr("co_cellvars", TupleValue{})             // Cell variables
 			codeObj.SetAttr("co_filename", StringValue("<builtin>")) // Filename
 			codeObj.SetAttr("co_name", StringValue(""))              // Function name
 			codeObj.SetAttr("co_firstlineno", NumberValue(0))        // First line number
