@@ -374,6 +374,29 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 				})
 				return steps, nil
 
+			case "yield-from":
+				// Yield from statement: (yield-from iterable)
+				// Transform into: for __yield_from_item in iterable: yield __yield_from_item
+				if n.Len() < 2 {
+					return nil, fmt.Errorf("yield-from requires an iterable argument")
+				}
+
+				// Create a unique variable name for the loop
+				loopVar := core.SymbolValue("__yield_from_item")
+				iterableExpr := n.Items()[1]
+
+				// Build the equivalent for loop structure
+				// (for __yield_from_item iterable (yield __yield_from_item))
+				forLoop := core.NewList(
+					core.SymbolValue("for"),
+					loopVar,
+					iterableExpr,
+					core.NewList(core.SymbolValue("yield"), loopVar),
+				)
+
+				// Transform the for loop into steps
+				return transformToSteps(forLoop)
+
 			case "return":
 				// Return statement
 				var returnNode core.Value

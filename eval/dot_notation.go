@@ -136,6 +136,9 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 										for i, arg := range args.Items()[2:] {
 											evalArgs[i], err = Eval(arg, ctx)
 											if err != nil {
+												fmt.Printf("[DEBUG DotForm Descriptor] Error evaluating argument %d for method %s\n", i+1, propName)
+												fmt.Printf("[DEBUG DotForm Descriptor]   obj = %T\n", obj)
+												fmt.Printf("[DEBUG DotForm Descriptor]   arg = %v\n", core.PrintValue(arg))
 												return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
 											}
 										}
@@ -238,6 +241,9 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						for i, arg := range args.Items()[2:] {
 							evalArgs[i], err = Eval(arg, ctx)
 							if err != nil {
+								fmt.Printf("[DEBUG DotForm BoundMethod] Error evaluating argument %d for method %s\n", i+1, propName)
+								fmt.Printf("[DEBUG DotForm BoundMethod]   obj = %T\n", obj)
+								fmt.Printf("[DEBUG DotForm BoundMethod]   arg = %v\n", core.PrintValue(arg))
 								return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
 							}
 						}
@@ -256,6 +262,9 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				for i, arg := range args.Items()[2:] {
 					evalArgs[i], err = Eval(arg, ctx)
 					if err != nil {
+						fmt.Printf("[DEBUG DotForm] Error evaluating argument %d for method %s\n", i+1, propName)
+						fmt.Printf("[DEBUG DotForm]   obj = %T\n", obj)
+						fmt.Printf("[DEBUG DotForm]   arg = %v\n", core.PrintValue(arg))
 						return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
 					}
 				}
