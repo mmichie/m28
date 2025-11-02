@@ -141,9 +141,9 @@ func Init_SREModule() *core.DictValue {
 		// Create a minimal pattern object (dict with basic attributes)
 		pattern := core.NewDict()
 
-		// Store the pattern string
+		// Store the pattern string - use SetValue for proper key formatting
 		if patternStr, ok := args[0].(core.StringValue); ok {
-			pattern.Set("pattern", patternStr)
+			pattern.SetValue(core.StringValue("pattern"), patternStr)
 		}
 
 		// Add flags (default 0)
@@ -153,25 +153,25 @@ func Init_SREModule() *core.DictValue {
 				flags = f
 			}
 		}
-		pattern.Set("flags", flags)
+		pattern.SetValue(core.StringValue("flags"), flags)
 
-		// Add stub methods
-		pattern.Set("match", core.NewNamedBuiltinFunction("match", func(matchArgs []core.Value, matchCtx *core.Context) (core.Value, error) {
+		// Add stub methods - use SetValue for proper key formatting
+		pattern.SetValue(core.StringValue("match"), core.NewNamedBuiltinFunction("match", func(matchArgs []core.Value, matchCtx *core.Context) (core.Value, error) {
 			// Return None (no match) for now
 			return core.None, nil
 		}))
 
-		pattern.Set("search", core.NewNamedBuiltinFunction("search", func(searchArgs []core.Value, searchCtx *core.Context) (core.Value, error) {
+		pattern.SetValue(core.StringValue("search"), core.NewNamedBuiltinFunction("search", func(searchArgs []core.Value, searchCtx *core.Context) (core.Value, error) {
 			// Return None (no match) for now
 			return core.None, nil
 		}))
 
-		pattern.Set("findall", core.NewNamedBuiltinFunction("findall", func(findallArgs []core.Value, findallCtx *core.Context) (core.Value, error) {
+		pattern.SetValue(core.StringValue("findall"), core.NewNamedBuiltinFunction("findall", func(findallArgs []core.Value, findallCtx *core.Context) (core.Value, error) {
 			// Return empty list for now
 			return core.NewList(), nil
 		}))
 
-		pattern.Set("sub", core.NewNamedBuiltinFunction("sub", func(subArgs []core.Value, subCtx *core.Context) (core.Value, error) {
+		pattern.SetValue(core.StringValue("sub"), core.NewNamedBuiltinFunction("sub", func(subArgs []core.Value, subCtx *core.Context) (core.Value, error) {
 			// Just return the original string for now
 			if len(subArgs) >= 2 {
 				if str, ok := subArgs[1].(core.StringValue); ok {
