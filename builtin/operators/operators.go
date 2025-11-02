@@ -2054,12 +2054,9 @@ func bitwiseAndTwo(left, right core.Value, ctx *core.Context) (core.Value, error
 			}
 			return types.Switch(right).
 				Bool(func(rightBool bool) (core.Value, error) {
-					rightInt := 0
-					if rightBool {
-						rightInt = 1
-					}
-					result := leftInt & rightInt
-					return core.BoolValue(result != 0), nil
+					// When both operands are bool, return bool
+					result := leftBool && rightBool
+					return core.BoolValue(result), nil
 				}).
 				Number(func(rightNum float64) (core.Value, error) {
 					if rightNum != float64(int(rightNum)) {
@@ -2158,12 +2155,9 @@ func bitwiseOrTwo(left, right core.Value, ctx *core.Context) (core.Value, error)
 			}
 			return types.Switch(right).
 				Bool(func(rightBool bool) (core.Value, error) {
-					rightInt := 0
-					if rightBool {
-						rightInt = 1
-					}
-					result := leftInt | rightInt
-					return core.NumberValue(float64(result)), nil
+					// When both operands are bool, return bool
+					result := leftBool || rightBool
+					return core.BoolValue(result), nil
 				}).
 				Number(func(rightNum float64) (core.Value, error) {
 					if rightNum != float64(int(rightNum)) {
@@ -2255,8 +2249,48 @@ func bitwiseXorTwo(left, right core.Value, ctx *core.Context) (core.Value, error
 
 	// Fall back to integer bitwise XOR
 	return types.Switch(left).
+		Bool(func(leftBool bool) (core.Value, error) {
+			leftInt := 0
+			if leftBool {
+				leftInt = 1
+			}
+			return types.Switch(right).
+				Bool(func(rightBool bool) (core.Value, error) {
+					// When both operands are bool, return bool
+					result := leftBool != rightBool
+					return core.BoolValue(result), nil
+				}).
+				Number(func(rightNum float64) (core.Value, error) {
+					if rightNum != float64(int(rightNum)) {
+						return nil, errors.NewTypeError("^",
+							"unsupported operand type(s)",
+							"'bool' and 'float'")
+					}
+					result := leftInt ^ int(rightNum)
+					return core.NumberValue(float64(result)), nil
+				}).
+				Default(func(r core.Value) (core.Value, error) {
+					return nil, errors.NewTypeError("^",
+						"unsupported operand type(s)",
+						"'bool' and '"+string(r.Type())+"'")
+				}).
+				Execute()
+		}).
 		Number(func(leftNum float64) (core.Value, error) {
 			return types.Switch(right).
+				Bool(func(rightBool bool) (core.Value, error) {
+					rightInt := 0
+					if rightBool {
+						rightInt = 1
+					}
+					if leftNum != float64(int(leftNum)) {
+						return nil, errors.NewTypeError("^",
+							"unsupported operand type(s)",
+							"'float' and 'bool'")
+					}
+					result := int(leftNum) ^ rightInt
+					return core.NumberValue(float64(result)), nil
+				}).
 				Number(func(rightNum float64) (core.Value, error) {
 					// Check if both are integers
 					if !core.IsInteger(leftNum) || !core.IsInteger(rightNum) {

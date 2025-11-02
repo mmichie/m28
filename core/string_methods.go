@@ -505,12 +505,30 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 				} else {
 					formatted = fmt.Sprintf("%X", int64(num))
 				}
+			} else if b, ok := value.(BoolValue); ok {
+				// In Python, bool is a subclass of int, so True is 1 and False is 0
+				if b {
+					if fmtType == 'x' {
+						formatted = "1"
+					} else {
+						formatted = "1"
+					}
+				} else {
+					formatted = "0"
+				}
 			} else {
 				return nil, fmt.Errorf("%%%c format: a number is required", fmtType)
 			}
 		case 'o': // Octal
 			if num, ok := value.(NumberValue); ok {
 				formatted = fmt.Sprintf("%o", int64(num))
+			} else if b, ok := value.(BoolValue); ok {
+				// In Python, bool is a subclass of int, so True is 1 and False is 0
+				if b {
+					formatted = "1"
+				} else {
+					formatted = "0"
+				}
 			} else {
 				return nil, fmt.Errorf("%%o format: a number is required")
 			}
