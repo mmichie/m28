@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -32,6 +33,23 @@ var (
 )
 
 const version = "0.1.0-fresh-start"
+
+// handleError checks if an error is SystemExit and exits with the appropriate code
+// Otherwise, reports the error and exits with code 1
+func handleError(err error, globalCtx *core.Context, errorReporter *repl.ErrorReporter) {
+	// Check if it's a SystemExit (unwrap if necessary)
+	var sysExit *core.SystemExit
+	if errors.As(err, &sysExit) {
+		os.Exit(sysExit.Code)
+	}
+
+	// Always show stack trace if available
+	if len(globalCtx.CallStack) > 0 {
+		fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
+	}
+	errorReporter.ReportError(err, globalCtx, os.Stderr)
+	os.Exit(1)
+}
 
 func main() {
 	// Parse command line flags
@@ -78,12 +96,7 @@ func main() {
 		errorReporter.AddSource("<command-line>", *evalExpr)
 		result, err := eval.EvalString(*evalExpr, globalCtx)
 		if err != nil {
-			// Always show stack trace if available
-			if len(globalCtx.CallStack) > 0 {
-				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
-			}
-			errorReporter.ReportError(err, globalCtx, os.Stderr)
-			os.Exit(1)
+			handleError(err, globalCtx, errorReporter)
 		}
 		fmt.Println(core.PrintValue(result))
 		if !*interactive {
@@ -96,12 +109,7 @@ func main() {
 		errorReporter.AddSource("<command-line>", *command)
 		result, err := eval.EvalString(*command, globalCtx)
 		if err != nil {
-			// Always show stack trace if available
-			if len(globalCtx.CallStack) > 0 {
-				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
-			}
-			errorReporter.ReportError(err, globalCtx, os.Stderr)
-			os.Exit(1)
+			handleError(err, globalCtx, errorReporter)
 		}
 		fmt.Println(core.PrintValue(result))
 		if !*interactive {
@@ -138,12 +146,7 @@ func main() {
 		// Execute the file
 		err := executeFile(args[0], globalCtx, errorReporter)
 		if err != nil {
-			// Always show stack trace if available
-			if len(globalCtx.CallStack) > 0 {
-				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
-			}
-			errorReporter.ReportError(err, globalCtx, os.Stderr)
-			os.Exit(1)
+			handleError(err, globalCtx, errorReporter)
 		}
 
 		if !*interactive {

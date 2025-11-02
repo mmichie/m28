@@ -3,6 +3,7 @@ package repl
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -260,6 +261,12 @@ func (r *REPL) Start() {
 				ir := node.ToIR()
 				lastResult, evalErr = eval.Eval(ir, r.ctx)
 				if evalErr != nil {
+					// Check if it's SystemExit - if so, exit the REPL
+					var sysExit *core.SystemExit
+					if errors.As(evalErr, &sysExit) {
+						fmt.Fprintln(r.writer, "Exiting...")
+						os.Exit(sysExit.Code)
+					}
 					r.errorReporter.ReportError(evalErr, r.ctx, r.writer)
 					break
 				}
@@ -300,6 +307,12 @@ func (r *REPL) Start() {
 		printedOutput := r.outputTracker.StopTracking()
 
 		if err != nil {
+			// Check if it's SystemExit - if so, exit the REPL
+			var sysExit *core.SystemExit
+			if errors.As(err, &sysExit) {
+				fmt.Fprintln(r.writer, "Exiting...")
+				os.Exit(sysExit.Code)
+			}
 			r.errorReporter.ReportError(err, r.ctx, r.writer)
 			continue
 		}

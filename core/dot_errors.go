@@ -144,6 +144,21 @@ func NewZeroDivisionError() *ZeroDivisionError {
 	return &ZeroDivisionError{}
 }
 
+// SystemExit represents a request to exit the program
+type SystemExit struct {
+	Code     int
+	Location *SourceLocation
+}
+
+func (e *SystemExit) Error() string {
+	return "SystemExit"
+}
+
+// NewSystemExit creates a new SystemExit error
+func NewSystemExit(code int) *SystemExit {
+	return &SystemExit{Code: code}
+}
+
 // ImportError represents a module import error
 type ImportError struct {
 	ModuleName string

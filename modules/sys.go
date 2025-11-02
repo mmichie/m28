@@ -294,7 +294,7 @@ func excepthook(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.NilValue{}, nil
 }
 
-// exitFunc exits the program
+// exitFunc exits the program by raising SystemExit
 func exitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	v := validation.NewArgs("exit", args)
 
@@ -307,8 +307,9 @@ func exitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		code = int(numVal)
 	}
 
-	os.Exit(code)
-	return core.NilValue{}, nil
+	// Raise SystemExit instead of calling os.Exit
+	// This allows the exception to be caught and handled in Python code
+	return nil, core.NewSystemExit(code)
 }
 
 // getRecursionLimit returns the current recursion limit
