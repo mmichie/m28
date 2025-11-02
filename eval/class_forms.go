@@ -569,6 +569,13 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					// Check if this is a simple variable assignment or subscript assignment
 					name, ok := sItems[1].(core.SymbolValue)
 					if ok {
+						// Track existing variables before evaluating RHS
+						// This handles chained assignments like a = b = c = 10
+						beforeVars := make(map[string]bool)
+						for varName := range classBodyCtx.Vars {
+							beforeVars[varName] = true
+						}
+
 						// Simple variable assignment: x = value
 						value, err := Eval(sItems[2], classBodyCtx)
 						if err != nil {
@@ -577,6 +584,15 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						class.SetClassAttr(string(name), value)
 						// Also add to class body context so later statements can reference it
 						classBodyCtx.Define(string(name), value)
+
+						// Check for new variables added by chained assignment
+						// e.g., in "a = b = c = 10", evaluating "b = c = 10" adds b and c
+						for varName, varValue := range classBodyCtx.Vars {
+							if !beforeVars[varName] && !strings.HasPrefix(varName, "__") {
+								// New variable added by chained assignment
+								class.SetClassAttr(varName, varValue)
+							}
+						}
 					} else {
 						// Could be subscript assignment: obj[key] = value
 						// Check if sItems[1] is a list starting with get-item
