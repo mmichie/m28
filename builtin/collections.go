@@ -602,12 +602,25 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
 // to ensure our custom Call is used instead of the generic class instantiation
 func (d *DictType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-	// For dict, keyword arguments are not supported in the constructor
-	// Just ignore kwargs and call our custom Call method
-	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("dict() does not accept keyword arguments")
+	// First create dict from positional arguments
+	dict, err := d.Call(args, ctx)
+	if err != nil {
+		return nil, err
 	}
-	return d.Call(args, ctx)
+
+	// Then add keyword arguments as key-value pairs
+	// dict(a=1, b=2) creates {'a': 1, 'b': 2}
+	if len(kwargs) > 0 {
+		dictVal, ok := dict.(*core.DictValue)
+		if !ok {
+			return nil, fmt.Errorf("dict() Call did not return a DictValue")
+		}
+		for key, value := range kwargs {
+			dictVal.Set(key, value)
+		}
+	}
+
+	return dict, nil
 }
 
 // createByteArrayClass creates the bytearray class that can be used as a base class

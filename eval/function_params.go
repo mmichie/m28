@@ -384,7 +384,11 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 	if sig.KeywordParam != nil {
 		kwargsDict := core.NewDict()
 		for k, v := range kwargs {
-			kwargsDict.Set(k, v)
+			// Use SetValue to properly convert string key to Value and use ValueToKey
+			err := kwargsDict.SetValue(core.StringValue(k), v)
+			if err != nil {
+				return fmt.Errorf("error setting kwarg %s: %v", k, err)
+			}
 		}
 		bindCtx.Define(string(*sig.KeywordParam), kwargsDict)
 	} else if len(kwargs) > 0 {

@@ -208,43 +208,39 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 
 	// Special handling for __mro__ (Method Resolution Order)
 	if name == "__mro__" {
-		// Build the MRO tuple: (CurrentClass, Parent, Grandparent, ..., object)
+		// Build the MRO tuple using C3 linearization
+		// Simplified algorithm: breadth-first traversal with deduplication
 		mro := []Value{c}
+		seen := make(map[*Class]bool)
+		seen[c] = true
 
-		// Follow the parent chain
-		current := c.Parent
-		for current != nil {
-			mro = append(mro, current)
-			current = current.Parent
+		// Queue of classes to process
+		queue := []*Class{}
+
+		// Add direct parents to queue
+		if len(c.Parents) > 0 {
+			queue = append(queue, c.Parents...)
+		} else if c.Parent != nil {
+			queue = append(queue, c.Parent)
 		}
 
-		// Also include parents from multiple inheritance
-		// For simplicity, we'll add them after the main parent chain
-		if len(c.Parents) > 0 {
-			// Already have the main parent, now add any additional parents
-			for i, parent := range c.Parents {
-				if i == 0 && c.Parent != nil {
-					// Skip first if it's the same as c.Parent
-					continue
-				}
-				// Add this parent and its ancestors
-				p := parent
-				for p != nil {
-					// Check if already in MRO to avoid duplicates
-					found := false
-					for _, existing := range mro {
-						if existingClass, ok := existing.(*Class); ok {
-							if existingClass == p {
-								found = true
-								break
-							}
-						}
-					}
-					if !found {
-						mro = append(mro, p)
-					}
-					p = p.Parent
-				}
+		// Process queue in breadth-first order
+		for len(queue) > 0 {
+			cls := queue[0]
+			queue = queue[1:]
+
+			if cls == nil || seen[cls] {
+				continue
+			}
+
+			mro = append(mro, cls)
+			seen[cls] = true
+
+			// Add this class's parents to the queue
+			if len(cls.Parents) > 0 {
+				queue = append(queue, cls.Parents...)
+			} else if cls.Parent != nil {
+				queue = append(queue, cls.Parent)
 			}
 		}
 
@@ -1135,14 +1131,77 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 		return method
 	}
 
-	// super() returns a proxy that looks up methods starting from s.Class
-	// When you call super().__init__() inside Path.__init__:
-	// 1. superForm() creates Super(class=PurePath) - skipping Path itself
-	// 2. Super.GetAttr("__init__") should look IN PurePath (not PurePath's parents)
-	// 3. If not found in PurePath, then check PurePath's parents
-	//
-	// The key: s.Class is ALREADY the parent to start searching from,
-	// so we need to check s.Class itself first, then s.Class's parents.
+	// For multiple inheritance, we need to use the instance's MRO
+	// and search starting from s.Class (inclusive)
+	// Example: ArgumentParser with MRO [ArgumentParser, _AttributeHolder, _ActionsContainer, object]
+	// When super() is called in ArgumentParser, s.Class = _AttributeHolder
+	// We should search [_AttributeHolder, _ActionsContainer, object]
+	if s.Instance != nil {
+		// Get the instance's MRO
+		mroVal, hasMRO := s.Instance.Class.GetAttr("__mro__")
+		if hasMRO {
+			if mro, ok := mroVal.(TupleValue); ok {
+				// Find s.Class in the MRO
+				startIdx := -1
+				for i, cls := range mro {
+					if c, ok := cls.(*Class); ok && c == s.Class {
+						startIdx = i
+						break
+					}
+				}
+
+				// Debug for ArgumentParser
+				if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
+					fmt.Printf("[DEBUG Super.GetAttr] Looking for __init__ in %s\n", s.Instance.Class.Name)
+					fmt.Printf("[DEBUG Super.GetAttr] s.Class = %s, startIdx = %d\n", s.Class.Name, startIdx)
+					fmt.Printf("[DEBUG Super.GetAttr] MRO = %v\n", func() []string {
+						names := make([]string, len(mro))
+						for i, c := range mro {
+							if cls, ok := c.(*Class); ok {
+								names[i] = cls.Name
+							}
+						}
+						return names
+					}())
+				}
+
+				if startIdx >= 0 {
+					// Search the MRO starting from s.Class (inclusive)
+					for i := startIdx; i < len(mro); i++ {
+						if cls, ok := mro[i].(*Class); ok {
+							// Debug for ArgumentParser
+							if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
+								fmt.Printf("[DEBUG Super.GetAttr] Checking class %s for __init__\n", cls.Name)
+							}
+							// Check Methods map directly (don't use GetMethodWithClass as it traverses parents)
+							// We'll find parent methods in the next MRO iteration
+							if method, ok := cls.Methods[name]; ok {
+								if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
+									fmt.Printf("[DEBUG Super.GetAttr] Found __init__ in %s.Methods\n", cls.Name)
+								}
+								return bindMethod(method, cls), true
+							}
+							// Then check Attributes for Python-defined methods
+							if attr, ok := cls.Attributes[name]; ok {
+								if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
+									fmt.Printf("[DEBUG Super.GetAttr] Found __init__ in %s.Attributes\n", cls.Name)
+								}
+								return bindMethod(attr, cls), true
+							}
+							if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
+								fmt.Printf("[DEBUG Super.GetAttr] __init__ NOT found in %s\n", cls.Name)
+							}
+						}
+					}
+					// Not found in MRO
+					return nil, false
+				}
+			}
+		}
+	}
+
+	// Fallback to old behavior when there's no instance or no MRO
+	// This handles super() in class methods and other edge cases
 
 	// First check s.Class itself (the starting point for MRO)
 	if method, defClass, ok := s.Class.GetMethodWithClass(name); ok {
@@ -1155,7 +1214,7 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 	// Then look in s.Class's parent classes using MRO
 	if len(s.Class.Parents) > 0 {
 		// Debug for pathlib
-		if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+		if name == "__init__" && (s.Instance != nil && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path")) {
 			fmt.Printf("[DEBUG Super.GetAttr] s.Class=%s, s.Class.Parents=%v\n", s.Class.Name, func() []string {
 				names := make([]string, len(s.Class.Parents))
 				for i, p := range s.Class.Parents {
@@ -1166,24 +1225,24 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 		}
 		for _, parent := range s.Class.Parents {
 			// Debug for pathlib
-			if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+			if name == "__init__" && (s.Instance != nil && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path")) {
 				fmt.Printf("[DEBUG Super.GetAttr] Checking parent %s for __init__\n", parent.Name)
 			}
 			// First try GetMethodWithClass (faster, checks Methods map)
 			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
-				if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+				if name == "__init__" && (s.Instance != nil && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path")) {
 					fmt.Printf("[DEBUG Super.GetAttr] Found __init__ in %s.Methods\n", defClass.Name)
 				}
 				return bindMethod(method, defClass), true
 			}
 			// Fallback to GetAttr to check Attributes (for Python-defined methods)
 			if method, ok := parent.GetAttr(name); ok {
-				if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+				if name == "__init__" && (s.Instance != nil && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path")) {
 					fmt.Printf("[DEBUG Super.GetAttr] Found __init__ in %s via GetAttr\n", parent.Name)
 				}
 				return bindMethod(method, parent), true
 			}
-			if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
+			if name == "__init__" && (s.Instance != nil && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path")) {
 				fmt.Printf("[DEBUG Super.GetAttr] __init__ NOT found in parent %s\n", parent.Name)
 			}
 		}

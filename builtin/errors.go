@@ -234,12 +234,16 @@ func RegisterErrors(ctx *core.Context) {
 	nameErrorClass := core.NewClass("NameError", exceptionClass)
 	ctx.Define("NameError", nameErrorClass)
 
-	// KeyError - raised when a dictionary key is not found
-	keyErrorClass := core.NewClass("KeyError", exceptionClass)
+	// LookupError - raised when a key or index used on a mapping or sequence is invalid
+	lookupErrorClass := core.NewClass("LookupError", exceptionClass)
+	ctx.Define("LookupError", lookupErrorClass)
+
+	// KeyError - raised when a dictionary key is not found (inherits from LookupError)
+	keyErrorClass := core.NewClass("KeyError", lookupErrorClass)
 	ctx.Define("KeyError", keyErrorClass)
 
-	// IndexError - raised when a sequence subscript is out of range
-	indexErrorClass := core.NewClass("IndexError", exceptionClass)
+	// IndexError - raised when a sequence subscript is out of range (inherits from LookupError)
+	indexErrorClass := core.NewClass("IndexError", lookupErrorClass)
 	ctx.Define("IndexError", indexErrorClass)
 
 	// AttributeError - raised when an attribute reference or assignment fails
