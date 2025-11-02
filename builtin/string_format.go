@@ -124,26 +124,28 @@ func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
 		return applyFormatSpecString(value, "", ctx)
 	}
 
-	// Get enhanced format spec (second argument)
-	// Format: "spec|!conversion|=original_expr"
-	enhancedSpec, _ := v.GetStringOrDefault(1, "")
-
-	// Parse the enhanced spec
+	// Parse format spec and conversion from remaining arguments
+	// Arguments can be: [expr] or [expr, formatSpec] or [expr, "!conversion"] or [expr, formatSpec, "!conversion"]
 	var formatSpec string
 	var conversion string
 	var selfDocExpr string
 
-	parts := strings.Split(enhancedSpec, "|")
-	if len(parts) > 0 && parts[0] != "" {
-		formatSpec = parts[0]
-	}
+	// Check each remaining argument
+	for i := 1; i < v.Count(); i++ {
+		arg, _ := v.GetStringOrDefault(i, "")
+		if arg == "" {
+			continue
+		}
 
-	for i := 1; i < len(parts); i++ {
-		part := parts[i]
-		if strings.HasPrefix(part, "!") && len(part) > 1 {
-			conversion = part[1:]
-		} else if strings.HasPrefix(part, "=") && len(part) > 1 {
-			selfDocExpr = part[1:]
+		if strings.HasPrefix(arg, "!") && len(arg) > 1 {
+			// Conversion specifier
+			conversion = arg[1:]
+		} else if strings.HasPrefix(arg, "=") && len(arg) > 1 {
+			// Self-documenting expression
+			selfDocExpr = arg[1:]
+		} else {
+			// Format spec
+			formatSpec = arg
 		}
 	}
 

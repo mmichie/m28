@@ -3519,7 +3519,30 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 		}
 
 		// Extract expression (i points after the closing })
-		exprStr := content[exprStart : i-1]
+		fullExprStr := content[exprStart : i-1]
+
+		// Parse conversion specifier (!r, !s, !a) and format spec (:...)
+		exprStr := fullExprStr
+		var conversion string
+		var formatSpec string
+
+		// Check for format spec first (:...)
+		// Need to be careful about nested braces and strings
+		colonIdx := strings.LastIndexFunc(fullExprStr, func(r rune) bool { return r == ':' })
+		if colonIdx >= 0 {
+			formatSpec = fullExprStr[colonIdx+1:]
+			exprStr = fullExprStr[:colonIdx]
+		}
+
+		// Check for conversion specifier (!r, !s, !a)
+		bangIdx := strings.LastIndexFunc(exprStr, func(r rune) bool { return r == '!' })
+		if bangIdx >= 0 && bangIdx+1 < len(exprStr) {
+			conv := exprStr[bangIdx+1:]
+			if conv == "r" || conv == "s" || conv == "a" {
+				conversion = conv
+				exprStr = exprStr[:bangIdx]
+			}
+		}
 
 		// Parse the expression using Python parser
 		// Create a temporary tokenizer and parser for the expression
@@ -3541,7 +3564,19 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 			return nil, fmt.Errorf("error converting f-string expression: %v", err)
 		}
 
-		parts = append(parts, exprValue)
+		// If we have conversion or format spec, wrap in format-expr
+		if conversion != "" || formatSpec != "" {
+			formatExpr := []core.Value{core.SymbolValue("format-expr"), exprValue}
+			if formatSpec != "" {
+				formatExpr = append(formatExpr, core.StringValue(formatSpec))
+			}
+			if conversion != "" {
+				formatExpr = append(formatExpr, core.StringValue("!"+conversion))
+			}
+			parts = append(parts, core.NewList(formatExpr...))
+		} else {
+			parts = append(parts, exprValue)
+		}
 	}
 
 	// If no expressions, return simple string
@@ -3554,18 +3589,11 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 		}
 	}
 
-	// Build format expression: (+ (str part1) (str part2) ...)
-	// Use + operator for string concatenation, wrapping non-strings in str()
-	result := core.NewList(core.SymbolValue("+"))
+	// Build format expression using str-format
+	// Format: (str-format part1 part2 ...)
+	result := core.NewList(core.SymbolValue("str-format"))
 	for _, part := range parts {
-		// If the part is already a string literal, use it directly
-		if _, isString := part.(core.StringValue); isString {
-			result.Append(part)
-		} else {
-			// Wrap in str() call to convert to string
-			strCall := core.NewList(core.SymbolValue("str"), part)
-			result.Append(strCall)
-		}
+		result.Append(part)
 	}
 	return result, nil
 }

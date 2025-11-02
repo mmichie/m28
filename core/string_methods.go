@@ -8,6 +8,41 @@ import (
 	"unicode"
 )
 
+// applyConversion applies a Python conversion specifier to a value
+// !s - str() - default string representation
+// !r - repr() - quoted string representation
+// !a - ascii() - like repr() but escape non-ASCII characters
+func applyConversion(value Value, conversion string) (Value, error) {
+	switch conversion {
+	case "s":
+		// str() conversion - default string representation
+		return StringValue(PrintValueWithoutQuotes(value)), nil
+	case "r":
+		// repr() conversion - quoted representation
+		return StringValue(PrintValue(value)), nil
+	case "a":
+		// ascii() conversion - repr() with non-ASCII escaped
+		repr := PrintValue(value)
+		// Escape non-ASCII characters
+		var result strings.Builder
+		for _, r := range repr {
+			if r < 128 {
+				result.WriteRune(r)
+			} else {
+				// Escape as \uXXXX or \UXXXXXXXX
+				if r <= 0xFFFF {
+					result.WriteString(fmt.Sprintf("\\u%04x", r))
+				} else {
+					result.WriteString(fmt.Sprintf("\\U%08x", r))
+				}
+			}
+		}
+		return StringValue(result.String()), nil
+	default:
+		return nil, fmt.Errorf("unknown conversion specifier '!%s'", conversion)
+	}
+}
+
 // formatValueWithSpec formats a value according to a Python-style format specification
 func formatValueWithSpec(value Value, spec string) (string, error) {
 	if spec == "" {
@@ -787,7 +822,7 @@ func InitStringMethods() {
 					spec := s[i+1 : j-1]
 
 					// Parse the spec: [field][!conversion][:format_spec]
-					var fieldSpec, formatSpec string
+					var fieldSpec, conversion, formatSpec string
 					var argIndex int
 
 					// Split on ':' to separate field from format spec
@@ -797,6 +832,17 @@ func InitStringMethods() {
 						formatSpec = spec[colonIdx+1:]
 					} else {
 						fieldSpec = spec
+					}
+
+					// Check for conversion specifier (!r, !s, !a)
+					bangIdx := strings.IndexByte(fieldSpec, '!')
+					if bangIdx >= 0 {
+						conversion = fieldSpec[bangIdx+1:]
+						fieldSpec = fieldSpec[:bangIdx]
+						// Validate conversion specifier
+						if conversion != "r" && conversion != "s" && conversion != "a" {
+							return nil, fmt.Errorf("invalid conversion specifier '!%s' in format string", conversion)
+						}
 					}
 
 					// Determine which argument to use
@@ -817,8 +863,18 @@ func InitStringMethods() {
 						return nil, fmt.Errorf("replacement index %d out of range for positional args tuple", argIndex)
 					}
 
+					// Apply conversion if specified
+					value := args[argIndex]
+					if conversion != "" {
+						var err error
+						value, err = applyConversion(value, conversion)
+						if err != nil {
+							return nil, err
+						}
+					}
+
 					// Format the argument
-					formatted, err := formatValueWithSpec(args[argIndex], formatSpec)
+					formatted, err := formatValueWithSpec(value, formatSpec)
 					if err != nil {
 						return nil, err
 					}
