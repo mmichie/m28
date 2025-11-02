@@ -8,6 +8,7 @@ import (
 
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/protocols"
 )
 
 func init() {
@@ -1357,6 +1358,12 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 
 	// Map Go error types to Python exception classes
 	switch baseErr.(type) {
+	case *core.StopIteration:
+		// StopIteration from generators
+		return createPythonExceptionInstance(ctx, "StopIteration", errMsg)
+	case *protocols.StopIteration:
+		// StopIteration from iterators
+		return createPythonExceptionInstance(ctx, "StopIteration", errMsg)
 	case *core.FileNotFoundError:
 		return createPythonExceptionInstance(ctx, "FileNotFoundError", errMsg)
 	case *core.OSError:
