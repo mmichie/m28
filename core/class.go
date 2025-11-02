@@ -451,6 +451,11 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 		// Prepend class as first argument
 		newArgs := append([]Value{c}, args...)
 
+		// Check if it's a ClassMethodValue (need to unwrap it)
+		if cm, ok := newMethod.(*ClassMethodValue); ok {
+			newMethod = cm.Function
+		}
+
 		// Call __new__ with positional args only
 		// In Python, __new__ typically only receives positional args,
 		// while keyword args are handled by __init__
@@ -602,6 +607,159 @@ func (t *TupleInstance) GetAttr(name string) (Value, bool) {
 	}
 	// Look up in the class
 	if attr, found := t.Class.GetAttr(name); found {
+		return attr, true
+	}
+	return nil, false
+}
+
+// ListInstance represents an instance of a class that inherits from list
+type ListInstance struct {
+	Data  *ListValue // The underlying list data
+	Class *Class     // The class this list is an instance of
+}
+
+// IteratorWrapper wraps a Go Iterator to make it a Value with __next__
+type IteratorWrapper struct {
+	Iterator Iterator
+}
+
+// Type returns the type
+func (w *IteratorWrapper) Type() Type {
+	return "iterator"
+}
+
+// String returns string representation
+func (w *IteratorWrapper) String() string {
+	return "<iterator>"
+}
+
+// GetAttr implements __next__ method
+func (w *IteratorWrapper) GetAttr(name string) (Value, bool) {
+	if name == "__next__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			val, hasNext := w.Iterator.Next()
+			if !hasNext {
+				return nil, fmt.Errorf("StopIteration")
+			}
+			return val, nil
+		}), true
+	}
+	return nil, false
+}
+
+// BoundListMethod represents a method bound to a ListInstance
+type BoundListMethod struct {
+	ListInstance *ListInstance
+	Method       interface {
+		Call([]Value, *Context) (Value, error)
+	}
+	DefiningClass *Class
+}
+
+// Type returns the type
+func (b *BoundListMethod) Type() Type {
+	return "method"
+}
+
+// String returns string representation
+func (b *BoundListMethod) String() string {
+	return "<bound method>"
+}
+
+// Call calls the method with the ListInstance as the first argument
+func (b *BoundListMethod) Call(args []Value, ctx *Context) (Value, error) {
+	// Prepend the ListInstance as self
+	newArgs := append([]Value{b.ListInstance}, args...)
+	return b.Method.Call(newArgs, ctx)
+}
+
+// NewListInstance creates a new list instance of a class
+func NewListInstance(class *Class, data *ListValue) *ListInstance {
+	return &ListInstance{
+		Data:  data,
+		Class: class,
+	}
+}
+
+// Type returns the type of the list instance
+func (l *ListInstance) Type() Type {
+	return Type(l.Class.Name)
+}
+
+// String returns the string representation
+func (l *ListInstance) String() string {
+	return l.Data.String()
+}
+
+// Iterator returns an iterator for the list
+func (l *ListInstance) Iterator() Iterator {
+	return l.Data.Iterator()
+}
+
+// Len returns the length of the list
+func (l *ListInstance) Len() int {
+	return l.Data.Len()
+}
+
+// Items returns the list items
+func (l *ListInstance) Items() []Value {
+	return l.Data.Items()
+}
+
+// GetAttr gets an attribute from the list's class
+func (l *ListInstance) GetAttr(name string) (Value, bool) {
+	// Special case for __class__
+	if name == "__class__" {
+		return l.Class, true
+	}
+
+	// Delegate list methods to the underlying list data
+	switch name {
+	case "__len__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return NumberValue(l.Data.Len()), nil
+		}), true
+	case "__iter__":
+		// Return a function that creates an iterator wrapper
+		// This matches Python behavior where __iter__ returns an iterator object
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// Create an iterator wrapper that implements __next__
+			iter := l.Data.Iterator()
+			wrapper := &IteratorWrapper{Iterator: iter}
+			return wrapper, nil
+		}), true
+	case "__getitem__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__getitem__ takes exactly 1 argument")
+			}
+			// Delegate to list's __getitem__
+			if getItem, ok := l.Data.GetAttr("__getitem__"); ok {
+				if callable, ok := getItem.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); ok {
+					return callable.Call(args, ctx)
+				}
+			}
+			return nil, fmt.Errorf("list has no __getitem__ method")
+		}), true
+	}
+
+	// Look up in the class
+	if attr, defClass, found := l.Class.GetMethodWithClass(name); found {
+		// Check if it's callable - if so, bind it as a method
+		if callable, ok := attr.(interface {
+			Call([]Value, *Context) (Value, error)
+		}); ok {
+			// Create bound method with ListInstance as receiver
+			// We need to create a wrapper since BoundInstanceMethod expects *Instance
+			boundMethod := &BoundListMethod{
+				ListInstance:  l,
+				Method:        callable,
+				DefiningClass: defClass,
+			}
+			return boundMethod, true
+		}
 		return attr, true
 	}
 	return nil, false

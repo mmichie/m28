@@ -105,6 +105,65 @@ func RegisterTypes(ctx *core.Context) {
 	tupleNew.SetAttr("__name__", core.StringValue("__new__"))
 	TupleTypeClass.SetMethod("__new__", &core.ClassMethodValue{Function: tupleNew})
 
+	// Add __new__ classmethod to list
+	listNew := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// list.__new__(cls, iterable=())
+		// First arg is cls (the class), second is optional iterable
+		if len(args) < 1 {
+			return nil, fmt.Errorf("list.__new__() missing 1 required positional argument: 'cls'")
+		}
+
+		cls := args[0]
+
+		// Convert iterable to list data
+		var listData *core.ListValue
+
+		if len(args) == 1 {
+			// If only cls provided, create empty list
+			listData = core.NewList()
+		} else {
+			// Convert iterable to list
+			iterable := args[1]
+
+			// Handle different iterable types
+			switch v := iterable.(type) {
+			case *core.ListValue:
+				// Copy the list
+				listData = core.NewList(v.Items()...)
+			case core.TupleValue:
+				listData = core.NewList(v...)
+			case core.Iterable:
+				// Iterate and collect values
+				result := make([]core.Value, 0)
+				iter := v.Iterator()
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					result = append(result, val)
+				}
+				listData = core.NewList(result...)
+			default:
+				return nil, fmt.Errorf("list.__new__() argument must be an iterable")
+			}
+		}
+
+		// If cls is a subclass of list (like StackSummary), create a ListInstance
+		// Otherwise, return a plain ListValue
+		if class, ok := cls.(*core.Class); ok {
+			// Check if it's a list subclass (not the base list class)
+			if class != ListTypeClass && class.Name != "list" {
+				return core.NewListInstance(class, listData), nil
+			}
+		}
+
+		// Return plain list for base list class
+		return listData, nil
+	})
+	listNew.SetAttr("__name__", core.StringValue("__new__"))
+	ListTypeClass.SetMethod("__new__", &core.ClassMethodValue{Function: listNew})
+
 	// Add __code__ and __globals__ as class attributes on function type
 	// These are descriptor objects that Python uses to access function attributes
 	FunctionTypeClass.SetClassAttr("__code__", core.NewCodeObject(nil))

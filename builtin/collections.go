@@ -235,6 +235,11 @@ func (l *ListType) GetClass() *core.Class {
 	return l.Class
 }
 
+// GetAttr delegates to the embedded Class to expose methods like __new__
+func (l *ListType) GetAttr(name string) (core.Value, bool) {
+	return l.Class.GetAttr(name)
+}
+
 // Call implements the callable interface for list() construction
 func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
@@ -256,10 +261,12 @@ func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 // to ensure our custom Call is used instead of the generic class instantiation
 func (l *ListType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	// For list, keyword arguments are not supported in the constructor
-	// Just ignore kwargs and call our custom Call method
 	if len(kwargs) > 0 {
 		return nil, fmt.Errorf("list() does not accept keyword arguments")
 	}
+	// Use the custom Call method which handles multiple arguments
+	// e.g., list(1, 2, 3) creates [1, 2, 3]
+	// List subclasses will call Class.CallWithKeywords directly, not through ListType
 	return l.Call(args, ctx)
 }
 
@@ -691,11 +698,10 @@ func createSetClass() *SetType {
 
 // createListClass creates the list class that can be used as a base class
 func createListClass() *ListType {
-	class := core.NewClass("list", nil)
-
+	// Use the global ListTypeClass which already has __new__ defined in types.go
 	// Add .copy unbound method that can be accessed as list.copy
 	// This returns a descriptor-like object that can be called
-	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ListTypeClass.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("descriptor 'copy' of 'list' object needs an argument")
 		}
@@ -715,7 +721,7 @@ func createListClass() *ListType {
 		return nil, fmt.Errorf("list.copy method not found")
 	}))
 
-	return &ListType{Class: class}
+	return &ListType{Class: ListTypeClass}
 }
 
 // createDictClass creates the dict class with class methods like fromkeys

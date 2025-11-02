@@ -53,6 +53,10 @@ func AsList(v core.Value) (*core.ListValue, bool) {
 	if list, ok := v.(*core.ListValue); ok {
 		return list, true
 	}
+	// Handle ListInstance (subclasses of list)
+	if listInst, ok := v.(*core.ListInstance); ok {
+		return listInst.Data, true
+	}
 	return nil, false
 }
 
