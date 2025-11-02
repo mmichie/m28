@@ -302,6 +302,29 @@ func (n NilValue) String() string {
 	return "None"
 }
 
+// GetAttr implements attribute access for None
+// In Python, None has __class__ and other dunder attributes
+func (n NilValue) GetAttr(name string) (Value, bool) {
+	// First check type descriptor (if registered)
+	desc := GetTypeDescriptor(NilType)
+	if desc != nil {
+		val, err := desc.GetAttribute(n, name)
+		if err == nil {
+			return val, true
+		}
+	}
+
+	// Fallback: handle basic attributes directly
+	switch name {
+	case "__bool__":
+		// None is falsy
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return BoolValue(false), nil
+		}), true
+	}
+	return nil, false
+}
+
 // Predefined nil value
 var (
 	Nil  = NilValue{}

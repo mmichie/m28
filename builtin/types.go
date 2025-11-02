@@ -47,6 +47,24 @@ func RegisterTypes(ctx *core.Context) {
 	FunctionTypeClass = core.NewClass("function", nil)
 	MethodTypeClass = core.NewClass("method", nil) // For bound methods
 
+	// Register type descriptor for NoneType to handle __class__
+	noneTypeDesc := &core.TypeDescriptor{
+		Name:       "NoneType",
+		PythonName: "NoneType",
+		BaseType:   core.NilType,
+		Properties: map[string]*core.PropertyDescriptor{
+			"__class__": {
+				Name:     "__class__",
+				ReadOnly: true,
+				Doc:      "The class of None",
+				Getter: func(v core.Value) (core.Value, error) {
+					return NoneTypeClass, nil
+				},
+			},
+		},
+	}
+	core.RegisterType(noneTypeDesc)
+
 	// Add __new__ classmethod to tuple
 	tupleNew := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// tuple.__new__(cls, iterable=())
