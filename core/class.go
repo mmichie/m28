@@ -756,7 +756,7 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 
 	// Step 4: Check class attributes (non-descriptors)
 	if attr, ok := i.Class.GetClassAttr(name); ok {
-		// Check if it has __get__
+		// Check if it has __get__ (making it a non-data descriptor)
 		if obj, ok := attr.(interface{ GetAttr(string) (Value, bool) }); ok {
 			if getMethod, exists := obj.GetAttr("__get__"); exists {
 				if callable, ok := getMethod.(Callable); ok {
