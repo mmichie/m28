@@ -797,12 +797,9 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 		}), true
 	case "keys":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			keys := od.dict.Keys()
-			result := make([]core.Value, len(keys))
-			for i, k := range keys {
-				result[i] = core.StringValue(k)
-			}
-			return core.NewList(result...), nil
+			// Use OriginalKeys() to get the actual key values, not internal representations
+			keys := od.dict.OriginalKeys()
+			return core.NewList(keys...), nil
 		}), true
 	case "values":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -817,9 +814,12 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 	case "items":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			items := make([]core.Value, 0)
-			for _, key := range od.dict.Keys() {
-				if val, ok := od.dict.Get(key); ok {
-					items = append(items, core.TupleValue{core.StringValue(key), val})
+			// Get both internal and original keys to maintain order
+			internalKeys := od.dict.Keys()
+			originalKeys := od.dict.OriginalKeys()
+			for i, internalKey := range internalKeys {
+				if val, ok := od.dict.Get(internalKey); ok {
+					items = append(items, core.TupleValue{originalKeys[i], val})
 				}
 			}
 			return core.NewList(items...), nil
