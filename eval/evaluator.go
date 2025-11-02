@@ -436,13 +436,15 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						if err != nil {
 							return nil, err
 						}
-						return value, nil
+						// Python assignments are statements and return None
+						return core.None, nil
 					}
 
 					// Special handling for dicts
 					if dict, ok := obj.(*core.DictValue); ok {
 						dict.Set(attrName, value)
-						return value, nil
+						// Python assignments are statements and return None
+						return core.None, nil
 					}
 
 					return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
@@ -550,7 +552,8 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		core.DebugLog("[ASSIGN] Tuple unpacking complete\n")
-		return value, nil
+		// Python assignments are statements and return None
+		return core.None, nil
 	}
 
 	// Single variable assignment
@@ -568,7 +571,8 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Variable assignment - always define/update in current scope
 	symName := string(sym)
 	ctx.Define(symName, value)
-	return value, nil
+	// Python assignments are statements and return None
+	return core.None, nil
 }
 
 // annotatedAssignForm implements annotated assignment (PEP 526): x: int = 5

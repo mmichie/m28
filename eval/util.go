@@ -570,8 +570,8 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 	return dict, nil
 }
 
-// AssignForm provides the implementation of the = special form
-func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+// assignFormInternal is the internal implementation that returns the assigned value
+func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 2 {
 		return nil, ErrArgCount("= requires at least 2 arguments")
 	}
@@ -1148,6 +1148,18 @@ func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	return nil, TypeError{Expected: "symbol or dot notation", Got: target.Type()}
+}
+
+// AssignForm provides the implementation of the = special form
+// Python assignments are statements and always return None
+func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Call the internal implementation
+	_, err := assignFormInternal(args, ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Python assignments are statements and return None
+	return core.None, nil
 }
 
 // WalrusForm provides the implementation of the walrus operator (:=)

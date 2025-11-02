@@ -98,7 +98,8 @@ func AugmentedAssignForm(op string, args *core.ListValue, ctx *core.Context) (co
 
 		// Assign the result
 		ctx.Define(string(t), result)
-		return result, nil
+		// Python assignments are statements and return None
+		return core.None, nil
 
 	case *core.ListValue:
 		// Could be indexing or dot notation

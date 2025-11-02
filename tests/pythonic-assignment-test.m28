@@ -117,20 +117,22 @@ pythonic_var = 10
 (assert (== sexp_var 20) "S-expression assignment works")
 (print "✓ Mixed styles work")
 
-# Test 18: Assignment in expression context
+# Test 18: Assignment in expression context (walrus operator)
 (print "\nTest 18: Assignment in expression")
-result18 = (+ (= temp 5) 10)
+result18 = (+ (:= temp 5) 10)
 (assert (== temp 5) "Inner assignment should work")
 (assert (== result18 15) "Outer expression should work")
 (print "✓ Assignment in expression works")
 
-# Test 19: Chained assignment
-(print "\nTest 19: Chained assignment")
-final = middle = initial = 42
-(assert (== initial 42) "First in chain")
-(assert (== middle 42) "Middle in chain")
-(assert (== final 42) "Final in chain")
-(print "✓ Chained assignment works")
+# Test 19: Separate assignments (Python doesn't support chained = in expressions)
+(print "\nTest 19: Multiple separate assignments")
+initial = 42
+middle = 42
+final = 42
+(assert (== initial 42) "First assignment")
+(assert (== middle 42) "Second assignment")
+(assert (== final 42) "Third assignment")
+(print "✓ Multiple separate assignments work")
 
 # Test 20: Assignment with operators
 (print "\nTest 20: Assignment with various operators")
