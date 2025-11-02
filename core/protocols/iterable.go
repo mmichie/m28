@@ -86,6 +86,29 @@ func (l *ListIterator) GetAttr(name string) (core.Value, bool) {
 	return nil, false
 }
 
+// Iterator makes ListIterator implement core.Iterable
+// In Python, calling iter() on an iterator returns the iterator itself
+func (l *ListIterator) Iterator() core.Iterator {
+	return &listIteratorAdapter{iter: l}
+}
+
+// listIteratorAdapter adapts protocols.ListIterator to core.Iterator
+type listIteratorAdapter struct {
+	iter *ListIterator
+}
+
+func (a *listIteratorAdapter) Next() (core.Value, bool) {
+	val, err := a.iter.Next()
+	if err != nil {
+		return nil, false
+	}
+	return val, true
+}
+
+func (a *listIteratorAdapter) Reset() {
+	a.iter.index = 0
+}
+
 // DictIterator iterates over dict keys (Python behavior)
 type DictIterator struct {
 	dict  *core.DictValue
