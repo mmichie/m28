@@ -8,6 +8,9 @@ import (
 // MethodHandler is a function that implements a method
 type MethodHandler func(receiver Value, args []Value, ctx *Context) (Value, error)
 
+// MethodHandlerWithKwargs is a function that implements a method with keyword argument support
+type MethodHandlerWithKwargs func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error)
+
 // ConstructorFunc creates a new instance of a type
 type ConstructorFunc func(args []Value, ctx *Context) (Value, error)
 
@@ -27,11 +30,12 @@ type TypeDescriptor struct {
 
 // MethodDescriptor describes a method
 type MethodDescriptor struct {
-	Name    string
-	Arity   int // -1 for variadic
-	Doc     string
-	Builtin bool // Is it implemented in Go?
-	Handler MethodHandler
+	Name         string
+	Arity        int // -1 for variadic
+	Doc          string
+	Builtin      bool // Is it implemented in Go?
+	Handler      MethodHandler
+	KwargHandler MethodHandlerWithKwargs // Optional keyword argument handler
 }
 
 // PropertyDescriptor describes an attribute/property
@@ -220,6 +224,26 @@ func (bm *BoundMethod) Call(args []Value, ctx *Context) (Value, error) {
 		return nil, fmt.Errorf("method %s has nil handler", bm.Method.Name)
 	}
 	return bm.Method.Handler(bm.Receiver, args, ctx)
+}
+
+// CallWithKeywords implements keyword argument support for bound methods
+func (bm *BoundMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	if bm.Method == nil {
+		return nil, fmt.Errorf("bound method has nil method descriptor")
+	}
+
+	// If method has a keyword argument handler, use it
+	if bm.Method.KwargHandler != nil {
+		return bm.Method.KwargHandler(bm.Receiver, args, kwargs, ctx)
+	}
+
+	// Otherwise, if there are no keyword arguments, use the regular handler
+	if len(kwargs) == 0 && bm.Method.Handler != nil {
+		return bm.Method.Handler(bm.Receiver, args, ctx)
+	}
+
+	// Method doesn't support keyword arguments
+	return nil, fmt.Errorf("method %s does not support keyword arguments", bm.Method.Name)
 }
 
 // GetAttr implements attribute access for bound methods

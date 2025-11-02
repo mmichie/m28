@@ -132,11 +132,12 @@ func getListMethods() map[string]*MethodDescriptor {
 			Handler: listMethodCount,
 		},
 		"sort": {
-			Name:    "sort",
-			Arity:   0,
-			Doc:     "Sort the list in place",
-			Builtin: true,
-			Handler: listMethodSort,
+			Name:         "sort",
+			Arity:        0,
+			Doc:          "Sort the list in place",
+			Builtin:      true,
+			Handler:      listMethodSort,
+			KwargHandler: listMethodSortWithKwargs,
 		},
 		"reverse": {
 			Name:    "reverse",
@@ -452,6 +453,105 @@ func listMethodSort(receiver Value, args []Value, ctx *Context) (Value, error) {
 		// For now, compare as strings
 		return Repr(list.items[i]) < Repr(list.items[j])
 	})
+
+	return None, nil
+}
+
+// listMethodSortWithKwargs implements list.sort() with keyword arguments (key=, reverse=)
+func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	list := receiver.(*ListValue)
+
+	// Extract keyword arguments
+	var keyFunc Value
+	reverse := false
+
+	if key, hasKey := kwargs["key"]; hasKey {
+		// Verify it's callable
+		if _, ok := key.(Callable); !ok {
+			// Also check for __call__ method
+			if obj, ok := key.(Object); ok {
+				if _, exists := obj.GetAttr("__call__"); !exists {
+					return nil, fmt.Errorf("key argument must be a callable function")
+				}
+			} else {
+				return nil, fmt.Errorf("key argument must be a callable function")
+			}
+		}
+		keyFunc = key
+	}
+
+	if rev, hasRev := kwargs["reverse"]; hasRev {
+		if b, ok := rev.(BoolValue); ok {
+			reverse = bool(b)
+		} else {
+			return nil, fmt.Errorf("reverse argument must be a boolean")
+		}
+	}
+
+	// Check for unknown keyword arguments
+	for k := range kwargs {
+		if k != "key" && k != "reverse" {
+			return nil, fmt.Errorf("sort() got an unexpected keyword argument '%s'", k)
+		}
+	}
+
+	// Create a slice of items with their keys for sorting
+	type keyedItem struct {
+		value    Value
+		keyValue Value
+		index    int // Original index for stable sort
+	}
+
+	keyedItems := make([]keyedItem, list.Len())
+	for i := 0; i < list.Len(); i++ {
+		var keyValue Value
+		if keyFunc != nil {
+			// Apply key function
+			if callable, ok := keyFunc.(Callable); ok {
+				var err error
+				keyValue, err = callable.Call([]Value{list.items[i]}, ctx)
+				if err != nil {
+					return nil, fmt.Errorf("error applying key function: %v", err)
+				}
+			} else {
+				// Try calling __call__ method
+				if obj, ok := keyFunc.(Object); ok {
+					if callMethod, exists := obj.GetAttr("__call__"); exists {
+						if callable, ok := callMethod.(Callable); ok {
+							var err error
+							keyValue, err = callable.Call([]Value{list.items[i]}, ctx)
+							if err != nil {
+								return nil, fmt.Errorf("error applying key function: %v", err)
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// No key function, use the value itself
+			keyValue = list.items[i]
+		}
+
+		keyedItems[i] = keyedItem{
+			value:    list.items[i],
+			keyValue: keyValue,
+			index:    i,
+		}
+	}
+
+	// Sort using Go's sort package
+	sort.SliceStable(keyedItems, func(i, j int) bool {
+		cmp := Compare(keyedItems[i].keyValue, keyedItems[j].keyValue)
+		if reverse {
+			return cmp > 0
+		}
+		return cmp < 0
+	})
+
+	// Update the list items in place
+	for i, ki := range keyedItems {
+		list.items[i] = ki.value
+	}
 
 	return None, nil
 }

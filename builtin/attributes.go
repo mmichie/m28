@@ -41,6 +41,89 @@ func RegisterAttributes(ctx *core.Context) {
 			}
 		}
 
+		// Special case for Module objects - include __dict__ contents
+		if module, ok := val.(*core.Module); ok {
+			nameSet := make(map[string]bool)
+
+			// Add contents from module's __dict__
+			if module.Dict != nil {
+				for _, key := range module.Dict.Keys() {
+					// Keys() returns []string (internal key representation like "s:BoolTest")
+					// Strip the prefix to get the original name
+					if len(key) > 2 && key[0] != 'p' { // 'p' prefix is for complex types
+						name := key[2:] // Strip "s:", "n:", "b:", etc.
+						nameSet[name] = true
+					}
+				}
+			}
+
+			// Add contents from module's Exports
+			for name := range module.Exports {
+				nameSet[name] = true
+			}
+
+			// Add standard module attributes
+			nameSet["__dict__"] = true
+			nameSet["__doc__"] = true
+			nameSet["__file__"] = true
+			nameSet["__name__"] = true
+
+			// Convert to sorted list
+			names := make([]string, 0, len(nameSet))
+			for name := range nameSet {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+
+			result := make([]core.Value, len(names))
+			for i, name := range names {
+				result[i] = core.StringValue(name)
+			}
+
+			return core.NewList(result...), nil
+		}
+
+		// Special case for Class objects - include methods
+		if class, ok := val.(*core.Class); ok {
+			nameSet := make(map[string]bool)
+
+			// Add methods from Class.Methods
+			for methodName := range class.Methods {
+				nameSet[methodName] = true
+			}
+
+			// Add inherited methods from parents
+			for _, parent := range class.Parents {
+				for methodName := range parent.Methods {
+					nameSet[methodName] = true
+				}
+			}
+
+			// Add standard class attributes
+			nameSet["__name__"] = true
+			nameSet["__bases__"] = true
+			nameSet["__dict__"] = true
+			nameSet["__module__"] = true
+			nameSet["__doc__"] = true
+			nameSet["__call__"] = true
+			nameSet["__instancecheck__"] = true
+			nameSet["__subclasscheck__"] = true
+
+			// Convert to sorted list
+			names := make([]string, 0, len(nameSet))
+			for name := range nameSet {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+
+			result := make([]core.Value, len(names))
+			for i, name := range names {
+				result[i] = core.StringValue(name)
+			}
+
+			return core.NewList(result...), nil
+		}
+
 		// Default implementation using type descriptor
 		desc := core.GetTypeDescriptorForValue(val)
 		if desc == nil {
