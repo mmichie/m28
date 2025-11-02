@@ -50,14 +50,18 @@ func createGeneratorExecState(function core.Value, args []core.Value, ctx *core.
 type StepKind int
 
 const (
-	StepStatement StepKind = iota // Regular statement to evaluate
-	StepYield                     // Yield expression
-	StepReturn                    // Return statement
-	StepLoopInit                  // Initialize loop
-	StepLoopNext                  // Get next loop iteration
-	StepLoopEnd                   // End of loop
-	StepIfStart                   // Start of if/conditional
-	StepIfEnd                     // End of if block
+	StepStatement    StepKind = iota // Regular statement to evaluate
+	StepYield                        // Yield expression
+	StepReturn                       // Return statement
+	StepLoopInit                     // Initialize loop
+	StepLoopNext                     // Get next loop iteration
+	StepLoopEnd                      // End of loop
+	StepIfStart                      // Start of if/conditional
+	StepIfEnd                        // End of if block
+	StepTryStart                     // Start of try block
+	StepTryEnd                       // End of try block (jump to finally)
+	StepFinallyStart                 // Start of finally block
+	StepFinallyEnd                   // End of finally block
 )
 
 // ExecutionStep represents one step in generator execution
@@ -70,13 +74,24 @@ type ExecutionStep struct {
 
 // GeneratorExecState holds the execution state of a generator
 type GeneratorExecState struct {
-	Steps       []ExecutionStep // Flattened execution steps
-	CurrentStep int             // Current position
-	Locals      *core.Context   // Local variables context
-	LoopStates  []LoopState     // Stack of active loop states
-	completed   bool            // Whether generator has finished
-	sentValue   core.Value      // Value sent via send()
-	started     bool            // Whether generator has started
+	Steps        []ExecutionStep // Flattened execution steps
+	CurrentStep  int             // Current position
+	Locals       *core.Context   // Local variables context
+	LoopStates   []LoopState     // Stack of active loop states
+	TryStates    []TryState      // Stack of active try/finally blocks
+	completed    bool            // Whether generator has finished
+	sentValue    core.Value      // Value sent via send()
+	started      bool            // Whether generator has started
+	pendingError error           // Error to be raised after finally blocks
+}
+
+// TryState tracks the state of an active try/except/finally block
+type TryState struct {
+	ExceptSteps []int // Steps to execute for each except handler
+	FinallyStep int   // Step to execute for finally block (0 if no finally)
+	EndStep     int   // Step after the entire try/except/finally
+	InFinally   bool  // Whether we're currently in the finally block
+	InExcept    bool  // Whether we're currently in an except handler
 }
 
 // LoopState tracks the state of an active loop
@@ -142,6 +157,20 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			// Evaluate the statement
 			result, err := Eval(step.Node, state.Locals)
 			if err != nil {
+				// If we're in a try block, jump to except handler (or finally)
+				if len(state.TryStates) > 0 {
+					tryState := &state.TryStates[len(state.TryStates)-1]
+					if !tryState.InExcept && !tryState.InFinally {
+						// Jump to first except handler and save error
+						if len(tryState.ExceptSteps) > 0 && tryState.ExceptSteps[0] > 0 {
+							state.pendingError = err
+							tryState.InExcept = true
+							state.CurrentStep = tryState.ExceptSteps[0]
+							continue
+						}
+					}
+				}
+				// Not in a try block or already in except/finally - propagate error
 				return nil, err
 			}
 
@@ -249,6 +278,41 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 
 		case StepLoopEnd:
 			// Jump back to loop next
+			state.CurrentStep = step.Arg
+
+		case StepTryStart:
+			// Push try state
+			// step.Arg points to either except handler or finally block
+			state.TryStates = append(state.TryStates, TryState{
+				ExceptSteps: []int{step.Arg}, // First except or finally
+				FinallyStep: 0,               // Will be set when we see StepFinallyStart
+				EndStep:     0,               // Will be set at StepTryEnd
+				InFinally:   false,
+				InExcept:    false,
+			})
+			state.CurrentStep++
+
+		case StepTryEnd:
+			// Normal exit from try block - skip except handlers, go to finally or end
+			// step.Arg points to finally block or after try
+			state.CurrentStep = step.Arg
+
+		case StepFinallyStart:
+			// Just a marker, continue to next step
+			state.CurrentStep++
+
+		case StepFinallyEnd:
+			// Pop try state
+			if len(state.TryStates) > 0 {
+				state.TryStates = state.TryStates[:len(state.TryStates)-1]
+			}
+			// Check if there's a pending error to re-raise
+			if state.pendingError != nil {
+				err := state.pendingError
+				state.pendingError = nil
+				return nil, err
+			}
+			// Jump to step after finally
 			state.CurrentStep = step.Arg
 
 		default:
@@ -372,6 +436,112 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 					Kind: StepStatement,
 					Node: node,
 				})
+				return steps, nil
+
+			case "try":
+				// Try/except/finally block: (try body... (except handler...) (finally cleanup...))
+				// Parse the try form
+				var tryBody []core.Value
+				var exceptClauses []*core.ListValue
+				var finallyBody []core.Value
+
+				for i := 1; i < n.Len(); i++ {
+					item := n.Items()[i]
+					if list, ok := item.(*core.ListValue); ok && list.Len() > 0 {
+						if sym, ok := list.Items()[0].(core.SymbolValue); ok {
+							switch string(sym) {
+							case "except":
+								exceptClauses = append(exceptClauses, list)
+								continue
+							case "finally":
+								finallyBody = list.Items()[1:]
+								continue
+							}
+						}
+					}
+					// If we haven't seen except or finally yet, it's part of try body
+					if len(exceptClauses) == 0 && len(finallyBody) == 0 {
+						tryBody = append(tryBody, item)
+					}
+				}
+
+				// Build the step sequence
+				tryStartIdx := len(steps)
+
+				// Mark start of try block - store index of first except handler (or finally if no except)
+				steps = append(steps, ExecutionStep{
+					Kind: StepTryStart,
+					Arg:  -1, // Will be filled in later
+				})
+
+				// Transform try body
+				for _, stmt := range tryBody {
+					substeps, err := transformToSteps(stmt)
+					if err != nil {
+						return nil, err
+					}
+					steps = append(steps, substeps...)
+				}
+
+				// Mark end of try block - jump past except handlers
+				tryEndIdx := len(steps)
+				steps = append(steps, ExecutionStep{
+					Kind: StepTryEnd,
+					Arg:  -1, // Will jump to finally or after
+				})
+
+				// Transform except handlers (for now, treat as opaque statements)
+				// In the future, we can add proper exception matching
+				exceptStartIdx := len(steps)
+				for _, exceptClause := range exceptClauses {
+					// For now, treat each except as a single statement
+					// This means if an error occurs, we jump here and evaluate it
+					steps = append(steps, ExecutionStep{
+						Kind: StepStatement,
+						Node: exceptClause,
+					})
+				}
+
+				// Transform finally block if present
+				var finallyStartIdx int
+				if len(finallyBody) > 0 {
+					finallyStartIdx = len(steps)
+					steps = append(steps, ExecutionStep{
+						Kind: StepFinallyStart,
+					})
+
+					for _, stmt := range finallyBody {
+						substeps, err := transformToSteps(stmt)
+						if err != nil {
+							return nil, err
+						}
+						steps = append(steps, substeps...)
+					}
+
+					steps = append(steps, ExecutionStep{
+						Kind: StepFinallyEnd,
+						Arg:  len(steps) + 1, // Jump past finally
+					})
+				}
+
+				afterTryIdx := len(steps)
+
+				// Fill in jump targets
+				if len(exceptClauses) > 0 {
+					steps[tryStartIdx].Arg = exceptStartIdx // On error, jump to except
+				} else if len(finallyBody) > 0 {
+					steps[tryStartIdx].Arg = finallyStartIdx // On error, jump to finally
+				} else {
+					steps[tryStartIdx].Arg = afterTryIdx // No except or finally
+				}
+
+				// Try end jumps to finally (if exists) or past everything
+				if len(finallyBody) > 0 {
+					steps[tryEndIdx].Arg = finallyStartIdx
+				} else {
+					steps[tryEndIdx].Arg = afterTryIdx
+				}
+
 				return steps, nil
 
 			default:
