@@ -1026,9 +1026,29 @@ func Equal() func([]core.Value, *core.Context) (core.Value, error) {
 
 // compareEqual compares two values for equality
 func compareEqual(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Special handling for Class objects - use the default __eq__ from type, not instance methods
+	// This prevents trying to call instance methods like TestCase.__eq__(self, other) on the class itself
+	if leftClass, ok := left.(*core.Class); ok {
+		// For classes, compare by identity or use the built-in __eq__ from Class.GetAttr
+		// which returns a bound BuiltinFunction, not instance methods
+		// Just use the fallback equality check
+		if rightClass, ok := right.(*core.Class); ok {
+			// Both are classes - compare by name
+			return core.BoolValue(leftClass.Name == rightClass.Name), nil
+		}
+		// Left is class, right is not - they're not equal
+		return core.BoolValue(false), nil
+	}
+
 	// Try __eq__ on left operand
 	if result, found, err := types.CallDunder(left, "__eq__", []core.Value{right}, ctx); found {
 		return result, err
+	}
+
+	// Special handling for Class objects on the right side too
+	if _, ok := right.(*core.Class); ok {
+		// Right is a class, left is not - they're not equal
+		return core.BoolValue(false), nil
 	}
 
 	// Try __eq__ on right operand (Python doesn't have __req__)

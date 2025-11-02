@@ -347,7 +347,8 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	switch name {
 	case "__eq__":
 		// Default __eq__ for classes
-		// Note: Called via protocol, so only receives 'other' argument (self is implicit)
+		// When accessed on a class (not instance), this should work for comparisons like test_class == None
+		// The function is designed to work when called via CallDunder with just the 'other' argument
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
 				return nil, fmt.Errorf("__eq__ requires exactly 1 argument")
