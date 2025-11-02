@@ -327,6 +327,9 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 
 		var value Value
 		var fmtType byte
+		var leftAlign bool
+		var width int
+		var hasWidth bool
 
 		// Check for %(name)s dictionary-style formatting
 		if formatStr[i] == '(' {
@@ -389,17 +392,44 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 
 			// Parse format specifier (simplified version)
 			// Full format: %[flags][width][.precision]type
-			// For now, just handle the type and ignore flags/width/precision
 
 			// Skip optional flags (-, +, 0, space, #)
+			leftAlign = false
 			for i < len(formatStr) && (formatStr[i] == '-' || formatStr[i] == '+' ||
 				formatStr[i] == '0' || formatStr[i] == ' ' || formatStr[i] == '#') {
+				if formatStr[i] == '-' {
+					leftAlign = true
+				}
 				i++
 			}
 
-			// Skip optional width
-			for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+			// Parse optional width (can be * for dynamic width)
+			width = 0
+			hasWidth = false
+			if i < len(formatStr) && formatStr[i] == '*' {
+				// Dynamic width from next argument
+				if valueIdx >= len(valueTuple) {
+					return nil, fmt.Errorf("not enough arguments for format string")
+				}
+				if widthNum, ok := valueTuple[valueIdx].(NumberValue); ok {
+					width = int(widthNum)
+					hasWidth = true
+					valueIdx++
+				} else {
+					return nil, fmt.Errorf("* wants int")
+				}
 				i++
+			} else {
+				// Static width
+				widthStart := i
+				for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+					i++
+				}
+				if i > widthStart {
+					widthStr := formatStr[widthStart:i]
+					fmt.Sscanf(widthStr, "%d", &width)
+					hasWidth = true
+				}
 			}
 
 			// Skip optional .precision
@@ -479,6 +509,19 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			}
 		default:
 			return nil, fmt.Errorf("unsupported format character '%c'", fmtType)
+		}
+
+		// Apply width padding if specified
+		if hasWidth {
+			currentLen := len(formatted)
+			if width > currentLen {
+				padding := strings.Repeat(" ", width-currentLen)
+				if leftAlign {
+					formatted = formatted + padding
+				} else {
+					formatted = padding + formatted
+				}
+			}
 		}
 
 		result.WriteString(formatted)
