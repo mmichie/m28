@@ -1711,14 +1711,34 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// unless we need to bind an exception variable
 			handlerCtx := ctx
 
+			// Convert error to exception instance
+			excValue := errorToExceptionInstance(tryErr, ctx)
+
 			// Bind exception variable if specified
 			if excVar != "" {
 				// Create new context only when binding exception variable
 				handlerCtx = core.NewContext(ctx)
-				// Convert error to exception instance (reuse from matching above)
-				excValue := errorToExceptionInstance(tryErr, ctx)
 				handlerCtx.Define(excVar, excValue)
 			}
+
+			// Store exception info in context for sys.exc_info()
+			// Get the exception class
+			var excTypeVal core.Value = core.None
+			if inst, ok := excValue.(*core.Instance); ok {
+				if classVal, hasClass := inst.GetAttr("__class__"); hasClass {
+					excTypeVal = classVal
+				}
+			}
+
+			// Save previous exception info to restore later
+			prevExcType := handlerCtx.ExcType
+			prevExcValue := handlerCtx.ExcValue
+			prevExcTb := handlerCtx.ExcTb
+
+			// Set current exception info
+			handlerCtx.ExcType = excTypeVal
+			handlerCtx.ExcValue = excValue
+			handlerCtx.ExcTb = core.None // Traceback object not yet implemented
 
 			// Execute handler
 			handlerErr := error(nil)
@@ -1730,6 +1750,11 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					break
 				}
 			}
+
+			// Restore previous exception info
+			handlerCtx.ExcType = prevExcType
+			handlerCtx.ExcValue = prevExcValue
+			handlerCtx.ExcTb = prevExcTb
 
 			// If handler completed without error, the exception is handled
 			if handlerErr == nil {

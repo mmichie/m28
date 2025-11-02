@@ -17,7 +17,7 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Debug: print all args
 	// fmt.Printf("DEBUG withForm: received %d args\n", args.Len())
-	// for i, arg := range args {
+	// for i, arg := range args.Items() {
 	// 	fmt.Printf("  arg[%d]: %v (type: %T)\n", i, arg, arg)
 	// }
 
@@ -36,15 +36,18 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			mgr := withManager{expr: args.Items()[0]}
 			bodyStart := 1
 
-			// Check for 'as' clause
+			// Check if args[1] is a variable name (symbol) or None
 			if args.Len() >= 3 {
-				if sym, ok := args.Items()[1].(core.SymbolValue); ok && string(sym) == "as" {
-					if varSym, ok := args.Items()[2].(core.SymbolValue); ok {
-						mgr.varName = string(varSym)
-						bodyStart = 3 // Skip "mgr as var"
+				if sym, ok := args.Items()[1].(core.SymbolValue); ok {
+					symStr := string(sym)
+					if symStr != "None" {
+						mgr.varName = symStr
+						bodyStart = 2
 					} else {
-						return nil, fmt.Errorf("with: variable name must be a symbol")
+						bodyStart = 2
 					}
+				} else if args.Items()[1] == core.None {
+					bodyStart = 2
 				}
 			}
 
@@ -60,19 +63,27 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			managers = parseManagerList(list)
 		}
 	} else {
-		// Single manager: (with mgr ...) or (with mgr as var ...)
+		// Single manager: (with mgr ...) or (with mgr var body)
+		// Format from ToIR is: (with context-expr variable-name body)
+		// Or: (with context-expr None body) if no variable
 		mgr := withManager{expr: args.Items()[0]}
 		bodyStart := 1
 
-		// Check for 'as' clause
+		// Check if args[1] is a variable name (symbol) or None
 		if args.Len() >= 3 {
-			if sym, ok := args.Items()[1].(core.SymbolValue); ok && string(sym) == "as" {
-				if varSym, ok := args.Items()[2].(core.SymbolValue); ok {
-					mgr.varName = string(varSym)
-					bodyStart = 3 // Skip "mgr as var"
+			if sym, ok := args.Items()[1].(core.SymbolValue); ok {
+				// Check if it's not "None" - if it's a real symbol, it's the variable name
+				symStr := string(sym)
+				if symStr != "None" {
+					mgr.varName = symStr
+					bodyStart = 2 // Skip "mgr var"
 				} else {
-					return nil, fmt.Errorf("with: variable name must be a symbol")
+					// It's None, no variable binding
+					bodyStart = 2
 				}
+			} else if args.Items()[1] == core.None {
+				// Explicitly None
+				bodyStart = 2
 			}
 		}
 

@@ -59,6 +59,12 @@ type Context struct {
 
 	// Evaluation counter for debugging and progress tracking
 	EvalCount uint64
+
+	// Current exception info for sys.exc_info()
+	// Set when entering an except handler, cleared when exiting
+	ExcType  Value
+	ExcValue Value
+	ExcTb    Value
 }
 
 // NewContext creates a new evaluation context

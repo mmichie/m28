@@ -295,10 +295,22 @@ func (fo *fileObject) getvalue(args []core.Value, ctx *core.Context) (core.Value
 // excInfo returns information about the current exception
 // Returns a tuple (type, value, traceback) or (None, None, None) if no exception
 func excInfo(args []core.Value, ctx *core.Context) (core.Value, error) {
-	// Check if there's a current exception in the context
-	// For now, return (None, None, None) - we'll enhance this when needed
-	noneTuple := core.TupleValue{core.None, core.None, core.None}
-	return noneTuple, nil
+	// Walk up the context chain to find exception info
+	// This is needed because exception handlers may create nested contexts
+	for c := ctx; c != nil; c = c.Outer {
+		if c.ExcType != nil && c.ExcValue != nil {
+			excType := c.ExcType
+			excValue := c.ExcValue
+			excTb := c.ExcTb
+			if excTb == nil {
+				excTb = core.None
+			}
+			return core.TupleValue{excType, excValue, excTb}, nil
+		}
+	}
+
+	// No exception - return (None, None, None)
+	return core.TupleValue{core.None, core.None, core.None}, nil
 }
 
 // excepthook is the default exception hook
