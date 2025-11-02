@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 
@@ -179,6 +180,28 @@ func Init_SREModule() *core.DictValue {
 				}
 			}
 			return core.StringValue(""), nil
+		}))
+
+		pattern.SetValue(core.StringValue("split"), core.NewNamedBuiltinFunction("split", func(splitArgs []core.Value, splitCtx *core.Context) (core.Value, error) {
+			// Stub implementation: just split on whitespace for now
+			if len(splitArgs) < 1 {
+				return core.NewList(), nil
+			}
+
+			str, ok := splitArgs[0].(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("split() argument must be a string")
+			}
+
+			// For now, just split on whitespace (this is a simplified stub)
+			// TODO: Actually use the pattern to split
+			parts := strings.Fields(string(str))
+			result := core.NewList()
+			for _, part := range parts {
+				result.Append(core.StringValue(part))
+			}
+
+			return result, nil
 		}))
 
 		return pattern, nil
