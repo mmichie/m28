@@ -643,6 +643,20 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 		return i.Class, true
 	}
 
+	// Handle __dict__ - return instance attributes as a dict
+	if name == "__dict__" {
+		dict := NewDict()
+		for k, v := range i.Attributes {
+			// Use SetValue to properly format the key with ValueToKey
+			err := dict.SetValue(StringValue(k), v)
+			if err != nil {
+				// If SetValue fails, fall back to SetWithKey
+				dict.SetWithKey(k, StringValue(k), v)
+			}
+		}
+		return dict, true
+	}
+
 	// Step 1: Check for data descriptor in class
 	// A data descriptor has __set__ or __delete__ methods
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
