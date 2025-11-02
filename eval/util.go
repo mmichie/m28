@@ -190,6 +190,34 @@ func DoForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return result, nil
 }
 
+// evaluateDefaultValues evaluates all default values in a function signature
+// This should be called at function definition time to match Python semantics
+func evaluateDefaultValues(signature *FunctionSignature, ctx *core.Context) error {
+	for i := range signature.OptionalParams {
+		if signature.OptionalParams[i].DefaultValue != nil {
+			// Skip evaluation for simple literals (numbers, strings, None, lists, dicts)
+			// These don't need evaluation
+			defaultVal := signature.OptionalParams[i].DefaultValue
+			switch defaultVal.(type) {
+			case core.NumberValue, core.StringValue, core.BoolValue, core.NilValue,
+				*core.ListValue, *core.DictValue, core.TupleValue:
+				// Already evaluated, skip
+				continue
+			}
+
+			evaluatedDefault, err := Eval(signature.OptionalParams[i].DefaultValue, ctx)
+			if err != nil {
+				// If evaluation fails, keep the unevaluated default
+				// It will be evaluated at call time (lazy evaluation)
+				// This handles forward references and circular dependencies
+				continue
+			}
+			signature.OptionalParams[i].DefaultValue = evaluatedDefault
+		}
+	}
+	return nil
+}
+
 // DefForm provides the implementation of the def special form
 func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 2 {
@@ -245,6 +273,11 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			ctx.Define(string(name), finalFunc)
 			return finalFunc, nil
+		}
+
+		// Evaluate default values at definition time
+		if err := evaluateDefaultValues(signature, ctx); err != nil {
+			return nil, err
 		}
 
 		// Create function body (implicit do) for new-style function
@@ -329,6 +362,11 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// New-style function with signature
+			// Evaluate default values at definition time
+			if err := evaluateDefaultValues(signature, ctx); err != nil {
+				return nil, err
+			}
+
 			// Create function body (implicit do)
 			body := args.Items()[2:]
 			var functionBody core.Value

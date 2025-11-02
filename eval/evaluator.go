@@ -1298,6 +1298,11 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		params = append(params, p.Name)
 	}
 
+	// Evaluate default values at definition time (matches Python semantics)
+	if err := evaluateDefaultValues(signature, ctx); err != nil {
+		return nil, err
+	}
+
 	// Create the function with signature
 	fn := &UserFunction{
 		BaseObject: *core.NewBaseObject(core.FunctionType),

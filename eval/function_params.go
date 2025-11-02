@@ -356,12 +356,31 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			boundParams[paramName] = true
 			argIndex++
 		} else {
-			// Use default value - evaluate it in the evaluation context
-			// This ensures access to builtins and outer scope
-			defaultVal, err := Eval(param.DefaultValue, evalCtx)
-			if err != nil {
-				return fmt.Errorf("error evaluating default value for %s: %v", paramName, err)
+			// Use default value
+			// If it's still unevaluated (symbol/expression), evaluate it now in function's env
+			// If it was already evaluated at definition time, use it directly
+			defaultVal := param.DefaultValue
+
+			// Check if it's an unevaluated symbol or expression
+			if sym, isSymbol := defaultVal.(core.SymbolValue); isSymbol {
+				// Unevaluated symbol - evaluate in function's env context
+				var err error
+				defaultVal, err = Eval(sym, evalCtx)
+				if err != nil {
+					return fmt.Errorf("error evaluating default value for %s: %v", paramName, err)
+				}
+			} else if list, isList := defaultVal.(*core.ListValue); isList {
+				// Check if it's an unevaluated expression (list starting with an operator/function)
+				// For now, treat all lists as potentially unevaluated expressions
+				// This is conservative but safe
+				var err error
+				defaultVal, err = Eval(list, evalCtx)
+				if err != nil {
+					// If evaluation fails, use the list as-is (it's probably a literal)
+					defaultVal = list
+				}
 			}
+
 			bindCtx.Define(paramName, defaultVal)
 			boundParams[paramName] = true
 		}
