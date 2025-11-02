@@ -448,14 +448,50 @@ func IsSubclassBuilder() builders.BuiltinFunc {
 			return nil, err
 		}
 
-		// First argument must be a class
-		cls, ok := v.Get(0).(*core.Class)
+		subArg := v.Get(0)
+		baseArg := v.Get(1)
+
+		// Handle builtin type constructors (e.g., bool, int, str)
+		if subBF, ok := subArg.(*core.BuiltinFunction); ok {
+			if baseBF, ok := baseArg.(*core.BuiltinFunction); ok {
+				// Get the names of both builtin types
+				subName := ""
+				baseName := ""
+				if nameAttr, hasName := subBF.GetAttr("__name__"); hasName {
+					if nameStr, ok := nameAttr.(core.StringValue); ok {
+						subName = string(nameStr)
+					}
+				}
+				if nameAttr, hasName := baseBF.GetAttr("__name__"); hasName {
+					if nameStr, ok := nameAttr.(core.StringValue); ok {
+						baseName = string(nameStr)
+					}
+				}
+
+				// Check if they're the same type
+				if subName == baseName {
+					return core.BoolValue(true), nil
+				}
+
+				// Special case: bool is a subclass of int in Python
+				if subName == "bool" && baseName == "int" {
+					return core.BoolValue(true), nil
+				}
+
+				return core.BoolValue(false), nil
+			}
+			// subclass is builtin but base is not - can't be a subclass
+			return core.BoolValue(false), nil
+		}
+
+		// First argument must be a class if not a builtin
+		cls, ok := subArg.(*core.Class)
 		if !ok {
-			return nil, errors.NewTypeError("issubclass", "arg 1 must be a class", string(v.Get(0).Type()))
+			return nil, errors.NewTypeError("issubclass", "arg 1 must be a class", string(subArg.Type()))
 		}
 
 		// Second argument can be a class or tuple of classes
-		typeArg := v.Get(1)
+		typeArg := baseArg
 
 		// Handle tuple of classes
 		if tuple, ok := typeArg.(core.TupleValue); ok {

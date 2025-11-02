@@ -1554,12 +1554,24 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 	if bf, ok := subClassVal.(*core.BuiltinFunction); ok && !ok1 {
 		// subclass is a builtin function, check if it's a type constructor
 		if isTypeConstructor(bf) {
-			// For builtin types, we can only check equality
+			// Get the base class name - handle both BuiltinFunction and types with GetClass()
+			var baseName string
 			if bf2, ok := baseClassVal.(*core.BuiltinFunction); ok {
-				// Both are builtin functions, check if they're the same
+				baseName, _ = getBuiltinName(bf2)
+			} else if classGetter, ok := baseClassVal.(interface{ GetClass() *core.Class }); ok {
+				// Handle IntType, StrType, etc.
+				baseClass := classGetter.GetClass()
+				baseName = baseClass.Name
+			}
+
+			if baseName != "" {
+				// Both are builtin types, check if they're the same
 				subName, _ := getBuiltinName(bf)
-				baseName, _ := getBuiltinName(bf2)
 				if subName == baseName {
+					return core.True, nil
+				}
+				// Special case: bool is a subclass of int in Python
+				if subName == "bool" && baseName == "int" {
 					return core.True, nil
 				}
 				return core.False, nil
