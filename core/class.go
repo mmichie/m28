@@ -643,6 +643,17 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 		return i.Class, true
 	}
 
+	// Handle __traceback__ - return None by default for exceptions
+	// This is needed for CPython's traceback module compatibility
+	if name == "__traceback__" {
+		// Check if it's already set in instance attributes
+		if attr, ok := i.Attributes[name]; ok {
+			return attr, true
+		}
+		// Default to None for exception instances
+		return None, true
+	}
+
 	// Handle __dict__ - return instance attributes as a dict
 	if name == "__dict__" {
 		dict := NewDict()
