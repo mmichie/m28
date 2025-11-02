@@ -178,10 +178,32 @@ func RegisterTypes(ctx *core.Context) {
 
 	// Add __init__ method to object
 	// object.__init__(self, *args, **kwargs) - does nothing, accepts any arguments
-	objectClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	objectInit := core.NewNamedBuiltinFunction("__init__", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// object.__init__ accepts self and any arguments, returns None
 		return core.None, nil
-	}))
+	})
+
+	// Create a custom __code__ object with proper signature: (self, *args, **kwargs)
+	// This allows inspect.signature() to work correctly
+	codeObj := core.NewCodeObject(objectInit)
+	codeObj.SetAttr("co_argcount", core.NumberValue(1)) // 1 positional arg: self
+	codeObj.SetAttr("co_posonlyargcount", core.NumberValue(0))
+	codeObj.SetAttr("co_kwonlyargcount", core.NumberValue(0))
+	codeObj.SetAttr("co_nlocals", core.NumberValue(1))
+	codeObj.SetAttr("co_flags", core.NumberValue(0x04|0x08)) // CO_VARARGS | CO_VARKEYWORDS
+	codeObj.SetAttr("co_varnames", core.TupleValue{core.StringValue("self"), core.StringValue("args"), core.StringValue("kwargs")})
+	codeObj.SetAttr("co_code", core.StringValue(""))
+	codeObj.SetAttr("co_consts", core.TupleValue{})
+	codeObj.SetAttr("co_names", core.TupleValue{})
+	codeObj.SetAttr("co_freevars", core.TupleValue{})
+	codeObj.SetAttr("co_cellvars", core.TupleValue{})
+	codeObj.SetAttr("co_filename", core.StringValue("<builtin>"))
+	codeObj.SetAttr("co_name", core.StringValue("__init__"))
+	codeObj.SetAttr("co_firstlineno", core.NumberValue(0))
+	codeObj.SetAttr("co_lnotab", core.StringValue(""))
+	objectInit.SetAttr("__code__", codeObj)
+
+	objectClass.SetMethod("__init__", objectInit)
 
 	// Add __str__ method to object
 	// object.__str__(self) - returns string representation

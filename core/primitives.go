@@ -455,6 +455,13 @@ func (f *BuiltinFunction) createRegistry() *MethodRegistry {
 			return NewDict(), nil
 		}),
 		MakeProperty("__code__", "Function code object", func(receiver Value) (Value, error) {
+			fn := receiver.(*BuiltinFunction)
+
+			// Check if a custom __code__ was set via SetAttr first
+			if customCode, ok := fn.BaseObject.GetAttr("__code__"); ok {
+				return customCode, nil
+			}
+
 			// Return a proper code object with required attributes for inspect.signature()
 			codeObj := NewCodeObject(receiver)
 
