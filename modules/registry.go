@@ -42,6 +42,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_operator":    InitOperatorModule,    // C extension module for operator functions
 	"_stat":        InitStatModule,        // C extension module for file stat constants
 	"_abc":         InitAbcModule,         // C extension module for abstract base classes
+	"unicodedata":  InitUnicodedataModule, // C extension module for Unicode normalization
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

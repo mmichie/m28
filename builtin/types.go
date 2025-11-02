@@ -500,6 +500,10 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 			return typeName == string(core.TupleType) || typeName == "tuple"
 		case *core.SetValue:
 			return typeName == string(core.SetType) || typeName == "set"
+		case core.BytesValue:
+			return typeName == string(core.BytesType) || typeName == "bytes"
+		case *core.ByteArrayValue:
+			return typeName == "bytearray"
 		case *core.BuiltinFunction:
 			return typeName == "function"
 		case core.Callable:
@@ -545,6 +549,10 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 					return typeName == "dict"
 				case *core.SetValue:
 					return typeName == "set"
+				case core.BytesValue:
+					return typeName == "bytes"
+				case *core.ByteArrayValue:
+					return typeName == "bytearray"
 				}
 			}
 		}

@@ -111,17 +111,28 @@ func InitPosixModule() *core.DictValue {
 		return core.StringValue("surrogateescape"), nil
 	}))
 
-	// Add fspath - convert path-like object to string
+	// Add fspath - convert path-like object to string or bytes
 	posixModule.SetWithKey("fspath", core.StringValue("fspath"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("fspath() takes exactly one argument")
 		}
-		// For now, just convert to string if it's already a string, otherwise error
-		if str, ok := args[0].(core.StringValue); ok {
-			return str, nil
+		// Accept str or bytes unchanged (Python fspath behavior)
+		switch v := args[0].(type) {
+		case core.StringValue:
+			return v, nil
+		case core.BytesValue:
+			return v, nil
 		}
-		// Try to call __fspath__ method if it exists
-		// For now, just return a simple error
+		// Try to call __fspath__ method if it exists for os.PathLike objects
+		if obj, ok := args[0].(core.Object); ok {
+			if fspathMethod, ok := obj.GetAttr("__fspath__"); ok {
+				if callable, ok := fspathMethod.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					return callable.Call([]core.Value{}, ctx)
+				}
+			}
+		}
 		return nil, fmt.Errorf("expected str, bytes or os.PathLike object, not %s", args[0].Type())
 	}))
 
@@ -206,6 +217,9 @@ func InitPosixModule() *core.DictValue {
 		core.StringValue("_exit"),
 		core.StringValue("_path_normpath"),
 		core.StringValue("_have_functions"),
+		core.StringValue("fspath"),
+		core.StringValue("fsencode"),
+		core.StringValue("fsdecode"),
 	)
 	posixModule.SetWithKey("__all__", core.StringValue("__all__"), exportsList)
 
