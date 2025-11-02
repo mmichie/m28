@@ -1415,6 +1415,8 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return createPythonExceptionInstance(ctx, "ImportError", errMsg)
 	case *core.AttributeError:
 		return createPythonExceptionInstance(ctx, "AttributeError", errMsg)
+	case *core.ValueError:
+		return createPythonExceptionInstance(ctx, "ValueError", errMsg)
 	default:
 		// Generic exception for unknown error types
 		return createPythonExceptionInstance(ctx, "Exception", errMsg)

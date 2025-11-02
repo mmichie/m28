@@ -144,6 +144,24 @@ func NewZeroDivisionError() *ZeroDivisionError {
 	return &ZeroDivisionError{}
 }
 
+// ValueError represents an invalid value error
+type ValueError struct {
+	Message  string
+	Location *SourceLocation
+}
+
+func (e *ValueError) Error() string {
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", e.Message, e.Location.String())
+	}
+	return e.Message
+}
+
+// NewValueError creates a new value error
+func NewValueError(msg string) *ValueError {
+	return &ValueError{Message: msg}
+}
+
 // SystemExit represents a request to exit the program
 type SystemExit struct {
 	Code     int

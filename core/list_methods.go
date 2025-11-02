@@ -67,7 +67,7 @@ func InitListMethods() {
 			}
 
 			if index == -1 {
-				return nil, fmt.Errorf("list.remove(x): x not in list")
+				return nil, &ValueError{Message: "list.remove(x): x not in list"}
 			}
 
 			// Mutate the list by removing the item

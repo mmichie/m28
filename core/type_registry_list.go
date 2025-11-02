@@ -361,7 +361,7 @@ func listMethodRemove(receiver Value, args []Value, ctx *Context) (Value, error)
 			return None, nil
 		}
 	}
-	return nil, fmt.Errorf("list.remove(x): x not in list")
+	return nil, &ValueError{Message: "list.remove(x): x not in list"}
 }
 
 func listMethodPop(receiver Value, args []Value, ctx *Context) (Value, error) {
