@@ -127,8 +127,94 @@ func AsIterable(v core.Value) (core.Iterable, bool) {
 		return &stringIterableWrapper{str}, true
 	}
 
+	// Check if the object has __iter__ method (Python protocol)
+	// Any object with __iter__ is iterable in Python
+	if obj, ok := v.(interface {
+		GetAttr(string) (core.Value, bool)
+	}); ok {
+		if iterMethod, hasIter := obj.GetAttr("__iter__"); hasIter {
+			// Wrap it to make it iterable
+			return &iterableWrapper{obj: v, iterMethod: iterMethod}, true
+		}
+	}
+
 	return nil, false
 }
+
+// iterableWrapper wraps an object with __iter__ to make it Iterable
+type iterableWrapper struct {
+	obj        core.Value
+	iterMethod core.Value
+}
+
+func (w *iterableWrapper) Type() core.Type {
+	return w.obj.Type()
+}
+
+func (w *iterableWrapper) String() string {
+	return w.obj.String()
+}
+
+func (w *iterableWrapper) Iterator() core.Iterator {
+	// Call __iter__() to get an iterator object
+	callable, ok := w.iterMethod.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		// Fallback: return empty iterator
+		return &emptyIterator{}
+	}
+
+	// Call __iter__() with no arguments (it's bound to self already if it's a method)
+	iterObj, err := callable.Call([]core.Value{}, nil)
+	if err != nil {
+		// Fallback: return empty iterator
+		return &emptyIterator{}
+	}
+
+	// The iterator object should have __next__ method
+	return &pythonIterator{iterObj: iterObj}
+}
+
+// pythonIterator wraps a Python iterator object (has __next__ method)
+type pythonIterator struct {
+	iterObj core.Value
+}
+
+func (pi *pythonIterator) Next() (core.Value, bool) {
+	// Get __next__ method
+	if obj, ok := pi.iterObj.(interface {
+		GetAttr(string) (core.Value, bool)
+	}); ok {
+		if nextMethod, hasNext := obj.GetAttr("__next__"); hasNext {
+			if callable, ok := nextMethod.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				val, err := callable.Call([]core.Value{}, nil)
+				if err != nil {
+					// StopIteration or other error - iteration done
+					return nil, false
+				}
+				return val, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func (pi *pythonIterator) Reset() {
+	// Python iterators don't support reset
+	// This is a limitation - calling Reset() won't actually reset the iterator
+}
+
+// emptyIterator returns no items
+type emptyIterator struct{}
+
+func (ei *emptyIterator) Next() (core.Value, bool) {
+	return nil, false
+}
+
+func (ei *emptyIterator) Reset() {}
 
 // stringIterableWrapper wraps a StringValue to implement core.Iterable
 type stringIterableWrapper struct {

@@ -202,6 +202,10 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 		result, bodyErr = executeBody(body, ctx)
 	}
 
+	// CRITICAL: After executing the body, variables defined in body should still be in ctx
+	// because we passed the SAME ctx to executeBody. This is correct Python behavior.
+	// The with statement does NOT create a new scope.
+
 	// Call __exit__ with exception info
 	var excType, excValue, excTraceback core.Value = core.Nil, core.Nil, core.Nil
 
