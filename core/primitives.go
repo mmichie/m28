@@ -455,16 +455,48 @@ func (f *BuiltinFunction) createRegistry() *MethodRegistry {
 			return NewDict(), nil
 		}),
 		MakeProperty("__code__", "Function code object", func(receiver Value) (Value, error) {
-			// Return a simple code object
-			codeObj := NewDict()
-			codeObj.Set("co_flags", NumberValue(0))
-			codeObj.Set("co_argcount", NumberValue(0))
+			// Return a proper code object with required attributes for inspect.signature()
+			codeObj := NewCodeObject(receiver)
+
+			// Set code object attributes that inspect.py expects
+			// For builtin functions, we use minimal/empty values
+			codeObj.SetAttr("co_argcount", NumberValue(0))           // Number of positional args
+			codeObj.SetAttr("co_posonlyargcount", NumberValue(0))    // Number of positional-only args (Python 3.8+)
+			codeObj.SetAttr("co_kwonlyargcount", NumberValue(0))     // Number of keyword-only args
+			codeObj.SetAttr("co_nlocals", NumberValue(0))            // Number of local variables
+			codeObj.SetAttr("co_stacksize", NumberValue(0))          // Required stack size
+			codeObj.SetAttr("co_flags", NumberValue(0))              // CO_* flags
+			codeObj.SetAttr("co_code", StringValue(""))              // Bytecode (empty for builtins)
+			codeObj.SetAttr("co_consts", NewList())                  // Constants used
+			codeObj.SetAttr("co_names", NewList())                   // Names used
+			codeObj.SetAttr("co_varnames", NewList())                // Local variable names (empty for builtins)
+			codeObj.SetAttr("co_freevars", NewList())                // Free variables
+			codeObj.SetAttr("co_cellvars", NewList())                // Cell variables
+			codeObj.SetAttr("co_filename", StringValue("<builtin>")) // Filename
+			codeObj.SetAttr("co_name", StringValue(""))              // Function name
+			codeObj.SetAttr("co_firstlineno", NumberValue(0))        // First line number
+			codeObj.SetAttr("co_lnotab", StringValue(""))            // Line number table
+
 			return codeObj, nil
 		}),
 		MakeProperty("__closure__", "Function closure", func(receiver Value) (Value, error) {
 			// Return None for builtin functions (no closure)
 			// Actually, Python returns None for functions without closure
 			return None, nil
+		}),
+		MakeProperty("__defaults__", "Default argument values", func(receiver Value) (Value, error) {
+			// Return None for builtin functions (no defaults)
+			// When functions have defaults, this should be a tuple
+			return None, nil
+		}),
+		MakeProperty("__kwdefaults__", "Keyword-only default argument values", func(receiver Value) (Value, error) {
+			// Return None for builtin functions (no kw defaults)
+			// When functions have kw defaults, this should be a dict
+			return None, nil
+		}),
+		MakeProperty("__annotations__", "Type annotations", func(receiver Value) (Value, error) {
+			// Return an empty dict for builtin functions (no annotations)
+			return NewDict(), nil
 		}),
 	)
 

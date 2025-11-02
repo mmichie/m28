@@ -811,6 +811,86 @@ func createGenericAliasClass() *core.Class {
 func createTypeMetaclass() *TypeType {
 	class := core.NewClass("type", nil)
 
+	// Add __call__ method to type metaclass
+	// This is needed for inspect.signature() to work properly
+	// type.__call__(cls, *args, **kwargs) - calls cls to create an instance
+	// cls is the class being instantiated (e.g., MyClass)
+	// This method represents what happens when you call a class: MyClass(...)
+	typeCallFunc := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// type.__call__(cls, *args, **kwargs)
+		// args[0] is cls (the class being called)
+		// args[1:] are the arguments to pass to the class constructor
+
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__call__() missing required positional argument: 'cls'")
+		}
+
+		cls := args[0]
+		ctorArgs := args[1:]
+
+		// Get the class object - handle various class-like types
+		var classObj *core.Class
+		switch c := cls.(type) {
+		case *core.Class:
+			classObj = c
+		case *TypeType, *StrType, *DictType, *IntType, *FloatType:
+			// These wrapper types have a GetClass() method
+			if wrapper, ok := cls.(interface{ GetClass() *core.Class }); ok {
+				classObj = wrapper.GetClass()
+			} else {
+				return nil, fmt.Errorf("__call__() requires a class, got %T", cls)
+			}
+		default:
+			return nil, fmt.Errorf("__call__() requires a class, got %T", cls)
+		}
+
+		// Call the class to create an instance
+		// This delegates to the class's normal instantiation logic
+		if callable, ok := cls.(core.Callable); ok {
+			return callable.Call(ctorArgs, ctx)
+		}
+
+		// Fallback: manual instance creation using __new__ and __init__
+		// 1. Call __new__ to create the instance
+		newMethod, hasNew := classObj.GetMethod("__new__")
+		var instance core.Value
+		if hasNew {
+			if newCallable, ok := newMethod.(core.Callable); ok {
+				// Call __new__(cls, *args)
+				newArgs := make([]core.Value, len(ctorArgs)+1)
+				newArgs[0] = cls
+				copy(newArgs[1:], ctorArgs)
+				var err error
+				instance, err = newCallable.Call(newArgs, ctx)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			// No __new__, create basic instance
+			instance = core.NewInstance(classObj)
+		}
+
+		// 2. Call __init__ if it exists
+		initMethod, hasInit := classObj.GetMethod("__init__")
+		if hasInit {
+			if initCallable, ok := initMethod.(core.Callable); ok {
+				// Call __init__(self, *args)
+				initArgs := make([]core.Value, len(ctorArgs)+1)
+				initArgs[0] = instance
+				copy(initArgs[1:], ctorArgs)
+				_, err := initCallable.Call(initArgs, ctx)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		return instance, nil
+	})
+	typeCallFunc.SetAttr("__name__", core.StringValue("__call__"))
+	class.SetMethod("__call__", typeCallFunc)
+
 	// Add __new__ method to type metaclass
 	// type.__new__(cls, name, bases, dict, **kwargs) creates a new class
 	// Create a wrapper that supports keyword arguments

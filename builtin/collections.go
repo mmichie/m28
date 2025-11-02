@@ -481,8 +481,12 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		// Convert from another dict or iterable of pairs
 		switch v := args[0].(type) {
 		case *core.DictValue:
-			// Copy the dictionary
-			// TODO: Implement proper dict copying
+			// Copy the dictionary by iterating over items
+			for _, key := range v.Keys() {
+				if val, ok := v.Get(key); ok {
+					dict.Set(key, val)
+				}
+			}
 		case *core.ListValue:
 			// Expect list of pairs
 			for i, item := range v.Items() {
@@ -511,6 +515,46 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 				}
 			}
 		default:
+			// Try to treat as a dict-like object with .items() or .keys() method
+			// This handles OrderedDict and other dict-like types
+			if objWithAttr, ok := args[0].(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				// Try .items() method first
+				if itemsMethod, hasItems := objWithAttr.GetAttr("items"); hasItems {
+					if callable, ok := itemsMethod.(core.Callable); ok {
+						// Call .items()
+						itemsResult, err := callable.Call([]core.Value{}, ctx)
+						if err == nil {
+							// itemsResult should be an iterable of (key, value) pairs
+							if iterable, ok := itemsResult.(core.Iterable); ok {
+								iter := iterable.Iterator()
+								for {
+									item, hasNext := iter.Next()
+									if !hasNext {
+										break
+									}
+									// Item should be a pair (tuple or list)
+									var key, value core.Value
+									if pair, ok := item.(*core.ListValue); ok && pair.Len() == 2 {
+										key = pair.Items()[0]
+										value = pair.Items()[1]
+									} else if tuple, ok := item.(core.TupleValue); ok && len(tuple) == 2 {
+										key = tuple[0]
+										value = tuple[1]
+									} else {
+										return nil, fmt.Errorf("dict .items() yielded non-pair")
+									}
+									if err := dict.SetValue(key, value); err != nil {
+										return nil, err
+									}
+								}
+								return dict, nil
+							}
+						}
+					}
+				}
+			}
 			return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
 		}
 		return dict, nil
