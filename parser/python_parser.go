@@ -3522,25 +3522,83 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 		fullExprStr := content[exprStart : i-1]
 
 		// Parse conversion specifier (!r, !s, !a) and format spec (:...)
+		// Must respect nested structures ([], (), {})
 		exprStr := fullExprStr
 		var conversion string
 		var formatSpec string
 
-		// Check for format spec first (:...)
-		// Need to be careful about nested braces and strings
-		colonIdx := strings.LastIndexFunc(fullExprStr, func(r rune) bool { return r == ':' })
+		// Find ! and : at top level (not inside nested structures)
+		bangIdx := -1
+		colonIdx := -1
+		braceDepth := 0
+		parenDepth := 0
+		bracketDepth := 0
+		inStr := false
+		var strChar byte
+
+		for j := len(fullExprStr) - 1; j >= 0; j-- {
+			ch := fullExprStr[j]
+
+			// Handle string escapes
+			if j > 0 && fullExprStr[j-1] == '\\' {
+				continue
+			}
+
+			// Track string state
+			if ch == '"' || ch == '\'' {
+				if inStr && ch == strChar {
+					inStr = false
+				} else if !inStr {
+					inStr = true
+					strChar = ch
+				}
+				continue
+			}
+
+			if inStr {
+				continue
+			}
+
+			// Track nesting depth
+			switch ch {
+			case '}':
+				braceDepth++
+			case '{':
+				braceDepth--
+			case ')':
+				parenDepth++
+			case '(':
+				parenDepth--
+			case ']':
+				bracketDepth++
+			case '[':
+				bracketDepth--
+			case ':':
+				if braceDepth == 0 && parenDepth == 0 && bracketDepth == 0 && colonIdx == -1 {
+					colonIdx = j
+				}
+			case '!':
+				if braceDepth == 0 && parenDepth == 0 && bracketDepth == 0 && bangIdx == -1 {
+					bangIdx = j
+				}
+			}
+		}
+
+		// Extract conversion and format spec if found at top level
 		if colonIdx >= 0 {
 			formatSpec = fullExprStr[colonIdx+1:]
 			exprStr = fullExprStr[:colonIdx]
 		}
 
-		// Check for conversion specifier (!r, !s, !a)
-		bangIdx := strings.LastIndexFunc(exprStr, func(r rune) bool { return r == '!' })
-		if bangIdx >= 0 && bangIdx+1 < len(exprStr) {
-			conv := exprStr[bangIdx+1:]
+		if bangIdx >= 0 && bangIdx < len(exprStr) && bangIdx+1 < len(fullExprStr) {
+			conv := fullExprStr[bangIdx+1:]
+			// If we also have a colonIdx, the conversion is between ! and :
+			if colonIdx >= 0 {
+				conv = fullExprStr[bangIdx+1 : colonIdx]
+			}
 			if conv == "r" || conv == "s" || conv == "a" {
 				conversion = conv
-				exprStr = exprStr[:bangIdx]
+				exprStr = fullExprStr[:bangIdx]
 			}
 		}
 
@@ -3680,18 +3738,21 @@ func (p *PythonParser) comprehensionToValue(comp *ast.ComprehensionForm) (core.V
 	}
 
 	// Build the comprehension form
-	// Format: (list-comp expr (for var iterable [condition]) ...)
-	result := core.NewList(core.SymbolValue(kindSym), exprValue)
+	// Format depends on number of clauses:
+	// Single: (list-comp expr var iterable [condition])
+	// Multi: (list-comp expr [[var1 iterable1 [condition1]] [var2 iterable2] ...])
 
-	// Add for clauses
-	for _, clause := range comp.Clauses {
+	if len(comp.Clauses) == 1 {
+		// Single clause format: (list-comp expr var iterable [condition])
+		clause := comp.Clauses[0]
 		iterVal, err := p.astNodeToValue(clause.Iterable)
 		if err != nil {
 			return nil, err
 		}
 
-		forClause := core.NewList(
-			core.SymbolValue("for"),
+		result := core.NewList(
+			core.SymbolValue(kindSym),
+			exprValue,
 			core.SymbolValue(clause.Variable),
 			iterVal,
 		)
@@ -3702,12 +3763,40 @@ func (p *PythonParser) comprehensionToValue(comp *ast.ComprehensionForm) (core.V
 			if err != nil {
 				return nil, err
 			}
-			forClause.Append(condVal)
+			result.Append(condVal)
 		}
 
-		result.Append(forClause)
+		return result, nil
 	}
 
+	// Multi-clause format: (list-comp expr [[var1 iterable1] [var2 iterable2] ...])
+	result := core.NewList(core.SymbolValue(kindSym), exprValue)
+	clausesList := core.NewList()
+
+	for _, clause := range comp.Clauses {
+		iterVal, err := p.astNodeToValue(clause.Iterable)
+		if err != nil {
+			return nil, err
+		}
+
+		clauseList := core.NewList(
+			core.SymbolValue(clause.Variable),
+			iterVal,
+		)
+
+		// Add condition if present
+		if clause.Condition != nil {
+			condVal, err := p.astNodeToValue(clause.Condition)
+			if err != nil {
+				return nil, err
+			}
+			clauseList.Append(condVal)
+		}
+
+		clausesList.Append(clauseList)
+	}
+
+	result.Append(clausesList)
 	return result, nil
 }
 
