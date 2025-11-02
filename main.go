@@ -27,6 +27,8 @@ var (
 	command     = flag.String("c", "", "Execute program passed as string")
 	parseOnly   = flag.Bool("parse", false, "Parse only, print AST and exit")
 	printAST    = flag.Bool("ast", false, "Print AST (same as -parse)")
+	printIR     = flag.Bool("ir", false, "Print IR before execution")
+	showStack   = flag.Bool("stacktrace", false, "Show full stack trace on errors")
 	pythonMode  = flag.Bool("python", false, "Enable Python mode for REPL")
 )
 
@@ -77,6 +79,9 @@ func main() {
 		errorReporter.AddSource("<command-line>", *evalExpr)
 		result, err := eval.EvalString(*evalExpr, globalCtx)
 		if err != nil {
+			if *showStack && len(globalCtx.CallStack) > 0 {
+				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
+			}
 			errorReporter.ReportError(err, globalCtx, os.Stderr)
 			os.Exit(1)
 		}
@@ -91,6 +96,9 @@ func main() {
 		errorReporter.AddSource("<command-line>", *command)
 		result, err := eval.EvalString(*command, globalCtx)
 		if err != nil {
+			if *showStack && len(globalCtx.CallStack) > 0 {
+				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
+			}
 			errorReporter.ReportError(err, globalCtx, os.Stderr)
 			os.Exit(1)
 		}
@@ -129,6 +137,10 @@ func main() {
 		// Execute the file
 		err := executeFile(args[0], globalCtx, errorReporter)
 		if err != nil {
+			// Show stack trace if requested
+			if *showStack && len(globalCtx.CallStack) > 0 {
+				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
+			}
 			errorReporter.ReportError(err, globalCtx, os.Stderr)
 			os.Exit(1)
 		}
@@ -151,32 +163,36 @@ func printHelp() {
 	fmt.Println("Usage: m28 [options] [file] [args...]")
 	fmt.Println()
 	fmt.Println("Options:")
-	fmt.Println("  -e EXPR      Evaluate expression")
-	fmt.Println("  -c PROGRAM   Execute program string")
-	fmt.Println("  -i           Interactive mode after file execution")
-	fmt.Println("  -python      Enable Python mode for REPL")
-	fmt.Println("  -parse       Parse file and print AST (don't execute)")
-	fmt.Println("  -ast         Print AST (same as -parse)")
-	fmt.Println("  -path PATHS  Additional module search paths (colon-separated)")
-	fmt.Println("  -debug       Enable debug mode")
-	fmt.Println("  -version     Show version")
-	fmt.Println("  -help        Show this help")
+	fmt.Println("  -e EXPR        Evaluate expression")
+	fmt.Println("  -c PROGRAM     Execute program string")
+	fmt.Println("  -i             Interactive mode after file execution")
+	fmt.Println("  -python        Enable Python mode for REPL")
+	fmt.Println("  -parse         Parse file and print AST (don't execute)")
+	fmt.Println("  -ast           Print AST (same as -parse)")
+	fmt.Println("  -ir            Print IR before execution")
+	fmt.Println("  -stacktrace    Show full stack trace on errors")
+	fmt.Println("  -path PATHS    Additional module search paths (colon-separated)")
+	fmt.Println("  -debug         Enable debug mode")
+	fmt.Println("  -version       Show version")
+	fmt.Println("  -help          Show this help")
 	fmt.Println()
 	fmt.Println("Supported File Types:")
-	fmt.Println("  .m28         M28 S-expression syntax")
-	fmt.Println("  .py          Python syntax (experimental)")
+	fmt.Println("  .m28           M28 S-expression syntax")
+	fmt.Println("  .py            Python syntax (experimental)")
 	fmt.Println()
 	fmt.Println("Environment Variables:")
-	fmt.Println("  M28_PATH     Module search paths (colon-separated)")
+	fmt.Println("  M28_PATH       Module search paths (colon-separated)")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  m28                    Start interactive REPL (M28 syntax)")
-	fmt.Println("  m28 -python            Start interactive REPL (Python syntax)")
-	fmt.Println("  m28 script.m28         Run M28 script")
-	fmt.Println("  m28 script.py          Run Python script")
-	fmt.Println("  m28 -e '(+ 1 2)'       Evaluate expression")
-	fmt.Println("  m28 -i script.m28      Run script then enter REPL")
-	fmt.Println("  m28 -parse script.py   Parse and show AST")
+	fmt.Println("  m28                      Start interactive REPL (M28 syntax)")
+	fmt.Println("  m28 -python              Start interactive REPL (Python syntax)")
+	fmt.Println("  m28 script.m28           Run M28 script")
+	fmt.Println("  m28 script.py            Run Python script")
+	fmt.Println("  m28 -e '(+ 1 2)'         Evaluate expression")
+	fmt.Println("  m28 -i script.m28        Run script then enter REPL")
+	fmt.Println("  m28 -parse script.py     Parse and show AST")
+	fmt.Println("  m28 -ir script.py        Show IR before execution")
+	fmt.Println("  m28 -stacktrace test.py  Show full stack trace on errors")
 }
 
 // setupModulePaths sets up the module search paths
@@ -292,12 +308,26 @@ func executePythonFile(filename, content string, ctx *core.Context) error {
 		return fmt.Errorf("parse error in %s: %v", filename, err)
 	}
 
+	// Print IR if requested
+	if *printIR {
+		fmt.Printf("=== IR for %s ===\n", filename)
+		for i, node := range nodes {
+			ir := node.ToIR()
+			fmt.Printf("Statement %d:\n", i+1)
+			fmt.Printf("  AST: %s\n", node.String())
+			fmt.Printf("  IR:  %s\n", core.PrintValue(ir))
+			fmt.Println()
+		}
+		fmt.Println("=== End IR ===")
+	}
+
 	// Lower AST to IR and evaluate each statement
-	for _, node := range nodes {
+	for i, node := range nodes {
 		ir := node.ToIR()
 		_, err = eval.Eval(ir, ctx)
 		if err != nil {
-			return err
+			// Add statement number to error for better debugging
+			return fmt.Errorf("error in statement %d: %w", i+1, err)
 		}
 	}
 
