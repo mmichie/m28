@@ -953,6 +953,28 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 		return attr, true
 	}
 
+	// Step 5: Call __getattr__ if it exists (Python protocol)
+	// This is called when normal attribute lookup fails
+	if getattrMethod, _, ok := i.Class.GetMethodWithClass("__getattr__"); ok {
+		if callable, ok := getattrMethod.(interface {
+			Call([]Value, *Context) (Value, error)
+		}); ok {
+			// Call instance.__getattr__(name)
+			// Create bound method that includes self
+			boundMethod := &BoundInstanceMethod{
+				Instance: i,
+				Method:   callable,
+			}
+			// Call with the attribute name
+			result, err := boundMethod.Call([]Value{StringValue(name)}, nil)
+			if err == nil {
+				return result, true
+			}
+			// If __getattr__ raises AttributeError, we should still return nil, false
+			// to maintain consistent error reporting
+		}
+	}
+
 	return nil, false
 }
 
