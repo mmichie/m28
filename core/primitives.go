@@ -399,6 +399,60 @@ func (f *BuiltinFunction) CallWithKeywords(args []Value, kwargs map[string]Value
 	return f.fn(args, ctx)
 }
 
+// BuiltinFunctionWithKwargs represents a builtin function that supports keyword arguments
+type BuiltinFunctionWithKwargs struct {
+	BaseObject
+	Name string
+	Fn   func(args []Value, kwargs map[string]Value, ctx *Context) (Value, error)
+}
+
+// Call implements Callable.Call
+func (f *BuiltinFunctionWithKwargs) Call(args []Value, ctx *Context) (Value, error) {
+	return f.Fn(args, nil, ctx)
+}
+
+// CallWithKeywords implements keyword argument support
+func (f *BuiltinFunctionWithKwargs) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	return f.Fn(args, kwargs, ctx)
+}
+
+// String implements Value.String
+func (f *BuiltinFunctionWithKwargs) String() string {
+	if f.Name != "" {
+		return fmt.Sprintf("<builtin function %s>", f.Name)
+	}
+	return "<builtin function>"
+}
+
+// Type implements Value.Type
+func (f *BuiltinFunctionWithKwargs) Type() Type {
+	return FunctionType
+}
+
+// GetAttr implements attribute access for BuiltinFunctionWithKwargs
+func (f *BuiltinFunctionWithKwargs) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "__name__":
+		if f.Name != "" {
+			return StringValue(f.Name), true
+		}
+		return StringValue("<anonymous>"), true
+	case "__qualname__":
+		if f.Name != "" {
+			return StringValue(f.Name), true
+		}
+		return StringValue("<anonymous>"), true
+	case "__module__":
+		return StringValue("builtins"), true
+	}
+	return f.BaseObject.GetAttr(name)
+}
+
+// SetAttr implements attribute setting for BuiltinFunctionWithKwargs
+func (f *BuiltinFunctionWithKwargs) SetAttr(name string, value Value) {
+	f.BaseObject.SetAttr(name, value)
+}
+
 // String implements Value.String
 func (f *BuiltinFunction) String() string {
 	if f.name != "" {

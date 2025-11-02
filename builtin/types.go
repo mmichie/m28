@@ -185,10 +185,15 @@ func RegisterTypes(ctx *core.Context) {
 
 	// Add __init__ method to object
 	// object.__init__(self, *args, **kwargs) - does nothing, accepts any arguments
-	objectInit := core.NewNamedBuiltinFunction("__init__", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// object.__init__ accepts self and any arguments, returns None
-		return core.None, nil
-	})
+	// We need to create a special builtin that supports keyword arguments
+	objectInit := &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "__init__",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			// object.__init__ accepts self and any arguments/kwargs, returns None
+			return core.None, nil
+		},
+	}
 
 	// Create a custom __code__ object with proper signature: (self, *args, **kwargs)
 	// This allows inspect.signature() to work correctly

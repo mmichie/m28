@@ -1034,6 +1034,37 @@ func (bsm *BoundSuperMethod) Call(args []Value, ctx *Context) (Value, error) {
 	return nil, fmt.Errorf("bound super method is not callable")
 }
 
+// CallWithKeywords implements CallWithKeywords interface for BoundSuperMethod
+func (bsm *BoundSuperMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	// Debug for pathlib classes
+	if bsm.Class.Name == "PurePath" || bsm.Class.Name == "Path" || bsm.Class.Name == "PosixPath" {
+		fmt.Printf("[DEBUG BoundSuperMethod.CallWithKeywords] Calling method from %s with %d args and %d kwargs\n", bsm.Class.Name, len(args), len(kwargs))
+	}
+	// Create a new context with __class__ set
+	methodCtx := NewContext(ctx)
+	methodCtx.Define("__class__", bsm.Class)
+
+	// Check if the underlying method supports keyword arguments
+	if kwargsMethod, ok := bsm.Method.(interface {
+		CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+	}); ok {
+		return kwargsMethod.CallWithKeywords(args, kwargs, methodCtx)
+	}
+
+	// If method doesn't support kwargs but we have kwargs, error
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("method does not support keyword arguments")
+	}
+
+	// Fall back to regular Call
+	if callable, ok := bsm.Method.(interface {
+		Call([]Value, *Context) (Value, error)
+	}); ok {
+		return callable.Call(args, methodCtx)
+	}
+	return nil, fmt.Errorf("bound super method is not callable")
+}
+
 // Type returns the bound super method type
 func (bsm *BoundSuperMethod) Type() Type {
 	return MethodType
