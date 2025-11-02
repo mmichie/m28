@@ -66,68 +66,87 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Handle generic descriptor protocol (e.g., TupleGetter)
 		// Check if value has __get__ method
-		// BUT: Don't invoke __get__ if the value is a Class - classes themselves are not descriptors
-		// when accessed from modules or other containers, even if they define __get__
+		// BUT: Don't invoke __get__ if:
+		// 1. The value is a Class - classes themselves are not descriptors when accessed from modules
+		// 2. The value is a function in an instance's __dict__ - these should not be bound as methods
+		//    (Python only binds functions found in the class, not in instance __dict__)
 		if _, isClass := value.(*core.Class); !isClass {
-			if valueWithGetAttr, ok := value.(interface {
-				GetAttr(string) (core.Value, bool)
-			}); ok {
-				if getMethod, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
-					// It's a descriptor - call __get__(self, instance, owner)
-					if getter, ok := getMethod.(interface {
-						Call([]core.Value, *core.Context) (core.Value, error)
-					}); ok {
-						// Get the owner class if possible
-						var owner core.Value = core.None
-						if objWithClass, ok := obj.(interface {
-							GetAttr(string) (core.Value, bool)
-						}); ok {
-							if classVal, ok := objWithClass.GetAttr("__class__"); ok {
-								owner = classVal
-							}
-						}
-						// Call __get__(instance, owner)
-						// Note: getter is already a bound method (bound to the descriptor instance),
-						// so we don't pass the descriptor as the first arg
-						descriptorResult, err := getter.Call([]core.Value{obj, owner}, ctx)
-						if err != nil {
-							return nil, err
-						}
+			// Check if this is a function stored in instance __dict__
+			// Functions in instance __dict__ should NOT be bound as methods
+			skipDescriptor := false
+			if inst, isInst := obj.(*core.Instance); isInst {
+				// Check if the attribute is in the instance's __dict__
+				if _, inInstanceDict := inst.Attributes[string(propName)]; inInstanceDict {
+					// It's from instance __dict__ - check if it's a function
+					if _, isFunc := value.(*UserFunction); isFunc {
+						skipDescriptor = true
+					} else if _, isGenFunc := value.(*core.GeneratorFunction); isGenFunc {
+						skipDescriptor = true
+					}
+				}
+			}
 
-						// IMPORTANT: If there are more arguments, this is a method call
-						// The descriptor returned a bound method, now we need to call it
-						if args.Len() > 2 {
-							// Check if it's just the __call__ marker (method with no args)
-							hasCallMarker := false
-							if args.Len() == 3 {
-								if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "__call__" {
-									hasCallMarker = true
+			if !skipDescriptor {
+				if valueWithGetAttr, ok := value.(interface {
+					GetAttr(string) (core.Value, bool)
+				}); ok {
+					if getMethod, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
+						// It's a descriptor - call __get__(self, instance, owner)
+						if getter, ok := getMethod.(interface {
+							Call([]core.Value, *core.Context) (core.Value, error)
+						}); ok {
+							// Get the owner class if possible
+							var owner core.Value = core.None
+							if objWithClass, ok := obj.(interface {
+								GetAttr(string) (core.Value, bool)
+							}); ok {
+								if classVal, ok := objWithClass.GetAttr("__class__"); ok {
+									owner = classVal
 								}
 							}
+							// Call __get__(instance, owner)
+							// Note: getter is already a bound method (bound to the descriptor instance),
+							// so we don't pass the descriptor as the first arg
+							descriptorResult, err := getter.Call([]core.Value{obj, owner}, ctx)
+							if err != nil {
+								return nil, err
+							}
 
-							// Call the bound method
-							if callable, ok := descriptorResult.(interface {
-								Call([]core.Value, *core.Context) (core.Value, error)
-							}); ok {
-								// Evaluate the arguments (skip __call__ marker if present)
-								var evalArgs []core.Value
-								if hasCallMarker {
-									evalArgs = []core.Value{} // No args
-								} else {
-									evalArgs = make([]core.Value, args.Len()-2)
-									for i, arg := range args.Items()[2:] {
-										evalArgs[i], err = Eval(arg, ctx)
-										if err != nil {
-											return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
-										}
+							// IMPORTANT: If there are more arguments, this is a method call
+							// The descriptor returned a bound method, now we need to call it
+							if args.Len() > 2 {
+								// Check if it's just the __call__ marker (method with no args)
+								hasCallMarker := false
+								if args.Len() == 3 {
+									if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+										hasCallMarker = true
 									}
 								}
-								return callable.Call(evalArgs, ctx)
-							}
-							return nil, fmt.Errorf("'%s' is not callable", string(propName))
-						}
 
-						return descriptorResult, nil
+								// Call the bound method
+								if callable, ok := descriptorResult.(interface {
+									Call([]core.Value, *core.Context) (core.Value, error)
+								}); ok {
+									// Evaluate the arguments (skip __call__ marker if present)
+									var evalArgs []core.Value
+									if hasCallMarker {
+										evalArgs = []core.Value{} // No args
+									} else {
+										evalArgs = make([]core.Value, args.Len()-2)
+										for i, arg := range args.Items()[2:] {
+											evalArgs[i], err = Eval(arg, ctx)
+											if err != nil {
+												return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
+											}
+										}
+									}
+									return callable.Call(evalArgs, ctx)
+								}
+								return nil, fmt.Errorf("'%s' is not callable", string(propName))
+							}
+
+							return descriptorResult, nil
+						}
 					}
 				}
 			}
