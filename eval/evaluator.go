@@ -1172,6 +1172,39 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 			fmt.Sscanf(hashStr, "%x", &hashNum)
 			return core.NumberValue(float64(hashNum)), nil
 		}), true
+	case "__get__":
+		// Return a descriptor function that binds this function to an instance
+		// When called as func.__get__(instance, owner), it returns a bound method
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Descriptor protocol: __get__(self, instance, owner)
+			// args[0] is instance (or None if accessed on class)
+			// args[1] is owner class (optional)
+
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__get__() requires at least 1 argument (instance), got %d", len(args))
+			}
+
+			instance := args[0]
+
+			// If instance is None, return the function itself (class-level access)
+			if instance == core.None || instance == core.Nil {
+				return f, nil
+			}
+
+			// Create a bound method
+			// Check if this is an Instance
+			if inst, ok := instance.(*core.Instance); ok {
+				return &core.BoundInstanceMethod{
+					Instance:      inst,
+					Method:        f,
+					DefiningClass: inst.Class,
+				}, nil
+			}
+
+			// For non-Instance objects, return the function unbound
+			// (this handles edge cases where __get__ is called on non-instances)
+			return f, nil
+		}), true
 	default:
 		return f.BaseObject.GetAttr(name)
 	}
