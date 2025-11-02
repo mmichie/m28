@@ -152,6 +152,44 @@ func InitPosixModule() *core.DictValue {
 	statResultClass := core.NewClass("stat_result", nil)
 	posixModule.SetWithKey("stat_result", core.StringValue("stat_result"), statResultClass)
 
+	// Add terminal_size class for argparse HelpFormatter
+	terminalSizeClass := core.NewClass("terminal_size", nil)
+	terminalSizeClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("terminal_size() missing required argument")
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("terminal_size.__init__ requires instance as first argument")
+		}
+
+		// args[1] should be a tuple (columns, lines)
+		var columns, lines core.Value
+		switch v := args[1].(type) {
+		case core.TupleValue:
+			if len(v) >= 2 {
+				columns = v[0]
+				lines = v[1]
+			} else {
+				return nil, fmt.Errorf("terminal_size() argument must be a sequence of length 2")
+			}
+		case *core.ListValue:
+			if v.Len() >= 2 {
+				columns = v.Items()[0]
+				lines = v.Items()[1]
+			} else {
+				return nil, fmt.Errorf("terminal_size() argument must be a sequence of length 2")
+			}
+		default:
+			return nil, fmt.Errorf("terminal_size() argument must be a sequence")
+		}
+
+		self.Attributes["columns"] = columns
+		self.Attributes["lines"] = lines
+		return core.None, nil
+	}))
+	posixModule.SetWithKey("terminal_size", core.StringValue("terminal_size"), terminalSizeClass)
+
 	// Add missing functions/attributes that Python expects
 
 	// _exit(status) - exit without cleanup

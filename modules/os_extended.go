@@ -73,6 +73,44 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return result, nil
 	}))
 
+	// terminal_size - class for argparse HelpFormatter
+	terminalSizeClass := core.NewClass("terminal_size", nil)
+	terminalSizeClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, core.NewTypeError("tuple", nil, "terminal_size() argument")
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, core.NewTypeError("instance", args[0], "terminal_size.__init__ self")
+		}
+
+		// args[1] should be a tuple (columns, lines)
+		var columns, lines core.Value
+		switch v := args[1].(type) {
+		case core.TupleValue:
+			if len(v) >= 2 {
+				columns = v[0]
+				lines = v[1]
+			} else {
+				return nil, core.NewTypeError("tuple of length 2", args[1], "terminal_size() argument")
+			}
+		case *core.ListValue:
+			if v.Len() >= 2 {
+				columns = v.Items()[0]
+				lines = v.Items()[1]
+			} else {
+				return nil, core.NewTypeError("sequence of length 2", args[1], "terminal_size() argument")
+			}
+		default:
+			return nil, core.NewTypeError("sequence", args[1], "terminal_size() argument")
+		}
+
+		self.Attributes["columns"] = columns
+		self.Attributes["lines"] = lines
+		return core.None, nil
+	}))
+	osModule.Set("terminal_size", terminalSizeClass)
+
 	// Environment variables
 	osModule.Set("putenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
