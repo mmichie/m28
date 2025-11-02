@@ -107,11 +107,10 @@ func IsCallable(v core.Value) bool {
 		return true
 	}
 
-	// Check for __call__ method on instances
-	if inst, ok := v.(*core.Instance); ok {
-		if inst.Class != nil && inst.Class.Methods != nil {
-			_, hasCall := inst.Class.Methods["__call__"]
-			return hasCall
+	// Check for __call__ method using GetAttr (works for all object types)
+	if obj, ok := v.(core.Object); ok {
+		if _, exists := obj.GetAttr("__call__"); exists {
+			return true
 		}
 	}
 
