@@ -616,7 +616,11 @@ func (d *DictType) CallWithKeywords(args []core.Value, kwargs map[string]core.Va
 			return nil, fmt.Errorf("dict() Call did not return a DictValue")
 		}
 		for key, value := range kwargs {
-			dictVal.Set(key, value)
+			// Use SetValue to properly format the key with ValueToKey
+			err := dictVal.SetValue(core.StringValue(key), value)
+			if err != nil {
+				return nil, fmt.Errorf("error setting dict kwarg %s: %v", key, err)
+			}
 		}
 	}
 
