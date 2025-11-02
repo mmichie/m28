@@ -89,7 +89,45 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						// Call __get__(instance, owner)
 						// Note: getter is already a bound method (bound to the descriptor instance),
 						// so we don't pass the descriptor as the first arg
-						return getter.Call([]core.Value{obj, owner}, ctx)
+						descriptorResult, err := getter.Call([]core.Value{obj, owner}, ctx)
+						if err != nil {
+							return nil, err
+						}
+
+						// IMPORTANT: If there are more arguments, this is a method call
+						// The descriptor returned a bound method, now we need to call it
+						if args.Len() > 2 {
+							// Check if it's just the __call__ marker (method with no args)
+							hasCallMarker := false
+							if args.Len() == 3 {
+								if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+									hasCallMarker = true
+								}
+							}
+
+							// Call the bound method
+							if callable, ok := descriptorResult.(interface {
+								Call([]core.Value, *core.Context) (core.Value, error)
+							}); ok {
+								// Evaluate the arguments (skip __call__ marker if present)
+								var evalArgs []core.Value
+								if hasCallMarker {
+									evalArgs = []core.Value{} // No args
+								} else {
+									evalArgs = make([]core.Value, args.Len()-2)
+									for i, arg := range args.Items()[2:] {
+										evalArgs[i], err = Eval(arg, ctx)
+										if err != nil {
+											return nil, fmt.Errorf("error evaluating argument %d: %v", i+1, err)
+										}
+									}
+								}
+								return callable.Call(evalArgs, ctx)
+							}
+							return nil, fmt.Errorf("'%s' is not callable", string(propName))
+						}
+
+						return descriptorResult, nil
 					}
 				}
 			}
