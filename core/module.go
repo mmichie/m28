@@ -83,6 +83,80 @@ func (m *Module) SetAll(names []string) {
 
 // GetAttr implements object attribute access for modules
 func (m *Module) GetAttr(name string) (Value, bool) {
+	// Special case: __dict__ returns the module's namespace
+	if name == "__dict__" {
+		// Create a dict from the module's exports and Dict
+		dict := NewDict()
+
+		// Add all exports
+		for k, v := range m.Exports {
+			dict.Set(ValueToKey(StringValue(k)), v)
+		}
+
+		// Override with Dict values if present (Dict has higher priority)
+		if m.Dict != nil {
+			for _, key := range m.Dict.Keys() {
+				if val, ok := m.Dict.Get(key); ok {
+					dict.Set(key, val)
+				}
+			}
+		}
+
+		return dict, true
+	}
+
+	// Special case: __doc__ returns the module's documentation
+	if name == "__doc__" {
+		// Check if __doc__ is in Dict or Exports
+		if m.Dict != nil {
+			key := ValueToKey(StringValue("__doc__"))
+			if val, ok := m.Dict.Get(key); ok {
+				return val, true
+			}
+		}
+		if val, ok := m.Exports["__doc__"]; ok {
+			return val, true
+		}
+		// Return None if no docstring is set
+		return None, true
+	}
+
+	// Special case: __file__ returns the module's file path
+	if name == "__file__" {
+		// Check if __file__ is in Dict or Exports first
+		if m.Dict != nil {
+			key := ValueToKey(StringValue("__file__"))
+			if val, ok := m.Dict.Get(key); ok {
+				return val, true
+			}
+		}
+		if val, ok := m.Exports["__file__"]; ok {
+			return val, true
+		}
+		// Return the module's Path field
+		if m.Path != "" {
+			return StringValue(m.Path), true
+		}
+		// Return None if no path is set
+		return None, true
+	}
+
+	// Special case: __name__ returns the module's name
+	if name == "__name__" {
+		// Check if __name__ is in Dict or Exports first
+		if m.Dict != nil {
+			key := ValueToKey(StringValue("__name__"))
+			if val, ok := m.Dict.Get(key); ok {
+				return val, true
+			}
+		}
+		if val, ok := m.Exports["__name__"]; ok {
+			return val, true
+		}
+		// Return the module's Name field
+		return StringValue(m.Name), true
+	}
+
 	// First check backing dict for most up-to-date values
 	// This allows Python's importlib._setup() to dynamically inject module globals
 	// Dict takes priority over Exports to support dynamic attribute updates via setattr()
