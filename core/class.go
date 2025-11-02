@@ -498,6 +498,12 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
 				fmt.Printf("[DEBUG Class.CallWithKeywords] Calling %s.__init__ with %d args, %d kwargs\n", c.Name, len(args), len(kwargs))
 			}
+			// Debug for TestProgram
+			if c.Name == "TestProgram" {
+				fmt.Printf("[DEBUG Class.CallWithKeywords] Calling %s.__init__ with %d args, %d kwargs\n", c.Name, len(args), len(kwargs))
+				fmt.Printf("[DEBUG Class.CallWithKeywords]   args: %v\n", args)
+				fmt.Printf("[DEBUG Class.CallWithKeywords]   kwargs: %v\n", kwargs)
+			}
 
 			// Create a new context with __class__ set to the class whose __init__ we're calling
 			// This allows super() to work correctly inside __init__
@@ -513,6 +519,9 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			}); ok {
 				_, err := kwargsCallable.CallWithKeywords(initArgs, kwargs, initCtx)
 				if err != nil {
+					if c.Name == "TestProgram" {
+						fmt.Printf("[DEBUG Class.CallWithKeywords] Error calling %s.__init__: %v\n", c.Name, err)
+					}
 					return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
 				}
 			} else if callable, ok := initMethod.(interface {

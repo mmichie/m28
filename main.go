@@ -93,6 +93,7 @@ func main() {
 
 	// Evaluate an expression from -e
 	if *evalExpr != "" {
+		globalCtx.Define("__name__", core.StringValue("__main__"))
 		errorReporter.AddSource("<command-line>", *evalExpr)
 		result, err := eval.EvalString(*evalExpr, globalCtx)
 		if err != nil {
@@ -106,6 +107,7 @@ func main() {
 
 	// Execute program from -c
 	if *command != "" {
+		globalCtx.Define("__name__", core.StringValue("__main__"))
 		errorReporter.AddSource("<command-line>", *command)
 		result, err := eval.EvalString(*command, globalCtx)
 		if err != nil {
