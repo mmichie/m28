@@ -57,7 +57,9 @@ func iterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("'%s' object is not iterable", obj.Type())
+	return nil, &core.TypeError{
+		Message: fmt.Sprintf("'%s' object is not iterable", obj.Type()),
+	}
 }
 
 // nextFunc implements the next() builtin
