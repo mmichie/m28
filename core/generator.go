@@ -468,12 +468,44 @@ func (gf *GeneratorFunction) Call(args []Value, ctx *Context) (Value, error) {
 // GetAttr implements attribute access for generator functions
 // Provides default values for standard function attributes
 func (gf *GeneratorFunction) GetAttr(name string) (Value, bool) {
+	// Special handling for __get__ - implement descriptor protocol
+	// This ensures that when accessed on an instance, the GeneratorFunction is bound, not the inner UserFunction
+	if name == "__get__" {
+		// Return a descriptor function that binds this generator function to an instance
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// Descriptor protocol: __get__(self, instance, owner)
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__get__() requires at least 1 argument (instance), got %d", len(args))
+			}
+
+			instance := args[0]
+
+			// If instance is None, return the generator function itself (class-level access)
+			if instance == None || instance == Nil {
+				return gf, nil
+			}
+
+			// Create a bound method with the GeneratorFunction, not the inner UserFunction
+			if inst, ok := instance.(*Instance); ok {
+				return &BoundInstanceMethod{
+					Instance:      inst,
+					Method:        gf, // Bind the GeneratorFunction, not the inner function!
+					DefiningClass: inst.Class,
+				}, nil
+			}
+
+			// For non-Instance objects, return the generator function unbound
+			return gf, nil
+		}), true
+	}
+
 	// First check explicitly set attributes
 	if val, ok := gf.BaseObject.GetAttr(name); ok {
 		return val, true
 	}
 
 	// Try to delegate to the underlying function if it has GetAttr
+	// But skip __get__ since we handled it above
 	if funcWithAttrs, ok := gf.Function.(interface {
 		GetAttr(string) (Value, bool)
 	}); ok {
