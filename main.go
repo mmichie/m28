@@ -28,7 +28,6 @@ var (
 	parseOnly   = flag.Bool("parse", false, "Parse only, print AST and exit")
 	printAST    = flag.Bool("ast", false, "Print AST (same as -parse)")
 	printIR     = flag.Bool("ir", false, "Print IR before execution")
-	showStack   = flag.Bool("stacktrace", false, "Show full stack trace on errors")
 	pythonMode  = flag.Bool("python", false, "Enable Python mode for REPL")
 )
 
@@ -79,7 +78,8 @@ func main() {
 		errorReporter.AddSource("<command-line>", *evalExpr)
 		result, err := eval.EvalString(*evalExpr, globalCtx)
 		if err != nil {
-			if *showStack && len(globalCtx.CallStack) > 0 {
+			// Always show stack trace if available
+			if len(globalCtx.CallStack) > 0 {
 				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
 			}
 			errorReporter.ReportError(err, globalCtx, os.Stderr)
@@ -96,7 +96,8 @@ func main() {
 		errorReporter.AddSource("<command-line>", *command)
 		result, err := eval.EvalString(*command, globalCtx)
 		if err != nil {
-			if *showStack && len(globalCtx.CallStack) > 0 {
+			// Always show stack trace if available
+			if len(globalCtx.CallStack) > 0 {
 				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
 			}
 			errorReporter.ReportError(err, globalCtx, os.Stderr)
@@ -137,8 +138,8 @@ func main() {
 		// Execute the file
 		err := executeFile(args[0], globalCtx, errorReporter)
 		if err != nil {
-			// Show stack trace if requested
-			if *showStack && len(globalCtx.CallStack) > 0 {
+			// Always show stack trace if available
+			if len(globalCtx.CallStack) > 0 {
 				fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
 			}
 			errorReporter.ReportError(err, globalCtx, os.Stderr)
@@ -170,7 +171,6 @@ func printHelp() {
 	fmt.Println("  -parse         Parse file and print AST (don't execute)")
 	fmt.Println("  -ast           Print AST (same as -parse)")
 	fmt.Println("  -ir            Print IR before execution")
-	fmt.Println("  -stacktrace    Show full stack trace on errors")
 	fmt.Println("  -path PATHS    Additional module search paths (colon-separated)")
 	fmt.Println("  -debug         Enable debug mode")
 	fmt.Println("  -version       Show version")
@@ -192,7 +192,8 @@ func printHelp() {
 	fmt.Println("  m28 -i script.m28        Run script then enter REPL")
 	fmt.Println("  m28 -parse script.py     Parse and show AST")
 	fmt.Println("  m28 -ir script.py        Show IR before execution")
-	fmt.Println("  m28 -stacktrace test.py  Show full stack trace on errors")
+	fmt.Println()
+	fmt.Println("Note: Stack traces are shown automatically on errors when available")
 }
 
 // setupModulePaths sets up the module search paths
