@@ -952,9 +952,10 @@ func (w *WithForm) ToIR() core.Value {
 
 // ExceptClause represents an except clause in a try statement
 type ExceptClause struct {
-	ExceptionType string // Empty string for bare except
-	Variable      string // Empty string if no 'as' clause
-	Body          []ASTNode
+	ExceptionType     string  // Empty string for bare except (deprecated - use ExceptionTypeExpr)
+	ExceptionTypeExpr ASTNode // The actual exception type expression (identifier, tuple, etc.)
+	Variable          string  // Empty string if no 'as' clause
+	Body              []ASTNode
 }
 
 // TryForm represents a try/except/finally statement
@@ -1011,19 +1012,30 @@ func (t *TryForm) ToIR() core.Value {
 			exceptBody = append(exceptBody, stmt.ToIR())
 		}
 
-		if except.ExceptionType != "" && except.Variable != "" {
-			// except ValueError as e: ...
+		// Determine the exception type IR value
+		var excTypeIR core.Value
+		if except.ExceptionTypeExpr != nil {
+			// Use the AST node (handles tuples, identifiers, etc.)
+			excTypeIR = except.ExceptionTypeExpr.ToIR()
+		} else if except.ExceptionType != "" {
+			// Fallback to string (backward compatibility)
+			excTypeIR = core.SymbolValue(except.ExceptionType)
+		}
+
+		if excTypeIR != nil && except.Variable != "" {
+			// except ValueError as e: ... or except (ValueError, TypeError) as e: ...
 			result = append(result, core.NewList(
 				core.SymbolValue("except"),
-				core.SymbolValue(except.ExceptionType),
+				excTypeIR,
+				core.SymbolValue("as"),
 				core.SymbolValue(except.Variable),
 				core.NewList(exceptBody...),
 			))
-		} else if except.ExceptionType != "" {
-			// except ValueError: ...
+		} else if excTypeIR != nil {
+			// except ValueError: ... or except (ValueError, TypeError): ...
 			result = append(result, core.NewList(
 				core.SymbolValue("except"),
-				core.SymbolValue(except.ExceptionType),
+				excTypeIR,
 				core.NewList(exceptBody...),
 			))
 		} else {

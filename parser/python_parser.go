@@ -3152,20 +3152,18 @@ func (p *PythonParser) parseTryStatement() ast.ASTNode {
 		var exceptType string
 		var exceptVar string
 
+		var typeExpr ast.ASTNode
 		// Check if there's an exception type
 		if !p.check(TOKEN_COLON) {
 			// Exception type can be an identifier, parenthesized identifier, or tuple
-			// For now, just get the string representation
-			typeExpr := p.parseExpression()
+			typeExpr = p.parseExpression()
 
-			// Convert AST node to string for storage
-			// This is a simplification - ideally we'd store the full AST node
+			// For backward compatibility, also store as string
 			if ident, ok := typeExpr.(*ast.Identifier); ok {
 				exceptType = ident.Name
 			} else {
-				// For complex types like (Exception) or (ValueError, TypeError),
-				// just convert to string representation
-				exceptType = typeExpr.String()
+				// For complex types, leave exceptType empty (will use ExceptionTypeExpr instead)
+				exceptType = ""
 			}
 
 			// Check for 'as variable'
@@ -3180,9 +3178,10 @@ func (p *PythonParser) parseTryStatement() ast.ASTNode {
 		exceptBody := p.parseBlock()
 
 		exceptClauses = append(exceptClauses, ast.ExceptClause{
-			ExceptionType: exceptType,
-			Variable:      exceptVar,
-			Body:          exceptBody,
+			ExceptionType:     exceptType,
+			ExceptionTypeExpr: typeExpr,
+			Variable:          exceptVar,
+			Body:              exceptBody,
 		})
 	}
 

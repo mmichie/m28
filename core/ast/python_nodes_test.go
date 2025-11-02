@@ -537,8 +537,13 @@ func TestTryForm_ExceptWithVariable(t *testing.T) {
 	if !ok {
 		t.Fatalf("Expected except clause ListValue, got %T", list.Items()[2])
 	}
-	if exceptClause.Len() != 4 {
-		t.Fatalf("Expected 4 elements in except (except Type var body), got %d", exceptClause.Len())
+	// Should be: (except ValueError as e (do handler))
+	if exceptClause.Len() != 5 {
+		t.Fatalf("Expected 5 elements in except (except Type as var body), got %d", exceptClause.Len())
+	}
+	// Check for "as" keyword
+	if asKeyword, ok := exceptClause.Items()[2].(core.SymbolValue); !ok || string(asKeyword) != "as" {
+		t.Fatalf("Expected 'as' keyword at position 2, got %v", exceptClause.Items()[2])
 	}
 }
 

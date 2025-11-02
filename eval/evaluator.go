@@ -1383,12 +1383,36 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// (except Type as var handler...) - catch specific type with variable (Python style)
 		// (except as var handler...) - catch all with variable (Python style)
 		var excType string
+		var excTypes []string // For tuple exception types like (ValueError, TypeError)
 		var excVar string
 		var handlerStart int = 1
 
 		if exceptClause.Len() > 1 {
-			// Check if second element is a symbol
-			if sym, ok := exceptClause.Items()[1].(core.SymbolValue); ok {
+			secondElem := exceptClause.Items()[1]
+
+			// Check if it's a tuple of exception types
+			if tupleList, ok := secondElem.(*core.ListValue); ok && tupleList.Len() > 0 {
+				if sym, ok := tupleList.Items()[0].(core.SymbolValue); ok && string(sym) == "tuple-literal" {
+					// It's a tuple like (tuple-literal ValueError TypeError)
+					for i := 1; i < tupleList.Len(); i++ {
+						if typeSym, ok := tupleList.Items()[i].(core.SymbolValue); ok {
+							excTypes = append(excTypes, string(typeSym))
+						}
+					}
+					handlerStart = 2
+
+					// Check for "as" syntax
+					if exceptClause.Len() > 3 {
+						if asSym, ok := exceptClause.Items()[2].(core.SymbolValue); ok && string(asSym) == "as" {
+							if varSym, ok := exceptClause.Items()[3].(core.SymbolValue); ok {
+								excVar = string(varSym)
+								handlerStart = 4
+							}
+						}
+					}
+				}
+			} else if sym, ok := secondElem.(core.SymbolValue); ok {
+				// Check if second element is a symbol
 				symStr := string(sym)
 
 				// Check for "as" syntax for catch-all
@@ -1434,10 +1458,49 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Check if this except matches
 		matches := false
-		if excType == "" {
+		if excType == "" && len(excTypes) == 0 {
 			// Catch-all
 			matches = true
+		} else if len(excTypes) > 0 {
+			// Tuple of exception types - match if ANY match
+			excInstance := errorToExceptionInstance(tryErr, ctx)
+
+			for _, exType := range excTypes {
+				// Look up the target exception class
+				targetClassVal, err := ctx.Lookup(exType)
+				if err != nil {
+					// Exception class not found - only match "Exception" or "Error"
+					if exType == "Exception" || exType == "Error" {
+						matches = true
+						break
+					}
+				} else if targetClass, ok := targetClassVal.(*core.Class); ok {
+					// Use isinstance semantics with proper inheritance
+					if inst, ok := excInstance.(*core.Instance); ok {
+						if core.IsInstanceOf(inst, targetClass) {
+							matches = true
+							break
+						}
+					} else if exType == "Exception" {
+						// Not an instance - only match "Exception"
+						matches = true
+						break
+					}
+				} else {
+					// Target is not a class - fallback to string matching
+					if exc, ok := tryErr.(*Exception); ok {
+						if exc.Type == exType || exType == "Exception" {
+							matches = true
+							break
+						}
+					} else if exType == "Exception" || exType == "Error" {
+						matches = true
+						break
+					}
+				}
+			}
 		} else {
+			// Single exception type
 			// Convert error to Python exception instance
 			excInstance := errorToExceptionInstance(tryErr, ctx)
 
