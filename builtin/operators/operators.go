@@ -1560,6 +1560,21 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 			return core.BoolValue(exists), nil
 
 		default:
+			// Try duck-typing for dict-like objects (e.g., OrderedDict)
+			// Try __getitem__ to check if key exists
+			if _, found, err := types.CallDunder(container, "__getitem__", []core.Value{value}, ctx); found {
+				if err != nil {
+					// __getitem__ raised an error (likely KeyError), key doesn't exist
+					// Check if it's a KeyError by looking at the error message
+					if strings.Contains(err.Error(), "KeyError") {
+						return core.BoolValue(false), nil
+					}
+					// Some other error, propagate it
+					return nil, err
+				}
+				// __getitem__ succeeded, key exists
+				return core.BoolValue(true), nil
+			}
 			return nil, errors.NewTypeError("in", "argument must be iterable", string(container.Type()))
 		}
 	}
