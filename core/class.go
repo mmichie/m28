@@ -171,6 +171,19 @@ func (c *Class) SetClassAttr(name string, value Value) {
 
 // GetAttr implements Object interface for classes
 func (c *Class) GetAttr(name string) (Value, bool) {
+	// Special handling for __class__ - a class's __class__ is its metaclass
+	// For most classes, this is the `type` metaclass
+	if name == "__class__" {
+		// Check if a custom metaclass is set as a class attribute
+		if metaclass, ok := c.GetClassAttr("__class__"); ok {
+			return metaclass, true
+		}
+		// Default to TypeMetaclass (the `type` builtin)
+		// Note: TypeMetaclass should be set during initialization
+		// For now, return a simple type representation
+		return c, true // Return self for now - this mimics Python's type
+	}
+
 	// Special handling for __name__
 	if name == "__name__" {
 		return StringValue(c.Name), true

@@ -196,6 +196,16 @@ func RegisterErrors(ctx *core.Context) {
 
 	ctx.Define("BaseException", baseExceptionClass)
 
+	// KeyboardInterrupt - raised when user hits interrupt key (Ctrl-C)
+	// Important: inherits from BaseException, not Exception
+	keyboardInterruptClass := core.NewClass("KeyboardInterrupt", baseExceptionClass)
+	ctx.Define("KeyboardInterrupt", keyboardInterruptClass)
+
+	// SystemExit - raised by sys.exit()
+	// Important: inherits from BaseException, not Exception
+	systemExitClass := core.NewClass("SystemExit", baseExceptionClass)
+	ctx.Define("SystemExit", systemExitClass)
+
 	// Exception inherits from BaseException
 	exceptionClass := core.NewClass("Exception", baseExceptionClass)
 
@@ -234,6 +244,22 @@ func RegisterErrors(ctx *core.Context) {
 	nameErrorClass := core.NewClass("NameError", exceptionClass)
 	ctx.Define("NameError", nameErrorClass)
 
+	// UnboundLocalError - raised when referencing a local variable before it has been assigned
+	unboundLocalErrorClass := core.NewClass("UnboundLocalError", nameErrorClass)
+	ctx.Define("UnboundLocalError", unboundLocalErrorClass)
+
+	// SyntaxError - raised when the parser encounters a syntax error
+	syntaxErrorClass := core.NewClass("SyntaxError", exceptionClass)
+	ctx.Define("SyntaxError", syntaxErrorClass)
+
+	// IndentationError - raised when indentation is not correct (subclass of SyntaxError)
+	indentationErrorClass := core.NewClass("IndentationError", syntaxErrorClass)
+	ctx.Define("IndentationError", indentationErrorClass)
+
+	// TabError - raised when indentation contains mixed tabs and spaces (subclass of IndentationError)
+	tabErrorClass := core.NewClass("TabError", indentationErrorClass)
+	ctx.Define("TabError", tabErrorClass)
+
 	// LookupError - raised when a key or index used on a mapping or sequence is invalid
 	lookupErrorClass := core.NewClass("LookupError", exceptionClass)
 	ctx.Define("LookupError", lookupErrorClass)
@@ -250,25 +276,49 @@ func RegisterErrors(ctx *core.Context) {
 	attributeErrorClass := core.NewClass("AttributeError", exceptionClass)
 	ctx.Define("AttributeError", attributeErrorClass)
 
+	// ArithmeticError - base class for arithmetic errors
+	arithmeticErrorClass := core.NewClass("ArithmeticError", exceptionClass)
+	ctx.Define("ArithmeticError", arithmeticErrorClass)
+
 	// ZeroDivisionError - raised when division or modulo by zero takes place
-	zeroDivisionErrorClass := core.NewClass("ZeroDivisionError", exceptionClass)
+	zeroDivisionErrorClass := core.NewClass("ZeroDivisionError", arithmeticErrorClass)
 	ctx.Define("ZeroDivisionError", zeroDivisionErrorClass)
+
+	// OverflowError - raised when arithmetic operation result is too large
+	overflowErrorClass := core.NewClass("OverflowError", arithmeticErrorClass)
+	ctx.Define("OverflowError", overflowErrorClass)
+
+	// FloatingPointError - raised when floating point operation fails
+	floatingPointErrorClass := core.NewClass("FloatingPointError", arithmeticErrorClass)
+	ctx.Define("FloatingPointError", floatingPointErrorClass)
 
 	// RuntimeError - raised when an error is detected that doesn't fall in any of the other categories
 	runtimeErrorClass := core.NewClass("RuntimeError", exceptionClass)
 	ctx.Define("RuntimeError", runtimeErrorClass)
 
-	// SystemError - raised when the interpreter finds an internal error
-	systemErrorClass := core.NewClass("SystemError", exceptionClass)
-	ctx.Define("SystemError", systemErrorClass)
+	// RecursionError - raised when maximum recursion depth is exceeded
+	recursionErrorClass := core.NewClass("RecursionError", runtimeErrorClass)
+	ctx.Define("RecursionError", recursionErrorClass)
 
 	// NotImplementedError - raised when an abstract method that should have been implemented is not
 	notImplementedErrorClass := core.NewClass("NotImplementedError", runtimeErrorClass)
 	ctx.Define("NotImplementedError", notImplementedErrorClass)
 
+	// SystemError - raised when the interpreter finds an internal error
+	systemErrorClass := core.NewClass("SystemError", exceptionClass)
+	ctx.Define("SystemError", systemErrorClass)
+
 	// ImportError - raised when an import statement fails
 	importErrorClass := core.NewClass("ImportError", exceptionClass)
 	ctx.Define("ImportError", importErrorClass)
+
+	// ModuleNotFoundError - raised when a module cannot be found
+	moduleNotFoundErrorClass := core.NewClass("ModuleNotFoundError", importErrorClass)
+	ctx.Define("ModuleNotFoundError", moduleNotFoundErrorClass)
+
+	// EOFError - raised when input() hits end-of-file without reading data
+	eofErrorClass := core.NewClass("EOFError", exceptionClass)
+	ctx.Define("EOFError", eofErrorClass)
 
 	// OSError - raised when a system function returns a system-related error
 	osErrorClass := core.NewClass("OSError", exceptionClass)
@@ -292,6 +342,54 @@ func RegisterErrors(ctx *core.Context) {
 	// NotADirectoryError - raised when a directory operation is requested on a non-directory
 	notADirectoryErrorClass := core.NewClass("NotADirectoryError", osErrorClass)
 	ctx.Define("NotADirectoryError", notADirectoryErrorClass)
+
+	// FileExistsError - raised when trying to create a file or directory that already exists
+	fileExistsErrorClass := core.NewClass("FileExistsError", osErrorClass)
+	ctx.Define("FileExistsError", fileExistsErrorClass)
+
+	// TimeoutError - raised when a system function timed out at the system level
+	timeoutErrorClass := core.NewClass("TimeoutError", osErrorClass)
+	ctx.Define("TimeoutError", timeoutErrorClass)
+
+	// InterruptedError - raised when a system call is interrupted
+	interruptedErrorClass := core.NewClass("InterruptedError", osErrorClass)
+	ctx.Define("InterruptedError", interruptedErrorClass)
+
+	// ConnectionError - base class for connection-related errors
+	connectionErrorClass := core.NewClass("ConnectionError", osErrorClass)
+	ctx.Define("ConnectionError", connectionErrorClass)
+
+	// BrokenPipeError - raised when trying to write to a pipe while the other end has been closed
+	brokenPipeErrorClass := core.NewClass("BrokenPipeError", connectionErrorClass)
+	ctx.Define("BrokenPipeError", brokenPipeErrorClass)
+
+	// ConnectionAbortedError - raised when a connection attempt is aborted by the peer
+	connectionAbortedErrorClass := core.NewClass("ConnectionAbortedError", connectionErrorClass)
+	ctx.Define("ConnectionAbortedError", connectionAbortedErrorClass)
+
+	// ConnectionRefusedError - raised when a connection attempt is refused by the peer
+	connectionRefusedErrorClass := core.NewClass("ConnectionRefusedError", connectionErrorClass)
+	ctx.Define("ConnectionRefusedError", connectionRefusedErrorClass)
+
+	// ConnectionResetError - raised when a connection is reset by the peer
+	connectionResetErrorClass := core.NewClass("ConnectionResetError", connectionErrorClass)
+	ctx.Define("ConnectionResetError", connectionResetErrorClass)
+
+	// UnicodeError - base class for Unicode-related errors
+	unicodeErrorClass := core.NewClass("UnicodeError", valueErrorClass)
+	ctx.Define("UnicodeError", unicodeErrorClass)
+
+	// UnicodeDecodeError - raised when a Unicode decoding error occurs
+	unicodeDecodeErrorClass := core.NewClass("UnicodeDecodeError", unicodeErrorClass)
+	ctx.Define("UnicodeDecodeError", unicodeDecodeErrorClass)
+
+	// UnicodeEncodeError - raised when a Unicode encoding error occurs
+	unicodeEncodeErrorClass := core.NewClass("UnicodeEncodeError", unicodeErrorClass)
+	ctx.Define("UnicodeEncodeError", unicodeEncodeErrorClass)
+
+	// UnicodeTranslateError - raised when a Unicode translation error occurs
+	unicodeTranslateErrorClass := core.NewClass("UnicodeTranslateError", unicodeErrorClass)
+	ctx.Define("UnicodeTranslateError", unicodeTranslateErrorClass)
 
 	// StopIteration - raised by next() and an iterator's __next__() to signal no more items
 	stopIterationClass := core.NewClass("StopIteration", exceptionClass)
