@@ -1537,6 +1537,19 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 			subClass = wrapper.GetClass()
 			ok1 = true
 		}
+		// Try string type names (e.g., "Exception", "ValueError")
+		if !ok1 {
+			if strVal, ok := subClassVal.(core.StringValue); ok {
+				typeName := string(strVal)
+				if classVal, err := ctx.Lookup(typeName); err == nil {
+					if cls, ok := classVal.(*core.Class); ok {
+						subClass = cls
+						ok1 = true
+						subClassVal = cls // Update for later checks
+					}
+				}
+			}
+		}
 	}
 
 	baseClass, ok2 := baseClassVal.(*core.Class)
@@ -1545,6 +1558,19 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		if wrapper, ok := baseClassVal.(interface{ GetClass() *core.Class }); ok {
 			baseClass = wrapper.GetClass()
 			ok2 = true
+		}
+		// Try string type names (e.g., "Exception", "ValueError")
+		if !ok2 {
+			if strVal, ok := baseClassVal.(core.StringValue); ok {
+				typeName := string(strVal)
+				if classVal, err := ctx.Lookup(typeName); err == nil {
+					if cls, ok := classVal.(*core.Class); ok {
+						baseClass = cls
+						ok2 = true
+						baseClassVal = cls // Update for later checks
+					}
+				}
+			}
 		}
 	}
 
