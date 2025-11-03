@@ -60,14 +60,18 @@ func RegisterIO(ctx *core.Context) {
 	}))
 
 	// open - open file with mode and encoding
-	// BEFORE: 25 lines
-	// AFTER: Custom builder for complex parameter handling
-	ctx.Define("open", core.NewBuiltinFunction(OpenBuilder()))
+	// Uses BuiltinFunctionWithKwargs to support encoding= keyword argument
+	openFunc := &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "open",
+		Fn:         OpenBuilderWithKwargs(),
+	}
+	ctx.Define("open", openFunc)
 }
 
-// OpenBuilder creates the open function with optional parameters
-func OpenBuilder() func([]core.Value, *core.Context) (core.Value, error) {
-	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+// OpenBuilderWithKwargs creates the open function with keyword argument support
+func OpenBuilderWithKwargs() func([]core.Value, map[string]core.Value, *core.Context) (core.Value, error) {
+	return func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("open", args)
 
 		if err := v.Range(1, 3); err != nil {
@@ -90,18 +94,19 @@ func OpenBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 			mode = m
 		}
 
-		// Get encoding (default "utf-8") - not used in current implementation
+		// Get encoding from kwargs (default "utf-8") - accepted but ignored for now
 		// encoding := "utf-8"
-		// if v.Count() >= 3 {
-		// 	enc, err := v.GetString(2)
-		// 	if err != nil {
-		// 		return nil, err
+		// if kwargs != nil {
+		// 	if encVal, ok := kwargs["encoding"]; ok {
+		// 		if encStr, ok := encVal.(core.StringValue); ok {
+		// 			encoding = string(encStr)
+		// 		}
 		// 	}
-		// 	encoding = enc
 		// }
 
 		// Create file object
 		// Note: core.NewFile only takes filename and mode
+		// The encoding parameter is accepted but currently not used
 		file, err := core.NewFile(filename, mode)
 		if err != nil {
 			return nil, errors.NewRuntimeError("open", err.Error())
