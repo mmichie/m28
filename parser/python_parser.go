@@ -2259,7 +2259,8 @@ func (p *PythonParser) parseLoopVariables() string {
 
 		for p.check(TOKEN_COMMA) && !p.checkAhead(TOKEN_IN, 1) {
 			p.advance()
-			parts = append(parts, parseVarElement())
+			next := parseVarElement()
+			parts = append(parts, next)
 		}
 
 		// Format as "(x, y, z)" or "(key, (begin, end))"

@@ -2734,7 +2734,7 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("gen-comp lambda format requires 2 or 3 arguments")
 			}
 
-			// Extract variable name from lambda
+			// Extract variable name(s) from lambda
 			if lambdaList.Len() < 3 {
 				return nil, fmt.Errorf("invalid lambda in gen-comp")
 			}
@@ -2742,11 +2742,28 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			if !ok || params.Len() != 1 {
 				return nil, fmt.Errorf("gen-comp lambda must have exactly one parameter")
 			}
-			varSym, ok := params.Items()[0].(core.SymbolValue)
-			if !ok {
-				return nil, fmt.Errorf("gen-comp lambda parameter must be a symbol")
+
+			// Check if parameter is a list (for unpacking) or a symbol (single variable)
+			var varName string
+			var varNames []string
+			param := params.Items()[0]
+
+			if listParam, ok := param.(*core.ListValue); ok {
+				// List parameter (parsed from tuple pattern) - extract variable names for unpacking
+				varNames = make([]string, listParam.Len())
+				for i, v := range listParam.Items() {
+					if sym, ok := v.(core.SymbolValue); ok {
+						varNames[i] = string(sym)
+					} else {
+						return nil, fmt.Errorf("gen-comp lambda tuple parameter must contain only symbols")
+					}
+				}
+			} else if varSym, ok := param.(core.SymbolValue); ok {
+				// Single symbol parameter
+				varName = string(varSym)
+			} else {
+				return nil, fmt.Errorf("gen-comp lambda parameter must be a symbol or list, got %T", param)
 			}
-			varName := string(varSym)
 
 			// Expression is the lambda body
 			expr := lambdaList.Items()[2]
@@ -2766,7 +2783,7 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Create generator
-			gen, err := core.NewGeneratorExpression("genexpr", expr, varName, iterable, condition, ctx, Eval)
+			gen, err := core.NewGeneratorExpression("genexpr", expr, varName, varNames, iterable, condition, ctx, Eval)
 			if err != nil {
 				return nil, err
 			}
@@ -2800,7 +2817,7 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Create a Generator object with the expression, variable, iterable, and condition
-	gen, err := core.NewGeneratorExpression("genexpr", expr, varName, iterable, condition, ctx, Eval)
+	gen, err := core.NewGeneratorExpression("genexpr", expr, varName, nil, iterable, condition, ctx, Eval)
 	if err != nil {
 		return nil, err
 	}

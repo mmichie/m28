@@ -33,7 +33,8 @@ type Generator struct {
 
 	// Fields for generator expressions
 	expr         Value                                // Expression to evaluate
-	varName      string                               // Loop variable name
+	varName      string                               // Loop variable name (single variable)
+	varNames     []string                             // Loop variable names (multiple variables for tuple unpacking)
 	iterable     Value                                // Original iterable
 	condition    Value                                // Optional condition (nil if none)
 	items        []Value                              // Converted items from iterable
@@ -71,7 +72,7 @@ func NewGenerator(name string, code Value, ctx *Context) *Generator {
 
 // NewGeneratorExpression creates a new generator for generator expressions
 // This converts the iterable to items immediately, but evaluates the expression lazily
-func NewGeneratorExpression(name string, expr Value, varName string, iterable Value, condition Value, ctx *Context, evalFunc func(Value, *Context) (Value, error)) (*Generator, error) {
+func NewGeneratorExpression(name string, expr Value, varName string, varNames []string, iterable Value, condition Value, ctx *Context, evalFunc func(Value, *Context) (Value, error)) (*Generator, error) {
 	g := &Generator{
 		BaseObject:   *NewBaseObject(Type("generator")),
 		name:         name,
@@ -79,6 +80,7 @@ func NewGeneratorExpression(name string, expr Value, varName string, iterable Va
 		context:      NewContext(ctx),
 		expr:         expr,
 		varName:      varName,
+		varNames:     varNames,
 		iterable:     iterable,
 		condition:    condition,
 		currentIndex: 0,
@@ -275,8 +277,28 @@ func (g *Generator) Next() (Value, error) {
 			item := g.items[g.currentIndex]
 			g.currentIndex++
 
-			// Define the loop variable in the generator's context
-			g.context.Define(g.varName, item)
+			// Define the loop variable(s) in the generator's context
+			if len(g.varNames) > 0 {
+				// Multiple variables - unpack the item
+				var values []Value
+				switch v := item.(type) {
+				case TupleValue:
+					values = []Value(v)
+				case *ListValue:
+					values = v.Items()
+				default:
+					return nil, fmt.Errorf("cannot unpack non-sequence %s", item.Type())
+				}
+				if len(values) != len(g.varNames) {
+					return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(g.varNames), len(values))
+				}
+				for i, varName := range g.varNames {
+					g.context.Define(varName, values[i])
+				}
+			} else {
+				// Single variable
+				g.context.Define(g.varName, item)
+			}
 
 			// Check condition if present
 			if g.condition != nil {

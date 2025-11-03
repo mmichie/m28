@@ -426,20 +426,19 @@ func (f *ForForm) ToIR() core.Value {
 			core.NewList(bodyIR...),
 		}
 	} else {
-		// Multiple variables (tuple unpacking): (for var1 var2 ... in iterable body)
-		result = []core.Value{core.SymbolValue("for")}
-
-		// Add all variables, parsing nested tuples
+		// Multiple variables (tuple unpacking): (for (var1 var2 ...) iterable body)
+		// Wrap variables in a list (patterns use ListValue, not TupleValue)
+		varList := make([]core.Value, 0, len(f.Variables))
 		for _, v := range f.Variables {
-			result = append(result, parseVariablePattern(v))
+			varList = append(varList, parseVariablePattern(v))
 		}
 
-		// Add 'in' keyword
-		result = append(result, core.SymbolValue("in"))
-
-		// Add iterable and body
-		result = append(result, f.Iterable.ToIR())
-		result = append(result, core.NewList(bodyIR...))
+		result = []core.Value{
+			core.SymbolValue("for"),
+			core.NewList(varList...),
+			f.Iterable.ToIR(),
+			core.NewList(bodyIR...),
+		}
 	}
 
 	// If there's an else clause, we need to handle it
@@ -821,22 +820,42 @@ func (c *ComprehensionForm) ToIR() core.Value {
 	case GeneratorComp:
 		// (x*x for x in range(10))
 		// → (gen-comp (lambda (x) (* x x)) (range 10))
+		// or for tuple unpacking:
+		// ((k, v) for k, v in items)
+		// → (gen-comp (lambda ((k v)) (tuple-literal k v)) items)
+
+		// Get variable, iterable, and condition from clauses or deprecated fields
+		var variable string
+		var iterable, condition ASTNode
+		if len(c.Clauses) > 0 {
+			variable = c.Clauses[0].Variable
+			iterable = c.Clauses[0].Iterable
+			condition = c.Clauses[0].Condition
+		} else {
+			variable = c.Variable
+			iterable = c.Iterable
+			condition = c.Condition
+		}
+
+		// Parse variable pattern to handle tuple unpacking
+		varPattern := parseVariablePattern(variable)
+
 		elemLambda := core.NewList(
 			core.SymbolValue("lambda"),
-			core.NewList(core.SymbolValue(c.Variable)),
+			core.NewList(varPattern),
 			c.Element.ToIR(),
 		)
 
-		if c.Condition != nil {
+		if condition != nil {
 			filterLambda := core.NewList(
 				core.SymbolValue("lambda"),
-				core.NewList(core.SymbolValue(c.Variable)),
-				c.Condition.ToIR(),
+				core.NewList(varPattern),
+				condition.ToIR(),
 			)
 			return core.NewList(
 				core.SymbolValue("gen-comp"),
 				elemLambda,
-				c.Iterable.ToIR(),
+				iterable.ToIR(),
 				filterLambda,
 			)
 		}
@@ -844,7 +863,7 @@ func (c *ComprehensionForm) ToIR() core.Value {
 		return core.NewList(
 			core.SymbolValue("gen-comp"),
 			elemLambda,
-			c.Iterable.ToIR(),
+			iterable.ToIR(),
 		)
 
 	default:
