@@ -1508,20 +1508,24 @@ func InitStringMethods() {
 				return nil, fmt.Errorf("zfill() argument must be a number")
 			}
 
+			// Use rune length for proper Unicode handling
+			runes := []rune(s)
+			runeLen := len(runes)
 			w := int(width)
-			if w <= len(s) {
+			if w <= runeLen {
 				return receiver, nil
 			}
 
-			// Check for sign
+			// Check for sign (first character)
 			sign := ""
-			if len(s) > 0 && (s[0] == '+' || s[0] == '-') {
-				sign = s[:1]
-				s = s[1:]
+			if runeLen > 0 && (runes[0] == '+' || runes[0] == '-') {
+				sign = string(runes[0])
+				runes = runes[1:]
+				runeLen--
 			}
 
-			padding := w - len(s) - len(sign)
-			return StringValue(sign + strings.Repeat("0", padding) + s), nil
+			padding := w - runeLen - len([]rune(sign))
+			return StringValue(sign + strings.Repeat("0", padding) + string(runes)), nil
 		},
 	}
 

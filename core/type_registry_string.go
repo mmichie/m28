@@ -206,11 +206,12 @@ func getStringMethods() map[string]*MethodDescriptor {
 		"__len__": {
 			Name:    "__len__",
 			Arity:   0,
-			Doc:     "Return the length of the string",
+			Doc:     "Return the length of the string (character count, not byte count)",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				s := string(receiver.(StringValue))
-				return NumberValue(len(s)), nil
+				// Use rune count for proper Unicode length
+				return NumberValue(len([]rune(s))), nil
 			},
 		},
 		"__getitem__": {
@@ -510,16 +511,19 @@ func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, err
 	}
 
 	s := string(receiver.(StringValue))
+	// Convert to runes for proper Unicode indexing
+	runes := []rune(s)
+	runeLen := len(runes)
 
 	// Handle slice
 	if slice, ok := args[0].(*SliceValue); ok {
-		start, stop := 0, len(s)
+		start, stop := 0, runeLen
 
 		if slice.Start != nil && slice.Start != Nil {
 			if n, ok := slice.Start.(NumberValue); ok {
 				start = int(n)
 				if start < 0 {
-					start = len(s) + start
+					start = runeLen + start
 				}
 				if start < 0 {
 					start = 0
@@ -531,20 +535,20 @@ func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, err
 			if n, ok := slice.Stop.(NumberValue); ok {
 				stop = int(n)
 				if stop < 0 {
-					stop = len(s) + stop
+					stop = runeLen + stop
 				}
 			}
 		}
 
-		if stop > len(s) {
-			stop = len(s)
+		if stop > runeLen {
+			stop = runeLen
 		}
 		if start > stop {
 			start = stop
 		}
 
 		// TODO: Handle step
-		return StringValue(s[start:stop]), nil
+		return StringValue(string(runes[start:stop])), nil
 	}
 
 	// Handle index
@@ -555,12 +559,12 @@ func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, err
 
 	i := int(idx)
 	if i < 0 {
-		i = len(s) + i
+		i = runeLen + i
 	}
 
-	if i < 0 || i >= len(s) {
-		return nil, &IndexError{Index: i, Length: len(s)}
+	if i < 0 || i >= runeLen {
+		return nil, &IndexError{Index: i, Length: runeLen}
 	}
 
-	return StringValue(s[i : i+1]), nil
+	return StringValue(string(runes[i])), nil
 }

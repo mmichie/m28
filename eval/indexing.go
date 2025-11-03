@@ -303,31 +303,33 @@ func sliceList(list []core.Value, start, end, step *int) (core.Value, error) {
 	return core.NewList(result...), nil
 }
 
-// sliceString performs slicing on a string
+// sliceString performs slicing on a string (rune-based for Unicode support)
 func sliceString(str string, start, end, step *int) (core.Value, error) {
-	length := len(str)
+	// Convert to runes for proper Unicode indexing
+	runes := []rune(str)
+	length := len(runes)
 
 	// Normalize indices
 	startIdx, endIdx, stepVal := normalizeSliceIndices(length, start, end, step)
 
-	// Build result
-	result := ""
+	// Build result using rune slice
+	var resultRunes []rune
 
 	if stepVal > 0 {
 		for i := startIdx; i < endIdx; i += stepVal {
 			if i >= 0 && i < length {
-				result += string(str[i])
+				resultRunes = append(resultRunes, runes[i])
 			}
 		}
 	} else {
 		for i := startIdx; i > endIdx; i += stepVal {
 			if i >= 0 && i < length {
-				result += string(str[i])
+				resultRunes = append(resultRunes, runes[i])
 			}
 		}
 	}
 
-	return core.StringValue(result), nil
+	return core.StringValue(string(resultRunes)), nil
 }
 
 // sliceBytes performs slicing on bytes
