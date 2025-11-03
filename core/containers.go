@@ -635,20 +635,20 @@ func (s *SetValue) String() string {
 
 // Add adds a value to the set
 func (s *SetValue) Add(value Value) {
-	key := PrintValue(value)
+	key := ValueToKey(value)
 	s.items[key] = value
 }
 
 // Contains checks if a value is in the set
 func (s *SetValue) Contains(value Value) bool {
-	key := PrintValue(value)
+	key := ValueToKey(value)
 	_, ok := s.items[key]
 	return ok
 }
 
 // Remove removes a value from the set
 func (s *SetValue) Remove(value Value) bool {
-	key := PrintValue(value)
+	key := ValueToKey(value)
 	if _, ok := s.items[key]; ok {
 		delete(s.items, key)
 		return true

@@ -145,25 +145,18 @@ func InitSetMethods() {
 
 	// Mutating methods (return new sets in functional style)
 
-	// add - add element to set
+	// add - add element to set (mutates in-place)
 	setType.Methods["add"] = &MethodDescriptor{
 		Name:    "add",
 		Arity:   1,
-		Doc:     "Add element to set (returns new set)",
+		Doc:     "Add element to set (modifies set in-place, returns None)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			result := NewSet()
-
-			// Copy current set
-			for k, v := range set.items {
-				result.items[k] = v
-			}
-
-			// Add new element
-			result.Add(args[0])
-
-			return result, nil
+			// Mutate in-place
+			set.Add(args[0])
+			// Return None (Python's set.add returns None)
+			return None, nil
 		},
 	}
 
@@ -171,28 +164,15 @@ func InitSetMethods() {
 	setType.Methods["remove"] = &MethodDescriptor{
 		Name:    "remove",
 		Arity:   1,
-		Doc:     "Remove element from set (returns new set, raises error if not found)",
+		Doc:     "Remove element from set (modifies set in-place, raises error if not found)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			elem := args[0]
-
-			// Check if element exists
-			key := PrintValue(elem)
-			if _, exists := set.items[key]; !exists {
-				return nil, &KeyError{Key: elem}
+			// Remove using the SetValue.Remove method which returns bool
+			if !set.Remove(args[0]) {
+				return nil, &KeyError{Key: args[0]}
 			}
-
-			result := NewSet()
-
-			// Copy all except the removed element
-			for k, v := range set.items {
-				if k != key {
-					result.items[k] = v
-				}
-			}
-
-			return result, nil
+			return None, nil
 		},
 	}
 
@@ -200,23 +180,13 @@ func InitSetMethods() {
 	setType.Methods["discard"] = &MethodDescriptor{
 		Name:    "discard",
 		Arity:   1,
-		Doc:     "Remove element from set (returns new set, no error if not found)",
+		Doc:     "Remove element from set (modifies set in-place, no error if not found)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			elem := args[0]
-			key := PrintValue(elem)
-
-			result := NewSet()
-
-			// Copy all except the discarded element
-			for k, v := range set.items {
-				if k != key {
-					result.items[k] = v
-				}
-			}
-
-			return result, nil
+			// Discard using the SetValue.Remove method, ignore result
+			set.Remove(args[0])
+			return None, nil
 		},
 	}
 
@@ -224,29 +194,34 @@ func InitSetMethods() {
 	setType.Methods["update"] = &MethodDescriptor{
 		Name:    "update",
 		Arity:   -1, // Variable args
-		Doc:     "Add elements from other sets (returns new set)",
+		Doc:     "Add elements from other sets (modifies set in-place)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			result := NewSet()
-
-			// Copy current set
-			for k, v := range set.items {
-				result.items[k] = v
-			}
-
-			// Add from other sets
+			// Add from other sets/iterables
 			for _, arg := range args {
-				other, ok := arg.(*SetValue)
-				if !ok {
-					return nil, fmt.Errorf("update() argument must be a set, not %s", arg.Type())
+				// Check if it's a set
+				if other, ok := arg.(*SetValue); ok {
+					for _, v := range other.items {
+						set.Add(v)
+					}
+					continue
 				}
-				for k, v := range other.items {
-					result.items[k] = v
+				// Check if it's an iterable
+				if iterable, ok := arg.(Iterable); ok {
+					iter := iterable.Iterator()
+					for {
+						val, hasNext := iter.Next()
+						if !hasNext {
+							break
+						}
+						set.Add(val)
+					}
+					continue
 				}
+				return nil, fmt.Errorf("update() argument must be an iterable, not %s", arg.Type())
 			}
-
-			return result, nil
+			return None, nil
 		},
 	}
 
@@ -254,10 +229,13 @@ func InitSetMethods() {
 	setType.Methods["clear"] = &MethodDescriptor{
 		Name:    "clear",
 		Arity:   0,
-		Doc:     "Remove all elements (returns empty set)",
+		Doc:     "Remove all elements (modifies set in-place)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			return NewSet(), nil
+			set := receiver.(*SetValue)
+			// Clear the items map
+			set.items = make(map[string]Value)
+			return None, nil
 		},
 	}
 

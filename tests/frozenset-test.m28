@@ -108,8 +108,8 @@
 
 # Frozenset as set member
 (= set_of_frozensets (set))
-(= set_of_frozensets (set_of_frozensets.add fs1))
-(= set_of_frozensets (set_of_frozensets.add fs2))
+(set_of_frozensets.add fs1)
+(set_of_frozensets.add fs2)
 (print "Set of frozensets:" set_of_frozensets)
 (assert (== (len set_of_frozensets) 2) "Should have 2 frozensets")
 
