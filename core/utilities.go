@@ -37,6 +37,10 @@ func EqualValues(a, b Value) bool {
 			}
 			return float64(aVal) == 0.0
 		}
+		// Number can be compared to complex (as complex with imaginary part 0)
+		if bVal, ok := b.(ComplexValue); ok {
+			return complex(float64(aVal), 0) == complex128(bVal)
+		}
 	case BigIntValue:
 		if bVal, ok := b.(BigIntValue); ok {
 			return aVal.GetBigInt().Cmp(bVal.GetBigInt()) == 0
@@ -72,6 +76,31 @@ func EqualValues(a, b Value) bool {
 				return float64(bVal) == 1.0
 			}
 			return float64(bVal) == 0.0
+		}
+		// Bool can also be compared to complex
+		if bVal, ok := b.(ComplexValue); ok {
+			expected := complex(0, 0)
+			if bool(aVal) {
+				expected = complex(1, 0)
+			}
+			return complex128(bVal) == expected
+		}
+	case ComplexValue:
+		if bVal, ok := b.(ComplexValue); ok {
+			// Compare complex to complex
+			return complex128(aVal) == complex128(bVal)
+		}
+		// Complex can be compared to numbers (real numbers with imaginary part 0)
+		if bVal, ok := b.(NumberValue); ok {
+			return complex128(aVal) == complex(float64(bVal), 0)
+		}
+		// Complex can be compared to bool (0 or 1 with imaginary part 0)
+		if bVal, ok := b.(BoolValue); ok {
+			expected := complex(0, 0)
+			if bool(bVal) {
+				expected = complex(1, 0)
+			}
+			return complex128(aVal) == expected
 		}
 	case NilValue:
 		_, ok := b.(NilValue)
