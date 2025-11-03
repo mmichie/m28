@@ -3,6 +3,7 @@ package builtin
 import (
 	"fmt"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/modules"
 )
 
 // RegisterEssentialBuiltins registers additional essential built-in functions
@@ -329,9 +330,21 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		moduleName := string(nameVal)
 
 		// Special case: __main__ module
-		// This represents the currently executing script
+		// Return the actual __main__ module from sys.modules if it exists
 		if moduleName == "__main__" {
-			// Return a mock __main__ module with basic attributes
+			// Try to get sys.modules
+			if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
+				if sysModulesVal, ok := sysModule.Get("modules"); ok {
+					if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
+						key := core.ValueToKey(core.StringValue("__main__"))
+						if mainModule, ok := sysModulesDict.Get(key); ok {
+							return mainModule, nil
+						}
+					}
+				}
+			}
+
+			// Fallback: return a mock __main__ module if not found in sys.modules
 			mainModule := core.NewDict()
 			mainModule.Set("__name__", core.StringValue("__main__"))
 			mainModule.Set("__file__", core.StringValue("<stdin>"))

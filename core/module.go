@@ -81,11 +81,46 @@ func (m *Module) SetAll(names []string) {
 	m.All = names
 }
 
+// SetAttr implements attribute setting for modules
+func (m *Module) SetAttr(name string, value Value) error {
+	// If we have a shared dict (like __main__), set there
+	if m.Dict != nil && m.Context != nil && m.Context.ModuleDict == m.Dict {
+		key := ValueToKey(StringValue(name))
+		m.Dict.Set(key, value)
+		// Also set in context for consistency
+		m.Context.Define(name, value)
+		return nil
+	}
+
+	// For regular modules, set in exports
+	m.Export(name, value)
+
+	// Also set in Dict if it exists
+	if m.Dict != nil {
+		key := ValueToKey(StringValue(name))
+		m.Dict.Set(key, value)
+	}
+
+	return nil
+}
+
 // GetAttr implements object attribute access for modules
 func (m *Module) GetAttr(name string) (Value, bool) {
 	// Special case: __dict__ returns the module's namespace
 	if name == "__dict__" {
-		// Create a dict from the module's exports and Dict
+		// If we have a Dict set (like for __main__), return it directly
+		// This ensures globals() and __main__.__dict__ return the same object
+		if m.Dict != nil && m.Context != nil && m.Context.ModuleDict == m.Dict {
+			// This is __main__ or a module with a shared dict
+			// Make sure the dict is synchronized with the context
+			for k, v := range m.Context.Vars {
+				key := ValueToKey(StringValue(k))
+				m.Dict.Set(key, v)
+			}
+			return m.Dict, true
+		}
+
+		// For regular modules, create a dict from the module's exports and Dict
 		dict := NewDict()
 
 		// Add all exports

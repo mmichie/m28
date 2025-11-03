@@ -93,7 +93,24 @@ func main() {
 
 	// Evaluate an expression from -e
 	if *evalExpr != "" {
+		// Create shared dict for __main__ module
+		mainDict := core.NewDict()
+		globalCtx.ModuleDict = mainDict
 		globalCtx.Define("__name__", core.StringValue("__main__"))
+
+		// Register __main__ in sys.modules
+		mainModule := core.NewModule("__main__", "<command-line>")
+		mainModule.Context = globalCtx
+		mainModule.Dict = mainDict
+		if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
+			if sysModulesVal, ok := sysModule.Get("modules"); ok {
+				if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
+					key := core.ValueToKey(core.StringValue("__main__"))
+					sysModulesDict.SetWithKey(key, core.StringValue("__main__"), mainModule)
+				}
+			}
+		}
+
 		errorReporter.AddSource("<command-line>", *evalExpr)
 		result, err := eval.EvalString(*evalExpr, globalCtx)
 		if err != nil {
@@ -107,7 +124,24 @@ func main() {
 
 	// Execute program from -c
 	if *command != "" {
+		// Create shared dict for __main__ module
+		mainDict := core.NewDict()
+		globalCtx.ModuleDict = mainDict
 		globalCtx.Define("__name__", core.StringValue("__main__"))
+
+		// Register __main__ in sys.modules
+		mainModule := core.NewModule("__main__", "<command-line>")
+		mainModule.Context = globalCtx
+		mainModule.Dict = mainDict
+		if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
+			if sysModulesVal, ok := sysModule.Get("modules"); ok {
+				if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
+					key := core.ValueToKey(core.StringValue("__main__"))
+					sysModulesDict.SetWithKey(key, core.StringValue("__main__"), mainModule)
+				}
+			}
+		}
+
 		errorReporter.AddSource("<command-line>", *command)
 		result, err := eval.EvalString(*command, globalCtx)
 		if err != nil {
@@ -263,6 +297,11 @@ func executeFile(filename string, ctx *core.Context, errorReporter *repl.ErrorRe
 	ext := filepath.Ext(filename)
 	isPython := ext == ".py"
 
+	// Create a shared dict for the __main__ module's namespace
+	// This ensures globals() and __main__.__dict__ return the same object
+	mainDict := core.NewDict()
+	ctx.ModuleDict = mainDict
+
 	// Set __file__ and __name__ in context
 	ctx.Define("__file__", core.StringValue(filename))
 	ctx.Define("__name__", core.StringValue("__main__"))
@@ -271,6 +310,7 @@ func executeFile(filename string, ctx *core.Context, errorReporter *repl.ErrorRe
 	// Create a module object that wraps the execution context
 	mainModule := core.NewModule("__main__", filename)
 	mainModule.Context = ctx
+	mainModule.Dict = mainDict // Use the same dict as globals()
 
 	// Register in sys.modules
 	if sysModule, ok := modules.GetBuiltinModule("sys"); ok {

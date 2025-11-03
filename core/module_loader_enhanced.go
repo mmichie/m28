@@ -178,28 +178,48 @@ func (l *ModuleLoaderEnhanced) registerInSysModules(name string, module *DictVal
 // checkSysModules checks if module is in sys.modules dict
 // This allows Python code to manually register modules like sys.modules['importlib._bootstrap']
 func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
+	if debugImportEnhanced {
+		log.Printf("[IMPORT] checkSysModules('%s') called", name)
+	}
+
 	// Get sys module from builtin registry
 	sysModule, isBuiltin := l.getBuiltinModule("sys")
 	if !isBuiltin {
+		if debugImportEnhanced {
+			log.Printf("[IMPORT] checkSysModules('%s') -> sys module not builtin", name)
+		}
 		return nil
 	}
 
 	// Get sys.modules dict
-	sysModulesKey := ValueToKey(StringValue("modules"))
-	sysModulesVal, ok := sysModule.Get(sysModulesKey)
+	// Use direct string key "modules" not ValueToKey which would be "s:modules"
+	sysModulesVal, ok := sysModule.Get("modules")
 	if !ok {
+		if debugImportEnhanced {
+			log.Printf("[IMPORT] checkSysModules('%s') -> sys.modules not found in sys", name)
+		}
 		return nil
 	}
 
 	sysModulesDict, ok := sysModulesVal.(*DictValue)
 	if !ok {
+		if debugImportEnhanced {
+			log.Printf("[IMPORT] checkSysModules('%s') -> sys.modules is not a DictValue", name)
+		}
 		return nil
 	}
 
 	// Check if module exists in sys.modules
 	moduleKey := ValueToKey(StringValue(name))
+	if debugImportEnhanced {
+		log.Printf("[IMPORT] checkSysModules('%s') -> looking for key: %s", name, moduleKey)
+	}
 	moduleVal, ok := sysModulesDict.Get(moduleKey)
 	if !ok {
+		if debugImportEnhanced {
+			log.Printf("[IMPORT] checkSysModules('%s') -> module not found in sys.modules", name)
+			log.Printf("[IMPORT] checkSysModules('%s') -> sys.modules keys: %v", name, sysModulesDict.Keys())
+		}
 		return nil
 	}
 
@@ -210,8 +230,15 @@ func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
 	}
 
 	if module, ok := moduleVal.(*Module); ok {
-		// Convert Module to DictValue by extracting exports
+		// Convert Module to DictValue by getting its __dict__
+		// This includes exports, context bindings, and Dict values
 		DebugLog("[DEBUG] Found module '%s' in sys.modules (Module), converting to DictValue\n", name)
+		if dictVal, ok := module.GetAttr("__dict__"); ok {
+			if dict, ok := dictVal.(*DictValue); ok {
+				return dict
+			}
+		}
+		// Fallback: just use exports if __dict__ doesn't work
 		dict := NewDict()
 		for name, val := range module.Exports {
 			dict.Set(name, val)
