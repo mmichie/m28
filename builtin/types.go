@@ -1558,7 +1558,9 @@ func (b *BoolType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 // CallWithKeywords delegates to Call since bool() doesn't accept keyword arguments
 func (b *BoolType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("bool() does not accept keyword arguments")
+		return nil, &core.TypeError{
+			Message: "bool() takes no keyword arguments",
+		}
 	}
 	return b.Call(args, ctx)
 }
