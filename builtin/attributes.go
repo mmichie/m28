@@ -13,13 +13,42 @@ import (
 
 // RegisterAttributes registers attribute functions using the builder framework
 func RegisterAttributes(ctx *core.Context) {
-	// dir - list attributes of object
-	// BEFORE: 19 lines
-	// AFTER: Using builder and __dir__() dunder support
+	// dir - list attributes of object or current scope
+	// dir() with no args returns names in current scope
+	// dir(obj) returns attributes of obj
 	ctx.Define("dir", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("dir", args)
-		if err := v.Exact(1); err != nil {
+		if err := v.Range(0, 1); err != nil {
 			return nil, err
+		}
+
+		// If no argument, return names in current scope
+		if len(args) == 0 {
+			nameSet := make(map[string]bool)
+
+			// Get local variables from context
+			if ctx != nil {
+				// Get all defined names from current context
+				// Note: This is a simplified version - a full implementation would
+				// walk the scope chain and include builtins
+				for name := range ctx.Vars {
+					nameSet[name] = true
+				}
+			}
+
+			// Convert to sorted list
+			names := make([]string, 0, len(nameSet))
+			for name := range nameSet {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+
+			result := make([]core.Value, len(names))
+			for i, name := range names {
+				result[i] = core.StringValue(name)
+			}
+
+			return core.NewList(result...), nil
 		}
 
 		val := v.Get(0)

@@ -229,7 +229,6 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			if listNode, ok := step.Node.(*core.ListValue); ok && listNode.Len() >= 3 {
 				// Get variable pattern - can be a single symbol or tuple of symbols
 				varPattern := listNode.Items()[1]
-				fmt.Printf("[DEBUG LoopInit] varPattern = %v (%T)\n", varPattern, varPattern)
 
 				var varName string
 				var varNames []string
@@ -238,9 +237,7 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 				if varSym, ok := varPattern.(core.SymbolValue); ok {
 					// Single variable
 					varName = string(varSym)
-					fmt.Printf("[DEBUG LoopInit] Single var: %s\n", varName)
 				} else if tuplePattern, ok := varPattern.(core.TupleValue); ok {
-					fmt.Printf("[DEBUG LoopInit] Tuple pattern with %d elements\n", len(tuplePattern))
 					// Tuple unpacking: (k, v)
 					varNames = make([]string, len(tuplePattern))
 					for i, elem := range tuplePattern {
@@ -252,12 +249,10 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 					}
 				} else if listPattern, ok := varPattern.(*core.ListValue); ok {
 					// List unpacking: [k, v]
-					fmt.Printf("[DEBUG LoopInit] List pattern with %d elements\n", listPattern.Len())
 					varNames = make([]string, listPattern.Len())
 					for i := 0; i < listPattern.Len(); i++ {
 						if sym, ok := listPattern.Items()[i].(core.SymbolValue); ok {
 							varNames[i] = string(sym)
-							fmt.Printf("[DEBUG LoopInit]   varNames[%d] = %s\n", i, varNames[i])
 						} else {
 							return nil, fmt.Errorf("tuple unpacking pattern must contain symbols")
 						}
@@ -265,7 +260,6 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 				} else {
 					return nil, fmt.Errorf("for loop variable must be a symbol or tuple pattern, got %T", varPattern)
 				}
-				fmt.Printf("[DEBUG LoopInit] Final: varName=%s, varNames=%v\n", varName, varNames)
 
 				// Evaluate iterable
 				iterableVal, err := Eval(listNode.Items()[2], state.Locals)
@@ -319,7 +313,6 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 				// Bind loop variable(s) and continue
 				if len(loopState.VarNames) > 0 {
 					// Tuple unpacking: unpack nextVal into multiple variables
-					fmt.Printf("[DEBUG LoopNext] Unpacking with VarNames=%v, nextVal=%v (%T)\n", loopState.VarNames, nextVal, nextVal)
 					var values []core.Value
 					switch v := nextVal.(type) {
 					case core.TupleValue:
@@ -336,12 +329,10 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 
 					// Bind each variable
 					for i, varName := range loopState.VarNames {
-						fmt.Printf("[DEBUG LoopNext] Binding %s = %v\n", varName, values[i])
 						state.Locals.Define(varName, values[i])
 					}
 				} else {
 					// Single variable: bind directly
-					fmt.Printf("[DEBUG LoopNext] Single var: %s = %v\n", loopState.VarName, nextVal)
 					state.Locals.Define(loopState.VarName, nextVal)
 				}
 				state.CurrentStep++
