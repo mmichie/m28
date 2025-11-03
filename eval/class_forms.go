@@ -1559,6 +1559,56 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		}
 	}
 
+	// Handle tuple of base classes (Python supports issubclass(cls, (A, B, C)))
+	if tupleVal, ok := baseClassVal.(core.TupleValue); ok {
+		// Check if subclass is a subclass of any class in the tuple
+		for _, baseItem := range tupleVal {
+			// Try to get a Class from this tuple item
+			var itemClass *core.Class
+			if cls, ok := baseItem.(*core.Class); ok {
+				itemClass = cls
+			} else if wrapper, ok := baseItem.(interface{ GetClass() *core.Class }); ok {
+				itemClass = wrapper.GetClass()
+			} else {
+				// Skip non-class items
+				continue
+			}
+
+			// Check if subClass is a subclass of this item
+			// Use the same logic as below
+			if !ok1 {
+				// subClass couldn't be extracted
+				continue
+			}
+
+			current := subClass
+			for current != nil {
+				if current == itemClass {
+					return core.True, nil
+				}
+				current = current.Parent
+			}
+
+			// Also check MRO if available
+			if len(subClass.Parents) > 1 {
+				for _, parent := range subClass.Parents {
+					if parent == itemClass {
+						return core.True, nil
+					}
+					// Check parent's hierarchy too
+					pc := parent
+					for pc != nil {
+						if pc == itemClass {
+							return core.True, nil
+						}
+						pc = pc.Parent
+					}
+				}
+			}
+		}
+		return core.False, nil
+	}
+
 	baseClass, ok2 := baseClassVal.(*core.Class)
 	if !ok2 {
 		// Try wrapper types
@@ -1623,7 +1673,8 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 	}
 
 	if !ok1 || !ok2 {
-		return nil, fmt.Errorf("issubclass arguments must be classes")
+		// Debug: show what types we got
+		return nil, fmt.Errorf("issubclass arguments must be classes (got subclass=%T ok1=%v, baseclass=%T ok2=%v)", subClassVal, ok1, baseClassVal, ok2)
 	}
 
 	// Check inheritance chain

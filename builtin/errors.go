@@ -223,6 +223,11 @@ func RegisterErrors(ctx *core.Context) {
 
 	ctx.Define("BaseException", baseExceptionClass)
 
+	// BaseExceptionGroup - base class for exception groups (Python 3.11+)
+	// Important: inherits from BaseException, not Exception
+	baseExceptionGroupClass := core.NewClass("BaseExceptionGroup", baseExceptionClass)
+	ctx.Define("BaseExceptionGroup", baseExceptionGroupClass)
+
 	// KeyboardInterrupt - raised when user hits interrupt key (Ctrl-C)
 	// Important: inherits from BaseException, not Exception
 	keyboardInterruptClass := core.NewClass("KeyboardInterrupt", baseExceptionClass)
