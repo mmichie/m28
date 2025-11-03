@@ -1051,6 +1051,7 @@ func (i *Instance) SetAttr(name string, value Value) error {
 	if (i.Class.Name == "PosixPath" || i.Class.Name == "Path" || i.Class.Name == "PurePath") && name == "_raw_paths" {
 		fmt.Printf("[DEBUG SetAttr] %s.%s being set in Attributes dict (no descriptor found)\n", i.Class.Name, name)
 	}
+
 	i.Attributes[name] = value
 	return nil
 }
@@ -1179,6 +1180,17 @@ func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]
 // GetAttr implements attribute access for bound instance methods
 // Provides default values for standard function attributes
 func (bm *BoundInstanceMethod) GetAttr(name string) (Value, bool) {
+	// Handle __get__ specially - bound methods should return themselves unchanged
+	// when accessed via the descriptor protocol
+	if name == "__get__" {
+		// Return a function that returns self when called
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// Descriptor protocol: __get__(self, instance, owner)
+			// For bound methods, we just return ourselves unchanged
+			return bm, nil
+		}), true
+	}
+
 	// Try to get attributes from the underlying method first
 	if methodWithAttrs, ok := bm.Method.(interface {
 		GetAttr(string) (Value, bool)
