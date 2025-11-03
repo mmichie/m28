@@ -267,6 +267,21 @@ func executeFile(filename string, ctx *core.Context, errorReporter *repl.ErrorRe
 	ctx.Define("__file__", core.StringValue(filename))
 	ctx.Define("__name__", core.StringValue("__main__"))
 
+	// Register __main__ module in sys.modules so unittest and other modules can find it
+	// Create a module object that wraps the execution context
+	mainModule := core.NewModule("__main__", filename)
+	mainModule.Context = ctx
+
+	// Register in sys.modules
+	if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
+		if sysModulesVal, ok := sysModule.Get("modules"); ok {
+			if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
+				key := core.ValueToKey(core.StringValue("__main__"))
+				sysModulesDict.SetWithKey(key, core.StringValue("__main__"), mainModule)
+			}
+		}
+	}
+
 	if isPython {
 		// Use Python parser for .py files
 		return executePythonFile(filename, string(content), ctx)

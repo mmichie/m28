@@ -93,6 +93,22 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 			dict.Set(ValueToKey(StringValue(k)), v)
 		}
 
+		// Add all context bindings (for __main__ and dynamically executed modules)
+		// Walk up the context chain to collect all bindings
+		if m.Context != nil {
+			ctx := m.Context
+			for ctx != nil {
+				for k, v := range ctx.Vars {
+					key := ValueToKey(StringValue(k))
+					// Only set if not already present (inner scopes take precedence)
+					if _, exists := dict.Get(key); !exists {
+						dict.Set(key, v)
+					}
+				}
+				ctx = ctx.Outer
+			}
+		}
+
 		// Override with Dict values if present (Dict has higher priority)
 		if m.Dict != nil {
 			for _, key := range m.Dict.Keys() {
@@ -170,6 +186,13 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 	// Then check exports (for modules without backing dict or non-exported names)
 	if val, ok := m.Exports[name]; ok {
 		return val, true
+	}
+
+	// Check the module's context (for __main__ and other dynamically executed modules)
+	if m.Context != nil {
+		if val, err := m.Context.Lookup(name); err == nil {
+			return val, true
+		}
 	}
 
 	// Finally check base object attributes
