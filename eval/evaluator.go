@@ -1745,11 +1745,14 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			prevExcType := handlerCtx.ExcType
 			prevExcValue := handlerCtx.ExcValue
 			prevExcTb := handlerCtx.ExcTb
+			prevExcError, _ := handlerCtx.Lookup("__current_exception__")
 
 			// Set current exception info
 			handlerCtx.ExcType = excTypeVal
 			handlerCtx.ExcValue = excValue
 			handlerCtx.ExcTb = core.None // Traceback object not yet implemented
+			// Store the exception instance for bare raise
+			handlerCtx.Define("__current_exception__", excValue)
 
 			// Execute handler
 			handlerErr := error(nil)
@@ -1766,6 +1769,10 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			handlerCtx.ExcType = prevExcType
 			handlerCtx.ExcValue = prevExcValue
 			handlerCtx.ExcTb = prevExcTb
+			// Restore previous exception error
+			if prevExcError != nil {
+				handlerCtx.Define("__current_exception__", prevExcError)
+			}
 
 			// If handler completed without error, the exception is handled
 			if handlerErr == nil {
@@ -1795,9 +1802,35 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 //	(raise ExceptionType)
 //	(raise ExceptionType "message")
 //	(raise (ExceptionType args...))
+//	(raise) - re-raise current exception
 func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Bare raise - re-raise current exception
 	if args.Len() == 0 {
-		return nil, fmt.Errorf("raise requires at least 1 argument")
+		// Try to get the current exception from context
+		if excVal, err := ctx.Lookup("__current_exception__"); err == nil {
+			// Convert exception instance back to error
+			if inst, ok := excVal.(*core.Instance); ok {
+				// Get exception type name
+				var excType string
+				if classVal, hasClass := inst.GetAttr("__class__"); hasClass {
+					if class, ok := classVal.(*core.Class); ok {
+						excType = class.Name
+					}
+				}
+				// Get exception message
+				var message string
+				if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+					if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+						if msgStr, ok := argsTuple[0].(core.StringValue); ok {
+							message = string(msgStr)
+						}
+					}
+				}
+				return nil, &Exception{Type: excType, Message: message}
+			}
+		}
+		// No current exception to re-raise
+		return nil, &Exception{Type: "RuntimeError", Message: "No active exception to re-raise"}
 	}
 
 	// Single argument
