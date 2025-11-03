@@ -1505,6 +1505,13 @@ func (b *BoolType) GetClass() *core.Class {
 
 // Call implements the callable interface for bool() construction
 func (b *BoolType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Python bool() accepts at most 1 argument
+	if len(args) > 1 {
+		return nil, &core.TypeError{
+			Message: fmt.Sprintf("bool expected at most 1 argument, got %d", len(args)),
+		}
+	}
+
 	// Python bool() with no args returns False
 	if len(args) == 0 {
 		return core.BoolValue(false), nil
@@ -1520,7 +1527,15 @@ func (b *BoolType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		return core.BoolValue(result), nil
 	}
 
-	// Fall back to IsTruthy
+	// Try __len__ as fallback (if __bool__ not found)
+	if length, found, err := types.CallLen(val, ctx); found {
+		if err != nil {
+			return nil, err
+		}
+		return core.BoolValue(length != 0), nil
+	}
+
+	// Fall back to IsTruthy for other types
 	return core.BoolValue(core.IsTruthy(val)), nil
 }
 

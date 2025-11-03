@@ -162,17 +162,23 @@ func RegisterCollections(ctx *core.Context) {
 					}
 					// Ensure it returns a number
 					if num, ok := types.AsNumber(result); ok {
-						// Validate it's non-negative
-						if num < 0 {
-							return nil, fmt.Errorf("__len__ should return a non-negative integer")
-						}
 						// Check if it's an integer
 						if num != float64(int(num)) {
-							return nil, fmt.Errorf("__len__ should return an integer, not %.2f", num)
+							return nil, &core.TypeError{
+								Message: fmt.Sprintf("'float' object cannot be interpreted as an integer"),
+							}
+						}
+						// Validate it's non-negative
+						if num < 0 {
+							return nil, &core.ValueError{
+								Message: "__len__() should return >= 0",
+							}
 						}
 						return core.NumberValue(num), nil
 					}
-					return nil, fmt.Errorf("__len__ should return an integer")
+					return nil, &core.TypeError{
+						Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", result.Type()),
+					}
 				}
 			}
 		}

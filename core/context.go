@@ -180,7 +180,18 @@ func (c *Context) Set(name string, value Value) error {
 // Delete removes a variable from the current scope
 // Returns error if variable doesn't exist in current scope
 func (c *Context) Delete(name string) error {
-	// Check if variable exists in current scope
+	// Check if variable exists in ModuleDict first (since Lookup checks it first)
+	if c.ModuleDict != nil {
+		key := ValueToKey(StringValue(name))
+		if _, ok := c.ModuleDict.Get(key); ok {
+			c.ModuleDict.Delete(key)
+			// Also delete from Vars if present
+			delete(c.Vars, name)
+			return nil
+		}
+	}
+
+	// Check if variable exists in current scope Vars
 	if _, ok := c.Vars[name]; ok {
 		delete(c.Vars, name)
 		return nil

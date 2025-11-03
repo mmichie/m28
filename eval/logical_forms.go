@@ -46,7 +46,9 @@ func AndForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if boolVal, ok := boolResult.(core.BoolValue); ok {
 						truthy = bool(boolVal)
 					} else {
-						return nil, fmt.Errorf("__bool__ should return bool, not %s", boolResult.Type())
+						return nil, &core.TypeError{
+							Message: fmt.Sprintf("__bool__ should return bool, not %s", boolResult.Type()),
+						}
 					}
 				} else {
 					truthy = core.IsTruthy(val)
@@ -103,7 +105,9 @@ func OrForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if boolVal, ok := boolResult.(core.BoolValue); ok {
 						truthy = bool(boolVal)
 					} else {
-						return nil, fmt.Errorf("__bool__ should return bool, not %s", boolResult.Type())
+						return nil, &core.TypeError{
+							Message: fmt.Sprintf("__bool__ should return bool, not %s", boolResult.Type()),
+						}
 					}
 				} else {
 					truthy = core.IsTruthy(val)

@@ -130,13 +130,24 @@ func CallLen(obj core.Value, ctx *core.Context) (int, bool, error) {
 	// Ensure result is a number
 	num, ok := AsNumber(result)
 	if !ok {
-		return 0, true, fmt.Errorf("__len__ returned non-numeric value: %s", result.Type())
+		return 0, true, &core.TypeError{
+			Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", result.Type()),
+		}
 	}
 
-	// Ensure it's a non-negative integer
+	// Ensure it's an integer
 	length := int(num)
-	if float64(length) != num || length < 0 {
-		return 0, true, fmt.Errorf("__len__ should return an integer >= 0")
+	if float64(length) != num {
+		return 0, true, &core.TypeError{
+			Message: fmt.Sprintf("'float' object cannot be interpreted as an integer"),
+		}
+	}
+
+	// Ensure it's non-negative
+	if length < 0 {
+		return 0, true, &core.ValueError{
+			Message: "__len__() should return >= 0",
+		}
 	}
 
 	return length, true, nil
@@ -184,7 +195,9 @@ func CallBool(obj core.Value, ctx *core.Context) (bool, bool, error) {
 	// Ensure result is a bool
 	b, ok := AsBool(result)
 	if !ok {
-		return false, true, fmt.Errorf("__bool__ should return bool, returned %s", result.Type())
+		return false, true, &core.TypeError{
+			Message: fmt.Sprintf("__bool__ should return bool, returned %s", result.Type()),
+		}
 	}
 
 	return b, true, nil

@@ -57,7 +57,7 @@
   (len bad1)
   (assert False "Should have raised error for non-integer __len__")
   (except Exception as e
-    (assert (in "should return an integer" (str e)) "correct error for float return")))
+    (assert (in "cannot be interpreted as an integer" (str e)) "correct error for float return")))
 
 # Test 5: __len__ returning negative (should fail)
 (class BadLen2 ()
@@ -69,7 +69,7 @@
   (len bad2)
   (assert False "Should have raised error for negative __len__")
   (except Exception as e
-    (assert (in "non-negative" (str e)) "correct error for negative return")))
+    (assert (in ">= 0" (str e)) "correct error for negative return")))
 
 # Test 6: __len__ returning non-number (should fail)
 (class BadLen3 ()
@@ -81,7 +81,7 @@
   (len bad3)
   (assert False "Should have raised error for string __len__")
   (except Exception as e
-    (assert (in "should return an integer" (str e)) "correct error for non-number return")))
+    (assert (in "cannot be interpreted as an integer" (str e)) "correct error for non-number return")))
 (print "✓ Error cases passed")
 
 # Test 7: Integration with __bool__ fallback
