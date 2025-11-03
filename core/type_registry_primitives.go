@@ -302,6 +302,27 @@ func registerBoolType() {
 		Name:       "bool",
 		PythonName: "bool",
 		BaseType:   BoolType,
+		Properties: map[string]*PropertyDescriptor{
+			"real": {
+				Name:     "real",
+				ReadOnly: true,
+				Doc:      "the real part of a complex number (for bool, the integer value)",
+				Getter: func(v Value) (Value, error) {
+					if bool(v.(BoolValue)) {
+						return NewBigIntFromInt64(1), nil
+					}
+					return NewBigIntFromInt64(0), nil
+				},
+			},
+			"imag": {
+				Name:     "imag",
+				ReadOnly: true,
+				Doc:      "the imaginary part of a complex number (always 0 for bool)",
+				Getter: func(v Value) (Value, error) {
+					return NewBigIntFromInt64(0), nil
+				},
+			},
+		},
 		Methods: map[string]*MethodDescriptor{
 			// Comparison operators - bools compare as ints (False=0, True=1)
 			"__lt__": {

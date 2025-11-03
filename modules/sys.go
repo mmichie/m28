@@ -208,14 +208,40 @@ func InitSysModule() *core.DictValue {
 		// Takes optional depth argument (defaults to 0)
 		// Returns a frame object with minimal attributes
 
+		// Get the current context's globals (if available)
+		var globals *core.DictValue
+		if ctx != nil && ctx.ModuleDict != nil {
+			// Use the module's dict as globals
+			globals = ctx.ModuleDict
+		} else if ctx != nil && ctx.Global != nil && ctx.Global.Vars != nil {
+			// Create a dict from the global context vars
+			globals = core.NewDict()
+			for k, v := range ctx.Global.Vars {
+				globals.Set(k, v)
+			}
+			// Ensure __name__ exists
+			if _, ok := globals.Get(core.ValueToKey(core.StringValue("__name__"))); !ok {
+				globals.Set("__name__", core.StringValue("__main__"))
+			}
+		} else {
+			globals = core.NewDict()
+			globals.Set("__name__", core.StringValue("__main__"))
+		}
+
+		// Create a code object with necessary attributes
+		codeObj := core.NewDict()
+		codeObj.Set("co_filename", core.StringValue("<string>"))
+		codeObj.Set("co_name", core.StringValue("<module>"))
+		codeObj.Set("co_firstlineno", core.NumberValue(1))
+
 		// Create a minimal frame object as a dict
 		frame := core.NewDict()
 
-		// Add required frame attributes that traceback expects
-		frame.Set("f_code", core.NewDict())        // code object (minimal)
+		// Add required frame attributes that traceback and warnings expect
+		frame.Set("f_code", codeObj)               // code object with co_filename
 		frame.Set("f_lineno", core.NumberValue(1)) // line number
 		frame.Set("f_locals", core.NewDict())      // local vars
-		frame.Set("f_globals", core.NewDict())     // global vars
+		frame.Set("f_globals", globals)            // global vars with __name__
 		frame.Set("f_back", core.None)             // previous frame (None = top of stack)
 
 		// Add tb_frame attribute that some code expects

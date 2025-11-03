@@ -263,8 +263,58 @@ func Init_SREModule() *core.DictValue {
 		}))
 
 		pattern.SetValue(core.StringValue("search"), core.NewNamedBuiltinFunction("search", func(searchArgs []core.Value, searchCtx *core.Context) (core.Value, error) {
-			// Return None (no match) for now
-			return core.None, nil
+			// Get the pattern string from the pattern object
+			patternKey := core.ValueToKey(core.StringValue("pattern"))
+			patternVal, ok := pattern.Get(patternKey)
+			if !ok {
+				return nil, fmt.Errorf("pattern object has no pattern string")
+			}
+			patternStr, ok := patternVal.(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("pattern must be a string")
+			}
+
+			// Get the string to search
+			if len(searchArgs) < 1 {
+				return nil, fmt.Errorf("search() takes at least 1 argument")
+			}
+			searchStr, ok := searchArgs[0].(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("search() argument must be a string")
+			}
+
+			// Convert pattern to Go-compatible regex (same logic as findall)
+			goPattern := string(patternStr)
+			if strings.Contains(goPattern, `(?=\s|$)`) {
+				goPattern = strings.ReplaceAll(goPattern, `+(?=\s|$)`, ``)
+			}
+
+			// Compile and execute the regex
+			re, err := regexp.Compile(goPattern)
+			if err != nil {
+				return nil, fmt.Errorf("invalid regex pattern: %v", err)
+			}
+
+			// Find first match
+			match := re.FindStringIndex(string(searchStr))
+			if match == nil {
+				return core.None, nil
+			}
+
+			// Create a Match object
+			matchObj := core.NewDict()
+			matchObj.Set("start", core.NumberValue(float64(match[0])))
+			matchObj.Set("end", core.NumberValue(float64(match[1])))
+			matchText := string(searchStr)[match[0]:match[1]]
+			matchObj.Set("group", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+				// group() or group(0) returns the full match
+				if len(args) == 0 || (len(args) == 1 && args[0] == core.NumberValue(0)) {
+					return core.StringValue(matchText), nil
+				}
+				return core.StringValue(matchText), nil
+			}))
+
+			return matchObj, nil
 		}))
 
 		pattern.SetValue(core.StringValue("findall"), core.NewNamedBuiltinFunction("findall", func(findallArgs []core.Value, findallCtx *core.Context) (core.Value, error) {

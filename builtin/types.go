@@ -16,6 +16,7 @@ import (
 // Type classes for built-in types
 var (
 	NumberTypeClass   *core.Class // Single number type for M28's unified NumberValue
+	IntTypeClass      *IntType    // Global int class instance
 	BoolTypeClass     *core.Class
 	NoneTypeClass     *core.Class
 	ListTypeClass     *core.Class
@@ -313,6 +314,7 @@ func RegisterTypes(ctx *core.Context) {
 	// int - Python int constructor
 	// Defined after object so it can inherit from it
 	intClass := createIntClass(objectClass)
+	IntTypeClass = intClass
 	ctx.Define("int", intClass)
 
 	// bool - Python bool class that inherits from int
@@ -858,6 +860,8 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			return core.NewClass("str", nil), nil
 		case core.BoolValue:
 			return BoolTypeClass, nil
+		case core.BigIntValue:
+			return IntTypeClass, nil
 		case core.NilValue:
 			return NoneTypeClass, nil
 		case *core.ListValue:
@@ -1535,6 +1539,12 @@ func (b *BoolType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 
 	val := args[0]
 
+	// Type/class objects are always truthy - skip __len__ check for them
+	switch val.(type) {
+	case *core.Class, *TypeType, *StrType, *DictType, *IntType, *FloatType, *BoolType:
+		return core.True, nil
+	}
+
 	// Try __bool__ dunder method first
 	if result, found, err := types.CallBool(val, ctx); found {
 		if err != nil {
@@ -1559,7 +1569,7 @@ func (b *BoolType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 func (b *BoolType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	if len(kwargs) > 0 {
 		return nil, &core.TypeError{
-			Message: "bool() takes no keyword arguments",
+			Message: "bool() takes no keyword argument",
 		}
 	}
 	return b.Call(args, ctx)
