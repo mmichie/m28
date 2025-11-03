@@ -672,30 +672,84 @@ func (t *Tokenizer) errorToken(message string, start, startLine, startCol int) T
 }
 
 func (t *Tokenizer) parseEscapes(s string) (string, error) {
-	// Simple escape sequence parser
-	result := make([]byte, 0, len(s))
+	// Escape sequence parser with Unicode support
+	result := make([]rune, 0, len(s))
 	i := 0
 	for i < len(s) {
 		if s[i] == '\\' && i+1 < len(s) {
 			switch s[i+1] {
 			case 'n':
 				result = append(result, '\n')
+				i += 2
 			case 't':
 				result = append(result, '\t')
+				i += 2
 			case 'r':
 				result = append(result, '\r')
+				i += 2
 			case '\\':
 				result = append(result, '\\')
+				i += 2
 			case '"':
 				result = append(result, '"')
+				i += 2
 			case '\'':
 				result = append(result, '\'')
+				i += 2
+			case 'x':
+				// \xHH - hex escape (2 hex digits)
+				if i+3 < len(s) {
+					hexStr := s[i+2 : i+4]
+					var hexVal int
+					if _, err := fmt.Sscanf(hexStr, "%x", &hexVal); err == nil {
+						result = append(result, rune(hexVal))
+						i += 4
+					} else {
+						result = append(result, rune(s[i+1]))
+						i += 2
+					}
+				} else {
+					result = append(result, rune(s[i+1]))
+					i += 2
+				}
+			case 'u':
+				// \uHHHH - unicode escape (4 hex digits)
+				if i+5 < len(s) {
+					hexStr := s[i+2 : i+6]
+					var hexVal int
+					if _, err := fmt.Sscanf(hexStr, "%x", &hexVal); err == nil {
+						result = append(result, rune(hexVal))
+						i += 6
+					} else {
+						result = append(result, rune(s[i+1]))
+						i += 2
+					}
+				} else {
+					result = append(result, rune(s[i+1]))
+					i += 2
+				}
+			case 'U':
+				// \UHHHHHHHH - long unicode escape (8 hex digits)
+				if i+9 < len(s) {
+					hexStr := s[i+2 : i+10]
+					var hexVal int
+					if _, err := fmt.Sscanf(hexStr, "%x", &hexVal); err == nil {
+						result = append(result, rune(hexVal))
+						i += 10
+					} else {
+						result = append(result, rune(s[i+1]))
+						i += 2
+					}
+				} else {
+					result = append(result, rune(s[i+1]))
+					i += 2
+				}
 			default:
-				result = append(result, s[i+1])
+				result = append(result, rune(s[i+1]))
+				i += 2
 			}
-			i += 2
 		} else {
-			result = append(result, s[i])
+			result = append(result, rune(s[i]))
 			i++
 		}
 	}

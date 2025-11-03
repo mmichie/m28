@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mmichie/m28/core"
 )
@@ -822,6 +823,64 @@ func (t *PythonTokenizer) scanString(quote byte, start, startLine, startCol int)
 					value.WriteByte('\'')
 				case '"':
 					value.WriteByte('"')
+				case 'x':
+					// Hex escape: \xNN - produces character with code point 0xNN
+					if t.pos+1 < len(t.input) {
+						hex1 := t.input[t.pos]
+						hex2 := t.input[t.pos+1]
+						if isHexDigit(hex1) && isHexDigit(hex2) {
+							hexVal := hexDigitValue(hex1)*16 + hexDigitValue(hex2)
+							// Write as a Unicode rune, not as a raw byte
+							value.WriteRune(rune(hexVal))
+							t.pos += 2
+						} else {
+							value.WriteByte('x')
+						}
+					} else {
+						value.WriteByte('x')
+					}
+				case 'u':
+					// Unicode escape: \uHHHH (4 hex digits)
+					if t.pos+3 < len(t.input) {
+						hex1 := t.input[t.pos]
+						hex2 := t.input[t.pos+1]
+						hex3 := t.input[t.pos+2]
+						hex4 := t.input[t.pos+3]
+						if isHexDigit(hex1) && isHexDigit(hex2) && isHexDigit(hex3) && isHexDigit(hex4) {
+							hexVal := hexDigitValue(hex1)*4096 + hexDigitValue(hex2)*256 + hexDigitValue(hex3)*16 + hexDigitValue(hex4)
+							// Convert rune to UTF-8 and write to string builder
+							value.WriteRune(rune(hexVal))
+							t.pos += 4
+						} else {
+							value.WriteByte('u')
+						}
+					} else {
+						value.WriteByte('u')
+					}
+				case 'U':
+					// Long unicode escape: \UHHHHHHHH (8 hex digits)
+					if t.pos+7 < len(t.input) {
+						hexVal := 0
+						valid := true
+						for i := 0; i < 8; i++ {
+							h := t.input[t.pos+i]
+							if isHexDigit(h) {
+								hexVal = hexVal*16 + hexDigitValue(h)
+							} else {
+								valid = false
+								break
+							}
+						}
+						if valid && hexVal <= 0x10FFFF {
+							// Convert rune to UTF-8 and write to string builder
+							value.WriteRune(rune(hexVal))
+							t.pos += 8
+						} else {
+							value.WriteByte('U')
+						}
+					} else {
+						value.WriteByte('U')
+					}
 				default:
 					value.WriteByte(escaped)
 				}
@@ -897,6 +956,54 @@ func (t *PythonTokenizer) scanBytesString(quote byte, start, startLine, startCol
 						}
 					} else {
 						value = append(value, 'x')
+					}
+				case 'u':
+					// Unicode escape: \uHHHH (4 hex digits)
+					if t.pos+3 < len(t.input) {
+						hex1 := t.input[t.pos]
+						hex2 := t.input[t.pos+1]
+						hex3 := t.input[t.pos+2]
+						hex4 := t.input[t.pos+3]
+						if isHexDigit(hex1) && isHexDigit(hex2) && isHexDigit(hex3) && isHexDigit(hex4) {
+							hexVal := hexDigitValue(hex1)*4096 + hexDigitValue(hex2)*256 + hexDigitValue(hex3)*16 + hexDigitValue(hex4)
+							// Convert rune to UTF-8 bytes
+							var buf [4]byte
+							n := utf8.EncodeRune(buf[:], rune(hexVal))
+							value = append(value, buf[:n]...)
+							t.pos += 4
+						} else {
+							// Invalid unicode escape
+							value = append(value, 'u')
+						}
+					} else {
+						value = append(value, 'u')
+					}
+				case 'U':
+					// Long unicode escape: \UHHHHHHHH (8 hex digits)
+					if t.pos+7 < len(t.input) {
+						hexVal := 0
+						valid := true
+						for i := 0; i < 8; i++ {
+							h := t.input[t.pos+i]
+							if isHexDigit(h) {
+								hexVal = hexVal*16 + hexDigitValue(h)
+							} else {
+								valid = false
+								break
+							}
+						}
+						if valid && hexVal <= 0x10FFFF {
+							// Convert rune to UTF-8 bytes
+							var buf [4]byte
+							n := utf8.EncodeRune(buf[:], rune(hexVal))
+							value = append(value, buf[:n]...)
+							t.pos += 8
+						} else {
+							// Invalid unicode escape
+							value = append(value, 'U')
+						}
+					} else {
+						value = append(value, 'U')
 					}
 				case '0', '1', '2', '3', '4', '5', '6', '7':
 					// Octal escape: \NNN (up to 3 digits)

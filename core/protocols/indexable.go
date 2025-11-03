@@ -185,23 +185,27 @@ func NewStringIndexable(str core.StringValue) Indexable {
 	return &StringIndexable{str: string(str)}
 }
 
-// GetIndex retrieves character at index
+// GetIndex retrieves character at index (rune-based, not byte-based)
 func (s *StringIndexable) GetIndex(index core.Value) (core.Value, error) {
 	idx, ok := index.(core.NumberValue)
 	if !ok {
 		return nil, fmt.Errorf("string indices must be integers, not %s", index.Type())
 	}
 
+	// Convert string to rune slice for proper Unicode indexing
+	runes := []rune(s.str)
+	runeLen := len(runes)
+
 	i := int(idx)
 	if i < 0 {
-		i = len(s.str) + i
+		i = runeLen + i
 	}
 
-	if i < 0 || i >= len(s.str) {
-		return nil, &core.IndexError{Index: i, Length: len(s.str)}
+	if i < 0 || i >= runeLen {
+		return nil, &core.IndexError{Index: i, Length: runeLen}
 	}
 
-	return core.StringValue(s.str[i : i+1]), nil
+	return core.StringValue(string(runes[i])), nil
 }
 
 // SetIndex returns error as strings are immutable
@@ -209,19 +213,22 @@ func (s *StringIndexable) SetIndex(index, value core.Value) error {
 	return fmt.Errorf("'str' object does not support item assignment")
 }
 
-// HasIndex checks if index exists
+// HasIndex checks if index exists (rune-based)
 func (s *StringIndexable) HasIndex(index core.Value) bool {
 	idx, ok := index.(core.NumberValue)
 	if !ok {
 		return false
 	}
 
+	// Use rune length for proper Unicode indexing
+	runeLen := len([]rune(s.str))
+
 	i := int(idx)
 	if i < 0 {
-		i = len(s.str) + i
+		i = runeLen + i
 	}
 
-	return i >= 0 && i < len(s.str)
+	return i >= 0 && i < runeLen
 }
 
 // DeleteIndex returns error as strings are immutable
