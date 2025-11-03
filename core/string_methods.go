@@ -1050,11 +1050,147 @@ func InitStringMethods() {
 				return False, nil
 			}
 			for _, r := range s {
-				if r != ' ' && r != '\t' && r != '\n' && r != '\r' {
+				if !unicode.IsSpace(r) {
 					return False, nil
 				}
 			}
 			return True, nil
+		},
+	}
+
+	td.Methods["isalnum"] = &MethodDescriptor{
+		Name:    "isalnum",
+		Arity:   0,
+		Doc:     "Return True if all characters in the string are alphanumeric",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			if len(s) == 0 {
+				return False, nil
+			}
+			for _, r := range s {
+				if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+					return False, nil
+				}
+			}
+			return True, nil
+		},
+	}
+
+	td.Methods["isdecimal"] = &MethodDescriptor{
+		Name:    "isdecimal",
+		Arity:   0,
+		Doc:     "Return True if all characters in the string are decimal characters",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			if len(s) == 0 {
+				return False, nil
+			}
+			for _, r := range s {
+				if !unicode.IsDigit(r) {
+					return False, nil
+				}
+			}
+			return True, nil
+		},
+	}
+
+	td.Methods["isnumeric"] = &MethodDescriptor{
+		Name:    "isnumeric",
+		Arity:   0,
+		Doc:     "Return True if all characters in the string are numeric characters",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			if len(s) == 0 {
+				return False, nil
+			}
+			for _, r := range s {
+				if !unicode.IsNumber(r) {
+					return False, nil
+				}
+			}
+			return True, nil
+		},
+	}
+
+	td.Methods["islower"] = &MethodDescriptor{
+		Name:    "islower",
+		Arity:   0,
+		Doc:     "Return True if all cased characters in the string are lowercase",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			if len(s) == 0 {
+				return False, nil
+			}
+			hasCased := false
+			for _, r := range s {
+				if unicode.IsUpper(r) {
+					return False, nil
+				}
+				if unicode.IsLower(r) {
+					hasCased = true
+				}
+			}
+			return BoolValue(hasCased), nil
+		},
+	}
+
+	td.Methods["isupper"] = &MethodDescriptor{
+		Name:    "isupper",
+		Arity:   0,
+		Doc:     "Return True if all cased characters in the string are uppercase",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			if len(s) == 0 {
+				return False, nil
+			}
+			hasCased := false
+			for _, r := range s {
+				if unicode.IsLower(r) {
+					return False, nil
+				}
+				if unicode.IsUpper(r) {
+					hasCased = true
+				}
+			}
+			return BoolValue(hasCased), nil
+		},
+	}
+
+	td.Methods["istitle"] = &MethodDescriptor{
+		Name:    "istitle",
+		Arity:   0,
+		Doc:     "Return True if the string is a titlecased string",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			if len(s) == 0 {
+				return False, nil
+			}
+			hasCased := false
+			prevCased := false
+			for _, r := range s {
+				if unicode.IsUpper(r) {
+					if prevCased {
+						return False, nil
+					}
+					hasCased = true
+					prevCased = true
+				} else if unicode.IsLower(r) {
+					if !prevCased {
+						return False, nil
+					}
+					hasCased = true
+					prevCased = true
+				} else {
+					prevCased = false
+				}
+			}
+			return BoolValue(hasCased), nil
 		},
 	}
 
