@@ -191,7 +191,7 @@ func InitCollectionsModule() *core.DictValue {
 		}
 		index, ok := args[0].(core.NumberValue)
 		if !ok {
-			return nil, fmt.Errorf("_tuplegetter() index must be a number")
+			return nil, fmt.Errorf("_tuplegetter() index must be a number, got %T", args[0])
 		}
 
 		var doc string
