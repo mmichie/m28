@@ -1625,6 +1625,30 @@ func createBoolClass(intClass *IntType) *BoolType {
 		return nil, fmt.Errorf("__str__() argument must be bool, not %s", args[0].Type())
 	}))
 
+	// Override from_bytes to return bool instead of int
+	// bool.from_bytes(bytes, byteorder, *, signed=False) -> bool
+	// Get the parent's from_bytes method
+	if parentFromBytes, ok := intClass.Class.Methods["from_bytes"]; ok {
+		class.SetMethod("from_bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Call the parent int.from_bytes method
+			callable, ok := parentFromBytes.(core.Callable)
+			if !ok {
+				return nil, fmt.Errorf("parent from_bytes is not callable")
+			}
+			result, err := callable.Call(args, ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Convert the int result to bool (False if 0, True otherwise)
+			if num, ok := result.(core.NumberValue); ok {
+				return core.BoolValue(float64(num) != 0), nil
+			}
+
+			return core.BoolValue(true), nil
+		}))
+	}
+
 	return &BoolType{Class: class}
 }
 
