@@ -38,10 +38,6 @@ func RegisterAllBuiltins(ctx *core.Context) {
 	methods.RegisterDictMethods(ctx)
 	methods.RegisterSetMethods(ctx)
 
-	// Register core math functions (sqrt, sin, cos, etc.) as global builtins
-	// Note: The math module itself is lazy-loaded like other modules
-	modules.RegisterMathModule(ctx)
-
 	// Register decimal module (Decimal type)
 	modules.RegisterDecimalModule(ctx)
 

@@ -289,6 +289,55 @@ func RegisterNumeric(ctx *core.Context) {
 
 		return core.ComplexValue(complex(real, imag)), nil
 	}))
+
+	// sqrt - square root
+	ctx.Define("sqrt", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("sqrt", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		num, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
+		}
+
+		if num < 0 {
+			return nil, fmt.Errorf("math domain error")
+		}
+
+		return core.NumberValue(math.Sqrt(num)), nil
+	}))
+
+	// floor - round down
+	ctx.Define("floor", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("floor", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		num, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
+		}
+
+		return core.NumberValue(math.Floor(num)), nil
+	}))
+
+	// ceil - round up
+	ctx.Define("ceil", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("ceil", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+
+		num, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
+		}
+
+		return core.NumberValue(math.Ceil(num)), nil
+	}))
 }
 
 // extremeWithKwargs is a helper for min/max with keyword argument support

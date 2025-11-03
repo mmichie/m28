@@ -1,12 +1,15 @@
 # Test migrated functions to ensure they work correctly
 
-# Test math functions
+# Test global math functions (sqrt, floor, ceil are global builtins)
 (assert (== (sqrt 4) 2) "sqrt of 4 should be 2")
 (assert (== (sqrt 9) 3) "sqrt of 9 should be 3")
-(assert (== (sin 0) 0) "sin(0) should be 0")
-(assert (== (cos 0) 1) "cos(0) should be 1")
 (assert (== (floor 3.7) 3) "floor(3.7) should be 3")
 (assert (== (ceil 3.2) 4) "ceil(3.2) should be 4")
+
+# Test math module functions (need import)
+(import "math")
+(assert (== (math.sin 0) 0) "sin(0) should be 0")
+(assert (== (math.cos 0) 1) "cos(0) should be 1")
 
 # Test string functions
 (assert (== (upper "hello") "HELLO") "upper should convert to uppercase")
@@ -25,7 +28,7 @@
 
 # Test divmod
 (= dm (divmod 7 3))
-(assert (== dm (2, 1)) "divmod(7, 3) should be (2, 1)")
+(assert (== dm (tuple 2 1)) "divmod(7, 3) should be (2, 1)")
 
 # Test pow
 (assert (== (pow 2 3) 8) "pow(2, 3) should be 8")
