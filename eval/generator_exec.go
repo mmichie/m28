@@ -150,13 +150,28 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 
 	// Execute steps until we hit a yield or complete
 	for state.CurrentStep < len(state.Steps) {
+		// Check if there's a pending error from throw()
+		// If there is, just propagate it and let normal exception handling deal with it
+		if state.pendingError != nil {
+			err := state.pendingError
+			state.pendingError = nil
+			// Treat this like any other error - it will be caught by try/except if present
+			return nil, err
+		}
+
 		step := state.Steps[state.CurrentStep]
 
 		switch step.Kind {
 		case StepStatement:
 			// Evaluate the statement
 			result, err := Eval(step.Node, state.Locals)
-			if err != nil {
+			if err == nil {
+				// Check if it's actually a return value
+				if ret, ok := result.(*ReturnValue); ok {
+					state.completed = true
+					return nil, &core.StopIteration{Value: ret.Value}
+				}
+			} else {
 				// If we're in a try block, jump to except handler (or finally)
 				if len(state.TryStates) > 0 {
 					tryState := &state.TryStates[len(state.TryStates)-1]
@@ -172,12 +187,6 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 				}
 				// Not in a try block or already in except/finally - propagate error
 				return nil, err
-			}
-
-			// Check if it's actually a return value (shouldn't happen in steps)
-			if ret, ok := result.(*ReturnValue); ok {
-				state.completed = true
-				return nil, &core.StopIteration{Value: ret.Value}
 			}
 
 			state.CurrentStep++
@@ -607,4 +616,60 @@ func (state *GeneratorExecState) Send(value core.Value) (core.Value, error) {
 
 	// Continue execution
 	return state.Next()
+}
+
+// Throw throws an exception into the generator
+func (state *GeneratorExecState) Throw(excType core.Value, excValue core.Value, excTb core.Value) (core.Value, error) {
+	// If generator hasn't started, just raise the exception
+	if !state.started {
+		return nil, createExceptionFromThrowArgs(excType, excValue, excTb)
+	}
+
+	// If generator is completed, re-raise the exception
+	if state.completed {
+		return nil, createExceptionFromThrowArgs(excType, excValue, excTb)
+	}
+
+	// Create the exception error
+	err := createExceptionFromThrowArgs(excType, excValue, excTb)
+
+	// Store as pending error - it will be raised when we resume execution
+	// This simulates Python's behavior where the exception is raised at the yield point
+	state.pendingError = err
+
+	// Continue execution - the exception will be raised at the current yield point
+	return state.Next()
+}
+
+// createExceptionFromThrowArgs creates an exception error from throw() arguments
+func createExceptionFromThrowArgs(excType core.Value, excValue core.Value, excTb core.Value) error {
+	// Get exception type name
+	var typeName string
+	if class, ok := excType.(*core.Class); ok {
+		typeName = class.Name
+	} else if str, ok := excType.(core.StringValue); ok {
+		typeName = string(str)
+	} else {
+		typeName = "Exception"
+	}
+
+	// Get exception message
+	var message string
+	if excValue != core.None && excValue != core.Nil {
+		if inst, ok := excValue.(*core.Instance); ok {
+			// Get message from instance args
+			if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+				if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+					if msgStr, ok := argsTuple[0].(core.StringValue); ok {
+						message = string(msgStr)
+					}
+				}
+			}
+		} else if str, ok := excValue.(core.StringValue); ok {
+			message = string(str)
+		}
+	}
+
+	// Return an Exception error
+	return &Exception{Type: typeName, Message: message}
 }

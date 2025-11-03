@@ -9,6 +9,7 @@ import (
 type GeneratorExecutor interface {
 	Next() (Value, error)
 	Send(Value) (Value, error)
+	Throw(excType Value, excValue Value, excTb Value) (Value, error)
 }
 
 // GeneratorExecFactory creates a GeneratorExecutor for a given function and arguments
@@ -211,6 +212,32 @@ func (g *Generator) createRegistry() *MethodRegistry {
 			}
 			return gen.Close()
 		}),
+
+		// throw method
+		MakeMethod("throw", -1, "Throw an exception into the generator", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			gen, err := TypedReceiver[*Generator](receiver, "throw")
+			if err != nil {
+				return nil, err
+			}
+			// throw(type[, value[, traceback]])
+			// Requires at least 1 argument (exception type)
+			if len(args) < 1 {
+				return nil, fmt.Errorf("throw() requires at least 1 argument (exception type)")
+			}
+
+			excType := args[0]
+			var excValue Value = None
+			var excTb Value = None
+
+			if len(args) > 1 {
+				excValue = args[1]
+			}
+			if len(args) > 2 {
+				excTb = args[2]
+			}
+
+			return gen.Throw(excType, excValue, excTb)
+		}),
 	)
 
 	return registry
@@ -307,6 +334,59 @@ func (g *Generator) Send(value Value) (Value, error) {
 	g.yielded = value
 
 	return g.Next()
+}
+
+// Throw throws an exception into the generator
+func (g *Generator) Throw(excType Value, excValue Value, excTb Value) (Value, error) {
+	if g.state == GeneratorCompleted {
+		// If generator is already completed, re-raise the exception
+		return nil, createExceptionFromThrow(excType, excValue, excTb)
+	}
+
+	// If we have an exec state, delegate to it
+	if g.execState != nil {
+		return g.execState.Throw(excType, excValue, excTb)
+	}
+
+	// For generator expressions without exec state, just raise the exception
+	return nil, createExceptionFromThrow(excType, excValue, excTb)
+}
+
+// createExceptionFromThrow creates an error from throw() arguments
+func createExceptionFromThrow(excType Value, excValue Value, excTb Value) error {
+	// Get exception type name
+	var typeName string
+	if class, ok := excType.(*Class); ok {
+		typeName = class.Name
+	} else if str, ok := excType.(StringValue); ok {
+		typeName = string(str)
+	} else {
+		typeName = "Exception"
+	}
+
+	// Get exception message
+	var message string
+	if excValue != None && excValue != Nil {
+		if inst, ok := excValue.(*Instance); ok {
+			// Get message from instance args
+			if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+				if argsTuple, ok := argsAttr.(TupleValue); ok && len(argsTuple) > 0 {
+					if msgStr, ok := argsTuple[0].(StringValue); ok {
+						message = string(msgStr)
+					}
+				}
+			}
+		} else if str, ok := excValue.(StringValue); ok {
+			message = string(str)
+		}
+	}
+
+	// Return a generic error with type and message
+	// The eval package will convert this to an Exception if needed
+	if message != "" {
+		return fmt.Errorf("%s: %s", typeName, message)
+	}
+	return fmt.Errorf("%s", typeName)
 }
 
 // Close closes the generator
