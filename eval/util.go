@@ -3,8 +3,32 @@ package eval
 import (
 	"fmt"
 
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 )
+
+// isTruthyWithErrors checks if a value is truthy, but propagates errors from __bool__
+// Unlike core.IsTruthy which silently treats errors as truthy, this propagates them
+func isTruthyWithErrors(v core.Value, ctx *core.Context) (bool, error) {
+	// Try __bool__ dunder method first with error propagation
+	if result, found, err := types.CallBool(v, ctx); found {
+		if err != nil {
+			return false, err
+		}
+		return result, nil
+	}
+
+	// Try __len__ as fallback with error propagation
+	if length, found, err := types.CallLen(v, ctx); found {
+		if err != nil {
+			return false, err
+		}
+		return length != 0, nil
+	}
+
+	// Fall back to core.IsTruthy for types without __bool__ or __len__
+	return core.IsTruthy(v), nil
+}
 
 // assignVariable handles variable assignment with global/nonlocal support
 // It checks if the variable is declared as global or nonlocal and assigns accordingly
@@ -49,7 +73,12 @@ func handleElifOrElse(clause core.Value, ctx *core.Context) (core.Value, error) 
 				return nil, err
 			}
 
-			if core.IsTruthy(cond) {
+			truthy, err := isTruthyWithErrors(cond, ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			if truthy {
 				return Eval(list.Items()[2], ctx)
 			}
 
@@ -78,8 +107,14 @@ func IfForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
+	// Check truthiness with error propagation
+	truthy, err := isTruthyWithErrors(condition, ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// If truthy, evaluate and return the then-branch
-	if core.IsTruthy(condition) {
+	if truthy {
 		return Eval(args.Items()[1], ctx)
 	}
 
@@ -103,7 +138,12 @@ func IfForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, err
 			}
 
-			if core.IsTruthy(elifCond) {
+			truthy, err := isTruthyWithErrors(elifCond, ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			if truthy {
 				return Eval(list.Items()[2], ctx)
 			}
 
@@ -137,7 +177,12 @@ func IfForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					return nil, err
 				}
 
-				if core.IsTruthy(elifCond) {
+				truthy, err := isTruthyWithErrors(elifCond, ctx)
+				if err != nil {
+					return nil, err
+				}
+
+				if truthy {
 					return Eval(elifArgs[2], ctx)
 				}
 
