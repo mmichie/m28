@@ -141,6 +141,12 @@ func RegisterErrors(ctx *core.Context) {
 		}
 		self.Attributes["args"] = exceptionArgs
 
+		// Initialize exception chaining attributes (PEP 3134)
+		self.Attributes["__cause__"] = core.None             // Explicit exception chaining (raise ... from ...)
+		self.Attributes["__context__"] = core.None           // Implicit exception chaining
+		self.Attributes["__suppress_context__"] = core.False // Whether to suppress context display
+		self.Attributes["__traceback__"] = core.None         // Traceback object
+
 		return core.None, nil
 	}))
 
@@ -194,6 +200,27 @@ func RegisterErrors(ctx *core.Context) {
 		return core.StringValue(fmt.Sprintf("%s()", className)), nil
 	}))
 
+	// Add with_traceback method to BaseException
+	// This method sets the traceback and returns self
+	baseExceptionClass.SetMethod("with_traceback", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("with_traceback() missing required argument: 'tb' (pos 2)")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("with_traceback() first argument must be an instance")
+		}
+
+		tb := args[1]
+
+		// Store the traceback (for now we just store it, not fully implemented)
+		self.Attributes["__traceback__"] = tb
+
+		// Return self
+		return self, nil
+	}))
+
 	ctx.Define("BaseException", baseExceptionClass)
 
 	// KeyboardInterrupt - raised when user hits interrupt key (Ctrl-C)
@@ -226,6 +253,12 @@ func RegisterErrors(ctx *core.Context) {
 			exceptionArgs[i-1] = args[i]
 		}
 		self.Attributes["args"] = exceptionArgs
+
+		// Initialize exception chaining attributes (PEP 3134)
+		self.Attributes["__cause__"] = core.None             // Explicit exception chaining (raise ... from ...)
+		self.Attributes["__context__"] = core.None           // Implicit exception chaining
+		self.Attributes["__suppress_context__"] = core.False // Whether to suppress context display
+		self.Attributes["__traceback__"] = core.None         // Traceback object
 
 		return core.None, nil
 	}))

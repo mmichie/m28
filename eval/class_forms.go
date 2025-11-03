@@ -129,6 +129,13 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])
 					}
 
+					// Check if trying to subclass bool - Python forbids this
+					if parent.Name == "bool" {
+						return nil, &core.TypeError{
+							Message: "type 'bool' is not an acceptable base type",
+						}
+					}
+
 					parentClasses = append(parentClasses, parent)
 				}
 			}

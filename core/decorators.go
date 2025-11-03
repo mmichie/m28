@@ -169,6 +169,23 @@ func (c *ClassMethodValue) GetAttr(name string) (Value, bool) {
 	if name == "__func__" {
 		return c.Function, true
 	}
+	// Implement descriptor protocol __get__
+	if name == "__get__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) < 2 {
+				return nil, fmt.Errorf("__get__() missing required positional arguments: 'instance' and 'owner'")
+			}
+			// args[0] is instance (can be None)
+			// args[1] is owner (the class)
+			owner := args[1]
+
+			// Return a bound classmethod
+			return &BoundClassMethod{
+				Class:    owner,
+				Function: c.Function,
+			}, nil
+		}), true
+	}
 	return nil, false
 }
 

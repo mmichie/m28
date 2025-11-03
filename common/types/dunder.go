@@ -28,7 +28,9 @@ func CallDunder(obj core.Value, method string, args []core.Value, ctx *core.Cont
 		Call([]core.Value, *core.Context) (core.Value, error)
 	})
 	if !ok {
-		return nil, true, fmt.Errorf("'%s' object attribute '%s' is not callable", obj.Type(), method)
+		return nil, true, &core.TypeError{
+			Message: fmt.Sprintf("'%s' object attribute '%s' is not callable", obj.Type(), method),
+		}
 	}
 
 	// Call the method

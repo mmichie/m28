@@ -211,8 +211,37 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 
 	if bodyErr != nil {
 		// Extract exception information
-		excType = core.StringValue("Exception")
-		excValue = core.StringValue(bodyErr.Error())
+		// Convert error to exception instance to get the proper type
+		excInstance := errorToExceptionInstance(bodyErr, ctx)
+
+		// Get the exception class
+		if inst, ok := excInstance.(*core.Instance); ok {
+			if classVal, hasClass := inst.GetAttr("__class__"); hasClass {
+				excType = classVal
+			} else {
+				excType = core.StringValue("Exception")
+			}
+		} else {
+			// Fallback: try to determine type from error
+			switch bodyErr.(type) {
+			case *core.TypeError:
+				if typeErrorClass, err := ctx.Lookup("TypeError"); err == nil {
+					excType = typeErrorClass
+				} else {
+					excType = core.StringValue("TypeError")
+				}
+			case *core.ValueError:
+				if valueErrorClass, err := ctx.Lookup("ValueError"); err == nil {
+					excType = valueErrorClass
+				} else {
+					excType = core.StringValue("ValueError")
+				}
+			default:
+				excType = core.StringValue("Exception")
+			}
+		}
+
+		excValue = excInstance
 		// excTraceback would be set if we had proper traceback objects
 	}
 

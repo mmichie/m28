@@ -86,6 +86,13 @@ func isInfixOperator(sym string) bool {
 	return exists
 }
 
+// isComparisonOperator checks if a symbol is a comparison operator
+func isComparisonOperator(sym string) bool {
+	return sym == "==" || sym == "!=" || sym == "<" || sym == ">" ||
+		sym == "<=" || sym == ">=" || sym == "is" || sym == "is not" ||
+		sym == "in" || sym == "not in"
+}
+
 // detectInfixPattern checks if elements form an infix pattern
 // Returns true if second element is an infix operator
 func detectInfixPattern(elements []core.Value) bool {
@@ -151,6 +158,12 @@ func parseInfixWithPrecedence(elements []core.Value, pos int, minPrec int) (core
 			break
 		}
 
+		// Special handling for chained comparisons (Python-style)
+		// a == b == c should become (and (== a b) (== b c))
+		if isComparisonOperator(opStr) {
+			return parseChainedComparison(elements, pos, left)
+		}
+
 		pos++ // consume operator
 
 		if pos >= len(elements) {
@@ -175,6 +188,58 @@ func parseInfixWithPrecedence(elements []core.Value, pos int, minPrec int) (core
 	}
 
 	return left, pos, nil
+}
+
+// parseChainedComparison handles Python-style chained comparisons
+// e.g., a == b == c becomes (and (== a b) (== b c))
+func parseChainedComparison(elements []core.Value, startPos int, leftOperand core.Value) (core.Value, int, error) {
+	var comparisons []core.Value
+	pos := startPos
+	left := leftOperand
+
+	// Collect all chained comparisons
+	for pos < len(elements) {
+		// Get the operator
+		if pos >= len(elements) {
+			break
+		}
+
+		op, ok := elements[pos].(core.SymbolValue)
+		if !ok || !isComparisonOperator(string(op)) {
+			// Not a comparison operator, we're done
+			break
+		}
+
+		pos++ // consume operator
+
+		if pos >= len(elements) {
+			return nil, pos, fmt.Errorf("comparison operator %s missing right operand", op)
+		}
+
+		// Get the right operand (just the next element, not a full expression)
+		// We need to parse it at a higher precedence to avoid consuming more comparisons
+		right := elements[pos]
+		pos++
+
+		// Create the comparison: (op left right)
+		comparison := core.NewList(op, left, right)
+		comparisons = append(comparisons, comparison)
+
+		// The right operand becomes the left operand for the next comparison
+		left = right
+	}
+
+	// If we only have one comparison, return it directly
+	if len(comparisons) == 1 {
+		return comparisons[0], pos, nil
+	}
+
+	// Build the chained and expression: (and comp1 comp2 comp3...)
+	andExpr := make([]core.Value, len(comparisons)+1)
+	andExpr[0] = core.SymbolValue("and")
+	copy(andExpr[1:], comparisons)
+
+	return core.NewList(andExpr...), pos, nil
 }
 
 // Helper function that returns just the value (for simpler API)

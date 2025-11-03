@@ -199,32 +199,6 @@ func RegisterTypes(ctx *core.Context) {
 	StrTypeClass = createStrClass()
 	ctx.Define("str", StrTypeClass)
 
-	// bool - convert to boolean
-	ctx.Define("bool", core.NewNamedBuiltinFunction("bool", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("bool", args)
-		if err := v.Max(1); err != nil {
-			return nil, err
-		}
-
-		// Python bool() with no args returns False
-		if v.Count() == 0 {
-			return core.BoolValue(false), nil
-		}
-
-		val := v.Get(0)
-
-		// Try __bool__ dunder method first
-		if b, found, err := types.CallBool(val, ctx); found {
-			if err != nil {
-				return nil, err
-			}
-			return core.BoolValue(b), nil
-		}
-
-		// Fall back to IsTruthy
-		return core.BoolValue(core.IsTruthy(val)), nil
-	}))
-
 	// is_none - check if value is None
 	// BEFORE: 6 lines
 	// AFTER: 3 lines
@@ -325,7 +299,12 @@ func RegisterTypes(ctx *core.Context) {
 
 	// int - Python int constructor
 	// Defined after object so it can inherit from it
-	ctx.Define("int", createIntClass(objectClass))
+	intClass := createIntClass(objectClass)
+	ctx.Define("int", intClass)
+
+	// bool - Python bool class that inherits from int
+	// Defined after int so it can inherit from it
+	ctx.Define("bool", createBoolClass(intClass))
 
 	// float - Python float constructor
 	ctx.Define("float", createFloatClass())
@@ -1295,12 +1274,17 @@ func createIntClass(objectClass *core.Class) *IntType {
 			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
 		}
 
-		// First argument is the class - handle both Class and IntType
+		// First argument is the class - handle Class, IntType, and BoolType
 		var cls *core.Class
 		if c, ok := args[0].(*core.Class); ok {
 			cls = c
 		} else if it, ok := args[0].(*IntType); ok {
 			cls = it.Class
+		} else if _, ok := args[0].(*BoolType); ok {
+			// Python doesn't allow int.__new__(bool, ...) - it raises TypeError
+			return nil, &core.TypeError{
+				Message: "int.__new__(bool) is not safe, use bool.__new__()",
+			}
 		} else {
 			return nil, fmt.Errorf("__new__() argument 1 must be a class, not %T", args[0])
 		}
@@ -1494,6 +1478,126 @@ func createIntClass(objectClass *core.Class) *IntType {
 	}))
 
 	return &IntType{Class: class}
+}
+
+// BoolType represents the bool class that can be called and used with isinstance
+type BoolType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (b *BoolType) GetClass() *core.Class {
+	return b.Class
+}
+
+// Call implements the callable interface for bool() construction
+func (b *BoolType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Python bool() with no args returns False
+	if len(args) == 0 {
+		return core.BoolValue(false), nil
+	}
+
+	val := args[0]
+
+	// Try __bool__ dunder method first
+	if result, found, err := types.CallBool(val, ctx); found {
+		if err != nil {
+			return nil, err
+		}
+		return core.BoolValue(result), nil
+	}
+
+	// Fall back to IsTruthy
+	return core.BoolValue(core.IsTruthy(val)), nil
+}
+
+// CallWithKeywords delegates to Call since bool() doesn't accept keyword arguments
+func (b *BoolType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	if len(kwargs) > 0 {
+		return nil, fmt.Errorf("bool() does not accept keyword arguments")
+	}
+	return b.Call(args, ctx)
+}
+
+// createBoolClass creates the bool class that inherits from int
+func createBoolClass(intClass *IntType) *BoolType {
+	class := core.NewClass("bool", intClass.Class)
+
+	// Add __new__ method to bool
+	// bool.__new__(cls, x=False) - creates a new bool instance
+	// Note: In Python, bool is not actually subclassable, but we need __new__ for compatibility
+	class.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
+		}
+
+		// First argument is the class
+		var cls *core.Class
+		if c, ok := args[0].(*core.Class); ok {
+			cls = c
+		} else if bt, ok := args[0].(*BoolType); ok {
+			cls = bt.Class
+		} else {
+			return nil, fmt.Errorf("__new__() argument 1 must be a class, not %T", args[0])
+		}
+
+		// If trying to subclass bool, raise TypeError
+		if cls.Name != "bool" {
+			return nil, &core.TypeError{
+				Message: "type 'bool' is not an acceptable base type",
+			}
+		}
+
+		// Convert argument to bool
+		var result core.BoolValue
+		if len(args) > 1 {
+			val := args[1]
+			// Try __bool__ dunder method first
+			if b, found, err := types.CallBool(val, ctx); found {
+				if err != nil {
+					return nil, err
+				}
+				result = core.BoolValue(b)
+			} else {
+				// Fall back to IsTruthy
+				result = core.BoolValue(core.IsTruthy(val))
+			}
+		} else {
+			result = core.BoolValue(false)
+		}
+
+		return result, nil
+	}))
+
+	// Add __repr__ method
+	class.SetMethod("__repr__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("__repr__() takes exactly 1 argument (%d given)", len(args))
+		}
+		if b, ok := args[0].(core.BoolValue); ok {
+			if b {
+				return core.StringValue("True"), nil
+			}
+			return core.StringValue("False"), nil
+		}
+		return nil, fmt.Errorf("__repr__() argument must be bool, not %s", args[0].Type())
+	}))
+
+	// Add __str__ method (same as __repr__ for bool)
+	class.SetMethod("__str__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("__str__() takes exactly 1 argument (%d given)", len(args))
+		}
+		if b, ok := args[0].(core.BoolValue); ok {
+			if b {
+				return core.StringValue("True"), nil
+			}
+			return core.StringValue("False"), nil
+		}
+		return nil, fmt.Errorf("__str__() argument must be bool, not %s", args[0].Type())
+	}))
+
+	return &BoolType{Class: class}
 }
 
 // FloatType represents the float class that can be called and used with isinstance

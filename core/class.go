@@ -335,11 +335,35 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 
 	// First check methods
 	if method, ok := c.GetMethod(name); ok {
+		// Invoke descriptor protocol for classmethods and staticmethods
+		if descriptor, hasGet := method.(interface{ GetAttr(string) (Value, bool) }); hasGet {
+			if getMethod, found := descriptor.GetAttr("__get__"); found {
+				if callable, ok := getMethod.(Callable); ok {
+					// Call __get__(None, class) for class attribute access
+					result, err := callable.Call([]Value{None, c}, nil)
+					if err == nil {
+						return result, true
+					}
+				}
+			}
+		}
 		return method, true
 	}
 
 	// Then check attributes
 	if attr, ok := c.GetClassAttr(name); ok {
+		// Invoke descriptor protocol if the attribute has __get__
+		if descriptor, hasGet := attr.(interface{ GetAttr(string) (Value, bool) }); hasGet {
+			if getMethod, found := descriptor.GetAttr("__get__"); found {
+				if callable, ok := getMethod.(Callable); ok {
+					// Call __get__(None, class) for class attribute access
+					result, err := callable.Call([]Value{None, c}, nil)
+					if err == nil {
+						return result, true
+					}
+				}
+			}
+		}
 		return attr, true
 	}
 

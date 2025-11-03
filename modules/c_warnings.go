@@ -10,11 +10,18 @@ func Init_WarningsModule() *core.DictValue {
 	warningsModule := core.NewDict()
 
 	// warn - issue a warning
-	warningsModule.Set("warn", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// For now, just print the warning to stderr (simplified)
-		// In a full implementation, this would check filters, etc.
-		return core.NilValue{}, nil
-	}))
+	// Signature: warn(message, category=None, stacklevel=1, source=None)
+	warnFunc := &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "warn",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			// For now, just print the warning to stderr (simplified)
+			// In a full implementation, this would check filters, etc.
+			// We ignore the arguments for now - warnings are just suppressed
+			return core.NilValue{}, nil
+		},
+	}
+	warningsModule.Set("warn", warnFunc)
 
 	// warn_explicit - issue a warning with explicit file/line info
 	warningsModule.Set("warn_explicit", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

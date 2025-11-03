@@ -1190,12 +1190,18 @@ func (p *PythonParser) parseNot() ast.ASTNode {
 }
 
 // parseComparison parses: bitwise_or (comp_op bitwise_or)*
+// Python chained comparisons like a == b == c are converted to (and (== a b) (== b c))
 func (p *PythonParser) parseComparison() ast.ASTNode {
-	expr := p.parseBitwiseOr()
+	left := p.parseBitwiseOr()
+
+	// Collect all comparison operators and operands
+	var comparisons []ast.ASTNode
+	var lastLoc *core.SourceLocation
 
 	for p.match(TOKEN_EQUALEQUAL, TOKEN_NOTEQUAL, TOKEN_LESS, TOKEN_LESSEQUAL,
 		TOKEN_GREATER, TOKEN_GREATEREQUAL, TOKEN_IN, TOKEN_NOT_IN, TOKEN_IS, TOKEN_IS_NOT) {
 		tok := p.previous()
+		lastLoc = p.makeLocation(tok)
 		right := p.parseBitwiseOr()
 
 		var op string
@@ -1222,14 +1228,35 @@ func (p *PythonParser) parseComparison() ast.ASTNode {
 			op = "is not"
 		}
 
-		expr = ast.NewSExpr([]ast.ASTNode{
-			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
-			expr,
+		// Create comparison: (op left right)
+		comparison := ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, lastLoc, ast.SyntaxPython),
+			left,
 			right,
-		}, p.makeLocation(tok), ast.SyntaxPython)
+		}, lastLoc, ast.SyntaxPython)
+
+		comparisons = append(comparisons, comparison)
+
+		// For chaining: right becomes the new left
+		left = right
 	}
 
-	return expr
+	// If no comparisons, return the original expression
+	if len(comparisons) == 0 {
+		return left
+	}
+
+	// If only one comparison, return it directly
+	if len(comparisons) == 1 {
+		return comparisons[0]
+	}
+
+	// Multiple comparisons: build (and comp1 comp2 ...)
+	andNodes := make([]ast.ASTNode, len(comparisons)+1)
+	andNodes[0] = ast.NewIdentifier("and", lastLoc, ast.SyntaxPython)
+	copy(andNodes[1:], comparisons)
+
+	return ast.NewSExpr(andNodes, lastLoc, ast.SyntaxPython)
 }
 
 // parseBitwiseOr parses: xor (| xor)*

@@ -1719,17 +1719,14 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		if matches {
 			// Use parent context for handler to preserve variable assignments
-			// unless we need to bind an exception variable
 			handlerCtx := ctx
 
 			// Convert error to exception instance
 			excValue := errorToExceptionInstance(tryErr, ctx)
 
-			// Bind exception variable if specified
+			// Bind exception variable if specified (in parent context to preserve assignments)
 			if excVar != "" {
-				// Create new context only when binding exception variable
-				handlerCtx = core.NewContext(ctx)
-				handlerCtx.Define(excVar, excValue)
+				ctx.Define(excVar, excValue)
 			}
 
 			// Store exception info in context for sys.exc_info()
