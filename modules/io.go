@@ -121,6 +121,9 @@ func newBytesIO(args []core.Value, ctx *core.Context) (core.Value, error) {
 	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(b.read))
 	obj.SetWithKey("getvalue", core.StringValue("getvalue"), core.NewBuiltinFunction(b.getvalue))
 	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(b.close))
+	obj.SetWithKey("tell", core.StringValue("tell"), core.NewBuiltinFunction(b.tell))
+	obj.SetWithKey("seek", core.StringValue("seek"), core.NewBuiltinFunction(b.seek))
+	obj.SetWithKey("getbuffer", core.StringValue("getbuffer"), core.NewBuiltinFunction(b.getbuffer))
 
 	return obj, nil
 }
@@ -155,6 +158,34 @@ func (b *BytesIO) getvalue(args []core.Value, ctx *core.Context) (core.Value, er
 
 func (b *BytesIO) close(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.NilValue{}, nil
+}
+
+func (b *BytesIO) tell(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Return current position (length of buffer in our case since we append-only)
+	return core.NumberValue(b.buffer.Len()), nil
+}
+
+func (b *BytesIO) seek(args []core.Value, ctx *core.Context) (core.Value, error) {
+	v := validation.NewArgs("seek", args)
+	if err := v.Range(1, 2); err != nil {
+		return nil, err
+	}
+
+	// For now, we don't actually support seeking since bytes.Buffer is append-only
+	// Just return the position
+	pos, err := v.GetInt(0)
+	if err != nil {
+		return nil, err
+	}
+
+	b.pos = pos
+	return core.NumberValue(pos), nil
+}
+
+func (b *BytesIO) getbuffer(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Return a memoryview-like object
+	// For pickle, this just needs to support len() and iteration
+	return core.BytesValue(b.buffer.Bytes()), nil
 }
 
 // TextIOWrapper wraps a binary stream and provides text I/O
