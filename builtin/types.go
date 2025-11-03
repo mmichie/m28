@@ -630,6 +630,32 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 			return true
 		}
 		return false
+	case *IntType:
+		// Special handling for int type to match NumberValue, BigIntValue, and BoolValue
+		// BoolValue is included because bool is a subclass of int in Python
+		// IMPORTANT: This case must come before *core.Class because IntType embeds *core.Class
+		switch obj.(type) {
+		case core.NumberValue, core.BigIntValue, core.BoolValue:
+			return true
+		case *core.Instance:
+			// Also match int subclass instances
+			inst := obj.(*core.Instance)
+			return inst.Class == t.Class || (inst.Class.Parent != nil && inst.Class.Parent == t.Class)
+		}
+		return false
+	case *BoolType:
+		// Special handling for bool type - only BoolValue is an instance of bool
+		// NumberValue (int) is NOT an instance of bool
+		// IMPORTANT: This case must come before *core.Class because BoolType embeds *core.Class
+		switch obj.(type) {
+		case core.BoolValue:
+			return true
+		case *core.Instance:
+			// Also match bool subclass instances (though bool can't be subclassed)
+			inst := obj.(*core.Instance)
+			return inst.Class == t.Class || (inst.Class.Parent != nil && inst.Class.Parent == t.Class)
+		}
+		return false
 	case *core.Class:
 		// Check against user-defined classes
 		if inst, ok := obj.(*core.Instance); ok {
@@ -652,7 +678,8 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 				case core.StringValue:
 					return typeName == "str"
 				case core.BoolValue:
-					return typeName == "bool"
+					// BoolValue is instance of bool, and also instance of int (bool is subclass of int)
+					return typeName == "bool" || typeName == "int"
 				case core.TupleValue:
 					return typeName == "tuple"
 				case *core.DictValue:
@@ -666,17 +693,6 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 				}
 			}
 		}
-	case *IntType:
-		// Special handling for int type to match both NumberValue and BigIntValue
-		switch obj.(type) {
-		case core.NumberValue, core.BigIntValue:
-			return true
-		case *core.Instance:
-			// Also match int subclass instances
-			inst := obj.(*core.Instance)
-			return inst.Class == t.Class || (inst.Class.Parent != nil && inst.Class.Parent == t.Class)
-		}
-		return false
 	default:
 		// Handle wrapper types that have GetClass() method
 		if wrapper, ok := typeVal.(interface{ GetClass() *core.Class }); ok {

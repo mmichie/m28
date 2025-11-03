@@ -1162,7 +1162,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				match := false
 				switch expectedType {
 				case "int", "float":
-					match = actualType == "number" || (expectedType == "int" && actualType == "bigint")
+					match = actualType == "number" || (expectedType == "int" && actualType == "bigint") || (expectedType == "int" && actualType == "bool")
 				case "str":
 					match = actualType == "string"
 				case "bool":
@@ -1200,7 +1200,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 						case "list":
 							match = actualType == "list"
 						case "int", "float":
-							match = actualType == "number" || (typeName == "int" && actualType == "bigint")
+							match = actualType == "number" || (typeName == "int" && actualType == "bigint") || (typeName == "int" && actualType == "bool")
 						case "str":
 							match = actualType == "string"
 						case "bool":
@@ -1245,7 +1245,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 						return core.True, nil
 					}
 				case core.BoolValue:
-					if class.Name == "bool" {
+					if class.Name == "bool" || class.Name == "int" {
 						return core.True, nil
 					}
 				case core.NilValue:
@@ -1300,7 +1300,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 						return core.True, nil
 					}
 				case core.BoolValue:
-					if class.Name == "bool" {
+					if class.Name == "bool" || class.Name == "int" {
 						return core.True, nil
 					}
 				case core.NilValue:
@@ -1343,7 +1343,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		// Handle Python type name aliases
 		switch expectedType {
 		case "int", "float":
-			return core.BoolValue(actualType == "number" || (expectedType == "int" && actualType == "bigint")), nil
+			return core.BoolValue(actualType == "number" || (expectedType == "int" && actualType == "bigint") || (expectedType == "int" && actualType == "bool")), nil
 		case "str":
 			return core.BoolValue(actualType == "string"), nil
 		case "bool":
@@ -1376,7 +1376,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				case "list":
 					return core.BoolValue(actualType == "list"), nil
 				case "int", "float":
-					return core.BoolValue(actualType == "number" || (typeName == "int" && actualType == "bigint")), nil
+					return core.BoolValue(actualType == "number" || (typeName == "int" && actualType == "bigint") || (typeName == "int" && actualType == "bool")), nil
 				case "str":
 					return core.BoolValue(actualType == "string"), nil
 				case "bool":
@@ -1408,7 +1408,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				case "list":
 					match = actualType == "list"
 				case "int", "float":
-					match = actualType == "number" || (typeName == "int" && actualType == "bigint")
+					match = actualType == "number" || (typeName == "int" && actualType == "bigint") || (typeName == "int" && actualType == "bool")
 				case "str":
 					match = actualType == "string"
 				case "bool":
@@ -1490,8 +1490,8 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				return core.True, nil
 			}
 		case core.BoolValue:
-			// Check if class is the bool class
-			if class.Name == "bool" {
+			// Check if class is the bool or int class (bool is subclass of int)
+			if class.Name == "bool" || class.Name == "int" {
 				return core.True, nil
 			}
 		case core.NilValue:
