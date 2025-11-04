@@ -14,6 +14,7 @@ import (
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/core/protocols"
+	"github.com/mmichie/m28/modules"
 )
 
 // Global operator registry for fast lookup without context traversal
@@ -1772,6 +1773,13 @@ func invertValue(value core.Value, ctx *core.Context) (core.Value, error) {
 	// Fall back to integer bitwise inversion
 	return types.Switch(value).
 		Bool(func(b bool) (core.Value, error) {
+			// Emit DeprecationWarning for ~bool (Python 3.12+)
+			// This operation is deprecated and will be removed in Python 3.14
+			if err := emitBoolInvertWarning(ctx); err != nil {
+				// If warnings are set to "error" mode, this will return an error
+				return nil, err
+			}
+
 			// In Python, bool is a subclass of int, so True is 1 and False is 0
 			// ~False = ~0 = -1, ~True = ~1 = -2
 			intVal := 0
@@ -2394,4 +2402,13 @@ func bigIntXor(left, right core.Value) (core.Value, error) {
 	}
 
 	return bigIntResult, nil
+}
+
+// emitBoolInvertWarning emits a DeprecationWarning for using ~ on bool values
+// This follows CPython 3.12+ behavior where ~bool is deprecated
+func emitBoolInvertWarning(ctx *core.Context) error {
+	// Use the warnings module's helper function to emit the warning
+	// This ensures proper integration with catch_warnings() and other warning infrastructure
+	message := "The unary ~ (invert) operator on bool is deprecated"
+	return modules.Warn(message, "DeprecationWarning", ctx)
 }

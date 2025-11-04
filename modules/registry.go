@@ -37,6 +37,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_ast":         Init_ASTModule,        // C extension module for ast.py (AST node types)
 	"_imp":         Init_ImpModule,        // C extension module for import machinery
 	"_warnings":    Init_WarningsModule,   // C extension module for warnings.py
+	"warnings":     InitWarningsModule,    // Full Go implementation of warnings module
 	"marshal":      InitMarshalModule,     // C extension module for bytecode serialization
 	"_opcode":      InitOpcodeModule,      // C extension module for bytecode opcodes
 	"_operator":    InitOperatorModule,    // C extension module for operator functions
