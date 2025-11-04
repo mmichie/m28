@@ -7,9 +7,15 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// tupleGetterCounter tracks field indices for _tuplegetter workaround
+// This is a temporary workaround for a transpiler bug where field names
+// are passed instead of field indices
+var tupleGetterCounter int
+
 // InitCollectionsModule creates and returns the collections module
 func InitCollectionsModule() *core.DictValue {
 	collectionsModule := core.NewDict()
+	tupleGetterCounter = 0 // Reset counter
 
 	// Register Counter class
 	collectionsModule.Set("Counter", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -185,24 +191,48 @@ func InitCollectionsModule() *core.DictValue {
 
 	// Register _tuplegetter type (for namedtuple field access)
 	// This is a callable that retrieves a specific index from a tuple
-	collectionsModule.Set("_tuplegetter", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("_tuplegetter() requires at least 1 argument (index)")
-		}
-		index, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("_tuplegetter() index must be a number, got %T", args[0])
-		}
+	// Note: Must support keyword arguments for Python compatibility
+	collectionsModule.Set("_tuplegetter", &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "_tuplegetter",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			// Get index - could be positional or keyword argument
+			var index core.NumberValue
+			var ok bool
 
-		var doc string
-		if len(args) > 1 {
-			if docVal, ok := args[1].(core.StringValue); ok {
-				doc = string(docVal)
+			if len(args) > 0 {
+				index, ok = args[0].(core.NumberValue)
+				if !ok {
+					// Workaround for transpiler bug: if first arg is not a number,
+					// use the sequential counter (namedtuple creates fields in order)
+					// This happens because the transpiler passes field names instead of indices
+					index = core.NumberValue(tupleGetterCounter)
+					tupleGetterCounter++
+					ok = true
+				}
+			} else if indexVal, found := kwargs["index"]; found {
+				index, ok = indexVal.(core.NumberValue)
 			}
-		}
 
-		return NewTupleGetter(int(index), doc), nil
-	}))
+			if !ok {
+				return nil, fmt.Errorf("_tuplegetter() index must be a number")
+			}
+
+			// Get doc - could be positional or keyword argument
+			var doc string
+			if len(args) > 1 {
+				if docVal, ok := args[1].(core.StringValue); ok {
+					doc = string(docVal)
+				}
+			} else if docVal, found := kwargs["doc"]; found {
+				if docStr, ok := docVal.(core.StringValue); ok {
+					doc = string(docStr)
+				}
+			}
+
+			return NewTupleGetter(int(index), doc), nil
+		},
+	})
 
 	// Register _count_elements helper function for Counter
 	// This tallies elements from an iterable into a mapping
