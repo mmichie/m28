@@ -146,36 +146,51 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	var body []core.Value
 
 	// Check if first arg is a list (old syntax) or symbol (new syntax)
-	if binding, ok := args.Items()[0].(*core.ListValue); ok && binding.Len() >= 1 {
-		// Check if this is old 3-arg syntax: (for (var sequence) body)
-		// Old syntax has exactly 2 elements in the binding list
-		if binding.Len() == 2 {
-			// Old 3-arg syntax: (for (var sequence) body)
+	// It might also be a quoted list: (quote (var1 var2))
+	firstArg := args.Items()[0]
+
+	// Handle quoted patterns: (quote (var1 var2)) → extract the list inside
+	// This is needed because Python transpiler quotes the variable list to prevent evaluation
+	if quotedList, ok := firstArg.(*core.ListValue); ok && quotedList.Len() == 2 {
+		if sym, ok := quotedList.Items()[0].(core.SymbolValue); ok && string(sym) == "quote" {
+			// Extract the pattern from inside the quote
+			firstArg = quotedList.Items()[1]
+		}
+	}
+
+	if binding, ok := firstArg.(*core.ListValue); ok && binding.Len() >= 1 {
+		// Check for 'in' keyword first to distinguish Python-style from old 3-arg syntax
+		hasInKeyword := false
+		if args.Len() >= 2 {
+			if sym, ok := args.Items()[1].(core.SymbolValue); ok && string(sym) == "in" {
+				hasInKeyword = true
+			}
+		}
+
+		if hasInKeyword {
+			// Python-style with 'in': (for (var1 var2) in sequence body...)
+			// Pattern is the entire binding list
+			if binding.Len() == 1 {
+				pattern = binding.Items()[0]
+			} else {
+				pattern = binding
+			}
+			sequenceExpr = args.Items()[2]
+			body = args.Items()[3:]
+		} else if binding.Len() == 2 && args.Len() < 3 {
+			// Old 3-arg syntax: (for (var sequence) body...)
+			// Has only 2 total args: the binding list and the body
 			// Last element of binding is the sequence
 			pattern = binding.Items()[0]
 			sequenceExpr = binding.Items()[1]
 			body = args.Items()[1:]
-		} else if args.Len() >= 3 {
-			// Check if next arg is 'in' keyword
-			if sym, ok := args.Items()[1].(core.SymbolValue); ok && string(sym) == "in" {
-				// Python-style with 'in': (for (var1 var2) in sequence body...)
-				// Pattern is the entire binding list
-				if binding.Len() == 1 {
-					pattern = binding.Items()[0]
-				} else {
-					pattern = binding
-				}
-				sequenceExpr = args.Items()[2]
-				body = args.Items()[3:]
-			} else {
-				// New 4-arg syntax: (for pattern sequence body)
-				// The binding IS the pattern, sequence is next arg
-				pattern = binding
-				sequenceExpr = args.Items()[1]
-				body = args.Items()[2:]
-			}
 		} else {
-			return nil, ArgumentError{"for requires at least 2 elements in binding list or enough args for new syntax"}
+			// New 4-arg syntax: (for pattern sequence body...)
+			// Has 3+ args: pattern, sequence, body
+			// The binding IS the pattern, sequence is next arg
+			pattern = binding
+			sequenceExpr = args.Items()[1]
+			body = args.Items()[2:]
 		}
 	} else {
 		// New syntax: check for multiple vars with 'in' keyword

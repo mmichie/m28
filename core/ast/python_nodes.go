@@ -426,16 +426,20 @@ func (f *ForForm) ToIR() core.Value {
 			core.NewList(bodyIR...),
 		}
 	} else {
-		// Multiple variables (tuple unpacking): (for (var1 var2 ...) iterable body)
-		// Wrap variables in a list (patterns use ListValue, not TupleValue)
+		// Multiple variables (tuple unpacking): (for (quote (var1 var2 ...)) iterable body)
+		// Wrap variables in a quoted list to prevent evaluation
+		// (patterns use ListValue, not TupleValue)
 		varList := make([]core.Value, 0, len(f.Variables))
 		for _, v := range f.Variables {
 			varList = append(varList, parseVariablePattern(v))
 		}
 
+		// Quote the variable list so it doesn't get evaluated as a function call
+		quotedVarList := core.NewList(core.SymbolValue("quote"), core.NewList(varList...))
+
 		result = []core.Value{
 			core.SymbolValue("for"),
-			core.NewList(varList...),
+			quotedVarList,
 			f.Iterable.ToIR(),
 			core.NewList(bodyIR...),
 		}
