@@ -299,8 +299,6 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs map[string]
 		if ok {
 			path = core.StringValue(pathStr.String())
 		} else {
-			fmt.Printf("[DEBUG KwargsPosixStat] args[0] type: %T\n", args[0])
-			fmt.Printf("[DEBUG KwargsPosixStat] args[0] value: %v\n", args[0])
 			return nil, fmt.Errorf("stat() path must be a string, got %T", args[0])
 		}
 	}

@@ -361,26 +361,6 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// TODO: Handle nested classes (e.g., "Outer.Inner") and local classes (e.g., "func.<locals>.Local")
 	class.SetClassAttr("__qualname__", core.StringValue(string(className)))
 
-	// Debug for Path classes
-	if string(className) == "Path" || string(className) == "PosixPath" || string(className) == "PurePath" {
-		fmt.Printf("[DEBUG classForm] Created class '%s' with %d parents\n", className, len(parentClasses))
-		for i, p := range parentClasses {
-			fmt.Printf("[DEBUG classForm]   Parent[%d] = %s\n", i, p.Name)
-		}
-		fmt.Printf("[DEBUG classForm] %s.Parents = %v\n", className, func() []string {
-			names := make([]string, len(class.Parents))
-			for i, p := range class.Parents {
-				names[i] = p.Name
-			}
-			return names
-		}())
-		if class.Parent != nil {
-			fmt.Printf("[DEBUG classForm] %s.Parent = %s\n", className, class.Parent.Name)
-		} else {
-			fmt.Printf("[DEBUG classForm] %s.Parent = nil\n", className)
-		}
-	}
-
 	if debugClass {
 		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Created class '%s', processing body from index %d to %d\n", className, bodyStart, args.Len()-1)
 	}
@@ -532,7 +512,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 							// Debug for PurePath.__init__
 							if (string(className) == "PurePath" || string(className) == "Path") && methodName == "__init__" {
-								fmt.Printf("[DEBUG classForm] Setting method %s.%s via SetMethod\n", className, methodName)
+								// 								fmt.Printf("[DEBUG classForm] Setting method %s.%s via SetMethod\n", className, methodName)
 							}
 
 							class.SetMethod(methodName, finalMethod)
@@ -994,17 +974,6 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// by checking for self/cls/mcls
 				if selfVal, err := ctx.Lookup("self"); err == nil {
 					if instance, ok := selfVal.(*core.Instance); ok {
-						// Debug for pathlib classes
-						if class.Name == "PosixPath" || class.Name == "Path" || class.Name == "PurePath" || class.Name == "PurePosixPath" {
-							fmt.Printf("[DEBUG super] __class__=%s, instance.Class=%s\n", class.Name, instance.Class.Name)
-							if len(class.Parents) > 0 {
-								fmt.Printf("[DEBUG super] %s -> Parents[0] = %s\n", class.Name, class.Parents[0].Name)
-							} else if class.Parent != nil {
-								fmt.Printf("[DEBUG super] %s -> Parent = %s\n", class.Name, class.Parent.Name)
-							} else {
-								fmt.Printf("[DEBUG super] %s has NO parent!\n", class.Name)
-							}
-						}
 						// Instance method - return super for parent class with instance
 						if len(class.Parents) > 0 {
 							return core.NewSuper(class.Parents[0], instance), nil

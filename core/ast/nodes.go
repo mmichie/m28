@@ -285,11 +285,6 @@ func (a *AssignForm) ToIR() core.Value {
 					targetIR,
 					valueIR,
 				)
-				fmt.Printf("[DEBUG AssignForm.ToIR] _raw_paths assignment detected\n")
-				fmt.Printf("  Target IR: %v\n", targetIR)
-				fmt.Printf("  Value IR: %v\n", valueIR)
-				fmt.Printf("  Result IR: %v\n", result)
-				fmt.Printf("  Result[0] type: %T, value: %v\n", result.Items()[0], result.Items()[0])
 				return result
 			}
 		}

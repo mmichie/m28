@@ -323,20 +323,6 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			boundParams[paramName] = true
 			argIndex++
 		} else {
-			// Debug for missing argument issues - print stack trace
-			fmt.Printf("[DEBUG BindArguments] Missing required argument: %s\n", paramName)
-			fmt.Printf("[DEBUG BindArguments] args=%d, argIndex=%d\n", len(args), argIndex)
-			fmt.Printf("[DEBUG BindArguments] RequiredParams=%v\n", func() []string {
-				names := make([]string, len(sig.RequiredParams))
-				for i, p := range sig.RequiredParams {
-					names[i] = string(p.Name)
-				}
-				return names
-			}())
-			fmt.Printf("[DEBUG BindArguments] Provided args:\n")
-			for i, arg := range args {
-				fmt.Printf("  args[%d]: %T = %v\n", i, arg, arg)
-			}
 			return fmt.Errorf("missing required argument: %s", paramName)
 		}
 	}
@@ -367,8 +353,8 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 				var err error
 				defaultVal, err = Eval(sym, evalCtx)
 				if err != nil {
-					fmt.Printf("[DEBUG BindArguments] Error evaluating symbol default for %s: %v\n", paramName, err)
-					fmt.Printf("[DEBUG BindArguments]   Symbol: %v\n", sym)
+					// 					fmt.Printf("[DEBUG BindArguments] Error evaluating symbol default for %s: %v\n", paramName, err)
+					// 					fmt.Printf("[DEBUG BindArguments]   Symbol: %v\n", sym)
 					return fmt.Errorf("error evaluating default value for %s: %v", paramName, err)
 				}
 			} else if list, isList := defaultVal.(*core.ListValue); isList {
@@ -376,10 +362,10 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 				// For now, treat all lists as potentially unevaluated expressions
 				// This is conservative but safe
 				var err error
-				fmt.Printf("[DEBUG BindArguments] Evaluating list default for %s: %v\n", paramName, core.PrintValue(list))
+				// 				fmt.Printf("[DEBUG BindArguments] Evaluating list default for %s: %v\n", paramName, core.PrintValue(list))
 				defaultVal, err = Eval(list, evalCtx)
 				if err != nil {
-					fmt.Printf("[DEBUG BindArguments] Error evaluating list default for %s: %v\n", paramName, err)
+					// 					fmt.Printf("[DEBUG BindArguments] Error evaluating list default for %s: %v\n", paramName, err)
 					// If evaluation fails, use the list as-is (it's probably a literal)
 					defaultVal = list
 				}

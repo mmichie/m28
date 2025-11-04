@@ -348,10 +348,6 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 	// For functions that don't support keyword arguments,
 	// only allow calls with no keyword arguments
 	if len(keywordArgs) > 0 {
-		// Debug: identify the function type
-		fmt.Printf("[DEBUG kwarg_eval] Function type: %T\n", fn)
-		fmt.Printf("[DEBUG kwarg_eval] Function: %v\n", fn)
-		fmt.Printf("[DEBUG kwarg_eval] keywordArgs: %v\n", keywordArgs)
 		return nil, fmt.Errorf("function does not support keyword arguments")
 	}
 

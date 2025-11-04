@@ -362,32 +362,32 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 			}
 		}
 	} else if name == "re" {
-		fmt.Printf("[DEBUG] Applying post-load fix for 're' module\n")
+		// 		fmt.Printf("[DEBUG] Applying post-load fix for 're' module\n")
 		core.DebugLog("[PYTHON_LOADER] Applying post-load fix for 're' module\n")
 		// The @enum.global_enum decorator in re/__init__.py doesn't work in M28
 		// It's supposed to export enum members to module level, but fails
 		// Manually add the missing T and DEBUG flags from _compiler
 		compilerKey := core.ValueToKey(core.StringValue("_compiler"))
-		fmt.Printf("[DEBUG] Looking for _compiler with key: %s\n", compilerKey)
+		// 		fmt.Printf("[DEBUG] Looking for _compiler with key: %s\n", compilerKey)
 		if compilerVal, ok := partialModule.Get(compilerKey); ok {
-			fmt.Printf("[DEBUG] Found _compiler in re module, type: %T\n", compilerVal)
+			// 			fmt.Printf("[DEBUG] Found _compiler in re module, type: %T\n", compilerVal)
 
 			// _compiler can be either a *core.Module or *core.DictValue
 			var getCompilerAttr func(string) (core.Value, bool)
 
 			if compilerModule, ok := compilerVal.(*core.Module); ok {
-				fmt.Printf("[DEBUG] _compiler is a Module, checking exports\n")
+				// 				fmt.Printf("[DEBUG] _compiler is a Module, checking exports\n")
 				getCompilerAttr = func(name string) (core.Value, bool) {
 					return compilerModule.GetExport(name)
 				}
 			} else if compilerDict, ok := compilerVal.(*core.DictValue); ok {
-				fmt.Printf("[DEBUG] _compiler is a DictValue\n")
+				// 				fmt.Printf("[DEBUG] _compiler is a DictValue\n")
 				getCompilerAttr = func(name string) (core.Value, bool) {
 					key := core.ValueToKey(core.StringValue(name))
 					return compilerDict.Get(key)
 				}
 			} else {
-				fmt.Printf("[DEBUG] _compiler is neither Module nor DictValue\n")
+				// 				fmt.Printf("[DEBUG] _compiler is neither Module nor DictValue\n")
 				getCompilerAttr = nil
 			}
 
@@ -411,7 +411,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 				for _, mapping := range flagMappings {
 					if flagVal, ok := getCompilerAttr(mapping.srcName); ok {
-						fmt.Printf("[DEBUG] Found %s: %v, adding %v\n", mapping.srcName, flagVal, mapping.dstNames)
+						// 						fmt.Printf("[DEBUG] Found %s: %v, adding %v\n", mapping.srcName, flagVal, mapping.dstNames)
 						for _, dstName := range mapping.dstNames {
 							partialModule.Set(dstName, flagVal)
 							if moduleCtx != nil {
@@ -419,16 +419,16 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 							}
 						}
 					} else {
-						fmt.Printf("[DEBUG] %s not found in _compiler\n", mapping.srcName)
+						// 						fmt.Printf("[DEBUG] %s not found in _compiler\n", mapping.srcName)
 					}
 				}
 			}
 		} else {
-			fmt.Printf("[DEBUG] WARNING: _compiler not found in re module\n")
+			// 			fmt.Printf("[DEBUG] WARNING: _compiler not found in re module\n")
 		}
 
 		// Add NOFLAG = 0 (defined in re/__init__.py but not exported by @enum.global_enum)
-		fmt.Printf("[DEBUG] Adding NOFLAG = 0\n")
+		// 		fmt.Printf("[DEBUG] Adding NOFLAG = 0\n")
 		partialModule.Set("NOFLAG", core.NumberValue(0))
 		if moduleCtx != nil {
 			moduleCtx.Define("NOFLAG", core.NumberValue(0))
