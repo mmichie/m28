@@ -394,6 +394,11 @@ func executePythonFile(filename, content string, ctx *core.Context) error {
 		ir := node.ToIR()
 		_, err = eval.Eval(ir, ctx)
 		if err != nil {
+			// Check if it's SystemExit - propagate it without wrapping
+			var sysExit *core.SystemExit
+			if errors.As(err, &sysExit) {
+				return err
+			}
 			// Add statement number to error for better debugging
 			return fmt.Errorf("error in statement %d: %w", i+1, err)
 		}

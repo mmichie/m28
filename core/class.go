@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -543,6 +544,11 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			}); ok {
 				_, err := kwargsCallable.CallWithKeywords(initArgs, kwargs, initCtx)
 				if err != nil {
+					// Check if it's SystemExit - propagate it without wrapping
+					var sysExit *SystemExit
+					if errors.As(err, &sysExit) {
+						return nil, err
+					}
 					if c.Name == "TestProgram" {
 						fmt.Printf("[DEBUG Class.CallWithKeywords] Error calling %s.__init__: %v\n", c.Name, err)
 					}
@@ -558,6 +564,11 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				}
 				_, err := callable.Call(initArgs, initCtx)
 				if err != nil {
+					// Check if it's SystemExit - propagate it without wrapping
+					var sysExit *SystemExit
+					if errors.As(err, &sysExit) {
+						return nil, err
+					}
 					return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
 				}
 			}
