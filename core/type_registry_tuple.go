@@ -340,48 +340,12 @@ func getTupleMethods() map[string]*MethodDescriptor {
 				// For tuples, pickle protocol returns: (tuple_class, (list(self),))
 				tuple := receiver.(TupleValue)
 
-				// Create tuple class callable
-				tupleClass := NewNamedBuiltinFunction("tuple", func(args []Value, ctx *Context) (Value, error) {
-					if len(args) == 0 {
-						return TupleValue{}, nil
-					}
-					if len(args) == 1 {
-						// Convert iterable to tuple
-						if t, ok := args[0].(TupleValue); ok {
-							return t, nil
-						}
-						if list, ok := args[0].(*ListValue); ok {
-							result := make(TupleValue, list.Len())
-							copy(result, list.Items())
-							return result, nil
-						}
-						return nil, fmt.Errorf("tuple() argument must be an iterable")
-					}
-					return nil, fmt.Errorf("tuple() takes at most 1 argument (%d given)", len(args))
-				})
-				tupleClass.SetAttr("__module__", StringValue("builtins"))
-				tupleClass.SetAttr("__name__", StringValue("tuple"))
-				tupleClass.SetAttr("__qualname__", StringValue("tuple"))
-
-				// Add __new__ method
-				tupleClass.SetAttr("__new__", NewNamedBuiltinFunction("__new__", func(args []Value, ctx *Context) (Value, error) {
-					if len(args) < 1 {
-						return nil, fmt.Errorf("__new__() missing required argument: 'cls'")
-					}
-					if len(args) == 1 {
-						return TupleValue{}, nil
-					}
-					// args[0] is cls, args[1] is the iterable
-					if t, ok := args[1].(TupleValue); ok {
-						return t, nil
-					}
-					if list, ok := args[1].(*ListValue); ok {
-						result := make(TupleValue, list.Len())
-						copy(result, list.Items())
-						return result, nil
-					}
-					return nil, fmt.Errorf("tuple __new__ requires iterable argument")
-				}))
+				// Get the global tuple class from TypeDescriptor
+				// This ensures identity equality with the global tuple
+				tupleClass := GetTypeDescriptor(TupleType).GetTypeObject()
+				if tupleClass == nil {
+					return nil, fmt.Errorf("tuple type not registered")
+				}
 
 				// Create __newobj__ function
 				newobjFunc := NewNamedBuiltinFunction("__newobj__", func(args []Value, ctx *Context) (Value, error) {

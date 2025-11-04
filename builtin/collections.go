@@ -59,10 +59,16 @@ func RegisterCollections(ctx *core.Context) {
 	// Create as a class so list.copy and other class methods can be accessed
 	listClass := createListClass()
 	ctx.Define("list", listClass)
+	// Set the list class as the type object for ListType so that
+	// [1,2].__class__ returns the same object as the global list
+	core.GetTypeDescriptor(core.ListType).SetTypeObject(listClass)
 
 	// tuple - create as a class (like dict) so tuple.__new__ works correctly
 	tupleClass := &TupleType{Class: TupleTypeClass}
 	ctx.Define("tuple", tupleClass)
+	// Set the tuple class as the type object for TupleType so that
+	// (1,).__class__ returns the same object as the global tuple
+	core.GetTypeDescriptor(core.TupleType).SetTypeObject(tupleClass)
 
 	// dict - Python dict class
 	// Create as a class so dict.fromkeys and other class methods can be accessed

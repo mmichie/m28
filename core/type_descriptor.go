@@ -340,6 +340,13 @@ func (td *TypeDescriptor) GetTypeObject() Value {
 	return typeFunc
 }
 
+// SetTypeObject sets the cached type object for this type descriptor
+// This is used to ensure that the global type (e.g., bool, int) is the same
+// object as the one returned by obj.__class__
+func (td *TypeDescriptor) SetTypeObject(typeObj Value) {
+	td.typeObject = typeObj
+}
+
 // Standard type representations
 func defaultRepr(v Value) string {
 	return v.String()

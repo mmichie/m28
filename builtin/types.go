@@ -40,13 +40,21 @@ func SetDictTypeClass(dictClass *DictType) {
 func RegisterTypes(ctx *core.Context) {
 	// Create type classes for built-in types
 	NumberTypeClass = core.NewClass("number", nil) // M28 uses unified NumberValue for all numbers
+	NumberTypeClass.Module = "builtins"
 	BoolTypeClass = core.NewClass("bool", nil)
+	BoolTypeClass.Module = "builtins"
 	NoneTypeClass = core.NewClass("NoneType", nil)
+	NoneTypeClass.Module = "builtins"
 	ListTypeClass = core.NewClass("list", nil)
+	ListTypeClass.Module = "builtins"
 	TupleTypeClass = core.NewClass("tuple", nil)
+	TupleTypeClass.Module = "builtins"
 	SetTypeClass = core.NewClass("set", nil)
+	SetTypeClass.Module = "builtins"
 	FunctionTypeClass = core.NewClass("function", nil)
+	FunctionTypeClass.Module = "builtins"
 	MethodTypeClass = core.NewClass("method", nil) // For bound methods
+	MethodTypeClass.Module = "builtins"
 
 	// Register type descriptor for NoneType to handle __class__
 	noneTypeDesc := &core.TypeDescriptor{
@@ -316,10 +324,17 @@ func RegisterTypes(ctx *core.Context) {
 	intClass := createIntClass(objectClass)
 	IntTypeClass = intClass
 	ctx.Define("int", intClass)
+	// Set the int class as the type object for NumberType so that
+	// (42).__class__ returns the same object as the global int
+	core.GetTypeDescriptor(core.NumberType).SetTypeObject(intClass)
 
 	// bool - Python bool class that inherits from int
 	// Defined after int so it can inherit from it
-	ctx.Define("bool", createBoolClass(intClass))
+	boolClass := createBoolClass(intClass)
+	ctx.Define("bool", boolClass)
+	// Set the bool class as the type object for BoolType so that
+	// True.__class__ returns the same object as the global bool
+	core.GetTypeDescriptor(core.BoolType).SetTypeObject(boolClass)
 
 	// float - Python float constructor
 	ctx.Define("float", createFloatClass())
@@ -1299,6 +1314,7 @@ func (i *IntType) CallWithKeywords(args []core.Value, kwargs map[string]core.Val
 // createIntClass creates the int class that can be used with isinstance
 func createIntClass(objectClass *core.Class) *IntType {
 	class := core.NewClass("int", objectClass)
+	class.Module = "builtins" // int is a builtin type
 
 	// Add __new__ method to int
 	// int.__new__(cls, value=0, base=10) - creates a new int instance
@@ -1578,6 +1594,7 @@ func (b *BoolType) CallWithKeywords(args []core.Value, kwargs map[string]core.Va
 // createBoolClass creates the bool class that inherits from int
 func createBoolClass(intClass *IntType) *BoolType {
 	class := core.NewClass("bool", intClass.Class)
+	class.Module = "builtins" // bool is a builtin type
 
 	// Add __new__ method to bool
 	// bool.__new__(cls, x=False) - creates a new bool instance

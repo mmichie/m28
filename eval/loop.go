@@ -148,6 +148,7 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Check if first arg is a list (old syntax) or symbol (new syntax)
 	// It might also be a quoted list: (quote (var1 var2))
 	firstArg := args.Items()[0]
+	wasQuoted := false
 
 	// Handle quoted patterns: (quote (var1 var2)) → extract the list inside
 	// This is needed because Python transpiler quotes the variable list to prevent evaluation
@@ -155,6 +156,7 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if sym, ok := quotedList.Items()[0].(core.SymbolValue); ok && string(sym) == "quote" {
 			// Extract the pattern from inside the quote
 			firstArg = quotedList.Items()[1]
+			wasQuoted = true
 		}
 	}
 
@@ -177,17 +179,19 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 			sequenceExpr = args.Items()[2]
 			body = args.Items()[3:]
-		} else if binding.Len() == 2 && args.Len() < 3 {
+		} else if binding.Len() == 2 && !wasQuoted {
 			// Old 3-arg syntax: (for (var sequence) body...)
-			// Has only 2 total args: the binding list and the body
-			// Last element of binding is the sequence
+			// binding has 2 elements: var and sequence
+			// Remaining args are body expressions
+			// Note: wasQuoted check ensures transpiled code goes to else branch
 			pattern = binding.Items()[0]
 			sequenceExpr = binding.Items()[1]
 			body = args.Items()[1:]
 		} else {
-			// New 4-arg syntax: (for pattern sequence body...)
-			// Has 3+ args: pattern, sequence, body
-			// The binding IS the pattern, sequence is next arg
+			// New 4-arg syntax or multi-var unpacking: (for (var1 var2 var3) sequence body...)
+			// OR transpiled quoted form: (for (quote (var1 var2)) sequence body...)
+			// binding has 1, 2 (if quoted), or 3+ elements
+			// sequence is next arg, rest are body
 			pattern = binding
 			sequenceExpr = args.Items()[1]
 			body = args.Items()[2:]
