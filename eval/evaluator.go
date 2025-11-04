@@ -1369,6 +1369,23 @@ func isExceptionType(name string) bool {
 	return knownTypes[name]
 }
 
+// isLikelyExceptionType returns true if the name looks like an exception type
+// based on naming conventions: starts with capital letter, or underscore+capital
+func isLikelyExceptionType(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+	// Starts with capital letter
+	if name[0] >= 'A' && name[0] <= 'Z' {
+		return true
+	}
+	// Starts with underscore followed by capital letter (e.g. _Stop)
+	if len(name) > 1 && name[0] == '_' && name[1] >= 'A' && name[1] <= 'Z' {
+		return true
+	}
+	return false
+}
+
 // errorToExceptionInstance converts any error into a Python exception instance
 // This handles both custom Exception types and Go error types (OSError, TypeError, etc.)
 func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
@@ -1612,7 +1629,7 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						excVar = string(varSym)
 						handlerStart = 3
 					}
-				} else if isExceptionType(symStr) || (len(symStr) > 0 && symStr[0] >= 'A' && symStr[0] <= 'Z') {
+				} else if isExceptionType(symStr) || isLikelyExceptionType(symStr) {
 					// It's an exception type
 					excType = symStr
 					handlerStart = 2

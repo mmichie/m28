@@ -1050,7 +1050,6 @@ func (t *TryForm) ToIR() core.Value {
 			result = append(result, core.NewList(
 				core.SymbolValue("except"),
 				excTypeIR,
-				core.SymbolValue("as"),
 				core.SymbolValue(except.Variable),
 				core.NewList(exceptBody...),
 			))

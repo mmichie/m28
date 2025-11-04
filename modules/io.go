@@ -119,6 +119,7 @@ func newBytesIO(args []core.Value, ctx *core.Context) (core.Value, error) {
 	obj := core.NewDict()
 	obj.SetWithKey("write", core.StringValue("write"), core.NewBuiltinFunction(b.write))
 	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(b.read))
+	obj.SetWithKey("readline", core.StringValue("readline"), core.NewBuiltinFunction(b.readline))
 	obj.SetWithKey("getvalue", core.StringValue("getvalue"), core.NewBuiltinFunction(b.getvalue))
 	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(b.close))
 	obj.SetWithKey("tell", core.StringValue("tell"), core.NewBuiltinFunction(b.tell))
@@ -149,7 +150,56 @@ func (b *BytesIO) write(args []core.Value, ctx *core.Context) (core.Value, error
 }
 
 func (b *BytesIO) read(args []core.Value, ctx *core.Context) (core.Value, error) {
-	return core.BytesValue(b.buffer.Bytes()), nil
+	v := validation.NewArgs("read", args)
+
+	// Optional size argument
+	size := -1
+	if v.Count() > 0 {
+		if sizeArg, err := v.GetInt(0); err == nil {
+			size = sizeArg
+		}
+	}
+
+	data := b.buffer.Bytes()
+	if b.pos >= len(data) {
+		return core.BytesValue{}, nil
+	}
+
+	if size < 0 {
+		// Read all remaining bytes
+		result := data[b.pos:]
+		b.pos = len(data)
+		return core.BytesValue(result), nil
+	}
+
+	// Read up to size bytes
+	end := b.pos + size
+	if end > len(data) {
+		end = len(data)
+	}
+	result := data[b.pos:end]
+	b.pos = end
+	return core.BytesValue(result), nil
+}
+
+func (b *BytesIO) readline(args []core.Value, ctx *core.Context) (core.Value, error) {
+	data := b.buffer.Bytes()
+	if b.pos >= len(data) {
+		return core.BytesValue{}, nil
+	}
+
+	// Find the next newline
+	start := b.pos
+	for b.pos < len(data) {
+		if data[b.pos] == '\n' {
+			b.pos++
+			return core.BytesValue(data[start:b.pos]), nil
+		}
+		b.pos++
+	}
+
+	// No newline found, return rest of buffer
+	return core.BytesValue(data[start:]), nil
 }
 
 func (b *BytesIO) getvalue(args []core.Value, ctx *core.Context) (core.Value, error) {
