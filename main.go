@@ -280,6 +280,13 @@ func initializeGlobalContext(ctx *core.Context) {
 		return p.Parse(code)
 	}, modules.GetBuiltinModule)
 	core.SetModuleLoader(moduleLoader)
+
+	// Pre-load builtins module into sys.modules for pickle support
+	// pickle.dumps() looks up types via sys.modules['builtins']
+	if _, err := moduleLoader.LoadModule("builtins", ctx); err != nil {
+		// Log warning but don't fail - builtins will be loaded on demand if needed
+		core.DebugLog("[WARNING] Failed to pre-load builtins module: %v\n", err)
+	}
 }
 
 // executeFile executes a file with the given context

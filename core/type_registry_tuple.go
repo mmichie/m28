@@ -331,61 +331,8 @@ func getTupleMethods() map[string]*MethodDescriptor {
 				return NumberValue(0), nil
 			},
 		},
-		"__reduce_ex__": {
-			Name:    "__reduce_ex__",
-			Arity:   1,
-			Doc:     "Helper for pickle",
-			Builtin: true,
-			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				// For tuples, pickle protocol returns: (tuple_class, (list(self),))
-				tuple := receiver.(TupleValue)
-
-				// Get the global tuple class from TypeDescriptor
-				// This ensures identity equality with the global tuple
-				tupleClass := GetTypeDescriptor(TupleType).GetTypeObject()
-				if tupleClass == nil {
-					return nil, fmt.Errorf("tuple type not registered")
-				}
-
-				// Create __newobj__ function
-				newobjFunc := NewNamedBuiltinFunction("__newobj__", func(args []Value, ctx *Context) (Value, error) {
-					if len(args) < 1 {
-						return nil, fmt.Errorf("__newobj__ requires at least 1 argument")
-					}
-					cls := args[0]
-					clsArgs := args[1:]
-
-					clsObj, ok := cls.(interface{ GetAttr(string) (Value, bool) })
-					if !ok {
-						return nil, fmt.Errorf("class does not support attribute access")
-					}
-
-					newMethod, exists := clsObj.GetAttr("__new__")
-					if !exists {
-						return nil, fmt.Errorf("class has no __new__ method")
-					}
-
-					newCallable, ok := newMethod.(Callable)
-					if !ok {
-						return nil, fmt.Errorf("__new__ is not callable")
-					}
-
-					newArgs := append([]Value{cls}, clsArgs...)
-					return newCallable.Call(newArgs, ctx)
-				})
-
-				newobjFunc.SetAttr("__module__", StringValue("copyreg"))
-				newobjFunc.SetAttr("__name__", StringValue("__newobj__"))
-				newobjFunc.SetAttr("__qualname__", StringValue("__newobj__"))
-
-				// Convert tuple to list for pickling
-				listItems := NewList(tuple...)
-
-				// Return tuple: (__newobj__, (tuple_class, list_of_items))
-				argsTuple := TupleValue{tupleClass, listItems}
-				result := TupleValue{newobjFunc, argsTuple}
-				return result, nil
-			},
-		},
+		// Note: __reduce_ex__ removed for tuple
+		// CPython's tuple doesn't have __reduce_ex__ - pickle handles it with save_tuple
+		// M28 should let pickle's save_tuple handle tuples instead of using __reduce_ex__
 	}
 }

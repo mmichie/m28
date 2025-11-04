@@ -109,6 +109,9 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 			}
 		}
 
+		// Register in sys.modules so pickle can find builtins.bool etc
+		registerModuleInSysModules(name, moduleDict)
+
 		return moduleDict, nil
 	}
 

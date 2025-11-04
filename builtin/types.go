@@ -867,6 +867,11 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			// type(dict) returns type
 			return TypeMetaclass, nil
 		case core.NumberValue:
+			// Return the type object registered with TypeDescriptor
+			// This ensures type(42) is int returns True
+			if typeObj := core.GetTypeDescriptor(core.NumberType).GetTypeObject(); typeObj != nil {
+				return typeObj, nil
+			}
 			return NumberTypeClass, nil
 		case core.StringValue:
 			if StrTypeClass != nil {
@@ -874,12 +879,26 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			}
 			return core.NewClass("str", nil), nil
 		case core.BoolValue:
+			// Return the type object registered with TypeDescriptor
+			// This ensures type(True) is bool returns True
+			if typeObj := core.GetTypeDescriptor(core.BoolType).GetTypeObject(); typeObj != nil {
+				return typeObj, nil
+			}
 			return BoolTypeClass, nil
 		case core.BigIntValue:
+			// BigIntValue uses the same type as NumberValue (int)
+			if typeObj := core.GetTypeDescriptor(core.NumberType).GetTypeObject(); typeObj != nil {
+				return typeObj, nil
+			}
 			return IntTypeClass, nil
 		case core.NilValue:
 			return NoneTypeClass, nil
 		case *core.ListValue:
+			// Return the type object registered with TypeDescriptor
+			// This ensures type([1,2]) is list returns True
+			if typeObj := core.GetTypeDescriptor(core.ListType).GetTypeObject(); typeObj != nil {
+				return typeObj, nil
+			}
 			return ListTypeClass, nil
 		case *core.DictValue:
 			if DictTypeClass != nil {
@@ -887,6 +906,11 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			}
 			return core.NewClass("dict", nil), nil
 		case core.TupleValue:
+			// Return the type object registered with TypeDescriptor
+			// This ensures type((1,2)) is tuple returns True
+			if typeObj := core.GetTypeDescriptor(core.TupleType).GetTypeObject(); typeObj != nil {
+				return typeObj, nil
+			}
 			return TupleTypeClass, nil
 		case *core.SetValue:
 			return SetTypeClass, nil
