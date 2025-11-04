@@ -154,6 +154,27 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 	}
 
+	// Get sys.path for runtime search paths
+	var sysPathDirs []string
+	if sysModule, ok := GetBuiltinModule("sys"); ok {
+		if sysPathVal, ok := sysModule.Get("path"); ok {
+			if sysPathList, ok := sysPathVal.(*core.ListValue); ok {
+				for _, item := range sysPathList.Items() {
+					if strVal, ok := item.(core.StringValue); ok {
+						path := string(strVal)
+						// Skip empty paths and current directory marker
+						if path != "" && path != "." {
+							sysPathDirs = append(sysPathDirs, path)
+						}
+					}
+				}
+				if debugImportLoader && len(sysPathDirs) > 0 {
+					log.Printf("[IMPORT] LoadPythonModule('%s') -> extracted %d paths from sys.path", name, len(sysPathDirs))
+				}
+			}
+		}
+	}
+
 	// Find the Python file
 	if debugImportLoader {
 		log.Printf("[IMPORT] LoadPythonModule('%s') -> getting Python finder", name)
@@ -167,10 +188,10 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	if debugImportLoader {
-		log.Printf("[IMPORT] LoadPythonModule('%s') -> calling finder.Find()", name)
+		log.Printf("[IMPORT] LoadPythonModule('%s') -> calling finder.FindWithExtraPaths()", name)
 	}
 	core.DebugLog("[PROFILE] Finding '%s'...\n", name)
-	pyPath, isPackage, err := finder.Find(name)
+	pyPath, isPackage, err := finder.FindWithExtraPaths(name, sysPathDirs)
 	if err != nil {
 		core.DebugLog("[PROFILE] Find failed for '%s': %v\n", name, err)
 		if debugImportLoader {

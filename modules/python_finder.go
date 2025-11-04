@@ -100,6 +100,11 @@ func discoverPythonPaths() ([]string, error) {
 // - path: full path to .py file or __init__.py
 // - isPackage: true if module is a package (has __init__.py)
 func (f *PythonModuleFinder) Find(moduleName string) (string, bool, error) {
+	return f.FindWithExtraPaths(moduleName, nil)
+}
+
+// FindWithExtraPaths locates a Python module, checking extraPaths first, then default paths
+func (f *PythonModuleFinder) FindWithExtraPaths(moduleName string, extraPaths []string) (string, bool, error) {
 	if debugImport {
 		log.Printf("[IMPORT] PythonFinder.Find('%s') called", moduleName)
 	}
@@ -123,12 +128,20 @@ func (f *PythonModuleFinder) Find(moduleName string) (string, bool, error) {
 		log.Printf("[IMPORT] PythonFinder.Find('%s') -> searching for: %s.py or %s/__init__.py", moduleName, modulePath, modulePath)
 	}
 
+	// Combine extra paths with default search paths (extra paths first)
+	allPaths := extraPaths
+	allPaths = append(allPaths, f.searchPaths...)
+
+	if debugImport && len(extraPaths) > 0 {
+		log.Printf("[IMPORT] PythonFinder.Find('%s') -> using %d extra paths from sys.path", moduleName, len(extraPaths))
+	}
+
 	// Search in all paths
-	for i, searchPath := range f.searchPaths {
+	for i, searchPath := range allPaths {
 		// Try as module: name.py
 		modulePyPath := filepath.Join(searchPath, modulePath+".py")
 		if debugImport {
-			log.Printf("[IMPORT] PythonFinder.Find('%s') -> trying [%d/%d]: %s", moduleName, i+1, len(f.searchPaths), modulePyPath)
+			log.Printf("[IMPORT] PythonFinder.Find('%s') -> trying [%d/%d]: %s", moduleName, i+1, len(allPaths), modulePyPath)
 		}
 		if fileExists(modulePyPath) {
 			f.mu.Lock()
