@@ -4,18 +4,18 @@
 (def linear_search (lst target)
   "Search for target in list using linear search"
   (def linear_search_helper (lst target idx)
-    (if (>= idx (len lst))
+    (return (if (>= idx (len lst))
       -1  # Not found
       (if (== (nth lst idx) target)
         idx
-        (linear_search_helper lst target (+ idx 1)))))
-  (linear_search_helper lst target 0))
+        (linear_search_helper lst target (+ idx 1))))))
+  (return (linear_search_helper lst target 0)))
 
 # Binary Search (iterative style using recursion)
 (def binary_search (lst target)
   "Search for target in sorted list using binary search"
   (def binary_search_iter (lst target left right)
-    (if (> left right)
+    (return (if (> left right)
       -1  # Not found
       (do
         (= mid (int (/ (+ left right) 2)))
@@ -24,58 +24,58 @@
           mid
           (if (< mid_val target)
             (binary_search_iter lst target (+ mid 1) right)
-            (binary_search_iter lst target left (- mid 1)))))))
-  (binary_search_iter lst target 0 (- (len lst) 1)))
+            (binary_search_iter lst target left (- mid 1))))))))
+  (return (binary_search_iter lst target 0 (- (len lst) 1))))
 
 # Binary Search (recursive)
 (def binary_search_recursive (lst target left right)
   "Recursive binary search implementation"
-  (if (> left right)
+  (return (if (> left right)
     -1
     (do
       (= mid (int (/ (+ left right) 2)))
       (= mid_val (nth lst mid))
-      
+
       (if (== mid_val target)
         mid
         (if (< mid_val target)
           (binary_search_recursive lst target (+ mid 1) right)
-          (binary_search_recursive lst target left (- mid 1)))))))
+          (binary_search_recursive lst target left (- mid 1))))))))
 
 (def binary_search_rec (lst target)
   "Wrapper for recursive binary search"
-  (binary_search_recursive lst target 0 (- (len lst) 1)))
+  (return (binary_search_recursive lst target 0 (- (len lst) 1))))
 
 # Jump Search
 (def jump_search (lst target)
   "Search using jump search algorithm"
   (= n (len lst))
   (= jump_size (int (** n 0.5)))  # sqrt(n)
-  
+
   # Helper to find the right block
   (def find_block (prev step)
-    (if (>= step n)
+    (return (if (>= step n)
       [prev, n]  # Last block
       (if (< (nth lst (min step (- n 1))) target)
         (find_block step (+ step jump_size))
-        [prev, step])))
-  
+        [prev, step]))))
+
   # Linear search within a block
   (def search_block (start end)
-    (if (>= start end)
+    (return (if (>= start end)
       -1
       (if (== (nth lst start) target)
         start
-        (search_block (+ start 1) end))))
-  
+        (search_block (+ start 1) end)))))
+
   (= block (find_block 0 jump_size))
-  (search_block (nth block 0) (min (nth block 1) n)))
+  (return (search_block (nth block 0) (min (nth block 1) n))))
 
 # Interpolation Search
 (def interpolation_search (lst target)
   "Search using interpolation (for uniformly distributed data)"
   (def interpolation_helper (lst target left right)
-    (if (> left right)
+    (return (if (> left right)
       -1  # Not found
       (if (< target (nth lst left))
         -1  # Target is smaller than smallest element
@@ -85,7 +85,7 @@
             (if (== (nth lst left) target) left -1)
             (do
               # Calculate position using interpolation formula
-              (= pos (+ left 
+              (= pos (+ left
                         (int (* (/ (- target (nth lst left))
                                   (- (nth lst right) (nth lst left)))
                                (- right left)))))
@@ -93,8 +93,8 @@
                 pos
                 (if (< (nth lst pos) target)
                   (interpolation_helper lst target (+ pos 1) right)
-                  (interpolation_helper lst target left (- pos 1))))))))))
-  (interpolation_helper lst target 0 (- (len lst) 1)))
+                  (interpolation_helper lst target left (- pos 1)))))))))))
+  (return (interpolation_helper lst target 0 (- (len lst) 1))))
 
 # Find first/last occurrence in sorted array with duplicates
 (def find_first (lst target)
@@ -102,10 +102,10 @@
   (= left 0)
   (= right (- (len lst) 1))
   (= result -1)
-  
+
   (while (<= left right)
     (= mid (int (/ (+ left right) 2)))
-    
+
     (if (== (nth lst mid) target)
       (do
         (= result mid)
@@ -113,18 +113,18 @@
       (if (< (nth lst mid) target)
         (= left (+ mid 1))
         (= right (- mid 1)))))
-  
-  result)
+
+  (return result))
 
 (def find_last (lst target)
   "Find last occurrence of target in sorted list"
   (= left 0)
   (= right (- (len lst) 1))
   (= result -1)
-  
+
   (while (<= left right)
     (= mid (int (/ (+ left right) 2)))
-    
+
     (if (== (nth lst mid) target)
       (do
         (= result mid)
@@ -132,15 +132,15 @@
       (if (< (nth lst mid) target)
         (= left (+ mid 1))
         (= right (- mid 1)))))
-  
-  result)
+
+  (return result))
 
 # Find peak element
 (def find_peak (lst)
   "Find a peak element (greater than neighbors)"
   (= n (len lst))
-  
-  (if (== n 1)
+
+  (return (if (== n 1)
     0  # Single element is a peak
     (if (>= (nth lst 0) (nth lst 1))
       0  # First element is a peak
@@ -149,20 +149,20 @@
         (do
           # Search for peak in the middle
           (def find_peak_helper (i)
-            (if (>= i (- n 1))
+            (return (if (>= i (- n 1))
               -1  # No peak found
               (if (>= (nth lst i) (nth lst (- i 1)))
                 (if (>= (nth lst i) (nth lst (+ i 1)))
                   i  # Found peak
                   (find_peak_helper (+ i 1)))
-                (find_peak_helper (+ i 1)))))
-          (find_peak_helper 1))))))
+                (find_peak_helper (+ i 1))))))
+          (find_peak_helper 1)))))))
 
 # Two-pointer search for pair with given sum
 (def two_sum_sorted (lst target_sum)
   "Find pair of numbers that sum to target in sorted list"
   (def two_sum_helper (left right)
-    (if (>= left right)
+    (return (if (>= left right)
       None  # No pair found
       (do
         (= current_sum (+ (nth lst left) (nth lst right)))
@@ -170,8 +170,8 @@
           [left, right]
           (if (< current_sum target_sum)
             (two_sum_helper (+ left 1) right)
-            (two_sum_helper left (- right 1)))))))
-  (two_sum_helper 0 (- (len lst) 1)))
+            (two_sum_helper left (- right 1))))))))
+  (return (two_sum_helper 0 (- (len lst) 1))))
 
 # Demonstrations
 (print "Searching Algorithms Demo")

@@ -3,15 +3,15 @@
 # 1. Recursive Fibonacci (simple but inefficient)
 (def fib_recursive (n)
   "Calculate nth Fibonacci number recursively"
-  (if (<= n 1)
+  (return (if (<= n 1)
     n
-    (+ (fib_recursive (- n 1)) 
-       (fib_recursive (- n 2)))))
+    (+ (fib_recursive (- n 1))
+       (fib_recursive (- n 2))))))
 
 # 2. Iterative Fibonacci (efficient)
 (def fib_iterative (n)
   "Calculate nth Fibonacci number iteratively"
-  (if (<= n 1)
+  (return (if (<= n 1)
     n
     (do
       (= a 0)
@@ -20,23 +20,23 @@
         (= temp (+ a b))
         (= a b)
         (= b temp))
-      b)))
+      b))))
 
 # 3. Memoized Fibonacci (recursive with caching)
 (= fib_cache {})
 
 (def fib_memoized (n)
   "Calculate nth Fibonacci number with memoization"
-  (if (in n fib_cache)
+  (return (if (in n fib_cache)
     (fib_cache.get n)
     (do
       (= result
         (if (<= n 1)
           n
           (+ (fib_memoized (- n 1))
-             (fib_memoized (- n 2))))))
+             (fib_memoized (- n 2)))))
       (= fib_cache[n] result)
-      result))
+      result))))
 
 # 4. Generator-based Fibonacci
 # NOTE: Commenting out generator as it may cause issues
@@ -55,46 +55,46 @@
 # 5. Tail-recursive Fibonacci
 (def fib_tail_recursive (n acc1 acc2)
   "Calculate nth Fibonacci number using tail recursion"
-  (if (== n 0)
+  (return (if (== n 0)
     acc1
     (if (== n 1)
       acc2
-      (fib_tail_recursive (- n 1) acc2 (+ acc1 acc2)))))
+      (fib_tail_recursive (- n 1) acc2 (+ acc1 acc2))))))
 
 (def fib_tail (n)
   "Wrapper for tail-recursive Fibonacci"
-  (fib_tail_recursive n 0 1))
+  (return (fib_tail_recursive n 0 1)))
 
 # 6. Matrix multiplication Fibonacci (most efficient for large n)
 (def matrix_mult (a b)
   "Multiply two 2x2 matrices"
-  [[(+ (* (nth (nth a 0) 0) (nth (nth b 0) 0))
+  (return [[(+ (* (nth (nth a 0) 0) (nth (nth b 0) 0))
        (* (nth (nth a 0) 1) (nth (nth b 1) 0))),
     (+ (* (nth (nth a 0) 0) (nth (nth b 0) 1))
        (* (nth (nth a 0) 1) (nth (nth b 1) 1)))],
    [(+ (* (nth (nth a 1) 0) (nth (nth b 0) 0))
        (* (nth (nth a 1) 1) (nth (nth b 1) 0))),
     (+ (* (nth (nth a 1) 0) (nth (nth b 0) 1))
-       (* (nth (nth a 1) 1) (nth (nth b 1) 1)))]])
+       (* (nth (nth a 1) 1) (nth (nth b 1) 1)))]]))
 
 (def matrix_power (mat n)
   "Raise a matrix to power n"
-  (if (== n 1)
+  (return (if (== n 1)
     mat
     (if (== (% n 2) 0)
       (do
         (= half (matrix_power mat (int (/ n 2))))
         (matrix_mult half half))
-      (matrix_mult mat (matrix_power mat (- n 1))))))
+      (matrix_mult mat (matrix_power mat (- n 1)))))))
 
 (def fib_matrix (n)
   "Calculate nth Fibonacci using matrix exponentiation"
-  (if (<= n 1)
+  (return (if (<= n 1)
     n
     (do
       (= base_matrix [[1, 1], [1, 0]])
       (= result (matrix_power base_matrix n))
-      (nth (nth result 0) 1))))
+      (nth (nth result 0) 1)))))
 
 # Demonstrations
 (print "Fibonacci Sequence Implementations")
@@ -138,8 +138,8 @@
 # Golden ratio approximation
 (def golden_ratio_approx (n)
   "Approximate golden ratio using consecutive Fibonacci numbers"
-  (/ (float (fib_iterative (+ n 1))) 
-     (float (fib_iterative n))))
+  (return (/ (float (fib_iterative (+ n 1)))
+     (float (fib_iterative n)))))
 
 (print "\nGolden ratio approximations:")
 (for n in [10, 15, 20]
@@ -152,7 +152,7 @@
   (= total 0)
   (for i in (range n)
     (= total (+ total (fib_iterative i))))
-  total)
+  (return total))
 
 (print "\nSum properties:")
 (for n in [5, 10, 15]

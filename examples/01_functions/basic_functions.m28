@@ -17,7 +17,7 @@
 
 # Function with return value
 (def add (a b)
-  (+ a b))
+  (return (+ a b)))
 
 (= result (add 5 3))
 (print "5 + 3 =" result)
@@ -30,7 +30,7 @@
 
 # Function with multiple return values
 (def calculate (a b)
-  (list (+ a b) (- a b) (* a b) (/ a b)))
+  (return (list (+ a b) (- a b) (* a b) (/ a b))))
 
 (= results (calculate 10 2))
 (= sum_val (get-item results 0))
@@ -46,9 +46,9 @@
 # Function with docstring (convention)
 (def factorial (n)
   # Calculate factorial of n recursively
-  (if (<= n 1)
+  (return (if (<= n 1)
       1
-      (* n (factorial (- n 1)))))
+      (* n (factorial (- n 1))))))
 
 (print "\nFactorials:")
 (print "5! =" (factorial 5))
@@ -62,8 +62,8 @@
 # Nested functions
 (def outer (x)
   (def inner (y)
-    (+ x y))
-  inner)  # Return the inner function
+    (return (+ x y)))
+  (return inner))  # Return the inner function
 
 (= add_5 (outer 5))
 (print "\nNested function (closure):")

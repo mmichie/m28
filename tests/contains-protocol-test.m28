@@ -21,13 +21,13 @@
 (class Container ()
   (def __init__ (self items)
     (= self.items items))
-  
+
   (def __contains__ (self item)
     # Custom logic: check if item is in items
     (for x self.items
       (if (== x item)
         (return True)))
-    False))
+    (return False)))
 
 (= c1 (Container [1, 2, 3]))
 (= c2 (Container ["a", "b", "c"]))
@@ -43,13 +43,13 @@
   (def __init__ (self start stop)
     (= self.start start)
     (= self.stop stop))
-  
+
   (def __contains__ (self item)
     # Check if item is a number in range
     (try
-      (and (>= item self.start) (< item self.stop))
+      (return (and (>= item self.start) (< item self.stop)))
       (except Exception as e
-        False))))
+        (return False)))))
 
 (= r1 (Range 0 10))
 (= r2 (Range -5 5))
@@ -63,7 +63,7 @@
 (print "\n4. Testing error cases:")
 (class BadContains ()
   (def __contains__ (self item)
-    "yes"))  # Returns string instead of boolean
+    (return "yes")))  # Returns string instead of boolean
 
 (= bad (BadContains))
 (try
@@ -77,11 +77,11 @@
 (print "\n5. Testing always True/False containers:")
 (class AlwaysContains ()
   (def __contains__ (self item)
-    True))
+    (return True)))
 
 (class NeverContains ()
   (def __contains__ (self item)
-    False))
+    (return False)))
 
 (= always (AlwaysContains))
 (= never (NeverContains))
@@ -96,7 +96,7 @@
 (class EvenIndexList ()
   (def __init__ (self items)
     (= self.items items))
-  
+
   (def __contains__ (self item)
     # Only contains items at even indices
     (= i 0)
@@ -104,7 +104,7 @@
       (if (and (== (% i 2) 0) (== x item))
         (return True))
       (= i (+ i 1)))
-    False))
+    (return False)))
 
 (= el (EvenIndexList [1, 2, 3, 4, 5]))
 (assert (in 1 el) "1 at index 0 (even)")
@@ -118,7 +118,7 @@
 (print "\n7. Testing empty container:")
 (class EmptyContainer ()
   (def __contains__ (self item)
-    False))
+    (return False)))
 
 (= empty (EmptyContainer))
 (assert (not (in "anything" empty)) "nothing in empty container")

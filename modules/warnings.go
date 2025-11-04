@@ -39,11 +39,20 @@ var globalRegistry = &WarningRegistry{
 func InitWarningsModule() *core.DictValue {
 	warningsModule := core.NewDict()
 
-	// Set default filters
-	// Python's default behavior: show DeprecationWarning from __main__, ignore from other modules
+	// Set default filters to match CPython's behavior
+	// Python's default filters (in order of precedence):
+	// 1. Show DeprecationWarning from __main__ module
+	// 2. Ignore DeprecationWarning from all other modules
+	// 3. Ignore PendingDeprecationWarning
+	// 4. Ignore ImportWarning
+	// 5. Ignore ResourceWarning
 	globalRegistry.mu.Lock()
 	globalRegistry.filters = []*WarningFilter{
-		{Action: "default", Category: nil, Module: "", Lineno: 0}, // Show all warnings by default
+		{Action: "default", Category: core.StringValue("DeprecationWarning"), Module: "__main__", Lineno: 0},
+		{Action: "ignore", Category: core.StringValue("DeprecationWarning"), Module: "", Lineno: 0},
+		{Action: "ignore", Category: core.StringValue("PendingDeprecationWarning"), Module: "", Lineno: 0},
+		{Action: "ignore", Category: core.StringValue("ImportWarning"), Module: "", Lineno: 0},
+		{Action: "ignore", Category: core.StringValue("ResourceWarning"), Module: "", Lineno: 0},
 	}
 	globalRegistry.mu.Unlock()
 
@@ -53,6 +62,11 @@ func InitWarningsModule() *core.DictValue {
 	warningsModule.Set("simplefilter", core.NewBuiltinFunction(simplefilterFunc))
 	warningsModule.Set("filterwarnings", core.NewBuiltinFunction(filterwarningsFunc))
 	warningsModule.Set("resetwarnings", core.NewBuiltinFunction(resetwarningsFunc))
+
+	// Expose filters as a list-like object (for compatibility with CPython)
+	// Create a FiltersProxy that wraps the global filters
+	filtersProxy := createFiltersProxy()
+	warningsModule.Set("filters", filtersProxy)
 
 	// catch_warnings is a class-like callable
 	catchWarningsClass := createCatchWarningsClass()
@@ -129,8 +143,8 @@ func simplefilterFunc(args []core.Value, ctx *core.Context) (core.Value, error) 
 		return nil, fmt.Errorf("invalid action: %s", action)
 	}
 
-	// Default category is Warning (all warnings)
-	var category core.Value = nil
+	// Default category is Warning class (not nil - nil would match all categories)
+	var category core.Value = core.StringValue("Warning")
 	if len(args) >= 2 {
 		category = args[1]
 	}
@@ -166,7 +180,7 @@ func simplefilterFunc(args []core.Value, ctx *core.Context) (core.Value, error) 
 	globalRegistry.mu.Unlock()
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] simplefilter(%s) added", action)
+		log.Printf("[WARNINGS] simplefilter(%s) added (category=%v)", action, category)
 	}
 
 	return core.Nil, nil
@@ -181,8 +195,13 @@ func filterwarningsFunc(args []core.Value, ctx *core.Context) (core.Value, error
 // resetwarningsFunc implements warnings.resetwarnings()
 func resetwarningsFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	globalRegistry.mu.Lock()
+	// Reset to CPython's default filters
 	globalRegistry.filters = []*WarningFilter{
-		{Action: "default", Category: nil, Module: "", Lineno: 0},
+		{Action: "default", Category: core.StringValue("DeprecationWarning"), Module: "__main__", Lineno: 0},
+		{Action: "ignore", Category: core.StringValue("DeprecationWarning"), Module: "", Lineno: 0},
+		{Action: "ignore", Category: core.StringValue("PendingDeprecationWarning"), Module: "", Lineno: 0},
+		{Action: "ignore", Category: core.StringValue("ImportWarning"), Module: "", Lineno: 0},
+		{Action: "ignore", Category: core.StringValue("ResourceWarning"), Module: "", Lineno: 0},
 	}
 	globalRegistry.onceRegistry = make(map[string]bool)
 	globalRegistry.mu.Unlock()
@@ -199,11 +218,15 @@ func emitWarning(message string, category core.Value, stacklevel int, ctx *core.
 	// Get category name
 	categoryName := getCategoryName(category, ctx)
 
-	// Check filters
-	action := getFilterAction(categoryName)
+	// Determine module name from context
+	// Warnings from unittest code should not be treated as __main__
+	moduleName := "<string>"
+
+	// Check filters with module name
+	action := getFilterAction(categoryName, moduleName)
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] emit: %s: %s (action=%s)", categoryName, message, action)
+		log.Printf("[WARNINGS] emit: %s: %s (module=%s, action=%s)", categoryName, message, moduleName, action)
 	}
 
 	switch action {
@@ -238,10 +261,14 @@ func emitWarning(message string, category core.Value, stacklevel int, ctx *core.
 // emitWarningExplicit emits a warning with explicit location info
 func emitWarningExplicit(message string, category core.Value, filename string, lineno int, ctx *core.Context) error {
 	categoryName := getCategoryName(category, ctx)
-	action := getFilterAction(categoryName)
+
+	// Extract module name from filename (use filename as module name for now)
+	moduleName := filename
+
+	action := getFilterAction(categoryName, moduleName)
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] explicit: %s:%d: %s: %s (action=%s)", filename, lineno, categoryName, message, action)
+		log.Printf("[WARNINGS] explicit: %s:%d: %s: %s (module=%s, action=%s)", filename, lineno, categoryName, message, moduleName, action)
 	}
 
 	switch action {
@@ -316,22 +343,47 @@ func getCategoryName(category core.Value, ctx *core.Context) string {
 	return "Warning"
 }
 
-// getFilterAction determines what action to take for a warning category
-func getFilterAction(categoryName string) string {
+// getFilterAction determines what action to take for a warning category and module
+func getFilterAction(categoryName string, moduleName string) string {
 	globalRegistry.mu.RLock()
 	defer globalRegistry.mu.RUnlock()
 
 	// Check filters in order (first match wins)
 	for _, filter := range globalRegistry.filters {
-		// If filter has no category, it matches all
-		if filter.Category == nil {
-			return filter.Action
+		// Check if module matches
+		// Empty filter.Module means match all modules
+		// Non-empty filter.Module must match exactly
+		if filter.Module != "" && filter.Module != moduleName {
+			continue // Module doesn't match, try next filter
 		}
 
 		// Check if category matches
-		filterCategoryName := getCategoryName(filter.Category, nil)
-		if filterCategoryName == categoryName || filterCategoryName == "Warning" {
+		if filter.Category == nil {
+			// No category specified - matches all categories
 			return filter.Action
+		}
+
+		filterCategoryName := getCategoryName(filter.Category, nil)
+		// Check for exact match or if the warning category is a subclass of the filter category
+		if filterCategoryName == categoryName {
+			return filter.Action
+		}
+
+		// Check if filter is for Warning base class - this should match all warning categories
+		if filterCategoryName == "Warning" {
+			// All warnings are subclasses of Warning
+			if categoryName == "DeprecationWarning" ||
+				categoryName == "PendingDeprecationWarning" ||
+				categoryName == "ImportWarning" ||
+				categoryName == "ResourceWarning" ||
+				categoryName == "UserWarning" ||
+				categoryName == "SyntaxWarning" ||
+				categoryName == "RuntimeWarning" ||
+				categoryName == "FutureWarning" ||
+				categoryName == "BytesWarning" ||
+				categoryName == "UnicodeWarning" {
+				return filter.Action
+			}
 		}
 	}
 
@@ -507,4 +559,27 @@ func Warn(message string, category string, ctx *core.Context) error {
 	}
 
 	return emitWarning(message, categoryValue, 1, ctx)
+}
+
+// createFiltersProxy creates a list-like proxy for the warnings filters
+func createFiltersProxy() core.Value {
+	// For now, return a simple list representation
+	// In a full implementation, this should be a dynamic proxy that reflects current filters
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
+	filtersList := core.NewList()
+	for _, filter := range globalRegistry.filters {
+		// Create a tuple representing the filter: (action, message, category, module, lineno)
+		filterTuple := core.TupleValue{
+			core.StringValue(filter.Action),
+			core.Nil, // message pattern (not implemented)
+			filter.Category,
+			core.StringValue(filter.Module),
+			core.NumberValue(float64(filter.Lineno)),
+		}
+		filtersList.Append(filterTuple)
+	}
+
+	return filtersList
 }

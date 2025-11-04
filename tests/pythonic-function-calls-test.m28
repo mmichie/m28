@@ -156,14 +156,14 @@ print(f"Hello, {name}!")
 # Test 23: Map function
 (print "\nTest 23: Map")
 (= nums3 [1, 2, 3])
-(= doubled list(map((lambda (x) (* x 2)), nums3)))
+(= doubled list(map((lambda (x) (return (* x 2))), nums3)))
 (assert (== doubled [2, 4, 6]) "map should work")
 (print "✓ map() works")
 
 # Test 24: Filter function
 (print "\nTest 24: Filter")
 (= nums4 [1, 2, 3, 4, 5])
-(= evens list(filter((lambda (x) (== (% x 2) 0)), nums4)))
+(= evens list(filter((lambda (x) (return (== (% x 2) 0))), nums4)))
 (assert (== evens [2, 4]) "filter should work")
 (print "✓ filter() works")
 

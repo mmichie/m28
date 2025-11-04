@@ -3,22 +3,22 @@
 
 # Function that takes a function as argument
 (def apply_twice (f x)
-  (f (f x)))
+  (return (f (f x))))
 
 (def double (x)
-  (* x 2))
+  (return (* x 2)))
 
 (print "Apply double twice to 5:" (apply_twice double 5))  # 20
 
 # Function composition
 (def compose (f g)
-  (lambda (x) (f (g x))))
+  (return (lambda (x) (f (g x)))))
 
 (def add_one (x)
-  (+ x 1))
+  (return (+ x 1)))
 
 (def square (x)
-  (* x x))
+  (return (* x x)))
 
 (= square_then_add_one (compose add_one square))
 (= add_one_then_square (compose square add_one))
@@ -29,10 +29,10 @@
 
 # Partial application - simplified example
 (def make_adder (n)
-  (lambda (x) (+ n x)))
+  (return (lambda (x) (+ n x))))
 
 (def make_multiplier (n)
-  (lambda (x) (* n x)))
+  (return (lambda (x) (* n x))))
 
 (= add_10 (make_adder 10))
 (= multiply_by_3 (make_multiplier 3))
@@ -43,34 +43,34 @@
 
 # Custom map implementation
 (def my_map (f lst)
-  (if (== (len lst) 0)
+  (return (if (== (len lst) 0)
       []
-      (+ (list (f (nth lst 0))) (my_map f lst[1:]))))
+      (+ (list (f (nth lst 0))) (my_map f lst[1:])))))
 
 (print "\nCustom map:")
 (print (my_map (lambda (x) (* x x)) (list 1 2 3 4)))
 
 # Custom filter implementation
 (def my_filter (pred lst)
-  (if (== (len lst) 0)
+  (return (if (== (len lst) 0)
       []
       (if (pred (nth lst 0))
           (+ (list (nth lst 0)) (my_filter pred lst[1:]))
-          (my_filter pred lst[1:]))))
+          (my_filter pred lst[1:])))))
 
 (print "\nCustom filter:")
 (print (my_filter (lambda (x) (> x 2)) (list 1 2 3 4 5)))
 
 # Function decorator pattern
 (def with_logging (f)
-  (lambda (a b)
+  (return (lambda (a b)
     (print "Calling function with args: (" a ", " b ")")
     (= result (f a b))
     (print "Result: " result)
-    result))
+    result)))
 
 (def multiply (a b)
-  (* a b))
+  (return (* a b)))
 
 (= logged_multiply (with_logging multiply))
 
@@ -80,7 +80,7 @@
 # Memoization example
 (def memoize (f)
   (= cache {})
-  (lambda (n)
+  (return (lambda (n)
     (= key (str n))  # Convert to string for dict key
     (if (in key cache)
         (do
@@ -90,13 +90,13 @@
           (print "Computing for " n)
           (= result (f n))
           (= cache[key] result)
-          result))))
+          result)))))
 
 (def slow_fibonacci (n)
-  (if (<= n 1)
+  (return (if (<= n 1)
       n
       (+ (slow_fibonacci (- n 1))
-         (slow_fibonacci (- n 2)))))
+         (slow_fibonacci (- n 2))))))
 
 (= fast_fibonacci (memoize slow_fibonacci))
 
@@ -106,8 +106,8 @@
 
 # Pipeline function
 (def pipeline (*funcs)
-  (lambda (x)
-    (reduce (lambda (acc f) (f acc)) funcs x)))
+  (return (lambda (x)
+    (reduce (lambda (acc f) (f acc)) funcs x))))
 
 (= process (pipeline
   (lambda (x) (* x 2))      # Double
@@ -119,10 +119,10 @@
 
 # Predicate combinators
 (def both (pred1 pred2)
-  (lambda (x) (and (pred1 x) (pred2 x))))
+  (return (lambda (x) (and (pred1 x) (pred2 x)))))
 
 (def either (pred1 pred2)
-  (lambda (x) (or (pred1 x) (pred2 x))))
+  (return (lambda (x) (or (pred1 x) (pred2 x)))))
 
 (= is_positive (lambda (x) (> x 0)))
 (= is_even (lambda (x) (== (% x 2) 0)))
@@ -140,7 +140,7 @@
 
 # Function that creates a bounded checker with default bounds
 (def make_range_checker ((min 0) (max 100))
-  (lambda (x) (and (>= x min) (<= x max))))
+  (return (lambda (x) (and (>= x min) (<= x max)))))
 
 (= in_default_range (make_range_checker))
 (= in_small_range (make_range_checker 0 10))
@@ -152,7 +152,7 @@
 
 # Decorator with configurable behavior
 (def with_retry ((max_attempts 3) (delay 0))
-  (lambda (f)
+  (return (lambda (f)
     (lambda (*args)
       (= attempts 0)
       (= last_error nil)
@@ -166,14 +166,14 @@
             (= attempts (+ attempts 1))
             (if (< attempts max_attempts)
                 (print "Retry" attempts "of" max_attempts)))))
-      (raise last_error))))
+      (raise last_error)))))
 
 # Function factory with default configuration
 (def make_accumulator ((initial 0) (step 1))
   (= value initial)
-  (lambda ((n step))
+  (return (lambda ((n step))
     (= value (+ value n))
-    value))
+    value)))
 
 (= counter (make_accumulator))          # Start at 0, increment by 1
 (= score (make_accumulator 100 10))     # Start at 100, increment by 10

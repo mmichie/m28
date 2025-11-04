@@ -22,9 +22,9 @@
 (class Container ()
   (def __init__ (self items)
     (= self.items items))
-  
+
   (def __len__ (self)
-    (len self.items)))
+    (return (len self.items))))
 
 (= c1 (Container [1, 2, 3]))
 (= c2 (Container []))
@@ -38,9 +38,9 @@
   (def __init__ (self items prefix)
     (Container.__init__ self items)
     (= self.prefix prefix))
-  
+
   (def __len__ (self)
-    (+ (len self.prefix) (len self.items))))
+    (return (+ (len self.prefix) (len self.items)))))
 
 (= ec (ExtendedContainer [1, 2, 3] "prefix"))
 (assert (== (len ec) 9) "__len__ with inheritance (3 + 6)")
@@ -50,7 +50,7 @@
 (print "\n4. Testing error cases:")
 (class BadLen1 ()
   (def __len__ (self)
-    3.14))
+    (return 3.14)))
 
 (= bad1 (BadLen1))
 (try
@@ -62,7 +62,7 @@
 # Test 5: __len__ returning negative (should fail)
 (class BadLen2 ()
   (def __len__ (self)
-    -5))
+    (return -5)))
 
 (= bad2 (BadLen2))
 (try
@@ -74,7 +74,7 @@
 # Test 6: __len__ returning non-number (should fail)
 (class BadLen3 ()
   (def __len__ (self)
-    "five"))
+    (return "five")))
 
 (= bad3 (BadLen3))
 (try
@@ -89,9 +89,9 @@
 (class LenOnly ()
   (def __init__ (self size)
     (= self.size size))
-  
+
   (def __len__ (self)
-    self.size))
+    (return self.size)))
 
 (= empty (LenOnly 0))
 (= nonempty (LenOnly 5))
@@ -124,9 +124,9 @@
       (for j (range cols)
         (row.append 0))
       (self.data.append row)))
-  
+
   (def __len__ (self)
-    (* self.rows self.cols)))
+    (return (* self.rows self.cols))))
 
 (= m1 (Matrix 3 4))
 (= m2 (Matrix 0 5))
@@ -152,11 +152,11 @@
 (print "\n8. Testing edge cases:")
 (class Zero ()
   (def __len__ (self)
-    0))
+    (return 0)))
 
 (class Large ()
   (def __len__ (self)
-    1000000))
+    (return 1000000)))
 
 (= z (Zero))
 (= l (Large))
@@ -166,7 +166,7 @@
 # Test len() with exactly 0.0 (integer as float)
 (class FloatZero ()
   (def __len__ (self)
-    0.0))
+    (return 0.0)))
 
 (= fz (FloatZero))
 (assert (== (len fz) 0) "__len__ returning 0.0 (exact integer as float)")

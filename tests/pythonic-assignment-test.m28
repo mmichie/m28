@@ -165,7 +165,7 @@ empty = None
 (def test_func ()
   (= local_var 99)
   local_var_pythonic = 100
-  (+ local_var local_var_pythonic))
+  (return (+ local_var local_var_pythonic)))
 result23 = test_func()
 (assert (== result23 199) "Assignment in function should work")
 (print "✓ Assignment in function works")

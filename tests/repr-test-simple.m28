@@ -29,7 +29,7 @@
     (= self.y y))
   
   (def __repr__ (self)
-    (+ "Point(" (str self.x) ", " (str self.y) ")")))
+    (return (+ "Point(" (str self.x) ", " (str self.y) ")"))))
 
 (= p (Point 3 4))
 (assert (== (repr p) "Point(3, 4)") "custom __repr__ method")

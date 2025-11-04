@@ -33,7 +33,7 @@
     (= x 15))
 
   (inner_func)
-  x)
+  (return x))
 
 (assert (== (outer_func) 15) "nonlocal statement should modify enclosing scope variable")
 
@@ -46,9 +46,9 @@
       (nonlocal y)
       (= y 10))
     (inner)
-    y)
+    (return y))
 
-  (middle))
+  (return (middle)))
 
 (assert (== (outer_nested) 10) "nonlocal should work through multiple nesting levels")
 
@@ -57,7 +57,7 @@
 
 (def test_local_shadow ()
   (= global_z 200)  # Creates local variable, doesn't affect global
-  global_z)
+  (return global_z))
 
 (assert (== (test_local_shadow) 200) "local assignment should create local variable")
 (assert (== global_z 100) "global variable should not be affected without global declaration")
@@ -75,7 +75,7 @@
     (= c 30))  # c is local, not nonlocal
 
   (inner)
-  (list a b c))
+  (return (list a b c)))
 
 (= result (outer_multiple))
 (assert (== (get-item result 0) 10) "nonlocal should work with first variable")
@@ -95,7 +95,7 @@
     (= local_mixed 100))
 
   (inner_mixed)
-  local_mixed)
+  (return local_mixed))
 
 (assert (== (outer_mixed) 100) "nonlocal should work when used with global")
 (assert (== global_mixed 50) "global should work when used with nonlocal")
@@ -115,9 +115,9 @@
   (def increment ()
     (nonlocal count)
     (= count (+ count 1))
-    count)
+    (return count))
 
-  increment)
+  (return increment))
 
 (= counter1 (make_counter))
 (assert (== (counter1) 1) "counter should increment to 1")

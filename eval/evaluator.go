@@ -856,7 +856,9 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 		return nil, fmt.Errorf("yield outside of generator function")
 	}
 
-	return result, nil
+	// In Python, functions without an explicit return statement return None
+	// (not the value of the last expression like in Lisp)
+	return core.None, nil
 }
 
 // CallWithKwargs calls the function with positional and keyword arguments
@@ -919,8 +921,10 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 		return ret.Value, nil
 	}
 
-	core.TraceExitFunction(f.name, result, nil)
-	return result, nil
+	// In Python, functions without an explicit return statement return None
+	// (not the value of the last expression like in Lisp)
+	core.TraceExitFunction(f.name, core.None, nil)
+	return core.None, nil
 }
 
 // CallWithKeywords is an alias for CallWithKwargs for interface compatibility
