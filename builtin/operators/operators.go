@@ -1644,6 +1644,18 @@ func Is() func([]core.Value, *core.Context) (core.Value, error) {
 			return core.BoolValue(false), nil
 		}
 
+		// Handle NotImplemented specially - it's a singleton
+		_, leftIsNotImpl := left.(*core.NotImplementedValue)
+		_, rightIsNotImpl := right.(*core.NotImplementedValue)
+		if leftIsNotImpl && rightIsNotImpl {
+			// Both are NotImplemented - they're the same singleton
+			return core.BoolValue(true), nil
+		}
+		if leftIsNotImpl || rightIsNotImpl {
+			// Only one is NotImplemented
+			return core.BoolValue(false), nil
+		}
+
 		// Handle booleans - True is True, False is False
 		leftBool, leftIsBool := left.(core.BoolValue)
 		rightBool, rightIsBool := right.(core.BoolValue)

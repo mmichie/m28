@@ -248,6 +248,66 @@ func registerNumberType() {
 					return BytesValue(result), nil
 				},
 			},
+			"__reduce_ex__": {
+				Name:    "__reduce_ex__",
+				Arity:   1,
+				Doc:     "Helper for pickle",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					// For numbers, pickle uses __reduce_ex__ protocol
+					// Return: (__newobj__, (int, value))
+
+					// Get the numeric value
+					numVal := receiver.(NumberValue)
+
+					// Get the int type object (cached, same instance every time)
+					intDesc := GetTypeDescriptor(NumberType)
+					if intDesc == nil {
+						return nil, fmt.Errorf("cannot get int type descriptor")
+					}
+					intClass := intDesc.GetTypeObject()
+					if intClass == nil {
+						return nil, fmt.Errorf("cannot get int type object")
+					}
+
+					// Get the global __newobj__ function from copyreg module
+					// For now, create it inline
+					newobjFunc := NewNamedBuiltinFunction("__newobj__", func(args []Value, ctx *Context) (Value, error) {
+						if len(args) < 1 {
+							return nil, fmt.Errorf("__newobj__ requires at least 1 argument")
+						}
+						cls := args[0]
+						clsArgs := args[1:]
+
+						clsObj, ok := cls.(interface{ GetAttr(string) (Value, bool) })
+						if !ok {
+							return nil, fmt.Errorf("class does not support attribute access")
+						}
+
+						newMethod, exists := clsObj.GetAttr("__new__")
+						if !exists {
+							return nil, fmt.Errorf("class has no __new__ method")
+						}
+
+						newCallable, ok := newMethod.(Callable)
+						if !ok {
+							return nil, fmt.Errorf("__new__ is not callable")
+						}
+
+						newArgs := append([]Value{cls}, clsArgs...)
+						return newCallable.Call(newArgs, ctx)
+					})
+
+					newobjFunc.SetAttr("__module__", StringValue("copyreg"))
+					newobjFunc.SetAttr("__name__", StringValue("__newobj__"))
+					newobjFunc.SetAttr("__qualname__", StringValue("__newobj__"))
+
+					// Return tuple: (__newobj__, (int, value))
+					argsTuple := TupleValue{intClass, numVal}
+					result := TupleValue{newobjFunc, argsTuple}
+					return result, nil
+				},
+			},
 		},
 		Constructor: func(args []Value, ctx *Context) (Value, error) {
 			if len(args) == 0 {
@@ -432,10 +492,14 @@ func registerBoolType() {
 					// Return (__newobj__, (bool, int_value))
 					// where __newobj__(cls, *args) calls cls.__new__(cls, *args)
 
-					// Get bool class
-					boolClass, ok := ctx.Vars["bool"]
-					if !ok {
-						return nil, fmt.Errorf("cannot get bool class")
+					// Get the bool type object (cached, same instance every time)
+					boolDesc := GetTypeDescriptor(BoolType)
+					if boolDesc == nil {
+						return nil, fmt.Errorf("cannot get bool type descriptor")
+					}
+					boolClass := boolDesc.GetTypeObject()
+					if boolClass == nil {
+						return nil, fmt.Errorf("cannot get bool type object")
 					}
 
 					// Convert bool to int (False=0, True=1)
@@ -446,8 +510,7 @@ func registerBoolType() {
 						intVal = NumberValue(0)
 					}
 
-					// Create a simple __newobj__ function inline
-					// __newobj__(cls, *args) -> cls.__new__(cls, *args)
+					// Create __newobj__ function
 					newobjFunc := NewNamedBuiltinFunction("__newobj__", func(args []Value, ctx *Context) (Value, error) {
 						if len(args) < 1 {
 							return nil, fmt.Errorf("__newobj__ requires at least 1 argument")
@@ -455,7 +518,6 @@ func registerBoolType() {
 						cls := args[0]
 						clsArgs := args[1:]
 
-						// Call cls.__new__(cls, *clsArgs)
 						clsObj, ok := cls.(interface{ GetAttr(string) (Value, bool) })
 						if !ok {
 							return nil, fmt.Errorf("class does not support attribute access")
@@ -471,12 +533,10 @@ func registerBoolType() {
 							return nil, fmt.Errorf("__new__ is not callable")
 						}
 
-						// Prepend cls as first argument
 						newArgs := append([]Value{cls}, clsArgs...)
 						return newCallable.Call(newArgs, ctx)
 					})
 
-					// Set __module__ and __name__ so pickle can save it as copyreg.__newobj__
 					newobjFunc.SetAttr("__module__", StringValue("copyreg"))
 					newobjFunc.SetAttr("__name__", StringValue("__newobj__"))
 					newobjFunc.SetAttr("__qualname__", StringValue("__newobj__"))

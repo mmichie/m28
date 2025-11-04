@@ -147,9 +147,15 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Check if first arg is a list (old syntax) or symbol (new syntax)
 	if binding, ok := args.Items()[0].(*core.ListValue); ok && binding.Len() >= 1 {
-		// Check if we have enough args for new 4-arg syntax: (for pattern sequence body)
-		// vs old syntax where sequence is inside the binding list
-		if args.Len() >= 3 {
+		// Check if this is old 3-arg syntax: (for (var sequence) body)
+		// Old syntax has exactly 2 elements in the binding list
+		if binding.Len() == 2 {
+			// Old 3-arg syntax: (for (var sequence) body)
+			// Last element of binding is the sequence
+			pattern = binding.Items()[0]
+			sequenceExpr = binding.Items()[1]
+			body = args.Items()[1:]
+		} else if args.Len() >= 3 {
 			// Check if next arg is 'in' keyword
 			if sym, ok := args.Items()[1].(core.SymbolValue); ok && string(sym) == "in" {
 				// Python-style with 'in': (for (var1 var2) in sequence body...)
@@ -168,19 +174,8 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				sequenceExpr = args.Items()[1]
 				body = args.Items()[2:]
 			}
-		} else if binding.Len() >= 2 {
-			// Old 3-arg syntax: (for (var sequence) body)
-			// Last element of binding is the sequence
-			patternElements := binding.Items()[0 : binding.Len()-1]
-			if len(patternElements) == 1 {
-				pattern = patternElements[0]
-			} else {
-				pattern = core.NewList(patternElements...)
-			}
-			sequenceExpr = binding.Items()[binding.Len()-1]
-			body = args.Items()[1:]
 		} else {
-			return nil, ArgumentError{"for requires at least 2 elements in binding list"}
+			return nil, ArgumentError{"for requires at least 2 elements in binding list or enough args for new syntax"}
 		}
 	} else {
 		// New syntax: check for multiple vars with 'in' keyword

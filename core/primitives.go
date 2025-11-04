@@ -362,7 +362,8 @@ func (n NotImplementedValue) String() string {
 }
 
 // Predefined NotImplemented value
-var NotImplemented = NotImplementedValue{}
+// This is a singleton - all references should be to the same instance for identity checks
+var NotImplemented = &NotImplementedValue{}
 
 // BuiltinFunction represents a Go function that can be called from M28
 type BuiltinFunction struct {
@@ -643,6 +644,34 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 				funcName = "builtin_function"
 			}
 			return StringValue(fmt.Sprintf("<%s object>", funcName)), nil
+		}), true
+	}
+
+	// Handle __reduce_ex__ for pickle support
+	if name == "__reduce_ex__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// Protocol number (we ignore it for now)
+			// For builtin functions with __module__ and __name__, pickle saves them
+			// as global references by returning "module.name" string
+
+			// Get module name
+			moduleName := "builtins"
+			if modVal, ok := f.BaseObject.GetAttr("__module__"); ok {
+				if modStr, ok := modVal.(StringValue); ok {
+					moduleName = string(modStr)
+				}
+			}
+
+			// Get function name
+			funcName := f.name
+			if funcName == "" {
+				funcName = "<builtin_function>"
+			}
+
+			// Return the global reference as a string
+			// When pickle sees a string from __reduce_ex__, it saves as global
+			globalRef := fmt.Sprintf("%s.%s", moduleName, funcName)
+			return StringValue(globalRef), nil
 		}), true
 	}
 

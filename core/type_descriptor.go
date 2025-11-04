@@ -26,6 +26,7 @@ type TypeDescriptor struct {
 	Repr        func(Value) string             // String representation
 	Str         func(Value) string             // Human-readable string
 	Doc         string                         // Type documentation
+	typeObject  Value                          // Cached type object for __class__ and pickle
 }
 
 // MethodDescriptor describes a method
@@ -155,6 +156,19 @@ func (td *TypeDescriptor) CallMethod(receiver Value, methodName string, args []V
 
 // GetAttribute gets an attribute value (method or property)
 func (td *TypeDescriptor) GetAttribute(receiver Value, name string) (Value, error) {
+	// Handle __class__ specially - return the type object
+	if name == "__class__" {
+		// Return a type object that represents this type
+		// For now, return a callable that can be used as the type constructor
+		// This matches what __reduce_ex__ expects
+		typeObj := td.GetTypeObject()
+		if typeObj != nil {
+			return typeObj, nil
+		}
+		// Fallback: return a string representation
+		return StringValue(td.PythonName), nil
+	}
+
 	// Check methods first
 	if method, ok := td.GetMethod(name); ok {
 		// Return a bound method
@@ -286,6 +300,44 @@ func (bm *BoundMethod) GetAttr(name string) (Value, bool) {
 		return None, true
 	}
 	return nil, false
+}
+
+// GetTypeObject returns a type object (callable) for this type
+// This is used for __class__ attribute and pickle support
+// The result is cached to ensure identity equality
+func (td *TypeDescriptor) GetTypeObject() Value {
+	// Return cached type object if it exists
+	if td.typeObject != nil {
+		return td.typeObject
+	}
+
+	if td.Constructor == nil {
+		return nil
+	}
+
+	// Create a callable type object
+	typeFunc := NewNamedBuiltinFunction(td.PythonName, func(args []Value, ctx *Context) (Value, error) {
+		return td.Constructor(args, ctx)
+	})
+
+	// Set standard type attributes
+	typeFunc.SetAttr("__module__", StringValue("builtins"))
+	typeFunc.SetAttr("__name__", StringValue(td.PythonName))
+	typeFunc.SetAttr("__qualname__", StringValue(td.PythonName))
+
+	// Add __new__ method for pickle support
+	typeFunc.SetAttr("__new__", NewNamedBuiltinFunction("__new__", func(args []Value, ctx *Context) (Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__new__() missing required argument: 'cls'")
+		}
+		// args[0] is cls, args[1:] are the constructor args
+		return td.Constructor(args[1:], ctx)
+	}))
+
+	// Cache the type object
+	td.typeObject = typeFunc
+
+	return typeFunc
 }
 
 // Standard type representations

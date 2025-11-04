@@ -331,5 +331,97 @@ func getTupleMethods() map[string]*MethodDescriptor {
 				return NumberValue(0), nil
 			},
 		},
+		"__reduce_ex__": {
+			Name:    "__reduce_ex__",
+			Arity:   1,
+			Doc:     "Helper for pickle",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				// For tuples, pickle protocol returns: (tuple_class, (list(self),))
+				tuple := receiver.(TupleValue)
+
+				// Create tuple class callable
+				tupleClass := NewNamedBuiltinFunction("tuple", func(args []Value, ctx *Context) (Value, error) {
+					if len(args) == 0 {
+						return TupleValue{}, nil
+					}
+					if len(args) == 1 {
+						// Convert iterable to tuple
+						if t, ok := args[0].(TupleValue); ok {
+							return t, nil
+						}
+						if list, ok := args[0].(*ListValue); ok {
+							result := make(TupleValue, list.Len())
+							copy(result, list.Items())
+							return result, nil
+						}
+						return nil, fmt.Errorf("tuple() argument must be an iterable")
+					}
+					return nil, fmt.Errorf("tuple() takes at most 1 argument (%d given)", len(args))
+				})
+				tupleClass.SetAttr("__module__", StringValue("builtins"))
+				tupleClass.SetAttr("__name__", StringValue("tuple"))
+				tupleClass.SetAttr("__qualname__", StringValue("tuple"))
+
+				// Add __new__ method
+				tupleClass.SetAttr("__new__", NewNamedBuiltinFunction("__new__", func(args []Value, ctx *Context) (Value, error) {
+					if len(args) < 1 {
+						return nil, fmt.Errorf("__new__() missing required argument: 'cls'")
+					}
+					if len(args) == 1 {
+						return TupleValue{}, nil
+					}
+					// args[0] is cls, args[1] is the iterable
+					if t, ok := args[1].(TupleValue); ok {
+						return t, nil
+					}
+					if list, ok := args[1].(*ListValue); ok {
+						result := make(TupleValue, list.Len())
+						copy(result, list.Items())
+						return result, nil
+					}
+					return nil, fmt.Errorf("tuple __new__ requires iterable argument")
+				}))
+
+				// Create __newobj__ function
+				newobjFunc := NewNamedBuiltinFunction("__newobj__", func(args []Value, ctx *Context) (Value, error) {
+					if len(args) < 1 {
+						return nil, fmt.Errorf("__newobj__ requires at least 1 argument")
+					}
+					cls := args[0]
+					clsArgs := args[1:]
+
+					clsObj, ok := cls.(interface{ GetAttr(string) (Value, bool) })
+					if !ok {
+						return nil, fmt.Errorf("class does not support attribute access")
+					}
+
+					newMethod, exists := clsObj.GetAttr("__new__")
+					if !exists {
+						return nil, fmt.Errorf("class has no __new__ method")
+					}
+
+					newCallable, ok := newMethod.(Callable)
+					if !ok {
+						return nil, fmt.Errorf("__new__ is not callable")
+					}
+
+					newArgs := append([]Value{cls}, clsArgs...)
+					return newCallable.Call(newArgs, ctx)
+				})
+
+				newobjFunc.SetAttr("__module__", StringValue("copyreg"))
+				newobjFunc.SetAttr("__name__", StringValue("__newobj__"))
+				newobjFunc.SetAttr("__qualname__", StringValue("__newobj__"))
+
+				// Convert tuple to list for pickling
+				listItems := NewList(tuple...)
+
+				// Return tuple: (__newobj__, (tuple_class, list_of_items))
+				argsTuple := TupleValue{tupleClass, listItems}
+				result := TupleValue{newobjFunc, argsTuple}
+				return result, nil
+			},
+		},
 	}
 }
