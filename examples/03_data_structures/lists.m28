@@ -92,13 +92,13 @@
 (= range10 [])
 (for i in (range 10)
   (= range10 (+ range10 [i])))
-(= squares (map (lambda (x) (* x x)) range10))
+(= squares (map (lambda (x) (return (* x x))) range10))
 (print "Squares:" squares)
 
 (= range20 [])
 (for i in (range 20)
   (= range20 (+ range20 [i])))
-(= evens (filter (lambda (x) (== (% x 2) 0)) range20))
+(= evens (filter (lambda (x) (return (== (% x 2) 0))) range20))
 (print "Even numbers:" evens)
 
 # Nested comprehensions not easily replicated
@@ -161,15 +161,15 @@
 
 # Filtering
 (= numbers [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-(= odds (filter (lambda (x) (== (% x 2) 1)) numbers))
+(= odds (filter (lambda (x) (return (== (% x 2) 1))) numbers))
 (print "\nOdd numbers:" odds)
 
 # Mapping
-(= doubled (map (lambda (x) (* x 2)) numbers))
+(= doubled (map (lambda (x) (return (* x 2))) numbers))
 (print "Doubled:" doubled)
 
 # Reducing
-(= product (reduce (lambda (acc x) (* acc x)) numbers 1))
+(= product (reduce (lambda (acc x) (return (* acc x))) numbers 1))
 (print "Product of all:" product)
 
 # List as a mutable object

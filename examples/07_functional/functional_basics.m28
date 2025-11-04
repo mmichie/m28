@@ -11,10 +11,10 @@
 
 # Store functions in data structures
 (= operations {
-  "add": (lambda (x y) (+ x y)),
-  "subtract": (lambda (x y) (- x y)),
-  "multiply": (lambda (x y) (* x y)),
-  "divide": (lambda (x y) (/ x y))
+  "add": (lambda (x y) (return (+ x y))),
+  "subtract": (lambda (x y) (return (- x y))),
+  "multiply": (lambda (x y) (return (* x y))),
+  "divide": (lambda (x y) (return (/ x y)))
 })
 
 (print (operations["add"] 10 5))      # 15
@@ -31,7 +31,7 @@
 # Function composition
 (def compose (f g)
   "Return a new function that is the composition of f and g"
-  (return (lambda (x) (f (g x)))))
+  (return (lambda (x) (return (f (g x))))))
 
 (def double (x) (return (* x 2)))
 (def add_one (x) (return (+ x 1)))
@@ -41,11 +41,11 @@
 
 # Map - apply function to each element
 (= numbers [1, 2, 3, 4, 5])
-(= squared (map (lambda (x) (* x x)) numbers))
+(= squared (map (lambda (x) (return (* x x))) numbers))
 (print squared)  # [1, 4, 9, 16, 25]
 
 # Filter - keep elements that satisfy predicate
-(= evens (filter (lambda (x) (== (% x 2) 0)) numbers))
+(= evens (filter (lambda (x) (return (== (% x 2) 0))) numbers))
 (print evens)  # [2, 4]
 
 # Reduce - fold a list into a single value
@@ -58,13 +58,13 @@
 (= sum_all (reduce + 0 numbers))
 (print sum_all)  # 15
 
-(= product (reduce (lambda (a b) (* a b)) 1 numbers))
+(= product (reduce (lambda (a b) (return (* a b))) 1 numbers))
 (print product)  # 120
 
 # Partial application / Currying
 (def curry (f)
   "Convert a 2-argument function to curried form"
-  (return (lambda (x) (lambda (y) (f x y)))))
+  (return (lambda (x) (return (lambda (y) (return (f x y)))))))
 
 (= add_curried (curry +))
 (= add5 (add_curried 5))
