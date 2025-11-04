@@ -95,16 +95,16 @@
     # In-place add - modifies self and returns self
     (= self.iadd_called true)
     (= self.value (+ self.value other))
-    self)
+    (return self))
 
   (def __imul__ (self other)
     # In-place multiply
     (= self.imul_called true)
     (= self.value (* self.value other))
-    self)
+    (return self))
 
   (def __str__ (self)
-    (str self.value)))
+    (return (str self.value))))
 
 (= counter (Counter 10))
 (print (+ "Initial counter: " (str counter)))
@@ -135,10 +135,10 @@
 
   # Has __add__ but NOT __iadd__
   (def __add__ (self other)
-    (SimpleValue (+ self.value other.value)))
+    (return (SimpleValue (+ self.value other.value))))
 
   (def __str__ (self)
-    (str self.value)))
+    (return (str self.value))))
 
 (= val1 (SimpleValue 10))
 (= val2 (SimpleValue 5))
@@ -168,27 +168,27 @@
   (def __iand__ (self other)
     (= self.and_called true)
     (= self.value (& self.value other))
-    self)
+    (return self))
 
   (def __ior__ (self other)
     (= self.or_called true)
     (= self.value (| self.value other))
-    self)
+    (return self))
 
   (def __ixor__ (self other)
     (= self.xor_called true)
     (= self.value (^ self.value other))
-    self)
+    (return self))
 
   (def __ilshift__ (self other)
     (= self.lshift_called true)
     (= self.value (<< self.value other))
-    self)
+    (return self))
 
   (def __irshift__ (self other)
     (= self.rshift_called true)
     (= self.value (>> self.value other))
-    self))
+    (return self)))
 
 (= flags (Flags 15))
 (&= flags 7)

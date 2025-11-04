@@ -76,7 +76,7 @@
 (= data {"first": 1 "second": 2 "third": 3})
 
 # Transform all keys to uppercase
-(= upper-keys (rename-keys data (lambda (k) (upper k))))
+(= upper-keys (rename-keys data (lambda (k) (return (upper k)))))
 (print (+ "Uppercase keys: " (str upper-keys)))
 (assert (== (get-item upper-keys "FIRST") 1) "rename-keys transforms keys with function")
 (assert (== (get-item upper-keys "SECOND") 2) "rename-keys applies function to all keys")
@@ -105,7 +105,7 @@
 (= settings {"cache_ttl": 3600 "max_connections": 100 "enable_logging": true})
 
 # Add prefix to all keys
-(= prefixed (map-keys settings (lambda (k) (+ "app_" k))))
+(= prefixed (map-keys settings (lambda (k) (return (+ "app_" k)))))
 (print (+ "Prefixed keys: " (str prefixed)))
 (assert (== (get-item prefixed "app_cache_ttl") 3600) "map-keys transforms all keys")
 (assert (== (get-item prefixed "app_max_connections") 100) "map-keys applies function uniformly")
@@ -124,14 +124,14 @@
 (= prices {"apple": 1.0 "banana": 0.5 "orange": 0.75})
 
 # Double all prices
-(= doubled (map-values prices (lambda (v) (* v 2))))
+(= doubled (map-values prices (lambda (v) (return (* v 2)))))
 (print (+ "Doubled prices: " (str doubled)))
 (assert (== (get-item doubled "apple") 2.0) "map-values transforms all values")
 (assert (== (get-item doubled "banana") 1.0) "map-values applies function to each value")
 (assert (== (get-item doubled "orange") 1.5) "map-values preserves keys")
 
 # Convert numbers to strings
-(= stringified (map-values prices (lambda (v) (str v))))
+(= stringified (map-values prices (lambda (v) (return (str v)))))
 (print (+ "Stringified: " (str stringified)))
 (assert (== (get-item stringified "apple") "1") "map-values can change value types")
 
@@ -146,7 +146,7 @@
 (= data {"a": 1 "b": 2 "c": 3 "d": 4 "e": 5})
 
 # Keep only keys that are in a list
-(= filtered (filter-keys data (lambda (k) (in k ["a" "c" "e"]))))
+(= filtered (filter-keys data (lambda (k) (return (in k ["a" "c" "e"])))))
 (print (+ "Filtered keys: " (str filtered)))
 (assert (== (len filtered) 3) "filter-keys removes unmatched keys")
 (assert (== (get-item filtered "a") 1) "filter-keys keeps matched keys")
@@ -155,7 +155,7 @@
 
 # Filter based on string properties
 (= mixed {"apple": 1 "apricot": 2 "banana": 3 "avocado": 4})
-(= a-words (filter-keys mixed (lambda (k) (k.startswith "a"))))
+(= a-words (filter-keys mixed (lambda (k) (return (k.startswith "a")))))
 (print (+ "Keys starting with 'a': " (str a-words)))
 (assert (== (len a-words) 3) "filter-keys uses predicate correctly")
 
@@ -170,7 +170,7 @@
 (= scores {"alice": 85 "bob": 92 "charlie": 78 "david": 95 "eve": 88})
 
 # Keep only scores >= 90
-(= high-scores (filter-values scores (lambda (v) (>= v 90))))
+(= high-scores (filter-values scores (lambda (v) (return (>= v 90)))))
 (print (+ "High scores: " (str high-scores)))
 (assert (== (len high-scores) 2) "filter-values removes unmatched values")
 (assert (== (get-item high-scores "bob") 92) "filter-values keeps matched values")
@@ -180,7 +180,7 @@
 # Filter based on type
 (= mixed-vals {"a": 1 "b": "hello" "c": 2 "d": "world" "e": 3})
 (= number-type (type 0))  # Get the number type once
-(= numbers-only (filter-values mixed-vals (lambda (v) (== (type v) number-type))))
+(= numbers-only (filter-values mixed-vals (lambda (v) (return (== (type v) number-type)))))
 (print (+ "Numbers only: " (str numbers-only)))
 (assert (== (len numbers-only) 3) "filter-values can filter by type")
 
@@ -205,7 +205,7 @@
 (= result (-> data
               (select-keys ["user_name" "user_email" "user_age"])
               (rename-keys {"user_name": "name" "user_email": "email" "user_age": "age"})
-              (map-values (lambda (v) (if (== (type v) string-type) (v.upper) v)))))
+              (map-values (lambda (v) (return (if (== (type v) string-type) (v.upper) v))))))
 
 (print (+ "Composed result: " (str result)))
 (assert (== (len result) 3) "Composition works")
@@ -227,13 +227,13 @@
 })
 
 # Extract just names from nested structure
-(= names (map-values users (lambda (user) (get-item user "name"))))
+(= names (map-values users (lambda (user) (return (get-item user "name")))))
 (print (+ "Names: " (str names)))
 (assert (== (get-item names "alice") "Alice") "map-values works with nested structures")
 (assert (== (get-item names "bob") "Bob") "map-values extracts nested values")
 
 # Filter users by age
-(= adults-30-plus (filter-values users (lambda (user) (>= (get-item user "age") 30))))
+(= adults-30-plus (filter-values users (lambda (user) (return (>= (get-item user "age") 30)))))
 (print (+ "Adults 30+: " (str adults-30-plus)))
 (assert (== (len adults-30-plus) 2) "filter-values works with nested structures")
 
@@ -253,12 +253,12 @@
 (= empty-renamed (rename-keys empty-dict {"a": "b"}))
 (assert (== (len empty-renamed) 0) "rename-keys on empty dict returns empty")
 
-(= empty-mapped (map-values empty-dict (lambda (v) (* v 2))))
+(= empty-mapped (map-values empty-dict (lambda (v) (return (* v 2)))))
 (assert (== (len empty-mapped) 0) "map-values on empty dict returns empty")
 
 # Single element
 (= single {"only": 42})
-(= single-filtered (filter-values single (lambda (v) (> v 40))))
+(= single-filtered (filter-values single (lambda (v) (return (> v 40)))))
 (assert (== (len single-filtered) 1) "filter on single element works")
 
 (print "✓ Edge cases handled correctly")
@@ -282,7 +282,7 @@
 
 # Clean up: remove internal fields, rename user_ fields, normalize email
 (= cleaned (-> api-response
-               (filter-keys (lambda (k) (not (k.startswith "internal_"))))
+               (filter-keys (lambda (k) (return (not (k.startswith "internal_")))))
                (rename-keys {"user_id": "id" "user_name": "name" "user_email": "email"})))
 
 (print (+ "Cleaned data: " (str cleaned)))

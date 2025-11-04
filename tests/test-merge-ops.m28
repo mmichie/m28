@@ -233,7 +233,7 @@
 (assert (== (get-item result "c") 3) "merge-with adds new keys")
 
 # Multiply values on conflict
-(= result2 (merge-with (lambda (a b) (* a b)) dict1 dict2))
+(= result2 (merge-with (lambda (a b) (return (* a b))) dict1 dict2))
 (print (+ "Merged with *: " (str result2)))
 (assert (== (get-item result2 "a") 10) "merge-with: different function works")
 
@@ -249,7 +249,7 @@
 (= dict2 {"x": [3 4]})
 
 # Concatenate lists
-(= result (merge-with (lambda (v1 v2) (+ v1 v2)) dict1 dict2))
+(= result (merge-with (lambda (v1 v2) (return (+ v1 v2))) dict1 dict2))
 (print (+ "Lists concatenated: " (str result)))
 (= merged-list (get-item result "x"))
 (assert (== (len merged-list) 4) "merge-with can concatenate lists")
@@ -259,7 +259,7 @@
 # Take max value
 (= nums1 {"score": 85 "level": 5})
 (= nums2 {"score": 92 "health": 100})
-(= result2 (merge-with (lambda (v1 v2) (if (> v1 v2) v1 v2)) nums1 nums2))
+(= result2 (merge-with (lambda (v1 v2) (return (if (> v1 v2) v1 v2))) nums1 nums2))
 (print (+ "Max values: " (str result2)))
 (assert (== (get-item result2 "score") 92) "merge-with can take max")
 (assert (== (get-item result2 "level") 5) "merge-with preserves unique keys")
@@ -306,7 +306,7 @@
 (= result (-> base-config
               (deep-merge user-config)
               (select-keys ["database" "cache"])
-              (update-path "cache.ttl" (lambda (x) (* x 2)))))
+              (update-path "cache.ttl" (lambda (x) (return (* x 2))))))
 
 (print (+ "Composed result: " (str result)))
 (assert (== (len result) 2) "Composition works")

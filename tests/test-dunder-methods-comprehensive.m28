@@ -10,69 +10,69 @@ print("Testing comprehensive dunder method support...")
 
   # Arithmetic operations
   (def __add__ (self other)
-    (Number (+ self.value (if (isinstance other Number) other.value other))))
+    (return (Number (+ self.value (if (isinstance other Number) other.value other)))))
 
   (def __sub__ (self other)
-    (Number (- self.value (if (isinstance other Number) other.value other))))
+    (return (Number (- self.value (if (isinstance other Number) other.value other)))))
 
   (def __mul__ (self other)
-    (Number (* self.value (if (isinstance other Number) other.value other))))
+    (return (Number (* self.value (if (isinstance other Number) other.value other)))))
 
   (def __truediv__ (self other)
-    (Number (/ self.value (if (isinstance other Number) other.value other))))
+    (return (Number (/ self.value (if (isinstance other Number) other.value other)))))
 
   (def __floordiv__ (self other)
-    (Number (// self.value (if (isinstance other Number) other.value other))))
+    (return (Number (// self.value (if (isinstance other Number) other.value other)))))
 
   (def __mod__ (self other)
-    (Number (% self.value (if (isinstance other Number) other.value other))))
+    (return (Number (% self.value (if (isinstance other Number) other.value other)))))
 
   (def __pow__ (self other)
-    (Number (** self.value (if (isinstance other Number) other.value other))))
+    (return (Number (** self.value (if (isinstance other Number) other.value other)))))
 
   # Reflected arithmetic operations
   (def __radd__ (self other)
-    (Number (+ other self.value)))
+    (return (Number (+ other self.value))))
 
   (def __rsub__ (self other)
-    (Number (- other self.value)))
+    (return (Number (- other self.value))))
 
   (def __rmul__ (self other)
-    (Number (* other self.value)))
+    (return (Number (* other self.value))))
 
   (def __rtruediv__ (self other)
-    (Number (/ other self.value)))
+    (return (Number (/ other self.value))))
 
   (def __rfloordiv__ (self other)
-    (Number (// other self.value)))
+    (return (Number (// other self.value))))
 
   (def __rmod__ (self other)
-    (Number (% other self.value)))
+    (return (Number (% other self.value))))
 
   (def __rpow__ (self other)
-    (Number (** other self.value)))
+    (return (Number (** other self.value))))
 
   # Comparison operations
   (def __lt__ (self other)
-    (< self.value (if (isinstance other Number) other.value other)))
+    (return (< self.value (if (isinstance other Number) other.value other))))
 
   (def __le__ (self other)
-    (<= self.value (if (isinstance other Number) other.value other)))
+    (return (<= self.value (if (isinstance other Number) other.value other))))
 
   (def __eq__ (self other)
-    (== self.value (if (isinstance other Number) other.value other)))
+    (return (== self.value (if (isinstance other Number) other.value other))))
 
   (def __ne__ (self other)
-    (!= self.value (if (isinstance other Number) other.value other)))
+    (return (!= self.value (if (isinstance other Number) other.value other))))
 
   (def __gt__ (self other)
-    (> self.value (if (isinstance other Number) other.value other)))
+    (return (> self.value (if (isinstance other Number) other.value other))))
 
   (def __ge__ (self other)
-    (>= self.value (if (isinstance other Number) other.value other)))
+    (return (>= self.value (if (isinstance other Number) other.value other))))
 
   (def __str__ (self)
-    (+ "Number(" (str self.value) ")")))
+    (return (+ "Number(" (str self.value) ")"))))
 
 # Test arithmetic operations
 print("\n=== Testing arithmetic dunder methods ===")
@@ -219,16 +219,16 @@ print("\n=== Testing special dunder methods ===")
     (= self.items items))
 
   (def __len__ (self)
-    (len self.items))
+    (return (len self.items)))
 
   (def __getitem__ (self index)
-    (get-item self.items index))
+    (return (get-item self.items index)))
 
   (def __setitem__ (self index value)
     (set-item self.items index value))
 
   (def __contains__ (self item)
-    (in item self.items)))
+    (return (in item self.items))))
 
 (= container (Container [1, 2, 3, 4, 5]))
 
@@ -255,7 +255,7 @@ print("\n=== Testing special dunder methods ===")
     (= self.n n))
 
   (def __call__ (self x)
-    (+ self.n x)))
+    (return (+ self.n x))))
 
 (= add5 (Adder 5))
 (= call_result (add5 10))
@@ -268,7 +268,7 @@ print("\n=== Testing special dunder methods ===")
     (= self.value value))
 
   (def __bool__ (self)
-    (> self.value 0)))
+    (return (> self.value 0))))
 
 (= truthy (BoolTest 5))
 (= falsy (BoolTest 0))
