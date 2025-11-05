@@ -88,13 +88,21 @@ func makeGeneratorFunction(fn *UserFunction) core.Value {
 }
 
 // containsYield checks if an expression contains yield statements
+// It stops recursing into nested function definitions (def and lambda)
+// since yields in nested functions don't make the outer function a generator
 func containsYield(expr core.Value) bool {
 	switch e := expr.(type) {
 	case *core.ListValue:
 		if e.Len() > 0 {
 			if sym, ok := e.Items()[0].(core.SymbolValue); ok {
-				if string(sym) == "yield" || string(sym) == "yield-from" {
+				symStr := string(sym)
+				if symStr == "yield" || symStr == "yield-from" {
 					return true
+				}
+				// Don't recurse into nested function definitions
+				// Yields in nested functions don't make the outer function a generator
+				if symStr == "def" || symStr == "lambda" {
+					return false
 				}
 			}
 			// Recursively check all elements

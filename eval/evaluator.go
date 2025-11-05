@@ -733,6 +733,7 @@ type UserFunction struct {
 	body      core.Value
 	env       *core.Context
 	name      string // Optional function name
+	isLambda  bool   // True for lambda expressions (implicitly return body value)
 }
 
 // Call implements Callable.Call
@@ -921,7 +922,13 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 		return ret.Value, nil
 	}
 
-	// In Python, functions without an explicit return statement return None
+	// Lambda expressions implicitly return the value of their body expression
+	if f.isLambda {
+		core.TraceExitFunction(f.name, result, nil)
+		return result, nil
+	}
+
+	// In Python, def functions without an explicit return statement return None
 	// (not the value of the last expression like in Lisp)
 	core.TraceExitFunction(f.name, core.None, nil)
 	return core.None, nil
@@ -1229,6 +1236,7 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			params:     params,
 			body:       body,
 			env:        ctx, // Capture current environment
+			isLambda:   true,
 		}
 
 		// Check if this is a generator function
@@ -1266,6 +1274,7 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		signature:  signature,
 		body:       body,
 		env:        ctx, // Capture current environment
+		isLambda:   true,
 	}
 
 	// Check if this is a generator function

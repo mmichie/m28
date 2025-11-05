@@ -224,7 +224,12 @@ func addExtendedSysFunctions(sysModule *core.DictValue) {
 	}))
 
 	// Exception (Python 3.11+)
+	// Returns the exception instance currently being handled, or None
 	sysModule.Set("exception", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Return the current exception value if one is being handled
+		if ctx.ExcValue != nil {
+			return ctx.ExcValue, nil
+		}
 		return core.None, nil
 	}))
 }
