@@ -6,7 +6,7 @@
 # Test 1: Simple identity macro
 (print "")
 (print "Test 1: Identity macro")
-(macro (def my-identity (x) x))
+(macro (def my-identity (x) (return x)))
 
 (= result1 (my-identity (+ 1 2)))
 (assert (== result1 3) "Identity macro should evaluate its argument")
@@ -27,7 +27,7 @@
 (print "Test 3: Code construction")
 (macro (def make-addition (a b)
    # Manually construct an addition expression
-   [+ a b]))
+   (return [+ a b])))
 
 (= x 5)
 (= y 10)
@@ -38,8 +38,8 @@
 # Test 4: Multiple macro definitions
 (print "")
 (print "Test 4: Multiple macros")
-(macro (def mac1 (x) x))
-(macro (def mac2 (x) x))
+(macro (def mac1 (x) (return x)))
+(macro (def mac2 (x) (return x)))
 
 (= r1 (mac1 42))
 (= r2 (mac2 99))

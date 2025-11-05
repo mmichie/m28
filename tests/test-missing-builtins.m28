@@ -16,7 +16,7 @@
 
   (def __format__ (self format_spec)
     # Custom formatting: prepend "NUM:" to the value
-    (+ "NUM:" (str self.value))))
+    (return (+ "NUM:" (str self.value)))))
 
 (= num (FormattableNumber 42))
 (= formatted (format num ".2f"))
@@ -48,7 +48,7 @@
 
   (def __reversed__ (self)
     # Return items in custom reverse order (double reverse)
-    self.items))
+    (return self.items)))
 
 (= custom (CustomReversible [1 2 3]))
 (= rev (reversed custom))
@@ -86,11 +86,11 @@
 
   (def __format__ (self format_spec)
     # Format as comma-separated list
-    (+ "[" (str (len self.items)) " items]"))
+    (return (+ "[" (str (len self.items)) " items]")))
 
   (def __reversed__ (self)
     # Return reversed items
-    (reversed self.items)))
+    (return (reversed self.items))))
 
 (= dlist (DisplayList [1 2 3 4]))
 (= display (format dlist ""))

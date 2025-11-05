@@ -10,7 +10,7 @@
   (def __init__ (self)
     (= self.x 10))
   (def __getattr__ (self name)
-    (+ "fallback_" name)))
+    (return (+ "fallback_" name))))
 
 (= d (Dynamic))
 (print (+ "Real attr: " (str (getattr d "x"))))
@@ -23,7 +23,7 @@
 (print "\nTest 2: __getattribute__() intercepts all")
 (class Intercept ()
   (def __getattribute__ (self name)
-    (+ "intercepted_" name)))
+    (return (+ "intercepted_" name))))
 
 (= i (Intercept))
 (= result (getattr i "anything"))
@@ -35,7 +35,7 @@
 (print "\nTest 3: __dir__() custom listing")
 (class CustomDir ()
   (def __dir__ (self)
-    ["a" "b" "c"]))
+    (return ["a" "b" "c"])))
 
 (= c (CustomDir))
 (= attrs (dir c))

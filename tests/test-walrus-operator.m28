@@ -31,7 +31,7 @@
 (assert (== (get-item squares 1) 16) "walrus should not affect comprehension result")
 
 # Test 6: Walrus with function call
-(def get_value () 42)
+(def get_value () (return 42))
 (if (:= result (get_value))
   (assert (== result 42) "walrus should work with function calls")
   (assert False "should not reach here"))
@@ -75,9 +75,9 @@
 (global walrus_global)
 (def test_walrus_with_global ()
   (global walrus_global)
-  (if (:= walrus_global 99)
+  (return (if (:= walrus_global 99)
     walrus_global
-    0))
+    0)))
 
 (assert (== (test_walrus_with_global) 99) "walrus should work with global")
 (assert (== walrus_global 99) "walrus should assign to global variable")
@@ -88,12 +88,12 @@
 
   (def inner_walrus ()
     (nonlocal walrus_local)
-    (if (:= walrus_local 25)
+    (return (if (:= walrus_local 25)
       walrus_local
-      0))
+      0)))
 
   (inner_walrus)
-  walrus_local)
+  (return walrus_local))
 
 (assert (== (outer_walrus) 25) "walrus should work with nonlocal")
 

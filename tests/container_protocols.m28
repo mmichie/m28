@@ -8,7 +8,7 @@
     (= self.data [1, 2, 3, 4, 5]))
   
   (def __getitem__ (self index)
-    (get-item self.data index)))
+    (return (get-item self.data index))))
 
 (= v (Vector))
 (assert (== (get-item v 0) 1) "Vector[0] should be 1")
@@ -22,9 +22,9 @@
 (class MutableVector
   (def __init__ (self)
     (= self.data {"0": 1, "1": 2, "2": 3, "3": 4, "4": 5, "-1": 5}))
-  
+
   (def __getitem__ (self index)
-    (get-item self.data (str index)))
+    (return (get-item self.data (str index))))
   
   (def __setitem__ (self index value)
     (set-item self.data (str index) value)))
@@ -45,14 +45,14 @@
     (= self.length 5))
   
   (def __getitem__ (self index)
-    (get-item self.data (str index)))
-  
+    (return (get-item self.data (str index))))
+
   (def __delitem__ (self index)
     (del-item self.data (str index))
     (= self.length (- self.length 1)))
   
   (def __len__ (self)
-    self.length))
+    (return self.length)))
 
 (= dv (DeletableVector))
 (assert (== (len dv) 5) "Initial length should be 5")
@@ -70,7 +70,7 @@
   
   (def __getitem__ (self index)
     # For this test, just handle regular indexing
-    (get-item self.data index)))
+    (return (get-item self.data index))))
 
 (= sv (SliceableVector))
 (assert (== (get-item sv 3) 3) "sv[3] should be 3")

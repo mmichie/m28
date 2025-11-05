@@ -18,10 +18,10 @@
     (= self.value value))
 
   (def __index__ (self)
-    self.value)
+    (return self.value))
 
   (def __repr__ (self)
-    (+ "MyIndex(" (str self.value) ")")))
+    (return (+ "MyIndex(" (str self.value) ")"))))
 
 # Test 4: Custom __index__ for indexing
 (= custom_idx (MyIndex 2))
@@ -43,7 +43,7 @@
     (= self.value value))
 
   (def __index__ (self)
-    self.value))  # Returns float
+    (return self.value)))  # Returns float
 
 (= bad_idx (BadIndex 2.5))
 (try
