@@ -492,14 +492,26 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
-		// Copy all variables from execCtx back to localsDict (if provided)
-		// This is critical for patterns like: exec("def fn(): pass", {}, ns)
-		// where the defined function needs to appear in ns
+		// Copy all variables from execCtx back to the appropriate dict
+		// Python semantics:
+		// - If locals is provided, write back to locals
+		// - Otherwise, if globals is provided, write back to globals
+		// - If neither is provided, variables stay in the current context
 		if localsDict != nil {
+			// Write back to locals (takes precedence)
 			for name, value := range execCtx.Vars {
 				keyVal := core.StringValue(name)
 				keyRepr := core.ValueToKey(keyVal)
 				localsDict.SetWithKey(keyRepr, keyVal, value)
+			}
+		} else if globalsDict != nil {
+			// Write back to globals (when no locals dict is provided)
+			// This is critical for patterns like: exec("def fn(): pass", d)
+			// where d is used as both globals and locals
+			for name, value := range execCtx.Vars {
+				keyVal := core.StringValue(name)
+				keyRepr := core.ValueToKey(keyVal)
+				globalsDict.SetWithKey(keyRepr, keyVal, value)
 			}
 		}
 

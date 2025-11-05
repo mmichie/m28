@@ -1182,6 +1182,29 @@ func createTypeMetaclass() *TypeType {
 				keyName = keyStr[2:] // Remove "s:" prefix
 			}
 
+			// SPECIAL CASE: __init__ must always be a method (but NOT for metaclasses!)
+			// Skip descriptor check for __init__ UNLESS the class is a metaclass
+			// Metaclasses (subclasses of type) need special handling
+			if keyName == "__init__" {
+				if _, ok := value.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				}); ok {
+					// Check if this is a metaclass (subclass of type)
+					isMetaclass := false
+					for _, parentClass := range parentClasses {
+						if parentClass.Name == "type" || parentClass.Name == "ABCMeta" {
+							isMetaclass = true
+							break
+						}
+					}
+
+					if !isMetaclass {
+						newClass.SetMethod(keyName, value)
+						continue // Skip the rest of the logic
+					}
+				}
+			}
+
 			// Check if it's a descriptor (has __get__ method)
 			// Descriptors should be stored as attributes, not methods
 			isDescriptor := false
