@@ -6,7 +6,45 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"unsafe"
 )
+
+// Cycle detection for container string representation
+var (
+	visitedMu sync.Mutex
+	visited   = make(map[uint64]map[uintptr]bool) // goroutine ID -> visited set
+)
+
+// withCycleDetection runs f with cycle detection for the given pointer
+func withCycleDetection(ptr uintptr, f func() string) string {
+	gid := getGoroutineID()
+
+	visitedMu.Lock()
+	if visited[gid] == nil {
+		visited[gid] = make(map[uintptr]bool)
+	}
+	goroutineVisited := visited[gid]
+
+	if goroutineVisited[ptr] {
+		visitedMu.Unlock()
+		return "{...}" // Circular reference
+	}
+
+	goroutineVisited[ptr] = true
+	visitedMu.Unlock()
+
+	defer func() {
+		visitedMu.Lock()
+		delete(goroutineVisited, ptr)
+		if len(goroutineVisited) == 0 {
+			delete(visited, gid)
+		}
+		visitedMu.Unlock()
+	}()
+
+	return f()
+}
 
 // ListValue represents a mutable list of values
 type ListValue struct {
@@ -57,11 +95,15 @@ func (l *ListValue) String() string {
 	if l == nil {
 		return "[]"
 	}
-	elements := make([]string, len(l.items))
-	for i, v := range l.items {
-		elements[i] = PrintValue(v)
-	}
-	return "[" + strings.Join(elements, ", ") + "]"
+
+	// Use cycle detection to prevent infinite recursion
+	return withCycleDetection(uintptr(unsafe.Pointer(l)), func() string {
+		elements := make([]string, len(l.items))
+		for i, v := range l.items {
+			elements[i] = PrintValue(v)
+		}
+		return "[" + strings.Join(elements, ", ") + "]"
+	})
 }
 
 // GetAttr implements Object interface using TypeDescriptor
@@ -235,19 +277,22 @@ func (d *DictValue) String() string {
 		return "{}"
 	}
 
-	// Use insertion order for consistent output (Python 3.7+ behavior)
-	parts := make([]string, 0, len(d.orderedKeys))
-	for _, k := range d.orderedKeys {
-		v := d.entries[k]
-		// Use original key if available, otherwise use string representation
-		if origKey, hasOrig := d.keys[k]; hasOrig {
-			parts = append(parts, fmt.Sprintf("%s: %s", PrintValue(origKey), PrintValue(v)))
-		} else {
-			parts = append(parts, fmt.Sprintf("%q: %s", k, PrintValue(v)))
+	// Use cycle detection to prevent infinite recursion
+	return withCycleDetection(uintptr(unsafe.Pointer(d)), func() string {
+		// Use insertion order for consistent output (Python 3.7+ behavior)
+		parts := make([]string, 0, len(d.orderedKeys))
+		for _, k := range d.orderedKeys {
+			v := d.entries[k]
+			// Use original key if available, otherwise use string representation
+			if origKey, hasOrig := d.keys[k]; hasOrig {
+				parts = append(parts, fmt.Sprintf("%s: %s", PrintValue(origKey), PrintValue(v)))
+			} else {
+				parts = append(parts, fmt.Sprintf("%q: %s", k, PrintValue(v)))
+			}
 		}
-	}
 
-	return "{" + strings.Join(parts, ", ") + "}"
+		return "{" + strings.Join(parts, ", ") + "}"
+	})
 }
 
 // Get retrieves a value by internal key representation
