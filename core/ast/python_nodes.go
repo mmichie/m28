@@ -1099,25 +1099,29 @@ func (t *TryForm) ToIR() core.Value {
 // ClassForm represents a class definition
 type ClassForm struct {
 	BaseNode
-	Name       string
-	Bases      []ASTNode // Base classes
-	Body       []ASTNode // Methods and attributes
-	Decorators []ASTNode // Class decorators
-	Keywords   []ASTNode // Keyword arguments (e.g., metaclass=...)
+	Name        string
+	Bases       []ASTNode // Base classes
+	Body        []ASTNode // Methods and attributes
+	Decorators  []ASTNode // Class decorators
+	Keywords    []ASTNode // Keyword arguments (e.g., metaclass=...)
+	StarBases   ASTNode   // *args unpacking for bases (e.g., class A(*bases))
+	KwargUnpack ASTNode   // **kwargs unpacking (e.g., class A(**kwargs))
 }
 
 // NewClassForm creates a new class definition
-func NewClassForm(name string, bases, body, decorators, keywords []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *ClassForm {
+func NewClassForm(name string, bases, body, decorators, keywords []ASTNode, starBases, kwargUnpack ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *ClassForm {
 	return &ClassForm{
 		BaseNode: BaseNode{
 			Loc:    loc,
 			Syntax: syntax,
 		},
-		Name:       name,
-		Bases:      bases,
-		Body:       body,
-		Decorators: decorators,
-		Keywords:   keywords,
+		Name:        name,
+		Bases:       bases,
+		Body:        body,
+		Decorators:  decorators,
+		Keywords:    keywords,
+		StarBases:   starBases,
+		KwargUnpack: kwargUnpack,
 	}
 }
 
@@ -1151,12 +1155,25 @@ func (c *ClassForm) ToIR() core.Value {
 		keywordsIR = append(keywordsIR, kw.ToIR())
 	}
 
-	// Basic class: (class Name [Base1 Base2] {keyword args} method1 method2 ...)
+	// Handle *bases and **kwargs unpacking
+	var starBasesIR core.Value = core.NilValue{}
+	if c.StarBases != nil {
+		starBasesIR = c.StarBases.ToIR()
+	}
+
+	var kwargUnpackIR core.Value = core.NilValue{}
+	if c.KwargUnpack != nil {
+		kwargUnpackIR = c.KwargUnpack.ToIR()
+	}
+
+	// Class IR: (class Name [Base1 Base2] {keyword args} *starBases **kwargUnpack method1 method2 ...)
 	result := []core.Value{
 		core.SymbolValue("class"),
 		core.SymbolValue(c.Name),
 		core.NewList(basesIR...),
-		core.NewList(keywordsIR...), // Add keywords as 4th element
+		core.NewList(keywordsIR...),
+		starBasesIR,
+		kwargUnpackIR,
 	}
 	result = append(result, bodyIR...)
 

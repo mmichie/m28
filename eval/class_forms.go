@@ -276,6 +276,99 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// Handle *args and **kwargs unpacking (Python 3.6+)
+	// IR format: (class Name [bases] [keywords] *starBases **kwargUnpack body...)
+	// But "class" is stripped, so args indices: 0=name, 1=bases, 2=keywords, 3=starBases, 4=kwargUnpack, 5+=body
+	// For backward compatibility, only process indices 3/4 if they look like unpacking values (nil or identifiers/expressions)
+	// NOT if they look like class body (ListValue starting with def, =, etc.)
+	if debugClass {
+		fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Full args for '%s': len=%d\n", className, args.Len())
+		for i, arg := range args.Items() {
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   args[%d] = %T: %v\n", i, arg, arg)
+		}
+	}
+
+	// Check if this is new format (has starBases/kwargUnpack) or old format (body starts at index 3)
+	hasUnpackingSlots := false
+	if args.Len() > 3 {
+		val3 := args.Items()[3]
+		// New format has nil or identifier at index 3, old format has ListValue with def/= etc
+		if _, isNil := val3.(core.NilValue); isNil {
+			hasUnpackingSlots = true
+		} else if _, isSymbol := val3.(core.SymbolValue); isSymbol {
+			hasUnpackingSlots = true
+		} else if _, isString := val3.(core.StringValue); isString {
+			hasUnpackingSlots = true
+		} else if _, isList := val3.(*core.ListValue); !isList {
+			// Not a list, so probably an expression for unpacking
+			hasUnpackingSlots = true
+		}
+	}
+
+	if hasUnpackingSlots && args.Len() > 3 {
+		// Check for *starBases at index 3
+		starBasesVal := args.Items()[3]
+		if _, isNil := starBasesVal.(core.NilValue); !isNil {
+			// Evaluate the *bases expression
+			basesResult, err := Eval(starBasesVal, ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating *bases: %v", err)
+			}
+
+			// Unpack the result into parentClasses
+			if basesList, ok := basesResult.(*core.ListValue); ok {
+				for _, baseVal := range basesList.Items() {
+					if baseClass, ok := baseVal.(*core.Class); ok {
+						parentClasses = append(parentClasses, baseClass)
+					} else {
+						return nil, fmt.Errorf("*bases must contain classes, got %T", baseVal)
+					}
+				}
+			} else if baseTuple, ok := basesResult.(core.TupleValue); ok {
+				for _, baseVal := range baseTuple {
+					if baseClass, ok := baseVal.(*core.Class); ok {
+						parentClasses = append(parentClasses, baseClass)
+					} else {
+						return nil, fmt.Errorf("*bases must contain classes, got %T", baseVal)
+					}
+				}
+			} else {
+				return nil, fmt.Errorf("*bases must be a sequence, got %T", basesResult)
+			}
+		}
+	}
+
+	if hasUnpackingSlots && args.Len() > 4 {
+		// Check for **kwargs at index 4
+		kwargsVal := args.Items()[4]
+		if _, isNil := kwargsVal.(core.NilValue); !isNil {
+			// Evaluate the **kwargs expression
+			kwargsResult, err := Eval(kwargsVal, ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating **kwargs: %v", err)
+			}
+
+			// Unpack the dict and look for metaclass
+			if kwargsDict, ok := kwargsResult.(*core.DictValue); ok {
+				// Look for "metaclass" key
+				if metaclassVal, ok := kwargsDict.Get("metaclass"); ok {
+					if mc, ok := metaclassVal.(*core.Class); ok {
+						metaclass = mc
+					} else if wrapper, ok := metaclassVal.(interface{ GetClass() *core.Class }); ok {
+						metaclass = wrapper.GetClass()
+					}
+				}
+			} else {
+				return nil, fmt.Errorf("**kwargs must be a dict, got %T", kwargsResult)
+			}
+		}
+	}
+
+	// Update bodyStart if using new format
+	if hasUnpackingSlots && bodyStart < 5 {
+		bodyStart = 5
+	}
+
 	// If no metaclass was explicitly specified, infer it from parent classes
 	// Python rule: use the metaclass of the most derived base class
 	if metaclass == nil && len(parentClasses) > 0 {

@@ -683,7 +683,7 @@ func TestClassForm_Simple(t *testing.T) {
 	loc := &core.SourceLocation{Line: 1, Column: 1}
 	// class Foo: pass
 	body := []ASTNode{NewPassForm(loc, SyntaxPython)}
-	classStmt := NewClassForm("Foo", nil, body, nil, nil, loc, SyntaxPython)
+	classStmt := NewClassForm("Foo", nil, body, nil, nil, nil, nil, loc, SyntaxPython)
 
 	// Check construction
 	if classStmt.Name != "Foo" {
@@ -709,7 +709,7 @@ func TestClassForm_WithBase(t *testing.T) {
 	// class Foo(Base): pass
 	base := NewIdentifier("Base", loc, SyntaxPython)
 	body := []ASTNode{NewPassForm(loc, SyntaxPython)}
-	classStmt := NewClassForm("Foo", []ASTNode{base}, body, nil, nil, loc, SyntaxPython)
+	classStmt := NewClassForm("Foo", []ASTNode{base}, body, nil, nil, nil, nil, loc, SyntaxPython)
 
 	// Check ToIR includes base class
 	ir := classStmt.ToIR()
@@ -733,7 +733,7 @@ func TestClassForm_WithDecorator(t *testing.T) {
 	// @decorator class Foo: pass
 	decorator := NewIdentifier("decorator", loc, SyntaxPython)
 	body := []ASTNode{NewPassForm(loc, SyntaxPython)}
-	classStmt := NewClassForm("Foo", nil, body, []ASTNode{decorator}, nil, loc, SyntaxPython)
+	classStmt := NewClassForm("Foo", nil, body, []ASTNode{decorator}, nil, nil, nil, loc, SyntaxPython)
 
 	// Check ToIR wraps in assignment: (= Foo (decorator (def-class Foo ...)))
 	ir := classStmt.ToIR()
@@ -752,7 +752,7 @@ func TestClassForm_WithMultipleDecorators(t *testing.T) {
 	decorator1 := NewIdentifier("decorator1", loc, SyntaxPython)
 	decorator2 := NewIdentifier("decorator2", loc, SyntaxPython)
 	body := []ASTNode{NewPassForm(loc, SyntaxPython)}
-	classStmt := NewClassForm("Foo", nil, body, []ASTNode{decorator1, decorator2}, nil, loc, SyntaxPython)
+	classStmt := NewClassForm("Foo", nil, body, []ASTNode{decorator1, decorator2}, nil, nil, nil, loc, SyntaxPython)
 
 	// Check ToIR nests decorators
 	ir := classStmt.ToIR()

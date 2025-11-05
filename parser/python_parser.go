@@ -1639,59 +1639,90 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 	return ast.NewSExpr(args, p.makeLocation(tok), ast.SyntaxPython)
 }
 
-// parseSubscript parses: [index] or [start:stop:step]
+// parseSubscript parses: [index] or [start:stop:step] or [a, b, :, ...] (multi-dimensional)
 func (p *PythonParser) parseSubscript(obj ast.ASTNode) ast.ASTNode {
 	tok := p.expect(TOKEN_LBRACKET)
 
-	// Check for slice syntax by looking ahead for colon
-	// We need to handle: [:]  [:stop]  [start:]  [start:stop]  [start:stop:step]
-	var start, stop, step ast.ASTNode
+	// Parse all subscript items (separated by commas)
+	// Each item can be a slice, expression, or ellipsis
+	var items []ast.ASTNode
 
-	// Parse start (optional)
-	if !p.check(TOKEN_COLON) && !p.check(TOKEN_RBRACKET) {
-		start = p.parseExpression()
+	if !p.check(TOKEN_RBRACKET) {
+		for {
+			item := p.parseSubscriptItem(tok)
+			items = append(items, item)
 
-		// Check for implicit tuple syntax: dict[a, b, c] means dict[(a, b, c)]
-		if p.check(TOKEN_COMMA) {
-			// Collect all comma-separated expressions into a tuple
-			elements := []ast.ASTNode{start}
-			for p.check(TOKEN_COMMA) {
-				p.advance() // consume comma
-				if p.check(TOKEN_RBRACKET) {
-					break // trailing comma
-				}
-				elements = append(elements, p.parseExpression())
+			if !p.check(TOKEN_COMMA) {
+				break
 			}
+			p.advance() // consume comma
 
-			// Create implicit tuple: (tuple-literal elem1 elem2 ...)
-			tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
-			allElements := append([]ast.ASTNode{tupleSym}, elements...)
-			start = ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+			// Check for trailing comma
+			if p.check(TOKEN_RBRACKET) {
+				break
+			}
 		}
 	}
 
-	// Check if this is a slice
+	p.expect(TOKEN_RBRACKET)
+
+	if len(items) == 0 {
+		// Empty brackets []
+		p.error("invalid syntax: empty brackets")
+		return nil
+	}
+
+	// If we have multiple items, wrap them in a tuple
+	var indexExpr ast.ASTNode
+	if len(items) == 1 {
+		indexExpr = items[0]
+	} else {
+		// Create implicit tuple: (tuple-literal item1 item2 ...)
+		tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+		allElements := append([]ast.ASTNode{tupleSym}, items...)
+		indexExpr = ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier("get-item", p.makeLocation(tok), ast.SyntaxPython),
+		obj,
+		indexExpr,
+	}, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseSubscriptItem parses a single subscript item (slice, expression, or ellipsis)
+func (p *PythonParser) parseSubscriptItem(tok Token) ast.ASTNode {
+	var start, stop, step ast.ASTNode
+
+	// Check for Ellipsis (...)
+	if p.check(TOKEN_ELLIPSIS) {
+		p.advance()
+		return ast.NewIdentifier("Ellipsis", p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse start (optional for slices)
+	if !p.check(TOKEN_COLON) {
+		start = p.parseExpression()
+	}
+
+	// Check if this is a slice (has colon)
 	if p.check(TOKEN_COLON) {
-		// It's a slice
 		p.advance() // consume first colon
 
 		// Parse stop (optional)
-		if !p.check(TOKEN_COLON) && !p.check(TOKEN_RBRACKET) {
+		if !p.check(TOKEN_COLON) && !p.check(TOKEN_COMMA) && !p.check(TOKEN_RBRACKET) {
 			stop = p.parseExpression()
 		}
 
 		// Parse step (optional)
 		if p.check(TOKEN_COLON) {
 			p.advance() // consume second colon
-			if !p.check(TOKEN_RBRACKET) {
+			if !p.check(TOKEN_COMMA) && !p.check(TOKEN_RBRACKET) {
 				step = p.parseExpression()
 			}
 		}
 
-		p.expect(TOKEN_RBRACKET)
-
-		// Create slice object: (slice start stop step)
-		// Use None (as nil literal) for missing components
+		// Create slice object with None for missing components
 		if start == nil {
 			start = ast.NewLiteral(core.NilValue{}, p.makeLocation(tok), ast.SyntaxPython)
 		}
@@ -1702,35 +1733,16 @@ func (p *PythonParser) parseSubscript(obj ast.ASTNode) ast.ASTNode {
 			step = ast.NewLiteral(core.NilValue{}, p.makeLocation(tok), ast.SyntaxPython)
 		}
 
-		// Create (get-item obj (slice start stop step))
-		sliceObj := ast.NewSExpr([]ast.ASTNode{
+		return ast.NewSExpr([]ast.ASTNode{
 			ast.NewIdentifier("slice", p.makeLocation(tok), ast.SyntaxPython),
 			start,
 			stop,
 			step,
 		}, p.makeLocation(tok), ast.SyntaxPython)
-
-		return ast.NewSExpr([]ast.ASTNode{
-			ast.NewIdentifier("get-item", p.makeLocation(tok), ast.SyntaxPython),
-			obj,
-			sliceObj,
-		}, p.makeLocation(tok), ast.SyntaxPython)
 	}
 
-	// Not a slice, just regular indexing
-	p.expect(TOKEN_RBRACKET)
-
-	if start == nil {
-		// Empty brackets []
-		p.error("invalid syntax: empty brackets")
-		return nil
-	}
-
-	return ast.NewSExpr([]ast.ASTNode{
-		ast.NewIdentifier("get-item", p.makeLocation(tok), ast.SyntaxPython),
-		obj,
-		start,
-	}, p.makeLocation(tok), ast.SyntaxPython)
+	// Not a slice, just return the expression
+	return start
 }
 
 // parseAttribute parses: .name
@@ -3115,7 +3127,10 @@ func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode
 
 	// Parse optional base classes and keyword arguments (like metaclass=)
 	var bases []ast.ASTNode
-	var keywords []ast.ASTNode // keyword arguments like metaclass=...
+	var keywords []ast.ASTNode  // keyword arguments like metaclass=...
+	var starBases ast.ASTNode   // *args unpacking
+	var kwargUnpack ast.ASTNode // **kwargs unpacking
+
 	if p.check(TOKEN_LPAREN) {
 		p.advance()
 
@@ -3131,8 +3146,16 @@ func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode
 					break
 				}
 
-				// Check for keyword argument: IDENTIFIER = expression
-				if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_ASSIGN {
+				// Check for **kwargs unpacking
+				if p.check(TOKEN_DOUBLESTAR) {
+					p.advance()
+					kwargUnpack = p.parseExpression()
+				} else if p.check(TOKEN_STAR) {
+					// Check for *args unpacking
+					p.advance()
+					starBases = p.parseExpression()
+				} else if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_ASSIGN {
+					// Check for keyword argument: IDENTIFIER = expression
 					nameTok := p.advance()
 					p.expect(TOKEN_ASSIGN)
 					value := p.parseExpression()
@@ -3161,7 +3184,7 @@ func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode
 	// Parse body
 	body := p.parseBlock()
 
-	return ast.NewClassForm(name, bases, body, decorators, keywords, p.makeLocation(tok), ast.SyntaxPython)
+	return ast.NewClassForm(name, bases, body, decorators, keywords, starBases, kwargUnpack, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // parseTryStatement parses: try: block (except (type (as var))?: block)+ (else: block)? (finally: block)?
