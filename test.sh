@@ -143,7 +143,20 @@ if [[ "$MODE" != "quick" ]]; then
     run_test "Break/Continue" "tests/break-continue-test.m28"
     run_test "Repr Function" "tests/repr-test-simple.m28"
     run_test "Bool Protocol" "tests/bool-protocol-test.m28"
-    run_test "CPython Bool Tests" "tests/test_bool.py"
+    # Try CPython's test_bool.py from current Python installation
+    CPYTHON_TEST_BOOL=""
+    if command -v python3 &> /dev/null; then
+        PYTHON_STDLIB=$(python3 -c "import sysconfig; print(sysconfig.get_path('stdlib'))" 2>/dev/null)
+        if [[ -n "$PYTHON_STDLIB" && -f "$PYTHON_STDLIB/test/test_bool.py" ]]; then
+            CPYTHON_TEST_BOOL="$PYTHON_STDLIB/test/test_bool.py"
+        fi
+    fi
+
+    if [[ -n "$CPYTHON_TEST_BOOL" ]]; then
+        run_test "CPython Bool Tests" "$CPYTHON_TEST_BOOL"
+    else
+        run_test "CPython Bool Tests" "tests/test_bool.py" true
+    fi
     run_test "Len Protocol" "tests/len-protocol-test.m28"
     run_test "Contains Protocol" "tests/contains-protocol-test.m28"
     run_test "Not In Operator" "tests/not-in-test.m28"
