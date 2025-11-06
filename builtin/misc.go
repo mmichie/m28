@@ -454,6 +454,9 @@ func RegisterMisc(ctx *core.Context) {
 			execCtx = core.NewContext(ctx)
 		}
 
+		// Track which variables existed before exec so we only write back new ones
+		existingVars := make(map[string]bool)
+
 		// If globals dict provided, populate the context
 		if globalsDict != nil {
 			// Use Keys() to iterate over all keys in the dict
@@ -466,6 +469,7 @@ func RegisterMisc(ctx *core.Context) {
 						cleanKey = keyStr[2:]
 					}
 					execCtx.Define(cleanKey, value)
+					existingVars[cleanKey] = true
 				}
 			}
 		}
@@ -482,6 +486,7 @@ func RegisterMisc(ctx *core.Context) {
 						cleanKey = keyStr[2:]
 					}
 					execCtx.Define(cleanKey, value)
+					existingVars[cleanKey] = true
 				}
 			}
 		}
@@ -492,14 +497,20 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
-		// Copy all variables from execCtx back to the appropriate dict
+		// Copy ONLY NEW variables from execCtx back to the appropriate dict
 		// Python semantics:
 		// - If locals is provided, write back to locals
 		// - Otherwise, if globals is provided, write back to globals
 		// - If neither is provided, variables stay in the current context
+		// IMPORTANT: Only write back variables that were created/modified during exec,
+		// not the ones that were already in the dict before exec
 		if localsDict != nil {
 			// Write back to locals (takes precedence)
 			for name, value := range execCtx.Vars {
+				// Skip variables that existed before exec
+				if existingVars[name] {
+					continue
+				}
 				keyVal := core.StringValue(name)
 				keyRepr := core.ValueToKey(keyVal)
 				localsDict.SetWithKey(keyRepr, keyVal, value)
@@ -509,6 +520,10 @@ func RegisterMisc(ctx *core.Context) {
 			// This is critical for patterns like: exec("def fn(): pass", d)
 			// where d is used as both globals and locals
 			for name, value := range execCtx.Vars {
+				// Skip variables that existed before exec
+				if existingVars[name] {
+					continue
+				}
 				keyVal := core.StringValue(name)
 				keyRepr := core.ValueToKey(keyVal)
 				globalsDict.SetWithKey(keyRepr, keyVal, value)
