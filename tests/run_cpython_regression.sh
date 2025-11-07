@@ -100,7 +100,7 @@ run_test() {
 echo -e "${BLUE}Tier 1: Basic Types${NC}"
 echo "─────────────────────────"
 run_test "test_bool" "pass"          # M28-9e56: ✓ PASSING
-run_test "test_int" "skip"            # Not yet targeted
+run_test "test_int" "fail"            # M28-f785: Parser fixed, blocked by unittest.mock import
 run_test "test_float" "skip"          # Not yet targeted
 run_test "test_string" "skip"         # Not yet targeted
 
