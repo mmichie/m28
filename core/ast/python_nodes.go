@@ -882,7 +882,8 @@ func (c *ComprehensionForm) ToIR() core.Value {
 // WithItem represents a single context manager in a with statement
 type WithItem struct {
 	Context  ASTNode
-	Variable string // Empty string if no 'as' clause
+	Variable string  // For simple identifiers (backwards compat)
+	Target   ASTNode // For complex targets like tuples: (a, b) - takes precedence if non-nil
 }
 
 // WithForm represents a with statement (context manager)
@@ -927,18 +928,21 @@ func (w *WithForm) ToIR() core.Value {
 	// (with context-expr var body)
 	if len(w.Items) == 1 {
 		item := w.Items[0]
-		if item.Variable != "" {
-			return core.NewList(
-				core.SymbolValue("with"),
-				item.Context.ToIR(),
-				core.SymbolValue(item.Variable),
-				core.NewList(bodyIR...),
-			)
+		var target core.Value
+		if item.Target != nil {
+			// Use Target if available (for tuple unpacking)
+			target = item.Target.ToIR()
+		} else if item.Variable != "" {
+			// Fallback to Variable for simple identifiers
+			target = core.SymbolValue(item.Variable)
+		} else {
+			// No target
+			target = core.None
 		}
 		return core.NewList(
 			core.SymbolValue("with"),
 			item.Context.ToIR(),
-			core.None,
+			target,
 			core.NewList(bodyIR...),
 		)
 	}
@@ -949,21 +953,23 @@ func (w *WithForm) ToIR() core.Value {
 	result := core.NewList(bodyIR...)
 	for i := len(w.Items) - 1; i >= 0; i-- {
 		item := w.Items[i]
-		if item.Variable != "" {
-			result = core.NewList(
-				core.SymbolValue("with"),
-				item.Context.ToIR(),
-				core.SymbolValue(item.Variable),
-				result,
-			)
+		var target core.Value
+		if item.Target != nil {
+			// Use Target if available (for tuple unpacking)
+			target = item.Target.ToIR()
+		} else if item.Variable != "" {
+			// Fallback to Variable for simple identifiers
+			target = core.SymbolValue(item.Variable)
 		} else {
-			result = core.NewList(
-				core.SymbolValue("with"),
-				item.Context.ToIR(),
-				core.None,
-				result,
-			)
+			// No target
+			target = core.None
 		}
+		result = core.NewList(
+			core.SymbolValue("with"),
+			item.Context.ToIR(),
+			target,
+			result,
+		)
 	}
 
 	return result

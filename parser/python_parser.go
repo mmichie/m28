@@ -1100,6 +1100,7 @@ func (p *PythonParser) parseTernary() ast.ASTNode {
 }
 
 // parseLambda parses: lambda [params]: expression
+// Supports *args and **kwargs
 func (p *PythonParser) parseLambda() ast.ASTNode {
 	tok := p.expect(TOKEN_LAMBDA)
 
@@ -1112,6 +1113,35 @@ func (p *PythonParser) parseLambda() ast.ASTNode {
 		for {
 			if p.check(TOKEN_COLON) {
 				break
+			}
+
+			// Check for *args
+			if p.check(TOKEN_STAR) {
+				p.advance() // consume *
+				if p.check(TOKEN_IDENTIFIER) {
+					paramTok := p.expect(TOKEN_IDENTIFIER)
+					// Mark as varargs by prefixing with *
+					params = append(params, ast.NewIdentifier("*"+paramTok.Lexeme, p.makeLocation(paramTok), ast.SyntaxPython))
+				}
+				// else it's just * (keyword-only separator) - skip it
+				if !p.check(TOKEN_COMMA) {
+					break
+				}
+				p.advance() // consume comma
+				continue
+			}
+
+			// Check for **kwargs
+			if p.check(TOKEN_DOUBLESTAR) {
+				p.advance() // consume **
+				paramTok := p.expect(TOKEN_IDENTIFIER)
+				// Mark as kwargs by prefixing with **
+				params = append(params, ast.NewIdentifier("**"+paramTok.Lexeme, p.makeLocation(paramTok), ast.SyntaxPython))
+				if !p.check(TOKEN_COMMA) {
+					break
+				}
+				p.advance() // consume comma
+				continue
 			}
 
 			paramTok := p.expect(TOKEN_IDENTIFIER)
@@ -3265,15 +3295,24 @@ func (p *PythonParser) parseWithStatement() ast.ASTNode {
 		context := p.parseExpression()
 
 		var variable string
+		var target ast.ASTNode
 		if p.check(TOKEN_AS) {
 			p.advance()
-			varTok := p.expect(TOKEN_IDENTIFIER)
-			variable = varTok.Lexeme
+			// Check if target is a tuple (starts with LPAREN) or simple identifier
+			if p.check(TOKEN_LPAREN) {
+				// Parse tuple unpacking: (a, b, c)
+				target = p.parsePrimary()
+			} else {
+				// Simple identifier
+				varTok := p.expect(TOKEN_IDENTIFIER)
+				variable = varTok.Lexeme
+			}
 		}
 
 		items = append(items, ast.WithItem{
 			Context:  context,
 			Variable: variable,
+			Target:   target,
 		})
 
 		if !p.check(TOKEN_COMMA) {
