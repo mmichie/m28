@@ -26,6 +26,7 @@ var (
 	modulePath  = flag.String("path", "", "Additional module search paths (colon-separated)")
 	interactive = flag.Bool("i", false, "Enter interactive mode after running file")
 	command     = flag.String("c", "", "Execute program passed as string")
+	moduleRun   = flag.String("m", "", "Run module as script")
 	parseOnly   = flag.Bool("parse", false, "Parse only, print AST and exit")
 	printAST    = flag.Bool("ast", false, "Print AST (same as -parse)")
 	printIR     = flag.Bool("ir", false, "Print IR before execution")
@@ -153,6 +154,74 @@ func main() {
 		}
 	}
 
+	// Run module as script with -m
+	if *moduleRun != "" {
+		// Set up sys.argv with module name and remaining args
+		args := flag.Args()
+		argvSlice := make([]core.Value, len(args)+1)
+		argvSlice[0] = core.StringValue(*moduleRun)
+		for i, arg := range args {
+			argvSlice[i+1] = core.StringValue(arg)
+		}
+		argsList := core.NewList(argvSlice...)
+		globalCtx.Define("ARGV", argsList)
+
+		// Also populate sys.argv
+		if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
+			sysDict.SetWithKey("argv", core.StringValue("argv"), argsList)
+		}
+
+		// Get sys.path for module search
+		var sysPathDirs []string
+		if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
+			if sysPathVal, ok := sysDict.Get("path"); ok {
+				if sysPathList, ok := sysPathVal.(*core.ListValue); ok {
+					for _, item := range sysPathList.Items() {
+						if strVal, ok := item.(core.StringValue); ok {
+							path := string(strVal)
+							if path == "" {
+								continue
+							}
+							// Expand "." to current working directory
+							if path == "." {
+								if cwd, err := os.Getwd(); err == nil {
+									path = cwd
+								} else {
+									continue
+								}
+							}
+							sysPathDirs = append(sysPathDirs, path)
+						}
+					}
+				}
+			}
+		}
+
+		// Find the module file using Python finder
+		finder, err := modules.GetPythonFinder()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Python finder initialization failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		pyPath, _, err := finder.FindWithExtraPaths(*moduleRun, sysPathDirs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: no module named '%s'\n", *moduleRun)
+			os.Exit(1)
+		}
+
+		// Execute the module file as __main__
+		// This is similar to executeFile but we already have the path
+		err = executeFile(pyPath, globalCtx, errorReporter)
+		if err != nil {
+			handleError(err, globalCtx, errorReporter)
+		}
+
+		if !*interactive {
+			return
+		}
+	}
+
 	// Get the file to execute from positional arguments
 	args := flag.Args()
 	if len(args) > 0 {
@@ -205,6 +274,7 @@ func printHelp() {
 	fmt.Println("Options:")
 	fmt.Println("  -e EXPR        Evaluate expression")
 	fmt.Println("  -c PROGRAM     Execute program string")
+	fmt.Println("  -m MODULE      Run module as script")
 	fmt.Println("  -i             Interactive mode after file execution")
 	fmt.Println("  -python        Enable Python mode for REPL")
 	fmt.Println("  -parse         Parse file and print AST (don't execute)")
@@ -228,6 +298,7 @@ func printHelp() {
 	fmt.Println("  m28 script.m28           Run M28 script")
 	fmt.Println("  m28 script.py            Run Python script")
 	fmt.Println("  m28 -e '(+ 1 2)'         Evaluate expression")
+	fmt.Println("  m28 -m unittest          Run module as script")
 	fmt.Println("  m28 -i script.m28        Run script then enter REPL")
 	fmt.Println("  m28 -parse script.py     Parse and show AST")
 	fmt.Println("  m28 -ir script.py        Show IR before execution")

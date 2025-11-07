@@ -162,10 +162,19 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 				for _, item := range sysPathList.Items() {
 					if strVal, ok := item.(core.StringValue); ok {
 						path := string(strVal)
-						// Skip empty paths and current directory marker
-						if path != "" && path != "." {
-							sysPathDirs = append(sysPathDirs, path)
+						// Skip empty paths
+						if path == "" {
+							continue
 						}
+						// Expand "." to current working directory
+						if path == "." {
+							if cwd, err := os.Getwd(); err == nil {
+								path = cwd
+							} else {
+								continue
+							}
+						}
+						sysPathDirs = append(sysPathDirs, path)
 					}
 				}
 				if debugImportLoader && len(sysPathDirs) > 0 {
