@@ -101,6 +101,31 @@ m28 -e 'def double(x): x*2 print(double(5))'
 - ❌ BAD: Stub `abc.py` to avoid fixing metaclass issues
 - ❌ BAD: Stub `functools.py` to avoid fixing decorator issues
 
+## Issue Tracking with Beads
+
+We track work in Beads (bd) instead of Markdown.
+
+**Workflow:**
+- Use `ready()` MCP function to find unblocked tasks ready to work on
+- Create issues when discovering new work: `create()` with title, type, priority, description
+- Update status when starting work: `update(issue_id, status="in_progress")`
+- Close issues when complete: `close(issue_id, reason="Completed")`
+- Link dependencies: `dep(issue_id, depends_on_id)` (second blocks first)
+- View issue details: `show(issue_id)`
+- List issues: `list(status=..., priority=..., issue_type=...)`
+
+**IMPORTANT:** Call `set_context(workspace_root="/Users/mim/src/m28")` at start of session before any write operations.
+
+**Session End Protocol:**
+1. File remaining work as issues (don't leave TODOs undocumented)
+2. Close completed issues with clear reason
+3. Update any in-progress issues with notes on current state
+4. Verify git status clean
+
+**Issue Types:** bug, feature, task, epic, chore
+**Status Values:** open, in_progress, blocked, closed
+**Priority:** 0 (highest) to 4 (lowest), default 2
+
 ## Build/Test Commands
 - Build: `make build`
 - Run all tests: `make test`
