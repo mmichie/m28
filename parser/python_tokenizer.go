@@ -603,6 +603,10 @@ func (t *PythonTokenizer) scanOperator(ch byte, start, startLine, startCol int) 
 		if t.match('.') && t.match('.') {
 			return makeToken(TOKEN_ELLIPSIS)
 		}
+		// Check for float literal starting with . (e.g., .995)
+		if !t.isAtEnd() && isDigit(t.peek()) {
+			return t.scanNumber(start, startLine, startCol)
+		}
 		return makeToken(TOKEN_DOT)
 
 	default:
@@ -686,14 +690,22 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 	}
 
 	// Regular decimal number
-	// Scan integer part (allow underscores for readability)
-	for !t.isAtEnd() && (isDigit(t.peek()) || t.peek() == '_') {
-		t.advance()
+	// Check if we're starting with a decimal point (e.g., .995)
+	startsWithDot := t.input[start] == '.'
+
+	if !startsWithDot {
+		// Scan integer part (allow underscores for readability)
+		for !t.isAtEnd() && (isDigit(t.peek()) || t.peek() == '_') {
+			t.advance()
+		}
 	}
 
-	// Check for decimal point
-	if !t.isAtEnd() && t.peek() == '.' && t.pos+1 < len(t.input) && isDigit(t.input[t.pos+1]) {
-		t.advance() // consume '.'
+	// Check for decimal point (or we started with one)
+	if startsWithDot || (!t.isAtEnd() && t.peek() == '.' && t.pos+1 < len(t.input) && isDigit(t.input[t.pos+1])) {
+		if !startsWithDot {
+			t.advance() // consume '.' only if we didn't start with it
+		}
+		// Scan fractional part
 		for !t.isAtEnd() && (isDigit(t.peek()) || t.peek() == '_') {
 			t.advance()
 		}
