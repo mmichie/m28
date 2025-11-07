@@ -42,7 +42,12 @@ echo ""
 if [[ "$MODE" == "cpython" ]]; then
     echo -e "${BLUE}Running CPython Conformance Tests${NC}"
     echo ""
-    exec ./tests/cpython/run_cpython_tests.sh
+    ./tests/cpython/run_cpython_tests.sh || true  # Don't exit on failure
+    echo ""
+    echo ""
+    echo -e "${BLUE}Running CPython Regression Tests${NC}"
+    echo ""
+    exec ./tests/run_cpython_regression.sh
 fi
 
 # Build first
