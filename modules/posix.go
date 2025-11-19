@@ -238,6 +238,33 @@ func InitPosixModule() *core.DictValue {
 	)
 	posixModule.SetWithKey("_have_functions", core.StringValue("_have_functions"), haveFuncs)
 
+	// waitpid(pid, options) - wait for child process to complete (stub)
+	// Used by subprocess module
+	posixModule.SetWithKey("waitpid", core.StringValue("waitpid"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Return stub (pid, status) tuple
+		// status = 0 means successful completion
+		return core.TupleValue{core.NumberValue(0), core.NumberValue(0)}, nil
+	}))
+
+	// waitstatus_to_exitcode(status) - convert wait status to exit code (stub)
+	posixModule.SetWithKey("waitstatus_to_exitcode", core.StringValue("waitstatus_to_exitcode"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Return 0 (success) as stub
+		return core.NumberValue(0), nil
+	}))
+
+	// WIFSTOPPED(status) - check if process was stopped (stub constant function)
+	posixModule.SetWithKey("WIFSTOPPED", core.StringValue("WIFSTOPPED"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.False, nil
+	}))
+
+	// WSTOPSIG(status) - get stop signal (stub constant function)
+	posixModule.SetWithKey("WSTOPSIG", core.StringValue("WSTOPSIG"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.NumberValue(0), nil
+	}))
+
+	// WNOHANG constant - for non-blocking waitpid
+	posixModule.SetWithKey("WNOHANG", core.StringValue("WNOHANG"), core.NumberValue(1))
+
 	// Add __all__ list with exported function names
 	exportsList := core.NewList(
 		core.StringValue("getcwd"),
@@ -258,6 +285,11 @@ func InitPosixModule() *core.DictValue {
 		core.StringValue("fspath"),
 		core.StringValue("fsencode"),
 		core.StringValue("fsdecode"),
+		core.StringValue("waitpid"),
+		core.StringValue("waitstatus_to_exitcode"),
+		core.StringValue("WIFSTOPPED"),
+		core.StringValue("WSTOPSIG"),
+		core.StringValue("WNOHANG"),
 	)
 	posixModule.SetWithKey("__all__", core.StringValue("__all__"), exportsList)
 

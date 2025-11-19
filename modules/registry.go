@@ -15,37 +15,40 @@ type ModuleInitializer func() *core.DictValue
 // Pure Python stdlib modules (.py files) should run directly without stubs
 var builtinModules = map[string]ModuleInitializer{
 	// Built-in C extension modules
-	"posix":        InitPosixModule,       // C extension for Unix - used by Python's os.py
-	"sys":          InitSysModule,         // Built-in module
-	"io":           InitIOModule,          // Built-in module
-	"_io":          InitIOModule,          // C extension for io.py (same as io for now)
-	"time":         InitTimeModule,        // Built-in C module
-	"math":         InitMathModule,        // Built-in C module
-	"errno":        InitErrnoModule,       // Built-in C module
-	"itertools":    InitItertoolsModule,   // Built-in C module
-	"_collections": InitCollectionsModule, // C extension module for collections.py
-	"_weakref":     InitWeakrefModule,     // C extension module for weakref.py
-	"_thread":      InitThreadModule,      // C extension module for threading.py
-	"_functools":   Init_FunctoolsModule,  // C extension module for functools.py
-	"_signal":      Init_SignalModule,     // C extension module for signal.py
-	"_string":      Init_StringModule,     // C extension module for string.py
-	"_codecs":      InitCodecsModule,      // C extension module for codecs.py
-	"enum":         InitEnumModule,        // Stub for enum.py (provides basic enum support)
-	"_sre":         Init_SREModule,        // C extension module for re (regex engine)
-	"re._parser":   Init_REParserModule,   // C extension module for re._parser
-	"_tokenize":    Init_TokenizeModule,   // C extension module for tokenize.py
-	"_ast":         Init_ASTModule,        // C extension module for ast.py (AST node types)
-	"_imp":         Init_ImpModule,        // C extension module for import machinery
-	"_warnings":    Init_WarningsModule,   // C extension module for warnings.py
-	"warnings":     InitWarningsModule,    // Full Go implementation of warnings module
-	"marshal":      InitMarshalModule,     // C extension module for bytecode serialization
-	"_opcode":      InitOpcodeModule,      // C extension module for bytecode opcodes
-	"_operator":    InitOperatorModule,    // C extension module for operator functions
-	"_stat":        InitStatModule,        // C extension module for file stat constants
-	"_abc":         InitAbcModule,         // C extension module for abstract base classes
-	"unicodedata":  InitUnicodedataModule, // C extension module for Unicode normalization
-	"_struct":      InitStructModule,      // C extension module for binary data packing/unpacking
-	"atexit":       InitAtexitModule,      // Built-in C module for exit handlers
+	"posix":            InitPosixModule,            // C extension for Unix - used by Python's os.py
+	"sys":              InitSysModule,              // Built-in module
+	"io":               InitIOModule,               // Built-in module
+	"_io":              InitIOModule,               // C extension for io.py (same as io for now)
+	"time":             InitTimeModule,             // Built-in C module
+	"math":             InitMathModule,             // Built-in C module
+	"errno":            InitErrnoModule,            // Built-in C module
+	"itertools":        InitItertoolsModule,        // Built-in C module
+	"_collections":     InitCollectionsModule,      // C extension module for collections.py
+	"_weakref":         InitWeakrefModule,          // C extension module for weakref.py
+	"_thread":          InitThreadModule,           // C extension module for threading.py
+	"_functools":       Init_FunctoolsModule,       // C extension module for functools.py
+	"_signal":          Init_SignalModule,          // C extension module for signal.py
+	"_string":          Init_StringModule,          // C extension module for string.py
+	"_codecs":          InitCodecsModule,           // C extension module for codecs.py
+	"enum":             InitEnumModule,             // Stub for enum.py (provides basic enum support)
+	"_sre":             Init_SREModule,             // C extension module for re (regex engine)
+	"re._parser":       Init_REParserModule,        // C extension module for re._parser
+	"_tokenize":        Init_TokenizeModule,        // C extension module for tokenize.py
+	"_ast":             Init_ASTModule,             // C extension module for ast.py (AST node types)
+	"_imp":             Init_ImpModule,             // C extension module for import machinery
+	"_warnings":        Init_WarningsModule,        // C extension module for warnings.py
+	"warnings":         InitWarningsModule,         // Full Go implementation of warnings module
+	"marshal":          InitMarshalModule,          // C extension module for bytecode serialization
+	"_opcode":          InitOpcodeModule,           // C extension module for bytecode opcodes
+	"_operator":        InitOperatorModule,         // C extension module for operator functions
+	"_stat":            InitStatModule,             // C extension module for file stat constants
+	"_abc":             InitAbcModule,              // C extension module for abstract base classes
+	"unicodedata":      InitUnicodedataModule,      // C extension module for Unicode normalization
+	"_struct":          InitStructModule,           // C extension module for binary data packing/unpacking
+	"atexit":           InitAtexitModule,           // Built-in C module for exit handlers
+	"_socket":          Init_SocketModule,          // C extension module for socket operations
+	"select":           InitSelectModule,           // C extension module for I/O multiplexing
+	"_posixsubprocess": Init_PosixsubprocessModule, // C extension module for subprocess
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

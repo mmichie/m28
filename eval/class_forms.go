@@ -676,20 +676,31 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					} else {
 						// Could be subscript assignment: obj[key] = value
 						// Check if sItems[1] is a list starting with get-item
-						if lhs, isList := sItems[1].(*core.ListValue); isList && lhs.Len() >= 3 {
-							if sym, isSymbol := lhs.Items()[0].(core.SymbolValue); isSymbol && string(sym) == "get-item" {
-								// This is obj[key] = value, evaluate it as a setitem operation
-								// Evaluate the whole assignment as an expression
-								_, err := Eval(stmt, classBodyCtx)
-								if err != nil {
-									return nil, err
+						if lhs, isList := sItems[1].(*core.ListValue); isList {
+							if lhs.Len() >= 3 {
+								if sym, isSymbol := lhs.Items()[0].(core.SymbolValue); isSymbol && string(sym) == "get-item" {
+									// This is obj[key] = value, evaluate it as a setitem operation
+									// Evaluate the whole assignment as an expression
+									_, err := Eval(stmt, classBodyCtx)
+									if err != nil {
+										return nil, err
+									}
+									// Continue to next statement
+									continue
 								}
-								// Continue to next statement
-								continue
 							}
+							// Check if this is a tuple unpacking pattern at class level
+							// e.g., (a, b) = (1, 2) or [a, b] = [1, 2]
+							// Python doesn't support this at class level, but the transpiler might generate it
+							// For now, just evaluate it as an expression
+							_, err := Eval(stmt, classBodyCtx)
+							if err != nil {
+								return nil, err
+							}
+							continue
 						}
 						// If we get here, it's an unsupported assignment pattern
-						return nil, fmt.Errorf("class variable name must be a symbol or subscript expression, got %T", sItems[1])
+						return nil, fmt.Errorf("class variable name must be a symbol or subscript expression, got %T: %v", sItems[1], sItems[1])
 					}
 
 				case "class":

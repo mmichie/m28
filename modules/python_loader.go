@@ -20,9 +20,9 @@ func init() {
 // C extension modules that cannot be transpiled
 // These are either .so/.pyd files or built into the Python interpreter
 var cExtensionModules = map[string]bool{
-	"_io":              true,
-	"_thread":          true,
-	"_socket":          true,
+	"_io":     true,
+	"_thread": true,
+	// "_socket" removed - provided as M28 stub module
 	"_ssl":             true,
 	"_hashlib":         true,
 	"_json":            true,

@@ -31,6 +31,15 @@ func InitEnumModule() *core.DictValue {
 
 	// Create IntFlag class (subclass of Enum)
 	intFlagClass := core.NewClassWithParents("IntFlag", []*core.Class{enumClass})
+
+	// Add _convert_() classmethod for socket.py compatibility
+	// socket.py calls IntFlag._convert_('MsgFlag', __name__, lambda_filter)
+	intFlagClass.SetMethod("_convert_", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// For now, just return None - socket.py doesn't actually use the result
+		// It just needs the method to exist to avoid AttributeError
+		return core.None, nil
+	}))
+
 	module.Set("IntFlag", intFlagClass)
 
 	// Create Flag class (subclass of Enum)

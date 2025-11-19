@@ -276,13 +276,12 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				continue
 			}
 
-			// Both strategies failed - return ImportError
+			// Both strategies failed - return error
 			if moduleName == "" {
-				return nil, &core.ImportError{
-					ModuleName: spec.name,
-					Message:    fmt.Sprintf("no module named '%s'", spec.name),
-				}
+				// Module not found - use ModuleNotFoundError (Python 3 subclass of ImportError)
+				return nil, core.NewModuleNotFoundError(spec.name)
 			}
+			// Module found but specific name cannot be imported - use ImportError
 			return nil, &core.ImportError{
 				ModuleName: moduleName,
 				Message:    fmt.Sprintf("cannot import name '%s' from '%s'", spec.name, moduleName),

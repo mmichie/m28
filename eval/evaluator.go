@@ -1402,6 +1402,9 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return createPythonExceptionInstance(ctx, "KeyError", errMsg)
 	case *core.IndexError:
 		return createPythonExceptionInstance(ctx, "IndexError", errMsg)
+	case *core.ModuleNotFoundError:
+		// Must check ModuleNotFoundError before ImportError since it embeds ImportError
+		return createPythonExceptionInstance(ctx, "ModuleNotFoundError", errMsg)
 	case *core.ImportError:
 		return createPythonExceptionInstance(ctx, "ImportError", errMsg)
 	case *core.AttributeError:

@@ -300,11 +300,8 @@ func (l *ModuleLoaderEnhanced) loadM28Module(registry *ModuleRegistry, cacheName
 func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *ModuleRegistry, name, cacheName string, m28Err error) (*DictValue, error) {
 	// Check if Python loader is available
 	if pythonLoaderFunc == nil {
-		// Python loader not available, return ImportError
-		return nil, &ImportError{
-			ModuleName: name,
-			Message:    fmt.Sprintf("no module named '%s'", name),
-		}
+		// Python loader not available, return ModuleNotFoundError
+		return nil, NewModuleNotFoundError(name)
 	}
 
 	// Create partial module and store in registry BEFORE loading
@@ -327,12 +324,9 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 		}
 		// Loading failed - remove the partial module from registry
 		registry.ReloadModule(cacheName)
-		// If error mentions "not found", return ImportError
+		// If error mentions "not found", return ModuleNotFoundError
 		if strings.Contains(err.Error(), "not found") {
-			return nil, &ImportError{
-				ModuleName: name,
-				Message:    fmt.Sprintf("no module named '%s'", name),
-			}
+			return nil, NewModuleNotFoundError(name)
 		}
 		// Other Python loading errors (transpilation, C extension, etc.)
 		return nil, err

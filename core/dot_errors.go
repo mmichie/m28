@@ -195,6 +195,21 @@ func (e *ImportError) Error() string {
 	return msg
 }
 
+// ModuleNotFoundError represents a missing module error (subclass of ImportError in Python 3)
+type ModuleNotFoundError struct {
+	ImportError
+}
+
+// NewModuleNotFoundError creates a new ModuleNotFoundError
+func NewModuleNotFoundError(moduleName string) *ModuleNotFoundError {
+	return &ModuleNotFoundError{
+		ImportError: ImportError{
+			ModuleName: moduleName,
+			Message:    fmt.Sprintf("no module named '%s'", moduleName),
+		},
+	}
+}
+
 // AttributeError represents an attribute access error
 type AttributeError struct {
 	ObjType  string
