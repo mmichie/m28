@@ -45,6 +45,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_abc":         InitAbcModule,         // C extension module for abstract base classes
 	"unicodedata":  InitUnicodedataModule, // C extension module for Unicode normalization
 	"_struct":      InitStructModule,      // C extension module for binary data packing/unpacking
+	"atexit":       InitAtexitModule,      // Built-in C module for exit handlers
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

@@ -70,6 +70,90 @@ func InitTimeModule() *core.DictValue {
 		return core.NumberValue(elapsed.Seconds()), nil
 	}))
 
+	// localtime() - convert seconds since epoch to local time struct
+	// Returns struct_time: (tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst)
+	timeModule.SetWithKey("localtime", core.StringValue("localtime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("localtime", args)
+		if err := v.Range(0, 1); err != nil {
+			return nil, err
+		}
+
+		// If no argument, use current time
+		var t time.Time
+		if v.Count() == 0 {
+			t = time.Now()
+		} else {
+			seconds, err := v.GetNumber(0)
+			if err != nil {
+				return nil, err
+			}
+			// Convert seconds since epoch to time.Time
+			sec := int64(float64(seconds))
+			nsec := int64((float64(seconds) - float64(sec)) * 1e9)
+			t = time.Unix(sec, nsec)
+		}
+
+		// Convert to local time
+		t = t.Local()
+
+		// Create struct_time tuple
+		// Python struct_time: (tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst)
+		structTime := core.TupleValue{
+			core.NumberValue(t.Year()),         // tm_year
+			core.NumberValue(int(t.Month())),   // tm_mon (1-12)
+			core.NumberValue(t.Day()),          // tm_mday (1-31)
+			core.NumberValue(t.Hour()),         // tm_hour (0-23)
+			core.NumberValue(t.Minute()),       // tm_min (0-59)
+			core.NumberValue(t.Second()),       // tm_sec (0-59)
+			core.NumberValue(int(t.Weekday())), // tm_wday (0=Monday in Python, but Go uses 0=Sunday)
+			core.NumberValue(t.YearDay()),      // tm_yday (1-366)
+			core.NumberValue(-1),               // tm_isdst (-1 = unknown)
+		}
+
+		return structTime, nil
+	}))
+
+	// gmtime() - convert seconds since epoch to UTC time struct
+	timeModule.SetWithKey("gmtime", core.StringValue("gmtime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("gmtime", args)
+		if err := v.Range(0, 1); err != nil {
+			return nil, err
+		}
+
+		// If no argument, use current time
+		var t time.Time
+		if v.Count() == 0 {
+			t = time.Now()
+		} else {
+			seconds, err := v.GetNumber(0)
+			if err != nil {
+				return nil, err
+			}
+			// Convert seconds since epoch to time.Time
+			sec := int64(float64(seconds))
+			nsec := int64((float64(seconds) - float64(sec)) * 1e9)
+			t = time.Unix(sec, nsec)
+		}
+
+		// Convert to UTC
+		t = t.UTC()
+
+		// Create struct_time tuple
+		structTime := core.TupleValue{
+			core.NumberValue(t.Year()),
+			core.NumberValue(int(t.Month())),
+			core.NumberValue(t.Day()),
+			core.NumberValue(t.Hour()),
+			core.NumberValue(t.Minute()),
+			core.NumberValue(t.Second()),
+			core.NumberValue(int(t.Weekday())),
+			core.NumberValue(t.YearDay()),
+			core.NumberValue(0), // tm_isdst = 0 for UTC
+		}
+
+		return structTime, nil
+	}))
+
 	// strftime() - format time according to a format string
 	timeModule.SetWithKey("strftime", core.StringValue("strftime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("strftime", args)
@@ -87,9 +171,21 @@ func InitTimeModule() *core.DictValue {
 		if v.Count() == 1 {
 			t = time.Now()
 		} else {
-			// For now, just use current time
-			// Full implementation would parse the time tuple argument
-			t = time.Now()
+			// Parse time tuple if provided
+			timeTuple := args[1]
+			if tuple, ok := timeTuple.(core.TupleValue); ok && len(tuple) >= 6 {
+				// Extract year, month, day, hour, minute, second from tuple
+				year := int(tuple[0].(core.NumberValue))
+				month := time.Month(int(tuple[1].(core.NumberValue)))
+				day := int(tuple[2].(core.NumberValue))
+				hour := int(tuple[3].(core.NumberValue))
+				minute := int(tuple[4].(core.NumberValue))
+				second := int(tuple[5].(core.NumberValue))
+				t = time.Date(year, month, day, hour, minute, second, 0, time.Local)
+			} else {
+				// Fallback to current time
+				t = time.Now()
+			}
 		}
 
 		// Simple conversion of common Python strftime formats to Go formats

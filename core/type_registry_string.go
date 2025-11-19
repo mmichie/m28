@@ -171,19 +171,72 @@ func getStringMethods() map[string]*MethodDescriptor {
 		},
 		"rfind": {
 			Name:    "rfind",
-			Arity:   1,
-			Doc:     "Return the highest index where substring is found, or -1 if not found",
+			Arity:   -1, // Variable arity: 1-3 args
+			Doc:     "Return the highest index where substring is found, or -1 if not found. rfind(sub[, start[, end]])",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("rfind() takes exactly one argument")
+				if len(args) < 1 || len(args) > 3 {
+					return nil, fmt.Errorf("rfind() takes 1 to 3 arguments (%d given)", len(args))
 				}
 				s := string(receiver.(StringValue))
 				sub, ok := args[0].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("rfind() argument must be str")
+					return nil, fmt.Errorf("rfind() argument 1 must be str")
 				}
-				return NumberValue(strings.LastIndex(s, string(sub))), nil
+
+				// Get start and end indices (default to 0 and len)
+				start := 0
+				end := len(s)
+
+				if len(args) >= 2 {
+					startNum, ok := args[1].(NumberValue)
+					if !ok {
+						return nil, fmt.Errorf("rfind() argument 2 must be int")
+					}
+					start = int(startNum)
+					// Python allows negative indices
+					if start < 0 {
+						start = len(s) + start
+						if start < 0 {
+							start = 0
+						}
+					}
+				}
+
+				if len(args) >= 3 {
+					endNum, ok := args[2].(NumberValue)
+					if !ok {
+						return nil, fmt.Errorf("rfind() argument 3 must be int")
+					}
+					end = int(endNum)
+					// Python allows negative indices
+					if end < 0 {
+						end = len(s) + end
+						if end < 0 {
+							end = 0
+						}
+					}
+				}
+
+				// Clamp indices to valid range
+				if start > len(s) {
+					start = len(s)
+				}
+				if end > len(s) {
+					end = len(s)
+				}
+				if start > end {
+					return NumberValue(-1), nil
+				}
+
+				// Search in the slice s[start:end]
+				slice := s[start:end]
+				idx := strings.LastIndex(slice, string(sub))
+				if idx == -1 {
+					return NumberValue(-1), nil
+				}
+				// Return the absolute index (not relative to the slice)
+				return NumberValue(start + idx), nil
 			},
 		},
 		"count": {
