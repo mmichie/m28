@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -1220,6 +1221,18 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 		classForSuper = bm.Instance.Class
 	}
 
+	// Debug output for super() investigation
+	debugSuper := false  // Set to true to debug
+	if debugSuper {
+		if methodFunc, ok := bm.Method.(interface{ String() string }); ok {
+			fmt.Fprintf(os.Stderr, "[DEBUG BoundInstanceMethod.Call] Method: %s, DefiningClass: %v, Instance.Class: %v, classForSuper: %v\n",
+				methodFunc.String(),
+				bm.DefiningClass != nil,
+				bm.Instance.Class.Name,
+				classForSuper.Name)
+		}
+	}
+
 	methodCtx.Define("__class__", classForSuper)
 	// Always define super as a value for bare super access
 	methodCtx.Define("super", NewSuper(classForSuper, bm.Instance))
@@ -1507,8 +1520,9 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 				}
 
 				if startIdx >= 0 {
-					// Search the MRO starting from s.Class (inclusive)
-					for i := startIdx; i < len(mro); i++ {
+					// Search the MRO starting AFTER s.Class (not inclusive)
+					// super() in a method should find parent class methods, not the current class
+					for i := startIdx + 1; i < len(mro); i++ {
 						if cls, ok := mro[i].(*Class); ok {
 							// Debug for ArgumentParser
 							if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
