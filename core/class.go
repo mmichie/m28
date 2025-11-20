@@ -197,26 +197,51 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 
 	// Special handling for __setattr__ - needed for class attribute assignment
 	// Python classes inherit __setattr__ from object/type
+	// Note: This is accessed via Instance.GetAttr which wraps it in BoundInstanceMethod
+	// BoundInstanceMethod prepends self, so we always receive 3 args: (self, name, value)
 	if name == "__setattr__" {
-		// Return a builtin function that sets attributes on instances
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 3 {
-				return nil, NewTypeError("3 arguments", TupleValue(args), "__setattr__() takes exactly 3 arguments (self, name, value)")
+			// When called through BoundInstanceMethod, we get (self, name, value)
+			if len(args) < 2 {
+				return nil, &TypeError{
+					Message: fmt.Sprintf("__setattr__() missing required arguments"),
+				}
 			}
-			// args[0] = self (the instance or class)
-			// args[1] = attribute name
-			// args[2] = value
-			attrName, ok := args[1].(StringValue)
+
+			// Handle both bound (3 args from BoundInstanceMethod) and direct (2 args) calls
+			var self Value
+			var attrNameVal Value
+			var attrValue Value
+
+			if len(args) == 3 {
+				// Normal case: BoundInstanceMethod provides (self, name, value)
+				self = args[0]
+				attrNameVal = args[1]
+				attrValue = args[2]
+			} else if len(args) == 2 {
+				// Direct call without binding: assume args are (name, value)
+				// This shouldn't normally happen, but handle it gracefully
+				// We can't do anything without self, so return error
+				return nil, &TypeError{
+					Message: "descriptor '__setattr__' requires an instance",
+				}
+			} else {
+				return nil, &TypeError{
+					Message: fmt.Sprintf("__setattr__() takes 3 arguments, got %d", len(args)),
+				}
+			}
+
+			attrName, ok := attrNameVal.(StringValue)
 			if !ok {
-				return nil, NewTypeError("string", args[1], "attribute name must be a string")
+				return nil, NewTypeError("string", attrNameVal, "attribute name must be a string")
 			}
 
 			// Set the attribute on the object
-			if obj, ok := args[0].(Object); ok {
-				obj.SetAttr(string(attrName), args[2])
+			if obj, ok := self.(Object); ok {
+				obj.SetAttr(string(attrName), attrValue)
 				return None, nil
 			}
-			return nil, NewTypeError("object", args[0], "first argument must be an object")
+			return nil, NewTypeError("object", self, "__setattr__ first argument must be an object")
 		}), true
 	}
 
@@ -1036,6 +1061,22 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 			// If __getattr__ raises AttributeError, we should still return nil, false
 			// to maintain consistent error reporting
 		}
+	}
+
+	// Step 6: Check class-level special attributes (like __setattr__)
+	// These are provided by Class.GetAttr() for attributes that all classes inherit
+	if classAttr, ok := i.Class.GetAttr(name); ok {
+		// For callable attributes, create a bound method
+		if callable, ok := classAttr.(interface {
+			Call([]Value, *Context) (Value, error)
+		}); ok {
+			boundMethod := &BoundInstanceMethod{
+				Instance: i,
+				Method:   callable,
+			}
+			return boundMethod, true
+		}
+		return classAttr, true
 	}
 
 	return nil, false

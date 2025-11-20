@@ -61,6 +61,18 @@ func createLRUDecorator(maxsizeInt int) core.Value {
 			return result, nil
 		})
 
+		// Add cache_clear method as an attribute
+		// Python's lru_cache adds this to allow clearing the cache
+		cache_clear := core.NewBuiltinFunction(func(clearArgs []core.Value, clearCtx *core.Context) (core.Value, error) {
+			// Clear the cache
+			for k := range cache {
+				delete(cache, k)
+			}
+			order = order[:0]
+			return core.None, nil
+		})
+		cachedFunc.SetAttr("cache_clear", cache_clear)
+
 		return cachedFunc, nil
 	})
 }
@@ -483,6 +495,18 @@ func (l *lruCacheBuiltin) CallWithKeywords(args []core.Value, kwargs map[string]
 
 				return result, nil
 			})
+
+			// Add cache_clear method as an attribute
+			// Python's lru_cache adds this to allow clearing the cache
+			cache_clear := core.NewBuiltinFunction(func(clearArgs []core.Value, clearCtx *core.Context) (core.Value, error) {
+				// Clear the cache
+				for k := range cache {
+					delete(cache, k)
+				}
+				order = order[:0]
+				return core.None, nil
+			})
+			cachedFunc.SetAttr("cache_clear", cache_clear)
 
 			return cachedFunc, nil
 		}

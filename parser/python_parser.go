@@ -2870,6 +2870,42 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 	nameTok := p.expect(TOKEN_IDENTIFIER)
 	name := nameTok.Lexeme
 
+	// Parse optional PEP 695 type parameters: def func[T, U](params):
+	// Type parameters are for runtime (Python 3.12+) but we can parse and ignore them
+	if p.check(TOKEN_LBRACKET) {
+		p.advance()
+
+		// Parse comma-separated list of type parameter names
+		if !p.check(TOKEN_RBRACKET) {
+			for {
+				// Each type parameter can be:
+				// - Simple name: T
+				// - Name with constraint: T: SomeType
+				// - Name with default: T = SomeType
+				// For now, we just consume the tokens without processing
+
+				_ = p.expect(TOKEN_IDENTIFIER) // type parameter name
+
+				// Check for constraint (: Type) or default (= Type)
+				if p.check(TOKEN_COLON) {
+					p.advance()
+					_ = p.parseTypeName() // parse the constraint type
+				} else if p.check(TOKEN_ASSIGN) {
+					p.advance()
+					_ = p.parseTypeName() // parse the default type
+				}
+
+				// Check for more type parameters
+				if !p.check(TOKEN_COMMA) {
+					break
+				}
+				p.advance() // consume comma
+			}
+		}
+
+		p.expect(TOKEN_RBRACKET)
+	}
+
 	// Parse parameters
 	p.expect(TOKEN_LPAREN)
 	params := p.parseParameters()
@@ -3065,24 +3101,8 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 
 // parseTypeAnnotation parses a type name (simplified - no generics yet)
 func (p *PythonParser) parseTypeAnnotation() *ast.TypeInfo {
-	// Type annotations can be identifiers or special constants like None, True, False
-	var typeName string
-	if p.check(TOKEN_IDENTIFIER) {
-		nameTok := p.advance()
-		typeName = nameTok.Lexeme
-	} else if p.check(TOKEN_NIL) {
-		p.advance()
-		typeName = "None"
-	} else if p.check(TOKEN_TRUE) {
-		p.advance()
-		typeName = "True"
-	} else if p.check(TOKEN_FALSE) {
-		p.advance()
-		typeName = "False"
-	} else {
-		p.error("Expected type name in type annotation")
-		return &ast.TypeInfo{Name: "object"} // fallback
-	}
+	// Parse the base type name (can be dotted like typing.Optional)
+	typeName := p.parseTypeName()
 
 	// Handle generic types like dict[str, object] or list[int]
 	// For now, we parse the brackets and contents but don't use them
@@ -3099,12 +3119,8 @@ func (p *PythonParser) parseTypeAnnotation() *ast.TypeInfo {
 	// For now, we just consume the tokens and use the first type
 	for p.check(TOKEN_PIPE) {
 		p.advance() // consume |
-		// Parse the next type in the union
-		if p.check(TOKEN_IDENTIFIER) {
-			p.advance()
-		} else if p.check(TOKEN_NIL) || p.check(TOKEN_TRUE) || p.check(TOKEN_FALSE) {
-			p.advance()
-		}
+		// Parse the next type in the union (can also be dotted)
+		_ = p.parseTypeName()
 		// Handle generics in union members
 		if p.check(TOKEN_LBRACKET) {
 			p.advance()
@@ -3116,27 +3132,100 @@ func (p *PythonParser) parseTypeAnnotation() *ast.TypeInfo {
 	return &ast.TypeInfo{Name: typeName}
 }
 
+// parseTypeName parses a potentially dotted type name like "typing.Optional" or "events.AbstractEventLoop"
+// Also handles string literals for forward references like 'IO[AnyStr]'
+// Returns the full dotted name as a string
+func (p *PythonParser) parseTypeName() string {
+	// Type annotations can be:
+	// - Identifiers: int, str, MyClass
+	// - String literals (forward references): 'MyClass', "IO[AnyStr]"
+	// - Special constants: None, True, False
+	var typeName string
+	if p.check(TOKEN_STRING) {
+		// Forward reference - quoted string like 'IO[AnyStr]'
+		// We just extract the string value
+		stringTok := p.advance()
+		typeName = stringTok.Lexeme
+		// Remove quotes if present
+		if len(typeName) >= 2 && (typeName[0] == '"' || typeName[0] == '\'') {
+			typeName = typeName[1 : len(typeName)-1]
+		}
+		return typeName // String forward references don't have dotted attribute access
+	} else if p.check(TOKEN_IDENTIFIER) {
+		nameTok := p.advance()
+		typeName = nameTok.Lexeme
+	} else if p.check(TOKEN_NIL) {
+		p.advance()
+		typeName = "None"
+	} else if p.check(TOKEN_TRUE) {
+		p.advance()
+		typeName = "True"
+	} else if p.check(TOKEN_FALSE) {
+		p.advance()
+		typeName = "False"
+	} else {
+		p.error("Expected type name in type annotation")
+		return "object" // fallback
+	}
+
+	// Handle dotted names like typing.Optional, events.AbstractEventLoop
+	for p.check(TOKEN_DOT) {
+		p.advance() // consume .
+		if !p.check(TOKEN_IDENTIFIER) {
+			p.error("Expected identifier after dot in type name")
+			break
+		}
+		attrTok := p.advance()
+		typeName += "." + attrTok.Lexeme
+	}
+
+	return typeName
+}
+
 // parseTypeArguments parses the contents of generic type brackets
 // e.g., "str, object" in dict[str, object]
+// Also handles complex nested types like typing.Callable[[], typing.Awaitable]
 func (p *PythonParser) parseTypeArguments() {
 	if p.check(TOKEN_RBRACKET) {
-		return // empty brackets
+		return // empty brackets like []
 	}
 
 	for {
-		// Parse one type argument - can be identifier or special constant
-		if p.check(TOKEN_IDENTIFIER) || p.check(TOKEN_NIL) || p.check(TOKEN_TRUE) || p.check(TOKEN_FALSE) {
-			p.advance()
-		} else {
-			p.error("Expected type name in type argument")
-			break
+		// Check if we hit a closing bracket (for empty nested lists like [])
+		if p.check(TOKEN_RBRACKET) {
+			return
 		}
 
-		// Handle nested generics like List[Dict[str, int]]
-		if p.check(TOKEN_LBRACKET) {
+		// Check for ellipsis ... in type arguments (e.g., Callable[..., Any])
+		if p.check(TOKEN_ELLIPSIS) {
+			p.advance() // consume ...
+		} else if p.check(TOKEN_LBRACKET) {
+			// Check if this type argument starts with [ (empty list notation like [])
+			// This is used in Callable[[], ReturnType] where [] represents no parameters
 			p.advance()
 			p.parseTypeArguments()
 			p.expect(TOKEN_RBRACKET)
+		} else {
+			// Parse one type argument - use parseTypeName to handle dotted names
+			_ = p.parseTypeName()
+
+			// Handle nested generics like List[Dict[str, int]] or Callable[[], Awaitable]
+			if p.check(TOKEN_LBRACKET) {
+				p.advance()
+				p.parseTypeArguments()
+				p.expect(TOKEN_RBRACKET)
+			}
+
+			// Handle union types within type arguments
+			for p.check(TOKEN_PIPE) {
+				p.advance() // consume |
+				_ = p.parseTypeName()
+				if p.check(TOKEN_LBRACKET) {
+					p.advance()
+					p.parseTypeArguments()
+					p.expect(TOKEN_RBRACKET)
+				}
+			}
 		}
 
 		// Check for more arguments
@@ -3144,6 +3233,11 @@ func (p *PythonParser) parseTypeArguments() {
 			break
 		}
 		p.advance() // consume comma
+
+		// After comma, check if we're at the end (trailing comma case)
+		if p.check(TOKEN_RBRACKET) {
+			return
+		}
 	}
 }
 
@@ -3154,6 +3248,42 @@ func (p *PythonParser) parseClassStatement(decorators []ast.ASTNode) ast.ASTNode
 	// Parse class name
 	nameTok := p.expect(TOKEN_IDENTIFIER)
 	name := nameTok.Lexeme
+
+	// Parse optional PEP 695 type parameters: class Name[T, U](Base):
+	// Type parameters are for runtime (Python 3.12+) but we can parse and ignore them
+	if p.check(TOKEN_LBRACKET) {
+		p.advance()
+
+		// Parse comma-separated list of type parameter names
+		if !p.check(TOKEN_RBRACKET) {
+			for {
+				// Each type parameter can be:
+				// - Simple name: T
+				// - Name with constraint: T: SomeType
+				// - Name with default: T = SomeType
+				// For now, we just consume the tokens without processing
+
+				_ = p.expect(TOKEN_IDENTIFIER) // type parameter name
+
+				// Check for constraint (: Type) or default (= Type)
+				if p.check(TOKEN_COLON) {
+					p.advance()
+					_ = p.parseTypeName() // parse the constraint type
+				} else if p.check(TOKEN_ASSIGN) {
+					p.advance()
+					_ = p.parseTypeName() // parse the default type
+				}
+
+				// Check for more type parameters
+				if !p.check(TOKEN_COMMA) {
+					break
+				}
+				p.advance() // consume comma
+			}
+		}
+
+		p.expect(TOKEN_RBRACKET)
+	}
 
 	// Parse optional base classes and keyword arguments (like metaclass=)
 	var bases []ast.ASTNode
