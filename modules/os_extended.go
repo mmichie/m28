@@ -2,8 +2,10 @@ package modules
 
 import (
 	"os"
+	"os/exec"
 	"os/user"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/mmichie/m28/core"
@@ -66,8 +68,34 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		result.Set("sysname", core.StringValue(runtime.GOOS))
 		hostname, _ := os.Hostname()
 		result.Set("nodename", core.StringValue(hostname))
-		result.Set("release", core.StringValue("unknown"))
-		result.Set("version", core.StringValue("unknown"))
+
+		// Get actual uname info using system uname command
+		if runtime.GOOS != "windows" {
+			// Get release version (e.g., "24.1.0" on Darwin)
+			if cmd := exec.Command("uname", "-r"); cmd != nil {
+				if output, err := cmd.Output(); err == nil {
+					release := strings.TrimSpace(string(output))
+					result.Set("release", core.StringValue(release))
+				} else {
+					result.Set("release", core.StringValue("24.0.0"))
+				}
+			}
+
+			// Get version string (e.g., "Darwin Kernel Version ...")
+			if cmd := exec.Command("uname", "-v"); cmd != nil {
+				if output, err := cmd.Output(); err == nil {
+					version := strings.TrimSpace(string(output))
+					result.Set("version", core.StringValue(version))
+				} else {
+					result.Set("version", core.StringValue("Darwin Kernel"))
+				}
+			}
+		} else {
+			// Windows fallback
+			result.Set("release", core.StringValue("10.0.0"))
+			result.Set("version", core.StringValue("Windows"))
+		}
+
 		result.Set("machine", core.StringValue(runtime.GOARCH))
 
 		return result, nil

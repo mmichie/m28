@@ -53,6 +53,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_asyncio":         Init_AsyncioModule,         // C extension module for fast asyncio primitives
 	"_typing":          Init_TypingModule,          // C extension module for core type system primitives
 	"urllib.parse":     Init_UrllibParseModule,     // Minimal stub for urllib.parse (needed by pathlib)
+	"_ctypes":          Init_CtypesModule,          // C extension module for FFI (Foreign Function Interface)
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
