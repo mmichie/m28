@@ -591,7 +591,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 	// Call __init__ if it exists and instance is of the right type
 	// Call __init__ if __new__ returned an instance of this class or a subclass
 	if inst, ok := instance.(*Instance); ok && IsInstanceOf(inst, c) {
-		if initMethod, ok := c.GetMethod("__init__"); ok {
+		if initMethod, _, ok := c.GetMethodWithClass("__init__"); ok {
 			// Debug for pathlib classes
 			if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
 				// 				fmt.Printf("[DEBUG Class.CallWithKeywords] Calling %s.__init__ with %d args, %d kwargs\n", c.Name, len(args), len(kwargs))
@@ -603,7 +603,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				// 				fmt.Printf("[DEBUG Class.CallWithKeywords]   kwargs: %v\n", kwargs)
 			}
 
-			// Create a new context with __class__ set to the class whose __init__ we're calling
+			// Create a new context with __class__ set to the class being instantiated
 			// This allows super() to work correctly inside __init__
 			initCtx := NewContext(ctx)
 			initCtx.Define("__class__", c)
@@ -1019,6 +1019,7 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 
 	// Step 3: Check for non-data descriptor in class (has __get__ but not __set__ or __delete__)
 	if classAttr, defClass, ok := i.Class.GetMethodWithClass(name); ok {
+
 		// Check if it has __get__ (making it a non-data descriptor)
 		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
 			if getMethod, exists := obj.GetAttr("__get__"); exists {
@@ -1222,20 +1223,37 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 	}
 
 	// Debug output for super() investigation
-	debugSuper := false  // Set to true to debug
+	debugSuper := false
 	if debugSuper {
 		if methodFunc, ok := bm.Method.(interface{ String() string }); ok {
-			fmt.Fprintf(os.Stderr, "[DEBUG BoundInstanceMethod.Call] Method: %s, DefiningClass: %v, Instance.Class: %v, classForSuper: %v\n",
+			defClassName := "nil"
+			if bm.DefiningClass != nil {
+				defClassName = bm.DefiningClass.Name
+			}
+			fmt.Fprintf(os.Stderr, "[DEBUG BoundInstanceMethod.Call] Method: %s, DefiningClass: %s, Instance.Class: %v, classForSuper: %v\n",
 				methodFunc.String(),
-				bm.DefiningClass != nil,
+				defClassName,
 				bm.Instance.Class.Name,
 				classForSuper.Name)
 		}
 	}
 
-	methodCtx.Define("__class__", classForSuper)
-	// Always define super as a value for bare super access
-	methodCtx.Define("super", NewSuper(classForSuper, bm.Instance))
+	// Only set __class__ if it's not already defined in the parent context
+	// (preserve it for super() chains)
+	// When Child.__init__ calls super().__init__(), which calls Base.__init__,
+	// __class__ should remain Child (from parent context), not change to Base
+	if ctx != nil {
+		_, err := ctx.Lookup("__class__")
+		if err != nil {
+			// __class__ not defined in parent context, set it to the defining class
+			methodCtx.Define("__class__", classForSuper)
+		}
+	} else {
+		// No parent context, set __class__
+		methodCtx.Define("__class__", classForSuper)
+	}
+	// Note: Don't define super here - let it come from the builtin function
+	// which will look up __class__ from the context
 
 	// Prepend instance as first argument (self)
 	callArgs := append([]Value{bm.Instance}, args...)
@@ -1254,9 +1272,19 @@ func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]
 		classForSuper = bm.Instance.Class
 	}
 
-	methodCtx.Define("__class__", classForSuper)
-	// Always define super as a value for bare super access
-	methodCtx.Define("super", NewSuper(classForSuper, bm.Instance))
+	// Only set __class__ if it's not already defined in the parent context
+	// (preserve it for super() chains)
+	if ctx != nil {
+		_, err := ctx.Lookup("__class__")
+		if err != nil {
+			// __class__ not defined in parent context, set it to the defining class
+			methodCtx.Define("__class__", classForSuper)
+		}
+	} else {
+		// No parent context, set __class__
+		methodCtx.Define("__class__", classForSuper)
+	}
+	// Note: Don't define super here - let it come from the builtin function
 
 	// Prepend instance as first argument (self)
 	callArgs := append([]Value{bm.Instance}, args...)
@@ -1473,6 +1501,30 @@ func (s *Super) String() string {
 
 // GetAttr gets an attribute from the parent class
 func (s *Super) GetAttr(name string) (Value, bool) {
+	debugSuperGetAttr := os.Getenv("M28_DEBUG_SUPER") != ""
+	if debugSuperGetAttr {
+		instClass := "nil"
+		if s.Instance != nil {
+			instClass = s.Instance.Class.Name
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Looking for %s, s.Class=%s, Instance.Class=%s\n",
+			name, s.Class.Name, instClass)
+		if name == "__class__" {
+			// Print stack trace for __class__ lookups to debug the loop
+			fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Stack trace for __class__ lookup:\n")
+			// Just print a simple marker - full stack trace would be too verbose
+			fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] __class__ requested on Super object\n")
+		}
+	}
+
+	// Special handling for __class__ attribute - return the class we're wrapping
+	if name == "__class__" {
+		if debugSuperGetAttr {
+			fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Returning s.Class for __class__ attribute\n")
+		}
+		return s.Class, true
+	}
+
 	// Helper function to bind method to instance
 	bindMethod := func(method Value, defClass *Class) Value {
 		if callable, ok := method.(interface {
@@ -1524,31 +1576,33 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 					// super() in a method should find parent class methods, not the current class
 					for i := startIdx + 1; i < len(mro); i++ {
 						if cls, ok := mro[i].(*Class); ok {
-							// Debug for ArgumentParser
-							if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
-								// 								fmt.Printf("[DEBUG Super.GetAttr] Checking class %s for __init__\n", cls.Name)
+							if debugSuperGetAttr {
+								fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Checking MRO[%d] = %s\n", i, cls.Name)
 							}
 							// Check Methods map directly (don't use GetMethodWithClass as it traverses parents)
 							// We'll find parent methods in the next MRO iteration
 							if method, ok := cls.Methods[name]; ok {
-								if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
-									// 									fmt.Printf("[DEBUG Super.GetAttr] Found __init__ in %s.Methods\n", cls.Name)
+								if debugSuperGetAttr {
+									fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in %s.Methods\n", name, cls.Name)
 								}
 								return bindMethod(method, cls), true
 							}
 							// Then check Attributes for Python-defined methods
 							if attr, ok := cls.Attributes[name]; ok {
-								if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
-									// 									fmt.Printf("[DEBUG Super.GetAttr] Found __init__ in %s.Attributes\n", cls.Name)
+								if debugSuperGetAttr {
+									fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in %s.Attributes\n", name, cls.Name)
 								}
 								return bindMethod(attr, cls), true
 							}
-							if name == "__init__" && s.Instance.Class.Name == "ArgumentParser" {
-								// 								fmt.Printf("[DEBUG Super.GetAttr] __init__ NOT found in %s\n", cls.Name)
+							if debugSuperGetAttr {
+								fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] %s NOT found in %s\n", name, cls.Name)
 							}
 						}
 					}
 					// Not found in MRO
+					if debugSuperGetAttr {
+						fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] %s not found in MRO\n", name)
+					}
 					return nil, false
 				}
 			}
@@ -1557,47 +1611,72 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 
 	// Fallback to old behavior when there's no instance or no MRO
 	// This handles super() in class methods and other edge cases
+	//
+	// IMPORTANT: Don't use GetAttr/GetMethodWithClass here as they can trigger
+	// descriptor protocol and cause infinite recursion. Only check direct dicts.
 
-	// First check s.Class itself (the starting point for MRO)
-	if method, defClass, ok := s.Class.GetMethodWithClass(name); ok {
-		return bindMethod(method, defClass), true
-	}
-	if method, ok := s.Class.GetAttr(name); ok {
-		return bindMethod(method, s.Class), true
-	}
-
-	// Then look in s.Class's parent classes using MRO
+	// First check s.Class's parent classes using MRO
+	// Note: We skip s.Class itself and start from parents, because super()
+	// should find methods in parent classes, not the current class
 	if len(s.Class.Parents) > 0 {
 		for _, parent := range s.Class.Parents {
-			// First try GetMethodWithClass (faster, checks Methods map)
-			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
-				return bindMethod(method, defClass), true
-			}
-			// Fallback to GetAttr to check Attributes (for Python-defined methods)
-			if method, ok := parent.GetAttr(name); ok {
+			// Check Methods map directly
+			if method, ok := parent.Methods[name]; ok {
+				if debugSuperGetAttr {
+					fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in %s.Methods\n", name, parent.Name)
+				}
 				return bindMethod(method, parent), true
+			}
+			// Check Attributes map directly
+			if attr, ok := parent.Attributes[name]; ok {
+				if debugSuperGetAttr {
+					fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in %s.Attributes\n", name, parent.Name)
+				}
+				return bindMethod(attr, parent), true
+			}
+			// Recursively check parent's parents
+			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
+				if debugSuperGetAttr {
+					fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via %s.GetMethodWithClass (defined in %s)\n", name, parent.Name, defClass.Name)
+				}
+				return bindMethod(method, defClass), true
 			}
 		}
 	} else if s.Class.Parent != nil {
 		// Fallback to single parent for backward compatibility
+		// Check parent's Methods map directly
+		if method, ok := s.Class.Parent.Methods[name]; ok {
+			return bindMethod(method, s.Class.Parent), true
+		}
+		// Check parent's Attributes map directly
+		if attr, ok := s.Class.Parent.Attributes[name]; ok {
+			return bindMethod(attr, s.Class.Parent), true
+		}
+		// Recursively check parent's parents
 		if method, defClass, ok := s.Class.Parent.GetMethodWithClass(name); ok {
 			return bindMethod(method, defClass), true
 		}
-
-		// Also try GetAttr on the parent class
-		if method, ok := s.Class.Parent.GetAttr(name); ok {
-			return bindMethod(method, s.Class.Parent), true
-		}
 	} else {
 		// No parents - this is the root class (like 'type' or 'object')
-		// For special methods, check the class itself
-		// This is needed because type.__new__ exists on type, and when a metaclass
-		// inherits from type and calls super().__new__(), we need to find type.__new__
-		if method, ok := s.Class.GetMethod(name); ok {
+		// For special methods, check the class's Methods map directly
+		if method, ok := s.Class.Methods[name]; ok {
+			if debugSuperGetAttr {
+				fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in root class %s.Methods\n", name, s.Class.Name)
+			}
 			return bindMethod(method, s.Class), true
+		}
+		// Check Attributes too
+		if attr, ok := s.Class.Attributes[name]; ok {
+			if debugSuperGetAttr {
+				fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in root class %s.Attributes\n", name, s.Class.Name)
+			}
+			return bindMethod(attr, s.Class), true
 		}
 	}
 
+	if debugSuperGetAttr {
+		fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] %s not found in fallback path\n", name)
+	}
 	return nil, false
 }
 

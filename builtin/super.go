@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/mmichie/m28/core"
 )
@@ -14,6 +15,7 @@ func SuperBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 		case 0:
 			// super() with no arguments - automatically determine class and self
 			// Look for __class__ and __self__ in the current context
+			fmt.Fprintf(os.Stderr, "[DEBUG super()] Called with 0 arguments\n")
 			selfVal, err := ctx.Lookup("self")
 			if err != nil {
 				return nil, fmt.Errorf("super(): no arguments given and cannot determine self")
@@ -23,6 +25,7 @@ func SuperBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 			if !ok {
 				return nil, fmt.Errorf("super(): self is not an instance")
 			}
+			fmt.Fprintf(os.Stderr, "[DEBUG super()] instance.Class=%s\n", instance.Class.Name)
 
 			// Get the current method's class from context
 			// This is set when a method is called
@@ -30,6 +33,7 @@ func SuperBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 			if err != nil {
 				// Fallback: use instance's class
 				// This isn't perfect but works for simple inheritance
+				fmt.Fprintf(os.Stderr, "[DEBUG super()] __class__ not found, using instance.Class=%s\n", instance.Class.Name)
 				return core.NewSuper(instance.Class, instance), nil
 			}
 
@@ -38,6 +42,7 @@ func SuperBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("super(): __class__ is not a class")
 			}
 
+			fmt.Fprintf(os.Stderr, "[DEBUG super()] Found __class__=%s for instance.Class=%s\n", class.Name, instance.Class.Name)
 			return core.NewSuper(class, instance), nil
 
 		case 2:

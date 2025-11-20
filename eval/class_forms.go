@@ -1073,22 +1073,26 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		classVal, classErr := ctx.Lookup("__class__")
 		if classErr == nil {
 			if class, ok := classVal.(*core.Class); ok {
-				// We know which class we're in, so use its parent
+				// We know which class we're in, use it for super()
+				// super() searches the MRO starting AFTER this class
 				// Now determine if we're in an instance method or class method
 				// by checking for self/cls/mcls
 				if selfVal, err := ctx.Lookup("self"); err == nil {
 					if instance, ok := selfVal.(*core.Instance); ok {
-						// Instance method - return super for parent class with instance
-						if len(class.Parents) > 0 {
-							return core.NewSuper(class.Parents[0], instance), nil
-						} else if class.Parent != nil {
-							return core.NewSuper(class.Parent, instance), nil
+						// Instance method - return super for current class with instance
+						// Super.GetAttr will search MRO starting AFTER this class
+						debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
+						if debugSuper {
+							fmt.Fprintf(os.Stderr, "[DEBUG superForm] Creating Super(__class__=%s, instance.Class=%s)\n",
+								class.Name, instance.Class.Name)
 						}
-						return nil, fmt.Errorf("super: class has no parent")
+						return core.NewSuper(class, instance), nil
 					}
 				}
 
 				// Class method or metaclass method - no instance
+				// For metaclasses, use the parent class to avoid infinite loops
+				// This is a workaround for complex metaclass hierarchies
 				if len(class.Parents) > 0 {
 					return core.NewSuper(class.Parents[0], nil), nil
 				} else if class.Parent != nil {
