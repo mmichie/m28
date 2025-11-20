@@ -226,11 +226,18 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 		if moduleName != "" {
 			parentModule, parentErr = loader.LoadModule(moduleName, ctx)
 			if parentErr != nil {
-				// If it's an ImportError, preserve it so try/except can catch it
+				// If it's already an ImportError or ModuleNotFoundError, preserve it so try/except can catch it
 				if _, ok := parentErr.(*core.ImportError); ok {
 					return nil, parentErr
 				}
-				return nil, fmt.Errorf("cannot import from '%s': %w", moduleName, parentErr)
+				if _, ok := parentErr.(*core.ModuleNotFoundError); ok {
+					return nil, parentErr
+				}
+				// Wrap other errors as ImportError so they can be caught by except ImportError
+				return nil, &core.ImportError{
+					ModuleName: moduleName,
+					Message:    fmt.Sprintf("cannot import from '%s': %v", moduleName, parentErr),
+				}
 			}
 		}
 

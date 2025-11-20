@@ -50,6 +50,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"select":           InitSelectModule,           // C extension module for I/O multiplexing
 	"_posixsubprocess": Init_PosixsubprocessModule, // C extension module for subprocess
 	"_contextvars":     Init_ContextvarsModule,     // C extension module for context variables
+	"_asyncio":         Init_AsyncioModule,         // C extension module for fast asyncio primitives
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
