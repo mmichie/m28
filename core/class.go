@@ -195,6 +195,31 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return StringValue(c.Module), true
 	}
 
+	// Special handling for __setattr__ - needed for class attribute assignment
+	// Python classes inherit __setattr__ from object/type
+	if name == "__setattr__" {
+		// Return a builtin function that sets attributes on instances
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 3 {
+				return nil, NewTypeError("3 arguments", TupleValue(args), "__setattr__() takes exactly 3 arguments (self, name, value)")
+			}
+			// args[0] = self (the instance or class)
+			// args[1] = attribute name
+			// args[2] = value
+			attrName, ok := args[1].(StringValue)
+			if !ok {
+				return nil, NewTypeError("string", args[1], "attribute name must be a string")
+			}
+
+			// Set the attribute on the object
+			if obj, ok := args[0].(Object); ok {
+				obj.SetAttr(string(attrName), args[2])
+				return None, nil
+			}
+			return nil, NewTypeError("object", args[0], "first argument must be an object")
+		}), true
+	}
+
 	// Special handling for __doc__
 	if name == "__doc__" {
 		if c.Doc != "" {
