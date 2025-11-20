@@ -308,6 +308,18 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				}
 			}
 		}
+
+		// Python behavior: for "from .module import *", the module object is also made available
+		// For example, "from .events import *" makes both the exported names AND the events module available
+		// Extract the base module name (last component after the last dot)
+		baseModuleName := moduleName
+		if lastDot := strings.LastIndex(moduleName, "."); lastDot != -1 {
+			baseModuleName = moduleName[lastDot+1:]
+		}
+		// Make the module object available under its base name
+		moduleObj := wrapDictAsModule(moduleName, dictModule)
+		ctx.Define(baseModuleName, moduleObj)
+
 		return dictModule, nil
 	} else {
 		// Import module as namespace
