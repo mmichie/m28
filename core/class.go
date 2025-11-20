@@ -74,8 +74,16 @@ func (c *Class) GetMethod(name string) (Value, bool) {
 	}
 
 	// Check parent classes using MRO (Method Resolution Order)
-	// Simple left-to-right depth-first search
+	// Use breadth-first search to match Python's C3 linearization behavior
+	// This ensures we check all direct parents before checking grandparents
 	if len(c.Parents) > 0 {
+		// First, check all direct parents (non-recursively)
+		for _, parent := range c.Parents {
+			if method, ok := parent.Methods[name]; ok {
+				return method, true
+			}
+		}
+		// Then check grandparents recursively
 		for _, parent := range c.Parents {
 			if method, ok := parent.GetMethod(name); ok {
 				return method, true
@@ -110,8 +118,15 @@ func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
 	}
 
 	// Check parent classes using MRO (Method Resolution Order)
-	// Simple left-to-right depth-first search
+	// Use breadth-first search to match Python's C3 linearization behavior
 	if len(c.Parents) > 0 {
+		// First, check all direct parents (non-recursively)
+		for _, parent := range c.Parents {
+			if method, ok := parent.Methods[name]; ok {
+				return method, parent, true
+			}
+		}
+		// Then check grandparents recursively
 		for _, parent := range c.Parents {
 			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
 				return method, defClass, true
@@ -150,8 +165,15 @@ func (c *Class) GetClassAttr(name string) (Value, bool) {
 		return attr, true
 	}
 
-	// Check parent classes using MRO
+	// Check parent classes using MRO (breadth-first)
 	if len(c.Parents) > 0 {
+		// First, check all direct parents (non-recursively)
+		for _, parent := range c.Parents {
+			if attr, ok := parent.Attributes[name]; ok {
+				return attr, true
+			}
+		}
+		// Then check grandparents recursively
 		for _, parent := range c.Parents {
 			if attr, ok := parent.GetClassAttr(name); ok {
 				return attr, true
