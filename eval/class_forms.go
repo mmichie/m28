@@ -1176,31 +1176,22 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
-	// super(SomeClass, obj) means: skip SomeClass, start from SomeClass's parent
-	// So we need to get the parent class to start the MRO search from
-	var parentClass *core.Class
-	if len(class.Parents) > 0 {
-		parentClass = class.Parents[0]
-	} else {
-		parentClass = class.Parent
-	}
-
-	if parentClass == nil {
-		return nil, fmt.Errorf("super: class %s has no parent", class.Name)
-	}
+	// super(SomeClass, obj) creates a super object that searches the MRO
+	// starting AFTER SomeClass. Super.GetAttr handles the "skip this class" logic.
+	// So we should pass SomeClass itself, not its parent.
 
 	// Check if it's an instance
 	if instance, ok := secondArgVal.(*core.Instance); ok {
-		// Return super starting from parentClass
-		return core.NewSuper(parentClass, instance), nil
+		// Return super for the specified class
+		// Super.GetAttr will search MRO starting AFTER this class
+		return core.NewSuper(class, instance), nil
 	}
 
 	// Check if it's a class (for use in __new__ or classmethods)
 	if secondClass, ok := secondArgVal.(*core.Class); ok {
 		// Create a super proxy for class-level lookups
 		// This is used in __new__ where cls is passed instead of self
-		// Start from parentClass, not class itself
-		return core.NewSuperForClass(parentClass, secondClass), nil
+		return core.NewSuperForClass(class, secondClass), nil
 	}
 
 	return nil, fmt.Errorf("second argument to super must be an instance or class, got %T", secondArgVal)

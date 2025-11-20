@@ -62,6 +62,11 @@ func SuperBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 				return nil, fmt.Errorf("super(type, obj): obj must be an instance or subtype of type")
 			}
 
+			debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
+			if debugSuper {
+				fmt.Fprintf(os.Stderr, "[DEBUG super(class, instance)] Creating Super(class=%s, instance.Class=%s)\n",
+					class.Name, instance.Class.Name)
+			}
 			return core.NewSuper(class, instance), nil
 
 		default:
