@@ -282,7 +282,19 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		if o, ok := obj.(core.Object); ok {
 			if method, exists := o.GetAttr("__setattr__"); exists {
 				if callable, ok := method.(core.Callable); ok {
-					_, err := callable.Call([]core.Value{core.StringValue(name), value}, ctx)
+					// Check if the method is already bound (BoundInstanceMethod, BoundMethod)
+					// If not, we need to bind it by prepending obj as the first argument
+					var callArgs []core.Value
+					switch method.(type) {
+					case *core.BoundInstanceMethod, *core.BoundMethod:
+						// Already bound, just pass name and value
+						callArgs = []core.Value{core.StringValue(name), value}
+					default:
+						// Not bound, need to prepend obj (self)
+						callArgs = []core.Value{obj, core.StringValue(name), value}
+					}
+
+					_, err := callable.Call(callArgs, ctx)
 					if err != nil {
 						return nil, err
 					}
