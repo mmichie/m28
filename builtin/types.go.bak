@@ -98,9 +98,6 @@ func RegisterTypes(ctx *core.Context) {
 			switch v := iterable.(type) {
 			case core.TupleValue:
 				tupleData = v
-			case *core.TupleInstance:
-				// TupleInstance wraps the underlying TupleValue
-				tupleData = v.Data
 			case *core.ListValue:
 				tupleData = core.TupleValue(v.Items())
 			case core.Iterable:
@@ -116,7 +113,7 @@ func RegisterTypes(ctx *core.Context) {
 				}
 				tupleData = core.TupleValue(result)
 			default:
-				return nil, fmt.Errorf("tuple.__new__() argument must be an iterable, got %T", iterable)
+				return nil, fmt.Errorf("tuple.__new__() argument must be an iterable")
 			}
 		}
 
@@ -133,7 +130,7 @@ func RegisterTypes(ctx *core.Context) {
 		return tupleData, nil
 	})
 	tupleNew.SetAttr("__name__", core.StringValue("__new__"))
-	TupleTypeClass.SetMethod("__new__", &core.StaticMethodValue{Function: tupleNew})
+	TupleTypeClass.SetMethod("__new__", &core.ClassMethodValue{Function: tupleNew})
 
 	// Add __new__ classmethod to list
 	listNew := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
