@@ -327,6 +327,10 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 	// callable() - check if object is callable
 	// callable() - now registered in functional.go
 
+	// super() - returns a proxy object that delegates method calls to parent classes
+	// Supports both super() with no args (auto-detect) and super(class, instance)
+	ctx.Define("super", core.NewBuiltinFunction(SuperBuilder()))
+
 	// __import__(name, globals=None, locals=None, fromlist=(), level=0)
 	// This is the function that the import statement calls
 	ctx.Define("__import__", core.NewBuiltinFunction(func(args []core.Value, innerCtx *core.Context) (core.Value, error) {
