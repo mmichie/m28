@@ -412,6 +412,31 @@ func (pf *partialFunction) GetAttr(name string) (core.Value, bool) {
 		return core.TupleValue{}, true
 	case "__dict__":
 		return core.NewDict(), true
+	case "__defaults__":
+		// Partial functions have no defaults (defaults are already baked in as fixed args)
+		return core.None, true
+	case "__kwdefaults__":
+		// Partial functions have no keyword-only defaults
+		return core.None, true
+	case "__code__":
+		// Return a code object for partial functions
+		// Try to get __code__ from the wrapped function if possible
+		if callable, ok := pf.function.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
+			if code, found := callable.GetAttr("__code__"); found {
+				return code, true
+			}
+		}
+		// Fall back to creating a minimal code object
+		codeObj := core.NewCodeObject(pf)
+		codeObj.SetAttr("co_argcount", core.NumberValue(0))
+		codeObj.SetAttr("co_posonlyargcount", core.NumberValue(0))
+		codeObj.SetAttr("co_kwonlyargcount", core.NumberValue(0))
+		codeObj.SetAttr("co_flags", core.NumberValue(3)) // OPTIMIZED | NEWLOCALS
+		codeObj.SetAttr("co_varnames", core.TupleValue{})
+		codeObj.SetAttr("co_name", core.StringValue("partial"))
+		return codeObj, true
 	}
 
 	return nil, false

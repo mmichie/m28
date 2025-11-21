@@ -461,6 +461,24 @@ func (f *BuiltinFunctionWithKwargs) GetAttr(name string) (Value, bool) {
 		return StringValue("<anonymous>"), true
 	case "__module__":
 		return StringValue("builtins"), true
+	case "__defaults__":
+		// Builtin functions have no defaults
+		return None, true
+	case "__kwdefaults__":
+		// Builtin functions have no keyword-only defaults
+		return None, true
+	case "__code__":
+		// Return a minimal code object for builtin functions
+		// This is needed for inspect.signature() and mock libraries
+		codeObj := NewCodeObject(f)
+		// Set minimal attributes for builtin functions
+		codeObj.SetAttr("co_argcount", NumberValue(0)) // Unknown for builtins
+		codeObj.SetAttr("co_posonlyargcount", NumberValue(0))
+		codeObj.SetAttr("co_kwonlyargcount", NumberValue(0))
+		codeObj.SetAttr("co_flags", NumberValue(3)) // OPTIMIZED | NEWLOCALS
+		codeObj.SetAttr("co_varnames", TupleValue{})
+		codeObj.SetAttr("co_name", StringValue(f.Name))
+		return codeObj, true
 	}
 	return f.BaseObject.GetAttr(name)
 }
@@ -695,6 +713,12 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 		return TupleValue{}, true
 	case "__dict__":
 		return NewDict(), true
+	case "__defaults__":
+		// Builtin functions have no defaults
+		return None, true
+	case "__kwdefaults__":
+		// Builtin functions have no keyword-only defaults
+		return None, true
 	case "__hash__":
 		// Return a hash function for the function
 		// Builtin functions are hashable by identity (pointer address)
@@ -706,6 +730,18 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 			fmt.Sscanf(hashStr, "%x", &hashNum)
 			return NumberValue(float64(hashNum)), nil
 		}), true
+	case "__code__":
+		// Return a minimal code object for builtin functions
+		// This is needed for inspect.signature() and mock libraries
+		codeObj := NewCodeObject(f)
+		// Set minimal attributes for builtin functions
+		codeObj.SetAttr("co_argcount", NumberValue(0)) // Unknown for builtins
+		codeObj.SetAttr("co_posonlyargcount", NumberValue(0))
+		codeObj.SetAttr("co_kwonlyargcount", NumberValue(0))
+		codeObj.SetAttr("co_flags", NumberValue(3)) // OPTIMIZED | NEWLOCALS
+		codeObj.SetAttr("co_varnames", TupleValue{})
+		codeObj.SetAttr("co_name", StringValue(f.name))
+		return codeObj, true
 	}
 
 	return nil, false
