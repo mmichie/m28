@@ -340,6 +340,7 @@ func initializeGlobalContext(ctx *core.Context) {
 	ctx.Define("false", core.BoolValue(false))
 	ctx.Define("True", core.BoolValue(true))
 	ctx.Define("False", core.BoolValue(false))
+	ctx.Define("__debug__", core.BoolValue(true)) // Python built-in constant (False with -O flag)
 	ctx.Define("nil", core.NilValue{})
 
 	// Register all built-in functions
