@@ -1581,6 +1581,47 @@ func createIntClass(objectClass *core.Class) *IntType {
 		return core.NumberValue(float64(result)), nil
 	}))
 
+	// Add bit_length instance method
+	// Returns the number of bits necessary to represent an integer in binary
+	// int.bit_length() -> int
+	class.SetMethod("bit_length", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("bit_length() takes exactly 1 argument (%d given)", len(args))
+		}
+
+		// Get the integer value
+		var n int64
+		switch val := args[0].(type) {
+		case core.NumberValue:
+			n = int64(val)
+		case core.BigIntValue:
+			// For BigInt, use the BitLen method from big.Int
+			return core.NumberValue(float64(val.GetBigInt().BitLen())), nil
+		default:
+			return nil, fmt.Errorf("bit_length() requires an integer, got %s", val.Type())
+		}
+
+		// Handle negative numbers - bit_length of abs(n)
+		if n < 0 {
+			n = -n
+		}
+
+		// Special case for 0
+		if n == 0 {
+			return core.NumberValue(0), nil
+		}
+
+		// Calculate bit length
+		// This is equivalent to floor(log2(n)) + 1
+		bitLen := 0
+		for n > 0 {
+			bitLen++
+			n >>= 1
+		}
+
+		return core.NumberValue(float64(bitLen)), nil
+	}))
+
 	return &IntType{Class: class}
 }
 

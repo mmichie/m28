@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"sort"
 )
 
@@ -47,6 +48,9 @@ type PropertyDescriptor struct {
 	Getter   func(Value) (Value, error)
 	Setter   func(Value, Value) error
 }
+
+// Debug flag for verbose attribute lookup logging
+var Debug = os.Getenv("M28_DEBUG_ATTR") != ""
 
 // Global type registry
 var typeRegistry = make(map[Type]*TypeDescriptor)
@@ -185,6 +189,55 @@ func (td *TypeDescriptor) GetAttribute(receiver Value, name string) (Value, erro
 			return prop.Getter(receiver)
 		}
 		return nil, fmt.Errorf("property '%s' has no getter", name)
+	}
+
+	// Fallback: check the type object's methods (for int.bit_length, etc.)
+	typeObj := td.GetTypeObject()
+	if Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG] GetAttribute('%s') on '%s': typeObj=%T\n", name, td.PythonName, typeObj)
+	}
+	if typeObj != nil {
+		// Try to get the Class, either directly or via GetClass()
+		var class *Class
+		if c, ok := typeObj.(*Class); ok {
+			if Debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG]   typeObj is *Class\n")
+			}
+			class = c
+		} else if classGetter, ok := typeObj.(interface{ GetClass() *Class }); ok {
+			if Debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG]   typeObj has GetClass()\n")
+			}
+			class = classGetter.GetClass()
+		}
+
+		if Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG]   class=%v\n", class != nil)
+		}
+		if class != nil {
+			method, hasMethod := class.GetMethod(name)
+			if Debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG]   GetMethod('%s'): hasMethod=%v, methodType=%T\n", name, hasMethod, method)
+			}
+			if hasMethod {
+				// Check if it's a callable
+				if callable, isCallable := method.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); isCallable {
+					if Debug {
+						fmt.Fprintf(os.Stderr, "[DEBUG]   method is callable, returning wrapper\n")
+					}
+					// Return a wrapper that binds the receiver to the method
+					return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+						// Prepend receiver as first argument
+						fullArgs := make([]Value, 0, len(args)+1)
+						fullArgs = append(fullArgs, receiver)
+						fullArgs = append(fullArgs, args...)
+						return callable.Call(fullArgs, ctx)
+					}), nil
+				}
+			}
+		}
 	}
 
 	return nil, fmt.Errorf("'%s' object has no attribute '%s'", td.PythonName, name)
