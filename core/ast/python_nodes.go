@@ -984,6 +984,7 @@ type ExceptClause struct {
 	ExceptionType     string  // Empty string for bare except (deprecated - use ExceptionTypeExpr)
 	ExceptionTypeExpr ASTNode // The actual exception type expression (identifier, tuple, etc.)
 	Variable          string  // Empty string if no 'as' clause
+	IsExceptStar      bool    // True for except* (exception groups, PEP 654)
 	Body              []ASTNode
 }
 

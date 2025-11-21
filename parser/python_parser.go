@@ -3471,11 +3471,18 @@ func (p *PythonParser) parseTryStatement() ast.ASTNode {
 	// Parse try body
 	tryBody := p.parseBlock()
 
-	// Parse except clauses
+	// Parse except clauses (including except* for exception groups)
 	var exceptClauses []ast.ExceptClause
 
 	for p.check(TOKEN_EXCEPT) {
-		p.advance()
+		p.advance() // consume EXCEPT
+
+		// Check for except* (exception groups, PEP 654 - Python 3.11+)
+		isExceptStar := false
+		if p.check(TOKEN_STAR) {
+			p.advance() // consume *
+			isExceptStar = true
+		}
 
 		var exceptType string
 		var exceptVar string
@@ -3509,6 +3516,7 @@ func (p *PythonParser) parseTryStatement() ast.ASTNode {
 			ExceptionType:     exceptType,
 			ExceptionTypeExpr: typeExpr,
 			Variable:          exceptVar,
+			IsExceptStar:      isExceptStar,
 			Body:              exceptBody,
 		})
 	}
@@ -3531,8 +3539,21 @@ func (p *PythonParser) parseTryStatement() ast.ASTNode {
 }
 
 // parseWithStatement parses: with expr (as var)?(, expr (as var)?)* : block
+// Also supports Python 3.10+ parenthesized form: with (expr as var, expr as var): block
 func (p *PythonParser) parseWithStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_WITH)
+
+	// Check for parenthesized form (Python 3.10+)
+	// with (manager() as x, manager2() as y): ...
+	isParenthesized := p.check(TOKEN_LPAREN)
+	if isParenthesized {
+		p.advance() // consume (
+
+		// Skip any newlines after opening paren
+		for p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+	}
 
 	// Parse context managers
 	var items []ast.WithItem
@@ -3562,10 +3583,37 @@ func (p *PythonParser) parseWithStatement() ast.ASTNode {
 			Target:   target,
 		})
 
+		// Skip newlines in parenthesized form
+		if isParenthesized {
+			for p.check(TOKEN_NEWLINE) {
+				p.advance()
+			}
+		}
+
 		if !p.check(TOKEN_COMMA) {
 			break
 		}
-		p.advance()
+		p.advance() // consume comma
+
+		// Skip newlines after comma in parenthesized form
+		if isParenthesized {
+			for p.check(TOKEN_NEWLINE) {
+				p.advance()
+			}
+			// Check for trailing comma before closing paren
+			if p.check(TOKEN_RPAREN) {
+				break
+			}
+		}
+	}
+
+	// If parenthesized, expect closing paren
+	if isParenthesized {
+		// Skip any trailing newlines before closing paren
+		for p.check(TOKEN_NEWLINE) {
+			p.advance()
+		}
+		p.expect(TOKEN_RPAREN)
 	}
 
 	// Parse body
