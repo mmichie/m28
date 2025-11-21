@@ -339,8 +339,8 @@ func (p *PythonParser) parseReturnStatement() ast.ASTNode {
 
 	var value ast.ASTNode
 	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
-		// Parse first expression
-		first := p.parseExpression()
+		// Parse first expression (may include star unpacking)
+		first := p.parseListElement()
 
 		// Check for comma-separated expressions (implicit tuple)
 		if p.check(TOKEN_COMMA) {
@@ -354,7 +354,8 @@ func (p *PythonParser) parseReturnStatement() ast.ASTNode {
 					break
 				}
 
-				values = append(values, p.parseExpression())
+				// Parse each element, supporting star unpacking
+				values = append(values, p.parseListElement())
 			}
 
 			// Create tuple: (tuple-literal elem1 elem2 ...)
@@ -390,10 +391,10 @@ func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 
 	var args []ast.ASTNode
 	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
-		// Parse first expression
-		first := p.parseExpression()
+		// Parse first expression (may include star unpacking)
+		first := p.parseListElement()
 
-		// Check for implicit tuple: yield a, b, c
+		// Check for implicit tuple: yield a, b, c or yield 1, *rest
 		if p.check(TOKEN_COMMA) {
 			values := []ast.ASTNode{first}
 
@@ -402,7 +403,8 @@ func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 				if p.check(TOKEN_NEWLINE) || p.isAtEnd() {
 					break
 				}
-				values = append(values, p.parseExpression())
+				// Parse each element, supporting star unpacking
+				values = append(values, p.parseListElement())
 			}
 
 			// Create tuple: (tuple-literal elem1 elem2 ...)
@@ -571,7 +573,13 @@ func (p *PythonParser) parseDelStatement() ast.ASTNode {
 	targets := []ast.ASTNode{p.parseExpression()}
 
 	for p.check(TOKEN_COMMA) {
-		p.advance()
+		p.advance() // consume comma
+
+		// Trailing comma is allowed (e.g., del x, y,)
+		if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) || p.isAtEnd() {
+			break
+		}
+
 		targets = append(targets, p.parseExpression())
 	}
 
@@ -2309,16 +2317,23 @@ func (p *PythonParser) parseLoopVariables() string {
 	first := parseVarElement()
 
 	// Check if this is a comma-separated list: for x, y in ... or for key,(begin,end) in ...
-	if p.check(TOKEN_COMMA) && !p.checkAhead(TOKEN_IN, 1) {
+	// Also handle trailing comma: for x, in ... (single-element tuple unpacking)
+	if p.check(TOKEN_COMMA) {
 		parts := []string{first}
 
-		for p.check(TOKEN_COMMA) && !p.checkAhead(TOKEN_IN, 1) {
-			p.advance()
+		for p.check(TOKEN_COMMA) {
+			p.advance() // consume comma
+
+			// Check if IN follows (trailing comma case: for x, in ...)
+			if p.check(TOKEN_IN) {
+				break
+			}
+
 			next := parseVarElement()
 			parts = append(parts, next)
 		}
 
-		// Format as "(x, y, z)" or "(key, (begin, end))"
+		// Format as "(x, y, z)" or "(key, (begin, end))" or "(x,)" for trailing comma
 		result := "(" + parts[0]
 		for i := 1; i < len(parts); i++ {
 			result += ", " + parts[i]
@@ -2871,10 +2886,11 @@ func (p *PythonParser) parseForStatement() ast.ASTNode {
 func (p *PythonParser) parseForIterable() ast.ASTNode {
 	startTok := p.peek()
 
-	// Parse first expression
-	exprs := []ast.ASTNode{p.parseExpression()}
+	// Parse first expression (may include star unpacking)
+	exprs := []ast.ASTNode{p.parseListElement()}
 
-	// Check for comma-separated values (implicit tuple)
+	// Check for comma-separated values (implicit tuple with possible star unpacking)
+	// Example: for x in *a, *b, *c:
 	// Continue collecting expressions until we hit a colon
 	for p.check(TOKEN_COMMA) {
 		p.advance() // consume comma
@@ -2884,7 +2900,8 @@ func (p *PythonParser) parseForIterable() ast.ASTNode {
 			break
 		}
 
-		exprs = append(exprs, p.parseExpression())
+		// Parse each element, supporting star unpacking
+		exprs = append(exprs, p.parseListElement())
 	}
 
 	// If we got multiple expressions, create an implicit tuple
