@@ -25,3 +25,4 @@ bin/
 
 **/.claude/settings.local.json
 tests/cpython-source/
+*.backup

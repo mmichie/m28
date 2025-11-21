@@ -366,8 +366,8 @@ func (p *PythonParser) parseReturnStatement() ast.ASTNode {
 		}
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -414,8 +414,8 @@ func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 		}
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -429,8 +429,8 @@ func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 func (p *PythonParser) parseBreakStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_BREAK)
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -441,8 +441,8 @@ func (p *PythonParser) parseBreakStatement() ast.ASTNode {
 func (p *PythonParser) parseContinueStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_CONTINUE)
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -453,8 +453,8 @@ func (p *PythonParser) parseContinueStatement() ast.ASTNode {
 func (p *PythonParser) parsePassStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_PASS)
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -481,8 +481,8 @@ func (p *PythonParser) parseGlobalStatement() ast.ASTNode {
 		names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -509,8 +509,8 @@ func (p *PythonParser) parseNonlocalStatement() ast.ASTNode {
 		names = append(names, ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython))
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -533,8 +533,8 @@ func (p *PythonParser) parseRaiseStatement() ast.ASTNode {
 		}
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -555,8 +555,8 @@ func (p *PythonParser) parseAssertStatement() ast.ASTNode {
 		message = p.parseExpression()
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -575,8 +575,8 @@ func (p *PythonParser) parseDelStatement() ast.ASTNode {
 		targets = append(targets, p.parseExpression())
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -599,8 +599,8 @@ func (p *PythonParser) parseImportStatement() ast.ASTNode {
 		modules = append(modules, p.parseImportModule(tok))
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -688,8 +688,8 @@ func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
 			)
 		}
 
-		// Consume newline
-		if p.check(TOKEN_NEWLINE) {
+		// Consume newline or semicolon
+		if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 			p.advance()
 		}
 
@@ -757,8 +757,8 @@ func (p *PythonParser) parseFromImportStatement() ast.ASTNode {
 		)
 	}
 
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -1002,8 +1002,8 @@ func (p *PythonParser) parseAnnotatedAssignment(target ast.ASTNode) ast.ASTNode 
 		p.advance() // consume =
 		value := p.parseExpression()
 
-		// Consume newline
-		if p.check(TOKEN_NEWLINE) {
+		// Consume newline or semicolon
+		if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 			p.advance()
 		}
 
@@ -1013,8 +1013,8 @@ func (p *PythonParser) parseAnnotatedAssignment(target ast.ASTNode) ast.ASTNode 
 
 	// No assignment - just a type annotation
 	// In Python 3.6+, bare annotations only add to __annotations__, don't create variable
-	// Consume newline
-	if p.check(TOKEN_NEWLINE) {
+	// Consume newline or semicolon
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		p.advance()
 	}
 
@@ -1145,7 +1145,20 @@ func (p *PythonParser) parseLambda() ast.ASTNode {
 			}
 
 			paramTok := p.expect(TOKEN_IDENTIFIER)
-			params = append(params, ast.NewIdentifier(paramTok.Lexeme, p.makeLocation(paramTok), ast.SyntaxPython))
+			var param ast.ASTNode = ast.NewIdentifier(paramTok.Lexeme, p.makeLocation(paramTok), ast.SyntaxPython)
+
+			// Check for default value: param=value
+			if p.check(TOKEN_ASSIGN) {
+				p.advance() // consume =
+				// Parse default value expression
+				// Use parseExpression to allow nested lambdas in defaults
+				// The expression will naturally stop at comma (next param) or colon (end of params)
+				defaultValue := p.parseExpression()
+				// Create (param default) list
+				param = ast.NewSExpr([]ast.ASTNode{param, defaultValue}, p.makeLocation(paramTok), ast.SyntaxPython)
+			}
+
+			params = append(params, param)
 
 			if !p.check(TOKEN_COMMA) {
 				break
@@ -2625,24 +2638,16 @@ func (p *PythonParser) parseBlock() []ast.ASTNode {
 }
 
 // parseDecorators parses: (@decorator_expr NEWLINE)*
+// PEP 614 (Python 3.9+): decorators can be arbitrary expressions, not just dotted names
 func (p *PythonParser) parseDecorators() []ast.ASTNode {
 	decorators := []ast.ASTNode{}
 
 	for p.check(TOKEN_AT) {
 		p.advance() // consume @
 
-		// Parse decorator expression (identifier or call)
-		decorator := p.parsePrimary()
-
-		// Handle attribute access (e.g., @contextlib.contextmanager)
-		for p.check(TOKEN_DOT) {
-			decorator = p.parseAttribute(decorator)
-		}
-
-		// If followed by (, it's a decorator call
-		if p.check(TOKEN_LPAREN) {
-			decorator = p.parseCall(decorator)
-		}
+		// PEP 614: Parse any expression as decorator
+		// This allows: @func, @obj.method(), @lambda x: x, @a or b, @(a := b), etc.
+		decorator := p.parseExpression()
 
 		decorators = append(decorators, decorator)
 		p.expect(TOKEN_NEWLINE)
@@ -2922,7 +2927,7 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 	p.expect(TOKEN_COLON)
 
 	var bodyNode ast.ASTNode
-	if p.check(TOKEN_NEWLINE) {
+	if p.check(TOKEN_NEWLINE) || p.check(TOKEN_SEMICOLON) {
 		// Indented block
 		p.advance() // consume newline
 		p.expect(TOKEN_INDENT)
