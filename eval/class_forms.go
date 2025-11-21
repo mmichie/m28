@@ -110,6 +110,14 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					switch p := parentVal.(type) {
 					case *core.Class:
 						parent = p
+					case *core.GenericAlias:
+						// Handle Generic[T] as a parent class
+						// Use the origin class (e.g., Generic becomes the parent)
+						// This is needed for typing module: class IO(Generic[AnyStr]): ...
+						parent = p.Origin
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Using GenericAlias origin as parent: %s\n", parent.Name)
+						}
 					case interface{ GetClass() *core.Class }:
 						// Handle wrapper types that embed Class (like staticmethod, classmethod)
 						parent = p.GetClass()
