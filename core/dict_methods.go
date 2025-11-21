@@ -192,6 +192,48 @@ func InitDictMethods() {
 		},
 	}
 
+	// Add popitem method
+	dictType.Methods["popitem"] = &MethodDescriptor{
+		Name:    "popitem",
+		Arity:   0,
+		Doc:     "Remove and return an arbitrary (key, value) pair as a tuple. Raises KeyError if dict is empty",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			dict := receiver.(*DictValue)
+
+			// Check if dict is empty
+			keys := dict.Keys()
+			if len(keys) == 0 {
+				return nil, &KeyError{Key: StringValue("dictionary is empty")}
+			}
+
+			// Get the last key (LIFO behavior like Python 3.7+)
+			keyStr := keys[len(keys)-1]
+
+			// Get the value
+			val, _ := dict.Get(keyStr)
+
+			// Get the original key object from dict.keys map
+			var keyVal Value
+			if dict.keys != nil {
+				if origKey, ok := dict.keys[keyStr]; ok {
+					keyVal = origKey
+				} else {
+					// Fall back to string key
+					keyVal = StringValue(keyStr)
+				}
+			} else {
+				keyVal = StringValue(keyStr)
+			}
+
+			// Remove the key from the dictionary
+			dict.Delete(keyStr)
+
+			// Return (key, value) as a tuple
+			return TupleValue([]Value{keyVal, val}), nil
+		},
+	}
+
 	// Add copy method
 	dictType.Methods["copy"] = &MethodDescriptor{
 		Name:    "copy",
