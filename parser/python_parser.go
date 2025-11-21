@@ -805,12 +805,6 @@ func (p *PythonParser) parseImportName(nameTok Token, baseTok Token) ast.ASTNode
 
 // parseExpressionStatement parses an expression or assignment statement
 func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
-	// Check for annotated assignment (PEP 526): identifier : type [= value]
-	// This must be checked before parseExpression() since colon would cause parse error
-	if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_COLON {
-		return p.parseAnnotatedAssignment()
-	}
-
 	// Check if this starts with star unpacking: *a, b = ...
 	var expr ast.ASTNode
 	if p.check(TOKEN_STAR) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_IDENTIFIER {
@@ -823,6 +817,12 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 		}, p.makeLocation(starTok), ast.SyntaxPython)
 	} else {
 		expr = p.parseExpression()
+	}
+
+	// Check for annotated assignment: target : type [= value]
+	// Target can be: identifier, attribute (obj.attr), or subscript (obj[key])
+	if p.check(TOKEN_COLON) {
+		return p.parseAnnotatedAssignment(expr)
 	}
 
 	// Check for comma (tuple formation on left side of assignment)
@@ -985,11 +985,11 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 }
 
 // parseAnnotatedAssignment parses PEP 526 annotated assignments
-// Syntax: identifier : type [= value]
-func (p *PythonParser) parseAnnotatedAssignment() ast.ASTNode {
-	// Parse the identifier
-	nameTok := p.expect(TOKEN_IDENTIFIER)
-	name := ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython)
+// Syntax: target : type [= value]
+// where target can be: identifier, attribute (obj.attr), or subscript (obj[key])
+func (p *PythonParser) parseAnnotatedAssignment(target ast.ASTNode) ast.ASTNode {
+	// Target has already been parsed by the caller
+	// It can be an identifier, attribute access, or subscript
 
 	// Expect colon
 	colonTok := p.expect(TOKEN_COLON)
@@ -1007,8 +1007,8 @@ func (p *PythonParser) parseAnnotatedAssignment() ast.ASTNode {
 			p.advance()
 		}
 
-		// Create annotated assignment: (annotated-assign identifier annotation value)
-		return ast.NewAnnotatedAssignForm(name, annotation, value, p.makeLocation(colonTok), ast.SyntaxPython)
+		// Create annotated assignment: (annotated-assign target annotation value)
+		return ast.NewAnnotatedAssignForm(target, annotation, value, p.makeLocation(colonTok), ast.SyntaxPython)
 	}
 
 	// No assignment - just a type annotation
@@ -1018,8 +1018,8 @@ func (p *PythonParser) parseAnnotatedAssignment() ast.ASTNode {
 		p.advance()
 	}
 
-	// Return annotated assignment without value: (annotated-assign identifier annotation)
-	return ast.NewAnnotatedAssignForm(name, annotation, nil, p.makeLocation(colonTok), ast.SyntaxPython)
+	// Return annotated assignment without value: (annotated-assign target annotation)
+	return ast.NewAnnotatedAssignForm(target, annotation, nil, p.makeLocation(colonTok), ast.SyntaxPython)
 }
 
 // ============================================================================
@@ -3099,37 +3099,45 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 	return params
 }
 
-// parseTypeAnnotation parses a type name (simplified - no generics yet)
+// parseTypeAnnotation parses a type annotation
+// In Python, type annotations can be arbitrary expressions: int, str, List[int], 1/0, etc.
 func (p *PythonParser) parseTypeAnnotation() *ast.TypeInfo {
-	// Parse the base type name (can be dotted like typing.Optional)
-	typeName := p.parseTypeName()
+	// Type annotations in Python are arbitrary expressions
+	// They can be: identifiers, dotted names, generics, unions, or even complex expressions like 1/0
+	// We parse the expression and extract a type name for the TypeInfo
 
-	// Handle generic types like dict[str, object] or list[int]
-	// For now, we parse the brackets and contents but don't use them
-	// Just consume tokens to allow the syntax
-	if p.check(TOKEN_LBRACKET) {
-		p.advance() // consume [
-		// Parse type arguments (can be nested: Dict[str, List[int]])
-		p.parseTypeArguments()
-		p.expect(TOKEN_RBRACKET)
-	}
+	// Try to parse as a simple type name first (common case optimization)
+	if p.check(TOKEN_IDENTIFIER) || p.check(TOKEN_STRING) || p.check(TOKEN_NIL) ||
+		p.check(TOKEN_TRUE) || p.check(TOKEN_FALSE) || p.check(TOKEN_LBRACKET) {
+		typeName := p.parseTypeName()
 
-	// Handle union types with | (Python 3.10+)
-	// e.g., bytes | bytearray | str
-	// For now, we just consume the tokens and use the first type
-	for p.check(TOKEN_PIPE) {
-		p.advance() // consume |
-		// Parse the next type in the union (can also be dotted)
-		_ = p.parseTypeName()
-		// Handle generics in union members
+		// Handle generic types like dict[str, object] or list[int]
 		if p.check(TOKEN_LBRACKET) {
-			p.advance()
+			p.advance() // consume [
 			p.parseTypeArguments()
 			p.expect(TOKEN_RBRACKET)
 		}
+
+		// Handle union types with | (Python 3.10+)
+		for p.check(TOKEN_PIPE) {
+			p.advance() // consume |
+			_ = p.parseTypeName()
+			if p.check(TOKEN_LBRACKET) {
+				p.advance()
+				p.parseTypeArguments()
+				p.expect(TOKEN_RBRACKET)
+			}
+		}
+
+		return &ast.TypeInfo{Name: typeName}
 	}
 
-	return &ast.TypeInfo{Name: typeName}
+	// Fall back to parsing any expression (for cases like 1/0, function calls, etc.)
+	// We don't actually use the expression, just consume the tokens
+	_ = p.parseExpression()
+
+	// Return a generic type name since we can't extract a meaningful name from arbitrary expressions
+	return &ast.TypeInfo{Name: "object"}
 }
 
 // parseTypeName parses a potentially dotted type name like "typing.Optional" or "events.AbstractEventLoop"
@@ -3140,6 +3148,7 @@ func (p *PythonParser) parseTypeName() string {
 	// - Identifiers: int, str, MyClass
 	// - String literals (forward references): 'MyClass', "IO[AnyStr]"
 	// - Special constants: None, True, False
+	// - List literals: [int, str] (for union-like annotations)
 	var typeName string
 	if p.check(TOKEN_STRING) {
 		// Forward reference - quoted string like 'IO[AnyStr]'
@@ -3151,6 +3160,22 @@ func (p *PythonParser) parseTypeName() string {
 			typeName = typeName[1 : len(typeName)-1]
 		}
 		return typeName // String forward references don't have dotted attribute access
+	} else if p.check(TOKEN_LBRACKET) {
+		// List literal as type annotation like [int, str]
+		// Parse it but return a placeholder type name
+		p.advance() // consume [
+		// Parse list contents - can be type names separated by commas
+		if !p.check(TOKEN_RBRACKET) {
+			for {
+				_ = p.parseTypeName() // recursive parse of element types
+				if !p.check(TOKEN_COMMA) {
+					break
+				}
+				p.advance() // consume comma
+			}
+		}
+		p.expect(TOKEN_RBRACKET)
+		return "list" // return generic "list" type name
 	} else if p.check(TOKEN_IDENTIFIER) {
 		nameTok := p.advance()
 		typeName = nameTok.Lexeme

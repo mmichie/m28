@@ -701,11 +701,30 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 	}
 
 	// Check for decimal point (or we started with one)
-	if startsWithDot || (!t.isAtEnd() && t.peek() == '.' && t.pos+1 < len(t.input) && isDigit(t.input[t.pos+1])) {
-		if !startsWithDot {
-			t.advance() // consume '.' only if we didn't start with it
+	// Python allows both 314. and .314 as valid float literals
+	hasDecimalPoint := startsWithDot
+	if !startsWithDot && !t.isAtEnd() && t.peek() == '.' {
+		// Look ahead to see if this is a float or dot notation
+		// It's a float if: (1) next char is digit, OR (2) next char is not a letter/underscore (trailing dot like 314.)
+		nextPos := t.pos + 1
+		if nextPos < len(t.input) {
+			nextChar := t.input[nextPos]
+			// It's a float if next is digit, or next is not identifier start (allows 314.)
+			if isDigit(nextChar) || !(isLetter(nextChar) || nextChar == '_') {
+				t.advance() // consume '.'
+				hasDecimalPoint = true
+				// Scan fractional part (may be empty for trailing dot like 314.)
+				for !t.isAtEnd() && (isDigit(t.peek()) || t.peek() == '_') {
+					t.advance()
+				}
+			}
+		} else {
+			// End of input after dot - it's a float like 314.
+			t.advance()
+			hasDecimalPoint = true
 		}
-		// Scan fractional part
+	} else if startsWithDot {
+		// Already consumed the dot, scan fractional part
 		for !t.isAtEnd() && (isDigit(t.peek()) || t.peek() == '_') {
 			t.advance()
 		}
@@ -751,7 +770,7 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 			}
 		}
 		value = core.ComplexValue(complex(0, imagPart))
-	} else if strings.Contains(cleanLexeme, ".") || strings.ContainsAny(cleanLexeme, "eE") {
+	} else if hasDecimalPoint || strings.ContainsAny(cleanLexeme, "eE") {
 		// Float
 		if f, err := strconv.ParseFloat(cleanLexeme, 64); err == nil {
 			value = core.NumberValue(f)
