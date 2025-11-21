@@ -842,6 +842,9 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
+		// Store the metaclass in the class object so type() can return it
+		class.Metaclass = metaclass
+
 		// After __new__, copy metaclass methods to the class as class methods
 		// First check metaclass.Methods
 		for methodName, method := range metaclass.Methods {

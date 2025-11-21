@@ -641,9 +641,15 @@ func doForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
-		// Check for return value - propagate it, don't unwrap!
-		// The unwrapping should only happen at function boundaries
+		// Check for flow control - propagate break/continue/return
+		// These need to bubble up to the enclosing loop or function
 		if _, ok := result.(*ReturnValue); ok {
+			return result, nil
+		}
+		if _, ok := result.(*BreakValue); ok {
+			return result, nil
+		}
+		if _, ok := result.(*ContinueValue); ok {
 			return result, nil
 		}
 	}

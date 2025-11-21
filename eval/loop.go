@@ -6,6 +6,7 @@ import (
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/core/protocols"
+	"os"
 	"strings"
 )
 
@@ -241,10 +242,17 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
+		if debugLoops := os.Getenv("M28_DEBUG_LOOPS"); debugLoops != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG LOOP] Body has %d expressions\n", len(body))
+			for idx, expr := range body {
+				fmt.Fprintf(os.Stderr, "[DEBUG LOOP]   Body[%d]: %T = %v\n", idx, expr, expr)
+			}
+		}
+
 		var result core.Value = core.Nil
 		var err error
 
-		for _, expr := range body {
+		for i, expr := range body {
 			result, err = Eval(expr, ctx)
 			if err != nil {
 				return nil, err
@@ -252,13 +260,25 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// Check for flow control
 			if _, ok := result.(*BreakValue); ok {
+				if debugLoops := os.Getenv("M28_DEBUG_LOOPS"); debugLoops != "" {
+					fmt.Fprintf(os.Stderr, "[DEBUG LOOP] Body expr %d returned Break\n", i)
+				}
 				return Break, nil
 			}
 			if _, ok := result.(*ContinueValue); ok {
+				if debugLoops := os.Getenv("M28_DEBUG_LOOPS"); debugLoops != "" {
+					fmt.Fprintf(os.Stderr, "[DEBUG LOOP] Body expr %d returned Continue\n", i)
+				}
 				return Continue, nil
 			}
 			if _, ok := result.(*ReturnValue); ok {
+				if debugLoops := os.Getenv("M28_DEBUG_LOOPS"); debugLoops != "" {
+					fmt.Fprintf(os.Stderr, "[DEBUG LOOP] Body expr %d returned Return\n", i)
+				}
 				return result, nil
+			}
+			if debugLoops := os.Getenv("M28_DEBUG_LOOPS"); debugLoops != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG LOOP] Body expr %d returned %T: %v\n", i, result, result)
 			}
 		}
 

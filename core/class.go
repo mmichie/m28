@@ -19,6 +19,7 @@ type Class struct {
 	Attributes  map[string]Value  // Class attributes
 	Constructor *MethodDescriptor // __init__ method
 	SlotNames   []string          // __slots__ attribute (if defined)
+	Metaclass   Value             // Metaclass of this class (type by default)
 }
 
 // NewClass creates a new class
@@ -198,6 +199,10 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	// Special handling for __class__ - a class's __class__ is its metaclass
 	// For most classes, this is the `type` metaclass
 	if name == "__class__" {
+		// Return the stored metaclass if available
+		if c.Metaclass != nil {
+			return c.Metaclass, true
+		}
 		// Check if a custom metaclass is set as a class attribute
 		if metaclass, ok := c.GetClassAttr("__class__"); ok {
 			return metaclass, true
@@ -412,6 +417,20 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 				return nil, fmt.Errorf("__or__ takes exactly 1 argument")
 			}
 			return NewUnionType([]Value{c, args[0]}), nil
+		}), true
+	}
+
+	// Special handling for __mro_entries__ (PEP 560 - Python 3.7+)
+	// This allows typing constructs like Generic to substitute themselves during class creation
+	// For regular classes, we just return the bases unchanged
+	if name == "__mro_entries__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__mro_entries__ takes exactly 1 argument, got %d", len(args))
+			}
+			// Regular classes return the bases tuple unchanged
+			// Typing constructs (like Generic) override this to return actual base classes
+			return args[0], nil
 		}), true
 	}
 

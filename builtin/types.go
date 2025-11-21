@@ -924,7 +924,12 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		case *core.BoundInstanceMethod:
 			return MethodTypeClass, nil
 		case *core.Class:
-			// type(SomeClass) returns type (the metaclass)
+			// type(SomeClass) returns its metaclass
+			// If the class has a custom metaclass, return it
+			// Otherwise return the default type metaclass
+			if v.Metaclass != nil {
+				return v.Metaclass, nil
+			}
 			return TypeMetaclass, nil
 		case core.Callable:
 			return FunctionTypeClass, nil
