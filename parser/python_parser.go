@@ -2380,16 +2380,30 @@ func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) as
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
 		iterable := p.parseOr()
 
+		// Parse multiple if clauses: [x for x in y if cond1 if cond2]
+		// Combine them with 'and': (cond1) and (cond2)
 		var condition ast.ASTNode
-		if p.check(TOKEN_IF) {
+		for p.check(TOKEN_IF) {
 			p.advance()
 			// Condition can use full expression parsing (including ternary if needed)
-			condition = p.parseOr()
+			nextCond := p.parseOr()
 
 			// Debug: print the condition AST
 			if debugComp := os.Getenv("DEBUG_COMP_PARSE"); debugComp != "" {
-				fmt.Fprintf(os.Stderr, "[DEBUG_COMP_PARSE] Parsed condition AST: %#v\n", condition)
-				fmt.Fprintf(os.Stderr, "[DEBUG_COMP_PARSE] Condition string: %s\n", condition.String())
+				fmt.Fprintf(os.Stderr, "[DEBUG_COMP_PARSE] Parsed condition AST: %#v\n", nextCond)
+				fmt.Fprintf(os.Stderr, "[DEBUG_COMP_PARSE] Condition string: %s\n", nextCond.String())
+			}
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
 			}
 		}
 
@@ -2430,10 +2444,24 @@ func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
 		iterable := p.parseOr()
 
+		// Parse multiple if clauses: comprehension if cond1 if cond2
+		// Combine them with 'and': (cond1) and (cond2)
 		var condition ast.ASTNode
-		if p.check(TOKEN_IF) {
+		for p.check(TOKEN_IF) {
 			p.advance()
-			condition = p.parseOr()
+			nextCond := p.parseOr()
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
 		}
 
 		clauses = append(clauses, ast.ComprehensionClause{
@@ -2472,10 +2500,24 @@ func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
 		iterable := p.parseOr()
 
+		// Parse multiple if clauses: comprehension if cond1 if cond2
+		// Combine them with 'and': (cond1) and (cond2)
 		var condition ast.ASTNode
-		if p.check(TOKEN_IF) {
+		for p.check(TOKEN_IF) {
 			p.advance()
-			condition = p.parseOr()
+			nextCond := p.parseOr()
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
 		}
 
 		clauses = append(clauses, ast.ComprehensionClause{
@@ -2514,10 +2556,24 @@ func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) 
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
 		iterable := p.parseOr()
 
+		// Parse multiple if clauses: comprehension if cond1 if cond2
+		// Combine them with 'and': (cond1) and (cond2)
 		var condition ast.ASTNode
-		if p.check(TOKEN_IF) {
+		for p.check(TOKEN_IF) {
 			p.advance()
-			condition = p.parseOr()
+			nextCond := p.parseOr()
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
 		}
 
 		clauses = append(clauses, ast.ComprehensionClause{
@@ -2560,10 +2616,24 @@ func (p *PythonParser) parseGeneratorExpressionNoParen(element ast.ASTNode, tok 
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
 		iterable := p.parseOr()
 
+		// Parse multiple if clauses: comprehension if cond1 if cond2
+		// Combine them with 'and': (cond1) and (cond2)
 		var condition ast.ASTNode
-		if p.check(TOKEN_IF) {
+		for p.check(TOKEN_IF) {
 			p.advance()
-			condition = p.parseOr()
+			nextCond := p.parseOr()
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
 		}
 
 		clauses = append(clauses, ast.ComprehensionClause{
