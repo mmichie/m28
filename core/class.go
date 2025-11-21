@@ -510,6 +510,18 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 			// Return a representation string
 			return StringValue(fmt.Sprintf("<%s object>", c.Name)), nil
 		}), true
+	case "__init__":
+		// Default __init__ that all classes inherit from object
+		// object.__init__(self, *args, **kwargs) does nothing but accepts any arguments
+		// This ensures all classes have __init__ even if they don't define it
+		return &BuiltinFunctionWithKwargs{
+			BaseObject: *NewBaseObject(FunctionType),
+			Name:       "__init__",
+			Fn: func(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+				// Default __init__ does nothing, just return None
+				return None, nil
+			},
+		}, true
 	}
 
 	// Finally check base object

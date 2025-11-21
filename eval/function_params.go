@@ -2,9 +2,11 @@ package eval
 
 import (
 	"fmt"
-	"github.com/mmichie/m28/core"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/mmichie/m28/core"
 )
 
 // ParameterInfo holds information about a function parameter
@@ -284,26 +286,32 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 	argIndex := 0
 
 	// Debug: print signature info
-	// fmt.Printf("DEBUG BindArguments: %d args, %d kwargs, %d required, %d optional params\n",
-	// 	len(args), len(kwargs), len(sig.RequiredParams), len(sig.OptionalParams))
-	// for i, arg := range args {
-	// 	fmt.Printf("  arg[%d] = %T: %v\n", i, arg, arg)
-	// }
-	// for k, v := range kwargs {
-	// 	fmt.Printf("  kwarg %s = %T: %v\n", k, v, v)
-	// }
-	// for _, p := range sig.RequiredParams {
-	// 	fmt.Printf("  Required: %s\n", p.Name)
-	// }
-	// for _, p := range sig.OptionalParams {
-	// 	fmt.Printf("  Optional: %s (default=%v)\n", p.Name, p.DefaultValue)
-	// }
-	// if sig.RestParam != nil {
-	// 	fmt.Printf("  *args: %s\n", *sig.RestParam)
-	// }
-	// if sig.KeywordParam != nil {
-	// 	fmt.Printf("  **kwargs: %s\n", *sig.KeywordParam)
-	// }
+	// NOTE: Disabled to avoid infinite recursion when printing Instance arguments
+	// The recursion: printf -> Instance.String -> GetAttr -> NewBuiltinFunction -> String...
+	debugBind := os.Getenv("M28_DEBUG_BIND") != ""
+	if debugBind {
+		fmt.Printf("DEBUG BindArguments: %d args, %d kwargs, %d required, %d optional params\n",
+			len(args), len(kwargs), len(sig.RequiredParams), len(sig.OptionalParams))
+		// Print only types, not values, to avoid recursion
+		for i, arg := range args {
+			fmt.Printf("  arg[%d] = %T\n", i, arg)
+		}
+		for k := range kwargs {
+			fmt.Printf("  kwarg %s\n", k)
+		}
+		for _, p := range sig.RequiredParams {
+			fmt.Printf("  Required: %s\n", p.Name)
+		}
+		for _, p := range sig.OptionalParams {
+			fmt.Printf("  Optional: %s\n", p.Name)
+		}
+		if sig.RestParam != nil {
+			fmt.Printf("  *args: %s\n", *sig.RestParam)
+		}
+		if sig.KeywordParam != nil {
+			fmt.Printf("  **kwargs: %s\n", *sig.KeywordParam)
+		}
+	}
 
 	// 1. Bind required parameters
 	for _, param := range sig.RequiredParams {

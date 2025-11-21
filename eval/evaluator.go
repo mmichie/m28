@@ -2269,9 +2269,15 @@ func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	varName := string(varSym)
 
 	// Evaluate the iterable
-	iterable, err := Eval(args.Items()[2], ctx)
+	iterableExpr := args.Items()[2]
+	iterable, err := Eval(iterableExpr, ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating iterable: %v", err)
+		// Debug: show what expression failed
+		exprStr := core.PrintValue(iterableExpr)
+		if len(exprStr) > 100 {
+			exprStr = exprStr[:100] + "..."
+		}
+		return nil, fmt.Errorf("error evaluating iterable %s: %v", exprStr, err)
 	}
 
 	// Convert iterable to a sequence we can iterate over
@@ -2591,9 +2597,15 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	varName := string(varSym)
 
 	// Evaluate the iterable
-	iterable, err := Eval(args.Items()[2], ctx)
+	iterableExpr := args.Items()[2]
+	iterable, err := Eval(iterableExpr, ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating iterable: %v", err)
+		// Debug: show what expression failed
+		exprStr := core.PrintValue(iterableExpr)
+		if len(exprStr) > 100 {
+			exprStr = exprStr[:100] + "..."
+		}
+		return nil, fmt.Errorf("error evaluating iterable %s: %v", exprStr, err)
 	}
 
 	// Convert iterable to a sequence we can iterate over
@@ -2800,9 +2812,15 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	varName := string(varSym)
 
 	// Evaluate the iterable
-	iterable, err := Eval(args.Items()[2], ctx)
+	iterableExpr := args.Items()[2]
+	iterable, err := Eval(iterableExpr, ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating iterable: %v", err)
+		// Debug: show what expression failed
+		exprStr := core.PrintValue(iterableExpr)
+		if len(exprStr) > 100 {
+			exprStr = exprStr[:100] + "..."
+		}
+		return nil, fmt.Errorf("error evaluating iterable %s: %v", exprStr, err)
 	}
 
 	// Store the expression, condition (if present), and context

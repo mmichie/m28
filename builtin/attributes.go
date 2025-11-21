@@ -53,9 +53,11 @@ func RegisterAttributes(ctx *core.Context) {
 
 		val := v.Get(0)
 
-		// Try __dir__ dunder method first
-		if obj, ok := val.(core.Object); ok {
-			if method, exists := obj.GetAttr("__dir__"); exists {
+		// Try __dir__ dunder method first, but ONLY for instances, not classes
+		// In Python, dir(SomeClass) does NOT call the instance method __dir__()
+		// It only calls __dir__() when given an instance: dir(some_instance)
+		if instance, ok := val.(*core.Instance); ok {
+			if method, exists := instance.GetAttr("__dir__"); exists {
 				if callable, ok := method.(core.Callable); ok {
 					result, err := callable.Call([]core.Value{}, ctx)
 					if err != nil {
