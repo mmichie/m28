@@ -234,6 +234,9 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	moduleCtx.Define("__name__", core.StringValue(name))
 	moduleCtx.Define("__file__", core.StringValue(pyPath))
+	// Initialize empty __annotations__ dict for PEP 526 support
+	// Python automatically creates this dict for modules that use annotations
+	moduleCtx.Define("__annotations__", core.NewDict())
 
 	// Add __package__ for packages
 	if isPackage {
