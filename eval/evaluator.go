@@ -4,6 +4,7 @@ package eval
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/mmichie/m28/common/types"
@@ -872,8 +873,18 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 
 	// If __class__ is defined in the call context, copy it to the function environment
 	// This allows super() to know which class's method is being executed
+	debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
 	if classVal, err := ctx.Lookup("__class__"); err == nil {
+		if debugSuper {
+			className := "unknown"
+			if cls, ok := classVal.(*core.Class); ok {
+				className = cls.Name
+			}
+			fmt.Fprintf(os.Stderr, "[DEBUG UserFunction.CallWithKwargs] Function %s: copying __class__=%s from ctx to funcEnv\n", f.name, className)
+		}
 		funcEnv.Define("__class__", classVal)
+	} else if debugSuper {
+		fmt.Fprintf(os.Stderr, "[DEBUG UserFunction.CallWithKwargs] Function %s: NO __class__ in ctx (error: %v)\n", f.name, err)
 	}
 
 	// Use new signature-based binding if available

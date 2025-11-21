@@ -213,6 +213,14 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return StringValue(c.Name), true
 	}
 
+	// Special handling for __qualname__
+	// In Python, __qualname__ is the qualified name including any enclosing classes
+	// For now, we just use the class name (same as __name__)
+	// TODO: Track nested class definitions to provide full qualified names
+	if name == "__qualname__" {
+		return StringValue(c.Name), true
+	}
+
 	// Special handling for __module__
 	if name == "__module__" {
 		return StringValue(c.Module), true
@@ -591,7 +599,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 	// Call __init__ if it exists and instance is of the right type
 	// Call __init__ if __new__ returned an instance of this class or a subclass
 	if inst, ok := instance.(*Instance); ok && IsInstanceOf(inst, c) {
-		if initMethod, _, ok := c.GetMethodWithClass("__init__"); ok {
+		if initMethod, definingClass, ok := c.GetMethodWithClass("__init__"); ok {
 			// Debug for pathlib classes
 			if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
 				// 				fmt.Printf("[DEBUG Class.CallWithKeywords] Calling %s.__init__ with %d args, %d kwargs\n", c.Name, len(args), len(kwargs))
@@ -603,10 +611,13 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				// 				fmt.Printf("[DEBUG Class.CallWithKeywords]   kwargs: %v\n", kwargs)
 			}
 
-			// Create a new context with __class__ set to the class being instantiated
-			// This allows super() to work correctly inside __init__
+			// CRITICAL: Set __class__ to the DEFINING class, not the instance's class
+			// This is required for super() to work correctly in inherited methods
+			// When Child has no __init__ but inherits Parent.__init__, and Parent.__init__
+			// calls super().__init__(), super() must search from Parent's position in MRO,
+			// not Child's position
 			initCtx := NewContext(ctx)
-			initCtx.Define("__class__", c)
+			initCtx.Define("__class__", definingClass)
 
 			// Prepend instance as first argument (self)
 			initArgs := append([]Value{instance}, args...)
@@ -1222,8 +1233,8 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 		classForSuper = bm.Instance.Class
 	}
 
-	// Debug output for super() investigation
-	debugSuper := false
+	// Debug output for super() investigation (controlled by M28_DEBUG_SUPER env var)
+	debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
 	if debugSuper {
 		if methodFunc, ok := bm.Method.(interface{ String() string }); ok {
 			defClassName := "nil"
@@ -1238,20 +1249,22 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 		}
 	}
 
-	// Only set __class__ if it's not already defined in the parent context
-	// (preserve it for super() chains)
-	// When Child.__init__ calls super().__init__(), which calls Base.__init__,
-	// __class__ should remain Child (from parent context), not change to Base
-	if ctx != nil {
-		_, err := ctx.Lookup("__class__")
-		if err != nil {
-			// __class__ not defined in parent context, set it to the defining class
-			methodCtx.Define("__class__", classForSuper)
+	// CRITICAL: Always set __class__ to the defining class for this method
+	// This is required for super() to work correctly in parent class methods
+	// When Parent.__init__ calls super().__init__(), super() needs to use
+	// Parent's __class__, not Child's, so it finds GrandParent.__init__
+	if debugSuper {
+		prevClass := "nil"
+		if ctx != nil {
+			if val, err := ctx.Lookup("__class__"); err == nil {
+				if cls, ok := val.(*Class); ok {
+					prevClass = cls.Name
+				}
+			}
 		}
-	} else {
-		// No parent context, set __class__
-		methodCtx.Define("__class__", classForSuper)
+		fmt.Fprintf(os.Stderr, "[DEBUG BoundInstanceMethod] Setting __class__ from %s to %s\n", prevClass, classForSuper.Name)
 	}
+	methodCtx.Define("__class__", classForSuper)
 	// Note: Don't define super here - let it come from the builtin function
 	// which will look up __class__ from the context
 
@@ -1272,18 +1285,23 @@ func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]
 		classForSuper = bm.Instance.Class
 	}
 
-	// Only set __class__ if it's not already defined in the parent context
-	// (preserve it for super() chains)
-	if ctx != nil {
-		_, err := ctx.Lookup("__class__")
-		if err != nil {
-			// __class__ not defined in parent context, set it to the defining class
-			methodCtx.Define("__class__", classForSuper)
+	// CRITICAL: Always set __class__ to the defining class for this method
+	// This is required for super() to work correctly in parent class methods
+	// When Parent.__init__ calls super().__init__(), super() needs to use
+	// Parent's __class__, not Child's, so it finds GrandParent.__init__
+	debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
+	if debugSuper {
+		prevClass := "nil"
+		if ctx != nil {
+			if val, err := ctx.Lookup("__class__"); err == nil {
+				if cls, ok := val.(*Class); ok {
+					prevClass = cls.Name
+				}
+			}
 		}
-	} else {
-		// No parent context, set __class__
-		methodCtx.Define("__class__", classForSuper)
+		fmt.Fprintf(os.Stderr, "[DEBUG BoundInstanceMethod] Setting __class__ from %s to %s\n", prevClass, classForSuper.Name)
 	}
+	methodCtx.Define("__class__", classForSuper)
 	// Note: Don't define super here - let it come from the builtin function
 
 	// Prepend instance as first argument (self)
