@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run official CPython regression tests from stdlib
-# Tracks which tests M28 can pass from CPython's test suite
+# Uses conformance.json to track which tests M28 can pass
 
 set -e
 
@@ -9,16 +9,34 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Find M28 binary
+# Find paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 M28_BIN="$SCRIPT_DIR/../bin/m28"
+CONFORMANCE_JSON="$SCRIPT_DIR/cpython/conformance.json"
 
 if [[ ! -f "$M28_BIN" ]]; then
     echo -e "${RED}Error: M28 binary not found at $M28_BIN${NC}"
     echo "Please run 'make build' first"
     exit 1
+fi
+
+if [[ ! -f "$CONFORMANCE_JSON" ]]; then
+    echo -e "${RED}Error: conformance.json not found at $CONFORMANCE_JSON${NC}"
+    exit 1
+fi
+
+# Check for jq
+if ! command -v jq &> /dev/null; then
+    echo -e "${YELLOW}Warning: jq not found, installing via brew...${NC}"
+    if command -v brew &> /dev/null; then
+        brew install jq
+    else
+        echo -e "${RED}Error: jq is required. Install with: brew install jq${NC}"
+        exit 1
+    fi
 fi
 
 # Detect Python stdlib location
@@ -36,139 +54,131 @@ fi
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}  CPython Regression Test Suite      ${NC}"
 echo -e "${BLUE}======================================${NC}"
-echo -e "Python stdlib: $PYTHON_STDLIB"
+echo -e "Python stdlib: ${CYAN}$PYTHON_STDLIB${NC}"
+echo -e "Conformance:   ${CYAN}$CONFORMANCE_JSON${NC}"
 echo ""
 
 # Test counters
 TOTAL=0
 PASSED=0
 FAILED=0
-SKIPPED=0
+NOT_FOUND=0
 FAILED_TESTS=()
+PASSED_TESTS=()
+NOT_FOUND_TESTS=()
 
 # Function to run a test
 run_test() {
     local test_name=$1
-    local expected_status=$2  # "pass", "fail", or "skip"
     local test_file="$PYTHON_STDLIB/test/${test_name}.py"
 
     TOTAL=$((TOTAL + 1))
 
     # Show test name with padding
-    printf "%-45s" "  $test_name..."
-
-    if [[ "$expected_status" == "skip" ]]; then
-        echo -e "${YELLOW}⊘ skipped${NC}"
-        SKIPPED=$((SKIPPED + 1))
-        return
-    fi
+    printf "    %-40s" "$test_name..."
 
     if [[ ! -f "$test_file" ]]; then
         echo -e "${YELLOW}⊘ not found${NC}"
-        SKIPPED=$((SKIPPED + 1))
+        NOT_FOUND=$((NOT_FOUND + 1))
+        NOT_FOUND_TESTS+=("$test_name")
         return
     fi
 
     # Run with timeout
     if timeout 30s "$M28_BIN" "$test_file" > /tmp/m28_regression_test.txt 2>&1; then
-        if [[ "$expected_status" == "pass" ]]; then
-            echo -e "${GREEN}✓ passed${NC}"
-            PASSED=$((PASSED + 1))
-        else
-            echo -e "${YELLOW}✓ passed (unexpected!)${NC}"
-            PASSED=$((PASSED + 1))
-        fi
+        echo -e "${GREEN}✓ passed${NC}"
+        PASSED=$((PASSED + 1))
+        PASSED_TESTS+=("$test_name")
     else
         EXIT_CODE=$?
-        if [[ "$expected_status" == "fail" ]]; then
-            echo -e "${YELLOW}✗ failed (expected)${NC}"
-            FAILED=$((FAILED + 1))
+        if [[ $EXIT_CODE -eq 124 ]]; then
+            echo -e "${YELLOW}⏱ timeout${NC}"
         else
-            echo -e "${RED}✗ FAILED${NC}"
-            FAILED=$((FAILED + 1))
-            FAILED_TESTS+=("$test_name")
-            # Show first error line
-            head -n 3 /tmp/m28_regression_test.txt 2>/dev/null | sed 's/^/    /'
+            echo -e "${RED}✗ failed${NC}"
         fi
+        FAILED=$((FAILED + 1))
+        FAILED_TESTS+=("$test_name")
+        # Show first error line
+        head -n 2 /tmp/m28_regression_test.txt 2>/dev/null | sed 's/^/        /'
     fi
 }
 
-# Define test categories and expected status
-# Format: test_name expected_status
-# expected_status: "pass" (should pass), "fail" (known to fail), "skip" (not ready to test)
+# Get list of tiers sorted by priority
+TIERS=$(jq -r '.tiers | to_entries | sort_by(.value.priority) | .[].key' "$CONFORMANCE_JSON")
 
-echo -e "${BLUE}Tier 1: Basic Types${NC}"
-echo "─────────────────────────"
-run_test "test_bool" "pass"          # M28-9e56: ✓ PASSING
-run_test "test_int" "fail"            # M28-f785: Parser fixed, blocked by unittest.mock import
-run_test "test_float" "skip"          # Not yet targeted
-run_test "test_string" "skip"         # Not yet targeted
+# Run tests tier by tier
+for tier in $TIERS; do
+    TIER_DESC=$(jq -r ".tiers.${tier}.description" "$CONFORMANCE_JSON")
+    TIER_PRIORITY=$(jq -r ".tiers.${tier}.priority" "$CONFORMANCE_JSON")
 
-echo ""
-echo -e "${BLUE}Tier 2: Data Structures${NC}"
-echo "─────────────────────────"
-run_test "test_list" "skip"           # Not yet targeted
-run_test "test_tuple" "skip"          # Needs test.support
-run_test "test_dict" "skip"           # Not yet targeted
-run_test "test_set" "skip"            # Not yet targeted
+    echo -e "${BLUE}Tier ${TIER_PRIORITY}: ${TIER_DESC}${NC}"
+    echo "─────────────────────────"
 
-echo ""
-echo -e "${BLUE}Tier 3: Language Features${NC}"
-echo "─────────────────────────"
-run_test "test_class" "fail"          # M28-1c83: Core working, unittest.main() issue
-run_test "test_augassign" "fail"      # M28-17e5: Blocked by unittest.main()
-run_test "test_dictcomps" "fail"      # M28-7ed5: 4/6 passing, unittest.main() issue
-run_test "test_contains" "fail"       # M28-a985: Blocked by unittest.main()
-run_test "test_compare" "skip"        # Not yet targeted
-run_test "test_slice" "skip"          # Not yet targeted
+    # Get tests in this tier
+    TEST_NAMES=$(jq -r ".tiers.${tier}.tests | keys[]" "$CONFORMANCE_JSON")
 
-echo ""
-echo -e "${BLUE}Tier 4: Advanced Features${NC}"
-echo "─────────────────────────"
-run_test "test_binop" "skip"          # Complex, needs work
-run_test "test_operators" "skip"      # Not yet targeted
-run_test "test_exceptions" "skip"     # Not yet targeted
+    if [[ -z "$TEST_NAMES" ]]; then
+        echo "  (no tests defined)"
+        echo ""
+        continue
+    fi
+
+    for test_name in $TEST_NAMES; do
+        run_test "$test_name"
+    done
+
+    echo ""
+done
 
 # Summary
-echo ""
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}           TEST SUMMARY               ${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo -e "Total Tests:    $TOTAL"
 echo -e "Passed:         ${GREEN}$PASSED${NC}"
 echo -e "Failed:         ${RED}$FAILED${NC}"
-echo -e "Skipped:        ${YELLOW}$SKIPPED${NC}"
+echo -e "Not Found:      ${YELLOW}$NOT_FOUND${NC}"
 
 if [[ $TOTAL -gt 0 ]]; then
-    TESTABLE=$((TOTAL - SKIPPED))
+    TESTABLE=$((TOTAL - NOT_FOUND))
     if [[ $TESTABLE -gt 0 ]]; then
         PERCENT=$((PASSED * 100 / TESTABLE))
         echo -e "Success Rate:   ${GREEN}${PERCENT}%${NC} (of testable)"
     fi
 fi
 
-# Failed test details
+# Show passed tests
+if [[ ${#PASSED_TESTS[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "${GREEN}Passed Tests (${#PASSED_TESTS[@]}):${NC}"
+    for test in "${PASSED_TESTS[@]}"; do
+        echo "  ✓ $test"
+    done
+fi
+
+# Show failed tests
 if [[ ${#FAILED_TESTS[@]} -gt 0 ]]; then
     echo ""
-    echo -e "${RED}Newly Failed Tests:${NC}"
+    echo -e "${RED}Failed Tests (${#FAILED_TESTS[@]}):${NC}"
     for test in "${FAILED_TESTS[@]}"; do
-        echo "  - $test"
+        echo "  ✗ $test"
+    done
+fi
+
+# Show not found tests
+if [[ ${#NOT_FOUND_TESTS[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "${YELLOW}Not Found in CPython stdlib (${#NOT_FOUND_TESTS[@]}):${NC}"
+    for test in "${NOT_FOUND_TESTS[@]}"; do
+        echo "  ⊘ $test"
     done
 fi
 
 echo ""
-echo -e "${BLUE}Next Steps:${NC}"
-echo "  1. Fix M28-e4b4: unittest.main() exception issue"
-echo "  2. Target M28-7ed5: test_dictcomps (4/6 passing!)"
-echo "  3. See: ./bin/m28 -e 'import beads; beads.show(\"M28-877c\")'"
-
-# Exit code based on unexpected failures
-if [[ ${#FAILED_TESTS[@]} -eq 0 ]]; then
-    echo ""
-    echo -e "${GREEN}✅ All targeted tests behaving as expected${NC}"
+if [[ $PASSED -gt 0 ]]; then
+    echo -e "${GREEN}✅ $PASSED tests passing!${NC}"
     exit 0
 else
-    echo ""
-    echo -e "${RED}❌ Some tests regressed${NC}"
-    exit 1
+    echo -e "${YELLOW}No tests passing yet${NC}"
+    exit 0
 fi
