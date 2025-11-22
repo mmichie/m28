@@ -365,3 +365,233 @@ func TestErrorFormatter_RangeHighlighting(t *testing.T) {
 		t.Errorf("Expected multiple carets for range, got: %s", carets)
 	}
 }
+
+func TestErrorFormatter_UnicodeCharacters(t *testing.T) {
+	ef := NewErrorFormatter(false)
+
+	source := `message = "Hello 世界"
+result = undefined_变量`
+
+	ef.AddSource("test.py", source)
+
+	err := &ParseError{
+		Message:  "name not defined",
+		Line:     2,
+		Col:      10, // Points to 'undefined_变量'
+		Filename: "test.py",
+	}
+
+	formatted := ef.FormatError(err)
+
+	// Should handle unicode correctly
+	if !strings.Contains(formatted, "undefined_变量") {
+		t.Errorf("Expected unicode variable name in output, got: %s", formatted)
+	}
+
+	// Should show correct line
+	if !strings.Contains(formatted, "line 2") {
+		t.Errorf("Expected line 2 in output, got: %s", formatted)
+	}
+}
+
+func TestErrorFormatter_VeryLongLine(t *testing.T) {
+	ef := NewErrorFormatter(false)
+
+	// Create a very long line (200+ characters)
+	longLine := "x = " + strings.Repeat("1 + ", 50) + "undefined_var"
+	ef.AddSource("test.py", longLine)
+
+	err := &ParseError{
+		Message:  "name not defined",
+		Line:     1,
+		Col:      len(longLine) - 10, // Near end of long line
+		Filename: "test.py",
+	}
+
+	formatted := ef.FormatError(err)
+
+	// Should still format without crashing
+	if formatted == "" {
+		t.Error("Expected non-empty formatted output for long line")
+	}
+
+	// Should contain part of the source
+	if !strings.Contains(formatted, "undefined_var") {
+		t.Errorf("Expected error location in output, got: %s", formatted)
+	}
+}
+
+func TestErrorFormatter_TabsInSource(t *testing.T) {
+	ef := NewErrorFormatter(false)
+
+	// Source with tabs
+	source := "def foo():\n\tx = 10\n\treturn x + undefined"
+
+	ef.AddSource("test.py", source)
+
+	err := &ParseError{
+		Message:  "name not defined",
+		Line:     3,
+		Col:      16,
+		Filename: "test.py",
+	}
+
+	formatted := ef.FormatError(err)
+
+	// Should handle tabs
+	if !strings.Contains(formatted, "return x") {
+		t.Errorf("Expected source line in output, got: %s", formatted)
+	}
+
+	// Should show caret
+	if !strings.Contains(formatted, "^") {
+		t.Errorf("Expected caret in output, got: %s", formatted)
+	}
+}
+
+func TestErrorFormatter_EmptyFile(t *testing.T) {
+	ef := NewErrorFormatter(false)
+
+	ef.AddSource("empty.py", "")
+
+	err := &ParseError{
+		Message:  "unexpected EOF",
+		Line:     1,
+		Col:      1,
+		Filename: "empty.py",
+	}
+
+	formatted := ef.FormatError(err)
+
+	// Should not crash on empty file
+	if formatted == "" {
+		t.Error("Expected formatted error for empty file")
+	}
+
+	if !strings.Contains(formatted, "unexpected EOF") {
+		t.Errorf("Expected error message in output, got: %s", formatted)
+	}
+}
+
+func TestErrorFormatter_ErrorAtEOF(t *testing.T) {
+	ef := NewErrorFormatter(false)
+
+	source := `def foo():
+    return 42
+# Missing newline at end`
+
+	ef.AddSource("test.py", source)
+
+	// Error at very end of file
+	lines := strings.Split(source, "\n")
+	lastLine := len(lines)
+
+	err := &ParseError{
+		Message:  "unexpected EOF",
+		Line:     lastLine,
+		Col:      len(lines[lastLine-1]),
+		Filename: "test.py",
+	}
+
+	formatted := ef.FormatError(err)
+
+	// Should handle EOF location
+	if !strings.Contains(formatted, "unexpected EOF") {
+		t.Errorf("Expected error message in output, got: %s", formatted)
+	}
+}
+
+func TestErrorFormatter_ConsecutiveErrors(t *testing.T) {
+	ef := NewErrorFormatter(false)
+
+	source := `x = 10
+y = undefined1
+z = undefined2`
+
+	ef.AddSource("test.py", source)
+
+	err1 := &ParseError{
+		Message:  "name 'undefined1' not defined",
+		Line:     2,
+		Col:      5,
+		Filename: "test.py",
+	}
+
+	err2 := &ParseError{
+		Message:  "name 'undefined2' not defined",
+		Line:     3,
+		Col:      5,
+		Filename: "test.py",
+	}
+
+	formatted1 := ef.FormatError(err1)
+	formatted2 := ef.FormatError(err2)
+
+	// Both should format correctly
+	if !strings.Contains(formatted1, "undefined1") {
+		t.Errorf("Expected first error in output, got: %s", formatted1)
+	}
+
+	if !strings.Contains(formatted2, "undefined2") {
+		t.Errorf("Expected second error in output, got: %s", formatted2)
+	}
+
+	// Should show different line numbers
+	if !strings.Contains(formatted1, "line 2") {
+		t.Errorf("Expected line 2 in first error, got: %s", formatted1)
+	}
+
+	if !strings.Contains(formatted2, "line 3") {
+		t.Errorf("Expected line 3 in second error, got: %s", formatted2)
+	}
+}
+
+func TestErrorFormatter_WindowsBOMLike(t *testing.T) {
+	ef := NewErrorFormatter(false)
+
+	// Source with Windows-style line endings and potential BOM-like content
+	source := "x = 10\r\ny = 20\r\nz = undefined"
+
+	ef.AddSource("test.py", source)
+
+	err := &ParseError{
+		Message:  "name not defined",
+		Line:     3,
+		Col:      5,
+		Filename: "test.py",
+	}
+
+	formatted := ef.FormatError(err)
+
+	// Should handle \r\n line endings
+	if !strings.Contains(formatted, "undefined") {
+		t.Errorf("Expected error location in output, got: %s", formatted)
+	}
+}
+
+func TestErrorFormatter_ErrorOnFirstCharacter(t *testing.T) {
+	ef := NewErrorFormatter(false)
+
+	source := "undefined"
+
+	ef.AddSource("test.py", source)
+
+	err := &ParseError{
+		Message:  "name not defined",
+		Line:     1,
+		Col:      1,
+		Filename: "test.py",
+	}
+
+	formatted := ef.FormatError(err)
+
+	// Should show caret at beginning
+	if !strings.Contains(formatted, "^") {
+		t.Errorf("Expected caret in output, got: %s", formatted)
+	}
+
+	// Should show the source
+	if !strings.Contains(formatted, "undefined") {
+		t.Errorf("Expected source in output, got: %s", formatted)
+	}
+}

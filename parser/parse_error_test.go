@@ -203,3 +203,345 @@ func TestParseErrorFilename(t *testing.T) {
 		})
 	}
 }
+
+func TestParseError_ComplexExpressions(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		shouldFail bool
+		errMsg     string
+	}{
+		{
+			name:       "nested parentheses OK",
+			source:     "result = ((1 + 2) * (3 + 4))",
+			shouldFail: false,
+		},
+		{
+			name:       "unclosed nested parenthesis",
+			source:     "result = ((1 + 2) * (3 + 4)",
+			shouldFail: true,
+			errMsg:     "RPAREN",
+		},
+		{
+			name:       "mismatched brackets and parens",
+			source:     "result = [(1 + 2)]",
+			shouldFail: false,
+		},
+		{
+			name:       "wrong closing delimiter",
+			source:     "result = [(1 + 2}]",
+			shouldFail: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenizer := NewPythonTokenizer(tt.source)
+			tokens, err := tokenizer.Tokenize()
+			if err != nil {
+				if !tt.shouldFail {
+					t.Fatalf("Tokenization failed: %v", err)
+				}
+				return
+			}
+
+			parser := NewPythonParser(tokens, "test.py", tt.source)
+			_, err = parser.Parse()
+
+			if tt.shouldFail && err == nil {
+				t.Error("Expected parse error but got none")
+			}
+			if !tt.shouldFail && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+			if tt.shouldFail && err != nil && tt.errMsg != "" {
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("Expected error containing %q, got: %s", tt.errMsg, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestParseError_FunctionDefinitions(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		shouldFail bool
+		errMsg     string
+	}{
+		{
+			name: "valid function",
+			source: `def foo(x, y):
+    return x + y`,
+			shouldFail: false,
+		},
+		{
+			name:       "missing colon",
+			source:     "def foo(x, y)\n    return x + y",
+			shouldFail: true,
+			errMsg:     "COLON",
+		},
+		{
+			name:       "missing params parentheses",
+			source:     "def foo:\n    pass",
+			shouldFail: true,
+		},
+		{
+			name: "function with default args",
+			source: `def foo(x, y=10):
+    return x + y`,
+			shouldFail: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenizer := NewPythonTokenizer(tt.source)
+			tokens, err := tokenizer.Tokenize()
+			if err != nil {
+				t.Fatalf("Tokenization failed: %v", err)
+			}
+
+			parser := NewPythonParser(tokens, "test.py", tt.source)
+			_, err = parser.Parse()
+
+			if tt.shouldFail && err == nil {
+				t.Error("Expected parse error but got none")
+			}
+			if !tt.shouldFail && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+		})
+	}
+}
+
+func TestParseError_ClassDefinitions(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		shouldFail bool
+	}{
+		{
+			name: "valid class",
+			source: `class MyClass:
+    pass`,
+			shouldFail: false,
+		},
+		{
+			name:       "missing colon",
+			source:     "class MyClass\n    pass",
+			shouldFail: true,
+		},
+		{
+			name: "class with methods",
+			source: `class MyClass:
+    def method(self):
+        pass`,
+			shouldFail: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenizer := NewPythonTokenizer(tt.source)
+			tokens, err := tokenizer.Tokenize()
+			if err != nil {
+				t.Fatalf("Tokenization failed: %v", err)
+			}
+
+			parser := NewPythonParser(tokens, "test.py", tt.source)
+			_, err = parser.Parse()
+
+			if tt.shouldFail && err == nil {
+				t.Error("Expected parse error but got none")
+			}
+			if !tt.shouldFail && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+		})
+	}
+}
+
+func TestParseError_ControlFlow(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		shouldFail bool
+		errMsg     string
+	}{
+		{
+			name: "if-elif-else OK",
+			source: `if x > 0:
+    print("positive")
+elif x < 0:
+    print("negative")
+else:
+    print("zero")`,
+			shouldFail: false,
+		},
+		{
+			name:       "if without colon",
+			source:     "if x > 0\n    print('x')",
+			shouldFail: true,
+			errMsg:     "COLON",
+		},
+		{
+			name: "while loop OK",
+			source: `while x > 0:
+    x = x - 1`,
+			shouldFail: false,
+		},
+		{
+			name:       "while without colon",
+			source:     "while True\n    break",
+			shouldFail: true,
+			errMsg:     "COLON",
+		},
+		{
+			name: "for loop OK",
+			source: `for i in range(10):
+    print(i)`,
+			shouldFail: false,
+		},
+		{
+			name:       "for without colon",
+			source:     "for i in range(10)\n    print(i)",
+			shouldFail: true,
+			errMsg:     "COLON",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenizer := NewPythonTokenizer(tt.source)
+			tokens, err := tokenizer.Tokenize()
+			if err != nil {
+				t.Fatalf("Tokenization failed: %v", err)
+			}
+
+			parser := NewPythonParser(tokens, "test.py", tt.source)
+			_, err = parser.Parse()
+
+			if tt.shouldFail && err == nil {
+				t.Error("Expected parse error but got none")
+			}
+			if !tt.shouldFail && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+			if tt.shouldFail && err != nil && tt.errMsg != "" {
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("Expected error containing %q, got: %s", tt.errMsg, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestParseError_TryExcept(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		shouldFail bool
+	}{
+		{
+			name: "try-except OK",
+			source: `try:
+    x = 1 / 0
+except ZeroDivisionError:
+    print("error")`,
+			shouldFail: false,
+		},
+		{
+			name: "try-finally OK",
+			source: `try:
+    x = 1
+finally:
+    print("cleanup")`,
+			shouldFail: false,
+		},
+		{
+			name: "try-except-finally OK",
+			source: `try:
+    x = 1
+except:
+    pass
+finally:
+    print("done")`,
+			shouldFail: false,
+		},
+		{
+			name:       "try without body",
+			source:     "try:",
+			shouldFail: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenizer := NewPythonTokenizer(tt.source)
+			tokens, err := tokenizer.Tokenize()
+			if err != nil {
+				t.Fatalf("Tokenization failed: %v", err)
+			}
+
+			parser := NewPythonParser(tokens, "test.py", tt.source)
+			_, err = parser.Parse()
+
+			if tt.shouldFail && err == nil {
+				t.Error("Expected parse error but got none")
+			}
+			if !tt.shouldFail && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+		})
+	}
+}
+
+func TestParseError_EmptyStatements(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		shouldFail bool
+	}{
+		{
+			name:       "empty if body",
+			source:     "if True:",
+			shouldFail: true,
+		},
+		{
+			name: "if with pass",
+			source: `if True:
+    pass`,
+			shouldFail: false,
+		},
+		{
+			name:       "empty function",
+			source:     "def foo():",
+			shouldFail: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenizer := NewPythonTokenizer(tt.source)
+			tokens, err := tokenizer.Tokenize()
+			if err != nil {
+				if !tt.shouldFail {
+					t.Fatalf("Tokenization failed: %v", err)
+				}
+				return
+			}
+
+			parser := NewPythonParser(tokens, "test.py", tt.source)
+			_, err = parser.Parse()
+
+			if tt.shouldFail && err == nil {
+				t.Error("Expected parse error but got none")
+			}
+			if !tt.shouldFail && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+		})
+	}
+}
