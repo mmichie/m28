@@ -58,28 +58,67 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 			// vs bare * (keyword-only separator)
 			if symStr == "*" && i+1 < len(paramList) {
 				if nextSym, ok := paramList[i+1].(core.SymbolValue); ok {
-					// Check if this is bare * (keyword-only separator) or *args (varargs)
-					// Heuristic: if there are more parameters after the next symbol,
-					// or if the next-next token is **, then * is a separator
-					hasMoreParams := i+2 < len(paramList)
-					if hasMoreParams {
-						// Check if next-next is ** (would make this: *, param, **kwargs)
-						if i+2 < len(paramList) {
-							if nextNext, ok := paramList[i+2].(core.SymbolValue); ok && string(nextNext) == "**" {
-								// Bare * separator: *, param, **kwargs
-								transformedParams = append(transformedParams, sym) // Keep bare *
-								i++                                                // Skip just the *
-								continue
-							}
-						}
-						// Bare * separator: *, param1, param2, ...
+					nextStr := string(nextSym)
+
+					// If the next symbol looks like a special marker (starts with * or **),
+					// then this is just a bare * separator
+					if strings.HasPrefix(nextStr, "*") {
 						transformedParams = append(transformedParams, sym) // Keep bare *
 						i++                                                // Skip just the *
 						continue
 					}
-					// This is *args style (last parameter or before **)
-					transformedParams = append(transformedParams, core.SymbolValue("*"+string(nextSym)))
-					i += 2 // Skip both * and args
+
+					// Check if this is bare * (keyword-only separator) or *args (varargs)
+					// NEW HEURISTIC: If the next symbol looks like a regular parameter name
+					// (doesn't contain =, isn't a known special form), treat * as separator
+					// The only way to have *args is to write it as a single token "*args"
+					// or to have it as the conventional name "args" after *
+
+					// Check for varargs pattern vs keyword-only separator
+					// Key distinction:
+					// - varargs: def f(*args) or def f(*args, **kwargs) - no regular params after *
+					// - separator: def f(a, *, b) or def f(a, *, b, c) - has regular params after *
+					//
+					// Heuristic:
+					// 1. If there are regular (non-special) params BEFORE *, treat as separator
+					// 2. Otherwise (*, x) is first/only param → treat as varargs
+
+					hasRegularParamsBefore := false
+					for j := 0; j < i; j++ {
+						if p, ok := paramList[j].(core.SymbolValue); ok {
+							ps := string(p)
+							// Check if it's a regular param (not * or **)
+							if !strings.HasPrefix(ps, "*") {
+								hasRegularParamsBefore = true
+								break
+							}
+						} else {
+							// List parameter (param with default) counts as regular
+							hasRegularParamsBefore = true
+							break
+						}
+					}
+
+					isArgsPattern := false
+					if !hasRegularParamsBefore {
+						// No regular params before * → this is varargs like def f(*args)
+						isArgsPattern = true
+					} else {
+						// Has regular params before * → this is separator like def f(a, *, b)
+						// Don't treat as varargs pattern
+						isArgsPattern = false
+					}
+
+					if isArgsPattern {
+						// This is *args style
+						transformedParams = append(transformedParams, core.SymbolValue("*"+nextStr))
+						i += 2 // Skip both * and args
+						continue
+					}
+
+					// Otherwise, treat as bare * separator (keyword-only marker)
+					transformedParams = append(transformedParams, sym) // Keep bare *
+					i++                                                // Skip just the *
 					continue
 				}
 			}
@@ -285,6 +324,26 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 	boundParams := make(map[string]bool)
 	argIndex := 0
 
+	// Calculate max positional arguments (excluding keyword-only params)
+	maxPositional := 0
+	for _, p := range sig.RequiredParams {
+		if !p.KeywordOnly {
+			maxPositional++
+		}
+	}
+	for _, p := range sig.OptionalParams {
+		if !p.KeywordOnly {
+			maxPositional++
+		}
+	}
+
+	// Check for too many positional arguments early (unless we have *args)
+	if sig.RestParam == nil && len(args) > maxPositional {
+		return &core.TypeError{
+			Message: fmt.Sprintf("too many positional arguments: expected at most %d, got %d", maxPositional, len(args)),
+		}
+	}
+
 	// Debug: print signature info
 	// NOTE: Disabled to avoid infinite recursion when printing Instance arguments
 	// The recursion: printf -> Instance.String -> GetAttr -> NewBuiltinFunction -> String...
@@ -324,7 +383,9 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			delete(kwargs, paramName)
 		} else if param.KeywordOnly {
 			// Keyword-only parameters cannot be bound from positional arguments
-			return fmt.Errorf("missing required keyword-only argument: %s", paramName)
+			return &core.TypeError{
+				Message: fmt.Sprintf("missing required keyword-only argument: %s", paramName),
+			}
 		} else if argIndex < len(args) {
 			// Bind from positional arguments (only for non-keyword-only params)
 			bindCtx.Define(paramName, args[argIndex])
