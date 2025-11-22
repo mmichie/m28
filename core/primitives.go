@@ -742,6 +742,13 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 		codeObj.SetAttr("co_varnames", TupleValue{})
 		codeObj.SetAttr("co_name", StringValue(f.name))
 		return codeObj, true
+	case "func":
+		// The .func attribute is used by functools.partial and functools.partialmethod
+		// to store the underlying function. For regular functions, we don't have this
+		// attribute, so mock and other libraries check for it with hasattr/getattr.
+		// Returning (nil, false) means the attribute doesn't exist, which is correct
+		// for non-partial functions.
+		return nil, false
 	}
 
 	return nil, false
