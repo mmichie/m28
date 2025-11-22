@@ -9,7 +9,13 @@ func Repr(val Value) string {
 		return "nil"
 	}
 
-	// Try __repr__ method first
+	// Handle Class objects specially - they have their own repr format
+	// and shouldn't use tryReprMethod which would call an unbound __repr__
+	if _, ok := val.(*Class); ok {
+		return reprBuiltinType(val)
+	}
+
+	// Try __repr__ method first (for instances)
 	if repr, ok := tryReprMethod(val); ok {
 		return repr
 	}
@@ -37,6 +43,8 @@ func tryReprMethod(val Value) (string, bool) {
 		return "", false
 	}
 
+	// Call __repr__ method
+	// BoundInstanceMethod automatically prepends self, so call with no args
 	result, err := callable.Call([]Value{}, nil)
 	if err != nil {
 		return "", false
@@ -83,8 +91,51 @@ func reprBuiltinType(val Value) string {
 }
 
 // reprString returns quoted string representation
+// Python uses single quotes by default, double quotes if string contains single quotes
 func reprString(s StringValue) string {
-	return fmt.Sprintf("%q", string(s))
+	str := string(s)
+
+	// Count single and double quotes
+	hasSingle := false
+	hasDouble := false
+	for _, ch := range str {
+		if ch == '\'' {
+			hasSingle = true
+		} else if ch == '"' {
+			hasDouble = true
+		}
+	}
+
+	// Choose quote style: prefer single quotes (Python default)
+	if hasSingle && !hasDouble {
+		// Use double quotes if string has single quotes but no double quotes
+		return fmt.Sprintf("%q", str)
+	}
+
+	// Use single quotes (default), escaping them if necessary
+	result := "'"
+	for _, ch := range str {
+		switch ch {
+		case '\'':
+			result += "\\'"
+		case '\\':
+			result += "\\\\"
+		case '\n':
+			result += "\\n"
+		case '\r':
+			result += "\\r"
+		case '\t':
+			result += "\\t"
+		default:
+			if ch < 32 || ch == 127 {
+				result += fmt.Sprintf("\\x%02x", ch)
+			} else {
+				result += string(ch)
+			}
+		}
+	}
+	result += "'"
+	return result
 }
 
 // reprNumber returns numeric representation

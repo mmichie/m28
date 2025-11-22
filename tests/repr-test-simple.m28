@@ -10,9 +10,9 @@
 
 (print "Basic tests passed!")
 
-# Test repr for strings - should show quotes
-(assert (== (repr "hello") "\"hello\"") "repr of string shows quotes")
-(assert (== (repr "") "\"\"") "repr of empty string")
+# Test repr for strings - should show quotes (Python uses single quotes by default)
+(assert (== (repr "hello") "'hello'") "repr of string shows quotes")
+(assert (== (repr "") "''") "repr of empty string")
 
 (print "String tests passed!")
 

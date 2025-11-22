@@ -991,6 +991,11 @@ func (f *UserFunction) String() string {
 	return fmt.Sprintf("<function (%s)>", strings.Join(params, " "))
 }
 
+// GetName returns the function name for repr() purposes
+func (f *UserFunction) GetName() string {
+	return f.name
+}
+
 // GetAttr implements attribute access for user functions
 func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 	switch name {

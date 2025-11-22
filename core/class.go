@@ -522,12 +522,18 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	case "__repr__":
 		// Default __repr__ returns a placeholder function
 		// Classes use this as a type marker (e.g., dict.__repr__, list.__repr__)
+		// Can be called two ways:
+		//  - With 0 args when called on the class itself: Class.__repr__()
+		//  - With 1 arg (self) when called on an instance: instance.__repr__()
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, fmt.Errorf("__repr__ requires exactly 1 argument")
+			if len(args) == 0 {
+				// Called on the class itself - return class representation
+				return StringValue(fmt.Sprintf("<class '%s'>", c.Name)), nil
+			} else if len(args) == 1 {
+				// Called on an instance - return instance representation
+				return StringValue(fmt.Sprintf("<%s object at %p>", c.Name, args[0])), nil
 			}
-			// Return a representation string
-			return StringValue(fmt.Sprintf("<%s object>", c.Name)), nil
+			return nil, fmt.Errorf("__repr__ takes 0 or 1 arguments, got %d", len(args))
 		}), true
 	case "__init__":
 		// Default __init__ that all classes inherit from object
