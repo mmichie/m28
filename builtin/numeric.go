@@ -10,6 +10,35 @@ import (
 	"github.com/mmichie/m28/core/protocols"
 )
 
+// bankersRound implements banker's rounding (round half to even)
+// This matches Python 3's default rounding behavior
+func bankersRound(x float64) float64 {
+	// Handle special cases
+	if math.IsNaN(x) || math.IsInf(x, 0) {
+		return x
+	}
+
+	// Get the integer and fractional parts
+	intPart, fracPart := math.Modf(x)
+
+	// If not exactly .5, use standard rounding
+	absFrac := math.Abs(fracPart)
+	if absFrac != 0.5 {
+		return math.Round(x)
+	}
+
+	// Exactly .5: round to nearest even integer
+	if int(intPart)%2 == 0 {
+		// Already even, round down (toward zero)
+		return intPart
+	}
+	// Odd, round up (away from zero) to make it even
+	if x > 0 {
+		return intPart + 1
+	}
+	return intPart - 1
+}
+
 // RegisterNumeric registers numeric functions
 func RegisterNumeric(ctx *core.Context) {
 	// abs - absolute value
@@ -84,12 +113,12 @@ func RegisterNumeric(ctx *core.Context) {
 		ndigitsInt := int(ndigitsVal)
 
 		if ndigitsInt == 0 {
-			return core.NumberValue(math.Round(num)), nil
+			return core.NumberValue(bankersRound(num)), nil
 		}
 
 		// Round to n decimal places
 		multiplier := math.Pow(10, float64(ndigitsInt))
-		return core.NumberValue(math.Round(num*multiplier) / multiplier), nil
+		return core.NumberValue(bankersRound(num*multiplier) / multiplier), nil
 	}))
 
 	// divmod - return quotient and remainder
