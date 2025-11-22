@@ -246,7 +246,7 @@ func (r *REPL) Start() {
 				continue
 			}
 
-			pythonParser := parser.NewPythonParser(tokens)
+			pythonParser := parser.NewPythonParser(tokens, "<repl>", fullInput)
 			nodes, parseErr := pythonParser.Parse()
 			if parseErr != nil {
 				fmt.Fprintf(r.writer, "Parse error: %s\n", parseErr)

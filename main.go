@@ -442,7 +442,7 @@ func executePythonFile(filename, content string, ctx *core.Context) error {
 	}
 
 	// Parse Python tokens into AST
-	pythonParser := parser.NewPythonParser(tokens)
+	pythonParser := parser.NewPythonParser(tokens, filename, content)
 	nodes, err := pythonParser.Parse()
 	if err != nil {
 		return fmt.Errorf("parse error in %s: %v", filename, err)
@@ -499,7 +499,7 @@ func parseAndPrintAST(filename string) error {
 			return fmt.Errorf("tokenization error: %v", err)
 		}
 
-		pythonParser := parser.NewPythonParser(tokens)
+		pythonParser := parser.NewPythonParser(tokens, filename, string(content))
 		nodes, err := pythonParser.Parse()
 		if err != nil {
 			return fmt.Errorf("parse error: %v", err)

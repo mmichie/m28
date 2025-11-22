@@ -65,7 +65,7 @@ func TestPythonToIRIntegration(t *testing.T) {
 			}
 
 			// Parse
-			pythonParser := parser.NewPythonParser(tokens)
+			pythonParser := parser.NewPythonParser(tokens, "<test>", tt.source)
 			nodes, err := pythonParser.Parse()
 			if err != nil {
 				t.Fatalf("Parse error: %v", err)
@@ -118,7 +118,7 @@ for i in range(5):
 	}
 
 	// Parse
-	pythonParser := parser.NewPythonParser(tokens)
+	pythonParser := parser.NewPythonParser(tokens, "<test>", source)
 	nodes, err := pythonParser.Parse()
 	if err != nil {
 		t.Fatalf("Parse error: %v", err)
@@ -163,7 +163,7 @@ func TestPythonClassDefinition(t *testing.T) {
 	}
 
 	// Parse
-	pythonParser := parser.NewPythonParser(tokens)
+	pythonParser := parser.NewPythonParser(tokens, "<test>", source)
 	nodes, err := pythonParser.Parse()
 	if err != nil {
 		t.Fatalf("Parse error: %v", err)

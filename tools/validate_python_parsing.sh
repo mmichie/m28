@@ -68,7 +68,7 @@ func main() {
 
     // Parse
     start = time.Now()
-    pythonParser := parser.NewPythonParser(tokens)
+    pythonParser := parser.NewPythonParser(tokens, filePath, string(content))
     astNodes, err := pythonParser.Parse()
     parseTime := time.Since(start)
 

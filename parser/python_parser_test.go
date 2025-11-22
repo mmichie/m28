@@ -15,7 +15,7 @@ func parseSource(source string) (*PythonParser, []ast.ASTNode, error) {
 		return nil, nil, err
 	}
 
-	parser := NewPythonParser(tokens)
+	parser := NewPythonParser(tokens, "<test>", source)
 	nodes, err := parser.Parse()
 	return parser, nodes, err
 }

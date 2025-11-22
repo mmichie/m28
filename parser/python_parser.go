@@ -14,16 +14,18 @@ type PythonParser struct {
 	tokens    []Token
 	current   int
 	errors    []error
-	panic     bool // panic mode for error recovery
-	depth     int  // recursion depth tracking
-	callCount int  // total parse calls (for detecting loops)
-	maxDepth  int  // maximum recursion depth allowed
-	maxCalls  int  // maximum parse calls allowed
-	debugMode bool // enable debug output
+	panic     bool   // panic mode for error recovery
+	depth     int    // recursion depth tracking
+	callCount int    // total parse calls (for detecting loops)
+	maxDepth  int    // maximum recursion depth allowed
+	maxCalls  int    // maximum parse calls allowed
+	debugMode bool   // enable debug output
+	filename  string // source filename for error reporting
+	source    string // full source code for error context
 }
 
 // NewPythonParser creates a new Python parser from a token stream
-func NewPythonParser(tokens []Token) *PythonParser {
+func NewPythonParser(tokens []Token, filename string, source string) *PythonParser {
 	return &PythonParser{
 		tokens:    tokens,
 		current:   0,
@@ -34,6 +36,8 @@ func NewPythonParser(tokens []Token) *PythonParser {
 		maxDepth:  500,    // Maximum recursion depth
 		maxCalls:  100000, // Maximum total parse calls
 		debugMode: false,  // Set to true to enable debug output
+		filename:  filename,
+		source:    source,
 	}
 }
 
@@ -190,8 +194,14 @@ func (p *PythonParser) error(message string) {
 
 	p.panic = true
 	tok := p.peek()
-	err := fmt.Errorf("parse error at line %d, col %d: %s (near %q)",
-		tok.Line, tok.Col, message, tok.Lexeme)
+	err := &ParseError{
+		Message:  message,
+		Line:     tok.Line,
+		Col:      tok.Col,
+		Lexeme:   tok.Lexeme,
+		Source:   p.source,
+		Filename: p.filename,
+	}
 	p.errors = append(p.errors, err)
 }
 
@@ -3995,7 +4005,7 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 			return nil, fmt.Errorf("error tokenizing f-string expression: %v", err)
 		}
 
-		tempParser := NewPythonParser(tokens)
+		tempParser := NewPythonParser(tokens, "<f-string>", exprStr)
 		exprNode := tempParser.parseExpression()
 		if len(tempParser.errors) > 0 {
 			return nil, fmt.Errorf("error parsing f-string expression: %v", tempParser.errors[0])

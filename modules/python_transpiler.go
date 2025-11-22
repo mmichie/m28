@@ -64,7 +64,7 @@ func (t *PythonModuleTranspiler) Transpile(pyPath string) (ast.ASTNode, error) {
 
 	// Parse tokens into AST
 	startParse := time.Now()
-	pythonParser := parser.NewPythonParser(tokens)
+	pythonParser := parser.NewPythonParser(tokens, pyPath, string(source))
 	nodes, err := pythonParser.Parse()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Python module '%s': %w", pyPath, err)

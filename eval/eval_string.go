@@ -33,7 +33,7 @@ func EvalString(input string, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
-	pythonParser := parser.NewPythonParser(tokens)
+	pythonParser := parser.NewPythonParser(tokens, "<eval>", input)
 	nodes, err := pythonParser.Parse()
 	if err != nil {
 		// Check if this is a parse error - if so, convert to SyntaxError
