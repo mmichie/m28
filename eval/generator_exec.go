@@ -230,6 +230,14 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 				// Get variable pattern - can be a single symbol or tuple of symbols
 				varPattern := listNode.Items()[1]
 
+				// Handle quoted patterns: (quote [a, b]) -> [a, b]
+				// This happens when parsing Python syntax: for a, b in ...
+				if quotedList, ok := varPattern.(*core.ListValue); ok && quotedList.Len() >= 2 {
+					if quoteSymbol, ok := quotedList.Items()[0].(core.SymbolValue); ok && string(quoteSymbol) == "quote" {
+						varPattern = quotedList.Items()[1]
+					}
+				}
+
 				var varName string
 				var varNames []string
 
@@ -244,17 +252,18 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 						if sym, ok := elem.(core.SymbolValue); ok {
 							varNames[i] = string(sym)
 						} else {
-							return nil, fmt.Errorf("tuple unpacking pattern must contain symbols")
+							return nil, fmt.Errorf("tuple unpacking pattern must contain symbols, got %T at index %d", elem, i)
 						}
 					}
 				} else if listPattern, ok := varPattern.(*core.ListValue); ok {
 					// List unpacking: [k, v]
 					varNames = make([]string, listPattern.Len())
 					for i := 0; i < listPattern.Len(); i++ {
-						if sym, ok := listPattern.Items()[i].(core.SymbolValue); ok {
+						elem := listPattern.Items()[i]
+						if sym, ok := elem.(core.SymbolValue); ok {
 							varNames[i] = string(sym)
 						} else {
-							return nil, fmt.Errorf("tuple unpacking pattern must contain symbols")
+							return nil, fmt.Errorf("tuple unpacking pattern must contain symbols, got %T at index %d", elem, i)
 						}
 					}
 				} else {
