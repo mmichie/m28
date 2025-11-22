@@ -15,8 +15,8 @@ func RegisterIteration(ctx *core.Context) {
 
 	// enumerate - return enumerate object
 	// BEFORE: 38 lines
-	// AFTER: Custom builder with optional start
-	ctx.Define("enumerate", core.NewBuiltinFunction(EnumerateBuilder()))
+	// AFTER: Custom builder with optional start (supports keyword arguments)
+	ctx.Define("enumerate", NewKwargsBuiltinFunction("enumerate", enumerateWithKwargs))
 
 	// zip - zip iterables together
 	// BEFORE: 42 lines
@@ -157,6 +157,65 @@ func EnumerateBuilder() builders.BuiltinFunc {
 		}
 		return core.NewList(result...), nil
 	}
+}
+
+// enumerateWithKwargs implements enumerate() with keyword argument support
+func enumerateWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// Check for start parameter in kwargs
+	start := 0
+	if startVal, ok := kwargs["start"]; ok {
+		if num, ok := startVal.(core.NumberValue); ok {
+			start = int(num)
+		} else {
+			return nil, errors.NewTypeError("enumerate", "start parameter must be an integer", string(startVal.Type()))
+		}
+		delete(kwargs, "start")
+	}
+
+	// Check for any remaining kwargs
+	if len(kwargs) > 0 {
+		for k := range kwargs {
+			return nil, errors.NewTypeError("enumerate", "'"+k+"' is an invalid keyword argument", "")
+		}
+	}
+
+	// Require exactly 1 or 2 positional arguments
+	if len(args) == 0 {
+		return nil, errors.NewTypeError("enumerate", "missing required argument: 'iterable' (pos 1)", "")
+	}
+	if len(args) > 2 {
+		return nil, errors.NewTypeError("enumerate", "takes at most 2 arguments", "")
+	}
+
+	// Get iterable
+	obj := args[0]
+	iterable, err := types.RequireIterable(obj, "enumerate() argument")
+	if err != nil {
+		return nil, err
+	}
+
+	// If positional start value provided, it overrides kwarg
+	if len(args) == 2 {
+		if num, ok := args[1].(core.NumberValue); ok {
+			start = int(num)
+		} else {
+			return nil, errors.NewTypeError("enumerate", "start parameter must be an integer", string(args[1].Type()))
+		}
+	}
+
+	// Build enumerate result
+	result := make([]core.Value, 0)
+	iter := iterable.Iterator()
+	index := start
+	for {
+		val, hasNext := iter.Next()
+		if !hasNext {
+			break
+		}
+		result = append(result, core.TupleValue{core.NumberValue(index), val})
+		index++
+	}
+	return core.NewList(result...), nil
 }
 
 // ZipBuilder creates the zip function
