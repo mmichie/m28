@@ -79,10 +79,10 @@ func TestReturnForm_WithValue(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("Expected 2 elements, got %d", len(items))
 	}
-	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "return" {
+	if sym, ok := unwrapPython(items[0]).(core.SymbolValue); !ok || string(sym) != "return" {
 		t.Errorf("Expected 'return' symbol, got %v", items[0])
 	}
-	if num, ok := items[1].(core.NumberValue); !ok || float64(num) != 42 {
+	if num, ok := unwrapPython(items[1]).(core.NumberValue); !ok || float64(num) != 42 {
 		t.Errorf("Expected 42, got %v", items[1])
 	}
 }
@@ -121,10 +121,10 @@ func TestRaiseForm_Simple(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("Expected 2 elements, got %d", len(items))
 	}
-	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "raise" {
+	if sym, ok := unwrapPython(items[0]).(core.SymbolValue); !ok || string(sym) != "raise" {
 		t.Errorf("Expected 'raise' symbol, got %v", items[0])
 	}
-	if sym, ok := items[1].(core.SymbolValue); !ok || string(sym) != "ValueError" {
+	if sym, ok := unwrapPython(items[1]).(core.SymbolValue); !ok || string(sym) != "ValueError" {
 		t.Errorf("Expected 'ValueError' symbol, got %v", items[1])
 	}
 }

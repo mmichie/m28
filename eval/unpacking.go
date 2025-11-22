@@ -20,6 +20,9 @@ import (
 // value: the value to unpack (must be iterable if pattern is a list)
 // ctx: the context to bind variables in
 func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) error {
+	// Unwrap LocatedValue wrappers from pattern to get the actual pattern structure
+	pattern = unwrapLocated(pattern)
+
 	switch p := pattern.(type) {
 	case core.SymbolValue:
 		// Simple binding: just assign value to variable
@@ -31,7 +34,8 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 		// If so, skip the literal marker and use the rest as the pattern
 		actualPattern := p
 		if p.Len() > 0 {
-			if sym, ok := p.Items()[0].(core.SymbolValue); ok {
+			firstItem := unwrapLocated(p.Items()[0])
+			if sym, ok := firstItem.(core.SymbolValue); ok {
 				if string(sym) == "tuple-literal" || string(sym) == "list-literal" {
 					// Skip the tuple-literal or list-literal marker
 					actualPattern = core.NewList(p.Items()[1:]...)

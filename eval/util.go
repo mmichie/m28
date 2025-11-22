@@ -7,6 +7,19 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// unwrapLocated recursively unwraps LocatedValue wrappers from a value
+// This is necessary because AST ToIR() wraps values in LocatedValue to preserve
+// source location, but special forms need the underlying value for type assertions
+func unwrapLocated(v core.Value) core.Value {
+	for {
+		if lv, ok := v.(core.LocatedValue); ok {
+			v = lv.Value
+		} else {
+			return v
+		}
+	}
+}
+
 // isTruthyWithErrors checks if a value is truthy, but propagates errors from __bool__
 // Unlike core.IsTruthy which silently treats errors as truthy, this propagates them
 func isTruthyWithErrors(v core.Value, ctx *core.Context) (bool, error) {
@@ -676,7 +689,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 		// Count leading symbols
 		symbolCount := 0
 		for i := 0; i < args.Len(); i++ {
-			if _, ok := args.Items()[i].(core.SymbolValue); ok {
+			unwrapped := unwrapLocated(args.Items()[i])
+			if _, ok := unwrapped.(core.SymbolValue); ok {
 				symbolCount++
 			} else {
 				break
@@ -686,12 +700,27 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 		// Check for star unpacking first: (= (a (*unpack b) c) expr)
 		// This happens when we have something like: a, *b, c = values
 		if symbolCount == 0 && args.Len() == 2 {
-			if targetList, ok := args.Items()[0].(*core.ListValue); ok {
+			unwrappedFirst := unwrapLocated(args.Items()[0])
+			if targetList, ok := unwrappedFirst.(*core.ListValue); ok {
+				// Skip tuple-literal or list-literal marker if present
+				actualTargets := targetList
+				if targetList.Len() > 0 {
+					firstItem := unwrapLocated(targetList.Items()[0])
+					if sym, ok := firstItem.(core.SymbolValue); ok {
+						if string(sym) == "tuple-literal" || string(sym) == "list-literal" {
+							// Skip the marker and use the rest
+							actualTargets = core.NewList(targetList.Items()[1:]...)
+						}
+					}
+				}
+
 				// Check if any element is (*unpack ...)
 				starIndex := -1
-				for i, t := range targetList.Items() {
-					if tList, ok := t.(*core.ListValue); ok && tList.Len() == 2 {
-						if sym, ok := tList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+				for i, t := range actualTargets.Items() {
+					unwrappedT := unwrapLocated(t)
+					if tList, ok := unwrappedT.(*core.ListValue); ok && tList.Len() == 2 {
+						unwrappedSym := unwrapLocated(tList.Items()[0])
+						if sym, ok := unwrappedSym.(core.SymbolValue); ok && string(sym) == "*unpack" {
 							starIndex = i
 							break
 						}
@@ -718,19 +747,19 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 					}
 
 					// Calculate minimum required length
-					minLen := targetList.Len() - 1 // All targets except the star
+					minLen := actualTargets.Len() - 1 // All targets except the star
 					if len(values) < minLen {
 						return nil, fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))
 					}
 
 					// Assign values
 					valIdx := 0
-					for i, target := range targetList.Items() {
+					for i, target := range actualTargets.Items() {
 						if i == starIndex {
 							// Star unpacking: collect remaining values
 							starTarget := target.(*core.ListValue)
 							starVar := starTarget.Items()[1].(core.SymbolValue)
-							remaining := len(values) - valIdx - (targetList.Len() - i - 1)
+							remaining := len(values) - valIdx - (actualTargets.Len() - i - 1)
 							starValues := values[valIdx : valIdx+remaining]
 							if err := assignVariable(ctx, string(starVar), core.NewList(starValues...)); err != nil {
 								return nil, err
@@ -738,7 +767,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 							valIdx += remaining
 						} else {
 							// Regular assignment
-							if sym, ok := target.(core.SymbolValue); ok {
+							unwrappedTarget := unwrapLocated(target)
+							if sym, ok := unwrappedTarget.(core.SymbolValue); ok {
 								if err := assignVariable(ctx, string(sym), values[valIdx]); err != nil {
 									return nil, err
 								}
@@ -802,7 +832,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 		// Check if all but last are symbols (old case 1)
 		allSymbols := true
 		for i := 0; i < args.Len()-1; i++ {
-			if _, ok := args.Items()[i].(core.SymbolValue); !ok {
+			unwrapped := unwrapLocated(args.Items()[i])
+			if _, ok := unwrapped.(core.SymbolValue); !ok {
 				allSymbols = false
 				break
 			}
@@ -819,7 +850,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 				// Get current values of targets
 				var currentValues []core.Value
 				for _, target := range targets {
-					if sym, ok := target.(core.SymbolValue); ok {
+					unwrappedTarget := unwrapLocated(target)
+					if sym, ok := unwrappedTarget.(core.SymbolValue); ok {
 						val, err := ctx.Lookup(string(sym))
 						if err != nil {
 							// Variable doesn't exist yet, use nil
@@ -865,7 +897,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 				// Assign each value
 				for i, target := range targets {
-					if sym, ok := target.(core.SymbolValue); ok {
+					unwrappedTarget := unwrapLocated(target)
+					if sym, ok := unwrappedTarget.(core.SymbolValue); ok {
 						if err := assignVariable(ctx, string(sym), values[i]); err != nil {
 							return nil, err
 						}
@@ -919,7 +952,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 		var lastValue core.Value
 		for i := 0; i < args.Len(); i += 2 {
-			target := args.Items()[i]
+			target := unwrapLocated(args.Items()[i])
 			value, err := Eval(args.Items()[i+1], ctx)
 			if err != nil {
 				return nil, err
@@ -939,7 +972,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 	}
 
 	// Single assignment (original logic)
-	target := args.Items()[0]
+	target := unwrapLocated(args.Items()[0])
 	value, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
@@ -958,7 +991,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 		// Check if it's a special form first (get-item or dot notation)
 		if t.Len() >= 3 {
 			// Check if it's a dot notation expression
-			if dotSym, ok := t.Items()[0].(core.SymbolValue); ok && string(dotSym) == "." {
+			unwrappedFirst := unwrapLocated(t.Items()[0])
+			if dotSym, ok := unwrappedFirst.(core.SymbolValue); ok && string(dotSym) == "." {
 				// Dot notation assignment: (. obj prop) = value
 				// Evaluate the object
 				obj, err := Eval(t.Items()[1], ctx)
@@ -998,7 +1032,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 			// Check if it's an index expression
 			if t.Len() == 3 {
-				if getItemSym, ok := t.Items()[0].(core.SymbolValue); ok && string(getItemSym) == "get-item" {
+				unwrappedFirst := unwrapLocated(t.Items()[0])
+				if getItemSym, ok := unwrappedFirst.(core.SymbolValue); ok && string(getItemSym) == "get-item" {
 					// Index assignment: (get-item obj index) = value
 					// Convert to (set-item obj index value)
 					setItemArgs := core.NewList(t.Items()[1], t.Items()[2], value)
@@ -1013,14 +1048,17 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 		hasStarUnpack := false
 		starIndex := -1
 		for i, elem := range t.Items() {
-			if _, ok := elem.(core.SymbolValue); ok {
+			unwrappedElem := unwrapLocated(elem)
+			if _, ok := unwrappedElem.(core.SymbolValue); ok {
 				continue
 			}
 			// Check if it's (*unpack var)
-			if elemList, ok := elem.(*core.ListValue); ok {
+			if elemList, ok := unwrappedElem.(*core.ListValue); ok {
 				if elemList.Len() == 2 {
-					if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
-						if _, ok := elemList.Items()[1].(core.SymbolValue); ok {
+					unwrappedSym := unwrapLocated(elemList.Items()[0])
+					if sym, ok := unwrappedSym.(core.SymbolValue); ok && string(sym) == "*unpack" {
+						unwrappedVar := unwrapLocated(elemList.Items()[1])
+						if _, ok := unwrappedVar.(core.SymbolValue); ok {
 							hasStarUnpack = true
 							starIndex = i
 							continue
@@ -1029,7 +1067,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 				}
 				// Check if it's dot notation (. obj attr)
 				if elemList.Len() == 3 {
-					if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "." {
+					unwrappedFirst := unwrapLocated(elemList.Items()[0])
+					if sym, ok := unwrappedFirst.(core.SymbolValue); ok && string(sym) == "." {
 						// This is a dot notation target like self.a
 						continue
 					}
@@ -1047,7 +1086,8 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 			// If so, skip the literal marker and use the rest as the pattern
 			actualPattern := t
 			if t.Len() > 0 {
-				if sym, ok := t.Items()[0].(core.SymbolValue); ok {
+				unwrappedFirst := unwrapLocated(t.Items()[0])
+				if sym, ok := unwrappedFirst.(core.SymbolValue); ok {
 					if string(sym) == "tuple-literal" || string(sym) == "list-literal" {
 						// Skip the tuple-literal or list-literal marker
 						actualPattern = core.NewList(t.Items()[1:]...)
@@ -1055,9 +1095,11 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 						hasStarUnpack = false
 						starIndex = -1
 						for i, elem := range actualPattern.Items() {
-							if elemList, ok := elem.(*core.ListValue); ok {
+							unwrappedElem := unwrapLocated(elem)
+							if elemList, ok := unwrappedElem.(*core.ListValue); ok {
 								if elemList.Len() == 2 {
-									if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+									unwrappedSym := unwrapLocated(elemList.Items()[0])
+									if sym, ok := unwrappedSym.(core.SymbolValue); ok && string(sym) == "*unpack" {
 										hasStarUnpack = true
 										starIndex = i
 										break

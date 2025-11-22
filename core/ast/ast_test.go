@@ -176,9 +176,9 @@ func TestDefForm(t *testing.T) {
 	}
 
 	// Check body
-	bodyList, ok := items[3].(*core.ListValue)
+	bodyList, ok := unwrap(items[3]).(*core.ListValue)
 	if !ok {
-		t.Fatalf("Expected body to be ListValue, got %T", items[3])
+		t.Fatalf("Expected body to be ListValue, got %T", unwrap(items[3]))
 	}
 	bodyItems := bodyList.Items()
 	if len(bodyItems) != 3 {
