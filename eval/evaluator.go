@@ -93,7 +93,12 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Check if it's a special form first (if, def, etc.)
-		if sym, ok := v.Items()[0].(core.SymbolValue); ok {
+		// Unwrap LocatedValue before checking for symbol
+		firstElem := v.Items()[0]
+		if lv, ok := firstElem.(core.LocatedValue); ok {
+			firstElem = lv.Unwrap()
+		}
+		if sym, ok := firstElem.(core.SymbolValue); ok {
 			core.DebugLog("[EVAL-LIST] First element is symbol: %s\n", string(sym))
 
 			if handler, ok := specialForms[string(sym)]; ok {
@@ -103,7 +108,8 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Check if it's a macro call (function with __macro__ attribute)
-		if sym, ok := v.Items()[0].(core.SymbolValue); ok {
+		// firstElem already unwrapped above
+		if sym, ok := firstElem.(core.SymbolValue); ok {
 			if isMacroCall(sym, ctx) {
 				core.DebugLog("[EVAL-LIST] Is macro call: %s\n", string(sym))
 				return evalMacroCall(v, ctx)

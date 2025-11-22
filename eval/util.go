@@ -1210,8 +1210,10 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 				// Assign each value to its corresponding target
 				for i, target := range t.Items() {
+					// Unwrap LocatedValue before type checking
+					unwrappedTarget := unwrapLocated(target)
 					// Check if target is a simple symbol
-					if sym, ok := target.(core.SymbolValue); ok {
+					if sym, ok := unwrappedTarget.(core.SymbolValue); ok {
 						if err := assignVariable(ctx, string(sym), values[i]); err != nil {
 							return nil, err
 						}
@@ -1219,8 +1221,9 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 					}
 
 					// Check if target is dot notation (attribute access)
-					if targetList, ok := target.(*core.ListValue); ok && targetList.Len() > 0 {
-						if sym, ok := targetList.Items()[0].(core.SymbolValue); ok && string(sym) == "." {
+					if targetList, ok := unwrappedTarget.(*core.ListValue); ok && targetList.Len() > 0 {
+						unwrappedFirst := unwrapLocated(targetList.Items()[0])
+						if sym, ok := unwrappedFirst.(core.SymbolValue); ok && string(sym) == "." {
 							// This is attribute assignment like self.a = value
 							if targetList.Len() != 3 {
 								return nil, fmt.Errorf("invalid dot notation in assignment target")
