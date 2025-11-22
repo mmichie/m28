@@ -48,12 +48,18 @@ func NewPythonTokenizer(input string) *PythonTokenizer {
 		pos:         0,
 		line:        1,
 		col:         1,
+		filename:    "<eval>",
 		tokens:      make([]Token, 0, 256),
 		errors:      make([]error, 0),
 		indentStack: []int{0}, // Start with base indentation level
 		atLineStart: true,
 		parenDepth:  0,
 	}
+}
+
+// SetFilename sets the filename for error reporting
+func (t *PythonTokenizer) SetFilename(filename string) {
+	t.filename = filename
 }
 
 // Tokenize performs lexical analysis and returns all tokens
@@ -117,7 +123,10 @@ func (t *PythonTokenizer) Tokenize() ([]Token, error) {
 	})
 
 	if len(t.errors) > 0 {
-		return t.tokens, fmt.Errorf("tokenization errors: %v", t.errors)
+		// Return the first error directly (it's already a TokenizationError with location)
+		// If there are multiple errors, we'll report the first one
+		// ErrorFormatter can then properly format it with source context
+		return t.tokens, t.errors[0]
 	}
 
 	return t.tokens, nil

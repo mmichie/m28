@@ -35,20 +35,35 @@ var (
 
 const version = "0.1.0-fresh-start"
 
+// isTerminal checks if stderr is a terminal (for color detection)
+func isTerminal() bool {
+	fileInfo, _ := os.Stderr.Stat()
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+}
+
 // handleError checks if an error is SystemExit and exits with the appropriate code
 // Otherwise, reports the error and exits with code 1
-func handleError(err error, globalCtx *core.Context, errorReporter *repl.ErrorReporter) {
+func handleError(err error, globalCtx *core.Context, errorFormatter *parser.ErrorFormatter) {
 	// Check if it's a SystemExit (unwrap if necessary)
 	var sysExit *core.SystemExit
 	if errors.As(err, &sysExit) {
 		os.Exit(sysExit.Code)
 	}
 
-	// Always show stack trace if available
-	if len(globalCtx.CallStack) > 0 {
-		fmt.Fprintln(os.Stderr, globalCtx.FormatStackTrace())
+	// Format error with source context using ErrorFormatter
+	formatted := errorFormatter.FormatError(err)
+	if formatted != "" {
+		fmt.Fprint(os.Stderr, formatted)
+	} else {
+		// Fallback if no special formatting
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
-	errorReporter.ReportError(err, globalCtx, os.Stderr)
+
+	// Always show stack trace if available (for runtime errors)
+	if len(globalCtx.CallStack) > 0 {
+		fmt.Fprintln(os.Stderr, "\n"+globalCtx.FormatStackTrace())
+	}
+
 	os.Exit(1)
 }
 
@@ -88,9 +103,10 @@ func main() {
 	// Register all special forms
 	special_forms.RegisterAllForms()
 
-	// Create error reporter for enhanced error messages
-	colorManager := repl.NewColorManager(true)
-	errorReporter := repl.NewErrorReporter(colorManager)
+	// Create error formatter for Python-style error messages
+	// Detect if we're outputting to a terminal for color support
+	useColor := isTerminal()
+	errorFormatter := parser.NewErrorFormatter(useColor)
 
 	// Evaluate an expression from -e
 	if *evalExpr != "" {
@@ -112,10 +128,13 @@ func main() {
 			}
 		}
 
-		errorReporter.AddSource("<command-line>", *evalExpr)
+		// Register source code for error reporting
+		// Register as both "<command-line>" and "<eval>" since EvalString uses "<eval>"
+		errorFormatter.AddSource("<command-line>", *evalExpr)
+		errorFormatter.AddSource("<eval>", *evalExpr)
 		result, err := eval.EvalString(*evalExpr, globalCtx)
 		if err != nil {
-			handleError(err, globalCtx, errorReporter)
+			handleError(err, globalCtx, errorFormatter)
 		}
 		fmt.Println(core.PrintValue(result))
 		if !*interactive {
@@ -143,10 +162,13 @@ func main() {
 			}
 		}
 
-		errorReporter.AddSource("<command-line>", *command)
+		// Register source code for error reporting
+		// Register as both "<command-line>" and "<eval>" since EvalString uses "<eval>"
+		errorFormatter.AddSource("<command-line>", *command)
+		errorFormatter.AddSource("<eval>", *command)
 		result, err := eval.EvalString(*command, globalCtx)
 		if err != nil {
-			handleError(err, globalCtx, errorReporter)
+			handleError(err, globalCtx, errorFormatter)
 		}
 		fmt.Println(core.PrintValue(result))
 		if !*interactive {
@@ -212,9 +234,9 @@ func main() {
 
 		// Execute the module file as __main__
 		// This is similar to executeFile but we already have the path
-		err = executeFile(pyPath, globalCtx, errorReporter)
+		err = executeFile(pyPath, globalCtx, errorFormatter)
 		if err != nil {
-			handleError(err, globalCtx, errorReporter)
+			handleError(err, globalCtx, errorFormatter)
 		}
 
 		if !*interactive {
@@ -249,9 +271,9 @@ func main() {
 		}
 
 		// Execute the file
-		err := executeFile(args[0], globalCtx, errorReporter)
+		err := executeFile(args[0], globalCtx, errorFormatter)
 		if err != nil {
-			handleError(err, globalCtx, errorReporter)
+			handleError(err, globalCtx, errorFormatter)
 		}
 
 		if !*interactive {
@@ -362,15 +384,15 @@ func initializeGlobalContext(ctx *core.Context) {
 }
 
 // executeFile executes a file with the given context
-func executeFile(filename string, ctx *core.Context, errorReporter *repl.ErrorReporter) error {
+func executeFile(filename string, ctx *core.Context, errorFormatter *parser.ErrorFormatter) error {
 	// Read the file content
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("error reading file: %v", err)
 	}
 
-	// Add source to error reporter
-	errorReporter.AddSource(filename, string(content))
+	// Register source code for error reporting
+	errorFormatter.AddSource(filename, string(content))
 
 	// Detect file type and parse accordingly
 	ext := filepath.Ext(filename)
@@ -436,9 +458,11 @@ func executeM28File(filename, content string, ctx *core.Context) error {
 func executePythonFile(filename, content string, ctx *core.Context) error {
 	// Tokenize Python source
 	tokenizer := parser.NewPythonTokenizer(content)
+	tokenizer.SetFilename(filename)
 	tokens, err := tokenizer.Tokenize()
 	if err != nil {
-		return fmt.Errorf("tokenization error in %s: %v", filename, err)
+		// Return error directly - it's already a TokenizationError with location info
+		return err
 	}
 
 	// Parse Python tokens into AST
