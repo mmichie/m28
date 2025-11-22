@@ -50,18 +50,19 @@ func createGeneratorExecState(function core.Value, args []core.Value, ctx *core.
 type StepKind int
 
 const (
-	StepStatement    StepKind = iota // Regular statement to evaluate
-	StepYield                        // Yield expression
-	StepReturn                       // Return statement
-	StepLoopInit                     // Initialize loop
-	StepLoopNext                     // Get next loop iteration
-	StepLoopEnd                      // End of loop
-	StepIfStart                      // Start of if/conditional
-	StepIfEnd                        // End of if block
-	StepTryStart                     // Start of try block
-	StepTryEnd                       // End of try block (jump to finally)
-	StepFinallyStart                 // Start of finally block
-	StepFinallyEnd                   // End of finally block
+	StepStatement      StepKind = iota // Regular statement to evaluate
+	StepYield                          // Yield expression
+	StepReturn                         // Return statement
+	StepLoopInit                       // Initialize loop
+	StepLoopNext                       // Get next loop iteration
+	StepLoopEnd                        // End of loop
+	StepWhileCondition                 // While loop condition check
+	StepIfStart                        // Start of if/conditional
+	StepIfEnd                          // End of if block
+	StepTryStart                       // Start of try block
+	StepTryEnd                         // End of try block (jump to finally)
+	StepFinallyStart                   // Start of finally block
+	StepFinallyEnd                     // End of finally block
 )
 
 // ExecutionStep represents one step in generator execution
@@ -351,6 +352,22 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			// Jump back to loop next
 			state.CurrentStep = step.Arg
 
+		case StepWhileCondition:
+			// Evaluate while loop condition
+			condValue, err := Eval(step.Node, state.Locals)
+			if err != nil {
+				return nil, err
+			}
+
+			// Check if condition is truthy
+			if !core.IsTruthy(condValue) {
+				// Condition is false - jump to end (stored in step.Arg)
+				state.CurrentStep = step.Arg
+			} else {
+				// Condition is true - continue to next step (loop body)
+				state.CurrentStep++
+			}
+
 		case StepTryStart:
 			// Push try state
 			// step.Arg points to either except handler or finally block
@@ -421,12 +438,11 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 					// Adjust jump targets (Arg values) to account for offset
 					offset := len(steps)
 					for j := range substeps {
-						// Adjust Arg if it's a valid jump target
-						if substeps[j].Arg > 0 {
+						// Adjust Arg if it's a valid jump target (>= 0, but not -1 sentinel)
+						if substeps[j].Arg >= 0 {
 							substeps[j].Arg += offset
-						} else if substeps[j].Arg == -1 {
-							// Keep -1 as a sentinel value (will be filled in later)
 						}
+						// -1 is a sentinel value (will be filled in later), don't adjust
 					}
 
 					steps = append(steps, substeps...)
@@ -520,6 +536,46 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 
 				// Fill in the end step for loop init
 				steps[loopStart].Arg = loopEndStep + 1
+
+				return steps, nil
+
+			case "while":
+				// While loop: (while condition body...)
+				if n.Len() < 2 {
+					return nil, fmt.Errorf("while loop requires condition and body")
+				}
+
+				// Extract condition and body
+				condition := n.Items()[1]
+				body := n.Items()[2:]
+
+				// Create steps for while loop
+				// Step 1: Check condition (and jump to end if false)
+				conditionStep := len(steps)
+				steps = append(steps, ExecutionStep{
+					Kind: StepWhileCondition,
+					Node: condition,
+					Arg:  -1, // Will be filled in later with end step
+				})
+
+				// Steps 2+: Loop body
+				for _, bodyExpr := range body {
+					substeps, err := transformToSteps(bodyExpr)
+					if err != nil {
+						return nil, err
+					}
+					steps = append(steps, substeps...)
+				}
+
+				// Final step: Jump back to condition check
+				loopEndStep := len(steps)
+				steps = append(steps, ExecutionStep{
+					Kind: StepLoopEnd,
+					Arg:  conditionStep,
+				})
+
+				// Fill in the end step for condition (where to jump if condition is false)
+				steps[conditionStep].Arg = loopEndStep + 1
 
 				return steps, nil
 
