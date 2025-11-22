@@ -66,6 +66,12 @@ func (ef *ErrorFormatter) FormatError(err error) string {
 	b.WriteString(ef.colorError(err.Error()))
 	b.WriteString("\n")
 
+	// Add suggestion if this is a TokenizationError with a suggestion
+	if tokErr, ok := err.(*TokenizationError); ok && tokErr.Suggestion != "" {
+		b.WriteString(ef.colorSuggestion(tokErr.Suggestion))
+		b.WriteString("\n")
+	}
+
 	return b.String()
 }
 
@@ -87,6 +93,11 @@ func (ef *ErrorFormatter) extractLocation(err error) *core.SourceLocation {
 			Line:   parseErr.Line,
 			Column: parseErr.Col,
 		}
+	}
+
+	// Try TokenizationError
+	if tokErr, ok := err.(*TokenizationError); ok {
+		return tokErr.Location
 	}
 
 	// Try to find SourceLocation in other error types (extensible)

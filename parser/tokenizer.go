@@ -3,9 +3,29 @@ package parser
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 )
+
+// TokenizationError represents a structured tokenization error with source context
+type TokenizationError struct {
+	Message    string
+	Location   *core.SourceLocation
+	Suggestion string
+	Source     string // Full source code for context
+}
+
+// Error implements the error interface
+func (e *TokenizationError) Error() string {
+	if e.Location != nil && e.Location.File != "" {
+		return fmt.Sprintf("%s:%d:%d: %s", e.Location.File, e.Location.Line, e.Location.Column, e.Message)
+	}
+	if e.Location != nil {
+		return fmt.Sprintf("line %d, column %d: %s", e.Location.Line, e.Location.Column, e.Message)
+	}
+	return e.Message
+}
 
 // Tokenizer performs lexical analysis on M28 source code
 type Tokenizer struct {
@@ -27,6 +47,20 @@ func NewTokenizer(input string) *Tokenizer {
 		col:    1,
 		tokens: make([]Token, 0, 256), // Pre-allocate
 		errors: make([]error, 0),
+	}
+}
+
+// makeTokenizationError creates a TokenizationError with location and optional suggestion
+func (t *Tokenizer) makeTokenizationError(message string, line, col int, suggestion string) error {
+	return &TokenizationError{
+		Message: message,
+		Location: &core.SourceLocation{
+			File:   t.filename,
+			Line:   line,
+			Column: col,
+		},
+		Suggestion: suggestion,
+		Source:     t.input,
 	}
 }
 
@@ -658,7 +692,17 @@ func (t *Tokenizer) makeToken(typ TokenType, start, startLine, startCol int) Tok
 }
 
 func (t *Tokenizer) errorToken(message string, start, startLine, startCol int) Token {
-	err := fmt.Errorf("%s at line %d, column %d", message, startLine, startCol)
+	// Determine suggestion based on message
+	suggestion := ""
+	if strings.Contains(message, "unterminated string") {
+		suggestion = "Add closing quote at end of string"
+	} else if strings.Contains(message, "invalid number") {
+		suggestion = "Check number format (e.g., use 0x for hex, 0o for octal, 0b for binary)"
+	} else if strings.Contains(message, "unexpected character '!'") {
+		suggestion = "Use 'not' for logical negation, or '!=' for inequality"
+	}
+
+	err := t.makeTokenizationError(message, startLine, startCol, suggestion)
 	t.errors = append(t.errors, err)
 
 	return Token{

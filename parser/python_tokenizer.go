@@ -27,6 +27,20 @@ type PythonTokenizer struct {
 	parenDepth  int     // Track nested parens/brackets/braces
 }
 
+// makeTokenizationError creates a TokenizationError with location and optional suggestion
+func (t *PythonTokenizer) makeTokenizationError(message string, line, col int, suggestion string) error {
+	return &TokenizationError{
+		Message: message,
+		Location: &core.SourceLocation{
+			File:   t.filename,
+			Line:   line,
+			Column: col,
+		},
+		Suggestion: suggestion,
+		Source:     t.input,
+	}
+}
+
 // NewPythonTokenizer creates a new Python tokenizer
 func NewPythonTokenizer(input string) *PythonTokenizer {
 	return &PythonTokenizer{
@@ -161,7 +175,13 @@ func (t *PythonTokenizer) handleIndentation() {
 
 		// Check for indentation error (dedent doesn't match any previous level)
 		if len(t.indentStack) > 0 && t.indentStack[len(t.indentStack)-1] != indent {
-			t.errors = append(t.errors, fmt.Errorf("indentation error at line %d", t.line))
+			err := t.makeTokenizationError(
+				"unindent does not match any outer indentation level",
+				startLine,
+				startCol,
+				"Make sure your indentation is consistent (use spaces or tabs, not both)",
+			)
+			t.errors = append(t.errors, err)
 		}
 	}
 	// If indent == currentIndent, no INDENT/DEDENT needed
@@ -252,26 +272,13 @@ func (t *PythonTokenizer) scanToken() Token {
 			return t.scanToken()
 		}
 		// If not followed by newline, it's an error
-		// Debug: show context around the backslash
-		contextStart := start - 20
-		if contextStart < 0 {
-			contextStart = 0
-		}
-		contextEnd := start + 20
-		if contextEnd > len(t.input) {
-			contextEnd = len(t.input)
-		}
-		context := t.input[contextStart:contextEnd]
-		fmt.Printf("[TOKENIZER ERROR] Unexpected backslash at line %d, pos %d\n", startLine, start)
-		fmt.Printf("  Full input length: %d\n", len(t.input))
-		if len(t.input) < 500 {
-			fmt.Printf("  Full input: %q\n", t.input)
-		} else {
-			fmt.Printf("  First 200 chars: %q\n", t.input[:200])
-		}
-		fmt.Printf("  Context: %q\n", context)
-		fmt.Printf("  Next char: %q\n", t.peek())
-		t.errors = append(t.errors, fmt.Errorf("unexpected character '\\' at line %d", startLine))
+		err := t.makeTokenizationError(
+			"unexpected character '\\'",
+			startLine,
+			startCol,
+			"Backslash must be followed by a newline for line continuation, or used inside a string",
+		)
+		t.errors = append(t.errors, err)
 		return Token{
 			Type:     TOKEN_ERROR,
 			Lexeme:   "\\",
@@ -610,7 +617,19 @@ func (t *PythonTokenizer) scanOperator(ch byte, start, startLine, startCol int) 
 		return makeToken(TOKEN_DOT)
 
 	default:
-		t.errors = append(t.errors, fmt.Errorf("unexpected character '%c' at line %d", ch, startLine))
+		suggestion := ""
+		if ch < 32 || ch > 126 {
+			suggestion = "Check for hidden control characters or use proper encoding"
+		} else {
+			suggestion = "This character is not valid Python syntax"
+		}
+		err := t.makeTokenizationError(
+			fmt.Sprintf("unexpected character '%c'", ch),
+			startLine,
+			startCol,
+			suggestion,
+		)
+		t.errors = append(t.errors, err)
 		return Token{
 			Type:     TOKEN_ERROR,
 			Lexeme:   string(ch),
@@ -1602,49 +1621,8 @@ func (t *PythonTokenizer) makeUnterminatedStringError(
 		expectedEnd = quoteChar + quoteChar + quoteChar
 	}
 
-	// Get a preview of the string content (first 50 chars)
-	preview := partialValue
-	if len(preview) > 50 {
-		preview = preview[:50] + "..."
-	}
+	message := fmt.Sprintf("unterminated %s", stringType)
+	suggestion := fmt.Sprintf("Add closing %s at end of string", expectedEnd)
 
-	// Get context: last few tokens before this string
-	contextTokens := ""
-	if len(t.tokens) > 0 {
-		startIdx := len(t.tokens) - 3
-		if startIdx < 0 {
-			startIdx = 0
-		}
-		recentTokens := []string{}
-		for i := startIdx; i < len(t.tokens); i++ {
-			tok := t.tokens[i]
-			if tok.Type == TOKEN_NEWLINE {
-				recentTokens = append(recentTokens, "NEWLINE")
-			} else if len(tok.Lexeme) > 20 {
-				recentTokens = append(recentTokens, tok.Lexeme[:20]+"...")
-			} else {
-				recentTokens = append(recentTokens, tok.Lexeme)
-			}
-		}
-		if len(recentTokens) > 0 {
-			contextTokens = fmt.Sprintf("\n  Context: previous tokens were: %v", recentTokens)
-		}
-	}
-
-	// Show where we started and where we ended
-	endLine := t.line
-	endCol := t.col
-
-	// Show opening quote(s) correctly
-	openingQuotes := quoteChar
-	if isTriple {
-		openingQuotes = quoteChar + quoteChar + quoteChar
-	}
-
-	return fmt.Errorf(
-		"unterminated %s: started at line %d, col %d with %s, reached EOF at line %d, col %d"+
-			"\n  Expected closing: %s"+
-			"\n  Parsed content: %q%s",
-		stringType, startLine, startCol, openingQuotes, endLine, endCol,
-		expectedEnd, preview, contextTokens)
+	return t.makeTokenizationError(message, startLine, startCol, suggestion)
 }
