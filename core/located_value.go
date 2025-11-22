@@ -5,9 +5,11 @@ import "fmt"
 
 // SourceLocation represents a position in source code
 type SourceLocation struct {
-	File   string
-	Line   int
-	Column int
+	File    string
+	Line    int
+	Column  int
+	EndLine int // Optional: end line for multi-line spans
+	EndCol  int // Optional: end column for range highlighting
 }
 
 // String returns a human-readable representation of the source location
