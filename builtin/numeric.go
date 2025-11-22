@@ -204,24 +204,41 @@ func RegisterNumeric(ctx *core.Context) {
 		// Get optional start value (default 0)
 		start, _ := v.GetNumberOrDefault(1, 0)
 
-		// Extract items from the iterable
-		var items []core.Value
-		switch v := iterable.(type) {
-		case *core.ListValue:
-			items = v.Items()
-		case core.TupleValue:
-			items = v
-		default:
-			return nil, fmt.Errorf("sum() argument must be an iterable, not '%s'", v.Type())
-		}
-
+		// Use the Iterator protocol to support all iterables (including generators)
 		sum := start
-		for _, item := range items {
-			num, err := types.RequireNumber(item, "sum() element")
-			if err != nil {
-				return nil, fmt.Errorf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())
+
+		if iter, ok := iterable.(core.Iterable); ok {
+			iterator := iter.Iterator()
+			for {
+				item, hasNext := iterator.Next()
+				if !hasNext {
+					break
+				}
+				num, err := types.RequireNumber(item, "sum() element")
+				if err != nil {
+					return nil, fmt.Errorf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())
+				}
+				sum += num
 			}
-			sum += num
+		} else {
+			// Fallback for types that don't implement Iterable interface
+			var items []core.Value
+			switch v := iterable.(type) {
+			case *core.ListValue:
+				items = v.Items()
+			case core.TupleValue:
+				items = v
+			default:
+				return nil, fmt.Errorf("sum() argument must be an iterable, not '%s'", v.Type())
+			}
+
+			for _, item := range items {
+				num, err := types.RequireNumber(item, "sum() element")
+				if err != nil {
+					return nil, fmt.Errorf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())
+				}
+				sum += num
+			}
 		}
 
 		return core.NumberValue(sum), nil
