@@ -6,6 +6,14 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// unwrap is a test helper that unwraps LocatedValue
+func unwrapPython(v core.Value) core.Value {
+	if lv, ok := v.(core.LocatedValue); ok {
+		return lv.Unwrap()
+	}
+	return v
+}
+
 // ============================================================================
 // Control Flow Tests
 // ============================================================================

@@ -231,7 +231,7 @@ func (p *PythonParser) synchronize() {
 // makeLocation creates a SourceLocation from a token
 func (p *PythonParser) makeLocation(tok Token) *core.SourceLocation {
 	return &core.SourceLocation{
-		File:   "<input>",
+		File:   p.filename,
 		Line:   tok.Line,
 		Column: tok.Col,
 	}

@@ -19,6 +19,13 @@ func init() {
 
 // Eval evaluates an expression in a context
 func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
+	// Extract location if expression is wrapped
+	var location *core.SourceLocation
+	if located, ok := expr.(core.LocatedValue); ok {
+		location = located.Location
+		expr = located.Unwrap()
+	}
+
 	// Increment evaluation counter and log progress periodically
 	if ctx != nil {
 		ctx.EvalCount++
@@ -63,6 +70,10 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		// Variable lookup (operators are handled via fast-path in ctx.Lookup)
 		val, err := ctx.Lookup(string(v))
 		if err != nil {
+			// Attach location to NameError if we have it
+			if nameErr, ok := err.(*core.NameError); ok && location != nil {
+				nameErr.Location = location
+			}
 			return nil, core.WrapEvalError(err, "name error", ctx)
 		}
 		return val, nil

@@ -26,7 +26,11 @@ func (i *Identifier) String() string {
 
 // ToIR implements ASTNode.ToIR
 func (i *Identifier) ToIR() core.Value {
-	return core.SymbolValue(i.Name)
+	value := core.SymbolValue(i.Name)
+	if i.Loc != nil {
+		return core.LocatedValue{Value: value, Location: i.Loc}
+	}
+	return value
 }
 
 // NewIdentifier creates a new identifier node
@@ -59,6 +63,9 @@ func (l *Literal) String() string {
 
 // ToIR implements ASTNode.ToIR
 func (l *Literal) ToIR() core.Value {
+	if l.Loc != nil {
+		return core.LocatedValue{Value: l.Value, Location: l.Loc}
+	}
 	return l.Value
 }
 
@@ -104,7 +111,11 @@ func (s *SExpr) ToIR() core.Value {
 		core.DebugLog("[ToIR] Element %d converted to: %T\n", i, vals[i])
 	}
 	core.DebugLog("[ToIR] SExpr.ToIR complete, creating list\n")
-	return core.NewList(vals...)
+	list := core.NewList(vals...)
+	if s.Loc != nil {
+		return core.LocatedValue{Value: list, Location: s.Loc}
+	}
+	return list
 }
 
 // NewSExpr creates a new S-expression node

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -40,8 +41,23 @@ func (ef *ErrorFormatter) FormatError(err error) string {
 		return ""
 	}
 
-	// Try to extract location from various error types
-	loc := ef.extractLocation(err)
+	// Unwrap any wrapped errors to get to the underlying error
+	underlyingErr := err
+	for {
+		unwrapped := errors.Unwrap(underlyingErr)
+		if unwrapped == nil {
+			break
+		}
+		underlyingErr = unwrapped
+	}
+
+	// Try to extract location from the underlying error
+	loc := ef.extractLocation(underlyingErr)
+	if loc == nil {
+		// Also try the original wrapped error
+		loc = ef.extractLocation(err)
+	}
+
 	if loc == nil {
 		// No location info - return basic error
 		return ef.colorError(err.Error())
@@ -62,12 +78,12 @@ func (ef *ErrorFormatter) FormatError(err error) string {
 		b.WriteString(context)
 	}
 
-	// Error message
+	// Error message - use the original error message which includes context
 	b.WriteString(ef.colorError(err.Error()))
 	b.WriteString("\n")
 
 	// Add suggestion if this is a TokenizationError with a suggestion
-	if tokErr, ok := err.(*TokenizationError); ok && tokErr.Suggestion != "" {
+	if tokErr, ok := underlyingErr.(*TokenizationError); ok && tokErr.Suggestion != "" {
 		b.WriteString(ef.colorSuggestion(tokErr.Suggestion))
 		b.WriteString("\n")
 	}
@@ -100,8 +116,71 @@ func (ef *ErrorFormatter) extractLocation(err error) *core.SourceLocation {
 		return tokErr.Location
 	}
 
-	// Try to find SourceLocation in other error types (extensible)
-	// Add more type checks here as needed
+	// Try NameError
+	if nameErr, ok := err.(*core.NameError); ok {
+		return nameErr.Location
+	}
+
+	// Try TypeError
+	if typeErr, ok := err.(*core.TypeError); ok {
+		return typeErr.Location
+	}
+
+	// Try IndexError
+	if idxErr, ok := err.(*core.IndexError); ok {
+		return idxErr.Location
+	}
+
+	// Try KeyError
+	if keyErr, ok := err.(*core.KeyError); ok {
+		return keyErr.Location
+	}
+
+	// Try ValueError
+	if valErr, ok := err.(*core.ValueError); ok {
+		return valErr.Location
+	}
+
+	// Try AttributeError
+	if attrErr, ok := err.(*core.AttributeError); ok {
+		return attrErr.Location
+	}
+
+	// Try AssertionError
+	if assertErr, ok := err.(*core.AssertionError); ok {
+		return assertErr.Location
+	}
+
+	// Try ImportError
+	if impErr, ok := err.(*core.ImportError); ok {
+		return impErr.Location
+	}
+
+	// Try OSError
+	if osErr, ok := err.(*core.OSError); ok {
+		return osErr.Location
+	}
+
+	// Try FileNotFoundError
+	if fnfErr, ok := err.(*core.FileNotFoundError); ok {
+		return fnfErr.Location
+	}
+
+	// Try EvalError (which may wrap other errors)
+	if evalErr, ok := err.(*core.EvalError); ok {
+		// Check if it has file/line info
+		if evalErr.File != "" && evalErr.Line > 0 {
+			return &core.SourceLocation{
+				File:   evalErr.File,
+				Line:   evalErr.Line,
+				Column: evalErr.Column,
+			}
+		}
+		// Try extracting from wrapped error
+		if evalErr.Wrapped != nil {
+			return ef.extractLocation(evalErr.Wrapped)
+		}
+	}
 
 	return nil
 }

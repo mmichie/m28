@@ -233,6 +233,11 @@ func TestParseToAST_ToIR(t *testing.T) {
 	// Lower to IR
 	ir := astNode.ToIR()
 
+	// Unwrap LocatedValue if present (ToIR now wraps with location)
+	if located, ok := ir.(core.LocatedValue); ok {
+		ir = located.Unwrap()
+	}
+
 	// Check IR is correct
 	list, ok := ir.(*core.ListValue)
 	if !ok {
@@ -244,16 +249,24 @@ func TestParseToAST_ToIR(t *testing.T) {
 		t.Fatalf("Expected 3 elements in IR, got %d", len(items))
 	}
 
-	// Check elements
-	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "+" {
-		t.Errorf("Expected '+', got %v", items[0])
+	// Helper to unwrap LocatedValue
+	unwrap := func(v core.Value) core.Value {
+		if lv, ok := v.(core.LocatedValue); ok {
+			return lv.Unwrap()
+		}
+		return v
 	}
 
-	if num, ok := items[1].(core.NumberValue); !ok || num != 1 {
-		t.Errorf("Expected 1, got %v", items[1])
+	// Check elements (unwrap each since they may be wrapped too)
+	if sym, ok := unwrap(items[0]).(core.SymbolValue); !ok || string(sym) != "+" {
+		t.Errorf("Expected '+', got %v (type: %T)", items[0], unwrap(items[0]))
 	}
 
-	if num, ok := items[2].(core.NumberValue); !ok || num != 2 {
-		t.Errorf("Expected 2, got %v", items[2])
+	if num, ok := unwrap(items[1]).(core.NumberValue); !ok || num != 1 {
+		t.Errorf("Expected 1, got %v (type: %T)", items[1], unwrap(items[1]))
+	}
+
+	if num, ok := unwrap(items[2]).(core.NumberValue); !ok || num != 2 {
+		t.Errorf("Expected 2, got %v (type: %T)", items[2], unwrap(items[2]))
 	}
 }

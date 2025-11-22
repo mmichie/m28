@@ -6,6 +6,14 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// unwrap is a test helper that unwraps LocatedValue
+func unwrap(v core.Value) core.Value {
+	if lv, ok := v.(core.LocatedValue); ok {
+		return lv.Unwrap()
+	}
+	return v
+}
+
 func TestIdentifier(t *testing.T) {
 	loc := &core.SourceLocation{File: "test.m28", Line: 1, Column: 1}
 	ident := NewIdentifier("foo", loc, SyntaxLisp)
@@ -33,7 +41,7 @@ func TestIdentifier(t *testing.T) {
 	}
 
 	// Test ToIR conversion
-	ir := ident.ToIR()
+	ir := unwrap(ident.ToIR())
 	if sym, ok := ir.(core.SymbolValue); !ok || string(sym) != "foo" {
 		t.Errorf("Expected SymbolValue('foo'), got %v", ir)
 	}
@@ -48,7 +56,7 @@ func TestLiteral(t *testing.T) {
 		t.Errorf("Expected NumberType, got %v", numLit.Type())
 	}
 
-	ir := numLit.ToIR()
+	ir := unwrap(numLit.ToIR())
 	if num, ok := ir.(core.NumberValue); !ok || num != 42 {
 		t.Errorf("Expected NumberValue(42), got %v", ir)
 	}
@@ -87,7 +95,7 @@ func TestSExpr(t *testing.T) {
 	}
 
 	// Test ToIR conversion
-	ir := sexpr.ToIR()
+	ir := unwrap(sexpr.ToIR())
 	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
@@ -98,16 +106,16 @@ func TestSExpr(t *testing.T) {
 		t.Errorf("Expected 3 elements, got %d", len(items))
 	}
 
-	// Check elements
-	if sym, ok := items[0].(core.SymbolValue); !ok || string(sym) != "+" {
+	// Check elements (unwrap each)
+	if sym, ok := unwrap(items[0]).(core.SymbolValue); !ok || string(sym) != "+" {
 		t.Errorf("Expected first element to be '+', got %v", items[0])
 	}
 
-	if num, ok := items[1].(core.NumberValue); !ok || num != 1 {
+	if num, ok := unwrap(items[1]).(core.NumberValue); !ok || num != 1 {
 		t.Errorf("Expected second element to be 1, got %v", items[1])
 	}
 
-	if num, ok := items[2].(core.NumberValue); !ok || num != 2 {
+	if num, ok := unwrap(items[2]).(core.NumberValue); !ok || num != 2 {
 		t.Errorf("Expected third element to be 2, got %v", items[2])
 	}
 }
