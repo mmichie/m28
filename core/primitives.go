@@ -242,6 +242,34 @@ func (s StringValue) GetAttr(name string) (Value, bool) {
 	return nil, false
 }
 
+// Iterator implements Iterable
+func (s StringValue) Iterator() Iterator {
+	return &stringIterator{
+		str:   string(s),
+		runes: []rune(string(s)),
+		index: 0,
+	}
+}
+
+type stringIterator struct {
+	str   string
+	runes []rune
+	index int
+}
+
+func (it *stringIterator) Next() (Value, bool) {
+	if it.index >= len(it.runes) {
+		return nil, false
+	}
+	char := StringValue(string(it.runes[it.index]))
+	it.index++
+	return char, true
+}
+
+func (it *stringIterator) Reset() {
+	it.index = 0
+}
+
 // BoolValue represents a boolean value
 type BoolValue bool
 
