@@ -398,6 +398,19 @@ func (pf *partialFunction) GetAttr(name string) (core.Value, bool) {
 
 	// Provide defaults for standard function attributes
 	switch name {
+	case "func":
+		// The wrapped function - this is what _unwrap_partial uses
+		return pf.function, true
+	case "args":
+		// The fixed positional arguments
+		return core.NewList(pf.fixedArgs...), true
+	case "keywords":
+		// The fixed keyword arguments
+		dict := core.NewDict()
+		for k, v := range pf.fixedKwargs {
+			dict.Set(k, v)
+		}
+		return dict, true
 	case "__name__":
 		return core.StringValue("partial"), true
 	case "__qualname__":

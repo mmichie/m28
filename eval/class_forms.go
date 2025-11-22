@@ -1524,18 +1524,28 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 	// This check must come AFTER GetClass() check since types like IntType are callable
 	if !isClass {
 		if callable, ok := classVal.(core.Callable); ok {
+			// Special case for functools.partial - check exact type match
+			// The partial class is *modules.partialBuiltin
+			// A partial instance is *modules.partialFunction
+			classType := fmt.Sprintf("%T", classVal)
+			objType := fmt.Sprintf("%T", obj)
+			if classType == "*modules.partialBuiltin" {
+				// Only return true if obj is actually a *modules.partialFunction
+				return core.BoolValue(objType == "*modules.partialFunction"), nil
+			}
+
 			// Check if it's a type object (like types.FunctionType)
 			// Type objects have type "type" and their string representation is the type name
 			callableType := callable.Type()
-			objType := obj.Type()
+			objCoreType := obj.Type()
 
 			if string(callableType) == "type" {
 				// It's a type object - compare its string representation with obj's type
 				typeStr := core.PrintValue(classVal)
-				if string(objType) == typeStr {
+				if string(objCoreType) == typeStr {
 					return core.True, nil
 				}
-			} else if callableType == objType {
+			} else if callableType == objCoreType {
 				// Both have the same type, they're compatible
 				return core.True, nil
 			}

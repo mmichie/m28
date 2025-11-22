@@ -713,7 +713,31 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 				}
 			}
 		}
+		// Special case: check if typeVal and obj are the exact same type
+		// This handles isinstance(partial_obj, partial_class) but not isinstance(func, partial_class)
+		// Only return true if obj is also the same concrete type (not just any BuiltinFunction)
+		// For partial: obj should be a *partialFunction, not just any callable
+		objType := fmt.Sprintf("%T", obj)
+		typeType := fmt.Sprintf("%T", t)
+		// For the partial class, we need to check if obj is a partialFunction
+		// The partial class is *modules.partialBuiltin
+		// A partial instance is *modules.partialFunction
+		if typeType == "*modules.partialBuiltin" {
+			return objType == "*modules.partialFunction"
+		}
+		// Don't match different builtin function types
+		return false
 	default:
+		// Special case for functools.partial - check exact type match
+		objType := fmt.Sprintf("%T", obj)
+		typeType := fmt.Sprintf("%T", typeVal)
+		// For the partial class, we need to check if obj is a partialFunction
+		// The partial class is *modules.partialBuiltin
+		// A partial instance is *modules.partialFunction
+		if typeType == "*modules.partialBuiltin" {
+			return objType == "*modules.partialFunction"
+		}
+
 		// Handle wrapper types that have GetClass() method
 		if wrapper, ok := typeVal.(interface{ GetClass() *core.Class }); ok {
 			classVal := wrapper.GetClass()
