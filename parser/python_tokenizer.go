@@ -658,7 +658,14 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
-			// If both fail, it's truly invalid (malformed binary)
+			// If both fail, use arbitrary-precision BigInt (Python supports arbitrary-sized integers)
+			if bigInt, err := core.NewBigIntFromString(cleanLexeme, 2); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: bigInt,
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			// If even BigInt fails, it's malformed (e.g., contains invalid characters)
 			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid binary literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
@@ -691,7 +698,14 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
-			// If both fail, it's truly invalid (malformed octal)
+			// If both fail, use arbitrary-precision BigInt
+			if bigInt, err := core.NewBigIntFromString(cleanLexeme, 8); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: bigInt,
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			// If even BigInt fails, it's malformed
 			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid octal literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
@@ -725,7 +739,14 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
-			// If both fail, it's truly invalid (malformed hex)
+			// If both fail, use arbitrary-precision BigInt
+			if bigInt, err := core.NewBigIntFromString(cleanLexeme, 16); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: bigInt,
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			// If even BigInt fails, it's malformed
 			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid hexadecimal literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
@@ -823,8 +844,16 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 		// Integer
 		if i, err := strconv.ParseInt(cleanLexeme, 10, 64); err == nil {
 			value = core.NumberValue(i)
+		} else if u, err := strconv.ParseUint(cleanLexeme, 10, 64); err == nil {
+			value = core.NumberValue(float64(u))
 		} else {
-			value = core.NumberValue(0)
+			// Use arbitrary-precision BigInt for very large integers
+			if bigInt, err := core.NewBigIntFromString(cleanLexeme, 10); err == nil {
+				value = bigInt
+			} else {
+				// Parse error - shouldn't happen if lexer scanned valid digits
+				value = core.NumberValue(0)
+			}
 		}
 	}
 
