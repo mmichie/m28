@@ -5,33 +5,16 @@ import (
 )
 
 // Init_WarningsModule creates and returns the _warnings module stub
-// This is a minimal stub implementation of Python's _warnings C extension module
+// This is a minimal stub that provides just enough for importlib to work.
+// It intentionally does NOT provide warn/warn_explicit so that warnings.py
+// uses its pure Python fallback implementation which has full functionality.
 func Init_WarningsModule() *core.DictValue {
 	warningsModule := core.NewDict()
 
-	// warn - issue a warning
-	// Signature: warn(message, category=None, stacklevel=1, source=None)
-	warnFunc := &core.BuiltinFunctionWithKwargs{
-		BaseObject: *core.NewBaseObject(core.FunctionType),
-		Name:       "warn",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-			// Minimal implementation - just suppress warnings
-			return core.None, nil
-		},
-	}
-	warningsModule.Set("warn", warnFunc)
-
-	// warn_explicit - issue a warning with explicit file/line info
-	// Signature: warn_explicit(message, category, filename, lineno, module=None, registry=None, module_globals=None, source=None)
-	warnExplicitFunc := &core.BuiltinFunctionWithKwargs{
-		BaseObject: *core.NewBaseObject(core.FunctionType),
-		Name:       "warn_explicit",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-			// Minimal implementation - just suppress warnings
-			return core.None, nil
-		},
-	}
-	warningsModule.Set("warn_explicit", warnExplicitFunc)
+	// NOTE: We intentionally do NOT provide warn() and warn_explicit() here.
+	// When warnings.py tries "from _warnings import warn", it will fail for those
+	// specific imports and fall back to its pure Python implementation.
+	// This gives us full warning functionality without implementing the C extension.
 
 	// filters - list of warning filters
 	warningsModule.Set("filters", core.NewList())

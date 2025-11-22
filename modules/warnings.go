@@ -551,14 +551,93 @@ func (c *CatchWarnings) exit(args []core.Value, ctx *core.Context) (core.Value, 
 
 // Warn is a helper function to emit warnings from Go code
 func Warn(message string, category string, ctx *core.Context) error {
+	// Delegate to CPython's warnings.warn() for proper integration with catch_warnings()
+	// Use __import__ to get the warnings module (works in any context)
+	importFunc, err := ctx.Lookup("__import__")
+	if err != nil {
+		if debugWarnings {
+			log.Printf("[WARN DEBUG] __import__ not found: %v", err)
+		}
+		fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
+		return nil
+	}
+
+	// Call __import__("warnings")
+	var warningsVal core.Value
+	if callable, ok := importFunc.(core.Callable); ok {
+		args := []core.Value{core.StringValue("warnings")}
+		warningsVal, err = callable.Call(args, ctx)
+		if err != nil {
+			if debugWarnings {
+				log.Printf("[WARN DEBUG] Failed to import warnings: %v", err)
+			}
+			fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
+			return nil
+		}
+	} else {
+		if debugWarnings {
+			log.Printf("[WARN DEBUG] __import__ is not callable")
+		}
+		fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
+		return nil
+	}
+
+	// Get the warn function from warnings module using attribute access
+	// Try as Object first (ModuleValue, Class, Instance, etc.)
+	var warnFunc core.Value
+	var found bool
+	if obj, ok := warningsVal.(core.Object); ok {
+		warnFunc, found = obj.GetAttr("warn")
+		if !found {
+			if debugWarnings {
+				log.Printf("[WARN DEBUG] warnings.warn not found via GetAttr")
+			}
+			fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
+			return nil
+		}
+	} else if warningsDict, ok := warningsVal.(*core.DictValue); ok {
+		// Fallback to dict access
+		warnFunc, found = warningsDict.Get("warn")
+		if !found {
+			if debugWarnings {
+				log.Printf("[WARN DEBUG] warnings.warn not found in dict")
+			}
+			fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
+			return nil
+		}
+	} else {
+		// Unknown type
+		if debugWarnings {
+			log.Printf("[WARN DEBUG] warnings module is unknown type: %T", warningsVal)
+		}
+		fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
+		return nil
+	}
+
+	if debugWarnings {
+		log.Printf("[WARN DEBUG] Successfully found warnings.warn, calling it")
+	}
+
+	// Get the category class
 	var categoryValue core.Value
-	if cat, err := ctx.Lookup(category); err == nil {
+	if cat, err3 := ctx.Lookup(category); err3 == nil {
 		categoryValue = cat
 	} else {
 		categoryValue = core.StringValue(category)
 	}
 
-	return emitWarning(message, categoryValue, 1, ctx)
+	// Call warnings.warn(message, category)
+	args := []core.Value{core.StringValue(message), categoryValue}
+
+	// Try calling as a Callable (covers most function types)
+	if callable, ok := warnFunc.(core.Callable); ok {
+		_, err := callable.Call(args, ctx)
+		return err
+	}
+
+	// Fallback to stderr if warn isn't callable
+	fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
+	return nil
 }
 
 // createFiltersProxy creates a list-like proxy for the warnings filters
