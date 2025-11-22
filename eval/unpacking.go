@@ -27,13 +27,15 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 		return nil
 
 	case *core.ListValue:
-		// Check if this is a tuple-literal form: (tuple-literal elem1 elem2 ...)
-		// If so, skip the tuple-literal marker and use the rest as the pattern
+		// Check if this is a tuple-literal or list-literal form: (tuple-literal elem1 elem2 ...) or (list-literal elem1 elem2 ...)
+		// If so, skip the literal marker and use the rest as the pattern
 		actualPattern := p
 		if p.Len() > 0 {
-			if sym, ok := p.Items()[0].(core.SymbolValue); ok && string(sym) == "tuple-literal" {
-				// Skip the tuple-literal marker
-				actualPattern = core.NewList(p.Items()[1:]...)
+			if sym, ok := p.Items()[0].(core.SymbolValue); ok {
+				if string(sym) == "tuple-literal" || string(sym) == "list-literal" {
+					// Skip the tuple-literal or list-literal marker
+					actualPattern = core.NewList(p.Items()[1:]...)
+				}
 			}
 		}
 

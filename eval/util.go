@@ -1043,23 +1043,25 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 		}
 
 		if isTupleUnpacking && t.Len() > 0 {
-			// Check if this is a tuple-literal form: (tuple-literal elem1 elem2 ...)
-			// If so, skip the tuple-literal marker and use the rest as the pattern
+			// Check if this is a tuple-literal or list-literal form: (tuple-literal elem1 elem2 ...) or (list-literal elem1 elem2 ...)
+			// If so, skip the literal marker and use the rest as the pattern
 			actualPattern := t
 			if t.Len() > 0 {
-				if sym, ok := t.Items()[0].(core.SymbolValue); ok && string(sym) == "tuple-literal" {
-					// Skip the tuple-literal marker
-					actualPattern = core.NewList(t.Items()[1:]...)
-					// Re-check for star unpacking in the actual pattern
-					hasStarUnpack = false
-					starIndex = -1
-					for i, elem := range actualPattern.Items() {
-						if elemList, ok := elem.(*core.ListValue); ok {
-							if elemList.Len() == 2 {
-								if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
-									hasStarUnpack = true
-									starIndex = i
-									break
+				if sym, ok := t.Items()[0].(core.SymbolValue); ok {
+					if string(sym) == "tuple-literal" || string(sym) == "list-literal" {
+						// Skip the tuple-literal or list-literal marker
+						actualPattern = core.NewList(t.Items()[1:]...)
+						// Re-check for star unpacking in the actual pattern
+						hasStarUnpack = false
+						starIndex = -1
+						for i, elem := range actualPattern.Items() {
+							if elemList, ok := elem.(*core.ListValue); ok {
+								if elemList.Len() == 2 {
+									if sym, ok := elemList.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack" {
+										hasStarUnpack = true
+										starIndex = i
+										break
+									}
 								}
 							}
 						}
