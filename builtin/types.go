@@ -1433,6 +1433,15 @@ func createIntClass(objectClass *core.Class) *IntType {
 			return core.NumberValue(float64(int(n))), nil
 		}
 
+		// Handle BoolValue (bool is a subclass of int in Python)
+		// True -> 1, False -> 0
+		if b, ok := receiver.(core.BoolValue); ok {
+			if b {
+				return core.NumberValue(1), nil
+			}
+			return core.NumberValue(0), nil
+		}
+
 		// Handle int subclass instances that store __value__
 		if inst, ok := receiver.(*core.Instance); ok {
 			if val, exists := inst.Attributes["__value__"]; exists {
@@ -1460,6 +1469,15 @@ func createIntClass(objectClass *core.Class) *IntType {
 				return nil, fmt.Errorf("__index__ returned non-integer value")
 			}
 			return core.NumberValue(float64(n)), nil
+		}
+
+		// Handle BoolValue (bool is a subclass of int in Python)
+		// True -> 1, False -> 0
+		if b, ok := receiver.(core.BoolValue); ok {
+			if b {
+				return core.NumberValue(1), nil
+			}
+			return core.NumberValue(0), nil
 		}
 
 		// Handle int subclass instances that store __value__
