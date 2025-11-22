@@ -1242,15 +1242,10 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 }
 
 // AssignForm provides the implementation of the = special form
-// Python assignments are statements and always return None
+// Returns the assigned value to support chained assignments like x = y = 10
 func AssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
-	// Call the internal implementation
-	_, err := assignFormInternal(args, ctx)
-	if err != nil {
-		return nil, err
-	}
-	// Python assignments are statements and return None
-	return core.None, nil
+	// Call the internal implementation and return its value
+	return assignFormInternal(args, ctx)
 }
 
 // WalrusForm provides the implementation of the walrus operator (:=)

@@ -79,8 +79,8 @@ func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Va
 		return nil, err
 	}
 
-	// Python assignments are statements and return None
-	return core.None, nil
+	// Return the assigned value to support chained assignments
+	return value, nil
 }
 
 // GetItemForm implements the get-item special form for index access
@@ -172,8 +172,8 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		// Python assignments are statements and return None
-		return core.None, nil
+		// Return the assigned value to support chained assignments
+		return value, nil
 	}
 	// fmt.Printf("DEBUG: CallSetItem did not find __setitem__, trying protocol\n")
 
@@ -183,8 +183,8 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		// Python assignments are statements and return None
-		return core.None, nil
+		// Return the assigned value to support chained assignments
+		return value, nil
 	}
 
 	// Fall back to error (shouldn't reach here with proper protocol support)
