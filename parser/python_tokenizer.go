@@ -747,12 +747,12 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 	hasDecimalPoint := startsWithDot
 	if !startsWithDot && !t.isAtEnd() && t.peek() == '.' {
 		// Look ahead to see if this is a float or dot notation
-		// It's a float if: (1) next char is digit, OR (2) next char is not a letter/underscore (trailing dot like 314.)
+		// It's a float if: (1) next char is digit, (2) next char is 'e' or 'E' (for floats like 3.e14), OR (3) next char is not a letter/underscore (trailing dot like 314.)
 		nextPos := t.pos + 1
 		if nextPos < len(t.input) {
 			nextChar := t.input[nextPos]
-			// It's a float if next is digit, or next is not identifier start (allows 314.)
-			if isDigit(nextChar) || !(isLetter(nextChar) || nextChar == '_') {
+			// It's a float if next is digit, e/E for exponent, or not identifier start (allows 314.)
+			if isDigit(nextChar) || nextChar == 'e' || nextChar == 'E' || !(isLetter(nextChar) || nextChar == '_') {
 				t.advance() // consume '.'
 				hasDecimalPoint = true
 				// Scan fractional part (may be empty for trailing dot like 314.)
