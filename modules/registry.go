@@ -29,6 +29,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_functools":       Init_FunctoolsModule,       // C extension module for functools.py
 	"_signal":          Init_SignalModule,          // C extension module for signal.py
 	"_string":          Init_StringModule,          // C extension module for string.py
+	"_pylong":          Init_PylongModule,          // Python module for huge integer optimizations
 	"_codecs":          InitCodecsModule,           // C extension module for codecs.py
 	"enum":             InitEnumModule,             // Stub for enum.py (provides basic enum support)
 	"_sre":             Init_SREModule,             // C extension module for re (regex engine)
