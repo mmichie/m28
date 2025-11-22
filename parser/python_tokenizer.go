@@ -639,13 +639,18 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 			lexeme := t.input[start:t.pos]
 			// Remove underscores and parse
 			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0b" prefix
+			if cleanLexeme == "" {
+				// Invalid binary literal (just "0b" with no digits)
+				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid binary literal"),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+			}
 			if i, err := strconv.ParseInt(cleanLexeme, 2, 64); err == nil {
 				return Token{
 					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
-			return Token{Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(0),
+			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid binary literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
 
@@ -658,13 +663,18 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 			}
 			lexeme := t.input[start:t.pos]
 			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0o" prefix
+			if cleanLexeme == "" {
+				// Invalid octal literal (just "0o" with no digits)
+				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid octal literal"),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+			}
 			if i, err := strconv.ParseInt(cleanLexeme, 8, 64); err == nil {
 				return Token{
 					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
-			return Token{Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(0),
+			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid octal literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
 
@@ -678,13 +688,18 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 			}
 			lexeme := t.input[start:t.pos]
 			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0x" prefix
+			if cleanLexeme == "" {
+				// Invalid hexadecimal literal (just "0x" with no digits)
+				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid hexadecimal literal"),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+			}
 			if i, err := strconv.ParseInt(cleanLexeme, 16, 64); err == nil {
 				return Token{
 					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
-			return Token{Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(0),
+			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid hexadecimal literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
 	}

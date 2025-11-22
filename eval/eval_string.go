@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/mmichie/m28/core"
@@ -35,6 +36,12 @@ func EvalString(input string, ctx *core.Context) (core.Value, error) {
 	pythonParser := parser.NewPythonParser(tokens)
 	nodes, err := pythonParser.Parse()
 	if err != nil {
+		// Check if this is a parse error - if so, convert to SyntaxError
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "parse error") || strings.Contains(errMsg, "Unexpected token") {
+			// Format as SyntaxError for proper exception handling
+			return nil, fmt.Errorf("SyntaxError: %s", errMsg)
+		}
 		return nil, err
 	}
 

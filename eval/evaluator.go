@@ -1420,6 +1420,26 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		errMsg = err.Error()
 	}
 
+	// Check if error message starts with a Python exception type name
+	// Format: "ExceptionType: message"
+	if idx := strings.Index(errMsg, ": "); idx > 0 {
+		possibleType := errMsg[:idx]
+		// List of known exception types that might be in error messages
+		knownTypes := []string{
+			"SyntaxError", "TypeError", "ValueError", "NameError",
+			"AttributeError", "KeyError", "IndexError", "ZeroDivisionError",
+			"ImportError", "ModuleNotFoundError", "OSError", "FileNotFoundError",
+			"RuntimeError", "NotImplementedError", "StopIteration",
+		}
+		for _, knownType := range knownTypes {
+			if possibleType == knownType {
+				// Extract just the message part (after ": ")
+				msgOnly := errMsg[idx+2:]
+				return createPythonExceptionInstance(ctx, knownType, msgOnly)
+			}
+		}
+	}
+
 	// Map Go error types to Python exception classes
 	switch baseErr.(type) {
 	case *core.StopIteration:
