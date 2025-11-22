@@ -1,11 +1,11 @@
 {
   "python_version": "3.12",
-  "last_updated": "2025-10-17",
+  "last_updated": "2025-11-22",
   "summary": {
-    "total_tests": 0,
+    "total_tests": 36,
     "passing": 0,
     "failing": 0,
-    "not_implemented": 0,
+    "not_implemented": 36,
     "success_rate": 0
   },
   "tiers": {
@@ -14,9 +14,12 @@
       "priority": 1,
       "tests": {
         "test_grammar": {"status": "not_run", "source": "cpython/Lib/test/test_grammar.py"},
+        "test_syntax": {"status": "not_run", "source": "cpython/Lib/test/test_syntax.py"},
         "test_types": {"status": "not_run", "source": "cpython/Lib/test/test_types.py"},
         "test_builtin": {"status": "not_run", "source": "cpython/Lib/test/test_builtin.py"},
-        "test_operations": {"status": "not_run", "source": "cpython/Lib/test/test_operations.py"}
+        "test_binop": {"status": "not_run", "source": "cpython/Lib/test/test_binop.py"},
+        "test_unary": {"status": "not_run", "source": "cpython/Lib/test/test_unary.py"},
+        "test_compare": {"status": "not_run", "source": "cpython/Lib/test/test_compare.py"}
       }
     },
     "tier2_data_structures": {
@@ -27,23 +30,25 @@
         "test_dict": {"status": "not_run", "source": "cpython/Lib/test/test_dict.py"},
         "test_set": {"status": "not_run", "source": "cpython/Lib/test/test_set.py"},
         "test_tuple": {"status": "not_run", "source": "cpython/Lib/test/test_tuple.py"},
-        "test_string": {"status": "not_run", "source": "cpython/Lib/test/test_string.py"}
+        "test_string": {"status": "not_run", "source": "cpython/Lib/test/test_string.py"},
+        "test_bytes": {"status": "not_run", "source": "cpython/Lib/test/test_bytes.py"}
       }
     },
     "tier3_control_flow": {
-      "description": "Control flow structures",
+      "description": "Control flow and exceptions",
       "priority": 3,
       "tests": {
-        "test_if": {"status": "not_run", "source": "cpython/Lib/test/test_if.py"},
-        "test_while": {"status": "not_run", "source": "cpython/Lib/test/test_while.py"},
-        "test_for": {"status": "not_run", "source": "cpython/Lib/test/test_for.py"},
-        "test_exceptions": {"status": "not_run", "source": "cpython/Lib/test/test_exceptions.py"}
+        "test_exceptions": {"status": "not_run", "source": "cpython/Lib/test/test_exceptions.py"},
+        "test_raise": {"status": "not_run", "source": "cpython/Lib/test/test_raise.py"},
+        "test_with": {"status": "not_run", "source": "cpython/Lib/test/test_with.py"},
+        "test_scope": {"status": "not_run", "source": "cpython/Lib/test/test_scope.py"}
       }
     },
     "tier4_functions_oop": {
       "description": "Functions and object-oriented programming",
       "priority": 4,
       "tests": {
+        "test_call": {"status": "not_run", "source": "cpython/Lib/test/test_call.py"},
         "test_functools": {"status": "not_run", "source": "cpython/Lib/test/test_functools.py"},
         "test_decorators": {"status": "not_run", "source": "cpython/Lib/test/test_decorators.py"},
         "test_class": {"status": "not_run", "source": "cpython/Lib/test/test_class.py"},
@@ -55,15 +60,29 @@
       "priority": 5,
       "tests": {
         "test_generators": {"status": "not_run", "source": "cpython/Lib/test/test_generators.py"},
+        "test_genexps": {"status": "not_run", "source": "cpython/Lib/test/test_genexps.py"},
+        "test_listcomps": {"status": "not_run", "source": "cpython/Lib/test/test_listcomps.py"},
+        "test_dictcomps": {"status": "not_run", "source": "cpython/Lib/test/test_dictcomps.py"},
+        "test_setcomps": {"status": "not_run", "source": "cpython/Lib/test/test_setcomps.py"},
+        "test_unpack": {"status": "not_run", "source": "cpython/Lib/test/test_unpack.py"},
+        "test_unpack_ex": {"status": "not_run", "source": "cpython/Lib/test/test_unpack_ex.py"},
+        "test_iter": {"status": "not_run", "source": "cpython/Lib/test/test_iter.py"},
         "test_itertools": {"status": "not_run", "source": "cpython/Lib/test/test_itertools.py"},
-        "test_comprehensions": {"status": "not_run", "source": "cpython/Lib/test/test_comprehensions.py"},
         "test_contextlib": {"status": "not_run", "source": "cpython/Lib/test/test_contextlib.py"}
+      }
+    },
+    "tier6_assignment": {
+      "description": "Assignment and augmented assignment",
+      "priority": 6,
+      "tests": {
+        "test_augassign": {"status": "not_run", "source": "cpython/Lib/test/test_augassign.py"}
       }
     }
   },
   "notes": [
-    "Tests adapted from CPython 3.12 test suite",
-    "Focus on pure-Python language features, not implementation details",
-    "Tests simplified to remove CPython-specific assumptions"
+    "Tests run directly from CPython 3.12 stdlib (not simplified versions)",
+    "All test files exist in CPython stdlib and are verified",
+    "Focus on pure-Python language features, not C implementation details",
+    "Run with: ./tests/run_cpython_regression.sh"
   ]
 }
