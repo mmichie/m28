@@ -644,12 +644,21 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid binary literal"),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 			}
+			// Try parsing as signed int64 first
 			if i, err := strconv.ParseInt(cleanLexeme, 2, 64); err == nil {
 				return Token{
 					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
+			// If that fails (overflow), try unsigned int64
+			if u, err := strconv.ParseUint(cleanLexeme, 2, 64); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(float64(u)),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			// If both fail, it's truly invalid (malformed binary)
 			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid binary literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
@@ -668,12 +677,21 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid octal literal"),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 			}
+			// Try parsing as signed int64 first
 			if i, err := strconv.ParseInt(cleanLexeme, 8, 64); err == nil {
 				return Token{
 					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
+			// If that fails (overflow), try unsigned int64
+			if u, err := strconv.ParseUint(cleanLexeme, 8, 64); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(float64(u)),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			// If both fail, it's truly invalid (malformed octal)
 			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid octal literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
@@ -693,12 +711,21 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid hexadecimal literal"),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 			}
+			// Try parsing as signed int64 first
 			if i, err := strconv.ParseInt(cleanLexeme, 16, 64); err == nil {
 				return Token{
 					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
+			// If that fails (overflow), try unsigned int64
+			if u, err := strconv.ParseUint(cleanLexeme, 16, 64); err == nil {
+				return Token{
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(float64(u)),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
+				}
+			}
+			// If both fail, it's truly invalid (malformed hex)
 			return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue("invalid hexadecimal literal"),
 				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
