@@ -871,6 +871,7 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 
 	// Handle return values
 	if ret, ok := result.(*ReturnValue); ok {
+		core.TraceExitFunction(f.name, ret.Value, nil)
 		return ret.Value, nil
 	}
 
@@ -879,8 +880,15 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 		return nil, fmt.Errorf("yield outside of generator function")
 	}
 
-	// In Python, functions without an explicit return statement return None
+	// Lambda expressions implicitly return the value of their body expression
+	if f.isLambda {
+		core.TraceExitFunction(f.name, result, nil)
+		return result, nil
+	}
+
+	// In Python, def functions without an explicit return statement return None
 	// (not the value of the last expression like in Lisp)
+	core.TraceExitFunction(f.name, core.None, nil)
 	return core.None, nil
 }
 
