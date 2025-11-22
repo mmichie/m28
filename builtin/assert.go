@@ -37,7 +37,7 @@ func RegisterAssertBuiltins(ctx *core.Context) {
 			} else {
 				message = "Assertion failed"
 			}
-			return nil, fmt.Errorf(message)
+			return nil, core.NewAssertionError(message)
 		}
 
 		return core.Nil, nil

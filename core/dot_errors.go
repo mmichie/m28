@@ -162,6 +162,28 @@ func NewValueError(msg string) *ValueError {
 	return &ValueError{Message: msg}
 }
 
+// AssertionError represents a failed assertion
+type AssertionError struct {
+	Message  string
+	Location *SourceLocation
+}
+
+func (e *AssertionError) Error() string {
+	msg := e.Message
+	if msg == "" {
+		msg = "assertion failed"
+	}
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
+}
+
+// NewAssertionError creates a new assertion error
+func NewAssertionError(msg string) *AssertionError {
+	return &AssertionError{Message: msg}
+}
+
 // SystemExit represents a request to exit the program
 type SystemExit struct {
 	Code     int

@@ -1370,6 +1370,7 @@ func isExceptionType(name string) bool {
 		"RuntimeError":      true,
 		"FileNotFoundError": true,
 		"PermissionError":   true,
+		"AssertionError":    true,
 	}
 	return knownTypes[name]
 }
@@ -1429,7 +1430,7 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 			"SyntaxError", "TypeError", "ValueError", "NameError",
 			"AttributeError", "KeyError", "IndexError", "ZeroDivisionError",
 			"ImportError", "ModuleNotFoundError", "OSError", "FileNotFoundError",
-			"RuntimeError", "NotImplementedError", "StopIteration",
+			"RuntimeError", "NotImplementedError", "StopIteration", "AssertionError",
 		}
 		for _, knownType := range knownTypes {
 			if possibleType == knownType {
@@ -1471,6 +1472,8 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return createPythonExceptionInstance(ctx, "AttributeError", errMsg)
 	case *core.ValueError:
 		return createPythonExceptionInstance(ctx, "ValueError", errMsg)
+	case *core.AssertionError:
+		return createPythonExceptionInstance(ctx, "AssertionError", errMsg)
 	default:
 		// Generic exception for unknown error types
 		return createPythonExceptionInstance(ctx, "Exception", errMsg)
