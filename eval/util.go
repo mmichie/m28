@@ -795,8 +795,15 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 					for i, target := range actualTargets.Items() {
 						if i == starIndex {
 							// Star unpacking: collect remaining values
-							starTarget := target.(*core.ListValue)
-							starVar := starTarget.Items()[1].(core.SymbolValue)
+							unwrappedTarget := unwrapLocated(target)
+							starTarget, ok := unwrappedTarget.(*core.ListValue)
+							if !ok {
+								return nil, fmt.Errorf("star unpacking target must be a list, got %v", unwrappedTarget.Type())
+							}
+							starVar, ok := starTarget.GetItemAsSymbol(1)
+							if !ok {
+								return nil, fmt.Errorf("star unpacking variable must be a symbol")
+							}
 							remaining := len(values) - valIdx - (actualTargets.Len() - i - 1)
 							starValues := values[valIdx : valIdx+remaining]
 							if err := assignVariable(ctx, string(starVar), core.NewList(starValues...)); err != nil {
@@ -1365,9 +1372,10 @@ func WalrusForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// First argument must be a symbol
-	target, ok := args.Items()[0].(core.SymbolValue)
+	target, ok := args.GetItemAsSymbol(0)
 	if !ok {
-		return nil, TypeError{Expected: "symbol", Got: args.Items()[0].Type()}
+		unwrapped := unwrapLocated(args.Items()[0])
+		return nil, TypeError{Expected: "symbol", Got: unwrapped.Type()}
 	}
 
 	// Evaluate the expression
