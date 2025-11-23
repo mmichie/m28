@@ -55,6 +55,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// (symbols or dot expressions)
 				allClassRefs := true
 				for _, elem := range parentList.Items() {
+					elem = unwrapLocated(elem)
 					switch e := elem.(type) {
 					case core.SymbolValue:
 						// Simple class name
@@ -93,6 +94,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Get parent classes if specified
 				parentItems := parentList.Items()
 				for i, parentElem := range parentItems {
+					parentElem = unwrapLocated(parentElem)
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating parent %d: %v\n", i, core.PrintValue(parentElem))
 					}
@@ -200,7 +202,15 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						}
 					}
 					// Extract the actual key-value pair
-					if pair.Len()-pairStartIdx == 2 {
+					if pair.Len() == 2 && pairStartIdx == 1 {
+						// When we skipped list-literal, the actual pair is the second element
+						innerVal := unwrapLocated(pairItems[1])
+						if innerList, ok := innerVal.(*core.ListValue); ok {
+							kwPair = innerList
+						} else {
+							kwPair = pair
+						}
+					} else if pair.Len()-pairStartIdx == 2 {
 						kwPair = core.NewList(pairItems[pairStartIdx:]...)
 					} else {
 						kwPair = pair
@@ -240,7 +250,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				bodyStart++ // Skip past keywords in body processing
 
 				for i := startIdx; i < kwList.Len(); i++ {
-					kw := kwItems[i]
+					kw := unwrapLocated(kwItems[i])
 
 					// Extract keyword pair, handling list-literal markers
 					var kwPair *core.ListValue
@@ -248,11 +258,20 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						pairItems := pair.Items()
 						pairStartIdx := 0
 						if pair.Len() > 0 {
-							if sym, ok := pairItems[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+							firstPairItem := unwrapLocated(pairItems[0])
+							if sym, ok := firstPairItem.(core.SymbolValue); ok && string(sym) == "list-literal" {
 								pairStartIdx = 1
 							}
 						}
-						if pair.Len()-pairStartIdx == 2 {
+						if pair.Len() == 2 && pairStartIdx == 1 {
+							// When we skipped list-literal, the actual pair is the second element
+							innerVal := unwrapLocated(pairItems[1])
+							if innerList, ok := innerVal.(*core.ListValue); ok {
+								kwPair = innerList
+							} else {
+								kwPair = pair
+							}
+						} else if pair.Len()-pairStartIdx == 2 {
 							kwPair = core.NewList(pairItems[pairStartIdx:]...)
 						} else {
 							kwPair = pair
@@ -266,7 +285,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 
 					kwPairItems := kwPair.Items()
-					kwName, ok := kwPairItems[0].(core.StringValue)
+					kwNameVal := unwrapLocated(kwPairItems[0])
+					kwName, ok := kwNameVal.(core.StringValue)
 					if !ok {
 						continue
 					}

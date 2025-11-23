@@ -1,0 +1,43 @@
+# Test for LocatedValue unwrapping in Python class definitions
+# Tests M28-0c2f: Fix LocatedValue unwrapping in Python class definitions
+
+(import abc)
+
+# Get ABCMeta and ABC for testing
+(= ABCMeta (getattr abc "ABCMeta"))
+(= ABC (getattr abc "ABC"))
+
+# Test 1: Class with explicit metaclass=ABCMeta can access metaclass methods
+(class MyABC () [[("metaclass", ABCMeta)]]
+  (= test_attr "test"))
+
+# Try to use register() method from ABCMeta
+# This should work if metaclass methods are properly accessible
+(print "Checking MyABC for 'register' attribute...")
+(print (+ "hasattr result: " (str (hasattr MyABC "register"))))
+(if (hasattr MyABC "register")
+  (print "Test 1 PASS: MyABC has register method")
+  (print "Test 1 FAIL: MyABC does not have register method"))
+
+# Test 2: Class inheriting from ABC parent gets metaclass
+(class MyBase (ABC))
+
+(class MyChild (MyBase))
+
+# Child should have access to metaclass methods
+(try
+  (do
+    (assert (hasattr MyChild "register") "MyChild should inherit metaclass")
+    (print "Test 2 PASS: MyChild inherits metaclass"))
+  (except Exception e
+    (print (+ "Test 2 FAIL: " (str e)))))
+
+# Test 3: Import _collections_abc
+(try
+  (do
+    (import _collections_abc)
+    (print "Test 3 PASS: _collections_abc imports successfully"))
+  (except Exception e
+    (print (+ "Test 3 FAIL: " (str e)))))
+
+(print "All tests completed")
