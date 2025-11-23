@@ -1013,13 +1013,14 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 				}
 
 				// Get the property name (can be StringValue or SymbolValue)
+				propVal := unwrapLocated(t.Items()[2])
 				var propName string
-				if strName, ok := t.Items()[2].(core.StringValue); ok {
+				if strName, ok := propVal.(core.StringValue); ok {
 					propName = string(strName)
-				} else if symName, ok := t.Items()[2].(core.SymbolValue); ok {
+				} else if symName, ok := propVal.(core.SymbolValue); ok {
 					propName = string(symName)
 				} else {
-					return nil, TypeError{Expected: "string or symbol property name", Got: t.Items()[2].Type()}
+					return nil, TypeError{Expected: "string or symbol property name", Got: propVal.Type()}
 				}
 
 				// Set the attribute

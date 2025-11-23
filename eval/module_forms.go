@@ -194,12 +194,13 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				return nil, fmt.Errorf("import :from requires a list of names or *")
 			}
 			i += 2
-		} else if sym, ok := args.Items()[i].(core.SymbolValue); ok && (string(sym) == ":level" || string(sym) == "level") {
+		} else if sym, ok := argI.(core.SymbolValue); ok && (string(sym) == ":level" || string(sym) == "level") {
 			// :level N (for relative imports)
 			if i+1 >= args.Len() {
 				return nil, fmt.Errorf("import :level requires a number")
 			}
-			if levelNum, ok := args.Items()[i+1].(core.NumberValue); !ok {
+			argI1 := unwrapLocated(args.Items()[i+1])
+			if levelNum, ok := argI1.(core.NumberValue); !ok {
 				return nil, fmt.Errorf("import :level must be a number")
 			} else {
 				// Resolve relative import
@@ -212,7 +213,7 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 			}
 			i += 2
 		} else {
-			return nil, fmt.Errorf("unexpected import option: %v", args.Items()[i])
+			return nil, fmt.Errorf("unexpected import option: %v", argI)
 		}
 	}
 
