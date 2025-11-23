@@ -1173,10 +1173,23 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 				// Assign values
 				valIdx := 0
 				for i, target := range t.Items() {
+					// Unwrap LocatedValue before processing
+					unwrappedTarget := unwrapLocated(target)
+
 					if i == starIndex {
 						// Star unpacking: collect remaining values
-						starTarget := target.(*core.ListValue)
-						starVar := starTarget.Items()[1].(core.SymbolValue)
+						starTarget, ok := unwrappedTarget.(*core.ListValue)
+						if !ok {
+							return nil, fmt.Errorf("star unpacking target must be a list, got %T", unwrappedTarget)
+						}
+						if starTarget.Len() < 2 {
+							return nil, fmt.Errorf("invalid star unpacking target")
+						}
+						starVarVal := unwrapLocated(starTarget.Items()[1])
+						starVar, ok := starVarVal.(core.SymbolValue)
+						if !ok {
+							return nil, fmt.Errorf("star unpacking variable must be a symbol, got %T", starVarVal)
+						}
 						remaining := len(values) - valIdx - (t.Len() - i - 1)
 						starValues := values[valIdx : valIdx+remaining]
 						if err := assignVariable(ctx, string(starVar), core.NewList(starValues...)); err != nil {
@@ -1185,7 +1198,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 						valIdx += remaining
 					} else {
 						// Regular assignment
-						if sym, ok := target.(core.SymbolValue); ok {
+						if sym, ok := unwrappedTarget.(core.SymbolValue); ok {
 							if err := assignVariable(ctx, string(sym), values[valIdx]); err != nil {
 								return nil, err
 							}
@@ -1194,8 +1207,9 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 						}
 
 						// Check if it's dot notation
-						if targetList, ok := target.(*core.ListValue); ok && targetList.Len() == 3 {
-							if sym, ok := targetList.Items()[0].(core.SymbolValue); ok && string(sym) == "." {
+						if targetList, ok := unwrappedTarget.(*core.ListValue); ok && targetList.Len() == 3 {
+							unwrappedFirstItem := unwrapLocated(targetList.Items()[0])
+							if sym, ok := unwrappedFirstItem.(core.SymbolValue); ok && string(sym) == "." {
 								// Evaluate the object
 								obj, err := Eval(targetList.Items()[1], ctx)
 								if err != nil {
