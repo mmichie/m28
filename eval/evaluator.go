@@ -2924,9 +2924,20 @@ func listLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 
 	// Evaluate each element
 	for _, arg := range args.Items() {
+		// Unwrap LocatedValue for the arg itself
+		unwrappedArg := arg
+		if located, ok := arg.(core.LocatedValue); ok {
+			unwrappedArg = located.Unwrap()
+		}
+
 		// Check if this is an unpacking expression: (*unpack-iter expr)
-		if list, ok := arg.(*core.ListValue); ok && list.Len() == 2 {
-			if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack-iter" {
+		if list, ok := unwrappedArg.(*core.ListValue); ok && list.Len() == 2 {
+			// Unwrap LocatedValue when checking for marker
+			firstElem := list.Items()[0]
+			if located, ok := firstElem.(core.LocatedValue); ok {
+				firstElem = located.Unwrap()
+			}
+			if sym, ok := firstElem.(core.SymbolValue); ok && string(sym) == "*unpack-iter" {
 				// Evaluate the expression to unpack
 				val, err := Eval(list.Items()[1], ctx)
 				if err != nil {
@@ -2977,9 +2988,20 @@ func tupleLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, erro
 	for i, arg := range args.Items() {
 		core.DebugLog("[TUPLE-LIT] Evaluating element %d: %T\n", i, arg)
 
+		// Unwrap LocatedValue for the arg itself
+		unwrappedArg := arg
+		if located, ok := arg.(core.LocatedValue); ok {
+			unwrappedArg = located.Unwrap()
+		}
+
 		// Check if this is an unpacking expression: (*unpack-iter expr)
-		if list, ok := arg.(*core.ListValue); ok && list.Len() == 2 {
-			if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "*unpack-iter" {
+		if list, ok := unwrappedArg.(*core.ListValue); ok && list.Len() == 2 {
+			// Unwrap LocatedValue when checking for marker
+			firstElem := list.Items()[0]
+			if located, ok := firstElem.(core.LocatedValue); ok {
+				firstElem = located.Unwrap()
+			}
+			if sym, ok := firstElem.(core.SymbolValue); ok && string(sym) == "*unpack-iter" {
 				// Evaluate the expression to unpack
 				val, err := Eval(list.Items()[1], ctx)
 				if err != nil {

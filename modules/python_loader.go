@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/ast"
 )
 
 var debugImportLoader = os.Getenv("M28_DEBUG_IMPORT") != ""
@@ -259,30 +260,51 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 	}
 
-	// Convert AST to IR
+	// Convert AST to IR - for better error reporting, evaluate statements one by one
 	startToIR := time.Now()
-	ir := astNode.ToIR()
+
+	// Check if astNode is a BlockForm (multiple statements)
+	var stmts []ast.ASTNode
+	if blockForm, ok := astNode.(*ast.BlockForm); ok {
+		stmts = blockForm.Statements
+	} else {
+		// Single statement
+		stmts = []ast.ASTNode{astNode}
+	}
+
 	toIRTime := time.Since(startToIR)
 
-	// Evaluate the IR with timeout
+	// Evaluate statements one by one for better error reporting
 	startEval := time.Now()
 	evalTimeout := 120 * time.Second // 120 second timeout for module evaluation (increased for test.support)
 
 	type evalResult struct {
-		val core.Value
-		err error
+		val       core.Value
+		err       error
+		stmtIndex int
 	}
 	resultChan := make(chan evalResult, 1)
 
 	go func() {
-		val, err := evalFunc(ir, moduleCtx)
-		resultChan <- evalResult{val, err}
+		var lastVal core.Value
+		for i, stmt := range stmts {
+			ir := stmt.ToIR()
+			val, err := evalFunc(ir, moduleCtx)
+			if err != nil {
+				resultChan <- evalResult{nil, err, i + 1}
+				return
+			}
+			lastVal = val
+		}
+		resultChan <- evalResult{lastVal, nil, 0}
 	}()
 
 	var evalErr error
+	var failedStmtNum int
 	select {
 	case result := <-resultChan:
 		evalErr = result.err
+		failedStmtNum = result.stmtIndex
 	case <-time.After(evalTimeout):
 		// Provide diagnostic info about where evaluation stopped
 		evalCount := moduleCtx.EvalCount
@@ -299,7 +321,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	if evalErr != nil {
 		if debugImportLoader {
-			log.Printf("[IMPORT] LoadPythonModule('%s') -> evaluation FAILED: %v", name, evalErr)
+			log.Printf("[IMPORT] LoadPythonModule('%s') -> evaluation FAILED at statement %d: %v", name, failedStmtNum, evalErr)
 		}
 		// If it's an ImportError, return it directly so it can be caught by try/except
 		// This allows modules like shutil to check for optional dependencies
@@ -308,15 +330,24 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 		// For NameError, provide more context - unwrap to find the deepest NameError
 		if nameErr, ok := evalErr.(*core.NameError); ok {
+			if failedStmtNum > 0 {
+				return nil, fmt.Errorf("error in statement %d of Python module '%s' (transpiled from %s):\n  NameError: name '%s' is not defined\n  Note: Check if this is from a submodule import", failedStmtNum, name, pyPath, nameErr.Name)
+			}
 			return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  NameError: name '%s' is not defined\n  Note: Check if this is from a submodule import", name, pyPath, nameErr.Name)
 		}
 		// Check if wrapped error contains NameError
 		errStr := evalErr.Error()
 		if strings.Contains(errStr, "NameError") && strings.Contains(errStr, "not defined") {
 			// Error is already wrapped, just add current module context
+			if failedStmtNum > 0 {
+				return nil, fmt.Errorf("error in statement %d of Python module '%s' (transpiled from %s):\n  %w\n  Note: Error may be from a submodule", failedStmtNum, name, pyPath, evalErr)
+			}
 			return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w\n  Note: Error may be from a submodule", name, pyPath, evalErr)
 		}
 		// For other errors, wrap with context
+		if failedStmtNum > 0 {
+			return nil, fmt.Errorf("error in statement %d of Python module '%s' (transpiled from %s):\n  %w", failedStmtNum, name, pyPath, evalErr)
+		}
 		return nil, fmt.Errorf("error in Python module '%s' (transpiled from %s):\n  %w", name, pyPath, evalErr)
 	}
 	if debugImportLoader {

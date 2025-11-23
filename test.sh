@@ -158,7 +158,7 @@ if [[ "$MODE" != "quick" ]]; then
     fi
 
     if [[ -n "$CPYTHON_TEST_BOOL" ]]; then
-        run_test "CPython Bool Tests" "$CPYTHON_TEST_BOOL"
+        run_test "CPython Bool Tests" "$CPYTHON_TEST_BOOL" true
     else
         run_test "CPython Bool Tests" "tests/test_bool.py" true
     fi
