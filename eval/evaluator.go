@@ -1653,14 +1653,16 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		var handlerStart int = 1
 
 		if exceptClause.Len() > 1 {
-			secondElem := exceptClause.Items()[1]
+			secondElem := unwrapLocated(exceptClause.Items()[1])
 
 			// Check if it's a tuple of exception types
 			if tupleList, ok := secondElem.(*core.ListValue); ok && tupleList.Len() > 0 {
-				if sym, ok := tupleList.Items()[0].(core.SymbolValue); ok && string(sym) == "tuple-literal" {
+				firstTupleElem := unwrapLocated(tupleList.Items()[0])
+				if sym, ok := firstTupleElem.(core.SymbolValue); ok && string(sym) == "tuple-literal" {
 					// It's a tuple like (tuple-literal ValueError TypeError)
 					for i := 1; i < tupleList.Len(); i++ {
-						if typeSym, ok := tupleList.Items()[i].(core.SymbolValue); ok {
+						typeElem := unwrapLocated(tupleList.Items()[i])
+						if typeSym, ok := typeElem.(core.SymbolValue); ok {
 							excTypes = append(excTypes, string(typeSym))
 						}
 					}
@@ -1668,8 +1670,10 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 					// Check for "as" syntax
 					if exceptClause.Len() > 3 {
-						if asSym, ok := exceptClause.Items()[2].(core.SymbolValue); ok && string(asSym) == "as" {
-							if varSym, ok := exceptClause.Items()[3].(core.SymbolValue); ok {
+						asElem := unwrapLocated(exceptClause.Items()[2])
+						if asSym, ok := asElem.(core.SymbolValue); ok && string(asSym) == "as" {
+							varElem := unwrapLocated(exceptClause.Items()[3])
+							if varSym, ok := varElem.(core.SymbolValue); ok {
 								excVar = string(varSym)
 								handlerStart = 4
 							}
@@ -1683,7 +1687,8 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Check for "as" syntax for catch-all
 				if symStr == "as" && exceptClause.Len() > 2 {
 					// (except as var handler...)
-					if varSym, ok := exceptClause.Items()[2].(core.SymbolValue); ok {
+					varElem := unwrapLocated(exceptClause.Items()[2])
+					if varSym, ok := varElem.(core.SymbolValue); ok {
 						excVar = string(varSym)
 						handlerStart = 3
 					}
@@ -1694,9 +1699,11 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 					// Check for "as" syntax
 					if exceptClause.Len() > 3 && handlerStart == 2 {
-						if asSym, ok := exceptClause.Items()[2].(core.SymbolValue); ok && string(asSym) == "as" {
+						asElem := unwrapLocated(exceptClause.Items()[2])
+						if asSym, ok := asElem.(core.SymbolValue); ok && string(asSym) == "as" {
 							// (except Type as var handler...)
-							if varSym, ok := exceptClause.Items()[3].(core.SymbolValue); ok {
+							varElem := unwrapLocated(exceptClause.Items()[3])
+							if varSym, ok := varElem.(core.SymbolValue); ok {
 								excVar = string(varSym)
 								handlerStart = 4
 							}
@@ -1705,7 +1712,8 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 					// Legacy: Check if next element is a variable name (lowercase)
 					if excVar == "" && exceptClause.Len() > 2 {
-						if varSym, ok := exceptClause.Items()[2].(core.SymbolValue); ok {
+						legacyVarElem := unwrapLocated(exceptClause.Items()[2])
+						if varSym, ok := legacyVarElem.(core.SymbolValue); ok {
 							varStr := string(varSym)
 							if len(varStr) > 0 && varStr[0] >= 'a' && varStr[0] <= 'z' {
 								excVar = varStr

@@ -1,0 +1,32 @@
+# Test for exception variable binding in except clauses
+# Tests fix for issue M28-6ca6
+
+(print "Testing exception variable binding...")
+
+# Test 1: Basic exception variable binding
+(try
+  (raise TypeError "test error")
+  (except TypeError as exc
+    (print (+ "Test 1 PASS: Got exception " (str exc)))))
+
+# Test 2: Access exception attributes
+(try
+  (raise ValueError "value error message")
+  (except ValueError as e
+    (= msg (str e))
+    (assert (in "value error" msg) "Exception message should be accessible")
+    (print "Test 2 PASS: Exception attributes accessible")))
+
+# Test 3: Tuple of exception types
+(try
+  (raise KeyError "key error")
+  (except (tuple-literal ValueError KeyError) as exc
+    (print "Test 3 PASS: Tuple exception types work with variable binding")))
+
+# Test 4: Catch-all with variable
+(try
+  (raise RuntimeError "runtime error")
+  (except as e
+    (print "Test 4 PASS: Catch-all with variable binding works")))
+
+(print "All exception variable binding tests passed!")
