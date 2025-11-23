@@ -268,10 +268,23 @@ func evaluateDefaultValues(signature *FunctionSignature, ctx *core.Context) erro
 			// Skip evaluation for simple literals (numbers, strings, None, lists, dicts)
 			// These don't need evaluation
 			defaultVal := signature.OptionalParams[i].DefaultValue
+
+			// Unwrap LocatedValue to check the actual type
+			if located, ok := defaultVal.(core.LocatedValue); ok {
+				defaultVal = located.Unwrap()
+			}
+
 			switch defaultVal.(type) {
 			case core.NumberValue, core.StringValue, core.BoolValue, core.NilValue,
 				*core.ListValue, *core.DictValue, core.TupleValue:
 				// Already evaluated, skip
+				continue
+			}
+
+			// For symbols like "None", keep them unevaluated
+			// They will be evaluated at call time to get the singleton
+			if _, ok := defaultVal.(core.SymbolValue); ok {
+				// Keep as unevaluated symbol
 				continue
 			}
 

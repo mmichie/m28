@@ -151,13 +151,12 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 					defaultValue = core.NumberValue(num)
 				} else if valueStr == "true" || valueStr == "false" {
 					defaultValue = core.BoolValue(valueStr == "true")
-				} else if valueStr == "nil" || valueStr == "None" {
-					defaultValue = core.Nil
 				} else if len(valueStr) >= 2 && valueStr[0] == '"' && valueStr[len(valueStr)-1] == '"' {
 					// String literal
 					defaultValue = core.StringValue(valueStr[1 : len(valueStr)-1])
 				} else {
-					// Treat as symbol
+					// Treat as symbol (including "nil" and "None")
+					// This ensures None evaluates to the singleton core.None, not a new NilValue instance
 					defaultValue = core.SymbolValue(valueStr)
 				}
 
@@ -420,14 +419,17 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			// If it was already evaluated at definition time, use it directly
 			defaultVal := param.DefaultValue
 
+			// Unwrap LocatedValue if present (Python AST wraps values with source location)
+			if located, ok := defaultVal.(core.LocatedValue); ok {
+				defaultVal = located.Unwrap()
+			}
+
 			// Check if it's an unevaluated symbol or expression
 			if sym, isSymbol := defaultVal.(core.SymbolValue); isSymbol {
 				// Unevaluated symbol - evaluate in function's env context
 				var err error
 				defaultVal, err = Eval(sym, evalCtx)
 				if err != nil {
-					// 					fmt.Printf("[DEBUG BindArguments] Error evaluating symbol default for %s: %v\n", paramName, err)
-					// 					fmt.Printf("[DEBUG BindArguments]   Symbol: %v\n", sym)
 					return fmt.Errorf("error evaluating default value for %s: %v", paramName, err)
 				}
 			} else if list, isList := defaultVal.(*core.ListValue); isList {

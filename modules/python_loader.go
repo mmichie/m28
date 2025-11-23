@@ -278,10 +278,10 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	evalTimeout := 120 * time.Second // 120 second timeout for module evaluation (increased for test.support)
 
 	type evalResult struct {
-		val         core.Value
-		err         error
-		stmtIndex   int
-		failedStmt  ast.ASTNode
+		val        core.Value
+		err        error
+		stmtIndex  int
+		failedStmt ast.ASTNode
 	}
 	resultChan := make(chan evalResult, 1)
 

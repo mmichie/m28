@@ -207,6 +207,18 @@ func (c *Context) Delete(name string) error {
 
 // Lookup finds a variable in the current or outer scopes
 func (c *Context) Lookup(name string) (Value, error) {
+	// Special case: Always return the singleton for None, True, False
+	// This ensures identity checks (is None) work correctly across all contexts
+	// These values are singletons and should have consistent identity
+	switch name {
+	case "None":
+		return None, nil
+	case "True":
+		return BoolValue(true), nil
+	case "False":
+		return BoolValue(false), nil
+	}
+
 	// Fast path: Check global operator registry first (no context traversal)
 	// This is critical for performance when operators are used in deeply nested contexts
 	// Import is done via GetOperatorFunc to avoid circular dependency
