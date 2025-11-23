@@ -173,6 +173,55 @@ func (l *ModuleLoaderEnhanced) registerInSysModules(name string, module *DictVal
 	key := ValueToKey(StringValue(name))
 	sysModulesDict.SetWithKey(key, StringValue(name), module)
 	DebugLog("[DEBUG] Registered module '%s' in sys.modules\n", name)
+
+	// For dotted module names (e.g., "test.test_bool"), set the submodule
+	// as an attribute on the parent package module
+	// This allows sys.modules['test'].test_bool to work
+	lastDot := -1
+	for i := len(name) - 1; i >= 0; i-- {
+		if name[i] == '.' {
+			lastDot = i
+			break
+		}
+	}
+
+	if lastDot > 0 {
+		parentName := name[:lastDot]
+		childName := name[lastDot+1:]
+
+		// Try to get existing parent module
+		parentKey := ValueToKey(StringValue(parentName))
+		parentModule, parentExists := sysModulesDict.Get(parentKey)
+
+		// Only set child on parent if parent already exists as a real module
+		// Don't create placeholder parent modules - they block the real module from loading
+		if parentExists {
+			if parentDict, ok := parentModule.(*DictValue); ok {
+				// Only set if the child doesn't already exist OR if it's also a dict (module)
+				// This prevents overwriting attributes like 'collections.namedtuple' (a function)
+				// with partial module dicts when 'collections.namedtuple' fails to load as a module
+				existingChild, childExists := parentDict.Get(childName)
+				if !childExists || isModuleLike(existingChild) {
+					parentDict.Set(childName, module)
+					DebugLog("[DEBUG] Set '%s' as attribute on parent module '%s'\n", childName, parentName)
+				} else {
+					DebugLog("[DEBUG] Skipped setting '%s' on parent '%s' (already exists as non-module: %T)\n", childName, parentName, existingChild)
+				}
+			}
+		} else {
+			DebugLog("[DEBUG] Parent module '%s' not loaded yet, will set '%s' attribute when parent loads\n", parentName, childName)
+		}
+	}
+}
+
+// isModuleLike checks if a value looks like a module (dict or Module object)
+func isModuleLike(val Value) bool {
+	switch val.(type) {
+	case *DictValue, *Module:
+		return true
+	default:
+		return false
+	}
 }
 
 // checkSysModules checks if module is in sys.modules dict
