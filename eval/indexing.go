@@ -119,7 +119,7 @@ func GetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Fall back to type-specific handling (shouldn't reach here with proper protocol support)
-	return nil, fmt.Errorf("'%s' object is not subscriptable", obj.Type())
+	return nil, fmt.Errorf("'%s' object is not subscriptable", core.GetPythonTypeName(obj))
 }
 
 // SetItemForm implements the set-item special form for index assignment
@@ -272,7 +272,7 @@ func SliceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return sliceByteArray(v, start, end, step)
 
 	default:
-		return nil, fmt.Errorf("'%s' object is not subscriptable", obj.Type())
+		return nil, fmt.Errorf("'%s' object is not subscriptable", core.GetPythonTypeName(obj))
 	}
 }
 
@@ -512,7 +512,7 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 	case *core.ByteArrayValue:
 		return sliceByteArray(v, start, stop, step)
 	default:
-		return nil, fmt.Errorf("'%s' object is not subscriptable", v.Type())
+		return nil, fmt.Errorf("'%s' object is not subscriptable", core.GetPythonTypeName(v))
 	}
 }
 

@@ -58,7 +58,7 @@ func iterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	return nil, &core.TypeError{
-		Message: fmt.Sprintf("'%s' object is not iterable", obj.Type()),
+		Message: fmt.Sprintf("'%s' object is not iterable", core.GetPythonTypeName(obj)),
 	}
 }
 
@@ -120,7 +120,7 @@ func nextFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return val, nil
 	}
 
-	return nil, fmt.Errorf("'%s' object is not an iterator", iterator.Type())
+	return nil, fmt.Errorf("'%s' object is not an iterator", core.GetPythonTypeName(iterator))
 }
 
 // RegisterIterationProtocol registers the iteration protocol functions

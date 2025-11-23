@@ -157,3 +157,41 @@ func (o *BaseObject) CallMethod(name string, args []Value, ctx *Context) (Value,
 // EvalHook is a function that can be set by the eval package to provide eval() functionality
 // This avoids circular dependencies between core and eval packages
 var EvalHook func(Value, *Context) (Value, error)
+
+// GetPythonTypeName returns the Python-visible type name for error messages
+// This matches what type(value).__name__ would return in Python
+func GetPythonTypeName(val Value) string {
+	switch v := val.(type) {
+	case NilValue:
+		return "NoneType"
+	case NumberValue:
+		return "int"
+	case BigIntValue:
+		return "int"
+	case StringValue:
+		return "str"
+	case BoolValue:
+		return "bool"
+	case *ListValue:
+		return "list"
+	case *DictValue:
+		return "dict"
+	case TupleValue:
+		return "tuple"
+	case *SetValue:
+		return "set"
+	case *BuiltinFunction:
+		return "builtin_function_or_method"
+	case *BoundMethod:
+		return "method"
+	case *BoundInstanceMethod:
+		return "method"
+	case *Class:
+		return "type"
+	case *Instance:
+		return v.Class.Name
+	default:
+		// Fallback to Type() for other types
+		return string(val.Type())
+	}
+}
