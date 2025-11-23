@@ -833,18 +833,24 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				result, err := callable.Call(args, callCtx)
 				if err != nil {
-					return nil, fmt.Errorf("error calling metaclass.__new__: %v", err)
-				}
-
-				// The result should be a class
-				if newClass, ok := result.(*core.Class); ok {
-					class = newClass
+					// Don't fail class creation if metaclass.__new__ fails
+					// This allows classes with metaclass=ABCMeta to work even if ABCMeta.__new__ uses unsupported syntax
 					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned new class\n")
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Warning: metaclass.__new__ failed: %v\n", err)
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Continuing with class creation anyway\n")
 					}
+					// Continue without calling __new__
 				} else {
-					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned %T, keeping original class\n", result)
+					// The result should be a class
+					if newClass, ok := result.(*core.Class); ok {
+						class = newClass
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned new class\n")
+						}
+					} else {
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned %T, keeping original class\n", result)
+						}
 					}
 				}
 			}

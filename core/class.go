@@ -549,6 +549,42 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		}, true
 	}
 
+	// Check metaclass for methods (Python behavior: class attributes come from metaclass)
+	// This allows classes with metaclass=ABCMeta to access methods like register()
+	if c.Metaclass != nil {
+		// Cast metaclass to *Class
+		if metaclass, ok := c.Metaclass.(*Class); ok {
+			// Try to get the attribute from the metaclass
+			if metaclassAttr, found := metaclass.GetMethod(name); found {
+				// Wrap it as a classmethod that binds the class as first argument
+				if callable, isCallable := metaclassAttr.(Callable); isCallable {
+					return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+						// Prepend the class as first argument
+						newArgs := make([]Value, len(args)+1)
+						newArgs[0] = c
+						copy(newArgs[1:], args)
+						return callable.Call(newArgs, ctx)
+					}), true
+				}
+				return metaclassAttr, true
+			}
+			// Also check metaclass attributes
+			if metaclassAttr, found := metaclass.GetClassAttr(name); found {
+				// Wrap callables as classmethods
+				if callable, isCallable := metaclassAttr.(Callable); isCallable {
+					return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+						// Prepend the class as first argument
+						newArgs := make([]Value, len(args)+1)
+						newArgs[0] = c
+						copy(newArgs[1:], args)
+						return callable.Call(newArgs, ctx)
+					}), true
+				}
+				return metaclassAttr, true
+			}
+		}
+	}
+
 	// Finally check base object
 	return c.BaseObject.GetAttr(name)
 }
