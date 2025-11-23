@@ -263,9 +263,10 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 		case *core.ListValue:
 			// Check if this is a varargs parameter parsed as (* args) or (** kwargs)
 			if p.Len() == 2 {
-				if star, ok := p.Items()[0].(core.SymbolValue); ok && string(star) == "*" {
+				// Use smart accessor to auto-unwrap LocatedValue
+				if star, ok := p.GetItemAsSymbol(0); ok && string(star) == "*" {
 					// This is (*args) - varargs parameter
-					if argSym, ok := p.Items()[1].(core.SymbolValue); ok {
+					if argSym, ok := p.GetItemAsSymbol(1); ok {
 						if seenRest {
 							return nil, fmt.Errorf("multiple *args parameters not allowed")
 						}
@@ -277,9 +278,10 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 						continue
 					}
 				}
-				if dstar, ok := p.Items()[0].(core.SymbolValue); ok && string(dstar) == "**" {
+				// Use smart accessor to auto-unwrap LocatedValue
+				if dstar, ok := p.GetItemAsSymbol(0); ok && string(dstar) == "**" {
 					// This is (**kwargs) - keyword args parameter
-					if kwargSym, ok := p.Items()[1].(core.SymbolValue); ok {
+					if kwargSym, ok := p.GetItemAsSymbol(1); ok {
 						if seenKeyword {
 							return nil, fmt.Errorf("multiple **kwargs parameters not allowed")
 						}
@@ -295,9 +297,11 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 				return nil, fmt.Errorf("invalid parameter with default: expected (name value)")
 			}
 
-			sym, ok := p.Items()[0].(core.SymbolValue)
+			// Use smart accessor to auto-unwrap LocatedValue
+			sym, ok := p.GetItemAsSymbol(0)
 			if !ok {
-				return nil, fmt.Errorf("parameter name must be a symbol, got %T", p.Items()[0])
+				item, _ := p.GetItemUnwrapped(0)
+				return nil, fmt.Errorf("parameter name must be a symbol, got %T", item)
 			}
 
 			seenDefault = true
