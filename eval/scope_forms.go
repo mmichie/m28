@@ -17,9 +17,10 @@ func GlobalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Mark each name as global
 	for _, arg := range args.Items() {
-		sym, ok := arg.(core.SymbolValue)
+		argVal := unwrapLocated(arg)
+		sym, ok := argVal.(core.SymbolValue)
 		if !ok {
-			return nil, fmt.Errorf("global requires symbol arguments, got %s", arg.Type())
+			return nil, fmt.Errorf("global requires symbol arguments, got %s", argVal.Type())
 		}
 
 		// Mark this variable as global in the current scope
@@ -39,9 +40,10 @@ func NonlocalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Mark each name as nonlocal
 	for _, arg := range args.Items() {
-		sym, ok := arg.(core.SymbolValue)
+		argVal := unwrapLocated(arg)
+		sym, ok := argVal.(core.SymbolValue)
 		if !ok {
-			return nil, fmt.Errorf("nonlocal requires symbol arguments, got %s", arg.Type())
+			return nil, fmt.Errorf("nonlocal requires symbol arguments, got %s", argVal.Type())
 		}
 
 		// Mark this variable as nonlocal in the current scope
@@ -111,6 +113,7 @@ func resolveSlice(slice *core.SliceValue, length int) (start, stop, step int, er
 
 // deleteTarget handles deletion of a single target
 func deleteTarget(target core.Value, ctx *core.Context) error {
+	target = unwrapLocated(target)
 	switch t := target.(type) {
 	case core.SymbolValue:
 		// Delete variable from appropriate scope
@@ -153,7 +156,7 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 		}
 
 		// Check the first element to determine the type of deletion
-		first := t.Items()[0]
+		first := unwrapLocated(t.Items()[0])
 
 		// Handle dot notation: (. obj attr)
 		if sym, ok := first.(core.SymbolValue); ok && string(sym) == "." {

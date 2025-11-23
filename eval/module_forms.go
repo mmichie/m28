@@ -83,7 +83,8 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 	// Get the module name
 	var moduleName string
-	switch name := args.Items()[0].(type) {
+	nameVal := unwrapLocated(args.Items()[0])
+	switch name := nameVal.(type) {
 	case core.StringValue:
 		moduleName = string(name)
 	case core.SymbolValue:
@@ -106,46 +107,54 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 	// Parse options
 	i := 1
 	for i < args.Len() {
-		if sym, ok := args.Items()[i].(core.SymbolValue); ok && (string(sym) == ":as" || string(sym) == "as") {
+		argI := unwrapLocated(args.Items()[i])
+		if sym, ok := argI.(core.SymbolValue); ok && (string(sym) == ":as" || string(sym) == "as") {
 			// :as alias
 			if i+1 >= args.Len() {
 				return nil, fmt.Errorf("import :as requires an alias")
 			}
-			if aliasSym, ok := args.Items()[i+1].(core.SymbolValue); ok {
+			argI1 := unwrapLocated(args.Items()[i+1])
+			if aliasSym, ok := argI1.(core.SymbolValue); ok {
 				alias = string(aliasSym)
 			} else {
 				return nil, fmt.Errorf("import alias must be a symbol")
 			}
 			i += 2
-		} else if sym, ok := args.Items()[i].(core.SymbolValue); ok && (string(sym) == ":from" || string(sym) == "from") {
+		} else if sym, ok := argI.(core.SymbolValue); ok && (string(sym) == ":from" || string(sym) == "from") {
 			// :from [names] or :from *
 			if i+1 >= args.Len() {
 				return nil, fmt.Errorf("import :from requires a list of names or *")
 			}
 
-			if sym, ok := args.Items()[i+1].(core.SymbolValue); ok && string(sym) == "*" {
+			argI1 := unwrapLocated(args.Items()[i+1])
+			if sym, ok := argI1.(core.SymbolValue); ok && string(sym) == "*" {
 				importAll = true
-			} else if list, ok := args.Items()[i+1].(*core.ListValue); ok {
+			} else if list, ok := argI1.(*core.ListValue); ok {
 				// Check if this is a list-literal form
 				if list.Len() > 0 {
-					if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+					firstListElem := unwrapLocated(list.Items()[0])
+					if sym, ok := firstListElem.(core.SymbolValue); ok && string(sym) == "list-literal" {
 						// It's [name1 name2] syntax, extract the symbols
 						// Each element can be either:
 						//   - A symbol (name without alias)
 						//   - A list-literal with [name, alias]
 						for j := 1; j < list.Len(); j++ {
-							if nameSym, ok := list.Items()[j].(core.SymbolValue); ok {
+							listItemJ := unwrapLocated(list.Items()[j])
+							if nameSym, ok := listItemJ.(core.SymbolValue); ok {
 								// Plain name without alias
 								importNames = append(importNames, importNameSpec{
 									name:  string(nameSym),
 									alias: "",
 								})
-							} else if pairList, ok := list.Items()[j].(*core.ListValue); ok {
+							} else if pairList, ok := listItemJ.(*core.ListValue); ok {
 								// Check if it's a [name, alias] pair
 								if pairList.Len() == 3 {
-									if listLitSym, ok := pairList.Items()[0].(core.SymbolValue); ok && string(listLitSym) == "list-literal" {
-										if nameSym, ok := pairList.Items()[1].(core.SymbolValue); ok {
-											if aliasSym, ok := pairList.Items()[2].(core.SymbolValue); ok {
+									pairItem0 := unwrapLocated(pairList.Items()[0])
+									if listLitSym, ok := pairItem0.(core.SymbolValue); ok && string(listLitSym) == "list-literal" {
+										pairItem1 := unwrapLocated(pairList.Items()[1])
+										if nameSym, ok := pairItem1.(core.SymbolValue); ok {
+											pairItem2 := unwrapLocated(pairList.Items()[2])
+											if aliasSym, ok := pairItem2.(core.SymbolValue); ok {
 												// [name, alias] pair
 												importNames = append(importNames, importNameSpec{
 													name:  string(nameSym),

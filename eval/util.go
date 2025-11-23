@@ -1371,13 +1371,14 @@ func ImportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Get the module name
 	var moduleName string
-	switch name := args.Items()[0].(type) {
+	nameVal := unwrapLocated(args.Items()[0])
+	switch name := nameVal.(type) {
 	case core.StringValue:
 		moduleName = string(name)
 	case core.SymbolValue:
 		moduleName = string(name)
 	default:
-		return nil, TypeError{Expected: "string or symbol", Got: args.Items()[0].Type()}
+		return nil, TypeError{Expected: "string or symbol", Got: nameVal.Type()}
 	}
 
 	// Get the module loader

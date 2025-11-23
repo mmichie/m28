@@ -22,9 +22,10 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get the property name
-	propName, ok := args.Items()[1].(core.StringValue)
+	propVal := unwrapLocated(args.Items()[1])
+	propName, ok := propVal.(core.StringValue)
 	if !ok {
-		return nil, fmt.Errorf("property name must be a string, got %T", args.Items()[1])
+		return nil, fmt.Errorf("property name must be a string, got %T", propVal)
 	}
 
 	// Check if it's a numeric index

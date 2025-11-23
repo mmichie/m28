@@ -661,7 +661,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 
 					// Check if this is a simple variable assignment or subscript assignment
-					name, ok := sItems[1].(core.SymbolValue)
+					sItem1 := unwrapLocated(sItems[1])
+					name, ok := sItem1.(core.SymbolValue)
 					if ok {
 						// Track existing variables before evaluating RHS
 						// This handles chained assignments like a = b = c = 10
@@ -690,9 +691,10 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					} else {
 						// Could be subscript assignment: obj[key] = value
 						// Check if sItems[1] is a list starting with get-item
-						if lhs, isList := sItems[1].(*core.ListValue); isList {
+						if lhs, isList := sItem1.(*core.ListValue); isList {
 							if lhs.Len() >= 3 {
-								if sym, isSymbol := lhs.Items()[0].(core.SymbolValue); isSymbol && string(sym) == "get-item" {
+								lhsItem0 := unwrapLocated(lhs.Items()[0])
+								if sym, isSymbol := lhsItem0.(core.SymbolValue); isSymbol && string(sym) == "get-item" {
 									// This is obj[key] = value, evaluate it as a setitem operation
 									// Evaluate the whole assignment as an expression
 									_, err := Eval(stmt, classBodyCtx)
