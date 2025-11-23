@@ -94,7 +94,13 @@ func containsYield(expr core.Value) bool {
 	switch e := expr.(type) {
 	case *core.ListValue:
 		if e.Len() > 0 {
-			if sym, ok := e.Items()[0].(core.SymbolValue); ok {
+			// Unwrap LocatedValue to get the actual symbol
+			firstElem := e.Items()[0]
+			if located, ok := firstElem.(core.LocatedValue); ok {
+				firstElem = located.Unwrap()
+			}
+
+			if sym, ok := firstElem.(core.SymbolValue); ok {
 				symStr := string(sym)
 				if symStr == "yield" || symStr == "yield-from" {
 					return true
@@ -117,6 +123,9 @@ func containsYield(expr core.Value) bool {
 		if string(e) == "yield" || string(e) == "yield-from" {
 			return true
 		}
+	case core.LocatedValue:
+		// Unwrap and check the inner value
+		return containsYield(e.Unwrap())
 	}
 	return false
 }

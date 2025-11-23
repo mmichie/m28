@@ -417,6 +417,11 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 	var steps []ExecutionStep
 
+	// Unwrap LocatedValue if present
+	if located, ok := node.(core.LocatedValue); ok {
+		node = located.Unwrap()
+	}
+
 	// Handle different node types
 	switch n := node.(type) {
 	case *core.ListValue:
@@ -425,7 +430,13 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 		}
 
 		// Check for special forms
-		if sym, ok := n.Items()[0].(core.SymbolValue); ok {
+		// Unwrap LocatedValue to get the actual symbol
+		firstItem := n.Items()[0]
+		if located, ok := firstItem.(core.LocatedValue); ok {
+			firstItem = located.Unwrap()
+		}
+
+		if sym, ok := firstItem.(core.SymbolValue); ok {
 			switch string(sym) {
 			case "do", "begin":
 				// Flatten do block into sequential steps
