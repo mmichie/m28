@@ -73,8 +73,10 @@ func assignVariable(ctx *core.Context, name string, value core.Value) error {
 // handleElifOrElse is a helper to process nested elif or else clauses
 func handleElifOrElse(clause core.Value, ctx *core.Context) (core.Value, error) {
 	// Check if it's another elif
-	if list, ok := clause.(*core.ListValue); ok && list.Len() > 0 {
-		if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "elif" {
+	unwrappedClause := unwrapLocated(clause)
+	if list, ok := unwrappedClause.(*core.ListValue); ok && list.Len() > 0 {
+		firstElem := unwrapLocated(list.Items()[0])
+		if sym, ok := firstElem.(core.SymbolValue); ok && string(sym) == "elif" {
 			// Recursive elif
 			if list.Len() < 3 {
 				return nil, ErrArgCount("elif requires condition and expression")
@@ -138,8 +140,10 @@ func IfForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check if the third argument is a list starting with elif
-	if list, ok := args.Items()[2].(*core.ListValue); ok && list.Len() > 0 {
-		if sym, ok := list.Items()[0].(core.SymbolValue); ok && string(sym) == "elif" {
+	thirdArg := unwrapLocated(args.Items()[2])
+	if list, ok := thirdArg.(*core.ListValue); ok && list.Len() > 0 {
+		firstElem := unwrapLocated(list.Items()[0])
+		if sym, ok := firstElem.(core.SymbolValue); ok && string(sym) == "elif" {
 			// Nested elif structure: (elif condition expr else-clause)
 			if list.Len() < 3 {
 				return nil, ErrArgCount("elif requires condition and expression")
@@ -172,14 +176,16 @@ func IfForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check if the third argument is elif symbol (flat structure)
-	if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "elif" {
+	// Reuse thirdArg from above (already unwrapped)
+	if sym, ok := thirdArg.(core.SymbolValue); ok && string(sym) == "elif" {
 		// Handle flat elif chain
 		// Structure: (if cond1 expr1 elif cond2 expr2 elif cond3 expr3 else expr4)
 		elifArgs := args.Items()[2:] // Skip "if" condition and expression
 
 		for len(elifArgs) > 0 {
 			// Check if current element is elif
-			if sym, ok := elifArgs[0].(core.SymbolValue); ok && string(sym) == "elif" {
+			currElem := unwrapLocated(elifArgs[0])
+			if sym, ok := currElem.(core.SymbolValue); ok && string(sym) == "elif" {
 				if len(elifArgs) < 3 {
 					return nil, ErrArgCount("elif requires condition and expression")
 				}
@@ -201,7 +207,7 @@ func IfForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				// Move to next elif or else
 				elifArgs = elifArgs[3:]
-			} else if sym, ok := elifArgs[0].(core.SymbolValue); ok && string(sym) == "else" {
+			} else if sym, ok := currElem.(core.SymbolValue); ok && string(sym) == "else" {
 				// Handle else clause
 				if len(elifArgs) < 2 {
 					return nil, ErrArgCount("else requires an expression")
@@ -289,11 +295,13 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check for alternative function definition form: (def (name args...) body...)
-	if fnDef, ok := args.Items()[0].(*core.ListValue); ok && fnDef.Len() > 0 {
+	firstArg := unwrapLocated(args.Items()[0])
+	if fnDef, ok := firstArg.(*core.ListValue); ok && fnDef.Len() > 0 {
 		// Get function name from the first element of the list
-		name, ok := fnDef.Items()[0].(core.SymbolValue)
+		nameVal := unwrapLocated(fnDef.Items()[0])
+		name, ok := nameVal.(core.SymbolValue)
 		if !ok {
-			return nil, TypeError{Expected: "symbol for function name", Got: fnDef.Items()[0].Type()}
+			return nil, TypeError{Expected: "symbol for function name", Got: nameVal.Type()}
 		}
 
 		// Get parameter list (the rest of the elements after the name)
@@ -305,10 +313,11 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Fall back to legacy simple parameter parsing
 			params := make([]core.SymbolValue, 0, fnDef.Len()-1)
 			for _, param := range fnDef.Items()[1:] {
-				if sym, ok := param.(core.SymbolValue); ok {
+				paramVal := unwrapLocated(param)
+				if sym, ok := paramVal.(core.SymbolValue); ok {
 					params = append(params, sym)
 				} else {
-					return nil, TypeError{Expected: "symbol", Got: param.Type()}
+					return nil, TypeError{Expected: "symbol", Got: paramVal.Type()}
 				}
 			}
 
@@ -373,16 +382,18 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Standard form: (def name ...)
-	name, ok := args.Items()[0].(core.SymbolValue)
+	nameVal := unwrapLocated(args.Items()[0])
+	name, ok := nameVal.(core.SymbolValue)
 	if !ok {
-		return nil, TypeError{Expected: "symbol", Got: args.Items()[0].Type()}
+		return nil, TypeError{Expected: "symbol", Got: nameVal.Type()}
 	}
 
 	// Check different definition forms
 	if args.Len() >= 3 {
 		// Check for function definition: (def name (params) body...)
 		// First form: (def name (arg1 arg2...) body...)
-		if paramList, ok := args.Items()[1].(*core.ListValue); ok {
+		secondArg := unwrapLocated(args.Items()[1])
+		if paramList, ok := secondArg.(*core.ListValue); ok {
 			// It's a function definition with parameter list
 
 			// Try to parse as new-style parameter list with defaults
@@ -391,10 +402,11 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Fall back to legacy simple parameter parsing
 				params := make([]core.SymbolValue, 0, paramList.Len())
 				for _, param := range paramList.Items() {
-					if sym, ok := param.(core.SymbolValue); ok {
+					paramVal := unwrapLocated(param)
+					if sym, ok := paramVal.(core.SymbolValue); ok {
 						params = append(params, sym)
 					} else {
-						return nil, TypeError{Expected: "symbol", Got: param.Type()}
+						return nil, TypeError{Expected: "symbol", Got: paramVal.Type()}
 					}
 				}
 

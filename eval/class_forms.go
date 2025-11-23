@@ -22,7 +22,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get class name
-	className, ok := args.Items()[0].(core.SymbolValue)
+	classNameVal := unwrapLocated(args.Items()[0])
+	className, ok := classNameVal.(core.SymbolValue)
 	if !ok {
 		return nil, fmt.Errorf("class name must be a symbol")
 	}
@@ -42,7 +43,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// - Is empty: ()
 		// - Contains one or more symbols: (ParentClass) or (Parent1, Parent2)
 		// - Does NOT start with a special form like "def"
-		if parentList, ok := args.Items()[1].(*core.ListValue); ok {
+		secondArg := unwrapLocated(args.Items()[1])
+		if parentList, ok := secondArg.(*core.ListValue); ok {
 			isParentSpec := false
 
 			if parentList.Len() == 0 {
@@ -61,7 +63,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						// Could be a dot expression like (. unittest TestCase)
 						// But NOT a special form like (def ...)
 						if e.Len() > 0 {
-							if sym, ok := e.Items()[0].(core.SymbolValue); ok {
+							firstListElem := unwrapLocated(e.Items()[0])
+							if sym, ok := firstListElem.(core.SymbolValue); ok {
 								symStr := string(sym)
 								// Check if it's a special form - not a class reference
 								if symStr == "def" || symStr == "=" || symStr == "do" ||
@@ -152,7 +155,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Parse keywords (e.g., metaclass=ABCMeta)
 	if args.Len() > bodyStart {
-		if kwList, ok := args.Items()[bodyStart].(*core.ListValue); ok {
+		bodyStartArg := unwrapLocated(args.Items()[bodyStart])
+		if kwList, ok := bodyStartArg.(*core.ListValue); ok {
 			if debugClass {
 				fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Checking potential keywords at index %d: %v\n", bodyStart, kwList)
 			}
@@ -162,7 +166,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			kwItems := kwList.Items()
 			startIdx := 0
 			if kwList.Len() > 0 {
-				if sym, ok := kwItems[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+				firstKwItem := unwrapLocated(kwItems[0])
+				if sym, ok := firstKwItem.(core.SymbolValue); ok && string(sym) == "list-literal" {
 					startIdx = 1
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Skipping list-literal marker\n")
@@ -174,7 +179,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Keywords are represented as [("metaclass" ABCMeta), ...]
 			isKeywords := true
 			for i := startIdx; i < kwList.Len(); i++ {
-				kw := kwItems[i]
+				kw := unwrapLocated(kwItems[i])
 				if debugClass {
 					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] kwList[%d] = %v (type %T)\n", i, kw, kw)
 				}
@@ -186,7 +191,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					pairItems := pair.Items()
 					pairStartIdx := 0
 					if pair.Len() > 0 {
-						if sym, ok := pairItems[0].(core.SymbolValue); ok && string(sym) == "list-literal" {
+						firstPairItem := unwrapLocated(pairItems[0])
+						if sym, ok := firstPairItem.(core.SymbolValue); ok && string(sym) == "list-literal" {
 							pairStartIdx = 1
 							if debugClass {
 								fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Found inner list-literal, pairStartIdx=%d\n", pairStartIdx)

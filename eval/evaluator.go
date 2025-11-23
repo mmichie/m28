@@ -1266,9 +1266,10 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get the parameter list
-	paramList, ok := args.Items()[0].(*core.ListValue)
+	firstArg := unwrapLocated(args.Items()[0])
+	paramList, ok := firstArg.(*core.ListValue)
 	if !ok {
-		return nil, fmt.Errorf("lambda: parameters must be a list, got %T: %#v", args.Items()[0], args.Items()[0])
+		return nil, fmt.Errorf("lambda: parameters must be a list, got %T: %#v", firstArg, firstArg)
 	}
 
 	// Try to parse as new-style parameter list with defaults
@@ -1277,7 +1278,8 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Fall back to legacy simple parameter parsing
 		params := make([]core.SymbolValue, 0, paramList.Len())
 		for _, p := range paramList.Items() {
-			sym, ok := p.(core.SymbolValue)
+			pVal := unwrapLocated(p)
+			sym, ok := pVal.(core.SymbolValue)
 			if !ok {
 				return nil, fmt.Errorf("lambda: parameters must be symbols")
 			}
@@ -1551,8 +1553,10 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Parse the try form
 	for i, arg := range args.Items() {
-		if list, ok := arg.(*core.ListValue); ok && list.Len() > 0 {
-			if sym, ok := list.Items()[0].(core.SymbolValue); ok {
+		unwrappedArg := unwrapLocated(arg)
+		if list, ok := unwrappedArg.(*core.ListValue); ok && list.Len() > 0 {
+			firstElem := unwrapLocated(list.Items()[0])
+			if sym, ok := firstElem.(core.SymbolValue); ok {
 				switch string(sym) {
 				case "except":
 					if i == 0 {

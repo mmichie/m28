@@ -148,13 +148,14 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Check if first arg is a list (old syntax) or symbol (new syntax)
 	// It might also be a quoted list: (quote (var1 var2))
-	firstArg := args.Items()[0]
+	firstArg := unwrapLocated(args.Items()[0])
 	wasQuoted := false
 
 	// Handle quoted patterns: (quote (var1 var2)) → extract the list inside
 	// This is needed because Python transpiler quotes the variable list to prevent evaluation
 	if quotedList, ok := firstArg.(*core.ListValue); ok && quotedList.Len() == 2 {
-		if sym, ok := quotedList.Items()[0].(core.SymbolValue); ok && string(sym) == "quote" {
+		firstQuoteElem := unwrapLocated(quotedList.Items()[0])
+		if sym, ok := firstQuoteElem.(core.SymbolValue); ok && string(sym) == "quote" {
 			// Extract the pattern from inside the quote
 			firstArg = quotedList.Items()[1]
 			wasQuoted = true
@@ -165,7 +166,8 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Check for 'in' keyword first to distinguish Python-style from old 3-arg syntax
 		hasInKeyword := false
 		if args.Len() >= 2 {
-			if sym, ok := args.Items()[1].(core.SymbolValue); ok && string(sym) == "in" {
+			secondArg := unwrapLocated(args.Items()[1])
+			if sym, ok := secondArg.(core.SymbolValue); ok && string(sym) == "in" {
 				hasInKeyword = true
 			}
 		}
@@ -202,7 +204,8 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Look for 'in' keyword
 		inIndex := -1
 		for i := 1; i < args.Len(); i++ {
-			if sym, ok := args.Items()[i].(core.SymbolValue); ok && string(sym) == "in" {
+			argVal := unwrapLocated(args.Items()[i])
+			if sym, ok := argVal.(core.SymbolValue); ok && string(sym) == "in" {
 				inIndex = i
 				break
 			}
