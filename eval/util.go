@@ -514,12 +514,21 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 
 	// If first arg is a ListValue with 2 elements, assume wrapped pairs
 	if args.Len() > 0 {
-		if pair, ok := args.Items()[0].(*core.ListValue); ok && pair.Len() == 2 {
+		// Unwrap LocatedValue if present
+		firstArg := args.Items()[0]
+		if located, ok := firstArg.(core.LocatedValue); ok {
+			firstArg = located.Unwrap()
+		}
+		if pair, ok := firstArg.(*core.ListValue); ok && pair.Len() == 2 {
 			// Wrapped pairs format - used by Python keyword arguments
 			// But check if ALL args are actually wrapped pairs - if not, fall through to flat format
 			allWrapped := true
 			for i := 0; i < args.Len(); i++ {
 				arg := args.Items()[i]
+				// Unwrap LocatedValue if present
+				if located, ok := arg.(core.LocatedValue); ok {
+					arg = located.Unwrap()
+				}
 				// Allow **unpack markers
 				if sym, ok := arg.(core.SymbolValue); ok && string(sym) == "**unpack" {
 					if i+1 < args.Len() {
@@ -541,6 +550,10 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 				// Process as wrapped pairs
 				for i := 0; i < args.Len(); i++ {
 					arg := args.Items()[i]
+					// Unwrap LocatedValue if present
+					if located, ok := arg.(core.LocatedValue); ok {
+						arg = located.Unwrap()
+					}
 
 					// Check for **unpack marker
 					if sym, ok := arg.(core.SymbolValue); ok && string(sym) == "**unpack" {

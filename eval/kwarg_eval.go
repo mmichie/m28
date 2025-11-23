@@ -54,8 +54,13 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 	seenKeyword := false
 
 	for i < args.Len() {
-		// Check for unpacking operators
-		if sym, ok := args.Items()[i].(core.SymbolValue); ok {
+		// Check for unpacking operators (unwrap LocatedValues first)
+		arg := args.Items()[i]
+		if located, ok := arg.(core.LocatedValue); ok {
+			arg = located.Unwrap()
+		}
+
+		if sym, ok := arg.(core.SymbolValue); ok {
 			symStr := string(sym)
 
 			// Check for **unpack marker (parser creates: ["**unpack", <expr>])

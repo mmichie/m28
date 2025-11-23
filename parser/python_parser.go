@@ -1647,16 +1647,16 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 
 	p.expect(TOKEN_RPAREN)
 
-	// If we have keyword arguments, append them as a special **kwargs node
+	// If we have keyword arguments, append them as a special **unpack node
 	if len(kwargs) > 0 {
 		// Create a dict-literal for the keyword arguments
 		dictSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
 		dictArgs := append([]ast.ASTNode{dictSym}, kwargs...)
 		kwDict := ast.NewSExpr(dictArgs, p.makeLocation(tok), ast.SyntaxPython)
 
-		// Append **kwargs marker and the dict
+		// Append **unpack marker and the dict
 		args = append(args,
-			ast.NewIdentifier("**kwargs", p.makeLocation(tok), ast.SyntaxPython),
+			ast.NewIdentifier("**unpack", p.makeLocation(tok), ast.SyntaxPython),
 			kwDict,
 		)
 	}
@@ -1672,7 +1672,7 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 				hasUnpacking := false
 				for _, arg := range args[1:] {
 					if id, ok := arg.(*ast.Identifier); ok {
-						if id.Name == "**unpack" || id.Name == "*unpack" || id.Name == "**kwargs" {
+						if id.Name == "**unpack" || id.Name == "*unpack" {
 							hasUnpacking = true
 							break
 						}
