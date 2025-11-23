@@ -66,7 +66,7 @@ func (p *Parser) parseDotAccess(base core.Value) (core.Value, error) {
 		// Add a method call marker to distinguish from property access
 		if len(args) == 0 {
 			// Empty args, but still a method call
-			result = append(result, core.SymbolValue("__call__"))
+			result = append(result, core.StringValue("__call__"))
 		} else {
 			result = append(result, args...)
 		}

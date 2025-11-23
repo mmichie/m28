@@ -119,7 +119,8 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 								// Check if it's just the __call__ marker (method with no args)
 								hasCallMarker := false
 								if args.Len() == 3 {
-									if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+									unwrapped := unwrapLocated(args.Items()[2])
+									if str, ok := unwrapped.(core.StringValue); ok && string(str) == "__call__" {
 										hasCallMarker = true
 									}
 								}
@@ -218,7 +219,8 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Check if it's just the __call__ marker (method with no args)
 			hasCallMarker := false
 			if args.Len() == 3 {
-				if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+				unwrapped := unwrapLocated(args.Items()[2])
+				if str, ok := unwrapped.(core.StringValue); ok && string(str) == "__call__" {
 					hasCallMarker = true
 				}
 			}
@@ -300,7 +302,8 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Check for __call__ marker
 	if isMethodCall && args.Len() == 3 {
-		if sym, ok := args.Items()[2].(core.SymbolValue); ok && string(sym) == "__call__" {
+		unwrapped := unwrapLocated(args.Items()[2])
+		if str, ok := unwrapped.(core.StringValue); ok && string(str) == "__call__" {
 			// It's a method call with no args
 			methodArgs = []core.Value{}
 		}

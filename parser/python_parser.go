@@ -1684,7 +1684,7 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 					// No args (empty call): convert to (. obj "name" __call__)
 					if len(args) == 1 && len(kwargs) == 0 {
 						return ast.NewSExpr(append(sexpr.Elements,
-							ast.NewIdentifier("__call__", p.makeLocation(tok), ast.SyntaxPython)),
+							ast.NewLiteral(core.StringValue("__call__"), p.makeLocation(tok), ast.SyntaxPython)),
 							p.makeLocation(tok), ast.SyntaxPython)
 					}
 					// Has simple args: convert to (. obj "name" arg1 arg2 ...)

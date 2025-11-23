@@ -861,7 +861,7 @@ func (p *Parser) parseDotAccessFromToken(base core.Value) (core.Value, error) {
 		}
 		if len(args) == 0 {
 			// Empty args, but still a method call
-			result = append(result, core.SymbolValue("__call__"))
+			result = append(result, core.StringValue("__call__"))
 		} else {
 			result = append(result, args...)
 		}
