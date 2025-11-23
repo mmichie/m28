@@ -1203,13 +1203,18 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 								}
 
 								// Get the attribute name
+								attrNameVal := targetList.Items()[2]
+								// Unwrap LocatedValue if present
+								if located, ok := attrNameVal.(core.LocatedValue); ok {
+									attrNameVal = located.Unwrap()
+								}
 								var attrName string
-								if strName, ok := targetList.Items()[2].(core.StringValue); ok {
+								if strName, ok := attrNameVal.(core.StringValue); ok {
 									attrName = string(strName)
-								} else if symName, ok := targetList.Items()[2].(core.SymbolValue); ok {
+								} else if symName, ok := attrNameVal.(core.SymbolValue); ok {
 									attrName = string(symName)
 								} else {
-									return nil, fmt.Errorf("attribute name must be a string or symbol")
+									return nil, fmt.Errorf("attribute name must be a string or symbol, got %T", attrNameVal)
 								}
 
 								// Set the attribute
@@ -1275,13 +1280,18 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 							}
 
 							// Get the attribute name (can be StringValue or SymbolValue)
+							attrNameVal := targetList.Items()[2]
+							// Unwrap LocatedValue if present
+							if located, ok := attrNameVal.(core.LocatedValue); ok {
+								attrNameVal = located.Unwrap()
+							}
 							var attrName string
-							if strName, ok := targetList.Items()[2].(core.StringValue); ok {
+							if strName, ok := attrNameVal.(core.StringValue); ok {
 								attrName = string(strName)
-							} else if symName, ok := targetList.Items()[2].(core.SymbolValue); ok {
+							} else if symName, ok := attrNameVal.(core.SymbolValue); ok {
 								attrName = string(symName)
 							} else {
-								return nil, fmt.Errorf("attribute name must be a string or symbol")
+								return nil, fmt.Errorf("attribute name must be a string or symbol, got %T", attrNameVal)
 							}
 
 							// Set the attribute

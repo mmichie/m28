@@ -171,9 +171,14 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 			}
 
 			// Get attribute name
-			attrName, ok := t.Items()[2].(core.StringValue)
+			attrNameVal := t.Items()[2]
+			// Unwrap LocatedValue if present
+			if located, ok := attrNameVal.(core.LocatedValue); ok {
+				attrNameVal = located.Unwrap()
+			}
+			attrName, ok := attrNameVal.(core.StringValue)
 			if !ok {
-				return fmt.Errorf("attribute name must be a string, got %s", t.Items()[2].Type())
+				return fmt.Errorf("attribute name must be a string, got %s", attrNameVal.Type())
 			}
 
 			// Try __delattr__ dunder method first

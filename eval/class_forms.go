@@ -739,6 +739,40 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						return nil, fmt.Errorf("class variable name must be a symbol or subscript expression, got %T: %v", sItems[1], sItems[1])
 					}
 
+				case "annotated-assign":
+					// Annotated assignment: x: int = 5
+					// Same as = but with type annotation
+					if s.Len() < 3 || s.Len() > 4 {
+						return nil, fmt.Errorf("annotated-assign requires 3 or 4 arguments in class definition")
+					}
+
+					// Get target (sItems[1])
+					sItem1 := unwrapLocated(sItems[1])
+					name, ok := sItem1.(core.SymbolValue)
+					if ok {
+						// annotation is sItems[2], value is sItems[3] (if present)
+						if s.Len() == 4 {
+							// Has a value: x: int = 5
+							value, err := Eval(sItems[3], classBodyCtx)
+							if err != nil {
+								return nil, err
+							}
+							class.SetClassAttr(string(name), value)
+							// Also add to class body context
+							classBodyCtx.Define(string(name), value)
+						}
+						// If no value (s.Len() == 3), just record the annotation
+						// Python doesn't create an attribute for annotation-only statements
+					} else {
+						// Could be attribute annotation: obj.x: int = 5
+						// For now, just evaluate it generically
+						_, err := Eval(stmt, classBodyCtx)
+						if err != nil {
+							return nil, err
+						}
+					}
+					continue
+
 				case "class":
 					// Handle nested class definitions
 					if debugClass {

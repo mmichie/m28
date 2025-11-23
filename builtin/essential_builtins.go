@@ -157,9 +157,14 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		}
 
 		obj := args[0]
-		nameVal, ok := args[1].(core.StringValue)
+		nameArg := args[1]
+		// Unwrap LocatedValue if present
+		if located, ok := nameArg.(core.LocatedValue); ok {
+			nameArg = located.Unwrap()
+		}
+		nameVal, ok := nameArg.(core.StringValue)
 		if !ok {
-			return nil, fmt.Errorf("hasattr() attribute name must be a string")
+			return nil, fmt.Errorf("hasattr() attribute name must be a string, got %T", nameArg)
 		}
 		name := string(nameVal)
 
@@ -192,9 +197,14 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		}
 
 		obj := args[0]
-		nameVal, ok := args[1].(core.StringValue)
+		nameArg := args[1]
+		// Unwrap LocatedValue if present
+		if located, ok := nameArg.(core.LocatedValue); ok {
+			nameArg = located.Unwrap()
+		}
+		nameVal, ok := nameArg.(core.StringValue)
 		if !ok {
-			return nil, fmt.Errorf("getattr() attribute name must be a string")
+			return nil, fmt.Errorf("getattr() attribute name must be a string, got %T", nameArg)
 		}
 		name := string(nameVal)
 
@@ -271,9 +281,14 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		}
 
 		obj := args[0]
-		nameVal, ok := args[1].(core.StringValue)
+		nameArg := args[1]
+		// Unwrap LocatedValue if present
+		if located, ok := nameArg.(core.LocatedValue); ok {
+			nameArg = located.Unwrap()
+		}
+		nameVal, ok := nameArg.(core.StringValue)
 		if !ok {
-			return nil, fmt.Errorf("setattr() attribute name must be a string")
+			return nil, fmt.Errorf("setattr() attribute name must be a string, got %T", nameArg)
 		}
 		name := string(nameVal)
 		value := args[2]
