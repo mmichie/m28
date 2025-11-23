@@ -65,6 +65,10 @@ type Context struct {
 	ExcType  Value
 	ExcValue Value
 	ExcTb    Value
+
+	// Location stack for tracking source locations during evaluation
+	// Eliminates need for LocatedValue unwrapping in evaluator internals
+	LocationStack []*SourceLocation
 }
 
 // NewContext creates a new evaluation context
@@ -390,4 +394,30 @@ func (c *Context) IsGlobal(name string) bool {
 // IsNonlocal checks if a variable is declared as nonlocal in this scope
 func (c *Context) IsNonlocal(name string) bool {
 	return c.NonlocalVars != nil && c.NonlocalVars[name]
+}
+
+// PushLocation adds a source location to the location stack
+// This is called when beginning evaluation of an expression with known location
+func (c *Context) PushLocation(loc *SourceLocation) {
+	if c.LocationStack == nil {
+		c.LocationStack = make([]*SourceLocation, 0, 8)
+	}
+	c.LocationStack = append(c.LocationStack, loc)
+}
+
+// PopLocation removes the most recent location from the stack
+// This should be called (typically via defer) when finishing evaluation of an expression
+func (c *Context) PopLocation() {
+	if len(c.LocationStack) > 0 {
+		c.LocationStack = c.LocationStack[:len(c.LocationStack)-1]
+	}
+}
+
+// CurrentLocation returns the current source location (top of stack)
+// Returns nil if location stack is empty
+func (c *Context) CurrentLocation() *SourceLocation {
+	if len(c.LocationStack) > 0 {
+		return c.LocationStack[len(c.LocationStack)-1]
+	}
+	return nil
 }

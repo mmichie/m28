@@ -19,10 +19,14 @@ func init() {
 
 // Eval evaluates an expression in a context
 func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
-	// Extract location if expression is wrapped
-	var location *core.SourceLocation
+	// Extract location if expression is wrapped, push onto stack
+	// This makes location available to all code via ctx.CurrentLocation()
+	// and eliminates need for unwrapping in evaluator internals
 	if located, ok := expr.(core.LocatedValue); ok {
-		location = located.Location
+		if located.Location != nil {
+			ctx.PushLocation(located.Location)
+			defer ctx.PopLocation()
+		}
 		expr = located.Unwrap()
 	}
 
@@ -70,9 +74,9 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		// Variable lookup (operators are handled via fast-path in ctx.Lookup)
 		val, err := ctx.Lookup(string(v))
 		if err != nil {
-			// Attach location to NameError if we have it
-			if nameErr, ok := err.(*core.NameError); ok && location != nil {
-				nameErr.Location = location
+			// Attach location to NameError from context stack
+			if nameErr, ok := err.(*core.NameError); ok {
+				nameErr.Location = ctx.CurrentLocation()
 			}
 			return nil, core.WrapEvalError(err, "name error", ctx)
 		}
@@ -93,23 +97,16 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Check if it's a special form first (if, def, etc.)
-		// Unwrap LocatedValue before checking for symbol
-		firstElem := v.Items()[0]
-		if lv, ok := firstElem.(core.LocatedValue); ok {
-			firstElem = lv.Unwrap()
-		}
-		if sym, ok := firstElem.(core.SymbolValue); ok {
+		// Use smart accessor to auto-unwrap LocatedValue
+		if sym, ok := v.GetItemAsSymbol(0); ok {
 			core.DebugLog("[EVAL-LIST] First element is symbol: %s\n", string(sym))
 
 			if handler, ok := specialForms[string(sym)]; ok {
 				core.DebugLog("[EVAL-LIST] Is special form: %s\n", string(sym))
 				return handler(core.NewList(v.Items()[1:]...), ctx)
 			}
-		}
 
-		// Check if it's a macro call (function with __macro__ attribute)
-		// firstElem already unwrapped above
-		if sym, ok := firstElem.(core.SymbolValue); ok {
+			// Check if it's a macro call (function with __macro__ attribute)
 			if isMacroCall(sym, ctx) {
 				core.DebugLog("[EVAL-LIST] Is macro call: %s\n", string(sym))
 				return evalMacroCall(v, ctx)
@@ -1653,16 +1650,16 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		var handlerStart int = 1
 
 		if exceptClause.Len() > 1 {
-			secondElem := unwrapLocated(exceptClause.Items()[1])
+			// Use smart accessor to get unwrapped second element
+			secondElem, _ := exceptClause.GetItemUnwrapped(1)
 
 			// Check if it's a tuple of exception types
 			if tupleList, ok := secondElem.(*core.ListValue); ok && tupleList.Len() > 0 {
-				firstTupleElem := unwrapLocated(tupleList.Items()[0])
-				if sym, ok := firstTupleElem.(core.SymbolValue); ok && string(sym) == "tuple-literal" {
+				// Check for tuple-literal marker using smart accessor
+				if sym, ok := tupleList.GetItemAsSymbol(0); ok && string(sym) == "tuple-literal" {
 					// It's a tuple like (tuple-literal ValueError TypeError)
 					for i := 1; i < tupleList.Len(); i++ {
-						typeElem := unwrapLocated(tupleList.Items()[i])
-						if typeSym, ok := typeElem.(core.SymbolValue); ok {
+						if typeSym, ok := tupleList.GetItemAsSymbol(i); ok {
 							excTypes = append(excTypes, string(typeSym))
 						}
 					}
@@ -1670,10 +1667,8 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 					// Check for "as" syntax
 					if exceptClause.Len() > 3 {
-						asElem := unwrapLocated(exceptClause.Items()[2])
-						if asSym, ok := asElem.(core.SymbolValue); ok && string(asSym) == "as" {
-							varElem := unwrapLocated(exceptClause.Items()[3])
-							if varSym, ok := varElem.(core.SymbolValue); ok {
+						if asSym, ok := exceptClause.GetItemAsSymbol(2); ok && string(asSym) == "as" {
+							if varSym, ok := exceptClause.GetItemAsSymbol(3); ok {
 								excVar = string(varSym)
 								handlerStart = 4
 							}
@@ -1687,8 +1682,7 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Check for "as" syntax for catch-all
 				if symStr == "as" && exceptClause.Len() > 2 {
 					// (except as var handler...)
-					varElem := unwrapLocated(exceptClause.Items()[2])
-					if varSym, ok := varElem.(core.SymbolValue); ok {
+					if varSym, ok := exceptClause.GetItemAsSymbol(2); ok {
 						excVar = string(varSym)
 						handlerStart = 3
 					}
@@ -1699,11 +1693,9 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 					// Check for "as" syntax
 					if exceptClause.Len() > 3 && handlerStart == 2 {
-						asElem := unwrapLocated(exceptClause.Items()[2])
-						if asSym, ok := asElem.(core.SymbolValue); ok && string(asSym) == "as" {
+						if asSym, ok := exceptClause.GetItemAsSymbol(2); ok && string(asSym) == "as" {
 							// (except Type as var handler...)
-							varElem := unwrapLocated(exceptClause.Items()[3])
-							if varSym, ok := varElem.(core.SymbolValue); ok {
+							if varSym, ok := exceptClause.GetItemAsSymbol(3); ok {
 								excVar = string(varSym)
 								handlerStart = 4
 							}
@@ -1712,8 +1704,7 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 					// Legacy: Check if next element is a variable name (lowercase)
 					if excVar == "" && exceptClause.Len() > 2 {
-						legacyVarElem := unwrapLocated(exceptClause.Items()[2])
-						if varSym, ok := legacyVarElem.(core.SymbolValue); ok {
+						if varSym, ok := exceptClause.GetItemAsSymbol(2); ok {
 							varStr := string(varSym)
 							if len(varStr) > 0 && varStr[0] >= 'a' && varStr[0] <= 'z' {
 								excVar = varStr

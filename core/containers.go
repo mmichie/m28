@@ -248,6 +248,54 @@ func (it *listIterator) Reset() {
 	it.index = 0
 }
 
+// Smart Accessors - Auto-unwrap LocatedValue for cleaner evaluator code
+// These methods eliminate the need for explicit unwrapLocated() calls
+
+// GetItemUnwrapped gets an item by index and auto-unwraps LocatedValue
+// Returns the unwrapped value or error if index out of bounds
+func (l *ListValue) GetItemUnwrapped(index int) (Value, error) {
+	val, err := l.GetItem(index)
+	if err != nil {
+		return nil, err
+	}
+	// Auto-unwrap LocatedValue
+	if lv, ok := val.(LocatedValue); ok {
+		return lv.Unwrap(), nil
+	}
+	return val, nil
+}
+
+// GetItemAsSymbol gets an item as SymbolValue (auto-unwraps)
+// Returns (symbol, true) if successful, (empty, false) otherwise
+func (l *ListValue) GetItemAsSymbol(index int) (SymbolValue, bool) {
+	val, err := l.GetItemUnwrapped(index)
+	if err != nil {
+		return "", false
+	}
+	sym, ok := val.(SymbolValue)
+	return sym, ok
+}
+
+// GetItemAsString gets an item as StringValue (auto-unwraps)
+func (l *ListValue) GetItemAsString(index int) (StringValue, bool) {
+	val, err := l.GetItemUnwrapped(index)
+	if err != nil {
+		return "", false
+	}
+	str, ok := val.(StringValue)
+	return str, ok
+}
+
+// GetItemAsList gets an item as *ListValue (auto-unwraps)
+func (l *ListValue) GetItemAsList(index int) (*ListValue, bool) {
+	val, err := l.GetItemUnwrapped(index)
+	if err != nil {
+		return nil, false
+	}
+	list, ok := val.(*ListValue)
+	return list, ok
+}
+
 // DictValue represents a dictionary mapping keys to values
 type DictValue struct {
 	BaseObject
