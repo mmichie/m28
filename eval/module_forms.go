@@ -244,9 +244,10 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 					return nil, parentErr
 				}
 				// Wrap other errors as ImportError so they can be caught by except ImportError
+				// Preserve detailed error message from submodules
 				return nil, &core.ImportError{
 					ModuleName: moduleName,
-					Message:    fmt.Sprintf("cannot import from '%s': %v", moduleName, parentErr),
+					Message:    fmt.Sprintf("cannot import from '%s':\n%v", moduleName, parentErr),
 				}
 			}
 		}
@@ -293,15 +294,23 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				continue
 			}
 
-			// Both strategies failed - return error
+			// Both strategies failed - return error with context
 			if moduleName == "" {
 				// Module not found - use ModuleNotFoundError (Python 3 subclass of ImportError)
 				return nil, core.NewModuleNotFoundError(spec.name)
 			}
-			// Module found but specific name cannot be imported - use ImportError
+			// Module found but specific name cannot be imported
+			// Check if submodule loading error has details
+			var detailedMsg string
+			if err != nil {
+				// Preserve detailed error from submodule loading attempt
+				detailedMsg = fmt.Sprintf("cannot import name '%s' from '%s':\n  (submodule load failed: %v)", spec.name, moduleName, err)
+			} else {
+				detailedMsg = fmt.Sprintf("cannot import name '%s' from '%s' (name not found in module)", spec.name, moduleName)
+			}
 			return nil, &core.ImportError{
 				ModuleName: moduleName,
-				Message:    fmt.Sprintf("cannot import name '%s' from '%s'", spec.name, moduleName),
+				Message:    detailedMsg,
 			}
 		}
 		return core.NilValue{}, nil
