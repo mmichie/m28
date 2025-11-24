@@ -539,6 +539,23 @@ func RegisterMisc(ctx *core.Context) {
 
 	// NotImplemented - Python's NotImplemented singleton
 	ctx.Define("NotImplemented", core.NotImplemented)
+
+	// compile - compile source into a code object
+	// For now, this is a stub implementation that returns a placeholder code object
+	ctx.Define("compile", core.NewNamedBuiltinFunction("compile", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("compile", args)
+		// compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1)
+		if err := v.Min(3); err != nil {
+			return nil, err
+		}
+		if err := v.Max(6); err != nil {
+			return nil, err
+		}
+
+		// For now, just return a code object
+		// TODO: Implement actual compilation when needed
+		return core.NewCodeObject(core.Nil), nil
+	}))
 }
 
 // Migration Statistics:

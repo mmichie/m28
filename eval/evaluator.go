@@ -1533,6 +1533,11 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return createPythonExceptionInstance(ctx, "ValueError", errMsg)
 	case *core.AssertionError:
 		return createPythonExceptionInstance(ctx, "AssertionError", errMsg)
+	case *core.SystemExit:
+		// SystemExit should be converted to a Python SystemExit instance
+		// Extract the exit code if available
+		sysExit := baseErr.(*core.SystemExit)
+		return createPythonExceptionInstance(ctx, "SystemExit", fmt.Sprintf("%d", sysExit.Code))
 	default:
 		// Generic exception for unknown error types
 		return createPythonExceptionInstance(ctx, "Exception", errMsg)
