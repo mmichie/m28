@@ -36,9 +36,11 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			mgr := withManager{expr: args.Items()[0]}
 			bodyStart := 1
 
-			// Check if args[1] is a variable name (symbol) or None
+			// Check if args[1] is a variable name (symbol), tuple pattern (list), or None
 			if args.Len() >= 3 {
-				if sym, ok := args.Items()[1].(core.SymbolValue); ok {
+				// Unwrap LocatedValue to get actual type
+				target := unwrapLocated(args.Items()[1])
+				if sym, ok := target.(core.SymbolValue); ok {
 					symStr := string(sym)
 					if symStr != "None" {
 						mgr.varName = symStr
@@ -46,7 +48,11 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					} else {
 						bodyStart = 2
 					}
-				} else if args.Items()[1] == core.None {
+				} else if list, ok := target.(*core.ListValue); ok {
+					// Tuple unpacking pattern: with ctx() as (a, b): ...
+					mgr.target = list
+					bodyStart = 2
+				} else if target == core.None {
 					bodyStart = 2
 				}
 			}
@@ -69,9 +75,11 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		mgr := withManager{expr: args.Items()[0]}
 		bodyStart := 1
 
-		// Check if args[1] is a variable name (symbol) or None
+		// Check if args[1] is a variable name (symbol), tuple pattern (list), or None
 		if args.Len() >= 3 {
-			if sym, ok := args.Items()[1].(core.SymbolValue); ok {
+			// Unwrap LocatedValue to get actual type
+			target := unwrapLocated(args.Items()[1])
+			if sym, ok := target.(core.SymbolValue); ok {
 				// Check if it's not "None" - if it's a real symbol, it's the variable name
 				symStr := string(sym)
 				if symStr != "None" {
@@ -81,7 +89,11 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					// It's None, no variable binding
 					bodyStart = 2
 				}
-			} else if args.Items()[1] == core.None {
+			} else if list, ok := target.(*core.ListValue); ok {
+				// Tuple unpacking pattern: with ctx() as (a, b): ...
+				mgr.target = list
+				bodyStart = 2
+			} else if target == core.None {
 				// Explicitly None
 				bodyStart = 2
 			}
@@ -106,7 +118,8 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // withManager represents a single context manager in a with statement
 type withManager struct {
 	expr    core.Value
-	varName string
+	varName string     // For simple variable: as x
+	target  core.Value // For tuple unpacking: as (a, b, c)
 }
 
 // looksLikeManagerList checks if a list looks like a multiple manager list
@@ -173,6 +186,7 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 	// Debug output
 	// fmt.Printf("DEBUG executeWith: Manager expression: %v (type: %T)\n", mgr.expr, mgr.expr)
 	// fmt.Printf("DEBUG executeWith: Manager expression evaluated to: %v (type: %T)\n", mgrValue, mgrValue)
+	// fmt.Printf("DEBUG executeWith: mgr.varName=%q, mgr.target=%v (type: %T)\n", mgr.varName, mgr.target, mgr.target)
 
 	// Check if it's a context manager
 	cm, ok := core.IsContextManager(mgrValue)
@@ -188,7 +202,15 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 
 	// Bind the value if there's an 'as' clause
 	if mgr.varName != "" {
+		// Simple variable binding: with ctx() as x:
 		ctx.Define(mgr.varName, enterValue)
+	} else if mgr.target != nil {
+		// Tuple unpacking: with ctx() as (a, b, c):
+		if err := UnpackPattern(mgr.target, enterValue, ctx); err != nil {
+			// Call __exit__ before returning error
+			cm.Exit(core.Nil, core.Nil, core.Nil)
+			return nil, err
+		}
 	}
 
 	// Execute the rest in a try-finally to ensure __exit__ is called

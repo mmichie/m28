@@ -1626,16 +1626,31 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Helper to run finally clause
-	runFinally := func() error {
+	// Returns (finallyResult, finallyErr)
+	// If finally block contains return/break/continue, finallyResult will be non-nil
+	runFinally := func() (core.Value, error) {
 		if finallyClause != nil && finallyClause.Len() > 1 {
+			var finallyResult core.Value
 			for _, expr := range finallyClause.Items()[1:] {
-				_, err := Eval(expr, ctx)
+				var err error
+				finallyResult, err = Eval(expr, ctx)
 				if err != nil {
-					return err
+					return nil, err
+				}
+				// If finally block has a return/break/continue, stop executing
+				if _, ok := finallyResult.(*ReturnValue); ok {
+					return finallyResult, nil
+				}
+				if _, ok := finallyResult.(*BreakValue); ok {
+					return finallyResult, nil
+				}
+				if _, ok := finallyResult.(*ContinueValue); ok {
+					return finallyResult, nil
 				}
 			}
+			return finallyResult, nil
 		}
-		return nil
+		return nil, nil
 	}
 
 	// Execute try body
@@ -1658,16 +1673,42 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				result, elseErr = Eval(expr, ctx)
 				if elseErr != nil {
 					// Error in else clause becomes the new error
-					if err := runFinally(); err != nil {
-						return nil, err
+					finallyResult, finallyErr := runFinally()
+					if finallyErr != nil {
+						return nil, finallyErr
+					}
+					// If finally has return/break/continue, it overrides the error
+					if finallyResult != nil {
+						if _, ok := finallyResult.(*ReturnValue); ok {
+							return finallyResult, nil
+						}
+						if _, ok := finallyResult.(*BreakValue); ok {
+							return finallyResult, nil
+						}
+						if _, ok := finallyResult.(*ContinueValue); ok {
+							return finallyResult, nil
+						}
 					}
 					return nil, elseErr
 				}
 			}
 		}
 
-		if err := runFinally(); err != nil {
-			return nil, err
+		finallyResult, finallyErr := runFinally()
+		if finallyErr != nil {
+			return nil, finallyErr
+		}
+		// If finally has return/break/continue, it overrides the try block result
+		if finallyResult != nil {
+			if _, ok := finallyResult.(*ReturnValue); ok {
+				return finallyResult, nil
+			}
+			if _, ok := finallyResult.(*BreakValue); ok {
+				return finallyResult, nil
+			}
+			if _, ok := finallyResult.(*ContinueValue); ok {
+				return finallyResult, nil
+			}
 		}
 		return result, nil
 	}
@@ -1902,8 +1943,22 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Run finally clause
-	if err := runFinally(); err != nil {
-		return nil, err
+	finallyResult, finallyErr := runFinally()
+	if finallyErr != nil {
+		return nil, finallyErr
+	}
+
+	// If finally has return/break/continue, it overrides everything
+	if finallyResult != nil {
+		if _, ok := finallyResult.(*ReturnValue); ok {
+			return finallyResult, nil
+		}
+		if _, ok := finallyResult.(*BreakValue); ok {
+			return finallyResult, nil
+		}
+		if _, ok := finallyResult.(*ContinueValue); ok {
+			return finallyResult, nil
+		}
 	}
 
 	// If exception wasn't handled or a new exception occurred, raise it
