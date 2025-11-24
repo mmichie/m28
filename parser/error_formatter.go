@@ -82,9 +82,15 @@ func (ef *ErrorFormatter) FormatError(err error) string {
 	b.WriteString(ef.colorError(err.Error()))
 	b.WriteString("\n")
 
-	// Add suggestion if this is a TokenizationError with a suggestion
+	// Add suggestion if this is an error type with a suggestion
 	if tokErr, ok := underlyingErr.(*TokenizationError); ok && tokErr.Suggestion != "" {
 		b.WriteString(ef.colorSuggestion(tokErr.Suggestion))
+		b.WriteString("\n")
+	} else if nameErr, ok := underlyingErr.(*core.NameError); ok && nameErr.Suggestion != "" {
+		b.WriteString(ef.colorSuggestion(nameErr.Suggestion))
+		b.WriteString("\n")
+	} else if attrErr, ok := underlyingErr.(*core.AttributeError); ok && attrErr.Suggestion != "" {
+		b.WriteString(ef.colorSuggestion(attrErr.Suggestion))
 		b.WriteString("\n")
 	}
 

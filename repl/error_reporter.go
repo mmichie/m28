@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mmichie/m28/common/suggestions"
 	"github.com/mmichie/m28/core"
 )
 
@@ -196,61 +197,20 @@ func (er *ErrorReporter) showSourceContext(filename string, line, column int, w 
 // findSimilarNames finds similar variable names for suggestions
 func (er *ErrorReporter) findSimilarNames(name string, ctx *core.Context) []string {
 	allNames := ctx.GetAllSymbols()
-	var suggestions []string
-
-	for _, candidate := range allNames {
-		if er.isSimilar(name, candidate) {
-			suggestions = append(suggestions, candidate)
-		}
-	}
-
-	// Limit to top 3 suggestions
-	if len(suggestions) > 3 {
-		suggestions = suggestions[:3]
-	}
-
-	return suggestions
+	// Use Levenshtein-based similarity matching with max distance 2, up to 3 suggestions
+	return suggestions.FindSimilarNames(name, allNames, 2, 3)
 }
 
-// isSimilar checks if two names are similar (simple edit distance)
+// isSimilar checks if two names are similar (using Levenshtein distance)
+// Deprecated: Use suggestions.LevenshteinDistance directly
 func (er *ErrorReporter) isSimilar(s1, s2 string) bool {
-	// Very simple similarity check
-	// In a real implementation, use Levenshtein distance
-
 	if len(s1) == 0 || len(s2) == 0 {
 		return false
 	}
 
-	// Check if one is a substring of the other
-	if strings.Contains(s1, s2) || strings.Contains(s2, s1) {
-		return true
-	}
-
-	// Check if they differ by only one character
-	if abs(len(s1)-len(s2)) > 1 {
-		return false
-	}
-
-	differences := 0
-	minLen := len(s1)
-	if len(s2) < minLen {
-		minLen = len(s2)
-	}
-
-	for i := 0; i < minLen; i++ {
-		if s1[i] != s2[i] {
-			differences++
-		}
-	}
-
-	return differences <= 1
-}
-
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
+	// Use Levenshtein distance - consider similar if within 2 edits
+	distance := suggestions.LevenshteinDistance(s1, s2)
+	return distance <= 2
 }
 
 // getSyntaxKindName returns a human-readable name for syntax kind

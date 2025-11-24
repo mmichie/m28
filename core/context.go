@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/mmichie/m28/common/suggestions"
 )
 
 var debugLookups = os.Getenv("M28_DEBUG_LOOKUPS") != ""
@@ -202,7 +204,13 @@ func (c *Context) Delete(name string) error {
 	}
 
 	// Variable not found in current scope
-	return &NameError{Name: name}
+	// Generate suggestion based on similar names in scope
+	availableNames := c.GetAllAvailableNames()
+	suggestion := generateNameSuggestion(name, availableNames)
+	return &NameError{
+		Name:       name,
+		Suggestion: suggestion,
+	}
 }
 
 // Lookup finds a variable in the current or outer scopes
@@ -234,7 +242,12 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 	// Prevent infinite loops in context chain
 	if depth > 100 {
 		log.Printf("ERROR: Lookup depth exceeded for '%s' - possible circular context chain", name)
-		return nil, &NameError{Name: name}
+		availableNames := c.GetAllAvailableNames()
+		suggestion := generateNameSuggestion(name, availableNames)
+		return nil, &NameError{
+			Name:       name,
+			Suggestion: suggestion,
+		}
 	}
 
 	// DEBUG: Log lookups that exceed a certain depth
@@ -284,7 +297,13 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 		}
 	}
 
-	return nil, &NameError{Name: name}
+	// Variable not found - generate suggestion
+	availableNames := c.GetAllAvailableNames()
+	suggestion := generateNameSuggestion(name, availableNames)
+	return nil, &NameError{
+		Name:       name,
+		Suggestion: suggestion,
+	}
 }
 
 // PushStack adds a new entry to the call stack
@@ -432,4 +451,48 @@ func (c *Context) CurrentLocation() *SourceLocation {
 		return c.LocationStack[len(c.LocationStack)-1]
 	}
 	return nil
+}
+
+// GetAllAvailableNames returns all available names in this context and its parents
+// This is used for generating "did you mean" suggestions
+func (c *Context) GetAllAvailableNames() []string {
+	names := make(map[string]bool)
+
+	// Collect from this context and all parents
+	ctx := c
+	for ctx != nil {
+		// Add from Vars
+		for k := range ctx.Vars {
+			names[k] = true
+		}
+		// Add from ModuleDict if present
+		if ctx.ModuleDict != nil {
+			for _, keyStr := range ctx.ModuleDict.Keys() {
+				names[keyStr] = true
+			}
+		}
+		ctx = ctx.Outer
+	}
+
+	// Check global context ModuleDict as well
+	if c.Global != nil && c.Global.ModuleDict != nil && c.Global != c {
+		for _, keyStr := range c.Global.ModuleDict.Keys() {
+			names[keyStr] = true
+		}
+	}
+
+	// Convert to slice
+	result := make([]string, 0, len(names))
+	for name := range names {
+		result = append(result, name)
+	}
+
+	return result
+}
+
+// generateNameSuggestion generates a "did you mean" suggestion for an undefined name
+func generateNameSuggestion(target string, availableNames []string) string {
+	// Find similar names within edit distance 2, suggest up to 3
+	similar := suggestions.FindSimilarNames(target, availableNames, 2, 3)
+	return suggestions.FormatSuggestion(similar)
 }

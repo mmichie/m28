@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/mmichie/m28/common/suggestions"
 	"github.com/mmichie/m28/core"
 )
 
@@ -289,9 +290,13 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	if !found {
+		// Generate suggestion based on available attributes
+		availableAttrs := getAvailableAttributes(obj)
+		suggestion := generateAttributeSuggestion(string(propName), availableAttrs)
 		return nil, &core.AttributeError{
-			ObjType:  string(obj.Type()),
-			AttrName: string(propName),
+			ObjType:    string(obj.Type()),
+			AttrName:   string(propName),
+			Suggestion: suggestion,
 		}
 	}
 
@@ -468,10 +473,72 @@ func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.List
 		}
 	}
 
+	// Generate suggestion based on available attributes
+	availableAttrs := getAvailableAttributes(dict)
+	suggestion := generateAttributeSuggestion(attr, availableAttrs)
 	return nil, &core.AttributeError{
-		ObjType:  "dict",
-		AttrName: attr,
+		ObjType:    "dict",
+		AttrName:   attr,
+		Suggestion: suggestion,
 	}
+}
+
+// getAvailableAttributes returns all available attributes for an object
+func getAvailableAttributes(obj core.Value) []string {
+	attrs := make(map[string]bool)
+
+	// Try to get attributes from object protocol
+	if objWithAttrs, ok := obj.(interface {
+		GetAttr(string) (core.Value, bool)
+	}); ok {
+		// For classes, get all methods and attributes
+		if class, ok := obj.(*core.Class); ok {
+			// Get instance methods
+			for name := range class.Methods {
+				attrs[name] = true
+			}
+			// Get class attributes
+			for name := range class.Attributes {
+				attrs[name] = true
+			}
+		}
+		// Try common Python attributes
+		commonAttrs := []string{
+			"__str__", "__repr__", "__dict__", "__class__", "__name__",
+			"__module__", "__doc__", "__init__", "__call__", "__len__",
+			"__getitem__", "__setitem__", "__contains__", "__iter__",
+			"append", "extend", "pop", "remove", "clear", "count", "index",
+			"keys", "values", "items", "get", "update", "split", "join",
+			"strip", "replace", "format", "upper", "lower",
+		}
+		for _, attr := range commonAttrs {
+			if _, found := objWithAttrs.GetAttr(attr); found {
+				attrs[attr] = true
+			}
+		}
+	}
+
+	// For type descriptors, get type-specific methods
+	if td := core.GetTypeDescriptorForValue(obj); td != nil {
+		for name := range td.Methods {
+			attrs[name] = true
+		}
+	}
+
+	// Convert to slice
+	result := make([]string, 0, len(attrs))
+	for attr := range attrs {
+		result = append(result, attr)
+	}
+
+	return result
+}
+
+// generateAttributeSuggestion generates a "did you mean" suggestion for an attribute
+func generateAttributeSuggestion(target string, availableAttrs []string) string {
+	// Find similar attributes within edit distance 2, suggest up to 3
+	similar := suggestions.FindSimilarNames(target, availableAttrs, 2, 3)
+	return suggestions.FormatSuggestion(similar)
 }
 
 // RegisterDotNotation registers the dot notation special form

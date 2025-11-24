@@ -54,12 +54,16 @@ func ErrTooManyArgumentsf(methodName string, expected, got int) error {
 
 // NameError is raised when a name is not found
 type NameError struct {
-	Name     string
-	Location *SourceLocation
+	Name       string
+	Location   *SourceLocation
+	Suggestion string // Optional suggestion for similar names
 }
 
 func (e *NameError) Error() string {
 	msg := fmt.Sprintf("name error: name '%s' is not defined", e.Name)
+	if e.Suggestion != "" {
+		msg = fmt.Sprintf("%s. %s", msg, e.Suggestion)
+	}
 	if e.Location != nil {
 		return fmt.Sprintf("%s at %s", msg, e.Location.String())
 	}
@@ -234,16 +238,20 @@ func NewModuleNotFoundError(moduleName string) *ModuleNotFoundError {
 
 // AttributeError represents an attribute access error
 type AttributeError struct {
-	ObjType  string
-	AttrName string
-	Message  string
-	Location *SourceLocation
+	ObjType    string
+	AttrName   string
+	Message    string
+	Location   *SourceLocation
+	Suggestion string // Optional suggestion for similar attributes
 }
 
 func (e *AttributeError) Error() string {
 	msg := e.Message
 	if msg == "" {
 		msg = fmt.Sprintf("'%s' object has no attribute '%s'", e.ObjType, e.AttrName)
+	}
+	if e.Suggestion != "" {
+		msg = fmt.Sprintf("%s. %s", msg, e.Suggestion)
 	}
 	if e.Location != nil {
 		return fmt.Sprintf("%s at %s", msg, e.Location.String())

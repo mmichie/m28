@@ -1470,8 +1470,21 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		}
 		for _, knownType := range knownTypes {
 			if possibleType == knownType {
-				// Extract just the message part (after ": ")
+				// Extract message part (after ": "), keeping any suggestions
 				msgOnly := errMsg[idx+2:]
+				// For NameError and AttributeError, check if baseErr has a suggestion
+				// and append it if not already in the message
+				if knownType == "NameError" || knownType == "AttributeError" {
+					var suggestion string
+					if nameErr, ok := baseErr.(*core.NameError); ok {
+						suggestion = nameErr.Suggestion
+					} else if attrErr, ok := baseErr.(*core.AttributeError); ok {
+						suggestion = attrErr.Suggestion
+					}
+					if suggestion != "" && !strings.Contains(msgOnly, suggestion) {
+						msgOnly = fmt.Sprintf("%s. %s", msgOnly, suggestion)
+					}
+				}
 				return createPythonExceptionInstance(ctx, knownType, msgOnly)
 			}
 		}
@@ -1490,7 +1503,12 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 	case *core.OSError:
 		return createPythonExceptionInstance(ctx, "OSError", errMsg)
 	case *core.NameError:
-		return createPythonExceptionInstance(ctx, "NameError", errMsg)
+		// Include suggestion in error message if present
+		msg := errMsg
+		if nameErr, ok := err.(*core.NameError); ok && nameErr.Suggestion != "" {
+			msg = fmt.Sprintf("%s. %s", msg, nameErr.Suggestion)
+		}
+		return createPythonExceptionInstance(ctx, "NameError", msg)
 	case *core.TypeError:
 		return createPythonExceptionInstance(ctx, "TypeError", errMsg)
 	case *core.ZeroDivisionError:
@@ -1505,7 +1523,12 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 	case *core.ImportError:
 		return createPythonExceptionInstance(ctx, "ImportError", errMsg)
 	case *core.AttributeError:
-		return createPythonExceptionInstance(ctx, "AttributeError", errMsg)
+		// Include suggestion in error message if present
+		msg := errMsg
+		if attrErr, ok := err.(*core.AttributeError); ok && attrErr.Suggestion != "" {
+			msg = fmt.Sprintf("%s. %s", msg, attrErr.Suggestion)
+		}
+		return createPythonExceptionInstance(ctx, "AttributeError", msg)
 	case *core.ValueError:
 		return createPythonExceptionInstance(ctx, "ValueError", errMsg)
 	case *core.AssertionError:
