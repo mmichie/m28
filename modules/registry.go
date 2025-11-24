@@ -37,7 +37,8 @@ var builtinModules = map[string]ModuleInitializer{
 	"_tokenize":        Init_TokenizeModule,        // C extension module for tokenize.py
 	"_ast":             Init_ASTModule,             // C extension module for ast.py (AST node types)
 	"_imp":             Init_ImpModule,             // C extension module for import machinery
-	"_warnings":        Init_WarningsModule,        // C extension module for warnings.py
+	"_warnings":        InitWarningsModule,         // C extension module for warnings.py (full implementation)
+	"_heapq":           Init_HeapqModule,           // C extension module for heapq.py (priority queue)
 	"marshal":          InitMarshalModule,          // C extension module for bytecode serialization
 	"_opcode":          InitOpcodeModule,           // C extension module for bytecode opcodes
 	"_operator":        InitOperatorModule,         // C extension module for operator functions
