@@ -17,6 +17,7 @@ type Class struct {
 	Parents     []*Class          // Parent classes (for multiple inheritance)
 	Methods     map[string]Value  // Class methods
 	Attributes  map[string]Value  // Class attributes
+	Annotations *DictValue        // Type annotations (__annotations__ attribute)
 	Constructor *MethodDescriptor // __init__ method
 	SlotNames   []string          // __slots__ attribute (if defined)
 	Metaclass   Value             // Metaclass of this class (type by default)
@@ -29,13 +30,14 @@ func NewClass(name string, parent *Class) *Class {
 		parents = []*Class{parent}
 	}
 	return &Class{
-		BaseObject: *NewBaseObject(Type("class")),
-		Name:       name,
-		Module:     "__main__", // Default module
-		Parent:     parent,     // Keep for backward compatibility
-		Parents:    parents,
-		Methods:    make(map[string]Value),
-		Attributes: make(map[string]Value),
+		BaseObject:  *NewBaseObject(Type("class")),
+		Name:        name,
+		Module:      "__main__", // Default module
+		Parent:      parent,     // Keep for backward compatibility
+		Parents:     parents,
+		Methods:     make(map[string]Value),
+		Attributes:  make(map[string]Value),
+		Annotations: NewDict(), // Initialize empty annotations dict
 	}
 }
 
@@ -46,13 +48,14 @@ func NewClassWithParents(name string, parents []*Class) *Class {
 		parent = parents[0] // First parent for backward compatibility
 	}
 	return &Class{
-		BaseObject: *NewBaseObject(Type("class")),
-		Name:       name,
-		Module:     "__main__", // Default module
-		Parent:     parent,
-		Parents:    parents,
-		Methods:    make(map[string]Value),
-		Attributes: make(map[string]Value),
+		BaseObject:  *NewBaseObject(Type("class")),
+		Name:        name,
+		Module:      "__main__", // Default module
+		Parent:      parent,
+		Parents:     parents,
+		Methods:     make(map[string]Value),
+		Attributes:  make(map[string]Value),
+		Annotations: NewDict(), // Initialize empty annotations dict
 	}
 }
 
@@ -288,6 +291,15 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		}
 		// Return None if no docstring
 		return None, true
+	}
+
+	// Special handling for __annotations__
+	if name == "__annotations__" {
+		if c.Annotations != nil {
+			return c.Annotations, true
+		}
+		// Return empty dict if no annotations
+		return NewDict(), true
 	}
 
 	// Special handling for __bases__ (Direct parent classes)
