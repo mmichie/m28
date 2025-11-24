@@ -568,6 +568,54 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				lastResult = result
 			}
+		} else if obj, ok := sequence.(core.Object); ok {
+			// Try sequence protocol: __getitem__ and optional __len__
+			if getitemVal, hasGetitem := obj.GetAttr("__getitem__"); hasGetitem {
+				// Object has __getitem__, iterate using integer indices
+				index := 0
+				for {
+					// Try to get item at current index
+					indexVal := core.NumberValue(float64(index))
+					var item core.Value
+					var err error
+
+					// Call __getitem__(index)
+					if getitemFunc, ok := getitemVal.(core.Callable); ok {
+						item, err = getitemFunc.Call([]core.Value{indexVal}, ctx)
+						if err != nil {
+							// Check if it's an IndexError (end of sequence)
+							if exc, ok := err.(*Exception); ok && exc.Type == "IndexError" {
+								break // End of iteration
+							}
+							return nil, err
+						}
+					} else {
+						return nil, fmt.Errorf("__getitem__ is not callable")
+					}
+
+					// Execute body with the item
+					result, err := bodyFunc(item)
+					if err != nil {
+						return nil, err
+					}
+
+					if result == Break {
+						break
+					}
+					if result == Continue {
+						index++
+						continue
+					}
+					if ret, ok := result.(*ReturnValue); ok {
+						return ret, nil
+					}
+
+					lastResult = result
+					index++
+				}
+			} else {
+				return nil, TypeError{Expected: "iterable", Got: sequence.Type()}
+			}
 		} else {
 			return nil, TypeError{Expected: "iterable", Got: sequence.Type()}
 		}
