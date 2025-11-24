@@ -55,6 +55,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"urllib.parse":     Init_UrllibParseModule,     // Minimal stub for urllib.parse (needed by pathlib)
 	"_ctypes":          Init_CtypesModule,          // C extension module for FFI (Foreign Function Interface)
 	"asyncio":          Init_PythonAsyncioModule,   // Minimal stub for asyncio package (avoids circular imports)
+	"ssl":              InitSSLModule,              // Stub for ssl module with exception classes (needed by asyncio.sslproto)
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
