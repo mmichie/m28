@@ -2,15 +2,12 @@ package modules
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/core/ast"
 )
-
-var debugImportLoader = os.Getenv("M28_DEBUG_IMPORT") != ""
 
 func init() {
 	// Register Python module loader with core
@@ -48,17 +45,12 @@ var cExtensionModules = map[string]bool{
 // Returns (*DictValue, error) to match ModuleLoader interface
 // If partialModule is provided, it will be populated during evaluation for circular import support
 func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, *core.Context) (core.Value, error), partialModule *core.DictValue) (*core.DictValue, error) {
-	if debugImportLoader {
-		log.Printf("[IMPORT] LoadPythonModule('%s') called", name)
-	}
-	core.DebugLog("[PROFILE] LoadPythonModule called for '%s'\n", name)
+	core.Log.Info(core.SubsystemImport, "Python loader invoked", "module", name)
 
 	// Create partial module if not provided
 	if partialModule == nil {
 		partialModule = core.NewDict()
-		if debugImportLoader {
-			log.Printf("[IMPORT] LoadPythonModule('%s') -> created new partial module", name)
-		}
+		core.Log.Debug(core.SubsystemImport, "Created new partial module", "module", name)
 	}
 
 	// Note: Circular import handling is done by ModuleLoaderEnhanced
@@ -66,6 +58,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	// Special case: builtins module - create a dict with builtin functions
 	if name == "builtins" {
+		core.Log.Debug(core.SubsystemImport, "Loading special builtins module", "module", name, "source_type", "builtin_special")
 		moduleDict := core.NewDict()
 		// Expose the most commonly used builtin functions
 		// These are already defined in the global context
@@ -118,7 +111,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	// Special case: os.path should import posixpath (on Unix) or ntpath (on Windows)
 	// For now, we always use posixpath
 	if name == "os.path" {
-		core.DebugLog("[DEBUG] Redirecting os.path import to posixpath\n")
+		core.Log.Debug(core.SubsystemImport, "Redirecting os.path to posixpath", "module", name, "target", "posixpath")
 		return LoadPythonModule("posixpath", ctx, evalFunc, partialModule)
 	}
 
@@ -140,9 +133,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 	// Check if this is a known C extension
 	if cExtensionModules[name] {
-		if debugImportLoader {
-			log.Printf("[IMPORT] LoadPythonModule('%s') -> C extension, cannot load", name)
-		}
+		core.Log.Warn(core.SubsystemImport, "C extension module cannot be loaded", "module", name, "source_type", "c_extension")
 		// Return ImportError so Python code can catch it
 		return nil, &core.ImportError{
 			ModuleName: name,
@@ -177,50 +168,40 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 						sysPathDirs = append(sysPathDirs, path)
 					}
 				}
-				if debugImportLoader && len(sysPathDirs) > 0 {
-					log.Printf("[IMPORT] LoadPythonModule('%s') -> extracted %d paths from sys.path", name, len(sysPathDirs))
+				if len(sysPathDirs) > 0 {
+					core.Log.Debug(core.SubsystemImport, "Extracted sys.path directories", "module", name, "path_count", len(sysPathDirs))
 				}
 			}
 		}
 	}
 
 	// Find the Python file
-	if debugImportLoader {
-		log.Printf("[IMPORT] LoadPythonModule('%s') -> getting Python finder", name)
-	}
+	core.Log.Debug(core.SubsystemImport, "Searching for Python file", "module", name)
 	finder, err := GetPythonFinder()
 	if err != nil {
-		if debugImportLoader {
-			log.Printf("[IMPORT] LoadPythonModule('%s') -> finder init FAILED: %v", name, err)
-		}
+		core.Log.Error(core.SubsystemImport, "Python finder initialization failed", "module", name, "error", err)
 		return nil, fmt.Errorf("Python finder initialization failed: %w", err)
 	}
 
-	if debugImportLoader {
-		log.Printf("[IMPORT] LoadPythonModule('%s') -> calling finder.FindWithExtraPaths()", name)
-	}
-	core.DebugLog("[PROFILE] Finding '%s'...\n", name)
+	core.Log.Debug(core.SubsystemImport, "Invoking Python finder with paths", "module", name, "extra_paths", len(sysPathDirs))
 	pyPath, isPackage, err := finder.FindWithExtraPaths(name, sysPathDirs)
 	if err != nil {
-		core.DebugLog("[PROFILE] Find failed for '%s': %v\n", name, err)
-		if debugImportLoader {
-			log.Printf("[IMPORT] LoadPythonModule('%s') -> finder.Find() FAILED: %v", name, err)
-		}
+		core.Log.Info(core.SubsystemImport, "Python module not found", "module", name, "error", err.Error())
 		return nil, err // Module not found
 	}
-	core.DebugLog("[PROFILE] Found '%s' at %s\n", name, pyPath)
-	if debugImportLoader {
-		log.Printf("[IMPORT] LoadPythonModule('%s') -> found at: %s (package=%v)", name, pyPath, isPackage)
-	}
+	core.Log.Info(core.SubsystemImport, "Python file located", "module", name, "path", pyPath, "is_package", isPackage)
 
 	startLoad := time.Now()
 
 	// Transpile the Python file
+	core.Log.Debug(core.SubsystemImport, "Transpiling Python file", "module", name, "path", pyPath)
 	transpiler := GetPythonTranspiler()
 	astNode, err := transpiler.Transpile(pyPath)
 	if err != nil {
+		core.Log.Error(core.SubsystemImport, "Transpilation failed", "module", name, "error", err)
 		return nil, fmt.Errorf("failed to transpile Python module '%s': %w", name, err)
 	}
+	core.Log.Debug(core.SubsystemImport, "Transpilation completed", "module", name)
 
 	// Create module context as its own global scope
 	// Pass nil to make it a top-level context
@@ -260,8 +241,6 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	// Convert AST to IR - for better error reporting, evaluate statements one by one
-	startToIR := time.Now()
-
 	// Check if astNode is a BlockForm (multiple statements)
 	var stmts []ast.ASTNode
 	if blockForm, ok := astNode.(*ast.BlockForm); ok {
@@ -271,11 +250,10 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		stmts = []ast.ASTNode{astNode}
 	}
 
-	toIRTime := time.Since(startToIR)
-
 	// Evaluate statements one by one for better error reporting
 	startEval := time.Now()
 	evalTimeout := 120 * time.Second // 120 second timeout for module evaluation (increased for test.support)
+	core.Log.Debug(core.SubsystemImport, "Beginning module evaluation", "module", name, "statements", len(stmts))
 
 	type evalResult struct {
 		val        core.Value
@@ -322,9 +300,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 
 	if evalErr != nil {
-		if debugImportLoader {
-			log.Printf("[IMPORT] LoadPythonModule('%s') -> evaluation FAILED at statement %d: %v", name, failedStmtNum, evalErr)
-		}
+		core.Log.Error(core.SubsystemImport, "Module evaluation failed", "module", name, "statement", failedStmtNum, "error", evalErr)
 
 		// Build detailed error message with source location
 		var errMsg string
@@ -350,14 +326,10 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		// Return formatted error with location context
 		return nil, fmt.Errorf("%s", errMsg)
 	}
-	if debugImportLoader {
-		log.Printf("[IMPORT] LoadPythonModule('%s') -> evaluation SUCCESS, returning module dict", name)
-	}
 	evalTime := time.Since(startEval)
 
 	totalLoad := time.Since(startLoad)
-	core.DebugLog("[PROFILE] LoadModule %s: total=%v toIR=%v eval=%v\n",
-		name, totalLoad, toIRTime, evalTime)
+	core.Log.Info(core.SubsystemImport, "Python module loaded successfully", "module", name, "total_time", totalLoad, "eval_time", evalTime)
 
 	// Note: Module dict was already populated during evaluation via Context.ModuleDict
 	// Context.Define() automatically syncs public names to partialModule

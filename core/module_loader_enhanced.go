@@ -2,13 +2,10 @@ package core
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 )
-
-var debugImportEnhanced = os.Getenv("M28_DEBUG_IMPORT") != ""
 
 // ModuleLoaderEnhanced is an enhanced module loader that supports builtin Go modules
 type ModuleLoaderEnhanced struct {
@@ -36,79 +33,59 @@ func NewModuleLoaderEnhanced(
 
 // LoadModule loads a module by name and returns its content
 func (l *ModuleLoaderEnhanced) LoadModule(name string, ctx *Context) (*DictValue, error) {
-	if debugImportEnhanced {
-		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') called", name)
-	}
+	Log.Info(SubsystemImport, "Import resolution started", "module", name)
 
 	registry := GetModuleRegistry()
 	cacheName := normalizeCacheName(name)
 
-	if debugImportEnhanced {
-		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> cacheName: %s", name, cacheName)
-	}
+	Log.Debug(SubsystemImport, "Module cache name normalized", "module", name, "cache_name", cacheName)
 
 	// Check cache and circular dependencies
 	if module, err := l.checkModuleCache(registry, cacheName, name); module != nil || err != nil {
-		if debugImportEnhanced {
-			if err != nil {
-				log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> cache check returned error: %v", name, err)
-			} else {
-				log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> found in cache", name)
-			}
+		if err != nil {
+			Log.Warn(SubsystemImport, "Cache check returned error", "module", name, "error", err)
+		} else {
+			Log.Info(SubsystemImport, "Module found in cache", "module", name, "cache_status", "hit")
 		}
 		return module, err
 	}
 
 	// Check sys.modules dict before trying to load
 	// This allows Python code to manually set sys.modules['importlib._bootstrap'] etc.
-	DebugLog("[DEBUG] LoadModule: checking sys.modules for '%s'\n", name)
+	Log.Debug(SubsystemImport, "Checking sys.modules", "module", name)
 	if module := l.checkSysModules(name); module != nil {
-		DebugLog("[DEBUG] LoadModule: found '%s' in sys.modules, returning it\n", name)
-		if debugImportEnhanced {
-			log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> found in sys.modules", name)
-		}
+		Log.Info(SubsystemImport, "Module found in sys.modules", "module", name, "cache_status", "sys.modules_hit")
 		// Cache it in registry for faster lookups next time
 		registry.StoreModule(cacheName, module, "<from sys.modules>", []string{})
 		return module, nil
 	}
-	DebugLog("[DEBUG] LoadModule: '%s' not in sys.modules, will try to load\n", name)
+	Log.Debug(SubsystemImport, "Module not in sys.modules, proceeding to load", "module", name)
 
 	// Mark module as loading
 	registry.SetLoading(cacheName, true)
 	defer registry.SetLoading(cacheName, false)
 
 	// Try to load as builtin module
-	if debugImportEnhanced {
-		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> trying builtin", name)
-	}
+	Log.Debug(SubsystemImport, "Attempting builtin module load", "module", name)
 	if module := l.tryLoadBuiltinModule(registry, cacheName); module != nil {
-		if debugImportEnhanced {
-			log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> loaded as builtin", name)
-		}
+		Log.Info(SubsystemImport, "Module loaded successfully", "module", name, "source_type", "builtin")
 		return module, nil
 	}
 
 	// Check if it's an M28 module
-	if debugImportEnhanced {
-		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> checking if M28 module", name)
-	}
+	Log.Debug(SubsystemImport, "Attempting M28 module resolution", "module", name)
 	path, err := registry.ResolveModulePath(name)
 	if err == nil {
-		if debugImportEnhanced {
-			log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> loading as M28 module from: %s", name, path)
-		}
+		Log.Info(SubsystemImport, "M28 module path resolved", "module", name, "path", path, "source_type", "m28")
 		// It's an M28 module - create partial module for circular import support
 		partialModule := NewDict()
 		registry.StoreModule(cacheName, partialModule, "", []string{})
-		DebugLog("[DEBUG] LoadModule: stored partial M28 module '%s' in registry\n", cacheName)
+		Log.Debug(SubsystemImport, "Partial M28 module stored in registry", "module", cacheName)
 		return l.loadM28Module(registry, cacheName, path, partialModule)
 	}
 
 	// Not an M28 module, try Python
-	// Python loader will create partial module if the Python file exists
-	if debugImportEnhanced {
-		log.Printf("[IMPORT] ModuleLoaderEnhanced.LoadModule('%s') -> not M28 module (err: %v), trying Python", name, err)
-	}
+	Log.Debug(SubsystemImport, "M28 module not found, attempting Python module load", "module", name, "m28_error", err.Error())
 	return l.tryLoadPythonModuleWithoutPartial(registry, name, cacheName, err)
 }
 
@@ -124,23 +101,25 @@ func normalizeCacheName(name string) string {
 func (l *ModuleLoaderEnhanced) checkModuleCache(registry *ModuleRegistry, cacheName, name string) (*DictValue, error) {
 	// Check if already loaded
 	if module, found := registry.GetModule(cacheName); found {
+		Log.Debug(SubsystemImport, "Module found in module cache", "module", name, "cache_status", "hit")
 		return module, nil
 	}
 
 	// Check for circular dependency - return partial module
 	// In Python, circular imports are allowed
 	if registry.IsLoading(cacheName) {
-		DebugLog("[DEBUG] Circular import detected for '%s', returning partial module\n", cacheName)
+		Log.Warn(SubsystemImport, "Circular import detected", "module", cacheName)
 		// Return the partial module that's currently being loaded
 		if partialModule, found := registry.GetModule(cacheName); found {
-			DebugLog("[DEBUG] Found partial module in registry with %d keys\n", len(partialModule.Keys()))
+			Log.Debug(SubsystemImport, "Returning partial module for circular import", "module", cacheName, "keys", len(partialModule.Keys()))
 			return partialModule, nil
 		}
 		// If not in registry yet, return empty dict (will be populated later)
-		DebugLog("[DEBUG] Partial module not in registry, returning empty dict\n")
+		Log.Debug(SubsystemImport, "Partial module not in registry, returning empty dict", "module", cacheName)
 		return NewDict(), nil
 	}
 
+	Log.Debug(SubsystemImport, "Module not in cache", "module", name, "cache_status", "miss")
 	return nil, nil
 }
 
@@ -227,16 +206,12 @@ func isModuleLike(val Value) bool {
 // checkSysModules checks if module is in sys.modules dict
 // This allows Python code to manually register modules like sys.modules['importlib._bootstrap']
 func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
-	if debugImportEnhanced {
-		log.Printf("[IMPORT] checkSysModules('%s') called", name)
-	}
+	Log.Trace(SubsystemImport, "Checking sys.modules for module", "module", name)
 
 	// Get sys module from builtin registry
 	sysModule, isBuiltin := l.getBuiltinModule("sys")
 	if !isBuiltin {
-		if debugImportEnhanced {
-			log.Printf("[IMPORT] checkSysModules('%s') -> sys module not builtin", name)
-		}
+		Log.Debug(SubsystemImport, "sys module not available as builtin", "module", name)
 		return nil
 	}
 
@@ -244,44 +219,35 @@ func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
 	// Use direct string key "modules" not ValueToKey which would be "s:modules"
 	sysModulesVal, ok := sysModule.Get("modules")
 	if !ok {
-		if debugImportEnhanced {
-			log.Printf("[IMPORT] checkSysModules('%s') -> sys.modules not found in sys", name)
-		}
+		Log.Debug(SubsystemImport, "sys.modules not found in sys", "module", name)
 		return nil
 	}
 
 	sysModulesDict, ok := sysModulesVal.(*DictValue)
 	if !ok {
-		if debugImportEnhanced {
-			log.Printf("[IMPORT] checkSysModules('%s') -> sys.modules is not a DictValue", name)
-		}
+		Log.Warn(SubsystemImport, "sys.modules is not a DictValue", "module", name)
 		return nil
 	}
 
 	// Check if module exists in sys.modules
 	moduleKey := ValueToKey(StringValue(name))
-	if debugImportEnhanced {
-		log.Printf("[IMPORT] checkSysModules('%s') -> looking for key: %s", name, moduleKey)
-	}
+	Log.Trace(SubsystemImport, "Looking up module key in sys.modules", "module", name, "key", moduleKey)
 	moduleVal, ok := sysModulesDict.Get(moduleKey)
 	if !ok {
-		if debugImportEnhanced {
-			log.Printf("[IMPORT] checkSysModules('%s') -> module not found in sys.modules", name)
-			log.Printf("[IMPORT] checkSysModules('%s') -> sys.modules keys: %v", name, sysModulesDict.Keys())
-		}
+		Log.Trace(SubsystemImport, "Module not found in sys.modules", "module", name)
 		return nil
 	}
 
 	// Module exists - verify it's a dict (module dict) or Module
 	if moduleDict, ok := moduleVal.(*DictValue); ok {
-		DebugLog("[DEBUG] Found module '%s' in sys.modules (DictValue)\n", name)
+		Log.Debug(SubsystemImport, "Found module in sys.modules as DictValue", "module", name)
 		return moduleDict
 	}
 
 	if module, ok := moduleVal.(*Module); ok {
 		// Convert Module to DictValue by getting its __dict__
 		// This includes exports, context bindings, and Dict values
-		DebugLog("[DEBUG] Found module '%s' in sys.modules (Module), converting to DictValue\n", name)
+		Log.Debug(SubsystemImport, "Found module in sys.modules as Module, converting to DictValue", "module", name)
 		if dictVal, ok := module.GetAttr("__dict__"); ok {
 			if dict, ok := dictVal.(*DictValue); ok {
 				return dict
@@ -296,7 +262,7 @@ func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
 	}
 
 	// Not a dict or Module - ignore it
-	DebugLog("[DEBUG] Found '%s' in sys.modules but it's not a dict/module (type: %T)\n", name, moduleVal)
+	Log.Warn(SubsystemImport, "Found module in sys.modules but not a dict/module", "module", name, "type", fmt.Sprintf("%T", moduleVal))
 	return nil
 }
 
@@ -349,6 +315,7 @@ func (l *ModuleLoaderEnhanced) loadM28Module(registry *ModuleRegistry, cacheName
 func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *ModuleRegistry, name, cacheName string, m28Err error) (*DictValue, error) {
 	// Check if Python loader is available
 	if pythonLoaderFunc == nil {
+		Log.Warn(SubsystemImport, "Python loader not available", "module", name)
 		// Python loader not available, return ModuleNotFoundError
 		return nil, NewModuleNotFoundError(name)
 	}
@@ -357,7 +324,7 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 	// This enables circular imports to access the partial module during evaluation
 	partialModule := NewDict()
 	registry.StoreModule(cacheName, partialModule, "", []string{})
-	DebugLog("[DEBUG] LoadModule: stored partial Python module '%s' in registry\n", cacheName)
+	Log.Debug(SubsystemImport, "Created partial Python module in registry", "module", cacheName)
 
 	// Register partial module in sys.modules BEFORE evaluation
 	// This allows circular imports to find the module via sys.modules
@@ -366,11 +333,10 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 
 	// Try to load as Python module
 	// Python loader will populate partialModule during evaluation via Context.ModuleDict
+	Log.Debug(SubsystemImport, "Invoking Python loader", "module", name)
 	moduleDict, err := pythonLoaderFunc(name, l.GetContext(), l.evalFunc, partialModule)
 	if err != nil {
-		if debugImportEnhanced {
-			log.Printf("[IMPORT] ModuleLoaderEnhanced.tryLoadPythonModuleWithoutPartial('%s') -> pythonLoaderFunc returned error: %v", name, err)
-		}
+		Log.Error(SubsystemImport, "Python loader failed", "module", name, "error", err)
 		// Loading failed - remove the partial module from registry
 		registry.ReloadModule(cacheName)
 		// If error mentions "not found", return ModuleNotFoundError
@@ -380,9 +346,7 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 		// Other Python loading errors (transpilation, C extension, etc.)
 		return nil, err
 	}
-	if debugImportEnhanced {
-		log.Printf("[IMPORT] ModuleLoaderEnhanced.tryLoadPythonModuleWithoutPartial('%s') -> pythonLoaderFunc SUCCESS", name)
-	}
+	Log.Info(SubsystemImport, "Python module loaded successfully", "module", name, "source_type", "python")
 
 	// Successfully loaded Python module, update registry with full path
 	registry.StoreModule(cacheName, moduleDict, fmt.Sprintf("<Python module '%s'>", name), []string{})

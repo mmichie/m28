@@ -2,15 +2,14 @@ package modules
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
-)
 
-var debugImport = os.Getenv("M28_DEBUG_IMPORT") != ""
+	"github.com/mmichie/m28/core"
+)
 
 // PythonModuleFinder locates Python modules in the standard library
 type PythonModuleFinder struct {
@@ -105,9 +104,7 @@ func (f *PythonModuleFinder) Find(moduleName string) (string, bool, error) {
 
 // FindWithExtraPaths locates a Python module, checking extraPaths first, then default paths
 func (f *PythonModuleFinder) FindWithExtraPaths(moduleName string, extraPaths []string) (string, bool, error) {
-	if debugImport {
-		log.Printf("[IMPORT] PythonFinder.Find('%s') called", moduleName)
-	}
+	core.Log.Trace(core.SubsystemImport, "Python finder searching for module", "module", moduleName)
 
 	// Check cache first
 	f.mu.RLock()
@@ -115,65 +112,50 @@ func (f *PythonModuleFinder) FindWithExtraPaths(moduleName string, extraPaths []
 		f.mu.RUnlock()
 		// Determine if it's a package
 		isPackage := strings.HasSuffix(cached, "__init__.py")
-		if debugImport {
-			log.Printf("[IMPORT] PythonFinder.Find('%s') -> found in cache: %s (package=%v)", moduleName, cached, isPackage)
-		}
+		core.Log.Debug(core.SubsystemImport, "Module path found in cache", "module", moduleName, "path", cached, "is_package", isPackage, "cache_status", "hit")
 		return cached, isPackage, nil
 	}
 	f.mu.RUnlock()
 
 	// Convert module name to path (e.g., "os.path" → "os/path")
 	modulePath := strings.ReplaceAll(moduleName, ".", string(filepath.Separator))
-	if debugImport {
-		log.Printf("[IMPORT] PythonFinder.Find('%s') -> searching for: %s.py or %s/__init__.py", moduleName, modulePath, modulePath)
-	}
+	core.Log.Debug(core.SubsystemImport, "Searching for Python file", "module", moduleName, "file_pattern", modulePath+".py", "package_pattern", modulePath+"/__init__.py")
 
 	// Combine extra paths with default search paths (extra paths first)
 	allPaths := extraPaths
 	allPaths = append(allPaths, f.searchPaths...)
 
-	if debugImport && len(extraPaths) > 0 {
-		log.Printf("[IMPORT] PythonFinder.Find('%s') -> using %d extra paths from sys.path", moduleName, len(extraPaths))
+	if len(extraPaths) > 0 {
+		core.Log.Debug(core.SubsystemImport, "Using extra search paths", "module", moduleName, "extra_paths", len(extraPaths), "total_paths", len(allPaths))
 	}
 
 	// Search in all paths
 	for i, searchPath := range allPaths {
 		// Try as module: name.py
 		modulePyPath := filepath.Join(searchPath, modulePath+".py")
-		if debugImport {
-			log.Printf("[IMPORT] PythonFinder.Find('%s') -> trying [%d/%d]: %s", moduleName, i+1, len(allPaths), modulePyPath)
-		}
+		core.Log.Trace(core.SubsystemImport, "Checking search path", "module", moduleName, "path_index", i+1, "total_paths", len(allPaths), "checking", modulePyPath)
 		if fileExists(modulePyPath) {
 			f.mu.Lock()
 			f.pathCache[moduleName] = modulePyPath
 			f.mu.Unlock()
-			if debugImport {
-				log.Printf("[IMPORT] PythonFinder.Find('%s') -> FOUND module: %s", moduleName, modulePyPath)
-			}
+			core.Log.Debug(core.SubsystemImport, "Python module file found", "module", moduleName, "path", modulePyPath, "is_package", false)
 			return modulePyPath, false, nil
 		}
 
 		// Try as package: name/__init__.py
 		packageInitPath := filepath.Join(searchPath, modulePath, "__init__.py")
-		if debugImport {
-			log.Printf("[IMPORT] PythonFinder.Find('%s') -> trying package: %s", moduleName, packageInitPath)
-		}
+		core.Log.Trace(core.SubsystemImport, "Checking for package", "module", moduleName, "checking", packageInitPath)
 		if fileExists(packageInitPath) {
 			f.mu.Lock()
 			f.pathCache[moduleName] = packageInitPath
 			f.mu.Unlock()
-			if debugImport {
-				log.Printf("[IMPORT] PythonFinder.Find('%s') -> FOUND package: %s", moduleName, packageInitPath)
-			}
+			core.Log.Debug(core.SubsystemImport, "Python package found", "module", moduleName, "path", packageInitPath, "is_package", true)
 			return packageInitPath, true, nil
 		}
 	}
 
 	err := fmt.Errorf("Python module '%s' not found in stdlib paths", moduleName)
-	if debugImport {
-		log.Printf("[IMPORT] PythonFinder.Find('%s') -> NOT FOUND: %v", moduleName, err)
-		log.Printf("[IMPORT] PythonFinder.Find('%s') -> searched %d paths: %v", moduleName, len(f.searchPaths), f.searchPaths)
-	}
+	core.Log.Debug(core.SubsystemImport, "Python module not found in any search path", "module", moduleName, "paths_searched", len(allPaths))
 	return "", false, err
 }
 
