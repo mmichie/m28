@@ -1887,6 +1887,12 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				handlerCtx.Define("__current_exception__", prevExcError)
 			}
 
+			// Delete exception variable after handler (Python PEP 3110 semantics)
+			// This prevents reference cycles and matches CPython behavior
+			if excVar != "" {
+				ctx.Delete(excVar)
+			}
+
 			// If handler completed without error, the exception is handled
 			if handlerErr == nil {
 				tryErr = nil // Clear the original exception
