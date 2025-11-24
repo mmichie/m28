@@ -1657,6 +1657,18 @@ func Is() func([]core.Value, *core.Context) (core.Value, error) {
 			return core.BoolValue(false), nil
 		}
 
+		// Handle Ellipsis specially - it's a singleton
+		_, leftIsEllipsis := left.(core.EllipsisValue)
+		_, rightIsEllipsis := right.(core.EllipsisValue)
+		if leftIsEllipsis && rightIsEllipsis {
+			// Both are Ellipsis - they're the same singleton
+			return core.BoolValue(true), nil
+		}
+		if leftIsEllipsis || rightIsEllipsis {
+			// Only one is Ellipsis
+			return core.BoolValue(false), nil
+		}
+
 		// Handle booleans - True is True, False is False
 		leftBool, leftIsBool := left.(core.BoolValue)
 		rightBool, rightIsBool := right.(core.BoolValue)
