@@ -184,11 +184,17 @@ func InitDictMethods() {
 	dictType.Methods["clear"] = &MethodDescriptor{
 		Name:    "clear",
 		Arity:   0,
-		Doc:     "Remove all items from dict (returns empty dict)",
+		Doc:     "Remove all items from dict (mutates in-place, returns None)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			// Return a new empty dict
-			return NewDict(), nil
+			dict := receiver.(*DictValue)
+			// Clear all entries in-place
+			keys := dict.Keys()
+			for _, key := range keys {
+				dict.Delete(key)
+			}
+			// Return None (Python's dict.clear() returns None)
+			return Nil, nil
 		},
 	}
 
