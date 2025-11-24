@@ -134,6 +134,102 @@ We track work in Beads (bd) instead of Markdown.
 - Clean: `make clean`
 - Install deps: `make deps`
 
+## Debugging M28
+
+M28 uses Go's `log/slog` for structured logging with subsystem-based filtering.
+
+### CLI Debugging Flags
+
+**Basic Flags:**
+- `--debug SUBSYSTEMS` - Enable debug for specific subsystems (comma-separated or 'all')
+- `--debug-level LEVEL` - Set log level: debug, info, warn, error (default: info)
+- `--log-format FORMAT` - Output format: text, json (default: text)
+- `--trace` - Enable trace-level logging (very verbose, shows function entry/exit)
+
+**Verbosity Shortcuts:**
+- `-v` - Verbose (debug level)
+- `-vv` - More verbose (debug level, all subsystems)
+- `-vvv` - Maximum verbosity (debug level, all subsystems, trace mode)
+
+### Subsystems
+
+Available subsystems for targeted debugging:
+- `parser` - Tokenization, AST parsing, desugaring transformations
+- `import` - Module resolution, loading, caching, circular import detection
+- `eval` - Expression evaluation, runtime operations
+- `builtin` - Built-in function calls, type operations
+- `scope` - Variable resolution, scope management
+
+Use `all` to enable all subsystems.
+
+### Log Levels
+
+Hierarchical levels (each includes all higher levels):
+1. **Trace** - Fine-grained operations (token scanning, function entry/exit)
+2. **Debug** - Detailed diagnostic info (cache hits, resolution steps)
+3. **Info** - High-level events (file parsing started/completed, module loaded)
+4. **Warn** - Issues that don't prevent execution (circular imports detected)
+5. **Error** - Failures and error conditions
+
+### Common Debugging Scenarios
+
+**Debug parser issues:**
+```bash
+m28 --debug parser script.py
+m28 --debug parser --trace script.py  # Very detailed
+```
+
+**Debug import/module loading:**
+```bash
+m28 --debug import script.py
+m28 -vv script.py  # Quick debug all subsystems
+```
+
+**Get JSON output for processing:**
+```bash
+m28 --log-format json --debug all script.py > debug.jsonl
+```
+
+**Debug specific test failure:**
+```bash
+m28 --debug parser,eval tests/test_classes.m28
+```
+
+**Maximum verbosity for investigation:**
+```bash
+m28 -vvv script.py  # Trace everything
+```
+
+### Structured Log Attributes
+
+Logs include contextual attributes for filtering:
+- `subsystem` - Which subsystem produced the log
+- `file` - Source file being processed
+- `module` - Module name being loaded
+- `line`, `col` - Source location for errors
+- `error` - Error details
+- `*_time` - Timing metrics (e.g., parse_time, total_time)
+- `*_count` - Counts (e.g., token_count, node_count)
+- `cache_status` - Cache hit/miss indicators
+
+### Implementation Notes
+
+The logging system is implemented in `core/logging.go`:
+- Zero overhead when subsystems are disabled
+- Subsystem filtering at log-time (not compile-time)
+- Thread-safe with sync.RWMutex
+- Configurable output destination (defaults to stderr)
+
+To add logging in code:
+```go
+core.Log.Info(core.SubsystemParser, "Parsing file", "file", filename)
+core.Log.Debug(core.SubsystemImport, "Cache hit", "module", name, "cache_status", "hit")
+core.Log.Trace(core.SubsystemEval, "Evaluating", "expr", exprType)
+
+// Trace function with automatic entry/exit logging
+defer core.Log.TraceFunc(core.SubsystemParser, "parseFunctionDef", "name", funcName)()
+```
+
 ## Code Style Guidelines
 - **Go Style**: Follow standard Go conventions
   - Use camelCase for function names
