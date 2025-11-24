@@ -67,9 +67,43 @@ func WhileForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, ErrArgCount("while requires at least 2 arguments (condition and body)")
 	}
 
-	// Extract condition and body
+	// Extract condition
 	condition := args.Items()[0]
-	body := args.Items()[1:]
+	allArgs := args.Items()[1:]
+
+	var body []core.Value
+	var elseClause []core.Value
+
+	// Check if this is Python-style (body wrapped in list) or S-expression style
+	if len(allArgs) >= 1 {
+		firstArg := allArgs[0]
+
+		// Python style: (while cond (do body...) [(do else...)])
+		// Check if first arg after condition is a list starting with 'do
+		if bodyList, ok := firstArg.(*core.ListValue); ok && bodyList.Len() > 0 {
+			firstItem := bodyList.Items()[0]
+			if sym, ok := firstItem.(core.SymbolValue); ok && string(sym) == "do" {
+				// Python style - body is wrapped in (do ...)
+				body = bodyList.Items()[1:]
+
+				// Check for else clause (also wrapped in (do ...))
+				if len(allArgs) >= 2 {
+					if elseList, ok := allArgs[1].(*core.ListValue); ok && elseList.Len() > 0 {
+						if sym, ok := elseList.Items()[0].(core.SymbolValue); ok && string(sym) == "do" {
+							elseClause = elseList.Items()[1:]
+						}
+					}
+				}
+			} else {
+				// S-expression style with list as first body expr
+				// Look for 'else symbol in remaining args
+				body, elseClause = extractElseClause(allArgs)
+			}
+		} else {
+			// S-expression style: (while cond body1 body2 ... [else else1 else2 ...])
+			body, elseClause = extractElseClause(allArgs)
+		}
+	}
 
 	// Create a body function that evaluates all expressions
 	bodyFunc := func() (core.Value, error) {
@@ -98,6 +132,7 @@ func WhileForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	var lastResult core.Value = core.Nil
+	brokeOut := false
 
 	for {
 		// Evaluate the condition
@@ -119,6 +154,7 @@ func WhileForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Handle special return values
 		if result == Break {
+			brokeOut = true
 			break
 		}
 		if result == Continue {
@@ -131,7 +167,38 @@ func WhileForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		lastResult = result
 	}
 
+	// Execute else clause if we didn't break out
+	if !brokeOut && len(elseClause) > 0 {
+		for _, expr := range elseClause {
+			var err error
+			lastResult, err = Eval(expr, ctx)
+			if err != nil {
+				return nil, err
+			}
+			// Check for return in else clause
+			if ret, ok := lastResult.(*ReturnValue); ok {
+				return ret, nil
+			}
+		}
+	}
+
 	return lastResult, nil
+}
+
+// extractElseClause splits args into body and else clause at 'else symbol
+func extractElseClause(args []core.Value) (body []core.Value, elseClause []core.Value) {
+	for i, expr := range args {
+		if sym, ok := unwrapLocated(expr).(core.SymbolValue); ok && string(sym) == "else" {
+			body = args[:i]
+			if i+1 < len(args) {
+				elseClause = args[i+1:]
+			}
+			return
+		}
+	}
+	// No else clause found
+	body = args
+	return
 }
 
 // ForForm implements the for loop special form

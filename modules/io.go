@@ -63,6 +63,7 @@ func newStringIO(args []core.Value, ctx *core.Context) (core.Value, error) {
 	obj.SetWithKey("write", core.StringValue("write"), core.NewBuiltinFunction(s.write))
 	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(s.read))
 	obj.SetWithKey("getvalue", core.StringValue("getvalue"), core.NewBuiltinFunction(s.getvalue))
+	obj.SetWithKey("flush", core.StringValue("flush"), core.NewBuiltinFunction(s.flush))
 	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(s.close))
 
 	return obj, nil
@@ -89,6 +90,11 @@ func (s *StringIO) read(args []core.Value, ctx *core.Context) (core.Value, error
 
 func (s *StringIO) getvalue(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.StringValue(s.buffer.String()), nil
+}
+
+func (s *StringIO) flush(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// StringIO is in-memory, flush is a no-op but must exist for compatibility
+	return core.None, nil
 }
 
 func (s *StringIO) close(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -121,6 +127,7 @@ func newBytesIO(args []core.Value, ctx *core.Context) (core.Value, error) {
 	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(b.read))
 	obj.SetWithKey("readline", core.StringValue("readline"), core.NewBuiltinFunction(b.readline))
 	obj.SetWithKey("getvalue", core.StringValue("getvalue"), core.NewBuiltinFunction(b.getvalue))
+	obj.SetWithKey("flush", core.StringValue("flush"), core.NewBuiltinFunction(b.flush))
 	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(b.close))
 	obj.SetWithKey("tell", core.StringValue("tell"), core.NewBuiltinFunction(b.tell))
 	obj.SetWithKey("seek", core.StringValue("seek"), core.NewBuiltinFunction(b.seek))
@@ -204,6 +211,11 @@ func (b *BytesIO) readline(args []core.Value, ctx *core.Context) (core.Value, er
 
 func (b *BytesIO) getvalue(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.BytesValue(b.buffer.Bytes()), nil
+}
+
+func (b *BytesIO) flush(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// BytesIO is in-memory, flush is a no-op but must exist for compatibility
+	return core.None, nil
 }
 
 func (b *BytesIO) close(args []core.Value, ctx *core.Context) (core.Value, error) {
