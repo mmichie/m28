@@ -64,6 +64,8 @@ func (t *PythonTokenizer) SetFilename(filename string) {
 
 // Tokenize performs lexical analysis and returns all tokens
 func (t *PythonTokenizer) Tokenize() ([]Token, error) {
+	core.Log.Trace(core.SubsystemParser, "Tokenization started", "file", t.filename)
+
 	for !t.isAtEnd() {
 		// Handle indentation only at line start (when not inside parens)
 		if t.atLineStart && t.parenDepth == 0 {
@@ -92,6 +94,9 @@ func (t *PythonTokenizer) Tokenize() ([]Token, error) {
 			continue
 		}
 
+		// Log token at trace level
+		core.Log.Trace(core.SubsystemParser, "Token scanned", "file", t.filename, "type", tok.Type.String(), "lexeme", tok.Lexeme, "line", tok.Line, "col", tok.Col)
+
 		t.tokens = append(t.tokens, tok)
 
 		// Track newlines
@@ -102,6 +107,7 @@ func (t *PythonTokenizer) Tokenize() ([]Token, error) {
 		}
 
 		if tok.Type == TOKEN_ERROR {
+			core.Log.Error(core.SubsystemParser, "Tokenization error encountered", "file", t.filename, "line", tok.Line, "col", tok.Col, "lexeme", tok.Lexeme)
 			t.advance() // Skip problematic character
 		}
 	}
@@ -123,12 +129,14 @@ func (t *PythonTokenizer) Tokenize() ([]Token, error) {
 	})
 
 	if len(t.errors) > 0 {
+		core.Log.Error(core.SubsystemParser, "Tokenization failed with errors", "file", t.filename, "error_count", len(t.errors), "tokens_parsed", len(t.tokens))
 		// Return the first error directly (it's already a TokenizationError with location)
 		// If there are multiple errors, we'll report the first one
 		// ErrorFormatter can then properly format it with source context
 		return t.tokens, t.errors[0]
 	}
 
+	core.Log.Trace(core.SubsystemParser, "Tokenization completed successfully", "file", t.filename, "token_count", len(t.tokens))
 	return t.tokens, nil
 }
 

@@ -43,12 +43,15 @@ func NewPythonParser(tokens []Token, filename string, source string) *PythonPars
 
 // Parse parses the token stream into a list of AST nodes
 func (p *PythonParser) Parse() ([]ast.ASTNode, error) {
+	core.Log.Trace(core.SubsystemParser, "AST parsing started", "file", p.filename, "tokens", len(p.tokens))
 	statements := []ast.ASTNode{}
 
 	for !p.isAtEnd() {
 		// Check for runaway parsing
 		if p.callCount > p.maxCalls {
-			return nil, fmt.Errorf("parser exceeded maximum call limit (%d calls) - possible infinite loop at token %d", p.maxCalls, p.current)
+			err := fmt.Errorf("parser exceeded maximum call limit (%d calls) - possible infinite loop at token %d", p.maxCalls, p.current)
+			core.Log.Error(core.SubsystemParser, "Parser exceeded call limit", "file", p.filename, "max_calls", p.maxCalls, "current_token", p.current)
+			return nil, err
 		}
 
 		// Skip any leading newlines or semicolons
@@ -63,21 +66,26 @@ func (p *PythonParser) Parse() ([]ast.ASTNode, error) {
 		stmt := p.parseStatement()
 		if stmt != nil {
 			statements = append(statements, stmt)
+			core.Log.Trace(core.SubsystemParser, "Statement parsed", "file", p.filename, "node_type", fmt.Sprintf("%T", stmt), "statement_count", len(statements))
 		} else if len(p.errors) > 0 {
 			// parseStatement returned nil and we have errors - stop parsing
+			core.Log.Error(core.SubsystemParser, "Parse statement returned error", "file", p.filename, "error_count", len(p.errors))
 			break
 		}
 
 		// If we hit an error, synchronize
 		if p.panic {
+			core.Log.Warn(core.SubsystemParser, "Parser in panic mode, synchronizing", "file", p.filename)
 			p.synchronize()
 		}
 	}
 
 	if len(p.errors) > 0 {
+		core.Log.Error(core.SubsystemParser, "Parsing failed with errors", "file", p.filename, "error_count", len(p.errors), "statements_parsed", len(statements))
 		return statements, fmt.Errorf("parse errors: %v", p.errors)
 	}
 
+	core.Log.Trace(core.SubsystemParser, "AST parsing completed successfully", "file", p.filename, "statement_count", len(statements))
 	return statements, nil
 }
 
@@ -881,6 +889,9 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 	if p.check(TOKEN_ASSIGN) {
 		tok := p.advance()
 
+		// Log Pythonic assignment desugaring
+		core.Log.Trace(core.SubsystemParser, "Desugaring Pythonic assignment", "file", p.filename, "line", tok.Line, "col", tok.Col)
+
 		// Collect all assignment targets
 		// For x = y = z = 0, we collect [x, y, z] and then parse 0
 		targets := []ast.ASTNode{expr}
@@ -1578,6 +1589,9 @@ func (p *PythonParser) parsePostfix() ast.ASTNode {
 // parseCall parses: (args)
 func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 	tok := p.expect(TOKEN_LPAREN)
+
+	// Log Pythonic function call desugaring
+	core.Log.Trace(core.SubsystemParser, "Desugaring Pythonic function call", "file", p.filename, "callee", fmt.Sprintf("%T", callee), "line", tok.Line, "col", tok.Col)
 
 	args := []ast.ASTNode{callee}
 	var kwargs []ast.ASTNode // keyword arguments as (keyword value) pairs
@@ -2971,6 +2985,9 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 	// Parse function name
 	nameTok := p.expect(TOKEN_IDENTIFIER)
 	name := nameTok.Lexeme
+
+	// Log Pythonic function definition desugaring
+	core.Log.Trace(core.SubsystemParser, "Desugaring Pythonic function definition", "file", p.filename, "function", name, "line", tok.Line, "col", tok.Col, "is_async", isAsync)
 
 	// Parse optional PEP 695 type parameters: def func[T, U](params):
 	// Type parameters are for runtime (Python 3.12+) but we can parse and ignore them

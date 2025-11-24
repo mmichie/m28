@@ -35,41 +35,52 @@ func GetPythonTranspiler() *PythonModuleTranspiler {
 
 // Transpile parses a Python file and returns its AST as a block
 func (t *PythonModuleTranspiler) Transpile(pyPath string) (ast.ASTNode, error) {
+	core.Log.Info(core.SubsystemParser, "Parsing file started", "file", pyPath)
 	startTotal := time.Now()
 
 	// Check cache first
 	t.mu.RLock()
 	if cached, ok := t.cache[pyPath]; ok {
 		t.mu.RUnlock()
+		core.Log.Debug(core.SubsystemParser, "File found in parse cache", "file", pyPath, "cache_status", "hit")
 		return cached, nil
 	}
 	t.mu.RUnlock()
+
+	core.Log.Debug(core.SubsystemParser, "File not in parse cache", "file", pyPath, "cache_status", "miss")
 
 	// Read the Python source file
 	startRead := time.Now()
 	source, err := os.ReadFile(pyPath)
 	if err != nil {
+		core.Log.Error(core.SubsystemParser, "Failed to read file", "file", pyPath, "error", err)
 		return nil, fmt.Errorf("failed to read Python file '%s': %w", pyPath, err)
 	}
 	readTime := time.Since(startRead)
+	core.Log.Debug(core.SubsystemParser, "File read completed", "file", pyPath, "size_bytes", len(source), "read_time", readTime)
 
 	// Tokenize Python source
 	startTokenize := time.Now()
 	tokenizer := parser.NewPythonTokenizer(string(source))
 	tokens, err := tokenizer.Tokenize()
 	if err != nil {
+		core.Log.Error(core.SubsystemParser, "Tokenization failed", "file", pyPath, "error", err)
 		return nil, fmt.Errorf("failed to tokenize Python module '%s': %w", pyPath, err)
 	}
 	tokenizeTime := time.Since(startTokenize)
+	core.Log.Debug(core.SubsystemParser, "Tokenization completed", "file", pyPath, "token_count", len(tokens), "tokenize_time", tokenizeTime)
 
 	// Parse tokens into AST
 	startParse := time.Now()
+	core.Log.Debug(core.SubsystemParser, "AST parsing started", "file", pyPath, "tokens", len(tokens))
 	pythonParser := parser.NewPythonParser(tokens, pyPath, string(source))
 	nodes, err := pythonParser.Parse()
 	if err != nil {
+		core.Log.Error(core.SubsystemParser, "AST parsing failed", "file", pyPath, "error", err)
 		return nil, fmt.Errorf("failed to parse Python module '%s': %w", pyPath, err)
 	}
 	parseTime := time.Since(startParse)
+	core.Log.Debug(core.SubsystemParser, "AST parsing completed", "file", pyPath, "node_count", len(nodes), "parse_time", parseTime)
 
 	// Wrap multiple statements in a BlockForm (do block)
 	var astNode ast.ASTNode
@@ -89,9 +100,7 @@ func (t *PythonModuleTranspiler) Transpile(pyPath string) (ast.ASTNode, error) {
 
 	totalTime := time.Since(startTotal)
 
-	// Always log timing for profiling
-	core.DebugLog("[PROFILE] Transpile %s: total=%v read=%v tokenize=%v parse=%v tokens=%d\n",
-		pyPath, totalTime, readTime, tokenizeTime, parseTime, len(tokens))
+	core.Log.Info(core.SubsystemParser, "Parsing file completed successfully", "file", pyPath, "total_time", totalTime, "nodes", len(nodes), "tokens", len(tokens))
 
 	return astNode, nil
 }
