@@ -22,7 +22,6 @@ var (
 	evalExpr    = flag.String("e", "", "Evaluate expression")
 	showHelp    = flag.Bool("help", false, "Show help")
 	showVersion = flag.Bool("version", false, "Show version")
-	debugMode   = flag.Bool("debug", false, "Enable debug mode")
 	modulePath  = flag.String("path", "", "Additional module search paths (colon-separated)")
 	interactive = flag.Bool("i", false, "Enter interactive mode after running file")
 	command     = flag.String("c", "", "Execute program passed as string")
@@ -31,6 +30,15 @@ var (
 	printAST    = flag.Bool("ast", false, "Print AST (same as -parse)")
 	printIR     = flag.Bool("ir", false, "Print IR before execution")
 	pythonMode  = flag.Bool("python", false, "Enable Python mode for REPL")
+
+	// Debug/logging flags
+	debugSubsystems = flag.String("debug", "", "Enable debug logging for subsystems (comma-separated: parser,import,eval,builtin,scope or 'all')")
+	debugLevel      = flag.String("debug-level", "info", "Set logging level (debug, info, warn, error)")
+	logFormat       = flag.String("log-format", "text", "Set log format (text, json)")
+	traceMode       = flag.Bool("trace", false, "Enable trace-level logging (very verbose)")
+	verboseShort    = flag.Bool("v", false, "Verbose output (equivalent to --debug-level=debug)")
+	verboseMedium   = flag.Bool("vv", false, "More verbose output (equivalent to --debug-level=debug --debug=all)")
+	verboseLong     = flag.Bool("vvv", false, "Maximum verbosity (equivalent to --debug-level=debug --debug=all --trace)")
 )
 
 const version = "0.1.0-fresh-start"
@@ -67,9 +75,50 @@ func handleError(err error, globalCtx *core.Context, errorFormatter *parser.Erro
 	os.Exit(1)
 }
 
+// initializeLogger sets up the logging system based on CLI flags
+func initializeLogger() {
+	// Determine log level based on flags
+	level := *debugLevel
+	trace := *traceMode
+
+	// Handle verbosity shortcuts
+	if *verboseShort {
+		level = "debug"
+	}
+	if *verboseMedium {
+		level = "debug"
+		if *debugSubsystems == "" {
+			*debugSubsystems = "all"
+		}
+	}
+	if *verboseLong {
+		level = "debug"
+		trace = true
+		if *debugSubsystems == "" {
+			*debugSubsystems = "all"
+		}
+	}
+
+	// Parse subsystems from comma-separated string
+	var subsystems []string
+	if *debugSubsystems != "" {
+		subsystems = strings.Split(*debugSubsystems, ",")
+		// Trim whitespace from each subsystem
+		for i, s := range subsystems {
+			subsystems[i] = strings.TrimSpace(s)
+		}
+	}
+
+	// Initialize the logger with parsed configuration
+	core.Log = core.InitLogger(level, *logFormat, subsystems, nil, trace)
+}
+
 func main() {
 	// Parse command line flags
 	flag.Parse()
+
+	// Initialize logger before anything else
+	initializeLogger()
 
 	// Show help
 	if *showHelp {
@@ -294,36 +343,47 @@ func printHelp() {
 	fmt.Println("Usage: m28 [options] [file] [args...]")
 	fmt.Println()
 	fmt.Println("Options:")
-	fmt.Println("  -e EXPR        Evaluate expression")
-	fmt.Println("  -c PROGRAM     Execute program string")
-	fmt.Println("  -m MODULE      Run module as script")
-	fmt.Println("  -i             Interactive mode after file execution")
-	fmt.Println("  -python        Enable Python mode for REPL")
-	fmt.Println("  -parse         Parse file and print AST (don't execute)")
-	fmt.Println("  -ast           Print AST (same as -parse)")
-	fmt.Println("  -ir            Print IR before execution")
-	fmt.Println("  -path PATHS    Additional module search paths (colon-separated)")
-	fmt.Println("  -debug         Enable debug mode")
-	fmt.Println("  -version       Show version")
-	fmt.Println("  -help          Show this help")
+	fmt.Println("  -e EXPR           Evaluate expression")
+	fmt.Println("  -c PROGRAM        Execute program string")
+	fmt.Println("  -m MODULE         Run module as script")
+	fmt.Println("  -i                Interactive mode after file execution")
+	fmt.Println("  -python           Enable Python mode for REPL")
+	fmt.Println("  -parse            Parse file and print AST (don't execute)")
+	fmt.Println("  -ast              Print AST (same as -parse)")
+	fmt.Println("  -ir               Print IR before execution")
+	fmt.Println("  -path PATHS       Additional module search paths (colon-separated)")
+	fmt.Println("  -version          Show version")
+	fmt.Println("  -help             Show this help")
+	fmt.Println()
+	fmt.Println("Debug/Logging Options:")
+	fmt.Println("  -debug SUBSYS     Enable debug for subsystems (parser,import,eval,builtin,scope or 'all')")
+	fmt.Println("  -debug-level LVL  Set log level (debug, info, warn, error)")
+	fmt.Println("  -log-format FMT   Set log format (text, json)")
+	fmt.Println("  -trace            Enable trace-level logging (very verbose)")
+	fmt.Println("  -v                Verbose output (debug level)")
+	fmt.Println("  -vv               More verbose (debug level, all subsystems)")
+	fmt.Println("  -vvv              Maximum verbosity (debug level, all subsystems, trace)")
 	fmt.Println()
 	fmt.Println("Supported File Types:")
-	fmt.Println("  .m28           M28 S-expression syntax")
-	fmt.Println("  .py            Python syntax (experimental)")
+	fmt.Println("  .m28              M28 S-expression syntax")
+	fmt.Println("  .py               Python syntax (experimental)")
 	fmt.Println()
 	fmt.Println("Environment Variables:")
-	fmt.Println("  M28_PATH       Module search paths (colon-separated)")
+	fmt.Println("  M28_PATH          Module search paths (colon-separated)")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  m28                      Start interactive REPL (M28 syntax)")
-	fmt.Println("  m28 -python              Start interactive REPL (Python syntax)")
-	fmt.Println("  m28 script.m28           Run M28 script")
-	fmt.Println("  m28 script.py            Run Python script")
-	fmt.Println("  m28 -e '(+ 1 2)'         Evaluate expression")
-	fmt.Println("  m28 -m unittest          Run module as script")
-	fmt.Println("  m28 -i script.m28        Run script then enter REPL")
-	fmt.Println("  m28 -parse script.py     Parse and show AST")
-	fmt.Println("  m28 -ir script.py        Show IR before execution")
+	fmt.Println("  m28                           Start interactive REPL (M28 syntax)")
+	fmt.Println("  m28 -python                   Start interactive REPL (Python syntax)")
+	fmt.Println("  m28 script.m28                Run M28 script")
+	fmt.Println("  m28 script.py                 Run Python script")
+	fmt.Println("  m28 -e '(+ 1 2)'              Evaluate expression")
+	fmt.Println("  m28 -m unittest               Run module as script")
+	fmt.Println("  m28 -i script.m28             Run script then enter REPL")
+	fmt.Println("  m28 -parse script.py          Parse and show AST")
+	fmt.Println("  m28 -ir script.py             Show IR before execution")
+	fmt.Println("  m28 -debug parser script.py   Debug parser while running")
+	fmt.Println("  m28 -vv script.py             Verbose debug output")
+	fmt.Println("  m28 --log-format json -vv     JSON debug output")
 	fmt.Println()
 	fmt.Println("Note: Stack traces are shown automatically on errors when available")
 }
