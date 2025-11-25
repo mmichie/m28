@@ -3024,11 +3024,8 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Expression is the lambda body
 			expr := lambdaList.Items()[2]
 
-			// Evaluate the iterable
-			iterable, err := Eval(args.Items()[1], ctx)
-			if err != nil {
-				return nil, fmt.Errorf("error evaluating iterable: %v", err)
-			}
+			// Store the unevaluated iterable expression for lazy evaluation
+			iterableExpr := args.Items()[1]
 
 			// Optional condition (also a lambda)
 			var condition core.Value
@@ -3039,11 +3036,11 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Create single-clause lazy generator
-			// Note: iterable is already evaluated, store it directly
+			// Note: Store unevaluated iterable for true lazy evaluation
 			clause := core.GenClause{
 				VarName:   varName,
 				VarNames:  varNames,
-				Iterable:  iterable,
+				Iterable:  iterableExpr, // Store unevaluated
 				Condition: condition,
 			}
 			return core.NewLazyGeneratorExpression("genexpr", expr, []core.GenClause{clause}, ctx, Eval), nil
@@ -3062,17 +3059,8 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 	varName := string(varSym)
 
-	// Evaluate the iterable
+	// Store the unevaluated iterable expression for lazy evaluation
 	iterableExpr := args.Items()[2]
-	iterable, err := Eval(iterableExpr, ctx)
-	if err != nil {
-		// Debug: show what expression failed
-		exprStr := core.PrintValue(iterableExpr)
-		if len(exprStr) > 100 {
-			exprStr = exprStr[:100] + "..."
-		}
-		return nil, fmt.Errorf("error evaluating iterable %s: %v", exprStr, err)
-	}
 
 	// Store the expression, condition (if present), and context
 	expr := args.Items()[0]
@@ -3082,11 +3070,11 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Create single-clause lazy generator
-	// Note: iterable is already evaluated, store it directly
+	// Note: Store unevaluated iterable for true lazy evaluation
 	clause := core.GenClause{
 		VarName:   varName,
 		VarNames:  nil,
-		Iterable:  iterable,
+		Iterable:  iterableExpr, // Store unevaluated
 		Condition: condition,
 	}
 	return core.NewLazyGeneratorExpression("genexpr", expr, []core.GenClause{clause}, ctx, Eval), nil

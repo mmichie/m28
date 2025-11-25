@@ -822,12 +822,34 @@ func (c *ComprehensionForm) ToIR() core.Value {
 		)
 
 	case GeneratorComp:
-		// (x*x for x in range(10))
+		// Single clause: (x*x for x in range(10))
 		// → (gen-comp (lambda (x) (* x x)) (range 10))
-		// or for tuple unpacking:
-		// ((k, v) for k, v in items)
-		// → (gen-comp (lambda ((k v)) (tuple-literal k v)) items)
+		//
+		// Multiple clauses: (x*y for x in range(3) for y in range(3))
+		// → (gen-comp (* x y) ((x (range 3)) (y (range 3))))
 
+		if len(c.Clauses) > 1 {
+			// Multi-clause (nested) generator expression
+			clausesIR := make([]core.Value, 0, len(c.Clauses))
+			for _, clause := range c.Clauses {
+				clauseIR := []core.Value{
+					core.SymbolValue(clause.Variable),
+					clause.Iterable.ToIR(),
+				}
+				if clause.Condition != nil {
+					clauseIR = append(clauseIR, clause.Condition.ToIR())
+				}
+				clausesIR = append(clausesIR, core.NewList(clauseIR...))
+			}
+
+			return core.NewList(
+				core.SymbolValue("gen-comp"),
+				c.Element.ToIR(),
+				core.NewList(clausesIR...),
+			)
+		}
+
+		// Single clause (backward compatible)
 		// Get variable, iterable, and condition from clauses or deprecated fields
 		var variable string
 		var iterable, condition ASTNode
