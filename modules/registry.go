@@ -39,6 +39,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_imp":                       Init_ImpModule,                     // C extension module for import machinery
 	"_warnings":                  InitWarningsModule,                 // C extension module for warnings.py (full implementation)
 	"_heapq":                     Init_HeapqModule,                   // C extension module for heapq.py (priority queue)
+	"_locale":                    Init_LocaleModule,                  // C extension module for locale support (UTF-8 defaults)
 	"_frozen_importlib":          Init_FrozenImportlibModule,         // C extension stub for CPython's frozen import machinery
 	"_frozen_importlib_external": Init_FrozenImportlibExternalModule, // C extension stub for CPython's frozen external import machinery
 	"marshal":                    InitMarshalModule,                  // C extension module for bytecode serialization
