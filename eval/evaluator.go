@@ -2903,16 +2903,83 @@ func setCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 	return result, nil
 }
 
+// genExprMultiClause handles nested generator expressions with lazy evaluation
+// Format: (gen-comp expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))
+func genExprMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Parse clauses into GenClause structs
+	clauses := make([]core.GenClause, 0, clausesList.Len())
+	for i, clauseVal := range clausesList.Items() {
+		clauseList, ok := clauseVal.(*core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("clause %d must be a list", i)
+		}
+
+		if clauseList.Len() < 2 || clauseList.Len() > 3 {
+			return nil, fmt.Errorf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)
+		}
+
+		// Get variable (or variables for tuple unpacking)
+		var varName string
+		var varNames []string
+
+		varArg := clauseList.Items()[0]
+		if varSym, ok := varArg.(core.SymbolValue); ok {
+			// Single variable
+			varName = string(varSym)
+		} else if varList, ok := varArg.(*core.ListValue); ok {
+			// Multiple variables (tuple unpacking)
+			varNames = make([]string, varList.Len())
+			for j, v := range varList.Items() {
+				if sym, ok := v.(core.SymbolValue); ok {
+					varNames[j] = string(sym)
+				} else {
+					return nil, fmt.Errorf("clause %d: variable list must contain symbols", i)
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("clause %d: variable must be a symbol or list of symbols", i)
+		}
+
+		// Get condition if present
+		var condition core.Value
+		if clauseList.Len() == 3 {
+			condition = clauseList.Items()[2]
+		}
+
+		clauses = append(clauses, core.GenClause{
+			VarName:   varName,
+			VarNames:  varNames,
+			Iterable:  clauseList.Items()[1], // Store unevaluated iterable
+			Condition: condition,
+		})
+	}
+
+	// Create lazy generator
+	return core.NewLazyGeneratorExpression("multi-clause-genexpr", expr, clauses, ctx, Eval), nil
+}
+
 // GenExprForm implements generator expressions
 // Forms:
 //
 //	Old format: (gen-expr expr var iterable [condition])
 //	Lambda format: (gen-comp (lambda (var) expr) iterable [(lambda (var) condition)])
+//	Multi-clause format: (gen-comp expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))
 //
 // Returns a Generator object that lazily evaluates the expression
 func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 2 || args.Len() > 4 {
 		return nil, fmt.Errorf("gen-expr/gen-comp requires 2-4 arguments")
+	}
+
+	// Check for multi-clause format: (gen-comp expr ((var iter [cond])...))
+	if args.Len() == 2 {
+		if clausesList, ok := args.Items()[1].(*core.ListValue); ok && clausesList.Len() > 0 {
+			// Check if first item is a list (indicating multi-clause format)
+			if firstClause, ok := clausesList.Items()[0].(*core.ListValue); ok && firstClause.Len() >= 2 {
+				// Multi-clause format detected
+				return genExprMultiClause(args.Items()[0], clausesList, ctx)
+			}
+		}
 	}
 
 	// Check if this is lambda format: first arg is a lambda
@@ -2971,12 +3038,15 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 			}
 
-			// Create generator
-			gen, err := core.NewGeneratorExpression("genexpr", expr, varName, varNames, iterable, condition, ctx, Eval)
-			if err != nil {
-				return nil, err
+			// Create single-clause lazy generator
+			// Note: iterable is already evaluated, store it directly
+			clause := core.GenClause{
+				VarName:   varName,
+				VarNames:  varNames,
+				Iterable:  iterable,
+				Condition: condition,
 			}
-			return gen, nil
+			return core.NewLazyGeneratorExpression("genexpr", expr, []core.GenClause{clause}, ctx, Eval), nil
 		}
 	}
 
@@ -3011,12 +3081,15 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		condition = args.Items()[3]
 	}
 
-	// Create a Generator object with the expression, variable, iterable, and condition
-	gen, err := core.NewGeneratorExpression("genexpr", expr, varName, nil, iterable, condition, ctx, Eval)
-	if err != nil {
-		return nil, err
+	// Create single-clause lazy generator
+	// Note: iterable is already evaluated, store it directly
+	clause := core.GenClause{
+		VarName:   varName,
+		VarNames:  nil,
+		Iterable:  iterable,
+		Condition: condition,
 	}
-	return gen, nil
+	return core.NewLazyGeneratorExpression("genexpr", expr, []core.GenClause{clause}, ctx, Eval), nil
 }
 
 // listLiteralForm implements the list-literal special form

@@ -37,9 +37,13 @@ type Generator struct {
 	varNames     []string                             // Loop variable names (multiple variables for tuple unpacking)
 	iterable     Value                                // Original iterable
 	condition    Value                                // Optional condition (nil if none)
-	items        []Value                              // Converted items from iterable
-	currentIndex int                                  // Current position in items
+	items        []Value                              // Converted items from iterable (eager mode)
+	currentIndex int                                  // Current position in items (eager mode)
 	evalFunc     func(Value, *Context) (Value, error) // Evaluator function
+
+	// Fields for lazy generator expressions
+	clauses   []GenClause   // Multi-clause generator clauses (lazy mode)
+	lazyState *LazyGenState // Lazy evaluation state
 }
 
 // GeneratorState represents the state of a generator
@@ -51,6 +55,25 @@ const (
 	GeneratorRunning
 	GeneratorCompleted
 )
+
+// GenClause represents a single clause in a generator expression
+// For example, in "(x*y for x in range(3) for y in range(3))"
+// there are two clauses: one for x and one for y
+type GenClause struct {
+	VarName   string   // Variable name (for single variable)
+	VarNames  []string // Variable names (for tuple unpacking)
+	Iterable  Value    // The iterable to loop over
+	Condition Value    // Optional filter condition (nil if none)
+}
+
+// LazyGenState maintains the iteration state for lazy generator evaluation
+type LazyGenState struct {
+	iterators []Iterator // One iterator per clause
+	values    []Value    // Current value for each clause
+	contexts  []*Context // Scope for each clause level
+	exhausted bool       // True when all combinations have been generated
+	started   bool       // True after first Next() call
+}
 
 // NewGenerator creates a new generator
 func NewGenerator(name string, code Value, ctx *Context) *Generator {
@@ -122,6 +145,45 @@ func NewGeneratorExpression(name string, expr Value, varName string, varNames []
 	g.registry = g.createRegistry()
 
 	return g, nil
+}
+
+// NewSimpleGenerator creates a generator from a pre-computed slice of values
+// This is used for multi-clause generator expressions that are eagerly evaluated
+func NewSimpleGenerator(name string, items []Value) *Generator {
+	g := &Generator{
+		BaseObject:   *NewBaseObject(Type("generator")),
+		name:         name,
+		state:        GeneratorCreated,
+		items:        items,
+		currentIndex: 0,
+	}
+
+	// Initialize the method registry
+	g.registry = g.createRegistry()
+
+	return g
+}
+
+// NewLazyGeneratorExpression creates a truly lazy generator that doesn't consume
+// the source iterable until Next() is called. Supports multi-clause generators.
+func NewLazyGeneratorExpression(name string, expr Value, clauses []GenClause, ctx *Context, evalFunc func(Value, *Context) (Value, error)) *Generator {
+	g := &Generator{
+		BaseObject: *NewBaseObject(Type("generator")),
+		name:       name,
+		state:      GeneratorCreated,
+		context:    NewContext(ctx),
+		expr:       expr,
+		clauses:    clauses,
+		evalFunc:   evalFunc,
+		lazyState: &LazyGenState{
+			started: false,
+		},
+	}
+
+	// Initialize the method registry
+	g.registry = g.createRegistry()
+
+	return g
 }
 
 // Type returns the generator type
@@ -270,6 +332,23 @@ func (g *Generator) Next() (Value, error) {
 		g.state = GeneratorSuspended
 	}
 
+	// Handle lazy generator expressions (truly lazy evaluation)
+	if g.lazyState != nil && len(g.clauses) > 0 {
+		return g.nextLazy()
+	}
+
+	// Handle simple generators (pre-computed items with no expression to evaluate)
+	if g.expr == nil && g.evalFunc == nil && len(g.items) > 0 {
+		if g.currentIndex < len(g.items) {
+			item := g.items[g.currentIndex]
+			g.currentIndex++
+			return item, nil
+		}
+		// No more items
+		g.state = GeneratorCompleted
+		return nil, &StopIteration{}
+	}
+
 	// Handle generator expressions
 	if g.expr != nil && g.evalFunc != nil {
 		// Loop through items until we find one that satisfies the condition
@@ -334,6 +413,288 @@ func (g *Generator) Next() (Value, error) {
 
 	// Fallback for generators without execution state
 	return nil, &StopIteration{Message: "generator has no execution state"}
+}
+
+// nextLazy implements lazy evaluation for multi-clause generator expressions
+func (g *Generator) nextLazy() (Value, error) {
+	// Initialize on first call
+	if !g.lazyState.started {
+		if err := g.initLazyState(); err != nil {
+			return nil, err
+		}
+	}
+
+	// If already exhausted, return StopIteration
+	if g.lazyState.exhausted {
+		g.state = GeneratorCompleted
+		return nil, &StopIteration{}
+	}
+
+	// Loop until we find a value that passes all conditions
+	for {
+		// Try to evaluate current position
+		result, shouldYield, err := g.tryEvaluateLazy()
+		if err != nil {
+			return nil, err
+		}
+
+		if shouldYield {
+			// Found a valid value, advance for next call
+			g.advanceLazy()
+			return result, nil
+		}
+
+		// Current position didn't pass condition, advance
+		if !g.advanceLazy() {
+			// No more combinations
+			g.state = GeneratorCompleted
+			return nil, &StopIteration{}
+		}
+	}
+}
+
+// initLazyState initializes iterators for all clauses
+func (g *Generator) initLazyState() error {
+	numClauses := len(g.clauses)
+	g.lazyState.iterators = make([]Iterator, numClauses)
+	g.lazyState.values = make([]Value, numClauses)
+	g.lazyState.contexts = make([]*Context, numClauses)
+
+	// Create context for first clause
+	g.lazyState.contexts[0] = NewContext(g.context)
+
+	// Evaluate iterable for first clause (may be already evaluated or an expression)
+	iterable, err := g.evalFunc(g.clauses[0].Iterable, g.context)
+	if err != nil {
+		return fmt.Errorf("error evaluating iterable for clause 0: %v", err)
+	}
+
+	// Create iterator for first clause
+	iter, err := g.getIterator(iterable)
+	if err != nil {
+		return err
+	}
+	g.lazyState.iterators[0] = iter
+
+	// Get first value from first iterator
+	val, hasNext := iter.Next()
+	if !hasNext {
+		// Empty iterable
+		g.lazyState.exhausted = true
+		g.lazyState.started = true
+		return nil
+	}
+	g.lazyState.values[0] = val
+
+	// Bind variable for first clause
+	if err := g.bindClauseVar(0, val, g.lazyState.contexts[0]); err != nil {
+		return err
+	}
+
+	// Initialize remaining clauses
+	// If any inner iterable is empty, we need to advance the outer loop
+	for i := 1; i < numClauses; i++ {
+	retryClause:
+		// Create context that inherits from previous clause
+		g.lazyState.contexts[i] = NewContext(g.lazyState.contexts[i-1])
+
+		// Evaluate iterable in parent context (might depend on outer loop vars)
+		iterable, err := g.evalFunc(g.clauses[i].Iterable, g.lazyState.contexts[i-1])
+		if err != nil {
+			return fmt.Errorf("error evaluating iterable for clause %d: %v", i, err)
+		}
+
+		iter, err := g.getIterator(iterable)
+		if err != nil {
+			return err
+		}
+		g.lazyState.iterators[i] = iter
+
+		val, hasNext := iter.Next()
+		if !hasNext {
+			// This inner iterable is empty
+			// We need to advance the previous clause and retry
+			// Find the previous clause to advance
+			foundNonEmpty := false
+			for j := i - 1; j >= 0; j-- {
+				val, hasNext := g.lazyState.iterators[j].Next()
+				if hasNext {
+					// Successfully advanced clause j
+					g.lazyState.values[j] = val
+					if err := g.bindClauseVar(j, val, g.lazyState.contexts[j]); err != nil {
+						return err
+					}
+
+					// Re-initialize all clauses from j+1 to i
+					for k := j + 1; k <= i; k++ {
+						if k == i {
+							// Retry this clause
+							foundNonEmpty = true
+							goto retryClause
+						}
+						// Re-initialize intermediate clause
+						g.lazyState.contexts[k] = NewContext(g.lazyState.contexts[k-1])
+						iterable, err := g.evalFunc(g.clauses[k].Iterable, g.lazyState.contexts[k-1])
+						if err != nil {
+							return fmt.Errorf("error evaluating iterable for clause %d: %v", k, err)
+						}
+						iter, err := g.getIterator(iterable)
+						if err != nil {
+							return err
+						}
+						g.lazyState.iterators[k] = iter
+						val, hasNext := iter.Next()
+						if !hasNext {
+							// This inner loop is also empty, continue advancing outer loops
+							foundNonEmpty = true
+							goto retryClause
+						}
+						g.lazyState.values[k] = val
+						if err := g.bindClauseVar(k, val, g.lazyState.contexts[k]); err != nil {
+							return err
+						}
+					}
+					foundNonEmpty = true
+					break
+				}
+			}
+			if !foundNonEmpty {
+				// All outer loops exhausted
+				g.lazyState.exhausted = true
+				g.lazyState.started = true
+				return nil
+			}
+			continue
+		}
+		g.lazyState.values[i] = val
+
+		if err := g.bindClauseVar(i, val, g.lazyState.contexts[i]); err != nil {
+			return err
+		}
+	}
+
+	g.lazyState.started = true
+	return nil
+}
+
+// getIterator converts a value to an iterator
+func (g *Generator) getIterator(val Value) (Iterator, error) {
+	if iterable, ok := val.(Iterable); ok {
+		return iterable.Iterator(), nil
+	}
+	return nil, fmt.Errorf("value is not iterable: %s", val.Type())
+}
+
+// bindClauseVar binds the loop variable(s) for a clause
+func (g *Generator) bindClauseVar(clauseIdx int, val Value, ctx *Context) error {
+	clause := g.clauses[clauseIdx]
+
+	// Handle tuple unpacking
+	if len(clause.VarNames) > 0 {
+		var values []Value
+		switch v := val.(type) {
+		case TupleValue:
+			values = []Value(v)
+		case *ListValue:
+			values = v.Items()
+		default:
+			return fmt.Errorf("cannot unpack non-sequence %s", val.Type())
+		}
+		if len(values) != len(clause.VarNames) {
+			return fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(clause.VarNames), len(values))
+		}
+		for i, varName := range clause.VarNames {
+			ctx.Define(varName, values[i])
+		}
+	} else {
+		// Single variable
+		ctx.Define(clause.VarName, val)
+	}
+	return nil
+}
+
+// tryEvaluateLazy tries to evaluate the expression at the current position
+// Returns (result, shouldYield, error)
+func (g *Generator) tryEvaluateLazy() (Value, bool, error) {
+	// Check all conditions
+	for i := range g.clauses {
+		if g.clauses[i].Condition != nil {
+			// Evaluate condition in this clause's context
+			condResult, err := g.evalFunc(g.clauses[i].Condition, g.lazyState.contexts[i])
+			if err != nil {
+				return nil, false, fmt.Errorf("error evaluating condition for clause %d: %v", i, err)
+			}
+			if !IsTruthy(condResult) {
+				return nil, false, nil
+			}
+		}
+	}
+
+	// All conditions passed, evaluate expression in innermost context
+	result, err := g.evalFunc(g.expr, g.lazyState.contexts[len(g.clauses)-1])
+	if err != nil {
+		return nil, false, fmt.Errorf("error evaluating expression: %v", err)
+	}
+
+	return result, true, nil
+}
+
+// advanceLazy advances to the next combination of loop values
+// Returns false if no more combinations are available
+func (g *Generator) advanceLazy() bool {
+	numClauses := len(g.clauses)
+
+	// Advance from innermost loop outward (rightmost first)
+	for i := numClauses - 1; i >= 0; i-- {
+		val, hasNext := g.lazyState.iterators[i].Next()
+		if hasNext {
+			// Successfully advanced this level
+			g.lazyState.values[i] = val
+			if err := g.bindClauseVar(i, val, g.lazyState.contexts[i]); err != nil {
+				// Binding error - treat as exhausted
+				g.lazyState.exhausted = true
+				return false
+			}
+
+			// Reset all inner loops
+			for j := i + 1; j < numClauses; j++ {
+				// Re-evaluate iterable (might depend on outer loop vars)
+				iterable, err := g.evalFunc(g.clauses[j].Iterable, g.lazyState.contexts[j-1])
+				if err != nil {
+					// Error evaluating iterable - treat as exhausted
+					g.lazyState.exhausted = true
+					return false
+				}
+
+				iter, err := g.getIterator(iterable)
+				if err != nil {
+					g.lazyState.exhausted = true
+					return false
+				}
+				g.lazyState.iterators[j] = iter
+
+				val, hasNext := iter.Next()
+				if !hasNext {
+					// Inner iterable is empty, continue advancing outer loop
+					break
+				}
+				g.lazyState.values[j] = val
+
+				if err := g.bindClauseVar(j, val, g.lazyState.contexts[j]); err != nil {
+					g.lazyState.exhausted = true
+					return false
+				}
+			}
+
+			return true
+		}
+
+		// This level is exhausted, continue to outer level
+	}
+
+	// All levels exhausted
+	g.lazyState.exhausted = true
+	return false
 }
 
 // SetExecState sets the execution state for generator functions
