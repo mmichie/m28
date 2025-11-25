@@ -1,0 +1,2144 @@
+package parser
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/ast"
+)
+
+// This file contains expression parsing methods for the Python parser.
+// It includes:
+// - Operator precedence climbing (parseExpression, parseOr, parseAnd, parseComparison, etc.)
+// - Primary expressions (literals, identifiers, parenthesized expressions)
+// - Postfix expressions (calls, subscripts, attributes)
+// - Collection literals (lists, dicts, sets, tuples)
+// - Comprehensions and generator expressions
+// - F-string parsing
+// - Lambda expressions
+// - Value conversion helpers
+
+func (p *PythonParser) parseExpression() ast.ASTNode {
+	if err := p.enterParse("parseExpression"); err != nil {
+		p.errors = append(p.errors, err)
+		return nil
+	}
+	defer p.exitParse()
+
+	// Lambda has lowest precedence, handle it first
+	if p.check(TOKEN_LAMBDA) {
+		return p.parseLambda()
+	}
+	return p.parseNamedExpr()
+}
+
+// parseNamedExpr parses: ternary [:= ternary]
+// Python: (x := expr)  -- walrus operator / assignment expression
+func (p *PythonParser) parseNamedExpr() ast.ASTNode {
+	expr := p.parseTernary()
+
+	if p.check(TOKEN_COLONEQUAL) {
+		tok := p.advance()
+
+		// Left side must be an identifier
+		ident, ok := expr.(*ast.Identifier)
+		if !ok {
+			// Error: walrus operator requires identifier on left
+			return nil
+		}
+
+		// Parse the value
+		value := p.parseTernary()
+
+		// Create (:= var value) form
+		// This should both assign and return the value
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(":=", p.makeLocation(tok), ast.SyntaxPython),
+			ident,
+			value,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseTernary parses: or (if or else or)?
+// Python: x if condition else y
+func (p *PythonParser) parseTernary() ast.ASTNode {
+	expr := p.parseOr()
+
+	if p.check(TOKEN_IF) {
+		p.advance() // consume 'if'
+		condition := p.parseOr()
+
+		if !p.check(TOKEN_ELSE) {
+			return nil // Error: expected 'else' after 'if' in ternary
+		}
+		p.advance() // consume 'else'
+
+		elseExpr := p.parseTernary() // Allow nested ternaries
+
+		// Create (if condition expr elseExpr)
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("if", p.makeLocation(p.previous()), ast.SyntaxPython),
+			condition,
+			expr,
+			elseExpr,
+		}, p.makeLocation(p.previous()), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseLambda parses: lambda [params]: expression
+// Supports *args and **kwargs
+func (p *PythonParser) parseLambda() ast.ASTNode {
+	tok := p.expect(TOKEN_LAMBDA)
+
+	// Parse parameters (no parentheses)
+	params := []ast.ASTNode{}
+
+	// If there's a colon immediately, no parameters
+	if !p.check(TOKEN_COLON) {
+		// Parse comma-separated parameter list
+		for {
+			if p.check(TOKEN_COLON) {
+				break
+			}
+
+			// Check for *args
+			if p.check(TOKEN_STAR) {
+				p.advance() // consume *
+				if p.check(TOKEN_IDENTIFIER) {
+					paramTok := p.expect(TOKEN_IDENTIFIER)
+					// Mark as varargs by prefixing with *
+					params = append(params, ast.NewIdentifier("*"+paramTok.Lexeme, p.makeLocation(paramTok), ast.SyntaxPython))
+				}
+				// else it's just * (keyword-only separator) - skip it
+				if !p.check(TOKEN_COMMA) {
+					break
+				}
+				p.advance() // consume comma
+				continue
+			}
+
+			// Check for **kwargs
+			if p.check(TOKEN_DOUBLESTAR) {
+				p.advance() // consume **
+				paramTok := p.expect(TOKEN_IDENTIFIER)
+				// Mark as kwargs by prefixing with **
+				params = append(params, ast.NewIdentifier("**"+paramTok.Lexeme, p.makeLocation(paramTok), ast.SyntaxPython))
+				if !p.check(TOKEN_COMMA) {
+					break
+				}
+				p.advance() // consume comma
+				continue
+			}
+
+			paramTok := p.expect(TOKEN_IDENTIFIER)
+			var param ast.ASTNode = ast.NewIdentifier(paramTok.Lexeme, p.makeLocation(paramTok), ast.SyntaxPython)
+
+			// Check for default value: param=value
+			if p.check(TOKEN_ASSIGN) {
+				p.advance() // consume =
+				// Parse default value expression
+				// Use parseExpression to allow nested lambdas in defaults
+				// The expression will naturally stop at comma (next param) or colon (end of params)
+				defaultValue := p.parseExpression()
+				// Create (param default) list
+				param = ast.NewSExpr([]ast.ASTNode{param, defaultValue}, p.makeLocation(paramTok), ast.SyntaxPython)
+			}
+
+			params = append(params, param)
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance() // consume comma
+		}
+	}
+
+	p.expect(TOKEN_COLON)
+
+	// Parse the body expression (everything after the colon)
+	// Use parseExpression to allow nested lambdas
+	body := p.parseExpression()
+
+	// Create parameter list S-expr
+	paramList := ast.NewSExpr(params, p.makeLocation(tok), ast.SyntaxPython)
+
+	// Create (lambda (params...) body) S-expr
+	return ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier("lambda", p.makeLocation(tok), ast.SyntaxPython),
+		paramList,
+		body,
+	}, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseOr parses: and_expr (or and_expr)*
+func (p *PythonParser) parseOr() ast.ASTNode {
+	expr := p.parseAnd()
+
+	for p.check(TOKEN_OR) {
+		tok := p.advance()
+		right := p.parseAnd()
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("or", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseAnd parses: not_expr (and not_expr)*
+func (p *PythonParser) parseAnd() ast.ASTNode {
+	expr := p.parseNot()
+
+	for p.check(TOKEN_AND) {
+		tok := p.advance()
+		right := p.parseNot()
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseNot parses: not not_expr | comparison
+func (p *PythonParser) parseNot() ast.ASTNode {
+	if p.check(TOKEN_NOT) {
+		tok := p.advance()
+		expr := p.parseNot()
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("not", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return p.parseComparison()
+}
+
+// parseComparison parses: bitwise_or (comp_op bitwise_or)*
+// Python chained comparisons like a == b == c are converted to (and (== a b) (== b c))
+func (p *PythonParser) parseComparison() ast.ASTNode {
+	left := p.parseBitwiseOr()
+
+	// Collect all comparison operators and operands
+	var comparisons []ast.ASTNode
+	var lastLoc *core.SourceLocation
+
+	for p.match(TOKEN_EQUALEQUAL, TOKEN_NOTEQUAL, TOKEN_LESS, TOKEN_LESSEQUAL,
+		TOKEN_GREATER, TOKEN_GREATEREQUAL, TOKEN_IN, TOKEN_NOT_IN, TOKEN_IS, TOKEN_IS_NOT) {
+		tok := p.previous()
+		lastLoc = p.makeLocation(tok)
+		right := p.parseBitwiseOr()
+
+		var op string
+		switch tok.Type {
+		case TOKEN_EQUALEQUAL:
+			op = "=="
+		case TOKEN_NOTEQUAL:
+			op = "!="
+		case TOKEN_LESS:
+			op = "<"
+		case TOKEN_LESSEQUAL:
+			op = "<="
+		case TOKEN_GREATER:
+			op = ">"
+		case TOKEN_GREATEREQUAL:
+			op = ">="
+		case TOKEN_IN:
+			op = "in"
+		case TOKEN_NOT_IN:
+			op = "not in"
+		case TOKEN_IS:
+			op = "is"
+		case TOKEN_IS_NOT:
+			op = "is not"
+		}
+
+		// Create comparison: (op left right)
+		comparison := ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, lastLoc, ast.SyntaxPython),
+			left,
+			right,
+		}, lastLoc, ast.SyntaxPython)
+
+		comparisons = append(comparisons, comparison)
+
+		// For chaining: right becomes the new left
+		left = right
+	}
+
+	// If no comparisons, return the original expression
+	if len(comparisons) == 0 {
+		return left
+	}
+
+	// If only one comparison, return it directly
+	if len(comparisons) == 1 {
+		return comparisons[0]
+	}
+
+	// Multiple comparisons: build (and comp1 comp2 ...)
+	andNodes := make([]ast.ASTNode, len(comparisons)+1)
+	andNodes[0] = ast.NewIdentifier("and", lastLoc, ast.SyntaxPython)
+	copy(andNodes[1:], comparisons)
+
+	return ast.NewSExpr(andNodes, lastLoc, ast.SyntaxPython)
+}
+
+// parseBitwiseOr parses: xor (| xor)*
+func (p *PythonParser) parseBitwiseOr() ast.ASTNode {
+	expr := p.parseBitwiseXor()
+
+	for p.match(TOKEN_PIPE) {
+		tok := p.previous()
+		right := p.parseBitwiseXor()
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("|", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseBitwiseXor parses: and (^ and)*
+func (p *PythonParser) parseBitwiseXor() ast.ASTNode {
+	expr := p.parseBitwiseAnd()
+
+	for p.match(TOKEN_CARET) {
+		tok := p.previous()
+		right := p.parseBitwiseAnd()
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("^", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseBitwiseAnd parses: shift (& shift)*
+func (p *PythonParser) parseBitwiseAnd() ast.ASTNode {
+	expr := p.parseShift()
+
+	for p.match(TOKEN_AMPERSAND) {
+		tok := p.previous()
+		right := p.parseShift()
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("&", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseShift parses: addition ((<<|>>) addition)*
+func (p *PythonParser) parseShift() ast.ASTNode {
+	expr := p.parseAddition()
+
+	for p.match(TOKEN_LSHIFT, TOKEN_RSHIFT) {
+		tok := p.previous()
+		right := p.parseAddition()
+
+		var op string
+		if tok.Type == TOKEN_LSHIFT {
+			op = "<<"
+		} else {
+			op = ">>"
+		}
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseAddition parses: multiplication ((+|-) multiplication)*
+func (p *PythonParser) parseAddition() ast.ASTNode {
+	expr := p.parseMultiplication()
+
+	for p.match(TOKEN_PLUS, TOKEN_MINUS) {
+		tok := p.previous()
+		right := p.parseMultiplication()
+
+		var op string
+		if tok.Type == TOKEN_PLUS {
+			op = "+"
+		} else {
+			op = "-"
+		}
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseMultiplication parses: factor ((*|/|//|%) factor)*
+func (p *PythonParser) parseMultiplication() ast.ASTNode {
+	expr := p.parseFactor()
+
+	for p.match(TOKEN_STAR, TOKEN_SLASH, TOKEN_DOUBLESLASH, TOKEN_PERCENT, TOKEN_AT) {
+		tok := p.previous()
+		right := p.parseFactor()
+
+		var op string
+		switch tok.Type {
+		case TOKEN_STAR:
+			op = "*"
+		case TOKEN_SLASH:
+			op = "/"
+		case TOKEN_DOUBLESLASH:
+			op = "//"
+		case TOKEN_PERCENT:
+			op = "%"
+		case TOKEN_AT:
+			op = "@"
+		}
+
+		expr = ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseFactor parses: (-|+|~) factor | power
+// Python grammar: factor: ('+' | '-' | '~') factor | power
+func (p *PythonParser) parseFactor() ast.ASTNode {
+	// Handle await expression
+	if p.match(TOKEN_AWAIT) {
+		tok := p.previous()
+		expr := p.parseFactor()
+
+		// For now, await just evaluates the expression (no async runtime)
+		// Emit: (await expr)
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("await", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Handle yield expression (used in expression context, not statement)
+	// Example: (yield), (yield x), foo((yield x))
+	if p.match(TOKEN_YIELD) {
+		tok := p.previous()
+
+		// Check for "yield from"
+		var yieldKeyword string
+		if p.check(TOKEN_FROM) {
+			p.advance() // consume FROM
+			yieldKeyword = "yield-from"
+		} else {
+			yieldKeyword = "yield"
+		}
+
+		var args []ast.ASTNode
+		// Parse optional value (not if at end of expression context)
+		if !p.check(TOKEN_RPAREN) && !p.check(TOKEN_COMMA) && !p.check(TOKEN_RBRACKET) &&
+			!p.check(TOKEN_RBRACE) && !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
+			args = append(args, p.parseFactor())
+		}
+
+		// Emit (yield expr) or (yield-from expr) form
+		return ast.NewSExpr(append([]ast.ASTNode{
+			ast.NewIdentifier(yieldKeyword, p.makeLocation(tok), ast.SyntaxPython),
+		}, args...), p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	if p.match(TOKEN_MINUS, TOKEN_PLUS, TOKEN_TILDE) {
+		tok := p.previous()
+		expr := p.parseFactor()
+
+		var op string
+		switch tok.Type {
+		case TOKEN_MINUS:
+			op = "-"
+		case TOKEN_PLUS:
+			op = "+"
+		case TOKEN_TILDE:
+			op = "~"
+		}
+
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return p.parsePower()
+}
+
+// parsePower parses: postfix (** factor)? (right-associative)
+// Python grammar: power: atom_expr ['**' factor]
+// Examples:
+//
+//	2**3**4 == 2**(3**4) = 512
+//	-2**2 == -(2**2) = -4
+//	2**-3 == 2**(-3) = 0.125
+func (p *PythonParser) parsePower() ast.ASTNode {
+	expr := p.parsePostfix()
+
+	if p.match(TOKEN_DOUBLESTAR) {
+		tok := p.previous()
+		// Right-associative: exponent can have unary operators
+		right := p.parseFactor()
+
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("**", p.makeLocation(tok), ast.SyntaxPython),
+			expr,
+			right,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return expr
+}
+
+// parseUnary is now parseFactor (see above)
+// Keeping this for compatibility, but it now just calls parseFactor
+func (p *PythonParser) parseUnary() ast.ASTNode {
+	return p.parseFactor()
+}
+
+// parsePostfix parses: primary (call | subscript | attribute)*
+func (p *PythonParser) parsePostfix() ast.ASTNode {
+	expr := p.parsePrimary()
+
+	for {
+		if p.check(TOKEN_LPAREN) {
+			// Function call
+			expr = p.parseCall(expr)
+		} else if p.check(TOKEN_LBRACKET) {
+			// Subscript
+			expr = p.parseSubscript(expr)
+		} else if p.check(TOKEN_DOT) {
+			// Attribute access
+			expr = p.parseAttribute(expr)
+		} else {
+			break
+		}
+	}
+
+	return expr
+}
+
+// parseCall parses: (args)
+func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
+	tok := p.expect(TOKEN_LPAREN)
+
+	// Log Pythonic function call desugaring
+	core.Log.Trace(core.SubsystemParser, "Desugaring Pythonic function call", "file", p.filename, "callee", fmt.Sprintf("%T", callee), "line", tok.Line, "col", tok.Col)
+
+	args := []ast.ASTNode{callee}
+	var kwargs []ast.ASTNode // keyword arguments as (keyword value) pairs
+
+	if !p.check(TOKEN_RPAREN) {
+		seenKeyword := false
+		for {
+			// Check for **kwargs unpacking
+			if p.check(TOKEN_DOUBLESTAR) {
+				p.advance() // consume **
+				expr := p.parseExpression()
+				// Mark as kwargs unpacking by adding **unpack marker
+				args = append(args,
+					ast.NewIdentifier("**unpack", p.makeLocation(tok), ast.SyntaxPython),
+					expr,
+				)
+			} else if p.check(TOKEN_STAR) {
+				// Check for *args unpacking
+				p.advance() // consume *
+				expr := p.parseExpression()
+				// Mark as args unpacking by adding *unpack marker
+				args = append(args,
+					ast.NewIdentifier("*unpack", p.makeLocation(tok), ast.SyntaxPython),
+					expr,
+				)
+			} else if p.check(TOKEN_IDENTIFIER) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Type == TOKEN_ASSIGN {
+				// Keyword argument: IDENTIFIER = expression
+				seenKeyword = true
+				nameTok := p.advance()
+				p.expect(TOKEN_ASSIGN)
+				value := p.parseExpression()
+
+				// Store as a keyword-value pair
+				kwPair := ast.NewSExpr([]ast.ASTNode{
+					ast.NewLiteral(core.StringValue(nameTok.Lexeme), p.makeLocation(nameTok), ast.SyntaxPython),
+					value,
+				}, p.makeLocation(nameTok), ast.SyntaxPython)
+				kwargs = append(kwargs, kwPair)
+			} else {
+				if seenKeyword {
+					p.error("Positional argument after keyword argument")
+					return nil
+				}
+				expr := p.parseExpression()
+
+				// Check if this is a generator expression: expr for var in iterable
+				if p.check(TOKEN_FOR) {
+					// Parse as generator expression (don't consume closing paren)
+					genExpr := p.parseGeneratorExpressionNoParen(expr, tok)
+					args = append(args, genExpr)
+				} else {
+					args = append(args, expr)
+				}
+			}
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance()
+
+			// Allow trailing comma before closing paren
+			if p.check(TOKEN_RPAREN) {
+				break
+			}
+		}
+	}
+
+	p.expect(TOKEN_RPAREN)
+
+	// If we have keyword arguments, append them as a special **unpack node
+	if len(kwargs) > 0 {
+		// Create a dict-literal for the keyword arguments
+		dictSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+		dictArgs := append([]ast.ASTNode{dictSym}, kwargs...)
+		kwDict := ast.NewSExpr(dictArgs, p.makeLocation(tok), ast.SyntaxPython)
+
+		// Append **unpack marker and the dict
+		args = append(args,
+			ast.NewIdentifier("**unpack", p.makeLocation(tok), ast.SyntaxPython),
+			kwDict,
+		)
+	}
+
+	// Special handling: if callee is an attribute access (. obj "name"),
+	// convert it to a method call form: (. obj "name" args...)
+	// This handles: {}.keys() -> (. {} "keys" __call__) instead of ((. {} "keys"))
+	if sexpr, ok := callee.(*ast.SExpr); ok {
+		if len(sexpr.Elements) >= 3 {
+			if ident, ok := sexpr.Elements[0].(*ast.Identifier); ok && ident.Name == "." {
+				// It's an attribute access: (. obj "name")
+				// Check if this is a simple method call (no unpacking markers)
+				hasUnpacking := false
+				for _, arg := range args[1:] {
+					if id, ok := arg.(*ast.Identifier); ok {
+						if id.Name == "**unpack" || id.Name == "*unpack" {
+							hasUnpacking = true
+							break
+						}
+					}
+				}
+
+				// Only use dot notation for simple cases (no unpacking)
+				if !hasUnpacking {
+					// No args (empty call): convert to (. obj "name" __call__)
+					if len(args) == 1 && len(kwargs) == 0 {
+						return ast.NewSExpr(append(sexpr.Elements,
+							ast.NewLiteral(core.StringValue("__call__"), p.makeLocation(tok), ast.SyntaxPython)),
+							p.makeLocation(tok), ast.SyntaxPython)
+					}
+					// Has simple args: convert to (. obj "name" arg1 arg2 ...)
+					if len(args) > 1 {
+						result := append(sexpr.Elements, args[1:]...)
+						return ast.NewSExpr(result, p.makeLocation(tok), ast.SyntaxPython)
+					}
+				}
+			}
+		}
+	}
+
+	return ast.NewSExpr(args, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseSubscript parses: [index] or [start:stop:step] or [a, b, :, ...] (multi-dimensional)
+func (p *PythonParser) parseSubscript(obj ast.ASTNode) ast.ASTNode {
+	tok := p.expect(TOKEN_LBRACKET)
+
+	// Parse all subscript items (separated by commas)
+	// Each item can be a slice, expression, or ellipsis
+	var items []ast.ASTNode
+
+	if !p.check(TOKEN_RBRACKET) {
+		for {
+			item := p.parseSubscriptItem(tok)
+			items = append(items, item)
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance() // consume comma
+
+			// Check for trailing comma
+			if p.check(TOKEN_RBRACKET) {
+				break
+			}
+		}
+	}
+
+	p.expect(TOKEN_RBRACKET)
+
+	if len(items) == 0 {
+		// Empty brackets []
+		p.error("invalid syntax: empty brackets")
+		return nil
+	}
+
+	// If we have multiple items, wrap them in a tuple
+	var indexExpr ast.ASTNode
+	if len(items) == 1 {
+		indexExpr = items[0]
+	} else {
+		// Create implicit tuple: (tuple-literal item1 item2 ...)
+		tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+		allElements := append([]ast.ASTNode{tupleSym}, items...)
+		indexExpr = ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier("get-item", p.makeLocation(tok), ast.SyntaxPython),
+		obj,
+		indexExpr,
+	}, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseSubscriptItem parses a single subscript item (slice, expression, or ellipsis)
+func (p *PythonParser) parseSubscriptItem(tok Token) ast.ASTNode {
+	var start, stop, step ast.ASTNode
+
+	// Check for Ellipsis (...)
+	if p.check(TOKEN_ELLIPSIS) {
+		p.advance()
+		return ast.NewIdentifier("Ellipsis", p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse start (optional for slices)
+	if !p.check(TOKEN_COLON) {
+		start = p.parseExpression()
+	}
+
+	// Check if this is a slice (has colon)
+	if p.check(TOKEN_COLON) {
+		p.advance() // consume first colon
+
+		// Parse stop (optional)
+		if !p.check(TOKEN_COLON) && !p.check(TOKEN_COMMA) && !p.check(TOKEN_RBRACKET) {
+			stop = p.parseExpression()
+		}
+
+		// Parse step (optional)
+		if p.check(TOKEN_COLON) {
+			p.advance() // consume second colon
+			if !p.check(TOKEN_COMMA) && !p.check(TOKEN_RBRACKET) {
+				step = p.parseExpression()
+			}
+		}
+
+		// Create slice object with None for missing components
+		if start == nil {
+			start = ast.NewLiteral(core.NilValue{}, p.makeLocation(tok), ast.SyntaxPython)
+		}
+		if stop == nil {
+			stop = ast.NewLiteral(core.NilValue{}, p.makeLocation(tok), ast.SyntaxPython)
+		}
+		if step == nil {
+			step = ast.NewLiteral(core.NilValue{}, p.makeLocation(tok), ast.SyntaxPython)
+		}
+
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("slice", p.makeLocation(tok), ast.SyntaxPython),
+			start,
+			stop,
+			step,
+		}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Not a slice, just return the expression
+	return start
+}
+
+// parseAttribute parses: .name
+func (p *PythonParser) parseAttribute(obj ast.ASTNode) ast.ASTNode {
+	tok := p.expect(TOKEN_DOT)
+	name := p.expect(TOKEN_IDENTIFIER)
+
+	return ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier(".", p.makeLocation(tok), ast.SyntaxPython),
+		obj,
+		ast.NewLiteral(core.StringValue(name.Lexeme), p.makeLocation(name), ast.SyntaxPython),
+	}, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// ============================================================================
+// Primary Expression Parsing
+// ============================================================================
+
+// parsePrimary parses atoms: identifiers, literals, parens, lists, dicts, sets
+func (p *PythonParser) parsePrimary() ast.ASTNode {
+	tok := p.peek()
+
+	switch tok.Type {
+	case TOKEN_IDENTIFIER:
+		p.advance()
+		return ast.NewIdentifier(tok.Lexeme, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_NUMBER:
+		p.advance()
+		return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_STRING:
+		p.advance()
+		// Handle implicit string/bytes concatenation (adjacent literals)
+		// Python: "hello" "world" -> "helloworld"
+		// Python: b'\xae\xd5' b'\xed\xb2\x80' -> b'\xae\xd5\xed\xb2\x80'
+
+		// Check if this is a string or bytes literal
+		if strValue, ok := tok.Value.(core.StringValue); ok {
+			// String literal - handle string concatenation
+			// Check if there are any adjacent strings (regular or f-strings)
+			if !p.check(TOKEN_STRING) && !p.check(TOKEN_FSTRING) {
+				// No concatenation needed
+				return ast.NewLiteral(strValue, p.makeLocation(tok), ast.SyntaxPython)
+			}
+
+			// Collect all adjacent string literals (both STRING and FSTRING)
+			parts := []ast.ASTNode{ast.NewLiteral(strValue, p.makeLocation(tok), ast.SyntaxPython)}
+
+			for p.check(TOKEN_STRING) || p.check(TOKEN_FSTRING) {
+				nextTok := p.advance()
+				var nextNode ast.ASTNode
+
+				if nextTok.Type == TOKEN_STRING {
+					// Regular string
+					nextNode = ast.NewLiteral(nextTok.Value, p.makeLocation(nextTok), ast.SyntaxPython)
+				} else {
+					// F-string
+					nextFstring, err := p.parseFStringFromLexeme(nextTok.Lexeme)
+					if err != nil {
+						p.error(fmt.Sprintf("Error parsing f-string: %v", err))
+						return nil
+					}
+					nextNode = p.convertValueToASTNode(nextFstring, nextTok)
+				}
+				parts = append(parts, nextNode)
+			}
+
+			// If all parts are simple strings, concatenate at compile time
+			allSimple := true
+			for _, part := range parts {
+				if _, ok := part.(*ast.Literal); !ok {
+					allSimple = false
+					break
+				}
+			}
+
+			if allSimple {
+				// Concatenate all string literals
+				concatenated := ""
+				for _, part := range parts {
+					lit := part.(*ast.Literal)
+					if str, ok := lit.Value.(core.StringValue); ok {
+						concatenated += string(str)
+					}
+				}
+				return ast.NewLiteral(core.StringValue(concatenated), p.makeLocation(tok), ast.SyntaxPython)
+			}
+
+			// Mix of strings and f-strings - use runtime concatenation with +
+			concatArgs := append([]ast.ASTNode{
+				ast.NewIdentifier("+", p.makeLocation(tok), ast.SyntaxPython),
+			}, parts...)
+			return ast.NewSExpr(concatArgs, p.makeLocation(tok), ast.SyntaxPython)
+		} else if bytesValue, ok := tok.Value.(core.BytesValue); ok {
+			// Bytes literal - handle bytes concatenation
+			// Check if there are any adjacent bytes literals
+			if !p.check(TOKEN_STRING) {
+				// No concatenation needed
+				return ast.NewLiteral(bytesValue, p.makeLocation(tok), ast.SyntaxPython)
+			}
+
+			// Collect all adjacent bytes literals
+			concatenated := []byte(bytesValue)
+
+			for p.check(TOKEN_STRING) {
+				nextTok := p.peek()
+				// Check if next token is also a bytes literal
+				if nextBytes, ok := nextTok.Value.(core.BytesValue); ok {
+					p.advance()
+					concatenated = append(concatenated, []byte(nextBytes)...)
+				} else {
+					// Next token is a string, not bytes - stop here
+					break
+				}
+			}
+
+			return ast.NewLiteral(core.BytesValue(concatenated), p.makeLocation(tok), ast.SyntaxPython)
+		} else {
+			// Unknown token value type
+			return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
+		}
+
+	case TOKEN_FSTRING:
+		p.advance()
+		// Parse f-string using M28's f-string parser
+		fstringValue, err := p.parseFStringFromLexeme(tok.Lexeme)
+		if err != nil {
+			p.error(fmt.Sprintf("Error parsing f-string: %v", err))
+			return nil
+		}
+
+		// Check for adjacent string/f-string concatenation
+		firstNode := p.convertValueToASTNode(fstringValue, tok)
+
+		// Collect any adjacent strings or f-strings
+		parts := []ast.ASTNode{firstNode}
+		for p.check(TOKEN_STRING) || p.check(TOKEN_FSTRING) {
+			nextTok := p.advance()
+			var nextNode ast.ASTNode
+
+			if nextTok.Type == TOKEN_STRING {
+				// Regular string
+				nextNode = ast.NewLiteral(nextTok.Value, p.makeLocation(nextTok), ast.SyntaxPython)
+			} else {
+				// F-string
+				nextFstring, err := p.parseFStringFromLexeme(nextTok.Lexeme)
+				if err != nil {
+					p.error(fmt.Sprintf("Error parsing f-string: %v", err))
+					return nil
+				}
+				nextNode = p.convertValueToASTNode(nextFstring, nextTok)
+			}
+			parts = append(parts, nextNode)
+		}
+
+		// If we have multiple parts, concatenate them with +
+		if len(parts) == 1 {
+			return parts[0]
+		}
+
+		// Build concatenation: (+ part1 part2 part3 ...)
+		concatArgs := append([]ast.ASTNode{
+			ast.NewIdentifier("+", p.makeLocation(tok), ast.SyntaxPython),
+		}, parts...)
+		return ast.NewSExpr(concatArgs, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_TRUE:
+		p.advance()
+		return ast.NewLiteral(core.BoolValue(true), p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_FALSE:
+		p.advance()
+		return ast.NewLiteral(core.BoolValue(false), p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_NIL:
+		p.advance()
+		return ast.NewLiteral(core.None, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_ELLIPSIS:
+		p.advance()
+		return ast.NewLiteral(core.EllipsisValue{}, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_LPAREN:
+		// Parenthesized expression or generator expression
+		return p.parseParenthesized()
+
+	case TOKEN_LBRACKET:
+		// List literal or list comprehension
+		return p.parseListLiteral()
+
+	case TOKEN_LBRACE:
+		// Dict literal, set literal, or comprehension
+		return p.parseDictOrSetLiteral()
+
+	default:
+		p.error(fmt.Sprintf("Unexpected token in expression: %v", tok.Type))
+		return nil
+	}
+}
+
+// parseParenthesized parses: (expression) or tuple literal
+func (p *PythonParser) parseParenthesized() ast.ASTNode {
+	tok := p.expect(TOKEN_LPAREN)
+
+	// Empty parens creates empty tuple
+	if p.check(TOKEN_RPAREN) {
+		p.advance()
+		return ast.NewLiteral(core.TupleValue{}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse first element (could be star expression in tuple)
+	first := p.parseListElement()
+
+	// Check if it's a generator expression (star expressions not allowed)
+	if p.check(TOKEN_FOR) {
+		// Star expressions not allowed in generator expressions
+		if sExpr, ok := first.(*ast.SExpr); ok {
+			if len(sExpr.Elements) > 0 {
+				if id, ok := sExpr.Elements[0].(*ast.Identifier); ok && id.Name == "*unpack-iter" {
+					p.error("Iterable unpacking (*) cannot be used in generator expression")
+					return nil
+				}
+			}
+		}
+		return p.parseGeneratorExpression(first, tok)
+	}
+
+	// Check for comma (tuple literal)
+	if p.check(TOKEN_COMMA) {
+		p.advance()
+
+		elements := []ast.ASTNode{first}
+
+		// Parse remaining elements (if any)
+		for !p.check(TOKEN_RPAREN) && !p.isAtEnd() {
+			elements = append(elements, p.parseListElement())
+
+			if !p.check(TOKEN_COMMA) {
+				break
+			}
+			p.advance()
+		}
+
+		// This is a tuple - create (tuple-literal elem1 elem2 ...)
+		tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+		allElements := append([]ast.ASTNode{tupleSym}, elements...)
+		p.expect(TOKEN_RPAREN)
+		return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// No comma - just a parenthesized expression (or single-element with star, which is an error)
+	p.expect(TOKEN_RPAREN)
+
+	// Check if it's a star expression without comma - that's an error
+	if sExpr, ok := first.(*ast.SExpr); ok {
+		if len(sExpr.Elements) > 0 {
+			if id, ok := sExpr.Elements[0].(*ast.Identifier); ok && id.Name == "*unpack-iter" {
+				p.error("Can't use starred expression here")
+				return nil
+			}
+		}
+	}
+
+	return first
+}
+
+// parseListElement parses a list/tuple element, which can include star expressions
+// Returns the element AST node
+func (p *PythonParser) parseListElement() ast.ASTNode {
+	// Check for star expression: *iterable
+	if p.check(TOKEN_STAR) {
+		starTok := p.advance()
+		expr := p.parseExpression()
+
+		// Create (*unpack-iter expr) to indicate unpacking in literal context
+		return ast.NewSExpr([]ast.ASTNode{
+			ast.NewIdentifier("*unpack-iter", p.makeLocation(starTok), ast.SyntaxPython),
+			expr,
+		}, p.makeLocation(starTok), ast.SyntaxPython)
+	}
+
+	return p.parseExpression()
+}
+
+// parseListLiteral parses: [elements] or [expr for var in iter]
+func (p *PythonParser) parseListLiteral() ast.ASTNode {
+	tok := p.expect(TOKEN_LBRACKET)
+
+	if p.check(TOKEN_RBRACKET) {
+		// Empty list
+		p.advance()
+		return ast.NewLiteral(core.NewList(), p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse first element
+	first := p.parseListElement()
+
+	// Check if it's a comprehension (only if first element is not a star expression)
+	if p.check(TOKEN_FOR) {
+		// Star expressions not allowed in comprehensions
+		if sExpr, ok := first.(*ast.SExpr); ok {
+			if len(sExpr.Elements) > 0 {
+				if id, ok := sExpr.Elements[0].(*ast.Identifier); ok && id.Name == "*unpack-iter" {
+					p.error("Iterable unpacking (*) cannot be used in comprehension")
+					return nil
+				}
+			}
+		}
+		return p.parseListComprehension(first, tok)
+	}
+
+	// Regular list
+	elements := []ast.ASTNode{first}
+
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		if p.check(TOKEN_RBRACKET) {
+			break // Trailing comma
+		}
+		elements = append(elements, p.parseListElement())
+	}
+
+	p.expect(TOKEN_RBRACKET)
+
+	// Create (list-literal elem1 elem2 ...) form
+	// This is a special form that evaluates each element and returns a list
+	listLiteralSym := ast.NewIdentifier("list-literal", p.makeLocation(tok), ast.SyntaxPython)
+	allElements := append([]ast.ASTNode{listLiteralSym}, elements...)
+
+	return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseDictOrSetLiteral parses: {k:v, ...} or {elem, ...}
+func (p *PythonParser) parseDictOrSetLiteral() ast.ASTNode {
+	tok := p.expect(TOKEN_LBRACE)
+
+	if p.check(TOKEN_RBRACE) {
+		// Empty dict (not set, since {} is dict in Python)
+		p.advance()
+		return ast.NewLiteral(core.NewDict(), p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Check for ** unpacking - if so, it's definitely a dict
+	if p.check(TOKEN_DOUBLESTAR) {
+		return p.parseDictLiteral(nil, tok)
+	}
+
+	// Check for * unpacking - if so, it's definitely a set
+	if p.check(TOKEN_STAR) {
+		first := p.parseListElement()
+		return p.parseSetLiteral(first, tok)
+	}
+
+	// Parse first element
+	first := p.parseExpression()
+
+	// Check if it's a dict (has colon) or set (no colon)
+	if p.check(TOKEN_COLON) {
+		return p.parseDictLiteral(first, tok)
+	} else {
+		return p.parseSetLiteral(first, tok)
+	}
+}
+
+// parseDictLiteral parses the rest of: {k: v, ...} or {**d, ...}
+// If firstKey is nil, starts parsing from the beginning (used when ** is first)
+func (p *PythonParser) parseDictLiteral(firstKey ast.ASTNode, tok Token) ast.ASTNode {
+	var entries []ast.ASTNode // Mix of key-value pairs and **unpack markers
+
+	// Handle first key-value pair if provided
+	if firstKey != nil {
+		p.expect(TOKEN_COLON)
+		firstValue := p.parseExpression()
+
+		// Check if it's a dict comprehension
+		if p.check(TOKEN_FOR) {
+			return p.parseDictComprehension(firstKey, firstValue, tok)
+		}
+
+		entries = append(entries, firstKey, firstValue)
+
+		// If no comma, we're done
+		if !p.check(TOKEN_COMMA) {
+			p.expect(TOKEN_RBRACE)
+
+			// Create (dict-literal key1 value1 ...) form
+			dictLiteralSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+			allElements := append([]ast.ASTNode{dictLiteralSym}, entries...)
+			return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+		}
+		p.advance() // consume comma
+	}
+
+	// Parse remaining entries (regular key:value or **dict)
+	for !p.check(TOKEN_RBRACE) {
+		// Check for **dict unpacking
+		if p.check(TOKEN_DOUBLESTAR) {
+			p.advance() // consume **
+			dictExpr := p.parseExpression()
+			// Add **unpack marker followed by the dict expression
+			entries = append(entries,
+				ast.NewIdentifier("**unpack", p.makeLocation(tok), ast.SyntaxPython),
+				dictExpr,
+			)
+		} else {
+			// Regular key: value pair
+			key := p.parseExpression()
+			p.expect(TOKEN_COLON)
+			value := p.parseExpression()
+			entries = append(entries, key, value)
+		}
+
+		// Check for comma
+		if !p.check(TOKEN_COMMA) {
+			break
+		}
+		p.advance()
+
+		// Allow trailing comma
+		if p.check(TOKEN_RBRACE) {
+			break
+		}
+	}
+
+	p.expect(TOKEN_RBRACE)
+
+	// Create (dict-literal key1 value1 **unpack dict1 ...) form
+	dictLiteralSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+	allElements := append([]ast.ASTNode{dictLiteralSym}, entries...)
+
+	return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseSetLiteral parses the rest of: {elem, ...}
+// Supports starred expressions: {1, *other_set, 3}
+func (p *PythonParser) parseSetLiteral(first ast.ASTNode, tok Token) ast.ASTNode {
+	// Check if it's a set comprehension (only if first element is not a star expression)
+	if p.check(TOKEN_FOR) {
+		// Star expressions not allowed in comprehensions
+		if sExpr, ok := first.(*ast.SExpr); ok {
+			if len(sExpr.Elements) > 0 {
+				if id, ok := sExpr.Elements[0].(*ast.Identifier); ok && id.Name == "*unpack-iter" {
+					p.error("Iterable unpacking (*) cannot be used in comprehension")
+					return nil
+				}
+			}
+		}
+		return p.parseSetComprehension(first, tok)
+	}
+
+	// Regular set - collect elements as AST nodes
+	elements := []ast.ASTNode{first}
+
+	for p.check(TOKEN_COMMA) {
+		p.advance()
+		if p.check(TOKEN_RBRACE) {
+			break // Trailing comma
+		}
+		elements = append(elements, p.parseListElement())
+	}
+
+	p.expect(TOKEN_RBRACE)
+
+	// Create (set (list-literal elem1 elem2 ...)) form
+	listLiteralSym := ast.NewIdentifier("list-literal", p.makeLocation(tok), ast.SyntaxPython)
+	listElements := append([]ast.ASTNode{listLiteralSym}, elements...)
+	listLiteral := ast.NewSExpr(listElements, p.makeLocation(tok), ast.SyntaxPython)
+
+	setSym := ast.NewIdentifier("set", p.makeLocation(tok), ast.SyntaxPython)
+	return ast.NewSExpr([]ast.ASTNode{setSym, listLiteral}, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// ============================================================================
+// Comprehension Parsing (stub - to be implemented)
+// ============================================================================
+
+// parseLoopVariables parses the loop variable(s) in a comprehension.
+// Handles:
+//   - Single variable: for x in ...
+//   - Parenthesized tuple: for (x, y) in ...
+//   - Unparenthesized tuple: for x, y in ...
+//   - Nested tuples: for key,(begin,end) in ...
+//
+// Returns the variable string in the format the evaluator expects.
+func (p *PythonParser) parseLoopVariables() string {
+	// Parse a single loop variable element (can be identifier or nested tuple)
+	parseVarElement := func() string {
+		if p.check(TOKEN_LPAREN) {
+			// Parenthesized tuple: (x, y) or (x, (y, z))
+			p.advance() // consume (
+
+			parts := []string{}
+			parts = append(parts, p.parseLoopVariableElement())
+
+			for p.check(TOKEN_COMMA) {
+				p.advance()
+				if p.check(TOKEN_RPAREN) {
+					break // Trailing comma
+				}
+				parts = append(parts, p.parseLoopVariableElement())
+			}
+
+			p.expect(TOKEN_RPAREN)
+
+			// Format as "(x, y, z)"
+			result := "(" + parts[0]
+			for i := 1; i < len(parts); i++ {
+				result += ", " + parts[i]
+			}
+			result += ")"
+			return result
+		}
+
+		// Simple identifier
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		return varTok.Lexeme
+	}
+
+	// Parse first element
+	first := parseVarElement()
+
+	// Check if this is a comma-separated list: for x, y in ... or for key,(begin,end) in ...
+	// Also handle trailing comma: for x, in ... (single-element tuple unpacking)
+	if p.check(TOKEN_COMMA) {
+		parts := []string{first}
+
+		for p.check(TOKEN_COMMA) {
+			p.advance() // consume comma
+
+			// Check if IN follows (trailing comma case: for x, in ...)
+			if p.check(TOKEN_IN) {
+				break
+			}
+
+			next := parseVarElement()
+			parts = append(parts, next)
+		}
+
+		// Format as "(x, y, z)" or "(key, (begin, end))" or "(x,)" for trailing comma
+		result := "(" + parts[0]
+		for i := 1; i < len(parts); i++ {
+			result += ", " + parts[i]
+		}
+		result += ")"
+		return result
+	}
+
+	// Single variable or already parenthesized
+	return first
+}
+
+// parseLoopVariableElement parses a single element of loop variables (can be nested)
+func (p *PythonParser) parseLoopVariableElement() string {
+	if p.check(TOKEN_LPAREN) {
+		// Nested tuple: (x, y)
+		p.advance() // consume (
+
+		parts := []string{}
+		parts = append(parts, p.parseLoopVariableElement())
+
+		for p.check(TOKEN_COMMA) {
+			p.advance()
+			if p.check(TOKEN_RPAREN) {
+				break // Trailing comma
+			}
+			parts = append(parts, p.parseLoopVariableElement())
+		}
+
+		p.expect(TOKEN_RPAREN)
+
+		// Format as "(x, y)"
+		result := "(" + parts[0]
+		for i := 1; i < len(parts); i++ {
+			result += ", " + parts[i]
+		}
+		result += ")"
+		return result
+	}
+
+	// Simple identifier
+	varTok := p.expect(TOKEN_IDENTIFIER)
+	return varTok.Lexeme
+}
+
+func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
+	// [expr for var in iter if condition]
+	// [expr for var1 in iter1 for var2 in iter2 if condition]
+
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
+
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
+
+		variable := p.parseLoopVariables()
+
+		p.expect(TOKEN_IN)
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
+
+		// Parse multiple if clauses: [x for x in y if cond1 if cond2]
+		// Combine them with 'and': (cond1) and (cond2)
+		var condition ast.ASTNode
+		for p.check(TOKEN_IF) {
+			p.advance()
+			// Condition can use full expression parsing (including ternary if needed)
+			nextCond := p.parseOr()
+
+			// Debug: print the condition AST
+			if debugComp := os.Getenv("DEBUG_COMP_PARSE"); debugComp != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG_COMP_PARSE] Parsed condition AST: %#v\n", nextCond)
+				fmt.Fprintf(os.Stderr, "[DEBUG_COMP_PARSE] Condition string: %s\n", nextCond.String())
+			}
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
+	}
+
+	p.expect(TOKEN_RBRACKET)
+
+	// Use the multi-clause constructor
+	return ast.NewComprehensionFormMulti(
+		ast.ListComp,
+		element, // Element expression
+		nil,     // KeyExpr (not used for list comp)
+		nil,     // ValueExpr (not used for list comp)
+		clauses,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
+}
+
+func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token) ast.ASTNode {
+	// {k: v for var in iter if condition}
+	// {k: v for var1 in iter1 for var2 in iter2 if condition}
+
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
+
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
+
+		variable := p.parseLoopVariables()
+
+		p.expect(TOKEN_IN)
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
+
+		// Parse multiple if clauses: comprehension if cond1 if cond2
+		// Combine them with 'and': (cond1) and (cond2)
+		var condition ast.ASTNode
+		for p.check(TOKEN_IF) {
+			p.advance()
+			nextCond := p.parseOr()
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
+	}
+
+	p.expect(TOKEN_RBRACE)
+
+	return ast.NewComprehensionFormMulti(
+		ast.DictComp,
+		nil,   // Element (not used for dict comp)
+		key,   // KeyExpr
+		value, // ValueExpr
+		clauses,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
+}
+
+func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast.ASTNode {
+	// {expr for var in iter if condition}
+	// {expr for var1 in iter1 for var2 in iter2 if condition}
+
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
+
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
+
+		variable := p.parseLoopVariables()
+
+		p.expect(TOKEN_IN)
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
+
+		// Parse multiple if clauses: comprehension if cond1 if cond2
+		// Combine them with 'and': (cond1) and (cond2)
+		var condition ast.ASTNode
+		for p.check(TOKEN_IF) {
+			p.advance()
+			nextCond := p.parseOr()
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
+	}
+
+	p.expect(TOKEN_RBRACE)
+
+	return ast.NewComprehensionFormMulti(
+		ast.SetComp,
+		element, // Element expression
+		nil,     // KeyExpr (not used for set comp)
+		nil,     // ValueExpr (not used for set comp)
+		clauses,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
+}
+
+func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) ast.ASTNode {
+	// (expr for var in iter if condition)
+	// (expr for var1 in iter1 for var2 in iter2)
+
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
+
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
+
+		variable := p.parseLoopVariables()
+
+		p.expect(TOKEN_IN)
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
+
+		// Parse multiple if clauses: comprehension if cond1 if cond2
+		// Combine them with 'and': (cond1) and (cond2)
+		var condition ast.ASTNode
+		for p.check(TOKEN_IF) {
+			p.advance()
+			nextCond := p.parseOr()
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
+	}
+
+	p.expect(TOKEN_RPAREN)
+
+	return ast.NewComprehensionFormMulti(
+		ast.GeneratorComp,
+		element, // Element expression
+		nil,     // KeyExpr (not used for generator)
+		nil,     // ValueExpr (not used for generator)
+		clauses,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
+}
+
+// parseGeneratorExpressionNoParen parses a generator expression without consuming closing paren
+// Used when generator is inside function call: func(expr for var in iter)
+func (p *PythonParser) parseGeneratorExpressionNoParen(element ast.ASTNode, tok Token) ast.ASTNode {
+	// expr for var in iter if condition (no closing paren)
+	// or: expr for (var1, var2) in iter
+	// or: expr for var1, var2 in iter
+	// or: expr for var1 in iter1 for var2 in iter2 (multiple for clauses)
+
+	// Parse all for clauses
+	clauses := []ast.ComprehensionClause{}
+
+	for p.check(TOKEN_FOR) {
+		p.advance() // consume FOR
+
+		variable := p.parseLoopVariables()
+
+		p.expect(TOKEN_IN)
+		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
+		iterable := p.parseOr()
+
+		// Parse multiple if clauses: comprehension if cond1 if cond2
+		// Combine them with 'and': (cond1) and (cond2)
+		var condition ast.ASTNode
+		for p.check(TOKEN_IF) {
+			p.advance()
+			nextCond := p.parseOr()
+
+			// Combine with previous condition using 'and'
+			if condition == nil {
+				condition = nextCond
+			} else {
+				// Create: (and condition nextCond)
+				condition = ast.NewSExpr([]ast.ASTNode{
+					ast.NewIdentifier("and", p.makeLocation(tok), ast.SyntaxPython),
+					condition,
+					nextCond,
+				}, p.makeLocation(tok), ast.SyntaxPython)
+			}
+		}
+
+		clauses = append(clauses, ast.ComprehensionClause{
+			Variable:  variable,
+			Iterable:  iterable,
+			Condition: condition,
+		})
+	}
+
+	// Don't consume closing paren - let the caller handle it
+
+	return ast.NewComprehensionFormMulti(
+		ast.GeneratorComp,
+		element, // Element expression
+		nil,     // KeyExpr (not used for generator)
+		nil,     // ValueExpr (not used for generator)
+		clauses,
+		p.makeLocation(tok),
+		ast.SyntaxPython,
+	)
+}
+
+// ============================================================================
+// Block and Decorator Parsing
+// ============================================================================
+
+// parseBlock parses a colon-delimited block: COLON NEWLINE INDENT statements DEDENT
+func (p *PythonParser) interpretFStringEscapes(s string) string {
+	var result strings.Builder
+	i := 0
+	for i < len(s) {
+		if s[i] == '\\' && i+1 < len(s) {
+			i++ // skip backslash
+			switch s[i] {
+			case 'n':
+				result.WriteByte('\n')
+			case 't':
+				result.WriteByte('\t')
+			case 'r':
+				result.WriteByte('\r')
+			case '\\':
+				result.WriteByte('\\')
+			case '\'':
+				result.WriteByte('\'')
+			case '"':
+				result.WriteByte('"')
+			case 'a':
+				result.WriteByte('\a')
+			case 'b':
+				result.WriteByte('\b')
+			case 'f':
+				result.WriteByte('\f')
+			case 'v':
+				result.WriteByte('\v')
+			case '0':
+				result.WriteByte('\x00')
+			default:
+				// Unknown escape - include backslash and character
+				result.WriteByte('\\')
+				result.WriteByte(s[i])
+			}
+			i++
+		} else {
+			result.WriteByte(s[i])
+			i++
+		}
+	}
+	return result.String()
+}
+
+// parseFStringFromLexeme parses an f-string from its full lexeme (e.g., f"hello {x}" or fr"raw {x}")
+// using Python expression syntax for expressions inside {}
+func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error) {
+	// Find the quote character (skip past prefix: f, fr, rf, etc.)
+	if len(lexeme) < 2 {
+		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+	}
+
+	// Skip past all prefix characters (f, r, b combinations)
+	quoteIdx := 1
+	for quoteIdx < len(lexeme) && (lexeme[quoteIdx] == 'f' || lexeme[quoteIdx] == 'r' || lexeme[quoteIdx] == 'b') {
+		quoteIdx++
+	}
+
+	if quoteIdx >= len(lexeme) {
+		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+	}
+
+	var quoteChar byte
+	if lexeme[quoteIdx] == '"' {
+		quoteChar = '"'
+	} else if lexeme[quoteIdx] == '\'' {
+		quoteChar = '\''
+	} else {
+		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+	}
+
+	// Extract the string content (without quotes and prefix)
+	quoteIdx++ // skip opening quote
+	var endIdx int
+	if quoteIdx < len(lexeme) && lexeme[quoteIdx] == quoteChar && lexeme[quoteIdx+1] == quoteChar {
+		// Triple-quoted string
+		quoteIdx += 2            // skip next two quotes
+		endIdx = len(lexeme) - 3 // before closing """
+	} else {
+		endIdx = len(lexeme) - 1 // before closing quote
+	}
+
+	content := lexeme[quoteIdx:endIdx]
+
+	// Parse the f-string content using Python expression parser
+	return p.parsePythonFString(content)
+}
+
+// parsePythonFString parses f-string content and returns a format expression
+func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
+	var parts []core.Value
+	i := 0
+
+	for i < len(content) {
+		// Look for {
+		if content[i] != '{' {
+			// Find the next { or end of string
+			start := i
+			for i < len(content) && content[i] != '{' && content[i] != '}' {
+				i++
+			}
+
+			// Handle }} (escaped })
+			if i < len(content) && content[i] == '}' {
+				if i+1 < len(content) && content[i+1] == '}' {
+					// Interpret escapes in the string part before }}
+					interpretedStr := p.interpretFStringEscapes(content[start : i+1])
+					parts = append(parts, core.StringValue(interpretedStr))
+					i += 2
+					continue
+				}
+				return nil, fmt.Errorf("single '}' is not allowed in f-string")
+			}
+
+			// Add literal string part (with escape sequences interpreted)
+			if i > start {
+				interpretedStr := p.interpretFStringEscapes(content[start:i])
+				parts = append(parts, core.StringValue(interpretedStr))
+			}
+			continue
+		}
+
+		// Found {
+		// Check for {{ (escaped {)
+		if i+1 < len(content) && content[i+1] == '{' {
+			parts = append(parts, core.StringValue("{"))
+			i += 2
+			continue
+		}
+
+		// Parse expression
+		i++ // skip {
+		exprStart := i
+		depth := 1
+		inString := false
+		var stringChar byte
+
+		// Find matching }
+		for i < len(content) && depth > 0 {
+			ch := content[i]
+
+			if inString {
+				if ch == '\\' {
+					i += 2 // skip escaped character
+					continue
+				}
+				if ch == stringChar {
+					inString = false
+				}
+				i++
+				continue
+			}
+
+			if ch == '"' || ch == '\'' {
+				inString = true
+				stringChar = ch
+				i++
+				continue
+			}
+
+			if ch == '{' {
+				depth++
+			} else if ch == '}' {
+				depth--
+			}
+			i++
+		}
+
+		if depth != 0 {
+			return nil, fmt.Errorf("unmatched '{' in f-string")
+		}
+
+		// Extract expression (i points after the closing })
+		fullExprStr := content[exprStart : i-1]
+
+		// Parse conversion specifier (!r, !s, !a) and format spec (:...)
+		// Must respect nested structures ([], (), {})
+		exprStr := fullExprStr
+		var conversion string
+		var formatSpec string
+
+		// Find ! and : at top level (not inside nested structures)
+		bangIdx := -1
+		colonIdx := -1
+		braceDepth := 0
+		parenDepth := 0
+		bracketDepth := 0
+		inStr := false
+		var strChar byte
+
+		for j := len(fullExprStr) - 1; j >= 0; j-- {
+			ch := fullExprStr[j]
+
+			// Handle string escapes
+			if j > 0 && fullExprStr[j-1] == '\\' {
+				continue
+			}
+
+			// Track string state
+			if ch == '"' || ch == '\'' {
+				if inStr && ch == strChar {
+					inStr = false
+				} else if !inStr {
+					inStr = true
+					strChar = ch
+				}
+				continue
+			}
+
+			if inStr {
+				continue
+			}
+
+			// Track nesting depth
+			switch ch {
+			case '}':
+				braceDepth++
+			case '{':
+				braceDepth--
+			case ')':
+				parenDepth++
+			case '(':
+				parenDepth--
+			case ']':
+				bracketDepth++
+			case '[':
+				bracketDepth--
+			case ':':
+				if braceDepth == 0 && parenDepth == 0 && bracketDepth == 0 && colonIdx == -1 {
+					colonIdx = j
+				}
+			case '!':
+				if braceDepth == 0 && parenDepth == 0 && bracketDepth == 0 && bangIdx == -1 {
+					bangIdx = j
+				}
+			}
+		}
+
+		// Extract conversion and format spec if found at top level
+		if colonIdx >= 0 {
+			formatSpec = fullExprStr[colonIdx+1:]
+			exprStr = fullExprStr[:colonIdx]
+		}
+
+		if bangIdx >= 0 && bangIdx < len(exprStr) && bangIdx+1 < len(fullExprStr) {
+			conv := fullExprStr[bangIdx+1:]
+			// If we also have a colonIdx, the conversion is between ! and :
+			if colonIdx >= 0 {
+				conv = fullExprStr[bangIdx+1 : colonIdx]
+			}
+			if conv == "r" || conv == "s" || conv == "a" {
+				conversion = conv
+				exprStr = fullExprStr[:bangIdx]
+			}
+		}
+
+		// Parse the expression using Python parser
+		// Create a temporary tokenizer and parser for the expression
+		tempTokenizer := NewPythonTokenizer(exprStr)
+		tokens, err := tempTokenizer.Tokenize()
+		if err != nil {
+			return nil, fmt.Errorf("error tokenizing f-string expression: %v", err)
+		}
+
+		tempParser := NewPythonParser(tokens, "<f-string>", exprStr)
+		exprNode := tempParser.parseExpression()
+		if len(tempParser.errors) > 0 {
+			return nil, fmt.Errorf("error parsing f-string expression: %v", tempParser.errors[0])
+		}
+
+		// Convert AST node to IR for evaluation
+		exprValue, err := p.astNodeToValue(exprNode)
+		if err != nil {
+			return nil, fmt.Errorf("error converting f-string expression: %v", err)
+		}
+
+		// If we have conversion or format spec, wrap in format-expr
+		if conversion != "" || formatSpec != "" {
+			formatExpr := []core.Value{core.SymbolValue("format-expr"), exprValue}
+			if formatSpec != "" {
+				formatExpr = append(formatExpr, core.StringValue(formatSpec))
+			}
+			if conversion != "" {
+				formatExpr = append(formatExpr, core.StringValue("!"+conversion))
+			}
+			parts = append(parts, core.NewList(formatExpr...))
+		} else {
+			parts = append(parts, exprValue)
+		}
+	}
+
+	// If no expressions, return simple string
+	if len(parts) == 0 {
+		return core.StringValue(""), nil
+	}
+	if len(parts) == 1 {
+		if str, ok := parts[0].(core.StringValue); ok {
+			return str, nil
+		}
+	}
+
+	// Build format expression using str-format
+	// Format: (str-format part1 part2 ...)
+	result := core.NewList(core.SymbolValue("str-format"))
+	for _, part := range parts {
+		result.Append(part)
+	}
+	return result, nil
+}
+
+// astNodeToValue converts an AST node to a core.Value for f-string expressions
+func (p *PythonParser) astNodeToValue(node ast.ASTNode) (core.Value, error) {
+	if node == nil {
+		return nil, fmt.Errorf("nil AST node")
+	}
+
+	switch n := node.(type) {
+	case *ast.Literal:
+		return n.Value, nil
+	case *ast.Identifier:
+		return core.SymbolValue(n.Name), nil
+	case *ast.SExpr:
+		var elements []core.Value
+		for _, elem := range n.Elements {
+			val, err := p.astNodeToValue(elem)
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, val)
+		}
+		return core.NewList(elements...), nil
+	case *ast.ComprehensionForm:
+		// Convert comprehension to IR: (comprehension kind element iterable [condition])
+		return p.comprehensionToValue(n)
+	case *ast.AssignForm:
+		// Convert assignment: (= target value)
+		target, err := p.astNodeToValue(n.Target)
+		if err != nil {
+			return nil, err
+		}
+		value, err := p.astNodeToValue(n.Value)
+		if err != nil {
+			return nil, err
+		}
+		return core.NewList(core.SymbolValue("="), target, value), nil
+	default:
+		// For other node types, try to convert via the IR
+		return nil, fmt.Errorf("unsupported AST node type in f-string: %T", node)
+	}
+}
+
+// comprehensionToValue converts a ComprehensionForm to a core.Value
+func (p *PythonParser) comprehensionToValue(comp *ast.ComprehensionForm) (core.Value, error) {
+	// Build comprehension IR based on kind
+	var kindSym string
+	switch comp.Kind {
+	case ast.ListComp:
+		kindSym = "list-comp"
+	case ast.SetComp:
+		kindSym = "set-comp"
+	case ast.DictComp:
+		kindSym = "dict-comp"
+	case ast.GeneratorComp:
+		kindSym = "generator-exp"
+	default:
+		return nil, fmt.Errorf("unknown comprehension kind: %v", comp.Kind)
+	}
+
+	// Convert element/key/value expressions
+	var exprValue core.Value
+	var err error
+
+	if comp.Kind == ast.DictComp {
+		// Dict comprehension: {key: value for ...}
+		keyVal, err := p.astNodeToValue(comp.KeyExpr)
+		if err != nil {
+			return nil, err
+		}
+		valVal, err := p.astNodeToValue(comp.ValueExpr)
+		if err != nil {
+			return nil, err
+		}
+		exprValue = core.NewList(keyVal, valVal)
+	} else {
+		// List/set/generator: [expr for ...]
+		exprValue, err = p.astNodeToValue(comp.Element)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Build the comprehension form
+	// Format depends on number of clauses:
+	// Single: (list-comp expr var iterable [condition])
+	// Multi: (list-comp expr [[var1 iterable1 [condition1]] [var2 iterable2] ...])
+
+	if len(comp.Clauses) == 1 {
+		// Single clause format: (list-comp expr var iterable [condition])
+		clause := comp.Clauses[0]
+		iterVal, err := p.astNodeToValue(clause.Iterable)
+		if err != nil {
+			return nil, err
+		}
+
+		result := core.NewList(
+			core.SymbolValue(kindSym),
+			exprValue,
+			core.SymbolValue(clause.Variable),
+			iterVal,
+		)
+
+		// Add condition if present
+		if clause.Condition != nil {
+			condVal, err := p.astNodeToValue(clause.Condition)
+			if err != nil {
+				return nil, err
+			}
+			result.Append(condVal)
+		}
+
+		return result, nil
+	}
+
+	// Multi-clause format: (list-comp expr [[var1 iterable1] [var2 iterable2] ...])
+	result := core.NewList(core.SymbolValue(kindSym), exprValue)
+	clausesList := core.NewList()
+
+	for _, clause := range comp.Clauses {
+		iterVal, err := p.astNodeToValue(clause.Iterable)
+		if err != nil {
+			return nil, err
+		}
+
+		clauseList := core.NewList(
+			core.SymbolValue(clause.Variable),
+			iterVal,
+		)
+
+		// Add condition if present
+		if clause.Condition != nil {
+			condVal, err := p.astNodeToValue(clause.Condition)
+			if err != nil {
+				return nil, err
+			}
+			clauseList.Append(condVal)
+		}
+
+		clausesList.Append(clauseList)
+	}
+
+	result.Append(clausesList)
+	return result, nil
+}
+
+// convertValueToASTNode converts a core.Value to an ASTNode
+// This is needed for f-strings which return IR values
+func (p *PythonParser) convertValueToASTNode(value core.Value, tok Token) ast.ASTNode {
+	switch v := value.(type) {
+	case core.StringValue:
+		// Simple string result - return as literal
+		return ast.NewLiteral(v, p.makeLocation(tok), ast.SyntaxPython)
+
+	case *core.ListValue:
+		// F-string with interpolations returns a list like (format ...)
+		// Convert to SExpr
+		nodes := make([]ast.ASTNode, v.Len())
+		for i, elem := range v.Items() {
+			nodes[i] = p.convertValueToASTNode(elem, tok)
+		}
+		return ast.NewSExpr(nodes, p.makeLocation(tok), ast.SyntaxPython)
+
+	case core.SymbolValue:
+		return ast.NewIdentifier(string(v), p.makeLocation(tok), ast.SyntaxPython)
+
+	default:
+		// For other types, wrap in literal
+		return ast.NewLiteral(v, p.makeLocation(tok), ast.SyntaxPython)
+	}
+}
