@@ -1704,8 +1704,19 @@ func Is() func([]core.Value, *core.Context) (core.Value, error) {
 		}
 
 		// For value types (numbers, strings), Python interns small values
-		// For simplicity, we'll say they're only identical if equal
-		// In real Python: small ints (-5 to 256) and some strings are interned
+		// Handle string interning - Python interns string literals
+		leftStr, leftIsStr := left.(core.StringValue)
+		rightStr, rightIsStr := right.(core.StringValue)
+		if leftIsStr && rightIsStr {
+			// In Python, string literals and many strings are interned
+			// Two equal strings should be considered the same object
+			return core.BoolValue(string(leftStr) == string(rightStr)), nil
+		}
+
+		// For numbers, only small integers are interned in Python (-5 to 256)
+		// For simplicity, we don't implement number interning yet
+		// This means 'x is y' for numbers will generally be False unless
+		// they're actually the same object in memory
 		return core.BoolValue(false), nil
 	}
 }
