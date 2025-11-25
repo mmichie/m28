@@ -15,49 +15,50 @@ type ModuleInitializer func() *core.DictValue
 // Pure Python stdlib modules (.py files) should run directly without stubs
 var builtinModules = map[string]ModuleInitializer{
 	// Built-in C extension modules
-	"posix":             InitPosixModule,            // C extension for Unix - used by Python's os.py
-	"sys":               InitSysModule,              // Built-in module
-	"io":                InitIOModule,               // Built-in module
-	"_io":               InitIOModule,               // C extension for io.py (same as io for now)
-	"time":              InitTimeModule,             // Built-in C module
-	"math":              InitMathModule,             // Built-in C module
-	"errno":             InitErrnoModule,            // Built-in C module
-	"itertools":         InitItertoolsModule,        // Built-in C module
-	"_collections":      InitCollectionsModule,      // C extension module for collections.py
-	"_weakref":          InitWeakrefModule,          // C extension module for weakref.py
-	"_thread":           InitThreadModule,           // C extension module for threading.py
-	"_functools":        Init_FunctoolsModule,       // C extension module for functools.py
-	"_signal":           Init_SignalModule,          // C extension module for signal.py
-	"_string":           Init_StringModule,          // C extension module for string.py
-	"_pylong":           Init_PylongModule,          // Python module for huge integer optimizations
-	"_codecs":           InitCodecsModule,           // C extension module for codecs.py
-	"enum":              InitEnumModule,             // Stub for enum.py (provides basic enum support)
-	"_sre":              Init_SREModule,             // C extension module for re (regex engine)
-	"re._parser":        Init_REParserModule,        // C extension module for re._parser
-	"_tokenize":         Init_TokenizeModule,        // C extension module for tokenize.py
-	"_ast":              Init_ASTModule,             // C extension module for ast.py (AST node types)
-	"_imp":              Init_ImpModule,             // C extension module for import machinery
-	"_warnings":         InitWarningsModule,         // C extension module for warnings.py (full implementation)
-	"_heapq":            Init_HeapqModule,           // C extension module for heapq.py (priority queue)
-	"_frozen_importlib": Init_FrozenImportlibModule, // C extension stub for CPython's frozen import machinery
-	"marshal":           InitMarshalModule,          // C extension module for bytecode serialization
-	"_opcode":           InitOpcodeModule,           // C extension module for bytecode opcodes
-	"_operator":         InitOperatorModule,         // C extension module for operator functions
-	"_stat":             InitStatModule,             // C extension module for file stat constants
-	"_abc":              InitAbcModule,              // C extension module for abstract base classes
-	"unicodedata":       InitUnicodedataModule,      // C extension module for Unicode normalization
-	"_struct":           InitStructModule,           // C extension module for binary data packing/unpacking
-	"atexit":            InitAtexitModule,           // Built-in C module for exit handlers
-	"_socket":           Init_SocketModule,          // C extension module for socket operations
-	"select":            InitSelectModule,           // C extension module for I/O multiplexing
-	"_posixsubprocess":  Init_PosixsubprocessModule, // C extension module for subprocess
-	"_contextvars":      Init_ContextvarsModule,     // C extension module for context variables
-	"_asyncio":          Init_AsyncioModule,         // C extension module for fast asyncio primitives
-	"_typing":           Init_TypingModule,          // C extension module for core type system primitives
-	"urllib.parse":      Init_UrllibParseModule,     // Minimal stub for urllib.parse (needed by pathlib)
-	"_ctypes":           Init_CtypesModule,          // C extension module for FFI (Foreign Function Interface)
-	"asyncio":           Init_PythonAsyncioModule,   // Minimal stub for asyncio package (avoids circular imports)
-	"ssl":               InitSSLModule,              // Stub for ssl module with exception classes (needed by asyncio.sslproto)
+	"posix":                      InitPosixModule,                    // C extension for Unix - used by Python's os.py
+	"sys":                        InitSysModule,                      // Built-in module
+	"io":                         InitIOModule,                       // Built-in module
+	"_io":                        InitIOModule,                       // C extension for io.py (same as io for now)
+	"time":                       InitTimeModule,                     // Built-in C module
+	"math":                       InitMathModule,                     // Built-in C module
+	"errno":                      InitErrnoModule,                    // Built-in C module
+	"itertools":                  InitItertoolsModule,                // Built-in C module
+	"_collections":               InitCollectionsModule,              // C extension module for collections.py
+	"_weakref":                   InitWeakrefModule,                  // C extension module for weakref.py
+	"_thread":                    InitThreadModule,                   // C extension module for threading.py
+	"_functools":                 Init_FunctoolsModule,               // C extension module for functools.py
+	"_signal":                    Init_SignalModule,                  // C extension module for signal.py
+	"_string":                    Init_StringModule,                  // C extension module for string.py
+	"_pylong":                    Init_PylongModule,                  // Python module for huge integer optimizations
+	"_codecs":                    InitCodecsModule,                   // C extension module for codecs.py
+	"enum":                       InitEnumModule,                     // Stub for enum.py (provides basic enum support)
+	"_sre":                       Init_SREModule,                     // C extension module for re (regex engine)
+	"re._parser":                 Init_REParserModule,                // C extension module for re._parser
+	"_tokenize":                  Init_TokenizeModule,                // C extension module for tokenize.py
+	"_ast":                       Init_ASTModule,                     // C extension module for ast.py (AST node types)
+	"_imp":                       Init_ImpModule,                     // C extension module for import machinery
+	"_warnings":                  InitWarningsModule,                 // C extension module for warnings.py (full implementation)
+	"_heapq":                     Init_HeapqModule,                   // C extension module for heapq.py (priority queue)
+	"_frozen_importlib":          Init_FrozenImportlibModule,         // C extension stub for CPython's frozen import machinery
+	"_frozen_importlib_external": Init_FrozenImportlibExternalModule, // C extension stub for CPython's frozen external import machinery
+	"marshal":                    InitMarshalModule,                  // C extension module for bytecode serialization
+	"_opcode":                    InitOpcodeModule,                   // C extension module for bytecode opcodes
+	"_operator":                  InitOperatorModule,                 // C extension module for operator functions
+	"_stat":                      InitStatModule,                     // C extension module for file stat constants
+	"_abc":                       InitAbcModule,                      // C extension module for abstract base classes
+	"unicodedata":                InitUnicodedataModule,              // C extension module for Unicode normalization
+	"_struct":                    InitStructModule,                   // C extension module for binary data packing/unpacking
+	"atexit":                     InitAtexitModule,                   // Built-in C module for exit handlers
+	"_socket":                    Init_SocketModule,                  // C extension module for socket operations
+	"select":                     InitSelectModule,                   // C extension module for I/O multiplexing
+	"_posixsubprocess":           Init_PosixsubprocessModule,         // C extension module for subprocess
+	"_contextvars":               Init_ContextvarsModule,             // C extension module for context variables
+	"_asyncio":                   Init_AsyncioModule,                 // C extension module for fast asyncio primitives
+	"_typing":                    Init_TypingModule,                  // C extension module for core type system primitives
+	"urllib.parse":               Init_UrllibParseModule,             // Minimal stub for urllib.parse (needed by pathlib)
+	"_ctypes":                    Init_CtypesModule,                  // C extension module for FFI (Foreign Function Interface)
+	"asyncio":                    Init_PythonAsyncioModule,           // Minimal stub for asyncio package (avoids circular imports)
+	"ssl":                        InitSSLModule,                      // Stub for ssl module with exception classes (needed by asyncio.sslproto)
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
