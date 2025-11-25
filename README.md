@@ -131,6 +131,7 @@ Everything is an expression in prefix notation:
 - [Language Guide](docs/language-guide.md) - Comprehensive language reference
 - [Tutorial](docs/tutorial.md) - Step-by-step introduction
 - [Standard Library](docs/stdlib.md) - Built-in functions and modules
+- [Debugging Guide](docs/debugging.md) - Debug flags, logging system, and troubleshooting
 - [Examples](examples/) - Code examples and patterns
 
 ## Examples
