@@ -14,17 +14,24 @@ func TestInitLogger_DefaultsToInfo(t *testing.T) {
 		t.Fatal("InitLogger returned nil")
 	}
 
-	// Info should log
-	logger.Info(SubsystemParser, "test message")
-	if !strings.Contains(buf.String(), "test message") {
-		t.Error("Info message was not logged")
+	// Error should log (default is error level)
+	logger.Error(SubsystemParser, "error message")
+	if !strings.Contains(buf.String(), "error message") {
+		t.Error("Error message was not logged")
 	}
 
-	// Debug should not log at info level
+	// Info should NOT log at error level
+	buf.Reset()
+	logger.Info(SubsystemParser, "info message")
+	if strings.Contains(buf.String(), "info message") {
+		t.Error("Info message was logged at error level")
+	}
+
+	// Debug should NOT log at error level
 	buf.Reset()
 	logger.Debug(SubsystemParser, "debug message")
 	if strings.Contains(buf.String(), "debug message") {
-		t.Error("Debug message was logged at info level")
+		t.Error("Debug message was logged at error level")
 	}
 }
 

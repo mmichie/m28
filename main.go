@@ -33,7 +33,7 @@ var (
 
 	// Debug/logging flags
 	debugSubsystems = flag.String("debug", "", "Enable debug logging for subsystems (comma-separated: parser,import,eval,builtin,scope or 'all')")
-	debugLevel      = flag.String("debug-level", "info", "Set logging level (debug, info, warn, error)")
+	debugLevel      = flag.String("debug-level", "error", "Set logging level (debug, info, warn, error)")
 	logFormat       = flag.String("log-format", "text", "Set log format (text, json)")
 	traceMode       = flag.Bool("trace", false, "Enable trace-level logging (very verbose)")
 	verboseShort    = flag.Bool("v", false, "Verbose output (equivalent to --debug-level=debug)")

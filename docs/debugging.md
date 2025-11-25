@@ -35,9 +35,10 @@ m28 --log-format json --debug all script.py > debug.jsonl
   - Multiple subsystems (comma-separated): `--debug parser,import,eval`
   - All subsystems: `--debug all`
 
-- `--debug-level LEVEL` - Set the minimum log level (default: `info`)
+- `--debug-level LEVEL` - Set the minimum log level (default: `error`)
   - Levels: `debug`, `info`, `warn`, `error`
   - Example: `--debug-level debug`
+  - Note: Default is `error` (silent except for errors, following Unix philosophy)
 
 - `--log-format FORMAT` - Set the output format (default: `text`)
   - `text` - Human-readable colored text output

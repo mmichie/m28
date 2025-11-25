@@ -61,7 +61,7 @@ func InitLogger(level string, format string, subsystems []string, output io.Writ
 	case "error":
 		slogLevel = slog.LevelError
 	default:
-		slogLevel = slog.LevelInfo
+		slogLevel = slog.LevelError
 	}
 
 	// Create handler based on format
