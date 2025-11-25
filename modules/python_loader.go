@@ -191,6 +191,27 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	}
 	core.Log.Info(core.SubsystemImport, "Python file located", "module", name, "path", pyPath, "is_package", isPackage)
 
+	// Special case: if pyPath is a directory (e.g., for "." import), create an empty namespace package
+	// This supports PEP 420 namespace packages and allows unittest to import "." for test discovery
+	if info, err := os.Stat(pyPath); err == nil && info.IsDir() {
+		core.Log.Debug(core.SubsystemImport, "Path is a directory, creating namespace package", "module", name, "path", pyPath)
+		// Create an empty module dict for the namespace package
+		// Set __path__ to allow submodule imports
+		partialModule.Set("__name__", core.StringValue(name))
+		partialModule.Set("__path__", core.NewList(core.StringValue(pyPath)))
+		partialModule.Set("__file__", core.NilValue{})
+		// For "." import, __package__ should be None, not "." to avoid trying to import ""
+		if name == "." {
+			partialModule.Set("__package__", core.NilValue{})
+		} else {
+			partialModule.Set("__package__", core.StringValue(name))
+		}
+		// Register in sys.modules
+		registerModuleInSysModules(name, partialModule)
+		core.Log.Info(core.SubsystemImport, "Namespace package created successfully", "module", name, "source_type", "namespace_package")
+		return partialModule, nil
+	}
+
 	startLoad := time.Now()
 
 	// Transpile the Python file

@@ -106,6 +106,36 @@ func (f *PythonModuleFinder) Find(moduleName string) (string, bool, error) {
 func (f *PythonModuleFinder) FindWithExtraPaths(moduleName string, extraPaths []string) (string, bool, error) {
 	core.Log.Trace(core.SubsystemImport, "Python finder searching for module", "module", moduleName)
 
+	// Special case: "." refers to the current working directory as a package
+	if moduleName == "." {
+		core.Log.Debug(core.SubsystemImport, "Handling special case: current directory import", "module", moduleName)
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", false, fmt.Errorf("cannot import '.': failed to get current working directory: %w", err)
+		}
+
+		// Check if current directory has __init__.py (is a package)
+		initPath := filepath.Join(cwd, "__init__.py")
+		if fileExists(initPath) {
+			core.Log.Debug(core.SubsystemImport, "Current directory is importable package", "module", moduleName, "path", initPath)
+			f.mu.Lock()
+			f.pathCache[moduleName] = initPath
+			f.mu.Unlock()
+			return initPath, true, nil
+		}
+
+		// Current directory is not a package - return it anyway but mark as not a package
+		// This allows unittest and other tools to use the directory for test discovery
+		// even if it doesn't have __init__.py
+		core.Log.Debug(core.SubsystemImport, "Current directory has no __init__.py, treating as implicit package", "module", moduleName, "path", cwd)
+		// Return a special marker that indicates this is a directory without __init__.py
+		// We'll return the directory path itself
+		f.mu.Lock()
+		f.pathCache[moduleName] = cwd
+		f.mu.Unlock()
+		return cwd, false, nil
+	}
+
 	// Check cache first
 	f.mu.RLock()
 	if cached, ok := f.pathCache[moduleName]; ok {

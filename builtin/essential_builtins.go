@@ -419,21 +419,24 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		// If fromlist is empty or module is a package, return the top-level module
 		// Otherwise return the final module
 		if len(fromlist) == 0 {
-			// Return the top-level module (e.g., for "import os.path", return os)
-			topLevel := moduleName
-			for i, ch := range moduleName {
-				if ch == '.' {
-					topLevel = moduleName[:i]
-					break
+			// Special case: "." should be returned as-is, not treated as a dotted import
+			if moduleName != "." {
+				// Return the top-level module (e.g., for "import os.path", return os)
+				topLevel := moduleName
+				for i, ch := range moduleName {
+					if ch == '.' {
+						topLevel = moduleName[:i]
+						break
+					}
 				}
-			}
-			if topLevel != moduleName {
-				// Load and return the top-level
-				topModule, err := loader.LoadModule(topLevel, globalCtx)
-				if err != nil {
-					return nil, fmt.Errorf("ImportError: %v", err)
+				if topLevel != moduleName {
+					// Load and return the top-level
+					topModule, err := loader.LoadModule(topLevel, globalCtx)
+					if err != nil {
+						return nil, fmt.Errorf("ImportError: %v", err)
+					}
+					return topModule, nil
 				}
-				return topModule, nil
 			}
 		}
 
