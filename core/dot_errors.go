@@ -349,11 +349,48 @@ func WrapEvalError(err error, message string, ctx *Context) *EvalError {
 		return evalErr
 	}
 
-	// Check if it's a NameError and preserve the detail
-	if nameErr, ok := err.(*NameError); ok {
+	// Check if it's a structured error type and preserve it
+	switch typedErr := err.(type) {
+	case *NameError:
 		return &EvalError{
 			Type:    "NameError",
-			Message: fmt.Sprintf("name '%s' is not defined", nameErr.Name),
+			Message: fmt.Sprintf("name '%s' is not defined", typedErr.Name),
+			Wrapped: err,
+		}
+	case *TypeError:
+		return &EvalError{
+			Type:    "TypeError",
+			Message: typedErr.Message,
+			Wrapped: err,
+		}
+	case *ValueError:
+		return &EvalError{
+			Type:    "ValueError",
+			Message: typedErr.Message,
+			Wrapped: err,
+		}
+	case *KeyError:
+		return &EvalError{
+			Type:    "KeyError",
+			Message: typedErr.Error(),
+			Wrapped: err,
+		}
+	case *IndexError:
+		return &EvalError{
+			Type:    "IndexError",
+			Message: typedErr.Error(),
+			Wrapped: err,
+		}
+	case *ZeroDivisionError:
+		return &EvalError{
+			Type:    "ZeroDivisionError",
+			Message: "division by zero",
+			Wrapped: err,
+		}
+	case *AttributeError:
+		return &EvalError{
+			Type:    "AttributeError",
+			Message: typedErr.Error(),
 			Wrapped: err,
 		}
 	}

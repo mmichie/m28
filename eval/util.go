@@ -616,7 +616,7 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 
 					// Check if key is hashable
 					if !core.IsHashable(key) {
-						return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
+						return nil, &core.TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
 					}
 
 					// Convert key to string representation
@@ -689,7 +689,7 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 
 		// Check if key is hashable
 		if !core.IsHashable(key) {
-			return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
 		}
 
 		// Convert key to string representation

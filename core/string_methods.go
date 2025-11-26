@@ -344,7 +344,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 				i++
 			}
 			if i >= len(formatStr) {
-				return nil, fmt.Errorf("incomplete format key")
+				return nil, &ValueError{Message: "incomplete format key"}
 			}
 
 			keyName := formatStr[keyStart:i]
@@ -382,7 +382,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			keyStr := ValueToKey(StringValue(keyName))
 			value, found = valueDict.Get(keyStr)
 			if !found {
-				return nil, fmt.Errorf("KeyError: '%s'", keyName)
+				return nil, &KeyError{Key: StringValue(keyName)}
 			}
 		} else {
 			// Positional formatting

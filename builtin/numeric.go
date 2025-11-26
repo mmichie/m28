@@ -245,7 +245,7 @@ func RegisterNumeric(ctx *core.Context) {
 				}
 				num, err := types.RequireNumber(item, "sum() element")
 				if err != nil {
-					return nil, fmt.Errorf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())
+					return nil, &core.TypeError{Message: fmt.Sprintf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())}
 				}
 				sum += num
 			}
@@ -258,13 +258,13 @@ func RegisterNumeric(ctx *core.Context) {
 			case core.TupleValue:
 				items = v
 			default:
-				return nil, fmt.Errorf("sum() argument must be an iterable, not '%s'", v.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("sum() argument must be an iterable, not '%s'", v.Type())}
 			}
 
 			for _, item := range items {
 				num, err := types.RequireNumber(item, "sum() element")
 				if err != nil {
-					return nil, fmt.Errorf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())
+					return nil, &core.TypeError{Message: fmt.Sprintf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())}
 				}
 				sum += num
 			}

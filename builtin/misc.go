@@ -255,7 +255,7 @@ func RegisterMisc(ctx *core.Context) {
 		}
 
 		if i < 0 || i > 0x10FFFF {
-			return nil, fmt.Errorf("chr() arg not in range(0x110000)")
+			return nil, &core.ValueError{Message: "chr() arg not in range(0x110000)"}
 		}
 
 		return core.StringValue(string(rune(i))), nil
@@ -275,7 +275,7 @@ func RegisterMisc(ctx *core.Context) {
 
 		runes := []rune(s)
 		if len(runes) != 1 {
-			return nil, fmt.Errorf("ord() expected a character, but string of length %d found", len(runes))
+			return nil, &core.TypeError{Message: fmt.Sprintf("ord() expected a character, but string of length %d found", len(runes))}
 		}
 
 		return core.NumberValue(int(runes[0])), nil

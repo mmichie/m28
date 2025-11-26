@@ -11,7 +11,7 @@ import (
 // iterFunc implements the iter() builtin
 func iterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("iter() takes exactly one argument (%d given)", len(args))
+		return nil, &core.TypeError{Message: fmt.Sprintf("iter() takes exactly one argument (%d given)", len(args))}
 	}
 
 	obj := args[0]
@@ -65,7 +65,7 @@ func iterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 // nextFunc implements the next() builtin
 func nextFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 || len(args) > 2 {
-		return nil, fmt.Errorf("next() takes 1 or 2 arguments (%d given)", len(args))
+		return nil, &core.TypeError{Message: fmt.Sprintf("next() takes 1 or 2 arguments (%d given)", len(args))}
 	}
 
 	iterator := args[0]
@@ -120,7 +120,7 @@ func nextFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return val, nil
 	}
 
-	return nil, fmt.Errorf("'%s' object is not an iterator", core.GetPythonTypeName(iterator))
+	return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not an iterator", core.GetPythonTypeName(iterator))}
 }
 
 // RegisterIterationProtocol registers the iteration protocol functions

@@ -451,7 +451,7 @@ func (d *DictValue) GetValue(key Value) (Value, bool) {
 // This is the preferred public API for setting dict values
 func (d *DictValue) SetValue(key Value, value Value) error {
 	if !IsHashable(key) {
-		return fmt.Errorf("unhashable type: '%s'", key.Type())
+		return &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
 	}
 	keyStr := ValueToKey(key)
 	d.SetWithKey(keyStr, key, value)

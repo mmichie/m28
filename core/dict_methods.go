@@ -68,7 +68,7 @@ func InitDictMethods() {
 
 			// Check if key is hashable
 			if !IsHashable(key) {
-				return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
+				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
 			}
 
 			// Use SetWithKey to properly track the original key

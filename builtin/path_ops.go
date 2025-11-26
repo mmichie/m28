@@ -177,7 +177,7 @@ func setAtPath(data core.Value, segments []interface{}, value core.Value) (core.
 		// Handle list
 		if list, ok := data.(*core.ListValue); ok {
 			if seg < 0 || seg >= list.Len() {
-				return nil, fmt.Errorf("list index out of range: %d", seg)
+				return nil, &core.IndexError{Index: seg, Length: list.Len()}
 			}
 
 			// Clone list
