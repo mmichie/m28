@@ -16,7 +16,6 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Debug: print all args
-	// fmt.Printf("DEBUG withForm: received %d args\n", args.Len())
 	// for i, arg := range args.Items() {
 	// 	fmt.Printf("  arg[%d]: %v (type: %T)\n", i, arg, arg)
 	// }
@@ -184,9 +183,6 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 	}
 
 	// Debug output
-	// fmt.Printf("DEBUG executeWith: Manager expression: %v (type: %T)\n", mgr.expr, mgr.expr)
-	// fmt.Printf("DEBUG executeWith: Manager expression evaluated to: %v (type: %T)\n", mgrValue, mgrValue)
-	// fmt.Printf("DEBUG executeWith: mgr.varName=%q, mgr.target=%v (type: %T)\n", mgr.varName, mgr.target, mgr.target)
 
 	// Check if it's a context manager
 	cm, ok := core.IsContextManager(mgrValue)

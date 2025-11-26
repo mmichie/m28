@@ -316,4 +316,3 @@ func TestBoolBuiltin(t *testing.T) {
 		})
 	}
 }
-

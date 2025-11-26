@@ -57,7 +57,7 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 			}
 
 			core.Log.Debug(core.SubsystemEval, "Evaluation progress",
-			"eval_count", ctx.EvalCount, "context_info", contextInfo, "expression", exprStr)
+				"eval_count", ctx.EvalCount, "context_info", contextInfo, "expression", exprStr)
 		}
 	}
 

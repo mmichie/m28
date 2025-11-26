@@ -710,4 +710,3 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Check if this is a generator function
 	return makeGeneratorFunction(fn), nil
 }
-

@@ -4,7 +4,6 @@ package modules
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sync"
 
@@ -180,7 +179,7 @@ func simplefilterFunc(args []core.Value, ctx *core.Context) (core.Value, error) 
 	globalRegistry.mu.Unlock()
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] simplefilter(%s) added (category=%v)", action, category)
+		core.Log.Debug(core.SubsystemBuiltin, "Warning filter added", "action", action, "category", fmt.Sprintf("%v", category))
 	}
 
 	return core.Nil, nil
@@ -207,7 +206,7 @@ func resetwarningsFunc(args []core.Value, ctx *core.Context) (core.Value, error)
 	globalRegistry.mu.Unlock()
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] resetwarnings() called")
+		core.Log.Debug(core.SubsystemBuiltin, "Warning filters reset")
 	}
 
 	return core.Nil, nil
@@ -226,7 +225,7 @@ func emitWarning(message string, category core.Value, stacklevel int, ctx *core.
 	action := getFilterAction(categoryName, moduleName)
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] emit: %s: %s (module=%s, action=%s)", categoryName, message, moduleName, action)
+		core.Log.Debug(core.SubsystemBuiltin, "Warning emitted", "category", categoryName, "message", message, "module", moduleName, "action", action)
 	}
 
 	switch action {
@@ -268,7 +267,7 @@ func emitWarningExplicit(message string, category core.Value, filename string, l
 	action := getFilterAction(categoryName, moduleName)
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] explicit: %s:%d: %s: %s (module=%s, action=%s)", filename, lineno, categoryName, message, moduleName, action)
+		core.Log.Debug(core.SubsystemBuiltin, "Explicit warning", "file", filename, "line", lineno, "category", categoryName, "message", message, "module", moduleName, "action", action)
 	}
 
 	switch action {
@@ -519,7 +518,7 @@ func (c *CatchWarnings) enter(args []core.Value, ctx *core.Context) (core.Value,
 		}
 
 		if debugWarnings {
-			log.Printf("[WARNINGS] catch_warnings.__enter__() - recording enabled, list=%p", c.warningsList)
+			core.Log.Debug(core.SubsystemBuiltin, "Warning recording enabled", "list_ptr", fmt.Sprintf("%p", c.warningsList))
 		}
 
 		// Return the list
@@ -527,7 +526,7 @@ func (c *CatchWarnings) enter(args []core.Value, ctx *core.Context) (core.Value,
 	}
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] catch_warnings.__enter__() - recording disabled")
+		core.Log.Debug(core.SubsystemBuiltin, "Warning recording disabled")
 	}
 
 	// Not recording, return None
@@ -543,7 +542,7 @@ func (c *CatchWarnings) exit(args []core.Value, ctx *core.Context) (core.Value, 
 	globalRegistry.recordingList = c.savedRecording
 
 	if debugWarnings {
-		log.Printf("[WARNINGS] catch_warnings.__exit__() - restored state")
+		core.Log.Debug(core.SubsystemBuiltin, "Warning state restored")
 	}
 
 	return core.False, nil // Don't suppress exceptions
@@ -556,7 +555,7 @@ func Warn(message string, category string, ctx *core.Context) error {
 	importFunc, err := ctx.Lookup("__import__")
 	if err != nil {
 		if debugWarnings {
-			log.Printf("[WARN DEBUG] __import__ not found: %v", err)
+			core.Log.Debug(core.SubsystemBuiltin, "__import__ not found", "error", err)
 		}
 		fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
 		return nil
@@ -569,14 +568,14 @@ func Warn(message string, category string, ctx *core.Context) error {
 		warningsVal, err = callable.Call(args, ctx)
 		if err != nil {
 			if debugWarnings {
-				log.Printf("[WARN DEBUG] Failed to import warnings: %v", err)
+				core.Log.Debug(core.SubsystemBuiltin, "Failed to import warnings module", "error", err)
 			}
 			fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
 			return nil
 		}
 	} else {
 		if debugWarnings {
-			log.Printf("[WARN DEBUG] __import__ is not callable")
+			core.Log.Debug(core.SubsystemBuiltin, "__import__ is not callable")
 		}
 		fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
 		return nil
@@ -590,7 +589,7 @@ func Warn(message string, category string, ctx *core.Context) error {
 		warnFunc, found = obj.GetAttr("warn")
 		if !found {
 			if debugWarnings {
-				log.Printf("[WARN DEBUG] warnings.warn not found via GetAttr")
+				core.Log.Debug(core.SubsystemBuiltin, "warnings.warn not found via GetAttr")
 			}
 			fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
 			return nil
@@ -600,7 +599,7 @@ func Warn(message string, category string, ctx *core.Context) error {
 		warnFunc, found = warningsDict.Get("warn")
 		if !found {
 			if debugWarnings {
-				log.Printf("[WARN DEBUG] warnings.warn not found in dict")
+				core.Log.Debug(core.SubsystemBuiltin, "warnings.warn not found in dict")
 			}
 			fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
 			return nil
@@ -608,14 +607,14 @@ func Warn(message string, category string, ctx *core.Context) error {
 	} else {
 		// Unknown type
 		if debugWarnings {
-			log.Printf("[WARN DEBUG] warnings module is unknown type: %T", warningsVal)
+			core.Log.Debug(core.SubsystemBuiltin, "warnings module has unknown type", "type", fmt.Sprintf("%T", warningsVal))
 		}
 		fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
 		return nil
 	}
 
 	if debugWarnings {
-		log.Printf("[WARN DEBUG] Successfully found warnings.warn, calling it")
+		core.Log.Debug(core.SubsystemBuiltin, "Successfully found warnings.warn")
 	}
 
 	// Get the category class

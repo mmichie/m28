@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/mmichie/m28/common/suggestions"
@@ -123,7 +122,7 @@ func (c *Context) Define(name string, value Value) {
 			if err := builtinRegistry.RegisterWithDepth(name, value, 3); err != nil {
 				// Log the duplicate if logging is enabled
 				if BuiltinLogging {
-					log.Printf("WARNING: %v", err)
+					Log.Warn(SubsystemBuiltin, "Duplicate builtin registration", "error", err)
 				}
 			}
 		}
@@ -157,7 +156,7 @@ func (c *Context) DefineBuiltin(name string, value Value) error {
 		if err := builtinRegistry.RegisterWithDepth(name, value, 3); err != nil {
 			// Log the duplicate if logging is enabled
 			if BuiltinLogging {
-				log.Printf("WARNING: %v", err)
+				Log.Warn(SubsystemBuiltin, "Duplicate builtin registration", "error", err)
 			}
 			// Return error but caller can choose to ignore it
 			return err
@@ -241,7 +240,7 @@ func (c *Context) Lookup(name string) (Value, error) {
 func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 	// Prevent infinite loops in context chain
 	if depth > 100 {
-		log.Printf("ERROR: Lookup depth exceeded for '%s' - possible circular context chain", name)
+		Log.Error(SubsystemScope, "Lookup depth exceeded - possible circular context chain", "name", name)
 		availableNames := c.GetAllAvailableNames()
 		suggestion := generateNameSuggestion(name, availableNames)
 		return nil, &NameError{
@@ -252,13 +251,14 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 
 	// DEBUG: Log lookups that exceed a certain depth
 	if depth > 50 {
-		log.Printf("WARN: Deep lookup for '%s' at depth %d", name, depth)
+		Log.Warn(SubsystemScope, "Deep lookup", "name", name, "depth", depth)
 	}
 
 	// DEBUG: Detailed lookup logging if enabled
 	if debugLookups && depth < 5 {
-		log.Printf("LOOKUP[%d]: '%s' in context %p (vars=%d, outer=%p, global=%p)",
-			depth, name, c, len(c.Vars), c.Outer, c.Global)
+		Log.Debug(SubsystemScope, "Variable lookup",
+			"depth", depth, "name", name, "context_ptr", fmt.Sprintf("%p", c),
+			"vars_count", len(c.Vars), "outer_ptr", fmt.Sprintf("%p", c.Outer), "global_ptr", fmt.Sprintf("%p", c.Global))
 	}
 
 	// For module contexts (those with ModuleDict), check ModuleDict FIRST
@@ -268,7 +268,7 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 		key := ValueToKey(StringValue(name))
 		if val, ok := c.ModuleDict.Get(key); ok {
 			if debugLookups && depth < 5 {
-				log.Printf("  FOUND in ModuleDict")
+				Log.Debug(SubsystemScope, "Variable found in ModuleDict", "name", name)
 			}
 			return val, nil
 		}
@@ -277,7 +277,7 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 	// Then check current scope Vars (for true local variables)
 	if val, ok := c.Vars[name]; ok {
 		if debugLookups && depth < 5 {
-			log.Printf("  FOUND in local scope")
+			Log.Debug(SubsystemScope, "Variable found in local scope", "name", name)
 		}
 		return val, nil
 	}

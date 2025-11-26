@@ -316,7 +316,6 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 		}
 	}
 
-	// fmt.Printf("DEBUG ParseParameterList result: %d required, %d optional, RestParam=%v, KeywordParam=%v\n",
 	// 	len(sig.RequiredParams), len(sig.OptionalParams), sig.RestParam, sig.KeywordParam)
 	return sig, nil
 }
@@ -352,26 +351,27 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 	// The recursion: printf -> Instance.String -> GetAttr -> NewBuiltinFunction -> String...
 	debugBind := os.Getenv("M28_DEBUG_BIND") != ""
 	if debugBind {
-		fmt.Printf("DEBUG BindArguments: %d args, %d kwargs, %d required, %d optional params\n",
-			len(args), len(kwargs), len(sig.RequiredParams), len(sig.OptionalParams))
+		core.Log.Debug(core.SubsystemEval, "Binding arguments to function signature",
+			"args_count", len(args), "kwargs_count", len(kwargs),
+			"required_params", len(sig.RequiredParams), "optional_params", len(sig.OptionalParams))
 		// Print only types, not values, to avoid recursion
 		for i, arg := range args {
-			fmt.Printf("  arg[%d] = %T\n", i, arg)
+			core.Log.Debug(core.SubsystemEval, "Positional argument", "index", i, "type", fmt.Sprintf("%T", arg))
 		}
 		for k := range kwargs {
-			fmt.Printf("  kwarg %s\n", k)
+			core.Log.Debug(core.SubsystemEval, "Keyword argument", "name", k)
 		}
 		for _, p := range sig.RequiredParams {
-			fmt.Printf("  Required: %s\n", p.Name)
+			core.Log.Debug(core.SubsystemEval, "Required parameter", "name", p.Name)
 		}
 		for _, p := range sig.OptionalParams {
-			fmt.Printf("  Optional: %s\n", p.Name)
+			core.Log.Debug(core.SubsystemEval, "Optional parameter", "name", p.Name)
 		}
 		if sig.RestParam != nil {
-			fmt.Printf("  *args: %s\n", *sig.RestParam)
+			core.Log.Debug(core.SubsystemEval, "Variadic parameter (*args)", "name", *sig.RestParam)
 		}
 		if sig.KeywordParam != nil {
-			fmt.Printf("  **kwargs: %s\n", *sig.KeywordParam)
+			core.Log.Debug(core.SubsystemEval, "Keyword parameter (**kwargs)", "name", *sig.KeywordParam)
 		}
 	}
 

@@ -1083,7 +1083,6 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 					// Index assignment: (get-item obj index) = value
 					// Convert to (set-item obj index value)
 					setItemArgs := core.NewList(t.Items()[1], t.Items()[2], value)
-					// fmt.Printf("DEBUG: Converting index assignment to set-item with args: %v\n", setItemArgs)
 					return SetItemForm(setItemArgs, ctx)
 				}
 			}

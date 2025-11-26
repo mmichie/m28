@@ -164,18 +164,14 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return handleSliceAssignment(obj, sliceVal, value)
 	}
 
-	// fmt.Printf("DEBUG SetItemForm: obj type=%s, key=%v, value=%v\n", obj.Type(), key, value)
-
 	// First, try dunder method __setitem__
 	if found, err := types.CallSetItem(obj, key, value, ctx); found {
-		// fmt.Printf("DEBUG: CallSetItem found __setitem__, err=%v\n", err)
 		if err != nil {
 			return nil, err
 		}
 		// Return the assigned value to support chained assignments
 		return value, nil
 	}
-	// fmt.Printf("DEBUG: CallSetItem did not find __setitem__, trying protocol\n")
 
 	// Then try protocol-based indexing
 	if indexable, ok := protocols.GetIndexableOps(obj); ok {
