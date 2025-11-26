@@ -14,7 +14,7 @@ func (p *Parser) ParseToAST(input string) (ast.ASTNode, *core.IRMetadata, error)
 	tokenizer := NewTokenizer(input)
 	tokens, err := tokenizer.Tokenize()
 	if err != nil {
-		return nil, nil, fmt.Errorf("tokenization error: %w", err)
+		return nil, nil, err // Tokenization error
 	}
 
 	// Step 2: Set up parser with tokens
@@ -230,7 +230,7 @@ func (p *Parser) parsePostfixToAST(base ast.ASTNode) (ast.ASTNode, error) {
 // parseMethodArgsToAST parses method/function arguments to AST
 func (p *Parser) parseMethodArgsToAST() ([]ast.ASTNode, error) {
 	if !p.matchToken(TOKEN_LPAREN) {
-		return nil, fmt.Errorf("expected ( for method arguments")
+		return nil, &ParseError{Message: "expected ( for method arguments"}
 	}
 	p.advanceToken() // consume (
 
@@ -238,7 +238,7 @@ func (p *Parser) parseMethodArgsToAST() ([]ast.ASTNode, error) {
 
 	for !p.matchToken(TOKEN_RPAREN) {
 		if p.matchToken(TOKEN_EOF) {
-			return nil, fmt.Errorf("unclosed argument list")
+			return nil, &ParseError{Message: "unclosed argument list"}
 		}
 
 		arg, err := p.parseExprToAST()
@@ -254,7 +254,7 @@ func (p *Parser) parseMethodArgsToAST() ([]ast.ASTNode, error) {
 	}
 
 	if !p.matchToken(TOKEN_RPAREN) {
-		return nil, fmt.Errorf("expected ) to close argument list")
+		return nil, &ParseError{Message: "expected ) to close argument list"}
 	}
 	p.advanceToken() // consume )
 
@@ -270,7 +270,7 @@ func (p *Parser) parseListToAST() (ast.ASTNode, error) {
 
 	for !p.matchToken(TOKEN_RPAREN) {
 		if p.matchToken(TOKEN_EOF) {
-			return nil, fmt.Errorf("unclosed list")
+			return nil, &ParseError{Message: "unclosed list"}
 		}
 
 		expr, err := p.parseExprToAST()
@@ -286,7 +286,7 @@ func (p *Parser) parseListToAST() (ast.ASTNode, error) {
 	}
 
 	if !p.matchToken(TOKEN_RPAREN) {
-		return nil, fmt.Errorf("expected ) to close list")
+		return nil, &ParseError{Message: "expected ) to close list"}
 	}
 	p.advanceToken() // consume )
 
@@ -302,7 +302,7 @@ func (p *Parser) parseVectorLiteralToAST() (ast.ASTNode, error) {
 
 	for !p.matchToken(TOKEN_RBRACKET) {
 		if p.matchToken(TOKEN_EOF) {
-			return nil, fmt.Errorf("unclosed vector literal")
+			return nil, &ParseError{Message: "unclosed vector literal"}
 		}
 
 		expr, err := p.parseExprToAST()
@@ -318,7 +318,7 @@ func (p *Parser) parseVectorLiteralToAST() (ast.ASTNode, error) {
 	}
 
 	if !p.matchToken(TOKEN_RBRACKET) {
-		return nil, fmt.Errorf("expected ] to close vector literal")
+		return nil, &ParseError{Message: "expected ] to close vector literal"}
 	}
 	p.advanceToken() // consume ]
 
@@ -341,7 +341,7 @@ func (p *Parser) parseDictLiteralToAST() (ast.ASTNode, error) {
 
 	for !p.matchToken(TOKEN_RBRACE) {
 		if p.matchToken(TOKEN_EOF) {
-			return nil, fmt.Errorf("unclosed dict literal")
+			return nil, &ParseError{Message: "unclosed dict literal"}
 		}
 
 		// Parse key
@@ -352,7 +352,7 @@ func (p *Parser) parseDictLiteralToAST() (ast.ASTNode, error) {
 
 		// Expect :
 		if !p.matchToken(TOKEN_COLON) {
-			return nil, fmt.Errorf("expected : after dict key")
+			return nil, &ParseError{Message: "expected : after dict key"}
 		}
 		p.advanceToken()
 
@@ -371,7 +371,7 @@ func (p *Parser) parseDictLiteralToAST() (ast.ASTNode, error) {
 	}
 
 	if !p.matchToken(TOKEN_RBRACE) {
-		return nil, fmt.Errorf("expected } to close dict literal")
+		return nil, &ParseError{Message: "expected } to close dict literal"}
 	}
 	p.advanceToken() // consume }
 

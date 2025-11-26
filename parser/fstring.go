@@ -89,7 +89,7 @@ func (p *Parser) parseFStringEnhancedSimple(quoteChar rune) (core.Value, error) 
 
 			// Skip '}'
 			if p.pos >= len(p.input) || p.input[p.pos] != '}' {
-				return nil, fmt.Errorf("expected '}' after f-string expression")
+				return nil, &ParseError{Message: "expected '}' after f-string expression"}
 			}
 			p.advance()
 
@@ -114,14 +114,14 @@ func (p *Parser) parseFStringEnhancedSimple(quoteChar rune) (core.Value, error) 
 				continue
 			}
 			// Unmatched }
-			return nil, fmt.Errorf("unmatched '}' in f-string")
+			return nil, &ParseError{Message: "unmatched '}' in f-string"}
 		} else {
 			currentString.WriteRune(ch)
 			p.advance()
 		}
 	}
 
-	return nil, fmt.Errorf("unclosed f-string")
+	return nil, &ParseError{Message: "unclosed f-string"}
 }
 
 // parseFStringExpressionSimple parses expressions with nested quote support
@@ -259,7 +259,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 		p.advance()
 	}
 
-	return nil, "", fmt.Errorf("unclosed f-string expression")
+	return nil, "", &ParseError{Message: "unclosed f-string expression"}
 }
 
 // isValidFormatSpecColon checks if a colon is a valid format spec separator

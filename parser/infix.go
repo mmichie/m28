@@ -112,7 +112,7 @@ func detectInfixPattern(elements []core.Value) bool {
 // Uses Pratt parsing (operator precedence climbing)
 func parseInfixExpression(elements []core.Value) (core.Value, error) {
 	if len(elements) == 0 {
-		return nil, fmt.Errorf("empty infix expression")
+		return nil, &ParseError{Message: "empty infix expression"}
 	}
 
 	// Start parsing from the first element
@@ -123,7 +123,7 @@ func parseInfixExpression(elements []core.Value) (core.Value, error) {
 
 	// Check if we consumed all elements
 	if finalPos < len(elements) {
-		return nil, fmt.Errorf("unexpected tokens after expression")
+		return nil, &ParseError{Message: "unexpected tokens after expression"}
 	}
 
 	return result, nil
@@ -134,7 +134,7 @@ func parseInfixExpression(elements []core.Value) (core.Value, error) {
 // minPrec is the minimum precedence to consider
 func parseInfixWithPrecedence(elements []core.Value, pos int, minPrec int) (core.Value, int, error) {
 	if pos >= len(elements) {
-		return nil, pos, fmt.Errorf("unexpected end of expression")
+		return nil, pos, &ParseError{Message: "unexpected end of expression"}
 	}
 
 	// Parse left operand (primary expression)
@@ -167,7 +167,7 @@ func parseInfixWithPrecedence(elements []core.Value, pos int, minPrec int) (core
 		pos++ // consume operator
 
 		if pos >= len(elements) {
-			return nil, pos, fmt.Errorf("operator %s missing right operand", opStr)
+			return nil, pos, &ParseError{Message: fmt.Sprintf("operator %s missing right operand", opStr), Line: 1, Col: 1}
 		}
 
 		// Determine next precedence level
@@ -213,7 +213,7 @@ func parseChainedComparison(elements []core.Value, startPos int, leftOperand cor
 		pos++ // consume operator
 
 		if pos >= len(elements) {
-			return nil, pos, fmt.Errorf("comparison operator %s missing right operand", op)
+			return nil, pos, &ParseError{Message: fmt.Sprintf("comparison operator %s missing right operand", op), Line: 1, Col: 1}
 		}
 
 		// Get the right operand (just the next element, not a full expression)
@@ -251,7 +251,7 @@ func parseInfixExpressionSimple(elements []core.Value) (core.Value, error) {
 
 	// Check if we consumed all elements
 	if finalPos < len(elements) {
-		return nil, fmt.Errorf("unexpected tokens after expression")
+		return nil, &ParseError{Message: "unexpected tokens after expression"}
 	}
 
 	return result, nil

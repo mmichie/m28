@@ -28,7 +28,7 @@ func (p *Parser) parseIndexAccess(base core.Value) (core.Value, error) {
 	// Parse the first expression (index or slice start)
 	first, err := p.parseAtom()
 	if err != nil {
-		return nil, fmt.Errorf("error parsing index: %v", err)
+		return nil, err // Already a ParseError from lower level
 	}
 
 	// Skip whitespace and check what follows
@@ -70,7 +70,7 @@ func (p *Parser) parseSlice(base core.Value, start core.Value) (core.Value, erro
 		var err error
 		end, err = p.parseAtom()
 		if err != nil {
-			return nil, fmt.Errorf("error parsing slice end: %v", err)
+			return nil, err // Already a ParseError from lower level
 		}
 		p.skipWhitespaceAndComments()
 	}
@@ -84,7 +84,7 @@ func (p *Parser) parseSlice(base core.Value, start core.Value) (core.Value, erro
 			var err error
 			step, err = p.parseAtom()
 			if err != nil {
-				return nil, fmt.Errorf("error parsing slice step: %v", err)
+				return nil, err // Already a ParseError from lower level
 			}
 			p.skipWhitespaceAndComments()
 		}

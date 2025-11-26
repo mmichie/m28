@@ -1774,7 +1774,7 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 					i += 2
 					continue
 				}
-				return nil, fmt.Errorf("single '}' is not allowed in f-string")
+				return nil, &ParseError{Message: "single '}' is not allowed in f-string"}
 			}
 
 			// Add literal string part (with escape sequences interpreted)
@@ -1832,7 +1832,7 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 		}
 
 		if depth != 0 {
-			return nil, fmt.Errorf("unmatched '{' in f-string")
+			return nil, &ParseError{Message: "unmatched '{' in f-string"}
 		}
 
 		// Extract expression (i points after the closing })
@@ -1976,7 +1976,7 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 // astNodeToValue converts an AST node to a core.Value for f-string expressions
 func (p *PythonParser) astNodeToValue(node ast.ASTNode) (core.Value, error) {
 	if node == nil {
-		return nil, fmt.Errorf("nil AST node")
+		return nil, &ParseError{Message: "nil AST node"}
 	}
 
 	switch n := node.(type) {
