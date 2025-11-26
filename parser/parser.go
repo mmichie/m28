@@ -113,7 +113,13 @@ func (p *Parser) Parse(input string) (core.Value, error) {
 	tokenizer := NewTokenizer(input)
 	tokens, err := tokenizer.Tokenize()
 	if err != nil {
-		return nil, fmt.Errorf("tokenization error: %w", err)
+		return nil, &ParseError{
+			Message:  fmt.Sprintf("tokenization error: %v", err),
+			Line:     1,
+			Col:      1,
+			Source:   input,
+			Filename: p.filename,
+		}
 	}
 
 	// Step 2: Set up parser with tokens
@@ -980,7 +986,7 @@ func (p *Parser) parseIndexAccessFromToken(base core.Value) (core.Value, error) 
 	// Handle unary minus for negative indices
 	first, err := p.parseIndexOrSliceValue()
 	if err != nil {
-		return nil, fmt.Errorf("error parsing index: %v", err)
+		return nil, err // Already a ParseError from lower level
 	}
 
 	// Check what follows
@@ -1035,7 +1041,7 @@ func (p *Parser) parseSliceFromToken(base core.Value, start core.Value) (core.Va
 		var err error
 		end, err = p.parseIndexOrSliceValue()
 		if err != nil {
-			return nil, fmt.Errorf("error parsing slice end: %v", err)
+			return nil, err // Already a ParseError from lower level
 		}
 	}
 
@@ -1046,7 +1052,7 @@ func (p *Parser) parseSliceFromToken(base core.Value, start core.Value) (core.Va
 			var err error
 			step, err = p.parseIndexOrSliceValue()
 			if err != nil {
-				return nil, fmt.Errorf("error parsing slice step: %v", err)
+				return nil, err // Already a ParseError from lower level
 			}
 		}
 	}
@@ -1107,7 +1113,7 @@ func (p *Parser) parseFStringFromLexeme(lexeme string) (core.Value, error) {
 		p.pos = savedPos
 		p.line = savedLine
 		p.col = savedCol
-		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+		return nil, p.error(fmt.Sprintf("invalid f-string lexeme: %s", lexeme))
 	}
 
 	// Parse using existing f-string logic
@@ -1150,7 +1156,7 @@ func (p *Parser) parseSStringFromLexeme(lexeme string) (core.Value, error) {
 		p.pos = savedPos
 		p.line = savedLine
 		p.col = savedCol
-		return nil, fmt.Errorf("invalid s-string lexeme: %s", lexeme)
+		return nil, p.error(fmt.Sprintf("invalid s-string lexeme: %s", lexeme))
 	}
 
 	// Determine quote character
@@ -1165,7 +1171,7 @@ func (p *Parser) parseSStringFromLexeme(lexeme string) (core.Value, error) {
 		p.pos = savedPos
 		p.line = savedLine
 		p.col = savedCol
-		return nil, fmt.Errorf("invalid s-string lexeme: %s", lexeme)
+		return nil, p.error(fmt.Sprintf("invalid s-string lexeme: %s", lexeme))
 	}
 
 	// Parse using existing s-string logic
@@ -1247,7 +1253,7 @@ func (p *Parser) parseAtom() (core.Value, error) {
 
 	// Check for end of input
 	if p.pos >= len(p.input) {
-		return nil, fmt.Errorf("unexpected end of input")
+		return nil, p.error("unexpected end of input")
 	}
 
 	// Check for reader macros: backtick (quasiquote), comma (unquote/unquote-splicing)
@@ -1342,7 +1348,7 @@ func (p *Parser) parseList() (core.Value, error) {
 
 	// Check for unclosed list
 	if p.pos >= len(p.input) {
-		return nil, fmt.Errorf("unclosed list")
+		return nil, p.error("unclosed list")
 	}
 
 	// Skip closing parenthesis
@@ -1404,7 +1410,7 @@ func (p *Parser) parseVectorLiteral() (core.Value, error) {
 
 	// Check for unclosed vector
 	if p.pos >= len(p.input) {
-		return nil, fmt.Errorf("unclosed vector")
+		return nil, p.error("unclosed vector")
 	}
 
 	// Skip closing bracket
@@ -1484,7 +1490,7 @@ func (p *Parser) parseDictLiteral() (core.Value, error) {
 
 	// Check for unclosed brace
 	if p.pos >= len(p.input) {
-		return nil, fmt.Errorf("unclosed dict or set")
+		return nil, p.error("unclosed dict or set")
 	}
 
 	// Skip closing brace
@@ -1603,7 +1609,7 @@ func (p *Parser) parseString() (core.Value, error) {
 		p.advance()
 	}
 
-	return nil, fmt.Errorf("unclosed string")
+	return nil, p.error("unclosed string")
 }
 
 // parseFString parses an f-string literal
@@ -1722,14 +1728,14 @@ func (p *Parser) parseFString() (core.Value, error) {
 			// Parse expression until '}'
 			expr, err := p.parseExpr()
 			if err != nil {
-				return nil, fmt.Errorf("error parsing f-string expression at line %d, column %d: %v", p.line, p.col, err)
+				return nil, p.error(fmt.Sprintf("error parsing f-string expression: %v", err))
 			}
 
 			// Skip whitespace before '}'
 			p.skipWhitespaceAndComments()
 
 			if p.pos >= len(p.input) || p.input[p.pos] != '}' {
-				return nil, fmt.Errorf("unclosed f-string expression at line %d, column %d", p.line, p.col)
+				return nil, p.error("unclosed f-string expression")
 			}
 
 			// Skip '}'
@@ -1743,7 +1749,7 @@ func (p *Parser) parseFString() (core.Value, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unclosed f-string at line %d, column %d", p.line, p.col)
+	return nil, p.error("unclosed f-string")
 }
 
 // isListComprehension checks if the elements form a list comprehension pattern
@@ -1795,7 +1801,7 @@ func (p *Parser) parseListComprehension(elements []core.Value) (core.Value, erro
 	// iterable: elements[inIndex+1:]
 
 	if forIndex <= 0 || inIndex <= forIndex+1 {
-		return nil, fmt.Errorf("invalid list comprehension syntax")
+		return nil, p.error("invalid list comprehension syntax")
 	}
 
 	// Get the expression (everything before "for")
@@ -1819,7 +1825,7 @@ func (p *Parser) parseListComprehension(elements []core.Value) (core.Value, erro
 
 	// Get the variable (between "for" and "in")
 	if inIndex != forIndex+2 {
-		return nil, fmt.Errorf("list comprehension variable must be a single symbol")
+		return nil, p.error("list comprehension variable must be a single symbol")
 	}
 	variable := elements[forIndex+1]
 
@@ -1840,7 +1846,7 @@ func (p *Parser) parseListComprehension(elements []core.Value) (core.Value, erro
 	if ifIndex >= 0 {
 		// Has condition
 		if ifIndex == 0 {
-			return nil, fmt.Errorf("missing iterable in list comprehension")
+			return nil, p.error("missing iterable in list comprehension")
 		}
 
 		// Iterable is everything before "if"
@@ -1861,7 +1867,7 @@ func (p *Parser) parseListComprehension(elements []core.Value) (core.Value, erro
 		// Condition is everything after "if"
 		condElements := remainingElements[ifIndex+1:]
 		if len(condElements) == 0 {
-			return nil, fmt.Errorf("missing condition after 'if' in list comprehension")
+			return nil, p.error("missing condition after 'if' in list comprehension")
 		} else if len(condElements) == 1 {
 			// Check if it's a list that should be unquoted
 			if list, ok := condElements[0].(*core.ListValue); ok && list.Len() > 0 {
@@ -1979,7 +1985,7 @@ func (p *Parser) parseGeneratorExpression(elements []core.Value) (core.Value, er
 	}
 
 	if forIndex <= 0 || inIndex <= forIndex+1 {
-		return nil, fmt.Errorf("invalid generator expression syntax")
+		return nil, p.error("invalid generator expression syntax")
 	}
 
 	// Get the expression (everything before "for")
@@ -2001,7 +2007,7 @@ func (p *Parser) parseGeneratorExpression(elements []core.Value) (core.Value, er
 
 	// Get the variable (between "for" and "in")
 	if inIndex-forIndex != 2 {
-		return nil, fmt.Errorf("generator expression requires single variable between 'for' and 'in'")
+		return nil, p.error("generator expression requires single variable between 'for' and 'in'")
 	}
 	variable := elements[forIndex+1]
 
@@ -2022,7 +2028,7 @@ func (p *Parser) parseGeneratorExpression(elements []core.Value) (core.Value, er
 	if ifIndex >= 0 {
 		// Has condition
 		if ifIndex == 0 {
-			return nil, fmt.Errorf("missing iterable in generator expression")
+			return nil, p.error("missing iterable in generator expression")
 		}
 
 		// Iterable is everything before "if"
@@ -2042,7 +2048,7 @@ func (p *Parser) parseGeneratorExpression(elements []core.Value) (core.Value, er
 		// Condition is everything after "if"
 		condElements := remainingElements[ifIndex+1:]
 		if len(condElements) == 0 {
-			return nil, fmt.Errorf("missing condition after 'if' in generator expression")
+			return nil, p.error("missing condition after 'if' in generator expression")
 		} else if len(condElements) == 1 {
 			if list, ok := condElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				condition = list
@@ -2133,7 +2139,7 @@ func (p *Parser) parseSetComprehension(elements []core.Value) (core.Value, error
 	}
 
 	if forIndex <= 0 || inIndex <= forIndex+1 {
-		return nil, fmt.Errorf("invalid set comprehension syntax")
+		return nil, p.error("invalid set comprehension syntax")
 	}
 
 	// Get the expression (everything before "for")
@@ -2153,7 +2159,7 @@ func (p *Parser) parseSetComprehension(elements []core.Value) (core.Value, error
 
 	// Get the variable (between "for" and "in")
 	if inIndex != forIndex+2 {
-		return nil, fmt.Errorf("set comprehension variable must be a single symbol")
+		return nil, p.error("set comprehension variable must be a single symbol")
 	}
 	variable := elements[forIndex+1]
 
@@ -2173,7 +2179,7 @@ func (p *Parser) parseSetComprehension(elements []core.Value) (core.Value, error
 	var condition core.Value
 	if ifIndex >= 0 {
 		if ifIndex == 0 {
-			return nil, fmt.Errorf("missing iterable in set comprehension")
+			return nil, p.error("missing iterable in set comprehension")
 		}
 
 		if ifIndex == 1 {
@@ -2191,7 +2197,7 @@ func (p *Parser) parseSetComprehension(elements []core.Value) (core.Value, error
 
 		condElements := remainingElements[ifIndex+1:]
 		if len(condElements) == 0 {
-			return nil, fmt.Errorf("missing condition after 'if' in set comprehension")
+			return nil, p.error("missing condition after 'if' in set comprehension")
 		} else if len(condElements) == 1 {
 			if list, ok := condElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				condition = list
@@ -2285,7 +2291,7 @@ func (p *Parser) parseDictComprehension(elements []core.Value, colonPositions ma
 	}
 
 	if forIndex <= 1 || inIndex <= forIndex+1 {
-		return nil, fmt.Errorf("invalid dict comprehension syntax")
+		return nil, p.error("invalid dict comprehension syntax")
 	}
 
 	// Key is element[0], value is element[1]
@@ -2294,7 +2300,7 @@ func (p *Parser) parseDictComprehension(elements []core.Value, colonPositions ma
 
 	// Get the variable (between "for" and "in")
 	if inIndex != forIndex+2 {
-		return nil, fmt.Errorf("dict comprehension variable must be a single symbol")
+		return nil, p.error("dict comprehension variable must be a single symbol")
 	}
 	variable := elements[forIndex+1]
 
@@ -2314,7 +2320,7 @@ func (p *Parser) parseDictComprehension(elements []core.Value, colonPositions ma
 	var condition core.Value
 	if ifIndex >= 0 {
 		if ifIndex == 0 {
-			return nil, fmt.Errorf("missing iterable in dict comprehension")
+			return nil, p.error("missing iterable in dict comprehension")
 		}
 
 		if ifIndex == 1 {
@@ -2332,7 +2338,7 @@ func (p *Parser) parseDictComprehension(elements []core.Value, colonPositions ma
 
 		condElements := remainingElements[ifIndex+1:]
 		if len(condElements) == 0 {
-			return nil, fmt.Errorf("missing condition after 'if' in dict comprehension")
+			return nil, p.error("missing condition after 'if' in dict comprehension")
 		} else if len(condElements) == 1 {
 			if list, ok := condElements[0].(*core.ListValue); ok && list.Len() > 0 {
 				condition = list
@@ -2403,7 +2409,7 @@ func (p *Parser) parseNumber() (core.Value, error) {
 	numStr := p.input[start:p.pos]
 	num, err := strconv.ParseFloat(numStr, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid number: %s", numStr)
+		return nil, p.error(fmt.Sprintf("invalid number: %s", numStr))
 	}
 
 	return core.NumberValue(num), nil
@@ -2568,7 +2574,13 @@ func isSymbolChar(ch byte) bool {
 
 // error creates a parser error with current position info
 func (p *Parser) error(msg string) error {
-	return fmt.Errorf("%s at line %d, column %d", msg, p.line, p.col)
+	return &ParseError{
+		Message:  msg,
+		Line:     p.line,
+		Col:      p.col,
+		Source:   p.input,
+		Filename: p.filename,
+	}
 }
 
 // Token navigation methods for token-based parsing
