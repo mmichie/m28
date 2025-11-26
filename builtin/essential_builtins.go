@@ -87,7 +87,7 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			}
 			return core.True, nil
 		default:
-			return nil, fmt.Errorf("all() argument must be an iterable, got type %T", args[0])
+			return nil, &core.TypeError{Message: fmt.Sprintf("all() argument must be an iterable, got type %T", args[0])}
 		}
 	}))
 
@@ -142,7 +142,7 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			}
 			return core.False, nil
 		default:
-			return nil, fmt.Errorf("any() argument must be an iterable, got type %T", args[0])
+			return nil, &core.TypeError{Message: fmt.Sprintf("any() argument must be an iterable, got type %T", args[0])}
 		}
 	}))
 
@@ -336,7 +336,10 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			}
 		}
 
-		return nil, fmt.Errorf("'%s' object has no attribute '%s'", obj.Type(), name)
+		return nil, &core.AttributeError{
+			ObjType:  string(obj.Type()),
+			AttrName: name,
+		}
 	}))
 
 	// callable() - check if object is callable

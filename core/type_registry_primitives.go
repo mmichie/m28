@@ -1178,10 +1178,10 @@ func registerDecimalType() {
 					case NumberValue:
 						d2 = decimal.NewFromFloat(float64(v))
 					default:
-						return nil, fmt.Errorf("unsupported operand type(s) for /: 'Decimal' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for /: 'Decimal' and '%s'", args[0].Type())}
 					}
 					if d2.IsZero() {
-						return nil, fmt.Errorf("division by zero")
+						return nil, &ZeroDivisionError{}
 					}
 					return NewDecimal(d1.Div(d2)), nil
 				},

@@ -121,21 +121,21 @@ func RegisterCollections(ctx *core.Context) {
 		// Validate that arguments are None or integers
 		if start != core.Nil {
 			if !types.IsNumber(start) {
-				return nil, fmt.Errorf("slice indices must be integers or None, not %s", start.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", start.Type())}
 			}
 		}
 		if stop != core.Nil {
 			if !types.IsNumber(stop) {
-				return nil, fmt.Errorf("slice indices must be integers or None, not %s", stop.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", stop.Type())}
 			}
 		}
 		if step != core.Nil {
 			if !types.IsNumber(step) {
-				return nil, fmt.Errorf("slice indices must be integers or None, not %s", step.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", step.Type())}
 			}
 			// Check that step is not zero
 			if num, ok := types.AsNumber(step); ok && int64(num) == 0 {
-				return nil, fmt.Errorf("slice step cannot be zero")
+				return nil, &core.ValueError{Message: "slice step cannot be zero"}
 			}
 		}
 
@@ -274,7 +274,7 @@ func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 func (l *ListType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	// For list, keyword arguments are not supported in the constructor
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("list() does not accept keyword arguments")
+		return nil, &core.TypeError{Message: "list() does not accept keyword arguments"}
 	}
 	// Use the custom Call method which handles multiple arguments
 	// e.g., list(1, 2, 3) creates [1, 2, 3]
@@ -315,7 +315,7 @@ func (t *TupleType) CallWithKeywords(args []core.Value, kwargs map[string]core.V
 	// For tuple, keyword arguments are not supported in the constructor
 	// Just ignore kwargs and call our custom Call method
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("tuple() does not accept keyword arguments")
+		return nil, &core.TypeError{Message: "tuple() does not accept keyword arguments"}
 	}
 	return t.Call(args, ctx)
 }
@@ -391,7 +391,7 @@ func (s *SetType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 		return set, nil
 	}
 
-	return nil, fmt.Errorf("set() argument must be an iterable, not '%s'", arg.Type())
+	return nil, &core.TypeError{Message: fmt.Sprintf("set() argument must be an iterable, not '%s'", arg.Type())}
 }
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
@@ -400,7 +400,7 @@ func (s *SetType) CallWithKeywords(args []core.Value, kwargs map[string]core.Val
 	// For set, keyword arguments are not supported in the constructor
 	// Just ignore kwargs and call our custom Call method
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("set() does not accept keyword arguments")
+		return nil, &core.TypeError{Message: "set() does not accept keyword arguments"}
 	}
 	return s.Call(args, ctx)
 }
@@ -609,7 +609,7 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 				return dict, nil
 			}
 
-			return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
+			return nil, &core.TypeError{Message: "dict() argument must be a dict or iterable of pairs"}
 		}
 		return dict, nil
 	}
