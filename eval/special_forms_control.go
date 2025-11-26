@@ -133,7 +133,13 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 			return exc.Value
 		}
 		// Create instance from Exception type
-		return createPythonExceptionInstance(ctx, exc.Type, exc.Error())
+		// Use exc.Message directly instead of exc.Error() to avoid duplicating the type name
+		// exc.Error() returns "Type: Message", but we just want "Message" here
+		message := exc.Message
+		if message == "" {
+			message = exc.Type
+		}
+		return createPythonExceptionInstance(ctx, exc.Type, message)
 	}
 
 	// Unwrap EvalError if needed

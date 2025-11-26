@@ -206,7 +206,7 @@ func RegisterCollections(ctx *core.Context) {
 			return core.NumberValue(set.Size()), nil
 		}
 
-		return nil, fmt.Errorf("object of type '%s' has no len()", arg.Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("object of type '%s' has no len()", arg.Type())}
 	}))
 
 	// bytes - create a new bytes object
