@@ -79,7 +79,7 @@ func RegisterTypes(ctx *core.Context) {
 		// tuple.__new__(cls, iterable=())
 		// First arg is cls (the class), second is optional iterable
 		if len(args) < 1 {
-			return nil, fmt.Errorf("tuple.__new__() missing 1 required positional argument: 'cls'")
+			return nil, &core.TypeError{Message: "tuple.__new__() missing 1 required positional argument: 'cls'"}
 		}
 
 		cls := args[0]
@@ -116,7 +116,7 @@ func RegisterTypes(ctx *core.Context) {
 				}
 				tupleData = core.TupleValue(result)
 			default:
-				return nil, fmt.Errorf("tuple.__new__() argument must be an iterable, got %T", iterable)
+				return nil, &core.TypeError{Message: fmt.Sprintf("tuple.__new__() argument must be an iterable, got %T", iterable)}
 			}
 		}
 
@@ -140,7 +140,7 @@ func RegisterTypes(ctx *core.Context) {
 		// list.__new__(cls, iterable=())
 		// First arg is cls (the class), second is optional iterable
 		if len(args) < 1 {
-			return nil, fmt.Errorf("list.__new__() missing 1 required positional argument: 'cls'")
+			return nil, &core.TypeError{Message: "list.__new__() missing 1 required positional argument: 'cls'"}
 		}
 
 		cls := args[0]
@@ -175,7 +175,7 @@ func RegisterTypes(ctx *core.Context) {
 				}
 				listData = core.NewList(result...)
 			default:
-				return nil, fmt.Errorf("list.__new__() argument must be an iterable")
+				return nil, &core.TypeError{Message: "list.__new__() argument must be an iterable"}
 			}
 		}
 
@@ -232,12 +232,12 @@ func RegisterTypes(ctx *core.Context) {
 	// This is a static method that's called before __init__
 	objectNew := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
-			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
+			return nil, &core.TypeError{Message: "__new__() missing 1 required positional argument: 'cls'"}
 		}
 		// First argument should be the class
 		cls, ok := args[0].(*core.Class)
 		if !ok {
-			return nil, fmt.Errorf("__new__() argument 1 must be a class, not %T", args[0])
+			return nil, &core.TypeError{Message: fmt.Sprintf("__new__() argument 1 must be a class, not %T", args[0])}
 		}
 		// Create a new instance of the class
 		return core.NewInstance(cls), nil
@@ -287,7 +287,7 @@ func RegisterTypes(ctx *core.Context) {
 	// object.__str__(self) - returns string representation
 	objectClass.SetMethod("__str__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
-			return nil, fmt.Errorf("__str__() missing 1 required positional argument: 'self'")
+			return nil, &core.TypeError{Message: "__str__() missing 1 required positional argument: 'self'"}
 		}
 		// Return a simple string representation
 		// For instances, format directly without calling String() to avoid recursion
@@ -842,7 +842,7 @@ func (s *StrType) CallWithKeywords(args []core.Value, kwargs map[string]core.Val
 	// For str, keyword arguments are not supported in the constructor
 	// Just ignore kwargs and call our custom Call method
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("str() does not accept keyword arguments")
+		return nil, &core.TypeError{Message: "str() does not accept keyword arguments"}
 	}
 	return s.Call(args, ctx)
 }
@@ -983,12 +983,12 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		// Delegate to type.__new__(type, name, bases, dict)
 		newMethod, found := t.Class.GetMethod("__new__")
 		if !found {
-			return nil, fmt.Errorf("type.__new__ not found")
+			return nil, &core.AttributeError{ObjType: "type", AttrName: "__new__"}
 		}
 
 		callable, ok := newMethod.(core.Callable)
 		if !ok {
-			return nil, fmt.Errorf("type.__new__ is not callable")
+			return nil, &core.TypeError{Message: "type.__new__ is not callable"}
 		}
 
 		// Call with type (cls) as first argument, then the 3 provided args
@@ -999,7 +999,7 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		newArgs[3] = args[2] // dict
 		return callable.Call(newArgs, ctx)
 	} else {
-		return nil, fmt.Errorf("type() takes 1 or 3 arguments, got %d", len(args))
+		return nil, &core.TypeError{Message: fmt.Sprintf("type() takes 1 or 3 arguments, got %d", len(args))}
 	}
 }
 
@@ -1012,7 +1012,7 @@ func createGenericAliasClass() *core.Class {
 	cls.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// GenericAlias.__new__(cls, origin, args)
 		if len(args) < 3 {
-			return nil, fmt.Errorf("GenericAlias.__new__() missing required arguments")
+			return nil, &core.TypeError{Message: "GenericAlias.__new__() missing required arguments"}
 		}
 
 		// args[0] is cls
@@ -1038,7 +1038,7 @@ func createGenericAliasClass() *core.Class {
 		case interface{ GetClass() *core.Class }:
 			originClass = o.GetClass()
 		default:
-			return nil, fmt.Errorf("GenericAlias origin must be a class, got %T", origin)
+			return nil, &core.TypeError{Message: fmt.Sprintf("GenericAlias origin must be a class, got %T", origin)}
 		}
 
 		// Create the GenericAlias
@@ -1063,7 +1063,7 @@ func createTypeMetaclass() *TypeType {
 		// args[1:] are the arguments to pass to the class constructor
 
 		if len(args) < 1 {
-			return nil, fmt.Errorf("__call__() missing required positional argument: 'cls'")
+			return nil, &core.TypeError{Message: "__call__() missing required positional argument: 'cls'"}
 		}
 
 		cls := args[0]
@@ -1079,10 +1079,10 @@ func createTypeMetaclass() *TypeType {
 			if wrapper, ok := cls.(interface{ GetClass() *core.Class }); ok {
 				classObj = wrapper.GetClass()
 			} else {
-				return nil, fmt.Errorf("__call__() requires a class, got %T", cls)
+				return nil, &core.TypeError{Message: fmt.Sprintf("__call__() requires a class, got %T", cls)}
 			}
 		default:
-			return nil, fmt.Errorf("__call__() requires a class, got %T", cls)
+			return nil, &core.TypeError{Message: fmt.Sprintf("__call__() requires a class, got %T", cls)}
 		}
 
 		// Call the class to create an instance
@@ -1139,7 +1139,7 @@ func createTypeMetaclass() *TypeType {
 		// type.__new__(cls, name, bases, dict, **kwargs)
 		// We need at least cls, name, bases, dict
 		if len(args) < 4 {
-			return nil, fmt.Errorf("type.__new__() takes at least 4 arguments (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("type.__new__() takes at least 4 arguments (%d given)", len(args))}
 		}
 
 		// args[0] is cls (the metaclass being used)
@@ -1150,18 +1150,18 @@ func createTypeMetaclass() *TypeType {
 
 		nameVal, ok := args[1].(core.StringValue)
 		if !ok {
-			return nil, fmt.Errorf("type.__new__() argument 2 must be str, not %s", args[1].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("type.__new__() argument 2 must be str, not %s", args[1].Type())}
 		}
 		name := string(nameVal)
 
 		basesVal, ok := args[2].(core.TupleValue)
 		if !ok {
-			return nil, fmt.Errorf("type.__new__() argument 3 must be tuple, not %s", args[2].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("type.__new__() argument 3 must be tuple, not %s", args[2].Type())}
 		}
 
 		namespace, ok := args[3].(*core.DictValue)
 		if !ok {
-			return nil, fmt.Errorf("type.__new__() argument 4 must be dict, not %s", args[3].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("type.__new__() argument 4 must be dict, not %s", args[3].Type())}
 		}
 
 		// Extract parent classes from bases tuple
@@ -1190,7 +1190,7 @@ func createTypeMetaclass() *TypeType {
 				}
 				parentClasses = append(parentClasses, baseClass)
 			default:
-				return nil, fmt.Errorf("bases must be classes, not %T (name: %v)", base, base)
+				return nil, &core.TypeError{Message: fmt.Sprintf("bases must be classes, not %T (name: %v)", base, base)}
 			}
 		}
 
@@ -1265,7 +1265,7 @@ func createTypeMetaclass() *TypeType {
 							// GetAttr already returns a bound method for Python instances
 							_, err := callable.Call([]core.Value{newClass, core.StringValue(keyName)}, ctx)
 							if err != nil {
-								return nil, fmt.Errorf("error calling __set_name__ for %s: %v", keyName, err)
+								return nil, fmt.Errorf("error calling __set_name__ for %s: %w", keyName, err)
 							}
 						}
 					}
@@ -1306,7 +1306,7 @@ func createStrClass() *StrType {
 			fn := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 				// For unbound methods, first arg should be the instance
 				if len(args) < 1 {
-					return nil, fmt.Errorf("%s() missing 1 required positional argument", name)
+					return nil, &core.TypeError{Message: fmt.Sprintf("%s() missing 1 required positional argument", name)}
 				}
 				receiver := args[0]
 				methodArgs := args[1:]
@@ -1343,7 +1343,7 @@ func createStrClass() *StrType {
 		}
 
 		if len(x) != len(y) {
-			return nil, fmt.Errorf("maketrans: the first two maketrans arguments must have equal length")
+			return nil, &core.ValueError{Message: "maketrans: the first two maketrans arguments must have equal length"}
 		}
 
 		// Build the translation table
@@ -1385,7 +1385,7 @@ func (i *IntType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 // This prevents primitive ints from being wrapped in Instance objects
 func (i *IntType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("int() does not accept keyword arguments")
+		return nil, &core.TypeError{Message: "int() does not accept keyword arguments"}
 	}
 	return i.Call(args, ctx)
 }
@@ -1399,7 +1399,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 	// int.__new__(cls, value=0, base=10) - creates a new int instance
 	class.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
-			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
+			return nil, &core.TypeError{Message: "__new__() missing 1 required positional argument: 'cls'"}
 		}
 
 		// First argument is the class - handle Class, IntType, and BoolType
@@ -1414,7 +1414,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 				Message: "int.__new__(bool) is not safe, use bool.__new__()",
 			}
 		} else {
-			return nil, fmt.Errorf("__new__() argument 1 must be a class, not %T", args[0])
+			return nil, &core.TypeError{Message: fmt.Sprintf("__new__() argument 1 must be a class, not %T", args[0])}
 		}
 
 		// For int subclasses, we need to handle the value argument
@@ -1447,7 +1447,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 	// Add __int__ method - needed for int() builtin and int subclasses
 	class.SetMethod("__int__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("__int__() takes exactly 1 argument (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("__int__() takes exactly 1 argument (%d given)", len(args))}
 		}
 		// The receiver is passed as the first argument
 		receiver := args[0]
@@ -1473,16 +1473,16 @@ func createIntClass(objectClass *core.Class) *IntType {
 					return core.NumberValue(float64(int(n))), nil
 				}
 			}
-			return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+			return nil, &core.AttributeError{ObjType: "int subclass", AttrName: "__value__"}
 		}
 
-		return nil, fmt.Errorf("__int__() argument must be int, not %s", receiver.Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("__int__() argument must be int, not %s", receiver.Type())}
 	}))
 
 	// Add __index__ method - needed for slicing
 	class.SetMethod("__index__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("__index__() takes exactly 1 argument (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("__index__() takes exactly 1 argument (%d given)", len(args))}
 		}
 		receiver := args[0]
 
@@ -1490,7 +1490,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 		if n, ok := receiver.(core.NumberValue); ok {
 			intVal := int(n)
 			if float64(intVal) != float64(n) {
-				return nil, fmt.Errorf("__index__ returned non-integer value")
+				return nil, &core.ValueError{Message: "__index__ returned non-integer value"}
 			}
 			return core.NumberValue(float64(n)), nil
 		}
@@ -1510,21 +1510,21 @@ func createIntClass(objectClass *core.Class) *IntType {
 				if n, ok := val.(core.NumberValue); ok {
 					intVal := int(n)
 					if float64(intVal) != float64(n) {
-						return nil, fmt.Errorf("__index__ returned non-integer value")
+						return nil, &core.ValueError{Message: "__index__ returned non-integer value"}
 					}
 					return core.NumberValue(float64(n)), nil
 				}
 			}
-			return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+			return nil, &core.AttributeError{ObjType: "int subclass", AttrName: "__value__"}
 		}
 
-		return nil, fmt.Errorf("__index__() argument must be int, not %s", receiver.Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("__index__() argument must be int, not %s", receiver.Type())}
 	}))
 
 	// Add __add__ method - needed for arithmetic
 	class.SetMethod("__add__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
-			return nil, fmt.Errorf("__add__() takes exactly 2 arguments (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("__add__() takes exactly 2 arguments (%d given)", len(args))}
 		}
 		receiver := args[0]
 		other := args[1]
@@ -1565,7 +1565,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 	// int.from_bytes(bytes, byteorder, *, signed=False)
 	class.SetMethod("from_bytes", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
-			return nil, fmt.Errorf("int.from_bytes() missing required arguments")
+			return nil, &core.TypeError{Message: "int.from_bytes() missing required arguments"}
 		}
 
 		// Get the bytes argument - can be bytes, str, or iterable of integers
@@ -1582,7 +1582,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 				if num, ok := item.(core.NumberValue); ok {
 					bytesData[i] = byte(int(num))
 				} else {
-					return nil, fmt.Errorf("int.from_bytes() list elements must be integers")
+					return nil, &core.TypeError{Message: "int.from_bytes() list elements must be integers"}
 				}
 			}
 		} else if tupleVal, ok := args[0].(core.TupleValue); ok {
@@ -1592,17 +1592,17 @@ func createIntClass(objectClass *core.Class) *IntType {
 				if num, ok := val.(core.NumberValue); ok {
 					bytesData[i] = byte(int(num))
 				} else {
-					return nil, fmt.Errorf("int.from_bytes() tuple elements must be integers")
+					return nil, &core.TypeError{Message: "int.from_bytes() tuple elements must be integers"}
 				}
 			}
 		} else {
-			return nil, fmt.Errorf("int.from_bytes() argument 1 must be bytes, str, or iterable of ints, not %s", args[0].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("int.from_bytes() argument 1 must be bytes, str, or iterable of ints, not %s", args[0].Type())}
 		}
 
 		// Get byteorder argument
 		byteorder, ok := args[1].(core.StringValue)
 		if !ok {
-			return nil, fmt.Errorf("int.from_bytes() argument 2 must be str, not %s", args[1].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("int.from_bytes() argument 2 must be str, not %s", args[1].Type())}
 		}
 
 		// For simplicity, implement basic big-endian and little-endian conversion
@@ -1617,7 +1617,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 				result = (result << 8) | uint64(bytesData[i])
 			}
 		} else {
-			return nil, fmt.Errorf("int.from_bytes() byteorder must be 'big' or 'little', not %s", byteorder)
+			return nil, &core.ValueError{Message: fmt.Sprintf("int.from_bytes() byteorder must be 'big' or 'little', not %s", byteorder)}
 		}
 
 		return core.NumberValue(float64(result)), nil
@@ -1628,7 +1628,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 	// int.bit_length() -> int
 	class.SetMethod("bit_length", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("bit_length() takes exactly 1 argument (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("bit_length() takes exactly 1 argument (%d given)", len(args))}
 		}
 
 		// Get the integer value
@@ -1640,7 +1640,7 @@ func createIntClass(objectClass *core.Class) *IntType {
 			// For BigInt, use the BitLen method from big.Int
 			return core.NumberValue(float64(val.GetBigInt().BitLen())), nil
 		default:
-			return nil, fmt.Errorf("bit_length() requires an integer, got %s", val.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("bit_length() requires an integer, got %s", val.Type())}
 		}
 
 		// Handle negative numbers - bit_length of abs(n)
@@ -1739,7 +1739,7 @@ func createBoolClass(intClass *IntType) *BoolType {
 	// Note: In Python, bool is not actually subclassable, but we need __new__ for compatibility
 	class.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
-			return nil, fmt.Errorf("__new__() missing 1 required positional argument: 'cls'")
+			return nil, &core.TypeError{Message: "__new__() missing 1 required positional argument: 'cls'"}
 		}
 
 		// First argument is the class
@@ -1749,7 +1749,7 @@ func createBoolClass(intClass *IntType) *BoolType {
 		} else if bt, ok := args[0].(*BoolType); ok {
 			cls = bt.Class
 		} else {
-			return nil, fmt.Errorf("__new__() argument 1 must be a class, not %T", args[0])
+			return nil, &core.TypeError{Message: fmt.Sprintf("__new__() argument 1 must be a class, not %T", args[0])}
 		}
 
 		// If trying to subclass bool, raise TypeError
@@ -1783,7 +1783,7 @@ func createBoolClass(intClass *IntType) *BoolType {
 	// Add __repr__ method
 	class.SetMethod("__repr__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("__repr__() takes exactly 1 argument (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("__repr__() takes exactly 1 argument (%d given)", len(args))}
 		}
 		if b, ok := args[0].(core.BoolValue); ok {
 			if b {
@@ -1791,13 +1791,13 @@ func createBoolClass(intClass *IntType) *BoolType {
 			}
 			return core.StringValue("False"), nil
 		}
-		return nil, fmt.Errorf("__repr__() argument must be bool, not %s", args[0].Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("__repr__() argument must be bool, not %s", args[0].Type())}
 	}))
 
 	// Add __str__ method (same as __repr__ for bool)
 	class.SetMethod("__str__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("__str__() takes exactly 1 argument (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("__str__() takes exactly 1 argument (%d given)", len(args))}
 		}
 		if b, ok := args[0].(core.BoolValue); ok {
 			if b {
@@ -1805,7 +1805,7 @@ func createBoolClass(intClass *IntType) *BoolType {
 			}
 			return core.StringValue("False"), nil
 		}
-		return nil, fmt.Errorf("__str__() argument must be bool, not %s", args[0].Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("__str__() argument must be bool, not %s", args[0].Type())}
 	}))
 
 	// Override from_bytes to return bool instead of int
@@ -1816,7 +1816,7 @@ func createBoolClass(intClass *IntType) *BoolType {
 			// Call the parent int.from_bytes method
 			callable, ok := parentFromBytes.(core.Callable)
 			if !ok {
-				return nil, fmt.Errorf("parent from_bytes is not callable")
+				return nil, &core.TypeError{Message: "parent from_bytes is not callable"}
 			}
 			result, err := callable.Call(args, ctx)
 			if err != nil {
@@ -1854,7 +1854,7 @@ func (f *FloatType) Call(args []core.Value, ctx *core.Context) (core.Value, erro
 // This prevents primitive floats from being wrapped in Instance objects
 func (f *FloatType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("float() does not accept keyword arguments")
+		return nil, &core.TypeError{Message: "float() does not accept keyword arguments"}
 	}
 	return f.Call(args, ctx)
 }
@@ -1867,7 +1867,7 @@ func createFloatClass() *FloatType {
 	// Python's float.__getformat__("double") returns "IEEE, little-endian" or similar
 	class.Methods["__getformat__"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("__getformat__() takes exactly one argument")
+			return nil, &core.TypeError{Message: "__getformat__() takes exactly one argument"}
 		}
 
 		typeStr, ok := args[0].(core.StringValue)
@@ -1882,7 +1882,7 @@ func createFloatClass() *FloatType {
 			return core.StringValue("IEEE, little-endian"), nil
 		}
 
-		return nil, fmt.Errorf("__getformat__() argument must be 'double' or 'float'")
+		return nil, &core.ValueError{Message: "__getformat__() argument must be 'double' or 'float'"}
 	})
 
 	return &FloatType{Class: class}
