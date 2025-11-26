@@ -1,0 +1,21 @@
+# Test max heap functions in _heapq module
+
+(import _heapq)
+
+# Test _heapify_max
+(= data [3, 1, 4, 1, 5, 9, 2, 6])
+(_heapq._heapify_max data)
+(print "After heapify_max:" data)
+(assert (== data[0] 9) "Expected max element 9 at index 0")
+
+# Test _heappop_max
+(= max_val (_heapq._heappop_max data))
+(print "Popped max value:" max_val)
+(assert (== max_val 9) "Expected 9 from heappop_max")
+
+# Test _heapreplace_max
+(= old_max (_heapq._heapreplace_max data 7))
+(print "Replaced max with 7, old value:" old_max)
+(assert (== old_max 6) "Expected old max 6")
+
+(print "All max heap tests passed!")

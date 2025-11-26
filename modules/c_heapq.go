@@ -65,6 +65,57 @@ func (h *pythonListHeap) Pop() interface{} {
 	return item
 }
 
+// pythonListMaxHeap wraps a Python list to implement a max heap (reverses comparisons)
+type pythonListMaxHeap struct {
+	list *core.ListValue
+}
+
+func (h pythonListMaxHeap) Len() int {
+	return h.list.Len()
+}
+
+func (h pythonListMaxHeap) Less(i, j int) bool {
+	// Reverse comparison for max heap
+	items := h.list.Items()
+	if i >= len(items) || j >= len(items) {
+		return false
+	}
+	// Returns true if items[i] > items[j] (reversed from min heap)
+	return core.Compare(items[i], items[j]) > 0
+}
+
+func (h pythonListMaxHeap) Swap(i, j int) {
+	if i >= h.list.Len() || j >= h.list.Len() || i < 0 || j < 0 {
+		return
+	}
+
+	itemI, errI := h.list.GetItem(i)
+	itemJ, errJ := h.list.GetItem(j)
+	if errI != nil || errJ != nil {
+		return
+	}
+
+	h.list.SetItem(i, itemJ)
+	h.list.SetItem(j, itemI)
+}
+
+func (h *pythonListMaxHeap) Push(x interface{}) {
+	if val, ok := x.(core.Value); ok {
+		h.list.Append(val)
+	}
+}
+
+func (h *pythonListMaxHeap) Pop() interface{} {
+	items := h.list.Items()
+	n := len(items)
+	if n == 0 {
+		return core.None
+	}
+	item := items[n-1]
+	*h.list = *core.NewList(items[:n-1]...)
+	return item
+}
+
 // Init_HeapqModule creates and returns the _heapq module
 func Init_HeapqModule() *core.DictValue {
 	heapqModule := core.NewDict()
@@ -188,6 +239,78 @@ func Init_HeapqModule() *core.DictValue {
 		returnItem := items[0]
 		items[0] = item
 		h := &pythonListHeap{list: list}
+		heap.Fix(h, 0)
+
+		return returnItem, nil
+	}))
+
+	// _heappop_max(heap) - Pop and return largest item from max heap
+	heapqModule.Set("_heappop_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("_heappop_max expected 1 argument, got %d", len(args))
+		}
+
+		list, ok := args[0].(*core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("_heappop_max argument must be a list")
+		}
+
+		if list.Len() == 0 {
+			return nil, fmt.Errorf("IndexError: index out of range")
+		}
+
+		// Create max heap wrapper and pop
+		h := &pythonListMaxHeap{list: list}
+		item := heap.Pop(h)
+
+		if val, ok := item.(core.Value); ok {
+			return val, nil
+		}
+		return core.None, nil
+	}))
+
+	// _heapify_max(x) - Transform list into max heap in-place
+	heapqModule.Set("_heapify_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("_heapify_max expected 1 argument, got %d", len(args))
+		}
+
+		list, ok := args[0].(*core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("_heapify_max argument must be a list")
+		}
+
+		// Create max heap wrapper and heapify
+		h := &pythonListMaxHeap{list: list}
+		heap.Init(h)
+
+		return core.None, nil
+	}))
+
+	// _heapreplace_max(heap, item) - Pop largest from max heap, then push new item
+	heapqModule.Set("_heapreplace_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("_heapreplace_max expected 2 arguments, got %d", len(args))
+		}
+
+		list, ok := args[0].(*core.ListValue)
+		if !ok {
+			return nil, fmt.Errorf("_heapreplace_max argument must be a list")
+		}
+
+		if list.Len() == 0 {
+			return nil, fmt.Errorf("IndexError: index out of range")
+		}
+
+		item := args[1]
+
+		// Get the largest item (at index 0 in max heap)
+		items := list.Items()
+		returnItem := items[0]
+
+		// Replace it with the new item and fix the heap
+		items[0] = item
+		h := &pythonListMaxHeap{list: list}
 		heap.Fix(h, 0)
 
 		return returnItem, nil
