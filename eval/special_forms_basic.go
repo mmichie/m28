@@ -245,13 +245,30 @@ func annotatedAssignForm(args *core.ListValue, ctx *core.Context) (core.Value, e
 		target = located.Unwrap()
 	}
 
-	// Get the annotation (always a string)
+	// Get the annotation (can be a string or symbol)
 	annotationVal := args.Items()[1]
-	annotationStr, ok := annotationVal.(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("annotation must be a string, got %v", annotationVal.Type())
+	var annotationType core.Value
+
+	// Handle both old format (string) and new format (symbol)
+	switch ann := annotationVal.(type) {
+	case core.StringValue:
+		// Old format: annotation is a string literal (for compatibility)
+		annotationType = ann
+	case core.SymbolValue:
+		// New format: annotation is a symbol to be evaluated
+		var err error
+		annotationType, err = Eval(annotationVal, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating annotation: %v", err)
+		}
+	default:
+		// Try to evaluate it as an expression
+		var err error
+		annotationType, err = Eval(annotationVal, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("annotation must be a string or symbol, got %v: %v", annotationVal.Type(), err)
+		}
 	}
-	annotation := string(annotationStr)
 
 	// Check what kind of target we have
 	if sym, ok := target.(core.SymbolValue); ok {
@@ -276,8 +293,8 @@ func annotatedAssignForm(args *core.ListValue, ctx *core.Context) (core.Value, e
 			ctx.Define("__annotations__", annotationsDict)
 		}
 
-		// Store the annotation
-		annotationsDict.Set(targetName, core.StringValue(annotation))
+		// Store the annotation (evaluated type object)
+		annotationsDict.Set(targetName, annotationType)
 
 		// If there's a value, evaluate and assign it
 		if args.Len() == 3 {

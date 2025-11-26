@@ -348,7 +348,7 @@ func (a *AnnotatedAssignForm) ToIR() core.Value {
 		return core.NewList(
 			core.SymbolValue("annotated-assign"),
 			a.Target.ToIR(),
-			core.StringValue(a.Annotation.Name),
+			core.SymbolValue(a.Annotation.Name),
 			a.Value.ToIR(),
 		)
 	}
@@ -356,7 +356,7 @@ func (a *AnnotatedAssignForm) ToIR() core.Value {
 	return core.NewList(
 		core.SymbolValue("annotated-assign"),
 		a.Target.ToIR(),
-		core.StringValue(a.Annotation.Name),
+		core.SymbolValue(a.Annotation.Name),
 	)
 }
 
