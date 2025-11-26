@@ -224,7 +224,7 @@ func (p *Parser) parseFStringExpressionSimple(outerQuote rune) (expr core.Value,
 					tempParser.SetFilename(p.filename)
 					expr, err = tempParser.Parse(exprStr)
 					if err != nil {
-						return nil, "", fmt.Errorf("error parsing f-string expression: %v", err)
+						return nil, "", &ParseError{Message: fmt.Sprintf("error parsing f-string expression: %v", err), Line: p.line, Col: p.col, Source: p.input, Filename: p.filename}
 					}
 
 					// Build enhanced format spec string that includes all modifiers

@@ -108,7 +108,13 @@ func (p *Parser) parseSString(quoteChar rune, raw bool) (core.Value, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unclosed s-string at line %d, column %d", p.line, p.col)
+	return nil, &ParseError{
+		Message:  "unclosed s-string",
+		Line:     p.line,
+		Col:      p.col,
+		Source:   p.input,
+		Filename: p.filename,
+	}
 }
 
 // parseRawSString parses a raw s-string (no interpolation)
@@ -145,14 +151,26 @@ func (p *Parser) parseRawSString(quoteChar rune) (core.Value, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unclosed raw s-string at line %d, column %d", p.line, p.col)
+	return nil, &ParseError{
+		Message:  "unclosed raw s-string",
+		Line:     p.line,
+		Col:      p.col,
+		Source:   p.input,
+		Filename: p.filename,
+	}
 }
 
 // parseSStringInterpolation parses a single interpolation expression
 // Handles: {x}, {=x}, {*x}, {**x}, {x#}
 func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, error) {
 	if p.pos >= len(p.input) || p.input[p.pos] != '{' {
-		return Interpolation{}, fmt.Errorf("expected '{' at line %d, column %d", p.line, p.col)
+		return Interpolation{}, &ParseError{
+			Message:  "expected '{'",
+			Line:     p.line,
+			Col:      p.col,
+			Source:   p.input,
+			Filename: p.filename,
+		}
 	}
 
 	// Skip '{'
@@ -160,7 +178,13 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 	p.skipWhitespaceAndComments()
 
 	if p.pos >= len(p.input) {
-		return Interpolation{}, fmt.Errorf("unclosed interpolation at line %d, column %d", p.line, p.col)
+		return Interpolation{}, &ParseError{
+			Message:  "unclosed interpolation",
+			Line:     p.line,
+			Col:      p.col,
+			Source:   p.input,
+			Filename: p.filename,
+		}
 	}
 
 	// Determine interpolation type
@@ -244,7 +268,13 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 					}
 
 					if exprStr == "" {
-						return Interpolation{}, fmt.Errorf("empty interpolation at line %d, column %d", p.line, p.col)
+						return Interpolation{}, &ParseError{
+							Message:  "empty interpolation",
+							Line:     p.line,
+							Col:      p.col,
+							Source:   p.input,
+							Filename: p.filename,
+						}
 					}
 
 					// Parse the expression
@@ -252,7 +282,13 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 					tempParser.SetFilename(p.filename)
 					expr, err := tempParser.Parse(exprStr)
 					if err != nil {
-						return Interpolation{}, fmt.Errorf("error parsing s-string interpolation: %v", err)
+						return Interpolation{}, &ParseError{
+							Message:  fmt.Sprintf("error parsing s-string interpolation: %v", err),
+							Line:     p.line,
+							Col:      p.col,
+							Source:   p.input,
+							Filename: p.filename,
+						}
 					}
 
 					// Skip '}'
@@ -279,7 +315,13 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 		p.advance()
 	}
 
-	return Interpolation{}, fmt.Errorf("unclosed s-string interpolation at line %d, column %d", p.line, p.col)
+	return Interpolation{}, &ParseError{
+		Message:  "unclosed s-string interpolation",
+		Line:     p.line,
+		Col:      p.col,
+		Source:   p.input,
+		Filename: p.filename,
+	}
 }
 
 // buildSStringAST builds the AST for an s-string with interpolations

@@ -1712,7 +1712,7 @@ func (p *PythonParser) interpretFStringEscapes(s string) string {
 func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error) {
 	// Find the quote character (skip past prefix: f, fr, rf, etc.)
 	if len(lexeme) < 2 {
-		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Line: 1, Col: 1}
 	}
 
 	// Skip past all prefix characters (f, r, b combinations)
@@ -1722,7 +1722,7 @@ func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error)
 	}
 
 	if quoteIdx >= len(lexeme) {
-		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Line: 1, Col: 1}
 	}
 
 	var quoteChar byte
@@ -1731,7 +1731,7 @@ func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error)
 	} else if lexeme[quoteIdx] == '\'' {
 		quoteChar = '\''
 	} else {
-		return nil, fmt.Errorf("invalid f-string lexeme: %s", lexeme)
+		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Line: 1, Col: 1}
 	}
 
 	// Extract the string content (without quotes and prefix)
@@ -1924,19 +1924,19 @@ func (p *PythonParser) parsePythonFString(content string) (core.Value, error) {
 		tempTokenizer := NewPythonTokenizer(exprStr)
 		tokens, err := tempTokenizer.Tokenize()
 		if err != nil {
-			return nil, fmt.Errorf("error tokenizing f-string expression: %v", err)
+			return nil, err // Already a TokenizationError
 		}
 
 		tempParser := NewPythonParser(tokens, "<f-string>", exprStr)
 		exprNode := tempParser.parseExpression()
 		if len(tempParser.errors) > 0 {
-			return nil, fmt.Errorf("error parsing f-string expression: %v", tempParser.errors[0])
+			return nil, tempParser.errors[0] // Already an error from parser
 		}
 
 		// Convert AST node to IR for evaluation
 		exprValue, err := p.astNodeToValue(exprNode)
 		if err != nil {
-			return nil, fmt.Errorf("error converting f-string expression: %v", err)
+			return nil, err // Already an error from conversion
 		}
 
 		// If we have conversion or format spec, wrap in format-expr
@@ -2010,7 +2010,7 @@ func (p *PythonParser) astNodeToValue(node ast.ASTNode) (core.Value, error) {
 		return core.NewList(core.SymbolValue("="), target, value), nil
 	default:
 		// For other node types, try to convert via the IR
-		return nil, fmt.Errorf("unsupported AST node type in f-string: %T", node)
+		return nil, &ParseError{Message: fmt.Sprintf("unsupported AST node type in f-string: %T", node), Line: 1, Col: 1}
 	}
 }
 
@@ -2028,7 +2028,7 @@ func (p *PythonParser) comprehensionToValue(comp *ast.ComprehensionForm) (core.V
 	case ast.GeneratorComp:
 		kindSym = "generator-exp"
 	default:
-		return nil, fmt.Errorf("unknown comprehension kind: %v", comp.Kind)
+		return nil, &ParseError{Message: fmt.Sprintf("unknown comprehension kind: %v", comp.Kind), Line: 1, Col: 1}
 	}
 
 	// Convert element/key/value expressions
