@@ -751,6 +751,15 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					name, ok := sItem1.(core.SymbolValue)
 					if ok {
 						// annotation is sItems[2], value is sItems[3] (if present)
+						// Evaluate the annotation type
+						annotationType, err := Eval(sItems[2], classBodyCtx)
+						if err != nil {
+							return nil, err
+						}
+
+						// Add annotation to class.__annotations__
+						class.Annotations.Set(string(name), annotationType)
+
 						if s.Len() == 4 {
 							// Has a value: x: int = 5
 							value, err := Eval(sItems[3], classBodyCtx)
