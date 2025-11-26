@@ -91,7 +91,7 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("count() takes exactly one argument")
+					return nil, &TypeError{Message: fmt.Sprintf("count() takes exactly one argument (%d given)", len(args))}
 				}
 
 				tuple := receiver.(TupleValue)
@@ -111,7 +111,7 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) < 1 {
-					return nil, fmt.Errorf("index() takes at least 1 argument")
+					return nil, &TypeError{Message: "index() takes at least 1 argument (0 given)"}
 				}
 
 				tuple := receiver.(TupleValue)

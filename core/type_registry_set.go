@@ -53,12 +53,12 @@ func registerSetType() {
 							result.Add(val)
 						}
 					} else {
-						return nil, fmt.Errorf("set() argument must be an iterable")
+						return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", args[0].Type())}
 					}
 				}
 				return result, nil
 			}
-			return nil, fmt.Errorf("set() takes at most 1 argument (%d given)", len(args))
+			return nil, &TypeError{Message: fmt.Sprintf("set() takes at most 1 argument (%d given)", len(args))}
 		},
 		Repr: func(v Value) string {
 			set := v.(*SetValue)
@@ -111,11 +111,11 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("remove() takes exactly one argument")
+					return nil, &TypeError{Message: fmt.Sprintf("remove() takes exactly one argument (%d given)", len(args))}
 				}
 				set := receiver.(*SetValue)
 				if !set.Contains(args[0]) {
-					return nil, fmt.Errorf("KeyError: %v", args[0])
+					return nil, &KeyError{Key: args[0]}
 				}
 				// Mutate in-place
 				set.Remove(args[0])
@@ -145,7 +145,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				set := receiver.(*SetValue)
 				if set.Size() == 0 {
-					return nil, fmt.Errorf("pop from an empty set")
+					return nil, &KeyError{Message: "pop from an empty set"}
 				}
 				// Return and remove the first element (get any key from the map)
 				for k, v := range set.items {
@@ -153,7 +153,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 					return v, nil
 				}
 				// Should never reach here since we checked size > 0
-				return nil, fmt.Errorf("pop from an empty set")
+				return nil, &KeyError{Message: "pop from an empty set"}
 			},
 		},
 		"clear": {

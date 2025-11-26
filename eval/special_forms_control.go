@@ -2,6 +2,7 @@
 package eval
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -153,6 +154,16 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		errMsg = evalErr.Message
 	} else {
 		errMsg = err.Error()
+	}
+
+	// Also unwrap any standard wrapped errors (fmt.Errorf with %w)
+	for {
+		unwrapped := errors.Unwrap(baseErr)
+		if unwrapped == nil {
+			break
+		}
+		baseErr = unwrapped
+		// Keep the original error message for display
 	}
 
 	// Check if error message starts with a Python exception type name

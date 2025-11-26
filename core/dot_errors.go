@@ -119,11 +119,17 @@ func (e *IndexError) Error() string {
 // KeyError represents a missing dictionary key
 type KeyError struct {
 	Key      Value
+	Message  string // Optional custom message (if empty, uses "key not found: {Key}")
 	Location *SourceLocation
 }
 
 func (e *KeyError) Error() string {
-	msg := fmt.Sprintf("key not found: %s", PrintValue(e.Key))
+	var msg string
+	if e.Message != "" {
+		msg = e.Message
+	} else {
+		msg = fmt.Sprintf("key not found: %s", PrintValue(e.Key))
+	}
 	if e.Location != nil {
 		return fmt.Sprintf("%s at %s", msg, e.Location.String())
 	}
@@ -370,9 +376,13 @@ func WrapEvalError(err error, message string, ctx *Context) *EvalError {
 			Wrapped: err,
 		}
 	case *KeyError:
+		msg := typedErr.Message
+		if msg == "" {
+			msg = typedErr.Error()
+		}
 		return &EvalError{
 			Type:    "KeyError",
-			Message: typedErr.Error(),
+			Message: msg,
 			Wrapped: err,
 		}
 	case *IndexError:

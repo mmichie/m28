@@ -359,7 +359,7 @@ func getListMethods() map[string]*MethodDescriptor {
 
 func listMethodAppend(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("append() takes exactly one argument")
+		return nil, &TypeError{Message: fmt.Sprintf("append() takes exactly one argument (%d given)", len(args))}
 	}
 	list := receiver.(*ListValue)
 	list.Append(args[0])
@@ -368,7 +368,7 @@ func listMethodAppend(receiver Value, args []Value, ctx *Context) (Value, error)
 
 func listMethodExtend(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("extend() takes exactly one argument")
+		return nil, &TypeError{Message: fmt.Sprintf("extend() takes exactly one argument (%d given)", len(args))}
 	}
 	list := receiver.(*ListValue)
 
@@ -407,13 +407,13 @@ func listMethodExtend(receiver Value, args []Value, ctx *Context) (Value, error)
 
 func listMethodInsert(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("insert() takes exactly 2 arguments")
+		return nil, &TypeError{Message: fmt.Sprintf("insert() takes exactly 2 arguments (%d given)", len(args))}
 	}
 
 	list := receiver.(*ListValue)
 	idxVal, ok := args[0].(NumberValue)
 	if !ok {
-		return nil, fmt.Errorf("insert() first argument must be an integer")
+		return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", args[0].Type())}
 	}
 
 	idx := int(idxVal)
@@ -439,7 +439,7 @@ func listMethodInsert(receiver Value, args []Value, ctx *Context) (Value, error)
 
 func listMethodRemove(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("remove() takes exactly one argument")
+		return nil, &TypeError{Message: fmt.Sprintf("remove() takes exactly one argument (%d given)", len(args))}
 	}
 
 	list := receiver.(*ListValue)
@@ -463,7 +463,7 @@ func listMethodPop(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) > 0 {
 		idxVal, ok := args[0].(NumberValue)
 		if !ok {
-			return nil, fmt.Errorf("pop() argument must be an integer")
+			return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", args[0].Type())}
 		}
 		idx = int(idxVal)
 		if idx < 0 {
@@ -485,7 +485,7 @@ func listMethodPop(receiver Value, args []Value, ctx *Context) (Value, error) {
 
 func listMethodIndex(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) < 1 {
-		return nil, fmt.Errorf("index() takes at least 1 argument")
+		return nil, &TypeError{Message: "index() takes at least 1 argument (0 given)"}
 	}
 
 	list := receiver.(*ListValue)
@@ -515,12 +515,12 @@ func listMethodIndex(receiver Value, args []Value, ctx *Context) (Value, error) 
 			return NumberValue(i), nil
 		}
 	}
-	return nil, fmt.Errorf("%v is not in list", args[0])
+	return nil, &ValueError{Message: fmt.Sprintf("%v is not in list", args[0])}
 }
 
 func listMethodCount(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("count() takes exactly one argument")
+		return nil, &TypeError{Message: fmt.Sprintf("count() takes exactly one argument (%d given)", len(args))}
 	}
 
 	list := receiver.(*ListValue)
