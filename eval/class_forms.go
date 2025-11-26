@@ -758,7 +758,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						}
 
 						// Add annotation to class.__annotations__
-						class.Annotations.Set(string(name), annotationType)
+						keyStr := core.StringValue(string(name))
+						class.Annotations.SetWithKey(core.ValueToKey(keyStr), keyStr, annotationType)
 
 						if s.Len() == 4 {
 							// Has a value: x: int = 5

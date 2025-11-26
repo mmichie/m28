@@ -66,6 +66,11 @@ func EqualValues(a, b Value) bool {
 		if bVal, ok := b.(*Class); ok {
 			return aVal == bVal // Same class instance
 		}
+		// Also handle types that wrap Class (like IntType, StrType, etc.)
+		if bWrapper, ok := b.(interface{ GetClass() *Class }); ok {
+			bClass := bWrapper.GetClass()
+			return aVal == bClass
+		}
 	case BoolValue:
 		if bVal, ok := b.(BoolValue); ok {
 			return bool(aVal) == bool(bVal)
@@ -177,6 +182,20 @@ func EqualValues(a, b Value) bool {
 		// This is correct for IntEnum which uses singleton pattern
 		if bVal, ok := b.(*Instance); ok {
 			return aVal == bVal
+		}
+	default:
+		// Handle types that wrap Class (like IntType, StrType, etc.)
+		if aWrapper, ok := a.(interface{ GetClass() *Class }); ok {
+			aClass := aWrapper.GetClass()
+			// Compare with another class
+			if bVal, ok := b.(*Class); ok {
+				return aClass == bVal
+			}
+			// Compare with another wrapper
+			if bWrapper, ok := b.(interface{ GetClass() *Class }); ok {
+				bClass := bWrapper.GetClass()
+				return aClass == bClass
+			}
 		}
 	}
 
