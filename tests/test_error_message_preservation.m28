@@ -1,0 +1,31 @@
+# Test that error messages are preserved when converting Go errors to Python exceptions
+
+# Test 1: Catch a TypeError and check the message
+(try
+  (int nil)  # This should raise TypeError with a detailed message
+  (except TypeError as e
+    (print "Caught TypeError:")
+    (print e)
+    (assert (> (len (str e)) 10) "Error message should be detailed, not just 'Exception'")))
+
+# Test 2: Catch a generic error
+(try
+  (raise (Exception "This is a detailed error message"))
+  (except Exception as e
+    (print "Caught Exception:")
+    (print e)
+    (assert (== (str e) "This is a detailed error message") "Error message should be preserved")))
+
+# Test 3: Raise a generic Go error and catch it
+(def test_function ()
+  (raise (Exception "error evaluating argument 1: expected str, bytes or os.PathLike object, not nil")))
+
+(try
+  (test_function)
+  (except Exception as e
+    (print "Caught from function:")
+    (print e)
+    (assert (!= (str e) "Exception") "Should not show 'Exception' as message")
+    (assert (> (len (str e)) 10) "Error message should be detailed")))
+
+(print "All tests passed!")

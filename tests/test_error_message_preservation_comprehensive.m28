@@ -1,0 +1,67 @@
+# Comprehensive test for error message preservation (M28-e346)
+# Tests that Go errors are always converted to Python exceptions with full error messages preserved
+
+(print "Testing error message preservation...")
+
+# Test 1: TypeError with detailed message
+(try
+  (int nil)
+  (except TypeError as e
+    (= msg (str e))
+    (print (+ "Test 1 - TypeError message: " msg))
+    (assert (!= msg "Exception") "Should not be generic 'Exception'")
+    (assert (!= msg "TypeError") "Should not be just the type name")
+    (assert (> (len msg) 5) "Message should be detailed")))
+
+# Test 2: ValueError with detailed message
+(try
+  (int "not a number!")
+  (except ValueError as e
+    (= msg (str e))
+    (print (+ "Test 2 - ValueError message: " msg))
+    (assert (!= msg "Exception") "Should not be generic 'Exception'")
+    (assert (!= msg "ValueError") "Should not be just the type name")))
+
+# Test 3: Generic Exception with detailed message
+(try
+  (raise (Exception "This is a very detailed error message that should not be lost"))
+  (except Exception as e
+    (= msg (str e))
+    (print (+ "Test 3 - Exception message: " msg))
+    # Note: str(e) may include quotes around the message
+    (assert (!= msg "Exception") "Message should not be just 'Exception'")
+    (assert (> (len msg) 20) "Message should be detailed")))
+
+# Test 4: Nested exceptions preserve messages
+(def failing_function ()
+  (raise (RuntimeError "Inner error with important details")))
+
+(try
+  (try
+    (failing_function)
+    (except RuntimeError as e
+      # Re-raise the caught exception
+      (raise e)))
+  (except RuntimeError as e
+    (= msg (str e))
+    (print (+ "Test 4 - Re-raised exception message: " msg))
+    (assert (!= msg "Exception") "Re-raised exception should preserve message")
+    (assert (!= msg "RuntimeError") "Should not be just the type name")))
+
+# Test 5: Exception created with empty message
+(try
+  (raise (Exception))
+  (except Exception as e
+    (= msg (str e))
+    (print (+ "Test 5 - Empty exception message: '" msg "'"))
+    (assert (== msg "") "Empty message should be empty string, not 'Exception'")))
+
+# Test 6: Exception caught as base Exception class
+(try
+  (raise (ValueError "Specific value error message"))
+  (except Exception as e
+    (= msg (str e))
+    (print (+ "Test 6 - ValueError caught as Exception: " msg))
+    (assert (!= msg "Exception") "Should preserve original message even when caught as base type")))
+
+(print "\nAll error message preservation tests passed!")

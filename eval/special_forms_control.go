@@ -243,22 +243,48 @@ func createPythonExceptionInstance(ctx *core.Context, exceptionType string, mess
 	// Try to get the exception class from context
 	exceptionClass, err := ctx.Lookup(exceptionType)
 	if err != nil {
-		// Fall back to string if class not found
-		return core.StringValue(message)
+		// Exception class not found - create a minimal exception instance manually
+		// We can't use the class system, so create a basic Instance with required attributes
+		inst := &core.Instance{
+			Class: &core.Class{Name: exceptionType},
+			Attributes: map[string]core.Value{
+				"args": core.TupleValue{core.StringValue(message)},
+			},
+		}
+		return inst
 	}
 
 	// Check if it's a class
 	class, ok := exceptionClass.(*core.Class)
 	if !ok {
-		// Fall back to string if not a class
-		return core.StringValue(message)
+		// Not a class - create a minimal exception instance manually
+		inst := &core.Instance{
+			Class: &core.Class{Name: exceptionType},
+			Attributes: map[string]core.Value{
+				"args": core.TupleValue{core.StringValue(message)},
+			},
+		}
+		return inst
 	}
 
 	// Instantiate the exception class with the message
 	instance, err := class.Call([]core.Value{core.StringValue(message)}, ctx)
 	if err != nil {
-		// Fall back to string if instantiation fails
-		return core.StringValue(message)
+		// Instantiation failed - log the error and create a minimal instance manually
+		// This preserves the original error message instead of losing it
+		core.Log.Debug(core.SubsystemEval, "Exception instantiation failed, creating minimal instance",
+			"exception_type", exceptionType,
+			"message", message,
+			"instantiation_error", err.Error())
+
+		// Create a minimal exception instance that preserves the message
+		inst := &core.Instance{
+			Class: class,
+			Attributes: map[string]core.Value{
+				"args": core.TupleValue{core.StringValue(message)},
+			},
+		}
+		return inst
 	}
 
 	return instance
