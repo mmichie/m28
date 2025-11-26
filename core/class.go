@@ -669,7 +669,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 		}); ok {
 			result, err := callable.Call(newArgs, ctx)
 			if err != nil {
-				return nil, fmt.Errorf("error in %s.__new__: %v", c.Name, err)
+				return nil, fmt.Errorf("error in %s.__new__: %w", c.Name, err)
 			}
 			instance = result
 		} else {
@@ -721,7 +721,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 					if c.Name == "TestProgram" {
 						// 						fmt.Printf("[DEBUG Class.CallWithKeywords] Error calling %s.__init__: %v\n", c.Name, err)
 					}
-					return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
+					return nil, fmt.Errorf("error in %s.__init__: %w", c.Name, err)
 				}
 			} else if callable, ok := initMethod.(interface {
 				Call([]Value, *Context) (Value, error)
@@ -738,7 +738,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 					if errors.As(err, &sysExit) {
 						return nil, err
 					}
-					return nil, fmt.Errorf("error in %s.__init__: %v", c.Name, err)
+					return nil, fmt.Errorf("error in %s.__init__: %w", c.Name, err)
 				}
 			}
 		}
