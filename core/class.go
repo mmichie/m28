@@ -426,7 +426,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			// args[0] is the right operand
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__or__ takes exactly 1 argument")
+				return nil, &TypeError{Message: "__or__ takes exactly 1 argument"}
 			}
 			return NewUnionType([]Value{c, args[0]}), nil
 		}), true
@@ -438,7 +438,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	if name == "__mro_entries__" {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__mro_entries__ takes exactly 1 argument, got %d", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("__mro_entries__ takes exactly 1 argument, got %d", len(args))}
 			}
 			// Regular classes return the bases tuple unchanged
 			// Typing constructs (like Generic) override this to return actual base classes
@@ -488,7 +488,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		// The function is designed to work when called via CallDunder with just the 'other' argument
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__eq__ requires exactly 1 argument")
+				return nil, &TypeError{Message: "__eq__ requires exactly 1 argument"}
 			}
 			other := args[0]
 
@@ -511,7 +511,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		// Note: Called via protocol, so only receives 'other' argument (self is implicit)
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__ne__ requires exactly 1 argument")
+				return nil, &TypeError{Message: "__ne__ requires exactly 1 argument"}
 			}
 			// Get __eq__ method
 			eqMethod, ok := c.GetAttr("__eq__")
@@ -545,7 +545,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 				// Called on an instance - return instance representation
 				return StringValue(fmt.Sprintf("<%s object at %p>", c.Name, args[0])), nil
 			}
-			return nil, fmt.Errorf("__repr__ takes 0 or 1 arguments, got %d", len(args))
+			return nil, &TypeError{Message: fmt.Sprintf("__repr__ takes 0 or 1 arguments, got %d", len(args))}
 		}), true
 	case "__init__":
 		// Default __init__ that all classes inherit from object
@@ -635,7 +635,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 					Call([]Value, *Context) (Value, error)
 				}); ok {
 					if len(kwargs) > 0 {
-						return nil, fmt.Errorf("metaclass __call__ does not support keyword arguments")
+						return nil, &TypeError{Message: "metaclass __call__ does not support keyword arguments"}
 					}
 					return callable.Call(callArgs, ctx)
 				}
@@ -729,7 +729,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				// __init__ doesn't support kwargs - call with positional args only
 				// If kwargs were provided, this is an error
 				if len(kwargs) > 0 {
-					return nil, fmt.Errorf("%s.__init__ does not support keyword arguments (method type: %T)", c.Name, initMethod)
+					return nil, &TypeError{Message: fmt.Sprintf("%s.__init__ does not support keyword arguments (method type: %T)", c.Name, initMethod)}
 				}
 				_, err := callable.Call(initArgs, initCtx)
 				if err != nil {
@@ -859,7 +859,7 @@ func (w *IteratorWrapper) GetAttr(name string) (Value, bool) {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			val, hasNext := w.Iterator.Next()
 			if !hasNext {
-				return nil, fmt.Errorf("StopIteration")
+				return nil, &StopIteration{}
 			}
 			return val, nil
 		}), true
@@ -951,7 +951,7 @@ func (l *ListInstance) GetAttr(name string) (Value, bool) {
 	case "__getitem__":
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__getitem__ takes exactly 1 argument")
+				return nil, &TypeError{Message: "__getitem__ takes exactly 1 argument"}
 			}
 			// Delegate to list's __getitem__
 			if getItem, ok := l.Data.GetAttr("__getitem__"); ok {
@@ -961,7 +961,7 @@ func (l *ListInstance) GetAttr(name string) (Value, bool) {
 					return callable.Call(args, ctx)
 				}
 			}
-			return nil, fmt.Errorf("list has no __getitem__ method")
+			return nil, &AttributeError{ObjType: "list", AttrName: "__getitem__"}
 		}), true
 	}
 
@@ -1277,7 +1277,7 @@ func (i *Instance) DelAttr(name string) error {
 
 	// No descriptor with __delete__, delete from instance __dict__
 	if _, ok := i.Attributes[name]; !ok {
-		return fmt.Errorf("'%s' object has no attribute '%s'", i.Class.Name, name)
+		return &AttributeError{ObjType: i.Class.Name, AttrName: name}
 	}
 	delete(i.Attributes, name)
 	return nil
@@ -1406,7 +1406,7 @@ func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]
 		// 		fmt.Printf("[DEBUG BoundInstanceMethod] Method type: %T\n", bm.Method)
 		// 		fmt.Printf("[DEBUG BoundInstanceMethod] Falling back to regular Call - kwargs will be lost\n")
 		// For now, we just error. TODO: integrate with kwarg_eval
-		return nil, fmt.Errorf("method does not support keyword arguments")
+		return nil, &TypeError{Message: "method does not support keyword arguments"}
 	}
 
 	// Fall back to regular Call
@@ -1549,7 +1549,7 @@ func (bsm *BoundSuperMethod) CallWithKeywords(args []Value, kwargs map[string]Va
 
 	// If method doesn't support kwargs but we have kwargs, error
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("method does not support keyword arguments")
+		return nil, &TypeError{Message: "method does not support keyword arguments"}
 	}
 
 	// Fall back to regular Call
