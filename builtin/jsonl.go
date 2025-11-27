@@ -35,7 +35,7 @@ func ParseJSONLLineBuilder() builders.BuiltinFunc {
 		lineArg := v.Get(0)
 		line, ok := types.AsString(lineArg)
 		if !ok {
-			return nil, fmt.Errorf("parse-jsonl-line requires string argument, got %s", lineArg.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("parse-jsonl-line requires string argument, got %s", lineArg.Type())}
 		}
 
 		// Trim whitespace
@@ -49,7 +49,7 @@ func ParseJSONLLineBuilder() builders.BuiltinFunc {
 		// Parse JSON
 		var goValue interface{}
 		if err := json.Unmarshal([]byte(line), &goValue); err != nil {
-			return nil, fmt.Errorf("parse-jsonl-line: invalid JSON: %w", err)
+			return nil, &core.ValueError{Message: fmt.Sprintf("parse-jsonl-line: invalid JSON: %v", err)}
 		}
 
 		// Convert to M28 value
@@ -104,7 +104,7 @@ func ReadJSONLBuilder() builders.BuiltinFunc {
 		filenameArg := v.Get(0)
 		filename, ok := types.AsString(filenameArg)
 		if !ok {
-			return nil, fmt.Errorf("read-jsonl requires string filename, got %s", filenameArg.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("read-jsonl requires string filename, got %s", filenameArg.Type())}
 		}
 
 		// Check for skip-errors keyword argument
@@ -124,7 +124,7 @@ func ReadJSONLBuilder() builders.BuiltinFunc {
 		// Open file
 		file, err := os.Open(filename)
 		if err != nil {
-			return nil, fmt.Errorf("read-jsonl: failed to open file: %w", err)
+			return nil, &core.OSError{Message: fmt.Sprintf("read-jsonl: failed to open file: %v", err)}
 		}
 		defer file.Close()
 
@@ -150,7 +150,7 @@ func ReadJSONLBuilder() builders.BuiltinFunc {
 					fmt.Fprintf(os.Stderr, "Warning: Skipping invalid JSON on line %d: %v\n", lineNum, err)
 					continue
 				}
-				return nil, fmt.Errorf("read-jsonl: invalid JSON on line %d: %w", lineNum, err)
+				return nil, &core.ValueError{Message: fmt.Sprintf("read-jsonl: invalid JSON on line %d: %v", lineNum, err)}
 			}
 
 			// Convert to M28 value
@@ -167,7 +167,7 @@ func ReadJSONLBuilder() builders.BuiltinFunc {
 		}
 
 		if err := scanner.Err(); err != nil {
-			return nil, fmt.Errorf("read-jsonl: error reading file: %w", err)
+			return nil, &core.OSError{Message: fmt.Sprintf("read-jsonl: error reading file: %v", err)}
 		}
 
 		return core.NewList(results...), nil
@@ -188,14 +188,14 @@ func WriteJSONLBuilder() builders.BuiltinFunc {
 		filenameArg := v.Get(0)
 		filename, ok := types.AsString(filenameArg)
 		if !ok {
-			return nil, fmt.Errorf("write-jsonl requires string filename, got %s", filenameArg.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("write-jsonl requires string filename, got %s", filenameArg.Type())}
 		}
 
 		// Get data (must be list)
 		dataArg := v.Get(1)
 		data, ok := types.AsList(dataArg)
 		if !ok {
-			return nil, fmt.Errorf("write-jsonl requires list as second argument, got %s", dataArg.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("write-jsonl requires list as second argument, got %s", dataArg.Type())}
 		}
 
 		// Get mode (write or append)
@@ -219,7 +219,7 @@ func WriteJSONLBuilder() builders.BuiltinFunc {
 
 		file, err := os.OpenFile(filename, flags, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("write-jsonl: failed to open file: %w", err)
+			return nil, &core.OSError{Message: fmt.Sprintf("write-jsonl: failed to open file: %v", err)}
 		}
 		defer file.Close()
 
@@ -240,13 +240,13 @@ func WriteJSONLBuilder() builders.BuiltinFunc {
 
 			// Write with newline
 			if _, err := writer.WriteString(string(jsonBytes) + "\n"); err != nil {
-				return nil, fmt.Errorf("write-jsonl: failed to write line %d: %w", i+1, err)
+				return nil, &core.OSError{Message: fmt.Sprintf("write-jsonl: failed to write line %d: %v", i+1, err)}
 			}
 		}
 
 		// Flush buffer
 		if err := writer.Flush(); err != nil {
-			return nil, fmt.Errorf("write-jsonl: failed to flush buffer: %w", err)
+			return nil, &core.OSError{Message: fmt.Sprintf("write-jsonl: failed to flush buffer: %v", err)}
 		}
 
 		return core.Nil, nil
@@ -266,7 +266,7 @@ func AppendJSONLLineBuilder() builders.BuiltinFunc {
 		filenameArg := v.Get(0)
 		filename, ok := types.AsString(filenameArg)
 		if !ok {
-			return nil, fmt.Errorf("append-jsonl-line requires string filename, got %s", filenameArg.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("append-jsonl-line requires string filename, got %s", filenameArg.Type())}
 		}
 
 		// Get object
@@ -275,7 +275,7 @@ func AppendJSONLLineBuilder() builders.BuiltinFunc {
 		// Open file in append mode
 		file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("append-jsonl-line: failed to open file: %w", err)
+			return nil, &core.OSError{Message: fmt.Sprintf("append-jsonl-line: failed to open file: %v", err)}
 		}
 		defer file.Close()
 
@@ -293,7 +293,7 @@ func AppendJSONLLineBuilder() builders.BuiltinFunc {
 
 		// Write with newline
 		if _, err := file.WriteString(string(jsonBytes) + "\n"); err != nil {
-			return nil, fmt.Errorf("append-jsonl-line: failed to write: %w", err)
+			return nil, &core.OSError{Message: fmt.Sprintf("append-jsonl-line: failed to write: %v", err)}
 		}
 
 		return core.Nil, nil
@@ -334,7 +334,7 @@ func goToM28Value(v interface{}) (core.Value, error) {
 		}
 		return dict, nil
 	default:
-		return nil, fmt.Errorf("unexpected JSON type: %T", v)
+		return nil, &core.TypeError{Message: fmt.Sprintf("unexpected JSON type: %T", v)}
 	}
 }
 
@@ -394,5 +394,5 @@ func m28ValueToGo(v core.Value) (interface{}, error) {
 		return result, nil
 	}
 
-	return nil, fmt.Errorf("cannot convert %s to JSON", v.Type())
+	return nil, &core.TypeError{Message: fmt.Sprintf("cannot convert %s to JSON", v.Type())}
 }
