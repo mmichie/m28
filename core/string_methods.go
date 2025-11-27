@@ -39,7 +39,7 @@ func applyConversion(value Value, conversion string) (Value, error) {
 		}
 		return StringValue(result.String()), nil
 	default:
-		return nil, fmt.Errorf("unknown conversion specifier '!%s'", conversion)
+		return nil, &ValueError{Message: fmt.Sprintf("unknown conversion specifier '!%s'", conversion)}
 	}
 }
 
@@ -315,7 +315,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		// Found % - check next character
 		i++
 		if i >= len(formatStr) {
-			return nil, fmt.Errorf("incomplete format")
+			return nil, &ValueError{Message: "incomplete format"}
 		}
 
 		// %% means literal %
@@ -334,7 +334,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		// Check for %(name)s dictionary-style formatting
 		if formatStr[i] == '(' {
 			if valueDict == nil {
-				return nil, fmt.Errorf("format requires a mapping")
+				return nil, &TypeError{Message: "format requires a mapping"}
 			}
 
 			// Find the closing )
@@ -371,7 +371,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			}
 
 			if i >= len(formatStr) {
-				return nil, fmt.Errorf("incomplete format")
+				return nil, &ValueError{Message: "incomplete format"}
 			}
 
 			fmtType = formatStr[i]
@@ -387,7 +387,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		} else {
 			// Positional formatting
 			if valueDict != nil {
-				return nil, fmt.Errorf("format requires a sequence, not a dict")
+				return nil, &TypeError{Message: "format requires a sequence, not a dict"}
 			}
 
 			// Parse format specifier (simplified version)
@@ -409,14 +409,14 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			if i < len(formatStr) && formatStr[i] == '*' {
 				// Dynamic width from next argument
 				if valueIdx >= len(valueTuple) {
-					return nil, fmt.Errorf("not enough arguments for format string")
+					return nil, &TypeError{Message: "not enough arguments for format string"}
 				}
 				if widthNum, ok := valueTuple[valueIdx].(NumberValue); ok {
 					width = int(widthNum)
 					hasWidth = true
 					valueIdx++
 				} else {
-					return nil, fmt.Errorf("* wants int")
+					return nil, &TypeError{Message: "* wants int"}
 				}
 				i++
 			} else {
@@ -441,7 +441,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			}
 
 			if i >= len(formatStr) {
-				return nil, fmt.Errorf("incomplete format")
+				return nil, &ValueError{Message: "incomplete format"}
 			}
 
 			// Get format type
@@ -450,7 +450,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 
 			// Get the value to format
 			if valueIdx >= len(valueTuple) {
-				return nil, fmt.Errorf("not enough arguments for format string")
+				return nil, &TypeError{Message: "not enough arguments for format string"}
 			}
 			value = valueTuple[valueIdx]
 			valueIdx++
@@ -476,13 +476,13 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 					formatted = "0"
 				}
 			} else {
-				return nil, fmt.Errorf("%%d format: a number is required, not %s", value.Type())
+				return nil, &TypeError{Message: fmt.Sprintf("%%d format: a number is required, not %s", value.Type())}
 			}
 		case 'f', 'F': // Float
 			if num, ok := value.(NumberValue); ok {
 				formatted = fmt.Sprintf("%f", float64(num))
 			} else {
-				return nil, fmt.Errorf("%%f format: a number is required, not %s", value.Type())
+				return nil, &TypeError{Message: fmt.Sprintf("%%f format: a number is required, not %s", value.Type())}
 			}
 		case 'r': // Repr
 			formatted = value.String()
@@ -493,10 +493,10 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 				if len(str) == 1 {
 					formatted = string(str)
 				} else {
-					return nil, fmt.Errorf("%%c requires int or char")
+					return nil, &TypeError{Message: "%c requires int or char"}
 				}
 			} else {
-				return nil, fmt.Errorf("%%c requires int or char")
+				return nil, &TypeError{Message: "%c requires int or char"}
 			}
 		case 'x', 'X': // Hex
 			if num, ok := value.(NumberValue); ok {
@@ -517,7 +517,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 					formatted = "0"
 				}
 			} else {
-				return nil, fmt.Errorf("%%%c format: a number is required", fmtType)
+				return nil, &TypeError{Message: fmt.Sprintf("%%%c format: a number is required", fmtType)}
 			}
 		case 'o': // Octal
 			if num, ok := value.(NumberValue); ok {
@@ -530,10 +530,10 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 					formatted = "0"
 				}
 			} else {
-				return nil, fmt.Errorf("%%o format: a number is required")
+				return nil, &TypeError{Message: "%o format: a number is required"}
 			}
 		default:
-			return nil, fmt.Errorf("unsupported format character '%c'", fmtType)
+			return nil, &ValueError{Message: fmt.Sprintf("unsupported format character '%c'", fmtType)}
 		}
 
 		// Apply width padding if specified
@@ -553,7 +553,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 	}
 
 	if valueDict == nil && valueIdx < len(valueTuple) {
-		return nil, fmt.Errorf("not all arguments converted during string formatting")
+		return nil, &TypeError{Message: "not all arguments converted during string formatting"}
 	}
 
 	return StringValue(result.String()), nil
@@ -588,26 +588,26 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) < 2 {
-				return nil, fmt.Errorf("replace() takes at least 2 arguments (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("replace() takes at least 2 arguments (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 
 			old, ok := args[0].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("replace() argument 1 must be a string")
+				return nil, &TypeError{Message: "replace() argument 1 must be a string"}
 			}
 
 			new, ok := args[1].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("replace() argument 2 must be a string")
+				return nil, &TypeError{Message: "replace() argument 2 must be a string"}
 			}
 
 			if len(args) >= 3 {
 				if count, ok := args[2].(NumberValue); ok {
 					return StringValue(strings.Replace(s, string(old), string(new), int(count))), nil
 				}
-				return nil, fmt.Errorf("replace() argument 3 must be a number")
+				return nil, &TypeError{Message: "replace() argument 3 must be a number"}
 			}
 
 			return StringValue(strings.ReplaceAll(s, string(old), string(new))), nil
@@ -621,7 +621,7 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("startswith() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("startswith() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
@@ -636,7 +636,7 @@ func InitStringMethods() {
 				for _, prefixVal := range prefixTuple {
 					prefix, ok := prefixVal.(StringValue)
 					if !ok {
-						return nil, fmt.Errorf("tuple for startswith must contain only strings")
+						return nil, &TypeError{Message: "tuple for startswith must contain only strings"}
 					}
 					if strings.HasPrefix(s, string(prefix)) {
 						return BoolValue(true), nil
@@ -645,7 +645,7 @@ func InitStringMethods() {
 				return BoolValue(false), nil
 			}
 
-			return nil, fmt.Errorf("startswith() argument must be a string or tuple of strings")
+			return nil, &TypeError{Message: "startswith() argument must be a string or tuple of strings"}
 		},
 	}
 
@@ -656,7 +656,7 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("endswith() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("endswith() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
@@ -671,7 +671,7 @@ func InitStringMethods() {
 				for _, suffixVal := range suffixTuple {
 					suffix, ok := suffixVal.(StringValue)
 					if !ok {
-						return nil, fmt.Errorf("tuple for endswith must contain only strings")
+						return nil, &TypeError{Message: "tuple for endswith must contain only strings"}
 					}
 					if strings.HasSuffix(s, string(suffix)) {
 						return BoolValue(true), nil
@@ -680,7 +680,7 @@ func InitStringMethods() {
 				return BoolValue(false), nil
 			}
 
-			return nil, fmt.Errorf("endswith() argument must be a string or tuple of strings")
+			return nil, &TypeError{Message: "endswith() argument must be a string or tuple of strings"}
 		},
 	}
 
@@ -691,13 +691,13 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) < 1 || len(args) > 3 {
-				return nil, fmt.Errorf("find() takes 1 to 3 arguments (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("find() takes 1 to 3 arguments (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 			sub, ok := args[0].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("find() argument must be a string")
+				return nil, &TypeError{Message: "find() argument must be a string"}
 			}
 
 			// Optional start parameter (default 0)
@@ -705,7 +705,7 @@ func InitStringMethods() {
 			if len(args) >= 2 {
 				startNum, ok := args[1].(NumberValue)
 				if !ok {
-					return nil, fmt.Errorf("find() start position must be an integer")
+					return nil, &TypeError{Message: "find() start position must be an integer"}
 				}
 				start = int(startNum)
 				if start < 0 {
@@ -721,7 +721,7 @@ func InitStringMethods() {
 			if len(args) >= 3 {
 				endNum, ok := args[2].(NumberValue)
 				if !ok {
-					return nil, fmt.Errorf("find() end position must be an integer")
+					return nil, &TypeError{Message: "find() end position must be an integer"}
 				}
 				end = int(endNum)
 				if end < 0 {
@@ -749,7 +749,7 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("join() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("join() takes exactly one argument (%d given)", len(args))}
 			}
 
 			sep := string(receiver.(StringValue))
@@ -763,7 +763,7 @@ func InitStringMethods() {
 					if s, ok := item.(StringValue); ok {
 						parts[i] = string(s)
 					} else {
-						return nil, fmt.Errorf("sequence item %d: expected str instance, %s found", i, item.Type())
+						return nil, &TypeError{Message: fmt.Sprintf("sequence item %d: expected str instance, %s found", i, item.Type())}
 					}
 				}
 			case TupleValue:
@@ -772,7 +772,7 @@ func InitStringMethods() {
 					if s, ok := item.(StringValue); ok {
 						parts[i] = string(s)
 					} else {
-						return nil, fmt.Errorf("sequence item %d: expected str instance, %s found", i, item.Type())
+						return nil, &TypeError{Message: fmt.Sprintf("sequence item %d: expected str instance, %s found", i, item.Type())}
 					}
 				}
 			default:
@@ -789,12 +789,12 @@ func InitStringMethods() {
 						if s, ok := item.(StringValue); ok {
 							parts = append(parts, string(s))
 						} else {
-							return nil, fmt.Errorf("sequence item %d: expected str instance, %s found", idx, item.Type())
+							return nil, &TypeError{Message: fmt.Sprintf("sequence item %d: expected str instance, %s found", idx, item.Type())}
 						}
 						idx++
 					}
 				} else {
-					return nil, fmt.Errorf("join() argument must be an iterable")
+					return nil, &TypeError{Message: "join() argument must be an iterable"}
 				}
 			}
 
@@ -835,13 +835,13 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("count() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("count() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 			sub, ok := args[0].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("count() argument must be a string")
+				return nil, &TypeError{Message: "count() argument must be a string"}
 			}
 
 			return NumberValue(strings.Count(s, string(sub))), nil
@@ -883,7 +883,7 @@ func InitStringMethods() {
 					}
 
 					if depth != 0 {
-						return nil, fmt.Errorf("unmatched '{' in format string")
+						return nil, &ValueError{Message: "unmatched '{' in format string"}
 					}
 
 					// Extract the format spec
@@ -909,7 +909,7 @@ func InitStringMethods() {
 						fieldSpec = fieldSpec[:bangIdx]
 						// Validate conversion specifier
 						if conversion != "r" && conversion != "s" && conversion != "a" {
-							return nil, fmt.Errorf("invalid conversion specifier '!%s' in format string", conversion)
+							return nil, &ValueError{Message: fmt.Sprintf("invalid conversion specifier '!%s' in format string", conversion)}
 						}
 					}
 
@@ -923,12 +923,12 @@ func InitStringMethods() {
 						var err error
 						_, err = fmt.Sscanf(fieldSpec, "%d", &argIndex)
 						if err != nil {
-							return nil, fmt.Errorf("invalid field name '%s' in format string", fieldSpec)
+							return nil, &ValueError{Message: fmt.Sprintf("invalid field name '%s' in format string", fieldSpec)}
 						}
 					}
 
 					if argIndex >= len(args) {
-						return nil, fmt.Errorf("replacement index %d out of range for positional args tuple", argIndex)
+						return nil, &ValueError{Message: fmt.Sprintf("replacement index %d out of range for positional args tuple", argIndex)}
 					}
 
 					// Apply conversion if specified
@@ -956,7 +956,7 @@ func InitStringMethods() {
 						i += 2
 						continue
 					}
-					return nil, fmt.Errorf("single '}' encountered in format string")
+					return nil, &ValueError{Message: "single '}' encountered in format string"}
 				} else {
 					result.WriteByte(s[i])
 					i++
@@ -980,7 +980,7 @@ func InitStringMethods() {
 			if chars, ok := args[0].(StringValue); ok {
 				return StringValue(strings.TrimLeft(s, string(chars))), nil
 			}
-			return nil, fmt.Errorf("lstrip() argument must be a string")
+			return nil, &TypeError{Message: "lstrip() argument must be a string"}
 		},
 	}
 
@@ -997,7 +997,7 @@ func InitStringMethods() {
 			if chars, ok := args[0].(StringValue); ok {
 				return StringValue(strings.TrimRight(s, string(chars))), nil
 			}
-			return nil, fmt.Errorf("rstrip() argument must be a string")
+			return nil, &TypeError{Message: "rstrip() argument must be a string"}
 		},
 	}
 
@@ -1201,18 +1201,18 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("index() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("index() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 			sub, ok := args[0].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("index() argument must be a string")
+				return nil, &TypeError{Message: "index() argument must be a string"}
 			}
 
 			idx := strings.Index(s, string(sub))
 			if idx == -1 {
-				return nil, fmt.Errorf("substring not found")
+				return nil, &ValueError{Message: "substring not found"}
 			}
 			return NumberValue(idx), nil
 		},
@@ -1232,7 +1232,7 @@ func InitStringMethods() {
 			if chars, ok := args[0].(StringValue); ok {
 				return StringValue(strings.Trim(s, string(chars))), nil
 			}
-			return nil, fmt.Errorf("strip() argument must be a string")
+			return nil, &TypeError{Message: "strip() argument must be a string"}
 		},
 	}
 
@@ -1257,7 +1257,7 @@ func InitStringMethods() {
 						limit = -1
 					}
 				} else {
-					return nil, fmt.Errorf("maxsplit must be a number")
+					return nil, &TypeError{Message: "maxsplit must be a number"}
 				}
 			}
 
@@ -1281,7 +1281,7 @@ func InitStringMethods() {
 				if sepStr, ok := args[0].(StringValue); ok {
 					sep = string(sepStr)
 				} else if args[0] != Nil {
-					return nil, fmt.Errorf("sep must be a string or None")
+					return nil, &TypeError{Message: "sep must be a string or None"}
 				}
 
 				if limit == -1 {
@@ -1316,7 +1316,7 @@ func InitStringMethods() {
 					if num, ok := args[0].(NumberValue); ok {
 						keepends = num != 0
 					} else {
-						return nil, fmt.Errorf("splitlines() argument must be a bool or int")
+						return nil, &TypeError{Message: "splitlines() argument must be a bool or int"}
 					}
 				}
 			}
@@ -1385,13 +1385,13 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("removeprefix() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("removeprefix() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 			prefix, ok := args[0].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("removeprefix() argument must be a string")
+				return nil, &TypeError{Message: "removeprefix() argument must be a string"}
 			}
 
 			return StringValue(strings.TrimPrefix(s, string(prefix))), nil
@@ -1406,13 +1406,13 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("removesuffix() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("removesuffix() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 			suffix, ok := args[0].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("removesuffix() argument must be a string")
+				return nil, &TypeError{Message: "removesuffix() argument must be a string"}
 			}
 
 			return StringValue(strings.TrimSuffix(s, string(suffix))), nil
@@ -1427,13 +1427,13 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("partition() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("partition() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 			sep, ok := args[0].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("partition() argument must be a string")
+				return nil, &TypeError{Message: "partition() argument must be a string"}
 			}
 
 			sepStr := string(sep)
@@ -1457,13 +1457,13 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("rpartition() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("rpartition() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 			sep, ok := args[0].(StringValue)
 			if !ok {
-				return nil, fmt.Errorf("rpartition() argument must be a string")
+				return nil, &TypeError{Message: "rpartition() argument must be a string"}
 			}
 
 			sepStr := string(sep)
@@ -1496,7 +1496,7 @@ func InitStringMethods() {
 						tabsize = 0
 					}
 				} else {
-					return nil, fmt.Errorf("expandtabs() argument must be a number")
+					return nil, &TypeError{Message: "expandtabs() argument must be a number"}
 				}
 			}
 
@@ -1530,7 +1530,7 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("translate() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("translate() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
@@ -1538,7 +1538,7 @@ func InitStringMethods() {
 			// Translation table should be a dict mapping rune codes to replacement strings
 			table, ok := args[0].(*DictValue)
 			if !ok {
-				return nil, fmt.Errorf("translate() argument must be a dict")
+				return nil, &TypeError{Message: "translate() argument must be a dict"}
 			}
 
 			var result strings.Builder
@@ -1577,13 +1577,13 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("zfill() takes exactly one argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("zfill() takes exactly one argument (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
 			width, ok := args[0].(NumberValue)
 			if !ok {
-				return nil, fmt.Errorf("zfill() argument must be a number")
+				return nil, &TypeError{Message: "zfill() argument must be a number"}
 			}
 
 			// Use rune length for proper Unicode handling
@@ -1615,7 +1615,7 @@ func InitStringMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__mod__() takes exactly 1 argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("__mod__() takes exactly 1 argument (%d given)", len(args))}
 			}
 
 			formatStr := string(receiver.(StringValue))
