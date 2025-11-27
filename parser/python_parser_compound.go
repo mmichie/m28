@@ -411,128 +411,152 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 	}
 
 	for {
-		// Check for / (positional-only parameter separator)
-		// In Python 3.8+: def f(a, b, /, c, d): means a, b are positional-only
-		// For now, we just skip it and treat all parameters normally
-		if p.check(TOKEN_SLASH) {
-			p.advance() // consume /
-
-			if !p.check(TOKEN_COMMA) {
-				break
-			}
-			p.advance()
-
-			if p.check(TOKEN_RPAREN) {
-				break
-			}
+		// Handle positional-only separator (/)
+		if shouldContinue, shouldBreak := p.handlePositionalOnlySeparator(&params); shouldBreak {
+			break
+		} else if shouldContinue {
 			continue
 		}
 
-		// Check for *args or keyword-only parameter separator (*)
-		if p.check(TOKEN_STAR) {
-			p.advance() // consume *
-
-			// Check if this is just a keyword-only separator (bare *)
-			// In that case, the next token is comma or rparen, not an identifier
-			if p.check(TOKEN_COMMA) || p.check(TOKEN_RPAREN) {
-				// Bare * - keyword-only parameter separator
-				// All parameters after this must be keyword-only
-				// Add a parameter with name "*" to mark the transition
-				params = append(params, ast.Parameter{Name: "*"})
-
-				if p.check(TOKEN_COMMA) {
-					p.advance()
-				}
-				if p.check(TOKEN_RPAREN) {
-					break
-				}
-				continue
-			}
-
-			// *args case
-			nameTok := p.expect(TOKEN_IDENTIFIER)
-			param := ast.Parameter{
-				Name:      "*" + nameTok.Lexeme, // Prefix with * to mark as varargs
-				IsVarArgs: true,
-			}
-
-			// Parse optional type annotation for *args
-			if p.check(TOKEN_COLON) {
-				p.advance()
-				param.Type = p.parseTypeAnnotation()
-			}
-
+		// Handle *args or keyword-only separator (*)
+		if param, ok := p.parseVarArgsParameter(); ok {
 			params = append(params, param)
-
-			if !p.check(TOKEN_COMMA) {
-				break
-			}
-			p.advance()
-
-			if p.check(TOKEN_RPAREN) {
+			if p.shouldBreakParameterLoop() {
 				break
 			}
 			continue
 		}
 
-		// Check for **kwargs
-		if p.check(TOKEN_DOUBLESTAR) {
-			p.advance() // consume **
-			nameTok := p.expect(TOKEN_IDENTIFIER)
-			param := ast.Parameter{
-				Name:     "**" + nameTok.Lexeme, // Prefix with ** to mark as kwargs
-				IsKwargs: true,
-			}
-
-			// Parse optional type annotation for **kwargs
-			if p.check(TOKEN_COLON) {
-				p.advance()
-				param.Type = p.parseTypeAnnotation()
-			}
-
+		// Handle **kwargs
+		if param, ok := p.parseKwargsParameter(); ok {
 			params = append(params, param)
-
-			if !p.check(TOKEN_COMMA) {
-				break
-			}
-			p.advance()
-
-			if p.check(TOKEN_RPAREN) {
+			if p.shouldBreakParameterLoop() {
 				break
 			}
 			continue
 		}
 
-		// Parse regular parameter name
-		nameTok := p.expect(TOKEN_IDENTIFIER)
-		param := ast.Parameter{Name: nameTok.Lexeme}
-
-		// Parse optional type annotation
-		if p.check(TOKEN_COLON) {
-			p.advance()
-			param.Type = p.parseTypeAnnotation()
-		}
-
-		// Parse optional default value
-		if p.check(TOKEN_ASSIGN) {
-			p.advance()
-			param.Default = p.parseExpression()
-		}
-
+		// Parse regular parameter
+		param := p.parseRegularParameter()
 		params = append(params, param)
 
-		if !p.check(TOKEN_COMMA) {
-			break
-		}
-		p.advance()
-
-		// Allow trailing comma
-		if p.check(TOKEN_RPAREN) {
+		if p.shouldBreakParameterLoop() {
 			break
 		}
 	}
 
 	return params
+}
+
+// handlePositionalOnlySeparator handles the / separator for positional-only parameters
+// Returns (shouldContinue, shouldBreak) to control the parameter parsing loop
+func (p *PythonParser) handlePositionalOnlySeparator(params *[]ast.Parameter) (bool, bool) {
+	if !p.check(TOKEN_SLASH) {
+		return false, false // Didn't see /, continue normal processing
+	}
+
+	p.advance() // consume /
+
+	// If no comma after /, we're done with parameters
+	if !p.check(TOKEN_COMMA) {
+		return false, true // Break the loop
+	}
+	p.advance() // consume comma
+
+	// If rparen after comma, we're done
+	if p.check(TOKEN_RPAREN) {
+		return false, true // Break the loop
+	}
+
+	return true, false // Continue to next iteration
+}
+
+// parseVarArgsParameter parses *args or bare * (keyword-only separator)
+// Returns (parameter, true) if found, (zero-value, false) otherwise
+func (p *PythonParser) parseVarArgsParameter() (ast.Parameter, bool) {
+	if !p.check(TOKEN_STAR) {
+		return ast.Parameter{}, false
+	}
+
+	p.advance() // consume *
+
+	// Check if this is just a keyword-only separator (bare *)
+	if p.check(TOKEN_COMMA) || p.check(TOKEN_RPAREN) {
+		param := ast.Parameter{Name: "*"}
+		// Don't consume the comma here - let shouldBreakParameterLoop() handle it
+		return param, true
+	}
+
+	// *args case
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	param := ast.Parameter{
+		Name:      "*" + nameTok.Lexeme, // Prefix with * to mark as varargs
+		IsVarArgs: true,
+	}
+
+	// Parse optional type annotation
+	if p.check(TOKEN_COLON) {
+		p.advance()
+		param.Type = p.parseTypeAnnotation()
+	}
+
+	return param, true
+}
+
+// parseKwargsParameter parses **kwargs
+// Returns (parameter, true) if found, (zero-value, false) otherwise
+func (p *PythonParser) parseKwargsParameter() (ast.Parameter, bool) {
+	if !p.check(TOKEN_DOUBLESTAR) {
+		return ast.Parameter{}, false
+	}
+
+	p.advance() // consume **
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	param := ast.Parameter{
+		Name:     "**" + nameTok.Lexeme, // Prefix with ** to mark as kwargs
+		IsKwargs: true,
+	}
+
+	// Parse optional type annotation
+	if p.check(TOKEN_COLON) {
+		p.advance()
+		param.Type = p.parseTypeAnnotation()
+	}
+
+	return param, true
+}
+
+// parseRegularParameter parses a regular parameter with optional type and default
+func (p *PythonParser) parseRegularParameter() ast.Parameter {
+	nameTok := p.expect(TOKEN_IDENTIFIER)
+	param := ast.Parameter{Name: nameTok.Lexeme}
+
+	// Parse optional type annotation
+	if p.check(TOKEN_COLON) {
+		p.advance()
+		param.Type = p.parseTypeAnnotation()
+	}
+
+	// Parse optional default value
+	if p.check(TOKEN_ASSIGN) {
+		p.advance()
+		param.Default = p.parseExpression()
+	}
+
+	return param
+}
+
+// shouldBreakParameterLoop determines if we should exit the parameter parsing loop
+func (p *PythonParser) shouldBreakParameterLoop() bool {
+	// If no comma, we're done
+	if !p.check(TOKEN_COMMA) {
+		return true
+	}
+
+	p.advance() // consume comma
+
+	// Allow trailing comma
+	return p.check(TOKEN_RPAREN)
 }
 
 // parseTypeAnnotation parses a type annotation
