@@ -3,7 +3,6 @@ package builtin
 import (
 	"fmt"
 
-	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
@@ -17,17 +16,9 @@ func RegisterAssertBuiltins(ctx *core.Context) {
 			return nil, err
 		}
 
-		// Convert the first argument to a boolean
-		var condition bool
+		// Use Python's truthiness rules to evaluate the condition
 		arg := v.Get(0)
-		if b, ok := types.AsBool(arg); ok {
-			condition = b
-		} else if types.IsNil(arg) {
-			condition = false
-		} else {
-			// In most languages, any non-nil, non-zero, non-empty value is considered true
-			condition = true
-		}
+		condition := core.IsTruthy(arg)
 
 		if !condition {
 			var message string
@@ -37,8 +28,13 @@ func RegisterAssertBuiltins(ctx *core.Context) {
 			} else {
 				message = "Assertion failed"
 			}
+			core.Log.Debug(core.SubsystemBuiltin, "Assertion failed",
+				"condition", arg,
+				"message", message)
 			return nil, core.NewAssertionError(message)
 		}
+
+		core.Log.Trace(core.SubsystemBuiltin, "Assertion passed", "condition", arg)
 
 		return core.Nil, nil
 	}))

@@ -691,9 +691,11 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			}
 			// Debug for TestProgram
 			if c.Name == "TestProgram" {
-				// 				fmt.Printf("[DEBUG Class.CallWithKeywords] Calling %s.__init__ with %d args, %d kwargs\n", c.Name, len(args), len(kwargs))
-				// 				fmt.Printf("[DEBUG Class.CallWithKeywords]   args: %v\n", args)
-				// 				fmt.Printf("[DEBUG Class.CallWithKeywords]   kwargs: %v\n", kwargs)
+				Log.Debug(SubsystemEval, "Calling __init__ for class",
+					"class", c.Name,
+					"arg_count", len(args),
+					"kwarg_count", len(kwargs),
+					"kwargs", kwargs)
 			}
 
 			// CRITICAL: Set __class__ to the DEFINING class, not the instance's class
@@ -711,15 +713,18 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			if kwargsCallable, ok := initMethod.(interface {
 				CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
 			}); ok {
+				if c.Name == "TestProgram" {
+					Log.Debug(SubsystemEval, "About to call __init__", "class", c.Name)
+				}
 				_, err := kwargsCallable.CallWithKeywords(initArgs, kwargs, initCtx)
 				if err != nil {
+					if c.Name == "TestProgram" {
+						Log.Debug(SubsystemEval, "Class __init__ returned error", "class", c.Name, "error", err)
+					}
 					// Check if it's SystemExit - propagate it without wrapping
 					var sysExit *SystemExit
 					if errors.As(err, &sysExit) {
 						return nil, err
-					}
-					if c.Name == "TestProgram" {
-						// 						fmt.Printf("[DEBUG Class.CallWithKeywords] Error calling %s.__init__: %v\n", c.Name, err)
 					}
 					return nil, fmt.Errorf("error in %s.__init__: %w", c.Name, err)
 				}
