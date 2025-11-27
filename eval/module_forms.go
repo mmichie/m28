@@ -22,19 +22,25 @@ func resolveRelativeImport(moduleName string, level int, ctx *core.Context) (str
 	// Get the current package from context
 	packageVal, err := ctx.Lookup("__package__")
 	if err != nil {
-		return "", fmt.Errorf("relative import attempted but __package__ not defined in context")
+		return "", &core.ImportError{
+			ModuleName: moduleName,
+			Message:    "relative import attempted but __package__ not defined in context",
+		}
 	}
 
 	var currentPackage string
 	if pkgStr, ok := packageVal.(core.StringValue); ok {
 		currentPackage = string(pkgStr)
 	} else {
-		return "", fmt.Errorf("__package__ must be a string")
+		return "", &core.TypeError{Message: "__package__ must be a string"}
 	}
 
 	// If __package__ is empty, we're at the top level and can't do relative imports
 	if currentPackage == "" && level > 0 {
-		return "", fmt.Errorf("attempted relative import beyond top-level package")
+		return "", &core.ImportError{
+			ModuleName: moduleName,
+			Message:    "attempted relative import beyond top-level package",
+		}
 	}
 
 	// Split the current package by "."
@@ -47,7 +53,10 @@ func resolveRelativeImport(moduleName string, level int, ctx *core.Context) (str
 	// Level 1 means current package, level 2 means parent, etc.
 	levelsUp := level - 1
 	if levelsUp > len(packageParts) {
-		return "", fmt.Errorf("attempted relative import beyond top-level package")
+		return "", &core.ImportError{
+			ModuleName: moduleName,
+			Message:    "attempted relative import beyond top-level package",
+		}
 	}
 
 	// Remove the last 'levelsUp' parts
@@ -78,7 +87,7 @@ func resolveRelativeImport(moduleName string, level int, ctx *core.Context) (str
 // Note: :as and :from syntax also supported but may cause issues with parser
 func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 1 {
-		return nil, fmt.Errorf("import requires at least 1 argument")
+		return nil, &core.TypeError{Message: "import requires at least 1 argument"}
 	}
 
 	// Get the module name
@@ -90,7 +99,7 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 	case core.SymbolValue:
 		moduleName = string(name)
 	default:
-		return nil, fmt.Errorf("module name must be a string or symbol")
+		return nil, &core.TypeError{Message: "module name must be a string or symbol"}
 	}
 
 	// Parse import options
@@ -111,19 +120,19 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 		if sym, ok := argI.(core.SymbolValue); ok && (string(sym) == ":as" || string(sym) == "as") {
 			// :as alias
 			if i+1 >= args.Len() {
-				return nil, fmt.Errorf("import :as requires an alias")
+				return nil, &core.TypeError{Message: "import :as requires an alias"}
 			}
 			argI1 := unwrapLocated(args.Items()[i+1])
 			if aliasSym, ok := argI1.(core.SymbolValue); ok {
 				alias = string(aliasSym)
 			} else {
-				return nil, fmt.Errorf("import alias must be a symbol")
+				return nil, &core.TypeError{Message: "import alias must be a symbol"}
 			}
 			i += 2
 		} else if sym, ok := argI.(core.SymbolValue); ok && (string(sym) == ":from" || string(sym) == "from") {
 			// :from [names] or :from *
 			if i+1 >= args.Len() {
-				return nil, fmt.Errorf("import :from requires a list of names or *")
+				return nil, &core.TypeError{Message: "import :from requires a list of names or *"}
 			}
 
 			argI1 := unwrapLocated(args.Items()[i+1])
@@ -161,19 +170,19 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 													alias: string(aliasSym),
 												})
 											} else {
-												return nil, fmt.Errorf("import alias must be a symbol")
+												return nil, &core.TypeError{Message: "import alias must be a symbol"}
 											}
 										} else {
-											return nil, fmt.Errorf("import name must be a symbol")
+											return nil, &core.TypeError{Message: "import name must be a symbol"}
 										}
 									} else {
-										return nil, fmt.Errorf("import names must be symbols or [name, alias] pairs")
+										return nil, &core.TypeError{Message: "import names must be symbols or [name, alias] pairs"}
 									}
 								} else {
-									return nil, fmt.Errorf("import names must be symbols or [name, alias] pairs")
+									return nil, &core.TypeError{Message: "import names must be symbols or [name, alias] pairs"}
 								}
 							} else {
-								return nil, fmt.Errorf("import names must be symbols or [name, alias] pairs")
+								return nil, &core.TypeError{Message: "import names must be symbols or [name, alias] pairs"}
 							}
 						}
 					} else {
@@ -185,23 +194,23 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 									alias: "",
 								})
 							} else {
-								return nil, fmt.Errorf("import names must be symbols")
+								return nil, &core.TypeError{Message: "import names must be symbols"}
 							}
 						}
 					}
 				}
 			} else {
-				return nil, fmt.Errorf("import :from requires a list of names or *")
+				return nil, &core.TypeError{Message: "import :from requires a list of names or *"}
 			}
 			i += 2
 		} else if sym, ok := argI.(core.SymbolValue); ok && (string(sym) == ":level" || string(sym) == "level") {
 			// :level N (for relative imports)
 			if i+1 >= args.Len() {
-				return nil, fmt.Errorf("import :level requires a number")
+				return nil, &core.TypeError{Message: "import :level requires a number"}
 			}
 			argI1 := unwrapLocated(args.Items()[i+1])
 			if levelNum, ok := argI1.(core.NumberValue); !ok {
-				return nil, fmt.Errorf("import :level must be a number")
+				return nil, &core.TypeError{Message: "import :level must be a number"}
 			} else {
 				// Resolve relative import
 				level := int(levelNum)
@@ -213,14 +222,17 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 			}
 			i += 2
 		} else {
-			return nil, fmt.Errorf("unexpected import option: %v", argI)
+			return nil, &core.TypeError{Message: fmt.Sprintf("unexpected import option: %v", argI)}
 		}
 	}
 
 	// Load the module using the loader directly to get a dict
 	loader := core.GetModuleLoader()
 	if loader == nil {
-		return nil, fmt.Errorf("no module loader registered")
+		return nil, &core.ImportError{
+			ModuleName: moduleName,
+			Message:    "no module loader registered",
+		}
 	}
 
 	// Handle different import forms
@@ -398,7 +410,10 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				var ok bool
 				topLevelModule, ok = topLevelVal.(*core.Module)
 				if !ok {
-					return nil, fmt.Errorf("name '%s' is already defined as non-module", topLevelName)
+					return nil, &core.ImportError{
+						ModuleName: moduleName,
+						Message:    fmt.Sprintf("name '%s' is already defined as non-module", topLevelName),
+					}
 				}
 			}
 
@@ -420,7 +435,10 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 				// Load the submodule
 				subDict, err := loader.LoadModule(partialName, ctx)
 				if err != nil {
-					return nil, fmt.Errorf("failed to load submodule '%s': %w", partialName, err)
+					return nil, &core.ImportError{
+						ModuleName: partialName,
+						Message:    fmt.Sprintf("failed to load submodule '%s': %v", partialName, err),
+					}
 				}
 				subModule := wrapDictAsModule(partialName, subDict)
 
@@ -469,24 +487,24 @@ func wrapDictAsModule(name string, dict *core.DictValue) *core.Module {
 // (export :all [names])   - sets __all__ for * imports
 func exportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 1 {
-		return nil, fmt.Errorf("export requires at least 1 argument")
+		return nil, &core.TypeError{Message: "export requires at least 1 argument"}
 	}
 
 	// Get the current module from context
 	moduleVal, err := ctx.Lookup("__module__")
 	if err != nil {
-		return nil, fmt.Errorf("export can only be used within a module")
+		return nil, &core.TypeError{Message: "export can only be used within a module"}
 	}
 
 	module, ok := moduleVal.(*core.Module)
 	if !ok {
-		return nil, fmt.Errorf("__module__ is not a module object")
+		return nil, &core.TypeError{Message: "__module__ is not a module object"}
 	}
 
 	// Handle :all directive
 	if sym, ok := args.Items()[0].(core.SymbolValue); ok && string(sym) == ":all" {
 		if args.Len() != 2 {
-			return nil, fmt.Errorf("export :all requires a list of names")
+			return nil, &core.TypeError{Message: "export :all requires a list of names"}
 		}
 		if list, ok := args.Items()[1].(*core.ListValue); ok {
 			allNames := []string{}
@@ -498,7 +516,7 @@ func exportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						if nameSym, ok := list.Items()[j].(core.SymbolValue); ok {
 							allNames = append(allNames, string(nameSym))
 						} else {
-							return nil, fmt.Errorf("export names must be symbols")
+							return nil, &core.TypeError{Message: "export names must be symbols"}
 						}
 					}
 				} else {
@@ -507,7 +525,7 @@ func exportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						if nameSym, ok := item.(core.SymbolValue); ok {
 							allNames = append(allNames, string(nameSym))
 						} else {
-							return nil, fmt.Errorf("export names must be symbols")
+							return nil, &core.TypeError{Message: "export names must be symbols"}
 						}
 					}
 				}
@@ -515,7 +533,7 @@ func exportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			module.SetAll(allNames)
 			return core.Nil, nil
 		}
-		return nil, fmt.Errorf("export :all requires a list")
+		return nil, &core.TypeError{Message: "export :all requires a list"}
 	}
 
 	// Handle single name or list of names
@@ -533,7 +551,7 @@ func exportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if nameSym, ok := list.Items()[j].(core.SymbolValue); ok {
 						names = append(names, string(nameSym))
 					} else {
-						return nil, fmt.Errorf("export names must be symbols")
+						return nil, &core.TypeError{Message: "export names must be symbols"}
 					}
 				}
 			} else {
@@ -542,20 +560,20 @@ func exportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if nameSym, ok := item.(core.SymbolValue); ok {
 						names = append(names, string(nameSym))
 					} else {
-						return nil, fmt.Errorf("export names must be symbols")
+						return nil, &core.TypeError{Message: "export names must be symbols"}
 					}
 				}
 			}
 		}
 	} else {
-		return nil, fmt.Errorf("export requires a symbol or list of symbols")
+		return nil, &core.TypeError{Message: "export requires a symbol or list of symbols"}
 	}
 
 	// Export each name
 	for _, name := range names {
 		val, err := ctx.Lookup(name)
 		if err != nil {
-			return nil, fmt.Errorf("cannot export '%s': %v", name, err)
+			return nil, &core.NameError{Name: name}
 		}
 		module.Export(name, val)
 	}
@@ -568,7 +586,10 @@ func loadModule(moduleName string, ctx *core.Context) (*core.Module, error) {
 	// Get the module loader
 	loader := core.GetModuleLoader()
 	if loader == nil {
-		return nil, fmt.Errorf("no module loader registered")
+		return nil, &core.ImportError{
+			ModuleName: moduleName,
+			Message:    "no module loader registered",
+		}
 	}
 
 	// Use the loader to load the module
