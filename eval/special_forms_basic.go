@@ -18,7 +18,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	core.DebugLog("[ASSIGN] assignForm called with %d args\n", args.Len())
 
 	if args.Len() != 2 {
-		return nil, fmt.Errorf("= requires 2 arguments, got %d", args.Len())
+		return nil, &core.TypeError{Message: fmt.Sprintf("= requires 2 arguments, got %d", args.Len())}
 	}
 
 	// Get the target
@@ -35,7 +35,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				case "get-item":
 					// Indexed assignment: lst[i] = value
 					if targetList.Len() != 3 {
-						return nil, fmt.Errorf("invalid index expression")
+						return nil, core.NewValueError("invalid index expression")
 					}
 					// Evaluate the value
 					value, err := Eval(args.Items()[1], ctx)
@@ -48,7 +48,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				case ".":
 					// Property assignment: obj.prop = value
 					if targetList.Len() != 3 {
-						return nil, fmt.Errorf("invalid dot notation in assignment target")
+						return nil, core.NewValueError("invalid dot notation in assignment target")
 					}
 
 					// Evaluate the object
@@ -69,7 +69,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					} else if symName, ok := attrNameVal.(core.SymbolValue); ok {
 						attrName = string(symName)
 					} else {
-						return nil, fmt.Errorf("attribute name must be a string or symbol, got %T", attrNameVal)
+						return nil, &core.TypeError{Message: fmt.Sprintf("attribute name must be a string or symbol, got %T", attrNameVal)}
 					}
 
 					// Evaluate the value
@@ -97,7 +97,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						return value, nil
 					}
 
-					return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+					return nil, &core.AttributeError{ObjType: string(obj.Type()), Message: fmt.Sprintf("'%s' does not support attribute assignment", obj.Type())}
 				}
 			}
 		}
@@ -122,15 +122,15 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			core.DebugLog("[ASSIGN] Unpacking list with %d elements\n", v.Len())
 			values = v.Items()
 		default:
-			return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-sequence %v", value.Type())}
 		}
 
 		// Check that the number of targets matches the number of values
 		if targetList.Len() != len(values) {
 			if len(values) < targetList.Len() {
-				return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", targetList.Len(), len(values))
+				return nil, core.NewValueError(fmt.Sprintf("not enough values to unpack (expected %d, got %d)", targetList.Len(), len(values)))
 			}
-			return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", targetList.Len(), len(values))
+			return nil, core.NewValueError(fmt.Sprintf("too many values to unpack (expected %d, got %d)", targetList.Len(), len(values)))
 		}
 
 		// Assign each value to its corresponding target
@@ -150,7 +150,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					// Use the same logic as single attribute assignment
 					// Evaluate to get the (object, attribute) pair, then set it
 					if targetList2.Len() != 3 {
-						return nil, fmt.Errorf("invalid dot notation in assignment target")
+						return nil, core.NewValueError("invalid dot notation in assignment target")
 					}
 
 					// Evaluate the object
@@ -171,7 +171,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					} else if symName, ok := attrNameVal.(core.SymbolValue); ok {
 						attrName = string(symName)
 					} else {
-						return nil, fmt.Errorf("attribute name must be a string or symbol, got %T", attrNameVal)
+						return nil, &core.TypeError{Message: fmt.Sprintf("attribute name must be a string or symbol, got %T", attrNameVal)}
 					}
 
 					// Set the attribute using the same pattern as util.go
@@ -191,7 +191,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						continue
 					}
 
-					return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+					return nil, &core.AttributeError{ObjType: string(obj.Type()), Message: fmt.Sprintf("'%s' does not support attribute assignment", obj.Type())}
 				}
 
 				// Not dot notation - must be nested unpacking pattern like (a, b)
@@ -203,7 +203,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Target is neither a symbol, dot notation, nor tuple pattern
-			return nil, fmt.Errorf("assignment target must be a symbol, dot notation, or tuple pattern, got %v", t.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("assignment target must be a symbol, dot notation, or tuple pattern, got %v", t.Type())}
 		}
 
 		core.DebugLog("[ASSIGN] Tuple unpacking complete\n")
@@ -214,7 +214,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Single variable assignment
 	sym, ok := target.(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("assignment target must be a symbol, got %v", target.Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("assignment target must be a symbol, got %v", target.Type())}
 	}
 
 	// Evaluate the value
@@ -236,7 +236,7 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // Supports: variable (x: int = 5), attribute (obj.x: int = 5), subscript (obj[k]: int = 5)
 func annotatedAssignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 2 || args.Len() > 3 {
-		return nil, fmt.Errorf("annotated-assign requires 2 or 3 arguments, got %d", args.Len())
+		return nil, &core.TypeError{Message: fmt.Sprintf("annotated-assign requires 2 or 3 arguments, got %d", args.Len())}
 	}
 
 	target := args.Items()[0]
@@ -259,14 +259,14 @@ func annotatedAssignForm(args *core.ListValue, ctx *core.Context) (core.Value, e
 		var err error
 		annotationType, err = Eval(annotationVal, ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating annotation: %v", err)
+			return nil, fmt.Errorf("error evaluating annotation: %w", err)
 		}
 	default:
 		// Try to evaluate it as an expression
 		var err error
 		annotationType, err = Eval(annotationVal, ctx)
 		if err != nil {
-			return nil, fmt.Errorf("annotation must be a string or symbol, got %v: %v", annotationVal.Type(), err)
+			return nil, &core.TypeError{Message: fmt.Sprintf("annotation must be a string or symbol, got %v: %v", annotationVal.Type(), err)}
 		}
 	}
 
@@ -324,13 +324,13 @@ func annotatedAssignForm(args *core.ListValue, ctx *core.Context) (core.Value, e
 		return core.Nil, nil
 	}
 
-	return nil, fmt.Errorf("annotated assignment target must be a symbol, attribute, or subscript, got %T", target)
+	return nil, &core.TypeError{Message: fmt.Sprintf("annotated assignment target must be a symbol, attribute, or subscript, got %T", target)}
 }
 
 // quoteForm implements the quote special form
 func quoteForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 1 {
-		return nil, fmt.Errorf("quote requires 1 argument")
+		return nil, &core.TypeError{Message: "quote requires 1 argument"}
 	}
 
 	// Return the argument unevaluated
@@ -373,7 +373,7 @@ func doForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // returnForm implements the return special form
 func returnForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() > 1 {
-		return nil, fmt.Errorf("return takes at most 1 argument")
+		return nil, &core.TypeError{Message: "return takes at most 1 argument"}
 	}
 
 	var value core.Value = core.Nil
@@ -415,7 +415,7 @@ func convertIterableToSlice(iterable core.Value) ([]core.Value, error) {
 				items = append(items, val)
 			}
 		} else {
-			return nil, fmt.Errorf("value must be iterable, got %s", v.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("value must be iterable, got %s", v.Type())}
 		}
 	}
 	return items, nil
@@ -427,7 +427,7 @@ func unpackTuplePattern(pattern string, value core.Value, ctx *core.Context) err
 	// Remove outer parentheses
 	pattern = strings.TrimSpace(pattern)
 	if !strings.HasPrefix(pattern, "(") || !strings.HasSuffix(pattern, ")") {
-		return fmt.Errorf("invalid tuple pattern: %s", pattern)
+		return core.NewValueError(fmt.Sprintf("invalid tuple pattern: %s", pattern))
 	}
 	pattern = pattern[1 : len(pattern)-1]
 
@@ -443,12 +443,12 @@ func unpackTuplePattern(pattern string, value core.Value, ctx *core.Context) err
 	case *core.ListValue:
 		values = v.Items()
 	default:
-		return fmt.Errorf("cannot unpack non-sequence type %s", value.Type())
+		return &core.TypeError{Message: fmt.Sprintf("cannot unpack non-sequence type %s", value.Type())}
 	}
 
 	// Check length matches
 	if len(values) != len(varNames) {
-		return fmt.Errorf("cannot unpack %d values into %d variables", len(values), len(varNames))
+		return core.NewValueError(fmt.Sprintf("cannot unpack %d values into %d variables", len(values), len(varNames)))
 	}
 
 	// Bind each variable
@@ -521,7 +521,7 @@ func comprehensionLoop(
 		if strings.HasPrefix(varName, "(") && strings.HasSuffix(varName, ")") {
 			// Parse the tuple pattern and unpack the item
 			if err := unpackTuplePattern(varName, item, loopCtx); err != nil {
-				return fmt.Errorf("error unpacking loop variable: %v", err)
+				return fmt.Errorf("error unpacking loop variable: %w", err)
 			}
 		} else {
 			// Simple variable binding
@@ -532,7 +532,7 @@ func comprehensionLoop(
 		if condition != nil {
 			condResult, err := Eval(condition, loopCtx)
 			if err != nil {
-				return fmt.Errorf("error evaluating condition: %v", err)
+				return fmt.Errorf("error evaluating condition: %w", err)
 			}
 
 			// Skip if condition is falsy
@@ -557,14 +557,14 @@ func comprehensionLoop(
 //	(list-comp expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))  // nested
 func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 2 {
-		return nil, fmt.Errorf("list-comp requires at least 2 arguments")
+		return nil, &core.TypeError{Message: "list-comp requires at least 2 arguments"}
 	}
 
 	// Check if this is multi-clause format (args.Items()[1] is a list)
 	if clausesList, ok := args.Items()[1].(*core.ListValue); ok {
 		// Multi-clause nested comprehension (2 args: expr, clauses)
 		if args.Len() != 2 {
-			return nil, fmt.Errorf("multi-clause list-comp requires exactly 2 arguments")
+			return nil, &core.TypeError{Message: "multi-clause list-comp requires exactly 2 arguments"}
 		}
 		return listCompMultiClause(args.Items()[0], clausesList, ctx)
 	}
@@ -572,13 +572,13 @@ func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Single-clause format (backward compatible)
 	// Requires 3-4 args: expr, var, iterable, [condition]
 	if args.Len() < 3 || args.Len() > 4 {
-		return nil, fmt.Errorf("single-clause list-comp requires 3 or 4 arguments")
+		return nil, &core.TypeError{Message: "single-clause list-comp requires 3 or 4 arguments"}
 	}
 
 	// Get the variable name
 	varSym, ok := args.Items()[1].(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("list comprehension variable must be a symbol")
+		return nil, &core.TypeError{Message: "list comprehension variable must be a symbol"}
 	}
 	varName := string(varSym)
 
@@ -591,13 +591,13 @@ func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if len(exprStr) > 100 {
 			exprStr = exprStr[:100] + "..."
 		}
-		return nil, fmt.Errorf("error evaluating iterable %s: %v", exprStr, err)
+		return nil, fmt.Errorf("error evaluating iterable %s: %w", exprStr, err)
 	}
 
 	// Convert iterable to a sequence we can iterate over
 	items, err := convertIterableToSlice(iterable)
 	if err != nil {
-		return nil, fmt.Errorf("list comprehension: %v", err)
+		return nil, fmt.Errorf("list comprehension: %w", err)
 	}
 
 	// Create result list
@@ -614,7 +614,7 @@ func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Evaluate the expression
 		exprResult, err := Eval(args.Items()[0], loopCtx)
 		if err != nil {
-			return fmt.Errorf("error evaluating expression: %v", err)
+			return fmt.Errorf("error evaluating expression: %w", err)
 		}
 
 		// Add to result
@@ -645,16 +645,16 @@ func listCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core
 	for i, clauseVal := range clausesList.Items() {
 		clauseList, ok := clauseVal.(*core.ListValue)
 		if !ok {
-			return nil, fmt.Errorf("clause %d must be a list", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d must be a list", i)}
 		}
 
 		if clauseList.Len() < 2 || clauseList.Len() > 3 {
-			return nil, fmt.Errorf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)}
 		}
 
 		varSym, ok := clauseList.Items()[0].(core.SymbolValue)
 		if !ok {
-			return nil, fmt.Errorf("clause %d variable must be a symbol", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d variable must be a symbol", i)}
 		}
 
 		var condition core.Value
@@ -676,7 +676,7 @@ func listCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core
 			// All loops processed, evaluate the expression
 			exprResult, err := Eval(expr, loopCtx)
 			if err != nil {
-				return fmt.Errorf("error evaluating expression: %v", err)
+				return fmt.Errorf("error evaluating expression: %w", err)
 			}
 			result = append(result, exprResult)
 			return nil
@@ -686,13 +686,13 @@ func listCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core
 		c := clauses[clauseIdx]
 		iterable, err := Eval(c.iterable, loopCtx)
 		if err != nil {
-			return fmt.Errorf("error evaluating iterable in clause %d: %v", clauseIdx, err)
+			return fmt.Errorf("error evaluating iterable in clause %d: %w", clauseIdx, err)
 		}
 
 		// Convert to slice
 		items, err := convertIterableToSlice(iterable)
 		if err != nil {
-			return fmt.Errorf("clause %d: %v", clauseIdx, err)
+			return fmt.Errorf("clause %d: %w", clauseIdx, err)
 		}
 
 		// Loop over items
@@ -718,14 +718,14 @@ func listCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core
 //	(dict-comp key-expr value-expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))  // nested
 func DictCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 3 {
-		return nil, fmt.Errorf("dict-comp requires at least 3 arguments")
+		return nil, &core.TypeError{Message: "dict-comp requires at least 3 arguments"}
 	}
 
 	// Check if this is multi-clause format (args.Items()[2] is a list)
 	if clausesList, ok := args.Items()[2].(*core.ListValue); ok {
 		// Multi-clause nested comprehension (3 args: key-expr, value-expr, clauses)
 		if args.Len() != 3 {
-			return nil, fmt.Errorf("multi-clause dict-comp requires exactly 3 arguments")
+			return nil, &core.TypeError{Message: "multi-clause dict-comp requires exactly 3 arguments"}
 		}
 		return dictCompMultiClause(args.Items()[0], args.Items()[1], clausesList, ctx)
 	}
@@ -733,26 +733,26 @@ func DictCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Single-clause format (backward compatible)
 	// Requires 4-5 args: key-expr, value-expr, var, iterable, [condition]
 	if args.Len() < 4 || args.Len() > 5 {
-		return nil, fmt.Errorf("single-clause dict-comp requires 4 or 5 arguments")
+		return nil, &core.TypeError{Message: "single-clause dict-comp requires 4 or 5 arguments"}
 	}
 
 	// Get the variable name
 	varSym, ok := args.Items()[2].(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("dict comprehension variable must be a symbol")
+		return nil, &core.TypeError{Message: "dict comprehension variable must be a symbol"}
 	}
 	varName := string(varSym)
 
 	// Evaluate the iterable
 	iterable, err := Eval(args.Items()[3], ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating iterable: %v", err)
+		return nil, fmt.Errorf("error evaluating iterable: %w", err)
 	}
 
 	// Convert iterable to a sequence we can iterate over
 	items, err := convertIterableToSlice(iterable)
 	if err != nil {
-		return nil, fmt.Errorf("dict comprehension: %v", err)
+		return nil, fmt.Errorf("dict comprehension: %w", err)
 	}
 
 	// Create result dict
@@ -769,13 +769,13 @@ func DictCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Evaluate the key expression
 		keyResult, err := Eval(args.Items()[0], loopCtx)
 		if err != nil {
-			return fmt.Errorf("error evaluating key expression: %v", err)
+			return fmt.Errorf("error evaluating key expression: %w", err)
 		}
 
 		// Evaluate the value expression
 		valueResult, err := Eval(args.Items()[1], loopCtx)
 		if err != nil {
-			return fmt.Errorf("error evaluating value expression: %v", err)
+			return fmt.Errorf("error evaluating value expression: %w", err)
 		}
 
 		// Add to result dict
@@ -807,16 +807,16 @@ func dictCompMultiClause(keyExpr, valueExpr core.Value, clausesList *core.ListVa
 	for i, clauseVal := range clausesList.Items() {
 		clauseList, ok := clauseVal.(*core.ListValue)
 		if !ok {
-			return nil, fmt.Errorf("clause %d must be a list", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d must be a list", i)}
 		}
 
 		if clauseList.Len() < 2 || clauseList.Len() > 3 {
-			return nil, fmt.Errorf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)}
 		}
 
 		varSym, ok := clauseList.Items()[0].(core.SymbolValue)
 		if !ok {
-			return nil, fmt.Errorf("clause %d variable must be a symbol", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d variable must be a symbol", i)}
 		}
 
 		var condition core.Value
@@ -838,12 +838,12 @@ func dictCompMultiClause(keyExpr, valueExpr core.Value, clausesList *core.ListVa
 			// All loops processed, evaluate key and value
 			keyResult, err := Eval(keyExpr, loopCtx)
 			if err != nil {
-				return fmt.Errorf("error evaluating key expression: %v", err)
+				return fmt.Errorf("error evaluating key expression: %w", err)
 			}
 
 			valueResult, err := Eval(valueExpr, loopCtx)
 			if err != nil {
-				return fmt.Errorf("error evaluating value expression: %v", err)
+				return fmt.Errorf("error evaluating value expression: %w", err)
 			}
 
 			keyStr := core.ValueToKey(keyResult)
@@ -855,13 +855,13 @@ func dictCompMultiClause(keyExpr, valueExpr core.Value, clausesList *core.ListVa
 		c := clauses[clauseIdx]
 		iterable, err := Eval(c.iterable, loopCtx)
 		if err != nil {
-			return fmt.Errorf("error evaluating iterable in clause %d: %v", clauseIdx, err)
+			return fmt.Errorf("error evaluating iterable in clause %d: %w", clauseIdx, err)
 		}
 
 		// Convert to slice
 		items, err := convertIterableToSlice(iterable)
 		if err != nil {
-			return fmt.Errorf("clause %d: %v", clauseIdx, err)
+			return fmt.Errorf("clause %d: %w", clauseIdx, err)
 		}
 
 		// Loop over items
@@ -885,14 +885,14 @@ func dictCompMultiClause(keyExpr, valueExpr core.Value, clausesList *core.ListVa
 //	(set-comp expr ((var1 iter1 [cond1]) (var2 iter2 [cond2]) ...))  // nested
 func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 2 {
-		return nil, fmt.Errorf("set-comp requires at least 2 arguments")
+		return nil, &core.TypeError{Message: "set-comp requires at least 2 arguments"}
 	}
 
 	// Check if this is multi-clause format (args.Items()[1] is a list)
 	if clausesList, ok := args.Items()[1].(*core.ListValue); ok {
 		// Multi-clause nested comprehension (2 args: expr, clauses)
 		if args.Len() != 2 {
-			return nil, fmt.Errorf("multi-clause set-comp requires exactly 2 arguments")
+			return nil, &core.TypeError{Message: "multi-clause set-comp requires exactly 2 arguments"}
 		}
 		return setCompMultiClause(args.Items()[0], clausesList, ctx)
 	}
@@ -900,13 +900,13 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Single-clause format (backward compatible)
 	// Requires 3-4 args: expr, var, iterable, [condition]
 	if args.Len() < 3 || args.Len() > 4 {
-		return nil, fmt.Errorf("single-clause set-comp requires 3 or 4 arguments")
+		return nil, &core.TypeError{Message: "single-clause set-comp requires 3 or 4 arguments"}
 	}
 
 	// Get the variable name
 	varSym, ok := args.Items()[1].(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("set comprehension variable must be a symbol")
+		return nil, &core.TypeError{Message: "set comprehension variable must be a symbol"}
 	}
 	varName := string(varSym)
 
@@ -919,13 +919,13 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if len(exprStr) > 100 {
 			exprStr = exprStr[:100] + "..."
 		}
-		return nil, fmt.Errorf("error evaluating iterable %s: %v", exprStr, err)
+		return nil, fmt.Errorf("error evaluating iterable %s: %w", exprStr, err)
 	}
 
 	// Convert iterable to a sequence we can iterate over
 	items, err := convertIterableToSlice(iterable)
 	if err != nil {
-		return nil, fmt.Errorf("set comprehension: %v", err)
+		return nil, fmt.Errorf("set comprehension: %w", err)
 	}
 
 	// Create result set
@@ -942,7 +942,7 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Evaluate the expression
 		exprResult, err := Eval(args.Items()[0], loopCtx)
 		if err != nil {
-			return fmt.Errorf("error evaluating expression: %v", err)
+			return fmt.Errorf("error evaluating expression: %w", err)
 		}
 
 		// Add to result set
@@ -973,16 +973,16 @@ func setCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 	for i, clauseVal := range clausesList.Items() {
 		clauseList, ok := clauseVal.(*core.ListValue)
 		if !ok {
-			return nil, fmt.Errorf("clause %d must be a list", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d must be a list", i)}
 		}
 
 		if clauseList.Len() < 2 || clauseList.Len() > 3 {
-			return nil, fmt.Errorf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)}
 		}
 
 		varSym, ok := clauseList.Items()[0].(core.SymbolValue)
 		if !ok {
-			return nil, fmt.Errorf("clause %d variable must be a symbol", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d variable must be a symbol", i)}
 		}
 
 		var condition core.Value
@@ -1004,7 +1004,7 @@ func setCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 			// All loops processed, evaluate the expression
 			exprResult, err := Eval(expr, loopCtx)
 			if err != nil {
-				return fmt.Errorf("error evaluating expression: %v", err)
+				return fmt.Errorf("error evaluating expression: %w", err)
 			}
 			result.Add(exprResult)
 			return nil
@@ -1014,13 +1014,13 @@ func setCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 		c := clauses[clauseIdx]
 		iterable, err := Eval(c.iterable, loopCtx)
 		if err != nil {
-			return fmt.Errorf("error evaluating iterable in clause %d: %v", clauseIdx, err)
+			return fmt.Errorf("error evaluating iterable in clause %d: %w", clauseIdx, err)
 		}
 
 		// Convert to slice
 		items, err := convertIterableToSlice(iterable)
 		if err != nil {
-			return fmt.Errorf("clause %d: %v", clauseIdx, err)
+			return fmt.Errorf("clause %d: %w", clauseIdx, err)
 		}
 
 		// Loop over items
@@ -1044,11 +1044,11 @@ func genExprMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 	for i, clauseVal := range clausesList.Items() {
 		clauseList, ok := clauseVal.(*core.ListValue)
 		if !ok {
-			return nil, fmt.Errorf("clause %d must be a list", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d must be a list", i)}
 		}
 
 		if clauseList.Len() < 2 || clauseList.Len() > 3 {
-			return nil, fmt.Errorf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d must have 2 or 3 elements (var, iter, [condition])", i)}
 		}
 
 		// Get variable (or variables for tuple unpacking)
@@ -1066,11 +1066,11 @@ func genExprMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 				if sym, ok := v.(core.SymbolValue); ok {
 					varNames[j] = string(sym)
 				} else {
-					return nil, fmt.Errorf("clause %d: variable list must contain symbols", i)
+					return nil, &core.TypeError{Message: fmt.Sprintf("clause %d: variable list must contain symbols", i)}
 				}
 			}
 		} else {
-			return nil, fmt.Errorf("clause %d: variable must be a symbol or list of symbols", i)
+			return nil, &core.TypeError{Message: fmt.Sprintf("clause %d: variable must be a symbol or list of symbols", i)}
 		}
 
 		// Get condition if present
@@ -1101,7 +1101,7 @@ func genExprMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 // Returns a Generator object that lazily evaluates the expression
 func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 2 || args.Len() > 4 {
-		return nil, fmt.Errorf("gen-expr/gen-comp requires 2-4 arguments")
+		return nil, &core.TypeError{Message: "gen-expr/gen-comp requires 2-4 arguments"}
 	}
 
 	// Check for multi-clause format: (gen-comp expr ((var iter [cond])...))
@@ -1120,16 +1120,16 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if lambdaSym, ok := lambdaList.Items()[0].(core.SymbolValue); ok && string(lambdaSym) == "lambda" {
 			// Lambda format: (gen-comp (lambda (var) expr) iterable [(lambda (var) condition)])
 			if args.Len() < 2 || args.Len() > 3 {
-				return nil, fmt.Errorf("gen-comp lambda format requires 2 or 3 arguments")
+				return nil, &core.TypeError{Message: "gen-comp lambda format requires 2 or 3 arguments"}
 			}
 
 			// Extract variable name(s) from lambda
 			if lambdaList.Len() < 3 {
-				return nil, fmt.Errorf("invalid lambda in gen-comp")
+				return nil, core.NewValueError("invalid lambda in gen-comp")
 			}
 			params, ok := lambdaList.Items()[1].(*core.ListValue)
 			if !ok || params.Len() != 1 {
-				return nil, fmt.Errorf("gen-comp lambda must have exactly one parameter")
+				return nil, &core.TypeError{Message: "gen-comp lambda must have exactly one parameter"}
 			}
 
 			// Check if parameter is a list (for unpacking) or a symbol (single variable)
@@ -1144,14 +1144,14 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if sym, ok := v.(core.SymbolValue); ok {
 						varNames[i] = string(sym)
 					} else {
-						return nil, fmt.Errorf("gen-comp lambda tuple parameter must contain only symbols")
+						return nil, &core.TypeError{Message: "gen-comp lambda tuple parameter must contain only symbols"}
 					}
 				}
 			} else if varSym, ok := param.(core.SymbolValue); ok {
 				// Single symbol parameter
 				varName = string(varSym)
 			} else {
-				return nil, fmt.Errorf("gen-comp lambda parameter must be a symbol or list, got %T", param)
+				return nil, &core.TypeError{Message: fmt.Sprintf("gen-comp lambda parameter must be a symbol or list, got %T", param)}
 			}
 
 			// Expression is the lambda body
@@ -1182,13 +1182,13 @@ func GenExprForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Old format: (gen-expr expr var iterable [condition])
 	if args.Len() < 3 || args.Len() > 4 {
-		return nil, fmt.Errorf("gen-expr old format requires 3 or 4 arguments")
+		return nil, &core.TypeError{Message: "gen-expr old format requires 3 or 4 arguments"}
 	}
 
 	// Get the variable name
 	varSym, ok := args.Items()[1].(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("generator expression variable must be a symbol")
+		return nil, &core.TypeError{Message: "generator expression variable must be a symbol"}
 	}
 	varName := string(varSym)
 
@@ -1243,7 +1243,7 @@ func listLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 				// Unpack the iterable into the result
 				items, err := convertIterableToSlice(val)
 				if err != nil {
-					return nil, fmt.Errorf("cannot unpack non-iterable: %v", err)
+					return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-iterable: %v", err)}
 				}
 				result = append(result, items...)
 				continue
@@ -1275,7 +1275,7 @@ func tupleLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, erro
 	defer func() { tupleLiteralDepth-- }()
 
 	if tupleLiteralDepth > maxTupleLiteralDepth {
-		return nil, fmt.Errorf("tuple literal evaluation depth exceeded %d - possible infinite loop", maxTupleLiteralDepth)
+		return nil, &core.EvalError{Type: "RecursionError", Message: fmt.Sprintf("tuple literal evaluation depth exceeded %d - possible infinite loop", maxTupleLiteralDepth)}
 	}
 
 	core.DebugLog("[TUPLE-LIT] tupleLiteralForm with %d args (depth: %d)\n", args.Len(), tupleLiteralDepth)
@@ -1307,7 +1307,7 @@ func tupleLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, erro
 				// Unpack the iterable into the result
 				items, err := convertIterableToSlice(val)
 				if err != nil {
-					return nil, fmt.Errorf("cannot unpack non-iterable: %v", err)
+					return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-iterable: %v", err)}
 				}
 				result = append(result, items...)
 				continue
