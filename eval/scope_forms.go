@@ -12,7 +12,7 @@ import (
 // Marks the given names as global in the current scope
 func GlobalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 1 {
-		return nil, fmt.Errorf("global requires at least one variable name")
+		return nil, &core.TypeError{Message: "global requires at least one variable name"}
 	}
 
 	// Mark each name as global
@@ -20,7 +20,7 @@ func GlobalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		argVal := unwrapLocated(arg)
 		sym, ok := argVal.(core.SymbolValue)
 		if !ok {
-			return nil, fmt.Errorf("global requires symbol arguments, got %s", argVal.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("global requires symbol arguments, got %s", argVal.Type())}
 		}
 
 		// Mark this variable as global in the current scope
@@ -35,7 +35,7 @@ func GlobalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // Marks the given names as nonlocal in the current scope
 func NonlocalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 1 {
-		return nil, fmt.Errorf("nonlocal requires at least one variable name")
+		return nil, &core.TypeError{Message: "nonlocal requires at least one variable name"}
 	}
 
 	// Mark each name as nonlocal
@@ -43,7 +43,7 @@ func NonlocalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		argVal := unwrapLocated(arg)
 		sym, ok := argVal.(core.SymbolValue)
 		if !ok {
-			return nil, fmt.Errorf("nonlocal requires symbol arguments, got %s", argVal.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("nonlocal requires symbol arguments, got %s", argVal.Type())}
 		}
 
 		// Mark this variable as nonlocal in the current scope
@@ -61,7 +61,7 @@ func NonlocalForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // Deletes variables, attributes, or items
 func DelForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 1 {
-		return nil, fmt.Errorf("del requires at least one target")
+		return nil, &core.TypeError{Message: "del requires at least one target"}
 	}
 
 	// Process each deletion target
@@ -101,7 +101,7 @@ func resolveSlice(slice *core.SliceValue, length int) (start, stop, step int, er
 			return 0, 0, 0, e
 		}
 		if val == 0 {
-			return 0, 0, 0, fmt.Errorf("slice step cannot be zero")
+			return 0, 0, 0, &core.ValueError{Message: "slice step cannot be zero"}
 		}
 		stepPtr = &val
 	}
@@ -123,7 +123,7 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 		// Check if variable is declared as global
 		if ctx.IsGlobal(name) {
 			if err := ctx.Global.Delete(name); err != nil {
-				return fmt.Errorf("cannot delete global name '%s': %v", name, err)
+				return fmt.Errorf("cannot delete global name '%s': %w", name, err)
 			}
 			return nil
 		}
@@ -135,24 +135,24 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 			for current != nil {
 				if _, ok := current.Vars[name]; ok {
 					if err := current.Delete(name); err != nil {
-						return fmt.Errorf("cannot delete nonlocal name '%s': %v", name, err)
+						return fmt.Errorf("cannot delete nonlocal name '%s': %w", name, err)
 					}
 					return nil
 				}
 				current = current.Outer
 			}
-			return fmt.Errorf("cannot delete nonlocal name '%s': not found in enclosing scope", name)
+			return &core.NameError{Name: name}
 		}
 
 		// Delete from current scope
 		if err := ctx.Delete(name); err != nil {
-			return fmt.Errorf("cannot delete name '%s': %v", name, err)
+			return &core.NameError{Name: name}
 		}
 		return nil
 
 	case *core.ListValue:
 		if t.Len() == 0 {
-			return fmt.Errorf("cannot delete empty list expression")
+			return &core.ValueError{Message: "cannot delete empty list expression"}
 		}
 
 		// Check the first element to determine the type of deletion
@@ -161,13 +161,13 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 		// Handle dot notation: (. obj attr)
 		if sym, ok := first.(core.SymbolValue); ok && string(sym) == "." {
 			if t.Len() != 3 {
-				return fmt.Errorf("dot notation requires exactly 2 arguments for deletion")
+				return &core.TypeError{Message: "dot notation requires exactly 2 arguments for deletion"}
 			}
 
 			// Evaluate the object
 			obj, err := Eval(t.Items()[1], ctx)
 			if err != nil {
-				return fmt.Errorf("error evaluating object for attribute deletion: %v", err)
+				return fmt.Errorf("error evaluating object for attribute deletion: %w", err)
 			}
 
 			// Get attribute name
@@ -178,7 +178,7 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 			}
 			attrName, ok := attrNameVal.(core.StringValue)
 			if !ok {
-				return fmt.Errorf("attribute name must be a string, got %s", attrNameVal.Type())
+				return &core.TypeError{Message: fmt.Sprintf("attribute name must be a string, got %s", attrNameVal.Type())}
 			}
 
 			// Try __delattr__ dunder method first
@@ -190,7 +190,7 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 					if callable, ok := method.(core.Callable); ok {
 						_, err := callable.Call([]core.Value{core.StringValue(attrName)}, ctx)
 						if err != nil {
-							return fmt.Errorf("error calling __delattr__: %v", err)
+							return fmt.Errorf("error calling __delattr__: %w", err)
 						}
 						return nil
 					}
@@ -200,36 +200,36 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 			// Try direct attribute deletion
 			if objWithDelAttr, ok := obj.(interface{ DelAttr(string) error }); ok {
 				if err := objWithDelAttr.DelAttr(string(attrName)); err != nil {
-					return fmt.Errorf("cannot delete attribute '%s': %v", attrName, err)
+					return &core.AttributeError{ObjType: string(obj.Type()), AttrName: string(attrName), Message: fmt.Sprintf("cannot delete attribute '%s': %v", attrName, err)}
 				}
 				return nil
 			}
 
-			return fmt.Errorf("'%s' object does not support attribute deletion", obj.Type())
+			return &core.AttributeError{ObjType: string(obj.Type()), Message: fmt.Sprintf("'%s' object does not support attribute deletion", obj.Type())}
 		}
 
 		// Handle indexing: (get-item obj key)
 		if sym, ok := first.(core.SymbolValue); ok && string(sym) == "get-item" {
 			if t.Len() != 3 {
-				return fmt.Errorf("get-item requires exactly 2 arguments for deletion")
+				return &core.TypeError{Message: "get-item requires exactly 2 arguments for deletion"}
 			}
 
 			// Evaluate the object
 			obj, err := Eval(t.Items()[1], ctx)
 			if err != nil {
-				return fmt.Errorf("error evaluating object for item deletion: %v", err)
+				return fmt.Errorf("error evaluating object for item deletion: %w", err)
 			}
 
 			// Evaluate the key
 			key, err := Eval(t.Items()[2], ctx)
 			if err != nil {
-				return fmt.Errorf("error evaluating key for item deletion: %v", err)
+				return fmt.Errorf("error evaluating key for item deletion: %w", err)
 			}
 
 			// Try __delitem__ dunder method first
 			if found, err := types.CallDelItem(obj, key, ctx); found {
 				if err != nil {
-					return fmt.Errorf("error deleting item: %v", err)
+					return fmt.Errorf("error deleting item: %w", err)
 				}
 				return nil
 			}
@@ -237,7 +237,7 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 			// Try dict deletion
 			if dict, ok := obj.(*core.DictValue); ok {
 				if !dict.DeleteValue(key) {
-					return fmt.Errorf("key not found in dict")
+					return &core.KeyError{Key: key}
 				}
 				return nil
 			}
@@ -250,7 +250,7 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 					length := list.Len()
 					start, stop, step, err := resolveSlice(slice, length)
 					if err != nil {
-						return fmt.Errorf("error resolving slice: %v", err)
+						return fmt.Errorf("error resolving slice: %w", err)
 					}
 
 					// Create set of indices to delete
@@ -281,14 +281,14 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 				// Handle single index deletion: del list[i]
 				idx, ok := key.(core.NumberValue)
 				if !ok {
-					return fmt.Errorf("list indices must be integers or slices, not %s", key.Type())
+					return &core.TypeError{Message: fmt.Sprintf("list indices must be integers or slices, not %s", key.Type())}
 				}
 				intIdx := int(idx)
 				if intIdx < 0 {
 					intIdx = list.Len() + intIdx
 				}
 				if intIdx < 0 || intIdx >= list.Len() {
-					return fmt.Errorf("list index out of range")
+					return &core.IndexError{Index: intIdx, Length: list.Len()}
 				}
 				// Delete by creating new list without the element
 				newItems := make([]core.Value, 0, list.Len()-1)
@@ -302,12 +302,12 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 				return nil
 			}
 
-			return fmt.Errorf("'%s' object does not support item deletion", obj.Type())
+			return &core.TypeError{Message: fmt.Sprintf("'%s' object does not support item deletion", obj.Type())}
 		}
 
-		return fmt.Errorf("cannot delete complex expression: %v", target)
+		return &core.ValueError{Message: fmt.Sprintf("cannot delete complex expression: %v", target)}
 
 	default:
-		return fmt.Errorf("cannot delete %s", target.Type())
+		return &core.TypeError{Message: fmt.Sprintf("cannot delete %s", target.Type())}
 	}
 }
