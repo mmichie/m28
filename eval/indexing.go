@@ -13,7 +13,7 @@ func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Va
 	// Only support slice assignment for lists
 	list, ok := obj.(*core.ListValue)
 	if !ok {
-		return nil, fmt.Errorf("slice assignment only supported for lists, not %s", obj.Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("slice assignment only supported for lists, not %s", obj.Type())}
 	}
 
 	// Extract slice parameters
@@ -38,7 +38,7 @@ func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Va
 
 	// For now, only support step=None (which means step=1)
 	if slice.Step != nil && slice.Step != core.Nil {
-		return nil, fmt.Errorf("slice assignment with step not yet supported")
+		return nil, &core.ValueError{Message: "slice assignment with step not yet supported"}
 	}
 
 	// Convert value to a list of values to insert
@@ -69,7 +69,7 @@ func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Va
 			}
 			valuesList = core.NewList(items...)
 		} else {
-			return nil, fmt.Errorf("can only assign an iterable to a slice")
+			return nil, &core.TypeError{Message: "can only assign an iterable to a slice"}
 		}
 	}
 
@@ -87,19 +87,19 @@ func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Va
 // (get-item obj key) -> value at index/key
 func GetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 2 {
-		return nil, fmt.Errorf("get-item requires exactly 2 arguments, got %d", args.Len())
+		return nil, &core.TypeError{Message: fmt.Sprintf("get-item requires exactly 2 arguments, got %d", args.Len())}
 	}
 
 	// Evaluate the object
 	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating object: %v", err)
+		return nil, fmt.Errorf("error evaluating object: %w", err)
 	}
 
 	// Evaluate the key/index
 	key, err := Eval(args.Items()[1], ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating key: %v", err)
+		return nil, fmt.Errorf("error evaluating key: %w", err)
 	}
 
 	// Check if key is a slice object
@@ -119,14 +119,14 @@ func GetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Fall back to type-specific handling (shouldn't reach here with proper protocol support)
-	return nil, fmt.Errorf("'%s' object is not subscriptable", core.GetPythonTypeName(obj))
+	return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not subscriptable", core.GetPythonTypeName(obj))}
 }
 
 // SetItemForm implements the set-item special form for index assignment
 // (set-item obj key value) -> value
 func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 3 {
-		return nil, fmt.Errorf("set-item requires exactly 3 arguments, got %d", args.Len())
+		return nil, &core.TypeError{Message: fmt.Sprintf("set-item requires exactly 3 arguments, got %d", args.Len())}
 	}
 
 	// WORKAROUND: Check if value argument is a list literal that lost its "list-literal" symbol
@@ -146,17 +146,17 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Evaluate all arguments
 	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating object: %v", err)
+		return nil, fmt.Errorf("error evaluating object: %w", err)
 	}
 
 	key, err := Eval(args.Items()[1], ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating key: %v", err)
+		return nil, fmt.Errorf("error evaluating key: %w", err)
 	}
 
 	value, err := Eval(valueArg, ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating value: %v", err)
+		return nil, fmt.Errorf("error evaluating value: %w", err)
 	}
 
 	// Handle slice assignment (obj[start:end] = values)
@@ -184,20 +184,20 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Fall back to error (shouldn't reach here with proper protocol support)
-	return nil, fmt.Errorf("'%s' object does not support item assignment", obj.Type())
+	return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object does not support item assignment", obj.Type())}
 }
 
 // SliceForm implements the slice special form
 // (slice obj start end step) -> sliced object
 func SliceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 4 {
-		return nil, fmt.Errorf("slice requires exactly 4 arguments, got %d", args.Len())
+		return nil, &core.TypeError{Message: fmt.Sprintf("slice requires exactly 4 arguments, got %d", args.Len())}
 	}
 
 	// Evaluate the object
 	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating object: %v", err)
+		return nil, fmt.Errorf("error evaluating object: %w", err)
 	}
 
 	// Helper function to get integer from value or None
@@ -224,22 +224,22 @@ func SliceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Get slice parameters
 	start, err := getInt(args.Items()[1], nil)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating start: %v", err)
+		return nil, fmt.Errorf("error evaluating start: %w", err)
 	}
 
 	end, err := getInt(args.Items()[2], nil)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating end: %v", err)
+		return nil, fmt.Errorf("error evaluating end: %w", err)
 	}
 
 	defaultStep := 1
 	step, err := getInt(args.Items()[3], &defaultStep)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating step: %v", err)
+		return nil, fmt.Errorf("error evaluating step: %w", err)
 	}
 
 	if step != nil && *step == 0 {
-		return nil, fmt.Errorf("slice step cannot be zero")
+		return nil, &core.ValueError{Message: "slice step cannot be zero"}
 	}
 
 	// Handle different object types
@@ -268,7 +268,7 @@ func SliceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return sliceByteArray(v, start, end, step)
 
 	default:
-		return nil, fmt.Errorf("'%s' object is not subscriptable", core.GetPythonTypeName(obj))
+		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not subscriptable", core.GetPythonTypeName(obj))}
 	}
 }
 
@@ -482,7 +482,7 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 			return nil, err
 		}
 		if val == 0 {
-			return nil, fmt.Errorf("slice step cannot be zero")
+			return nil, &core.ValueError{Message: "slice step cannot be zero"}
 		}
 		step = &val
 	}
@@ -508,7 +508,7 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 	case *core.ByteArrayValue:
 		return sliceByteArray(v, start, stop, step)
 	default:
-		return nil, fmt.Errorf("'%s' object is not subscriptable", core.GetPythonTypeName(v))
+		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not subscriptable", core.GetPythonTypeName(v))}
 	}
 }
 
@@ -516,19 +516,19 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 // (del-item obj key) -> nil
 func DelItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 2 {
-		return nil, fmt.Errorf("del-item requires exactly 2 arguments, got %d", args.Len())
+		return nil, &core.TypeError{Message: fmt.Sprintf("del-item requires exactly 2 arguments, got %d", args.Len())}
 	}
 
 	// Evaluate the object
 	obj, err := Eval(args.Items()[0], ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating object: %v", err)
+		return nil, fmt.Errorf("error evaluating object: %w", err)
 	}
 
 	// Evaluate the key/index
 	key, err := Eval(args.Items()[1], ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error evaluating key: %v", err)
+		return nil, fmt.Errorf("error evaluating key: %w", err)
 	}
 
 	// First, try dunder method __delitem__
@@ -549,7 +549,7 @@ func DelItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Fall back to error
-	return nil, fmt.Errorf("'%s' object does not support item deletion", obj.Type())
+	return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object does not support item deletion", obj.Type())}
 }
 
 // RegisterIndexing registers the indexing special forms
