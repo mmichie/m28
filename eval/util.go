@@ -60,7 +60,7 @@ func assignVariable(ctx *core.Context, name string, value core.Value) error {
 		if err := ctx.Outer.Set(name, value); err != nil {
 			// If Set fails, it means the variable doesn't exist in any outer scope
 			// This shouldn't happen because DeclareNonlocal validates this
-			return fmt.Errorf("no binding for nonlocal '%s' found", name)
+			return &core.NameError{Name: name}
 		}
 		return nil
 	}
@@ -511,7 +511,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		ctx.Define(string(name), value)
 	default:
 		// Not a function, error
-		return nil, fmt.Errorf("def can only be used to define functions, not %s values. Use = for variable assignment", value.Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("def can only be used to define functions, not %s values. Use = for variable assignment", value.Type())}
 	}
 	return value, nil
 }
@@ -571,19 +571,19 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 					// Check for **unpack marker
 					if sym, ok := arg.(core.SymbolValue); ok && string(sym) == "**unpack" {
 						if i+1 >= args.Len() {
-							return nil, fmt.Errorf("**unpack requires a dict expression")
+							return nil, &core.TypeError{Message: "**unpack requires a dict expression"}
 						}
 
 						// Evaluate the dict to unpack
 						unpackVal, err := Eval(args.Items()[i+1], ctx)
 						if err != nil {
-							return nil, fmt.Errorf("error evaluating **unpack dict: %v", err)
+							return nil, fmt.Errorf("error evaluating **unpack dict: %w", err)
 						}
 
 						// Must be a dict
 						unpackDict, ok := unpackVal.(*core.DictValue)
 						if !ok {
-							return nil, fmt.Errorf("**unpack requires a dict, got %s", unpackVal.Type())
+							return nil, &core.TypeError{Message: fmt.Sprintf("**unpack requires a dict, got %s", unpackVal.Type())}
 						}
 
 						// Merge all key-value pairs from unpacked dict
@@ -605,13 +605,13 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 					// Regular wrapped pair
 					pairList, ok := arg.(*core.ListValue)
 					if !ok || pairList.Len() != 2 {
-						return nil, fmt.Errorf("dict-literal with wrapped pairs: expected (key value) pairs or **unpack")
+						return nil, &core.TypeError{Message: "dict-literal with wrapped pairs: expected (key value) pairs or **unpack"}
 					}
 
 					// Evaluate the key
 					key, err := Eval(pairList.Items()[0], ctx)
 					if err != nil {
-						return nil, fmt.Errorf("error evaluating dict key: %v", err)
+						return nil, fmt.Errorf("error evaluating dict key: %w", err)
 					}
 
 					// Check if key is hashable
@@ -625,7 +625,7 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 					// Evaluate the value
 					value, err := Eval(pairList.Items()[1], ctx)
 					if err != nil {
-						return nil, fmt.Errorf("error evaluating dict value for key %v: %v", key, err)
+						return nil, fmt.Errorf("error evaluating dict value for key %v: %w", key, err)
 					}
 
 					// Set the key-value pair
@@ -643,19 +643,19 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 		// Check for **unpack marker
 		if sym, ok := args.Items()[i].(core.SymbolValue); ok && string(sym) == "**unpack" {
 			if i+1 >= args.Len() {
-				return nil, fmt.Errorf("**unpack requires a dict expression")
+				return nil, &core.TypeError{Message: "**unpack requires a dict expression"}
 			}
 
 			// Evaluate the dict to unpack
 			unpackVal, err := Eval(args.Items()[i+1], ctx)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating **unpack dict: %v", err)
+				return nil, fmt.Errorf("error evaluating **unpack dict: %w", err)
 			}
 
 			// Must be a dict
 			unpackDict, ok := unpackVal.(*core.DictValue)
 			if !ok {
-				return nil, fmt.Errorf("**unpack requires a dict, got %s", unpackVal.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("**unpack requires a dict, got %s", unpackVal.Type())}
 			}
 
 			// Merge all key-value pairs from unpacked dict
@@ -678,13 +678,13 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 
 		// Regular key-value pair
 		if i+1 >= args.Len() {
-			return nil, fmt.Errorf("dict-literal requires key-value pairs (odd number of arguments after unpacking)")
+			return nil, ArgumentError{Message: "dict-literal requires key-value pairs (odd number of arguments after unpacking)"}
 		}
 
 		// Evaluate the key
 		key, err := Eval(args.Items()[i], ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating dict key: %v", err)
+			return nil, fmt.Errorf("error evaluating dict key: %w", err)
 		}
 
 		// Check if key is hashable
@@ -698,7 +698,7 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 		// Evaluate the value
 		value, err := Eval(args.Items()[i+1], ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating dict value for key %v: %v", key, err)
+			return nil, fmt.Errorf("error evaluating dict value for key %v: %w", key, err)
 		}
 
 		// Set the key-value pair
@@ -781,13 +781,13 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 					case *core.ListValue:
 						values = v.Items()
 					default:
-						return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
+						return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-sequence %s", value.Type())}
 					}
 
 					// Calculate minimum required length
 					minLen := actualTargets.Len() - 1 // All targets except the star
 					if len(values) < minLen {
-						return nil, fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))
+						return nil, &core.ValueError{Message: fmt.Sprintf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))}
 					}
 
 					// Assign values
@@ -798,11 +798,11 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 							unwrappedTarget := unwrapLocated(target)
 							starTarget, ok := unwrappedTarget.(*core.ListValue)
 							if !ok {
-								return nil, fmt.Errorf("star unpacking target must be a list, got %v", unwrappedTarget.Type())
+								return nil, &core.TypeError{Message: fmt.Sprintf("star unpacking target must be a list, got %s", unwrappedTarget.Type())}
 							}
 							starVar, ok := starTarget.GetItemAsSymbol(1)
 							if !ok {
-								return nil, fmt.Errorf("star unpacking variable must be a symbol")
+								return nil, &core.TypeError{Message: "star unpacking variable must be a symbol"}
 							}
 							remaining := len(values) - valIdx - (actualTargets.Len() - i - 1)
 							starValues := values[valIdx : valIdx+remaining]
@@ -819,7 +819,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 								}
 								valIdx++
 							} else {
-								return nil, fmt.Errorf("unpacking target must be a symbol")
+								return nil, &core.TypeError{Message: "unpacking target must be a symbol"}
 							}
 						}
 					}
@@ -858,9 +858,9 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 			// Check length match
 			if len(targets) != len(values) {
 				if len(values) < len(targets) {
-					return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(targets), len(values))
+					return nil, &core.ValueError{Message: fmt.Sprintf("not enough values to unpack (expected %d, got %d)", len(targets), len(values))}
 				}
-				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
+				return nil, &core.ValueError{Message: fmt.Sprintf("too many values to unpack (expected %d, got %d)", len(targets), len(values))}
 			}
 
 			// Assign each value using generic unpacking
@@ -937,7 +937,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 				// Check length match
 				if len(targets) != len(values) {
-					return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
+					return nil, &core.ValueError{Message: fmt.Sprintf("too many values to unpack (expected %d, got %d)", len(targets), len(values))}
 				}
 
 				// Assign each value
@@ -969,15 +969,15 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 				values = v.Items()
 			default:
 				// If not a sequence, error
-				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-sequence %s", value.Type())}
 			}
 
 			// Check length match
 			if len(targets) != len(values) {
 				if len(values) < len(targets) {
-					return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(targets), len(values))
+					return nil, &core.ValueError{Message: fmt.Sprintf("not enough values to unpack (expected %d, got %d)", len(targets), len(values))}
 				}
-				return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", len(targets), len(values))
+				return nil, &core.ValueError{Message: fmt.Sprintf("too many values to unpack (expected %d, got %d)", len(targets), len(values))}
 			}
 
 			// Assign each value using generic unpacking
@@ -992,7 +992,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 		// Case 2: (= a b c d) - pairwise assignment
 		if args.Len()%2 != 0 {
-			return nil, fmt.Errorf("= with multiple arguments requires an even number of arguments")
+			return nil, ArgumentError{Message: "= with multiple arguments requires an even number of arguments"}
 		}
 
 		var lastValue core.Value
@@ -1009,7 +1009,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 				}
 				lastValue = value
 			} else {
-				return nil, fmt.Errorf("assignment target must be a symbol")
+				return nil, &core.TypeError{Message: "assignment target must be a symbol"}
 			}
 		}
 
@@ -1073,7 +1073,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 					return value, nil
 				}
 
-				return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+				return nil, &core.AttributeError{ObjType: string(obj.Type()), Message: fmt.Sprintf("'%s' object does not support attribute assignment", obj.Type())}
 			}
 
 			// Check if it's an index expression
@@ -1166,14 +1166,14 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 			case *core.ListValue:
 				values = v.Items()
 			default:
-				return nil, fmt.Errorf("cannot unpack non-sequence %v", value.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-sequence %s", value.Type())}
 			}
 
 			if hasStarUnpack {
 				// Star unpacking
 				minLen := t.Len() - 1 // All targets except the star
 				if len(values) < minLen {
-					return nil, fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))
+					return nil, &core.ValueError{Message: fmt.Sprintf("not enough values to unpack (expected at least %d, got %d)", minLen, len(values))}
 				}
 
 				// Assign values
@@ -1186,15 +1186,15 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 						// Star unpacking: collect remaining values
 						starTarget, ok := unwrappedTarget.(*core.ListValue)
 						if !ok {
-							return nil, fmt.Errorf("star unpacking target must be a list, got %T", unwrappedTarget)
+							return nil, &core.TypeError{Message: fmt.Sprintf("star unpacking target must be a list, got %T", unwrappedTarget)}
 						}
 						if starTarget.Len() < 2 {
-							return nil, fmt.Errorf("invalid star unpacking target")
+							return nil, &core.TypeError{Message: "invalid star unpacking target"}
 						}
 						starVarVal := unwrapLocated(starTarget.Items()[1])
 						starVar, ok := starVarVal.(core.SymbolValue)
 						if !ok {
-							return nil, fmt.Errorf("star unpacking variable must be a symbol, got %T", starVarVal)
+							return nil, &core.TypeError{Message: fmt.Sprintf("star unpacking variable must be a symbol, got %T", starVarVal)}
 						}
 						remaining := len(values) - valIdx - (t.Len() - i - 1)
 						starValues := values[valIdx : valIdx+remaining]
@@ -1234,7 +1234,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 								} else if symName, ok := attrNameVal.(core.SymbolValue); ok {
 									attrName = string(symName)
 								} else {
-									return nil, fmt.Errorf("attribute name must be a string or symbol, got %T", attrNameVal)
+									return nil, &core.TypeError{Message: fmt.Sprintf("attribute name must be a string or symbol, got %T", attrNameVal)}
 								}
 
 								// Set the attribute
@@ -1255,11 +1255,11 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 									continue
 								}
 
-								return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+								return nil, &core.AttributeError{ObjType: string(obj.Type()), Message: fmt.Sprintf("'%s' object does not support attribute assignment", obj.Type())}
 							}
 						}
 
-						return nil, fmt.Errorf("unpacking target must be a symbol or dot notation")
+						return nil, &core.TypeError{Message: "unpacking target must be a symbol or dot notation"}
 					}
 				}
 			} else {
@@ -1267,9 +1267,9 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 				// Check that the number of targets matches the number of values
 				if t.Len() != len(values) {
 					if len(values) < t.Len() {
-						return nil, fmt.Errorf("not enough values to unpack (expected %d, got %d)", t.Len(), len(values))
+						return nil, &core.ValueError{Message: fmt.Sprintf("not enough values to unpack (expected %d, got %d)", t.Len(), len(values))}
 					}
-					return nil, fmt.Errorf("too many values to unpack (expected %d, got %d)", t.Len(), len(values))
+					return nil, &core.ValueError{Message: fmt.Sprintf("too many values to unpack (expected %d, got %d)", t.Len(), len(values))}
 				}
 
 				// Assign each value to its corresponding target
@@ -1290,7 +1290,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 						if sym, ok := unwrappedFirst.(core.SymbolValue); ok && string(sym) == "." {
 							// This is attribute assignment like self.a = value
 							if targetList.Len() != 3 {
-								return nil, fmt.Errorf("invalid dot notation in assignment target")
+								return nil, &core.TypeError{Message: "invalid dot notation in assignment target"}
 							}
 
 							// Evaluate the object
@@ -1311,7 +1311,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 							} else if symName, ok := attrNameVal.(core.SymbolValue); ok {
 								attrName = string(symName)
 							} else {
-								return nil, fmt.Errorf("attribute name must be a string or symbol, got %T", attrNameVal)
+								return nil, &core.TypeError{Message: fmt.Sprintf("attribute name must be a string or symbol, got %T", attrNameVal)}
 							}
 
 							// Set the attribute
@@ -1330,7 +1330,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 								continue
 							}
 
-							return nil, fmt.Errorf("%s does not support attribute assignment", obj.Type())
+							return nil, &core.AttributeError{ObjType: string(obj.Type()), Message: fmt.Sprintf("'%s' object does not support attribute assignment", obj.Type())}
 						}
 
 						// Not dot notation - must be nested unpacking pattern like (a, b)
@@ -1341,7 +1341,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 						continue
 					}
 
-					return nil, fmt.Errorf("assignment target must be a symbol, dot notation, or tuple pattern, got %v", target.Type())
+					return nil, &core.TypeError{Message: fmt.Sprintf("assignment target must be a symbol, dot notation, or tuple pattern, got %s", target.Type())}
 				}
 			}
 
