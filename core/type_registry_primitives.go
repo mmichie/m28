@@ -23,7 +23,7 @@ func registerNumberType() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 1 {
-						return nil, fmt.Errorf("__add__ takes exactly one argument")
+						return nil, &TypeError{Message: "__add__ takes exactly one argument"}
 					}
 
 					// Extract numeric value from receiver (handle both NumberValue and int subclass instances)
@@ -118,7 +118,7 @@ func registerNumberType() {
 						intVal := int(n)
 						// Check if the number is actually an integer
 						if float64(intVal) != float64(n) {
-							return nil, fmt.Errorf("__index__ returned non-integer value")
+							return nil, &TypeError{Message: "__index__ returned non-integer value"}
 						}
 						return NumberValue(float64(n)), nil
 					}
@@ -130,15 +130,15 @@ func registerNumberType() {
 								intVal := int(n)
 								// Check if the number is actually an integer
 								if float64(intVal) != float64(n) {
-									return nil, fmt.Errorf("__index__ returned non-integer value")
+									return nil, &TypeError{Message: "__index__ returned non-integer value"}
 								}
 								return NumberValue(float64(n)), nil
 							}
 						}
-						return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+						return nil, &AttributeError{Message: "int subclass instance has no __value__ attribute"}
 					}
 
-					return nil, fmt.Errorf("__index__ called on non-int receiver: %s", receiver.Type())
+					return nil, &TypeError{Message: fmt.Sprintf("__index__ called on non-int receiver: %s", receiver.Type())}
 				},
 			},
 			"__int__": {
@@ -159,10 +159,10 @@ func registerNumberType() {
 								return NumberValue(float64(int(n))), nil
 							}
 						}
-						return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+						return nil, &AttributeError{Message: "int subclass instance has no __value__ attribute"}
 					}
 
-					return nil, fmt.Errorf("__int__ called on non-int receiver: %s", receiver.Type())
+					return nil, &TypeError{Message: fmt.Sprintf("__int__ called on non-int receiver: %s", receiver.Type())}
 				},
 			},
 			"to_bytes": {
@@ -172,7 +172,7 @@ func registerNumberType() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 2 {
-						return nil, fmt.Errorf("to_bytes() takes exactly 2 arguments (%d given)", len(args))
+						return nil, &TypeError{Message: fmt.Sprintf("to_bytes() takes exactly 2 arguments (%d given)", len(args))}
 					}
 
 					// Get the integer value
@@ -181,54 +181,54 @@ func registerNumberType() {
 						num = int64(n)
 						// Check if it's actually an integer
 						if float64(num) != float64(n) {
-							return nil, fmt.Errorf("'float' object cannot be interpreted as an integer")
+							return nil, &TypeError{Message: "'float' object cannot be interpreted as an integer"}
 						}
 					} else if inst, ok := receiver.(*Instance); ok {
 						if val, exists := inst.Attributes["__value__"]; exists {
 							if n, ok := val.(NumberValue); ok {
 								num = int64(n)
 								if float64(num) != float64(n) {
-									return nil, fmt.Errorf("'float' object cannot be interpreted as an integer")
+									return nil, &TypeError{Message: "'float' object cannot be interpreted as an integer"}
 								}
 							} else {
-								return nil, fmt.Errorf("to_bytes() requires an integer")
+								return nil, &TypeError{Message: "to_bytes() requires an integer"}
 							}
 						} else {
-							return nil, fmt.Errorf("int subclass instance has no __value__ attribute")
+							return nil, &AttributeError{Message: "int subclass instance has no __value__ attribute"}
 						}
 					} else {
-						return nil, fmt.Errorf("to_bytes() requires an integer")
+						return nil, &TypeError{Message: "to_bytes() requires an integer"}
 					}
 
 					// Get length argument
 					lengthVal, ok := args[0].(NumberValue)
 					if !ok {
-						return nil, fmt.Errorf("to_bytes() length argument must be an integer")
+						return nil, &TypeError{Message: "to_bytes() length argument must be an integer"}
 					}
 					length := int(lengthVal)
 					if float64(length) != float64(lengthVal) || length < 0 {
-						return nil, fmt.Errorf("to_bytes() length argument must be a non-negative integer")
+						return nil, &TypeError{Message: "to_bytes() length argument must be a non-negative integer"}
 					}
 
 					// Get byteorder argument
 					byteorder, ok := args[1].(StringValue)
 					if !ok {
-						return nil, fmt.Errorf("to_bytes() byteorder argument must be a string")
+						return nil, &TypeError{Message: "to_bytes() byteorder argument must be a string"}
 					}
 					order := string(byteorder)
 					if order != "little" && order != "big" {
-						return nil, fmt.Errorf("byteorder must be either 'little' or 'big'")
+						return nil, &ValueError{Message: "byteorder must be either 'little' or 'big'"}
 					}
 
 					// Check if number is negative
 					if num < 0 {
-						return nil, fmt.Errorf("can't convert negative int to unsigned")
+						return nil, &ValueError{Message: "can't convert negative int to unsigned"}
 					}
 
 					// Check if number fits in the specified length
 					maxVal := int64(1) << uint(length*8)
 					if num >= maxVal {
-						return nil, fmt.Errorf("int too big to convert")
+						return nil, &ValueError{Message: "int too big to convert"}
 					}
 
 					// Convert to bytes
@@ -263,35 +263,35 @@ func registerNumberType() {
 					// Get the int type object (cached, same instance every time)
 					intDesc := GetTypeDescriptor(NumberType)
 					if intDesc == nil {
-						return nil, fmt.Errorf("cannot get int type descriptor")
+						return nil, &TypeError{Message: "cannot get int type descriptor"}
 					}
 					intClass := intDesc.GetTypeObject()
 					if intClass == nil {
-						return nil, fmt.Errorf("cannot get int type object")
+						return nil, &TypeError{Message: "cannot get int type object"}
 					}
 
 					// Get the global __newobj__ function from copyreg module
 					// For now, create it inline
 					newobjFunc := NewNamedBuiltinFunction("__newobj__", func(args []Value, ctx *Context) (Value, error) {
 						if len(args) < 1 {
-							return nil, fmt.Errorf("__newobj__ requires at least 1 argument")
+							return nil, &TypeError{Message: "__newobj__ requires at least 1 argument"}
 						}
 						cls := args[0]
 						clsArgs := args[1:]
 
 						clsObj, ok := cls.(interface{ GetAttr(string) (Value, bool) })
 						if !ok {
-							return nil, fmt.Errorf("class does not support attribute access")
+							return nil, &TypeError{Message: "class does not support attribute access"}
 						}
 
 						newMethod, exists := clsObj.GetAttr("__new__")
 						if !exists {
-							return nil, fmt.Errorf("class has no __new__ method")
+							return nil, &AttributeError{Message: "class has no __new__ method"}
 						}
 
 						newCallable, ok := newMethod.(Callable)
 						if !ok {
-							return nil, fmt.Errorf("__new__ is not callable")
+							return nil, &TypeError{Message: "__new__ is not callable"}
 						}
 
 						newArgs := append([]Value{cls}, clsArgs...)
@@ -327,17 +327,17 @@ func registerNumberType() {
 					if f, ok := ParseFloat(s); ok {
 						return NumberValue(f), nil
 					}
-					return nil, fmt.Errorf("invalid literal for int() with base 10: '%s'", s)
+					return nil, &ValueError{Message: fmt.Sprintf("invalid literal for int() with base 10: '%s'", s)}
 				case BoolValue:
 					if v {
 						return NumberValue(1), nil
 					}
 					return NumberValue(0), nil
 				default:
-					return nil, fmt.Errorf("int() argument must be a string or a number, not '%s'", v.Type())
+					return nil, &TypeError{Message: fmt.Sprintf("int() argument must be a string or a number, not '%s'", v.Type())}
 				}
 			}
-			return nil, fmt.Errorf("int() takes at most 1 argument (%d given)", len(args))
+			return nil, &TypeError{Message: fmt.Sprintf("int() takes at most 1 argument (%d given)", len(args))}
 		},
 		Str: func(v Value) string {
 			n := v.(NumberValue)
@@ -405,7 +405,7 @@ func registerBoolType() {
 					case NumberValue:
 						b = int(v)
 					default:
-						return nil, fmt.Errorf("'<' not supported between instances of 'bool' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of 'bool' and '%s'", args[0].Type())}
 					}
 					return BoolValue(a < b), nil
 				},
@@ -429,7 +429,7 @@ func registerBoolType() {
 					case NumberValue:
 						b = int(v)
 					default:
-						return nil, fmt.Errorf("'<=' not supported between instances of 'bool' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("'<=' not supported between instances of 'bool' and '%s'", args[0].Type())}
 					}
 					return BoolValue(a <= b), nil
 				},
@@ -453,7 +453,7 @@ func registerBoolType() {
 					case NumberValue:
 						b = int(v)
 					default:
-						return nil, fmt.Errorf("'>' not supported between instances of 'bool' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("'>' not supported between instances of 'bool' and '%s'", args[0].Type())}
 					}
 					return BoolValue(a > b), nil
 				},
@@ -477,7 +477,7 @@ func registerBoolType() {
 					case NumberValue:
 						b = int(v)
 					default:
-						return nil, fmt.Errorf("'>=' not supported between instances of 'bool' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("'>=' not supported between instances of 'bool' and '%s'", args[0].Type())}
 					}
 					return BoolValue(a >= b), nil
 				},
@@ -495,11 +495,11 @@ func registerBoolType() {
 					// Get the bool type object (cached, same instance every time)
 					boolDesc := GetTypeDescriptor(BoolType)
 					if boolDesc == nil {
-						return nil, fmt.Errorf("cannot get bool type descriptor")
+						return nil, &TypeError{Message: "cannot get bool type descriptor"}
 					}
 					boolClass := boolDesc.GetTypeObject()
 					if boolClass == nil {
-						return nil, fmt.Errorf("cannot get bool type object")
+						return nil, &TypeError{Message: "cannot get bool type object"}
 					}
 
 					// Convert bool to int (False=0, True=1)
@@ -513,24 +513,24 @@ func registerBoolType() {
 					// Create __newobj__ function
 					newobjFunc := NewNamedBuiltinFunction("__newobj__", func(args []Value, ctx *Context) (Value, error) {
 						if len(args) < 1 {
-							return nil, fmt.Errorf("__newobj__ requires at least 1 argument")
+							return nil, &TypeError{Message: "__newobj__ requires at least 1 argument"}
 						}
 						cls := args[0]
 						clsArgs := args[1:]
 
 						clsObj, ok := cls.(interface{ GetAttr(string) (Value, bool) })
 						if !ok {
-							return nil, fmt.Errorf("class does not support attribute access")
+							return nil, &TypeError{Message: "class does not support attribute access"}
 						}
 
 						newMethod, exists := clsObj.GetAttr("__new__")
 						if !exists {
-							return nil, fmt.Errorf("class has no __new__ method")
+							return nil, &AttributeError{Message: "class has no __new__ method"}
 						}
 
 						newCallable, ok := newMethod.(Callable)
 						if !ok {
-							return nil, fmt.Errorf("__new__ is not callable")
+							return nil, &TypeError{Message: "__new__ is not callable"}
 						}
 
 						newArgs := append([]Value{cls}, clsArgs...)
@@ -555,7 +555,7 @@ func registerBoolType() {
 			if len(args) == 1 {
 				return BoolValue(IsTruthy(args[0])), nil
 			}
-			return nil, fmt.Errorf("bool() takes at most 1 argument (%d given)", len(args))
+			return nil, &TypeError{Message: fmt.Sprintf("bool() takes at most 1 argument (%d given)", len(args))}
 		},
 		Str: func(v Value) string {
 			if v.(BoolValue) {
@@ -646,12 +646,12 @@ func registerBytesType() {
 					if len(args) > 0 {
 						enc, ok := args[0].(StringValue)
 						if !ok {
-							return nil, fmt.Errorf("decode() argument 1 must be str, not %s", args[0].Type())
+							return nil, &TypeError{Message: fmt.Sprintf("decode() argument 1 must be str, not %s", args[0].Type())}
 						}
 						encoding = string(enc)
 					}
 					if encoding != "utf-8" {
-						return nil, fmt.Errorf("only utf-8 encoding is currently supported")
+						return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
 					}
 					return StringValue(string(b)), nil
 				},
@@ -687,16 +687,16 @@ func registerBytesType() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 1 {
-						return nil, fmt.Errorf("__contains__ takes exactly one argument")
+						return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
 					}
 					b := receiver.(BytesValue)
 					num, ok := args[0].(NumberValue)
 					if !ok {
-						return nil, fmt.Errorf("argument should be integer")
+						return nil, &TypeError{Message: "argument should be integer"}
 					}
 					intVal := int(num)
 					if intVal < 0 || intVal > 255 {
-						return nil, fmt.Errorf("byte must be in range(0, 256)")
+						return nil, &ValueError{Message: "byte must be in range(0, 256)"}
 					}
 					for _, byte := range b {
 						if byte == uint8(intVal) {
@@ -713,7 +713,7 @@ func registerBytesType() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 1 {
-						return nil, fmt.Errorf("__eq__ takes exactly one argument")
+						return nil, &TypeError{Message: "__eq__ takes exactly one argument"}
 					}
 					b1 := receiver.(BytesValue)
 					b2, ok := args[0].(BytesValue)
@@ -751,7 +751,7 @@ func registerBytesType() {
 							if bytes, ok := result.(BytesValue); ok {
 								return bytes, nil
 							}
-							return nil, fmt.Errorf("__bytes__ returned non-bytes (type %s)", result.Type())
+							return nil, &TypeError{Message: fmt.Sprintf("__bytes__ returned non-bytes (type %s)", result.Type())}
 						}
 					}
 				}
@@ -765,11 +765,11 @@ func registerBytesType() {
 					for i, val := range v.Items() {
 						num, ok := val.(NumberValue)
 						if !ok {
-							return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
+							return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", val.Type())}
 						}
 						intVal := int(num)
 						if intVal < 0 || intVal > 255 {
-							return nil, fmt.Errorf("bytes must be in range(0, 256)")
+							return nil, &ValueError{Message: "bytes must be in range(0, 256)"}
 						}
 						result[i] = byte(intVal)
 					}
@@ -790,11 +790,11 @@ func registerBytesType() {
 					for _, val := range v.items {
 						num, ok := val.(NumberValue)
 						if !ok {
-							return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
+							return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", val.Type())}
 						}
 						intVal := int(num)
 						if intVal < 0 || intVal > 255 {
-							return nil, fmt.Errorf("bytes must be in range(0, 256)")
+							return nil, &ValueError{Message: "bytes must be in range(0, 256)"}
 						}
 						result = append(result, byte(intVal))
 					}
@@ -805,35 +805,35 @@ func registerBytesType() {
 					for _, val := range v.items {
 						num, ok := val.(NumberValue)
 						if !ok {
-							return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
+							return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", val.Type())}
 						}
 						intVal := int(num)
 						if intVal < 0 || intVal > 255 {
-							return nil, fmt.Errorf("bytes must be in range(0, 256)")
+							return nil, &ValueError{Message: "bytes must be in range(0, 256)"}
 						}
 						result = append(result, byte(intVal))
 					}
 					return BytesValue(result), nil
 				default:
-					return nil, fmt.Errorf("cannot convert '%s' object to bytes", v.Type())
+					return nil, &TypeError{Message: fmt.Sprintf("cannot convert '%s' object to bytes", v.Type())}
 				}
 			}
 			// bytes(string, encoding)
 			if len(args) == 2 {
 				str, ok := args[0].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("bytes() argument 1 must be str, not %s", args[0].Type())
+					return nil, &TypeError{Message: fmt.Sprintf("bytes() argument 1 must be str, not %s", args[0].Type())}
 				}
 				enc, ok := args[1].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("bytes() argument 2 must be str, not %s", args[1].Type())
+					return nil, &TypeError{Message: fmt.Sprintf("bytes() argument 2 must be str, not %s", args[1].Type())}
 				}
 				if string(enc) != "utf-8" {
-					return nil, fmt.Errorf("only utf-8 encoding is currently supported")
+					return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
 				}
 				return BytesValue([]byte(string(str))), nil
 			}
-			return nil, fmt.Errorf("bytes() takes at most 2 arguments (%d given)", len(args))
+			return nil, &TypeError{Message: fmt.Sprintf("bytes() takes at most 2 arguments (%d given)", len(args))}
 		},
 		Str: func(v Value) string {
 			return v.(BytesValue).String()
@@ -873,12 +873,12 @@ func registerByteArrayType() {
 					if len(args) > 0 {
 						enc, ok := args[0].(StringValue)
 						if !ok {
-							return nil, fmt.Errorf("decode() argument 1 must be str, not %s", args[0].Type())
+							return nil, &TypeError{Message: fmt.Sprintf("decode() argument 1 must be str, not %s", args[0].Type())}
 						}
 						encoding = string(enc)
 					}
 					if encoding != "utf-8" {
-						return nil, fmt.Errorf("only utf-8 encoding is currently supported")
+						return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
 					}
 					return StringValue(string(b.data)), nil
 				},
@@ -904,16 +904,16 @@ func registerByteArrayType() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 1 {
-						return nil, fmt.Errorf("append() takes exactly one argument")
+						return nil, &TypeError{Message: "append() takes exactly one argument"}
 					}
 					b := receiver.(*ByteArrayValue)
 					num, ok := args[0].(NumberValue)
 					if !ok {
-						return nil, fmt.Errorf("an integer is required")
+						return nil, &TypeError{Message: "an integer is required"}
 					}
 					intVal := int(num)
 					if intVal < 0 || intVal > 255 {
-						return nil, fmt.Errorf("byte must be in range(0, 256)")
+						return nil, &ValueError{Message: "byte must be in range(0, 256)"}
 					}
 					b.data = append(b.data, byte(intVal))
 					return None, nil
@@ -926,7 +926,7 @@ func registerByteArrayType() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 1 {
-						return nil, fmt.Errorf("extend() takes exactly one argument")
+						return nil, &TypeError{Message: "extend() takes exactly one argument"}
 					}
 					b := receiver.(*ByteArrayValue)
 
@@ -939,16 +939,16 @@ func registerByteArrayType() {
 						for _, val := range v.Items() {
 							num, ok := val.(NumberValue)
 							if !ok {
-								return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
+								return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", val.Type())}
 							}
 							intVal := int(num)
 							if intVal < 0 || intVal > 255 {
-								return nil, fmt.Errorf("byte must be in range(0, 256)")
+								return nil, &ValueError{Message: "byte must be in range(0, 256)"}
 							}
 							b.data = append(b.data, byte(intVal))
 						}
 					default:
-						return nil, fmt.Errorf("bytearray.extend() argument must be iterable")
+						return nil, &TypeError{Message: "bytearray.extend() argument must be iterable"}
 					}
 					return None, nil
 				},
@@ -981,16 +981,16 @@ func registerByteArrayType() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 1 {
-						return nil, fmt.Errorf("__contains__ takes exactly one argument")
+						return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
 					}
 					b := receiver.(*ByteArrayValue)
 					num, ok := args[0].(NumberValue)
 					if !ok {
-						return nil, fmt.Errorf("argument should be integer")
+						return nil, &TypeError{Message: "argument should be integer"}
 					}
 					intVal := int(num)
 					if intVal < 0 || intVal > 255 {
-						return nil, fmt.Errorf("byte must be in range(0, 256)")
+						return nil, &ValueError{Message: "byte must be in range(0, 256)"}
 					}
 					for _, byte := range b.data {
 						if byte == uint8(intVal) {
@@ -1007,7 +1007,7 @@ func registerByteArrayType() {
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 1 {
-						return nil, fmt.Errorf("__eq__ takes exactly one argument")
+						return nil, &TypeError{Message: "__eq__ takes exactly one argument"}
 					}
 					b1 := receiver.(*ByteArrayValue)
 					// Check if comparing with bytes
@@ -1053,11 +1053,11 @@ func registerByteArrayType() {
 					for i, val := range v.Items() {
 						num, ok := val.(NumberValue)
 						if !ok {
-							return nil, fmt.Errorf("'%s' object cannot be interpreted as an integer", val.Type())
+							return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", val.Type())}
 						}
 						intVal := int(num)
 						if intVal < 0 || intVal > 255 {
-							return nil, fmt.Errorf("bytes must be in range(0, 256)")
+							return nil, &ValueError{Message: "bytes must be in range(0, 256)"}
 						}
 						result[i] = byte(intVal)
 					}
@@ -1073,25 +1073,25 @@ func registerByteArrayType() {
 					copy(result, v.data)
 					return NewByteArray(result), nil
 				default:
-					return nil, fmt.Errorf("cannot convert '%s' object to bytearray", v.Type())
+					return nil, &TypeError{Message: fmt.Sprintf("cannot convert '%s' object to bytearray", v.Type())}
 				}
 			}
 			// bytearray(string, encoding)
 			if len(args) == 2 {
 				str, ok := args[0].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("bytearray() argument 1 must be str, not %s", args[0].Type())
+					return nil, &TypeError{Message: fmt.Sprintf("bytearray() argument 1 must be str, not %s", args[0].Type())}
 				}
 				enc, ok := args[1].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("bytearray() argument 2 must be str, not %s", args[1].Type())
+					return nil, &TypeError{Message: fmt.Sprintf("bytearray() argument 2 must be str, not %s", args[1].Type())}
 				}
 				if string(enc) != "utf-8" {
-					return nil, fmt.Errorf("only utf-8 encoding is currently supported")
+					return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
 				}
 				return NewByteArray([]byte(string(str))), nil
 			}
-			return nil, fmt.Errorf("bytearray() takes at most 2 arguments (%d given)", len(args))
+			return nil, &TypeError{Message: fmt.Sprintf("bytearray() takes at most 2 arguments (%d given)", len(args))}
 		},
 		Str: func(v Value) string {
 			return v.(*ByteArrayValue).String()
@@ -1124,7 +1124,7 @@ func registerDecimalType() {
 						d2 := decimal.NewFromFloat(float64(v))
 						return NewDecimal(d1.Add(d2)), nil
 					default:
-						return nil, fmt.Errorf("unsupported operand type(s) for +: 'Decimal' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for +: 'Decimal' and '%s'", args[0].Type())}
 					}
 				},
 			},
@@ -1142,7 +1142,7 @@ func registerDecimalType() {
 						d2 := decimal.NewFromFloat(float64(v))
 						return NewDecimal(d1.Sub(d2)), nil
 					default:
-						return nil, fmt.Errorf("unsupported operand type(s) for -: 'Decimal' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for -: 'Decimal' and '%s'", args[0].Type())}
 					}
 				},
 			},
@@ -1160,7 +1160,7 @@ func registerDecimalType() {
 						d2 := decimal.NewFromFloat(float64(v))
 						return NewDecimal(d1.Mul(d2)), nil
 					default:
-						return nil, fmt.Errorf("unsupported operand type(s) for *: 'Decimal' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for *: 'Decimal' and '%s'", args[0].Type())}
 					}
 				},
 			},
@@ -1239,7 +1239,7 @@ func registerDecimalType() {
 						d2 := decimal.NewFromFloat(float64(v))
 						return BoolValue(d1.LessThan(d2)), nil
 					default:
-						return nil, fmt.Errorf("'<' not supported between instances of 'Decimal' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of 'Decimal' and '%s'", args[0].Type())}
 					}
 				},
 			},
@@ -1257,7 +1257,7 @@ func registerDecimalType() {
 						d2 := decimal.NewFromFloat(float64(v))
 						return BoolValue(d1.LessThanOrEqual(d2)), nil
 					default:
-						return nil, fmt.Errorf("'<=' not supported between instances of 'Decimal' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("'<=' not supported between instances of 'Decimal' and '%s'", args[0].Type())}
 					}
 				},
 			},
@@ -1275,7 +1275,7 @@ func registerDecimalType() {
 						d2 := decimal.NewFromFloat(float64(v))
 						return BoolValue(d1.GreaterThan(d2)), nil
 					default:
-						return nil, fmt.Errorf("'>' not supported between instances of 'Decimal' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("'>' not supported between instances of 'Decimal' and '%s'", args[0].Type())}
 					}
 				},
 			},
@@ -1293,7 +1293,7 @@ func registerDecimalType() {
 						d2 := decimal.NewFromFloat(float64(v))
 						return BoolValue(d1.GreaterThanOrEqual(d2)), nil
 					default:
-						return nil, fmt.Errorf("'>=' not supported between instances of 'Decimal' and '%s'", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("'>=' not supported between instances of 'Decimal' and '%s'", args[0].Type())}
 					}
 				},
 			},
@@ -1324,7 +1324,7 @@ func registerDecimalType() {
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					d := receiver.(*DecimalValue).GetDecimal()
 					if d.IsNegative() {
-						return nil, fmt.Errorf("cannot take square root of negative number")
+						return nil, &ValueError{Message: "cannot take square root of negative number"}
 					}
 					// Use big.Float for square root
 					f, _ := d.Float64()
@@ -1341,7 +1341,7 @@ func registerDecimalType() {
 					d := receiver.(*DecimalValue).GetDecimal()
 					exp, ok := args[0].(*DecimalValue)
 					if !ok {
-						return nil, fmt.Errorf("quantize() argument must be a Decimal")
+						return nil, &TypeError{Message: "quantize() argument must be a Decimal"}
 					}
 					// Round to the same exponent as exp
 					expInt := exp.GetDecimal().Exponent()
