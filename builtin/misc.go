@@ -6,8 +6,108 @@ import (
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/ast"
 	"github.com/mmichie/m28/eval"
+	"github.com/mmichie/m28/modules"
+	"github.com/mmichie/m28/parser"
 )
+
+// checkAssertPatterns checks for problematic assert patterns and emits SyntaxWarnings
+// Specifically detects: assert(condition, message) which creates a tuple, always truthy
+func checkAssertPatterns(source, filename string, ctx *core.Context) error {
+	// Parse the source code using Python tokenizer and parser
+	tokenizer := parser.NewPythonTokenizer(source)
+	tokens, err := tokenizer.Tokenize()
+	if err != nil {
+		// If tokenization fails, let it fail during actual evaluation
+		return nil
+	}
+
+	pythonParser := parser.NewPythonParser(tokens, filename, source)
+	nodes, err := pythonParser.Parse()
+	if err != nil {
+		// If parsing fails, let it fail during actual evaluation
+		return nil
+	}
+
+	// Walk the AST looking for assert statements
+	for _, node := range nodes {
+		walkForAsserts(node, ctx)
+	}
+
+	return nil
+}
+
+// walkForAsserts recursively walks the AST to find AssertForm nodes
+func walkForAsserts(node ast.ASTNode, ctx *core.Context) {
+	if node == nil {
+		return
+	}
+
+	// Check if this is an assert statement
+	if assertForm, ok := node.(*ast.AssertForm); ok {
+		checkAssertCondition(assertForm, ctx)
+		// Still walk the condition and message in case they contain nested asserts
+		walkForAsserts(assertForm.Condition, ctx)
+		if assertForm.Message != nil {
+			walkForAsserts(assertForm.Message, ctx)
+		}
+		return
+	}
+
+	// Recursively walk child nodes based on their type
+	// For most forms, Body is either an ASTNode or contained in an SExpr
+	switch n := node.(type) {
+	case *ast.SExpr:
+		// Walk all elements of SExpr (most compound statements use this)
+		for _, elem := range n.Elements {
+			walkForAsserts(elem, ctx)
+		}
+	case *ast.DefForm:
+		walkForAsserts(n.Body, ctx)
+	case *ast.ClassForm:
+		// ClassForm.Body is []ASTNode
+		for _, stmt := range n.Body {
+			walkForAsserts(stmt, ctx)
+		}
+	}
+}
+
+// checkAssertCondition checks if an assert statement has a tuple condition
+// Pattern: assert(x, "msg") compiles to assert with tuple condition
+func checkAssertCondition(assertForm *ast.AssertForm, ctx *core.Context) {
+	// Check if condition is an SExpr (tuple-literal ...)
+	sexpr, ok := assertForm.Condition.(*ast.SExpr)
+	if !ok {
+		return
+	}
+
+	elements := sexpr.Elements
+	if len(elements) == 0 {
+		return
+	}
+
+	// Check if first element is "tuple-literal" identifier
+	if ident, ok := elements[0].(*ast.Identifier); ok {
+		if ident.Name == "tuple-literal" && len(elements) > 1 {
+			// This is a tuple with at least one element
+			// assert(x, "msg") creates (tuple-literal x "msg")
+			// assert(x,) creates (tuple-literal x)
+			// Both are always truthy and should warn
+			emitSyntaxWarning(ctx)
+		}
+	}
+}
+
+// emitSyntaxWarning emits a SyntaxWarning that will be captured by catch_warnings()
+func emitSyntaxWarning(ctx *core.Context) {
+	// Use the Warn helper from warnings module which properly integrates with catch_warnings()
+	message := "assertion is always true, perhaps remove parentheses?"
+	category := "SyntaxWarning"
+
+	// Call the Warn function which will use the warnings module properly
+	modules.Warn(message, category, ctx)
+}
 
 // RegisterMisc registers miscellaneous functions
 func RegisterMisc(ctx *core.Context) {
@@ -541,7 +641,7 @@ func RegisterMisc(ctx *core.Context) {
 	ctx.Define("NotImplemented", core.NotImplemented)
 
 	// compile - compile source into a code object
-	// For now, this is a stub implementation that returns a placeholder code object
+	// Parses source and emits warnings for problematic patterns
 	ctx.Define("compile", core.NewNamedBuiltinFunction("compile", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("compile", args)
 		// compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1)
@@ -552,8 +652,31 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
-		// For now, just return a code object
-		// TODO(M28-4604): Implement actual compilation when needed
+		// Get source code
+		source, err := v.GetString(0)
+		if err != nil {
+			return nil, err
+		}
+
+		filename, err := v.GetString(1)
+		if err != nil {
+			return nil, err
+		}
+
+		// mode (exec, eval, single) - not used for now
+		_, err = v.GetString(2)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse the source to check for problematic patterns
+		// We need to emit SyntaxWarnings for assert statements with tuple conditions
+		if err := checkAssertPatterns(source, filename, ctx); err != nil {
+			return nil, err
+		}
+
+		// Return a code object placeholder
+		// TODO(M28-4604): Implement actual bytecode compilation
 		return core.NewCodeObject(core.Nil), nil
 	}))
 }

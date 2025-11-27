@@ -257,6 +257,11 @@ func emitWarning(message string, category core.Value, stacklevel int, ctx *core.
 	return nil
 }
 
+// EmitWarningExplicit emits a warning with explicit location info (exported for use by compile())
+func EmitWarningExplicit(message string, category core.Value, filename string, lineno int, ctx *core.Context) error {
+	return emitWarningExplicit(message, category, filename, lineno, ctx)
+}
+
 // emitWarningExplicit emits a warning with explicit location info
 func emitWarningExplicit(message string, category core.Value, filename string, lineno int, ctx *core.Context) error {
 	categoryName := getCategoryName(category, ctx)
@@ -300,13 +305,18 @@ func showWarningExplicit(categoryName, message, filename string, lineno int) {
 
 	// If recording mode is active, create a warning message object and append to list
 	if recordingList != nil {
-		warningMsg := core.NewDict()
-		warningMsg.Set("message", core.StringValue(message))
-		warningMsg.Set("category", core.StringValue(categoryName))
-		warningMsg.Set("filename", core.StringValue(filename))
-		warningMsg.Set("lineno", core.NumberValue(float64(lineno)))
+		// Create a warning message object with attributes (not a dict)
+		warningMsg := core.NewBaseObject(core.Type("WarningMessage"))
+		warningMsg.SetAttr("message", core.StringValue(message))
+		warningMsg.SetAttr("category", core.StringValue(categoryName))
+		warningMsg.SetAttr("filename", core.StringValue(filename))
+		warningMsg.SetAttr("lineno", core.NumberValue(float64(lineno)))
 
 		recordingList.Append(warningMsg)
+
+		if debugWarnings {
+			core.Log.Debug(core.SubsystemBuiltin, "Warning recorded", "category", categoryName, "message", message)
+		}
 		return
 	}
 
@@ -399,12 +409,12 @@ func showWarning(categoryName, message string, stacklevel int) {
 
 	// If recording mode is active, create a warning message object and append to list
 	if recordingList != nil {
-		// Create a simple warning message dict
-		warningMsg := core.NewDict()
-		warningMsg.Set("message", core.StringValue(message))
-		warningMsg.Set("category", core.StringValue(categoryName))
-		warningMsg.Set("filename", core.StringValue("<string>"))
-		warningMsg.Set("lineno", core.NumberValue(1))
+		// Create a warning message object with attributes (not a dict)
+		warningMsg := core.NewBaseObject(core.Type("WarningMessage"))
+		warningMsg.SetAttr("message", core.StringValue(message))
+		warningMsg.SetAttr("category", core.StringValue(categoryName))
+		warningMsg.SetAttr("filename", core.StringValue("<string>"))
+		warningMsg.SetAttr("lineno", core.NumberValue(1))
 
 		recordingList.Append(warningMsg)
 		return
