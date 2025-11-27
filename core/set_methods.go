@@ -33,7 +33,7 @@ func InitSetMethods() {
 			for _, arg := range args {
 				other, ok := arg.(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("union() argument must be a set, not %s", arg.Type())
+					return nil, &TypeError{Message: fmt.Sprintf("union() argument must be a set, not %s", arg.Type())}
 				}
 				for k, v := range other.items {
 					result.items[k] = v
@@ -52,7 +52,7 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) == 0 {
-				return nil, fmt.Errorf("intersection() requires at least one argument")
+				return nil, &TypeError{Message: "intersection() requires at least one argument"}
 			}
 
 			set := receiver.(*SetValue)
@@ -64,7 +64,7 @@ func InitSetMethods() {
 				for _, arg := range args {
 					other, ok := arg.(*SetValue)
 					if !ok {
-						return nil, fmt.Errorf("intersection() argument must be a set, not %s", arg.Type())
+						return nil, &TypeError{Message: fmt.Sprintf("intersection() argument must be a set, not %s", arg.Type())}
 					}
 					if !other.Contains(v) {
 						inAll = false
@@ -99,7 +99,7 @@ func InitSetMethods() {
 			for _, arg := range args {
 				other, ok := arg.(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("difference() argument must be a set, not %s", arg.Type())
+					return nil, &TypeError{Message: fmt.Sprintf("difference() argument must be a set, not %s", arg.Type())}
 				}
 				for k := range other.items {
 					delete(result.items, k)
@@ -120,7 +120,7 @@ func InitSetMethods() {
 			set := receiver.(*SetValue)
 			other, ok := args[0].(*SetValue)
 			if !ok {
-				return nil, fmt.Errorf("symmetric_difference() argument must be a set, not %s", args[0].Type())
+				return nil, &TypeError{Message: fmt.Sprintf("symmetric_difference() argument must be a set, not %s", args[0].Type())}
 			}
 
 			result := NewSet()
@@ -219,7 +219,7 @@ func InitSetMethods() {
 					}
 					continue
 				}
-				return nil, fmt.Errorf("update() argument must be an iterable, not %s", arg.Type())
+				return nil, &TypeError{Message: fmt.Sprintf("update() argument must be an iterable, not %s", arg.Type())}
 			}
 			return None, nil
 		},
@@ -267,7 +267,7 @@ func InitSetMethods() {
 			set := receiver.(*SetValue)
 			other, ok := args[0].(*SetValue)
 			if !ok {
-				return nil, fmt.Errorf("issubset() argument must be a set, not %s", args[0].Type())
+				return nil, &TypeError{Message: fmt.Sprintf("issubset() argument must be a set, not %s", args[0].Type())}
 			}
 
 			// Check if all items in this set are in other
@@ -291,7 +291,7 @@ func InitSetMethods() {
 			set := receiver.(*SetValue)
 			other, ok := args[0].(*SetValue)
 			if !ok {
-				return nil, fmt.Errorf("issuperset() argument must be a set, not %s", args[0].Type())
+				return nil, &TypeError{Message: fmt.Sprintf("issuperset() argument must be a set, not %s", args[0].Type())}
 			}
 
 			// Check if all items in other are in this set
@@ -315,7 +315,7 @@ func InitSetMethods() {
 			set := receiver.(*SetValue)
 			other, ok := args[0].(*SetValue)
 			if !ok {
-				return nil, fmt.Errorf("isdisjoint() argument must be a set, not %s", args[0].Type())
+				return nil, &TypeError{Message: fmt.Sprintf("isdisjoint() argument must be a set, not %s", args[0].Type())}
 			}
 
 			// Check if any item in this set is in other
@@ -339,7 +339,7 @@ func InitSetMethods() {
 			set := receiver.(*SetValue)
 
 			if set.Size() == 0 {
-				return nil, fmt.Errorf("pop from empty set")
+				return nil, &KeyError{Message: "pop from an empty set"}
 			}
 
 			// Get first item (arbitrary)

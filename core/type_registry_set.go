@@ -198,7 +198,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				for _, arg := range args {
 					other, ok := arg.(*SetValue)
 					if !ok {
-						return nil, fmt.Errorf("union() argument must be a set")
+						return nil, &TypeError{Message: "union() argument must be a set"}
 					}
 					for _, item := range other.items {
 						result.Add(item)
@@ -233,7 +233,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 					for _, arg := range args {
 						other, ok := arg.(*SetValue)
 						if !ok {
-							return nil, fmt.Errorf("intersection() argument must be a set")
+							return nil, &TypeError{Message: "intersection() argument must be a set"}
 						}
 						if !other.Contains(item) {
 							inAll = false
@@ -263,7 +263,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 					for _, arg := range args {
 						other, ok := arg.(*SetValue)
 						if !ok {
-							return nil, fmt.Errorf("difference() argument must be a set")
+							return nil, &TypeError{Message: "difference() argument must be a set"}
 						}
 						if other.Contains(item) {
 							shouldInclude = false
@@ -284,13 +284,13 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("symmetric_difference() takes exactly one argument")
+					return nil, &TypeError{Message: "symmetric_difference() takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
 				other, ok := args[0].(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("symmetric_difference() argument must be a set")
+					return nil, &TypeError{Message: "symmetric_difference() argument must be a set"}
 				}
 
 				result := NewSet()
@@ -319,7 +319,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("issubset() takes exactly one argument")
+					return nil, &TypeError{Message: "issubset() takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
@@ -354,7 +354,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 						otherItems[key] = item
 					}
 				default:
-					return nil, fmt.Errorf("issubset() argument must be an iterable")
+					return nil, &TypeError{Message: "issubset() argument must be an iterable"}
 				}
 
 				// Create a lookup function
@@ -380,7 +380,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("issuperset() takes exactly one argument")
+					return nil, &TypeError{Message: "issuperset() takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
@@ -415,7 +415,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 						otherItems[key] = item
 					}
 				default:
-					return nil, fmt.Errorf("issuperset() argument must be an iterable")
+					return nil, &TypeError{Message: "issuperset() argument must be an iterable"}
 				}
 
 				// Check if all items in other are in this set
@@ -434,13 +434,13 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("isdisjoint() takes exactly one argument")
+					return nil, &TypeError{Message: "isdisjoint() takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
 				other, ok := args[0].(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("isdisjoint() argument must be a set")
+					return nil, &TypeError{Message: "isdisjoint() argument must be a set"}
 				}
 
 				// Check if any item in this set is in other
@@ -469,7 +469,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__contains__ takes exactly one argument")
+					return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
 				}
 				set := receiver.(*SetValue)
 				return BoolValue(set.Contains(args[0])), nil
@@ -507,13 +507,13 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__sub__ takes exactly one argument")
+					return nil, &TypeError{Message: "__sub__ takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
 				other, ok := args[0].(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("unsupported operand type(s) for -: 'set' and '%s'", args[0].Type())
+					return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for -: 'set' and '%s'", args[0].Type())}
 				}
 
 				result := NewSet()
@@ -532,13 +532,13 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__or__ takes exactly one argument")
+					return nil, &TypeError{Message: "__or__ takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
 				other, ok := args[0].(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("unsupported operand type(s) for |: 'set' and '%s'", args[0].Type())
+					return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for |: 'set' and '%s'", args[0].Type())}
 				}
 
 				result := NewSet()
@@ -558,13 +558,13 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__and__ takes exactly one argument")
+					return nil, &TypeError{Message: "__and__ takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
 				other, ok := args[0].(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("unsupported operand type(s) for &: 'set' and '%s'", args[0].Type())
+					return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for &: 'set' and '%s'", args[0].Type())}
 				}
 
 				result := NewSet()
@@ -583,13 +583,13 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__xor__ takes exactly one argument")
+					return nil, &TypeError{Message: "__xor__ takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
 				other, ok := args[0].(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("unsupported operand type(s) for ^: 'set' and '%s'", args[0].Type())
+					return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for ^: 'set' and '%s'", args[0].Type())}
 				}
 
 				result := NewSet()
@@ -634,7 +634,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 							set.Add(val)
 						}
 					} else {
-						return nil, fmt.Errorf("update() argument must be an iterable")
+						return nil, &TypeError{Message: "update() argument must be an iterable"}
 					}
 				}
 				return Nil, nil
@@ -663,7 +663,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 							set.Remove(val)
 						}
 					} else {
-						return nil, fmt.Errorf("difference_update() argument must be an iterable")
+						return nil, &TypeError{Message: "difference_update() argument must be an iterable"}
 					}
 				}
 				return Nil, nil
@@ -688,7 +688,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 					for _, arg := range args {
 						other, ok := arg.(*SetValue)
 						if !ok {
-							return nil, fmt.Errorf("intersection_update() argument must be a set")
+							return nil, &TypeError{Message: "intersection_update() argument must be a set"}
 						}
 						if !other.Contains(item) {
 							inAll = false
@@ -713,13 +713,13 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("symmetric_difference_update() takes exactly one argument")
+					return nil, &TypeError{Message: "symmetric_difference_update() takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
 				other, ok := args[0].(*SetValue)
 				if !ok {
-					return nil, fmt.Errorf("symmetric_difference_update() argument must be a set")
+					return nil, &TypeError{Message: "symmetric_difference_update() argument must be a set"}
 				}
 
 				// Items to add (in other but not in set)
@@ -756,7 +756,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__le__ takes exactly one argument")
+					return nil, &TypeError{Message: "__le__ takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
@@ -781,7 +781,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__ge__ takes exactly one argument")
+					return nil, &TypeError{Message: "__ge__ takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
@@ -806,7 +806,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__lt__ takes exactly one argument")
+					return nil, &TypeError{Message: "__lt__ takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
@@ -840,7 +840,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__gt__ takes exactly one argument")
+					return nil, &TypeError{Message: "__gt__ takes exactly one argument"}
 				}
 
 				set := receiver.(*SetValue)
