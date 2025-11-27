@@ -1,11 +1,14 @@
 package builtin
 
 import (
+	goerrors "errors"
+
 	"github.com/mmichie/m28/common/builders"
 	"github.com/mmichie/m28/common/errors"
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/protocols"
 )
 
 // RegisterIteration registers iteration functions using the builder framework
@@ -100,8 +103,9 @@ func NextBuilder() builders.BuiltinFunc {
 				if callable, ok := types.AsCallable(method); ok {
 					result, err := callable.Call([]core.Value{}, ctx)
 					if err != nil {
-						// Check for StopIteration in error message
-						if v.Count() == 2 && err.Error() == "RuntimeError: next: StopIteration" {
+						// Check for StopIteration using errors.As
+						var stopIter *protocols.StopIteration
+						if v.Count() == 2 && goerrors.As(err, &stopIter) {
 							// Return default value
 							return v.Get(1), nil
 						}

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -205,8 +206,10 @@ func (l *DefaultModuleLoader) tryLoadPythonModule(name string, ctx *Context, m28
 	// Try to load as Python module (no partial module for legacy loader)
 	moduleDict, err := pythonLoaderFunc(name, ctx, l.evalFunc, nil)
 	if err != nil {
-		// If error mentions "not found", include original M28 error
-		if strings.Contains(err.Error(), "not found") {
+		// Check if error is ModuleNotFoundError or ImportError using errors.As
+		var modNotFound *ModuleNotFoundError
+		var impErr *ImportError
+		if errors.As(err, &modNotFound) || errors.As(err, &impErr) || strings.Contains(err.Error(), "not found") {
 			return nil, fmt.Errorf("module '%s' not found as M28 module (%v) or Python module (%v)", name, m28Err, err)
 		}
 		// Other Python loading errors (transpilation, C extension, etc.)

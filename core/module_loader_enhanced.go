@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -339,8 +340,10 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 		Log.Error(SubsystemImport, "Python loader failed", "module", name, "error", err)
 		// Loading failed - remove the partial module from registry
 		registry.ReloadModule(cacheName)
-		// If error mentions "not found", return ModuleNotFoundError
-		if strings.Contains(err.Error(), "not found") {
+		// Check if error is ModuleNotFoundError or ImportError using errors.As
+		var modNotFound *ModuleNotFoundError
+		var impErr *ImportError
+		if errors.As(err, &modNotFound) || errors.As(err, &impErr) || strings.Contains(err.Error(), "not found") {
 			return nil, NewModuleNotFoundError(name)
 		}
 		// Other Python loading errors (transpilation, C extension, etc.)

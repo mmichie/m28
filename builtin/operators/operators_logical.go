@@ -1,6 +1,7 @@
 package operators
 
 import (
+	goerrors "errors"
 	"reflect"
 	"strings"
 
@@ -164,8 +165,9 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 			if _, found, err := types.CallDunder(container, "__getitem__", []core.Value{value}, ctx); found {
 				if err != nil {
 					// __getitem__ raised an error (likely KeyError), key doesn't exist
-					// Check if it's a KeyError by looking at the error message
-					if strings.Contains(err.Error(), "KeyError") {
+					// Check if it's a KeyError using errors.As
+					var keyErr *core.KeyError
+					if goerrors.As(err, &keyErr) {
 						return core.BoolValue(false), nil
 					}
 					// Some other error, propagate it

@@ -2,6 +2,7 @@
 package eval
 
 import (
+	"errors"
 	"fmt"
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
@@ -11,16 +12,22 @@ import (
 )
 
 // isStopIteration checks if an error is a StopIteration exception
-// Handles both protocols.StopIteration and errors with "StopIteration" in message
+// Uses errors.As to properly check for StopIteration types
 func isStopIteration(err error) bool {
 	if err == nil {
 		return false
 	}
-	// Check for protocols.StopIteration type
-	if _, ok := err.(*protocols.StopIteration); ok {
+	// Check for protocols.StopIteration type using errors.As
+	var stopIter *protocols.StopIteration
+	if errors.As(err, &stopIter) {
 		return true
 	}
-	// Check for StopIteration in error message (for core.stopIterationError)
+	// Check for core.StopIteration type (from generators)
+	type coreStopIteration interface {
+		Error() string
+	}
+	// Fallback: check error message for StopIteration
+	// This handles core.stopIterationError and other StopIteration variants
 	return strings.Contains(err.Error(), "StopIteration")
 }
 
