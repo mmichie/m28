@@ -127,7 +127,7 @@ func reprString(s StringValue) string {
 		case '\t':
 			result += "\\t"
 		default:
-			if ch < 32 || ch == 127 {
+			if ch < ASCIIPrintableMin || ch == ASCIIDel {
 				result += fmt.Sprintf("\\x%02x", ch)
 			} else {
 				result += string(ch)

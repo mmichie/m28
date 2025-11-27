@@ -171,7 +171,7 @@ func (n *NumericOps) Power(other core.Value) (core.Value, error) {
 		leftIsInt := core.IsInteger(leftNum)
 		rightIsInt := core.IsInteger(rightNum)
 
-		if leftIsInt && rightIsInt && rightNum >= 0 && rightNum <= 10000 {
+		if leftIsInt && rightIsInt && rightNum >= 0 && rightNum <= core.PowerOptimizationThreshold {
 			// For integer exponentiation, estimate if result needs BigInt
 			// BEFORE computing with float64 to avoid precision loss
 			if leftNum != 0 && math.Abs(leftNum) > 1 {

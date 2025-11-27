@@ -846,7 +846,7 @@ func (b BytesValue) String() string {
 		case '\'':
 			result += "\\'"
 		default:
-			if ch >= 32 && ch < 127 {
+			if ch >= ASCIIPrintableMin && ch < ASCIIPrintableMax {
 				result += string(ch)
 			} else {
 				result += fmt.Sprintf("\\x%02x", ch)
@@ -938,7 +938,7 @@ func (b *ByteArrayValue) String() string {
 		case '\'':
 			result += "\\'"
 		default:
-			if ch >= 32 && ch < 127 {
+			if ch >= ASCIIPrintableMin && ch < ASCIIPrintableMax {
 				result += string(ch)
 			} else {
 				result += fmt.Sprintf("\\x%02x", ch)

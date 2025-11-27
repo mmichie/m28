@@ -7,6 +7,21 @@ import (
 	"github.com/mmichie/m28/core/ast"
 )
 
+// Parser configuration constants
+const (
+	// DefaultMaxParseDepth is the maximum recursion depth allowed during parsing
+	// to prevent stack overflow from deeply nested expressions
+	DefaultMaxParseDepth = 500
+
+	// DefaultMaxParseCalls is the maximum total parse method calls allowed
+	// to detect and prevent infinite loops in the parser
+	DefaultMaxParseCalls = 100000
+
+	// ParseProgressLogInterval controls how often parser progress is logged
+	// when debug mode is enabled (every N parse calls)
+	ParseProgressLogInterval = 100
+)
+
 // PythonParser implements a recursive descent parser for Python syntax
 type PythonParser struct {
 	tokens    []Token
@@ -31,9 +46,9 @@ func NewPythonParser(tokens []Token, filename string, source string) *PythonPars
 		panic:     false,
 		depth:     0,
 		callCount: 0,
-		maxDepth:  500,    // Maximum recursion depth
-		maxCalls:  100000, // Maximum total parse calls
-		debugMode: false,  // Set to true to enable debug output
+		maxDepth:  DefaultMaxParseDepth,
+		maxCalls:  DefaultMaxParseCalls,
+		debugMode: false, // Set to true to enable debug output
 		filename:  filename,
 		source:    source,
 	}
@@ -96,7 +111,7 @@ func (p *PythonParser) enterParse(name string) error {
 	p.depth++
 	p.callCount++
 
-	if p.debugMode && p.callCount%100 == 0 {
+	if p.debugMode && p.callCount%ParseProgressLogInterval == 0 {
 		core.Log.Trace(core.SubsystemParser, "Parser progress",
 			"call_count", p.callCount, "depth", p.depth,
 			"token_pos", p.current, "total_tokens", len(p.tokens),

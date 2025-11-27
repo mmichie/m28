@@ -635,7 +635,7 @@ func (t *PythonTokenizer) scanOperator(ch byte, start, startLine, startCol int) 
 
 	default:
 		suggestion := ""
-		if ch < 32 || ch > 126 {
+		if ch < core.ASCIIPrintableMin || ch > core.ASCIIPrintableMaxVisible {
 			suggestion = "Check for hidden control characters or use proper encoding"
 		} else {
 			suggestion = "This character is not valid Python syntax"
@@ -1152,11 +1152,11 @@ func (t *PythonTokenizer) scanBytesString(quote byte, start, startLine, startCol
 						t.pos++
 						count++
 					}
-					if octalVal <= 255 {
+					if octalVal <= core.MaxByteValue {
 						value = append(value, byte(octalVal))
 					} else {
 						// Invalid octal value, just use modulo
-						value = append(value, byte(octalVal%256))
+						value = append(value, byte(octalVal%(core.MaxByteValue+1)))
 					}
 				default:
 					// Unknown escape, include backslash and character

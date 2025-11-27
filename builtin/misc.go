@@ -60,7 +60,7 @@ func RegisterMisc(ctx *core.Context) {
 				result += string(r)
 			} else if r < 256 {
 				result += fmt.Sprintf("\\x%02x", r)
-			} else if r < 65536 {
+			} else if r < core.UnicodeBMPLimit {
 				result += fmt.Sprintf("\\u%04x", r)
 			} else {
 				result += fmt.Sprintf("\\U%08x", r)

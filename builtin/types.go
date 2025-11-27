@@ -433,8 +433,8 @@ func IntBuilder() builders.BuiltinFunc {
 			return nil, err
 		}
 
-		if base != 0 && (base < 2 || base > 36) {
-			return nil, errors.NewValueError("int", "int() base must be >= 2 and <= 36, or 0")
+		if base != 0 && (base < core.IntBaseMin || base > core.IntBaseMax) {
+			return nil, errors.NewValueError("int", fmt.Sprintf("int() base must be >= %d and <= %d, or 0", core.IntBaseMin, core.IntBaseMax))
 		}
 
 		// Parse with specified base

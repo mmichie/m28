@@ -166,7 +166,7 @@ func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
 			s := value.String()
 			var result strings.Builder
 			for _, r := range s {
-				if r > 127 {
+				if r > core.ASCIIMax {
 					result.WriteString(fmt.Sprintf("\\u%04x", r))
 				} else {
 					result.WriteRune(r)

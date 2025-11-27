@@ -7,6 +7,13 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// Evaluator configuration constants
+const (
+	// MaxExpressionDisplayLength is the maximum length of expression strings
+	// displayed in debug logging before truncation
+	MaxExpressionDisplayLength = 150
+)
+
 func init() {
 	// Set the EvalHook so that builtin eval() can work
 	core.EvalHook = Eval
@@ -33,8 +40,8 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		if logThis {
 			// Show progress every 100 evaluations (lowered for debugging slow modules)
 			exprStr := core.PrintValue(expr)
-			if len(exprStr) > 150 {
-				exprStr = exprStr[:150] + "..."
+			if len(exprStr) > MaxExpressionDisplayLength {
+				exprStr = exprStr[:MaxExpressionDisplayLength] + "..."
 			}
 
 			// Show module/function context for debugging
