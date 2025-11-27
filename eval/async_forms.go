@@ -11,7 +11,7 @@ import (
 // (async (lambda (args) body...))   - creates an async lambda
 func asyncForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 1 {
-		return nil, fmt.Errorf("async requires at least 1 argument")
+		return nil, &core.TypeError{Message: "async requires at least 1 argument"}
 	}
 
 	// Check if it's async def
@@ -39,24 +39,24 @@ func asyncForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return core.NewAsyncFunction(expr, name), nil
 	}
 
-	return nil, fmt.Errorf("async requires a function")
+	return nil, &core.TypeError{Message: "async requires a function"}
 }
 
 // asyncDefForm handles async def
 func asyncDefForm(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// Similar to regular def but creates an async function
 	if len(args) < 3 {
-		return nil, fmt.Errorf("async def requires name, params, and body")
+		return nil, &core.TypeError{Message: "async def requires name, params, and body"}
 	}
 
 	name, ok := args[0].(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("function name must be a symbol")
+		return nil, &core.TypeError{Message: "function name must be a symbol"}
 	}
 
 	params, ok := args[1].(*core.ListValue)
 	if !ok {
-		return nil, fmt.Errorf("parameters must be a list")
+		return nil, &core.TypeError{Message: "parameters must be a list"}
 	}
 
 	// Create a regular function first
@@ -76,7 +76,7 @@ func asyncDefForm(args []core.Value, ctx *core.Context) (core.Value, error) {
 // awaitForm waits for an async task to complete
 func awaitForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 1 {
-		return nil, fmt.Errorf("await requires exactly 1 argument")
+		return nil, &core.TypeError{Message: "await requires exactly 1 argument"}
 	}
 
 	// Evaluate the expression
@@ -110,10 +110,10 @@ func channelForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if num, ok := capVal.(core.NumberValue); ok {
 			capacity = int(num)
 			if capacity < 0 {
-				return nil, fmt.Errorf("channel capacity must be non-negative")
+				return nil, &core.ValueError{Message: "channel capacity must be non-negative"}
 			}
 		} else {
-			return nil, fmt.Errorf("channel capacity must be a number")
+			return nil, &core.TypeError{Message: "channel capacity must be a number"}
 		}
 	}
 
@@ -124,7 +124,7 @@ func channelForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // (send! channel value)
 func sendForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 2 {
-		return nil, fmt.Errorf("send! requires 2 arguments: channel and value")
+		return nil, &core.TypeError{Message: "send! requires 2 arguments: channel and value"}
 	}
 
 	// Evaluate channel
@@ -135,7 +135,7 @@ func sendForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	ch, ok := chVal.(*core.Channel)
 	if !ok {
-		return nil, fmt.Errorf("first argument must be a channel")
+		return nil, &core.TypeError{Message: "first argument must be a channel"}
 	}
 
 	// Evaluate value
@@ -157,7 +157,7 @@ func sendForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // (recv! channel)
 func receiveForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 1 {
-		return nil, fmt.Errorf("recv! requires 1 argument: channel")
+		return nil, &core.TypeError{Message: "recv! requires 1 argument: channel"}
 	}
 
 	// Evaluate channel
@@ -168,7 +168,7 @@ func receiveForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	ch, ok := chVal.(*core.Channel)
 	if !ok {
-		return nil, fmt.Errorf("argument must be a channel")
+		return nil, &core.TypeError{Message: "argument must be a channel"}
 	}
 
 	// Receive value
@@ -183,7 +183,7 @@ func receiveForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 //	(default (lambda () ...)))
 func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() == 0 {
-		return nil, fmt.Errorf("select requires at least one case")
+		return nil, &core.TypeError{Message: "select requires at least one case"}
 	}
 
 	var cases []core.SelectCase
@@ -192,7 +192,7 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	for _, arg := range args.Items() {
 		caseList, ok := arg.(*core.ListValue)
 		if !ok || caseList.Len() != 2 {
-			return nil, fmt.Errorf("select case must be a list of (channel-op handler)")
+			return nil, &core.TypeError{Message: "select case must be a list of (channel-op handler)"}
 		}
 
 		// Check for default case
@@ -210,7 +210,7 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					return fn.Call([]core.Value{}, ctx)
 				}
 			} else {
-				return nil, fmt.Errorf("default handler must be a function")
+				return nil, &core.TypeError{Message: "default handler must be a function"}
 			}
 			continue
 		}
@@ -218,12 +218,12 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Parse channel operation
 		opList, ok := caseList.Items()[0].(*core.ListValue)
 		if !ok || opList.Len() < 1 {
-			return nil, fmt.Errorf("invalid channel operation in select")
+			return nil, &core.TypeError{Message: "invalid channel operation in select"}
 		}
 
 		opSym, ok := opList.Items()[0].(core.SymbolValue)
 		if !ok {
-			return nil, fmt.Errorf("channel operation must start with a symbol")
+			return nil, &core.TypeError{Message: "channel operation must start with a symbol"}
 		}
 
 		// Get handler
@@ -236,13 +236,13 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			Call([]core.Value, *core.Context) (core.Value, error)
 		})
 		if !ok {
-			return nil, fmt.Errorf("case handler must be a function")
+			return nil, &core.TypeError{Message: "case handler must be a function"}
 		}
 
 		switch string(opSym) {
 		case "recv!", "receive":
 			if opList.Len() != 2 {
-				return nil, fmt.Errorf("recv! requires 1 argument")
+				return nil, &core.TypeError{Message: "recv! requires 1 argument"}
 			}
 
 			chVal, err := Eval(opList.Items()[1], ctx)
@@ -252,7 +252,7 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			ch, ok := chVal.(*core.Channel)
 			if !ok {
-				return nil, fmt.Errorf("recv! argument must be a channel")
+				return nil, &core.TypeError{Message: "recv! argument must be a channel"}
 			}
 
 			cases = append(cases, core.SelectCase{
@@ -265,7 +265,7 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		case "send!", "send":
 			if opList.Len() != 3 {
-				return nil, fmt.Errorf("send! requires 2 arguments")
+				return nil, &core.TypeError{Message: "send! requires 2 arguments"}
 			}
 
 			chVal, err := Eval(opList.Items()[1], ctx)
@@ -275,7 +275,7 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			ch, ok := chVal.(*core.Channel)
 			if !ok {
-				return nil, fmt.Errorf("send! first argument must be a channel")
+				return nil, &core.TypeError{Message: "send! first argument must be a channel"}
 			}
 
 			value, err := Eval(opList.Items()[2], ctx)
@@ -293,7 +293,7 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			})
 
 		default:
-			return nil, fmt.Errorf("unknown channel operation: %s", string(opSym))
+			return nil, &core.ValueError{Message: fmt.Sprintf("unknown channel operation: %s", string(opSym))}
 		}
 	}
 
@@ -305,7 +305,7 @@ func selectForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // (go expr) - evaluates expr in a new goroutine
 func goForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 1 {
-		return nil, fmt.Errorf("go requires exactly 1 argument")
+		return nil, &core.TypeError{Message: "go requires exactly 1 argument"}
 	}
 
 	// Create a task that evaluates the expression
@@ -341,7 +341,7 @@ func goForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // (sleep seconds)
 func sleepForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 1 {
-		return nil, fmt.Errorf("sleep requires exactly 1 argument")
+		return nil, &core.TypeError{Message: "sleep requires exactly 1 argument"}
 	}
 
 	// Evaluate duration
@@ -352,7 +352,7 @@ func sleepForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	dur, ok := durVal.(core.NumberValue)
 	if !ok {
-		return nil, fmt.Errorf("sleep duration must be a number")
+		return nil, &core.TypeError{Message: "sleep duration must be a number"}
 	}
 
 	core.Sleep(float64(dur))
