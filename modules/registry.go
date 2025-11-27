@@ -60,6 +60,9 @@ var builtinModules = map[string]ModuleInitializer{
 	"_ctypes":                    Init_CtypesModule,                  // C extension module for FFI (Foreign Function Interface)
 	"asyncio":                    Init_PythonAsyncioModule,           // Minimal stub for asyncio package (avoids circular imports)
 	"ssl":                        InitSSLModule,                      // Stub for ssl module with exception classes (needed by asyncio.sslproto)
+	"_bz2":                       Init_Bz2Module,                     // C extension stub for bzip2 compression (Phase 4 - allows imports)
+	"zlib":                       InitZlibModule,                     // C extension stub for zlib compression (Phase 4 - allows imports)
+	"_lzma":                      Init_LzmaModule,                    // C extension stub for LZMA compression (Phase 4 - allows imports)
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
