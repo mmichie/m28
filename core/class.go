@@ -508,28 +508,58 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		}), true
 	case "__ne__":
 		// Default __ne__ is negation of __eq__
-		// Note: Called via protocol, so only receives 'other' argument (self is implicit)
+		// Note: When called as bound method (via instance.GetAttr), args = [self, other]
+		// When called via type dispatch (CallDunder), args = [other] and self is implicit
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, &TypeError{Message: "__ne__ requires exactly 1 argument"}
+			var self, other Value
+
+			// Handle both bound method calls (2 args) and direct calls (1 arg)
+			if len(args) == 2 {
+				// Bound method: args = [self, other]
+				self = args[0]
+				other = args[1]
+			} else if len(args) == 1 {
+				// Direct call via type dispatch: args = [other], self is the class
+				self = Value(c)
+				other = args[0]
+			} else {
+				return nil, &TypeError{Message: fmt.Sprintf("__ne__() takes 1 or 2 arguments (%d given)", len(args))}
 			}
-			// Get __eq__ method
-			eqMethod, ok := c.GetAttr("__eq__")
+
+			// Get __eq__ method from self
+			var eqMethod Value
+			var ok bool
+			if selfWithAttr, hasAttr := self.(interface{ GetAttr(string) (Value, bool) }); hasAttr {
+				eqMethod, ok = selfWithAttr.GetAttr("__eq__")
+			} else {
+				eqMethod, ok = c.GetAttr("__eq__")
+			}
+
 			if !ok {
 				// Fallback to identity comparison
-				return BoolValue(Value(c) != args[0]), nil
+				return BoolValue(self != other), nil
 			}
-			// Call __eq__ and negate the result
+
+			// Call __eq__(other) and negate the result
 			if callable, ok := eqMethod.(interface {
 				Call([]Value, *Context) (Value, error)
 			}); ok {
-				result, err := callable.Call(args, ctx)
+				// If eqMethod is a bound method, just pass [other]
+				// If it's unbound, pass [self, other]
+				var eqArgs []Value
+				if _, isBound := eqMethod.(*BoundInstanceMethod); isBound {
+					eqArgs = []Value{other}
+				} else {
+					eqArgs = []Value{other} // For class methods, other is the only arg needed
+				}
+				result, err := callable.Call(eqArgs, ctx)
 				if err != nil {
 					return nil, err
 				}
 				return BoolValue(!IsTruthy(result)), nil
 			}
-			return BoolValue(Value(c) != args[0]), nil
+			// Fallback if __eq__ is not callable
+			return BoolValue(self != other), nil
 		}), true
 	case "__repr__":
 		// Default __repr__ returns a placeholder function
