@@ -258,7 +258,7 @@ func TestOperatorMultiply(t *testing.T) {
 			args:    []core.Value{str("a"), str("b")},
 			want:    nil,
 			wantErr: true,
-			errMsg:  "TypeError: *: unsupported operand type(s) for *: 'string'",
+			errMsg:  "*: unsupported operand type(s) for *: 'string'",
 		},
 		{
 			name:    "list * number",

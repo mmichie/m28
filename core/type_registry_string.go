@@ -20,7 +20,7 @@ func registerStringType() {
 			if len(args) == 1 {
 				return StringValue(PrintValue(args[0])), nil
 			}
-			return nil, fmt.Errorf("str() takes at most 1 argument (%d given)", len(args))
+			return nil, &TypeError{Message: fmt.Sprintf("str() takes at most 1 argument (%d given)", len(args))}
 		},
 		Str: func(v Value) string {
 			return string(v.(StringValue))
@@ -93,7 +93,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("startswith() takes exactly one argument")
+					return nil, &TypeError{Message: "startswith() takes exactly one argument"}
 				}
 				s := string(receiver.(StringValue))
 
@@ -107,7 +107,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 					for _, prefixVal := range prefixTuple {
 						prefix, ok := prefixVal.(StringValue)
 						if !ok {
-							return nil, fmt.Errorf("tuple for startswith must contain only strings")
+							return nil, &TypeError{Message: "tuple for startswith must contain only strings"}
 						}
 						if strings.HasPrefix(s, string(prefix)) {
 							return BoolValue(true), nil
@@ -116,7 +116,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 					return BoolValue(false), nil
 				}
 
-				return nil, fmt.Errorf("startswith() argument must be a string or tuple of strings")
+				return nil, &TypeError{Message: "startswith() argument must be a string or tuple of strings"}
 			},
 		},
 		"endswith": {
@@ -126,7 +126,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("endswith() takes exactly one argument")
+					return nil, &TypeError{Message: "endswith() takes exactly one argument"}
 				}
 				s := string(receiver.(StringValue))
 
@@ -140,7 +140,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 					for _, suffixVal := range suffixTuple {
 						suffix, ok := suffixVal.(StringValue)
 						if !ok {
-							return nil, fmt.Errorf("tuple for endswith must contain only strings")
+							return nil, &TypeError{Message: "tuple for endswith must contain only strings"}
 						}
 						if strings.HasSuffix(s, string(suffix)) {
 							return BoolValue(true), nil
@@ -149,7 +149,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 					return BoolValue(false), nil
 				}
 
-				return nil, fmt.Errorf("endswith() argument must be a string or tuple of strings")
+				return nil, &TypeError{Message: "endswith() argument must be a string or tuple of strings"}
 			},
 		},
 		"find": {
@@ -159,12 +159,12 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("find() takes exactly one argument")
+					return nil, &TypeError{Message: "find() takes exactly one argument"}
 				}
 				s := string(receiver.(StringValue))
 				sub, ok := args[0].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("find() argument must be str")
+					return nil, &TypeError{Message: "find() argument must be str"}
 				}
 				return NumberValue(strings.Index(s, string(sub))), nil
 			},
@@ -176,12 +176,12 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) < 1 || len(args) > 3 {
-					return nil, fmt.Errorf("rfind() takes 1 to 3 arguments (%d given)", len(args))
+					return nil, &TypeError{Message: fmt.Sprintf("rfind() takes 1 to 3 arguments (%d given)", len(args))}
 				}
 				s := string(receiver.(StringValue))
 				sub, ok := args[0].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("rfind() argument 1 must be str")
+					return nil, &TypeError{Message: "rfind() argument 1 must be str"}
 				}
 
 				// Get start and end indices (default to 0 and len)
@@ -191,7 +191,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 				if len(args) >= 2 {
 					startNum, ok := args[1].(NumberValue)
 					if !ok {
-						return nil, fmt.Errorf("rfind() argument 2 must be int")
+						return nil, &TypeError{Message: "rfind() argument 2 must be int"}
 					}
 					start = int(startNum)
 					// Python allows negative indices
@@ -206,7 +206,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 				if len(args) >= 3 {
 					endNum, ok := args[2].(NumberValue)
 					if !ok {
-						return nil, fmt.Errorf("rfind() argument 3 must be int")
+						return nil, &TypeError{Message: "rfind() argument 3 must be int"}
 					}
 					end = int(endNum)
 					// Python allows negative indices
@@ -246,12 +246,12 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("count() takes exactly one argument")
+					return nil, &TypeError{Message: "count() takes exactly one argument"}
 				}
 				s := string(receiver.(StringValue))
 				sub, ok := args[0].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("count() argument must be str")
+					return nil, &TypeError{Message: "count() argument must be str"}
 				}
 				return NumberValue(strings.Count(s, string(sub))), nil
 			},
@@ -281,12 +281,12 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__contains__ takes exactly one argument")
+					return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
 				}
 				s := string(receiver.(StringValue))
 				sub, ok := args[0].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("'in <string>' requires string as left operand")
+					return nil, &TypeError{Message: "'in <string>' requires string as left operand"}
 				}
 				return BoolValue(strings.Contains(s, string(sub))), nil
 			},
@@ -308,12 +308,12 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__add__ takes exactly one argument")
+					return nil, &TypeError{Message: "__add__ takes exactly one argument"}
 				}
 				s1 := string(receiver.(StringValue))
 				s2, ok := args[0].(StringValue)
 				if !ok {
-					return nil, fmt.Errorf("can only concatenate str to str")
+					return nil, &TypeError{Message: "can only concatenate str to str"}
 				}
 				return StringValue(s1 + string(s2)), nil
 			},
@@ -325,13 +325,12 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__mul__ takes exactly one argument")
+					return nil, &TypeError{Message: "__mul__ takes exactly one argument"}
 				}
 				s := string(receiver.(StringValue))
 				n, ok := args[0].(NumberValue)
 				if !ok {
-					// Match the expected error format
-					return nil, fmt.Errorf("TypeError: *: unsupported operand type(s) for *: 'string'")
+					return nil, &TypeError{Message: "*: unsupported operand type(s) for *: 'string'"}
 				}
 				count := int(n)
 				if count <= 0 {
@@ -351,12 +350,12 @@ func getStringMethods() map[string]*MethodDescriptor {
 				if len(args) > 0 {
 					enc, ok := args[0].(StringValue)
 					if !ok {
-						return nil, fmt.Errorf("encode() argument 1 must be str, not %s", args[0].Type())
+						return nil, &TypeError{Message: fmt.Sprintf("encode() argument 1 must be str, not %s", args[0].Type())}
 					}
 					encoding = string(enc)
 				}
 				if encoding != "utf-8" {
-					return nil, fmt.Errorf("only utf-8 encoding is currently supported")
+					return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
 				}
 				return BytesValue([]byte(s)), nil
 			},
@@ -429,7 +428,7 @@ func stringMethodSplit(receiver Value, args []Value, ctx *Context) (Value, error
 			// None means split on whitespace - same as no argument
 			hasSep = false
 		} else {
-			return nil, fmt.Errorf("sep must be a string or None")
+			return nil, &TypeError{Message: "sep must be a string or None"}
 		}
 	}
 
@@ -440,7 +439,7 @@ func stringMethodSplit(receiver Value, args []Value, ctx *Context) (Value, error
 				maxSplit = -1
 			}
 		} else {
-			return nil, fmt.Errorf("maxsplit must be an integer")
+			return nil, &TypeError{Message: "maxsplit must be an integer"}
 		}
 	}
 
@@ -476,7 +475,7 @@ func stringMethodSplit(receiver Value, args []Value, ctx *Context) (Value, error
 
 func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("join() takes exactly one argument")
+		return nil, &TypeError{Message: "join() takes exactly one argument"}
 	}
 
 	sep := string(receiver.(StringValue))
@@ -492,7 +491,7 @@ func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error)
 			if s, ok := item.(StringValue); ok {
 				parts[i] = string(s)
 			} else {
-				return nil, fmt.Errorf("join() requires string elements")
+				return nil, &TypeError{Message: "join() requires string elements"}
 			}
 		}
 	case TupleValue:
@@ -501,7 +500,7 @@ func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error)
 			if s, ok := item.(StringValue); ok {
 				parts[i] = string(s)
 			} else {
-				return nil, fmt.Errorf("join() requires string elements")
+				return nil, &TypeError{Message: "join() requires string elements"}
 			}
 		}
 	default:
@@ -517,11 +516,11 @@ func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error)
 				if s, ok := item.(StringValue); ok {
 					parts = append(parts, string(s))
 				} else {
-					return nil, fmt.Errorf("join() requires string elements")
+					return nil, &TypeError{Message: "join() requires string elements"}
 				}
 			}
 		} else {
-			return nil, fmt.Errorf("join() argument must be an iterable (got %T, type=%s)", args[0], args[0].Type())
+			return nil, &TypeError{Message: fmt.Sprintf("join() argument must be an iterable (got %T, type=%s)", args[0], args[0].Type())}
 		}
 	}
 
@@ -530,19 +529,19 @@ func stringMethodJoin(receiver Value, args []Value, ctx *Context) (Value, error)
 
 func stringMethodReplace(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) < 2 {
-		return nil, fmt.Errorf("replace() takes at least 2 arguments")
+		return nil, &TypeError{Message: "replace() takes at least 2 arguments"}
 	}
 
 	s := string(receiver.(StringValue))
 
 	old, ok := args[0].(StringValue)
 	if !ok {
-		return nil, fmt.Errorf("replace() old must be str")
+		return nil, &TypeError{Message: "replace() old must be str"}
 	}
 
 	new, ok := args[1].(StringValue)
 	if !ok {
-		return nil, fmt.Errorf("replace() new must be str")
+		return nil, &TypeError{Message: "replace() new must be str"}
 	}
 
 	count := -1
@@ -550,7 +549,7 @@ func stringMethodReplace(receiver Value, args []Value, ctx *Context) (Value, err
 		if n, ok := args[2].(NumberValue); ok {
 			count = int(n)
 		} else {
-			return nil, fmt.Errorf("replace() count must be an integer")
+			return nil, &TypeError{Message: "replace() count must be an integer"}
 		}
 	}
 
