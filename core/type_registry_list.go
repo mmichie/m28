@@ -40,9 +40,9 @@ func registerListType() {
 					}
 					return result, nil
 				}
-				return nil, fmt.Errorf("list() argument must be an iterable")
+				return nil, &TypeError{Message: "list() argument must be an iterable"}
 			}
-			return nil, fmt.Errorf("list() takes at most 1 argument (%d given)", len(args))
+			return nil, &TypeError{Message: fmt.Sprintf("list() takes at most 1 argument (%d given)", len(args))}
 		},
 		Repr: func(v Value) string {
 			list := v.(*ListValue)
@@ -196,7 +196,7 @@ func getListMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__contains__ takes exactly one argument")
+					return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
 				}
 				list := receiver.(*ListValue)
 				for _, item := range list.Items() {
@@ -214,12 +214,12 @@ func getListMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__add__ takes exactly one argument")
+					return nil, &TypeError{Message: "__add__ takes exactly one argument"}
 				}
 				list1 := receiver.(*ListValue)
 				list2, ok := args[0].(*ListValue)
 				if !ok {
-					return nil, fmt.Errorf("can only concatenate list to list")
+					return nil, &TypeError{Message: "can only concatenate list to list"}
 				}
 				result := make([]Value, list1.Len()+list2.Len())
 				copy(result, list1.Items())
@@ -234,12 +234,12 @@ func getListMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__mul__ takes exactly one argument")
+					return nil, &TypeError{Message: "__mul__ takes exactly one argument"}
 				}
 				list := receiver.(*ListValue)
 				n, ok := args[0].(NumberValue)
 				if !ok {
-					return nil, fmt.Errorf("can't multiply sequence by non-int")
+					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
 				}
 				count := int(n)
 				if count <= 0 {
@@ -285,9 +285,9 @@ func getListMethods() map[string]*MethodDescriptor {
 						if t, ok := args[0].(TupleValue); ok {
 							return NewList(t...), nil
 						}
-						return nil, fmt.Errorf("list() argument must be an iterable")
+						return nil, &TypeError{Message: "list() argument must be an iterable"}
 					}
-					return nil, fmt.Errorf("list() takes at most 1 argument (%d given)", len(args))
+					return nil, &TypeError{Message: fmt.Sprintf("list() takes at most 1 argument (%d given)", len(args))}
 				})
 				listClass.SetAttr("__module__", StringValue("builtins"))
 				listClass.SetAttr("__name__", StringValue("list"))
@@ -296,7 +296,7 @@ func getListMethods() map[string]*MethodDescriptor {
 				// Add __new__ method
 				listClass.SetAttr("__new__", NewNamedBuiltinFunction("__new__", func(args []Value, ctx *Context) (Value, error) {
 					if len(args) < 1 {
-						return nil, fmt.Errorf("__new__() missing required argument: 'cls'")
+						return nil, &TypeError{Message: "__new__() missing required argument: 'cls'"}
 					}
 					if len(args) == 1 {
 						return NewList(), nil
@@ -308,30 +308,30 @@ func getListMethods() map[string]*MethodDescriptor {
 					if t, ok := args[1].(TupleValue); ok {
 						return NewList(t...), nil
 					}
-					return nil, fmt.Errorf("list __new__ requires iterable argument")
+					return nil, &TypeError{Message: "list __new__ requires iterable argument"}
 				}))
 
 				// Create __newobj__ function
 				newobjFunc := NewNamedBuiltinFunction("__newobj__", func(args []Value, ctx *Context) (Value, error) {
 					if len(args) < 1 {
-						return nil, fmt.Errorf("__newobj__ requires at least 1 argument")
+						return nil, &TypeError{Message: "__newobj__ requires at least 1 argument"}
 					}
 					cls := args[0]
 					clsArgs := args[1:]
 
 					clsObj, ok := cls.(interface{ GetAttr(string) (Value, bool) })
 					if !ok {
-						return nil, fmt.Errorf("class does not support attribute access")
+						return nil, &TypeError{Message: "class does not support attribute access"}
 					}
 
 					newMethod, exists := clsObj.GetAttr("__new__")
 					if !exists {
-						return nil, fmt.Errorf("class has no __new__ method")
+						return nil, &AttributeError{ObjType: "class", AttrName: "__new__"}
 					}
 
 					newCallable, ok := newMethod.(Callable)
 					if !ok {
-						return nil, fmt.Errorf("__new__ is not callable")
+						return nil, &TypeError{Message: "__new__ is not callable"}
 					}
 
 					newArgs := append([]Value{cls}, clsArgs...)
@@ -397,7 +397,7 @@ func listMethodExtend(receiver Value, args []Value, ctx *Context) (Value, error)
 				toExtend = append(toExtend, val)
 			}
 		} else {
-			return nil, fmt.Errorf("extend() argument must be iterable")
+			return nil, &TypeError{Message: "extend() argument must be iterable"}
 		}
 	}
 
@@ -560,10 +560,10 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 			// Also check for __call__ method
 			if obj, ok := key.(Object); ok {
 				if _, exists := obj.GetAttr("__call__"); !exists {
-					return nil, fmt.Errorf("key argument must be a callable function")
+					return nil, &TypeError{Message: "key argument must be a callable function"}
 				}
 			} else {
-				return nil, fmt.Errorf("key argument must be a callable function")
+				return nil, &TypeError{Message: "key argument must be a callable function"}
 			}
 		}
 		keyFunc = key
@@ -573,14 +573,14 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 		if b, ok := rev.(BoolValue); ok {
 			reverse = bool(b)
 		} else {
-			return nil, fmt.Errorf("reverse argument must be a boolean")
+			return nil, &TypeError{Message: "reverse argument must be a boolean"}
 		}
 	}
 
 	// Check for unknown keyword arguments
 	for k := range kwargs {
 		if k != "key" && k != "reverse" {
-			return nil, fmt.Errorf("sort() got an unexpected keyword argument '%s'", k)
+			return nil, &TypeError{Message: fmt.Sprintf("sort() got an unexpected keyword argument '%s'", k)}
 		}
 	}
 
@@ -600,7 +600,7 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 				var err error
 				keyValue, err = callable.Call([]Value{list.items[i]}, ctx)
 				if err != nil {
-					return nil, fmt.Errorf("error applying key function: %v", err)
+					return nil, fmt.Errorf("error applying key function: %w", err)
 				}
 			} else {
 				// Try calling __call__ method
@@ -610,7 +610,7 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 							var err error
 							keyValue, err = callable.Call([]Value{list.items[i]}, ctx)
 							if err != nil {
-								return nil, fmt.Errorf("error applying key function: %v", err)
+								return nil, fmt.Errorf("error applying key function: %w", err)
 							}
 						}
 					}
@@ -706,13 +706,13 @@ func listMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, error
 
 func listMethodSetItem(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("__setitem__ takes exactly 2 arguments")
+		return nil, &TypeError{Message: "__setitem__ takes exactly 2 arguments"}
 	}
 
 	list := receiver.(*ListValue)
 	idx, ok := args[0].(NumberValue)
 	if !ok {
-		return nil, fmt.Errorf("list indices must be integers")
+		return nil, &TypeError{Message: "list indices must be integers"}
 	}
 
 	i := int(idx)
@@ -735,7 +735,7 @@ func listMethodSetItem(receiver Value, args []Value, ctx *Context) (Value, error
 
 func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("__delitem__ takes exactly one argument")
+		return nil, &TypeError{Message: "__delitem__ takes exactly one argument"}
 	}
 
 	list := receiver.(*ListValue)
@@ -769,7 +769,7 @@ func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error
 				return nil, err
 			}
 			if val == 0 {
-				return nil, fmt.Errorf("slice step cannot be zero")
+				return nil, &ValueError{Message: "slice step cannot be zero"}
 			}
 			step = &val
 		}
@@ -804,7 +804,7 @@ func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error
 	// Handle single index deletion: del list[i]
 	idx, ok := args[0].(NumberValue)
 	if !ok {
-		return nil, fmt.Errorf("list indices must be integers or slices, not %s", args[0].Type())
+		return nil, &TypeError{Message: fmt.Sprintf("list indices must be integers or slices, not %s", args[0].Type())}
 	}
 
 	i := int(idx)
@@ -910,11 +910,11 @@ func toIndex(obj Value, ctx *Context) (int, error) {
 				// Ensure result is an integer
 				num, ok := result.(NumberValue)
 				if !ok {
-					return 0, fmt.Errorf("__index__ returned non-int type %s", result.Type())
+					return 0, &TypeError{Message: fmt.Sprintf("__index__ returned non-int type %s", result.Type())}
 				}
 				intVal := int(num)
 				if float64(intVal) != float64(num) {
-					return 0, fmt.Errorf("__index__ returned non-integer value %v", num)
+					return 0, &TypeError{Message: fmt.Sprintf("__index__ returned non-integer value %v", num)}
 				}
 				return intVal, nil
 			}
@@ -925,11 +925,11 @@ func toIndex(obj Value, ctx *Context) (int, error) {
 	if num, ok := obj.(NumberValue); ok {
 		intVal := int(num)
 		if float64(intVal) != float64(num) {
-			return 0, fmt.Errorf("list indices must be integers, not float")
+			return 0, &TypeError{Message: "list indices must be integers, not float"}
 		}
 		return intVal, nil
 	}
 
 	// Not convertible to index
-	return 0, fmt.Errorf("list indices must be integers, not %s", obj.Type())
+	return 0, &TypeError{Message: fmt.Sprintf("list indices must be integers, not %s", obj.Type())}
 }
