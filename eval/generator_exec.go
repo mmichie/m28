@@ -772,18 +772,48 @@ func (state *GeneratorExecState) Throw(excType core.Value, excValue core.Value, 
 
 // createExceptionFromThrowArgs creates an exception error from throw() arguments
 func createExceptionFromThrowArgs(excType core.Value, excValue core.Value, excTb core.Value) error {
-	// Get exception type name
+	// Handle None/Nil excType - this indicates generator cleanup or improper throw() call
+	if excType == nil || excType == core.Nil || excType == core.None {
+		// Default to GeneratorExit for generator cleanup scenarios
+		return &Exception{Type: "GeneratorExit", Message: ""}
+	}
+
+	// Get exception type name - handle both exception classes and structured errors
 	var typeName string
+	var message string
+
+	// Check if excType is already a Go error (structured exception type)
+	if err, ok := excType.(error); ok {
+		// It's a structured error like *core.TypeError, *core.AttributeError, etc.
+		// Just return it directly
+		return err
+	}
+
+	// Check if it's an exception class
 	if class, ok := excType.(*core.Class); ok {
 		typeName = class.Name
 	} else if str, ok := excType.(core.StringValue); ok {
 		typeName = string(str)
+	} else if inst, ok := excType.(*core.Instance); ok {
+		// It's an exception instance - get the class name and message
+		typeName = inst.Class.Name
+		if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
+			if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+				if msgStr, ok := argsTuple[0].(core.StringValue); ok {
+					message = string(msgStr)
+				}
+			}
+		}
+		// Return early since we already have everything from the instance
+		return &Exception{Type: typeName, Message: message}
 	} else {
-		typeName = "Exception"
+		// Unknown type - create a descriptive error
+		return &core.TypeError{
+			Message: fmt.Sprintf("throw() argument must be an exception class or instance, not %s", excType.Type()),
+		}
 	}
 
-	// Get exception message
-	var message string
+	// Get exception message from excValue
 	if excValue != core.None && excValue != core.Nil {
 		if inst, ok := excValue.(*core.Instance); ok {
 			// Get message from instance args
