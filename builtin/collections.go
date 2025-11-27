@@ -228,7 +228,7 @@ func RegisterCollections(ctx *core.Context) {
 	// For now, just return the input object wrapped as a memoryview-like type
 	ctx.Define("memoryview", core.NewNamedBuiltinFunction("memoryview", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("memoryview() takes exactly 1 argument (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("memoryview() takes exactly 1 argument (%d given)", len(args))}
 		}
 		// For now, just return a simple wrapper
 		// Python's memoryview is mainly used for buffer protocol
@@ -441,7 +441,7 @@ func (b *ByteArrayTypeClass) CallWithKeywords(args []core.Value, kwargs map[stri
 	// For bytearray, keyword arguments are not supported in the constructor
 	// Just ignore kwargs and call our custom Call method
 	if len(kwargs) > 0 {
-		return nil, fmt.Errorf("bytearray() does not accept keyword arguments")
+		return nil, &core.TypeError{Message: "bytearray() does not accept keyword arguments"}
 	}
 	return b.Call(args, ctx)
 }
@@ -514,23 +514,23 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 				// Item can be a list or tuple
 				if pair, ok := item.(*core.ListValue); ok {
 					if pair.Len() != 2 {
-						return nil, fmt.Errorf("dict update sequence element #%d has length %d; 2 is required", i, pair.Len())
+						return nil, &core.ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, pair.Len())}
 					}
 					key = pair.Items()[0]
 					value = pair.Items()[1]
 				} else if tuple, ok := item.(core.TupleValue); ok {
 					if len(tuple) != 2 {
-						return nil, fmt.Errorf("dict update sequence element #%d has length %d; 2 is required", i, len(tuple))
+						return nil, &core.ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, len(tuple))}
 					}
 					key = tuple[0]
 					value = tuple[1]
 				} else {
-					return nil, fmt.Errorf("dict update sequence element #%d is not a sequence", i)
+					return nil, &core.TypeError{Message: fmt.Sprintf("cannot convert dictionary update sequence element #%d to a sequence", i)}
 				}
 
 				// Use SetValue for proper key handling (supports any hashable type)
 				if err := dict.SetValue(key, value); err != nil {
-					return nil, fmt.Errorf("error setting dict key: %v", err)
+					return nil, fmt.Errorf("error setting dict key: %w", err)
 				}
 			}
 		default:
@@ -562,7 +562,7 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 										key = tuple[0]
 										value = tuple[1]
 									} else {
-										return nil, fmt.Errorf("dict .items() yielded non-pair")
+										return nil, &core.ValueError{Message: "dictionary update sequence element is not a 2-element sequence"}
 									}
 									if err := dict.SetValue(key, value); err != nil {
 										return nil, err
@@ -588,21 +588,21 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 					var key, value core.Value
 					if pair, ok := item.(*core.ListValue); ok {
 						if pair.Len() != 2 {
-							return nil, fmt.Errorf("dict update sequence element #%d has length %d; 2 is required", i, pair.Len())
+							return nil, &core.ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, pair.Len())}
 						}
 						key = pair.Items()[0]
 						value = pair.Items()[1]
 					} else if tuple, ok := item.(core.TupleValue); ok {
 						if len(tuple) != 2 {
-							return nil, fmt.Errorf("dict update sequence element #%d has length %d; 2 is required", i, len(tuple))
+							return nil, &core.ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, len(tuple))}
 						}
 						key = tuple[0]
 						value = tuple[1]
 					} else {
-						return nil, fmt.Errorf("dict update sequence element #%d is not a sequence", i)
+						return nil, &core.TypeError{Message: fmt.Sprintf("cannot convert dictionary update sequence element #%d to a sequence", i)}
 					}
 					if err := dict.SetValue(key, value); err != nil {
-						return nil, fmt.Errorf("error setting dict key: %v", err)
+						return nil, fmt.Errorf("error setting dict key: %w", err)
 					}
 					i++
 				}
@@ -615,7 +615,7 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 	}
 
 	// Odd number of args > 1
-	return nil, fmt.Errorf("dict() takes an even number of positional arguments for key-value pairs")
+	return nil, &core.TypeError{Message: "dict() takes an even number of positional arguments for key-value pairs"}
 }
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
@@ -638,7 +638,7 @@ func (d *DictType) CallWithKeywords(args []core.Value, kwargs map[string]core.Va
 			// Use SetValue to properly format the key with ValueToKey
 			err := dictVal.SetValue(core.StringValue(key), value)
 			if err != nil {
-				return nil, fmt.Errorf("error setting dict kwarg %s: %v", key, err)
+				return nil, fmt.Errorf("error setting dict kwarg %s: %w", key, err)
 			}
 		}
 	}
@@ -653,13 +653,13 @@ func createByteArrayClass() *ByteArrayTypeClass {
 	// Add .copy unbound method that can be accessed as bytearray.copy
 	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("descriptor 'copy' of 'bytearray' object needs an argument")
+			return nil, &core.TypeError{Message: "descriptor 'copy' of 'bytearray' object needs an argument"}
 		}
 
 		// Get the bytearray instance
 		baInst, ok := args[0].(*core.ByteArrayValue)
 		if !ok {
-			return nil, fmt.Errorf("descriptor 'copy' for 'bytearray' objects doesn't apply to '%s' object", args[0].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("descriptor 'copy' for 'bytearray' objects doesn't apply to '%s' object", args[0].Type())}
 		}
 
 		// Return a shallow copy by using the .copy() instance method if it exists
@@ -687,13 +687,13 @@ func createSetClass() *SetType {
 	// Add .copy unbound method that can be accessed as set.copy
 	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("descriptor 'copy' of 'set' object needs an argument")
+			return nil, &core.TypeError{Message: "descriptor 'copy' of 'set' object needs an argument"}
 		}
 
 		// Get the set instance
 		setInst, ok := args[0].(*core.SetValue)
 		if !ok {
-			return nil, fmt.Errorf("descriptor 'copy' for 'set' objects doesn't apply to '%s' object", args[0].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("descriptor 'copy' for 'set' objects doesn't apply to '%s' object", args[0].Type())}
 		}
 
 		// Return a shallow copy by using the .copy() instance method
@@ -702,7 +702,7 @@ func createSetClass() *SetType {
 				return callable.Call([]core.Value{}, ctx)
 			}
 		}
-		return nil, fmt.Errorf("set.copy method not found")
+		return nil, &core.AttributeError{ObjType: "set", AttrName: "copy"}
 	}))
 
 	return &SetType{Class: class}
@@ -715,13 +715,13 @@ func createListClass() *ListType {
 	// This returns a descriptor-like object that can be called
 	ListTypeClass.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("descriptor 'copy' of 'list' object needs an argument")
+			return nil, &core.TypeError{Message: "descriptor 'copy' of 'list' object needs an argument"}
 		}
 
 		// Get the list instance
 		listInst, ok := args[0].(*core.ListValue)
 		if !ok {
-			return nil, fmt.Errorf("descriptor 'copy' for 'list' objects doesn't apply to '%s' object", args[0].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("descriptor 'copy' for 'list' objects doesn't apply to '%s' object", args[0].Type())}
 		}
 
 		// Return a shallow copy by using the .copy() instance method
@@ -730,7 +730,7 @@ func createListClass() *ListType {
 				return callable.Call([]core.Value{}, ctx)
 			}
 		}
-		return nil, fmt.Errorf("list.copy method not found")
+		return nil, &core.AttributeError{ObjType: "list", AttrName: "copy"}
 	}))
 
 	return &ListType{Class: ListTypeClass}
@@ -743,13 +743,13 @@ func createDictClass() *DictType {
 	// Add .copy unbound method that can be accessed as dict.copy
 	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("descriptor 'copy' of 'dict' object needs an argument")
+			return nil, &core.TypeError{Message: "descriptor 'copy' of 'dict' object needs an argument"}
 		}
 
 		// Get the dict instance
 		dictInst, ok := args[0].(*core.DictValue)
 		if !ok {
-			return nil, fmt.Errorf("descriptor 'copy' for 'dict' objects doesn't apply to '%s' object", args[0].Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("descriptor 'copy' for 'dict' objects doesn't apply to '%s' object", args[0].Type())}
 		}
 
 		// Return a shallow copy by using the .copy() instance method
@@ -759,14 +759,14 @@ func createDictClass() *DictType {
 				return callable.Call([]core.Value{}, ctx)
 			}
 		}
-		return nil, fmt.Errorf("dict.copy method not found")
+		return nil, &core.AttributeError{ObjType: "dict", AttrName: "copy"}
 	}))
 
 	// Add fromkeys class method
 	// dict.fromkeys(iterable, value=None) -> new dict with keys from iterable
 	class.SetMethod("fromkeys", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 2 {
-			return nil, fmt.Errorf("fromkeys() takes 1 or 2 positional arguments (%d given)", len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("fromkeys() takes 1 or 2 positional arguments (%d given)", len(args))}
 		}
 
 		iterable := args[0]
@@ -801,7 +801,7 @@ func createDictClass() *DictType {
 				dict.Set(string(ch), value)
 			}
 		default:
-			return nil, fmt.Errorf("fromkeys() argument must be an iterable")
+			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not iterable", iterable.Type())}
 		}
 
 		return dict, nil
