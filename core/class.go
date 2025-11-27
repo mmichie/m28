@@ -145,6 +145,38 @@ func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
 	return nil, nil, false
 }
 
+// IsSubclass checks if child is a subclass of parent (strict or not)
+// Returns true if child == parent or child inherits from parent
+func IsSubclass(child, parent *Class) bool {
+	if child == nil || parent == nil {
+		return false
+	}
+	if child == parent {
+		return true
+	}
+	if len(child.Parents) > 0 {
+		for _, p := range child.Parents {
+			if IsSubclass(p, parent) {
+				return true
+			}
+		}
+	} else if child.Parent != nil {
+		return IsSubclass(child.Parent, parent)
+	}
+	return false
+}
+
+// IsStrictSubclass checks if child is a strict subclass of parent (child != parent)
+func IsStrictSubclass(child, parent *Class) bool {
+	if child == nil || parent == nil {
+		return false
+	}
+	if child == parent {
+		return false
+	}
+	return IsSubclass(child, parent)
+}
+
 // SetMethod adds a method to the class
 func (c *Class) SetMethod(name string, method Value) {
 	// Debug for PurePath.__init__

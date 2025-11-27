@@ -72,14 +72,38 @@ func NotEqual() func([]core.Value, *core.Context) (core.Value, error) {
 
 // compareNotEqual compares two values for inequality
 func compareNotEqual(left, right core.Value, ctx *core.Context) (core.Value, error) {
-	// Try __ne__ on left operand
-	if result, found, err := types.CallDunder(left, "__ne__", []core.Value{right}, ctx); found {
-		return result, err
+	// Python operator precedence: if right's class is a strict subclass of left's class,
+	// try right's method first
+	var leftClass, rightClass *core.Class
+	if leftInst, ok := left.(*core.Instance); ok {
+		leftClass = leftInst.Class
+	}
+	if rightInst, ok := right.(*core.Instance); ok {
+		rightClass = rightInst.Class
 	}
 
-	// Try __ne__ on right operand
-	if result, found, err := types.CallDunder(right, "__ne__", []core.Value{left}, ctx); found {
-		return result, err
+	// If right operand's class is a strict subclass of left operand's class,
+	// try right operand's __ne__ first
+	if leftClass != nil && rightClass != nil && core.IsStrictSubclass(rightClass, leftClass) {
+		// Try __ne__ on right operand first (reflected operation)
+		if result, found, err := types.CallDunder(right, "__ne__", []core.Value{left}, ctx); found {
+			return result, err
+		}
+		// Then try __ne__ on left operand
+		if result, found, err := types.CallDunder(left, "__ne__", []core.Value{right}, ctx); found {
+			return result, err
+		}
+	} else {
+		// Normal order: try left first, then right
+		// Try __ne__ on left operand
+		if result, found, err := types.CallDunder(left, "__ne__", []core.Value{right}, ctx); found {
+			return result, err
+		}
+
+		// Try __ne__ on right operand
+		if result, found, err := types.CallDunder(right, "__ne__", []core.Value{left}, ctx); found {
+			return result, err
+		}
 	}
 
 	// Fall back to negation of equality
