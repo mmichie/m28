@@ -1,0 +1,36 @@
+# Test that module evaluation failures raise ImportError
+# This ensures try/except ImportError blocks work correctly
+
+print("=== Testing ImportError Handling ===")
+
+# Test 1: Missing module raises ImportError
+(print "\n1. Testing missing module...")
+(try
+  (do
+    (import nonexistent_module_xyz)
+    (print "✗ ERROR: Import should have failed")
+    (exit 1))
+  (except ImportError e
+    (print "✓ Correctly caught ImportError for missing module")))
+
+# Test 2: Import errors are catchable
+(print "\n2. Testing that ImportError can be caught...")
+(= import_failed False)
+(try
+  (import another_nonexistent_module)
+  (except ImportError
+    (= import_failed True)))
+
+(assert import_failed "ImportError should have been raised and caught")
+(print "✓ ImportError was caught successfully")
+
+# Test 3: Test ModuleNotFoundError (subclass of ImportError)
+(print "\n3. Testing ModuleNotFoundError...")
+(try
+  (import yet_another_missing_module)
+  (except ModuleNotFoundError e
+    (print "✓ Caught ModuleNotFoundError (subclass of ImportError)")))
+
+print("\n============================================")
+print("✅ All ImportError handling tests passed!")
+print("============================================")

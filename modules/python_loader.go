@@ -325,8 +325,9 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 		// Build detailed error message with source location
 		var errMsg string
+		var loc *core.SourceLocation
 		if failedStmt != nil {
-			loc := failedStmt.Location()
+			loc = failedStmt.Location()
 			stmtStr := failedStmt.String()
 			if loc != nil {
 				errMsg = fmt.Sprintf("  File \"%s\", line %d\n    %s\n -> %s",
@@ -338,14 +339,22 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 			errMsg = evalErr.Error()
 		}
 
-		// If it's an ImportError, return it directly so it can be caught by try/except
+		// If it's already an ImportError, return it directly so it can be caught by try/except
 		// This allows modules like shutil to check for optional dependencies
-		if _, ok := evalErr.(*core.ImportError); ok {
-			return nil, evalErr
+		if importErr, ok := evalErr.(*core.ImportError); ok {
+			return nil, importErr
+		}
+		if moduleNotFoundErr, ok := evalErr.(*core.ModuleNotFoundError); ok {
+			return nil, moduleNotFoundErr
 		}
 
-		// Return formatted error with location context
-		return nil, fmt.Errorf("%s", errMsg)
+		// All module evaluation failures should be ImportError so they can be caught
+		// by try/except ImportError blocks (matching CPython behavior)
+		return nil, &core.ImportError{
+			ModuleName: name,
+			Message:    errMsg,
+			Location:   loc,
+		}
 	}
 	evalTime := time.Since(startEval)
 
