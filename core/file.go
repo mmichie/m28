@@ -86,28 +86,28 @@ func NewFile(path string, mode string) (*File, error) {
 	case "r", "rb":
 		f.file, err = os.Open(path)
 		if err != nil {
-			return nil, fmt.Errorf("cannot open file '%s': %v", path, err)
+			return nil, &OSError{Message: fmt.Sprintf("cannot open file '%s': %v", path, err)}
 		}
 		f.reader = bufio.NewReader(f.file)
 
 	case "w", "wb":
 		f.file, err = os.Create(path)
 		if err != nil {
-			return nil, fmt.Errorf("cannot create file '%s': %v", path, err)
+			return nil, &OSError{Message: fmt.Sprintf("cannot create file '%s': %v", path, err)}
 		}
 		f.writer = bufio.NewWriter(f.file)
 
 	case "a", "ab":
 		f.file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("cannot open file '%s' for append: %v", path, err)
+			return nil, &OSError{Message: fmt.Sprintf("cannot open file '%s' for append: %v", path, err)}
 		}
 		f.writer = bufio.NewWriter(f.file)
 
 	case "r+", "rb+", "r+b":
 		f.file, err = os.OpenFile(path, os.O_RDWR, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("cannot open file '%s' for read/write: %v", path, err)
+			return nil, &OSError{Message: fmt.Sprintf("cannot open file '%s' for read/write: %v", path, err)}
 		}
 		f.reader = bufio.NewReader(f.file)
 		f.writer = bufio.NewWriter(f.file)
@@ -115,13 +115,13 @@ func NewFile(path string, mode string) (*File, error) {
 	case "w+", "wb+", "w+b":
 		f.file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("cannot create file '%s' for read/write: %v", path, err)
+			return nil, &OSError{Message: fmt.Sprintf("cannot create file '%s' for read/write: %v", path, err)}
 		}
 		f.reader = bufio.NewReader(f.file)
 		f.writer = bufio.NewWriter(f.file)
 
 	default:
-		return nil, fmt.Errorf("invalid file mode: %s", mode)
+		return nil, &ValueError{Message: fmt.Sprintf("invalid file mode: %s", mode)}
 	}
 
 	// Initialize the method registry
@@ -147,18 +147,18 @@ func (f *File) String() string {
 // Read reads from the file
 func (f *File) Read(size int) (Value, error) {
 	if f.closed {
-		return nil, fmt.Errorf("I/O operation on closed file")
+		return nil, &ValueError{Message: "I/O operation on closed file"}
 	}
 
 	if f.reader == nil {
-		return nil, fmt.Errorf("file not open for reading")
+		return nil, &OSError{Message: "file not open for reading"}
 	}
 
 	if size < 0 {
 		// Read entire file
 		content, err := io.ReadAll(f.reader)
 		if err != nil {
-			return nil, fmt.Errorf("error reading file: %v", err)
+			return nil, &OSError{Message: fmt.Sprintf("error reading file: %v", err)}
 		}
 
 		if f.isText {
@@ -172,7 +172,7 @@ func (f *File) Read(size int) (Value, error) {
 	buf := make([]byte, size)
 	n, err := f.reader.Read(buf)
 	if err != nil && err != io.EOF {
-		return nil, fmt.Errorf("error reading file: %v", err)
+		return nil, &OSError{Message: fmt.Sprintf("error reading file: %v", err)}
 	}
 
 	if f.isText {
@@ -184,16 +184,16 @@ func (f *File) Read(size int) (Value, error) {
 // Write writes to the file
 func (f *File) Write(data string) error {
 	if f.closed {
-		return fmt.Errorf("I/O operation on closed file")
+		return &ValueError{Message: "I/O operation on closed file"}
 	}
 
 	if f.writer == nil {
-		return fmt.Errorf("file not open for writing")
+		return &OSError{Message: "file not open for writing"}
 	}
 
 	_, err := f.writer.WriteString(data)
 	if err != nil {
-		return fmt.Errorf("error writing to file: %v", err)
+		return &OSError{Message: fmt.Sprintf("error writing to file: %v", err)}
 	}
 
 	// Flush to ensure data is written
@@ -203,11 +203,11 @@ func (f *File) Write(data string) error {
 // ReadLine reads a single line
 func (f *File) ReadLine() (Value, error) {
 	if f.closed {
-		return nil, fmt.Errorf("I/O operation on closed file")
+		return nil, &ValueError{Message: "I/O operation on closed file"}
 	}
 
 	if f.reader == nil {
-		return nil, fmt.Errorf("file not open for reading")
+		return nil, &OSError{Message: "file not open for reading"}
 	}
 
 	line, err := f.reader.ReadString('\n')
@@ -218,7 +218,7 @@ func (f *File) ReadLine() (Value, error) {
 			}
 			return StringValue(""), io.EOF
 		}
-		return nil, fmt.Errorf("error reading line: %v", err)
+		return nil, &OSError{Message: fmt.Sprintf("error reading line: %v", err)}
 	}
 
 	return StringValue(line), nil
@@ -227,11 +227,11 @@ func (f *File) ReadLine() (Value, error) {
 // ReadLines reads all lines
 func (f *File) ReadLines() (Value, error) {
 	if f.closed {
-		return nil, fmt.Errorf("I/O operation on closed file")
+		return nil, &ValueError{Message: "I/O operation on closed file"}
 	}
 
 	if f.reader == nil {
-		return nil, fmt.Errorf("file not open for reading")
+		return nil, &OSError{Message: "file not open for reading"}
 	}
 
 	lines := NewList()
@@ -242,7 +242,7 @@ func (f *File) ReadLines() (Value, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading lines: %v", err)
+		return nil, &OSError{Message: fmt.Sprintf("error reading lines: %v", err)}
 	}
 
 	return lines, nil
@@ -256,12 +256,12 @@ func (f *File) Close() error {
 
 	if f.writer != nil {
 		if err := f.writer.Flush(); err != nil {
-			return fmt.Errorf("error flushing file: %v", err)
+			return &OSError{Message: fmt.Sprintf("error flushing file: %v", err)}
 		}
 	}
 
 	if err := f.file.Close(); err != nil {
-		return fmt.Errorf("error closing file: %v", err)
+		return &OSError{Message: fmt.Sprintf("error closing file: %v", err)}
 	}
 
 	f.closed = true
@@ -271,12 +271,12 @@ func (f *File) Close() error {
 // Seek changes the file position
 func (f *File) Seek(offset int64, whence int) (int64, error) {
 	if f.closed {
-		return 0, fmt.Errorf("I/O operation on closed file")
+		return 0, &ValueError{Message: "I/O operation on closed file"}
 	}
 
 	pos, err := f.file.Seek(offset, whence)
 	if err != nil {
-		return 0, fmt.Errorf("error seeking: %v", err)
+		return 0, &OSError{Message: fmt.Sprintf("error seeking: %v", err)}
 	}
 
 	// Reset readers/writers after seek
@@ -293,7 +293,7 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 // Tell returns the current file position
 func (f *File) Tell() (int64, error) {
 	if f.closed {
-		return 0, fmt.Errorf("I/O operation on closed file")
+		return 0, &ValueError{Message: "I/O operation on closed file"}
 	}
 
 	return f.file.Seek(0, io.SeekCurrent)
@@ -342,7 +342,7 @@ func (f *File) createRegistry() *MethodRegistry {
 					if num, ok := args[0].(NumberValue); ok {
 						size = int(num)
 					} else {
-						return nil, fmt.Errorf("read() argument must be a number")
+						return nil, &TypeError{Message: "read() argument must be a number"}
 					}
 				}
 				return file.Read(size)
@@ -419,7 +419,7 @@ func (f *File) createRegistry() *MethodRegistry {
 				case TupleValue:
 					lines = v
 				default:
-					return nil, fmt.Errorf("writelines() argument must be a list or tuple of strings")
+					return nil, &TypeError{Message: "writelines() argument must be a list or tuple of strings"}
 				}
 
 				// Write each line
@@ -428,7 +428,7 @@ func (f *File) createRegistry() *MethodRegistry {
 					if s, ok := line.(StringValue); ok {
 						data = string(s)
 					} else {
-						return nil, fmt.Errorf("writelines() argument must contain strings, found %s at index %d", line.Type(), i)
+						return nil, &TypeError{Message: fmt.Sprintf("writelines() argument must contain strings, found %s at index %d", line.Type(), i)}
 					}
 					err := file.Write(data)
 					if err != nil {
@@ -470,7 +470,7 @@ func (f *File) createRegistry() *MethodRegistry {
 
 				offset, ok := args[0].(NumberValue)
 				if !ok {
-					return nil, fmt.Errorf("seek() offset must be a number")
+					return nil, &TypeError{Message: "seek() offset must be a number"}
 				}
 
 				whence := 0
@@ -478,7 +478,7 @@ func (f *File) createRegistry() *MethodRegistry {
 					if w, ok := args[1].(NumberValue); ok {
 						whence = int(w)
 					} else {
-						return nil, fmt.Errorf("seek() whence must be a number")
+						return nil, &TypeError{Message: "seek() whence must be a number"}
 					}
 				}
 
