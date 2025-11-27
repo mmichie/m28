@@ -540,6 +540,9 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Processing body statement %d: %T\n", i, stmt)
 		}
 
+		// Unwrap LocatedValue if present
+		stmt = unwrapLocated(stmt)
+
 		// Handle different statement types
 		switch s := stmt.(type) {
 		case *core.ListValue:
@@ -549,7 +552,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			sItems := s.Items()
 			// Check for def form (methods), = form (class variables), or if form (conditional defs)
-			if sym, ok := sItems[0].(core.SymbolValue); ok {
+			firstItem := unwrapLocated(sItems[0])
+			if sym, ok := firstItem.(core.SymbolValue); ok {
 				switch string(sym) {
 				case "if":
 					// Special handling for if statements at class level
@@ -779,6 +783,40 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						_, err := Eval(stmt, classBodyCtx)
 						if err != nil {
 							return nil, err
+						}
+					}
+					continue
+
+				case "import":
+					// Handle class-level import statements
+					// Examples:
+					//   from sys import version -> adds 'version' as class attribute
+					//   from test.support.warnings_helper import check_syntax_warning
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Evaluating import statement in class body\n")
+					}
+
+					// Track variables before import
+					beforeImport := make(map[string]bool)
+					for varName := range classBodyCtx.Vars {
+						beforeImport[varName] = true
+					}
+
+					// Evaluate the import statement in class body context
+					// This will define the imported names in classBodyCtx
+					_, err := Eval(stmt, classBodyCtx)
+					if err != nil {
+						return nil, err
+					}
+
+					// Find newly imported names and add them as class attributes
+					for varName, varValue := range classBodyCtx.Vars {
+						if !beforeImport[varName] {
+							// This is a newly imported name - add it as a class attribute
+							class.SetClassAttr(varName, varValue)
+							if debugClass {
+								fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Added imported name '%s' as class attribute\n", varName)
+							}
 						}
 					}
 					continue
