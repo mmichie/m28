@@ -140,7 +140,7 @@ func getTupleMethods() map[string]*MethodDescriptor {
 						return NumberValue(i), nil
 					}
 				}
-				return nil, fmt.Errorf("%v is not in tuple", args[0])
+				return nil, &ValueError{Message: fmt.Sprintf("%v is not in tuple", args[0])}
 			},
 		},
 		"__len__": {
@@ -160,43 +160,16 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__getitem__ takes exactly one argument")
+					return nil, &TypeError{Message: "__getitem__ takes exactly one argument"}
 				}
 
 				tuple := receiver.(TupleValue)
 
 				// Handle slice
 				if slice, ok := args[0].(*SliceValue); ok {
-					start, stop, step := 0, len(tuple), 1
-
-					if slice.Start != nil && slice.Start != Nil {
-						if n, ok := slice.Start.(NumberValue); ok {
-							start = int(n)
-							if start < 0 {
-								start = len(tuple) + start
-							}
-							if start < 0 {
-								start = 0
-							}
-						}
-					}
-
-					if slice.Stop != nil && slice.Stop != Nil {
-						if n, ok := slice.Stop.(NumberValue); ok {
-							stop = int(n)
-							if stop < 0 {
-								stop = len(tuple) + stop
-							}
-						}
-					}
-
-					if slice.Step != nil && slice.Step != Nil {
-						if n, ok := slice.Step.(NumberValue); ok {
-							step = int(n)
-							if step == 0 {
-								return nil, fmt.Errorf("slice step cannot be zero")
-							}
-						}
+					start, stop, step, err := NormalizeSliceIndices(slice, len(tuple))
+					if err != nil {
+						return nil, err
 					}
 
 					// Extract slice
@@ -221,16 +194,12 @@ func getTupleMethods() map[string]*MethodDescriptor {
 				// Handle index
 				idx, ok := args[0].(NumberValue)
 				if !ok {
-					return nil, fmt.Errorf("tuple indices must be integers")
+					return nil, &TypeError{Message: "tuple indices must be integers"}
 				}
 
-				i := int(idx)
-				if i < 0 {
-					i = len(tuple) + i
-				}
-
-				if i < 0 || i >= len(tuple) {
-					return nil, &IndexError{Index: i, Length: len(tuple)}
+				i, err := NormalizeIndex(int(idx), len(tuple))
+				if err != nil {
+					return nil, err
 				}
 
 				return tuple[i], nil
@@ -243,7 +212,7 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__contains__ takes exactly one argument")
+					return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
 				}
 				tuple := receiver.(TupleValue)
 				for _, item := range tuple {
@@ -261,12 +230,12 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__add__ takes exactly one argument")
+					return nil, &TypeError{Message: "__add__ takes exactly one argument"}
 				}
 				tuple1 := receiver.(TupleValue)
 				tuple2, ok := args[0].(TupleValue)
 				if !ok {
-					return nil, fmt.Errorf("can only concatenate tuple to tuple")
+					return nil, &TypeError{Message: "can only concatenate tuple to tuple"}
 				}
 				result := make(TupleValue, len(tuple1)+len(tuple2))
 				copy(result, tuple1)
@@ -281,12 +250,12 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("__mul__ takes exactly one argument")
+					return nil, &TypeError{Message: "__mul__ takes exactly one argument"}
 				}
 				tuple := receiver.(TupleValue)
 				n, ok := args[0].(NumberValue)
 				if !ok {
-					return nil, fmt.Errorf("can't multiply sequence by non-int")
+					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
 				}
 				count := int(n)
 				if count <= 0 {

@@ -560,7 +560,7 @@ func stringMethodReplace(receiver Value, args []Value, ctx *Context) (Value, err
 
 func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("__getitem__ takes exactly one argument")
+		return nil, &TypeError{Message: "__getitem__ takes exactly one argument"}
 	}
 
 	s := string(receiver.(StringValue))
@@ -570,53 +570,28 @@ func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, err
 
 	// Handle slice
 	if slice, ok := args[0].(*SliceValue); ok {
-		start, stop := 0, runeLen
-
-		if slice.Start != nil && slice.Start != Nil {
-			if n, ok := slice.Start.(NumberValue); ok {
-				start = int(n)
-				if start < 0 {
-					start = runeLen + start
-				}
-				if start < 0 {
-					start = 0
-				}
-			}
+		start, stop, step, err := NormalizeSliceIndices(slice, runeLen)
+		if err != nil {
+			return nil, err
 		}
 
-		if slice.Stop != nil && slice.Stop != Nil {
-			if n, ok := slice.Stop.(NumberValue); ok {
-				stop = int(n)
-				if stop < 0 {
-					stop = runeLen + stop
-				}
-			}
+		// For now, only handle step=1 (TODO: support arbitrary step)
+		if step != 1 {
+			return nil, &ValueError{Message: "string slicing with step != 1 not yet supported"}
 		}
 
-		if stop > runeLen {
-			stop = runeLen
-		}
-		if start > stop {
-			start = stop
-		}
-
-		// TODO(M28-b902): Handle step
 		return StringValue(string(runes[start:stop])), nil
 	}
 
 	// Handle index
 	idx, ok := args[0].(NumberValue)
 	if !ok {
-		return nil, fmt.Errorf("string indices must be integers")
+		return nil, &TypeError{Message: "string indices must be integers"}
 	}
 
-	i := int(idx)
-	if i < 0 {
-		i = runeLen + i
-	}
-
-	if i < 0 || i >= runeLen {
-		return nil, &IndexError{Index: i, Length: runeLen}
+	i, err := NormalizeIndex(int(idx), runeLen)
+	if err != nil {
+		return nil, err
 	}
 
 	return StringValue(string(runes[i])), nil

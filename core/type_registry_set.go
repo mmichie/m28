@@ -96,7 +96,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("add() takes exactly one argument")
+					return nil, &TypeError{Message: "add() takes exactly one argument"}
 				}
 				set := receiver.(*SetValue)
 				// Mutate in-place
@@ -129,7 +129,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				if len(args) != 1 {
-					return nil, fmt.Errorf("discard() takes exactly one argument")
+					return nil, &TypeError{Message: "discard() takes exactly one argument"}
 				}
 				set := receiver.(*SetValue)
 				// Mutate in-place

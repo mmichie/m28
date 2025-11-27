@@ -656,43 +656,16 @@ func listMethodReverse(receiver Value, args []Value, ctx *Context) (Value, error
 
 func listMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("__getitem__ takes exactly one argument")
+		return nil, &TypeError{Message: "__getitem__ takes exactly one argument"}
 	}
 
 	list := receiver.(*ListValue)
 
 	// Handle slice
 	if slice, ok := args[0].(*SliceValue); ok {
-		start, stop, step := 0, list.Len(), 1
-
-		if slice.Start != nil && slice.Start != Nil {
-			if n, ok := slice.Start.(NumberValue); ok {
-				start = int(n)
-				if start < 0 {
-					start = list.Len() + start
-				}
-				if start < 0 {
-					start = 0
-				}
-			}
-		}
-
-		if slice.Stop != nil && slice.Stop != Nil {
-			if n, ok := slice.Stop.(NumberValue); ok {
-				stop = int(n)
-				if stop < 0 {
-					stop = list.Len() + stop
-				}
-			}
-		}
-
-		if slice.Step != nil && slice.Step != Nil {
-			if n, ok := slice.Step.(NumberValue); ok {
-				step = int(n)
-				if step == 0 {
-					return nil, fmt.Errorf("slice step cannot be zero")
-				}
-			}
+		start, stop, step, err := NormalizeSliceIndices(slice, list.Len())
+		if err != nil {
+			return nil, err
 		}
 
 		// Extract slice
@@ -715,7 +688,7 @@ func listMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, error
 		return NewList(result...), nil
 	}
 
-	// Handle index - use ToIndex to support __index__ dunder method
+	// Handle index - use toIndex to support __index__ dunder method
 	i, err := toIndex(args[0], ctx)
 	if err != nil {
 		return nil, err
