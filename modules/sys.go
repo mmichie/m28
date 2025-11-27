@@ -196,8 +196,8 @@ func InitSysModule() *core.DictValue {
 		if !ok {
 			return nil, core.NewTypeError("string", args[0], "intern() argument")
 		}
-		// TODO: Implement actual string interning
-		// For now, just return the string as-is
+		// String interning: just return the string as-is (Go handles string interning)
+		// Python's sys.intern() is mainly for memory optimization
 		return str, nil
 	}))
 

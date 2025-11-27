@@ -62,7 +62,7 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 				return nil, fmt.Errorf("apply() third argument must be a dict, got %s", v.Get(2).Type())
 			}
 
-			// TODO: Full kwargs support would require changes to core.Callable interface
+			// TODO(M28-c8e9): Full kwargs support would require changes to core.Callable interface
 			// For now, we'll just pass the regular args and ignore kwargs
 			// This allows the code to run without errors
 		}

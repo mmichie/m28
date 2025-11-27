@@ -12,7 +12,7 @@ import (
 // - asyncio.coroutines (submodule will be loaded separately by CPython)
 // - iscoroutinefunction (stub that returns False)
 //
-// TODO: Implement full asyncio support or fix circular import issues in CPython's asyncio
+// TODO(M28-2a50): Implement full asyncio support or fix circular import issues in CPython's asyncio
 func Init_PythonAsyncioModule() *core.DictValue {
 	asyncioModule := core.NewDict()
 

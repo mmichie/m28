@@ -391,7 +391,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// For now, just split on whitespace (this is a simplified stub)
-			// TODO: Actually use the pattern to split
+			// TODO(M28-580c): Actually use the pattern to split
 			parts := strings.Fields(string(str))
 			result := core.NewList()
 			for _, part := range parts {

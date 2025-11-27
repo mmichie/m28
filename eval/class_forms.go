@@ -128,7 +128,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						parent = p.GetClass()
 					case *core.BuiltinFunction:
 						// TEMPORARY: Allow builtin types as base classes
-						// TODO: Make list/int/float proper classes
+						// TODO(M28-b902): Make list/int/float proper classes
 						if nameVal, ok := p.GetAttr("__name__"); ok {
 							if nameStr, ok := nameVal.(core.StringValue); ok {
 								parent = core.NewClass(string(nameStr), nil)
@@ -485,7 +485,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Set __qualname__ attribute (qualified name)
 	// For now, just use the class name (simple case)
-	// TODO: Handle nested classes (e.g., "Outer.Inner") and local classes (e.g., "func.<locals>.Local")
+	// TODO(M28-2854): Handle nested classes (e.g., "Outer.Inner") and local classes (e.g., "func.<locals>.Local")
 	class.SetClassAttr("__qualname__", core.StringValue(string(className)))
 
 	if debugClass {

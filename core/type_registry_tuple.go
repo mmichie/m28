@@ -327,7 +327,7 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				// For now, just return 0
-				// TODO: Implement proper hashing
+				// TODO(M28-b902): Implement proper hashing
 				return NumberValue(0), nil
 			},
 		},

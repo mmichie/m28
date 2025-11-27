@@ -228,7 +228,7 @@ func Init_FunctoolsModule() *core.DictValue {
 
 			// In a full implementation, we would copy __name__, __doc__, etc. from wrapped to wrapper
 			// For now, just return the wrapper as-is
-			// TODO: Copy metadata attributes if wrapper is a dict or has __dict__
+			// TODO(M28-1d21): Copy metadata attributes if wrapper is a dict or has __dict__
 
 			return wrapper, nil
 		})

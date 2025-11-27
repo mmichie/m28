@@ -211,7 +211,7 @@ func IsHashable(v Value) bool {
 		// In Python, instances are hashable by default (using object ID)
 		// unless they define __hash__ = None or __eq__ without __hash__
 		// For now, we make all instances hashable by default
-		// TODO: Check for __hash__ = None or missing __hash__ with custom __eq__
+		// TODO(M28-b2fc): Check for __hash__ = None or missing __hash__ with custom __eq__
 		return true
 	default:
 		// Check if it's a Callable (function) - functions are hashable by identity

@@ -600,7 +600,7 @@ func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, err
 			start = stop
 		}
 
-		// TODO: Handle step
+		// TODO(M28-b902): Handle step
 		return StringValue(string(runes[start:stop])), nil
 	}
 

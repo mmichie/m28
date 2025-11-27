@@ -22,7 +22,7 @@ func InitWeakrefModule() *core.DictValue {
 		// that could be dereferenced and would allow the object to be garbage collected
 		obj := args[0]
 
-		// TODO: Implement proper weak references with:
+		// TODO(M28-145d): Implement proper weak references with:
 		// - Automatic dereferencing via __call__
 		// - Callback support when object is collected
 		// - Returning None when referent is gone

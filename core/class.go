@@ -224,7 +224,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	// Special handling for __qualname__
 	// In Python, __qualname__ is the qualified name including any enclosing classes
 	// For now, we just use the class name (same as __name__)
-	// TODO: Track nested class definitions to provide full qualified names
+	// TODO(M28-2854): Track nested class definitions to provide full qualified names
 	if name == "__qualname__" {
 		return StringValue(c.Name), true
 	}
@@ -1405,7 +1405,7 @@ func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]
 		// Try to use eval.EvalKwargCall which handles UserFunctions with signatures
 		// 		fmt.Printf("[DEBUG BoundInstanceMethod] Method type: %T\n", bm.Method)
 		// 		fmt.Printf("[DEBUG BoundInstanceMethod] Falling back to regular Call - kwargs will be lost\n")
-		// For now, we just error. TODO: integrate with kwarg_eval
+		// For now, we just error. TODO(M28-8da4): integrate with kwarg_eval
 		return nil, &TypeError{Message: "method does not support keyword arguments"}
 	}
 

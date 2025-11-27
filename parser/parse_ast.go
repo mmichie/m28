@@ -115,7 +115,7 @@ func (p *Parser) parseExprToAST() (ast.ASTNode, error) {
 		return nil, err
 	}
 
-	// TODO: Handle infix operators
+	// TODO(M28-56d6): Handle infix operators
 	// For now, just return the base expression
 
 	return base, nil
@@ -153,7 +153,7 @@ func (p *Parser) parseAtomToAST() (ast.ASTNode, error) {
 
 		// Check for Pythonic def syntax: def name(params): expr
 		if name == "def" {
-			// TODO: Implement Pythonic def parsing to AST
+			// TODO(M28-56d6): Implement Pythonic def parsing to AST
 			// For now, just return as identifier
 			return p.makeIdentifier(name, tok), nil
 		}
@@ -194,7 +194,7 @@ func (p *Parser) parseAtomToAST() (ast.ASTNode, error) {
 	// We'll convert these later
 	case TOKEN_FSTRING, TOKEN_SSTRING:
 		// For now, parse to IR and wrap in Literal
-		// TODO: Create proper AST nodes for f-strings and s-strings
+		// TODO(M28-56d6): Create proper AST nodes for f-strings and s-strings
 		p.advanceToken()
 		return p.makeLiteral(tok.Value, tok), nil
 
@@ -222,7 +222,7 @@ func (p *Parser) parseAtomToAST() (ast.ASTNode, error) {
 
 // parsePostfixToAST handles postfix operations (placeholder for now)
 func (p *Parser) parsePostfixToAST(base ast.ASTNode) (ast.ASTNode, error) {
-	// TODO: Implement dot notation, method calls, indexing for AST
+	// TODO(M28-56d6): Implement dot notation, method calls, indexing for AST
 	// For now, just return the base
 	return base, nil
 }
@@ -336,7 +336,7 @@ func (p *Parser) parseDictLiteralToAST() (ast.ASTNode, error) {
 
 	var elements []ast.ASTNode
 
-	// TODO: Handle set literals vs dict literals
+	// TODO(M28-56d6): Handle set literals vs dict literals
 	// For now, assume dict literal
 
 	for !p.matchToken(TOKEN_RBRACE) {

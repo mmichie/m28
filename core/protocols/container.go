@@ -173,7 +173,7 @@ func GetContainer(v core.Value) (Container, bool) {
 		if container, ok := v.(Container); ok {
 			return container, true
 		}
-		// TODO: Check for __len__ and __contains__ methods
+		// TODO(M28-b2fc): Check for __len__ and __contains__ methods
 		return nil, false
 	}
 }

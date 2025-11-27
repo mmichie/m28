@@ -34,7 +34,7 @@ func registerDictType() {
 					}
 					return result, nil
 				}
-				// TODO: Handle iterable of pairs
+				// TODO(M28-b902): Handle iterable of pairs
 				return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
 			}
 			return nil, fmt.Errorf("dict() takes at most 1 argument (%d given)", len(args))

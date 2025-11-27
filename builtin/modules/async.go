@@ -8,5 +8,5 @@ import (
 func RegisterAsyncModule(ctx *core.Context) {
 	// Note: The actual implementation is in builtin/async.go
 	// This function is called from the new registry system
-	// TODO: Move the implementation here to avoid circular imports
+	// TODO(M28-a357): Move the implementation here to avoid circular imports
 }

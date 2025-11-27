@@ -538,7 +538,7 @@ func listMethodSort(receiver Value, args []Value, ctx *Context) (Value, error) {
 
 	// Sort the items in place using Go's sort package
 	sort.Slice(list.items, func(i, j int) bool {
-		// TODO: Implement proper comparison
+		// TODO(M28-b902): Implement proper comparison
 		// For now, compare as strings
 		return Repr(list.items[i]) < Repr(list.items[j])
 	})

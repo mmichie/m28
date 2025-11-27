@@ -60,7 +60,7 @@ func MapBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 			iterables[i-1] = iter
 		}
 
-		// TODO: Return map iterator when implemented
+		// TODO(M28-5beb): Return map iterator when implemented
 		// For now, return a simple list implementation
 		result := make([]core.Value, 0)
 		// This is a simplified implementation for demonstration
@@ -108,7 +108,7 @@ func FilterBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
-		// TODO: Return filter iterator when implemented
+		// TODO(M28-5beb): Return filter iterator when implemented
 		// For now, return a simple list implementation
 		result := make([]core.Value, 0)
 		iter := iterable.Iterator()

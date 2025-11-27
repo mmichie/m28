@@ -592,7 +592,7 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 
 			case "if":
 				// For now, treat if as a regular statement
-				// TODO: Proper conditional handling with step skipping
+				// TODO(M28-7095): Proper conditional handling with step skipping
 				steps = append(steps, ExecutionStep{
 					Kind: StepStatement,
 					Node: node,
@@ -740,7 +740,7 @@ func (state *GeneratorExecState) Send(value core.Value) (core.Value, error) {
 	}
 
 	// Store the value to be used by yield expression
-	// TODO: Implement yield expressions (x = yield val)
+	// TODO(M28-2260): Implement yield expressions (x = yield val)
 	state.sentValue = value
 
 	// Continue execution

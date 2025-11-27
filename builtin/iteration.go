@@ -41,7 +41,7 @@ func IterBuilder() builders.BuiltinFunc {
 		// Single argument - get iterator
 		if v.Count() == 1 {
 			// For now, just return the iterable itself
-			// TODO: Return proper iterator object when implemented
+			// TODO(M28-5beb): Return proper iterator object when implemented
 			if iterable, ok := types.AsIterable(obj); ok {
 				return iterable, nil
 			}
@@ -64,7 +64,7 @@ func IterBuilder() builders.BuiltinFunc {
 		}
 
 		// Two arguments - callable with sentinel
-		// TODO: Implement sentinel iterator
+		// TODO(M28-5beb): Implement sentinel iterator
 		return nil, errors.NewRuntimeError("iter", "iter() with sentinel not yet implemented")
 	}
 }
@@ -142,7 +142,7 @@ func EnumerateBuilder() builders.BuiltinFunc {
 			start = s
 		}
 
-		// TODO: Return proper enumerate iterator when implemented
+		// TODO(M28-5beb): Return proper enumerate iterator when implemented
 		// For now, return a simple implementation
 		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
@@ -238,7 +238,7 @@ func ZipBuilder() builders.BuiltinFunc {
 			iterables[i] = iter
 		}
 
-		// TODO: Return proper zip iterator when implemented
+		// TODO(M28-5beb): Return proper zip iterator when implemented
 		// For now, return a simple implementation
 		if len(iterables) == 0 {
 			return core.NewList(), nil
