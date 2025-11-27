@@ -206,7 +206,7 @@ func RegisterNumeric(ctx *core.Context) {
 				return nil, err
 			}
 			if mod == 0 {
-				return nil, fmt.Errorf("pow() 3rd argument cannot be 0")
+				return nil, &core.ValueError{Message: "pow() 3rd argument cannot be 0"}
 			}
 			// For now, just compute normally and mod
 			// In the future, should use modular exponentiation
@@ -300,15 +300,15 @@ func RegisterNumeric(ctx *core.Context) {
 				real = 0.0
 			}
 		case core.StringValue:
-			return nil, fmt.Errorf("complex() first argument cannot be a string")
+			return nil, &core.TypeError{Message: "complex() first argument cannot be a string"}
 		case core.ComplexValue:
 			// If first arg is complex and no second arg, return it as-is
 			if v.Count() == 1 {
 				return r, nil
 			}
-			return nil, fmt.Errorf("complex() can't take second arg if first is complex")
+			return nil, &core.TypeError{Message: "complex() can't take second arg if first is complex"}
 		default:
-			return nil, fmt.Errorf("complex() argument must be a number, not '%s'", realPart.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("complex() argument must be a number, not '%s'", realPart.Type())}
 		}
 
 		// Get imaginary part (default to 0)
@@ -325,11 +325,11 @@ func RegisterNumeric(ctx *core.Context) {
 					imag = 0.0
 				}
 			case core.StringValue:
-				return nil, fmt.Errorf("complex() second argument cannot be a string")
+				return nil, &core.TypeError{Message: "complex() second argument cannot be a string"}
 			case core.ComplexValue:
-				return nil, fmt.Errorf("complex() second argument can't be complex")
+				return nil, &core.TypeError{Message: "complex() second argument can't be complex"}
 			default:
-				return nil, fmt.Errorf("complex() argument must be a number, not '%s'", imagPart.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("complex() argument must be a number, not '%s'", imagPart.Type())}
 			}
 		}
 
@@ -349,7 +349,7 @@ func RegisterNumeric(ctx *core.Context) {
 		}
 
 		if num < 0 {
-			return nil, fmt.Errorf("math domain error")
+			return nil, &core.ValueError{Message: "math domain error"}
 		}
 
 		return core.NumberValue(math.Sqrt(num)), nil
@@ -408,12 +408,12 @@ func extremeWithKwargs(funcName string, isMin bool) func([]core.Value, map[strin
 		// Check for any remaining kwargs
 		if len(kwargs) > 0 {
 			for k := range kwargs {
-				return nil, fmt.Errorf("%s() got an unexpected keyword argument '%s'", funcName, k)
+				return nil, &core.TypeError{Message: fmt.Sprintf("%s() got an unexpected keyword argument '%s'", funcName, k)}
 			}
 		}
 
 		if len(args) == 0 {
-			return nil, fmt.Errorf("%s expected at least 1 argument, got 0", funcName)
+			return nil, &core.TypeError{Message: fmt.Sprintf("%s expected at least 1 argument, got 0", funcName)}
 		}
 
 		// If single iterable argument
@@ -468,7 +468,7 @@ func extremeWithKwargs(funcName string, isMin bool) func([]core.Value, map[strin
 				if hasDefault {
 					return defaultValue, nil
 				}
-				return nil, fmt.Errorf("%s() arg is an empty sequence", funcName)
+				return nil, &core.ValueError{Message: fmt.Sprintf("%s() arg is an empty sequence", funcName)}
 			}
 
 			return findExtreme(items, keyFunc, ctx, isMin)
@@ -488,7 +488,7 @@ var maxWithKwargs = extremeWithKwargs("max", false)
 // findExtreme finds the minimum or maximum value based on the isMin flag
 func findExtreme(items []core.Value, keyFunc core.Value, ctx *core.Context, isMin bool) (core.Value, error) {
 	if len(items) == 0 {
-		return nil, fmt.Errorf("sequence is empty")
+		return nil, &core.ValueError{Message: "sequence is empty"}
 	}
 
 	result := items[0]
@@ -505,7 +505,7 @@ func findExtreme(items []core.Value, keyFunc core.Value, ctx *core.Context, isMi
 			}
 			resultKey = key
 		} else {
-			return nil, fmt.Errorf("key function must be callable")
+			return nil, &core.TypeError{Message: "key function must be callable"}
 		}
 	} else {
 		resultKey = result
@@ -542,8 +542,8 @@ func findExtreme(items []core.Value, keyFunc core.Value, ctx *core.Context, isMi
 					shouldReplace = k2 > k1
 				}
 			} else {
-				return nil, fmt.Errorf("'%s' not supported between instances of '%s' and '%s'",
-					map[bool]string{true: "<", false: ">"}[isMin], itemKey.Type(), k1.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("'%s' not supported between instances of '%s' and '%s'",
+					map[bool]string{true: "<", false: ">"}[isMin], itemKey.Type(), k1.Type())}
 			}
 		case core.StringValue:
 			if k2, ok := itemKey.(core.StringValue); ok {
@@ -553,12 +553,12 @@ func findExtreme(items []core.Value, keyFunc core.Value, ctx *core.Context, isMi
 					shouldReplace = k2 > k1
 				}
 			} else {
-				return nil, fmt.Errorf("'%s' not supported between instances of '%s' and '%s'",
-					map[bool]string{true: "<", false: ">"}[isMin], itemKey.Type(), k1.Type())
+				return nil, &core.TypeError{Message: fmt.Sprintf("'%s' not supported between instances of '%s' and '%s'",
+					map[bool]string{true: "<", false: ">"}[isMin], itemKey.Type(), k1.Type())}
 			}
 		default:
-			return nil, fmt.Errorf("'%s' not supported for type '%s'",
-				map[bool]string{true: "<", false: ">"}[isMin], k1.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' not supported for type '%s'",
+				map[bool]string{true: "<", false: ">"}[isMin], k1.Type())}
 		}
 
 		if shouldReplace {
