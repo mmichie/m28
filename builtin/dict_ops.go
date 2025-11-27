@@ -32,14 +32,14 @@ func SelectKeysBuilder() builders.BuiltinFunc {
 		dictArg := v.Get(0)
 		dict, ok := dictArg.(*core.DictValue)
 		if !ok {
-			return nil, fmt.Errorf("select-keys requires dict as first argument, got %s", dictArg.Type())
+			return nil, core.NewTypeError("dict", dictArg, "select-keys")
 		}
 
 		// Get keys list
 		keysArg := v.Get(1)
 		keysList, ok := keysArg.(*core.ListValue)
 		if !ok {
-			return nil, fmt.Errorf("select-keys requires list as second argument, got %s", keysArg.Type())
+			return nil, core.NewTypeError("list", keysArg, "select-keys")
 		}
 
 		// Build result dict - skip missing keys
@@ -74,7 +74,7 @@ func RenameKeysBuilder() builders.BuiltinFunc {
 		dictArg := v.Get(0)
 		dict, ok := dictArg.(*core.DictValue)
 		if !ok {
-			return nil, fmt.Errorf("rename-keys requires dict as first argument, got %s", dictArg.Type())
+			return nil, core.NewTypeError("dict", dictArg, "rename-keys")
 		}
 
 		mapperArg := v.Get(1)
@@ -88,7 +88,7 @@ func RenameKeysBuilder() builders.BuiltinFunc {
 			return renameKeysWithFunction(dict, callable, ctx)
 		}
 
-		return nil, fmt.Errorf("rename-keys requires dict mapping or function as second argument, got %s", mapperArg.Type())
+		return nil, core.NewTypeError("dict or callable", mapperArg, "rename-keys")
 	}
 }
 
@@ -111,7 +111,7 @@ func renameKeysWithMapping(dict *core.DictValue, mapping *core.DictValue) (core.
 		// Check for collision
 		keyStr := core.ValueToKey(newKey)
 		if seenKeys[keyStr] {
-			return nil, fmt.Errorf("rename-keys: key collision - key %v already exists after renaming", newKey)
+			return nil, core.NewValueError(fmt.Sprintf("rename-keys: key collision - key %v already exists after renaming", newKey))
 		}
 		seenKeys[keyStr] = true
 
@@ -139,7 +139,7 @@ func renameKeysWithFunction(dict *core.DictValue, fn core.Callable, ctx *core.Co
 		// Check for collision
 		keyStr := core.ValueToKey(newKey)
 		if seenKeys[keyStr] {
-			return nil, fmt.Errorf("rename-keys: key collision - key %v already exists after renaming", newKey)
+			return nil, core.NewValueError(fmt.Sprintf("rename-keys: key collision - key %v already exists after renaming", newKey))
 		}
 		seenKeys[keyStr] = true
 
@@ -162,14 +162,14 @@ func MapKeysBuilder() builders.BuiltinFunc {
 		dictArg := v.Get(0)
 		dict, ok := dictArg.(*core.DictValue)
 		if !ok {
-			return nil, fmt.Errorf("map-keys requires dict as first argument, got %s", dictArg.Type())
+			return nil, core.NewTypeError("dict", dictArg, "map-keys")
 		}
 
 		// Get function argument
 		fnArg := v.Get(1)
 		callable, ok := types.AsCallable(fnArg)
 		if !ok {
-			return nil, fmt.Errorf("map-keys requires callable as second argument, got %s", fnArg.Type())
+			return nil, core.NewTypeError("callable", fnArg, "map-keys")
 		}
 
 		return renameKeysWithFunction(dict, callable, ctx)
@@ -189,14 +189,14 @@ func MapValuesBuilder() builders.BuiltinFunc {
 		dictArg := v.Get(0)
 		dict, ok := dictArg.(*core.DictValue)
 		if !ok {
-			return nil, fmt.Errorf("map-values requires dict as first argument, got %s", dictArg.Type())
+			return nil, core.NewTypeError("dict", dictArg, "map-values")
 		}
 
 		// Get function argument
 		fnArg := v.Get(1)
 		callable, ok := types.AsCallable(fnArg)
 		if !ok {
-			return nil, fmt.Errorf("map-values requires callable as second argument, got %s", fnArg.Type())
+			return nil, core.NewTypeError("callable", fnArg, "map-values")
 		}
 
 		result := core.NewDict()
@@ -231,14 +231,14 @@ func FilterKeysBuilder() builders.BuiltinFunc {
 		dictArg := v.Get(0)
 		dict, ok := dictArg.(*core.DictValue)
 		if !ok {
-			return nil, fmt.Errorf("filter-keys requires dict as first argument, got %s", dictArg.Type())
+			return nil, core.NewTypeError("dict", dictArg, "filter-keys")
 		}
 
 		// Get predicate function
 		predArg := v.Get(1)
 		callable, ok := types.AsCallable(predArg)
 		if !ok {
-			return nil, fmt.Errorf("filter-keys requires callable as second argument, got %s", predArg.Type())
+			return nil, core.NewTypeError("callable", predArg, "filter-keys")
 		}
 
 		result := core.NewDict()
@@ -276,14 +276,14 @@ func FilterValuesBuilder() builders.BuiltinFunc {
 		dictArg := v.Get(0)
 		dict, ok := dictArg.(*core.DictValue)
 		if !ok {
-			return nil, fmt.Errorf("filter-values requires dict as first argument, got %s", dictArg.Type())
+			return nil, core.NewTypeError("dict", dictArg, "filter-values")
 		}
 
 		// Get predicate function
 		predArg := v.Get(1)
 		callable, ok := types.AsCallable(predArg)
 		if !ok {
-			return nil, fmt.Errorf("filter-values requires callable as second argument, got %s", predArg.Type())
+			return nil, core.NewTypeError("callable", predArg, "filter-values")
 		}
 
 		result := core.NewDict()
