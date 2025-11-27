@@ -18,14 +18,14 @@ var debugClass = os.Getenv("M28_DEBUG_CLASS") != ""
 // (class ClassName (ParentClass) (keywords) body...) - with keywords like metaclass
 func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 1 {
-		return nil, fmt.Errorf("class requires at least a name")
+		return nil, &core.TypeError{Message: "class requires at least a name"}
 	}
 
 	// Get class name
 	classNameVal := unwrapLocated(args.Items()[0])
 	className, ok := classNameVal.(core.SymbolValue)
 	if !ok {
-		return nil, fmt.Errorf("class name must be a symbol")
+		return nil, &core.TypeError{Message: "class name must be a symbol"}
 	}
 
 	if debugClass {
@@ -104,7 +104,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						if debugClass {
 							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Error evaluating parent: %v\n", err)
 						}
-						return nil, fmt.Errorf("error evaluating parent class: %v", err)
+						return nil, &core.TypeError{Message: fmt.Sprintf("error evaluating parent class: %v", err)}
 					}
 
 					if debugClass {
@@ -133,13 +133,13 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 							if nameStr, ok := nameVal.(core.StringValue); ok {
 								parent = core.NewClass(string(nameStr), nil)
 							} else {
-								return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])
+								return nil, &core.TypeError{Message: fmt.Sprintf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])}
 							}
 						} else {
-							return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])
+							return nil, &core.TypeError{Message: fmt.Sprintf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])}
 						}
 					default:
-						return nil, fmt.Errorf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])
+						return nil, &core.TypeError{Message: fmt.Sprintf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])}
 					}
 
 					// Check if trying to subclass bool - Python forbids this
@@ -295,7 +295,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						// Evaluate the metaclass expression
 						metaclassVal, err := Eval(kwPairItems[1], ctx)
 						if err != nil {
-							return nil, fmt.Errorf("error evaluating metaclass: %v", err)
+							return nil, &core.TypeError{Message: fmt.Sprintf("error evaluating metaclass: %v", err)}
 						}
 
 						// Check if it's a class
@@ -346,7 +346,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Evaluate the *bases expression
 			basesResult, err := Eval(starBasesVal, ctx)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating *bases: %v", err)
+				return nil, &core.TypeError{Message: fmt.Sprintf("error evaluating *bases: %v", err)}
 			}
 
 			// Unpack the result into parentClasses
@@ -355,7 +355,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if baseClass, ok := baseVal.(*core.Class); ok {
 						parentClasses = append(parentClasses, baseClass)
 					} else {
-						return nil, fmt.Errorf("*bases must contain classes, got %T", baseVal)
+						return nil, &core.TypeError{Message: fmt.Sprintf("*bases must contain classes, got %T", baseVal)}
 					}
 				}
 			} else if baseTuple, ok := basesResult.(core.TupleValue); ok {
@@ -363,11 +363,11 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if baseClass, ok := baseVal.(*core.Class); ok {
 						parentClasses = append(parentClasses, baseClass)
 					} else {
-						return nil, fmt.Errorf("*bases must contain classes, got %T", baseVal)
+						return nil, &core.TypeError{Message: fmt.Sprintf("*bases must contain classes, got %T", baseVal)}
 					}
 				}
 			} else {
-				return nil, fmt.Errorf("*bases must be a sequence, got %T", basesResult)
+				return nil, &core.TypeError{Message: fmt.Sprintf("*bases must be a sequence, got %T", basesResult)}
 			}
 		}
 	}
@@ -379,7 +379,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Evaluate the **kwargs expression
 			kwargsResult, err := Eval(kwargsVal, ctx)
 			if err != nil {
-				return nil, fmt.Errorf("error evaluating **kwargs: %v", err)
+				return nil, &core.TypeError{Message: fmt.Sprintf("error evaluating **kwargs: %v", err)}
 			}
 
 			// Unpack the dict and look for metaclass
@@ -393,7 +393,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 				}
 			} else {
-				return nil, fmt.Errorf("**kwargs must be a dict, got %T", kwargsResult)
+				return nil, &core.TypeError{Message: fmt.Sprintf("**kwargs must be a dict, got %T", kwargsResult)}
 			}
 		}
 	}
@@ -608,12 +608,12 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				case "def":
 					// Method definition
 					if s.Len() < 3 {
-						return nil, fmt.Errorf("def requires at least name and value")
+						return nil, &core.TypeError{Message: "def requires at least name and value"}
 					}
 
 					name, ok := sItems[1].(core.SymbolValue)
 					if !ok {
-						return nil, fmt.Errorf("def name must be a symbol")
+						return nil, &core.TypeError{Message: "def name must be a symbol"}
 					}
 
 					// Check if it's a method definition
@@ -637,7 +637,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 								}); ok {
 									finalMethod = createBoundClassMethod(class, callable)
 								} else {
-									return nil, fmt.Errorf("method %s is not callable", methodName)
+									return nil, &core.TypeError{Message: fmt.Sprintf("method %s is not callable", methodName)}
 								}
 							}
 
@@ -654,7 +654,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 
 					// def should only be used for functions
-					return nil, fmt.Errorf("def can only be used for method definitions in classes")
+					return nil, &core.TypeError{Message: "def can only be used for method definitions in classes"}
 
 				case "del":
 					// Delete class variable or attribute
@@ -681,7 +681,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				case "=":
 					// Class variable definition or subscript assignment
 					if s.Len() != 3 {
-						return nil, fmt.Errorf("= requires exactly 2 arguments in class definition")
+						return nil, &core.TypeError{Message: "= requires exactly 2 arguments in class definition"}
 					}
 
 					// Check if this is a simple variable assignment or subscript assignment
@@ -740,14 +740,14 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 							continue
 						}
 						// If we get here, it's an unsupported assignment pattern
-						return nil, fmt.Errorf("class variable name must be a symbol or subscript expression, got %T: %v", sItems[1], sItems[1])
+						return nil, &core.TypeError{Message: fmt.Sprintf("class variable name must be a symbol or subscript expression, got %T: %v", sItems[1], sItems[1])}
 					}
 
 				case "annotated-assign":
 					// Annotated assignment: x: int = 5
 					// Same as = but with type annotation
 					if s.Len() < 3 || s.Len() > 4 {
-						return nil, fmt.Errorf("annotated-assign requires 3 or 4 arguments in class definition")
+						return nil, &core.TypeError{Message: "annotated-assign requires 3 or 4 arguments in class definition"}
 					}
 
 					// Get target (sItems[1])
@@ -888,7 +888,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 		err := core.SetupSlots(class, slotsAttr)
 		if err != nil {
-			return nil, fmt.Errorf("error setting up __slots__ for class '%s': %v", className, err)
+			return nil, &core.TypeError{Message: fmt.Sprintf("error setting up __slots__ for class '%s': %v", className, err)}
 		}
 		if debugClass {
 			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] __slots__ setup complete with %d slots\n", len(class.SlotNames))
@@ -1130,7 +1130,7 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 		for _, p := range params.Items() {
 			sym, ok := p.(core.SymbolValue)
 			if !ok {
-				return nil, fmt.Errorf("method parameters must be symbols")
+				return nil, &core.TypeError{Message: "method parameters must be symbols"}
 			}
 			paramSyms = append(paramSyms, sym)
 		}
@@ -1225,7 +1225,7 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				} else if class.Parent != nil {
 					return core.NewSuper(class.Parent, nil), nil
 				}
-				return nil, fmt.Errorf("super: class has no parent")
+				return nil, &core.TypeError{Message: "super: class has no parent"}
 			}
 		}
 
@@ -1243,7 +1243,7 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Try mcls (for metaclass methods)
 				firstArg, err = ctx.Lookup("mcls")
 				if err != nil {
-					return nil, fmt.Errorf("super: no arguments given and cannot determine self/cls/mcls")
+					return nil, &core.TypeError{Message: "super: no arguments given and cannot determine self/cls/mcls"}
 				}
 			}
 		}
@@ -1263,7 +1263,7 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				return core.NewSuper(class.Parent, nil), nil
 			}
 			// No parent, can't use super
-			return nil, fmt.Errorf("super: class has no parent")
+			return nil, &core.TypeError{Message: "super: class has no parent"}
 		}
 
 		// Check for wrapper types
@@ -1273,15 +1273,15 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Pass nil as instance
 				return core.NewSuper(class.Parent, nil), nil
 			}
-			return nil, fmt.Errorf("super: class has no parent")
+			return nil, &core.TypeError{Message: "super: class has no parent"}
 		}
 
-		return nil, fmt.Errorf("super: first argument must be an instance or class, got %T", firstArg)
+		return nil, &core.TypeError{Message: fmt.Sprintf("super: first argument must be an instance or class, got %T", firstArg)}
 	}
 
 	// Legacy form with explicit class and instance
 	if args.Len() != 2 {
-		return nil, fmt.Errorf("super requires 0 or 2 arguments")
+		return nil, &core.TypeError{Message: "super requires 0 or 2 arguments"}
 	}
 
 	// Get class
@@ -1292,7 +1292,7 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	class, ok := classVal.(*core.Class)
 	if !ok {
-		return nil, fmt.Errorf("first argument to super must be a class")
+		return nil, &core.TypeError{Message: "first argument to super must be a class"}
 	}
 
 	// Get instance or class (second argument)
@@ -1321,13 +1321,13 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return core.NewSuperForClass(class, secondClass), nil
 	}
 
-	return nil, fmt.Errorf("second argument to super must be an instance or class, got %T", secondArgVal)
+	return nil, &core.TypeError{Message: fmt.Sprintf("second argument to super must be an instance or class, got %T", secondArgVal)}
 }
 
 // isinstanceForm checks if an object is an instance of a class
 func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 2 {
-		return nil, fmt.Errorf("isinstance requires 2 arguments")
+		return nil, &core.TypeError{Message: "isinstance requires 2 arguments"}
 	}
 
 	// Evaluate object
@@ -1672,7 +1672,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 	}
 
 	if !isClass {
-		return nil, fmt.Errorf("isinstance second argument must be a class or string type name, got %T: %v", classVal, classVal)
+		return nil, &core.TypeError{Message: fmt.Sprintf("isinstance second argument must be a class or string type name, got %T: %v", classVal, classVal)}
 	}
 
 	// Handle primitive types (StringValue, NumberValue, etc.) that are not Instances
@@ -1830,7 +1830,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 // issubclassForm checks if a class is a subclass of another
 func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 2 {
-		return nil, fmt.Errorf("issubclass requires 2 arguments")
+		return nil, &core.TypeError{Message: "issubclass requires 2 arguments"}
 	}
 
 	// Evaluate both arguments
@@ -1982,7 +1982,7 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 
 	if !ok1 || !ok2 {
 		// Debug: show what types we got
-		return nil, fmt.Errorf("issubclass arguments must be classes (got subclass=%T ok1=%v, baseclass=%T ok2=%v)", subClassVal, ok1, baseClassVal, ok2)
+		return nil, &core.TypeError{Message: fmt.Sprintf("issubclass arguments must be classes (got subclass=%T ok1=%v, baseclass=%T ok2=%v)", subClassVal, ok1, baseClassVal, ok2)}
 	}
 
 	// Check inheritance chain
