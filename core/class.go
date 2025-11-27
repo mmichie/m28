@@ -515,28 +515,46 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	// Provide default magic methods that Python classes automatically have
 	switch name {
 	case "__eq__":
-		// Default __eq__ for classes
-		// When accessed on a class (not instance), this should work for comparisons like test_class == None
-		// The function is designed to work when called via CallDunder with just the 'other' argument
+		// Default __eq__ for classes and instances
+		// Note: When called as bound method (via instance.GetAttr), args = [self, other]
+		// When called via type dispatch (CallDunder), args = [other] and self is implicit
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, &TypeError{Message: "__eq__ requires exactly 1 argument"}
-			}
-			other := args[0]
+			var self, other Value
 
-			// Compare classes by name if both are classes
-			if otherClass, ok := other.(*Class); ok {
-				return BoolValue(c.Name == otherClass.Name), nil
+			// Handle both bound method calls (2 args) and direct calls (1 arg)
+			if len(args) == 2 {
+				// Bound method: args = [self, other]
+				self = args[0]
+				other = args[1]
+			} else if len(args) == 1 {
+				// Direct call via type dispatch: args = [other], self is the class
+				self = Value(c)
+				other = args[0]
+			} else {
+				return nil, &TypeError{Message: fmt.Sprintf("__eq__() takes 1 or 2 arguments (%d given)", len(args))}
 			}
 
-			// Check if other has GetClass() method (for type wrappers like StrType, TypeType, etc.)
-			if classGetter, ok := other.(interface{ GetClass() *Class }); ok {
-				otherClass := classGetter.GetClass()
-				return BoolValue(c.Name == otherClass.Name), nil
+			// For instances, use identity comparison (object default behavior)
+			if _, ok := self.(*Instance); ok {
+				// Python's default object.__eq__ compares by identity
+				return BoolValue(self == other), nil
+			}
+
+			// For classes, compare by name if both are classes
+			if selfClass, ok := self.(*Class); ok {
+				if otherClass, ok := other.(*Class); ok {
+					return BoolValue(selfClass.Name == otherClass.Name), nil
+				}
+
+				// Check if other has GetClass() method (for type wrappers like StrType, TypeType, etc.)
+				if classGetter, ok := other.(interface{ GetClass() *Class }); ok {
+					otherClass := classGetter.GetClass()
+					return BoolValue(selfClass.Name == otherClass.Name), nil
+				}
 			}
 
 			// For other types, use pointer equality
-			return BoolValue(Value(c) == other), nil
+			return BoolValue(self == other), nil
 		}), true
 	case "__ne__":
 		// Default __ne__ is negation of __eq__
