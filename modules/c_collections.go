@@ -53,7 +53,7 @@ func InitCollectionsModule() *core.DictValue {
 	// Register defaultdict class
 	collectionsModule.Set("defaultdict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
-			return nil, fmt.Errorf("defaultdict requires at least 1 argument (default_factory)")
+			return nil, &core.TypeError{Message: "defaultdict requires at least 1 argument (default_factory)"}
 		}
 
 		// First argument is the default factory
@@ -106,11 +106,11 @@ func InitCollectionsModule() *core.DictValue {
 	// This is the type returned by iter(deque)
 	collectionsModule.Set("_deque_iterator", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, fmt.Errorf("_deque_iterator() requires exactly 1 argument")
+			return nil, &core.TypeError{Message: "_deque_iterator() requires exactly 1 argument"}
 		}
 		dq, ok := args[0].(*Deque)
 		if !ok {
-			return nil, fmt.Errorf("_deque_iterator() argument must be a deque")
+			return nil, &core.TypeError{Message: "_deque_iterator() argument must be a deque"}
 		}
 		return NewDequeIterator(dq), nil
 	}))
@@ -135,18 +135,18 @@ func InitCollectionsModule() *core.DictValue {
 					var key, value core.Value
 					if pair, ok := item.(*core.ListValue); ok {
 						if pair.Len() != 2 {
-							return nil, fmt.Errorf("OrderedDict update sequence element #%d has length %d; 2 is required", i, pair.Len())
+							return nil, &core.ValueError{Message: fmt.Sprintf("OrderedDict update sequence element #%d has length %d; 2 is required", i, pair.Len())}
 						}
 						key = pair.Items()[0]
 						value = pair.Items()[1]
 					} else if tuple, ok := item.(core.TupleValue); ok {
 						if len(tuple) != 2 {
-							return nil, fmt.Errorf("OrderedDict update sequence element #%d has length %d; 2 is required", i, len(tuple))
+							return nil, &core.ValueError{Message: fmt.Sprintf("OrderedDict update sequence element #%d has length %d; 2 is required", i, len(tuple))}
 						}
 						key = tuple[0]
 						value = tuple[1]
 					} else {
-						return nil, fmt.Errorf("OrderedDict update sequence element #%d is not a sequence", i)
+						return nil, &core.TypeError{Message: fmt.Sprintf("OrderedDict update sequence element #%d is not a sequence", i)}
 					}
 					od.dict.SetValue(key, value)
 				}
@@ -164,24 +164,24 @@ func InitCollectionsModule() *core.DictValue {
 						var key, value core.Value
 						if pair, ok := item.(*core.ListValue); ok {
 							if pair.Len() != 2 {
-								return nil, fmt.Errorf("OrderedDict update sequence element #%d has length %d; 2 is required", i, pair.Len())
+								return nil, &core.ValueError{Message: fmt.Sprintf("OrderedDict update sequence element #%d has length %d; 2 is required", i, pair.Len())}
 							}
 							key = pair.Items()[0]
 							value = pair.Items()[1]
 						} else if tuple, ok := item.(core.TupleValue); ok {
 							if len(tuple) != 2 {
-								return nil, fmt.Errorf("OrderedDict update sequence element #%d has length %d; 2 is required", i, len(tuple))
+								return nil, &core.ValueError{Message: fmt.Sprintf("OrderedDict update sequence element #%d has length %d; 2 is required", i, len(tuple))}
 							}
 							key = tuple[0]
 							value = tuple[1]
 						} else {
-							return nil, fmt.Errorf("OrderedDict update sequence element #%d is not a sequence", i)
+							return nil, &core.TypeError{Message: fmt.Sprintf("OrderedDict update sequence element #%d is not a sequence", i)}
 						}
 						od.dict.SetValue(key, value)
 						i++
 					}
 				} else {
-					return nil, fmt.Errorf("OrderedDict() argument must be a dict or iterable of pairs")
+					return nil, &core.TypeError{Message: "OrderedDict() argument must be a dict or iterable of pairs"}
 				}
 			}
 		}
@@ -215,7 +215,7 @@ func InitCollectionsModule() *core.DictValue {
 			}
 
 			if !ok {
-				return nil, fmt.Errorf("_tuplegetter() index must be a number")
+				return nil, &core.TypeError{Message: "_tuplegetter() index must be a number"}
 			}
 
 			// Get doc - could be positional or keyword argument
@@ -238,7 +238,7 @@ func InitCollectionsModule() *core.DictValue {
 	// This tallies elements from an iterable into a mapping
 	collectionsModule.Set("_count_elements", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
-			return nil, fmt.Errorf("_count_elements() requires exactly 2 arguments (mapping, iterable)")
+			return nil, &core.TypeError{Message: "_count_elements() requires exactly 2 arguments (mapping, iterable)"}
 		}
 
 		// Get the mapping (should support __getitem__ and __setitem__)
@@ -247,7 +247,7 @@ func InitCollectionsModule() *core.DictValue {
 		// Get the iterable
 		iterable, ok := args[1].(core.Iterable)
 		if !ok {
-			return nil, fmt.Errorf("_count_elements() second argument must be iterable")
+			return nil, &core.TypeError{Message: "_count_elements() second argument must be iterable"}
 		}
 
 		// Iterate and count elements
@@ -349,7 +349,7 @@ func (c *Counter) GetAttr(name string) (core.Value, bool) {
 	case "__getitem__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__getitem__ requires exactly 1 argument")
+				return nil, &core.TypeError{Message: "__getitem__ requires exactly 1 argument"}
 			}
 			key := core.ValueToKey(args[0])
 			if val, ok := c.counts.Get(key); ok {
@@ -360,7 +360,7 @@ func (c *Counter) GetAttr(name string) (core.Value, bool) {
 	case "__setitem__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 2 {
-				return nil, fmt.Errorf("__setitem__ requires exactly 2 arguments")
+				return nil, &core.TypeError{Message: "__setitem__ requires exactly 2 arguments"}
 			}
 			key := core.ValueToKey(args[0])
 			c.counts.Set(key, args[1])
@@ -372,7 +372,7 @@ func (c *Counter) GetAttr(name string) (core.Value, bool) {
 
 // SetAttr implements attribute setting
 func (c *Counter) SetAttr(name string, value core.Value) error {
-	return fmt.Errorf("cannot set attribute '%s' on Counter", name)
+	return &core.AttributeError{Message: fmt.Sprintf("cannot set attribute '%s' on Counter", name)}
 }
 
 // Update adds counts from an iterable or mapping
@@ -497,14 +497,14 @@ func (dd *DefaultDict) GetAttr(name string) (core.Value, bool) {
 	case "__getitem__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__getitem__ requires exactly 1 argument")
+				return nil, &core.TypeError{Message: "__getitem__ requires exactly 1 argument"}
 			}
 			return dd.Get(args[0], ctx)
 		}), true
 	case "__setitem__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 2 {
-				return nil, fmt.Errorf("__setitem__ requires exactly 2 arguments")
+				return nil, &core.TypeError{Message: "__setitem__ requires exactly 2 arguments"}
 			}
 			key := core.ValueToKey(args[0])
 			dd.dict.Set(key, args[1])
@@ -535,7 +535,7 @@ func (dd *DefaultDict) GetAttr(name string) (core.Value, bool) {
 
 // SetAttr implements attribute setting
 func (dd *DefaultDict) SetAttr(name string, value core.Value) error {
-	return fmt.Errorf("cannot set attribute '%s' on defaultdict", name)
+	return &core.AttributeError{Message: fmt.Sprintf("cannot set attribute '%s' on defaultdict", name)}
 }
 
 // Get returns the value for a key, calling the factory if missing
@@ -557,7 +557,7 @@ func (dd *DefaultDict) Get(key core.Value, ctx *core.Context) (core.Value, error
 		return val, nil
 	}
 
-	return nil, fmt.Errorf("default_factory is not callable")
+	return nil, &core.TypeError{Message: "default_factory is not callable"}
 }
 
 // Deque is a double-ended queue
@@ -590,7 +590,7 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 	case "append":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("append() requires exactly 1 argument")
+				return nil, &core.TypeError{Message: "append() requires exactly 1 argument"}
 			}
 			dq.Append(args[0])
 			return core.Nil, nil
@@ -598,7 +598,7 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 	case "appendleft":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("appendleft() requires exactly 1 argument")
+				return nil, &core.TypeError{Message: "appendleft() requires exactly 1 argument"}
 			}
 			dq.AppendLeft(args[0])
 			return core.Nil, nil
@@ -614,7 +614,7 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 	case "extend":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("extend() requires exactly 1 argument")
+				return nil, &core.TypeError{Message: "extend() requires exactly 1 argument"}
 			}
 			if list, ok := args[0].(*core.ListValue); ok {
 				for _, item := range list.Items() {
@@ -626,7 +626,7 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 	case "extendleft":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("extendleft() requires exactly 1 argument")
+				return nil, &core.TypeError{Message: "extendleft() requires exactly 1 argument"}
 			}
 			if list, ok := args[0].(*core.ListValue); ok {
 				for _, item := range list.Items() {
@@ -658,7 +658,7 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 	case "__getitem__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__getitem__ requires exactly 1 argument")
+				return nil, &core.TypeError{Message: "__getitem__ requires exactly 1 argument"}
 			}
 			if idx, ok := args[0].(core.NumberValue); ok {
 				i := int(idx)
@@ -666,11 +666,11 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 					i = len(dq.items) + i
 				}
 				if i < 0 || i >= len(dq.items) {
-					return nil, fmt.Errorf("deque index out of range")
+					return nil, &core.IndexError{Message: "deque index out of range"}
 				}
 				return dq.items[i], nil
 			}
-			return nil, fmt.Errorf("deque indices must be integers")
+			return nil, &core.TypeError{Message: "deque indices must be integers"}
 		}), true
 	}
 	return nil, false
@@ -678,7 +678,7 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 
 // SetAttr implements attribute setting
 func (dq *Deque) SetAttr(name string, value core.Value) error {
-	return fmt.Errorf("cannot set attribute '%s' on deque", name)
+	return &core.AttributeError{Message: fmt.Sprintf("cannot set attribute '%s' on deque", name)}
 }
 
 // Append adds an element to the right side
@@ -700,7 +700,7 @@ func (dq *Deque) AppendLeft(item core.Value) {
 // Pop removes and returns an element from the right side
 func (dq *Deque) Pop() (core.Value, error) {
 	if len(dq.items) == 0 {
-		return nil, fmt.Errorf("pop from an empty deque")
+		return nil, &core.IndexError{Message: "pop from an empty deque"}
 	}
 	item := dq.items[len(dq.items)-1]
 	dq.items = dq.items[:len(dq.items)-1]
@@ -710,7 +710,7 @@ func (dq *Deque) Pop() (core.Value, error) {
 // PopLeft removes and returns an element from the left side
 func (dq *Deque) PopLeft() (core.Value, error) {
 	if len(dq.items) == 0 {
-		return nil, fmt.Errorf("pop from an empty deque")
+		return nil, &core.IndexError{Message: "pop from an empty deque"}
 	}
 	item := dq.items[0]
 	dq.items = dq.items[1:]
@@ -808,18 +808,18 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 	case "__getitem__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__getitem__ requires exactly 1 argument")
+				return nil, &core.TypeError{Message: "__getitem__ requires exactly 1 argument"}
 			}
 			key := core.ValueToKey(args[0])
 			if val, ok := od.dict.Get(key); ok {
 				return val, nil
 			}
-			return nil, fmt.Errorf("KeyError: %s", key)
+			return nil, &core.KeyError{Message: key}
 		}), true
 	case "__setitem__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 2 {
-				return nil, fmt.Errorf("__setitem__ requires exactly 2 arguments")
+				return nil, &core.TypeError{Message: "__setitem__ requires exactly 2 arguments"}
 			}
 			key := core.ValueToKey(args[0])
 			od.dict.Set(key, args[1])
@@ -857,7 +857,7 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 	case "get":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) < 1 {
-				return nil, fmt.Errorf("get() requires at least 1 argument")
+				return nil, &core.TypeError{Message: "get() requires at least 1 argument"}
 			}
 			key := core.ValueToKey(args[0])
 			if val, ok := od.dict.Get(key); ok {
@@ -874,7 +874,7 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 
 // SetAttr implements attribute setting
 func (od *OrderedDict) SetAttr(name string, value core.Value) error {
-	return fmt.Errorf("cannot set attribute '%s' on OrderedDict", name)
+	return &core.AttributeError{Message: fmt.Sprintf("cannot set attribute '%s' on OrderedDict", name)}
 }
 
 // TupleGetter is a callable that retrieves a specific index from a tuple
@@ -905,7 +905,7 @@ func (tg *TupleGetter) String() string {
 // Call implements Callable.Call
 func (tg *TupleGetter) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("tuplegetter requires exactly 1 argument")
+		return nil, &core.TypeError{Message: "tuplegetter requires exactly 1 argument"}
 	}
 
 	// Accept tuples, lists, and tuple instances (namedtuples)
@@ -918,11 +918,11 @@ func (tg *TupleGetter) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	case *core.TupleInstance:
 		items = v.Items()
 	default:
-		return nil, fmt.Errorf("tuplegetter argument must be a tuple or list, not %s", v.Type())
+		return nil, &core.TypeError{Message: fmt.Sprintf("tuplegetter argument must be a tuple or list, not %s", v.Type())}
 	}
 
 	if tg.index < 0 || tg.index >= len(items) {
-		return nil, fmt.Errorf("tuple index out of range")
+		return nil, &core.IndexError{Message: "tuple index out of range"}
 	}
 
 	return items[tg.index], nil
@@ -944,7 +944,7 @@ func (tg *TupleGetter) GetAttr(name string) (core.Value, bool) {
 			// args[0] is instance (the namedtuple instance or None)
 			// args[1] is owner (the namedtuple class) - optional
 			if len(args) < 1 {
-				return nil, fmt.Errorf("__get__ requires at least 1 argument")
+				return nil, &core.TypeError{Message: "__get__ requires at least 1 argument"}
 			}
 
 			instance := args[0]
@@ -979,7 +979,7 @@ func (tg *TupleGetter) SetAttr(name string, value core.Value) error {
 			tg.doc = ""
 			return nil
 		}
-		return fmt.Errorf("__doc__ must be a string or None, not %s", value.Type())
+		return &core.TypeError{Message: fmt.Sprintf("__doc__ must be a string or None, not %s", value.Type())}
 	}
-	return fmt.Errorf("cannot set attribute '%s' on tuplegetter", name)
+	return &core.AttributeError{Message: fmt.Sprintf("cannot set attribute '%s' on tuplegetter", name)}
 }

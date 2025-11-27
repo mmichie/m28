@@ -105,11 +105,17 @@ func (e *EvalError) Error() string {
 type IndexError struct {
 	Index    int
 	Length   int
+	Message  string // Optional custom message (if empty, uses default format)
 	Location *SourceLocation
 }
 
 func (e *IndexError) Error() string {
-	msg := fmt.Sprintf("list index out of range (index %d, length %d)", e.Index, e.Length)
+	var msg string
+	if e.Message != "" {
+		msg = e.Message
+	} else {
+		msg = fmt.Sprintf("list index out of range (index %d, length %d)", e.Index, e.Length)
+	}
 	if e.Location != nil {
 		return fmt.Sprintf("%s at %s", msg, e.Location.String())
 	}
