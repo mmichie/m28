@@ -38,20 +38,44 @@ func compareEqual(left, right core.Value, ctx *core.Context) (core.Value, error)
 		return core.BoolValue(false), nil
 	}
 
-	// Try __eq__ on left operand
-	if result, found, err := types.CallDunder(left, "__eq__", []core.Value{right}, ctx); found {
-		return result, err
+	// Python operator precedence: if right's class is a strict subclass of left's class,
+	// try right's method first
+	var leftClass, rightClass *core.Class
+	if leftInst, ok := left.(*core.Instance); ok {
+		leftClass = leftInst.Class
+	}
+	if rightInst, ok := right.(*core.Instance); ok {
+		rightClass = rightInst.Class
 	}
 
-	// Special handling for Class objects on the right side too
-	if _, ok := right.(*core.Class); ok {
-		// Right is a class, left is not - they're not equal
-		return core.BoolValue(false), nil
-	}
+	// If right operand's class is a strict subclass of left operand's class,
+	// try right operand's __eq__ first
+	if leftClass != nil && rightClass != nil && core.IsStrictSubclass(rightClass, leftClass) {
+		// Try __eq__ on right operand first (reflected operation)
+		if result, found, err := types.CallDunder(right, "__eq__", []core.Value{left}, ctx); found {
+			return result, err
+		}
+		// Then try __eq__ on left operand
+		if result, found, err := types.CallDunder(left, "__eq__", []core.Value{right}, ctx); found {
+			return result, err
+		}
+	} else {
+		// Normal order: try left first, then right
+		// Try __eq__ on left operand
+		if result, found, err := types.CallDunder(left, "__eq__", []core.Value{right}, ctx); found {
+			return result, err
+		}
 
-	// Try __eq__ on right operand (Python doesn't have __req__)
-	if result, found, err := types.CallDunder(right, "__eq__", []core.Value{left}, ctx); found {
-		return result, err
+		// Special handling for Class objects on the right side too
+		if _, ok := right.(*core.Class); ok {
+			// Right is a class, left is not - they're not equal
+			return core.BoolValue(false), nil
+		}
+
+		// Try __eq__ on right operand (Python doesn't have __req__)
+		if result, found, err := types.CallDunder(right, "__eq__", []core.Value{left}, ctx); found {
+			return result, err
+		}
 	}
 
 	// Fall back to built-in equality

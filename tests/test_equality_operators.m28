@@ -1,0 +1,106 @@
+# Test equality operators with proper subclass precedence and None blocking
+
+# Test 1: Default object equality returns NotImplemented for non-identical objects
+(class SupEq ()
+    (def __eq__ (self other)
+        (return True)))
+
+(class F ())
+
+(= e (SupEq))
+(= f (F))
+
+# Test reflected operation when default __eq__ returns NotImplemented
+(assert (== e f) "e == f should be True (SupEq.__eq__ returns True)")
+(assert (== f e) "f == e should be True (reflected to SupEq.__eq__)")
+
+# Test 2: Subclass __eq__ = None should block equality and raise TypeError
+(class S (SupEq)
+    "Subclass that blocks __eq__"
+    (= __eq__ None))
+
+(= s (S))
+
+# When S has __eq__ = None, it should raise TypeError
+(try
+    ((== e s)
+     (assert False "e == s should raise TypeError"))
+    (except TypeError
+        pass))  # Expected
+
+(try
+    ((== s e)
+     (assert False "s == e should raise TypeError"))
+    (except TypeError
+        pass))  # Expected
+
+# Test 3: __eq__ = None on independent class
+(class X ()
+    (= __eq__ None))
+
+(= x (X))
+
+# e == x should work (SupEq.__eq__ is called first)
+(assert (== e x) "e == x should be True")
+
+# x == e should raise TypeError (X.__eq__ = None blocks it)
+(try
+    ((== x e)
+     (assert False "x == e should raise TypeError"))
+    (except TypeError
+        pass))  # Expected
+
+# Test 4: Subclass precedence in equality
+(class A ()
+    (def __eq__ (self other)
+        (return "A")))
+
+(class B (A)
+    (def __eq__ (self other)
+        (return "B")))
+
+(= a (A))
+(= b (B))
+
+# Subclass B should be checked first when comparing with parent A
+(= result (== a b))
+(assert (== result "B") "a == b should use B.__eq__ (subclass precedence)")
+
+(= result (== b a))
+(assert (== result "B") "b == a should use B.__eq__")
+
+# Test 5: Identity comparison still works
+(= obj1 (F))
+(= obj2 (F))
+
+(assert (== obj1 obj1) "obj1 == obj1 should be True (identity)")
+(assert (not (== obj1 obj2)) "obj1 == obj2 should be False (different objects)")
+
+# Test 6: __ne__ = None blocking (already implemented)
+(class SN (SupEq)
+    "Subclass that blocks __ne__"
+    (= __ne__ None))
+
+(class XN ()
+    "Independent class that blocks __ne__"
+    (def __eq__ (self other)
+        (return True))
+    (= __ne__ None))
+
+(= sn (SN))
+(= xn (XN))
+
+# __ne__ = None should raise TypeError
+(try
+    ((!= e sn)
+     (assert False "e != sn should raise TypeError"))
+    (except TypeError
+        pass))  # Expected
+
+(try
+    ((!= xn e)
+     (assert False "xn != e should raise TypeError"))
+    (except TypeError
+        pass))  # Expected
+
+(print "All equality operator tests passed!")

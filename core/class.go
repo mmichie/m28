@@ -109,12 +109,21 @@ func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
 		// 		fmt.Printf("[DEBUG GetMethodWithClass] Looking for %s.%s, in Methods: %v\n", c.Name, name, c.Methods[name] != nil)
 	}
 
-	// Check this class first
+	// Check this class first - look in both Methods and Attributes
+	// This is important for when a subclass sets __eq__ = None to block inherited __eq__
 	if method, ok := c.Methods[name]; ok {
 		if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
 			// 			fmt.Printf("[DEBUG GetMethodWithClass] FOUND %s.%s in Methods\n", c.Name, name)
 		}
 		return method, c, true
+	}
+
+	// Also check class attributes - needed for __eq__ = None pattern
+	// Only check for special methods (dunder methods) to avoid interference with regular methods
+	if strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") {
+		if attr, ok := c.Attributes[name]; ok {
+			return attr, c, true
+		}
 	}
 
 	// Debug when not found
@@ -537,7 +546,11 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 			// For instances, use identity comparison (object default behavior)
 			if _, ok := self.(*Instance); ok {
 				// Python's default object.__eq__ compares by identity
-				return BoolValue(self == other), nil
+				// If identical, return True; otherwise return NotImplemented to allow reflected operation
+				if self == other {
+					return BoolValue(true), nil
+				}
+				return NotImplemented, nil
 			}
 
 			// For classes, compare by name if both are classes
