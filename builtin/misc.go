@@ -32,25 +32,25 @@ func checkAssertPatterns(source, filename string, ctx *core.Context) error {
 
 	// Walk the AST looking for assert statements
 	for _, node := range nodes {
-		walkForAsserts(node, ctx)
+		walkForAsserts(node, filename, ctx)
 	}
 
 	return nil
 }
 
 // walkForAsserts recursively walks the AST to find AssertForm nodes
-func walkForAsserts(node ast.ASTNode, ctx *core.Context) {
+func walkForAsserts(node ast.ASTNode, filename string, ctx *core.Context) {
 	if node == nil {
 		return
 	}
 
 	// Check if this is an assert statement
 	if assertForm, ok := node.(*ast.AssertForm); ok {
-		checkAssertCondition(assertForm, ctx)
+		checkAssertCondition(assertForm, filename, ctx)
 		// Still walk the condition and message in case they contain nested asserts
-		walkForAsserts(assertForm.Condition, ctx)
+		walkForAsserts(assertForm.Condition, filename, ctx)
 		if assertForm.Message != nil {
-			walkForAsserts(assertForm.Message, ctx)
+			walkForAsserts(assertForm.Message, filename, ctx)
 		}
 		return
 	}
@@ -61,21 +61,21 @@ func walkForAsserts(node ast.ASTNode, ctx *core.Context) {
 	case *ast.SExpr:
 		// Walk all elements of SExpr (most compound statements use this)
 		for _, elem := range n.Elements {
-			walkForAsserts(elem, ctx)
+			walkForAsserts(elem, filename, ctx)
 		}
 	case *ast.DefForm:
-		walkForAsserts(n.Body, ctx)
+		walkForAsserts(n.Body, filename, ctx)
 	case *ast.ClassForm:
 		// ClassForm.Body is []ASTNode
 		for _, stmt := range n.Body {
-			walkForAsserts(stmt, ctx)
+			walkForAsserts(stmt, filename, ctx)
 		}
 	}
 }
 
 // checkAssertCondition checks if an assert statement has a tuple condition
 // Pattern: assert(x, "msg") compiles to assert with tuple condition
-func checkAssertCondition(assertForm *ast.AssertForm, ctx *core.Context) {
+func checkAssertCondition(assertForm *ast.AssertForm, filename string, ctx *core.Context) {
 	// Check if condition is an SExpr (tuple-literal ...)
 	sexpr, ok := assertForm.Condition.(*ast.SExpr)
 	if !ok {
@@ -94,19 +94,24 @@ func checkAssertCondition(assertForm *ast.AssertForm, ctx *core.Context) {
 			// assert(x, "msg") creates (tuple-literal x "msg")
 			// assert(x,) creates (tuple-literal x)
 			// Both are always truthy and should warn
-			emitSyntaxWarning(ctx)
+			// Get line number from AST node if available
+			lineno := 1
+			if assertForm.Loc != nil && assertForm.Loc.Line > 0 {
+				lineno = assertForm.Loc.Line
+			}
+			emitSyntaxWarning(filename, lineno, ctx)
 		}
 	}
 }
 
 // emitSyntaxWarning emits a SyntaxWarning that will be captured by catch_warnings()
-func emitSyntaxWarning(ctx *core.Context) {
-	// Use the Warn helper from warnings module which properly integrates with catch_warnings()
+func emitSyntaxWarning(filename string, lineno int, ctx *core.Context) {
+	// Use the WarnExplicit helper from warnings module which properly integrates with catch_warnings()
 	message := "assertion is always true, perhaps remove parentheses?"
 	category := "SyntaxWarning"
 
-	// Call the Warn function which will use the warnings module properly
-	modules.Warn(message, category, ctx)
+	// Call the WarnExplicit function which uses warn_explicit for proper filename/lineno
+	modules.WarnExplicit(message, category, filename, lineno, ctx)
 }
 
 // RegisterMisc registers miscellaneous functions

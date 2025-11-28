@@ -558,6 +558,83 @@ func (c *CatchWarnings) exit(args []core.Value, ctx *core.Context) (core.Value, 
 	return core.False, nil // Don't suppress exceptions
 }
 
+// WarnExplicit is a helper function to emit warnings from Go code with explicit location
+func WarnExplicit(message string, category string, filename string, lineno int, ctx *core.Context) error {
+	// Use Python's warnings.warn_explicit for proper integration with catch_warnings()
+	importFunc, err := ctx.Lookup("__import__")
+	if err != nil {
+		if debugWarnings {
+			core.Log.Debug(core.SubsystemBuiltin, "__import__ not found for WarnExplicit", "error", err)
+		}
+		// Fallback to stderr
+		fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, "warning")
+		return nil
+	}
+
+	// Import warnings module
+	var warningsVal core.Value
+	if callable, ok := importFunc.(core.Callable); ok {
+		warningsVal, err = callable.Call([]core.Value{core.StringValue("warnings")}, ctx)
+		if err != nil {
+			if debugWarnings {
+				core.Log.Debug(core.SubsystemBuiltin, "Failed to import warnings module for WarnExplicit", "error", err)
+			}
+			fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, "warning")
+			return nil
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, "warning")
+		return nil
+	}
+
+	// Get warn_explicit function from warnings module
+	var warnExplicitFunc core.Value
+	var found bool
+	if obj, ok := warningsVal.(core.Object); ok {
+		warnExplicitFunc, found = obj.GetAttr("warn_explicit")
+		if !found {
+			// Fallback to warn with stacklevel if warn_explicit not available
+			fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, "warning")
+			return nil
+		}
+	} else if warningsDict, ok := warningsVal.(*core.DictValue); ok {
+		warnExplicitFunc, found = warningsDict.Get("warn_explicit")
+		if !found {
+			fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, "warning")
+			return nil
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, "warning")
+		return nil
+	}
+
+	// Get the category class
+	var categoryValue core.Value
+	if cat, err := ctx.Lookup(category); err == nil {
+		categoryValue = cat
+	} else {
+		categoryValue = core.StringValue(category)
+	}
+
+	// Call warnings.warn_explicit(message, category, filename, lineno)
+	// Python signature: warn_explicit(message, category, filename, lineno, module=None, registry=None, module_globals=None, source=None)
+	args := []core.Value{
+		core.StringValue(message),
+		categoryValue,
+		core.StringValue(filename),
+		core.NumberValue(float64(lineno)),
+	}
+
+	if callable, ok := warnExplicitFunc.(core.Callable); ok {
+		_, err := callable.Call(args, ctx)
+		return err
+	}
+
+	// Fallback
+	fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, "warning")
+	return nil
+}
+
 // Warn is a helper function to emit warnings from Go code
 func Warn(message string, category string, ctx *core.Context) error {
 	// Delegate to CPython's warnings.warn() for proper integration with catch_warnings()
