@@ -106,6 +106,72 @@ type CodeType struct {
 	Function Value // Reference to the function this code belongs to
 }
 
+// PythonError wraps a Python exception instance so it can propagate through Go's error system
+// while preserving the original exception type for try/except matching
+type PythonError struct {
+	Instance *Instance // The Python exception instance
+}
+
+// NewPythonError creates a new PythonError wrapping an exception instance
+func NewPythonError(inst *Instance) *PythonError {
+	return &PythonError{Instance: inst}
+}
+
+// Error implements the error interface
+func (e *PythonError) Error() string {
+	if e.Instance == nil {
+		return "Exception"
+	}
+	// Format as "ExceptionType: message"
+	className := e.Instance.Class.Name
+	if argsAttr, hasArgs := e.Instance.GetAttr("args"); hasArgs {
+		if argsTuple, ok := argsAttr.(TupleValue); ok && len(argsTuple) > 0 {
+			return fmt.Sprintf("%s: %s", className, argsTuple[0].String())
+		}
+	}
+	return className
+}
+
+// GetExceptionType returns the class name of the wrapped exception
+func (e *PythonError) GetExceptionType() string {
+	if e.Instance == nil || e.Instance.Class == nil {
+		return "Exception"
+	}
+	return e.Instance.Class.Name
+}
+
+// IsSubclassOf checks if the wrapped exception is a subclass of the given type
+func (e *PythonError) IsSubclassOf(typeName string) bool {
+	if e.Instance == nil || e.Instance.Class == nil {
+		return false
+	}
+	// Check the class and all its bases
+	return isClassSubclassOf(e.Instance.Class, typeName)
+}
+
+// isClassSubclassOf recursively checks if a class is a subclass of the given type name
+func isClassSubclassOf(cls *Class, typeName string) bool {
+	if cls == nil {
+		return false
+	}
+	if cls.Name == typeName {
+		return true
+	}
+	// Check single parent (deprecated but still used)
+	if cls.Parent != nil {
+		if isClassSubclassOf(cls.Parent, typeName) {
+			return true
+		}
+	}
+	// Check multiple parents
+	for _, parent := range cls.Parents {
+		if isClassSubclassOf(parent, typeName) {
+			return true
+		}
+	}
+	return false
+}
+
 // NewCodeObject creates a new code object for a function
 func NewCodeObject(fn Value) *CodeType {
 	return &CodeType{

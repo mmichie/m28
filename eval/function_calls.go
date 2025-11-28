@@ -107,6 +107,16 @@ func evalFunctionCall(expr *core.ListValue, ctx *core.Context) (core.Value, erro
 	}
 
 	if err != nil {
+		// Preserve PythonError for proper try/except matching
+		if _, ok := err.(*core.PythonError); ok {
+			return nil, err
+		}
+
+		// Preserve Exception for proper try/except matching
+		if _, ok := err.(*Exception); ok {
+			return nil, err
+		}
+
 		// Check if this is already a well-formatted error (e.g., from assert)
 		// Don't wrap errors that are already EvalError or have specific messages
 		if _, isEvalError := err.(*core.EvalError); isEvalError {

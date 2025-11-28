@@ -87,26 +87,8 @@ func RegisterErrors(ctx *core.Context) {
 			return nil, fmt.Errorf("%s", exc.Message)
 		} else if inst, ok := arg.(*core.Instance); ok {
 			// Raising an instance of an exception class
-			// Try to get the message from the instance's args or message attribute
-			var message string
-			if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
-				if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
-					if msgStr, ok := argsTuple[0].(core.StringValue); ok {
-						message = string(msgStr)
-					}
-				}
-			}
-			if message == "" {
-				if msgAttr, hasMsg := inst.GetAttr("message"); hasMsg {
-					if msgStr, ok := msgAttr.(core.StringValue); ok {
-						message = string(msgStr)
-					}
-				}
-			}
-			if message != "" {
-				return nil, fmt.Errorf("%s: %s", inst.Class.Name, message)
-			}
-			return nil, fmt.Errorf("%s", inst.Class.Name)
+			// Use PythonError to preserve the instance for proper try/except matching
+			return nil, core.NewPythonError(inst)
 		} else if str, ok := types.AsString(arg); ok {
 			// Raise generic error with message
 			return nil, fmt.Errorf("%s", str)

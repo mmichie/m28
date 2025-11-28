@@ -143,6 +143,12 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return createPythonExceptionInstance(ctx, exc.Type, message)
 	}
 
+	// Check if it's a PythonError wrapping a Python exception instance
+	// This preserves the original exception type and attributes
+	if pyErr, ok := err.(*core.PythonError); ok && pyErr.Instance != nil {
+		return pyErr.Instance
+	}
+
 	// Unwrap EvalError if needed
 	var baseErr error = err
 	var errMsg string
@@ -150,6 +156,10 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 	if evalErr, ok := err.(*core.EvalError); ok && evalErr.Wrapped != nil {
 		baseErr = evalErr.Wrapped
 		errMsg = evalErr.Wrapped.Error()
+		// Check if the wrapped error is a PythonError
+		if pyErr, ok := evalErr.Wrapped.(*core.PythonError); ok && pyErr.Instance != nil {
+			return pyErr.Instance
+		}
 	} else if evalErr, ok := err.(*core.EvalError); ok {
 		errMsg = evalErr.Message
 	} else {
@@ -163,6 +173,10 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 			break
 		}
 		baseErr = unwrapped
+		// Check if the unwrapped error is a PythonError
+		if pyErr, ok := baseErr.(*core.PythonError); ok && pyErr.Instance != nil {
+			return pyErr.Instance
+		}
 		// Keep the original error message for display
 	}
 

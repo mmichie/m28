@@ -366,6 +366,14 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 
 		result, err := kwargsFunc.CallWithKeywords(positionalArgs, keywordArgs, ctx)
 		if err != nil {
+			// Preserve PythonError for proper try/except matching
+			if _, ok := err.(*core.PythonError); ok {
+				return nil, err
+			}
+			// Preserve Exception for proper try/except matching
+			if _, ok := err.(*Exception); ok {
+				return nil, err
+			}
 			// Wrap error with call stack
 			return nil, core.WrapEvalError(err, fmt.Sprintf("error in %s: %v", funcName, err), ctx)
 		}
@@ -437,6 +445,16 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 
 	result, err := callable.Call(positionalArgs, ctx)
 	if err != nil {
+		// Preserve PythonError for proper try/except matching
+		if _, ok := err.(*core.PythonError); ok {
+			return nil, err
+		}
+
+		// Preserve Exception for proper try/except matching
+		if _, ok := err.(*Exception); ok {
+			return nil, err
+		}
+
 		// Check if this is already a well-formatted error (e.g., from assert)
 		// Don't wrap errors that are already EvalError or have specific messages
 		if _, isEvalError := err.(*core.EvalError); isEvalError {
