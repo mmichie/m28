@@ -347,6 +347,9 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 	params := p.parseParameters()
 	p.expect(TOKEN_RPAREN)
 
+	// Validate parameters - check for invalid star-only patterns
+	p.validateParameters(params, tok)
+
 	// Parse optional return type annotation
 	var returnType *ast.TypeInfo
 	if p.check(TOKEN_ARROW) {
@@ -557,6 +560,40 @@ func (p *PythonParser) shouldBreakParameterLoop() bool {
 
 	// Allow trailing comma
 	return p.check(TOKEN_RPAREN)
+}
+
+// validateParameters checks for invalid parameter patterns
+// Python requires at least one keyword-only parameter after a bare *
+func (p *PythonParser) validateParameters(params []ast.Parameter, tok Token) {
+	// Find bare * (keyword-only separator without a name)
+	barStarIndex := -1
+	for i, param := range params {
+		if param.Name == "*" && !param.IsVarArgs {
+			barStarIndex = i
+			break
+		}
+	}
+
+	if barStarIndex == -1 {
+		return // No bare *, nothing to validate
+	}
+
+	// Check if there's at least one keyword-only parameter after the bare *
+	hasKeywordOnlyParam := false
+	for i := barStarIndex + 1; i < len(params); i++ {
+		param := params[i]
+		// Skip **kwargs - it doesn't count as a keyword-only parameter
+		if param.IsKwargs || (len(param.Name) > 2 && param.Name[:2] == "**") {
+			continue
+		}
+		// Found a regular keyword-only parameter
+		hasKeywordOnlyParam = true
+		break
+	}
+
+	if !hasKeywordOnlyParam {
+		p.error("named arguments must follow bare *")
+	}
 }
 
 // parseTypeAnnotation parses a type annotation

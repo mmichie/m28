@@ -830,8 +830,33 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 	}
 
 	// Check for scientific notation
+	// Must be: e/E followed by optional +/- and at least one digit
 	if !t.isAtEnd() && (t.peek() == 'e' || t.peek() == 'E') {
-		t.advance()
+		// Look ahead to verify this is valid scientific notation
+		lookAhead := t.pos + 1
+		if lookAhead < len(t.input) {
+			ch := t.input[lookAhead]
+			// Check for optional sign
+			if ch == '+' || ch == '-' {
+				lookAhead++
+				if lookAhead >= len(t.input) {
+					// e/E followed by sign but no digits - not scientific notation
+					goto skipScientific
+				}
+				ch = t.input[lookAhead]
+			}
+			// Must have at least one digit after e/E (or e/E+/-)
+			if !isDigit(ch) {
+				// No digit - this is not scientific notation (e.g., "1Else")
+				goto skipScientific
+			}
+		} else {
+			// Nothing after e/E - not scientific notation
+			goto skipScientific
+		}
+
+		// Valid scientific notation - consume it
+		t.advance() // consume e/E
 		if !t.isAtEnd() && (t.peek() == '+' || t.peek() == '-') {
 			t.advance()
 		}
@@ -839,12 +864,32 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 			t.advance()
 		}
 	}
+skipScientific:
 
 	// Check for complex number suffix 'j' or 'J'
 	isComplex := false
 	if !t.isAtEnd() && (t.peek() == 'j' || t.peek() == 'J') {
 		t.advance() // consume 'j' or 'J'
 		isComplex = true
+	}
+
+	// Check for invalid literal - number followed by letter (e.g., "1Else", "2abc")
+	// In Python 3, this is a SyntaxError: invalid decimal literal
+	if !t.isAtEnd() && pythonIsAlpha(t.peek()) {
+		// Consume all following alphanumeric characters for error message
+		for !t.isAtEnd() && pythonIsAlphaNumeric(t.peek()) {
+			t.advance()
+		}
+		lexeme := t.input[start:t.pos]
+		return Token{
+			Type:     TOKEN_ERROR,
+			Lexeme:   lexeme,
+			Value:    core.StringValue("invalid decimal literal"),
+			Line:     startLine,
+			Col:      startCol,
+			StartPos: start,
+			EndPos:   t.pos,
+		}
 	}
 
 	lexeme := t.input[start:t.pos]
