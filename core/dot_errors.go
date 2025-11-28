@@ -94,11 +94,29 @@ type EvalError struct {
 	Column     int
 	Suggestion string
 	Wrapped    error
-	SyntaxKind int // Which frontend syntax (ast.SyntaxKind)
+	SyntaxKind int          // Which frontend syntax (ast.SyntaxKind)
+	StackTrace []TraceEntry // Captured call stack at time of error
 }
 
 func (e *EvalError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
+}
+
+// FormatTraceback returns a Python-style traceback string
+func (e *EvalError) FormatTraceback() string {
+	if len(e.StackTrace) == 0 {
+		return ""
+	}
+	trace := "Traceback (most recent call last):\n"
+	for _, entry := range e.StackTrace {
+		// Skip entries with no location info
+		if entry.File == "" && entry.Line == 0 {
+			continue
+		}
+		trace += fmt.Sprintf("  File \"%s\", line %d, in %s\n",
+			entry.File, entry.Line, entry.Function)
+	}
+	return trace
 }
 
 // IndexError represents an index out of bounds error
@@ -357,29 +375,49 @@ func NewTypeError(expected string, got Value, context string) *TypeError {
 // WrapEvalError wraps an existing error with evaluation context
 func WrapEvalError(err error, message string, ctx *Context) *EvalError {
 	if evalErr, ok := err.(*EvalError); ok {
-		// Don't double-wrap eval errors
+		// Don't double-wrap eval errors, but capture stack if not already captured
+		if len(evalErr.StackTrace) == 0 && ctx != nil {
+			stack := ctx.GetCallStack()
+			if len(stack) > 0 {
+				evalErr.StackTrace = make([]TraceEntry, len(stack))
+				copy(evalErr.StackTrace, stack)
+			}
+		}
 		return evalErr
+	}
+
+	// Capture the call stack from context
+	var stackTrace []TraceEntry
+	if ctx != nil {
+		stack := ctx.GetCallStack()
+		if len(stack) > 0 {
+			stackTrace = make([]TraceEntry, len(stack))
+			copy(stackTrace, stack)
+		}
 	}
 
 	// Check if it's a structured error type and preserve it
 	switch typedErr := err.(type) {
 	case *NameError:
 		return &EvalError{
-			Type:    "NameError",
-			Message: fmt.Sprintf("name '%s' is not defined", typedErr.Name),
-			Wrapped: err,
+			Type:       "NameError",
+			Message:    fmt.Sprintf("name '%s' is not defined", typedErr.Name),
+			Wrapped:    err,
+			StackTrace: stackTrace,
 		}
 	case *TypeError:
 		return &EvalError{
-			Type:    "TypeError",
-			Message: typedErr.Message,
-			Wrapped: err,
+			Type:       "TypeError",
+			Message:    typedErr.Message,
+			Wrapped:    err,
+			StackTrace: stackTrace,
 		}
 	case *ValueError:
 		return &EvalError{
-			Type:    "ValueError",
-			Message: typedErr.Message,
-			Wrapped: err,
+			Type:       "ValueError",
+			Message:    typedErr.Message,
+			Wrapped:    err,
+			StackTrace: stackTrace,
 		}
 	case *KeyError:
 		msg := typedErr.Message
@@ -387,33 +425,38 @@ func WrapEvalError(err error, message string, ctx *Context) *EvalError {
 			msg = typedErr.Error()
 		}
 		return &EvalError{
-			Type:    "KeyError",
-			Message: msg,
-			Wrapped: err,
+			Type:       "KeyError",
+			Message:    msg,
+			Wrapped:    err,
+			StackTrace: stackTrace,
 		}
 	case *IndexError:
 		return &EvalError{
-			Type:    "IndexError",
-			Message: typedErr.Error(),
-			Wrapped: err,
+			Type:       "IndexError",
+			Message:    typedErr.Error(),
+			Wrapped:    err,
+			StackTrace: stackTrace,
 		}
 	case *ZeroDivisionError:
 		return &EvalError{
-			Type:    "ZeroDivisionError",
-			Message: "division by zero",
-			Wrapped: err,
+			Type:       "ZeroDivisionError",
+			Message:    "division by zero",
+			Wrapped:    err,
+			StackTrace: stackTrace,
 		}
 	case *AttributeError:
 		return &EvalError{
-			Type:    "AttributeError",
-			Message: typedErr.Error(),
-			Wrapped: err,
+			Type:       "AttributeError",
+			Message:    typedErr.Error(),
+			Wrapped:    err,
+			StackTrace: stackTrace,
 		}
 	}
 
 	return &EvalError{
-		Type:    "EvalError",
-		Message: message,
-		Wrapped: err,
+		Type:       "EvalError",
+		Message:    message,
+		Wrapped:    err,
+		StackTrace: stackTrace,
 	}
 }

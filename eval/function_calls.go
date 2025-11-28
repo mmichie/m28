@@ -82,7 +82,16 @@ func evalFunctionCall(expr *core.ListValue, ctx *core.Context) (core.Value, erro
 		}
 	}
 
-	ctx.PushStack(funcName, "", 0, 0)
+	// Get source location from context for better error messages
+	file := ""
+	line := 0
+	col := 0
+	if loc := ctx.CurrentLocation(); loc != nil {
+		file = loc.File
+		line = loc.Line
+		col = loc.Column
+	}
+	ctx.PushStack(funcName, file, line, col)
 	defer ctx.PopStack()
 
 	// Trace function call BEFORE execution

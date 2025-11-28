@@ -654,11 +654,13 @@ func (p *PythonParser) parseInitialExpression() ast.ASTNode {
 }
 
 // parseTuplePattern parses comma-separated expressions for tuple unpacking
-// e.g., x, y = 1, 2 or a, *b, c = [1, 2, 3, 4]
+// e.g., x, y = 1, 2 or a, *b, c = [1, 2, 3, 4] or x, = [1] (single-element unpacking)
 func (p *PythonParser) parseTuplePattern(firstExpr ast.ASTNode) ast.ASTNode {
 	elements := []ast.ASTNode{firstExpr}
+	hasComma := false // Track if we saw at least one comma
 
 	for p.check(TOKEN_COMMA) {
+		hasComma = true
 		p.advance() // consume comma
 
 		// Check for trailing comma before assignment or end of line
@@ -670,8 +672,9 @@ func (p *PythonParser) parseTuplePattern(firstExpr ast.ASTNode) ast.ASTNode {
 		elements = append(elements, p.parseTupleElement())
 	}
 
-	// If more than one element, it's a tuple pattern for unpacking
-	if len(elements) > 1 {
+	// If there was a comma, it's a tuple pattern for unpacking
+	// This handles both multi-element (x, y = ...) and single-element (x, = ...) cases
+	if hasComma {
 		return ast.NewSExpr(elements, p.makeLocation(p.peek()), ast.SyntaxPython)
 	}
 	return firstExpr

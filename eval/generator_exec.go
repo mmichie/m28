@@ -63,6 +63,8 @@ const (
 	StepTryEnd                         // End of try block (jump to finally)
 	StepFinallyStart                   // Start of finally block
 	StepFinallyEnd                     // End of finally block
+	StepWithEnter                      // Enter context manager
+	StepWithExit                       // Exit context manager
 )
 
 // ExecutionStep represents one step in generator execution
@@ -80,6 +82,7 @@ type GeneratorExecState struct {
 	Locals       *core.Context   // Local variables context
 	LoopStates   []LoopState     // Stack of active loop states
 	TryStates    []TryState      // Stack of active try/finally blocks
+	WithStates   []WithState     // Stack of active with statements
 	completed    bool            // Whether generator has finished
 	sentValue    core.Value      // Value sent via send()
 	started      bool            // Whether generator has started
@@ -101,6 +104,12 @@ type LoopState struct {
 	VarName  string        // Loop variable name (empty if VarNames is used)
 	VarNames []string      // Multiple loop variable names for tuple unpacking
 	EndStep  int           // Step to jump to when loop completes
+}
+
+// WithState tracks the state of an active with statement
+type WithState struct {
+	ContextManager core.ContextManager // The context manager
+	EnterValue     core.Value          // Value returned by __enter__
 }
 
 // NewGeneratorExecState creates a new execution state for a generator
@@ -403,6 +412,80 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			// Jump to step after finally
 			state.CurrentStep = step.Arg
 
+		case StepWithEnter:
+			// Enter a context manager
+			// step.Node is the context expression (or a list of [context-expr, pattern] for tuple unpacking)
+			// step.Label is the variable name (empty if no binding or tuple pattern)
+			var contextExpr core.Value
+			var varPattern core.Value
+
+			if listNode, ok := step.Node.(*core.ListValue); ok && listNode.Len() == 2 {
+				// Has tuple pattern: [context-expr, pattern]
+				contextExpr = listNode.Items()[0]
+				varPattern = listNode.Items()[1]
+			} else {
+				// Simple case: just the context expression
+				contextExpr = step.Node
+			}
+
+			// Evaluate the context manager expression
+			mgrValue, err := Eval(contextExpr, state.Locals)
+			if err != nil {
+				return nil, err
+			}
+
+			// Check if it's a context manager
+			cm, ok := core.IsContextManager(mgrValue)
+			if !ok {
+				return nil, fmt.Errorf("'%s' object does not support the context manager protocol", mgrValue.Type())
+			}
+
+			// Call __enter__
+			enterValue, err := cm.Enter()
+			if err != nil {
+				return nil, err
+			}
+
+			// Push with state
+			state.WithStates = append(state.WithStates, WithState{
+				ContextManager: cm,
+				EnterValue:     enterValue,
+			})
+
+			// Bind the value if there's an 'as' clause
+			if step.Label != "" {
+				// Simple variable binding
+				state.Locals.Define(step.Label, enterValue)
+			} else if varPattern != nil {
+				// Tuple unpacking
+				if err := UnpackPattern(varPattern, enterValue, state.Locals); err != nil {
+					// Call __exit__ before returning error
+					cm.Exit(core.Nil, core.Nil, core.Nil)
+					state.WithStates = state.WithStates[:len(state.WithStates)-1]
+					return nil, err
+				}
+			}
+
+			state.CurrentStep++
+
+		case StepWithExit:
+			// Exit a context manager
+			if len(state.WithStates) == 0 {
+				return nil, fmt.Errorf("with exit without active with statement")
+			}
+
+			// Pop the with state
+			withState := state.WithStates[len(state.WithStates)-1]
+			state.WithStates = state.WithStates[:len(state.WithStates)-1]
+
+			// Call __exit__ with no exception
+			_, exitErr := withState.ContextManager.Exit(core.Nil, core.Nil, core.Nil)
+			if exitErr != nil {
+				return nil, exitErr
+			}
+
+			state.CurrentStep++
+
 		default:
 			return nil, fmt.Errorf("unknown step kind: %d", step.Kind)
 		}
@@ -597,6 +680,118 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 					Kind: StepStatement,
 					Node: node,
 				})
+				return steps, nil
+
+			case "with":
+				// With statement: (with context-expr var body...)
+				// or (with context-expr None body...)
+				// Need to properly handle yields inside the with body
+				if n.Len() < 3 {
+					// Malformed with, treat as statement
+					steps = append(steps, ExecutionStep{
+						Kind: StepStatement,
+						Node: node,
+					})
+					return steps, nil
+				}
+
+				// Parse the with statement structure
+				// Format: (with context-expr var-or-None body...)
+				contextExpr := n.Items()[1]
+				varOrNone := n.Items()[2]
+				bodyStart := 3
+
+				// Check if varOrNone is actually the body start (old format without explicit var)
+				// In old format: (with context-expr body...)
+				// In new format: (with context-expr var body...) or (with context-expr None body...)
+				var varName string
+				var varPattern core.Value
+
+				if sym, ok := varOrNone.(core.SymbolValue); ok {
+					symStr := string(sym)
+					if symStr == "None" {
+						// Explicit None - no variable binding
+						varName = ""
+					} else {
+						// It's a variable name
+						varName = symStr
+					}
+				} else if list, ok := varOrNone.(*core.ListValue); ok {
+					// Could be tuple pattern for unpacking, or could be body
+					// Check if it looks like an expression to evaluate
+					if list.Len() > 0 {
+						if firstSym, ok := list.Items()[0].(core.SymbolValue); ok {
+							symStr := string(firstSym)
+							// If it starts with a known form, it's body
+							if symStr == "do" || symStr == "begin" || symStr == "yield" ||
+								symStr == "return" || symStr == "if" || symStr == "for" ||
+								symStr == "while" || symStr == "try" || symStr == "with" ||
+								symStr == "=" || symStr == "print" {
+								// This is body, not a variable pattern
+								bodyStart = 2
+							} else {
+								// It's a variable pattern
+								varPattern = varOrNone
+							}
+						} else {
+							// Assume it's a tuple pattern
+							varPattern = varOrNone
+						}
+					} else {
+						// Empty list - probably body start
+						bodyStart = 2
+					}
+				} else if varOrNone == core.None || varOrNone == core.Nil {
+					// Explicit None
+					varName = ""
+				} else {
+					// Unknown type - assume it's body
+					bodyStart = 2
+				}
+
+				body := n.Items()[bodyStart:]
+
+				// Check if body contains any yield statements
+				hasYield := containsYieldInBody(body)
+
+				if !hasYield {
+					// No yields in body - can treat as atomic statement
+					steps = append(steps, ExecutionStep{
+						Kind: StepStatement,
+						Node: node,
+					})
+					return steps, nil
+				}
+
+				// Body contains yield - need to break it into steps
+				// Step 1: WithEnter - evaluate context expr and call __enter__
+				steps = append(steps, ExecutionStep{
+					Kind:  StepWithEnter,
+					Node:  contextExpr,
+					Label: varName,
+					// Store variable pattern as a separate step if needed
+				})
+
+				// Store variable pattern info if using tuple unpacking
+				if varPattern != nil {
+					// We'll handle this in StepWithEnter by storing the pattern
+					steps[len(steps)-1].Node = core.NewList(contextExpr, varPattern)
+				}
+
+				// Transform body into steps
+				for _, stmt := range body {
+					substeps, err := transformToSteps(stmt)
+					if err != nil {
+						return nil, err
+					}
+					steps = append(steps, substeps...)
+				}
+
+				// Step N: WithExit - call __exit__
+				steps = append(steps, ExecutionStep{
+					Kind: StepWithExit,
+				})
+
 				return steps, nil
 
 			case "try":
@@ -831,4 +1026,14 @@ func createExceptionFromThrowArgs(excType core.Value, excValue core.Value, excTb
 
 	// Return an Exception error
 	return &Exception{Type: typeName, Message: message}
+}
+
+// containsYieldInBody checks if a list of AST nodes contains any yield statements
+func containsYieldInBody(nodes []core.Value) bool {
+	for _, node := range nodes {
+		if containsYield(node) {
+			return true
+		}
+	}
+	return false
 }

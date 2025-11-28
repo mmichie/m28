@@ -181,7 +181,12 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Check if the function is referenced by a symbol (for better error messages)
 	var symbolName string
-	if sym, ok := expr.Items()[0].(core.SymbolValue); ok {
+	first := expr.Items()[0]
+	// Unwrap LocatedValue if needed
+	if located, ok := first.(core.LocatedValue); ok {
+		first = located.Value
+	}
+	if sym, ok := first.(core.SymbolValue); ok {
 		symbolName = string(sym)
 	}
 	core.DebugLog("[KWCALL] evalFunctionCallWithKeywords: %s, %d args\n", symbolName, expr.Len()-1)
@@ -343,9 +348,26 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 	if kwargsFunc, ok := fn.(interface {
 		CallWithKeywords([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
 	}); ok {
+		// Get source location and push to call stack before calling
+		file := ""
+		line := 0
+		col := 0
+		if loc := ctx.CurrentLocation(); loc != nil {
+			file = loc.File
+			line = loc.Line
+			col = loc.Column
+		}
+		funcName := symbolName
+		if funcName == "" {
+			funcName = "<anonymous>"
+		}
+		ctx.PushStack(funcName, file, line, col)
+		defer ctx.PopStack()
+
 		result, err := kwargsFunc.CallWithKeywords(positionalArgs, keywordArgs, ctx)
 		if err != nil {
-			return nil, err
+			// Wrap error with call stack
+			return nil, core.WrapEvalError(err, fmt.Sprintf("error in %s: %v", funcName, err), ctx)
 		}
 		return result, nil
 	}
@@ -401,7 +423,16 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 		}
 	}
 
-	ctx.PushStack(funcName, "", 0, 0)
+	// Get source location from context for better error messages
+	file := ""
+	line := 0
+	col := 0
+	if loc := ctx.CurrentLocation(); loc != nil {
+		file = loc.File
+		line = loc.Line
+		col = loc.Column
+	}
+	ctx.PushStack(funcName, file, line, col)
 	defer ctx.PopStack()
 
 	result, err := callable.Call(positionalArgs, ctx)

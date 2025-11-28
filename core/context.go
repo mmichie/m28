@@ -77,7 +77,6 @@ func NewContext(outer *Context) *Context {
 	ctx := &Context{
 		Vars:         make(map[string]Value),
 		Outer:        outer,
-		CallStack:    make([]TraceEntry, 0),
 		GlobalVars:   make(map[string]bool),
 		NonlocalVars: make(map[string]bool),
 	}
@@ -86,8 +85,10 @@ func NewContext(outer *Context) *Context {
 	if outer == nil {
 		ctx.Global = ctx
 		ctx.Metadata = NewIRMetadata()
+		ctx.CallStack = make([]TraceEntry, 0) // Only global context owns the call stack
 	} else {
 		// Otherwise, inherit global and metadata from parent
+		// Call stack operations use ctx.Global.CallStack via PushStack/PopStack
 		ctx.Global = outer.Global
 		ctx.Metadata = outer.Metadata
 	}
@@ -307,8 +308,13 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 }
 
 // PushStack adds a new entry to the call stack
+// Always operates on the Global context to ensure shared call stack
 func (c *Context) PushStack(function, file string, line, column int) {
-	c.CallStack = append(c.CallStack, TraceEntry{
+	target := c
+	if c.Global != nil {
+		target = c.Global
+	}
+	target.CallStack = append(target.CallStack, TraceEntry{
 		Function: function,
 		File:     file,
 		Line:     line,
@@ -318,22 +324,44 @@ func (c *Context) PushStack(function, file string, line, column int) {
 }
 
 // PopStack removes the most recent entry from the call stack
+// Always operates on the Global context to ensure shared call stack
 func (c *Context) PopStack() {
-	if len(c.CallStack) > 0 {
-		c.CallStack = c.CallStack[:len(c.CallStack)-1]
-		if len(c.CallStack) > 0 {
-			c.CurrentFunction = c.CallStack[len(c.CallStack)-1].Function
+	target := c
+	if c.Global != nil {
+		target = c.Global
+	}
+	if len(target.CallStack) > 0 {
+		target.CallStack = target.CallStack[:len(target.CallStack)-1]
+		if len(target.CallStack) > 0 {
+			c.CurrentFunction = target.CallStack[len(target.CallStack)-1].Function
 		} else {
 			c.CurrentFunction = ""
 		}
 	}
 }
 
+// GetCallStack returns the call stack, using Global context if available
+func (c *Context) GetCallStack() []TraceEntry {
+	if c.Global != nil {
+		return c.Global.CallStack
+	}
+	return c.CallStack
+}
+
 // FormatStackTrace returns a formatted stack trace for error reporting
+// Follows Python convention: oldest frame first, most recent last
 func (c *Context) FormatStackTrace() string {
+	stack := c.GetCallStack()
+	if len(stack) == 0 {
+		return ""
+	}
 	trace := "Traceback (most recent call last):\n"
-	for i := len(c.CallStack) - 1; i >= 0; i-- {
-		entry := c.CallStack[i]
+	// Python shows frames oldest-to-newest (deepest call at bottom)
+	for _, entry := range stack {
+		// Skip entries with no location info
+		if entry.File == "" && entry.Line == 0 {
+			continue
+		}
 		trace += fmt.Sprintf("  File \"%s\", line %d, in %s\n",
 			entry.File, entry.Line, entry.Function)
 	}

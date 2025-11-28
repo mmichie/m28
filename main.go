@@ -58,21 +58,94 @@ func handleError(err error, globalCtx *core.Context, errorFormatter *parser.Erro
 		os.Exit(sysExit.Code)
 	}
 
-	// Format error with source context using ErrorFormatter
+	// Format Python-style: traceback first, then error message
+	// This matches Python's output format
+
+	// Try to get stack trace from EvalError first (captured at error time)
+	var stackTrace string
+	var evalErr *core.EvalError
+	if errors.As(err, &evalErr) && len(evalErr.StackTrace) > 0 {
+		stackTrace = evalErr.FormatTraceback()
+	} else if len(globalCtx.GetCallStack()) > 0 {
+		// Fall back to current context call stack
+		stackTrace = globalCtx.FormatStackTrace()
+	}
+
+	if stackTrace != "" {
+		fmt.Fprint(os.Stderr, stackTrace)
+	}
+
+	// Format error message using the error formatter for location context
 	formatted := errorFormatter.FormatError(err)
 	if formatted != "" {
 		fmt.Fprint(os.Stderr, formatted)
 	} else {
-		// Fallback if no special formatting
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-	}
-
-	// Always show stack trace if available (for runtime errors)
-	if len(globalCtx.CallStack) > 0 {
-		fmt.Fprintln(os.Stderr, "\n"+globalCtx.FormatStackTrace())
+		// Format the error in Python style
+		errMsg := formatPythonError(err)
+		fmt.Fprintln(os.Stderr, errMsg)
 	}
 
 	os.Exit(1)
+}
+
+// formatPythonError formats an error in Python style (ErrorType: message)
+func formatPythonError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	// Try to get the underlying error for better type detection
+	underlyingErr := err
+	for {
+		unwrapped := errors.Unwrap(underlyingErr)
+		if unwrapped == nil {
+			break
+		}
+		underlyingErr = unwrapped
+	}
+
+	// Check for specific M28 error types
+	switch e := underlyingErr.(type) {
+	case *core.TypeError:
+		return fmt.Sprintf("TypeError: %s", e.Message)
+	case *core.ValueError:
+		return fmt.Sprintf("ValueError: %s", e.Message)
+	case *core.AttributeError:
+		return fmt.Sprintf("AttributeError: %s", e.Message)
+	case *core.KeyError:
+		return fmt.Sprintf("KeyError: %s", e.Message)
+	case *core.IndexError:
+		return fmt.Sprintf("IndexError: %s", e.Message)
+	case *core.NameError:
+		return fmt.Sprintf("NameError: name '%s' is not defined", e.Name)
+	case *core.ImportError:
+		return fmt.Sprintf("ImportError: %s", e.Message)
+	case *core.FileNotFoundError:
+		return fmt.Sprintf("FileNotFoundError: %s", e.Message)
+	case *core.OSError:
+		return fmt.Sprintf("OSError: %s", e.Message)
+	case *core.AssertionError:
+		return fmt.Sprintf("AssertionError: %s", e.Message)
+	case *core.StopIteration:
+		if e.Message != "" {
+			return fmt.Sprintf("StopIteration: %s", e.Message)
+		}
+		return "StopIteration"
+	case *core.EvalError:
+		// EvalError wraps other errors - check its wrapped error
+		if e.Wrapped != nil {
+			return formatPythonError(e.Wrapped)
+		}
+		return e.Error()
+	default:
+		// Try to extract type name from error string if it's already formatted
+		errStr := err.Error()
+		if strings.Contains(errStr, ": ") {
+			// Already looks like "TypeName: message"
+			return errStr
+		}
+		return fmt.Sprintf("Exception: %s", errStr)
+	}
 }
 
 // initializeLogger sets up the logging system based on CLI flags
@@ -546,7 +619,7 @@ func executePythonFile(filename, content string, ctx *core.Context) error {
 	}
 
 	// Lower AST to IR and evaluate each statement
-	for i, node := range nodes {
+	for _, node := range nodes {
 		ir := node.ToIR()
 		_, err = eval.Eval(ir, ctx)
 		if err != nil {
@@ -555,8 +628,9 @@ func executePythonFile(filename, content string, ctx *core.Context) error {
 			if errors.As(err, &sysExit) {
 				return err
 			}
-			// Add statement number to error for better debugging
-			return fmt.Errorf("error in statement %d: %w", i+1, err)
+			// Return error directly - it already contains location info
+			// via the traceback system (file, line, function name)
+			return err
 		}
 	}
 
