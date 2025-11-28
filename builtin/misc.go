@@ -32,27 +32,35 @@ func checkAssertPatterns(source, filename string, ctx *core.Context) error {
 
 	// Walk the AST looking for assert statements
 	for _, node := range nodes {
-		walkForAsserts(node, filename, ctx)
+		if err := walkForAsserts(node, filename, ctx); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 // walkForAsserts recursively walks the AST to find AssertForm nodes
-func walkForAsserts(node ast.ASTNode, filename string, ctx *core.Context) {
+func walkForAsserts(node ast.ASTNode, filename string, ctx *core.Context) error {
 	if node == nil {
-		return
+		return nil
 	}
 
 	// Check if this is an assert statement
 	if assertForm, ok := node.(*ast.AssertForm); ok {
-		checkAssertCondition(assertForm, filename, ctx)
-		// Still walk the condition and message in case they contain nested asserts
-		walkForAsserts(assertForm.Condition, filename, ctx)
-		if assertForm.Message != nil {
-			walkForAsserts(assertForm.Message, filename, ctx)
+		if err := checkAssertCondition(assertForm, filename, ctx); err != nil {
+			return err
 		}
-		return
+		// Still walk the condition and message in case they contain nested asserts
+		if err := walkForAsserts(assertForm.Condition, filename, ctx); err != nil {
+			return err
+		}
+		if assertForm.Message != nil {
+			if err := walkForAsserts(assertForm.Message, filename, ctx); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	// Recursively walk child nodes based on their type
@@ -61,30 +69,37 @@ func walkForAsserts(node ast.ASTNode, filename string, ctx *core.Context) {
 	case *ast.SExpr:
 		// Walk all elements of SExpr (most compound statements use this)
 		for _, elem := range n.Elements {
-			walkForAsserts(elem, filename, ctx)
+			if err := walkForAsserts(elem, filename, ctx); err != nil {
+				return err
+			}
 		}
 	case *ast.DefForm:
-		walkForAsserts(n.Body, filename, ctx)
+		if err := walkForAsserts(n.Body, filename, ctx); err != nil {
+			return err
+		}
 	case *ast.ClassForm:
 		// ClassForm.Body is []ASTNode
 		for _, stmt := range n.Body {
-			walkForAsserts(stmt, filename, ctx)
+			if err := walkForAsserts(stmt, filename, ctx); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // checkAssertCondition checks if an assert statement has a tuple condition
 // Pattern: assert(x, "msg") compiles to assert with tuple condition
-func checkAssertCondition(assertForm *ast.AssertForm, filename string, ctx *core.Context) {
+func checkAssertCondition(assertForm *ast.AssertForm, filename string, ctx *core.Context) error {
 	// Check if condition is an SExpr (tuple-literal ...)
 	sexpr, ok := assertForm.Condition.(*ast.SExpr)
 	if !ok {
-		return
+		return nil
 	}
 
 	elements := sexpr.Elements
 	if len(elements) == 0 {
-		return
+		return nil
 	}
 
 	// Check if first element is "tuple-literal" identifier
@@ -99,19 +114,22 @@ func checkAssertCondition(assertForm *ast.AssertForm, filename string, ctx *core
 			if assertForm.Loc != nil && assertForm.Loc.Line > 0 {
 				lineno = assertForm.Loc.Line
 			}
-			emitSyntaxWarning(filename, lineno, ctx)
+			return emitSyntaxWarning(filename, lineno, ctx)
 		}
 	}
+	return nil
 }
 
 // emitSyntaxWarning emits a SyntaxWarning that will be captured by catch_warnings()
-func emitSyntaxWarning(filename string, lineno int, ctx *core.Context) {
+// Returns an error if the warning is treated as an error (e.g., via simplefilter('error'))
+func emitSyntaxWarning(filename string, lineno int, ctx *core.Context) error {
 	// Use the WarnExplicit helper from warnings module which properly integrates with catch_warnings()
 	message := "assertion is always true, perhaps remove parentheses?"
 	category := "SyntaxWarning"
 
 	// Call the WarnExplicit function which uses warn_explicit for proper filename/lineno
-	modules.WarnExplicit(message, category, filename, lineno, ctx)
+	// If warnings.simplefilter('error', SyntaxWarning) is active, this will return an error
+	return modules.WarnExplicit(message, category, filename, lineno, ctx)
 }
 
 // RegisterMisc registers miscellaneous functions
@@ -677,6 +695,40 @@ func RegisterMisc(ctx *core.Context) {
 		// Parse the source to check for problematic patterns
 		// We need to emit SyntaxWarnings for assert statements with tuple conditions
 		if err := checkAssertPatterns(source, filename, ctx); err != nil {
+			// Check if this is a SyntaxWarning being treated as error
+			// CPython's compile() converts SyntaxWarning to SyntaxError
+			// Check for eval.Exception (the common exception type in M28)
+			if evalExc, ok := err.(*eval.Exception); ok && evalExc.Type == "SyntaxWarning" {
+				// Convert SyntaxWarning to SyntaxError to match CPython behavior
+				return nil, &eval.Exception{
+					Type:    "SyntaxError",
+					Message: evalExc.Message,
+				}
+			}
+			// Also check for core.PythonError
+			if pyErr, ok := err.(*core.PythonError); ok {
+				if pyErr.GetExceptionType() == "SyntaxWarning" {
+					// Convert SyntaxWarning to SyntaxError to match CPython behavior
+					// Look up SyntaxError class and create instance
+					if syntaxErrorClass, lookupErr := ctx.Lookup("SyntaxError"); lookupErr == nil {
+						if cls, ok := syntaxErrorClass.(*core.Class); ok {
+							// Get message from the original warning
+							msg := "assertion is always true, perhaps remove parentheses?"
+							if pyErr.Instance != nil {
+								if argsAttr, hasArgs := pyErr.Instance.GetAttr("args"); hasArgs {
+									if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+										msg = argsTuple[0].String()
+									}
+								}
+							}
+							// Create SyntaxError instance
+							inst := core.NewInstance(cls)
+							inst.SetAttr("args", core.TupleValue{core.StringValue(msg)})
+							return nil, core.NewPythonError(inst)
+						}
+					}
+				}
+			}
 			return nil, err
 		}
 
