@@ -700,6 +700,30 @@ func RegisterMisc(ctx *core.Context) {
 			// Check for eval.Exception (the common exception type in M28)
 			if evalExc, ok := err.(*eval.Exception); ok && evalExc.Type == "SyntaxWarning" {
 				// Convert SyntaxWarning to SyntaxError to match CPython behavior
+				// Look up SyntaxError class and create a proper instance with attributes
+				if syntaxErrorClass, lookupErr := ctx.Lookup("SyntaxError"); lookupErr == nil {
+					if cls, ok := syntaxErrorClass.(*core.Class); ok {
+						inst := core.NewInstance(cls)
+						// Set SyntaxError-specific attributes
+						inst.SetAttr("msg", core.StringValue(evalExc.Message))
+						inst.SetAttr("lineno", core.NumberValue(1))
+						inst.SetAttr("offset", core.Nil)
+						inst.SetAttr("text", core.Nil)
+						inst.SetAttr("filename", core.StringValue(filename))
+						// args tuple: (msg, (filename, lineno, offset, text))
+						inst.SetAttr("args", core.TupleValue{
+							core.StringValue(evalExc.Message),
+							core.TupleValue{
+								core.StringValue(filename),
+								core.NumberValue(1),
+								core.Nil,
+								core.Nil,
+							},
+						})
+						return nil, core.NewPythonError(inst)
+					}
+				}
+				// Fallback to eval.Exception if class lookup fails
 				return nil, &eval.Exception{
 					Type:    "SyntaxError",
 					Message: evalExc.Message,
@@ -721,9 +745,22 @@ func RegisterMisc(ctx *core.Context) {
 									}
 								}
 							}
-							// Create SyntaxError instance
+							// Create SyntaxError instance with proper attributes
 							inst := core.NewInstance(cls)
-							inst.SetAttr("args", core.TupleValue{core.StringValue(msg)})
+							inst.SetAttr("msg", core.StringValue(msg))
+							inst.SetAttr("lineno", core.NumberValue(1))
+							inst.SetAttr("offset", core.Nil)
+							inst.SetAttr("text", core.Nil)
+							inst.SetAttr("filename", core.StringValue(filename))
+							inst.SetAttr("args", core.TupleValue{
+								core.StringValue(msg),
+								core.TupleValue{
+									core.StringValue(filename),
+									core.NumberValue(1),
+									core.Nil,
+									core.Nil,
+								},
+							})
 							return nil, core.NewPythonError(inst)
 						}
 					}
