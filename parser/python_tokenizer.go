@@ -673,6 +673,13 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 				t.advance()
 			}
 			lexeme := t.input[start:t.pos]
+
+			// Validate underscore placement
+			if errMsg := validateUnderscores(lexeme); errMsg != "" {
+				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue(errMsg),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+			}
+
 			// Remove underscores and parse
 			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0b" prefix
 			if cleanLexeme == "" {
@@ -714,6 +721,13 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 				t.advance()
 			}
 			lexeme := t.input[start:t.pos]
+
+			// Validate underscore placement
+			if errMsg := validateUnderscores(lexeme); errMsg != "" {
+				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue(errMsg),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+			}
+
 			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0o" prefix
 			if cleanLexeme == "" {
 				// Invalid octal literal (just "0o" with no digits)
@@ -755,6 +769,13 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 				t.advance()
 			}
 			lexeme := t.input[start:t.pos]
+
+			// Validate underscore placement
+			if errMsg := validateUnderscores(lexeme); errMsg != "" {
+				return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue(errMsg),
+					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+			}
+
 			cleanLexeme := strings.ReplaceAll(lexeme[2:], "_", "") // skip "0x" prefix
 			if cleanLexeme == "" {
 				// Invalid hexadecimal literal (just "0x" with no digits)
@@ -804,12 +825,22 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 	hasDecimalPoint := startsWithDot
 	if !startsWithDot && !t.isAtEnd() && t.peek() == '.' {
 		// Look ahead to see if this is a float or dot notation
-		// It's a float if: (1) next char is digit, (2) next char is 'e' or 'E' (for floats like 3.e14), OR (3) next char is not a letter/underscore (trailing dot like 314.)
 		nextPos := t.pos + 1
 		if nextPos < len(t.input) {
 			nextChar := t.input[nextPos]
-			// It's a float if next is digit, e/E for exponent, or not identifier start (allows 314.)
-			if isDigit(nextChar) || nextChar == 'e' || nextChar == 'E' || !(isLetter(nextChar) || nextChar == '_') {
+			// It's a float if:
+			// (1) next char is digit (1.5)
+			// (2) next char is 'e' or 'E' for exponent (1.e5)
+			// (3) next char is underscore followed by digit (1._4 - invalid but should be caught)
+			// (4) next char is not a letter/underscore (trailing dot like 314.)
+			isFloat := isDigit(nextChar) || nextChar == 'e' || nextChar == 'E' || !(isLetter(nextChar) || nextChar == '_')
+
+			// Special case: underscore after dot followed by digit should be parsed as (invalid) number
+			if nextChar == '_' && nextPos+1 < len(t.input) && isDigit(t.input[nextPos+1]) {
+				isFloat = true
+			}
+
+			if isFloat {
 				t.advance() // consume '.'
 				hasDecimalPoint = true
 				// Scan fractional part (may be empty for trailing dot like 314.)
@@ -893,6 +924,13 @@ skipScientific:
 	}
 
 	lexeme := t.input[start:t.pos]
+
+	// Validate underscore placement for decimal numbers
+	if errMsg := validateUnderscores(lexeme); errMsg != "" {
+		return Token{Type: TOKEN_ERROR, Lexeme: lexeme, Value: core.StringValue(errMsg),
+			Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+	}
+
 	// Remove underscores before parsing
 	cleanLexeme := strings.ReplaceAll(lexeme, "_", "")
 	if isComplex && (strings.HasSuffix(cleanLexeme, "j") || strings.HasSuffix(cleanLexeme, "J")) {
@@ -1381,6 +1419,78 @@ func (t *PythonTokenizer) scanRawBytesString(quote byte, start, startLine, start
 		StartPos: start,
 		EndPos:   t.pos,
 	}
+}
+
+// validateUnderscores checks for invalid underscore placement in numeric literals
+// Returns an error message if invalid, empty string if valid
+func validateUnderscores(lexeme string) string {
+	// Find where digits start (skip prefix like 0b, 0o, 0x)
+	digitStart := 0
+	if len(lexeme) >= 2 && lexeme[0] == '0' {
+		ch := lexeme[1]
+		if ch == 'b' || ch == 'B' || ch == 'o' || ch == 'O' || ch == 'x' || ch == 'X' {
+			digitStart = 2
+		}
+	}
+
+	// Check for underscore immediately after prefix (0b_, 0x_, 0o_)
+	if digitStart > 0 && digitStart < len(lexeme) && lexeme[digitStart] == '_' {
+		return "invalid decimal literal"
+	}
+
+	// Check for trailing underscore
+	if len(lexeme) > 0 && lexeme[len(lexeme)-1] == '_' {
+		return "invalid decimal literal"
+	}
+
+	// Check for consecutive underscores and underscore around decimal point
+	prevWasUnderscore := false
+	for i := digitStart; i < len(lexeme); i++ {
+		ch := lexeme[i]
+
+		if ch == '_' {
+			if prevWasUnderscore {
+				return "invalid decimal literal"
+			}
+			prevWasUnderscore = true
+		} else if ch == '.' {
+			// Underscore before dot (1_.4)
+			if prevWasUnderscore {
+				return "invalid decimal literal"
+			}
+			// Underscore after dot (1._4)
+			if i+1 < len(lexeme) && lexeme[i+1] == '_' {
+				return "invalid decimal literal"
+			}
+			prevWasUnderscore = false
+		} else if ch == 'e' || ch == 'E' {
+			// Underscore before exponent (1_e10)
+			if prevWasUnderscore {
+				return "invalid decimal literal"
+			}
+			// Underscore after exponent (1e_10) - check next char
+			if i+1 < len(lexeme) && lexeme[i+1] == '_' {
+				return "invalid decimal literal"
+			}
+			// Handle optional sign after exponent
+			if i+1 < len(lexeme) && (lexeme[i+1] == '+' || lexeme[i+1] == '-') {
+				if i+2 < len(lexeme) && lexeme[i+2] == '_' {
+					return "invalid decimal literal"
+				}
+			}
+			prevWasUnderscore = false
+		} else if ch == 'j' || ch == 'J' {
+			// Underscore before complex suffix (1_j)
+			if prevWasUnderscore {
+				return "invalid decimal literal"
+			}
+			prevWasUnderscore = false
+		} else {
+			prevWasUnderscore = false
+		}
+	}
+
+	return "" // Valid
 }
 
 // Helper functions for hex parsing
