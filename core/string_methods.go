@@ -1306,74 +1306,10 @@ func InitStringMethods() {
 		Doc:     "Return a list of the lines in the string, breaking at line boundaries",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			s := string(receiver.(StringValue))
-			keepends := false
-
-			if len(args) > 0 {
-				if args[0] == True {
-					keepends = true
-				} else if args[0] != False && args[0] != Nil {
-					if num, ok := args[0].(NumberValue); ok {
-						keepends = num != 0
-					} else {
-						return nil, &TypeError{Message: "splitlines() argument must be a bool or int"}
-					}
-				}
-			}
-
-			var lines []string
-			var currentLine strings.Builder
-			runes := []rune(s)
-
-			for i := 0; i < len(runes); i++ {
-				r := runes[i]
-
-				// Check for line breaks
-				if r == '\n' {
-					if keepends {
-						currentLine.WriteRune('\n')
-					}
-					lines = append(lines, currentLine.String())
-					currentLine.Reset()
-				} else if r == '\r' {
-					// Check for \r\n
-					if i+1 < len(runes) && runes[i+1] == '\n' {
-						if keepends {
-							currentLine.WriteString("\r\n")
-						}
-						lines = append(lines, currentLine.String())
-						currentLine.Reset()
-						i++ // Skip the \n
-					} else {
-						if keepends {
-							currentLine.WriteRune('\r')
-						}
-						lines = append(lines, currentLine.String())
-						currentLine.Reset()
-					}
-				} else if r == '\v' || r == '\f' || r == '\x1c' || r == '\x1d' || r == '\x1e' || r == '\x85' || r == '\u2028' || r == '\u2029' {
-					// Other line breaks
-					if keepends {
-						currentLine.WriteRune(r)
-					}
-					lines = append(lines, currentLine.String())
-					currentLine.Reset()
-				} else {
-					currentLine.WriteRune(r)
-				}
-			}
-
-			// Add the last line if there's anything left
-			if currentLine.Len() > 0 || len(lines) == 0 {
-				lines = append(lines, currentLine.String())
-			}
-
-			// Convert to list of StringValues
-			result := make([]Value, len(lines))
-			for i, line := range lines {
-				result[i] = StringValue(line)
-			}
-			return NewList(result...), nil
+			return stringSplitlinesImpl(receiver, args, nil)
+		},
+		KwargHandler: func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+			return stringSplitlinesImpl(receiver, args, kwargs)
 		},
 	}
 
@@ -1622,4 +1558,100 @@ func InitStringMethods() {
 			return formatStringWithPercent(formatStr, args[0])
 		},
 	}
+}
+
+// stringSplitlinesImpl implements str.splitlines() with support for keyword arguments
+func stringSplitlinesImpl(receiver Value, args []Value, kwargs map[string]Value) (Value, error) {
+	s := string(receiver.(StringValue))
+	keepends := false
+
+	// Check for keyword argument first
+	if kwargs != nil {
+		if keependsVal, hasKeepends := kwargs["keepends"]; hasKeepends {
+			if keependsVal == True {
+				keepends = true
+			} else if keependsVal == False {
+				keepends = false
+			} else if num, ok := keependsVal.(NumberValue); ok {
+				keepends = num != 0
+			} else {
+				return nil, &TypeError{Message: "splitlines() argument must be a bool or int"}
+			}
+		}
+		// Check for unknown keyword arguments
+		for k := range kwargs {
+			if k != "keepends" {
+				return nil, &TypeError{Message: fmt.Sprintf("splitlines() got an unexpected keyword argument '%s'", k)}
+			}
+		}
+	}
+
+	// Positional argument overrides keyword argument
+	if len(args) > 0 {
+		if args[0] == True {
+			keepends = true
+		} else if args[0] == False {
+			keepends = false
+		} else if args[0] != Nil {
+			if num, ok := args[0].(NumberValue); ok {
+				keepends = num != 0
+			} else {
+				return nil, &TypeError{Message: "splitlines() argument must be a bool or int"}
+			}
+		}
+	}
+
+	var lines []string
+	var currentLine strings.Builder
+	runes := []rune(s)
+
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+
+		// Check for line breaks
+		if r == '\n' {
+			if keepends {
+				currentLine.WriteRune('\n')
+			}
+			lines = append(lines, currentLine.String())
+			currentLine.Reset()
+		} else if r == '\r' {
+			// Check for \r\n
+			if i+1 < len(runes) && runes[i+1] == '\n' {
+				if keepends {
+					currentLine.WriteString("\r\n")
+				}
+				lines = append(lines, currentLine.String())
+				currentLine.Reset()
+				i++ // Skip the \n
+			} else {
+				if keepends {
+					currentLine.WriteRune('\r')
+				}
+				lines = append(lines, currentLine.String())
+				currentLine.Reset()
+			}
+		} else if r == '\v' || r == '\f' || r == '\x1c' || r == '\x1d' || r == '\x1e' || r == '\x85' || r == '\u2028' || r == '\u2029' {
+			// Other line breaks
+			if keepends {
+				currentLine.WriteRune(r)
+			}
+			lines = append(lines, currentLine.String())
+			currentLine.Reset()
+		} else {
+			currentLine.WriteRune(r)
+		}
+	}
+
+	// Add the last line if there's anything left
+	if currentLine.Len() > 0 || len(lines) == 0 {
+		lines = append(lines, currentLine.String())
+	}
+
+	// Convert to list of StringValues
+	result := make([]Value, len(lines))
+	for i, line := range lines {
+		result[i] = StringValue(line)
+	}
+	return NewList(result...), nil
 }
