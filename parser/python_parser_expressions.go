@@ -558,7 +558,8 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 	core.Log.Trace(core.SubsystemParser, "Desugaring Pythonic function call", "file", p.filename, "callee", fmt.Sprintf("%T", callee), "line", tok.Line, "col", tok.Col)
 
 	args := []ast.ASTNode{callee}
-	var kwargs []ast.ASTNode // keyword arguments as (keyword value) pairs
+	var kwargs []ast.ASTNode            // keyword arguments as (keyword value) pairs
+	seenKwargs := make(map[string]bool) // track keyword names for duplicate detection
 
 	if !p.check(TOKEN_RPAREN) {
 		seenKeyword := false
@@ -585,6 +586,14 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 				// Keyword argument: IDENTIFIER = expression
 				seenKeyword = true
 				nameTok := p.advance()
+
+				// Check for duplicate keyword argument
+				if seenKwargs[nameTok.Lexeme] {
+					p.error(fmt.Sprintf("keyword argument repeated: %s", nameTok.Lexeme))
+					return nil
+				}
+				seenKwargs[nameTok.Lexeme] = true
+
 				p.expect(TOKEN_ASSIGN)
 				value := p.parseExpression()
 
