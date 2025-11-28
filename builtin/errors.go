@@ -360,6 +360,131 @@ func RegisterErrors(ctx *core.Context) {
 
 	// OSError - raised when a system function returns a system-related error
 	osErrorClass := core.NewClass("OSError", exceptionClass)
+
+	// Add special __init__ for OSError to handle (errno, strerror, filename) pattern
+	// Python's OSError has several constructor patterns:
+	// - OSError(msg) - just message
+	// - OSError(errno, strerror) - errno and strerror
+	// - OSError(errno, strerror, filename) - adds filename
+	// - OSError(errno, strerror, filename, winerror, filename2) - full form
+	osErrorClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__init__ requires at least 1 argument (self)")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("__init__ first argument must be an instance")
+		}
+
+		// Initialize default values for OSError attributes
+		self.Attributes["errno"] = core.None
+		self.Attributes["strerror"] = core.None
+		self.Attributes["filename"] = core.None
+		self.Attributes["filename2"] = core.None
+
+		// Initialize exception chaining attributes (PEP 3134)
+		self.Attributes["__cause__"] = core.None
+		self.Attributes["__context__"] = core.None
+		self.Attributes["__suppress_context__"] = core.False
+		self.Attributes["__traceback__"] = core.None
+
+		numArgs := len(args) - 1 // excluding self
+
+		if numArgs == 0 {
+			// No arguments - empty args tuple
+			self.Attributes["args"] = core.TupleValue{}
+			return core.None, nil
+		}
+
+		// Check if first arg (after self) is a number (errno pattern)
+		// In Python, OSError(errno, strerror) pattern is detected when first arg is numeric
+		firstArg := args[1]
+		isErrnoPattern := false
+		if types.IsNumeric(firstArg) && numArgs >= 2 {
+			isErrnoPattern = true
+		}
+
+		if isErrnoPattern {
+			// Pattern: (errno, strerror[, filename[, winerror[, filename2]]])
+			self.Attributes["errno"] = args[1]
+
+			if numArgs >= 2 {
+				self.Attributes["strerror"] = args[2]
+			}
+
+			if numArgs >= 3 {
+				self.Attributes["filename"] = args[3]
+			}
+
+			// winerror (args[4]) is Windows-specific, we just ignore it
+
+			if numArgs >= 5 {
+				self.Attributes["filename2"] = args[5]
+			}
+
+			// For errno pattern, args tuple is (errno, strerror)
+			// NOT including filename - this matches Python behavior
+			if numArgs >= 2 {
+				self.Attributes["args"] = core.TupleValue{args[1], args[2]}
+			} else {
+				self.Attributes["args"] = core.TupleValue{args[1]}
+			}
+		} else {
+			// Pattern: just a message string or other args
+			// Store all arguments after self as a tuple in args
+			exceptionArgs := make(core.TupleValue, numArgs)
+			for i := 1; i < len(args); i++ {
+				exceptionArgs[i-1] = args[i]
+			}
+			self.Attributes["args"] = exceptionArgs
+		}
+
+		return core.None, nil
+	}))
+
+	// Override __str__ for OSError to format properly
+	osErrorClass.SetMethod("__str__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("__str__() missing 1 required positional argument: 'self'")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.StringValue(""), nil
+		}
+
+		// Check for errno pattern
+		errno, hasErrno := self.Attributes["errno"]
+		strerror, hasStrerror := self.Attributes["strerror"]
+		filename, hasFilename := self.Attributes["filename"]
+
+		if hasErrno && !types.IsNil(errno) {
+			// Format: [Errno N] message or [Errno N] message: 'filename'
+			msg := ""
+			if hasStrerror && !types.IsNil(strerror) {
+				msg = strerror.String()
+			}
+
+			result := fmt.Sprintf("[Errno %s] %s", errno.String(), msg)
+
+			if hasFilename && !types.IsNil(filename) {
+				result += fmt.Sprintf(": '%s'", filename.String())
+			}
+
+			return core.StringValue(result), nil
+		}
+
+		// Fall back to default behavior - first arg
+		if argsVal, hasArgs := self.Attributes["args"]; hasArgs {
+			if argsTuple, ok := argsVal.(core.TupleValue); ok && len(argsTuple) > 0 {
+				return core.StringValue(argsTuple[0].String()), nil
+			}
+		}
+
+		return core.StringValue(""), nil
+	}))
+
 	ctx.Define("OSError", osErrorClass)
 
 	// IOError - alias for OSError (deprecated but still used)
