@@ -705,9 +705,10 @@ func RegisterMisc(ctx *core.Context) {
 					if cls, ok := syntaxErrorClass.(*core.Class); ok {
 						inst := core.NewInstance(cls)
 						// Set SyntaxError-specific attributes
+						// CPython sets offset=1 for assertion warnings
 						inst.SetAttr("msg", core.StringValue(evalExc.Message))
 						inst.SetAttr("lineno", core.NumberValue(1))
-						inst.SetAttr("offset", core.Nil)
+						inst.SetAttr("offset", core.NumberValue(1))
 						inst.SetAttr("text", core.Nil)
 						inst.SetAttr("filename", core.StringValue(filename))
 						// args tuple: (msg, (filename, lineno, offset, text))
@@ -716,7 +717,7 @@ func RegisterMisc(ctx *core.Context) {
 							core.TupleValue{
 								core.StringValue(filename),
 								core.NumberValue(1),
-								core.Nil,
+								core.NumberValue(1),
 								core.Nil,
 							},
 						})
@@ -746,10 +747,11 @@ func RegisterMisc(ctx *core.Context) {
 								}
 							}
 							// Create SyntaxError instance with proper attributes
+							// CPython sets offset=1 for assertion warnings
 							inst := core.NewInstance(cls)
 							inst.SetAttr("msg", core.StringValue(msg))
 							inst.SetAttr("lineno", core.NumberValue(1))
-							inst.SetAttr("offset", core.Nil)
+							inst.SetAttr("offset", core.NumberValue(1))
 							inst.SetAttr("text", core.Nil)
 							inst.SetAttr("filename", core.StringValue(filename))
 							inst.SetAttr("args", core.TupleValue{
@@ -757,7 +759,7 @@ func RegisterMisc(ctx *core.Context) {
 								core.TupleValue{
 									core.StringValue(filename),
 									core.NumberValue(1),
-									core.Nil,
+									core.NumberValue(1),
 									core.Nil,
 								},
 							})
