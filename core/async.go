@@ -538,8 +538,9 @@ func (c *Coroutine) GetAttr(name string) (Value, bool) {
 // AsyncFunction wraps a function to run asynchronously
 type AsyncFunction struct {
 	BaseObject
-	Function Value
-	Name     string
+	Function   Value
+	Name       string
+	Attributes map[string]Value // Custom attributes (for decorators etc.)
 }
 
 // NewAsyncFunction creates a new async function
@@ -548,6 +549,7 @@ func NewAsyncFunction(function Value, name string) *AsyncFunction {
 		BaseObject: *NewBaseObject(FunctionType),
 		Function:   function,
 		Name:       name,
+		Attributes: make(map[string]Value),
 	}
 }
 
@@ -570,6 +572,77 @@ func (af *AsyncFunction) Call(args []Value, ctx *Context) (Value, error) {
 	// Return a coroutine object, not a running task
 	// The coroutine can be awaited later or closed
 	return NewCoroutine(af.Function, args, af.Name), nil
+}
+
+// GetAttr returns function attributes like __name__, __qualname__, etc.
+func (af *AsyncFunction) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "__name__":
+		if af.Name != "" {
+			return StringValue(af.Name), true
+		}
+		return StringValue("<anonymous>"), true
+	case "__qualname__":
+		if af.Name != "" {
+			return StringValue(af.Name), true
+		}
+		return StringValue("<anonymous>"), true
+	case "__module__":
+		return StringValue("__main__"), true
+	case "__defaults__":
+		return None, true
+	case "__kwdefaults__":
+		return None, true
+	case "__code__":
+		// Return a minimal code object for async functions
+		codeObj := NewCodeObject(af.Function)
+		codeObj.SetAttr("co_argcount", NumberValue(0))
+		codeObj.SetAttr("co_posonlyargcount", NumberValue(0))
+		codeObj.SetAttr("co_kwonlyargcount", NumberValue(0))
+		codeObj.SetAttr("co_nlocals", NumberValue(0))
+		codeObj.SetAttr("co_stacksize", NumberValue(0))
+		codeObj.SetAttr("co_flags", NumberValue(128)) // CO_COROUTINE = 128
+		codeObj.SetAttr("co_code", StringValue(""))
+		codeObj.SetAttr("co_consts", TupleValue{None})
+		codeObj.SetAttr("co_names", TupleValue{})
+		codeObj.SetAttr("co_varnames", TupleValue{})
+		codeObj.SetAttr("co_freevars", TupleValue{})
+		codeObj.SetAttr("co_cellvars", TupleValue{})
+		codeObj.SetAttr("co_filename", StringValue("<unknown>"))
+		codeObj.SetAttr("co_name", StringValue(af.Name))
+		codeObj.SetAttr("co_qualname", StringValue(af.Name))
+		codeObj.SetAttr("co_firstlineno", NumberValue(0))
+		codeObj.SetAttr("co_linetable", StringValue(""))
+		return codeObj, true
+	case "__annotations__":
+		return NewDict(), true
+	case "__globals__":
+		return NewDict(), true
+	case "__dict__":
+		return NewDict(), true
+	case "__doc__":
+		return None, true
+	case "__wrapped__":
+		return None, true
+	}
+	// Check custom attributes (set by decorators, etc.)
+	if val, ok := af.Attributes[name]; ok {
+		return val, true
+	}
+	// Fall back to checking the underlying function
+	if obj, ok := af.Function.(Object); ok {
+		return obj.GetAttr(name)
+	}
+	return nil, false
+}
+
+// SetAttr sets an attribute on the async function
+func (af *AsyncFunction) SetAttr(name string, value Value) error {
+	if af.Attributes == nil {
+		af.Attributes = make(map[string]Value)
+	}
+	af.Attributes[name] = value
+	return nil
 }
 
 // Sleep pauses execution for the specified duration
