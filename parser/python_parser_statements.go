@@ -700,6 +700,12 @@ func (p *PythonParser) parseChainedAssignment(target ast.ASTNode) ast.ASTNode {
 	core.Log.Trace(core.SubsystemParser, "Desugaring Pythonic assignment",
 		"file", p.filename, "line", tok.Line, "col", tok.Col)
 
+	// Validate the assignment target
+	if errMsg := p.validateAssignmentTarget(target); errMsg != "" {
+		p.error(errMsg)
+		return nil
+	}
+
 	// Collect all assignment targets
 	targets := []ast.ASTNode{target}
 
@@ -708,7 +714,11 @@ func (p *PythonParser) parseChainedAssignment(target ast.ASTNode) ast.ASTNode {
 		nextExpr := p.parseAssignmentValue(tok)
 
 		if p.check(TOKEN_ASSIGN) {
-			// Another assignment, collect this target
+			// Another assignment, validate and collect this target
+			if errMsg := p.validateAssignmentTarget(nextExpr); errMsg != "" {
+				p.error(errMsg)
+				return nil
+			}
 			targets = append(targets, nextExpr)
 			p.advance() // consume the =
 		} else {
@@ -777,6 +787,13 @@ func (p *PythonParser) isAugmentedAssignment() bool {
 
 // parseAugmentedAssignment parses augmented assignments like +=, -=, etc.
 func (p *PythonParser) parseAugmentedAssignment(target ast.ASTNode) ast.ASTNode {
+	// Validate the assignment target first
+	// CPython uses "illegal expression" for augmented assignment on invalid targets
+	if errMsg := p.validateAssignmentTarget(target); errMsg != "" {
+		p.error("'" + p.describeTarget(target) + "' is an illegal expression for augmented assignment")
+		return nil
+	}
+
 	p.match(TOKEN_PLUS_ASSIGN, TOKEN_MINUS_ASSIGN, TOKEN_STAR_ASSIGN,
 		TOKEN_SLASH_ASSIGN, TOKEN_DOUBLESLASH_ASSIGN, TOKEN_PERCENT_ASSIGN,
 		TOKEN_DOUBLESTAR_ASSIGN, TOKEN_PIPE_ASSIGN, TOKEN_AMPERSAND_ASSIGN,
@@ -874,6 +891,157 @@ func (p *PythonParser) parseAnnotatedAssignment(target ast.ASTNode) ast.ASTNode 
 
 	// Return annotated assignment without value: (annotated-assign target annotation)
 	return ast.NewAnnotatedAssignForm(target, annotation, nil, p.makeLocation(colonTok), ast.SyntaxPython)
+}
+
+// ============================================================================
+// Assignment Target Validation
+// ============================================================================
+
+// describeTarget returns a description of an AST node for error messages
+func (p *PythonParser) describeTarget(target ast.ASTNode) string {
+	switch n := target.(type) {
+	case *ast.Identifier:
+		return n.Name
+	case *ast.Literal:
+		return "literal"
+	case *ast.ComprehensionForm:
+		switch n.Kind {
+		case ast.DictComp:
+			return "dict comprehension"
+		case ast.ListComp:
+			return "list comprehension"
+		case ast.SetComp:
+			return "set comprehension"
+		case ast.GeneratorComp:
+			return "generator expression"
+		default:
+			return "comprehension"
+		}
+	case *ast.SExpr:
+		if len(n.Elements) > 0 {
+			if ident, ok := n.Elements[0].(*ast.Identifier); ok {
+				switch ident.Name {
+				case "dict-comp":
+					return "dict comprehension"
+				case "list-comp":
+					return "list comprehension"
+				case "set-comp":
+					return "set comprehension"
+				case "generator":
+					return "generator expression"
+				case "call":
+					return "function call result"
+				case "lambda":
+					return "lambda"
+				case "if-expr", "ternary":
+					return "conditional expression"
+				}
+			}
+		}
+		return "expression"
+	default:
+		return "expression"
+	}
+}
+
+// validateAssignmentTarget checks if an AST node is a valid assignment target
+// Returns an error message if invalid, empty string if valid
+// Valid targets: identifiers, attribute access (obj.attr), subscript (obj[key]), tuple/list unpacking
+// Invalid: comprehensions, literals, calls, binary operations
+func (p *PythonParser) validateAssignmentTarget(target ast.ASTNode) string {
+	switch n := target.(type) {
+	case *ast.Identifier:
+		// Simple variable names are valid targets
+		return ""
+
+	case *ast.Literal:
+		// Literals cannot be assigned to
+		return "cannot assign to literal here. Maybe you meant '==' instead of '='?"
+
+	case *ast.ComprehensionForm:
+		// Comprehensions cannot be assigned to
+		switch n.Kind {
+		case ast.DictComp:
+			return "cannot assign to dict comprehension"
+		case ast.ListComp:
+			return "cannot assign to list comprehension"
+		case ast.SetComp:
+			return "cannot assign to set comprehension"
+		case ast.GeneratorComp:
+			return "cannot assign to generator expression"
+		default:
+			return "cannot assign to comprehension"
+		}
+
+	case *ast.SExpr:
+		// Check what kind of S-expression this is
+		elements := n.Elements
+		if len(elements) == 0 {
+			return "cannot assign to empty expression"
+		}
+
+		// Check the head of the S-expression
+		if ident, ok := elements[0].(*ast.Identifier); ok {
+			switch ident.Name {
+			case "get-attr", ".":
+				// Attribute access is a valid target
+				return ""
+			case "get-item", "subscript":
+				// Subscript access is a valid target
+				return ""
+			case "tuple-literal", "list-literal":
+				// Tuple/list unpacking - validate each element
+				for _, elem := range elements[1:] {
+					if errMsg := p.validateAssignmentTarget(elem); errMsg != "" {
+						return errMsg
+					}
+				}
+				return ""
+			case "*unpack":
+				// Star unpacking in assignment is valid
+				return ""
+			case "dict-comp":
+				return "cannot assign to dict comprehension"
+			case "list-comp":
+				return "cannot assign to list comprehension"
+			case "set-comp":
+				return "cannot assign to set comprehension"
+			case "generator":
+				return "cannot assign to generator expression"
+			case "call":
+				return "cannot assign to function call"
+			case "+", "-", "*", "/", "//", "%", "**",
+				"&", "|", "^", "<<", ">>",
+				"and", "or", "not",
+				"==", "!=", "<", ">", "<=", ">=",
+				"is", "is-not", "in", "not-in":
+				return "cannot assign to expression"
+			case "lambda":
+				return "cannot assign to lambda"
+			case "if-expr", "ternary":
+				return "cannot assign to conditional expression"
+			}
+		}
+
+		// For other S-expressions, check if it looks like a tuple for unpacking
+		// This handles implicit tuples like (a, b)
+		allValidTargets := true
+		for _, elem := range elements {
+			if errMsg := p.validateAssignmentTarget(elem); errMsg != "" {
+				allValidTargets = false
+				break
+			}
+		}
+		if allValidTargets && len(elements) > 0 {
+			return "" // Valid tuple unpacking
+		}
+
+		return "cannot assign to expression"
+
+	default:
+		// For any other node types, reject
+		return "cannot assign to expression"
+	}
 }
 
 // ============================================================================

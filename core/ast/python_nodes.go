@@ -911,8 +911,9 @@ type WithItem struct {
 // WithForm represents a with statement (context manager)
 type WithForm struct {
 	BaseNode
-	Items []WithItem
-	Body  []ASTNode
+	Items   []WithItem
+	Body    []ASTNode
+	IsAsync bool // True for async with statements
 }
 
 // NewWithForm creates a new with statement
@@ -922,8 +923,22 @@ func NewWithForm(items []WithItem, body []ASTNode, loc *core.SourceLocation, syn
 			Loc:    loc,
 			Syntax: syntax,
 		},
-		Items: items,
-		Body:  body,
+		Items:   items,
+		Body:    body,
+		IsAsync: false,
+	}
+}
+
+// NewAsyncWithForm creates a new async with statement
+func NewAsyncWithForm(items []WithItem, body []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *WithForm {
+	return &WithForm{
+		BaseNode: BaseNode{
+			Loc:    loc,
+			Syntax: syntax,
+		},
+		Items:   items,
+		Body:    body,
+		IsAsync: true,
 	}
 }
 
@@ -939,6 +954,12 @@ func (w *WithForm) String() string {
 
 // ToIR lowers with statement to IR
 func (w *WithForm) ToIR() core.Value {
+	// Determine the symbol to use based on whether this is async
+	formSymbol := core.SymbolValue("with")
+	if w.IsAsync {
+		formSymbol = core.SymbolValue("async-with")
+	}
+
 	// Build body block
 	bodyIR := make([]core.Value, 0, len(w.Body)+1)
 	bodyIR = append(bodyIR, core.SymbolValue("do"))
@@ -947,7 +968,7 @@ func (w *WithForm) ToIR() core.Value {
 	}
 
 	// For now, handle simple case: one context manager
-	// (with context-expr var body)
+	// (with context-expr var body) or (async-with context-expr var body)
 	if len(w.Items) == 1 {
 		item := w.Items[0]
 		var target core.Value
@@ -962,7 +983,7 @@ func (w *WithForm) ToIR() core.Value {
 			target = core.None
 		}
 		return core.NewList(
-			core.SymbolValue("with"),
+			formSymbol,
 			item.Context.ToIR(),
 			target,
 			core.NewList(bodyIR...),
@@ -972,6 +993,7 @@ func (w *WithForm) ToIR() core.Value {
 	// Multiple context managers: nest them
 	// with x as a, y as b: body
 	// → (with x a (with y b body))
+	// For async: (async-with x a (async-with y b body))
 	result := core.NewList(bodyIR...)
 	for i := len(w.Items) - 1; i >= 0; i-- {
 		item := w.Items[i]
@@ -987,7 +1009,7 @@ func (w *WithForm) ToIR() core.Value {
 			target = core.None
 		}
 		result = core.NewList(
-			core.SymbolValue("with"),
+			formSymbol,
 			item.Context.ToIR(),
 			target,
 			result,

@@ -3,6 +3,7 @@ package eval
 import (
 	"fmt"
 
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 )
 
@@ -297,8 +298,181 @@ func executeBody(body []core.Value, ctx *core.Context) (core.Value, error) {
 	return result, nil
 }
 
+// asyncWithForm implements the async with statement
+// (async-with expr body...)              - simple form
+// (async-with expr as var body...)       - with variable binding
+func asyncWithForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	if args.Len() < 2 {
+		return nil, fmt.Errorf("async with requires at least 2 arguments")
+	}
+
+	// Parse async context managers - same structure as sync with
+	var managers []asyncWithManager
+
+	// Handle single manager case (the common case from ToIR)
+	mgr := asyncWithManager{expr: args.Items()[0]}
+	bodyStart := 1
+
+	// Check if args[1] is a variable name (symbol), tuple pattern (list), or None
+	if args.Len() >= 3 {
+		target := unwrapLocated(args.Items()[1])
+		if sym, ok := target.(core.SymbolValue); ok {
+			symStr := string(sym)
+			if symStr != "None" {
+				mgr.varName = symStr
+				bodyStart = 2
+			} else {
+				bodyStart = 2
+			}
+		} else if list, ok := target.(*core.ListValue); ok {
+			mgr.target = list
+			bodyStart = 2
+		} else if target == core.None {
+			bodyStart = 2
+		}
+	}
+
+	managers = []asyncWithManager{mgr}
+	body := args.Items()[bodyStart:]
+
+	return executeAsyncWith(managers, body, ctx)
+}
+
+// asyncWithManager represents a single async context manager in an async with statement
+type asyncWithManager struct {
+	expr    core.Value
+	varName string     // For simple variable: as x
+	target  core.Value // For tuple unpacking: as (a, b, c)
+}
+
+// executeAsyncWith executes an async with statement with proper async enter/exit handling
+func executeAsyncWith(managers []asyncWithManager, body []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(managers) == 0 {
+		return executeBody(body, ctx)
+	}
+
+	// Take the first manager
+	mgr := managers[0]
+	rest := managers[1:]
+
+	// Evaluate the manager expression
+	mgrValue, err := Eval(mgr.expr, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if it's an async context manager (has __aenter__ and __aexit__)
+	if !types.HasAenter(mgrValue) || !types.HasAexit(mgrValue) {
+		return nil, fmt.Errorf("'%s' object does not support the async context manager protocol", mgrValue.Type())
+	}
+
+	// Call __aenter__
+	aenterResult, found, err := types.CallAenter(mgrValue, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("'%s' object has no __aenter__ method", mgrValue.Type())
+	}
+
+	// If __aenter__ returns a coroutine, execute it to get the actual value
+	enterValue := aenterResult
+	if coro, ok := aenterResult.(*core.Coroutine); ok {
+		if callable, callOk := coro.Function.(interface {
+			Call([]core.Value, *core.Context) (core.Value, error)
+		}); callOk {
+			enterValue, err = callable.Call(coro.Args, ctx)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Bind the value if there's an 'as' clause
+	if mgr.varName != "" {
+		ctx.Define(mgr.varName, enterValue)
+	} else if mgr.target != nil {
+		if err := UnpackPattern(mgr.target, enterValue, ctx); err != nil {
+			// Call __aexit__ before returning error
+			callAsyncExit(mgrValue, core.Nil, core.Nil, core.Nil, ctx)
+			return nil, err
+		}
+	}
+
+	// Execute the body
+	var result core.Value
+	var bodyErr error
+
+	if len(rest) > 0 {
+		result, bodyErr = executeAsyncWith(rest, body, ctx)
+	} else {
+		result, bodyErr = executeBody(body, ctx)
+	}
+
+	// Call __aexit__ with exception info
+	var excType, excValue, excTraceback core.Value = core.Nil, core.Nil, core.Nil
+
+	if bodyErr != nil {
+		excInstance := errorToExceptionInstance(bodyErr, ctx)
+		if inst, ok := excInstance.(*core.Instance); ok {
+			if classVal, hasClass := inst.GetAttr("__class__"); hasClass {
+				excType = classVal
+			} else {
+				excType = core.StringValue("Exception")
+			}
+		} else {
+			excType = core.StringValue("Exception")
+		}
+		excValue = excInstance
+	}
+
+	suppress, exitErr := callAsyncExit(mgrValue, excType, excValue, excTraceback, ctx)
+	if exitErr != nil {
+		return nil, exitErr
+	}
+
+	// If __aexit__ returned true, suppress the exception
+	if suppress && bodyErr != nil {
+		return result, nil
+	}
+
+	if bodyErr != nil {
+		return nil, bodyErr
+	}
+
+	return result, nil
+}
+
+// callAsyncExit calls __aexit__ on an async context manager, handling coroutine return
+func callAsyncExit(mgrValue, excType, excValue, excTb core.Value, ctx *core.Context) (bool, error) {
+	aexitResult, found, err := types.CallAexit(mgrValue, excType, excValue, excTb, ctx)
+	if err != nil {
+		return false, err
+	}
+	if !found {
+		return false, fmt.Errorf("'%s' object has no __aexit__ method", mgrValue.Type())
+	}
+
+	// If __aexit__ returns a coroutine, execute it to get the actual return value
+	exitValue := aexitResult
+	if coro, ok := aexitResult.(*core.Coroutine); ok {
+		if callable, callOk := coro.Function.(interface {
+			Call([]core.Value, *core.Context) (core.Value, error)
+		}); callOk {
+			exitValue, err = callable.Call(coro.Args, ctx)
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+
+	// Check if __aexit__ returned truthy value to suppress exception
+	return core.IsTruthy(exitValue), nil
+}
+
 // RegisterContextForms registers context manager related forms
 func RegisterContextForms() {
 	RegisterSpecialForm("with", withForm)
+	RegisterSpecialForm("async-with", asyncWithForm)
 	// open is now a builtin function, not a special form
 }

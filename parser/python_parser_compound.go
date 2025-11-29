@@ -287,8 +287,8 @@ func (p *PythonParser) parseAsyncStatement() ast.ASTNode {
 		// async for - for now, treat like regular for
 		return p.parseForStatement()
 	case TOKEN_WITH:
-		// async with - for now, treat like regular with
-		return p.parseWithStatement()
+		// async with - use async context manager protocol
+		return p.parseWithStatementWithAsync(true)
 	default:
 		p.error(fmt.Sprintf("Expected 'def', 'for', or 'with' after 'async', got %v", p.peek().Type))
 		return nil
@@ -946,6 +946,11 @@ func (p *PythonParser) parseTryStatement() ast.ASTNode {
 // parseWithStatement parses: with expr (as var)?(, expr (as var)?)* : block
 // Also supports Python 3.10+ parenthesized form: with (expr as var, expr as var): block
 func (p *PythonParser) parseWithStatement() ast.ASTNode {
+	return p.parseWithStatementWithAsync(false)
+}
+
+// parseWithStatementWithAsync parses with statements, optionally as async
+func (p *PythonParser) parseWithStatementWithAsync(isAsync bool) ast.ASTNode {
 	tok := p.expect(TOKEN_WITH)
 
 	// Check for parenthesized form (Python 3.10+)
@@ -1024,6 +1029,9 @@ func (p *PythonParser) parseWithStatement() ast.ASTNode {
 	// Parse body
 	body := p.parseBlock()
 
+	if isAsync {
+		return ast.NewAsyncWithForm(items, body, p.makeLocation(tok), ast.SyntaxPython)
+	}
 	return ast.NewWithForm(items, body, p.makeLocation(tok), ast.SyntaxPython)
 }
 

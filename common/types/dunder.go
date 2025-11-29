@@ -274,6 +274,26 @@ func CallAnext(obj core.Value, ctx *core.Context) (core.Value, bool, error) {
 	return CallDunder(obj, "__anext__", []core.Value{}, ctx)
 }
 
+// CallAenter calls __aenter__ on an async context manager
+func CallAenter(obj core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(obj, "__aenter__", []core.Value{}, ctx)
+}
+
+// CallAexit calls __aexit__ on an async context manager
+func CallAexit(obj core.Value, excType, excValue, excTb core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(obj, "__aexit__", []core.Value{excType, excValue, excTb}, ctx)
+}
+
+// HasAenter checks if an object has __aenter__ method (async context manager check)
+func HasAenter(obj core.Value) bool {
+	return HasDunder(obj, "__aenter__")
+}
+
+// HasAexit checks if an object has __aexit__ method (async context manager check)
+func HasAexit(obj core.Value) bool {
+	return HasDunder(obj, "__aexit__")
+}
+
 // CallCall calls __call__ on an object (makes it callable)
 func CallCall(obj core.Value, args []core.Value, ctx *core.Context) (core.Value, bool, error) {
 	return CallDunder(obj, "__call__", args, ctx)

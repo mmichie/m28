@@ -777,6 +777,11 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 		// Returning (nil, false) means the attribute doesn't exist, which is correct
 		// for non-partial functions.
 		return nil, false
+	case "__call__":
+		// Functions are callable via __call__
+		// func.__call__(args) is equivalent to func(args)
+		// This is important for decorators that use func.__call__
+		return f, true
 	}
 
 	return nil, false

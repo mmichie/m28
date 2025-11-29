@@ -619,6 +619,11 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 			// (this handles edge cases where __get__ is called on non-instances)
 			return f, nil
 		}), true
+	case "__call__":
+		// Functions are callable via __call__
+		// func.__call__(args) is equivalent to func(args)
+		// This is important for decorators that use func.__call__
+		return f, true
 	default:
 		return f.BaseObject.GetAttr(name)
 	}

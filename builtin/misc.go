@@ -19,15 +19,17 @@ func checkAssertPatterns(source, filename string, ctx *core.Context) error {
 	tokenizer := parser.NewPythonTokenizer(source)
 	tokens, err := tokenizer.Tokenize()
 	if err != nil {
-		// If tokenization fails, let it fail during actual evaluation
-		return nil
+		// Tokenization error - convert to SyntaxError
+		return createSyntaxError(err.Error(), filename, 1, 0, ctx)
 	}
 
 	pythonParser := parser.NewPythonParser(tokens, filename, source)
 	nodes, err := pythonParser.Parse()
 	if err != nil {
-		// If parsing fails, let it fail during actual evaluation
-		return nil
+		// Parse error - convert to SyntaxError
+		// Extract line number if available from the error message
+		errMsg := err.Error()
+		return createSyntaxError(errMsg, filename, 1, 0, ctx)
 	}
 
 	// Walk the AST looking for assert statements
@@ -38,6 +40,36 @@ func checkAssertPatterns(source, filename string, ctx *core.Context) error {
 	}
 
 	return nil
+}
+
+// createSyntaxError creates a SyntaxError from an error message
+func createSyntaxError(msg, filename string, lineno, offset int, ctx *core.Context) error {
+	// Try to look up SyntaxError class and create a proper instance
+	if syntaxErrorClass, err := ctx.Lookup("SyntaxError"); err == nil {
+		if cls, ok := syntaxErrorClass.(*core.Class); ok {
+			inst := core.NewInstance(cls)
+			inst.SetAttr("msg", core.StringValue(msg))
+			inst.SetAttr("lineno", core.NumberValue(lineno))
+			inst.SetAttr("offset", core.NumberValue(offset))
+			inst.SetAttr("text", core.Nil)
+			inst.SetAttr("filename", core.StringValue(filename))
+			inst.SetAttr("args", core.TupleValue{
+				core.StringValue(msg),
+				core.TupleValue{
+					core.StringValue(filename),
+					core.NumberValue(lineno),
+					core.NumberValue(offset),
+					core.Nil,
+				},
+			})
+			return core.NewPythonError(inst)
+		}
+	}
+	// Fallback to eval.Exception if class lookup fails
+	return &eval.Exception{
+		Type:    "SyntaxError",
+		Message: msg,
+	}
 }
 
 // walkForAsserts recursively walks the AST to find AssertForm nodes

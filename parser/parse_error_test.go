@@ -545,3 +545,118 @@ func TestParseError_EmptyStatements(t *testing.T) {
 		})
 	}
 }
+
+func TestParseError_InvalidAssignmentTargets(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		shouldFail bool
+		errMsg     string
+	}{
+		// Valid assignments - should not fail
+		{
+			name:       "simple variable assignment",
+			source:     "x = 5",
+			shouldFail: false,
+		},
+		{
+			name:       "tuple unpacking",
+			source:     "x, y = 1, 2",
+			shouldFail: false,
+		},
+		{
+			name:       "attribute assignment",
+			source:     "obj.attr = 5",
+			shouldFail: false,
+		},
+		{
+			name:       "subscript assignment",
+			source:     "arr[0] = 5",
+			shouldFail: false,
+		},
+		{
+			name:       "chained assignment",
+			source:     "x = y = z = 0",
+			shouldFail: false,
+		},
+		{
+			name:       "star unpacking",
+			source:     "a, *b, c = [1, 2, 3, 4]",
+			shouldFail: false,
+		},
+		// Dict comprehension - should fail
+		{
+			name:       "dict comprehension assignment",
+			source:     "{x: y for y, x in [(1, 2)]} = 5",
+			shouldFail: true,
+			errMsg:     "cannot assign to dict comprehension",
+		},
+		{
+			name:       "dict comprehension augmented assignment",
+			source:     "{x: y for y, x in [(1, 2)]} += 5",
+			shouldFail: true,
+			errMsg:     "illegal expression",
+		},
+		// List comprehension - should fail
+		{
+			name:       "list comprehension assignment",
+			source:     "[x for x in range(5)] = [1, 2, 3]",
+			shouldFail: true,
+			errMsg:     "cannot assign to list comprehension",
+		},
+		{
+			name:       "list comprehension augmented assignment",
+			source:     "[x for x in range(5)] += [1]",
+			shouldFail: true,
+			errMsg:     "illegal expression",
+		},
+		// Set comprehension - should fail
+		{
+			name:       "set comprehension assignment",
+			source:     "{x for x in range(5)} = {1, 2}",
+			shouldFail: true,
+			errMsg:     "cannot assign to set comprehension",
+		},
+		// Literals - should fail
+		{
+			name:       "number literal assignment",
+			source:     "5 = x",
+			shouldFail: true,
+			errMsg:     "cannot assign to literal",
+		},
+		{
+			name:       "string literal assignment",
+			source:     `"hello" = x`,
+			shouldFail: true,
+			errMsg:     "cannot assign to literal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenizer := NewPythonTokenizer(tt.source)
+			tokens, err := tokenizer.Tokenize()
+			if err != nil {
+				if !tt.shouldFail {
+					t.Fatalf("Tokenization failed: %v", err)
+				}
+				return
+			}
+
+			parser := NewPythonParser(tokens, "test.py", tt.source)
+			_, err = parser.Parse()
+
+			if tt.shouldFail && err == nil {
+				t.Errorf("Expected parse error for %q but got none", tt.source)
+			}
+			if !tt.shouldFail && err != nil {
+				t.Errorf("Expected no error for %q but got: %v", tt.source, err)
+			}
+			if tt.shouldFail && err != nil && tt.errMsg != "" {
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("Expected error containing %q for %q, got: %s", tt.errMsg, tt.source, err.Error())
+				}
+			}
+		})
+	}
+}
