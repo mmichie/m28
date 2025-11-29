@@ -1,0 +1,102 @@
+# Test async methods in class definitions
+# Tests that async def methods are properly recognized and callable
+
+print("Test 1: Basic async method")
+
+(class AsyncMethodClass ()
+  (async def async_method (self)
+    (return 42)))
+
+obj = (AsyncMethodClass)
+(assert (hasattr obj "async_method") "Should have async_method")
+
+# Call the async method - should return a coroutine
+coro = (obj.async_method)
+(assert (== (type coro).__name__ "coroutine") f"Expected coroutine, got {(type coro).__name__}")
+
+# Execute the coroutine
+(try
+  (coro.send None)
+  (except StopIteration as e
+    (assert (== e.value 42) f"Expected 42, got {e.value}")
+    print("  - Basic async method: PASSED")))
+
+
+print("Test 2: Async method with self access")
+
+(class Counter ()
+  (def __init__ (self start)
+    (= self.value start))
+
+  (async def increment (self)
+    (= self.value (+ self.value 1))
+    (return self.value)))
+
+counter = (Counter 10)
+coro = (counter.increment)
+(try
+  (coro.send None)
+  (except StopIteration as e
+    (assert (== e.value 11) f"Expected 11, got {e.value}")
+    (assert (== counter.value 11) f"Expected counter.value == 11, got {counter.value}")
+    print("  - Async method with self: PASSED")))
+
+
+print("Test 3: Multiple async methods")
+
+(class MultiAsync ()
+  (async def method_a (self)
+    (return "a"))
+
+  (async def method_b (self)
+    (return "b"))
+
+  (def sync_method (self)
+    (return "sync")))
+
+obj = (MultiAsync)
+
+# Test async method a
+coro_a = (obj.method_a)
+(try
+  (coro_a.send None)
+  (except StopIteration as e
+    (assert (== e.value "a") f"Expected 'a', got {e.value}")))
+
+# Test async method b
+coro_b = (obj.method_b)
+(try
+  (coro_b.send None)
+  (except StopIteration as e
+    (assert (== e.value "b") f"Expected 'b', got {e.value}")))
+
+# Test sync method still works
+(assert (== (obj.sync_method) "sync") "Sync method should work")
+print("  - Multiple async methods: PASSED")
+
+
+print("Test 4: Async __anext__ method")
+
+(class MyAsyncIter ()
+  (def __init__ (self)
+    (= self.count 0))
+
+  (def __aiter__ (self)
+    (return self))
+
+  (async def __anext__ (self)
+    (if (>= self.count 2)
+      (raise StopAsyncIteration))
+    val = self.count
+    (= self.count (+ self.count 1))
+    (return val)))
+
+items = []
+(for item (MyAsyncIter)
+  (items.append item))
+
+(assert (== items [0, 1]) f"Expected [0, 1], got {items}")
+print("  - Async __anext__ method: PASSED")
+
+
+print("\nAll async methods tests passed!")

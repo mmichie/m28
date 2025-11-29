@@ -149,6 +149,25 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return pyErr.Instance
 	}
 
+	// Check for core.StopIteration early (before any unwrapping)
+	// This must be handled before the string-based type detection
+	// Also check if wrapped in an EvalError
+	var stopIterToCheck error = err
+	if evalErr, ok := err.(*core.EvalError); ok && evalErr.Wrapped != nil {
+		stopIterToCheck = evalErr.Wrapped
+	}
+	if stopIter, ok := stopIterToCheck.(*core.StopIteration); ok {
+		inst := createPythonExceptionInstance(ctx, "StopIteration", "StopIteration")
+		if instance, ok := inst.(*core.Instance); ok {
+			if stopIter.Value != nil {
+				instance.SetAttr("value", stopIter.Value)
+			} else {
+				instance.SetAttr("value", core.Nil)
+			}
+		}
+		return inst
+	}
+
 	// Unwrap EvalError if needed
 	var baseErr error = err
 	var errMsg string

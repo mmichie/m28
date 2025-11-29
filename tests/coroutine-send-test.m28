@@ -1,0 +1,76 @@
+# Test coroutine.send() functionality
+# Tests that calling send(None) on a coroutine executes its body
+# and returns the result via StopIteration.value
+
+print("Test 1: Basic coroutine send")
+
+(async def simple_coro ()
+  (return 42))
+
+coro = (simple_coro)
+(assert (== (type coro).__name__ "coroutine") f"Expected coroutine, got {(type coro).__name__}")
+
+(try
+  (coro.send None)
+  (assert False "Expected StopIteration")
+  (except StopIteration as e
+    (assert (== e.value 42) f"Expected value 42, got {e.value}")
+    print("  - Basic coroutine send: PASSED")))
+
+
+print("Test 2: Coroutine with side effects")
+
+side_effect_called = False
+
+(async def side_effect_coro ()
+  (global side_effect_called)
+  (= side_effect_called True)
+  (return "done"))
+
+coro2 = (side_effect_coro)
+(assert (not side_effect_called) "Side effect called before send")
+
+(try
+  (coro2.send None)
+  (except StopIteration as e
+    (assert side_effect_called "Side effect not called")
+    (assert (== e.value "done") f"Expected 'done', got {e.value}")
+    print("  - Side effects executed: PASSED")))
+
+
+print("Test 3: Coroutine raising exception")
+
+(class CustomError (Exception))
+
+(async def raising_coro ()
+  (raise (CustomError "test error")))
+
+coro3 = (raising_coro)
+(try
+  (coro3.send None)
+  (assert False "Expected CustomError")
+  (except CustomError as e
+    # str(e) returns the message with quotes in M28
+    (assert (or (== (str e) "test error") (== (str e) "\"test error\"")) f"Wrong error message: {e}")
+    print("  - Exception propagation: PASSED")))
+
+
+print("Test 4: Coroutine cannot be reused")
+
+(async def once_only ()
+  (return 1))
+
+coro4 = (once_only)
+(try
+  (coro4.send None)
+  (except StopIteration))
+
+(try
+  (coro4.send None)
+  (assert False "Expected error on reuse")
+  (except Exception as e
+    # Should error on second send
+    print("  - Cannot reuse coroutine: PASSED")))
+
+
+print("\nAll coroutine send tests passed!")

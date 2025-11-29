@@ -651,12 +651,44 @@ func (af *AsyncFunction) GetAttr(name string) (Value, bool) {
 		return None, true
 	case "__wrapped__":
 		return None, true
+	case "__get__":
+		// Return a descriptor function that binds this async function to an instance
+		// IMPORTANT: We must return the AsyncFunction wrapper, not the underlying function
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// Descriptor protocol: __get__(self, instance, owner)
+			// args[0] is instance (or None if accessed on class)
+			// args[1] is owner class (optional)
+
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__get__() requires at least 1 argument (instance), got %d", len(args))
+			}
+
+			instance := args[0]
+
+			// If instance is None, return the async function itself (class-level access)
+			if instance == None || instance == Nil {
+				return af, nil
+			}
+
+			// Create a bound method that wraps the async function
+			if inst, ok := instance.(*Instance); ok {
+				return &BoundInstanceMethod{
+					Instance:      inst,
+					Method:        af, // Use the AsyncFunction, not the underlying function
+					DefiningClass: inst.Class,
+				}, nil
+			}
+
+			// For non-Instance objects, return the async function unbound
+			return af, nil
+		}), true
 	}
 	// Check custom attributes (set by decorators, etc.)
 	if val, ok := af.Attributes[name]; ok {
 		return val, true
 	}
-	// Fall back to checking the underlying function
+	// Fall back to checking the underlying function for other attributes
+	// BUT NOT for __get__ - we already handled that above
 	if obj, ok := af.Function.(Object); ok {
 		return obj.GetAttr(name)
 	}

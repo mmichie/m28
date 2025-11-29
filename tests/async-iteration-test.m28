@@ -1,0 +1,63 @@
+# Test async iteration protocol (__aiter__/__anext__)
+# Tests that for loops can iterate over async iterables
+
+print("Test 1: Basic async iteration with StopAsyncIteration")
+
+(class EmptyAsyncIter ()
+  (def __aiter__ (self)
+    (return self))
+  (async def __anext__ (self)
+    (raise StopAsyncIteration)))
+
+items = []
+(for item (EmptyAsyncIter)
+  (items.append item))
+
+(assert (== items []) f"Expected empty list, got {items}")
+print("  - Empty async iterator: PASSED")
+
+
+print("Test 2: Async iterator with items")
+
+(class CountingAsyncIter ()
+  (def __init__ (self max_val)
+    (= self.current 0)
+    (= self.max_val max_val))
+
+  (def __aiter__ (self)
+    (return self))
+
+  (async def __anext__ (self)
+    (if (>= self.current self.max_val)
+      (raise StopAsyncIteration))
+    val = self.current
+    (= self.current (+ self.current 1))
+    (return val)))
+
+items = []
+(for item (CountingAsyncIter 3)
+  (items.append item))
+
+(assert (== items [0, 1, 2]) f"Expected [0, 1, 2], got {items}")
+print("  - Counting async iterator: PASSED")
+
+
+print("Test 3: hasattr checks for async iterator")
+
+(class AsyncOnly ()
+  (def __aiter__ (self)
+    (return self))
+  (async def __anext__ (self)
+    (raise StopAsyncIteration)))
+
+ai = (AsyncOnly)
+(assert (hasattr ai "__aiter__") "Should have __aiter__")
+(assert (hasattr ai "__anext__") "Should have __anext__")
+(assert (not (hasattr ai "__iter__")) "Should not have __iter__")
+(assert (not (hasattr ai "__next__")) "Should not have __next__")
+# After fix, instances without __getitem__ defined should not have it
+(assert (not (hasattr ai "__getitem__")) "Should not inherit __getitem__ from type syntax")
+print("  - hasattr checks correct: PASSED")
+
+
+print("\nAll async iteration tests passed!")
