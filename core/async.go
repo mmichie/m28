@@ -450,6 +450,7 @@ type Coroutine struct {
 	BaseObject
 	Function Value
 	Args     []Value
+	Kwargs   map[string]Value
 	Name     string
 	closed   bool
 	registry *MethodRegistry
@@ -461,6 +462,19 @@ func NewCoroutine(function Value, args []Value, name string) *Coroutine {
 		BaseObject: *NewBaseObject(Type("coroutine")),
 		Function:   function,
 		Args:       args,
+		Name:       name,
+	}
+	c.registry = c.createRegistry()
+	return c
+}
+
+// NewCoroutineWithKwargs creates a new coroutine with keyword arguments
+func NewCoroutineWithKwargs(function Value, args []Value, kwargs map[string]Value, name string) *Coroutine {
+	c := &Coroutine{
+		BaseObject: *NewBaseObject(Type("coroutine")),
+		Function:   function,
+		Args:       args,
+		Kwargs:     kwargs,
 		Name:       name,
 	}
 	c.registry = c.createRegistry()
@@ -522,6 +536,22 @@ func (c *Coroutine) createRegistry() *MethodRegistry {
 				coro.closed = true
 
 				// Execute the coroutine's function
+				// First try CallWithKeywords if we have kwargs
+				if len(coro.Kwargs) > 0 {
+					if kwargsCallable, ok := coro.Function.(interface {
+						CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+					}); ok {
+						result, err := kwargsCallable.CallWithKeywords(coro.Args, coro.Kwargs, ctx)
+						if err != nil {
+							// Propagate exceptions from the coroutine
+							return nil, err
+						}
+						// Coroutine completed normally - raise StopIteration with return value
+						return nil, &StopIteration{Value: result}
+					}
+				}
+
+				// Fall back to regular Call
 				if callable, ok := coro.Function.(interface {
 					Call([]Value, *Context) (Value, error)
 				}); ok {
@@ -599,6 +629,17 @@ func (af *AsyncFunction) Call(args []Value, ctx *Context) (Value, error) {
 	// Return a coroutine object, not a running task
 	// The coroutine can be awaited later or closed
 	return NewCoroutine(af.Function, args, af.Name), nil
+}
+
+// CallWithKeywords creates a coroutine object with keyword arguments
+// This matches Python behavior where calling an async function with kwargs returns a coroutine
+func (af *AsyncFunction) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	// Return a coroutine object with kwargs, not a running task
+	// The coroutine can be awaited later or closed
+	if len(kwargs) == 0 {
+		return NewCoroutine(af.Function, args, af.Name), nil
+	}
+	return NewCoroutineWithKwargs(af.Function, args, kwargs, af.Name), nil
 }
 
 // GetAttr returns function attributes like __name__, __qualname__, etc.
