@@ -1271,91 +1271,36 @@ func (m *MatchForm) String() string {
 }
 
 // ToIR lowers match statement to IR
-// For now, we'll convert to a series of if/elif statements
+// Generates: (match subject (case pattern [if guard] body...) ...)
 func (m *MatchForm) ToIR() core.Value {
-	// (let ((subject-var <subject>))
-	//   (if (match-pattern? subject-var pattern1)
-	//     body1
-	//     (if (match-pattern? subject-var pattern2)
-	//       body2
-	//       ...)))
-
-	// For simplicity, we'll just convert to a series of if statements
-	// More sophisticated pattern matching can be added later
-
 	if len(m.Cases) == 0 {
 		return core.SymbolValue("nil")
 	}
 
-	// Generate a let binding for the subject
-	subjectVar := core.SymbolValue("__match_subject__")
-	subjectIR := m.Subject.ToIR()
+	// Build the match expression: (match subject case1 case2 ...)
+	result := make([]core.Value, 0, len(m.Cases)+2)
+	result = append(result, core.SymbolValue("match"))
+	result = append(result, m.Subject.ToIR())
 
-	// Build nested if/elif chain
-	var buildCases func(int) core.Value
-	buildCases = func(idx int) core.Value {
-		if idx >= len(m.Cases) {
-			// No more cases, return nil
-			return core.SymbolValue("nil")
-		}
+	// Build each case clause: (case pattern [if guard] body...)
+	for _, caseClause := range m.Cases {
+		caseIR := make([]core.Value, 0)
+		caseIR = append(caseIR, core.SymbolValue("case"))
+		caseIR = append(caseIR, caseClause.Pattern.ToIR())
 
-		caseClause := m.Cases[idx]
-
-		// Build case body
-		bodyIR := make([]core.Value, 0, len(caseClause.Body)+1)
-		bodyIR = append(bodyIR, core.SymbolValue("do"))
-		for _, stmt := range caseClause.Body {
-			bodyIR = append(bodyIR, stmt.ToIR())
-		}
-
-		// Build condition
-		// For now, simple pattern matching:
-		// - Identifier starting with _ is wildcard (always matches)
-		// - Otherwise, use equality check
-		var condition core.Value
-
-		if ident, ok := caseClause.Pattern.(*Identifier); ok && ident.Name == "_" {
-			// Wildcard pattern - always true
-			condition = core.BoolValue(true)
-		} else {
-			// Equality check
-			patternIR := caseClause.Pattern.ToIR()
-			condition = core.NewList(
-				core.SymbolValue("=="),
-				subjectVar,
-				patternIR,
-			)
-		}
-
-		// Add guard if present
+		// Add guard if present: if guard
 		if caseClause.Guard != nil {
-			guardIR := caseClause.Guard.ToIR()
-			condition = core.NewList(
-				core.SymbolValue("and"),
-				condition,
-				guardIR,
-			)
+			caseIR = append(caseIR, core.SymbolValue("if"))
+			caseIR = append(caseIR, caseClause.Guard.ToIR())
 		}
 
-		// Build if statement
-		elseClause := buildCases(idx + 1)
+		// Add body statements
+		for _, stmt := range caseClause.Body {
+			caseIR = append(caseIR, stmt.ToIR())
+		}
 
-		return core.NewList(
-			core.SymbolValue("if"),
-			condition,
-			core.NewList(bodyIR...),
-			elseClause,
-		)
+		result = append(result, core.NewList(caseIR...))
 	}
 
-	// Wrap in let binding
-	ifChain := buildCases(0)
-
-	return core.NewList(
-		core.SymbolValue("let"),
-		core.NewList(
-			core.NewList(subjectVar, subjectIR),
-		),
-		ifChain,
-	)
+	return core.NewList(result...)
 }

@@ -39,6 +39,9 @@ func registerControlFlowForms() {
 	eval.RegisterSpecialForm("for", forForm)
 	eval.RegisterSpecialForm("break", breakForm)
 	eval.RegisterSpecialForm("continue", continueForm)
+
+	// Pattern matching (Python 3.10+)
+	eval.RegisterSpecialForm("match", matchForm)
 }
 
 // registerLogicalForms registers special forms for logical operators
@@ -188,4 +191,9 @@ func andForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 // orForm implements the 'or' special form with short-circuit evaluation
 func orForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return eval.OrForm(args, ctx)
+}
+
+// matchForm implements the 'match' special form for Python 3.10+ pattern matching
+func matchForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	return eval.MatchForm(args, ctx)
 }

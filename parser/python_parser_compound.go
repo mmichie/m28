@@ -1090,9 +1090,21 @@ func (p *PythonParser) parsePattern() ast.ASTNode {
 	tok := p.peek()
 
 	switch tok.Type {
-	case TOKEN_NUMBER, TOKEN_STRING, TOKEN_TRUE, TOKEN_FALSE, TOKEN_NIL:
+	case TOKEN_NUMBER, TOKEN_STRING:
 		p.advance()
 		return ast.NewLiteral(tok.Value, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_TRUE:
+		p.advance()
+		return ast.NewLiteral(core.True, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_FALSE:
+		p.advance()
+		return ast.NewLiteral(core.False, p.makeLocation(tok), ast.SyntaxPython)
+
+	case TOKEN_NIL:
+		p.advance()
+		return ast.NewLiteral(core.Nil, p.makeLocation(tok), ast.SyntaxPython)
 
 	case TOKEN_IDENTIFIER:
 		// Could be:
