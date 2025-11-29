@@ -264,6 +264,16 @@ func CallNext(obj core.Value, ctx *core.Context) (core.Value, bool, error) {
 	return CallDunder(obj, "__next__", []core.Value{}, ctx)
 }
 
+// CallAiter calls __aiter__ on an object to get an async iterator
+func CallAiter(obj core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(obj, "__aiter__", []core.Value{}, ctx)
+}
+
+// CallAnext calls __anext__ on an async iterator
+func CallAnext(obj core.Value, ctx *core.Context) (core.Value, bool, error) {
+	return CallDunder(obj, "__anext__", []core.Value{}, ctx)
+}
+
 // CallCall calls __call__ on an object (makes it callable)
 func CallCall(obj core.Value, args []core.Value, ctx *core.Context) (core.Value, bool, error) {
 	return CallDunder(obj, "__call__", args, ctx)

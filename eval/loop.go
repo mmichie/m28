@@ -31,6 +31,23 @@ func isStopIteration(err error) bool {
 	return strings.Contains(err.Error(), "StopIteration")
 }
 
+// isStopAsyncIteration checks if an error is a StopAsyncIteration exception
+func isStopAsyncIteration(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check error message for StopAsyncIteration
+	errStr := err.Error()
+	if strings.Contains(errStr, "StopAsyncIteration") {
+		return true
+	}
+	// Also check for Exception type with StopAsyncIteration
+	if exc, ok := err.(*Exception); ok && exc.Type == "StopAsyncIteration" {
+		return true
+	}
+	return false
+}
+
 // Break signals a break from a loop
 type BreakValue struct {
 	core.BaseObject
@@ -619,6 +636,62 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 					lastResult = result
 					index++
+				}
+			} else if asyncIter, found, err := types.CallAiter(obj, ctx); found {
+				// Try async iteration protocol: __aiter__ / __anext__
+				if err != nil {
+					return nil, err
+				}
+
+				// Loop using __anext__
+				for {
+					// Call __anext__ on the async iterator
+					anextResult, found, err := types.CallAnext(asyncIter, ctx)
+					if err != nil {
+						// Check for StopAsyncIteration
+						if isStopAsyncIteration(err) {
+							break
+						}
+						return nil, err
+					}
+					if !found {
+						return nil, fmt.Errorf("async iterator type %T has no __anext__ method", asyncIter)
+					}
+
+					// If __anext__ returns a coroutine, execute it
+					var item core.Value = anextResult
+					if coro, ok := anextResult.(*core.Coroutine); ok {
+						// Execute the coroutine by calling its function
+						if callable, callOk := coro.Function.(interface {
+							Call([]core.Value, *core.Context) (core.Value, error)
+						}); callOk {
+							item, err = callable.Call(coro.Args, ctx)
+							if err != nil {
+								// Check for StopAsyncIteration
+								if isStopAsyncIteration(err) {
+									break
+								}
+								return nil, err
+							}
+						}
+					}
+
+					result, err := bodyFunc(item)
+					if err != nil {
+						return nil, err
+					}
+
+					if result == Break {
+						break
+					}
+					if result == Continue {
+						continue
+					}
+					if ret, ok := result.(*ReturnValue); ok {
+						return ret, nil
+					}
+
+					lastResult = result
 				}
 			} else {
 				return nil, TypeError{Expected: "iterable", Got: sequence.Type()}

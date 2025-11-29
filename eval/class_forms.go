@@ -605,6 +605,42 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 					continue
 
+				case "async":
+					// Async method definition: (async def name (params) body)
+					if s.Len() < 4 {
+						return nil, &core.TypeError{Message: "async requires at least def, name, and params"}
+					}
+
+					// Check that the next element is "def"
+					if defSym, ok := sItems[1].(core.SymbolValue); !ok || string(defSym) != "def" {
+						return nil, &core.TypeError{Message: "async must be followed by def in class body"}
+					}
+
+					name, ok := sItems[2].(core.SymbolValue)
+					if !ok {
+						return nil, &core.TypeError{Message: "async def name must be a symbol"}
+					}
+
+					if s.Len() >= 4 {
+						if paramList, ok := sItems[3].(*core.ListValue); ok {
+							// Create an async method
+							method, err := createMethod(string(name), paramList, sItems[4:], ctx)
+							if err != nil {
+								return nil, err
+							}
+
+							// Wrap as an async function
+							asyncMethod := core.NewAsyncFunction(method, string(name))
+
+							methodName := string(name)
+							class.SetMethod(methodName, asyncMethod)
+							classBodyCtx.Define(methodName, asyncMethod)
+							continue
+						}
+					}
+
+					return nil, &core.TypeError{Message: "async def should have parameters in class definition"}
+
 				case "def":
 					// Method definition
 					if s.Len() < 3 {

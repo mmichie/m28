@@ -505,9 +505,36 @@ func (c *Coroutine) createRegistry() *MethodRegistry {
 
 		MakeMethod("send", 1, "Send a value into the coroutine",
 			func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				// Simplified: just return None for now
-				// Full implementation would resume execution
-				return Nil, nil
+				coro, err := TypedReceiver[*Coroutine](receiver, "send")
+				if err != nil {
+					return nil, err
+				}
+				if err := ValidateArityRange("send", args, 0, 1); err != nil {
+					return nil, err
+				}
+
+				// Check if coroutine is closed
+				if coro.closed {
+					return nil, fmt.Errorf("cannot reuse already awaited coroutine")
+				}
+
+				// Mark as closed (coroutines can only be run once)
+				coro.closed = true
+
+				// Execute the coroutine's function
+				if callable, ok := coro.Function.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); ok {
+					result, err := callable.Call(coro.Args, ctx)
+					if err != nil {
+						// Propagate exceptions from the coroutine
+						return nil, err
+					}
+					// Coroutine completed normally - raise StopIteration with return value
+					return nil, &StopIteration{Value: result}
+				}
+
+				return nil, fmt.Errorf("coroutine function is not callable")
 			}),
 
 		MakeMethod("throw", 1, "Throw an exception into the coroutine",

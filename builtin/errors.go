@@ -540,6 +540,10 @@ func RegisterErrors(ctx *core.Context) {
 	stopIterationClass := core.NewClass("StopIteration", exceptionClass)
 	ctx.Define("StopIteration", stopIterationClass)
 
+	// StopAsyncIteration - raised by an async iterator's __anext__() to signal no more items
+	stopAsyncIterationClass := core.NewClass("StopAsyncIteration", exceptionClass)
+	ctx.Define("StopAsyncIteration", stopAsyncIterationClass)
+
 	// AssertionError - raised when an assert statement fails
 	assertionErrorClass := core.NewClass("AssertionError", exceptionClass)
 	ctx.Define("AssertionError", assertionErrorClass)

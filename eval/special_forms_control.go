@@ -214,10 +214,18 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 	}
 
 	// Map Go error types to Python exception classes
-	switch baseErr.(type) {
+	switch e := baseErr.(type) {
 	case *core.StopIteration:
-		// StopIteration from generators
-		return createPythonExceptionInstance(ctx, "StopIteration", errMsg)
+		// StopIteration from generators - preserve the value attribute
+		inst := createPythonExceptionInstance(ctx, "StopIteration", errMsg)
+		if instance, ok := inst.(*core.Instance); ok {
+			if e.Value != nil {
+				instance.SetAttr("value", e.Value)
+			} else {
+				instance.SetAttr("value", core.Nil)
+			}
+		}
+		return inst
 	case *protocols.StopIteration:
 		// StopIteration from iterators
 		return createPythonExceptionInstance(ctx, "StopIteration", errMsg)

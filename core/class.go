@@ -1283,18 +1283,22 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 
 	// Step 6: Check class-level special attributes (like __setattr__)
 	// These are provided by Class.GetAttr() for attributes that all classes inherit
-	if classAttr, ok := i.Class.GetAttr(name); ok {
-		// For callable attributes, create a bound method
-		if callable, ok := classAttr.(interface {
-			Call([]Value, *Context) (Value, error)
-		}); ok {
-			boundMethod := &BoundInstanceMethod{
-				Instance: i,
-				Method:   callable,
+	// Skip __getitem__ and __or__ here - these are for type syntax (list[int], int | str)
+	// not for instance attribute access. Only use them for instances if explicitly defined.
+	if name != "__getitem__" && name != "__or__" {
+		if classAttr, ok := i.Class.GetAttr(name); ok {
+			// For callable attributes, create a bound method
+			if callable, ok := classAttr.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				boundMethod := &BoundInstanceMethod{
+					Instance: i,
+					Method:   callable,
+				}
+				return boundMethod, true
 			}
-			return boundMethod, true
+			return classAttr, true
 		}
-		return classAttr, true
 	}
 
 	return nil, false
