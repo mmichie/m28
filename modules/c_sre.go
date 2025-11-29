@@ -380,7 +380,6 @@ func Init_SREModule() *core.DictValue {
 		}))
 
 		pattern.SetValue(core.StringValue("split"), core.NewNamedBuiltinFunction("split", func(splitArgs []core.Value, splitCtx *core.Context) (core.Value, error) {
-			// Stub implementation: just split on whitespace for now
 			if len(splitArgs) < 1 {
 				return core.NewList(), nil
 			}
@@ -390,13 +389,91 @@ func Init_SREModule() *core.DictValue {
 				return nil, fmt.Errorf("split() argument must be a string")
 			}
 
-			// For now, just split on whitespace (this is a simplified stub)
-			// TODO(M28-580c): Actually use the pattern to split
-			parts := strings.Fields(string(str))
-			result := core.NewList()
-			for _, part := range parts {
-				result.Append(core.StringValue(part))
+			// Get maxsplit parameter (0 means unlimited)
+			maxsplit := 0
+			if len(splitArgs) >= 2 {
+				if ms, ok := splitArgs[1].(core.NumberValue); ok {
+					maxsplit = int(ms)
+				}
 			}
+
+			// Get the pattern string from the pattern object
+			patternKey := core.ValueToKey(core.StringValue("pattern"))
+			patternVal, ok := pattern.Get(patternKey)
+			if !ok {
+				return nil, fmt.Errorf("pattern object has no pattern string")
+			}
+			patternStr, ok := patternVal.(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("pattern must be a string")
+			}
+
+			// Convert pattern to Go-compatible regex
+			goPattern := string(patternStr)
+			if strings.Contains(goPattern, `(?=\s|$)`) {
+				goPattern = strings.ReplaceAll(goPattern, `+(?=\s|$)`, ``)
+			}
+
+			// Compile the regex
+			re, err := regexp.Compile(goPattern)
+			if err != nil {
+				return nil, fmt.Errorf("invalid regex pattern: %v", err)
+			}
+
+			s := string(str)
+
+			// If pattern doesn't match at all, return original string in list
+			if !re.MatchString(s) {
+				result := core.NewList()
+				result.Append(core.StringValue(s))
+				return result, nil
+			}
+
+			// Find all matches with their submatch indices
+			// This gives us: [match_start, match_end, group1_start, group1_end, ...]
+			allMatches := re.FindAllStringSubmatchIndex(s, -1)
+			if len(allMatches) == 0 {
+				result := core.NewList()
+				result.Append(core.StringValue(s))
+				return result, nil
+			}
+
+			// Build result list
+			result := core.NewList()
+			lastEnd := 0
+			numSplits := 0
+
+			for _, match := range allMatches {
+				// Check if we've reached maxsplit
+				if maxsplit > 0 && numSplits >= maxsplit {
+					break
+				}
+
+				matchStart := match[0]
+				matchEnd := match[1]
+
+				// Add the part before this match
+				result.Append(core.StringValue(s[lastEnd:matchStart]))
+
+				// Add any captured groups (indices 2+ in the match array)
+				// match[0:2] is the full match, match[2:4] is group 1, etc.
+				for i := 2; i < len(match); i += 2 {
+					groupStart := match[i]
+					groupEnd := match[i+1]
+					if groupStart >= 0 && groupEnd >= 0 {
+						result.Append(core.StringValue(s[groupStart:groupEnd]))
+					} else {
+						// Group didn't participate in match (optional group)
+						result.Append(core.None)
+					}
+				}
+
+				lastEnd = matchEnd
+				numSplits++
+			}
+
+			// Add the remainder after the last match
+			result.Append(core.StringValue(s[lastEnd:]))
 
 			return result, nil
 		}))
