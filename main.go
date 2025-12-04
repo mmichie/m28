@@ -232,6 +232,48 @@ func main() {
 
 	// Evaluate an expression from -e
 	if *evalExpr != "" {
+		// Handle -ast/-parse or -ir flags for -e expressions
+		if *parseOnly || *printAST || *printIR {
+			// Parse the expression to get AST
+			tokenizer := parser.NewPythonTokenizer(*evalExpr)
+			tokens, err := tokenizer.Tokenize()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: tokenization error: %v\n", err)
+				os.Exit(1)
+			}
+
+			pythonParser := parser.NewPythonParser(tokens, "<command-line>", *evalExpr)
+			nodes, err := pythonParser.Parse()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: parse error: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Print AST/IR then continue to evaluate
+			if *parseOnly || *printAST {
+				fmt.Println("=== AST for expression ===")
+				for i, node := range nodes {
+					fmt.Printf("Statement %d:\n", i+1)
+					fmt.Printf("  Type: %T\n", node)
+					fmt.Printf("  AST: %s\n", node.String())
+					ir := node.ToIR()
+					fmt.Printf("  IR: %s\n", core.PrintSExpr(ir))
+					fmt.Println()
+				}
+				fmt.Println("=== Execution ===")
+			} else if *printIR {
+				fmt.Println("=== IR for expression ===")
+				for i, node := range nodes {
+					ir := node.ToIR()
+					fmt.Printf("Statement %d:\n", i+1)
+					fmt.Printf("  AST: %s\n", node.String())
+					fmt.Printf("  IR:  %s\n", core.PrintSExpr(ir))
+					fmt.Println()
+				}
+				fmt.Println("=== Execution ===")
+			}
+		}
+
 		// Create shared dict for __main__ module
 		mainDict := core.NewDict()
 		globalCtx.ModuleDict = mainDict
@@ -612,7 +654,7 @@ func executePythonFile(filename, content string, ctx *core.Context) error {
 			ir := node.ToIR()
 			fmt.Printf("Statement %d:\n", i+1)
 			fmt.Printf("  AST: %s\n", node.String())
-			fmt.Printf("  IR:  %s\n", core.PrintValue(ir))
+			fmt.Printf("  IR:  %s\n", core.PrintSExpr(ir))
 			fmt.Println()
 		}
 		fmt.Println("=== End IR ===")
@@ -670,7 +712,7 @@ func parseAndPrintAST(filename string) error {
 			fmt.Printf("  Type: %T\n", node)
 			fmt.Printf("  AST: %s\n", node.String())
 			ir := node.ToIR()
-			fmt.Printf("  IR: %s\n", core.PrintValue(ir))
+			fmt.Printf("  IR: %s\n", core.PrintSExpr(ir))
 			fmt.Println()
 		}
 	} else {

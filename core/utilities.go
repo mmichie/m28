@@ -448,6 +448,32 @@ func PrintValueWithoutQuotes(val Value) string {
 	return PrintValue(val)
 }
 
+// PrintSExpr returns an S-expression representation of a value (lists use () not [])
+func PrintSExpr(val Value) string {
+	if val == nil {
+		return "nil"
+	}
+	switch v := val.(type) {
+	case LocatedValue:
+		return PrintSExpr(v.Value)
+	case *ListValue:
+		if v == nil || len(v.Items()) == 0 {
+			return "()"
+		}
+		elements := make([]string, len(v.Items()))
+		for i, item := range v.Items() {
+			elements[i] = PrintSExpr(item)
+		}
+		return "(" + strings.Join(elements, " ") + ")"
+	case StringValue:
+		return string(v)
+	case SymbolValue:
+		return string(v)
+	default:
+		return val.String()
+	}
+}
+
 // ProcessEscapeSequences processes escape sequences in a string
 func ProcessEscapeSequences(s string) string {
 	// For now, just return the string as is
