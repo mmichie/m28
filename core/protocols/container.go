@@ -155,6 +155,71 @@ func (t *TupleContainer) IsEmpty() bool {
 	return len(t.tuple) == 0
 }
 
+// InstanceContainer adapts an Instance with __len__/__contains__ to Container protocol
+type InstanceContainer struct {
+	instance   *core.Instance
+	lenMethod  core.Value
+	hasContains bool
+	containsMethod core.Value
+}
+
+// NewInstanceContainer creates a Container adapter for instances with container methods
+// Returns nil if the instance doesn't have __len__
+func NewInstanceContainer(inst *core.Instance) Container {
+	// Must have __len__ to be a container
+	lenMethod, hasLen := inst.GetAttr("__len__")
+	if !hasLen {
+		return nil
+	}
+
+	containsMethod, hasContains := inst.GetAttr("__contains__")
+
+	return &InstanceContainer{
+		instance:       inst,
+		lenMethod:      lenMethod,
+		hasContains:    hasContains,
+		containsMethod: containsMethod,
+	}
+}
+
+// Size returns the result of calling __len__
+func (ic *InstanceContainer) Size() int {
+	if callable, ok := ic.lenMethod.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	}); ok {
+		result, err := callable.Call([]core.Value{}, nil)
+		if err == nil {
+			if num, ok := result.(core.NumberValue); ok {
+				return int(num)
+			}
+		}
+	}
+	return 0
+}
+
+// Contains checks if the container contains an item using __contains__
+func (ic *InstanceContainer) Contains(item core.Value) bool {
+	if !ic.hasContains {
+		// If no __contains__, fall back to iteration (not implemented here)
+		return false
+	}
+
+	if callable, ok := ic.containsMethod.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	}); ok {
+		result, err := callable.Call([]core.Value{item}, nil)
+		if err == nil {
+			return core.IsTruthy(result)
+		}
+	}
+	return false
+}
+
+// IsEmpty checks if the container is empty
+func (ic *InstanceContainer) IsEmpty() bool {
+	return ic.Size() == 0
+}
+
 // GetContainer returns a Container implementation for a value if possible
 func GetContainer(v core.Value) (Container, bool) {
 	switch val := v.(type) {
@@ -168,12 +233,17 @@ func GetContainer(v core.Value) (Container, bool) {
 		return NewSetContainer(val), true
 	case core.TupleValue:
 		return NewTupleContainer(val), true
+	case *core.Instance:
+		// Check for __len__ method on the instance
+		if container := NewInstanceContainer(val); container != nil {
+			return container, true
+		}
+		return nil, false
 	default:
 		// Check if value implements Container directly
 		if container, ok := v.(Container); ok {
 			return container, true
 		}
-		// TODO(M28-b2fc): Check for __len__ and __contains__ methods
 		return nil, false
 	}
 }

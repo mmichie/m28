@@ -210,8 +210,37 @@ func IsHashable(v Value) bool {
 	case *Instance:
 		// In Python, instances are hashable by default (using object ID)
 		// unless they define __hash__ = None or __eq__ without __hash__
-		// For now, we make all instances hashable by default
-		// TODO(M28-b2fc): Check for __hash__ = None or missing __hash__ with custom __eq__
+		inst := v.(*Instance)
+		if inst.Class == nil {
+			return true // No class, use default behavior
+		}
+
+		// Check the class's OWN definitions (not inherited) for __hash__ and __eq__
+		// Methods are stored in Methods map, attributes in Attributes map
+		// This is crucial: GetClassAttr searches parent classes, but Python 3's
+		// unhashability rule is about the class's OWN definitions
+
+		// Check for __hash__ in both Methods (def __hash__) and Attributes (__hash__ = None)
+		ownHashAttr, hasOwnHashAttr := inst.Class.Attributes["__hash__"]
+		_, hasOwnHashMethod := inst.Class.Methods["__hash__"]
+		hasOwnHash := hasOwnHashAttr || hasOwnHashMethod
+
+		// Check for __eq__ in Methods (def __eq__)
+		_, hasOwnEqMethod := inst.Class.Methods["__eq__"]
+
+		// Check if __hash__ is explicitly set to None (unhashable)
+		if hasOwnHashAttr {
+			if _, isNil := ownHashAttr.(NilValue); isNil || ownHashAttr == Nil {
+				return false // Explicitly unhashable
+			}
+		}
+
+		// Check if class has custom __eq__ without custom __hash__
+		// In Python 3, defining __eq__ without __hash__ makes the class unhashable
+		if hasOwnEqMethod && !hasOwnHash {
+			return false // Custom __eq__ without __hash__ is unhashable
+		}
+
 		return true
 	default:
 		// Check if it's a Callable (function) - functions are hashable by identity

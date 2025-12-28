@@ -1,0 +1,84 @@
+# Test hash and container protocol behavior
+
+(print "=== Hash Protocol Tests ===")
+
+# Test 1: Default class is hashable
+(class Default ())
+(= d (Default))
+(= h (hash d))
+(print "Default class hashable:" (isinstance h int))
+
+# Test 2: Class with __eq__ without __hash__ should be unhashable
+(class CustomEq ()
+  (def __eq__ (self other)
+    True))
+
+(= c (CustomEq))
+(try
+  (hash c)
+  (print "CustomEq: ERROR - should be unhashable")
+  (except TypeError as e
+    (print "CustomEq correctly unhashable: True")))
+
+# Test 3: Class with __hash__ = None should be unhashable
+(class ExplicitNone ()
+  (= __hash__ None))
+
+(= e (ExplicitNone))
+(try
+  (hash e)
+  (print "ExplicitNone: ERROR - should be unhashable")
+  (except TypeError as te
+    (print "ExplicitNone correctly unhashable: True")))
+
+# Test 4: Class with custom __hash__ should be hashable
+(class CustomHash ()
+  (def __hash__ (self)
+    (return 42)))
+
+(= ch (CustomHash))
+(= h (hash ch))
+(print "CustomHash hash:" h)
+(print "CustomHash hashable:" (== h 42))
+
+# Test 5: Class with both __eq__ and __hash__ should be hashable
+(class CustomBoth ()
+  (def __eq__ (self other)
+    (return True))
+  (def __hash__ (self)
+    (return 42)))
+
+(= cb (CustomBoth))
+(= h (hash cb))
+(print "CustomBoth hash:" h)
+(print "CustomBoth hashable:" (== h 42))
+
+(print "\n=== Container Protocol Tests ===")
+
+# Test 6: Custom container with __len__ and __contains__
+(class MyContainer ()
+  (def __init__ (self items)
+    (= self._items items))
+
+  (def __len__ (self)
+    (return (len self._items)))
+
+  (def __contains__ (self item)
+    (return (in item self._items))))
+
+(= c (MyContainer [1, 2, 3]))
+(print "len(MyContainer):" (len c))
+(print "2 in MyContainer:" (in 2 c))
+(print "5 in MyContainer:" (in 5 c))
+
+# Test 7: Empty container
+(= empty (MyContainer []))
+(print "len(empty):" (len empty))
+(print "1 in empty:" (in 1 empty))
+
+# Test 8: Container with strings
+(= sc (MyContainer ["apple", "banana", "cherry"]))
+(print "'banana' in sc:" (in "banana" sc))
+(print "'grape' in sc:" (in "grape" sc))
+
+(print "\n=== All Tests Complete ===")

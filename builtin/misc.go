@@ -243,7 +243,7 @@ func RegisterMisc(ctx *core.Context) {
 		}
 
 		if !core.IsHashable(obj) {
-			return nil, fmt.Errorf("unhashable type: '%s'", obj.Type())
+			return nil, &core.TypeError{Message: fmt.Sprintf("unhashable type: '%s'", obj.Type())}
 		}
 
 		// For now, return a simple hash based on string representation
