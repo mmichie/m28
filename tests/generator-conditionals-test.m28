@@ -1,0 +1,132 @@
+# generator-conditionals-test.m28
+#
+# Test for generator yield inside conditional statements (if/elif/else)
+# This tests the fix for M28-7095
+
+(print "===== Generator Conditionals Tests =====\n")
+
+# -- Basic If/Else with Yields --
+
+(print "-- Basic If/Else with Yields --")
+
+(def (conditional_gen flag)
+  (yield "start")
+  (if flag
+    (do
+      (yield "branch-true-1")
+      (yield "branch-true-2"))
+    (do
+      (yield "branch-false-1")
+      (yield "branch-false-2")))
+  (yield "end"))
+
+# Test true branch
+(print "\nTesting true branch:")
+(= results [])
+(for v (conditional_gen True)
+  (results.append v))
+(print "Results:" results)
+(assert (== results ["start" "branch-true-1" "branch-true-2" "end"])
+  "True branch should yield correctly")
+
+# Test false branch
+(print "\nTesting false branch:")
+(= results2 [])
+(for v (conditional_gen False)
+  (results2.append v))
+(print "Results:" results2)
+(assert (== results2 ["start" "branch-false-1" "branch-false-2" "end"])
+  "False branch should yield correctly")
+
+# -- Nested If (elif pattern) --
+
+(print "\n-- Nested If (elif pattern) --")
+
+(def (multi_conditional_gen x)
+  (yield "start")
+  (if (== x 1)
+    (yield "one")
+    (if (== x 2)
+      (yield "two")
+      (yield "other")))
+  (yield "end"))
+
+# Test each case
+(print "\nTesting x=1:")
+(= r1 [])
+(for v (multi_conditional_gen 1)
+  (r1.append v))
+(print "Results:" r1)
+(assert (== r1 ["start" "one" "end"]) "x=1 should yield 'one'")
+
+(print "\nTesting x=2:")
+(= r2 [])
+(for v (multi_conditional_gen 2)
+  (r2.append v))
+(print "Results:" r2)
+(assert (== r2 ["start" "two" "end"]) "x=2 should yield 'two'")
+
+(print "\nTesting x=3 (else case):")
+(= r3 [])
+(for v (multi_conditional_gen 3)
+  (r3.append v))
+(print "Results:" r3)
+(assert (== r3 ["start" "other" "end"]) "x=3 should yield 'other'")
+
+# -- Multiple Yields in Conditional --
+
+(print "\n-- Multiple Yields in Conditional --")
+
+(def (verbose_gen condition)
+  (yield "begin")
+  (if condition
+    (do
+      (yield "step-1")
+      (yield "step-2")
+      (yield "step-3"))
+    (do
+      (yield "alt-1")
+      (yield "alt-2")))
+  (yield "done"))
+
+(print "\nTesting condition=True (3 yields):")
+(= rv1 [])
+(for v (verbose_gen True)
+  (rv1.append v))
+(print "Results:" rv1)
+(assert (== rv1 ["begin" "step-1" "step-2" "step-3" "done"])
+  "Should yield all 3 steps in true branch")
+
+(print "\nTesting condition=False (2 yields):")
+(= rv2 [])
+(for v (verbose_gen False)
+  (rv2.append v))
+(print "Results:" rv2)
+(assert (== rv2 ["begin" "alt-1" "alt-2" "done"])
+  "Should yield 2 steps in false branch")
+
+# -- Conditional Without Else --
+
+(print "\n-- Conditional Without Else --")
+
+(def (optional_gen include_extra)
+  (yield "first")
+  (if include_extra
+    (yield "extra"))
+  (yield "last"))
+
+(print "\nTesting include_extra=True:")
+(= ro1 [])
+(for v (optional_gen True)
+  (ro1.append v))
+(print "Results:" ro1)
+(assert (== ro1 ["first" "extra" "last"]) "Should include extra yield")
+
+(print "\nTesting include_extra=False:")
+(= ro2 [])
+(for v (optional_gen False)
+  (ro2.append v))
+(print "Results:" ro2)
+(assert (== ro2 ["first" "last"]) "Should skip extra yield")
+
+(print "\n===== All Generator Conditionals Tests Passed! =====")

@@ -377,6 +377,26 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 				state.CurrentStep++
 			}
 
+		case StepIfStart:
+			// Evaluate if condition
+			condValue, err := Eval(step.Node, state.Locals)
+			if err != nil {
+				return nil, err
+			}
+
+			// Check if condition is truthy
+			if !core.IsTruthy(condValue) {
+				// Condition is false - jump to else branch (or end)
+				state.CurrentStep = step.Arg
+			} else {
+				// Condition is true - continue to next step (then body)
+				state.CurrentStep++
+			}
+
+		case StepIfEnd:
+			// Jump to end of if/else (skip else branch)
+			state.CurrentStep = step.Arg
+
 		case StepTryStart:
 			// Push try state
 			// step.Arg points to either except handler or finally block
@@ -497,6 +517,25 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 }
 
 // transformToSteps converts an AST node into a flat list of execution steps
+// appendStepsWithOffset appends substeps to steps, adjusting any jump targets (Arg values)
+// by the offset (which is the current length of steps before appending).
+// This is needed for nested control flow (if inside if, etc.) so jump targets remain valid.
+func appendStepsWithOffset(steps []ExecutionStep, substeps []ExecutionStep) []ExecutionStep {
+	offset := len(steps)
+	for _, substep := range substeps {
+		adjusted := substep
+		// Adjust jump targets for control flow steps
+		if substep.Arg >= 0 {
+			switch substep.Kind {
+			case StepIfStart, StepIfEnd, StepLoopInit, StepLoopNext, StepLoopEnd, StepWhileCondition, StepTryStart, StepTryEnd:
+				adjusted.Arg = substep.Arg + offset
+			}
+		}
+		steps = append(steps, adjusted)
+	}
+	return steps
+}
+
 func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 	var steps []ExecutionStep
 
@@ -674,12 +713,65 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 				return steps, nil
 
 			case "if":
-				// For now, treat if as a regular statement
-				// TODO(M28-7095): Proper conditional handling with step skipping
+				// If statement: (if condition then-body [else-body])
+				// Structure: condition at index 1, then-body at index 2, optional else-body at index 3
+				if n.Len() < 3 {
+					// Malformed if, treat as statement
+					steps = append(steps, ExecutionStep{
+						Kind: StepStatement,
+						Node: node,
+					})
+					return steps, nil
+				}
+
+				condition := n.Items()[1]
+				thenBody := n.Items()[2]
+				var elseBody core.Value
+				if n.Len() > 3 {
+					elseBody = n.Items()[3]
+				}
+
+				// Step 1: Evaluate condition and jump to else if false
+				conditionStep := len(steps)
 				steps = append(steps, ExecutionStep{
-					Kind: StepStatement,
-					Node: node,
+					Kind: StepIfStart,
+					Node: condition,
+					Arg:  -1, // Will be filled in: jump target if condition is false
 				})
+
+				// Steps 2+: Then body (use appendStepsWithOffset for proper jump target adjustment)
+				thenSteps, err := transformToSteps(thenBody)
+				if err != nil {
+					return nil, err
+				}
+				steps = appendStepsWithOffset(steps, thenSteps)
+
+				// After then body, jump to end (skip else)
+				thenEndStep := len(steps)
+				steps = append(steps, ExecutionStep{
+					Kind: StepIfEnd,
+					Arg:  -1, // Will be filled in: jump to after else
+				})
+
+				// Mark where else branch starts (or end if no else)
+				elseBranchStart := len(steps)
+
+				// Steps for else body (if present) - use appendStepsWithOffset for nested ifs
+				if elseBody != nil {
+					elseSteps, err := transformToSteps(elseBody)
+					if err != nil {
+						return nil, err
+					}
+					steps = appendStepsWithOffset(steps, elseSteps)
+				}
+
+				// End of entire if/else
+				ifEndStep := len(steps)
+
+				// Fill in jump targets
+				steps[conditionStep].Arg = elseBranchStart // If false, jump to else (or end)
+				steps[thenEndStep].Arg = ifEndStep         // After then, jump to end
+
 				return steps, nil
 
 			case "with":
