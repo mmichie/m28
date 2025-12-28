@@ -352,6 +352,34 @@ func getListMethods() map[string]*MethodDescriptor {
 				return result, nil
 			},
 		},
+		"__lt__": {
+			Name:    "__lt__",
+			Arity:   1,
+			Doc:     "Return self < other (lexicographic comparison)",
+			Builtin: true,
+			Handler: listMethodLt,
+		},
+		"__le__": {
+			Name:    "__le__",
+			Arity:   1,
+			Doc:     "Return self <= other (lexicographic comparison)",
+			Builtin: true,
+			Handler: listMethodLe,
+		},
+		"__gt__": {
+			Name:    "__gt__",
+			Arity:   1,
+			Doc:     "Return self > other (lexicographic comparison)",
+			Builtin: true,
+			Handler: listMethodGt,
+		},
+		"__ge__": {
+			Name:    "__ge__",
+			Arity:   1,
+			Doc:     "Return self >= other (lexicographic comparison)",
+			Builtin: true,
+			Handler: listMethodGe,
+		},
 	}
 }
 
@@ -932,4 +960,152 @@ func toIndex(obj Value, ctx *Context) (int, error) {
 
 	// Not convertible to index
 	return 0, &TypeError{Message: fmt.Sprintf("list indices must be integers, not %s", obj.Type())}
+}
+
+// listCompare performs lexicographic comparison of two lists
+// Returns -1 if a < b, 0 if a == b, 1 if a > b
+func listCompare(a, b *ListValue) int {
+	aItems := a.Items()
+	bItems := b.Items()
+	minLen := len(aItems)
+	if len(bItems) < minLen {
+		minLen = len(bItems)
+	}
+
+	// Compare element by element
+	for i := 0; i < minLen; i++ {
+		cmp := compareValues(aItems[i], bItems[i])
+		if cmp != 0 {
+			return cmp
+		}
+	}
+
+	// If all compared elements are equal, shorter list is "less"
+	if len(aItems) < len(bItems) {
+		return -1
+	} else if len(aItems) > len(bItems) {
+		return 1
+	}
+	return 0
+}
+
+// compareValues compares two values, returning -1, 0, or 1
+func compareValues(a, b Value) int {
+	// Handle numeric comparisons
+	if aNum, aOk := a.(NumberValue); aOk {
+		if bNum, bOk := b.(NumberValue); bOk {
+			if float64(aNum) < float64(bNum) {
+				return -1
+			} else if float64(aNum) > float64(bNum) {
+				return 1
+			}
+			return 0
+		}
+	}
+
+	// Handle string comparisons
+	if aStr, aOk := a.(StringValue); aOk {
+		if bStr, bOk := b.(StringValue); bOk {
+			if string(aStr) < string(bStr) {
+				return -1
+			} else if string(aStr) > string(bStr) {
+				return 1
+			}
+			return 0
+		}
+	}
+
+	// Handle nested list comparisons
+	if aList, aOk := a.(*ListValue); aOk {
+		if bList, bOk := b.(*ListValue); bOk {
+			return listCompare(aList, bList)
+		}
+	}
+
+	// Handle tuple comparisons
+	if aTuple, aOk := a.(TupleValue); aOk {
+		if bTuple, bOk := b.(TupleValue); bOk {
+			return tupleCompare(aTuple, bTuple)
+		}
+	}
+
+	// For other types, compare by string representation
+	aRepr := Repr(a)
+	bRepr := Repr(b)
+	if aRepr < bRepr {
+		return -1
+	} else if aRepr > bRepr {
+		return 1
+	}
+	return 0
+}
+
+// tupleCompare performs lexicographic comparison of two tuples
+func tupleCompare(a, b TupleValue) int {
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+
+	for i := 0; i < minLen; i++ {
+		cmp := compareValues(a[i], b[i])
+		if cmp != 0 {
+			return cmp
+		}
+	}
+
+	if len(a) < len(b) {
+		return -1
+	} else if len(a) > len(b) {
+		return 1
+	}
+	return 0
+}
+
+func listMethodLt(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) != 1 {
+		return nil, &TypeError{Message: "__lt__ takes exactly one argument"}
+	}
+	list1 := receiver.(*ListValue)
+	list2, ok := args[0].(*ListValue)
+	if !ok {
+		return nil, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of 'list' and '%s'", args[0].Type())}
+	}
+	return BoolValue(listCompare(list1, list2) < 0), nil
+}
+
+func listMethodLe(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) != 1 {
+		return nil, &TypeError{Message: "__le__ takes exactly one argument"}
+	}
+	list1 := receiver.(*ListValue)
+	list2, ok := args[0].(*ListValue)
+	if !ok {
+		return nil, &TypeError{Message: fmt.Sprintf("'<=' not supported between instances of 'list' and '%s'", args[0].Type())}
+	}
+	return BoolValue(listCompare(list1, list2) <= 0), nil
+}
+
+func listMethodGt(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) != 1 {
+		return nil, &TypeError{Message: "__gt__ takes exactly one argument"}
+	}
+	list1 := receiver.(*ListValue)
+	list2, ok := args[0].(*ListValue)
+	if !ok {
+		return nil, &TypeError{Message: fmt.Sprintf("'>' not supported between instances of 'list' and '%s'", args[0].Type())}
+	}
+	return BoolValue(listCompare(list1, list2) > 0), nil
+}
+
+func listMethodGe(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) != 1 {
+		return nil, &TypeError{Message: "__ge__ takes exactly one argument"}
+	}
+	list1 := receiver.(*ListValue)
+	list2, ok := args[0].(*ListValue)
+	if !ok {
+		return nil, &TypeError{Message: fmt.Sprintf("'>=' not supported between instances of 'list' and '%s'", args[0].Type())}
+	}
+	return BoolValue(listCompare(list1, list2) >= 0), nil
 }

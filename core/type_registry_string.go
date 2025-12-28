@@ -574,12 +574,24 @@ func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, err
 			return nil, err
 		}
 
-		// For now, only handle step=1 (TODO: support arbitrary step)
-		if step != 1 {
-			return nil, &ValueError{Message: "string slicing with step != 1 not yet supported"}
+		// Build result based on step direction
+		var result []rune
+		if step > 0 {
+			for i := start; i < stop; i += step {
+				if i >= 0 && i < runeLen {
+					result = append(result, runes[i])
+				}
+			}
+		} else {
+			// Negative step: iterate backwards
+			for i := start; i > stop; i += step {
+				if i >= 0 && i < runeLen {
+					result = append(result, runes[i])
+				}
+			}
 		}
 
-		return StringValue(string(runes[start:stop])), nil
+		return StringValue(string(result)), nil
 	}
 
 	// Handle index

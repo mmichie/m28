@@ -295,13 +295,71 @@ func getTupleMethods() map[string]*MethodDescriptor {
 			Doc:     "Return hash of tuple",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				// For now, just return 0
-				// TODO(M28-b902): Implement proper hashing
-				return NumberValue(0), nil
+				tuple := receiver.(TupleValue)
+				// Use a hash combining algorithm similar to Python's
+				// Start with a prime number, combine element hashes
+				hash := int64(0x345678)
+				mult := int64(1000003)
+
+				for _, elem := range tuple {
+					// Get hash of element
+					elemHash := hashValue(elem)
+					// Combine hashes
+					hash = (hash ^ elemHash) * mult
+					mult += int64(82520 + len(tuple)*2)
+				}
+				hash += int64(97531)
+
+				return NumberValue(hash), nil
 			},
 		},
 		// Note: __reduce_ex__ removed for tuple
 		// CPython's tuple doesn't have __reduce_ex__ - pickle handles it with save_tuple
 		// M28 should let pickle's save_tuple handle tuples instead of using __reduce_ex__
+	}
+}
+
+// hashValue returns a hash value for a Value
+func hashValue(v Value) int64 {
+	switch val := v.(type) {
+	case NumberValue:
+		// Hash number by converting to bits
+		n := float64(val)
+		if n == float64(int64(n)) {
+			return int64(n)
+		}
+		// For floats, use bit representation
+		return int64(n * 1000000)
+	case StringValue:
+		// Simple hash for strings
+		hash := int64(5381)
+		for _, ch := range string(val) {
+			hash = ((hash << 5) + hash) + int64(ch) // hash * 33 + ch
+		}
+		return hash
+	case BoolValue:
+		if bool(val) {
+			return 1
+		}
+		return 0
+	case NilValue:
+		return 0
+	case TupleValue:
+		// Recursive tuple hashing
+		hash := int64(0x345678)
+		mult := int64(1000003)
+		for _, elem := range val {
+			elemHash := hashValue(elem)
+			hash = (hash ^ elemHash) * mult
+			mult += int64(82520 + len(val)*2)
+		}
+		return hash + 97531
+	default:
+		// Fallback: hash the string representation
+		hash := int64(5381)
+		for _, ch := range Repr(v) {
+			hash = ((hash << 5) + hash) + int64(ch) // hash * 33 + ch
+		}
+		return hash
 	}
 }

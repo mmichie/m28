@@ -754,6 +754,15 @@ func (s *SetValue) Size() int {
 	return len(s.items)
 }
 
+// Items returns all values in the set as a slice
+func (s *SetValue) Items() []Value {
+	values := make([]Value, 0, len(s.items))
+	for _, v := range s.items {
+		values = append(values, v)
+	}
+	return values
+}
+
 // GetAttr implements Object interface using TypeDescriptor
 func (s *SetValue) GetAttr(name string) (Value, bool) {
 	desc := GetTypeDescriptor(SetType)

@@ -452,10 +452,7 @@ func SortedBuilder() builders.BuiltinFunc {
 			items = make([]core.Value, len(tuple))
 			copy(items, tuple)
 		} else if set, ok := types.AsSet(seq); ok {
-			items = make([]core.Value, 0, set.Size())
-			// SetValue needs proper iteration method
-			// For now, use a simple approach
-			// TODO(M28-b902): Add proper set iteration when available
+			items = set.Items()
 		} else if str, ok := types.AsString(seq); ok {
 			items = make([]core.Value, len(str))
 			for i, ch := range str {

@@ -34,8 +34,46 @@ func registerDictType() {
 					}
 					return result, nil
 				}
-				// TODO(M28-b902): Handle iterable of pairs
-				return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
+
+				// Handle iterable of pairs (list/tuple of 2-element sequences)
+				var items []Value
+				switch v := arg.(type) {
+				case *ListValue:
+					items = v.Items()
+				case TupleValue:
+					items = []Value(v)
+				default:
+					return nil, fmt.Errorf("dict() argument must be a dict or iterable of pairs")
+				}
+
+				result := NewDict()
+				for i, item := range items {
+					// Each item must be a 2-element sequence (key, value)
+					var key, val Value
+					switch pair := item.(type) {
+					case TupleValue:
+						if len(pair) != 2 {
+							return nil, fmt.Errorf("dictionary update sequence element #%d has length %d; 2 is required", i, len(pair))
+						}
+						key, val = pair[0], pair[1]
+					case *ListValue:
+						pairItems := pair.Items()
+						if len(pairItems) != 2 {
+							return nil, fmt.Errorf("dictionary update sequence element #%d has length %d; 2 is required", i, len(pairItems))
+						}
+						key, val = pairItems[0], pairItems[1]
+					default:
+						return nil, fmt.Errorf("cannot convert dictionary update sequence element #%d to a sequence", i)
+					}
+
+					if !IsHashable(key) {
+						return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
+					}
+					if err := result.SetValue(key, val); err != nil {
+						return nil, err
+					}
+				}
+				return result, nil
 			}
 			return nil, fmt.Errorf("dict() takes at most 1 argument (%d given)", len(args))
 		},
