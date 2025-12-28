@@ -157,9 +157,9 @@ func (t *TupleContainer) IsEmpty() bool {
 
 // InstanceContainer adapts an Instance with __len__/__contains__ to Container protocol
 type InstanceContainer struct {
-	instance   *core.Instance
-	lenMethod  core.Value
-	hasContains bool
+	instance       *core.Instance
+	lenMethod      core.Value
+	hasContains    bool
 	containsMethod core.Value
 }
 
