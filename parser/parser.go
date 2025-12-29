@@ -13,29 +13,58 @@ import (
 // ParseError represents a parsing error with source location info
 type ParseError struct {
 	Message  string
-	Line     int
-	Col      int
+	Location *core.SourceLocation // Consolidated location info (line, column, file)
 	Lexeme   string
 	Source   string // Full source code for context
-	Filename string
+}
+
+// Line returns the line number (for backward compatibility and convenience)
+func (e *ParseError) Line() int {
+	if e.Location != nil {
+		return e.Location.Line
+	}
+	return 0
+}
+
+// Col returns the column number (for backward compatibility and convenience)
+func (e *ParseError) Col() int {
+	if e.Location != nil {
+		return e.Location.Column
+	}
+	return 0
+}
+
+// Filename returns the filename (for backward compatibility and convenience)
+func (e *ParseError) Filename() string {
+	if e.Location != nil {
+		return e.Location.File
+	}
+	return ""
 }
 
 func (e *ParseError) Error() string {
-	if e.Filename != "" {
-		return fmt.Sprintf("%s:%d:%d: %s", e.Filename, e.Line, e.Col, e.Message)
+	if e.Location != nil && e.Location.File != "" {
+		return fmt.Sprintf("%s:%d:%d: %s", e.Location.File, e.Location.Line, e.Location.Column, e.Message)
 	}
-	return fmt.Sprintf("line %d, column %d: %s", e.Line, e.Col, e.Message)
+	if e.Location != nil {
+		return fmt.Sprintf("line %d, column %d: %s", e.Location.Line, e.Location.Column, e.Message)
+	}
+	return e.Message
 }
 
 // FormatWithContext returns the error with source code context
 func (e *ParseError) FormatWithContext() string {
 	var b strings.Builder
 
+	line := e.Line()
+	col := e.Col()
+	filename := e.Filename()
+
 	// Error header
-	if e.Filename != "" {
-		fmt.Fprintf(&b, "Parse error in %s at line %d, column %d:\n", e.Filename, e.Line, e.Col)
+	if filename != "" {
+		fmt.Fprintf(&b, "Parse error in %s at line %d, column %d:\n", filename, line, col)
 	} else {
-		fmt.Fprintf(&b, "Parse error at line %d, column %d:\n", e.Line, e.Col)
+		fmt.Fprintf(&b, "Parse error at line %d, column %d:\n", line, col)
 	}
 	fmt.Fprintf(&b, "  %s\n\n", e.Message)
 
@@ -44,11 +73,11 @@ func (e *ParseError) FormatWithContext() string {
 		lines := strings.Split(e.Source, "\n")
 
 		// Show 2 lines before and after
-		start := e.Line - 3
+		start := line - 3
 		if start < 0 {
 			start = 0
 		}
-		end := e.Line + 1
+		end := line + 1
 		if end >= len(lines) {
 			end = len(lines) - 1
 		}
@@ -56,15 +85,15 @@ func (e *ParseError) FormatWithContext() string {
 		for i := start; i <= end; i++ {
 			lineNum := i + 1
 			prefix := "  "
-			if lineNum == e.Line {
+			if lineNum == line {
 				prefix = "> "
 			}
 
 			fmt.Fprintf(&b, "%s%4d | %s\n", prefix, lineNum, lines[i])
 
 			// Show caret pointing to error
-			if lineNum == e.Line && e.Col > 0 {
-				spaces := strings.Repeat(" ", e.Col-1+8)
+			if lineNum == line && col > 0 {
+				spaces := strings.Repeat(" ", col-1+8)
 				marker := "^"
 				if e.Lexeme != "" && len(e.Lexeme) > 1 {
 					marker = strings.Repeat("^", len(e.Lexeme))
@@ -115,10 +144,8 @@ func (p *Parser) Parse(input string) (core.Value, error) {
 	if err != nil {
 		return nil, &ParseError{
 			Message:  fmt.Sprintf("tokenization error: %v", err),
-			Line:     1,
-			Col:      1,
+			Location: &core.SourceLocation{Line: 1, Column: 1, File: p.filename},
 			Source:   input,
-			Filename: p.filename,
 		}
 	}
 
@@ -579,11 +606,8 @@ func (p *Parser) parseListFromToken() (core.Value, error) {
 			eofTok := p.currentToken()
 			return nil, &ParseError{
 				Message:  fmt.Sprintf("Unclosed list: expected ')' to match '(' at line %d, column %d", openParen.Line, openParen.Col),
-				Line:     eofTok.Line,
-				Col:      eofTok.Col,
-				Lexeme:   "",
+				Location: &core.SourceLocation{Line: eofTok.Line, Column: eofTok.Col, File: p.filename},
 				Source:   p.input,
-				Filename: p.filename,
 			}
 		}
 
@@ -649,11 +673,8 @@ func (p *Parser) parseVectorLiteralFromToken() (core.Value, error) {
 			eofTok := p.currentToken()
 			return nil, &ParseError{
 				Message:  fmt.Sprintf("Unclosed vector: expected ']' to match '[' at line %d, column %d", openBracket.Line, openBracket.Col),
-				Line:     eofTok.Line,
-				Col:      eofTok.Col,
-				Lexeme:   "",
+				Location: &core.SourceLocation{Line: eofTok.Line, Column: eofTok.Col, File: p.filename},
 				Source:   p.input,
-				Filename: p.filename,
 			}
 		}
 
@@ -713,11 +734,8 @@ func (p *Parser) parseDictLiteralFromToken() (core.Value, error) {
 			eofTok := p.currentToken()
 			return nil, &ParseError{
 				Message:  fmt.Sprintf("Unclosed dict/set: expected '}' to match '{' at line %d, column %d", openBrace.Line, openBrace.Col),
-				Line:     eofTok.Line,
-				Col:      eofTok.Col,
-				Lexeme:   "",
+				Location: &core.SourceLocation{Line: eofTok.Line, Column: eofTok.Col, File: p.filename},
 				Source:   p.input,
-				Filename: p.filename,
 			}
 		}
 
@@ -2576,10 +2594,8 @@ func isSymbolChar(ch byte) bool {
 func (p *Parser) error(msg string) error {
 	return &ParseError{
 		Message:  msg,
-		Line:     p.line,
-		Col:      p.col,
+		Location: &core.SourceLocation{Line: p.line, Column: p.col, File: p.filename},
 		Source:   p.input,
-		Filename: p.filename,
 	}
 }
 
@@ -2634,10 +2650,8 @@ func (p *Parser) matchToken(types ...TokenType) bool {
 func (p *Parser) tokenError(msg string, tok Token) error {
 	return &ParseError{
 		Message:  msg,
-		Line:     tok.Line,
-		Col:      tok.Col,
+		Location: &core.SourceLocation{Line: tok.Line, Column: tok.Col, File: p.filename},
 		Lexeme:   tok.Lexeme,
 		Source:   p.input,
-		Filename: p.filename,
 	}
 }

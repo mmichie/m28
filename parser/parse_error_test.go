@@ -76,8 +76,8 @@ print(my_list)`,
 			}
 
 			// Verify error has filename
-			if tt.expectedInFile && parseErr.Filename != "test.py" {
-				t.Errorf("Expected filename 'test.py', got '%s'", parseErr.Filename)
+			if tt.expectedInFile && parseErr.Filename() != "test.py" {
+				t.Errorf("Expected filename 'test.py', got '%s'", parseErr.Filename())
 			}
 
 			// Verify error has source
@@ -137,12 +137,12 @@ if x > 5
 	}
 
 	// Verify line number is correct (should be line 3 where 'if' is)
-	if parseErr.Line != 3 {
-		t.Errorf("Expected error on line 3, got line %d", parseErr.Line)
+	if parseErr.Line() != 3 {
+		t.Errorf("Expected error on line 3, got line %d", parseErr.Line())
 	}
 
 	// Verify error has location info
-	if parseErr.Col == 0 {
+	if parseErr.Col() == 0 {
 		t.Errorf("Expected column number to be set")
 	}
 }
@@ -191,8 +191,8 @@ func TestParseErrorFilename(t *testing.T) {
 				t.Fatalf("Expected ParseError, got %T", parser.errors[0])
 			}
 
-			if parseErr.Filename != tt.expectedFile {
-				t.Errorf("Expected filename '%s', got '%s'", tt.expectedFile, parseErr.Filename)
+			if parseErr.Filename() != tt.expectedFile {
+				t.Errorf("Expected filename '%s', got '%s'", tt.expectedFile, parseErr.Filename())
 			}
 
 			// Error() should include filename in output

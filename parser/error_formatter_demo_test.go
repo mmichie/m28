@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/mmichie/m28/core"
 )
 
 // TestErrorFormatter_VisualDemo demonstrates the error formatter output
@@ -25,9 +27,7 @@ z = 40`
 
 	err1 := &ParseError{
 		Message:  "SyntaxError: invalid syntax",
-		Line:     2,
-		Col:      8,
-		Filename: "example.py",
+		Location: &core.SourceLocation{Line: 2, Column: 8, File: "example.py"},
 	}
 
 	fmt.Println("Example 1: Basic Syntax Error")
@@ -43,9 +43,7 @@ z = 40`
 
 	err2 := &ParseError{
 		Message:  "NameError: name 'undefined_var' is not defined",
-		Line:     2,
-		Col:      12,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 2, Column: 12, File: "test.py"},
 	}
 
 	fmt.Println("Example 2: With Suggestion")
@@ -64,9 +62,7 @@ z = 40`
 
 	err3 := &ParseError{
 		Message:  "SyntaxError: unexpected identifier",
-		Line:     4,
-		Col:      5,
-		Filename: "complex.py",
+		Location: &core.SourceLocation{Line: 4, Column: 5, File: "complex.py"},
 	}
 
 	fmt.Println("Example 3: Context Showing")
@@ -80,9 +76,7 @@ z = 40`
 
 	err4 := &ParseError{
 		Message:  "SyntaxError: unexpected end of line",
-		Line:     1,
-		Col:      10,
-		Filename: "plain.py",
+		Location: &core.SourceLocation{Line: 1, Column: 10, File: "plain.py"},
 	}
 
 	fmt.Println("Example 4: No Color Output (for piping/logs)")

@@ -110,10 +110,8 @@ func (p *Parser) parseSString(quoteChar rune, raw bool) (core.Value, error) {
 
 	return nil, &ParseError{
 		Message:  "unclosed s-string",
-		Line:     p.line,
-		Col:      p.col,
+		Location: &core.SourceLocation{Line: p.line, Column: p.col, File: p.filename},
 		Source:   p.input,
-		Filename: p.filename,
 	}
 }
 
@@ -153,10 +151,8 @@ func (p *Parser) parseRawSString(quoteChar rune) (core.Value, error) {
 
 	return nil, &ParseError{
 		Message:  "unclosed raw s-string",
-		Line:     p.line,
-		Col:      p.col,
+		Location: &core.SourceLocation{Line: p.line, Column: p.col, File: p.filename},
 		Source:   p.input,
-		Filename: p.filename,
 	}
 }
 
@@ -166,10 +162,8 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 	if p.pos >= len(p.input) || p.input[p.pos] != '{' {
 		return Interpolation{}, &ParseError{
 			Message:  "expected '{'",
-			Line:     p.line,
-			Col:      p.col,
+			Location: &core.SourceLocation{Line: p.line, Column: p.col, File: p.filename},
 			Source:   p.input,
-			Filename: p.filename,
 		}
 	}
 
@@ -180,10 +174,8 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 	if p.pos >= len(p.input) {
 		return Interpolation{}, &ParseError{
 			Message:  "unclosed interpolation",
-			Line:     p.line,
-			Col:      p.col,
+			Location: &core.SourceLocation{Line: p.line, Column: p.col, File: p.filename},
 			Source:   p.input,
-			Filename: p.filename,
 		}
 	}
 
@@ -270,10 +262,8 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 					if exprStr == "" {
 						return Interpolation{}, &ParseError{
 							Message:  "empty interpolation",
-							Line:     p.line,
-							Col:      p.col,
+							Location: &core.SourceLocation{Line: p.line, Column: p.col, File: p.filename},
 							Source:   p.input,
-							Filename: p.filename,
 						}
 					}
 
@@ -284,10 +274,8 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 					if err != nil {
 						return Interpolation{}, &ParseError{
 							Message:  fmt.Sprintf("error parsing s-string interpolation: %v", err),
-							Line:     p.line,
-							Col:      p.col,
+							Location: &core.SourceLocation{Line: p.line, Column: p.col, File: p.filename},
 							Source:   p.input,
-							Filename: p.filename,
 						}
 					}
 
@@ -317,10 +305,8 @@ func (p *Parser) parseSStringInterpolation(outerQuote rune) (Interpolation, erro
 
 	return Interpolation{}, &ParseError{
 		Message:  "unclosed s-string interpolation",
-		Line:     p.line,
-		Col:      p.col,
+		Location: &core.SourceLocation{Line: p.line, Column: p.col, File: p.filename},
 		Source:   p.input,
-		Filename: p.filename,
 	}
 }
 

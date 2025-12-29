@@ -110,11 +110,7 @@ func (ef *ErrorFormatter) FormatErrorWithSuggestion(err error, suggestion string
 func (ef *ErrorFormatter) extractLocation(err error) *core.SourceLocation {
 	// Try ParseError
 	if parseErr, ok := err.(*ParseError); ok {
-		return &core.SourceLocation{
-			File:   parseErr.Filename,
-			Line:   parseErr.Line,
-			Column: parseErr.Col,
-		}
+		return parseErr.Location
 	}
 
 	// Try TokenizationError

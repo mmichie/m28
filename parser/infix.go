@@ -167,7 +167,7 @@ func parseInfixWithPrecedence(elements []core.Value, pos int, minPrec int) (core
 		pos++ // consume operator
 
 		if pos >= len(elements) {
-			return nil, pos, &ParseError{Message: fmt.Sprintf("operator %s missing right operand", opStr), Line: 1, Col: 1}
+			return nil, pos, &ParseError{Message: fmt.Sprintf("operator %s missing right operand", opStr), Location: &core.SourceLocation{Line: 1, Column: 1}}
 		}
 
 		// Determine next precedence level
@@ -213,7 +213,7 @@ func parseChainedComparison(elements []core.Value, startPos int, leftOperand cor
 		pos++ // consume operator
 
 		if pos >= len(elements) {
-			return nil, pos, &ParseError{Message: fmt.Sprintf("comparison operator %s missing right operand", op), Line: 1, Col: 1}
+			return nil, pos, &ParseError{Message: fmt.Sprintf("comparison operator %s missing right operand", op), Location: &core.SourceLocation{Line: 1, Column: 1}}
 		}
 
 		// Get the right operand (just the next element, not a full expression)

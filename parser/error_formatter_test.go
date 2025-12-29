@@ -12,9 +12,7 @@ func TestErrorFormatter_Basic(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "unexpected token",
-		Line:     1,
-		Col:      5,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 1, Column: 5, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -42,9 +40,7 @@ z = 40`
 
 	err := &ParseError{
 		Message:  "invalid syntax",
-		Line:     2,
-		Col:      8,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 2, Column: 8, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -74,9 +70,7 @@ line5`
 
 	err := &ParseError{
 		Message:  "syntax error",
-		Line:     3,
-		Col:      1,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 3, Column: 1, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -122,9 +116,7 @@ func TestErrorFormatter_EdgeCases(t *testing.T) {
 			name: "missing source",
 			err: &ParseError{
 				Message:  "error",
-				Line:     1,
-				Col:      1,
-				Filename: "missing.py",
+				Location: &core.SourceLocation{Line: 1, Column: 1, File: "missing.py"},
 			},
 			source:   "",
 			filename: "other.py",
@@ -134,9 +126,7 @@ func TestErrorFormatter_EdgeCases(t *testing.T) {
 			name: "invalid line number (too high)",
 			err: &ParseError{
 				Message:  "error",
-				Line:     999,
-				Col:      1,
-				Filename: "test.py",
+				Location: &core.SourceLocation{Line: 999, Column: 1, File: "test.py"},
 			},
 			source:   "line1\nline2",
 			filename: "test.py",
@@ -146,9 +136,7 @@ func TestErrorFormatter_EdgeCases(t *testing.T) {
 			name: "invalid line number (zero)",
 			err: &ParseError{
 				Message:  "error",
-				Line:     0,
-				Col:      1,
-				Filename: "test.py",
+				Location: &core.SourceLocation{Line: 0, Column: 1, File: "test.py"},
 			},
 			source:   "line1\nline2",
 			filename: "test.py",
@@ -178,9 +166,7 @@ func TestErrorFormatter_CaretPositioning(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "undefined name",
-		Line:     1,
-		Col:      10, // Points to 'e' in 'error_token'
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 1, Column: 10, File: "test.py"}, // Points to 'e' in 'error_token'
 	}
 
 	formatted := ef.FormatError(err)
@@ -220,9 +206,7 @@ func TestErrorFormatter_WithSuggestion(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "name 'x' is not defined",
-		Line:     1,
-		Col:      1,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 1, Column: 1, File: "test.py"},
 	}
 
 	formatted := ef.FormatErrorWithSuggestion(err, "Did you mean 'y'?")
@@ -237,9 +221,7 @@ func TestErrorFormatter_ColorOutput(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "syntax error",
-		Line:     1,
-		Col:      1,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 1, Column: 1, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -272,9 +254,7 @@ func TestErrorFormatter_MultilineError(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "unexpected indent",
-		Line:     3,
-		Col:      9,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 3, Column: 9, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -321,9 +301,7 @@ line5`
 
 	err := &ParseError{
 		Message:  "error",
-		Line:     3,
-		Col:      1,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 3, Column: 1, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -376,9 +354,7 @@ result = undefined_变量`
 
 	err := &ParseError{
 		Message:  "name not defined",
-		Line:     2,
-		Col:      10, // Points to 'undefined_变量'
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 2, Column: 10, File: "test.py"}, // Points to 'undefined_变量'
 	}
 
 	formatted := ef.FormatError(err)
@@ -403,9 +379,7 @@ func TestErrorFormatter_VeryLongLine(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "name not defined",
-		Line:     1,
-		Col:      len(longLine) - 10, // Near end of long line
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 1, Column: len(longLine) - 10, File: "test.py"}, // Near end of long line
 	}
 
 	formatted := ef.FormatError(err)
@@ -431,9 +405,7 @@ func TestErrorFormatter_TabsInSource(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "name not defined",
-		Line:     3,
-		Col:      16,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 3, Column: 16, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -456,9 +428,7 @@ func TestErrorFormatter_EmptyFile(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "unexpected EOF",
-		Line:     1,
-		Col:      1,
-		Filename: "empty.py",
+		Location: &core.SourceLocation{Line: 1, Column: 1, File: "empty.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -488,9 +458,7 @@ func TestErrorFormatter_ErrorAtEOF(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "unexpected EOF",
-		Line:     lastLine,
-		Col:      len(lines[lastLine-1]),
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: lastLine, Column: len(lines[lastLine-1]), File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -512,16 +480,12 @@ z = undefined2`
 
 	err1 := &ParseError{
 		Message:  "name 'undefined1' not defined",
-		Line:     2,
-		Col:      5,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 2, Column: 5, File: "test.py"},
 	}
 
 	err2 := &ParseError{
 		Message:  "name 'undefined2' not defined",
-		Line:     3,
-		Col:      5,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 3, Column: 5, File: "test.py"},
 	}
 
 	formatted1 := ef.FormatError(err1)
@@ -556,9 +520,7 @@ func TestErrorFormatter_WindowsBOMLike(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "name not defined",
-		Line:     3,
-		Col:      5,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 3, Column: 5, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)
@@ -578,9 +540,7 @@ func TestErrorFormatter_ErrorOnFirstCharacter(t *testing.T) {
 
 	err := &ParseError{
 		Message:  "name not defined",
-		Line:     1,
-		Col:      1,
-		Filename: "test.py",
+		Location: &core.SourceLocation{Line: 1, Column: 1, File: "test.py"},
 	}
 
 	formatted := ef.FormatError(err)

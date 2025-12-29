@@ -1721,7 +1721,7 @@ func (p *PythonParser) interpretFStringEscapes(s string) string {
 func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error) {
 	// Find the quote character (skip past prefix: f, fr, rf, etc.)
 	if len(lexeme) < 2 {
-		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Line: 1, Col: 1}
+		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Location: &core.SourceLocation{Line: 1, Column: 1}}
 	}
 
 	// Skip past all prefix characters (f, r, b combinations)
@@ -1731,7 +1731,7 @@ func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error)
 	}
 
 	if quoteIdx >= len(lexeme) {
-		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Line: 1, Col: 1}
+		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Location: &core.SourceLocation{Line: 1, Column: 1}}
 	}
 
 	var quoteChar byte
@@ -1740,7 +1740,7 @@ func (p *PythonParser) parseFStringFromLexeme(lexeme string) (core.Value, error)
 	} else if lexeme[quoteIdx] == '\'' {
 		quoteChar = '\''
 	} else {
-		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Line: 1, Col: 1}
+		return nil, &ParseError{Message: fmt.Sprintf("invalid f-string lexeme: %s", lexeme), Location: &core.SourceLocation{Line: 1, Column: 1}}
 	}
 
 	// Extract the string content (without quotes and prefix)
@@ -2019,7 +2019,7 @@ func (p *PythonParser) astNodeToValue(node ast.ASTNode) (core.Value, error) {
 		return core.NewList(core.SymbolValue("="), target, value), nil
 	default:
 		// For other node types, try to convert via the IR
-		return nil, &ParseError{Message: fmt.Sprintf("unsupported AST node type in f-string: %T", node), Line: 1, Col: 1}
+		return nil, &ParseError{Message: fmt.Sprintf("unsupported AST node type in f-string: %T", node), Location: &core.SourceLocation{Line: 1, Column: 1}}
 	}
 }
 
@@ -2037,7 +2037,7 @@ func (p *PythonParser) comprehensionToValue(comp *ast.ComprehensionForm) (core.V
 	case ast.GeneratorComp:
 		kindSym = "generator-exp"
 	default:
-		return nil, &ParseError{Message: fmt.Sprintf("unknown comprehension kind: %v", comp.Kind), Line: 1, Col: 1}
+		return nil, &ParseError{Message: fmt.Sprintf("unknown comprehension kind: %v", comp.Kind), Location: &core.SourceLocation{Line: 1, Column: 1}}
 	}
 
 	// Convert element/key/value expressions

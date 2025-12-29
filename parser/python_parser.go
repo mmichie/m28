@@ -219,11 +219,9 @@ func (p *PythonParser) error(message string) {
 	tok := p.peek()
 	err := &ParseError{
 		Message:  message,
-		Line:     tok.Line,
-		Col:      tok.Col,
+		Location: &core.SourceLocation{Line: tok.Line, Column: tok.Col, File: p.filename},
 		Lexeme:   tok.Lexeme,
 		Source:   p.source,
-		Filename: p.filename,
 	}
 	p.errors = append(p.errors, err)
 }
