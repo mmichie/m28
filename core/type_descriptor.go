@@ -60,11 +60,8 @@ var typeRegistryTracker = NewRegistry("type")
 
 // RegisterType registers a type descriptor with duplicate detection
 func RegisterType(desc *TypeDescriptor) {
-	// Check for duplicates but don't panic - log warning if duplicate
-	if err := typeRegistryTracker.Register(string(desc.BaseType), desc); err != nil {
-		// Uncomment to debug duplicate type registrations:
-		// fmt.Printf("Warning: %v\n", err)
-	}
+	// Check for duplicates but don't panic - just ignore
+	_ = typeRegistryTracker.Register(string(desc.BaseType), desc)
 	typeRegistry[desc.BaseType] = desc
 }
 

@@ -204,24 +204,8 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 		if classVal, err := ctx.Lookup("__class__"); err == nil {
 			core.DebugLog("[CALL] Found __class__, defining in funcEnv\n")
 			funcEnv.Define("__class__", classVal)
-			// Debug for pathlib classes
-			if f.name == "__init__" && classVal != nil {
-				if cls, ok := classVal.(*core.Class); ok {
-					if cls.Name == "PosixPath" || cls.Name == "Path" || cls.Name == "PurePath" {
-						// 						fmt.Printf("[DEBUG] Setting __class__ to %s in %s.__init__\n", cls.Name, f.name)
-					}
-				}
-			}
 		} else {
 			core.DebugLog("[CALL] No __class__ found (error: %v)\n", err)
-			// Debug for pathlib classes
-			if f.name == "__init__" && len(args) > 0 {
-				if inst, ok := args[0].(*core.Instance); ok {
-					if inst.Class.Name == "PosixPath" || inst.Class.Name == "Path" || inst.Class.Name == "PurePath" {
-						// 						fmt.Printf("[DEBUG] NO __class__ found for %s instance in __init__\n", inst.Class.Name)
-					}
-				}
-			}
 		}
 	}
 
@@ -329,14 +313,7 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 	} else {
 		// Legacy: simple parameter binding - no kwargs support
 		if len(kwargs) > 0 {
-			// Debug: identify which function is being called
-			funcName := "unknown"
-			if f.name != "" {
-				funcName = f.name
-			}
-			// 			fmt.Printf("[DEBUG] Function %s called with kwargs but has no signature\n", funcName)
-			// 			fmt.Printf("[DEBUG] kwargs: %v\n", kwargs)
-			err := fmt.Errorf("function %s does not support keyword arguments", funcName)
+			err := fmt.Errorf("function %s does not support keyword arguments", f.name)
 			core.TraceExitFunction(f.name, nil, err)
 			return nil, err
 		}

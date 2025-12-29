@@ -92,17 +92,9 @@ func (c *Class) GetMethod(name string) (Value, bool) {
 
 // GetMethodWithClass looks up a method and returns the class where it was defined
 func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
-	// Debug for PurePath.__init__
-	if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
-		// 		fmt.Printf("[DEBUG GetMethodWithClass] Looking for %s.%s, in Methods: %v\n", c.Name, name, c.Methods[name] != nil)
-	}
-
 	// Check this class first - look in both Methods and Attributes
 	// This is important for when a subclass sets __eq__ = None to block inherited __eq__
 	if method, ok := c.Methods[name]; ok {
-		if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
-			// 			fmt.Printf("[DEBUG GetMethodWithClass] FOUND %s.%s in Methods\n", c.Name, name)
-		}
 		return method, c, true
 	}
 
@@ -112,11 +104,6 @@ func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
 		if attr, ok := c.Attributes[name]; ok {
 			return attr, c, true
 		}
-	}
-
-	// Debug when not found
-	if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
-		// 		fmt.Printf("[DEBUG GetMethodWithClass] NOT found in %s.Methods, checking parents\n", c.Name)
 	}
 
 	// Check parent classes using MRO (Method Resolution Order)
@@ -169,20 +156,7 @@ func IsStrictSubclass(child, parent *Class) bool {
 
 // SetMethod adds a method to the class
 func (c *Class) SetMethod(name string, method Value) {
-	// Debug for PurePath.__init__
-	if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
-		// 		fmt.Printf("[DEBUG SetMethod] %s.%s being set in Methods map (before: %v, after: will be %T)\n", c.Name, name, c.Methods[name] != nil, method)
-	}
-
 	c.Methods[name] = method
-
-	// Debug verification
-	if (c.Name == "PurePath" || c.Name == "Path") && name == "__init__" {
-		// 		fmt.Printf("[DEBUG SetMethod] %s.%s set complete, now in Methods: %v\n", c.Name, name, c.Methods[name] != nil)
-	}
-
-	// Special handling for __init__
-	// Constructor is set when creating instances
 }
 
 // GetClassAttr gets a class attribute
@@ -735,19 +709,6 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 	// Call __init__ if __new__ returned an instance of this class or a subclass
 	if inst, ok := instance.(*Instance); ok && IsInstanceOf(inst, c) {
 		if initMethod, definingClass, ok := c.GetMethodWithClass("__init__"); ok {
-			// Debug for pathlib classes
-			if c.Name == "PosixPath" || c.Name == "PurePath" || c.Name == "PurePosixPath" || c.Name == "Path" {
-				// 				fmt.Printf("[DEBUG Class.CallWithKeywords] Calling %s.__init__ with %d args, %d kwargs\n", c.Name, len(args), len(kwargs))
-			}
-			// Debug for TestProgram
-			if c.Name == "TestProgram" {
-				Log.Debug(SubsystemEval, "Calling __init__ for class",
-					"class", c.Name,
-					"arg_count", len(args),
-					"kwarg_count", len(kwargs),
-					"kwargs", kwargs)
-			}
-
 			// CRITICAL: Set __class__ to the DEFINING class, not the instance's class
 			// This is required for super() to work correctly in inherited methods
 			// When Child has no __init__ but inherits Parent.__init__, and Parent.__init__
@@ -826,10 +787,6 @@ func NewInstance(class *Class) *Instance {
 			inst.SlotValues[i] = nil
 		}
 
-		// Debug for Path-related classes
-		if class.Name == "PosixPath" || class.Name == "Path" || class.Name == "PurePath" {
-			// 			fmt.Printf("[DEBUG NewInstance] %s: %d slots - %v\n", class.Name, len(class.SlotNames), class.SlotNames)
-		}
 	}
 
 	return inst
@@ -1266,11 +1223,6 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 // 1. Check for data descriptor with __set__ in class
 // 2. Set in instance __dict__
 func (i *Instance) SetAttr(name string, value Value) error {
-	// Debug for PosixPath._raw_paths
-	if (i.Class.Name == "PosixPath" || i.Class.Name == "PurePath" || i.Class.Name == "Path") && name == "_raw_paths" {
-		// 		fmt.Printf("[DEBUG SetAttr] %s.%s = %v\n", i.Class.Name, name, value)
-	}
-
 	// Check for data descriptor in class with __set__
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
 		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
@@ -1296,11 +1248,6 @@ func (i *Instance) SetAttr(name string, value Value) error {
 	}
 
 	// No descriptor with __set__, set in instance __dict__
-	// Debug for Path-related classes
-	if (i.Class.Name == "PosixPath" || i.Class.Name == "Path" || i.Class.Name == "PurePath") && name == "_raw_paths" {
-		// 		fmt.Printf("[DEBUG SetAttr] %s.%s being set in Attributes dict (no descriptor found)\n", i.Class.Name, name)
-	}
-
 	i.Attributes[name] = value
 	return nil
 }
@@ -1572,10 +1519,6 @@ type BoundSuperMethod struct {
 
 // Call implements Callable interface for BoundSuperMethod
 func (bsm *BoundSuperMethod) Call(args []Value, ctx *Context) (Value, error) {
-	// Debug for pathlib classes
-	if bsm.Class.Name == "PurePath" || bsm.Class.Name == "Path" || bsm.Class.Name == "PosixPath" {
-		// 		fmt.Printf("[DEBUG BoundSuperMethod.Call] Calling method from %s with %d args\n", bsm.Class.Name, len(args))
-	}
 	// Create a new context with __class__ set
 	methodCtx := NewContext(ctx)
 	methodCtx.Define("__class__", bsm.Class)
@@ -1591,10 +1534,6 @@ func (bsm *BoundSuperMethod) Call(args []Value, ctx *Context) (Value, error) {
 
 // CallWithKeywords implements CallWithKeywords interface for BoundSuperMethod
 func (bsm *BoundSuperMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
-	// Debug for pathlib classes
-	if bsm.Class.Name == "PurePath" || bsm.Class.Name == "Path" || bsm.Class.Name == "PosixPath" {
-		// 		fmt.Printf("[DEBUG BoundSuperMethod.CallWithKeywords] Calling method from %s with %d args and %d kwargs\n", bsm.Class.Name, len(args), len(kwargs))
-	}
 	// Create a new context with __class__ set
 	methodCtx := NewContext(ctx)
 	methodCtx.Define("__class__", bsm.Class)
@@ -1694,10 +1633,6 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 		}); ok {
 			// Create bound method if we have an instance
 			if s.Instance != nil {
-				// Debug for pathlib classes
-				if name == "__init__" && (s.Instance.Class.Name == "PosixPath" || s.Instance.Class.Name == "Path") {
-					// 					fmt.Printf("[DEBUG Super.GetAttr] Binding __init__ from class %s for instance %s (method type: %T)\n", defClass.Name, s.Instance.Class.Name, method)
-				}
 				// Use BoundSuperMethod to ensure __class__ is set correctly
 				// This allows super() to work correctly in parent class methods
 				return &BoundSuperMethod{

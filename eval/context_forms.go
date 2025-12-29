@@ -16,11 +16,6 @@ func withForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("with requires at least 2 arguments")
 	}
 
-	// Debug: print all args
-	// for i, arg := range args.Items() {
-	// 	fmt.Printf("  arg[%d]: %v (type: %T)\n", i, arg, arg)
-	// }
-
 	// Parse context managers
 	var managers []withManager
 
@@ -182,8 +177,6 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 	if err != nil {
 		return nil, err
 	}
-
-	// Debug output
 
 	// Check if it's a context manager
 	cm, ok := core.IsContextManager(mgrValue)

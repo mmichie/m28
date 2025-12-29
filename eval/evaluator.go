@@ -249,7 +249,6 @@ func RegisterSpecialForm(name string, handler SpecialFormHandler) {
 		// In non-strict mode, allow overwrites but log them
 		// This preserves existing behavior where special_forms/register.go
 		// intentionally overrides some handlers with delegating versions
-		// fmt.Printf("Warning: %v\n", err)
 	}
 	specialForms[name] = handler
 }

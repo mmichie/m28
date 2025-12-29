@@ -677,11 +677,6 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 								}
 							}
 
-							// Debug for PurePath.__init__
-							if (string(className) == "PurePath" || string(className) == "Path") && methodName == "__init__" {
-								// 								fmt.Printf("[DEBUG classForm] Setting method %s.%s via SetMethod\n", className, methodName)
-							}
-
 							class.SetMethod(methodName, finalMethod)
 							// Also add to class body context so later statements can reference it
 							classBodyCtx.Define(methodName, finalMethod)
