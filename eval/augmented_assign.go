@@ -17,6 +17,7 @@ var augmentedOps = map[string]string{
 	"//=": "//",
 	"%=":  "%",
 	"**=": "**",
+	"@=":  "@",
 	"&=":  "&",
 	"|=":  "|",
 	"^=":  "^",
@@ -33,6 +34,7 @@ var augmentedDunderMethods = map[string]string{
 	"//=": "__ifloordiv__",
 	"%=":  "__imod__",
 	"**=": "__ipow__",
+	"@=":  "__imatmul__",
 	"&=":  "__iand__",
 	"|=":  "__ior__",
 	"^=":  "__ixor__",
@@ -74,6 +76,11 @@ func AugmentedAssignForm(op string, args *core.ListValue, ctx *core.Context) (co
 	target := args.Items()[0]
 	augValue := args.Items()[1]
 
+	// Unwrap LocatedValue if present
+	if lv, ok := target.(core.LocatedValue); ok {
+		target = lv.Value
+	}
+
 	// Handle different target types
 	switch t := target.(type) {
 	case core.SymbolValue:
@@ -96,15 +103,22 @@ func AugmentedAssignForm(op string, args *core.ListValue, ctx *core.Context) (co
 			return nil, err
 		}
 
-		// Assign the result
-		ctx.Define(string(t), result)
+		// Assign the result using assignVariable which handles global/nonlocal
+		if err := assignVariable(ctx, string(t), result); err != nil {
+			return nil, err
+		}
 		// Python assignments are statements and return None
 		return core.None, nil
 
 	case *core.ListValue:
 		// Could be indexing or dot notation
 		if t.Len() >= 3 {
-			if sym, ok := t.Items()[0].(core.SymbolValue); ok {
+			// Unwrap LocatedValue from first item if present
+			firstItem := t.Items()[0]
+			if lv, ok := firstItem.(core.LocatedValue); ok {
+				firstItem = lv.Value
+			}
+			if sym, ok := firstItem.(core.SymbolValue); ok {
 				switch string(sym) {
 				case "get-item":
 					// Index assignment: lst[i] += y
@@ -159,8 +173,12 @@ func augmentedPropertyAssign(dotExpr *core.ListValue, op string, augValue core.V
 		return nil, fmt.Errorf("invalid property expression")
 	}
 
+	items := dotExpr.Items()
+	// DotForm expects args without the leading "." - pass [obj, "prop"]
+	dotArgs := core.NewList(items[1:]...)
+
 	// Get current value
-	currentValue, err := DotForm(dotExpr, ctx)
+	currentValue, err := DotForm(dotArgs, ctx)
 	if err != nil {
 		return nil, err
 	}

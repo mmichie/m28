@@ -192,12 +192,12 @@ func TestParseAssignment(t *testing.T) {
 func TestParseAugmentedAssignment(t *testing.T) {
 	tests := []struct {
 		source string
-		op     string
+		augOp  string // The augmented assignment operator (+=, -=, etc.)
 	}{
-		{"x += 1", "+"},
-		{"x -= 1", "-"},
-		{"x *= 2", "*"},
-		{"x /= 2", "/"},
+		{"x += 1", "+="},
+		{"x -= 1", "-="},
+		{"x *= 2", "*="},
+		{"x /= 2", "/="},
 	}
 
 	for _, tt := range tests {
@@ -206,24 +206,23 @@ func TestParseAugmentedAssignment(t *testing.T) {
 			t.Fatalf("Parse error for %q: %v", tt.source, err)
 		}
 
-		assign, ok := nodes[0].(*ast.AssignForm)
+		// Augmented assignment is now parsed as an SExpr: (+= x 1)
+		sexpr, ok := nodes[0].(*ast.SExpr)
 		if !ok {
-			t.Fatalf("Expected AssignForm for %q, got %T", tt.source, nodes[0])
+			t.Fatalf("Expected SExpr for %q, got %T", tt.source, nodes[0])
 		}
 
-		// The value should be an SExpr representing the operation
-		sexpr, ok := assign.Value.(*ast.SExpr)
-		if !ok {
-			t.Fatalf("Expected value to be SExpr for %q, got %T", tt.source, assign.Value)
+		if len(sexpr.Elements) != 3 {
+			t.Fatalf("Expected 3 elements in SExpr for %q, got %d", tt.source, len(sexpr.Elements))
 		}
 
 		opNode, ok := sexpr.Elements[0].(*ast.Identifier)
 		if !ok {
-			t.Fatalf("Expected operator to be Identifier for %q", tt.source)
+			t.Fatalf("Expected operator to be Identifier for %q, got %T", tt.source, sexpr.Elements[0])
 		}
 
-		if opNode.Name != tt.op {
-			t.Errorf("Expected operator %q for %q, got %q", tt.op, tt.source, opNode.Name)
+		if opNode.Name != tt.augOp {
+			t.Errorf("Expected augmented operator %q for %q, got %q", tt.augOp, tt.source, opNode.Name)
 		}
 	}
 }

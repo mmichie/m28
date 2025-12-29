@@ -809,16 +809,17 @@ func (p *PythonParser) parseAugmentedAssignment(target ast.ASTNode) ast.ASTNode 
 	tok := p.previous()
 	value := p.parseExpression()
 
-	// Convert augmented assignment to regular assignment: x += 1 → x = x + 1
-	op := p.getAugmentedOperator(tok.Type)
-	opCall := ast.NewSExpr([]ast.ASTNode{
-		ast.NewIdentifier(op, p.makeLocation(tok), ast.SyntaxPython),
+	// Emit augmented assignment as special form: x += 1 → (+= x 1)
+	// This allows the evaluator to try __iadd__ before falling back to __add__
+	augOp := p.getAugmentedAssignOp(tok.Type)
+	augAssign := ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier(augOp, p.makeLocation(tok), ast.SyntaxPython),
 		target,
 		value,
 	}, p.makeLocation(tok), ast.SyntaxPython)
 
 	p.consumeStatementTerminator()
-	return ast.NewAssignForm(target, opCall, p.makeLocation(tok), ast.SyntaxPython)
+	return augAssign
 }
 
 // getAugmentedOperator maps augmented assignment tokens to their base operators
@@ -850,6 +851,41 @@ func (p *PythonParser) getAugmentedOperator(tokType TokenType) string {
 		return ">>"
 	case TOKEN_AT_EQ:
 		return "@"
+	default:
+		return ""
+	}
+}
+
+// getAugmentedAssignOp maps augmented assignment tokens to their operator symbols
+// These are the operators that the evaluator recognizes as augmented assignment special forms
+func (p *PythonParser) getAugmentedAssignOp(tokType TokenType) string {
+	switch tokType {
+	case TOKEN_PLUS_ASSIGN:
+		return "+="
+	case TOKEN_MINUS_ASSIGN:
+		return "-="
+	case TOKEN_STAR_ASSIGN:
+		return "*="
+	case TOKEN_SLASH_ASSIGN:
+		return "/="
+	case TOKEN_DOUBLESLASH_ASSIGN:
+		return "//="
+	case TOKEN_PERCENT_ASSIGN:
+		return "%="
+	case TOKEN_DOUBLESTAR_ASSIGN:
+		return "**="
+	case TOKEN_PIPE_ASSIGN:
+		return "|="
+	case TOKEN_AMPERSAND_ASSIGN:
+		return "&="
+	case TOKEN_CARET_ASSIGN:
+		return "^="
+	case TOKEN_LSHIFT_ASSIGN:
+		return "<<="
+	case TOKEN_RSHIFT_ASSIGN:
+		return ">>="
+	case TOKEN_AT_EQ:
+		return "@="
 	default:
 		return ""
 	}
