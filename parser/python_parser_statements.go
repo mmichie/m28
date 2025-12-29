@@ -787,10 +787,17 @@ func (p *PythonParser) isAugmentedAssignment() bool {
 
 // parseAugmentedAssignment parses augmented assignments like +=, -=, etc.
 func (p *PythonParser) parseAugmentedAssignment(target ast.ASTNode) ast.ASTNode {
-	// Validate the assignment target first
+	// Augmented assignment requires a single target - tuples/lists are not allowed
+	// Check for tuple/list before general validation
+	if p.isSequenceTarget(target) {
+		p.error("'" + p.describeTargetForAugmented(target) + "' is an illegal expression for augmented assignment")
+		return nil
+	}
+
+	// Validate the assignment target
 	// CPython uses "illegal expression" for augmented assignment on invalid targets
 	if errMsg := p.validateAssignmentTarget(target); errMsg != "" {
-		p.error("'" + p.describeTarget(target) + "' is an illegal expression for augmented assignment")
+		p.error("'" + p.describeTargetForAugmented(target) + "' is an illegal expression for augmented assignment")
 		return nil
 	}
 
@@ -942,6 +949,86 @@ func (p *PythonParser) describeTarget(target ast.ASTNode) string {
 	default:
 		return "expression"
 	}
+}
+
+// isSequenceTarget checks if an AST node is a tuple or list (sequence unpacking target)
+// These are valid for regular assignment but NOT for augmented assignment
+func (p *PythonParser) isSequenceTarget(target ast.ASTNode) bool {
+	switch n := target.(type) {
+	case *ast.SExpr:
+		if len(n.Elements) == 0 {
+			return false
+		}
+		// Check the first element
+		if ident, ok := n.Elements[0].(*ast.Identifier); ok {
+			switch ident.Name {
+			// Explicit tuple-literal or list-literal
+			case "tuple-literal", "list-literal":
+				return true
+			// Special forms that are valid augmented assignment targets
+			case "get-attr", ".", "get-item", "subscript":
+				return false
+			}
+			// Check for implicit tuple: bare S-expression with multiple simple identifiers
+			// e.g., (x b) from parsing "x, b"
+			// This excludes things like (get-item self elem) where get-item is a special form
+			if len(n.Elements) >= 2 {
+				// If all elements are simple identifiers (not special forms), it's a tuple
+				allSimpleIdents := true
+				for _, elem := range n.Elements {
+					if id, ok := elem.(*ast.Identifier); ok {
+						// Check if it's a special form identifier
+						switch id.Name {
+						case "get-attr", ".", "get-item", "subscript", "+", "-", "*", "/",
+							"call", "lambda", "if-expr", "ternary", "tuple-literal", "list-literal":
+							allSimpleIdents = false
+						}
+					} else {
+						allSimpleIdents = false
+					}
+					if !allSimpleIdents {
+						break
+					}
+				}
+				if allSimpleIdents {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// describeTargetForAugmented returns a description for augmented assignment errors
+// Returns "tuple" or "list" for sequence targets
+func (p *PythonParser) describeTargetForAugmented(target ast.ASTNode) string {
+	switch n := target.(type) {
+	case *ast.SExpr:
+		if len(n.Elements) > 0 {
+			if ident, ok := n.Elements[0].(*ast.Identifier); ok {
+				switch ident.Name {
+				case "tuple-literal":
+					return "tuple"
+				case "list-literal":
+					return "list"
+				}
+			}
+			// Check for implicit tuple (multiple identifiers)
+			if len(n.Elements) >= 2 {
+				allIdents := true
+				for _, elem := range n.Elements {
+					if _, ok := elem.(*ast.Identifier); !ok {
+						allIdents = false
+						break
+					}
+				}
+				if allIdents {
+					return "tuple"
+				}
+			}
+		}
+	}
+	return p.describeTarget(target)
 }
 
 // validateAssignmentTarget checks if an AST node is a valid assignment target
