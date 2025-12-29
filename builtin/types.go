@@ -586,8 +586,8 @@ func IsSubclassBuilder() builders.BuiltinFunc {
 		if tuple, ok := typeArg.(core.TupleValue); ok {
 			for _, t := range tuple {
 				if parentCls, ok := t.(*core.Class); ok {
-					// Simple check - classes are same or cls has parent in bases
-					if cls == parentCls || (cls.Parent != nil && cls.Parent == parentCls) {
+					// Check if cls is a subclass of parentCls
+					if core.IsSubclass(cls, parentCls) {
 						return core.BoolValue(true), nil
 					}
 				}
@@ -597,8 +597,8 @@ func IsSubclassBuilder() builders.BuiltinFunc {
 
 		// Single class check
 		if parentCls, ok := typeArg.(*core.Class); ok {
-			// Simple check - classes are same or cls has parent in bases
-			return core.BoolValue(cls == parentCls || (cls.Parent != nil && cls.Parent == parentCls)), nil
+			// Check if cls is a subclass of parentCls
+			return core.BoolValue(core.IsSubclass(cls, parentCls)), nil
 		}
 
 		return nil, errors.NewTypeError("issubclass", "arg 2 must be a class or tuple of classes", string(typeArg.Type()))
@@ -660,7 +660,7 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 		case *core.Instance:
 			// Also match int subclass instances
 			inst := obj.(*core.Instance)
-			return inst.Class == t.Class || (inst.Class.Parent != nil && inst.Class.Parent == t.Class)
+			return core.IsInstanceOf(inst, t.Class)
 		}
 		return false
 	case *BoolType:
@@ -673,14 +673,14 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 		case *core.Instance:
 			// Also match bool subclass instances (though bool can't be subclassed)
 			inst := obj.(*core.Instance)
-			return inst.Class == t.Class || (inst.Class.Parent != nil && inst.Class.Parent == t.Class)
+			return core.IsInstanceOf(inst, t.Class)
 		}
 		return false
 	case *core.Class:
 		// Check against user-defined classes
 		if inst, ok := obj.(*core.Instance); ok {
 			// Simple check - instance's class matches
-			return inst.Class == t || (inst.Class.Parent != nil && inst.Class.Parent == t)
+			return core.IsInstanceOf(inst, t)
 		}
 	case *core.BuiltinFunction:
 		// Handle builtin type constructors like list, int, float, etc.
@@ -742,7 +742,7 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 		if wrapper, ok := typeVal.(interface{ GetClass() *core.Class }); ok {
 			classVal := wrapper.GetClass()
 			if inst, ok := obj.(*core.Instance); ok {
-				return inst.Class == classVal || (inst.Class.Parent != nil && inst.Class.Parent == classVal)
+				return core.IsInstanceOf(inst, classVal)
 			}
 		}
 	}

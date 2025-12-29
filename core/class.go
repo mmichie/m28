@@ -13,7 +13,6 @@ type Class struct {
 	Name        string            // Class name
 	Module      string            // Module name (__module__ attribute)
 	Doc         string            // Docstring (__doc__ attribute)
-	Parent      *Class            // Parent class (for inheritance) - deprecated, use Parents
 	Parents     []*Class          // Parent classes (for multiple inheritance)
 	Methods     map[string]Value  // Class methods
 	Attributes  map[string]Value  // Class attributes
@@ -33,7 +32,6 @@ func NewClass(name string, parent *Class) *Class {
 		BaseObject:  *NewBaseObject(Type("class")),
 		Name:        name,
 		Module:      "__main__", // Default module
-		Parent:      parent,     // Keep for backward compatibility
 		Parents:     parents,
 		Methods:     make(map[string]Value),
 		Attributes:  make(map[string]Value),
@@ -43,15 +41,10 @@ func NewClass(name string, parent *Class) *Class {
 
 // NewClassWithParents creates a new class with multiple parents
 func NewClassWithParents(name string, parents []*Class) *Class {
-	var parent *Class
-	if len(parents) > 0 {
-		parent = parents[0] // First parent for backward compatibility
-	}
 	return &Class{
 		BaseObject:  *NewBaseObject(Type("class")),
 		Name:        name,
 		Module:      "__main__", // Default module
-		Parent:      parent,
 		Parents:     parents,
 		Methods:     make(map[string]Value),
 		Attributes:  make(map[string]Value),
@@ -81,22 +74,17 @@ func (c *Class) GetMethod(name string) (Value, bool) {
 	// Check parent classes using MRO (Method Resolution Order)
 	// Use breadth-first search to match Python's C3 linearization behavior
 	// This ensures we check all direct parents before checking grandparents
-	if len(c.Parents) > 0 {
-		// First, check all direct parents (non-recursively)
-		for _, parent := range c.Parents {
-			if method, ok := parent.Methods[name]; ok {
-				return method, true
-			}
+	// First, check all direct parents (non-recursively)
+	for _, parent := range c.Parents {
+		if method, ok := parent.Methods[name]; ok {
+			return method, true
 		}
-		// Then check grandparents recursively
-		for _, parent := range c.Parents {
-			if method, ok := parent.GetMethod(name); ok {
-				return method, true
-			}
+	}
+	// Then check grandparents recursively
+	for _, parent := range c.Parents {
+		if method, ok := parent.GetMethod(name); ok {
+			return method, true
 		}
-	} else if c.Parent != nil {
-		// Fallback to single parent for backward compatibility
-		return c.Parent.GetMethod(name)
 	}
 
 	return nil, false
@@ -146,9 +134,6 @@ func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
 				return method, defClass, true
 			}
 		}
-	} else if c.Parent != nil {
-		// Fallback to single parent for backward compatibility
-		return c.Parent.GetMethodWithClass(name)
 	}
 
 	return nil, nil, false
@@ -163,14 +148,10 @@ func IsSubclass(child, parent *Class) bool {
 	if child == parent {
 		return true
 	}
-	if len(child.Parents) > 0 {
-		for _, p := range child.Parents {
-			if IsSubclass(p, parent) {
-				return true
-			}
+	for _, p := range child.Parents {
+		if IsSubclass(p, parent) {
+			return true
 		}
-	} else if child.Parent != nil {
-		return IsSubclass(child.Parent, parent)
 	}
 	return false
 }
@@ -225,9 +206,6 @@ func (c *Class) GetClassAttr(name string) (Value, bool) {
 				return attr, true
 			}
 		}
-	} else if c.Parent != nil {
-		// Fallback to single parent for backward compatibility
-		return c.Parent.GetClassAttr(name)
 	}
 
 	return nil, false
@@ -345,16 +323,9 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 
 	// Special handling for __bases__ (Direct parent classes)
 	if name == "__bases__" {
-		var bases []Value
-		if c.Parent != nil {
-			bases = append(bases, c.Parent)
-		}
+		bases := make([]Value, len(c.Parents))
 		for i, parent := range c.Parents {
-			if i == 0 && c.Parent != nil {
-				// Skip first if it's the same as c.Parent
-				continue
-			}
-			bases = append(bases, parent)
+			bases[i] = parent
 		}
 		return TupleValue(bases), true
 	}
@@ -371,11 +342,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		queue := []*Class{}
 
 		// Add direct parents to queue
-		if len(c.Parents) > 0 {
-			queue = append(queue, c.Parents...)
-		} else if c.Parent != nil {
-			queue = append(queue, c.Parent)
-		}
+		queue = append(queue, c.Parents...)
 
 		// Process queue in breadth-first order
 		for len(queue) > 0 {
@@ -390,11 +357,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 			seen[cls] = true
 
 			// Add this class's parents to the queue
-			if len(cls.Parents) > 0 {
-				queue = append(queue, cls.Parents...)
-			} else if cls.Parent != nil {
-				queue = append(queue, cls.Parent)
-			}
+			queue = append(queue, cls.Parents...)
 		}
 
 		return TupleValue(mro), true
@@ -435,15 +398,9 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		dict.SetWithKey(dictKey, StringValue("__dict__"), dictDescriptor)
 
 		// __bases__ - Direct parent classes
-		var bases []Value
-		if c.Parent != nil {
-			bases = append(bases, c.Parent)
-		}
+		bases := make([]Value, len(c.Parents))
 		for i, parent := range c.Parents {
-			if i == 0 && c.Parent != nil {
-				continue
-			}
-			bases = append(bases, parent)
+			bases[i] = parent
 		}
 		basesKey := ValueToKey(StringValue("__bases__"))
 		dict.SetWithKey(basesKey, StringValue("__bases__"), TupleValue(bases))
@@ -1847,20 +1804,6 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 				return bindMethod(method, defClass), true
 			}
 		}
-	} else if s.Class.Parent != nil {
-		// Fallback to single parent for backward compatibility
-		// Check parent's Methods map directly
-		if method, ok := s.Class.Parent.Methods[name]; ok {
-			return bindMethod(method, s.Class.Parent), true
-		}
-		// Check parent's Attributes map directly
-		if attr, ok := s.Class.Parent.Attributes[name]; ok {
-			return bindMethod(attr, s.Class.Parent), true
-		}
-		// Recursively check parent's parents
-		if method, defClass, ok := s.Class.Parent.GetMethodWithClass(name); ok {
-			return bindMethod(method, defClass), true
-		}
 	} else {
 		// No parents - this is the root class (like 'type' or 'object')
 		// For special methods, check the class's Methods map directly
@@ -1899,12 +1842,24 @@ func IsInstance(v Value) bool {
 
 // Helper function to check instance of class
 func IsInstanceOf(instance *Instance, class *Class) bool {
-	current := instance.Class
-	for current != nil {
+	// Use BFS to check all ancestors with multiple inheritance
+	seen := make(map[*Class]bool)
+	queue := []*Class{instance.Class}
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if current == nil || seen[current] {
+			continue
+		}
+		seen[current] = true
+
 		if current == class {
 			return true
 		}
-		current = current.Parent
+
+		queue = append(queue, current.Parents...)
 	}
 	return false
 }
@@ -2043,36 +1998,22 @@ func (m *MRODescriptor) GetAttr(name string) (Value, bool) {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			// __get__(self, obj, type=None)
 			// For class-level access, obj will be None
-			// Return the MRO tuple
+			// Return the MRO tuple using BFS
 			mro := []Value{m.class}
-			current := m.class.Parent
-			for current != nil {
-				mro = append(mro, current)
-				current = current.Parent
-			}
-			// Also include parents from multiple inheritance
-			if len(m.class.Parents) > 0 {
-				for i, parent := range m.class.Parents {
-					if i == 0 && m.class.Parent != nil {
-						continue
-					}
-					p := parent
-					for p != nil {
-						alreadyInMRO := false
-						for _, existing := range mro {
-							if existingClass, ok := existing.(*Class); ok {
-								if existingClass == p {
-									alreadyInMRO = true
-									break
-								}
-							}
-						}
-						if !alreadyInMRO {
-							mro = append(mro, p)
-						}
-						p = p.Parent
-					}
+			seen := make(map[*Class]bool)
+			seen[m.class] = true
+			queue := append([]*Class{}, m.class.Parents...)
+
+			for len(queue) > 0 {
+				cls := queue[0]
+				queue = queue[1:]
+
+				if cls == nil || seen[cls] {
+					continue
 				}
+				seen[cls] = true
+				mro = append(mro, cls)
+				queue = append(queue, cls.Parents...)
 			}
 			return TupleValue(mro), nil
 		}), true

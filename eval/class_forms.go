@@ -1258,8 +1258,6 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// This is a workaround for complex metaclass hierarchies
 				if len(class.Parents) > 0 {
 					return core.NewSuper(class.Parents[0], nil), nil
-				} else if class.Parent != nil {
-					return core.NewSuper(class.Parent, nil), nil
 				}
 				return nil, &core.TypeError{Message: "super: class has no parent"}
 			}
@@ -1293,10 +1291,10 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Check if it's a class (for class methods or metaclass methods)
 		if class, ok := firstArg.(*core.Class); ok {
 			// It's a class, use its parent
-			if class.Parent != nil {
+			if len(class.Parents) > 0 {
 				// Return a super object for the parent class
 				// Pass nil as instance since we're in a class/metaclass method
-				return core.NewSuper(class.Parent, nil), nil
+				return core.NewSuper(class.Parents[0], nil), nil
 			}
 			// No parent, can't use super
 			return nil, &core.TypeError{Message: "super: class has no parent"}
@@ -1305,9 +1303,9 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Check for wrapper types
 		if wrapper, ok := firstArg.(interface{ GetClass() *core.Class }); ok {
 			class := wrapper.GetClass()
-			if class.Parent != nil {
+			if len(class.Parents) > 0 {
 				// Pass nil as instance
-				return core.NewSuper(class.Parent, nil), nil
+				return core.NewSuper(class.Parents[0], nil), nil
 			}
 			return nil, &core.TypeError{Message: "super: class has no parent"}
 		}
@@ -1457,7 +1455,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 			if class, ok := typeVal.(*core.Class); ok {
 				// Check if obj is an instance of this class
 				if instance, ok := obj.(*core.Instance); ok {
-					if instance.Class == class || (instance.Class.Parent != nil && instance.Class.Parent == class) {
+					if core.IsInstanceOf(instance, class) {
 						return core.True, nil
 					}
 				}
@@ -1512,7 +1510,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				class := wrapper.GetClass()
 				// Check if obj is an instance of this class
 				if instance, ok := obj.(*core.Instance); ok {
-					if instance.Class == class || (instance.Class.Parent != nil && instance.Class.Parent == class) {
+					if core.IsInstanceOf(instance, class) {
 						return core.True, nil
 					}
 				}
@@ -1925,29 +1923,9 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				continue
 			}
 
-			current := subClass
-			for current != nil {
-				if current == itemClass {
-					return core.True, nil
-				}
-				current = current.Parent
-			}
-
-			// Also check MRO if available
-			if len(subClass.Parents) > 1 {
-				for _, parent := range subClass.Parents {
-					if parent == itemClass {
-						return core.True, nil
-					}
-					// Check parent's hierarchy too
-					pc := parent
-					for pc != nil {
-						if pc == itemClass {
-							return core.True, nil
-						}
-						pc = pc.Parent
-					}
-				}
+			// Check if subClass is a subclass of itemClass using BFS
+			if core.IsSubclass(subClass, itemClass) {
+				return core.True, nil
 			}
 		}
 		return core.False, nil
@@ -2021,13 +1999,9 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		return nil, &core.TypeError{Message: fmt.Sprintf("issubclass arguments must be classes (got subclass=%T ok1=%v, baseclass=%T ok2=%v)", subClassVal, ok1, baseClassVal, ok2)}
 	}
 
-	// Check inheritance chain
-	current := subClass
-	for current != nil {
-		if current == baseClass {
-			return core.True, nil
-		}
-		current = current.Parent
+	// Check inheritance chain using BFS
+	if core.IsSubclass(subClass, baseClass) {
+		return core.True, nil
 	}
 
 	return core.False, nil

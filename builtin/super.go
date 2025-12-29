@@ -77,40 +77,10 @@ func SuperBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 
 // isSubclassInstance checks if instance is an instance of class or its subclass
 func isSubclassInstance(instance *core.Instance, class *core.Class) bool {
-	current := instance.Class
-	for current != nil {
-		if current == class {
-			return true
-		}
-		// Check parents
-		if len(current.Parents) > 0 {
-			for _, parent := range current.Parents {
-				if isSubclassOf(parent, class) {
-					return true
-				}
-			}
-		} else if current.Parent != nil {
-			current = current.Parent
-		} else {
-			break
-		}
-	}
-	return false
+	return core.IsInstanceOf(instance, class)
 }
 
 // isSubclassOf checks if child is a subclass of parent
 func isSubclassOf(child, parent *core.Class) bool {
-	if child == parent {
-		return true
-	}
-	if len(child.Parents) > 0 {
-		for _, p := range child.Parents {
-			if isSubclassOf(p, parent) {
-				return true
-			}
-		}
-	} else if child.Parent != nil {
-		return isSubclassOf(child.Parent, parent)
-	}
-	return false
+	return core.IsSubclass(child, parent)
 }

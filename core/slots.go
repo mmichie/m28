@@ -141,13 +141,6 @@ func SetupSlots(class *Class, slotsValue Value) error {
 			copy(allSlotNames, parent.SlotNames)
 			startIndex = len(allSlotNames)
 		}
-	} else if class.Parent != nil {
-		if class.Parent.HasSlots() {
-			// Inherit parent slots
-			allSlotNames = make([]string, len(class.Parent.SlotNames))
-			copy(allSlotNames, class.Parent.SlotNames)
-			startIndex = len(allSlotNames)
-		}
 	}
 
 	// Extract new slot names from this class's __slots__ attribute

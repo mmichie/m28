@@ -201,18 +201,6 @@ func (er *ErrorReporter) findSimilarNames(name string, ctx *core.Context) []stri
 	return suggestions.FindSimilarNames(name, allNames, 2, 3)
 }
 
-// isSimilar checks if two names are similar (using Levenshtein distance)
-// Deprecated: Use suggestions.LevenshteinDistance directly
-func (er *ErrorReporter) isSimilar(s1, s2 string) bool {
-	if len(s1) == 0 || len(s2) == 0 {
-		return false
-	}
-
-	// Use Levenshtein distance - consider similar if within 2 edits
-	distance := suggestions.LevenshteinDistance(s1, s2)
-	return distance <= 2
-}
-
 // getSyntaxKindName returns a human-readable name for syntax kind
 func (er *ErrorReporter) getSyntaxKindName(kind int) string {
 	// Import ast.SyntaxKind constants

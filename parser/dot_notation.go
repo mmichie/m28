@@ -126,13 +126,6 @@ func (p *Parser) parseMethodArgs() ([]core.Value, error) {
 	return args, nil
 }
 
-// DEPRECATED: tryParseDotNotation is kept for backward compatibility
-// The new implementation uses parsePostfix and parseDotAccess
-func (p *Parser) tryParseDotNotation(obj core.Value) (core.Value, bool, error) {
-	// This function is no longer used but kept to avoid breaking changes
-	return obj, false, nil
-}
-
 // isValidPropertyName checks if a string is a valid property name
 func isValidPropertyName(name string) bool {
 	if len(name) == 0 {

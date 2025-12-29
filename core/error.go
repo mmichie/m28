@@ -157,13 +157,7 @@ func isClassSubclassOf(cls *Class, typeName string) bool {
 	if cls.Name == typeName {
 		return true
 	}
-	// Check single parent (deprecated but still used)
-	if cls.Parent != nil {
-		if isClassSubclassOf(cls.Parent, typeName) {
-			return true
-		}
-	}
-	// Check multiple parents
+	// Check parent classes
 	for _, parent := range cls.Parents {
 		if isClassSubclassOf(parent, typeName) {
 			return true

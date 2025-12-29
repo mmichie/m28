@@ -43,10 +43,6 @@ func NewEnvironment(outer *Environment) *Environment {
 
 	// No need to register type constants in this version
 
-	// This is a reasonable default for most environment needs
-	// This ensures builtins are always available
-	env.SetupBuiltins()
-
 	return env
 }
 
@@ -100,13 +96,6 @@ func (e *Environment) SetMutable(symbol string, value core.Value) bool {
 func (e *Environment) NewEnvironment(outer *Environment) *Environment {
 	newEnv := NewEnvironment(outer)
 	return newEnv
-}
-
-// SetupBuiltins initializes the environment with builtin functions
-func (e *Environment) SetupBuiltins() {
-	// DEPRECATED: This function is no longer needed as builtin registration
-	// is handled by the core.Context system.
-	// Keeping empty function for backward compatibility.
 }
 
 func (e *Environment) String() string {
