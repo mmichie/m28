@@ -1026,11 +1026,27 @@ func (t *PythonTokenizer) scanString(quote byte, start, startLine, startCol int)
 			}
 		}
 
-		// Handle escape sequences
-		if ch == '\\' && !isTriple {
+		// Handle escape sequences (applies to both single and triple-quoted strings)
+		if ch == '\\' {
 			t.advance()
 			if !t.isAtEnd() {
-				escaped := t.advance()
+				escaped := t.peek()
+				// Line continuation: backslash followed by newline removes both
+				if escaped == '\n' {
+					t.advance() // consume the newline
+					t.line++
+					t.col = 1
+					continue // skip both backslash and newline
+				}
+				// Handle \r\n line continuation (Windows line endings)
+				if escaped == '\r' && t.pos+1 < len(t.input) && t.input[t.pos+1] == '\n' {
+					t.advance() // consume \r
+					t.advance() // consume \n
+					t.line++
+					t.col = 1
+					continue // skip backslash and line ending
+				}
+				t.advance() // consume the escaped character
 				switch escaped {
 				case 'n':
 					value.WriteByte('\n')
