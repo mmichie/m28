@@ -176,6 +176,20 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 				// __getitem__ succeeded, key exists
 				return core.BoolValue(true), nil
 			}
+			// Try iterating through the container (for generators, iterators, etc.)
+			if iterable, ok := container.(core.Iterable); ok {
+				iter := iterable.Iterator()
+				for {
+					item, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					if core.EqualValues(value, item) {
+						return core.BoolValue(true), nil
+					}
+				}
+				return core.BoolValue(false), nil
+			}
 			return nil, errors.NewTypeError("in", "argument must be iterable", string(container.Type()))
 		}
 	}

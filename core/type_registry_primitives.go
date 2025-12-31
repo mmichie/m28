@@ -812,27 +812,50 @@ func registerBytesType() {
 			"__contains__": {
 				Name:    "__contains__",
 				Arity:   1,
-				Doc:     "Check if byte is in bytes",
+				Doc:     "Check if byte or sub-bytes is in bytes",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					if len(args) != 1 {
 						return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
 					}
 					b := receiver.(BytesValue)
-					num, ok := args[0].(NumberValue)
-					if !ok {
-						return nil, &TypeError{Message: "argument should be integer"}
-					}
-					intVal := int(num)
-					if intVal < 0 || intVal > 255 {
-						return nil, &ValueError{Message: "byte must be in range(0, 256)"}
-					}
-					for _, byte := range b {
-						if byte == uint8(intVal) {
+					switch arg := args[0].(type) {
+					case NumberValue:
+						// Check for single byte value
+						intVal := int(arg)
+						if intVal < 0 || intVal > 255 {
+							return nil, &ValueError{Message: "byte must be in range(0, 256)"}
+						}
+						for _, bt := range b {
+							if bt == uint8(intVal) {
+								return True, nil
+							}
+						}
+						return False, nil
+					case BytesValue:
+						// Check for sub-bytes (like substring check)
+						if len(arg) == 0 {
 							return True, nil
 						}
+						if len(arg) > len(b) {
+							return False, nil
+						}
+						for i := 0; i <= len(b)-len(arg); i++ {
+							match := true
+							for j := 0; j < len(arg); j++ {
+								if b[i+j] != arg[j] {
+									match = false
+									break
+								}
+							}
+							if match {
+								return True, nil
+							}
+						}
+						return False, nil
+					default:
+						return nil, &TypeError{Message: "a bytes-like object is required, not '" + string(args[0].Type()) + "'"}
 					}
-					return False, nil
 				},
 			},
 			"__eq__": {
