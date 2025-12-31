@@ -349,7 +349,9 @@ func InitSetMethods() {
 				break
 			}
 
-			// Return just the value (in functional style, we'd return both value and new set)
+			// Remove the item from the set
+			set.Remove(firstVal)
+
 			return firstVal, nil
 		},
 	}

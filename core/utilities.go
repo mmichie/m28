@@ -266,6 +266,19 @@ func EqualValues(a, b Value) bool {
 			}
 			return true
 		}
+	case *FrozenSetValue:
+		if bVal, ok := b.(*FrozenSetValue); ok {
+			if aVal.Size() != bVal.Size() {
+				return false
+			}
+			// Check if all items in a are in b
+			for _, v := range aVal.items {
+				if !bVal.Contains(v) {
+					return false
+				}
+			}
+			return true
+		}
 	case *DictValue:
 		if bVal, ok := b.(*DictValue); ok {
 			if aVal.Size() != bVal.Size() {
