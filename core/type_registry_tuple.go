@@ -268,6 +268,31 @@ func getTupleMethods() map[string]*MethodDescriptor {
 				return result, nil
 			},
 		},
+		"__rmul__": {
+			Name:    "__rmul__",
+			Arity:   1,
+			Doc:     "Repeat tuple n times (reversed operand)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, &TypeError{Message: "__rmul__ takes exactly one argument"}
+				}
+				tuple := receiver.(TupleValue)
+				n, ok := args[0].(NumberValue)
+				if !ok {
+					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
+				}
+				count := int(n)
+				if count <= 0 {
+					return TupleValue{}, nil
+				}
+				result := make(TupleValue, 0, len(tuple)*count)
+				for i := 0; i < count; i++ {
+					result = append(result, tuple...)
+				}
+				return result, nil
+			},
+		},
 		"__iter__": {
 			Name:    "__iter__",
 			Arity:   0,
