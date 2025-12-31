@@ -1991,6 +1991,295 @@ func registerByteArrayType() {
 	})
 }
 
+// registerComplexType registers the complex type descriptor
+func registerComplexType() {
+	RegisterType(&TypeDescriptor{
+		Name:       "complex",
+		PythonName: "complex",
+		BaseType:   ComplexType,
+		Properties: map[string]*PropertyDescriptor{
+			"real": {
+				Name: "real",
+				Doc:  "Return the real part of the complex number",
+				Getter: func(receiver Value) (Value, error) {
+					c := receiver.(ComplexValue)
+					return NumberValue(real(complex128(c))), nil
+				},
+			},
+			"imag": {
+				Name: "imag",
+				Doc:  "Return the imaginary part of the complex number",
+				Getter: func(receiver Value) (Value, error) {
+					c := receiver.(ComplexValue)
+					return NumberValue(imag(complex128(c))), nil
+				},
+			},
+		},
+		Methods: map[string]*MethodDescriptor{
+			"conjugate": {
+				Name:    "conjugate",
+				Arity:   0,
+				Doc:     "Return the complex conjugate",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c := receiver.(ComplexValue)
+					r := real(complex128(c))
+					i := imag(complex128(c))
+					return ComplexValue(complex(r, -i)), nil
+				},
+			},
+			"__neg__": {
+				Name:    "__neg__",
+				Arity:   0,
+				Doc:     "Return -self",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c := receiver.(ComplexValue)
+					return ComplexValue(-complex128(c)), nil
+				},
+			},
+			"__pos__": {
+				Name:    "__pos__",
+				Arity:   0,
+				Doc:     "Return +self",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					return receiver, nil
+				},
+			},
+			"__abs__": {
+				Name:    "__abs__",
+				Arity:   0,
+				Doc:     "Return the absolute value (magnitude)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c := receiver.(ComplexValue)
+					r := real(complex128(c))
+					i := imag(complex128(c))
+					return NumberValue(math.Sqrt(r*r + i*i)), nil
+				},
+			},
+			"__bool__": {
+				Name:    "__bool__",
+				Arity:   0,
+				Doc:     "Return True if not zero",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c := receiver.(ComplexValue)
+					r := real(complex128(c))
+					i := imag(complex128(c))
+					return BoolValue(r != 0 || i != 0), nil
+				},
+			},
+			"__hash__": {
+				Name:    "__hash__",
+				Arity:   0,
+				Doc:     "Return hash value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c := receiver.(ComplexValue)
+					r := real(complex128(c))
+					i := imag(complex128(c))
+					// Simple hash combining real and imaginary parts
+					hash := int64(r*1000003) ^ int64(i*1000003)
+					return NumberValue(hash), nil
+				},
+			},
+			"__eq__": {
+				Name:    "__eq__",
+				Arity:   1,
+				Doc:     "Return self==value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c1 := receiver.(ComplexValue)
+					switch c2 := args[0].(type) {
+					case ComplexValue:
+						return BoolValue(c1 == c2), nil
+					case NumberValue:
+						// Compare with real number (imag must be 0)
+						r := real(complex128(c1))
+						i := imag(complex128(c1))
+						return BoolValue(i == 0 && r == float64(c2)), nil
+					}
+					return False, nil
+				},
+			},
+			"__rmul__": {
+				Name:    "__rmul__",
+				Arity:   1,
+				Doc:     "Return value*self (reversed operand for multiplication)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c := receiver.(ComplexValue)
+					switch n := args[0].(type) {
+					case NumberValue:
+						return ComplexValue(complex(float64(n), 0) * complex128(c)), nil
+					case ComplexValue:
+						return ComplexValue(complex128(n) * complex128(c)), nil
+					}
+					return NotImplemented, nil
+				},
+			},
+			"__rsub__": {
+				Name:    "__rsub__",
+				Arity:   1,
+				Doc:     "Return value-self (reversed operand for subtraction)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c := receiver.(ComplexValue)
+					switch n := args[0].(type) {
+					case NumberValue:
+						return ComplexValue(complex(float64(n), 0) - complex128(c)), nil
+					case ComplexValue:
+						return ComplexValue(complex128(n) - complex128(c)), nil
+					}
+					return NotImplemented, nil
+				},
+			},
+			"__radd__": {
+				Name:    "__radd__",
+				Arity:   1,
+				Doc:     "Return value+self (reversed operand for addition)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					c := receiver.(ComplexValue)
+					switch n := args[0].(type) {
+					case NumberValue:
+						return ComplexValue(complex(float64(n), 0) + complex128(c)), nil
+					case ComplexValue:
+						return ComplexValue(complex128(n) + complex128(c)), nil
+					}
+					return NotImplemented, nil
+				},
+			},
+		},
+		Constructor: func(args []Value, ctx *Context) (Value, error) {
+			if len(args) == 0 {
+				return ComplexValue(0), nil
+			}
+			if len(args) == 1 {
+				switch v := args[0].(type) {
+				case NumberValue:
+					return ComplexValue(complex(float64(v), 0)), nil
+				case ComplexValue:
+					return v, nil
+				case StringValue:
+					// Parse string like "1+2j" or "3j" or "5"
+					s := strings.TrimSpace(string(v))
+					c, err := parseComplexString(s)
+					if err != nil {
+						return nil, &ValueError{Message: fmt.Sprintf("complex() arg is a malformed string: %s", err)}
+					}
+					return c, nil
+				default:
+					return nil, &TypeError{Message: fmt.Sprintf("complex() first argument must be a string or a number, not '%s'", v.Type())}
+				}
+			}
+			if len(args) == 2 {
+				var realPart, imagPart float64
+				switch r := args[0].(type) {
+				case NumberValue:
+					realPart = float64(r)
+				case ComplexValue:
+					return nil, &TypeError{Message: "complex() can't take second arg if first is a string"}
+				default:
+					return nil, &TypeError{Message: fmt.Sprintf("complex() first argument must be a string or a number, not '%s'", r.Type())}
+				}
+				switch i := args[1].(type) {
+				case NumberValue:
+					imagPart = float64(i)
+				default:
+					return nil, &TypeError{Message: fmt.Sprintf("complex() second argument must be a number, not '%s'", i.Type())}
+				}
+				return ComplexValue(complex(realPart, imagPart)), nil
+			}
+			return nil, &TypeError{Message: fmt.Sprintf("complex() takes at most 2 arguments (%d given)", len(args))}
+		},
+		Str: func(v Value) string {
+			return v.(ComplexValue).String()
+		},
+		Repr: func(v Value) string {
+			return v.(ComplexValue).String()
+		},
+	})
+}
+
+// parseComplexString parses a string like "1+2j", "3j", "5", "-2-3j"
+func parseComplexString(s string) (ComplexValue, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("empty string")
+	}
+
+	// Remove parentheses if present
+	if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
+		s = s[1 : len(s)-1]
+	}
+
+	// Check for 'j' at the end
+	hasJ := strings.HasSuffix(s, "j") || strings.HasSuffix(s, "J")
+
+	if !hasJ {
+		// Try to parse as pure real
+		real, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, err
+		}
+		return ComplexValue(complex(real, 0)), nil
+	}
+
+	// Remove trailing 'j'
+	s = s[:len(s)-1]
+
+	// Pure imaginary: "3", "-3", "", "+"
+	// Find the last + or - that's not at the start and not after 'e' or 'E'
+	lastSign := -1
+	for i := len(s) - 1; i > 0; i-- {
+		if (s[i] == '+' || s[i] == '-') && s[i-1] != 'e' && s[i-1] != 'E' {
+			lastSign = i
+			break
+		}
+	}
+
+	if lastSign == -1 {
+		// Pure imaginary
+		if s == "" || s == "+" {
+			return ComplexValue(complex(0, 1)), nil
+		}
+		if s == "-" {
+			return ComplexValue(complex(0, -1)), nil
+		}
+		imag, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, err
+		}
+		return ComplexValue(complex(0, imag)), nil
+	}
+
+	// Has both real and imaginary parts
+	realStr := s[:lastSign]
+	imagStr := s[lastSign:]
+
+	realPart, err := strconv.ParseFloat(realStr, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	if imagStr == "+" {
+		return ComplexValue(complex(realPart, 1)), nil
+	}
+	if imagStr == "-" {
+		return ComplexValue(complex(realPart, -1)), nil
+	}
+
+	imagPart, err := strconv.ParseFloat(imagStr, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return ComplexValue(complex(realPart, imagPart)), nil
+}
+
 // registerDecimalType registers the decimal type descriptor
 func registerDecimalType() {
 	RegisterType(&TypeDescriptor{

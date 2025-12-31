@@ -341,7 +341,7 @@ func EqualValues(a, b Value) bool {
 // IsHashable determines if a value can be used as a dictionary key
 func IsHashable(v Value) bool {
 	switch v.(type) {
-	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class, BytesValue:
+	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class, BytesValue, ComplexValue:
 		return true
 	case *Instance:
 		// In Python, instances are hashable by default (using object ID)
@@ -440,6 +440,10 @@ func ValueToKey(v Value) string {
 		return "nil"
 	case BytesValue:
 		return fmt.Sprintf("bytes:%x", []byte(val))
+	case ComplexValue:
+		r := real(complex128(val))
+		i := imag(complex128(val))
+		return fmt.Sprintf("c:%g+%gj", r, i)
 	}
 
 	switch val := v.(type) {
