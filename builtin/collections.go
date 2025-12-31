@@ -781,24 +781,22 @@ func createDictClass() *DictType {
 		switch v := iterable.(type) {
 		case *core.ListValue:
 			for _, key := range v.Items() {
-				keyStr, ok := key.(core.StringValue)
-				if !ok {
-					keyStr = core.StringValue(key.String())
+				if err := dict.SetValue(key, value); err != nil {
+					return nil, err
 				}
-				dict.Set(string(keyStr), value)
 			}
 		case core.TupleValue:
 			for _, key := range v {
-				keyStr, ok := key.(core.StringValue)
-				if !ok {
-					keyStr = core.StringValue(key.String())
+				if err := dict.SetValue(key, value); err != nil {
+					return nil, err
 				}
-				dict.Set(string(keyStr), value)
 			}
 		case core.StringValue:
 			// String is iterable in Python - each character is a key
 			for _, ch := range string(v) {
-				dict.Set(string(ch), value)
+				if err := dict.SetValue(core.StringValue(string(ch)), value); err != nil {
+					return nil, err
+				}
 			}
 		default:
 			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not iterable", iterable.Type())}
