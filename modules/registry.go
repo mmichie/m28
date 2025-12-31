@@ -63,6 +63,10 @@ var builtinModules = map[string]ModuleInitializer{
 	"_bz2":                       Init_Bz2Module,                     // C extension stub for bzip2 compression (Phase 4 - allows imports)
 	"zlib":                       InitZlibModule,                     // C extension stub for zlib compression (Phase 4 - allows imports)
 	"_lzma":                      Init_LzmaModule,                    // C extension stub for LZMA compression (Phase 4 - allows imports)
+	"_random":                    InitRandomModule,                   // C extension module for random number generation
+	"_bisect":                    InitBisectModule,                   // C extension module for bisection algorithms
+	"_sha512":                    InitSHA512Module,                   // C extension module for SHA-512 hashing
+	"gc":                         InitGCModule,                       // Garbage collection module (Go handles GC automatically)
 }
 
 // moduleCache stores initialized modules to avoid re-initialization

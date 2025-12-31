@@ -500,7 +500,7 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						lastResult = result
 					}
 				} else {
-					return nil, fmt.Errorf("sequence type %T (value: %v) returned from __iter__ has no __next__ and no protocol support", iter, iter)
+					return nil, &core.TypeError{Message: fmt.Sprintf("iter() returned non-iterator of type '%s'", iter.Type())}
 				}
 			} else {
 				// Use the iterator returned by __iter__
@@ -515,8 +515,8 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						return nil, err
 					}
 					if !found {
-						// No __next__ method - shouldn't happen if __iter__ worked
-						return nil, fmt.Errorf("iterator type %T (value: %v) has no __next__ method", iter, iter)
+						// No __next__ method - can happen if __next__ is deleted during iteration
+						return nil, &core.TypeError{Message: fmt.Sprintf("iter() returned non-iterator of type '%s'", iter.Type())}
 					}
 
 					result, err := bodyFunc(item)

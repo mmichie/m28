@@ -606,6 +606,65 @@ func InitItertoolsModule() *core.DictValue {
 		return core.NewList(result...), nil
 	}))
 
+	// accumulate - make an iterator that returns accumulated sums/results
+	// accumulate([1,2,3,4,5]) --> 1 3 6 10 15
+	// accumulate([1,2,3,4,5], operator.mul) --> 1 2 6 24 120
+	itertoolsModule.Set("accumulate", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("accumulate", args)
+		if err := v.Range(1, 2); err != nil {
+			return nil, err
+		}
+
+		iterable, err := types.RequireIterable(v.Get(0), "accumulate() first argument")
+		if err != nil {
+			return nil, err
+		}
+
+		// Get optional function (default is addition)
+		var fn core.Callable
+		if v.Count() == 2 {
+			fn, err = types.RequireCallable(v.Get(1), "accumulate() second argument")
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		result := make([]core.Value, 0)
+		iter := iterable.Iterator()
+		var total core.Value
+
+		for {
+			val, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+
+			if total == nil {
+				// First element
+				total = val
+			} else if fn != nil {
+				// Apply custom function
+				newTotal, err := fn.Call([]core.Value{total, val}, ctx)
+				if err != nil {
+					return nil, err
+				}
+				total = newTotal
+			} else {
+				// Default: addition
+				totalNum, ok1 := total.(core.NumberValue)
+				valNum, ok2 := val.(core.NumberValue)
+				if !ok1 || !ok2 {
+					return nil, errors.NewRuntimeError("accumulate", "default accumulate requires numeric values")
+				}
+				total = core.NumberValue(float64(totalNum) + float64(valNum))
+			}
+
+			result = append(result, total)
+		}
+
+		return core.NewList(result...), nil
+	}))
+
 	// filterfalse - filter elements where predicate is false
 	itertoolsModule.Set("filterfalse", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("filterfalse", args)

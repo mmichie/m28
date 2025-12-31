@@ -463,7 +463,7 @@ func NewDunderIterator(obj core.Value, ctx *core.Context) (*DunderIterator, erro
 	}
 
 	if _, hasNext := iteratorObj.GetAttr("__next__"); !hasNext {
-		return nil, fmt.Errorf("iterator type %T (value: %v) has no __next__ method", iterator, iterator)
+		return nil, &core.TypeError{Message: fmt.Sprintf("iter() returned non-iterator of type '%s'", iterator.Type())}
 	}
 
 	return &DunderIterator{

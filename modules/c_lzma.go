@@ -53,5 +53,21 @@ func Init_LzmaModule() *core.DictValue {
 		return nil, fmt.Errorf("NotImplementedError: LZMA decompression not yet implemented in M28")
 	}))
 
+	// _encode_filter_properties - encode filter properties (stub)
+	module.Set("_encode_filter_properties", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return nil, fmt.Errorf("NotImplementedError: LZMA filter encoding not yet implemented in M28")
+	}))
+
+	// _decode_filter_properties - decode filter properties (stub)
+	module.Set("_decode_filter_properties", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return nil, fmt.Errorf("NotImplementedError: LZMA filter decoding not yet implemented in M28")
+	}))
+
+	// is_check_supported - check if a check type is supported
+	module.Set("is_check_supported", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Return false for all checks since we don't implement LZMA
+		return core.BoolValue(false), nil
+	}))
+
 	return module
 }

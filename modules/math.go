@@ -39,9 +39,21 @@ func InitMathModule() *core.DictValue {
 	mathModule.Set("floor", core.NewBuiltinFunction(builders.UnaryNumberSimple("floor", math.Floor)))
 	mathModule.Set("ceil", core.NewBuiltinFunction(builders.UnaryNumberSimple("ceil", math.Ceil)))
 	mathModule.Set("trunc", core.NewBuiltinFunction(builders.UnaryNumberSimple("trunc", math.Trunc)))
+	mathModule.Set("modf", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, errors.NewTypeError("modf", "exactly 1 argument", "got different count")
+		}
+		num, ok := args[0].(core.NumberValue)
+		if !ok {
+			return nil, errors.NewTypeError("modf", "float", string(args[0].Type()))
+		}
+		intPart, frac := math.Modf(float64(num))
+		return core.TupleValue{core.NumberValue(frac), core.NumberValue(intPart)}, nil
+	}))
 
 	// Other math functions
 	mathModule.Set("abs", core.NewBuiltinFunction(builders.UnaryNumberSimple("abs", math.Abs)))
+	mathModule.Set("fabs", core.NewBuiltinFunction(builders.UnaryNumberSimple("fabs", math.Abs))) // fabs is abs for floats
 	mathModule.Set("hypot", core.NewBuiltinFunction(builders.BinaryNumberSimple("hypot", math.Hypot)))
 	mathModule.Set("copysign", core.NewBuiltinFunction(builders.BinaryNumberSimple("copysign", math.Copysign)))
 
@@ -52,6 +64,21 @@ func InitMathModule() *core.DictValue {
 	mathModule.Set("asinh", core.NewBuiltinFunction(builders.UnaryNumberSimple("asinh", math.Asinh)))
 	mathModule.Set("acosh", core.NewBuiltinFunction(builders.UnaryNumberSimple("acosh", math.Acosh)))
 	mathModule.Set("atanh", core.NewBuiltinFunction(builders.UnaryNumberSimple("atanh", math.Atanh)))
+
+	// Gamma functions (needed by random module)
+	mathModule.Set("lgamma", core.NewBuiltinFunction(builders.UnaryNumber("lgamma", func(x float64) (float64, error) {
+		if x <= 0 && x == math.Floor(x) {
+			return 0, errors.NewValueError("lgamma", "math domain error")
+		}
+		result, _ := math.Lgamma(x) // Ignore sign, return log of absolute value
+		return result, nil
+	})))
+	mathModule.Set("gamma", core.NewBuiltinFunction(builders.UnaryNumber("gamma", func(x float64) (float64, error) {
+		if x <= 0 && x == math.Floor(x) {
+			return 0, errors.NewValueError("gamma", "math domain error")
+		}
+		return math.Gamma(x), nil
+	})))
 
 	// Angle conversion
 	mathModule.Set("degrees", core.NewBuiltinFunction(builders.UnaryNumber("degrees", func(x float64) (float64, error) {

@@ -6,6 +6,41 @@ import (
 	"strconv"
 )
 
+// instanceNeedsEqComparison checks if an instance has a custom __hash__ that
+// could cause hash collisions requiring __eq__ comparison
+func instanceNeedsEqComparison(v Value) bool {
+	inst, ok := v.(*Instance)
+	if !ok {
+		return false
+	}
+	if inst.Class == nil {
+		return false
+	}
+	// Check if class defines __hash__ (not inherited from object)
+	_, hasOwnHash := inst.Class.Methods["__hash__"]
+	return hasOwnHash
+}
+
+// dictFindKeyWithEq finds a key in the dict by comparing with __eq__
+// Returns the internal key string, the value, found bool, and any error from __eq__
+func dictFindKeyWithEq(dict *DictValue, searchKey Value, ctx *Context) (string, Value, bool, error) {
+	// For instances with custom __hash__, we need to compare with all stored keys
+	// using __eq__ because they might have the same hash
+	for internalKey, storedKey := range dict.keys {
+		// Use EqualValuesWithError to properly propagate __eq__ exceptions
+		equal, err := EqualValuesWithError(storedKey, searchKey, ctx)
+		if err != nil {
+			// Propagate exception from __eq__
+			return "", nil, false, err
+		}
+		if equal {
+			val, _ := dict.Get(internalKey)
+			return internalKey, val, true, nil
+		}
+	}
+	return "", nil, false, nil
+}
+
 // InitDictMethods adds additional methods to the dict type descriptor
 func InitDictMethods() {
 	dictType := GetTypeDescriptor("dict")
@@ -39,11 +74,27 @@ func InitDictMethods() {
 			// Update dict in place by copying all entries from other
 			for _, k := range other.Keys() {
 				v, _ := other.Get(k)
-				// Also copy the original key value
-				if origKey, exists := other.keys[k]; exists {
-					dict.SetWithKey(k, origKey, v)
+				// Get the original key value
+				origKey, exists := other.keys[k]
+				if !exists {
+					origKey = StringValue(k) // Fallback
+				}
+
+				// For instances with custom __hash__, check if key exists using __eq__
+				if instanceNeedsEqComparison(origKey) {
+					internalKey, _, found, err := dictFindKeyWithEq(dict, origKey, ctx)
+					if err != nil {
+						return nil, err // Propagate __eq__ exception
+					}
+					if found {
+						// Update existing key
+						dict.SetWithKey(internalKey, origKey, v)
+					} else {
+						// Add new key
+						dict.SetWithKey(k, origKey, v)
+					}
 				} else {
-					dict.Set(k, v)
+					dict.SetWithKey(k, origKey, v)
 				}
 			}
 
@@ -71,6 +122,19 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
 			}
 
+			// For instances with custom __hash__, check for existing key with __eq__
+			if instanceNeedsEqComparison(key) {
+				internalKey, _, found, err := dictFindKeyWithEq(dict, key, ctx)
+				if err != nil {
+					return nil, err // Propagate __eq__ exception
+				}
+				if found {
+					// Update existing key
+					dict.SetWithKey(internalKey, key, value)
+					return value, nil
+				}
+			}
+
 			// Use SetWithKey to properly track the original key
 			keyRepr := ValueToKey(key)
 			dict.SetWithKey(keyRepr, key, value)
@@ -89,13 +153,29 @@ func InitDictMethods() {
 				return nil, fmt.Errorf("get() takes 1 or 2 arguments")
 			}
 			dict := receiver.(*DictValue)
+			searchKey := args[0]
 
 			// Check if key is hashable
-			if !IsHashable(args[0]) {
-				return nil, fmt.Errorf("unhashable type: '%s'", args[0].Type())
+			if !IsHashable(searchKey) {
+				return nil, fmt.Errorf("unhashable type: '%s'", searchKey.Type())
 			}
 
-			key := ValueToKey(args[0])
+			// For instances with custom __hash__, use __eq__ comparison
+			if instanceNeedsEqComparison(searchKey) {
+				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
+				if err != nil {
+					return nil, err // Propagate __eq__ exception
+				}
+				if found {
+					return val, nil
+				}
+				if len(args) == 2 {
+					return args[1], nil
+				}
+				return Nil, nil
+			}
+
+			key := ValueToKey(searchKey)
 			if val, exists := dict.Get(key); exists {
 				return val, nil
 			}
@@ -118,13 +198,31 @@ func InitDictMethods() {
 				return nil, fmt.Errorf("pop expects 1 or 2 arguments")
 			}
 
+			searchKey := args[0]
+
 			// Check if key is hashable
-			if !IsHashable(args[0]) {
-				return nil, fmt.Errorf("unhashable type: '%s'", args[0].Type())
+			if !IsHashable(searchKey) {
+				return nil, fmt.Errorf("unhashable type: '%s'", searchKey.Type())
+			}
+
+			// For instances with custom __hash__, use __eq__ comparison
+			if instanceNeedsEqComparison(searchKey) {
+				internalKey, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
+				if err != nil {
+					return nil, err // Propagate __eq__ exception
+				}
+				if found {
+					dict.Delete(internalKey)
+					return val, nil
+				}
+				if len(args) > 1 {
+					return args[1], nil
+				}
+				return nil, &KeyError{Key: searchKey}
 			}
 
 			// Convert key to string representation
-			keyStr := ValueToKey(args[0])
+			keyStr := ValueToKey(searchKey)
 
 			// Try to get and remove the value
 			val, found := dict.Get(keyStr)
@@ -132,7 +230,7 @@ func InitDictMethods() {
 				if len(args) > 1 {
 					return args[1], nil
 				}
-				return nil, &KeyError{Key: args[0]}
+				return nil, &KeyError{Key: searchKey}
 			}
 
 			// Remove the key from the dictionary
@@ -154,13 +252,34 @@ func InitDictMethods() {
 				return nil, fmt.Errorf("setdefault expects 1 or 2 arguments")
 			}
 
+			searchKey := args[0]
+
 			// Check if key is hashable
-			if !IsHashable(args[0]) {
-				return nil, fmt.Errorf("unhashable type: '%s'", args[0].Type())
+			if !IsHashable(searchKey) {
+				return nil, fmt.Errorf("unhashable type: '%s'", searchKey.Type())
+			}
+
+			// For instances with custom __hash__, use __eq__ comparison
+			if instanceNeedsEqComparison(searchKey) {
+				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
+				if err != nil {
+					return nil, err // Propagate __eq__ exception
+				}
+				if found {
+					return val, nil
+				}
+				// Key not found, set default
+				var defaultVal Value = None
+				if len(args) > 1 {
+					defaultVal = args[1]
+				}
+				keyStr := ValueToKey(searchKey)
+				dict.SetWithKey(keyStr, searchKey, defaultVal)
+				return defaultVal, nil
 			}
 
 			// Convert key to string representation
-			keyStr := ValueToKey(args[0])
+			keyStr := ValueToKey(searchKey)
 
 			val, found := dict.Get(keyStr)
 			if found {
@@ -174,7 +293,7 @@ func InitDictMethods() {
 			}
 
 			// Set the default value in the dictionary
-			dict.SetWithKey(keyStr, args[0], defaultVal)
+			dict.SetWithKey(keyStr, searchKey, defaultVal)
 
 			return defaultVal, nil
 		},
@@ -388,11 +507,25 @@ func InitDictMethods() {
 				return nil, fmt.Errorf("__getitem__ takes exactly 1 argument")
 			}
 			dict := receiver.(*DictValue)
-			key := ValueToKey(args[0])
+			searchKey := args[0]
+
+			// For instances with custom __hash__, use __eq__ comparison
+			if instanceNeedsEqComparison(searchKey) {
+				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
+				if err != nil {
+					return nil, err // Propagate __eq__ exception
+				}
+				if found {
+					return val, nil
+				}
+				return nil, &KeyError{Key: searchKey}
+			}
+
+			key := ValueToKey(searchKey)
 			if val, exists := dict.Get(key); exists {
 				return val, nil
 			}
-			return nil, &KeyError{Key: args[0]}
+			return nil, &KeyError{Key: searchKey}
 		},
 	}
 
@@ -407,9 +540,25 @@ func InitDictMethods() {
 				return nil, fmt.Errorf("__delitem__ takes exactly 1 argument")
 			}
 			dict := receiver.(*DictValue)
-			key := ValueToKey(args[0])
+			searchKey := args[0]
+
+			// For instances with custom __hash__, use __eq__ comparison
+			if instanceNeedsEqComparison(searchKey) {
+				internalKey, _, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
+				if err != nil {
+					return nil, err // Propagate __eq__ exception
+				}
+				if !found {
+					return nil, &KeyError{Key: searchKey}
+				}
+				dict.Delete(internalKey)
+				delete(dict.keys, internalKey)
+				return None, nil
+			}
+
+			key := ValueToKey(searchKey)
 			if _, exists := dict.Get(key); !exists {
-				return nil, &KeyError{Key: args[0]}
+				return nil, &KeyError{Key: searchKey}
 			}
 			dict.Delete(key)
 			// Also remove from keys map
@@ -429,7 +578,18 @@ func InitDictMethods() {
 				return nil, fmt.Errorf("__contains__ takes exactly 1 argument")
 			}
 			dict := receiver.(*DictValue)
-			key := ValueToKey(args[0])
+			searchKey := args[0]
+
+			// For instances with custom __hash__, use __eq__ comparison
+			if instanceNeedsEqComparison(searchKey) {
+				_, _, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
+				if err != nil {
+					return nil, err // Propagate __eq__ exception
+				}
+				return BoolValue(found), nil
+			}
+
+			key := ValueToKey(searchKey)
 			_, exists := dict.Get(key)
 			return BoolValue(exists), nil
 		},

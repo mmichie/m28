@@ -227,6 +227,39 @@ func getListMethods() map[string]*MethodDescriptor {
 				return NewList(result...), nil
 			},
 		},
+		"__iadd__": {
+			Name:    "__iadd__",
+			Arity:   1,
+			Doc:     "Concatenate (extend) list in-place",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, &TypeError{Message: "__iadd__ takes exactly one argument"}
+				}
+				list := receiver.(*ListValue)
+				// Accept any iterable for in-place extension
+				switch v := args[0].(type) {
+				case *ListValue:
+					list.items = append(list.items, v.Items()...)
+				case TupleValue:
+					list.items = append(list.items, v...)
+				default:
+					if iterable, ok := args[0].(Iterable); ok {
+						iter := iterable.Iterator()
+						for {
+							val, ok := iter.Next()
+							if !ok {
+								break
+							}
+							list.items = append(list.items, val)
+						}
+					} else {
+						return nil, &TypeError{Message: "can only concatenate list to list"}
+					}
+				}
+				return list, nil
+			},
+		},
 		"__mul__": {
 			Name:    "__mul__",
 			Arity:   1,
@@ -250,6 +283,36 @@ func getListMethods() map[string]*MethodDescriptor {
 					result = append(result, list.Items()...)
 				}
 				return NewList(result...), nil
+			},
+		},
+		"__imul__": {
+			Name:    "__imul__",
+			Arity:   1,
+			Doc:     "Repeat list n times in-place",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) != 1 {
+					return nil, &TypeError{Message: "__imul__ takes exactly one argument"}
+				}
+				list := receiver.(*ListValue)
+				n, ok := args[0].(NumberValue)
+				if !ok {
+					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
+				}
+				count := int(n)
+				if count <= 0 {
+					// Clear the list in place
+					list.items = []Value{}
+					return list, nil
+				}
+				// Store original items
+				original := make([]Value, list.Len())
+				copy(original, list.Items())
+				// Extend (count-1) more times in place
+				for i := 1; i < count; i++ {
+					list.items = append(list.items, original...)
+				}
+				return list, nil
 			},
 		},
 		"__iter__": {

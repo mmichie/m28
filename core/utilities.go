@@ -8,6 +8,111 @@ import (
 	"sync"
 )
 
+// EqualValuesWithError compares two values for equality and returns any error from __eq__
+// This is used by dict operations where __eq__ exceptions should propagate
+func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
+	// Check nil values first
+	if a == nil && b == nil {
+		return true, nil
+	}
+	if a == nil || b == nil {
+		return false, nil
+	}
+
+	// For instances, check if they have a custom __eq__ method
+	if aInst, ok := a.(*Instance); ok {
+		if eqMethod, ok := aInst.GetAttr("__eq__"); ok {
+			if callable, ok := eqMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				// Call __eq__(b)
+				result, err := callable.Call([]Value{b}, ctx)
+				if err != nil {
+					// Propagate the error from __eq__!
+					return false, err
+				}
+				if boolResult, ok := result.(BoolValue); ok {
+					return bool(boolResult), nil
+				}
+				// NotImplemented should fall back to identity comparison
+				if result == NotImplemented {
+					if bInst, ok := b.(*Instance); ok {
+						return aInst == bInst, nil
+					}
+					return false, nil
+				}
+				// For other results, use truthiness
+				return IsTruthy(result), nil
+			}
+		}
+		// No __eq__ method, use identity comparison
+		if bInst, ok := b.(*Instance); ok {
+			return aInst == bInst, nil
+		}
+		return false, nil
+	}
+
+	// For non-instances, use existing EqualValues (which doesn't raise errors)
+	return EqualValues(a, b), nil
+}
+
+// ComputeHash computes the hash of a value, calling __hash__ for instances
+// Returns the hash value and any error from __hash__
+func ComputeHash(v Value, ctx *Context) (int64, error) {
+	switch val := v.(type) {
+	case NumberValue:
+		// Hash of a number is the number itself (for integers)
+		// This matches Python's behavior
+		return int64(val), nil
+	case StringValue:
+		// Use Go's string hash
+		h := int64(0)
+		for _, c := range string(val) {
+			h = 31*h + int64(c)
+		}
+		return h, nil
+	case BoolValue:
+		if bool(val) {
+			return 1, nil
+		}
+		return 0, nil
+	case NilValue:
+		return 0, nil
+	case BytesValue:
+		// Use similar hash to strings
+		h := int64(0)
+		for _, b := range val {
+			h = 31*h + int64(b)
+		}
+		return h, nil
+	case *Instance:
+		// Check for custom __hash__ method
+		if hashMethod, ok := val.GetAttr("__hash__"); ok {
+			if callable, ok := hashMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				result, err := callable.Call([]Value{}, ctx)
+				if err != nil {
+					return 0, err
+				}
+				if numResult, ok := result.(NumberValue); ok {
+					return int64(numResult), nil
+				}
+				return 0, fmt.Errorf("__hash__ returned non-integer: %T", result)
+			}
+		}
+		// Default: use pointer address as hash (identity hash)
+		var hashNum int64
+		fmt.Sscanf(fmt.Sprintf("%p", v), "%x", &hashNum)
+		return hashNum, nil
+	default:
+		// For other types, use pointer-based hash
+		var hashNum int64
+		fmt.Sscanf(fmt.Sprintf("%p", v), "%x", &hashNum)
+		return hashNum, nil
+	}
+}
+
 // EqualValues compares two values for equality
 func EqualValues(a, b Value) bool {
 	// Check nil values first
@@ -57,6 +162,18 @@ func EqualValues(a, b Value) bool {
 		// Also compare string to Class name for backwards compatibility
 		if bVal, ok := b.(*Class); ok {
 			return string(aVal) == bVal.Name
+		}
+	case BytesValue:
+		if bVal, ok := b.(BytesValue); ok {
+			if len(aVal) != len(bVal) {
+				return false
+			}
+			for i := range aVal {
+				if aVal[i] != bVal[i] {
+					return false
+				}
+			}
+			return true
 		}
 	case *Class:
 		// Compare Class to StringValue or another Class
@@ -163,6 +280,12 @@ func EqualValues(a, b Value) bool {
 			}
 			return true
 		}
+	case *SliceValue:
+		if bVal, ok := b.(*SliceValue); ok {
+			return EqualValues(aVal.Start, bVal.Start) &&
+				EqualValues(aVal.Stop, bVal.Stop) &&
+				EqualValues(aVal.Step, bVal.Step)
+		}
 	case *Instance:
 		// For instances, check if they have a custom __eq__ method
 		if eqMethod, ok := aVal.GetAttr("__eq__"); ok {
@@ -205,7 +328,7 @@ func EqualValues(a, b Value) bool {
 // IsHashable determines if a value can be used as a dictionary key
 func IsHashable(v Value) bool {
 	switch v.(type) {
-	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class:
+	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class, BytesValue:
 		return true
 	case *Instance:
 		// In Python, instances are hashable by default (using object ID)
@@ -302,6 +425,8 @@ func ValueToKey(v Value) string {
 		return fmt.Sprintf("b:%t", bool(val))
 	case NilValue:
 		return "nil"
+	case BytesValue:
+		return fmt.Sprintf("bytes:%x", []byte(val))
 	}
 
 	switch val := v.(type) {

@@ -112,6 +112,29 @@ func (n *NumericOps) Multiply(other core.Value) (core.Value, error) {
 			return core.NewList(result...), nil
 		}
 		return nil, errors.NewTypeError("*", "can't multiply sequence by non-int of type 'float'", "")
+	case core.TupleValue:
+		// Support tuple repetition: 3 * (1,2) = (1,2,1,2,1,2)
+		if n.value == float64(int(n.value)) && n.value >= 0 {
+			count := int(n.value)
+			result := make([]core.Value, 0, len(v)*count)
+			for i := 0; i < count; i++ {
+				result = append(result, v...)
+			}
+			return core.TupleValue(result), nil
+		}
+		return nil, errors.NewTypeError("*", "can't multiply sequence by non-int of type 'float'", "")
+	case *core.TupleInstance:
+		// Support tuple subclass repetition: 3 * namedtuple = repeated tuple
+		if n.value == float64(int(n.value)) && n.value >= 0 {
+			count := int(n.value)
+			data := v.Data
+			result := make([]core.Value, 0, len(data)*count)
+			for i := 0; i < count; i++ {
+				result = append(result, data...)
+			}
+			return core.TupleValue(result), nil
+		}
+		return nil, errors.NewTypeError("*", "can't multiply sequence by non-int of type 'float'", "")
 	default:
 		// Try __rmul__ on other
 		if result, found, err := types.CallRmul(other, core.NumberValue(n.value), nil); found {

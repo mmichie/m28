@@ -136,6 +136,12 @@ func AsIterable(v core.Value) (core.Iterable, bool) {
 			// Wrap it to make it iterable
 			return &iterableWrapper{obj: v, iterMethod: iterMethod}, true
 		}
+
+		// Check for __getitem__ method (Python sequence protocol)
+		// Objects with only __getitem__ are also iterable in Python
+		if getItemMethod, hasGetItem := obj.GetAttr("__getitem__"); hasGetItem {
+			return &getItemIterableWrapper{obj: v, getItemMethod: getItemMethod}, true
+		}
 	}
 
 	return nil, false
@@ -215,6 +221,55 @@ func (ei *emptyIterator) Next() (core.Value, bool) {
 }
 
 func (ei *emptyIterator) Reset() {}
+
+// getItemIterableWrapper wraps an object with __getitem__ to make it Iterable
+// This implements Python's sequence protocol for iteration
+type getItemIterableWrapper struct {
+	obj           core.Value
+	getItemMethod core.Value
+}
+
+func (w *getItemIterableWrapper) Type() core.Type {
+	return w.obj.Type()
+}
+
+func (w *getItemIterableWrapper) String() string {
+	return w.obj.String()
+}
+
+func (w *getItemIterableWrapper) Iterator() core.Iterator {
+	return &getItemIterator{obj: w.obj, getItemMethod: w.getItemMethod, index: 0}
+}
+
+// getItemIterator iterates using __getitem__ starting from index 0
+type getItemIterator struct {
+	obj           core.Value
+	getItemMethod core.Value
+	index         int
+}
+
+func (gi *getItemIterator) Next() (core.Value, bool) {
+	callable, ok := gi.getItemMethod.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, false
+	}
+
+	// Call __getitem__(index)
+	val, err := callable.Call([]core.Value{core.NumberValue(gi.index)}, nil)
+	if err != nil {
+		// IndexError or StopIteration means iteration is done
+		return nil, false
+	}
+
+	gi.index++
+	return val, true
+}
+
+func (gi *getItemIterator) Reset() {
+	gi.index = 0
+}
 
 // stringIterableWrapper wraps a StringValue to implement core.Iterable
 type stringIterableWrapper struct {

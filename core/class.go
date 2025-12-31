@@ -632,6 +632,25 @@ func (c *Class) SetAttr(name string, value Value) error {
 	return nil
 }
 
+// DelAttr deletes an attribute from the class
+// Implements Python's attribute deletion for classes
+func (c *Class) DelAttr(name string) error {
+	// Check if the attribute exists in Methods
+	if _, ok := c.Methods[name]; ok {
+		delete(c.Methods, name)
+		return nil
+	}
+
+	// Check if the attribute exists in Attributes
+	if _, ok := c.Attributes[name]; ok {
+		delete(c.Attributes, name)
+		return nil
+	}
+
+	// Attribute doesn't exist
+	return &AttributeError{ObjType: c.Name, AttrName: name}
+}
+
 // Call implements Callable interface for classes (instantiation)
 func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 	// Delegate to CallWithKeywords with no keyword arguments

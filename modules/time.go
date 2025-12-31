@@ -70,6 +70,52 @@ func InitTimeModule() *core.DictValue {
 		return core.NumberValue(elapsed.Seconds()), nil
 	}))
 
+	// process_time() - return CPU time of the current process in seconds (Python 3.3+)
+	// Go doesn't have direct CPU time measurement, so we approximate with elapsed time
+	timeModule.SetWithKey("process_time", core.StringValue("process_time"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("process_time", args)
+		if err := v.Exact(0); err != nil {
+			return nil, err
+		}
+
+		// Approximate CPU time with elapsed time since module load
+		elapsed := time.Since(startTime)
+		return core.NumberValue(elapsed.Seconds()), nil
+	}))
+
+	// process_time_ns() - return CPU time in nanoseconds (Python 3.7+)
+	timeModule.SetWithKey("process_time_ns", core.StringValue("process_time_ns"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("process_time_ns", args)
+		if err := v.Exact(0); err != nil {
+			return nil, err
+		}
+
+		elapsed := time.Since(startTime)
+		return core.NumberValue(elapsed.Nanoseconds()), nil
+	}))
+
+	// perf_counter_ns() - return performance counter in nanoseconds (Python 3.7+)
+	timeModule.SetWithKey("perf_counter_ns", core.StringValue("perf_counter_ns"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("perf_counter_ns", args)
+		if err := v.Exact(0); err != nil {
+			return nil, err
+		}
+
+		elapsed := time.Since(startTime)
+		return core.NumberValue(elapsed.Nanoseconds()), nil
+	}))
+
+	// monotonic_ns() - return monotonic time in nanoseconds (Python 3.7+)
+	timeModule.SetWithKey("monotonic_ns", core.StringValue("monotonic_ns"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("monotonic_ns", args)
+		if err := v.Exact(0); err != nil {
+			return nil, err
+		}
+
+		elapsed := time.Since(startTime)
+		return core.NumberValue(elapsed.Nanoseconds()), nil
+	}))
+
 	// localtime() - convert seconds since epoch to local time struct
 	// Returns struct_time: (tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst)
 	timeModule.SetWithKey("localtime", core.StringValue("localtime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {

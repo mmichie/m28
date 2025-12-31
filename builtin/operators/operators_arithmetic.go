@@ -433,6 +433,33 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 				return nil, errors.NewTypeError("*",
 					"can't multiply sequence by non-int of type 'float'", "")
 			}
+			// Number * Tuple (repetition)
+			if rightTuple, ok := right.(core.TupleValue); ok {
+				if leftNum == float64(int(leftNum)) && leftNum >= 0 {
+					count := int(leftNum)
+					result := make([]core.Value, 0, len(rightTuple)*count)
+					for i := 0; i < count; i++ {
+						result = append(result, rightTuple...)
+					}
+					return core.TupleValue(result), nil
+				}
+				return nil, errors.NewTypeError("*",
+					"can't multiply sequence by non-int of type 'float'", "")
+			}
+			// Number * TupleInstance (tuple subclass repetition)
+			if rightTuple, ok := right.(*core.TupleInstance); ok {
+				if leftNum == float64(int(leftNum)) && leftNum >= 0 {
+					count := int(leftNum)
+					data := rightTuple.Data
+					result := make([]core.Value, 0, len(data)*count)
+					for i := 0; i < count; i++ {
+						result = append(result, data...)
+					}
+					return core.TupleValue(result), nil
+				}
+				return nil, errors.NewTypeError("*",
+					"can't multiply sequence by non-int of type 'float'", "")
+			}
 			return nil, errors.NewTypeError("*",
 				"unsupported operand type(s)",
 				"'float' and '"+string(right.Type())+"'")
@@ -488,6 +515,23 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 			}
 			return nil, errors.NewTypeError("*",
 				"can't multiply sequence of type 'bytes' by non-int of type '"+string(right.Type())+"'", "")
+		}).
+		Tuple(func(leftTuple core.TupleValue) (core.Value, error) {
+			// Tuple * Number (repetition)
+			if rightNum, ok := types.AsNumber(right); ok {
+				if rightNum == float64(int(rightNum)) && rightNum >= 0 {
+					count := int(rightNum)
+					result := make([]core.Value, 0, len(leftTuple)*count)
+					for i := 0; i < count; i++ {
+						result = append(result, leftTuple...)
+					}
+					return core.TupleValue(result), nil
+				}
+				return nil, errors.NewTypeError("*",
+					"can't multiply sequence by non-int of type 'float'", "")
+			}
+			return nil, errors.NewTypeError("*",
+				"can't multiply sequence of type 'tuple' by non-int of type '"+string(right.Type())+"'", "")
 		}).
 		Default(func(l core.Value) (core.Value, error) {
 			return nil, errors.NewTypeError("*",
