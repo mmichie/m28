@@ -1393,16 +1393,19 @@ func createStrClass() *StrType {
 			return nil, &core.ValueError{Message: "maketrans: the first two maketrans arguments must have equal length"}
 		}
 
-		// Build the translation table
-		for i, char := range string(x) {
-			table.Set(string(char), core.StringValue(string([]rune(string(y))[i])))
+		// Build the translation table with integer keys (character codes)
+		xRunes := []rune(string(x))
+		yRunes := []rune(string(y))
+		for i, char := range xRunes {
+			// Key is the ordinal value of the character
+			table.SetValue(core.NumberValue(char), core.StringValue(string(yRunes[i])))
 		}
 
 		// If there's a third argument, it's characters to delete (map to None)
 		if v.Count() == 3 {
 			if z, ok := args[2].(core.StringValue); ok {
 				for _, char := range string(z) {
-					table.Set(string(char), core.None)
+					table.SetValue(core.NumberValue(char), core.None)
 				}
 			}
 		}

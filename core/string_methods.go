@@ -1558,6 +1558,425 @@ func InitStringMethods() {
 			return formatStringWithPercent(formatStr, args[0])
 		},
 	}
+
+	// swapcase - swap case of each character
+	td.Methods["swapcase"] = &MethodDescriptor{
+		Name:    "swapcase",
+		Arity:   0,
+		Doc:     "Return a copy of the string with uppercase characters converted to lowercase and vice versa",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			var result strings.Builder
+			for _, r := range s {
+				if unicode.IsUpper(r) {
+					result.WriteRune(unicode.ToLower(r))
+				} else if unicode.IsLower(r) {
+					result.WriteRune(unicode.ToUpper(r))
+				} else {
+					result.WriteRune(r)
+				}
+			}
+			return StringValue(result.String()), nil
+		},
+	}
+
+	// casefold - aggressive lowercase for caseless matching
+	td.Methods["casefold"] = &MethodDescriptor{
+		Name:    "casefold",
+		Arity:   0,
+		Doc:     "Return a casefolded copy of the string for caseless matching",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			// Go's strings.ToLower is similar to casefold for most cases
+			// For full Unicode casefold, we'd need more complex logic
+			return StringValue(strings.ToLower(s)), nil
+		},
+	}
+
+	// rindex - like rfind but raises ValueError if not found
+	td.Methods["rindex"] = &MethodDescriptor{
+		Name:    "rindex",
+		Arity:   -1,
+		Doc:     "Like rfind() but raises ValueError when substring is not found",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) < 1 || len(args) > 3 {
+				return nil, &TypeError{Message: fmt.Sprintf("rindex() takes 1 to 3 arguments (%d given)", len(args))}
+			}
+			s := string(receiver.(StringValue))
+			sub, ok := args[0].(StringValue)
+			if !ok {
+				return nil, &TypeError{Message: "rindex() argument 1 must be str"}
+			}
+
+			// Get start and end indices
+			start := 0
+			end := len(s)
+
+			if len(args) >= 2 {
+				startNum, ok := args[1].(NumberValue)
+				if !ok {
+					return nil, &TypeError{Message: "rindex() argument 2 must be int"}
+				}
+				start = int(startNum)
+				if start < 0 {
+					start = len(s) + start
+					if start < 0 {
+						start = 0
+					}
+				}
+			}
+
+			if len(args) >= 3 {
+				endNum, ok := args[2].(NumberValue)
+				if !ok {
+					return nil, &TypeError{Message: "rindex() argument 3 must be int"}
+				}
+				end = int(endNum)
+				if end < 0 {
+					end = len(s) + end
+					if end < 0 {
+						end = 0
+					}
+				}
+			}
+
+			// Clamp indices
+			if start > len(s) {
+				start = len(s)
+			}
+			if end > len(s) {
+				end = len(s)
+			}
+			if start > end {
+				return nil, &ValueError{Message: "substring not found"}
+			}
+
+			slice := s[start:end]
+			idx := strings.LastIndex(slice, string(sub))
+			if idx == -1 {
+				return nil, &ValueError{Message: "substring not found"}
+			}
+			return NumberValue(start + idx), nil
+		},
+	}
+
+	// isprintable - check if all characters are printable
+	td.Methods["isprintable"] = &MethodDescriptor{
+		Name:    "isprintable",
+		Arity:   0,
+		Doc:     "Return True if all characters in the string are printable",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			// Empty string is printable
+			if len(s) == 0 {
+				return True, nil
+			}
+			for _, r := range s {
+				// In Python, printable means IsPrint or is space (but not other whitespace like \n, \t)
+				if !unicode.IsPrint(r) && r != ' ' {
+					return False, nil
+				}
+			}
+			return True, nil
+		},
+	}
+
+	// center - center string in width
+	td.Methods["center"] = &MethodDescriptor{
+		Name:    "center",
+		Arity:   -1,
+		Doc:     "Return a centered string of length width",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) < 1 || len(args) > 2 {
+				return nil, &TypeError{Message: fmt.Sprintf("center() takes 1 to 2 arguments (%d given)", len(args))}
+			}
+
+			s := string(receiver.(StringValue))
+			width, ok := args[0].(NumberValue)
+			if !ok {
+				return nil, &TypeError{Message: "center() argument 1 must be int"}
+			}
+
+			fillchar := " "
+			if len(args) == 2 {
+				fc, ok := args[1].(StringValue)
+				if !ok {
+					return nil, &TypeError{Message: "center() argument 2 must be str"}
+				}
+				if len([]rune(string(fc))) != 1 {
+					return nil, &TypeError{Message: "The fill character must be exactly one character long"}
+				}
+				fillchar = string(fc)
+			}
+
+			runeLen := len([]rune(s))
+			w := int(width)
+			if w <= runeLen {
+				return receiver, nil
+			}
+
+			padding := w - runeLen
+			leftPad := padding / 2
+			rightPad := padding - leftPad
+			return StringValue(strings.Repeat(fillchar, leftPad) + s + strings.Repeat(fillchar, rightPad)), nil
+		},
+	}
+
+	// ljust - left justify string in width
+	td.Methods["ljust"] = &MethodDescriptor{
+		Name:    "ljust",
+		Arity:   -1,
+		Doc:     "Return a left-justified string of length width",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) < 1 || len(args) > 2 {
+				return nil, &TypeError{Message: fmt.Sprintf("ljust() takes 1 to 2 arguments (%d given)", len(args))}
+			}
+
+			s := string(receiver.(StringValue))
+			width, ok := args[0].(NumberValue)
+			if !ok {
+				return nil, &TypeError{Message: "ljust() argument 1 must be int"}
+			}
+
+			fillchar := " "
+			if len(args) == 2 {
+				fc, ok := args[1].(StringValue)
+				if !ok {
+					return nil, &TypeError{Message: "ljust() argument 2 must be str"}
+				}
+				if len([]rune(string(fc))) != 1 {
+					return nil, &TypeError{Message: "The fill character must be exactly one character long"}
+				}
+				fillchar = string(fc)
+			}
+
+			runeLen := len([]rune(s))
+			w := int(width)
+			if w <= runeLen {
+				return receiver, nil
+			}
+
+			padding := w - runeLen
+			return StringValue(s + strings.Repeat(fillchar, padding)), nil
+		},
+	}
+
+	// rjust - right justify string in width
+	td.Methods["rjust"] = &MethodDescriptor{
+		Name:    "rjust",
+		Arity:   -1,
+		Doc:     "Return a right-justified string of length width",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) < 1 || len(args) > 2 {
+				return nil, &TypeError{Message: fmt.Sprintf("rjust() takes 1 to 2 arguments (%d given)", len(args))}
+			}
+
+			s := string(receiver.(StringValue))
+			width, ok := args[0].(NumberValue)
+			if !ok {
+				return nil, &TypeError{Message: "rjust() argument 1 must be int"}
+			}
+
+			fillchar := " "
+			if len(args) == 2 {
+				fc, ok := args[1].(StringValue)
+				if !ok {
+					return nil, &TypeError{Message: "rjust() argument 2 must be str"}
+				}
+				if len([]rune(string(fc))) != 1 {
+					return nil, &TypeError{Message: "The fill character must be exactly one character long"}
+				}
+				fillchar = string(fc)
+			}
+
+			runeLen := len([]rune(s))
+			w := int(width)
+			if w <= runeLen {
+				return receiver, nil
+			}
+
+			padding := w - runeLen
+			return StringValue(strings.Repeat(fillchar, padding) + s), nil
+		},
+	}
+
+	// rsplit - split from right
+	td.Methods["rsplit"] = &MethodDescriptor{
+		Name:    "rsplit",
+		Arity:   -1,
+		Doc:     "Return a list of the words in the string, splitting from the right",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			s := string(receiver.(StringValue))
+			var parts []string
+			limit := -1
+			hasSep := len(args) > 0 && args[0] != Nil
+
+			if len(args) > 1 {
+				if maxSplit, ok := args[1].(NumberValue); ok {
+					limit = int(maxSplit)
+					if limit < 0 {
+						limit = -1
+					}
+				} else {
+					return nil, &TypeError{Message: "maxsplit must be a number"}
+				}
+			}
+
+			if !hasSep {
+				// Split on whitespace from right
+				// For simplicity, use Fields and reverse if needed
+				parts = strings.Fields(s)
+				if limit >= 0 && len(parts) > limit+1 {
+					// Join the parts from the left beyond the limit
+					remainder := strings.Join(parts[:len(parts)-limit], " ")
+					parts = append([]string{remainder}, parts[len(parts)-limit:]...)
+				}
+			} else {
+				sep := ""
+				if sepStr, ok := args[0].(StringValue); ok {
+					sep = string(sepStr)
+				} else {
+					return nil, &TypeError{Message: "sep must be a string or None"}
+				}
+
+				if limit == -1 {
+					parts = strings.Split(s, sep)
+				} else {
+					// Split from right: reverse, split, reverse results
+					// Go doesn't have rsplit, so we implement it manually
+					runes := []rune(s)
+					sepRunes := []rune(sep)
+
+					// Find all separator positions from right
+					var splits []int
+					for i := len(runes) - len(sepRunes); i >= 0 && (limit == -1 || len(splits) < limit); i-- {
+						match := true
+						for j := 0; j < len(sepRunes); j++ {
+							if runes[i+j] != sepRunes[j] {
+								match = false
+								break
+							}
+						}
+						if match {
+							splits = append([]int{i}, splits...)
+							i -= len(sepRunes) - 1 // Skip past this match
+						}
+					}
+
+					// Build parts from splits
+					prev := 0
+					for _, pos := range splits {
+						parts = append(parts, string(runes[prev:pos]))
+						prev = pos + len(sepRunes)
+					}
+					parts = append(parts, string(runes[prev:]))
+				}
+			}
+
+			result := make([]Value, len(parts))
+			for i, part := range parts {
+				result[i] = StringValue(part)
+			}
+			return NewList(result...), nil
+		},
+	}
+
+	// format_map - format using mapping
+	td.Methods["format_map"] = &MethodDescriptor{
+		Name:    "format_map",
+		Arity:   1,
+		Doc:     "Return a formatted version of the string using a mapping",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: fmt.Sprintf("format_map() takes exactly 1 argument (%d given)", len(args))}
+			}
+
+			s := string(receiver.(StringValue))
+			mapping, ok := args[0].(*DictValue)
+			if !ok {
+				return nil, &TypeError{Message: "format_map() argument must be a mapping"}
+			}
+
+			result := &strings.Builder{}
+			i := 0
+
+			for i < len(s) {
+				if s[i] == '{' {
+					// Check for escaped brace
+					if i+1 < len(s) && s[i+1] == '{' {
+						result.WriteByte('{')
+						i += 2
+						continue
+					}
+
+					// Find matching }
+					j := i + 1
+					depth := 1
+					for j < len(s) && depth > 0 {
+						if s[j] == '{' {
+							depth++
+						} else if s[j] == '}' {
+							depth--
+						}
+						j++
+					}
+
+					if depth != 0 {
+						return nil, &ValueError{Message: "unmatched '{' in format string"}
+					}
+
+					// Extract field name (everything between { and })
+					spec := s[i+1 : j-1]
+
+					// Split on : for format spec
+					colonIdx := strings.IndexByte(spec, ':')
+					fieldName := spec
+					formatSpec := ""
+					if colonIdx >= 0 {
+						fieldName = spec[:colonIdx]
+						formatSpec = spec[colonIdx+1:]
+					}
+
+					// Look up in mapping
+					key := ValueToKey(StringValue(fieldName))
+					value, found := mapping.Get(key)
+					if !found {
+						return nil, &KeyError{Key: StringValue(fieldName)}
+					}
+
+					// Format the value
+					formatted, err := formatValueWithSpec(value, formatSpec)
+					if err != nil {
+						return nil, err
+					}
+					result.WriteString(formatted)
+
+					i = j
+				} else if s[i] == '}' {
+					if i+1 < len(s) && s[i+1] == '}' {
+						result.WriteByte('}')
+						i += 2
+						continue
+					}
+					return nil, &ValueError{Message: "single '}' encountered in format string"}
+				} else {
+					result.WriteByte(s[i])
+					i++
+				}
+			}
+
+			return StringValue(result.String()), nil
+		},
+	}
 }
 
 // stringSplitlinesImpl implements str.splitlines() with support for keyword arguments
