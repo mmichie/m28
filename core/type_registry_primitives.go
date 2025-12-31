@@ -860,6 +860,759 @@ func registerBytesType() {
 					return True, nil
 				},
 			},
+			"upper": {
+				Name:    "upper",
+				Arity:   0,
+				Doc:     "Return a copy with all ASCII characters converted to uppercase",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					result := make([]byte, len(b))
+					for i, c := range b {
+						if c >= 'a' && c <= 'z' {
+							result[i] = c - 32
+						} else {
+							result[i] = c
+						}
+					}
+					return BytesValue(result), nil
+				},
+			},
+			"lower": {
+				Name:    "lower",
+				Arity:   0,
+				Doc:     "Return a copy with all ASCII characters converted to lowercase",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					result := make([]byte, len(b))
+					for i, c := range b {
+						if c >= 'A' && c <= 'Z' {
+							result[i] = c + 32
+						} else {
+							result[i] = c
+						}
+					}
+					return BytesValue(result), nil
+				},
+			},
+			"strip": {
+				Name:    "strip",
+				Arity:   -1,
+				Doc:     "Return a copy with leading and trailing whitespace removed",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					chars := []byte(" \t\n\r\f\v")
+					if len(args) > 0 {
+						if stripBytes, ok := args[0].(BytesValue); ok {
+							chars = []byte(stripBytes)
+						}
+					}
+					start, end := 0, len(b)
+					for start < end && containsByte(chars, b[start]) {
+						start++
+					}
+					for end > start && containsByte(chars, b[end-1]) {
+						end--
+					}
+					return BytesValue(b[start:end]), nil
+				},
+			},
+			"lstrip": {
+				Name:    "lstrip",
+				Arity:   -1,
+				Doc:     "Return a copy with leading whitespace removed",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					chars := []byte(" \t\n\r\f\v")
+					if len(args) > 0 {
+						if stripBytes, ok := args[0].(BytesValue); ok {
+							chars = []byte(stripBytes)
+						}
+					}
+					start := 0
+					for start < len(b) && containsByte(chars, b[start]) {
+						start++
+					}
+					return BytesValue(b[start:]), nil
+				},
+			},
+			"rstrip": {
+				Name:    "rstrip",
+				Arity:   -1,
+				Doc:     "Return a copy with trailing whitespace removed",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					chars := []byte(" \t\n\r\f\v")
+					if len(args) > 0 {
+						if stripBytes, ok := args[0].(BytesValue); ok {
+							chars = []byte(stripBytes)
+						}
+					}
+					end := len(b)
+					for end > 0 && containsByte(chars, b[end-1]) {
+						end--
+					}
+					return BytesValue(b[:end]), nil
+				},
+			},
+			"split": {
+				Name:    "split",
+				Arity:   -1,
+				Doc:     "Return a list of bytes split by separator",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					var sep []byte
+					if len(args) > 0 && args[0] != Nil {
+						if sepBytes, ok := args[0].(BytesValue); ok {
+							sep = []byte(sepBytes)
+						} else {
+							return nil, &TypeError{Message: "a bytes-like object is required"}
+						}
+					}
+					var parts [][]byte
+					if sep == nil {
+						parts = splitBytesWhitespace([]byte(b))
+					} else {
+						parts = splitBytes([]byte(b), sep)
+					}
+					list := NewList()
+					for _, part := range parts {
+						list.Append(BytesValue(part))
+					}
+					return list, nil
+				},
+			},
+			"join": {
+				Name:    "join",
+				Arity:   1,
+				Doc:     "Concatenate bytes with separator",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					sep := receiver.(BytesValue)
+					if len(args) != 1 {
+						return nil, &TypeError{Message: "join() takes exactly one argument"}
+					}
+					list, ok := args[0].(*ListValue)
+					if !ok {
+						return nil, &TypeError{Message: "can only join an iterable"}
+					}
+					var result []byte
+					for i, item := range list.Items() {
+						itemBytes, ok := item.(BytesValue)
+						if !ok {
+							return nil, &TypeError{Message: "sequence item: expected bytes"}
+						}
+						if i > 0 {
+							result = append(result, sep...)
+						}
+						result = append(result, itemBytes...)
+					}
+					return BytesValue(result), nil
+				},
+			},
+			"replace": {
+				Name:    "replace",
+				Arity:   -1,
+				Doc:     "Return a copy with all occurrences of old replaced by new",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(args) < 2 {
+						return nil, &TypeError{Message: "replace() takes at least 2 arguments"}
+					}
+					old, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: "a bytes-like object is required"}
+					}
+					newBytes, ok := args[1].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: "a bytes-like object is required"}
+					}
+					count := -1
+					if len(args) > 2 {
+						if c, ok := args[2].(NumberValue); ok {
+							count = int(c)
+						}
+					}
+					result := replaceBytes([]byte(b), []byte(old), []byte(newBytes), count)
+					return BytesValue(result), nil
+				},
+			},
+			"find": {
+				Name:    "find",
+				Arity:   -1,
+				Doc:     "Return the lowest index where substring is found",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(args) < 1 {
+						return nil, &TypeError{Message: "find() takes at least 1 argument"}
+					}
+					sub, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: "a bytes-like object is required"}
+					}
+					idx := findBytes([]byte(b), []byte(sub))
+					return NumberValue(idx), nil
+				},
+			},
+			"index": {
+				Name:    "index",
+				Arity:   -1,
+				Doc:     "Return the lowest index where substring is found, raises ValueError if not found",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(args) < 1 {
+						return nil, &TypeError{Message: "index() takes at least 1 argument"}
+					}
+					sub, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: "a bytes-like object is required"}
+					}
+					idx := findBytes([]byte(b), []byte(sub))
+					if idx == -1 {
+						return nil, &ValueError{Message: "subsection not found"}
+					}
+					return NumberValue(idx), nil
+				},
+			},
+			"count": {
+				Name:    "count",
+				Arity:   1,
+				Doc:     "Return the number of non-overlapping occurrences of substring",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					sub, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: "a bytes-like object is required"}
+					}
+					count := countBytes([]byte(b), []byte(sub))
+					return NumberValue(count), nil
+				},
+			},
+			"startswith": {
+				Name:    "startswith",
+				Arity:   1,
+				Doc:     "Return True if bytes starts with the specified prefix",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					prefix, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: "a bytes-like object is required"}
+					}
+					if len(prefix) > len(b) {
+						return False, nil
+					}
+					for i := range prefix {
+						if b[i] != prefix[i] {
+							return False, nil
+						}
+					}
+					return True, nil
+				},
+			},
+			"endswith": {
+				Name:    "endswith",
+				Arity:   1,
+				Doc:     "Return True if bytes ends with the specified suffix",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					suffix, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: "a bytes-like object is required"}
+					}
+					if len(suffix) > len(b) {
+						return False, nil
+					}
+					offset := len(b) - len(suffix)
+					for i := range suffix {
+						if b[offset+i] != suffix[i] {
+							return False, nil
+						}
+					}
+					return True, nil
+				},
+			},
+			"isupper": {
+				Name:    "isupper",
+				Arity:   0,
+				Doc:     "Return True if all cased characters are uppercase",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					hasCased := false
+					for _, c := range b {
+						if c >= 'a' && c <= 'z' {
+							return False, nil
+						}
+						if c >= 'A' && c <= 'Z' {
+							hasCased = true
+						}
+					}
+					return BoolValue(hasCased), nil
+				},
+			},
+			"islower": {
+				Name:    "islower",
+				Arity:   0,
+				Doc:     "Return True if all cased characters are lowercase",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					hasCased := false
+					for _, c := range b {
+						if c >= 'A' && c <= 'Z' {
+							return False, nil
+						}
+						if c >= 'a' && c <= 'z' {
+							hasCased = true
+						}
+					}
+					return BoolValue(hasCased), nil
+				},
+			},
+			"isdigit": {
+				Name:    "isdigit",
+				Arity:   0,
+				Doc:     "Return True if all characters are digits",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(b) == 0 {
+						return False, nil
+					}
+					for _, c := range b {
+						if c < '0' || c > '9' {
+							return False, nil
+						}
+					}
+					return True, nil
+				},
+			},
+			"isalpha": {
+				Name:    "isalpha",
+				Arity:   0,
+				Doc:     "Return True if all characters are alphabetic",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(b) == 0 {
+						return False, nil
+					}
+					for _, c := range b {
+						if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+							return False, nil
+						}
+					}
+					return True, nil
+				},
+			},
+			"isalnum": {
+				Name:    "isalnum",
+				Arity:   0,
+				Doc:     "Return True if all characters are alphanumeric",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(b) == 0 {
+						return False, nil
+					}
+					for _, c := range b {
+						if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+							return False, nil
+						}
+					}
+					return True, nil
+				},
+			},
+			"isspace": {
+				Name:    "isspace",
+				Arity:   0,
+				Doc:     "Return True if all characters are whitespace",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(b) == 0 {
+						return False, nil
+					}
+					for _, c := range b {
+						if c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' && c != '\v' {
+							return False, nil
+						}
+					}
+					return True, nil
+				},
+			},
+			"title": {
+				Name:    "title",
+				Arity:   0,
+				Doc:     "Return a titlecased version",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					result := make([]byte, len(b))
+					capitalizeNext := true
+					for i, c := range b {
+						if c >= 'a' && c <= 'z' {
+							if capitalizeNext {
+								result[i] = c - 32
+							} else {
+								result[i] = c
+							}
+							capitalizeNext = false
+						} else if c >= 'A' && c <= 'Z' {
+							if capitalizeNext {
+								result[i] = c
+							} else {
+								result[i] = c + 32
+							}
+							capitalizeNext = false
+						} else {
+							result[i] = c
+							capitalizeNext = true
+						}
+					}
+					return BytesValue(result), nil
+				},
+			},
+			"capitalize": {
+				Name:    "capitalize",
+				Arity:   0,
+				Doc:     "Return a copy with first character capitalized",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(b) == 0 {
+						return BytesValue([]byte{}), nil
+					}
+					result := make([]byte, len(b))
+					for i, c := range b {
+						if i == 0 && c >= 'a' && c <= 'z' {
+							result[i] = c - 32
+						} else if i > 0 && c >= 'A' && c <= 'Z' {
+							result[i] = c + 32
+						} else {
+							result[i] = c
+						}
+					}
+					return BytesValue(result), nil
+				},
+			},
+			"swapcase": {
+				Name:    "swapcase",
+				Arity:   0,
+				Doc:     "Return a copy with uppercase characters converted to lowercase and vice versa",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					result := make([]byte, len(b))
+					for i, c := range b {
+						if c >= 'a' && c <= 'z' {
+							result[i] = c - 32
+						} else if c >= 'A' && c <= 'Z' {
+							result[i] = c + 32
+						} else {
+							result[i] = c
+						}
+					}
+					return BytesValue(result), nil
+				},
+			},
+			"center": {
+				Name:    "center",
+				Arity:   -1,
+				Doc:     "Return centered in a bytes of length width",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(args) < 1 {
+						return nil, &TypeError{Message: "center() takes at least 1 argument"}
+					}
+					width, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, &TypeError{Message: "width must be an integer"}
+					}
+					w := int(width)
+					if w <= len(b) {
+						return b, nil
+					}
+					fillchar := byte(' ')
+					if len(args) > 1 {
+						if fb, ok := args[1].(BytesValue); ok && len(fb) == 1 {
+							fillchar = fb[0]
+						}
+					}
+					leftPad := (w - len(b)) / 2
+					rightPad := w - len(b) - leftPad
+					result := make([]byte, w)
+					for i := 0; i < leftPad; i++ {
+						result[i] = fillchar
+					}
+					copy(result[leftPad:], b)
+					for i := 0; i < rightPad; i++ {
+						result[leftPad+len(b)+i] = fillchar
+					}
+					return BytesValue(result), nil
+				},
+			},
+			"ljust": {
+				Name:    "ljust",
+				Arity:   -1,
+				Doc:     "Return left-justified in a bytes of length width",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(args) < 1 {
+						return nil, &TypeError{Message: "ljust() takes at least 1 argument"}
+					}
+					width, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, &TypeError{Message: "width must be an integer"}
+					}
+					w := int(width)
+					if w <= len(b) {
+						return b, nil
+					}
+					fillchar := byte(' ')
+					if len(args) > 1 {
+						if fb, ok := args[1].(BytesValue); ok && len(fb) == 1 {
+							fillchar = fb[0]
+						}
+					}
+					result := make([]byte, w)
+					copy(result, b)
+					for i := len(b); i < w; i++ {
+						result[i] = fillchar
+					}
+					return BytesValue(result), nil
+				},
+			},
+			"rjust": {
+				Name:    "rjust",
+				Arity:   -1,
+				Doc:     "Return right-justified in a bytes of length width",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(args) < 1 {
+						return nil, &TypeError{Message: "rjust() takes at least 1 argument"}
+					}
+					width, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, &TypeError{Message: "width must be an integer"}
+					}
+					w := int(width)
+					if w <= len(b) {
+						return b, nil
+					}
+					fillchar := byte(' ')
+					if len(args) > 1 {
+						if fb, ok := args[1].(BytesValue); ok && len(fb) == 1 {
+							fillchar = fb[0]
+						}
+					}
+					result := make([]byte, w)
+					pad := w - len(b)
+					for i := 0; i < pad; i++ {
+						result[i] = fillchar
+					}
+					copy(result[pad:], b)
+					return BytesValue(result), nil
+				},
+			},
+			"zfill": {
+				Name:    "zfill",
+				Arity:   1,
+				Doc:     "Pad a bytes with ASCII '0' digits to fill a field of the given width",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					width, ok := args[0].(NumberValue)
+					if !ok {
+						return nil, &TypeError{Message: "width must be an integer"}
+					}
+					w := int(width)
+					if w <= len(b) {
+						return b, nil
+					}
+					result := make([]byte, w)
+					pad := w - len(b)
+					for i := 0; i < pad; i++ {
+						result[i] = '0'
+					}
+					copy(result[pad:], b)
+					return BytesValue(result), nil
+				},
+			},
+			"istitle": {
+				Name:    "istitle",
+				Arity:   0,
+				Doc:     "Return True if the bytes is a titlecased string",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					if len(b) == 0 {
+						return False, nil
+					}
+					hasCased := false
+					prevCased := false
+					for _, c := range b {
+						isUpper := c >= 'A' && c <= 'Z'
+						isLower := c >= 'a' && c <= 'z'
+						if isUpper {
+							if prevCased {
+								return False, nil
+							}
+							hasCased = true
+							prevCased = true
+						} else if isLower {
+							if !prevCased {
+								return False, nil
+							}
+							hasCased = true
+							prevCased = true
+						} else {
+							prevCased = false
+						}
+					}
+					return BoolValue(hasCased), nil
+				},
+			},
+			"__lt__": {
+				Name:    "__lt__",
+				Arity:   1,
+				Doc:     "Return self<value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b1 := receiver.(BytesValue)
+					b2, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of 'bytes' and '%s'", args[0].Type())}
+					}
+					minLen := len(b1)
+					if len(b2) < minLen {
+						minLen = len(b2)
+					}
+					for i := 0; i < minLen; i++ {
+						if b1[i] < b2[i] {
+							return True, nil
+						}
+						if b1[i] > b2[i] {
+							return False, nil
+						}
+					}
+					return BoolValue(len(b1) < len(b2)), nil
+				},
+			},
+			"__le__": {
+				Name:    "__le__",
+				Arity:   1,
+				Doc:     "Return self<=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b1 := receiver.(BytesValue)
+					b2, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: fmt.Sprintf("'<=' not supported between instances of 'bytes' and '%s'", args[0].Type())}
+					}
+					minLen := len(b1)
+					if len(b2) < minLen {
+						minLen = len(b2)
+					}
+					for i := 0; i < minLen; i++ {
+						if b1[i] < b2[i] {
+							return True, nil
+						}
+						if b1[i] > b2[i] {
+							return False, nil
+						}
+					}
+					return BoolValue(len(b1) <= len(b2)), nil
+				},
+			},
+			"__gt__": {
+				Name:    "__gt__",
+				Arity:   1,
+				Doc:     "Return self>value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b1 := receiver.(BytesValue)
+					b2, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: fmt.Sprintf("'>' not supported between instances of 'bytes' and '%s'", args[0].Type())}
+					}
+					minLen := len(b1)
+					if len(b2) < minLen {
+						minLen = len(b2)
+					}
+					for i := 0; i < minLen; i++ {
+						if b1[i] > b2[i] {
+							return True, nil
+						}
+						if b1[i] < b2[i] {
+							return False, nil
+						}
+					}
+					return BoolValue(len(b1) > len(b2)), nil
+				},
+			},
+			"__ge__": {
+				Name:    "__ge__",
+				Arity:   1,
+				Doc:     "Return self>=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b1 := receiver.(BytesValue)
+					b2, ok := args[0].(BytesValue)
+					if !ok {
+						return nil, &TypeError{Message: fmt.Sprintf("'>=' not supported between instances of 'bytes' and '%s'", args[0].Type())}
+					}
+					minLen := len(b1)
+					if len(b2) < minLen {
+						minLen = len(b2)
+					}
+					for i := 0; i < minLen; i++ {
+						if b1[i] > b2[i] {
+							return True, nil
+						}
+						if b1[i] < b2[i] {
+							return False, nil
+						}
+					}
+					return BoolValue(len(b1) >= len(b2)), nil
+				},
+			},
+			"__rmul__": {
+				Name:    "__rmul__",
+				Arity:   1,
+				Doc:     "Return value*self (reversed operand for multiplication)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(BytesValue)
+					n, ok := args[0].(NumberValue)
+					if !ok {
+						return NotImplemented, nil
+					}
+					count := int(n)
+					if count <= 0 {
+						return BytesValue([]byte{}), nil
+					}
+					result := make([]byte, 0, len(b)*count)
+					for i := 0; i < count; i++ {
+						result = append(result, b...)
+					}
+					return BytesValue(result), nil
+				},
+			},
 		},
 		Constructor: func(args []Value, ctx *Context) (Value, error) {
 			if len(args) == 0 {
@@ -886,6 +1639,13 @@ func registerBytesType() {
 				}
 
 				switch v := val.(type) {
+				case NumberValue:
+					// bytes(int) creates zero-filled bytes of that length
+					length := int(v)
+					if length < 0 {
+						return nil, &ValueError{Message: "negative count"}
+					}
+					return BytesValue(make([]byte, length)), nil
 				case StringValue:
 					return BytesValue([]byte(string(v))), nil
 				case *ListValue:
@@ -1594,4 +2354,145 @@ func registerDecimalType() {
 			return "Decimal('" + v.(*DecimalValue).String() + "')"
 		},
 	})
+}
+
+// Helper functions for bytes operations
+
+// containsByte checks if a byte is in a slice of bytes
+func containsByte(chars []byte, b byte) bool {
+	for _, c := range chars {
+		if c == b {
+			return true
+		}
+	}
+	return false
+}
+
+// splitBytesWhitespace splits bytes on whitespace, like Python's split()
+func splitBytesWhitespace(b []byte) [][]byte {
+	var result [][]byte
+	start := -1
+	for i, c := range b {
+		isSpace := c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'
+		if isSpace {
+			if start >= 0 {
+				result = append(result, b[start:i])
+				start = -1
+			}
+		} else {
+			if start < 0 {
+				start = i
+			}
+		}
+	}
+	if start >= 0 {
+		result = append(result, b[start:])
+	}
+	return result
+}
+
+// splitBytes splits bytes by a separator
+func splitBytes(b, sep []byte) [][]byte {
+	if len(sep) == 0 {
+		// Split on empty separator: split into individual bytes
+		result := make([][]byte, len(b))
+		for i := range b {
+			result[i] = b[i : i+1]
+		}
+		return result
+	}
+	var result [][]byte
+	start := 0
+	for i := 0; i <= len(b)-len(sep); i++ {
+		match := true
+		for j := 0; j < len(sep); j++ {
+			if b[i+j] != sep[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			result = append(result, b[start:i])
+			start = i + len(sep)
+			i = start - 1 // -1 because loop will increment
+		}
+	}
+	result = append(result, b[start:])
+	return result
+}
+
+// replaceBytes replaces occurrences of old with new in b
+func replaceBytes(b, old, new []byte, count int) []byte {
+	if count == 0 || len(old) == 0 {
+		return b
+	}
+	var result []byte
+	start := 0
+	replaced := 0
+	for i := 0; i <= len(b)-len(old); i++ {
+		if count >= 0 && replaced >= count {
+			break
+		}
+		match := true
+		for j := 0; j < len(old); j++ {
+			if b[i+j] != old[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			result = append(result, b[start:i]...)
+			result = append(result, new...)
+			start = i + len(old)
+			i = start - 1
+			replaced++
+		}
+	}
+	result = append(result, b[start:]...)
+	return result
+}
+
+// findBytes finds the first occurrence of sub in b
+func findBytes(b, sub []byte) int {
+	if len(sub) == 0 {
+		return 0
+	}
+	if len(sub) > len(b) {
+		return -1
+	}
+	for i := 0; i <= len(b)-len(sub); i++ {
+		match := true
+		for j := 0; j < len(sub); j++ {
+			if b[i+j] != sub[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}
+
+// countBytes counts non-overlapping occurrences of sub in b
+func countBytes(b, sub []byte) int {
+	if len(sub) == 0 {
+		return len(b) + 1
+	}
+	count := 0
+	for i := 0; i <= len(b)-len(sub); i++ {
+		match := true
+		for j := 0; j < len(sub); j++ {
+			if b[i+j] != sub[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			count++
+			i += len(sub) - 1 // Skip past match (non-overlapping)
+		}
+	}
+	return count
 }

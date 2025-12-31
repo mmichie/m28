@@ -210,14 +210,9 @@ func RegisterCollections(ctx *core.Context) {
 	}))
 
 	// bytes - create a new bytes object
-	ctx.Define("bytes", core.NewNamedBuiltinFunction("bytes", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// Get the type descriptor for bytes to use its constructor
-		desc := core.GetTypeDescriptor(core.BytesType)
-		if desc == nil {
-			return nil, fmt.Errorf("bytes type not registered")
-		}
-		return desc.Constructor(args, ctx)
-	}))
+	// Create as a class so bytes.fromhex can be accessed
+	bytesClass := createBytesClass()
+	ctx.Define("bytes", bytesClass)
 
 	// bytearray - Python bytearray class
 	// Create as a class so bytearray.copy can be accessed
@@ -734,6 +729,111 @@ func createListClass() *ListType {
 	}))
 
 	return &ListType{Class: ListTypeClass}
+}
+
+// BytesType represents the bytes class that can be called and has class methods
+type BytesType struct {
+	*core.Class
+}
+
+// GetClass returns the embedded Class for use as a parent class
+func (b *BytesType) GetClass() *core.Class {
+	return b.Class
+}
+
+// GetAttr delegates to the embedded Class to expose methods like fromhex
+func (b *BytesType) GetAttr(name string) (core.Value, bool) {
+	return b.Class.GetAttr(name)
+}
+
+// Call creates new bytes when bytes(...) is called
+func (b *BytesType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Get the type descriptor for bytes to use its constructor
+	desc := core.GetTypeDescriptor(core.BytesType)
+	if desc == nil {
+		return nil, fmt.Errorf("bytes type not registered")
+	}
+	return desc.Constructor(args, ctx)
+}
+
+// CallWithKeywords overrides the embedded Class's CallWithKeywords
+// to ensure our custom Call is used instead of the generic class instantiation
+func (b *BytesType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// For bytes, keyword arguments are not supported in the constructor
+	if len(kwargs) > 0 {
+		return nil, &core.TypeError{Message: "bytes() does not accept keyword arguments"}
+	}
+	return b.Call(args, ctx)
+}
+
+// Type returns "type"
+func (b *BytesType) Type() core.Type {
+	return "type"
+}
+
+// String returns "bytes"
+func (b *BytesType) String() string {
+	return "<class 'bytes'>"
+}
+
+// createBytesClass creates the bytes class with class methods like fromhex
+func createBytesClass() *BytesType {
+	class := core.NewClass("bytes", nil)
+
+	// Add fromhex class method
+	// bytes.fromhex(string) -> bytes
+	class.SetMethod("fromhex", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("fromhex() takes exactly 1 argument (%d given)", len(args))}
+		}
+
+		hexStr, ok := args[0].(core.StringValue)
+		if !ok {
+			return nil, &core.TypeError{Message: fmt.Sprintf("fromhex() argument must be str, not %s", args[0].Type())}
+		}
+
+		// Parse hex string (with optional whitespace)
+		s := string(hexStr)
+		var result []byte
+		i := 0
+		for i < len(s) {
+			// Skip whitespace
+			if s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' {
+				i++
+				continue
+			}
+			// Need at least 2 hex digits
+			if i+1 >= len(s) {
+				return nil, &core.ValueError{Message: "non-hexadecimal number found in fromhex() arg"}
+			}
+			// Parse 2 hex digits
+			hi := hexDigitValue(s[i])
+			lo := hexDigitValue(s[i+1])
+			if hi == -1 || lo == -1 {
+				return nil, &core.ValueError{Message: "non-hexadecimal number found in fromhex() arg"}
+			}
+			result = append(result, byte(hi<<4|lo))
+			i += 2
+		}
+
+		return core.BytesValue(result), nil
+	}))
+
+	return &BytesType{Class: class}
+}
+
+// hexDigitValue returns the value of a hex digit, or -1 if invalid
+func hexDigitValue(c byte) int {
+	if c >= '0' && c <= '9' {
+		return int(c - '0')
+	}
+	if c >= 'a' && c <= 'f' {
+		return int(c - 'a' + 10)
+	}
+	if c >= 'A' && c <= 'F' {
+		return int(c - 'A' + 10)
+	}
+	return -1
 }
 
 // createDictClass creates the dict class with class methods like fromkeys
