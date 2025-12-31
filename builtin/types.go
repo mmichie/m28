@@ -439,8 +439,46 @@ func IntBuilder() builders.BuiltinFunc {
 
 		// Parse with specified base
 		s := strings.TrimSpace(str)
+
+		// Handle base prefixes (0x, 0o, 0b) - strip them for big.Int parsing
+		sForBigInt := s
+		actualBase := base
+		if base == 0 {
+			// Auto-detect base from prefix
+			actualBase = 10
+			if len(s) >= 2 {
+				prefix := strings.ToLower(s[:2])
+				switch prefix {
+				case "0x":
+					actualBase = 16
+					sForBigInt = s[2:]
+				case "0o":
+					actualBase = 8
+					sForBigInt = s[2:]
+				case "0b":
+					actualBase = 2
+					sForBigInt = s[2:]
+				}
+			}
+		} else if base == 16 && len(s) >= 2 && strings.ToLower(s[:2]) == "0x" {
+			// Strip 0x prefix for hex parsing
+			sForBigInt = s[2:]
+		} else if base == 8 && len(s) >= 2 && strings.ToLower(s[:2]) == "0o" {
+			// Strip 0o prefix for octal parsing
+			sForBigInt = s[2:]
+		} else if base == 2 && len(s) >= 2 && strings.ToLower(s[:2]) == "0b" {
+			// Strip 0b prefix for binary parsing
+			sForBigInt = s[2:]
+		}
+
+		// Try standard int64 parsing first (faster for small numbers)
 		if i, err := strconv.ParseInt(s, base, 64); err == nil {
 			return core.NumberValue(float64(i)), nil
+		}
+
+		// Fall back to big.Int for large numbers
+		if bi, err := core.NewBigIntFromString(sForBigInt, actualBase); err == nil {
+			return bi, nil
 		}
 
 		return nil, errors.NewValueError("int", fmt.Sprintf("invalid literal for int() with base %d: '%s'", base, s))
@@ -1381,13 +1419,51 @@ func (i *IntType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 	return IntBuilder()(args, ctx)
 }
 
-// CallWithKeywords delegates to Call since int() doesn't accept keyword arguments
-// This prevents primitive ints from being wrapped in Instance objects
+// CallWithKeywords handles int(x=..., base=...) keyword arguments
+// int([x]) -> integer
+// int(x, base=10) -> integer
+// int(x=...) or int(x=..., base=...) are all valid
 func (i *IntType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-	if len(kwargs) > 0 {
-		return nil, &core.TypeError{Message: "int() does not accept keyword arguments"}
+	// Validate keyword argument names
+	for key := range kwargs {
+		if key != "x" && key != "base" {
+			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' is an invalid keyword argument for int()", key)}
+		}
 	}
-	return i.Call(args, ctx)
+
+	// Build the positional args list from positional args and kwargs
+	finalArgs := make([]core.Value, 0, 2)
+
+	// Handle 'x' argument
+	if len(args) > 0 {
+		// x provided positionally
+		if _, hasX := kwargs["x"]; hasX {
+			return nil, &core.TypeError{Message: "int() got multiple values for argument 'x'"}
+		}
+		finalArgs = append(finalArgs, args[0])
+	} else if xVal, hasX := kwargs["x"]; hasX {
+		// x provided as keyword
+		finalArgs = append(finalArgs, xVal)
+	}
+
+	// Handle 'base' argument
+	if len(args) > 1 {
+		// base provided positionally
+		if _, hasBase := kwargs["base"]; hasBase {
+			return nil, &core.TypeError{Message: "int() got multiple values for argument 'base'"}
+		}
+		finalArgs = append(finalArgs, args[1])
+	} else if baseVal, hasBase := kwargs["base"]; hasBase {
+		// base provided as keyword - need x first if not already there
+		if len(finalArgs) == 0 {
+			// If base is given but x isn't, that's an error in Python
+			// "int() missing string argument"
+			return nil, &core.TypeError{Message: "int() missing string argument"}
+		}
+		finalArgs = append(finalArgs, baseVal)
+	}
+
+	return IntBuilder()(finalArgs, ctx)
 }
 
 // createIntClass creates the int class that can be used with isinstance
