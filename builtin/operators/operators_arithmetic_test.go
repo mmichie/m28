@@ -361,12 +361,12 @@ func TestModuloBasic(t *testing.T) {
 		{
 			name:     "modulo negative dividend",
 			args:     []core.Value{core.NumberValue(-10), core.NumberValue(3)},
-			expected: core.NumberValue(-1),
+			expected: core.NumberValue(2), // Python's floored modulo: -10 = 3 * (-4) + 2
 		},
 		{
 			name:     "modulo negative divisor",
 			args:     []core.Value{core.NumberValue(10), core.NumberValue(-3)},
-			expected: core.NumberValue(1),
+			expected: core.NumberValue(-2), // Python's floored modulo: 10 = -3 * (-4) + (-2)
 		},
 		{
 			name:     "modulo floats",

@@ -169,14 +169,22 @@ func (n *NumericOps) Divide(other core.Value) (core.Value, error) {
 	}
 }
 
-// Modulo implements Numeric.Modulo
+// Modulo implements Numeric.Modulo with Python's floored modulo semantics
 func (n *NumericOps) Modulo(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
-		if float64(v) == 0 {
-			return nil, errors.NewRuntimeError("modulo by zero", "")
+		divisor := float64(v)
+		if divisor == 0 {
+			return nil, &core.ZeroDivisionError{}
 		}
-		return core.NumberValue(math.Mod(n.value, float64(v))), nil
+		// Python uses floored modulo (result has same sign as divisor)
+		// Go's math.Mod uses truncated modulo (result has same sign as dividend)
+		result := math.Mod(n.value, divisor)
+		// Adjust for Python's floored semantics
+		if (result < 0 && divisor > 0) || (result > 0 && divisor < 0) {
+			result += divisor
+		}
+		return core.NumberValue(result), nil
 	default:
 		return nil, errors.NewTypeError("%", "unsupported operand type(s)",
 			fmt.Sprintf("'float' and '%s'", other.Type()))
