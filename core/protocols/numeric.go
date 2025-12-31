@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"math/cmplx"
 
 	"github.com/mmichie/m28/common/errors"
 	"github.com/mmichie/m28/common/types"
@@ -228,6 +229,21 @@ func (n *NumericOps) Power(other core.Value) (core.Value, error) {
 
 		// Safe to use float64
 		return core.NumberValue(math.Pow(leftNum, rightNum)), nil
+	case core.BoolValue:
+		// Python: True == 1, False == 0
+		var rightNum float64
+		if bool(v) {
+			rightNum = 1
+		} else {
+			rightNum = 0
+		}
+		return core.NumberValue(math.Pow(n.value, rightNum)), nil
+	case core.ComplexValue:
+		// For complex exponent, use cmplx.Pow
+		base := complex(n.value, 0)
+		exp := complex128(v)
+		result := cmplx.Pow(base, exp)
+		return core.ComplexValue(result), nil
 	default:
 		return nil, errors.NewTypeError("**", "unsupported operand type(s)",
 			fmt.Sprintf("'float' and '%s'", other.Type()))
