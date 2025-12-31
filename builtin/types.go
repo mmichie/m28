@@ -407,7 +407,11 @@ func IntBuilder() builders.BuiltinFunc {
 				if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 					return core.NumberValue(float64(i)), nil
 				}
-				// Try to parse as float and truncate
+				// Try to parse as BigInt for large numbers
+				if bi, err := core.NewBigIntFromString(s, 10); err == nil {
+					return bi, nil
+				}
+				// Try to parse as float and truncate (for strings like "3.14")
 				if f, err := strconv.ParseFloat(s, 64); err == nil {
 					return core.NumberValue(float64(int(f))), nil
 				}
@@ -440,8 +444,13 @@ func IntBuilder() builders.BuiltinFunc {
 		// Parse with specified base
 		s := strings.TrimSpace(str)
 
-		// Handle base prefixes (0x, 0o, 0b) - strip them for big.Int parsing
-		sForBigInt := s
+		// Strip underscores (PEP 515 - underscores in numeric literals)
+		// Python allows 1_000_000 or 0x_FF_FF
+		s = strings.ReplaceAll(s, "_", "")
+
+		// Handle base prefixes (0x, 0o, 0b) - strip them for parsing
+		// Both strconv.ParseInt and big.Int.SetString need prefix stripped when base is explicit
+		sStripped := s
 		actualBase := base
 		if base == 0 {
 			// Auto-detect base from prefix
@@ -451,33 +460,33 @@ func IntBuilder() builders.BuiltinFunc {
 				switch prefix {
 				case "0x":
 					actualBase = 16
-					sForBigInt = s[2:]
+					sStripped = s[2:]
 				case "0o":
 					actualBase = 8
-					sForBigInt = s[2:]
+					sStripped = s[2:]
 				case "0b":
 					actualBase = 2
-					sForBigInt = s[2:]
+					sStripped = s[2:]
 				}
 			}
 		} else if base == 16 && len(s) >= 2 && strings.ToLower(s[:2]) == "0x" {
 			// Strip 0x prefix for hex parsing
-			sForBigInt = s[2:]
+			sStripped = s[2:]
 		} else if base == 8 && len(s) >= 2 && strings.ToLower(s[:2]) == "0o" {
 			// Strip 0o prefix for octal parsing
-			sForBigInt = s[2:]
+			sStripped = s[2:]
 		} else if base == 2 && len(s) >= 2 && strings.ToLower(s[:2]) == "0b" {
 			// Strip 0b prefix for binary parsing
-			sForBigInt = s[2:]
+			sStripped = s[2:]
 		}
 
 		// Try standard int64 parsing first (faster for small numbers)
-		if i, err := strconv.ParseInt(s, base, 64); err == nil {
+		if i, err := strconv.ParseInt(sStripped, actualBase, 64); err == nil {
 			return core.NumberValue(float64(i)), nil
 		}
 
 		// Fall back to big.Int for large numbers
-		if bi, err := core.NewBigIntFromString(sForBigInt, actualBase); err == nil {
+		if bi, err := core.NewBigIntFromString(sStripped, actualBase); err == nil {
 			return bi, nil
 		}
 
@@ -1497,19 +1506,23 @@ func createIntClass(objectClass *core.Class) *IntType {
 		// args[1] is the value (if provided)
 		// args[2] is the base (if provided)
 
-		var value core.NumberValue
+		var value core.Value = core.NumberValue(0)
 		if len(args) > 1 {
 			// Convert the value argument to an int
 			result, err := IntBuilder()(args[1:], ctx)
 			if err != nil {
 				return nil, err
 			}
-			if num, ok := result.(core.NumberValue); ok {
-				value = num
+			// Accept both NumberValue and BigIntValue
+			switch r := result.(type) {
+			case core.NumberValue:
+				value = r
+			case core.BigIntValue:
+				value = r
 			}
 		}
 
-		// If this is exactly int, return the NumberValue directly
+		// If this is exactly int, return the value directly
 		if cls.Name == "int" {
 			return value, nil
 		}
