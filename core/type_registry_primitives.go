@@ -308,6 +308,119 @@ func registerNumberType() {
 					return result, nil
 				},
 			},
+			"is_integer": {
+				Name:    "is_integer",
+				Arity:   0,
+				Doc:     "Return True if the float is an integer (has no fractional part)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					n := float64(receiver.(NumberValue))
+					// Check for infinity or NaN
+					if math.IsInf(n, 0) || math.IsNaN(n) {
+						return False, nil
+					}
+					return BoolValue(n == math.Trunc(n)), nil
+				},
+			},
+			"as_integer_ratio": {
+				Name:    "as_integer_ratio",
+				Arity:   0,
+				Doc:     "Return a pair of integers whose ratio equals the float",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					n := float64(receiver.(NumberValue))
+					// Check for infinity
+					if math.IsInf(n, 0) {
+						return nil, &ValueError{Message: "cannot convert Infinity to integer ratio"}
+					}
+					// Check for NaN
+					if math.IsNaN(n) {
+						return nil, &ValueError{Message: "cannot convert NaN to integer ratio"}
+					}
+
+					// Handle zero
+					if n == 0 {
+						return TupleValue{NumberValue(0), NumberValue(1)}, nil
+					}
+
+					// Use math.Frexp to get mantissa and exponent
+					// n = mantissa * 2^exponent where 0.5 <= |mantissa| < 1
+					mantissa, exponent := math.Frexp(n)
+
+					// Scale mantissa to integer
+					// float64 has 53 bits of mantissa precision
+					const mantissaBits = 53
+					mantissa *= float64(int64(1) << mantissaBits)
+					exponent -= mantissaBits
+
+					// Now mantissa is an integer and n = mantissa * 2^exponent
+					numerator := int64(mantissa)
+					denominator := int64(1)
+
+					if exponent > 0 {
+						numerator <<= uint(exponent)
+					} else if exponent < 0 {
+						denominator <<= uint(-exponent)
+					}
+
+					// Reduce the fraction by GCD
+					g := gcd(abs64(numerator), denominator)
+					numerator /= g
+					denominator /= g
+
+					return TupleValue{NumberValue(numerator), NumberValue(denominator)}, nil
+				},
+			},
+			"hex": {
+				Name:    "hex",
+				Arity:   0,
+				Doc:     "Return a hexadecimal representation of a float",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					n := float64(receiver.(NumberValue))
+
+					// Handle special cases
+					if math.IsNaN(n) {
+						return StringValue("nan"), nil
+					}
+					if math.IsInf(n, 1) {
+						return StringValue("inf"), nil
+					}
+					if math.IsInf(n, -1) {
+						return StringValue("-inf"), nil
+					}
+					if n == 0 {
+						if math.Signbit(n) {
+							return StringValue("-0x0.0p+0"), nil
+						}
+						return StringValue("0x0.0p+0"), nil
+					}
+
+					// Use Go's hex format and convert to Python format
+					// Go: %x gives e.g. "0x1.921fb54442d18p+01"
+					// Python: "0x1.921fb54442d18p+1" (no leading zero on exponent)
+					result := strconv.FormatFloat(n, 'x', -1, 64)
+					return StringValue(result), nil
+				},
+			},
+			"__float__": {
+				Name:    "__float__",
+				Arity:   0,
+				Doc:     "Return float(self)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					return receiver, nil
+				},
+			},
+			"conjugate": {
+				Name:    "conjugate",
+				Arity:   0,
+				Doc:     "Return self (floats are their own conjugate)",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					return receiver, nil
+				},
+			},
 		},
 		Constructor: func(args []Value, ctx *Context) (Value, error) {
 			if len(args) == 0 {
@@ -626,6 +739,22 @@ func formatInt(n int64) string {
 // formatFloat formats a float as a string
 func formatFloat(f float64) string {
 	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+// gcd returns the greatest common divisor of a and b
+func gcd(a, b int64) int64 {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	return a
+}
+
+// abs64 returns the absolute value of an int64
+func abs64(n int64) int64 {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
 
 // registerBytesType registers the bytes type descriptor

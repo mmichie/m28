@@ -1974,6 +1974,40 @@ func createFloatClass() *FloatType {
 		return nil, &core.ValueError{Message: "__getformat__() argument must be 'double' or 'float'"}
 	})
 
+	// Add fromhex class method to create float from hexadecimal string
+	class.Methods["fromhex"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: "fromhex() requires exactly one argument"}
+		}
+
+		s, ok := args[0].(core.StringValue)
+		if !ok {
+			return nil, core.NewTypeError("str", args[0], "fromhex() argument")
+		}
+
+		hexStr := strings.TrimSpace(string(s))
+
+		// Handle special values
+		lower := strings.ToLower(hexStr)
+		switch lower {
+		case "inf", "infinity":
+			return core.NumberValue(math.Inf(1)), nil
+		case "-inf", "-infinity":
+			return core.NumberValue(math.Inf(-1)), nil
+		case "nan":
+			return core.NumberValue(math.NaN()), nil
+		}
+
+		// Try to parse as hex float using strconv
+		// Go's ParseFloat with hex prefix handles Python's hex format
+		f, err := strconv.ParseFloat(hexStr, 64)
+		if err != nil {
+			return nil, &core.ValueError{Message: fmt.Sprintf("could not convert string to float: '%s'", hexStr)}
+		}
+
+		return core.NumberValue(f), nil
+	})
+
 	return &FloatType{Class: class}
 }
 
