@@ -193,10 +193,6 @@ func enumerateWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *c
 
 	// Get iterable
 	obj := args[0]
-	iterable, err := types.RequireIterable(obj, "enumerate() argument")
-	if err != nil {
-		return nil, err
-	}
 
 	// If positional start value provided, it overrides kwarg
 	if len(args) == 2 {
@@ -207,19 +203,29 @@ func enumerateWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *c
 		}
 	}
 
-	// Build enumerate result
-	result := make([]core.Value, 0)
-	iter := iterable.Iterator()
-	index := start
-	for {
-		val, hasNext := iter.Next()
-		if !hasNext {
-			break
-		}
-		result = append(result, core.TupleValue{core.NumberValue(index), val})
-		index++
+	// First try protocol-based iteration (for built-in types)
+	if iter, ok := protocols.GetIterableOpsWithCtx(obj, ctx); ok {
+		return protocols.NewEnumerateIterator(iter, start), nil
 	}
-	return core.NewList(result...), nil
+
+	// Try calling __iter__ for custom iterables
+	if iterResult, found, err := types.CallIter(obj, ctx); found {
+		if err != nil {
+			return nil, err
+		}
+		// Wrap the iterator result in a DunderIterator
+		dunderIter, err := protocols.NewDunderIterator(iterResult, ctx)
+		if err != nil {
+			// If the result already is an iterator, use it directly
+			if pIter, ok := protocols.GetIterableOpsWithCtx(iterResult, ctx); ok {
+				return protocols.NewEnumerateIterator(pIter, start), nil
+			}
+			return nil, err
+		}
+		return protocols.NewEnumerateIterator(dunderIter, start), nil
+	}
+
+	return nil, errors.NewTypeError("enumerate", "argument must be iterable", string(obj.Type()))
 }
 
 // ZipBuilder creates the zip function

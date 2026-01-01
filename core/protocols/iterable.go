@@ -417,6 +417,55 @@ func (r *RangeIterator) GetAttr(name string) (core.Value, bool) {
 	return nil, false
 }
 
+// SetIterator iterates over set values
+type SetIterator struct {
+	items []core.Value
+	index int
+}
+
+// NewSetIterator creates an iterator for sets
+func NewSetIterator(s *core.SetValue) *SetIterator {
+	return &SetIterator{
+		items: s.Items(),
+		index: 0,
+	}
+}
+
+// Next returns the next value
+func (s *SetIterator) Next() (core.Value, error) {
+	if s.index < len(s.items) {
+		val := s.items[s.index]
+		s.index++
+		return val, nil
+	}
+	return nil, &StopIteration{}
+}
+
+// HasNext checks if there are more values
+func (s *SetIterator) HasNext() bool {
+	return s.index < len(s.items)
+}
+
+// Type implements Value.Type
+func (s *SetIterator) Type() core.Type {
+	return "set_iterator"
+}
+
+// String implements Value.String
+func (s *SetIterator) String() string {
+	return "<set_iterator>"
+}
+
+// GetAttr implements Object interface for iterator protocol
+func (s *SetIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return s.Next()
+		}), true
+	}
+	return nil, false
+}
+
 // DunderIterator wraps objects with __iter__/__next__ methods
 type DunderIterator struct {
 	iterator   core.Value    // The iterator returned by __iter__
@@ -553,11 +602,18 @@ func (d *DunderIterator) String() string {
 
 // GetIterableOps returns an iterator for a value if possible
 func GetIterableOps(v core.Value) (Iterator, bool) {
+	return GetIterableOpsWithCtx(v, nil)
+}
+
+// GetIterableOpsWithCtx returns an iterator for a value with context support
+func GetIterableOpsWithCtx(v core.Value, ctx *core.Context) (Iterator, bool) {
 	switch val := v.(type) {
 	case *core.ListValue:
 		return NewListIterator(val), true
 	case *core.DictValue:
 		return NewDictIterator(val), true
+	case *core.SetValue:
+		return NewSetIterator(val), true
 	case core.TupleValue:
 		return NewTupleIterator(val), true
 	case core.StringValue:
@@ -577,9 +633,7 @@ func GetIterableOps(v core.Value) (Iterator, bool) {
 		if obj, ok := v.(core.Object); ok {
 			if _, exists := obj.GetAttr("__iter__"); exists {
 				// Return a DunderIterator wrapper
-				// Note: We need a context, but don't have one here
-				// For now, create with nil context - callers should handle this
-				iter, err := NewDunderIterator(v, nil)
+				iter, err := NewDunderIterator(v, ctx)
 				if err == nil {
 					return iter, true
 				}
@@ -587,4 +641,59 @@ func GetIterableOps(v core.Value) (Iterator, bool) {
 		}
 		return nil, false
 	}
+}
+
+// EnumerateIterator provides lazy iteration with index
+type EnumerateIterator struct {
+	iter  Iterator
+	index int
+}
+
+// NewEnumerateIterator creates an enumerate iterator
+func NewEnumerateIterator(iter Iterator, start int) *EnumerateIterator {
+	return &EnumerateIterator{
+		iter:  iter,
+		index: start,
+	}
+}
+
+// Next returns the next (index, value) tuple
+func (e *EnumerateIterator) Next() (core.Value, error) {
+	val, err := e.iter.Next()
+	if err != nil {
+		return nil, err
+	}
+	result := core.TupleValue{core.NumberValue(e.index), val}
+	e.index++
+	return result, nil
+}
+
+// HasNext checks if there are more values
+func (e *EnumerateIterator) HasNext() bool {
+	return e.iter.HasNext()
+}
+
+// Type implements Value.Type
+func (e *EnumerateIterator) Type() core.Type {
+	return "enumerate"
+}
+
+// String implements Value.String
+func (e *EnumerateIterator) String() string {
+	return "<enumerate object>"
+}
+
+// GetAttr implements Object interface for iterator protocol
+func (e *EnumerateIterator) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__next__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return e.Next()
+		}), true
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return e, nil
+		}), true
+	}
+	return nil, false
 }
