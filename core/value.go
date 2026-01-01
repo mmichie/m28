@@ -139,6 +139,16 @@ func (o *BaseObject) SetAttr(name string, value Value) error {
 	return nil
 }
 
+// ForEachAttr iterates over all attributes in the object
+func (o *BaseObject) ForEachAttr(fn func(name string, value Value)) {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+
+	for name, value := range o.attrs {
+		fn(name, value)
+	}
+}
+
 // CallMethod implements Object.CallMethod
 func (o *BaseObject) CallMethod(name string, args []Value, ctx *Context) (Value, error) {
 	method, ok := o.GetAttr(name)

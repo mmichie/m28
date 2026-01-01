@@ -510,8 +510,21 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		return globalsDict, true
 	case "__dict__":
 		// Return function's namespace/attributes as a dict
+		// This should contain custom user-set attributes, not special function attrs
 		funcDict := core.NewDict()
-		// Could populate with actual function attributes if needed
+		// Get all attributes from BaseObject and add them to the dict
+		// Exclude special function attributes that have dedicated handling
+		specialAttrs := map[string]bool{
+			"__name__": true, "__qualname__": true, "__module__": true,
+			"__doc__": true, "__annotations__": true, "__type_params__": true,
+		}
+		f.BaseObject.ForEachAttr(func(name string, value core.Value) {
+			if !specialAttrs[name] {
+				// Use SetWithKey with proper key formatting for dict access
+				keyVal := core.StringValue(name)
+				funcDict.SetWithKey(core.ValueToKey(keyVal), keyVal, value)
+			}
+		})
 		return funcDict, true
 	case "__closure__":
 		// Return tuple of closure cells (or None for no closure)
