@@ -231,6 +231,36 @@ func (r *RangeValue) createRegistry() *MethodRegistry {
 
 		// __iter__ method
 		MakeIterMethod(),
+
+		// __eq__ method
+		MakeMethod("__eq__", 1, "Check equality with another range", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			r, err := TypedReceiver[*RangeValue](receiver, "__eq__")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("__eq__", args, 1); err != nil {
+				return nil, err
+			}
+
+			other, ok := args[0].(*RangeValue)
+			if !ok {
+				return BoolValue(false), nil
+			}
+
+			// Two ranges are equal if they produce the same sequence
+			// This means same length and same elements
+			if r.Length() != other.Length() {
+				return BoolValue(false), nil
+			}
+
+			// Empty ranges are always equal
+			if r.Length() == 0 {
+				return BoolValue(true), nil
+			}
+
+			// Check if start and step produce same sequence
+			return BoolValue(r.Start == other.Start && r.Step == other.Step), nil
+		}),
 	)
 
 	return registry
