@@ -112,7 +112,7 @@ func (a *listIteratorAdapter) Reset() {
 // DictIterator iterates over dict keys (Python behavior)
 type DictIterator struct {
 	dict  *core.DictValue
-	keys  []string
+	keys  []core.Value
 	index int
 }
 
@@ -120,7 +120,7 @@ type DictIterator struct {
 func NewDictIterator(dict *core.DictValue) *DictIterator {
 	return &DictIterator{
 		dict:  dict,
-		keys:  dict.Keys(),
+		keys:  dict.OriginalKeys(),
 		index: 0,
 	}
 }
@@ -130,11 +130,7 @@ func (d *DictIterator) Next() (core.Value, error) {
 	if d.index < len(d.keys) {
 		key := d.keys[d.index]
 		d.index++
-		// Try to get the original key value
-		// Note: DictValue.Keys() returns internal string representations
-		// We need to return the original key values when iterating
-		// For now, just return the string key
-		return core.StringValue(key), nil
+		return key, nil
 	}
 	return nil, &StopIteration{}
 }
