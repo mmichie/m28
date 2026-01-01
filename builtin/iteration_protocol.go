@@ -80,8 +80,14 @@ func nextFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// First, try calling __next__ if it exists
 	if result, found, err := types.CallNext(iterator, ctx); found {
 		if err != nil {
-			// Check if it's StopIteration
+			// Check if it's StopIteration (either protocols.StopIteration or core.StopIteration)
 			if _, isStop := err.(*protocols.StopIteration); isStop {
+				if hasDefault {
+					return defaultValue, nil
+				}
+				return nil, err
+			}
+			if _, isStop := err.(*core.StopIteration); isStop {
 				if hasDefault {
 					return defaultValue, nil
 				}
@@ -96,8 +102,14 @@ func nextFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	if iter, ok := iterator.(protocols.Iterator); ok {
 		val, err := iter.Next()
 		if err != nil {
-			// Check if it's StopIteration
+			// Check if it's StopIteration (either protocols.StopIteration or core.StopIteration)
 			if _, isStop := err.(*protocols.StopIteration); isStop {
+				if hasDefault {
+					return defaultValue, nil
+				}
+				return nil, err
+			}
+			if _, isStop := err.(*core.StopIteration); isStop {
 				if hasDefault {
 					return defaultValue, nil
 				}
