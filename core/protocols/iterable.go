@@ -697,3 +697,25 @@ func (e *EnumerateIterator) GetAttr(name string) (core.Value, bool) {
 	}
 	return nil, false
 }
+
+// Iterator implements core.Iterable interface
+func (e *EnumerateIterator) Iterator() core.Iterator {
+	return &enumerateCoreIterator{enum: e}
+}
+
+// enumerateCoreIterator adapts EnumerateIterator to core.Iterator
+type enumerateCoreIterator struct {
+	enum *EnumerateIterator
+}
+
+func (it *enumerateCoreIterator) Next() (core.Value, bool) {
+	val, err := it.enum.Next()
+	if err != nil {
+		return nil, false
+	}
+	return val, true
+}
+
+func (it *enumerateCoreIterator) Reset() {
+	// EnumerateIterator doesn't support reset
+}
