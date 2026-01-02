@@ -513,6 +513,45 @@ func (it *dictIterator) Reset() {
 	it.index = 0
 }
 
+// Type implements Value.Type for dict iterator
+func (it *dictIterator) Type() Type {
+	return "dict_keyiterator"
+}
+
+// String implements Value.String for dict iterator
+func (it *dictIterator) String() string {
+	return "<dict_keyiterator>"
+}
+
+// GetAttr implements Object interface for dict iterator protocol
+func (it *dictIterator) GetAttr(name string) (Value, bool) {
+	if name == "__iter__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return it, nil
+		}), true
+	}
+	if name == "__next__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			val, ok := it.Next()
+			if !ok {
+				return nil, &stopIterationError{}
+			}
+			return val, nil
+		}), true
+	}
+	if name == "__length_hint__" {
+		// PEP 424: Return estimated remaining length
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			remaining := len(it.keys) - it.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return NumberValue(remaining), nil
+		}), true
+	}
+	return nil, false
+}
+
 // GetAttr implements Object interface using TypeDescriptor
 func (d *DictValue) GetAttr(name string) (Value, bool) {
 	// First try to find the key with string prefix
@@ -620,6 +659,45 @@ func (it *tupleIterator) Next() (Value, bool) {
 
 func (it *tupleIterator) Reset() {
 	it.index = 0
+}
+
+// Type implements Value.Type for tuple iterator
+func (it *tupleIterator) Type() Type {
+	return "tuple_iterator"
+}
+
+// String implements Value.String for tuple iterator
+func (it *tupleIterator) String() string {
+	return "<tuple_iterator>"
+}
+
+// GetAttr implements Object interface for tuple iterator protocol
+func (it *tupleIterator) GetAttr(name string) (Value, bool) {
+	if name == "__iter__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return it, nil
+		}), true
+	}
+	if name == "__next__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			val, ok := it.Next()
+			if !ok {
+				return nil, &stopIterationError{}
+			}
+			return val, nil
+		}), true
+	}
+	if name == "__length_hint__" {
+		// PEP 424: Return estimated remaining length
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			remaining := len(it.tuple) - it.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return NumberValue(remaining), nil
+		}), true
+	}
+	return nil, false
 }
 
 // SliceValue represents a slice object with start, stop, and step
@@ -841,6 +919,11 @@ func (e *stopIterationError) Error() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (it *setIterator) GetAttr(name string) (Value, bool) {
+	if name == "__iter__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return it, nil
+		}), true
+	}
 	if name == "__next__" {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			val, ok := it.Next()
@@ -849,6 +932,16 @@ func (it *setIterator) GetAttr(name string) (Value, bool) {
 				return nil, &stopIterationError{}
 			}
 			return val, nil
+		}), true
+	}
+	if name == "__length_hint__" {
+		// PEP 424: Return estimated remaining length
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			remaining := len(it.values) - it.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false

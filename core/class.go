@@ -337,6 +337,31 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return TupleValue(mro), true
 	}
 
+	// mro() method - returns the MRO as a list (unlike __mro__ which is a tuple)
+	if name == "mro" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// Build the MRO list using the same algorithm as __mro__
+			mro := []Value{c}
+			seen := make(map[*Class]bool)
+			seen[c] = true
+			queue := []*Class{}
+			queue = append(queue, c.Parents...)
+
+			for len(queue) > 0 {
+				cls := queue[0]
+				queue = queue[1:]
+				if cls == nil || seen[cls] {
+					continue
+				}
+				mro = append(mro, cls)
+				seen[cls] = true
+				queue = append(queue, cls.Parents...)
+			}
+
+			return NewList(mro...), nil
+		}), true
+	}
+
 	// Special handling for __dict__
 	if name == "__dict__" {
 		dict := NewDict()

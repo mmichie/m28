@@ -78,9 +78,24 @@ func (l *ListIterator) String() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (l *ListIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__iter__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return l, nil
+		}), true
+	}
 	if name == "__next__" {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return l.Next()
+		}), true
+	}
+	if name == "__length_hint__" {
+		// PEP 424: Return estimated remaining length
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			remaining := l.list.Len() - l.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return core.NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false
@@ -152,9 +167,23 @@ func (d *DictIterator) String() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (d *DictIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__iter__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return d, nil
+		}), true
+	}
 	if name == "__next__" {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return d.Next()
+		}), true
+	}
+	if name == "__length_hint__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			remaining := len(d.keys) - d.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return core.NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false
@@ -198,9 +227,23 @@ func (t *TupleIterator) String() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (t *TupleIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__iter__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return t, nil
+		}), true
+	}
 	if name == "__next__" {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return t.Next()
+		}), true
+	}
+	if name == "__length_hint__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			remaining := len(t.tuple) - t.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return core.NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false
@@ -250,9 +293,23 @@ func (s *StringIterator) String() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (s *StringIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__iter__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return s, nil
+		}), true
+	}
 	if name == "__next__" {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return s.Next()
+		}), true
+	}
+	if name == "__length_hint__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			remaining := len(s.runes) - s.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return core.NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false
@@ -299,9 +356,23 @@ func (b *BytesIterator) String() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (b *BytesIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__iter__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return b, nil
+		}), true
+	}
 	if name == "__next__" {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return b.Next()
+		}), true
+	}
+	if name == "__length_hint__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			remaining := len(b.bytes) - b.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return core.NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false
@@ -349,9 +420,23 @@ func (b *ByteArrayIterator) String() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (b *ByteArrayIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__iter__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return b, nil
+		}), true
+	}
 	if name == "__next__" {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return b.Next()
+		}), true
+	}
+	if name == "__length_hint__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			remaining := len(b.bytearray.GetData()) - b.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return core.NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false
@@ -409,9 +494,28 @@ func (r *RangeIterator) String() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (r *RangeIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__iter__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return r, nil
+		}), true
+	}
 	if name == "__next__" {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return r.Next()
+		}), true
+	}
+	if name == "__length_hint__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			var remaining int
+			if r.rang.Step > 0 {
+				remaining = int((r.rang.Stop - r.current + r.rang.Step - 1) / r.rang.Step)
+			} else {
+				remaining = int((r.current - r.rang.Stop - r.rang.Step - 1) / (-r.rang.Step))
+			}
+			if remaining < 0 {
+				remaining = 0
+			}
+			return core.NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false
@@ -458,9 +562,23 @@ func (s *SetIterator) String() string {
 
 // GetAttr implements Object interface for iterator protocol
 func (s *SetIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__iter__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return s, nil
+		}), true
+	}
 	if name == "__next__" {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return s.Next()
+		}), true
+	}
+	if name == "__length_hint__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			remaining := len(s.items) - s.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return core.NumberValue(remaining), nil
 		}), true
 	}
 	return nil, false
@@ -693,6 +811,19 @@ func (e *EnumerateIterator) GetAttr(name string) (core.Value, bool) {
 	case "__iter__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return e, nil
+		}), true
+	case "__length_hint__":
+		// Delegate to underlying iterator if it has __length_hint__
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if obj, ok := e.iter.(core.Object); ok {
+				if hintMethod, found := obj.GetAttr("__length_hint__"); found {
+					if callable, ok := hintMethod.(core.Callable); ok {
+						return callable.Call([]core.Value{}, ctx)
+					}
+				}
+			}
+			// No length hint available
+			return core.NumberValue(0), nil
 		}), true
 	}
 	return nil, false

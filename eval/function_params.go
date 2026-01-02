@@ -11,10 +11,11 @@ import (
 
 // ParameterInfo holds information about a function parameter
 type ParameterInfo struct {
-	Name         core.SymbolValue
-	DefaultValue core.Value // nil if no default
-	HasDefault   bool
-	KeywordOnly  bool // true if parameter can only be passed by keyword (after *)
+	Name           core.SymbolValue
+	DefaultValue   core.Value // nil if no default
+	HasDefault     bool
+	KeywordOnly    bool // true if parameter can only be passed by keyword (after *)
+	PositionalOnly bool // true if parameter can only be passed positionally (before /, PEP 570)
 }
 
 // FunctionSignature holds the full signature of a function
@@ -209,6 +210,19 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 		case core.SymbolValue:
 			name := string(p)
 
+			// Check for / (positional-only separator, PEP 570)
+			if name == "/" {
+				// All previous parameters are now positional-only
+				// Mark them by updating the already-parsed params
+				for i := range sig.RequiredParams {
+					sig.RequiredParams[i].PositionalOnly = true
+				}
+				for i := range sig.OptionalParams {
+					sig.OptionalParams[i].PositionalOnly = true
+				}
+				continue
+			}
+
 			// Check for bare * (keyword-only separator)
 			if name == "*" {
 				// Following parameters are keyword-only
@@ -381,6 +395,12 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 
 		// Check if provided as keyword argument
 		if kwValue, ok := kwargs[paramName]; ok {
+			// Positional-only parameters cannot be passed by keyword (PEP 570)
+			if param.PositionalOnly {
+				return &core.TypeError{
+					Message: fmt.Sprintf("'%s' is a positional-only parameter", paramName),
+				}
+			}
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
 			delete(kwargs, paramName)
@@ -405,6 +425,12 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 
 		// Check if provided as keyword argument
 		if kwValue, ok := kwargs[paramName]; ok {
+			// Positional-only parameters cannot be passed by keyword (PEP 570)
+			if param.PositionalOnly {
+				return &core.TypeError{
+					Message: fmt.Sprintf("'%s' is a positional-only parameter", paramName),
+				}
+			}
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
 			delete(kwargs, paramName)
@@ -457,7 +483,8 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 		for ; argIndex < len(args); argIndex++ {
 			restArgs = append(restArgs, args[argIndex])
 		}
-		bindCtx.Define(string(*sig.RestParam), core.NewList(restArgs...))
+		// Python requires *args to be a tuple, not a list
+		bindCtx.Define(string(*sig.RestParam), core.TupleValue(restArgs))
 	} else if argIndex < len(args) {
 		// Too many positional arguments
 		return fmt.Errorf("too many positional arguments: expected at most %d, got %d",

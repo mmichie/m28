@@ -37,6 +37,16 @@ func (s *simpleListIterator) GetAttr(name string) (Value, bool) {
 			return nil, fmt.Errorf("StopIteration")
 		}), true
 	}
+	if name == "__length_hint__" {
+		// PEP 424: Return estimated remaining length
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			remaining := s.list.Len() - s.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return NumberValue(remaining), nil
+		}), true
+	}
 	return nil, false
 }
 

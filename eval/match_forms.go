@@ -219,45 +219,55 @@ func matchPattern(value core.Value, pattern core.Value, ctx *core.Context) (bool
 				}
 				return false, nil
 
+			case "as":
+				// As pattern: (as pattern name)
+				// Match the pattern AND bind the value to the name
+				if p.Len() != 3 {
+					return false, nil
+				}
+				subPattern := p.Items()[1]
+				nameVal := p.Items()[2]
+				if located, ok := nameVal.(core.LocatedValue); ok {
+					nameVal = located.Unwrap()
+				}
+				nameSym, ok := nameVal.(core.SymbolValue)
+				if !ok {
+					return false, nil
+				}
+				// First match the pattern
+				matched, err := matchPattern(value, subPattern, ctx)
+				if err != nil {
+					return false, err
+				}
+				if matched {
+					// Bind the entire value to the name
+					ctx.Define(string(nameSym), value)
+				}
+				return matched, nil
+
 			case "tuple-literal":
-				// Tuple pattern: (tuple-literal p1 p2 ...)
+				// Tuple pattern: (tuple-literal p1 p2 ...) with optional star pattern
 				tuple, ok := value.(core.TupleValue)
 				if !ok {
 					return false, nil
 				}
-				if len(tuple) != p.Len()-1 {
-					return false, nil
-				}
-				for i := 1; i < p.Len(); i++ {
-					matched, err := matchPattern(tuple[i-1], p.Items()[i], ctx)
-					if err != nil {
-						return false, err
-					}
-					if !matched {
-						return false, nil
-					}
-				}
-				return true, nil
+				return matchSequencePattern([]core.Value(tuple), p.Items()[1:], ctx)
 
 			case "list-literal":
-				// List pattern: (list-literal p1 p2 ...)
+				// List pattern: (list-literal p1 p2 ...) with optional star pattern
 				list, ok := value.(*core.ListValue)
 				if !ok {
 					return false, nil
 				}
-				if list.Len() != p.Len()-1 {
+				return matchSequencePattern(list.Items(), p.Items()[1:], ctx)
+
+			case "dict-literal":
+				// Dict pattern: (dict-literal key1 pattern1 key2 pattern2 ...)
+				dict, ok := value.(*core.DictValue)
+				if !ok {
 					return false, nil
 				}
-				for i := 1; i < p.Len(); i++ {
-					matched, err := matchPattern(list.Items()[i-1], p.Items()[i], ctx)
-					if err != nil {
-						return false, err
-					}
-					if !matched {
-						return false, nil
-					}
-				}
-				return true, nil
+				return matchDictPattern(dict, p.Items()[1:], ctx)
 
 			default:
 				// Could be a class pattern: (ClassName args...)
@@ -355,6 +365,192 @@ func matchClassPattern(value core.Value, class *core.Class, pattern *core.ListVa
 			return false, nil
 		}
 		matched, err := matchPattern(attrVal, argPattern, ctx)
+		if err != nil {
+			return false, err
+		}
+		if !matched {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// matchSequencePattern matches a sequence (list or tuple) against patterns
+// Handles star patterns like [a, *rest, b]
+func matchSequencePattern(values []core.Value, patterns []core.Value, ctx *core.Context) (bool, error) {
+	// Find if there's a star pattern and where
+	starIndex := -1
+	for i, pat := range patterns {
+		if isStarPattern(pat) {
+			if starIndex != -1 {
+				// Multiple star patterns - error
+				return false, &core.TypeError{Message: "multiple starred expressions in pattern"}
+			}
+			starIndex = i
+		}
+	}
+
+	if starIndex == -1 {
+		// No star pattern - exact match required
+		if len(values) != len(patterns) {
+			return false, nil
+		}
+		for i, pat := range patterns {
+			matched, err := matchPattern(values[i], pat, ctx)
+			if err != nil {
+				return false, err
+			}
+			if !matched {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+
+	// Has a star pattern
+	beforeCount := starIndex
+	afterCount := len(patterns) - starIndex - 1
+	minRequired := beforeCount + afterCount
+
+	if len(values) < minRequired {
+		return false, nil
+	}
+
+	// Match patterns before the star
+	for i := 0; i < beforeCount; i++ {
+		matched, err := matchPattern(values[i], patterns[i], ctx)
+		if err != nil {
+			return false, err
+		}
+		if !matched {
+			return false, nil
+		}
+	}
+
+	// Match patterns after the star
+	for i := 0; i < afterCount; i++ {
+		valueIdx := len(values) - afterCount + i
+		patternIdx := starIndex + 1 + i
+		matched, err := matchPattern(values[valueIdx], patterns[patternIdx], ctx)
+		if err != nil {
+			return false, err
+		}
+		if !matched {
+			return false, nil
+		}
+	}
+
+	// Bind the star pattern
+	starPat := patterns[starIndex]
+	starName := getStarPatternName(starPat)
+	if starName != "" && starName != "_" {
+		// Collect the middle elements
+		middleStart := beforeCount
+		middleEnd := len(values) - afterCount
+		middleValues := values[middleStart:middleEnd]
+		ctx.Define(starName, core.NewList(middleValues...))
+	}
+
+	return true, nil
+}
+
+// isStarPattern checks if a pattern is a star pattern (star name)
+func isStarPattern(pat core.Value) bool {
+	if located, ok := pat.(core.LocatedValue); ok {
+		pat = located.Unwrap()
+	}
+	list, ok := pat.(*core.ListValue)
+	if !ok || list.Len() != 2 {
+		return false
+	}
+	first := list.Items()[0]
+	if located, ok := first.(core.LocatedValue); ok {
+		first = located.Unwrap()
+	}
+	if sym, ok := first.(core.SymbolValue); ok {
+		return string(sym) == "star"
+	}
+	return false
+}
+
+// getStarPatternName gets the name from a star pattern
+func getStarPatternName(pat core.Value) string {
+	if located, ok := pat.(core.LocatedValue); ok {
+		pat = located.Unwrap()
+	}
+	list, ok := pat.(*core.ListValue)
+	if !ok || list.Len() != 2 {
+		return ""
+	}
+	second := list.Items()[1]
+	if located, ok := second.(core.LocatedValue); ok {
+		second = located.Unwrap()
+	}
+	if sym, ok := second.(core.SymbolValue); ok {
+		return string(sym)
+	}
+	return ""
+}
+
+// matchDictPattern matches a dict against a dict pattern
+// Pattern format: key1, pattern1, key2, pattern2, ...
+func matchDictPattern(dict *core.DictValue, patterns []core.Value, ctx *core.Context) (bool, error) {
+	if len(patterns)%2 != 0 {
+		return false, &core.TypeError{Message: "dict pattern must have even number of key-pattern pairs"}
+	}
+
+	// For each key-pattern pair in the pattern
+	for i := 0; i < len(patterns); i += 2 {
+		keyPattern := patterns[i]
+		valuePattern := patterns[i+1]
+
+		// Unwrap the key
+		if located, ok := keyPattern.(core.LocatedValue); ok {
+			keyPattern = located.Unwrap()
+		}
+
+		// Evaluate the key to get the actual key value
+		// For pattern matching, keys should be literals (string, number, etc.)
+		var keyValue core.Value
+		switch k := keyPattern.(type) {
+		case core.StringValue:
+			keyValue = k
+		case core.NumberValue:
+			keyValue = k
+		case core.BoolValue:
+			keyValue = k
+		case core.SymbolValue:
+			// Could be a variable or a constant
+			name := string(k)
+			switch name {
+			case "True":
+				keyValue = core.True
+			case "False":
+				keyValue = core.False
+			case "None":
+				keyValue = core.Nil
+			default:
+				// Try to look up as a variable
+				val, err := ctx.Lookup(name)
+				if err != nil {
+					return false, fmt.Errorf("undefined key in dict pattern: %s", name)
+				}
+				keyValue = val
+			}
+		default:
+			// For other types, try to evaluate
+			return false, fmt.Errorf("unsupported key type in dict pattern: %T", keyPattern)
+		}
+
+		// Get the value from the dict
+		val, found := dict.GetValue(keyValue)
+		if !found {
+			return false, nil
+		}
+
+		// Match the value against the pattern
+		matched, err := matchPattern(val, valuePattern, ctx)
 		if err != nil {
 			return false, err
 		}

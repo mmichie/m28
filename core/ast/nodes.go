@@ -177,18 +177,52 @@ func (d *DefForm) String() string {
 func (d *DefForm) ToIR() core.Value {
 	// Build (def name (params) body) or (async def name (params) body)
 	// Parameters with defaults are represented as (param default-value)
-	params := make([]core.Value, len(d.Params))
+	// PEP 570/3102: / marks end of positional-only, * marks start of keyword-only
+	params := make([]core.Value, 0, len(d.Params)+2) // +2 for possible / and * markers
+
+	// Track where to insert markers
+	lastPositionalOnly := -1
+	firstKeywordOnly := -1
+	seenVarArgs := false
+
 	for i, p := range d.Params {
+		if p.PositionalOnly {
+			lastPositionalOnly = i
+		}
+		if p.IsVarArgs {
+			seenVarArgs = true
+		}
+		if p.KeywordOnly && firstKeywordOnly < 0 && !p.IsVarArgs && !p.IsKwargs {
+			firstKeywordOnly = i
+		}
+	}
+
+	for i, p := range d.Params {
+		// Insert / after last positional-only param (if there are any)
+		if i > 0 && lastPositionalOnly >= 0 && i-1 == lastPositionalOnly && !d.Params[i-1].IsVarArgs && !d.Params[i-1].IsKwargs {
+			params = append(params, core.SymbolValue("/"))
+		}
+
+		// Insert bare * before first keyword-only param (if not from *args)
+		if firstKeywordOnly >= 0 && i == firstKeywordOnly && !seenVarArgs {
+			params = append(params, core.SymbolValue("*"))
+		}
+
 		if p.Default != nil {
 			// Parameter with default: (param-name default-value)
-			params[i] = core.NewList(
+			params = append(params, core.NewList(
 				core.SymbolValue(p.Name),
 				p.Default.ToIR(),
-			)
+			))
 		} else {
 			// Parameter without default: just the symbol
-			params[i] = core.SymbolValue(p.Name)
+			params = append(params, core.SymbolValue(p.Name))
 		}
+	}
+
+	// Handle trailing / (all params are positional-only)
+	if lastPositionalOnly >= 0 && lastPositionalOnly == len(d.Params)-1 && len(d.Params) > 0 && !d.Params[lastPositionalOnly].IsVarArgs && !d.Params[lastPositionalOnly].IsKwargs {
+		params = append(params, core.SymbolValue("/"))
 	}
 
 	paramsList := core.NewList(params...)

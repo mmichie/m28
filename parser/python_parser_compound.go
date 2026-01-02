@@ -405,9 +405,10 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 }
 
 // parseParameters parses: (param (: type)? (= default)?, ...)*
-// Also handles *args and **kwargs
+// Also handles *args and **kwargs, and PEP 570/3102 positional/keyword-only markers
 func (p *PythonParser) parseParameters() []ast.Parameter {
 	params := []ast.Parameter{}
+	keywordOnly := false // Track if we've seen * or *args
 
 	if p.check(TOKEN_RPAREN) {
 		return params // Empty parameter list
@@ -424,6 +425,8 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 		// Handle *args or keyword-only separator (*)
 		if param, ok := p.parseVarArgsParameter(); ok {
 			params = append(params, param)
+			// After * or *args, all subsequent parameters are keyword-only
+			keywordOnly = true
 			if p.shouldBreakParameterLoop() {
 				break
 			}
@@ -441,6 +444,8 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 
 		// Parse regular parameter
 		param := p.parseRegularParameter()
+		// Mark as keyword-only if we've seen * or *args
+		param.KeywordOnly = keywordOnly
 		params = append(params, param)
 
 		if p.shouldBreakParameterLoop() {
@@ -453,12 +458,21 @@ func (p *PythonParser) parseParameters() []ast.Parameter {
 
 // handlePositionalOnlySeparator handles the / separator for positional-only parameters
 // Returns (shouldContinue, shouldBreak) to control the parameter parsing loop
+// Also marks all previous parameters as positional-only
 func (p *PythonParser) handlePositionalOnlySeparator(params *[]ast.Parameter) (bool, bool) {
 	if !p.check(TOKEN_SLASH) {
 		return false, false // Didn't see /, continue normal processing
 	}
 
 	p.advance() // consume /
+
+	// Mark all previous parameters as positional-only (PEP 570)
+	for i := range *params {
+		// Don't mark *args or **kwargs as positional-only
+		if !(*params)[i].IsVarArgs && !(*params)[i].IsKwargs {
+			(*params)[i].PositionalOnly = true
+		}
+	}
 
 	// If no comma after /, we're done with parameters
 	if !p.check(TOKEN_COMMA) {
@@ -1086,14 +1100,48 @@ func (p *PythonParser) parseMatchStatement() ast.ASTNode {
 	return ast.NewMatchForm(subject, cases, p.makeLocation(tok), ast.SyntaxPython)
 }
 
-// parsePattern parses a pattern in a case clause
+// parsePattern parses a pattern in a case clause, including OR and AS patterns
 // Patterns can be:
 // - Literal values: 1, "hello", True, None
 // - Wildcard: _
 // - Class patterns: Point(x, y), ast.Expr(expr)
 // - Or patterns: pattern1 | pattern2
-// For now, we handle simple patterns and class patterns
+// - As patterns: pattern as name
 func (p *PythonParser) parsePattern() ast.ASTNode {
+	tok := p.peek()
+	first := p.parseSinglePattern()
+	if first == nil {
+		return nil
+	}
+
+	// Check for OR pattern (pattern1 | pattern2 | ...)
+	var pattern ast.ASTNode = first
+	if p.check(TOKEN_PIPE) {
+		// Collect all patterns in the OR
+		patterns := []ast.ASTNode{first}
+		for p.check(TOKEN_PIPE) {
+			p.advance() // consume |
+			next := p.parseSinglePattern()
+			if next == nil {
+				return nil
+			}
+			patterns = append(patterns, next)
+		}
+		pattern = ast.NewOrPattern(patterns, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Check for AS pattern (pattern as name)
+	if p.check(TOKEN_AS) {
+		p.advance() // consume 'as'
+		nameTok := p.expect(TOKEN_IDENTIFIER)
+		pattern = ast.NewAsPattern(pattern, nameTok.Lexeme, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	return pattern
+}
+
+// parseSinglePattern parses a single pattern (not OR patterns)
+func (p *PythonParser) parseSinglePattern() ast.ASTNode {
 	// Check for literal patterns
 	tok := p.peek()
 
@@ -1137,18 +1185,182 @@ func (p *PythonParser) parsePattern() ast.ASTNode {
 		// Simple identifier or wildcard
 		return node
 
+	case TOKEN_STAR:
+		// Star pattern (*name or *_)
+		starTok := p.advance()
+		if p.check(TOKEN_IDENTIFIER) {
+			name := p.advance()
+			return ast.NewStarPattern(name.Lexeme, p.makeLocation(starTok), ast.SyntaxPython)
+		}
+		// Bare * is not valid in patterns, but we'll handle it as *_
+		return ast.NewStarPattern("_", p.makeLocation(starTok), ast.SyntaxPython)
+
 	case TOKEN_LPAREN:
-		// Tuple pattern or grouped pattern
-		return p.parseParenthesized()
+		// Parenthesized pattern or tuple pattern
+		return p.parseParenthesizedPattern()
 
 	case TOKEN_LBRACKET:
 		// List pattern
-		return p.parseListLiteral()
+		return p.parseListPattern()
+
+	case TOKEN_LBRACE:
+		// Dict/mapping pattern
+		return p.parseDictPattern()
 
 	default:
 		p.error(fmt.Sprintf("Unexpected token in pattern: %v", tok.Type))
 		return nil
 	}
+}
+
+// parseListPattern parses a list pattern [p1, p2, *rest, p3]
+func (p *PythonParser) parseListPattern() ast.ASTNode {
+	tok := p.expect(TOKEN_LBRACKET)
+
+	// Empty list []
+	if p.check(TOKEN_RBRACKET) {
+		p.advance()
+		listSym := ast.NewIdentifier("list-literal", p.makeLocation(tok), ast.SyntaxPython)
+		return ast.NewSExpr([]ast.ASTNode{listSym}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse patterns
+	patterns := []ast.ASTNode{}
+	for {
+		pattern := p.parsePattern()
+		if pattern == nil {
+			return nil
+		}
+		patterns = append(patterns, pattern)
+
+		if !p.check(TOKEN_COMMA) {
+			break
+		}
+		p.advance() // consume comma
+		if p.check(TOKEN_RBRACKET) {
+			break // trailing comma
+		}
+	}
+	p.expect(TOKEN_RBRACKET)
+
+	// Create list-literal: (list-literal p1 p2 ...)
+	listSym := ast.NewIdentifier("list-literal", p.makeLocation(tok), ast.SyntaxPython)
+	allElements := append([]ast.ASTNode{listSym}, patterns...)
+	return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseDictPattern parses a dict/mapping pattern {'key': pattern, ...}
+func (p *PythonParser) parseDictPattern() ast.ASTNode {
+	tok := p.expect(TOKEN_LBRACE)
+
+	// Empty dict {}
+	if p.check(TOKEN_RBRACE) {
+		p.advance()
+		dictSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+		return ast.NewSExpr([]ast.ASTNode{dictSym}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse key-pattern pairs
+	elements := []ast.ASTNode{}
+	for {
+		// Parse key (must be a literal)
+		var key ast.ASTNode
+		keyTok := p.peek()
+		switch keyTok.Type {
+		case TOKEN_STRING:
+			p.advance()
+			key = ast.NewLiteral(keyTok.Value, p.makeLocation(keyTok), ast.SyntaxPython)
+		case TOKEN_NUMBER:
+			p.advance()
+			key = ast.NewLiteral(keyTok.Value, p.makeLocation(keyTok), ast.SyntaxPython)
+		case TOKEN_IDENTIFIER:
+			// Could be True, False, None as keys
+			p.advance()
+			switch keyTok.Lexeme {
+			case "True":
+				key = ast.NewLiteral(core.True, p.makeLocation(keyTok), ast.SyntaxPython)
+			case "False":
+				key = ast.NewLiteral(core.False, p.makeLocation(keyTok), ast.SyntaxPython)
+			case "None":
+				key = ast.NewLiteral(core.Nil, p.makeLocation(keyTok), ast.SyntaxPython)
+			default:
+				// Variable key - allow identifier as key
+				key = ast.NewIdentifier(keyTok.Lexeme, p.makeLocation(keyTok), ast.SyntaxPython)
+			}
+		default:
+			p.error(fmt.Sprintf("Expected dict key, got %v", keyTok.Type))
+			return nil
+		}
+		elements = append(elements, key)
+
+		p.expect(TOKEN_COLON)
+
+		// Parse value pattern
+		pattern := p.parsePattern()
+		if pattern == nil {
+			return nil
+		}
+		elements = append(elements, pattern)
+
+		if !p.check(TOKEN_COMMA) {
+			break
+		}
+		p.advance() // consume comma
+		if p.check(TOKEN_RBRACE) {
+			break // trailing comma
+		}
+	}
+	p.expect(TOKEN_RBRACE)
+
+	// Create dict-literal: (dict-literal key1 pattern1 key2 pattern2 ...)
+	dictSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+	allElements := append([]ast.ASTNode{dictSym}, elements...)
+	return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// parseParenthesizedPattern parses a parenthesized pattern (pattern) or tuple pattern (p1, p2)
+func (p *PythonParser) parseParenthesizedPattern() ast.ASTNode {
+	tok := p.expect(TOKEN_LPAREN)
+
+	// Empty tuple ()
+	if p.check(TOKEN_RPAREN) {
+		p.advance()
+		tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+		return ast.NewSExpr([]ast.ASTNode{tupleSym}, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	// Parse first pattern
+	first := p.parsePattern()
+	if first == nil {
+		return nil
+	}
+
+	// Check for comma (tuple pattern) or just closing paren (grouped pattern)
+	if p.check(TOKEN_RPAREN) {
+		p.advance()
+		// Just a grouped pattern - return the inner pattern
+		return first
+	}
+
+	// Must be a tuple pattern
+	patterns := []ast.ASTNode{first}
+	for p.check(TOKEN_COMMA) {
+		p.advance() // consume comma
+		if p.check(TOKEN_RPAREN) {
+			break // trailing comma
+		}
+		next := p.parsePattern()
+		if next == nil {
+			return nil
+		}
+		patterns = append(patterns, next)
+	}
+	p.expect(TOKEN_RPAREN)
+
+	// Create tuple-literal: (tuple-literal p1 p2 ...)
+	tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+	allElements := append([]ast.ASTNode{tupleSym}, patterns...)
+	return ast.NewSExpr(allElements, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // ============================================================================

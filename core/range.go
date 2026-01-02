@@ -159,6 +159,50 @@ func (it *rangeIterator) Reset() {
 	it.current = it.rang.Start
 }
 
+// Type implements Value.Type for range iterator
+func (it *rangeIterator) Type() Type {
+	return "range_iterator"
+}
+
+// String implements Value.String for range iterator
+func (it *rangeIterator) String() string {
+	return "<range_iterator>"
+}
+
+// GetAttr implements Object interface for range iterator protocol
+func (it *rangeIterator) GetAttr(name string) (Value, bool) {
+	if name == "__iter__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return it, nil
+		}), true
+	}
+	if name == "__next__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			val, ok := it.Next()
+			if !ok {
+				return nil, fmt.Errorf("StopIteration")
+			}
+			return val, nil
+		}), true
+	}
+	if name == "__length_hint__" {
+		// PEP 424: Return estimated remaining length
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			var remaining int
+			if it.rang.Step > 0 {
+				remaining = int((it.rang.Stop - it.current + it.rang.Step - 1) / it.rang.Step)
+			} else {
+				remaining = int((it.current - it.rang.Stop - it.rang.Step - 1) / (-it.rang.Step))
+			}
+			if remaining < 0 {
+				remaining = 0
+			}
+			return NumberValue(remaining), nil
+		}), true
+	}
+	return nil, false
+}
+
 // createRegistry sets up all methods and properties for range
 func (r *RangeValue) createRegistry() *MethodRegistry {
 	registry := NewMethodRegistry()

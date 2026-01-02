@@ -1263,6 +1263,114 @@ type CaseClause struct {
 	Body    []ASTNode // Statements to execute if matched
 }
 
+// OrPattern represents an OR pattern in match/case (pattern1 | pattern2 | ...)
+type OrPattern struct {
+	BaseNode
+	Patterns []ASTNode // The alternative patterns
+}
+
+// NewOrPattern creates a new OR pattern
+func NewOrPattern(patterns []ASTNode, loc *core.SourceLocation, syntax SyntaxKind) *OrPattern {
+	return &OrPattern{
+		BaseNode: BaseNode{Loc: loc, Syntax: syntax},
+		Patterns: patterns,
+	}
+}
+
+// Type implements core.Value.Type
+func (o *OrPattern) Type() core.Type {
+	return core.ListType
+}
+
+// String implements core.Value.String
+func (o *OrPattern) String() string {
+	return "(or ...)"
+}
+
+// ToIR converts OrPattern to IR: (or p1 p2 ...)
+func (o *OrPattern) ToIR() core.Value {
+	result := make([]core.Value, 0, len(o.Patterns)+1)
+	result = append(result, core.SymbolValue("or"))
+	for _, pattern := range o.Patterns {
+		result = append(result, pattern.ToIR())
+	}
+	return core.NewList(result...)
+}
+
+// AsPattern represents an AS pattern in match/case (pattern as name)
+type AsPattern struct {
+	BaseNode
+	Pattern ASTNode // The pattern to match
+	Name    string  // The name to bind the value to
+}
+
+// NewAsPattern creates a new AS pattern
+func NewAsPattern(pattern ASTNode, name string, loc *core.SourceLocation, syntax SyntaxKind) *AsPattern {
+	return &AsPattern{
+		BaseNode: BaseNode{Loc: loc, Syntax: syntax},
+		Pattern:  pattern,
+		Name:     name,
+	}
+}
+
+// Type implements core.Value.Type
+func (a *AsPattern) Type() core.Type {
+	return core.ListType
+}
+
+// String implements core.Value.String
+func (a *AsPattern) String() string {
+	return "(as ...)"
+}
+
+// ToIR converts AsPattern to IR: (as pattern name)
+func (a *AsPattern) ToIR() core.Value {
+	return core.NewList(
+		core.SymbolValue("as"),
+		a.Pattern.ToIR(),
+		core.SymbolValue(a.Name),
+	)
+}
+
+// StarPattern represents a star pattern in match/case (*name or *)
+type StarPattern struct {
+	BaseNode
+	Name string // The name to bind the rest to (empty for wildcard *)
+}
+
+// NewStarPattern creates a new star pattern
+func NewStarPattern(name string, loc *core.SourceLocation, syntax SyntaxKind) *StarPattern {
+	return &StarPattern{
+		BaseNode: BaseNode{Loc: loc, Syntax: syntax},
+		Name:     name,
+	}
+}
+
+// Type implements core.Value.Type
+func (s *StarPattern) Type() core.Type {
+	return core.ListType
+}
+
+// String implements core.Value.String
+func (s *StarPattern) String() string {
+	if s.Name == "" || s.Name == "_" {
+		return "(*)"
+	}
+	return "(*" + s.Name + ")"
+}
+
+// ToIR converts StarPattern to IR: (star name) or (star _)
+func (s *StarPattern) ToIR() core.Value {
+	name := s.Name
+	if name == "" {
+		name = "_"
+	}
+	return core.NewList(
+		core.SymbolValue("star"),
+		core.SymbolValue(name),
+	)
+}
+
 // MatchForm represents a match statement
 type MatchForm struct {
 	BaseNode
