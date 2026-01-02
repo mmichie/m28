@@ -191,8 +191,9 @@ func (c *ClassMethodValue) GetAttr(name string) (Value, bool) {
 
 // BoundClassMethod represents a class method bound to a specific class
 type BoundClassMethod struct {
-	Class    Value
-	Function Value
+	Class         Value  // The class passed as first argument (e.g., the subclass)
+	Function      Value  // The underlying function
+	DefiningClass *Class // The class where the method is defined (for super() support)
 }
 
 // Type implements Value.Type
@@ -213,9 +214,17 @@ func (b *BoundClassMethod) Call(args []Value, ctx *Context) (Value, error) {
 	classMethodArgs[0] = b.Class
 	copy(classMethodArgs[1:], args)
 
+	// Create a child context with __class__ set if we know the defining class
+	// This allows super() without arguments to work correctly
+	callCtx := ctx
+	if b.DefiningClass != nil {
+		callCtx = NewContext(ctx)
+		callCtx.Define("__class__", b.DefiningClass)
+	}
+
 	// Call the underlying function with class as first arg
 	if callable, ok := b.Function.(Callable); ok {
-		return callable.Call(classMethodArgs, ctx)
+		return callable.Call(classMethodArgs, callCtx)
 	}
 	return nil, fmt.Errorf("classmethod function is not callable")
 }
@@ -228,11 +237,19 @@ func (b *BoundClassMethod) CallWithKeywords(args []Value, kwargs map[string]Valu
 	classMethodArgs[0] = b.Class
 	copy(classMethodArgs[1:], args)
 
+	// Create a child context with __class__ set if we know the defining class
+	// This allows super() without arguments to work correctly
+	callCtx := ctx
+	if b.DefiningClass != nil {
+		callCtx = NewContext(ctx)
+		callCtx.Define("__class__", b.DefiningClass)
+	}
+
 	// Call the underlying function with class as first arg and keywords
 	if kwargsFunc, ok := b.Function.(interface {
 		CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
 	}); ok {
-		return kwargsFunc.CallWithKeywords(classMethodArgs, kwargs, ctx)
+		return kwargsFunc.CallWithKeywords(classMethodArgs, kwargs, callCtx)
 	}
 
 	// Fallback: if underlying function doesn't support keywords, only allow empty kwargs
@@ -242,7 +259,7 @@ func (b *BoundClassMethod) CallWithKeywords(args []Value, kwargs map[string]Valu
 
 	// Call with just positional args
 	if callable, ok := b.Function.(Callable); ok {
-		return callable.Call(classMethodArgs, ctx)
+		return callable.Call(classMethodArgs, callCtx)
 	}
 	return nil, fmt.Errorf("classmethod function is not callable")
 }

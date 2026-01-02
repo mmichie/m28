@@ -1132,13 +1132,12 @@ func createTypeMetaclass() *TypeType {
 			return nil, &core.TypeError{Message: fmt.Sprintf("__call__() requires a class, got %T", cls)}
 		}
 
-		// Call the class to create an instance
-		// This delegates to the class's normal instantiation logic
-		if callable, ok := cls.(core.Callable); ok {
-			return callable.Call(ctorArgs, ctx)
-		}
+		// type.__call__ implements the default instance creation logic:
+		// 1. Call cls.__new__(cls, *args) to create the instance
+		// 2. Call instance.__init__(*args) if __new__ returned an instance of cls
+		// This is the base implementation that metaclass __call__ methods should call via super()
+		// We do NOT call cls.Call() here to avoid infinite recursion when metaclass has __call__
 
-		// Fallback: manual instance creation using __new__ and __init__
 		// 1. Call __new__ to create the instance
 		newMethod, hasNew := classObj.GetMethod("__new__")
 		var instance core.Value
@@ -1286,12 +1285,21 @@ func createTypeMetaclass() *TypeType {
 
 			// Check if it's a descriptor (has __get__ method)
 			// Descriptors should be stored as attributes, not methods
+			// BUT: Functions (UserFunction) have __get__ for method binding,
+			// they should still be treated as methods, not descriptors
 			isDescriptor := false
 			if valueWithGetAttr, ok := value.(interface {
 				GetAttr(string) (core.Value, bool)
 			}); ok {
-				if _, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
-					isDescriptor = true
+				// Only check for descriptor if it's NOT a callable
+				// Functions are callables that happen to have __get__ for method binding
+				_, isCallable := value.(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				})
+				if !isCallable {
+					if _, hasGet := valueWithGetAttr.GetAttr("__get__"); hasGet {
+						isDescriptor = true
+					}
 				}
 			}
 

@@ -407,9 +407,9 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Python rule: use the metaclass of the most derived base class
 	if metaclass == nil && len(parentClasses) > 0 {
 		for _, parent := range parentClasses {
-			// Check if parent has a custom metaclass
-			if parentMetaclass, ok := parent.GetClassAttr("__class__"); ok {
-				if pmc, ok := parentMetaclass.(*core.Class); ok {
+			// Check if parent has a custom metaclass stored in the Metaclass field
+			if parent.Metaclass != nil {
+				if pmc, ok := parent.Metaclass.(*core.Class); ok {
 					// Use parent's metaclass for this class
 					metaclass = pmc
 					if debugClass {
@@ -662,10 +662,11 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 							}
 
 							// Special methods that are implicitly classmethods
-							// __init_subclass__ and __class_getitem__ automatically receive the class as first arg
+							// __class_getitem__ automatically receives the class as first arg
+							// __init_subclass__ is NOT pre-bound - it receives the SUBCLASS when called
 							methodName := string(name)
 							var finalMethod core.Value = method
-							if methodName == "__init_subclass__" || methodName == "__class_getitem__" {
+							if methodName == "__class_getitem__" {
 								// Wrap as a classmethod that receives the class as first argument
 								// Type assert to get the callable interface
 								if callable, ok := method.(interface {
@@ -676,6 +677,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 									return nil, &core.TypeError{Message: fmt.Sprintf("method %s is not callable", methodName)}
 								}
 							}
+							// Note: __init_subclass__ is stored as-is (not pre-bound)
+							// It will be called with the subclass as cls when a subclass is created
 
 							class.SetMethod(methodName, finalMethod)
 							// Also add to class body context so later statements can reference it
@@ -930,20 +933,34 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if metaclass != nil {
 		if debugClass {
 			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Calling metaclass.__new__ for class '%s'\n", className)
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.Name=%s, metaclass.Methods keys:\n", metaclass.Name)
+			for k := range metaclass.Methods {
+				fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   - %s\n", k)
+			}
 		}
 
 		// Check if metaclass has __new__ method
 		if newMethod, hasNew := metaclass.GetMethod("__new__"); hasNew {
+			if debugClass {
+				fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Found __new__ method, type=%T\n", newMethod)
+			}
 			if callable, ok := newMethod.(interface {
 				Call([]core.Value, *core.Context) (core.Value, error)
 			}); ok {
 				// Build namespace dict from class methods and attributes
 				namespace := core.NewDict()
 				for name, method := range class.Methods {
-					namespace.Set(name, method)
+					// Use SetValue to properly convert string keys
+					namespace.SetValue(core.StringValue(name), method)
 				}
 				for name, attr := range class.Attributes {
-					namespace.Set(name, attr)
+					namespace.SetValue(core.StringValue(name), attr)
+				}
+				if debugClass {
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Namespace for metaclass.__new__ call:\n")
+					for _, key := range namespace.Keys() {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   - %s\n", key)
+					}
 				}
 
 				// Build bases tuple
@@ -992,7 +1009,54 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// Store the metaclass in the class object so type() can return it
 		class.Metaclass = metaclass
 
-		// After __new__, copy metaclass methods to the class as class methods
+		// Call metaclass.__init__ after __new__ completes
+		// Python calls __init__(cls, name, bases, namespace) to initialize the class
+		if initMethod, hasInit := metaclass.GetMethod("__init__"); hasInit {
+			if callable, ok := initMethod.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				// Build namespace dict from class methods and attributes
+				namespace := core.NewDict()
+				for name, method := range class.Methods {
+					namespace.SetValue(core.StringValue(name), method)
+				}
+				for name, attr := range class.Attributes {
+					namespace.SetValue(core.StringValue(name), attr)
+				}
+
+				// Build bases tuple
+				bases := make(core.TupleValue, len(parentClasses))
+				for i, parent := range parentClasses {
+					bases[i] = parent
+				}
+
+				// Call metaclass.__init__(cls, name, bases, namespace)
+				initArgs := []core.Value{
+					class,                       // cls (the newly created class)
+					core.StringValue(className), // name
+					bases,                       // bases
+					namespace,                   // namespace
+				}
+
+				// Create a new context with __class__ set for super() support
+				callCtx := core.NewContext(ctx)
+				callCtx.Define("__class__", metaclass)
+
+				if debugClass {
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Calling metaclass.__init__ for class '%s'\n", className)
+				}
+
+				_, err := callable.Call(initArgs, callCtx)
+				if err != nil {
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Warning: metaclass.__init__ failed: %v\n", err)
+					}
+					// Continue without failing - __init__ errors are warnings in class creation
+				}
+			}
+		}
+
+		// After __new__ and __init__, copy metaclass methods to the class as class methods
 		// First check metaclass.Methods
 		for methodName, method := range metaclass.Methods {
 			// Don't override methods created by __new__
@@ -1000,8 +1064,11 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				continue
 			}
 
-			// Skip __new__ and __init__
-			if methodName != "__new__" && methodName != "__init__" {
+			// Skip __new__, __init__, and __call__
+			// __new__ and __init__ are handled specially during class creation
+			// __call__ should NOT be bound to the class - it receives the class to instantiate
+			// as its first argument when called (e.g., Meta.__call__(Child) should pass Child, not Meta)
+			if methodName != "__new__" && methodName != "__init__" && methodName != "__call__" {
 				// Wrap the method so it receives the class as first argument
 				if callable, ok := method.(interface {
 					Call([]core.Value, *core.Context) (core.Value, error)
@@ -1087,6 +1154,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Create a special calling environment that treats this as a classmethod
 				// The function expects one parameter: cls (the new subclass)
 				// We call it with just the new class
+				// Use CallWithKwargs to handle **kwargs properly
 				if debugClass {
 					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] UserFunction details:\n")
 					if userFunc.signature != nil {
@@ -1101,8 +1169,14 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 				}
 
+				// Create a new context with __class__ set to the parent class
+				// This allows super() without arguments to work correctly
+				initSubclassCtx := core.NewContext(ctx)
+				initSubclassCtx.Define("__class__", parent)
+
 				// Call with the new class as the only argument
-				_, err := userFunc.Call([]core.Value{class}, ctx)
+				// Use CallWithKwargs to properly handle **kwargs in the function signature
+				_, err := userFunc.CallWithKwargs([]core.Value{class}, nil, initSubclassCtx)
 				if err != nil {
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Error calling __init_subclass__: %v\n", err)
@@ -1249,6 +1323,14 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 
 				// Class method or metaclass method - no instance
+				// Check for cls parameter (used in __init_subclass__, classmethods, etc.)
+				if clsVal, err := ctx.Lookup("cls"); err == nil {
+					if targetClass, ok := clsVal.(*core.Class); ok {
+						// Use the cls parameter as the targetClass for proper binding
+						// This allows super().__init_subclass__() to pass cls correctly
+						return core.NewSuperForClass(class, targetClass), nil
+					}
+				}
 				// For metaclasses, use the parent class to avoid infinite loops
 				// This is a workaround for complex metaclass hierarchies
 				if len(class.Parents) > 0 {

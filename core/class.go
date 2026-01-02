@@ -663,24 +663,29 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 	// Python metaclass protocol:
 	// If the class has a metaclass with __call__, invoke that first
 	// This allows metaclasses to control instance creation (e.g., for enum singletons)
-	if metaclassVal, ok := c.GetClassAttr("__class__"); ok {
-		if metaclass, ok := metaclassVal.(*Class); ok {
+	if c.Metaclass != nil {
+		if metaclass, ok := c.Metaclass.(*Class); ok {
 			if callMethod, ok := metaclass.GetMethod("__call__"); ok {
 				// Prepend the class as first argument to __call__
 				callArgs := append([]Value{c}, args...)
+
+				// Create a child context with __class__ set to the metaclass
+				// This allows super() without arguments to work correctly in __call__
+				callCtx := NewContext(ctx)
+				callCtx.Define("__class__", metaclass)
 
 				// Try CallWithKeywords first if method supports it
 				if kwargsCallable, ok := callMethod.(interface {
 					CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
 				}); ok {
-					return kwargsCallable.CallWithKeywords(callArgs, kwargs, ctx)
+					return kwargsCallable.CallWithKeywords(callArgs, kwargs, callCtx)
 				} else if callable, ok := callMethod.(interface {
 					Call([]Value, *Context) (Value, error)
 				}); ok {
 					if len(kwargs) > 0 {
 						return nil, &TypeError{Message: "metaclass __call__ does not support keyword arguments"}
 					}
-					return callable.Call(callArgs, ctx)
+					return callable.Call(callArgs, callCtx)
 				}
 			}
 		}
@@ -1645,7 +1650,7 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 		return s.Class, true
 	}
 
-	// Helper function to bind method to instance
+	// Helper function to bind method to instance or class
 	bindMethod := func(method Value, defClass *Class) Value {
 		if callable, ok := method.(interface {
 			Call([]Value, *Context) (Value, error)
@@ -1662,6 +1667,18 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 						DefiningClass: defClass,
 					},
 					Class: defClass,
+				}
+			}
+			// For class methods (like __init_subclass__), bind to TargetClass
+			if s.TargetClass != nil {
+				// Create a bound classmethod that prepends TargetClass as first argument
+				// and sets DefiningClass so super() works correctly inside the method
+				if funcVal, ok := method.(Value); ok {
+					return &BoundClassMethod{
+						Class:         s.TargetClass,
+						Function:      funcVal,
+						DefiningClass: defClass,
+					}
 				}
 			}
 		}
