@@ -246,10 +246,16 @@ d = {
     "string": 1,
     42: 2,
     (1, 2): 3,
-    True: 4,  # Note: True == 1 in Python
+    True: 4,  # Note: True == 1 in Python, but no 1 key here
 }
-# Note: True and 1 are the same key
-assert len(d) == 3  # "string", 42, (1,2) - True overwrites 42
+# True == 1 but there's no 1 key, so True is a separate key
+assert len(d) == 4  # "string", 42, (1,2), True
+
+# Test that True and 1 ARE the same key
+d2 = {1: "one", True: "true"}
+assert len(d2) == 1  # True overwrites 1
+assert d2[1] == "true"
+assert d2[True] == "true"
 
 # Copy
 d1 = {"a": 1, "b": 2}

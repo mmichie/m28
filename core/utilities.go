@@ -435,7 +435,12 @@ func ValueToKey(v Value) string {
 	case StringValue:
 		return fmt.Sprintf("s:%s", string(val))
 	case BoolValue:
-		return fmt.Sprintf("b:%t", bool(val))
+		// In Python, True == 1 and False == 0, and they share the same hash
+		// So True and 1 should be the same dict key
+		if bool(val) {
+			return "n:1"
+		}
+		return "n:0"
 	case NilValue:
 		return "nil"
 	case BytesValue:
