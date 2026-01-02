@@ -204,13 +204,20 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// If the object is a Super, wrap the method to inject __class__ when called
+		// BUT skip wrapping if Super.GetAttr already returned a properly wrapped method
 		if superObj, ok := obj.(*core.Super); ok {
-			if _, ok := value.(interface {
-				Call([]core.Value, *core.Context) (core.Value, error)
-			}); ok {
-				value = &core.BoundSuperMethod{
-					Method: value,
-					Class:  superObj.Class,
+			// Don't double-wrap - Super.GetAttr.bindMethod already returns
+			// BoundSuperMethod for instance methods and BoundClassMethod for class methods
+			if _, isBoundSuperMethod := value.(*core.BoundSuperMethod); !isBoundSuperMethod {
+				if _, isBoundClassMethod := value.(*core.BoundClassMethod); !isBoundClassMethod {
+					if _, ok := value.(interface {
+						Call([]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						value = &core.BoundSuperMethod{
+							Method: value,
+							Class:  superObj.Class,
+						}
+					}
 				}
 			}
 		}

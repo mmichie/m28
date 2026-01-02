@@ -420,6 +420,17 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 
 	// First check methods
 	if method, ok := c.GetMethod(name); ok {
+		// __init_subclass__ is implicitly a classmethod in Python
+		// When accessed from a class, it should auto-bind cls
+		// Check this BEFORE the descriptor protocol to override the default behavior
+		if name == "__init_subclass__" {
+			if funcVal, ok := method.(Value); ok {
+				return &BoundClassMethod{
+					Class:    c,
+					Function: funcVal,
+				}, true
+			}
+		}
 		// Invoke descriptor protocol for classmethods and staticmethods
 		if descriptor, hasGet := method.(interface{ GetAttr(string) (Value, bool) }); hasGet {
 			if getMethod, found := descriptor.GetAttr("__get__"); found {
@@ -437,6 +448,16 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 
 	// Then check attributes
 	if attr, ok := c.GetClassAttr(name); ok {
+		// __init_subclass__ is implicitly a classmethod in Python
+		// Check this BEFORE the descriptor protocol
+		if name == "__init_subclass__" {
+			if funcVal, ok := attr.(Value); ok {
+				return &BoundClassMethod{
+					Class:    c,
+					Function: funcVal,
+				}, true
+			}
+		}
 		// Invoke descriptor protocol if the attribute has __get__
 		if descriptor, hasGet := attr.(interface{ GetAttr(string) (Value, bool) }); hasGet {
 			if getMethod, found := descriptor.GetAttr("__get__"); found {
@@ -1651,7 +1672,12 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 	}
 
 	// Helper function to bind method to instance or class
-	bindMethod := func(method Value, defClass *Class) Value {
+	// methodName is used to identify special methods like __new__ that shouldn't be auto-bound
+	bindMethod := func(method Value, defClass *Class, methodName string) Value {
+		if debugSuperGetAttr {
+			fmt.Fprintf(os.Stderr, "[DEBUG bindMethod] method=%T, defClass=%s, s.Instance=%v, s.TargetClass=%v, name=%s\n",
+				method, defClass.Name, s.Instance != nil, s.TargetClass != nil, methodName)
+		}
 		if callable, ok := method.(interface {
 			Call([]Value, *Context) (Value, error)
 		}); ok {
@@ -1670,10 +1696,20 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 				}
 			}
 			// For class methods (like __init_subclass__), bind to TargetClass
+			// But NOT for __new__ which is a static method that takes cls explicitly
 			if s.TargetClass != nil {
-				// Create a bound classmethod that prepends TargetClass as first argument
-				// and sets DefiningClass so super() works correctly inside the method
+				// __new__ is a static method - it takes cls as an explicit first argument
+				// Don't auto-bind cls for __new__
+				if methodName == "__new__" {
+					if debugSuperGetAttr {
+						fmt.Fprintf(os.Stderr, "[DEBUG bindMethod] Returning unwrapped __new__ for TargetClass=%s\n", s.TargetClass.Name)
+					}
+					return method
+				}
 				if funcVal, ok := method.(Value); ok {
+					if debugSuperGetAttr {
+						fmt.Fprintf(os.Stderr, "[DEBUG bindMethod] Returning BoundClassMethod for TargetClass=%s\n", s.TargetClass.Name)
+					}
 					return &BoundClassMethod{
 						Class:         s.TargetClass,
 						Function:      funcVal,
@@ -1718,14 +1754,14 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 								if debugSuperGetAttr {
 									fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in %s.Methods\n", name, cls.Name)
 								}
-								return bindMethod(method, cls), true
+								return bindMethod(method, cls, name), true
 							}
 							// Then check Attributes for Python-defined methods
 							if attr, ok := cls.Attributes[name]; ok {
 								if debugSuperGetAttr {
 									fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in %s.Attributes\n", name, cls.Name)
 								}
-								return bindMethod(attr, cls), true
+								return bindMethod(attr, cls, name), true
 							}
 							if debugSuperGetAttr {
 								fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] %s NOT found in %s\n", name, cls.Name)
@@ -1758,21 +1794,21 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 				if debugSuperGetAttr {
 					fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in %s.Methods\n", name, parent.Name)
 				}
-				return bindMethod(method, parent), true
+				return bindMethod(method, parent, name), true
 			}
 			// Check Attributes map directly
 			if attr, ok := parent.Attributes[name]; ok {
 				if debugSuperGetAttr {
 					fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in %s.Attributes\n", name, parent.Name)
 				}
-				return bindMethod(attr, parent), true
+				return bindMethod(attr, parent, name), true
 			}
 			// Recursively check parent's parents
 			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
 				if debugSuperGetAttr {
 					fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via %s.GetMethodWithClass (defined in %s)\n", name, parent.Name, defClass.Name)
 				}
-				return bindMethod(method, defClass), true
+				return bindMethod(method, defClass, name), true
 			}
 		}
 	} else {
@@ -1782,14 +1818,14 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 			if debugSuperGetAttr {
 				fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in root class %s.Methods\n", name, s.Class.Name)
 			}
-			return bindMethod(method, s.Class), true
+			return bindMethod(method, s.Class, name), true
 		}
 		// Check Attributes too
 		if attr, ok := s.Class.Attributes[name]; ok {
 			if debugSuperGetAttr {
 				fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in root class %s.Attributes\n", name, s.Class.Name)
 			}
-			return bindMethod(attr, s.Class), true
+			return bindMethod(attr, s.Class, name), true
 		}
 	}
 
