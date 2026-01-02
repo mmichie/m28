@@ -35,6 +35,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Parse parent classes and keywords
 	var parentClasses []*core.Class
 	var metaclass *core.Class
+	var classKwargs = make(map[string]core.Value) // Non-metaclass kwargs for __init_subclass__
 	bodyStart := 1
 
 	if args.Len() > 1 {
@@ -304,6 +305,13 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						} else if wrapper, ok := metaclassVal.(interface{ GetClass() *core.Class }); ok {
 							metaclass = wrapper.GetClass()
 						}
+					} else {
+						// Non-metaclass keyword - collect for __init_subclass__
+						kwValue, err := Eval(kwPairItems[1], ctx)
+						if err != nil {
+							return nil, &core.TypeError{Message: fmt.Sprintf("error evaluating class keyword %s: %v", kwName, err)}
+						}
+						classKwargs[string(kwName)] = kwValue
 					}
 				}
 			}
@@ -1176,7 +1184,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				// Call with the new class as the only argument
 				// Use CallWithKwargs to properly handle **kwargs in the function signature
-				_, err := userFunc.CallWithKwargs([]core.Value{class}, nil, initSubclassCtx)
+				// Pass classKwargs (non-metaclass keywords from class definition)
+				_, err := userFunc.CallWithKwargs([]core.Value{class}, classKwargs, initSubclassCtx)
 				if err != nil {
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Error calling __init_subclass__: %v\n", err)
