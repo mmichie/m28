@@ -163,7 +163,7 @@ func CallStr(obj core.Value, ctx *core.Context) (string, bool, error) {
 	// Ensure result is a string
 	str, ok := AsString(result)
 	if !ok {
-		return "", true, fmt.Errorf("__str__ returned non-string value: %s", result.Type())
+		return "", true, &core.TypeError{Message: fmt.Sprintf("__str__ returned non-string (type %s)", result.Type())}
 	}
 
 	return str, true, nil
@@ -179,7 +179,7 @@ func CallRepr(obj core.Value, ctx *core.Context) (string, bool, error) {
 	// Ensure result is a string
 	str, ok := AsString(result)
 	if !ok {
-		return "", true, fmt.Errorf("__repr__ returned non-string value: %s", result.Type())
+		return "", true, &core.TypeError{Message: fmt.Sprintf("__repr__ returned non-string (type %s)", result.Type())}
 	}
 
 	return str, true, nil
@@ -214,13 +214,13 @@ func CallIndex(obj core.Value, ctx *core.Context) (int, bool, error) {
 	// Ensure result is an integer
 	num, ok := result.(core.NumberValue)
 	if !ok {
-		return 0, true, fmt.Errorf("__index__ returned non-int type %s", result.Type())
+		return 0, true, &core.TypeError{Message: fmt.Sprintf("__index__ returned non-int (type %s)", result.Type())}
 	}
 
 	// Check if it's an integer value (not a float)
 	intVal := int(num)
 	if float64(intVal) != float64(num) {
-		return 0, true, fmt.Errorf("__index__ returned non-integer value %v", num)
+		return 0, true, &core.TypeError{Message: fmt.Sprintf("__index__ returned non-integer value %v", num)}
 	}
 
 	return intVal, true, nil
@@ -374,13 +374,13 @@ func CallInt(obj core.Value, ctx *core.Context) (int, bool, error) {
 	// Ensure result is a number
 	num, ok := AsNumber(result)
 	if !ok {
-		return 0, true, fmt.Errorf("__int__ returned non-int type %s", result.Type())
+		return 0, true, &core.TypeError{Message: fmt.Sprintf("__int__ returned non-int (type %s)", result.Type())}
 	}
 
 	// Check if it's an integer value (not a float)
 	intVal := int(num)
 	if float64(intVal) != num {
-		return 0, true, fmt.Errorf("__int__ returned non-integer value %v", num)
+		return 0, true, &core.TypeError{Message: fmt.Sprintf("__int__ returned non-integer value %v", num)}
 	}
 
 	return intVal, true, nil
@@ -396,7 +396,7 @@ func CallFloat(obj core.Value, ctx *core.Context) (float64, bool, error) {
 	// Ensure result is a number
 	num, ok := AsNumber(result)
 	if !ok {
-		return 0, true, fmt.Errorf("__float__ returned non-numeric type %s", result.Type())
+		return 0, true, &core.TypeError{Message: fmt.Sprintf("__float__ returned non-float (type %s)", result.Type())}
 	}
 
 	return num, true, nil
@@ -412,7 +412,7 @@ func CallFormat(obj core.Value, formatSpec string, ctx *core.Context) (string, b
 	// Ensure result is a string
 	str, ok := AsString(result)
 	if !ok {
-		return "", true, fmt.Errorf("__format__ returned non-string value: %s", result.Type())
+		return "", true, &core.TypeError{Message: fmt.Sprintf("__format__ returned non-string (type %s)", result.Type())}
 	}
 
 	return str, true, nil
@@ -442,7 +442,7 @@ func CallHash(obj core.Value, ctx *core.Context) (int, bool, error) {
 	// Ensure result is a number
 	num, ok := AsNumber(result)
 	if !ok {
-		return 0, true, fmt.Errorf("__hash__ returned non-numeric value: %s", result.Type())
+		return 0, true, &core.TypeError{Message: fmt.Sprintf("__hash__ returned non-int (type %s)", result.Type())}
 	}
 
 	// Convert to int
