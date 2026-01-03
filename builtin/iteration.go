@@ -342,10 +342,31 @@ func ReversedBuilder() builders.BuiltinFunc {
 			return core.NewList(result...), nil
 		}
 
-		// If object has __len__ and __getitem__, we could implement reverse iteration
-		// but for now, require __reversed__ or built-in sequence types
+		// If object has __len__ and __getitem__, use them for reverse iteration
 		if hasLen && hasGetitem {
-			return nil, errors.NewRuntimeError("reversed", "reverse iteration via __getitem__ not yet implemented")
+			// Get the length
+			length, found, err := types.CallLen(obj, ctx)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				return nil, errors.NewTypeError("reversed", "object has no len()", string(obj.Type()))
+			}
+
+			// Iterate backwards using __getitem__
+			result := make([]core.Value, length)
+			for i := 0; i < length; i++ {
+				idx := length - 1 - i
+				val, found, err := types.CallGetItem(obj, core.NumberValue(idx), ctx)
+				if err != nil {
+					return nil, err
+				}
+				if !found {
+					return nil, errors.NewTypeError("reversed", "object does not support indexing", string(obj.Type()))
+				}
+				result[i] = val
+			}
+			return core.NewList(result...), nil
 		}
 
 		return nil, errors.NewTypeError("reversed", "argument must be a sequence", string(obj.Type()))
