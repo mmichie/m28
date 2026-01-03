@@ -208,15 +208,14 @@ func Init_FunctoolsModule() *core.DictValue {
 	}))
 
 	// wraps - Decorator that updates wrapper function to look like wrapped
-	// Simplified version that returns a decorator function
+	// Copies metadata from wrapped to wrapper function
 	functoolsModule.Set("wraps", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("wraps", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err
 		}
 
-		// In a full implementation, we would use this to copy metadata
-		_ = v.Get(0) // wrapped function
+		wrapped := v.Get(0)
 
 		// Return a decorator function
 		decorator := core.NewBuiltinFunction(func(decoratorArgs []core.Value, decoratorCtx *core.Context) (core.Value, error) {
@@ -226,9 +225,27 @@ func Init_FunctoolsModule() *core.DictValue {
 
 			wrapper := decoratorArgs[0]
 
-			// In a full implementation, we would copy __name__, __doc__, etc. from wrapped to wrapper
-			// For now, just return the wrapper as-is
-			// TODO(M28-1d21): Copy metadata attributes if wrapper is a dict or has __dict__
+			// Copy metadata attributes from wrapped to wrapper
+			// WRAPPER_ASSIGNMENTS = ('__module__', '__name__', '__qualname__', '__annotations__', '__doc__')
+			assignments := []string{"__module__", "__name__", "__qualname__", "__annotations__", "__doc__"}
+
+			// Get wrapped's attributes
+			if wrappedObj, ok := wrapped.(core.Object); ok {
+				if wrapperObj, ok := wrapper.(core.Object); ok {
+					for _, attr := range assignments {
+						if val, exists := wrappedObj.GetAttr(attr); exists {
+							if err := wrapperObj.SetAttr(attr, val); err != nil {
+								// Ignore errors setting attributes (some may be read-only)
+							}
+						}
+					}
+				}
+			}
+
+			// Also copy __wrapped__ to point to the original function
+			if wrapperObj, ok := wrapper.(core.Object); ok {
+				wrapperObj.SetAttr("__wrapped__", wrapped)
+			}
 
 			return wrapper, nil
 		})
