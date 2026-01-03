@@ -34,6 +34,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Parse parent classes and keywords
 	var parentClasses []*core.Class
+	var explicitBaseValues []core.Value // Raw base values for metaclass.__new__ (may include non-classes)
 	var metaclass *core.Class
 	var classKwargs = make(map[string]core.Value) // Non-metaclass kwargs for __init_subclass__
 	bodyStart := 1
@@ -52,40 +53,27 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Empty list means no parent but still a parent spec
 				isParentSpec = true
 			} else {
-				// Check if all elements look like class references
-				// (symbols or dot expressions)
-				allClassRefs := true
+				// Check if this looks like a parent specification
+				// Parent specs can contain ANY values (metaclass will handle them)
+				// The only exclusion is special forms like (def ...)
+				isParentSpec = true
 				for _, elem := range parentList.Items() {
 					elem = unwrapLocated(elem)
-					switch e := elem.(type) {
-					case core.SymbolValue:
-						// Simple class name
-						continue
-					case *core.ListValue:
-						// Could be a dot expression like (. unittest TestCase)
-						// But NOT a special form like (def ...)
-						if e.Len() > 0 {
-							firstListElem := unwrapLocated(e.Items()[0])
-							if sym, ok := firstListElem.(core.SymbolValue); ok {
-								symStr := string(sym)
-								// Check if it's a special form - not a class reference
-								if symStr == "def" || symStr == "=" || symStr == "do" ||
-									symStr == "if" || symStr == "for" || symStr == "while" {
-									allClassRefs = false
-									break
-								}
+					if e, ok := elem.(*core.ListValue); ok && e.Len() > 0 {
+						// Check if it's a special form - that makes this body, not parents
+						firstListElem := unwrapLocated(e.Items()[0])
+						if sym, ok := firstListElem.(core.SymbolValue); ok {
+							symStr := string(sym)
+							// Check if it's a special form - not a parent spec
+							if symStr == "def" || symStr == "=" || symStr == "do" ||
+								symStr == "if" || symStr == "for" || symStr == "while" {
+								isParentSpec = false
+								break
 							}
 						}
-						// OK, could be dot expression
-						continue
-					default:
-						// Not a valid class reference
-						allClassRefs = false
-						break
 					}
-				}
-				if allClassRefs {
-					isParentSpec = true
+					// All other values (symbols, numbers, strings, dot expressions, etc.)
+					// are valid bases - metaclass.__new__ will receive them
 				}
 			}
 
@@ -112,6 +100,10 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Parent evaluated to: %T\n", parentVal)
 					}
 
+					// Always track the raw value for metaclass.__new__
+					explicitBaseValues = append(explicitBaseValues, parentVal)
+
+					// Try to extract a Class for actual class creation
 					var parent *core.Class
 					switch p := parentVal.(type) {
 					case *core.Class:
@@ -133,24 +125,26 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						if nameVal, ok := p.GetAttr("__name__"); ok {
 							if nameStr, ok := nameVal.(core.StringValue); ok {
 								parent = core.NewClass(string(nameStr), nil)
-							} else {
-								return nil, &core.TypeError{Message: fmt.Sprintf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])}
 							}
-						} else {
-							return nil, &core.TypeError{Message: fmt.Sprintf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])}
 						}
+						// If we can't extract a class, that's OK - metaclass will handle it
 					default:
-						return nil, &core.TypeError{Message: fmt.Sprintf("parent must be a class for class '%s', got %T from expression: %v", className, parentVal, parentItems[i])}
-					}
-
-					// Check if trying to subclass bool - Python forbids this
-					if parent.Name == "bool" {
-						return nil, &core.TypeError{
-							Message: "type 'bool' is not an acceptable base type",
+						// Non-class base - this is OK if a metaclass handles it
+						// We'll check later if metaclass is specified
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Non-class base %T will be passed to metaclass\n", parentVal)
 						}
 					}
 
-					parentClasses = append(parentClasses, parent)
+					if parent != nil {
+						// Check if trying to subclass bool - Python forbids this
+						if parent.Name == "bool" {
+							return nil, &core.TypeError{
+								Message: "type 'bool' is not an acceptable base type",
+							}
+						}
+						parentClasses = append(parentClasses, parent)
+					}
 				}
 			}
 		}
@@ -357,25 +351,51 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				return nil, &core.TypeError{Message: fmt.Sprintf("error evaluating *bases: %v", err)}
 			}
 
-			// Unpack the result into parentClasses
-			if basesList, ok := basesResult.(*core.ListValue); ok {
-				for _, baseVal := range basesList.Items() {
-					if baseClass, ok := baseVal.(*core.Class); ok {
-						parentClasses = append(parentClasses, baseClass)
-					} else {
-						return nil, &core.TypeError{Message: fmt.Sprintf("*bases must contain classes, got %T", baseVal)}
-					}
+			// Helper to process a single base value
+			processBase := func(baseVal core.Value) {
+				// Always track raw value for metaclass.__new__
+				explicitBaseValues = append(explicitBaseValues, baseVal)
+				// Only add to parentClasses if it's an actual class
+				if baseClass, ok := baseVal.(*core.Class); ok {
+					parentClasses = append(parentClasses, baseClass)
+				} else if debugClass {
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Non-class *base %T will be passed to metaclass\n", baseVal)
 				}
-			} else if baseTuple, ok := basesResult.(core.TupleValue); ok {
-				for _, baseVal := range baseTuple {
-					if baseClass, ok := baseVal.(*core.Class); ok {
-						parentClasses = append(parentClasses, baseClass)
-					} else {
-						return nil, &core.TypeError{Message: fmt.Sprintf("*bases must contain classes, got %T", baseVal)}
-					}
+			}
+
+			// Unpack the result - support multiple iterable types
+			switch bases := basesResult.(type) {
+			case *core.ListValue:
+				for _, baseVal := range bases.Items() {
+					processBase(baseVal)
 				}
-			} else {
-				return nil, &core.TypeError{Message: fmt.Sprintf("*bases must be a sequence, got %T", basesResult)}
+			case core.TupleValue:
+				for _, baseVal := range bases {
+					processBase(baseVal)
+				}
+			case *core.RangeValue:
+				// Iterate over range values
+				for i := 0; i < bases.Length(); i++ {
+					baseVal, err := bases.GetItem(i)
+					if err != nil {
+						return nil, &core.TypeError{Message: fmt.Sprintf("error iterating *bases range: %v", err)}
+					}
+					processBase(baseVal)
+				}
+			default:
+				// Try generic iterator protocol
+				if iter, ok := basesResult.(interface{ Iterator() core.Iterator }); ok {
+					it := iter.Iterator()
+					for {
+						val, done := it.Next()
+						if done {
+							break
+						}
+						processBase(val)
+					}
+				} else {
+					return nil, &core.TypeError{Message: fmt.Sprintf("*bases must be a sequence, got %T", basesResult)}
+				}
 			}
 		}
 	}
@@ -383,21 +403,55 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if hasUnpackingSlots && args.Len() > 4 {
 		// Check for **kwargs at index 4
 		kwargsVal := args.Items()[4]
+		// Unwrap LocatedValue if present
+		kwargsVal = unwrapLocated(kwargsVal)
+		if debugClass {
+			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Checking kwargs at index 4: %T = %v\n", kwargsVal, kwargsVal)
+		}
 		if _, isNil := kwargsVal.(core.NilValue); !isNil {
 			// Evaluate the **kwargs expression
 			kwargsResult, err := Eval(kwargsVal, ctx)
 			if err != nil {
 				return nil, &core.TypeError{Message: fmt.Sprintf("error evaluating **kwargs: %v", err)}
 			}
+			if debugClass {
+				fmt.Fprintf(os.Stderr, "[DEBUG CLASS] kwargs evaluated to: %T\n", kwargsResult)
+			}
 
 			// Unpack the dict and look for metaclass
 			if kwargsDict, ok := kwargsResult.(*core.DictValue); ok {
-				// Look for "metaclass" key
-				if metaclassVal, ok := kwargsDict.Get("metaclass"); ok {
-					if mc, ok := metaclassVal.(*core.Class); ok {
-						metaclass = mc
-					} else if wrapper, ok := metaclassVal.(interface{ GetClass() *core.Class }); ok {
-						metaclass = wrapper.GetClass()
+				if debugClass {
+					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] kwargs dict keys:\n")
+					for _, k := range kwargsDict.Keys() {
+						v, _ := kwargsDict.Get(k)
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   %v (%T) -> %T\n", k, k, v)
+					}
+				}
+				// Process all keys from **kwargs
+				for _, keyStr := range kwargsDict.Keys() {
+					val, _ := kwargsDict.Get(keyStr)
+					// Extract actual key name from internal representation
+					// String keys have format "s:keyname"
+					actualKey := keyStr
+					if strings.HasPrefix(keyStr, "s:") {
+						actualKey = keyStr[2:]
+					}
+					if actualKey == "metaclass" {
+						// Extract metaclass
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Found metaclass in kwargs: %T\n", val)
+						}
+						if mc, ok := val.(*core.Class); ok {
+							metaclass = mc
+						} else if wrapper, ok := val.(interface{ GetClass() *core.Class }); ok {
+							metaclass = wrapper.GetClass()
+						}
+					} else {
+						// Collect non-metaclass kwargs using the actual key name
+						classKwargs[actualKey] = val
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Collected class kwarg: %s = %T\n", actualKey, val)
+						}
 					}
 				}
 			} else {
@@ -976,13 +1030,12 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 				}
 
-				// Build bases tuple
-				bases := make(core.TupleValue, len(parentClasses))
-				for i, parent := range parentClasses {
-					bases[i] = parent
-				}
+				// Build bases tuple - use explicit base values (what user specified)
+				// This may include non-class values that the metaclass will handle
+				bases := make(core.TupleValue, len(explicitBaseValues))
+				copy(bases, explicitBaseValues)
 
-				// Call metaclass.__new__(metaclass, name, bases, namespace)
+				// Call metaclass.__new__(metaclass, name, bases, namespace, **kwargs)
 				args := []core.Value{
 					metaclass,                   // mcls
 					core.StringValue(className), // name
@@ -994,7 +1047,31 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				callCtx := core.NewContext(ctx)
 				callCtx.Define("__class__", metaclass)
 
-				result, err := callable.Call(args, callCtx)
+				// Call with kwargs if available
+				var result core.Value
+				var err error
+				if len(classKwargs) > 0 {
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Calling metaclass.__new__ with kwargs:\n")
+						for k, v := range classKwargs {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   %s = %T\n", k, v)
+						}
+					}
+					// Try CallWithKwargs if supported
+					if kwargsCallable, ok := callable.(interface {
+						CallWithKwargs([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						result, err = kwargsCallable.CallWithKwargs(args, classKwargs, callCtx)
+					} else {
+						// Fallback to regular call (kwargs will be lost)
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Warning: metaclass.__new__ doesn't support kwargs, calling without them\n")
+						}
+						result, err = callable.Call(args, callCtx)
+					}
+				} else {
+					result, err = callable.Call(args, callCtx)
+				}
 				if err != nil {
 					// Don't fail class creation if metaclass.__new__ fails
 					// This allows classes with metaclass=ABCMeta to work even if ABCMeta.__new__ uses unsupported syntax
@@ -1048,11 +1125,9 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					namespace.SetValue(core.StringValue(name), attr)
 				}
 
-				// Build bases tuple
-				bases := make(core.TupleValue, len(parentClasses))
-				for i, parent := range parentClasses {
-					bases[i] = parent
-				}
+				// Build bases tuple - use explicit base values (what user specified)
+				bases := make(core.TupleValue, len(explicitBaseValues))
+				copy(bases, explicitBaseValues)
 
 				// Call metaclass.__init__(cls, name, bases, namespace)
 				initArgs := []core.Value{
