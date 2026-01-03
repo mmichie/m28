@@ -373,7 +373,7 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			firstElem := unwrapLocated(list.Items()[0])
 			if sym, ok := firstElem.(core.SymbolValue); ok {
 				switch string(sym) {
-				case "except":
+				case "except", "except*":
 					if i == 0 {
 						return nil, fmt.Errorf("try must have a body before except")
 					}
@@ -495,6 +495,10 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			continue
 		}
 
+		// Check for except* (exception groups - PEP 654)
+		firstSym, _ := exceptClause.GetItemAsSymbol(0)
+		isExceptStar := string(firstSym) == "except*"
+
 		// Parse except clause
 		// Forms:
 		// (except handler...) - catch all
@@ -503,6 +507,8 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// (except Type var handler...) - catch specific type with variable (legacy)
 		// (except Type as var handler...) - catch specific type with variable (Python style)
 		// (except as var handler...) - catch all with variable (Python style)
+		// (except* Type handler...) - match Type within exception group
+		// (except* Type as var handler...) - match Type with variable binding
 		var excType string
 		var excTypes []string // For tuple exception types like (ValueError, TypeError)
 		var excVar string
@@ -579,7 +585,165 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
-		// Check if this except matches
+		// Handle except* for exception groups (PEP 654)
+		if isExceptStar {
+			// except* requires an exception type (no bare except*)
+			if excType == "" && len(excTypes) == 0 {
+				return nil, fmt.Errorf("except* requires an exception type")
+			}
+
+			// Check if the exception is an ExceptionGroup
+			excInstance := errorToExceptionInstance(tryErr, ctx)
+			inst, isInstance := excInstance.(*core.Instance)
+			if !isInstance {
+				continue // except* only matches ExceptionGroup instances
+			}
+
+			// Check if it's an ExceptionGroup or BaseExceptionGroup
+			isExceptionGroup := false
+			if inst.Class != nil {
+				className := inst.Class.Name
+				if className == "ExceptionGroup" || className == "BaseExceptionGroup" {
+					isExceptionGroup = true
+				}
+			}
+			if !isExceptionGroup {
+				continue // except* only matches exception groups
+			}
+
+			// Get the exceptions from the group
+			excTuple, hasExceptions := inst.Attributes["exceptions"]
+			if !hasExceptions {
+				continue
+			}
+			exceptions, isTuple := excTuple.(core.TupleValue)
+			if !isTuple {
+				continue
+			}
+
+			// Find matching and non-matching exceptions
+			var matchingExceptions []core.Value
+			var nonMatchingExceptions []core.Value
+
+			// Get target exception classes
+			targetTypes := excTypes
+			if excType != "" {
+				targetTypes = []string{excType}
+			}
+
+			for _, exc := range exceptions {
+				matched := false
+				excInst, isInst := exc.(*core.Instance)
+
+				for _, targetTypeName := range targetTypes {
+					targetClassVal, err := ctx.Lookup(targetTypeName)
+					if err != nil {
+						continue
+					}
+					targetClass, isClass := targetClassVal.(*core.Class)
+					if !isClass {
+						continue
+					}
+
+					if isInst && core.IsInstanceOf(excInst, targetClass) {
+						matched = true
+						break
+					}
+				}
+
+				if matched {
+					matchingExceptions = append(matchingExceptions, exc)
+				} else {
+					nonMatchingExceptions = append(nonMatchingExceptions, exc)
+				}
+			}
+
+			// If no matching exceptions, skip this handler
+			if len(matchingExceptions) == 0 {
+				continue
+			}
+
+			// Create a new ExceptionGroup with matching exceptions for the handler
+			handlerCtx := ctx
+
+			// Get the message from the original group
+			message := inst.Attributes["message"]
+
+			// Create new ExceptionGroup with matching exceptions
+			matchingTuple := make(core.TupleValue, len(matchingExceptions))
+			for i, exc := range matchingExceptions {
+				matchingTuple[i] = exc
+			}
+
+			// Create a new ExceptionGroup instance for the handler
+			egClass, err := ctx.Lookup("ExceptionGroup")
+			if err != nil {
+				return nil, fmt.Errorf("ExceptionGroup class not found")
+			}
+			egClassPtr, ok := egClass.(*core.Class)
+			if !ok {
+				return nil, fmt.Errorf("ExceptionGroup is not a class")
+			}
+
+			matchingGroup, err := egClassPtr.Call([]core.Value{message, core.NewList(matchingExceptions...)}, ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Bind exception variable
+			if excVar != "" {
+				ctx.Define(excVar, matchingGroup)
+			}
+
+			// Execute handler
+			handlerErr := error(nil)
+			for i := handlerStart; i < exceptClause.Len(); i++ {
+				result, handlerErr = Eval(exceptClause.Items()[i], handlerCtx)
+				if handlerErr != nil {
+					break
+				}
+			}
+
+			// Delete exception variable after handler
+			if excVar != "" {
+				ctx.Delete(excVar)
+			}
+
+			// If there are non-matching exceptions, re-raise them
+			if len(nonMatchingExceptions) > 0 {
+				// Create new ExceptionGroup with non-matching exceptions
+				nonMatchingTuple := make(core.TupleValue, len(nonMatchingExceptions))
+				for i, exc := range nonMatchingExceptions {
+					nonMatchingTuple[i] = exc
+				}
+
+				nonMatchingGroup, err := egClassPtr.Call([]core.Value{message, core.NewList(nonMatchingExceptions...)}, ctx)
+				if err != nil {
+					return nil, err
+				}
+
+				// Re-raise with non-matching exceptions
+				tryErr = &Exception{
+					Type:    "ExceptionGroup",
+					Message: fmt.Sprintf("%v", message),
+					Value:   nonMatchingGroup,
+				}
+			} else if handlerErr == nil {
+				// All exceptions handled, clear the error
+				tryErr = nil
+			} else {
+				// Handler raised an exception
+				tryErr = handlerErr
+			}
+
+			// Continue to check remaining except* clauses (they can match other exceptions)
+			if tryErr == nil {
+				break
+			}
+			continue
+		}
+
+		// Check if this except matches (regular except, not except*)
 		matches := false
 		if excType == "" && len(excTypes) == 0 {
 			// Catch-all

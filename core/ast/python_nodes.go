@@ -1096,27 +1096,32 @@ func (t *TryForm) ToIR() core.Value {
 			excTypeIR = core.SymbolValue(except.ExceptionType)
 		}
 
+		// Choose except or except* keyword based on IsExceptStar
+		exceptKeyword := "except"
+		if except.IsExceptStar {
+			exceptKeyword = "except*"
+		}
+
 		if excTypeIR != nil && except.Variable != "" {
-			// except ValueError as e: ... or except (ValueError, TypeError) as e: ...
+			// except ValueError as e: ... or except* ValueError as e: ...
 			result = append(result, core.NewList(
-				core.SymbolValue("except"),
+				core.SymbolValue(exceptKeyword),
 				excTypeIR,
 				core.SymbolValue("as"),
-
 				core.SymbolValue(except.Variable),
 				core.NewList(exceptBody...),
 			))
 		} else if excTypeIR != nil {
-			// except ValueError: ... or except (ValueError, TypeError): ...
+			// except ValueError: ... or except* ValueError: ...
 			result = append(result, core.NewList(
-				core.SymbolValue("except"),
+				core.SymbolValue(exceptKeyword),
 				excTypeIR,
 				core.NewList(exceptBody...),
 			))
 		} else {
-			// except: ... (bare except)
+			// except: ... (bare except - not valid with except*)
 			result = append(result, core.NewList(
-				core.SymbolValue("except"),
+				core.SymbolValue(exceptKeyword),
 				core.NewList(exceptBody...),
 			))
 		}
