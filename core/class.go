@@ -742,6 +742,32 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 	// 2. If __new__ returns an instance of the class, call __init__ on it
 	// 3. Return the instance
 
+	// Python validation: if neither __init__ nor __new__ is overridden,
+	// the class takes no arguments
+	if len(args) > 0 || len(kwargs) > 0 {
+		hasCustomInit := false
+		hasCustomNew := false
+
+		// Check if __init__ is overridden (not from object)
+		if _, defClass, ok := c.GetMethodWithClass("__init__"); ok {
+			if defClass.Name != "object" {
+				hasCustomInit = true
+			}
+		}
+
+		// Check if __new__ is overridden (not from object)
+		if _, defClass, ok := c.GetMethodWithClass("__new__"); ok {
+			if defClass.Name != "object" {
+				hasCustomNew = true
+			}
+		}
+
+		// If neither is overridden, class takes no arguments
+		if !hasCustomInit && !hasCustomNew {
+			return nil, &TypeError{Message: fmt.Sprintf("%s() takes no arguments", c.Name)}
+		}
+	}
+
 	var instance Value
 
 	// Check for __new__ method

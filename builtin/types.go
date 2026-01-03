@@ -239,6 +239,35 @@ func RegisterTypes(ctx *core.Context) {
 		if !ok {
 			return nil, &core.TypeError{Message: fmt.Sprintf("__new__() argument 1 must be a class, not %T", args[0])}
 		}
+
+		// Python validation: object.__new__ only accepts extra args if:
+		// - Class has custom __init__ (args are meant for it)
+		// - Class does NOT have custom __new__ (if it does, it should handle its own args)
+		if len(args) > 1 {
+			hasCustomInit := false
+			hasCustomNew := false
+			if _, defClass, ok := cls.GetMethodWithClass("__init__"); ok {
+				if defClass.Name != "object" {
+					hasCustomInit = true
+				}
+			}
+			if _, defClass, ok := cls.GetMethodWithClass("__new__"); ok {
+				if defClass.Name != "object" {
+					hasCustomNew = true
+				}
+			}
+
+			// Only accept extra args if: has custom __init__ AND no custom __new__
+			if !(hasCustomInit && !hasCustomNew) {
+				if !hasCustomInit && !hasCustomNew {
+					// Neither overridden - class takes no arguments
+					return nil, &core.TypeError{Message: fmt.Sprintf("%s() takes no arguments", cls.Name)}
+				}
+				// Both overridden or only __new__ overridden - object.__new__ takes exactly one arg
+				return nil, &core.TypeError{Message: "object.__new__() takes exactly one argument (the type to instantiate)"}
+			}
+		}
+
 		// Create a new instance of the class
 		return core.NewInstance(cls), nil
 	})
@@ -247,13 +276,52 @@ func RegisterTypes(ctx *core.Context) {
 	objectClass.SetMethod("__new__", objectNew)
 
 	// Add __init__ method to object
-	// object.__init__(self, *args, **kwargs) - does nothing, accepts any arguments
+	// object.__init__(self) - initializes the instance
+	// Python validation: only accepts extra args if __new__ is overridden
 	// We need to create a special builtin that supports keyword arguments
 	objectInit := &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "__init__",
 		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-			// object.__init__ accepts self and any arguments/kwargs, returns None
+			// Python validation: object.__init__ only accepts extra args if:
+			// - Class has custom __new__ (args are meant for it)
+			// - Class does NOT have custom __init__ (if it does, it should handle its own args)
+			if len(args) > 1 || len(kwargs) > 0 {
+				// Get the class from self
+				var cls *core.Class
+				if inst, ok := args[0].(*core.Instance); ok {
+					cls = inst.Class
+				} else if c, ok := args[0].(*core.Class); ok {
+					cls = c
+				}
+
+				if cls != nil {
+					hasCustomNew := false
+					hasCustomInit := false
+					if _, defClass, ok := cls.GetMethodWithClass("__new__"); ok {
+						if defClass.Name != "object" {
+							hasCustomNew = true
+						}
+					}
+					if _, defClass, ok := cls.GetMethodWithClass("__init__"); ok {
+						if defClass.Name != "object" {
+							hasCustomInit = true
+						}
+					}
+
+					// Only accept extra args if: has custom __new__ AND no custom __init__
+					if !(hasCustomNew && !hasCustomInit) {
+						// Error message depends on whether class has custom __init__
+						// If class has custom __init__ (that's calling super().__init__), use "object"
+						// If class has no custom __init__, error uses class name
+						if hasCustomInit {
+							return nil, &core.TypeError{Message: "object.__init__() takes exactly one argument (the instance to initialize)"}
+						}
+						return nil, &core.TypeError{Message: fmt.Sprintf("%s.__init__() takes exactly one argument (the instance to initialize)", cls.Name)}
+					}
+				}
+			}
+			// object.__init__ does nothing
 			return core.None, nil
 		},
 	}
