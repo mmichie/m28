@@ -3,7 +3,6 @@ package eval
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/mmichie/m28/common/types"
@@ -194,20 +193,11 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	}
 
 	// Create a new environment with the function's environment as parent
+	// The captured f.env already contains the correct __class__ for super() to use.
+	// We do NOT copy __class__ from the call context because that would break
+	// super() in nested classes - the defining class's __class__ is correct, not the caller's.
 	funcEnv := core.NewContext(f.env)
 	core.DebugLog("[CALL] Created funcEnv for %s\n", f.name)
-
-	// If __class__ is defined in the call context, copy it to the function environment
-	// This allows super() to know which class's method is being executed
-	if ctx != nil {
-		core.DebugLog("[CALL] Checking for __class__ in context\n")
-		if classVal, err := ctx.Lookup("__class__"); err == nil {
-			core.DebugLog("[CALL] Found __class__, defining in funcEnv\n")
-			funcEnv.Define("__class__", classVal)
-		} else {
-			core.DebugLog("[CALL] No __class__ found (error: %v)\n", err)
-		}
-	}
 
 	// Use new signature-based binding if available
 	if f.signature != nil {
@@ -284,23 +274,10 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 	core.TraceEnterFunction(f.name, args)
 
 	// Create a new environment with the function's environment as parent
+	// The captured f.env already contains the correct __class__ for super() to use.
+	// We do NOT copy __class__ from the call context because that would break
+	// super() in nested classes - the defining class's __class__ is correct, not the caller's.
 	funcEnv := core.NewContext(f.env)
-
-	// If __class__ is defined in the call context, copy it to the function environment
-	// This allows super() to know which class's method is being executed
-	debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
-	if classVal, err := ctx.Lookup("__class__"); err == nil {
-		if debugSuper {
-			className := "unknown"
-			if cls, ok := classVal.(*core.Class); ok {
-				className = cls.Name
-			}
-			fmt.Fprintf(os.Stderr, "[DEBUG UserFunction.CallWithKwargs] Function %s: copying __class__=%s from ctx to funcEnv\n", f.name, className)
-		}
-		funcEnv.Define("__class__", classVal)
-	} else if debugSuper {
-		fmt.Fprintf(os.Stderr, "[DEBUG UserFunction.CallWithKwargs] Function %s: NO __class__ in ctx (error: %v)\n", f.name, err)
-	}
 
 	// Use new signature-based binding if available
 	if f.signature != nil {

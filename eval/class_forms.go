@@ -558,6 +558,11 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// This enables patterns like: __await__ = __iter__
 	classBodyCtx := core.NewContext(ctx)
 
+	// CRITICAL: Set __class__ in the class body context
+	// This ensures that methods defined in this class capture the correct __class__
+	// for super() to work correctly, especially in nested class scenarios
+	classBodyCtx.Define("__class__", class)
+
 	// Check for docstring: first non-empty statement in class body that's a string literal
 	// Skip over any empty lists that might have been inserted by the parser
 	argsItems := args.Items()
@@ -686,7 +691,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if s.Len() >= 4 {
 						if paramList, ok := sItems[3].(*core.ListValue); ok {
 							// Create an async method
-							method, err := createMethod(string(name), paramList, sItems[4:], ctx)
+							// Use classBodyCtx which has __class__ set to this class
+							method, err := createMethod(string(name), paramList, sItems[4:], classBodyCtx)
 							if err != nil {
 								return nil, err
 							}
@@ -718,7 +724,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if s.Len() >= 3 {
 						if paramList, ok := sItems[2].(*core.ListValue); ok {
 							// It's a method definition
-							method, err := createMethod(string(name), paramList, sItems[3:], ctx)
+							// Use classBodyCtx which has __class__ set to this class
+							method, err := createMethod(string(name), paramList, sItems[3:], classBodyCtx)
 							if err != nil {
 								return nil, err
 							}
@@ -1408,27 +1415,34 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// We know which class we're in, use it for super()
 				// super() searches the MRO starting AFTER this class
 				// Now determine if we're in an instance method or class method
-				// by checking for self/cls/mcls
+				// by checking for cls/self/mcls
+				// IMPORTANT: Check cls BEFORE self to handle nested class scenarios correctly.
+				// In nested classes, 'self' from an outer method might be in the context chain,
+				// but we want to use the local 'cls' parameter for __new__ methods.
+				debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
+
+				// Check for cls parameter first (used in __new__, __init_subclass__, classmethods, etc.)
+				if clsVal, err := ctx.Lookup("cls"); err == nil {
+					if targetClass, ok := clsVal.(*core.Class); ok {
+						if debugSuper {
+							fmt.Fprintf(os.Stderr, "[DEBUG superForm] Creating SuperForClass(__class__=%s, targetClass=%s)\n",
+								class.Name, targetClass.Name)
+						}
+						// Use the cls parameter as the targetClass for proper binding
+						return core.NewSuperForClass(class, targetClass), nil
+					}
+				}
+
+				// Check for self parameter (instance methods)
 				if selfVal, err := ctx.Lookup("self"); err == nil {
 					if instance, ok := selfVal.(*core.Instance); ok {
 						// Instance method - return super for current class with instance
 						// Super.GetAttr will search MRO starting AFTER this class
-						debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
 						if debugSuper {
 							fmt.Fprintf(os.Stderr, "[DEBUG superForm] Creating Super(__class__=%s, instance.Class=%s)\n",
 								class.Name, instance.Class.Name)
 						}
 						return core.NewSuper(class, instance), nil
-					}
-				}
-
-				// Class method or metaclass method - no instance
-				// Check for cls parameter (used in __init_subclass__, classmethods, etc.)
-				if clsVal, err := ctx.Lookup("cls"); err == nil {
-					if targetClass, ok := clsVal.(*core.Class); ok {
-						// Use the cls parameter as the targetClass for proper binding
-						// This allows super().__init_subclass__() to pass cls correctly
-						return core.NewSuperForClass(class, targetClass), nil
 					}
 				}
 				// For metaclasses, use the parent class to avoid infinite loops
