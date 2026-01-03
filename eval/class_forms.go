@@ -937,6 +937,11 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// Track if metaclass.__new__ returned a non-class value
+	// In Python, metaclass.__new__ can return anything, and that becomes the class binding
+	var metaclassNewResult core.Value
+	metaclassNewReturnedNonClass := false
+
 	// If metaclass was specified, call its __new__ method to finalize the class
 	if metaclass != nil {
 		if debugClass {
@@ -999,19 +1004,30 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 					// Continue without calling __new__
 				} else {
-					// The result should be a class
+					// Check if __new__ returned a class or something else
 					if newClass, ok := result.(*core.Class); ok {
 						class = newClass
 						if debugClass {
 							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned new class\n")
 						}
 					} else {
+						// Python allows metaclass.__new__ to return any value
+						// That value becomes the class binding (not a class object)
+						metaclassNewResult = result
+						metaclassNewReturnedNonClass = true
 						if debugClass {
-							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned %T, keeping original class\n", result)
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned non-class %T, will use as class binding\n", result)
 						}
 					}
 				}
 			}
+		}
+
+		// If metaclass.__new__ returned a non-class, skip all class-specific processing
+		// and just define the name to the returned value
+		if metaclassNewReturnedNonClass {
+			ctx.Define(string(className), metaclassNewResult)
+			return metaclassNewResult, nil
 		}
 
 		// Store the metaclass in the class object so type() can return it
