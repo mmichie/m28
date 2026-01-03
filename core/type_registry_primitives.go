@@ -2182,6 +2182,12 @@ func registerComplexType() {
 			}
 			if len(args) == 1 {
 				switch v := args[0].(type) {
+				case BoolValue:
+					// bool is subclass of int in Python, so complex(True) = 1+0j
+					if v {
+						return ComplexValue(complex(1, 0)), nil
+					}
+					return ComplexValue(complex(0, 0)), nil
 				case NumberValue:
 					return ComplexValue(complex(float64(v), 0)), nil
 				case ComplexValue:
@@ -2201,6 +2207,13 @@ func registerComplexType() {
 			if len(args) == 2 {
 				var realPart, imagPart float64
 				switch r := args[0].(type) {
+				case BoolValue:
+					// bool is subclass of int in Python
+					if r {
+						realPart = 1
+					} else {
+						realPart = 0
+					}
 				case NumberValue:
 					realPart = float64(r)
 				case ComplexValue:
@@ -2209,6 +2222,13 @@ func registerComplexType() {
 					return nil, &TypeError{Message: fmt.Sprintf("complex() first argument must be a string or a number, not '%s'", r.Type())}
 				}
 				switch i := args[1].(type) {
+				case BoolValue:
+					// bool is subclass of int in Python
+					if i {
+						imagPart = 1
+					} else {
+						imagPart = 0
+					}
 				case NumberValue:
 					imagPart = float64(i)
 				default:
