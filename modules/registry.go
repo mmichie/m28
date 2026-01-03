@@ -67,6 +67,10 @@ var builtinModules = map[string]ModuleInitializer{
 	"_bisect":                    InitBisectModule,                   // C extension module for bisection algorithms
 	"_sha512":                    InitSHA512Module,                   // C extension module for SHA-512 hashing
 	"gc":                         InitGCModule,                       // Garbage collection module (Go handles GC automatically)
+	"termios":                    InitTermiosModule,                  // Unix terminal I/O module
+	"pwd":                        InitPwdModule,                      // Unix password database module
+	"grp":                        InitGrpModule,                      // Unix group database module
+	"msvcrt":                     InitMsvcrtModule,                   // Windows-specific module (stubs on Unix)
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
