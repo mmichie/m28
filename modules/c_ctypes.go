@@ -13,6 +13,71 @@ func Init_CtypesModule() *core.DictValue {
 	// Version info
 	module.Set("__version__", core.StringValue("1.1.0"))
 
+	// _SimpleCData - base class for simple C data types (c_int, c_char, etc.)
+	simpleCDataClass := core.NewClass("_SimpleCData", nil)
+	simpleCDataClass.Module = "_ctypes"
+	simpleCDataClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, nil
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		if len(args) > 1 {
+			self.Attributes["value"] = args[1]
+		} else {
+			self.Attributes["value"] = core.NumberValue(0)
+		}
+		return core.None, nil
+	}))
+	module.Set("_SimpleCData", simpleCDataClass)
+
+	// PyCSimpleType - metaclass for simple C types
+	pyCSimpleType := core.NewClass("PyCSimpleType", nil)
+	pyCSimpleType.Module = "_ctypes"
+	module.Set("PyCSimpleType", pyCSimpleType)
+
+	// PyCStructType - metaclass for Structure
+	pyCStructType := core.NewClass("PyCStructType", nil)
+	pyCStructType.Module = "_ctypes"
+	module.Set("PyCStructType", pyCStructType)
+
+	// PyCArrayType - metaclass for Array
+	pyCArrayType := core.NewClass("PyCArrayType", nil)
+	pyCArrayType.Module = "_ctypes"
+	module.Set("PyCArrayType", pyCArrayType)
+
+	// PyCPointerType - metaclass for pointer types
+	pyCPointerType := core.NewClass("PyCPointerType", nil)
+	pyCPointerType.Module = "_ctypes"
+	module.Set("PyCPointerType", pyCPointerType)
+
+	// PyCFuncPtrType - metaclass for function pointer types
+	pyCFuncPtrType := core.NewClass("PyCFuncPtrType", nil)
+	pyCFuncPtrType.Module = "_ctypes"
+	module.Set("PyCFuncPtrType", pyCFuncPtrType)
+
+	// dlopen - open a shared library
+	module.Set("dlopen", core.NewBuiltinFunction(
+		func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Return a dummy handle
+			return core.NumberValue(1), nil
+		}))
+
+	// dlclose - close a shared library
+	module.Set("dlclose", core.NewBuiltinFunction(
+		func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.NumberValue(0), nil
+		}))
+
+	// dlsym - get symbol from shared library
+	module.Set("dlsym", core.NewBuiltinFunction(
+		func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Return a dummy address
+			return core.NumberValue(0), nil
+		}))
+
 	// RTLD constants for dynamic library loading
 	module.Set("RTLD_LOCAL", core.NumberValue(0))
 	module.Set("RTLD_GLOBAL", core.NumberValue(256))
