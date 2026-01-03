@@ -208,6 +208,58 @@ func RegisterErrors(ctx *core.Context) {
 	// BaseExceptionGroup - base class for exception groups (Python 3.11+)
 	// Important: inherits from BaseException, not Exception
 	baseExceptionGroupClass := core.NewClass("BaseExceptionGroup", baseExceptionClass)
+
+	// Add __init__ for BaseExceptionGroup(message, exceptions)
+	baseExceptionGroupClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 3 {
+			return nil, fmt.Errorf("BaseExceptionGroup() requires 2 arguments: message and exceptions")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("__init__ first argument must be an instance")
+		}
+
+		message := args[1]
+		exceptions := args[2]
+
+		// Store message
+		self.Attributes["message"] = message
+
+		// Convert exceptions to tuple if it's a list
+		var excTuple core.TupleValue
+		if list, ok := exceptions.(*core.ListValue); ok {
+			excTuple = make(core.TupleValue, list.Len())
+			for i, item := range list.Items() {
+				excTuple[i] = item
+			}
+		} else if tuple, ok := exceptions.(core.TupleValue); ok {
+			excTuple = tuple
+		} else {
+			return nil, fmt.Errorf("second argument must be a sequence of exceptions")
+		}
+
+		self.Attributes["exceptions"] = excTuple
+		self.Attributes["args"] = core.TupleValue{message, excTuple}
+
+		return core.None, nil
+	}))
+
+	// Add message property
+	baseExceptionGroupClass.SetMethod("message", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("message requires self")
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		if msg, exists := self.Attributes["message"]; exists {
+			return msg, nil
+		}
+		return core.None, nil
+	}))
+
 	ctx.Define("BaseExceptionGroup", baseExceptionGroupClass)
 
 	// KeyboardInterrupt - raised when user hits interrupt key (Ctrl-C)
@@ -251,6 +303,49 @@ func RegisterErrors(ctx *core.Context) {
 	}))
 
 	ctx.Define("Exception", exceptionClass)
+
+	// ExceptionGroup - exception group for grouping exceptions (Python 3.11+)
+	// In Python it inherits from both Exception and BaseExceptionGroup
+	// We inherit from Exception and add the group functionality
+	exceptionGroupClass := core.NewClass("ExceptionGroup", exceptionClass)
+
+	// Add __init__ for ExceptionGroup(message, exceptions)
+	exceptionGroupClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 3 {
+			return nil, fmt.Errorf("ExceptionGroup() requires 2 arguments: message and exceptions")
+		}
+
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("__init__ first argument must be an instance")
+		}
+
+		message := args[1]
+		exceptions := args[2]
+
+		// Store message
+		self.Attributes["message"] = message
+
+		// Convert exceptions to tuple if it's a list
+		var excTuple core.TupleValue
+		if list, ok := exceptions.(*core.ListValue); ok {
+			excTuple = make(core.TupleValue, list.Len())
+			for i, item := range list.Items() {
+				excTuple[i] = item
+			}
+		} else if tuple, ok := exceptions.(core.TupleValue); ok {
+			excTuple = tuple
+		} else {
+			return nil, fmt.Errorf("second argument must be a sequence of exceptions")
+		}
+
+		self.Attributes["exceptions"] = excTuple
+		self.Attributes["args"] = core.TupleValue{message, excTuple}
+
+		return core.None, nil
+	}))
+
+	ctx.Define("ExceptionGroup", exceptionGroupClass)
 
 	// TypeError - raised when an operation or function is applied to an object of inappropriate type
 	typeErrorClass := core.NewClass("TypeError", exceptionClass)
