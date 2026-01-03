@@ -183,6 +183,77 @@ func InitThreadModule() *core.DictValue {
 	errorClass := core.NewClassWithParents("error", []*core.Class{})
 	threadModule.SetWithKey("error", core.StringValue("error"), errorClass)
 
+	// LockType - the type of lock objects
+	lockType := core.NewClass("LockType", nil)
+	threadModule.SetWithKey("LockType", core.StringValue("LockType"), lockType)
+
+	// _local - thread-local storage class
+	localClass := core.NewClass("_local", nil)
+	localClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Thread-local storage: just return the instance as-is
+		// In a real implementation, each thread would see different attributes
+		return core.None, nil
+	}))
+	threadModule.SetWithKey("_local", core.StringValue("_local"), localClass)
+
+	// _ExceptHookArgs - namedtuple for exception hook arguments
+	exceptHookArgsClass := core.NewClass("_ExceptHookArgs", nil)
+	exceptHookArgsClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("_ExceptHookArgs requires self")
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		// Set default attributes
+		self.Attributes["exc_type"] = core.None
+		self.Attributes["exc_value"] = core.None
+		self.Attributes["exc_traceback"] = core.None
+		self.Attributes["thread"] = core.None
+		return core.None, nil
+	}))
+	threadModule.SetWithKey("_ExceptHookArgs", core.StringValue("_ExceptHookArgs"), exceptHookArgsClass)
+
+	// interrupt_main() - raises KeyboardInterrupt in the main thread
+	threadModule.SetWithKey("interrupt_main", core.StringValue("interrupt_main"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			v := validation.NewArgs("interrupt_main", args)
+			if err := v.Range(0, 1); err != nil {
+				return nil, err
+			}
+			// Stub: raise KeyboardInterrupt
+			return nil, fmt.Errorf("KeyboardInterrupt")
+		}))
+
+	// exit() - exit the current thread
+	threadModule.SetWithKey("exit", core.StringValue("exit"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Raise SystemExit to exit the thread
+			return nil, fmt.Errorf("SystemExit")
+		}))
+
+	// _count() - return the number of active threads
+	threadModule.SetWithKey("_count", core.StringValue("_count"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Stub: return 1 (main thread only)
+			return core.NumberValue(1), nil
+		}))
+
+	// _register_atexit - register function to call at thread exit
+	threadModule.SetWithKey("_register_atexit", core.StringValue("_register_atexit"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Stub: do nothing
+			return core.None, nil
+		}))
+
+	// _unregister_atexit - unregister atexit function
+	threadModule.SetWithKey("_unregister_atexit", core.StringValue("_unregister_atexit"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Stub: do nothing
+			return core.None, nil
+		}))
+
 	return threadModule
 }
 
