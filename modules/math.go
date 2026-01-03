@@ -35,10 +35,64 @@ func InitMathModule() *core.DictValue {
 	mathModule.Set("log10", core.NewBuiltinFunction(builders.UnaryNumberSimple("log10", math.Log10)))
 	mathModule.Set("log2", core.NewBuiltinFunction(builders.UnaryNumberSimple("log2", math.Log2)))
 
-	// Rounding functions
-	mathModule.Set("floor", core.NewBuiltinFunction(builders.UnaryNumberSimple("floor", math.Floor)))
-	mathModule.Set("ceil", core.NewBuiltinFunction(builders.UnaryNumberSimple("ceil", math.Ceil)))
-	mathModule.Set("trunc", core.NewBuiltinFunction(builders.UnaryNumberSimple("trunc", math.Trunc)))
+	// Rounding functions - check for __floor__, __ceil__, __trunc__ dunder methods first
+	mathModule.Set("floor", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, errors.NewTypeError("floor", "exactly 1 argument", "got different count")
+		}
+		// Check for __floor__ dunder method
+		if obj, ok := args[0].(core.Object); ok {
+			if method, found := obj.GetAttr("__floor__"); found {
+				if callable, isCallable := method.(core.Callable); isCallable {
+					return callable.Call([]core.Value{}, ctx)
+				}
+			}
+		}
+		// Fall back to numeric conversion
+		num, ok := args[0].(core.NumberValue)
+		if !ok {
+			return nil, errors.NewTypeError("floor", "number", string(args[0].Type()))
+		}
+		return core.NumberValue(math.Floor(float64(num))), nil
+	}))
+	mathModule.Set("ceil", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, errors.NewTypeError("ceil", "exactly 1 argument", "got different count")
+		}
+		// Check for __ceil__ dunder method
+		if obj, ok := args[0].(core.Object); ok {
+			if method, found := obj.GetAttr("__ceil__"); found {
+				if callable, isCallable := method.(core.Callable); isCallable {
+					return callable.Call([]core.Value{}, ctx)
+				}
+			}
+		}
+		// Fall back to numeric conversion
+		num, ok := args[0].(core.NumberValue)
+		if !ok {
+			return nil, errors.NewTypeError("ceil", "number", string(args[0].Type()))
+		}
+		return core.NumberValue(math.Ceil(float64(num))), nil
+	}))
+	mathModule.Set("trunc", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, errors.NewTypeError("trunc", "exactly 1 argument", "got different count")
+		}
+		// Check for __trunc__ dunder method
+		if obj, ok := args[0].(core.Object); ok {
+			if method, found := obj.GetAttr("__trunc__"); found {
+				if callable, isCallable := method.(core.Callable); isCallable {
+					return callable.Call([]core.Value{}, ctx)
+				}
+			}
+		}
+		// Fall back to numeric conversion
+		num, ok := args[0].(core.NumberValue)
+		if !ok {
+			return nil, errors.NewTypeError("trunc", "number", string(args[0].Type()))
+		}
+		return core.NumberValue(math.Trunc(float64(num))), nil
+	}))
 	mathModule.Set("modf", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("modf", "exactly 1 argument", "got different count")
