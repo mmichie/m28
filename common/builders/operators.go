@@ -603,12 +603,16 @@ func In() BuiltinFunc {
 					if err != nil {
 						return nil, err
 					}
-					// Ensure we return a boolean
+					// Convert result to boolean using Python's truthiness rules
+					// None/nil is treated as False (matches Python behavior)
+					if result == nil || result == core.None || result == core.Nil {
+						return core.False, nil
+					}
 					if b, ok := result.(core.BoolValue); ok {
 						return b, nil
 					}
-					// The test expects an error for non-boolean returns
-					return nil, errors.NewTypeError("in", "__contains__ should return a boolean", string(result.Type()))
+					// For other types, use truthiness
+					return core.BoolValue(core.IsTruthy(result)), nil
 				}
 			}
 		}

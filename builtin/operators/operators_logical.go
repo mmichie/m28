@@ -115,11 +115,17 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			// Ensure we return a boolean
+			// Convert result to boolean using Python's truthiness rules
+			// None/nil is treated as False (this matches Python behavior where
+			// __contains__ returning None is treated as False)
+			if result == nil || result == core.None || result == core.Nil {
+				return core.False, nil
+			}
 			if b, ok := result.(core.BoolValue); ok {
 				return b, nil
 			}
-			return nil, errors.NewTypeError("in", "__contains__ should return a boolean", string(result.Type()))
+			// For other types, use truthiness (e.g., non-empty string is True)
+			return core.BoolValue(core.IsTruthy(result)), nil
 		}
 
 		// Use protocol-based container operations

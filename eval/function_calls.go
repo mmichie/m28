@@ -541,6 +541,24 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		}
 		// Return empty tuple for type parameters by default
 		return core.TupleValue{}, true
+	case "__eq__":
+		// Python functions compare equal by identity (same object = equal)
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__eq__ requires 1 argument")
+			}
+			// Identity comparison - same pointer means equal
+			if args[0] == f {
+				return core.True, nil
+			}
+			// Also check if it's wrapped in another type but same pointer
+			if other, ok := args[0].(*UserFunction); ok {
+				if other == f {
+					return core.True, nil
+				}
+			}
+			return core.False, nil
+		}), true
 	case "__hash__":
 		// Return a hash function for the function
 		// Python functions are hashable by identity (pointer address)

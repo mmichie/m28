@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
+	"unsafe"
 )
 
 // Class represents a class definition
@@ -1625,18 +1627,57 @@ func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]
 // GetAttr implements attribute access for bound instance methods
 // Provides default values for standard function attributes
 func (bm *BoundInstanceMethod) GetAttr(name string) (Value, bool) {
-	// Handle __get__ specially - bound methods should return themselves unchanged
-	// when accessed via the descriptor protocol
-	if name == "__get__" {
-		// Return a function that returns self when called
+	// Handle bound method-specific attributes FIRST before delegating to underlying method
+	// These are unique to bound methods and should not be delegated
+	switch name {
+	case "__get__":
+		// Bound methods should return themselves unchanged
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			// Descriptor protocol: __get__(self, instance, owner)
-			// For bound methods, we just return ourselves unchanged
 			return bm, nil
+		}), true
+	case "__self__":
+		return bm.Instance, true
+	case "__func__":
+		if methodVal, ok := bm.Method.(Value); ok {
+			return methodVal, true
+		}
+		return None, true
+	case "__eq__":
+		// Two bound methods are equal if they have the same __self__ and __func__
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__eq__ requires 1 argument"}
+			}
+			other, ok := args[0].(*BoundInstanceMethod)
+			if !ok {
+				return False, nil
+			}
+			// Compare instances (by identity)
+			if bm.Instance != other.Instance {
+				return False, nil
+			}
+			// Compare methods directly using reflect for pointer comparison
+			bmMethodPtr := reflect.ValueOf(bm.Method).Pointer()
+			otherMethodPtr := reflect.ValueOf(other.Method).Pointer()
+			if bmMethodPtr == otherMethodPtr {
+				return True, nil
+			}
+			return False, nil
+		}), true
+	case "__hash__":
+		// Hash combines the hash of __self__ and __func__
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			instancePtr := uintptr(unsafe.Pointer(bm.Instance))
+			var methodPtr uintptr
+			if methodVal, ok := bm.Method.(Value); ok {
+				methodPtr = reflect.ValueOf(methodVal).Pointer()
+			}
+			combinedHash := int64(instancePtr) ^ int64(methodPtr)
+			return NumberValue(float64(combinedHash)), nil
 		}), true
 	}
 
-	// Try to get attributes from the underlying method first
+	// Try to get other attributes from the underlying method
 	if methodWithAttrs, ok := bm.Method.(interface {
 		GetAttr(string) (Value, bool)
 	}); ok {
@@ -1690,16 +1731,6 @@ func (bm *BoundInstanceMethod) GetAttr(name string) (Value, bool) {
 		return TupleValue{}, true
 	case "__dict__":
 		return NewDict(), true
-	case "__self__":
-		// Return the bound instance
-		return bm.Instance, true
-	case "__func__":
-		// Return the underlying function if it's a Value
-		if methodVal, ok := bm.Method.(Value); ok {
-			return methodVal, true
-		}
-		// Otherwise return None
-		return None, true
 	}
 
 	return nil, false
@@ -1921,6 +1952,17 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 								}
 								return bindMethod(attr, cls, name), true
 							}
+							// Also check GetAttr for built-in methods like type.__init__
+							// Only do this for metaclasses (type and its subclasses) to avoid
+							// incorrectly finding the default __init__ that Class.GetAttr provides
+							if name == "__init__" && cls.Name == "type" {
+								if method, ok := cls.GetAttr(name); ok {
+									if debugSuperGetAttr {
+										fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via %s.GetAttr (type metaclass)\n", name, cls.Name)
+									}
+									return bindMethod(method, cls, name), true
+								}
+							}
 							if debugSuperGetAttr {
 								fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] %s NOT found in %s\n", name, cls.Name)
 							}
@@ -1961,6 +2003,16 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 				}
 				return bindMethod(attr, parent, name), true
 			}
+			// Also check GetAttr for built-in methods like type.__init__
+			// Only do this for metaclasses (type and its subclasses)
+			if name == "__init__" && parent.Name == "type" {
+				if method, ok := parent.GetAttr(name); ok {
+					if debugSuperGetAttr {
+						fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via %s.GetAttr (type metaclass)\n", name, parent.Name)
+					}
+					return bindMethod(method, parent, name), true
+				}
+			}
 			// Recursively check parent's parents
 			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
 				if debugSuperGetAttr {
@@ -1984,6 +2036,16 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 				fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s in root class %s.Attributes\n", name, s.Class.Name)
 			}
 			return bindMethod(attr, s.Class, name), true
+		}
+		// Also check GetAttr for built-in methods like type.__init__
+		// Only do this for metaclasses (type and its subclasses)
+		if name == "__init__" && s.Class.Name == "type" {
+			if method, ok := s.Class.GetAttr(name); ok {
+				if debugSuperGetAttr {
+					fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via root class %s.GetAttr (type metaclass)\n", name, s.Class.Name)
+				}
+				return bindMethod(method, s.Class, name), true
+			}
 		}
 	}
 

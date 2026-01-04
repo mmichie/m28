@@ -1136,7 +1136,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				bases := make(core.TupleValue, len(explicitBaseValues))
 				copy(bases, explicitBaseValues)
 
-				// Call metaclass.__init__(cls, name, bases, namespace)
+				// Call metaclass.__init__(cls, name, bases, namespace, **kwargs)
 				initArgs := []core.Value{
 					class,                       // cls (the newly created class)
 					core.StringValue(className), // name
@@ -1152,7 +1152,30 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Calling metaclass.__init__ for class '%s'\n", className)
 				}
 
-				_, err := callable.Call(initArgs, callCtx)
+				// Call with kwargs if available
+				var err error
+				if len(classKwargs) > 0 {
+					if debugClass {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Calling metaclass.__init__ with kwargs:\n")
+						for k, v := range classKwargs {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   %s = %T\n", k, v)
+						}
+					}
+					// Try CallWithKwargs if supported
+					if kwargsCallable, ok := callable.(interface {
+						CallWithKwargs([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						_, err = kwargsCallable.CallWithKwargs(initArgs, classKwargs, callCtx)
+					} else {
+						// Fallback to regular call (kwargs will be lost)
+						if debugClass {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Warning: metaclass.__init__ doesn't support kwargs, calling without them\n")
+						}
+						_, err = callable.Call(initArgs, callCtx)
+					}
+				} else {
+					_, err = callable.Call(initArgs, callCtx)
+				}
 				if err != nil {
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Warning: metaclass.__init__ failed: %v\n", err)
