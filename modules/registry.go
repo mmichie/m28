@@ -65,6 +65,7 @@ var builtinModules = map[string]ModuleInitializer{
 	"_lzma":                      Init_LzmaModule,                    // C extension stub for LZMA compression (Phase 4 - allows imports)
 	"_random":                    InitRandomModule,                   // C extension module for random number generation
 	"_bisect":                    InitBisectModule,                   // C extension module for bisection algorithms
+	"array":                      InitArrayModule,                    // C extension module for efficient arrays of numeric values
 	"_sha512":                    InitSHA512Module,                   // C extension module for SHA-512 hashing
 	"gc":                         InitGCModule,                       // Garbage collection module (Go handles GC automatically)
 	"termios":                    InitTermiosModule,                  // Unix terminal I/O module
