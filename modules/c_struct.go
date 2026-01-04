@@ -9,6 +9,19 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// getFormatString extracts a format string from either str or bytes value
+// Python's struct module accepts both str and bytes as format strings
+func getFormatString(v core.Value) (string, error) {
+	switch val := v.(type) {
+	case core.StringValue:
+		return string(val), nil
+	case core.BytesValue:
+		return string(val), nil
+	default:
+		return "", fmt.Errorf("format must be str or bytes, not %s", v.Type())
+	}
+}
+
 // InitStructModule creates and returns the _struct module
 // This implements Python's _struct C extension for binary data packing/unpacking
 func InitStructModule() *core.DictValue {
@@ -20,13 +33,13 @@ func InitStructModule() *core.DictValue {
 			return nil, &core.TypeError{Message: "pack() missing required argument: 'format' (pos 1)"}
 		}
 
-		formatStr, ok := args[0].(core.StringValue)
-		if !ok {
-			return nil, &core.TypeError{Message: fmt.Sprintf("pack() argument 1 must be str, not %s", args[0].Type())}
+		formatStr, err := getFormatString(args[0])
+		if err != nil {
+			return nil, &core.TypeError{Message: fmt.Sprintf("pack() argument 1 %v", err)}
 		}
 
 		values := args[1:]
-		result, err := structPack(string(formatStr), values)
+		result, err := structPack(formatStr, values)
 		if err != nil {
 			return nil, err
 		}
@@ -40,9 +53,9 @@ func InitStructModule() *core.DictValue {
 			return nil, &core.TypeError{Message: fmt.Sprintf("unpack() takes exactly 2 arguments (%d given)", len(args))}
 		}
 
-		formatStr, ok := args[0].(core.StringValue)
-		if !ok {
-			return nil, &core.TypeError{Message: fmt.Sprintf("unpack() argument 1 must be str, not %s", args[0].Type())}
+		formatStr, err := getFormatString(args[0])
+		if err != nil {
+			return nil, &core.TypeError{Message: fmt.Sprintf("unpack() argument 1 %v", err)}
 		}
 
 		buffer, ok := args[1].(core.BytesValue)
@@ -50,7 +63,7 @@ func InitStructModule() *core.DictValue {
 			return nil, &core.TypeError{Message: fmt.Sprintf("unpack() argument 2 must be bytes, not %s", args[1].Type())}
 		}
 
-		result, err := structUnpack(string(formatStr), []byte(buffer))
+		result, err := structUnpack(formatStr, []byte(buffer))
 		if err != nil {
 			return nil, err
 		}
@@ -64,12 +77,12 @@ func InitStructModule() *core.DictValue {
 			return nil, &core.TypeError{Message: fmt.Sprintf("calcsize() takes exactly 1 argument (%d given)", len(args))}
 		}
 
-		formatStr, ok := args[0].(core.StringValue)
-		if !ok {
-			return nil, &core.TypeError{Message: fmt.Sprintf("calcsize() argument must be str, not %s", args[0].Type())}
+		formatStr, err := getFormatString(args[0])
+		if err != nil {
+			return nil, &core.TypeError{Message: fmt.Sprintf("calcsize() argument %v", err)}
 		}
 
-		size, err := structCalcsize(string(formatStr))
+		size, err := structCalcsize(formatStr)
 		if err != nil {
 			return nil, err
 		}
@@ -110,9 +123,102 @@ func InitStructModule() *core.DictValue {
 		return nil, &core.ValueError{Message: "iter_unpack() not yet implemented"}
 	}))
 
-	// Struct class - compiled format strings (stub for now)
+	// Struct class - compiled format strings
 	structModule.Set("Struct", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		return nil, &core.ValueError{Message: "Struct() class not yet implemented"}
+		if len(args) < 1 {
+			return nil, &core.TypeError{Message: "Struct() requires a format string"}
+		}
+
+		formatStr, err := getFormatString(args[0])
+		if err != nil {
+			return nil, &core.TypeError{Message: fmt.Sprintf("Struct() argument %v", err)}
+		}
+
+		// Pre-calculate size
+		size, err := structCalcsize(formatStr)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create struct object as a dict with methods
+		structObj := core.NewDict()
+
+		// format property
+		structObj.Set("format", core.BytesValue(formatStr))
+
+		// size property
+		structObj.Set("size", core.NumberValue(float64(size)))
+
+		// pack(*args) method
+		structObj.Set("pack", core.NewBuiltinFunction(func(packArgs []core.Value, ctx *core.Context) (core.Value, error) {
+			result, err := structPack(formatStr, packArgs)
+			if err != nil {
+				return nil, err
+			}
+			return core.BytesValue(result), nil
+		}))
+
+		// unpack(buffer) method
+		structObj.Set("unpack", core.NewBuiltinFunction(func(unpackArgs []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(unpackArgs) != 1 {
+				return nil, &core.TypeError{Message: "unpack() takes exactly 1 argument"}
+			}
+
+			buffer, ok := unpackArgs[0].(core.BytesValue)
+			if !ok {
+				return nil, &core.TypeError{Message: fmt.Sprintf("unpack() argument must be bytes, not %s", unpackArgs[0].Type())}
+			}
+
+			result, err := structUnpack(formatStr, []byte(buffer))
+			if err != nil {
+				return nil, err
+			}
+			return core.TupleValue(result), nil
+		}))
+
+		// pack_into(buffer, offset, *args) method (stub)
+		structObj.Set("pack_into", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return nil, &core.ValueError{Message: "pack_into() not yet implemented"}
+		}))
+
+		// unpack_from(buffer, offset=0) method
+		structObj.Set("unpack_from", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, &core.TypeError{Message: "unpack_from() requires at least 1 argument"}
+			}
+
+			var buffer []byte
+			switch v := args[0].(type) {
+			case core.BytesValue:
+				buffer = []byte(v)
+			default:
+				return nil, &core.TypeError{Message: fmt.Sprintf("unpack_from() argument must be bytes, not %s", args[0].Type())}
+			}
+
+			offset := 0
+			if len(args) > 1 {
+				if n, ok := args[1].(core.NumberValue); ok {
+					offset = int(n)
+				}
+			}
+
+			if offset < 0 || offset > len(buffer) {
+				return nil, &core.ValueError{Message: "unpack_from() offset out of range"}
+			}
+
+			result, err := structUnpack(formatStr, buffer[offset:])
+			if err != nil {
+				return nil, err
+			}
+			return core.TupleValue(result), nil
+		}))
+
+		// iter_unpack(buffer) method (stub)
+		structObj.Set("iter_unpack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return nil, &core.ValueError{Message: "iter_unpack() not yet implemented"}
+		}))
+
+		return structObj, nil
 	}))
 
 	// __doc__ - module documentation

@@ -2,6 +2,7 @@
 package modules
 
 import (
+	"runtime"
 	"sync"
 
 	"github.com/mmichie/m28/core"
@@ -72,6 +73,9 @@ var builtinModules = map[string]ModuleInitializer{
 	"pwd":                        InitPwdModule,                      // Unix password database module
 	"grp":                        InitGrpModule,                      // Unix group database module
 	"msvcrt":                     InitMsvcrtModule,                   // Windows-specific module (stubs on Unix)
+	"_pickle":                    InitPickleModule,                   // C extension module for object serialization
+	"fcntl":                      InitFcntlModule,                    // Unix file control module
+	"binascii":                   InitBinasciiModule,                 // Binary to ASCII conversions
 }
 
 // moduleCache stores initialized modules to avoid re-initialization
@@ -80,6 +84,15 @@ var moduleCacheMutex sync.RWMutex
 
 // GetBuiltinModule returns a builtin module by name if it exists
 func GetBuiltinModule(name string) (*core.DictValue, bool) {
+	// Platform-specific module availability
+	// msvcrt and _winapi are Windows-only; they should not be available on Unix
+	// This allows Python's subprocess.py to correctly detect non-Windows platforms
+	if runtime.GOOS != "windows" {
+		if name == "msvcrt" || name == "_winapi" {
+			return nil, false
+		}
+	}
+
 	// Check cache first
 	moduleCacheMutex.RLock()
 	if module, cached := moduleCache[name]; cached {
@@ -111,6 +124,12 @@ func GetBuiltinModule(name string) (*core.DictValue, bool) {
 
 // IsBuiltinModule checks if a name corresponds to a builtin module
 func IsBuiltinModule(name string) bool {
+	// Platform-specific module availability
+	if runtime.GOOS != "windows" {
+		if name == "msvcrt" || name == "_winapi" {
+			return false
+		}
+	}
 	_, exists := builtinModules[name]
 	return exists
 }

@@ -395,8 +395,10 @@ func addOSConstants(osModule *core.DictValue) {
 	osModule.Set("O_RDWR", core.NumberValue(os.O_RDWR))
 	osModule.Set("O_APPEND", core.NumberValue(os.O_APPEND))
 	osModule.Set("O_CREATE", core.NumberValue(os.O_CREATE))
+	osModule.Set("O_CREAT", core.NumberValue(os.O_CREATE)) // Python uses O_CREAT, Go uses O_CREATE
 	osModule.Set("O_EXCL", core.NumberValue(os.O_EXCL))
 	osModule.Set("O_TRUNC", core.NumberValue(os.O_TRUNC))
+	osModule.Set("O_SYNC", core.NumberValue(os.O_SYNC))
 
 	// Path separator
 	osModule.Set("sep", core.StringValue(string(os.PathSeparator)))
