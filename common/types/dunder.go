@@ -28,6 +28,15 @@ func CallDunder(obj core.Value, method string, args []core.Value, ctx *core.Cont
 		Call([]core.Value, *core.Context) (core.Value, error)
 	})
 	if !ok {
+		// If the result is a descriptor (has __get__), it means the descriptor's
+		// __get__ method raised an error (likely AttributeError) which was swallowed.
+		// In this case, treat the method as not found to allow fallback behavior.
+		// This matches Python's behavior with properties that raise AttributeError.
+		if attrObj, hasAttr := methodVal.(interface{ GetAttr(string) (core.Value, bool) }); hasAttr {
+			if _, hasGet := attrObj.GetAttr("__get__"); hasGet {
+				return nil, false, nil
+			}
+		}
 		return nil, true, &core.TypeError{
 			Message: fmt.Sprintf("'%s' object attribute '%s' is not callable", obj.Type(), method),
 		}

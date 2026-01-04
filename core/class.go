@@ -268,12 +268,46 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 				return nil, NewTypeError("string", attrNameVal, "attribute name must be a string")
 			}
 
-			// Set the attribute on the object
+			// Set the attribute on the object using the default behavior
+			// Use SetAttrDefault to avoid infinite recursion when custom __setattr__ calls super().__setattr__
+			if inst, ok := self.(*Instance); ok {
+				return None, inst.SetAttrDefault(string(attrName), attrValue)
+			}
 			if obj, ok := self.(Object); ok {
-				obj.SetAttr(string(attrName), attrValue)
-				return None, nil
+				return None, obj.SetAttr(string(attrName), attrValue)
 			}
 			return nil, NewTypeError("object", self, "__setattr__ first argument must be an object")
+		}), true
+	}
+
+	// Special handling for __delattr__ - needed for class attribute deletion
+	// Python classes inherit __delattr__ from object/type
+	if name == "__delattr__" {
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			// When called through BoundInstanceMethod, we get (self, name)
+			if len(args) < 2 {
+				return nil, &TypeError{
+					Message: fmt.Sprintf("__delattr__() missing required argument: 'name'"),
+				}
+			}
+
+			self := args[0]
+			attrNameVal := args[1]
+
+			attrName, ok := attrNameVal.(StringValue)
+			if !ok {
+				return nil, NewTypeError("string", attrNameVal, "attribute name must be a string")
+			}
+
+			// Delete the attribute on the object using the default behavior
+			// Use DelAttrDefault to avoid infinite recursion when custom __delattr__ calls super().__delattr__
+			if inst, ok := self.(*Instance); ok {
+				return None, inst.DelAttrDefault(string(attrName))
+			}
+			if obj, ok := self.(interface{ DelAttr(string) error }); ok {
+				return None, obj.DelAttr(string(attrName))
+			}
+			return nil, NewTypeError("object", self, "__delattr__ first argument must be an object")
 		}), true
 	}
 
@@ -805,6 +839,27 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 	// Call __init__ if __new__ returned an instance of this class or a subclass
 	if inst, ok := instance.(*Instance); ok && IsInstanceOf(inst, c) {
 		if initMethod, definingClass, ok := c.GetMethodWithClass("__init__"); ok {
+			// Check if __init__ is a property descriptor and invoke it if so
+			// This handles cases like: __init__ = property(lambda self: raise_error())
+			// We specifically check for *PropertyValue, not any object with __get__,
+			// because regular functions also have __get__ (they're descriptors too)
+			// but don't need special handling here - the normal method call path works.
+			if prop, isProp := initMethod.(*PropertyValue); isProp {
+				if getMethod, hasGet := prop.GetAttr("__get__"); hasGet {
+					if callable, ok := getMethod.(Callable); ok {
+						// Invoke property.__get__(instance, type)
+						_, err := callable.Call([]Value{inst, c}, ctx)
+						if err != nil {
+							// Propagate the error from the property directly (e.g., AttributeError)
+							// Don't wrap it so the error type is preserved for except clauses
+							return nil, err
+						}
+						// Property getter succeeded - but property can't return a valid __init__
+						// This is an error case, fall through to normal __init__ handling
+					}
+				}
+			}
+
 			// CRITICAL: Set __class__ to the DEFINING class, not the instance's class
 			// This is required for super() to work correctly in inherited methods
 			// When Child has no __init__ but inherits Parent.__init__, and Parent.__init__
@@ -1315,10 +1370,36 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 }
 
 // SetAttr implements Object interface for instances
-// Implements Python's descriptor protocol for setting:
+// Implements Python's attribute setting protocol:
+// 1. Check for custom __setattr__ in the class hierarchy and call it
+// 2. Otherwise use default behavior (descriptor protocol + instance dict)
+func (i *Instance) SetAttr(name string, value Value) error {
+	// Check for custom __setattr__ in the class hierarchy
+	// Look in class methods (not GetAttr which returns the builtin fallback)
+	if setAttrMethod, _, ok := i.Class.GetMethodWithClass("__setattr__"); ok {
+		// Found custom __setattr__, call it
+		if callable, ok := setAttrMethod.(Callable); ok {
+			_, err := callable.Call([]Value{i, StringValue(name), value}, nil)
+			return err
+		}
+		// Also support CallWithKeywords for user functions
+		if kwCallable, ok := setAttrMethod.(interface {
+			CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+		}); ok {
+			_, err := kwCallable.CallWithKeywords([]Value{i, StringValue(name), value}, nil, nil)
+			return err
+		}
+	}
+
+	// No custom __setattr__, use default behavior
+	return i.SetAttrDefault(name, value)
+}
+
+// SetAttrDefault implements the default attribute setting behavior
+// This is what object.__setattr__ does:
 // 1. Check for data descriptor with __set__ in class
 // 2. Set in instance __dict__
-func (i *Instance) SetAttr(name string, value Value) error {
+func (i *Instance) SetAttrDefault(name string, value Value) error {
 	// Check for data descriptor in class with __set__
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
 		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
@@ -1349,10 +1430,36 @@ func (i *Instance) SetAttr(name string, value Value) error {
 }
 
 // DelAttr deletes an attribute from the instance
-// Implements Python's descriptor protocol for deletion:
+// Implements Python's attribute deletion protocol:
+// 1. Check for custom __delattr__ in the class hierarchy and call it
+// 2. Otherwise use default behavior (descriptor protocol + instance dict)
+func (i *Instance) DelAttr(name string) error {
+	// Check for custom __delattr__ in the class hierarchy
+	// Look in class methods (not GetAttr which returns the builtin fallback)
+	if delAttrMethod, _, ok := i.Class.GetMethodWithClass("__delattr__"); ok {
+		// Found custom __delattr__, call it
+		if callable, ok := delAttrMethod.(Callable); ok {
+			_, err := callable.Call([]Value{i, StringValue(name)}, nil)
+			return err
+		}
+		// Also support CallWithKeywords for user functions
+		if kwCallable, ok := delAttrMethod.(interface {
+			CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+		}); ok {
+			_, err := kwCallable.CallWithKeywords([]Value{i, StringValue(name)}, nil, nil)
+			return err
+		}
+	}
+
+	// No custom __delattr__, use default behavior
+	return i.DelAttrDefault(name)
+}
+
+// DelAttrDefault implements the default attribute deletion behavior
+// This is what object.__delattr__ does:
 // 1. Check for descriptor with __delete__ in class
 // 2. Delete from instance __dict__
-func (i *Instance) DelAttr(name string) error {
+func (i *Instance) DelAttrDefault(name string) error {
 	// Check for descriptor in class with __delete__
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
 		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
