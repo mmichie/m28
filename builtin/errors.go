@@ -147,7 +147,13 @@ func RegisterErrors(ctx *core.Context) {
 		if argsVal, hasArgs := self.Attributes["args"]; hasArgs {
 			if argsTuple, ok := argsVal.(core.TupleValue); ok && len(argsTuple) > 0 {
 				// Return the first argument as the string representation
-				return core.StringValue(argsTuple[0].String()), nil
+				// For strings, return the raw value without quotes
+				firstArg := argsTuple[0]
+				if strVal, ok := firstArg.(core.StringValue); ok {
+					return strVal, nil
+				}
+				// For other types, use their string representation
+				return core.StringValue(firstArg.String()), nil
 			}
 		}
 
