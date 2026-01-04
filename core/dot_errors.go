@@ -102,6 +102,11 @@ func (e *EvalError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
 }
 
+// Unwrap returns the wrapped error for use with errors.Is/As
+func (e *EvalError) Unwrap() error {
+	return e.Wrapped
+}
+
 // FormatTraceback returns a Python-style traceback string
 func (e *EvalError) FormatTraceback() string {
 	if len(e.StackTrace) == 0 {
