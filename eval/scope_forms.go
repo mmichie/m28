@@ -120,6 +120,22 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 		// del x
 		name := string(t)
 
+		// Before deleting, look up the value and call __del__ if it's an instance
+		if val, err := ctx.Lookup(name); err == nil {
+			if inst, ok := val.(*core.Instance); ok {
+				// Check if the instance has a __del__ method
+				if delMethod, ok := inst.Class.GetMethod("__del__"); ok {
+					// Call __del__ with self as the only argument
+					if callable, ok := delMethod.(interface {
+						Call([]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						_, _ = callable.Call([]core.Value{inst}, ctx)
+						// Ignore errors from __del__ as per Python semantics
+					}
+				}
+			}
+		}
+
 		// Check if variable is declared as global
 		if ctx.IsGlobal(name) {
 			if err := ctx.Global.Delete(name); err != nil {
