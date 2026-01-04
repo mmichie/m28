@@ -114,6 +114,119 @@ func InitTermiosModule() *core.DictValue {
 	return termiosModule
 }
 
+// StructPasswd represents a pwd.struct_passwd with both tuple and attribute access
+type StructPasswd struct {
+	core.BaseObject
+	values []core.Value // Tuple values for indexed access
+	names  []string     // Field names for attribute access
+}
+
+// Type returns the type name
+func (s *StructPasswd) Type() core.Type {
+	return "pwd.struct_passwd"
+}
+
+// String returns a string representation
+func (s *StructPasswd) String() string {
+	return fmt.Sprintf("pwd.struct_passwd(pw_name=%q, pw_passwd=%q, pw_uid=%v, pw_gid=%v, pw_gecos=%q, pw_dir=%q, pw_shell=%q)",
+		s.values[0], s.values[1], s.values[2], s.values[3], s.values[4], s.values[5], s.values[6])
+}
+
+// GetAttr returns named attributes
+func (s *StructPasswd) GetAttr(name string) (core.Value, bool) {
+	for i, n := range s.names {
+		if n == name {
+			return s.values[i], true
+		}
+	}
+	// Special attributes
+	switch name {
+	case "__len__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.NumberValue(len(s.values)), nil
+		}), true
+	case "__getitem__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__getitem__ requires an index")
+			}
+			idx, ok := args[0].(core.NumberValue)
+			if !ok {
+				return nil, fmt.Errorf("indices must be integers")
+			}
+			i := int(idx)
+			if i < 0 {
+				i = len(s.values) + i
+			}
+			if i < 0 || i >= len(s.values) {
+				return nil, fmt.Errorf("index out of range")
+			}
+			return s.values[i], nil
+		}), true
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return &structPasswdIterator{values: s.values, index: 0}, nil
+		}), true
+	case "n_fields":
+		return core.NumberValue(len(s.values)), true
+	case "n_sequence_fields":
+		return core.NumberValue(len(s.values)), true
+	case "n_unnamed_fields":
+		return core.NumberValue(0), true
+	}
+	return nil, false
+}
+
+// GetItem implements indexed access
+func (s *StructPasswd) GetItem(key core.Value) (core.Value, error) {
+	idx, ok := key.(core.NumberValue)
+	if !ok {
+		return nil, fmt.Errorf("indices must be integers, not %s", key.Type())
+	}
+	i := int(idx)
+	if i < 0 {
+		i = len(s.values) + i
+	}
+	if i < 0 || i >= len(s.values) {
+		return nil, fmt.Errorf("index out of range")
+	}
+	return s.values[i], nil
+}
+
+// Len returns the number of fields
+func (s *StructPasswd) Len() int {
+	return len(s.values)
+}
+
+// structPasswdIterator for iterating over struct_passwd
+type structPasswdIterator struct {
+	core.BaseObject
+	values []core.Value
+	index  int
+}
+
+func (it *structPasswdIterator) Type() core.Type {
+	return "struct_passwd_iterator"
+}
+
+func (it *structPasswdIterator) String() string {
+	return "<struct_passwd_iterator>"
+}
+
+func (it *structPasswdIterator) GetAttr(name string) (core.Value, bool) {
+	if name == "__next__" {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if it.index >= len(it.values) {
+				return nil, &core.StopIteration{}
+			}
+			val := it.values[it.index]
+			it.index++
+			return val, nil
+		}), true
+	}
+	return nil, false
+}
+
 // InitPwdModule creates a stub for the pwd Unix password database module
 func InitPwdModule() *core.DictValue {
 	pwdModule := core.NewDict()
@@ -176,8 +289,8 @@ func InitPwdModule() *core.DictValue {
 	return pwdModule
 }
 
-// makePasswdStruct creates a passwd struct tuple from a user
-func makePasswdStruct(u *user.User) core.TupleValue {
+// makePasswdStruct creates a passwd struct from a user
+func makePasswdStruct(u *user.User) *StructPasswd {
 	uid, _ := strconv.Atoi(u.Uid)
 	gid, _ := strconv.Atoi(u.Gid)
 	homeDir := u.HomeDir
@@ -185,15 +298,18 @@ func makePasswdStruct(u *user.User) core.TupleValue {
 		homeDir = os.Getenv("HOME")
 	}
 
-	// struct_passwd: (pw_name, pw_passwd, pw_uid, pw_gid, pw_gecos, pw_dir, pw_shell)
-	return core.TupleValue{
-		core.StringValue(u.Username), // pw_name
-		core.StringValue("x"),        // pw_passwd (placeholder)
-		core.NumberValue(uid),        // pw_uid
-		core.NumberValue(gid),        // pw_gid
-		core.StringValue(u.Name),     // pw_gecos
-		core.StringValue(homeDir),    // pw_dir
-		core.StringValue("/bin/sh"),  // pw_shell (placeholder)
+	// struct_passwd fields: pw_name, pw_passwd, pw_uid, pw_gid, pw_gecos, pw_dir, pw_shell
+	return &StructPasswd{
+		values: []core.Value{
+			core.StringValue(u.Username), // pw_name
+			core.StringValue("x"),        // pw_passwd (placeholder)
+			core.NumberValue(uid),        // pw_uid
+			core.NumberValue(gid),        // pw_gid
+			core.StringValue(u.Name),     // pw_gecos
+			core.StringValue(homeDir),    // pw_dir
+			core.StringValue("/bin/sh"),  // pw_shell (placeholder)
+		},
+		names: []string{"pw_name", "pw_passwd", "pw_uid", "pw_gid", "pw_gecos", "pw_dir", "pw_shell"},
 	}
 }
 
