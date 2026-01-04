@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/mmichie/m28/core"
 )
@@ -176,7 +177,7 @@ func (a *ArrayValue) tobytes() core.BytesValue {
 // frombytes extends the array from bytes
 func (a *ArrayValue) frombytes(b []byte) error {
 	if len(b)%a.itemsize != 0 {
-		return fmt.Errorf("bytes length not a multiple of item size")
+		return &core.ValueError{Message: "bytes length not a multiple of item size"}
 	}
 	a.data = append(a.data, b...)
 	return nil
@@ -588,6 +589,46 @@ func (a *ArrayValue) GetAttr(name string) (core.Value, bool) {
 			return a.class, true
 		}
 		return nil, false
+	case "__eq__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__eq__ requires 1 argument")
+			}
+			other, ok := args[0].(*ArrayValue)
+			if !ok {
+				return core.False, nil
+			}
+			if a.typecode != other.typecode {
+				return core.False, nil
+			}
+			if len(a.data) != len(other.data) {
+				return core.False, nil
+			}
+			if !bytes.Equal(a.data, other.data) {
+				return core.False, nil
+			}
+			return core.True, nil
+		}), true
+	case "__ne__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("__ne__ requires 1 argument")
+			}
+			other, ok := args[0].(*ArrayValue)
+			if !ok {
+				return core.True, nil
+			}
+			if a.typecode != other.typecode {
+				return core.True, nil
+			}
+			if len(a.data) != len(other.data) {
+				return core.True, nil
+			}
+			if !bytes.Equal(a.data, other.data) {
+				return core.True, nil
+			}
+			return core.False, nil
+		}), true
 	}
 	return nil, false
 }
@@ -624,6 +665,214 @@ func (it *arrayIterator) GetAttr(name string) (core.Value, bool) {
 		}), true
 	}
 	return nil, false
+}
+
+// Machine format codes for _array_reconstructor
+const (
+	UNSIGNED_INT8      = 0
+	SIGNED_INT8        = 1
+	UNSIGNED_INT16_LE  = 2
+	UNSIGNED_INT16_BE  = 3
+	SIGNED_INT16_LE    = 4
+	SIGNED_INT16_BE    = 5
+	UNSIGNED_INT32_LE  = 6
+	UNSIGNED_INT32_BE  = 7
+	SIGNED_INT32_LE    = 8
+	SIGNED_INT32_BE    = 9
+	UNSIGNED_INT64_LE  = 10
+	UNSIGNED_INT64_BE  = 11
+	SIGNED_INT64_LE    = 12
+	SIGNED_INT64_BE    = 13
+	IEEE_754_FLOAT_LE  = 14
+	IEEE_754_FLOAT_BE  = 15
+	IEEE_754_DOUBLE_LE = 16
+	IEEE_754_DOUBLE_BE = 17
+	UTF16_LE           = 18
+	UTF16_BE           = 19
+	UTF32_LE           = 20
+	UTF32_BE           = 21
+)
+
+// decodeByMformatCode decodes bytes according to machine format code
+func decodeByMformatCode(data []byte, mcode int) ([]core.Value, error) {
+	var values []core.Value
+
+	switch mcode {
+	case UNSIGNED_INT8:
+		for _, b := range data {
+			values = append(values, core.NumberValue(b))
+		}
+	case SIGNED_INT8:
+		for _, b := range data {
+			values = append(values, core.NumberValue(int8(b)))
+		}
+	case UNSIGNED_INT16_LE:
+		if len(data)%2 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 2 {
+			v := binary.LittleEndian.Uint16(data[i : i+2])
+			values = append(values, core.NumberValue(v))
+		}
+	case UNSIGNED_INT16_BE:
+		if len(data)%2 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 2 {
+			v := binary.BigEndian.Uint16(data[i : i+2])
+			values = append(values, core.NumberValue(v))
+		}
+	case SIGNED_INT16_LE:
+		if len(data)%2 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 2 {
+			v := int16(binary.LittleEndian.Uint16(data[i : i+2]))
+			values = append(values, core.NumberValue(v))
+		}
+	case SIGNED_INT16_BE:
+		if len(data)%2 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 2 {
+			v := int16(binary.BigEndian.Uint16(data[i : i+2]))
+			values = append(values, core.NumberValue(v))
+		}
+	case UNSIGNED_INT32_LE:
+		if len(data)%4 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 4 {
+			v := binary.LittleEndian.Uint32(data[i : i+4])
+			values = append(values, core.NumberValue(v))
+		}
+	case UNSIGNED_INT32_BE:
+		if len(data)%4 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 4 {
+			v := binary.BigEndian.Uint32(data[i : i+4])
+			values = append(values, core.NumberValue(v))
+		}
+	case SIGNED_INT32_LE:
+		if len(data)%4 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 4 {
+			v := int32(binary.LittleEndian.Uint32(data[i : i+4]))
+			values = append(values, core.NumberValue(v))
+		}
+	case SIGNED_INT32_BE:
+		if len(data)%4 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 4 {
+			v := int32(binary.BigEndian.Uint32(data[i : i+4]))
+			values = append(values, core.NumberValue(v))
+		}
+	case UNSIGNED_INT64_LE:
+		if len(data)%8 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 8 {
+			v := binary.LittleEndian.Uint64(data[i : i+8])
+			values = append(values, core.NumberValue(v))
+		}
+	case UNSIGNED_INT64_BE:
+		if len(data)%8 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 8 {
+			v := binary.BigEndian.Uint64(data[i : i+8])
+			values = append(values, core.NumberValue(v))
+		}
+	case SIGNED_INT64_LE:
+		if len(data)%8 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 8 {
+			v := int64(binary.LittleEndian.Uint64(data[i : i+8]))
+			values = append(values, core.NumberValue(v))
+		}
+	case SIGNED_INT64_BE:
+		if len(data)%8 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 8 {
+			v := int64(binary.BigEndian.Uint64(data[i : i+8]))
+			values = append(values, core.NumberValue(v))
+		}
+	case IEEE_754_FLOAT_LE:
+		if len(data)%4 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 4 {
+			bits := binary.LittleEndian.Uint32(data[i : i+4])
+			v := math.Float32frombits(bits)
+			values = append(values, core.NumberValue(v))
+		}
+	case IEEE_754_FLOAT_BE:
+		if len(data)%4 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 4 {
+			bits := binary.BigEndian.Uint32(data[i : i+4])
+			v := math.Float32frombits(bits)
+			values = append(values, core.NumberValue(v))
+		}
+	case IEEE_754_DOUBLE_LE:
+		if len(data)%8 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 8 {
+			bits := binary.LittleEndian.Uint64(data[i : i+8])
+			v := math.Float64frombits(bits)
+			values = append(values, core.NumberValue(v))
+		}
+	case IEEE_754_DOUBLE_BE:
+		if len(data)%8 != 0 {
+			return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+		}
+		for i := 0; i < len(data); i += 8 {
+			bits := binary.BigEndian.Uint64(data[i : i+8])
+			v := math.Float64frombits(bits)
+			values = append(values, core.NumberValue(v))
+		}
+	case UTF16_LE, UTF16_BE, UTF32_LE, UTF32_BE:
+		// For unicode, just pass through as integers for now
+		// Full unicode support would need proper conversion
+		if mcode == UTF16_LE || mcode == UTF16_BE {
+			if len(data)%2 != 0 {
+				return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+			}
+			for i := 0; i < len(data); i += 2 {
+				var v uint16
+				if mcode == UTF16_LE {
+					v = binary.LittleEndian.Uint16(data[i : i+2])
+				} else {
+					v = binary.BigEndian.Uint16(data[i : i+2])
+				}
+				values = append(values, core.NumberValue(v))
+			}
+		} else {
+			if len(data)%4 != 0 {
+				return nil, &core.ValueError{Message: "bytes length not a multiple of item size"}
+			}
+			for i := 0; i < len(data); i += 4 {
+				var v uint32
+				if mcode == UTF32_LE {
+					v = binary.LittleEndian.Uint32(data[i : i+4])
+				} else {
+					v = binary.BigEndian.Uint32(data[i : i+4])
+				}
+				values = append(values, core.NumberValue(v))
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unknown machine format code: %d", mcode)
+	}
+
+	return values, nil
 }
 
 // InitArrayModule creates the array module
@@ -730,6 +979,84 @@ func InitArrayModule() *core.DictValue {
 
 	// typecodes - string of all available type codes
 	arrayModule.Set("typecodes", core.StringValue("bBuhHiIlLqQfd"))
+
+	// _array_reconstructor(arraytype, typecode, mformat_code, items)
+	// Internal function used for pickling support
+	// Machine format codes:
+	// 0=UNSIGNED_INT8, 1=SIGNED_INT8, 2=UNSIGNED_INT16_LE, 3=UNSIGNED_INT16_BE,
+	// 4=SIGNED_INT16_LE, 5=SIGNED_INT16_BE, 6=UNSIGNED_INT32_LE, 7=UNSIGNED_INT32_BE,
+	// 8=SIGNED_INT32_LE, 9=SIGNED_INT32_BE, 10=UNSIGNED_INT64_LE, 11=UNSIGNED_INT64_BE,
+	// 12=SIGNED_INT64_LE, 13=SIGNED_INT64_BE, 14=IEEE_754_FLOAT_LE, 15=IEEE_754_FLOAT_BE,
+	// 16=IEEE_754_DOUBLE_LE, 17=IEEE_754_DOUBLE_BE, 18=UTF16_LE, 19=UTF16_BE,
+	// 20=UTF32_LE, 21=UTF32_BE
+	arrayModule.Set("_array_reconstructor", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 4 {
+			return nil, fmt.Errorf("_array_reconstructor() requires 4 arguments")
+		}
+
+		// args[0] is arraytype (the class) - must be array.array or subclass
+		switch args[0].(type) {
+		case *core.Class:
+			// OK
+		case core.StringValue:
+			return nil, &core.TypeError{Message: "first argument must be a type object, not str"}
+		default:
+			if _, ok := args[0].(*core.BuiltinFunction); !ok {
+				return nil, &core.TypeError{Message: fmt.Sprintf("first argument must be a type object, not %s", args[0].Type())}
+			}
+		}
+
+		// args[1] is typecode
+		typecodeVal, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, &core.TypeError{Message: fmt.Sprintf("array typecode must be str, not %s", args[1].Type())}
+		}
+		if len(typecodeVal) != 1 {
+			return nil, &core.ValueError{Message: "bad typecode (must be b, B, u, h, H, i, I, l, L, q, Q, f or d)"}
+		}
+		typecode := byte(typecodeVal[0])
+		if _, valid := typecodeSizes[typecode]; !valid {
+			return nil, &core.ValueError{Message: "bad typecode (must be b, B, u, h, H, i, I, l, L, q, Q, f or d)"}
+		}
+
+		// args[2] is mformat_code
+		mformatCode, ok := args[2].(core.NumberValue)
+		if !ok {
+			return nil, &core.TypeError{Message: fmt.Sprintf("third argument must be an integer, not %s", args[2].Type())}
+		}
+		mcode := int(mformatCode)
+		if mcode < 0 || mcode > 21 {
+			return nil, &core.ValueError{Message: "second argument not a valid machine format code."}
+		}
+
+		// args[3] is items (bytes)
+		itemsBytes, ok := args[3].(core.BytesValue)
+		if !ok {
+			if _, isStr := args[3].(core.StringValue); isStr {
+				return nil, &core.TypeError{Message: "fourth argument should be bytes, not str"}
+			}
+			return nil, &core.TypeError{Message: fmt.Sprintf("fourth argument should be bytes, not %s", args[3].Type())}
+		}
+
+		arr, err := NewArrayValue(typecode, arrayClass)
+		if err != nil {
+			return nil, err
+		}
+
+		// Decode bytes based on mformat_code and store as values
+		data := []byte(itemsBytes)
+		values, err := decodeByMformatCode(data, mcode)
+		if err != nil {
+			return nil, err
+		}
+
+		// Extend array with decoded values
+		if err := arr.extend(values); err != nil {
+			return nil, err
+		}
+
+		return arr, nil
+	}))
 
 	return arrayModule
 }
