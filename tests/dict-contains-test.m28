@@ -33,8 +33,9 @@
 (assert (in True d3) "True key in mixed dict")
 (assert (in False d3) "False key in mixed dict")
 (assert (not (in "42" d3)) "string '42' != number 42")
-(assert (not (in 1 d3)) "1 != True in dict keys")
-(assert (not (in 0 d3)) "0 != False in dict keys")
+# Note: In Python, True == 1 and False == 0, so 1 in {True: x} is True
+(assert (in 1 d3) "1 == True in Python semantics")
+(assert (in 0 d3) "0 == False in Python semantics")
 (print "✓ Mixed key types passed")
 
 # Test 4: Empty dict

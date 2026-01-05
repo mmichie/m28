@@ -59,19 +59,22 @@
 (assert (not (in 5 r2)) "5 not in Range(-5, 5)")
 (print "✓ Range container passed")
 
-# Test 4: __contains__ returning non-boolean (should fail)
-(print "\n4. Testing error cases:")
-(class BadContains ()
+# Test 4: __contains__ returning truthy/falsy values (Python behavior)
+# Python coerces return value to boolean, so "yes" -> True, "" -> False, 1 -> True, 0 -> False
+(print "\n4. Testing truthy/falsy returns:")
+(class TruthyContains ()
   (def __contains__ (self item)
-    (return "yes")))  # Returns string instead of boolean
+    (return "yes")))  # Truthy string -> True
 
-(= bad (BadContains))
-(try
-  (in "x" bad)
-  (assert False "Should have raised error for non-boolean __contains__")
-  (except Exception as e
-    (assert (in "should return a boolean" (str e)) "correct error for non-boolean return")))
-(print "✓ Error cases passed")
+(class FalsyContains ()
+  (def __contains__ (self item)
+    (return "")))  # Falsy string -> False
+
+(= truthy (TruthyContains))
+(= falsy (FalsyContains))
+(assert (in "x" truthy) "truthy string 'yes' becomes True")
+(assert (not (in "x" falsy)) "falsy string '' becomes False")
+(print "✓ Truthy/falsy returns passed")
 
 # Test 5: Container that always returns True/False
 (print "\n5. Testing always True/False containers:")

@@ -189,30 +189,14 @@ func KeysFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
-	// Ensure it's a dictionary
-	if _, ok := types.AsDict(v.Get(0)); !ok {
+	// Get the dictionary directly
+	dict, ok := types.AsDict(v.Get(0))
+	if !ok {
 		return nil, errors.NewTypeError("keys", "dictionary", string(v.Get(0).Type()))
 	}
 
-	// Get the dictionary as object
-	obj, ok := v.Get(0).(core.Object)
-	if !ok {
-		return nil, errors.NewTypeError("keys", "dictionary object", string(v.Get(0).Type()))
-	}
-
-	// Call the keys method using the object protocol
-	keysMethod, found := obj.GetAttr("keys")
-	if !found {
-		return nil, errors.NewRuntimeError("keys", "dictionary does not have keys method")
-	}
-
-	// Call the method
-	callable, ok := types.AsCallable(keysMethod)
-	if !ok {
-		return nil, errors.NewRuntimeError("keys", "keys is not callable")
-	}
-
-	return callable.Call([]core.Value{}, ctx)
+	// Return list of original keys
+	return core.NewList(dict.OriginalKeys()...), nil
 }
 
 // ValuesFunc returns a list of all values in a dictionary
@@ -222,30 +206,22 @@ func ValuesFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
-	// Ensure it's a dictionary
-	if _, ok := types.AsDict(v.Get(0)); !ok {
+	// Get the dictionary directly
+	dict, ok := types.AsDict(v.Get(0))
+	if !ok {
 		return nil, errors.NewTypeError("values", "dictionary", string(v.Get(0).Type()))
 	}
 
-	// Get the dictionary as object
-	obj, ok := v.Get(0).(core.Object)
-	if !ok {
-		return nil, errors.NewTypeError("values", "dictionary object", string(v.Get(0).Type()))
+	// Build list of values in original key order
+	keys := dict.OriginalKeys()
+	values := make([]core.Value, 0, len(keys))
+	for _, key := range keys {
+		if val, exists := dict.GetValue(key); exists {
+			values = append(values, val)
+		}
 	}
 
-	// Call the values method using the object protocol
-	valuesMethod, found := obj.GetAttr("values")
-	if !found {
-		return nil, errors.NewRuntimeError("values", "dictionary does not have values method")
-	}
-
-	// Call the method
-	callable, ok := types.AsCallable(valuesMethod)
-	if !ok {
-		return nil, errors.NewRuntimeError("values", "values is not callable")
-	}
-
-	return callable.Call([]core.Value{}, ctx)
+	return core.NewList(values...), nil
 }
 
 // ItemsFunc returns a list of key-value pairs from a dictionary
@@ -255,30 +231,22 @@ func ItemsFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
-	// Ensure it's a dictionary
-	if _, ok := types.AsDict(v.Get(0)); !ok {
+	// Get the dictionary directly
+	dict, ok := types.AsDict(v.Get(0))
+	if !ok {
 		return nil, errors.NewTypeError("items", "dictionary", string(v.Get(0).Type()))
 	}
 
-	// Get the dictionary as object
-	obj, ok := v.Get(0).(core.Object)
-	if !ok {
-		return nil, errors.NewTypeError("items", "dictionary object", string(v.Get(0).Type()))
+	// Build list of (key, value) tuples in original key order
+	keys := dict.OriginalKeys()
+	items := make([]core.Value, 0, len(keys))
+	for _, key := range keys {
+		if val, exists := dict.GetValue(key); exists {
+			items = append(items, core.TupleValue{key, val})
+		}
 	}
 
-	// Call the items method using the object protocol
-	itemsMethod, found := obj.GetAttr("items")
-	if !found {
-		return nil, errors.NewRuntimeError("items", "dictionary does not have items method")
-	}
-
-	// Call the method
-	callable, ok := types.AsCallable(itemsMethod)
-	if !ok {
-		return nil, errors.NewRuntimeError("items", "items is not callable")
-	}
-
-	return callable.Call([]core.Value{}, ctx)
+	return core.NewList(items...), nil
 }
 
 // MergeFunc merges two or more dictionaries

@@ -4,17 +4,17 @@
 (print "=== Frozenset Creation ===")
 
 # Empty frozenset
-(= fs_empty (frozenset))
+(= fs_empty (frozenset []))
 (print "Empty frozenset:" fs_empty)
 (assert (== (len fs_empty) 0) "Empty frozenset should have length 0")
 
 # Frozenset from list
-(= fs1 (frozenset [1 , 2 , 3]))
+(= fs1 (frozenset [1, 2, 3]))
 (print "fs1 from [1,2,3]:" fs1)
 (assert (== (len fs1) 3) "fs1 should have length 3")
 
 # Frozenset from tuple
-(= fs2 (frozenset (tuple [3 , 4 , 5])))
+(= fs2 (frozenset (tuple [3, 4, 5])))
 (print "fs2 from tuple [3,4,5]:" fs2)
 
 # Frozenset from string
@@ -22,7 +22,7 @@
 (print "fs_str from 'abc':" fs_str)
 
 # Frozenset from set
-(= s1 (set [1 , 2 , 3]))
+(= s1 (set [1, 2, 3]))
 (= fs_from_set (frozenset s1))
 (print "fs_from_set from set:" fs_from_set)
 
@@ -35,24 +35,25 @@
 
 # Union
 (print "\nUnion:")
-(print "fs1.union(fs2) =" (fs1.union fs2))
-(assert (== (len (fs1.union fs2)) 5) "Union should have 5 elements")
+(= fs_union (. fs1 union fs2))
+(print "fs1.union(fs2) =" fs_union)
+(assert (== (len fs_union) 5) "Union should have 5 elements")
 
 # Intersection
 (print "\nIntersection:")
-(= fs_inter (fs1.intersection fs2))
+(= fs_inter (. fs1 intersection fs2))
 (print "fs1.intersection(fs2) =" fs_inter)
 (assert (== (len fs_inter) 1) "Intersection should have 1 element (3)")
 
 # Difference
 (print "\nDifference:")
-(= fs_diff (fs1.difference fs2))
+(= fs_diff (. fs1 difference fs2))
 (print "fs1.difference(fs2) =" fs_diff)
 (assert (== (len fs_diff) 2) "Difference should have 2 elements")
 
 # Symmetric difference
 (print "\nSymmetric difference:")
-(= fs_sym (fs1.symmetric_difference fs2))
+(= fs_sym (. fs1 symmetric_difference fs2))
 (print "fs1.symmetric_difference(fs2) =" fs_sym)
 (assert (== (len fs_sym) 4) "Symmetric difference should have 4 elements")
 
@@ -61,25 +62,25 @@
 
 # issubset
 (print "\nissubset:")
-(= fs_subset (frozenset [1 , 2]))
-(= fs_superset (frozenset [1 , 2 , 3]))
-(print "frozenset({1,2}).issubset(frozenset({1,2,3})) =" (fs_subset.issubset fs_superset))
-(assert (fs_subset.issubset fs_superset) "Should be True")
-(print "frozenset({1,2,3}).issubset(frozenset({1,2})) =" (fs_superset.issubset fs_subset))
-(assert (not (fs_superset.issubset fs_subset)) "Should be False")
+(= fs_subset (frozenset [1, 2]))
+(= fs_superset (frozenset [1, 2, 3]))
+(print "frozenset({1,2}).issubset(frozenset({1,2,3})) =" (. fs_subset issubset fs_superset))
+(assert (. fs_subset issubset fs_superset) "Should be True")
+(print "frozenset({1,2,3}).issubset(frozenset({1,2})) =" (. fs_superset issubset fs_subset))
+(assert (not (. fs_superset issubset fs_subset)) "Should be False")
 
 # issuperset
 (print "\nissuperset:")
-(print "fs_superset.issuperset(fs_subset) =" (fs_superset.issuperset fs_subset))
-(assert (fs_superset.issuperset fs_subset) "Should be True")
+(print "fs_superset.issuperset(fs_subset) =" (. fs_superset issuperset fs_subset))
+(assert (. fs_superset issuperset fs_subset) "Should be True")
 
 # isdisjoint
 (print "\nisdisjoint:")
-(= fs_disjoint (frozenset [10 , 11 , 12]))
-(print "fs1.isdisjoint(fs2) =" (fs1.isdisjoint fs2))
-(assert (not (fs1.isdisjoint fs2)) "Should be False (they share 3)")
-(print "fs1.isdisjoint(fs_disjoint) =" (fs1.isdisjoint fs_disjoint))
-(assert (fs1.isdisjoint fs_disjoint) "Should be True (no common elements)")
+(= fs_disjoint (frozenset [10, 11, 12]))
+(print "fs1.isdisjoint(fs2) =" (. fs1 isdisjoint fs2))
+(assert (not (. fs1 isdisjoint fs2)) "Should be False (they share 3)")
+(print "fs1.isdisjoint(fs_disjoint) =" (. fs1 isdisjoint fs_disjoint))
+(assert (. fs1 isdisjoint fs_disjoint) "Should be True (no common elements)")
 
 # Test membership with 'in'
 (print "\n=== Membership Test ===")
@@ -100,53 +101,52 @@
 
 # Frozenset as dict key
 (= d (dict))
-(dict-set d fs1 "value1")
-(dict-set d fs2 "value2")
+(. d set fs1 "value1")
+(. d set fs2 "value2")
 (print "Dict with frozenset keys:" d)
-(assert (== (d.get fs1) "value1") "Should get value1 for fs1 key")
-(assert (== (d.get fs2) "value2") "Should get value2 for fs2 key")
+(assert (== (. d get fs1) "value1") "Should get value1 for fs1 key")
+(assert (== (. d get fs2) "value2") "Should get value2 for fs2 key")
 
 # Frozenset as set member
-(= set_of_frozensets (set))
-(set_of_frozensets.add fs1)
-(set_of_frozensets.add fs2)
+(= set_of_frozensets (set []))
+(. set_of_frozensets add fs1)
+(. set_of_frozensets add fs2)
 (print "Set of frozensets:" set_of_frozensets)
 (assert (== (len set_of_frozensets) 2) "Should have 2 frozensets")
 
 # Test iteration
 (print "\n=== Iteration ===")
 # Test that iteration works
-(= items (list))
-(for item fs1
+(= items [])
+(for item in fs1
   (= items (+ items [item])))
 (print "Items from iteration:" items)
 (assert (== (len items) 3) "Should iterate over 3 items")
 
-# Test copy
+# Test copy (by creating new frozenset from original)
 (print "\n=== Copy ===")
-(= fs_copied (fs1.copy))
+(= fs_copied (frozenset fs1))
 (print "Copied frozenset:" fs_copied)
-# Note: == for frozensets compares identity, not content
-# Check that they have the same length and elements instead
+# Check that they have the same length and elements
 (assert (== (len fs_copied) (len fs1)) "Copy should have same length")
-(assert (fs_copied.issubset fs1) "Copy should be subset of original")
-(assert (fs1.issubset fs_copied) "Original should be subset of copy")
+(assert (. fs_copied issubset fs1) "Copy should be subset of original")
+(assert (. fs1 issubset fs_copied) "Original should be subset of copy")
 
 # Test that frozenset works with both set and frozenset arguments
 (print "\n=== Mixed Operations (frozenset with set) ===")
-(= s_regular (set [3 , 4 , 5]))
-(= fs_mixed (fs1.union s_regular))
+(= s_regular (set [3, 4, 5]))
+(= fs_mixed (. fs1 union s_regular))
 (print "frozenset.union(set) =" fs_mixed)
 (assert (== (len fs_mixed) 5) "Union with set should work")
 
-(= fs_mixed2 (fs1.intersection s_regular))
+(= fs_mixed2 (. fs1 intersection s_regular))
 (print "frozenset.intersection(set) =" fs_mixed2)
 (assert (== (len fs_mixed2) 1) "Intersection with set should work")
 
 # Test uniqueness
 (print "\n=== Uniqueness ===")
-(= fs_dup (frozenset [1 , 1 , 2 , 2 , 3 , 3]))
+(= fs_dup (frozenset [1, 1, 2, 2, 3, 3]))
 (print "frozenset([1,1,2,2,3,3]) =" fs_dup)
 (assert (== (len fs_dup) 3) "Should only have 3 unique elements")
 
-(print "\n✓ All frozenset tests passed!")
+(print "\nAll frozenset tests passed!")

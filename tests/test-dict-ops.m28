@@ -205,7 +205,7 @@
 (= result (-> data
               (select-keys ["user_name" "user_email" "user_age"])
               (rename-keys {"user_name": "name" "user_email": "email" "user_age": "age"})
-              (map-values (lambda (v) (return (if (== (type v) string-type) (v.upper) v))))))
+              (map-values (lambda (v) (return (if (== (type v) string-type) (. v upper) v))))))
 
 (print (+ "Composed result: " (str result)))
 (assert (== (len result) 3) "Composition works")
