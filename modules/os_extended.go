@@ -275,7 +275,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 			return nil, core.NewOSError(err.Error(), string(path))
 		}
 		result := core.NewDict()
-		result.Set("st_mode", core.NumberValue(info.Mode()))
+		result.Set("st_mode", core.NumberValue(fileModeToUnixMode(info.Mode())))
 		result.Set("st_size", core.NumberValue(info.Size()))
 		return result, nil
 	}))
@@ -508,7 +508,7 @@ func (f *KwargsOSStat) CallWithKeywords(args []core.Value, kwargs map[string]cor
 	}
 
 	result := core.NewDict()
-	result.Set("st_mode", core.NumberValue(info.Mode()))
+	result.Set("st_mode", core.NumberValue(fileModeToUnixMode(info.Mode())))
 	result.Set("st_size", core.NumberValue(info.Size()))
 	result.Set("st_mtime", core.NumberValue(info.ModTime().Unix()))
 	return result, nil

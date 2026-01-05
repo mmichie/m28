@@ -299,6 +299,49 @@ func InitPosixModule() *core.DictValue {
 	return posixModule
 }
 
+// fileModeToUnixMode converts Go's os.FileMode to Unix st_mode
+// Go's FileMode uses different bit positions than Unix
+func fileModeToUnixMode(mode os.FileMode) uint32 {
+	// Unix file type constants
+	const (
+		S_IFMT   = 0o170000 // File type mask
+		S_IFDIR  = 0o040000 // Directory
+		S_IFREG  = 0o100000 // Regular file
+		S_IFLNK  = 0o120000 // Symbolic link
+		S_IFBLK  = 0o060000 // Block device
+		S_IFCHR  = 0o020000 // Character device
+		S_IFIFO  = 0o010000 // FIFO
+		S_IFSOCK = 0o140000 // Socket
+	)
+
+	var result uint32
+
+	// Determine file type
+	switch {
+	case mode.IsDir():
+		result = S_IFDIR
+	case mode&os.ModeSymlink != 0:
+		result = S_IFLNK
+	case mode&os.ModeDevice != 0:
+		if mode&os.ModeCharDevice != 0 {
+			result = S_IFCHR
+		} else {
+			result = S_IFBLK
+		}
+	case mode&os.ModeNamedPipe != 0:
+		result = S_IFIFO
+	case mode&os.ModeSocket != 0:
+		result = S_IFSOCK
+	default:
+		result = S_IFREG
+	}
+
+	// Add permission bits (lower 9 bits)
+	result |= uint32(mode.Perm())
+
+	return result
+}
+
 // KwargsPosixStat implements posix.stat with follow_symlinks keyword argument support
 type KwargsPosixStat struct {
 	core.BaseObject
@@ -366,7 +409,8 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs map[string]
 	statResult := core.NewDict()
 	statResult.SetWithKey("st_size", core.StringValue("st_size"), core.NumberValue(float64(info.Size())))
 	statResult.SetWithKey("st_mtime", core.StringValue("st_mtime"), core.NumberValue(float64(info.ModTime().Unix())))
-	statResult.SetWithKey("st_mode", core.StringValue("st_mode"), core.NumberValue(float64(info.Mode())))
+	// Convert Go's FileMode to Unix st_mode
+	statResult.SetWithKey("st_mode", core.StringValue("st_mode"), core.NumberValue(float64(fileModeToUnixMode(info.Mode()))))
 
 	// Add is_dir method
 	isDir := info.IsDir()
@@ -417,6 +461,11 @@ func (d *DirEntry) GetAttr(name string) (core.Value, bool) {
 		isSymlink := d.isSymlink
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(isSymlink), nil
+		}), true
+	case "is_junction":
+		// Junctions are Windows-specific, always False on Unix
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.BoolValue(false), nil
 		}), true
 	}
 	return nil, false

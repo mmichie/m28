@@ -130,6 +130,38 @@ func NewFile(path string, mode string) (*File, error) {
 	return f, nil
 }
 
+// NewFileFromFD creates a file object from a file descriptor
+// This is used by io.open with an opener argument (e.g., tempfile.NamedTemporaryFile)
+func NewFileFromFD(fd int, mode string) (*File, error) {
+	// Convert file descriptor to *os.File
+	osFile := os.NewFile(uintptr(fd), fmt.Sprintf("fd:%d", fd))
+	if osFile == nil {
+		return nil, &OSError{Message: fmt.Sprintf("invalid file descriptor: %d", fd)}
+	}
+
+	f := &File{
+		BaseObject: *NewBaseObject(Type("file")),
+		Path:       osFile.Name(),
+		Mode:       mode,
+		file:       osFile,
+		closed:     false,
+		isText:     !strings.Contains(mode, "b"),
+	}
+
+	// Set up reader/writer based on mode
+	if strings.Contains(mode, "r") || strings.Contains(mode, "+") {
+		f.reader = bufio.NewReader(f.file)
+	}
+	if strings.Contains(mode, "w") || strings.Contains(mode, "a") || strings.Contains(mode, "+") {
+		f.writer = bufio.NewWriter(f.file)
+	}
+
+	// Initialize the method registry
+	f.registry = f.createRegistry()
+
+	return f, nil
+}
+
 // Type returns the file type
 func (f *File) Type() Type {
 	return Type("file")
