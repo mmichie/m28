@@ -18,15 +18,72 @@ func Init_TypingModule() *core.DictValue {
 	}))
 
 	// TypeVar - class for type variables
+	// TypeVar(name, *constraints, bound=None, covariant=False, contravariant=False)
 	typeVarClass := core.NewClass("TypeVar", nil)
+	typeVarClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return core.None, nil
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		// First arg after self is the name
+		self.Attributes["__name__"] = args[1]
+		// Store constraints (remaining positional args)
+		if len(args) > 2 {
+			constraints := make([]core.Value, len(args)-2)
+			copy(constraints, args[2:])
+			self.Attributes["__constraints__"] = core.TupleValue(constraints)
+		} else {
+			self.Attributes["__constraints__"] = core.TupleValue{}
+		}
+		self.Attributes["__bound__"] = core.None
+		self.Attributes["__covariant__"] = core.BoolValue(false)
+		self.Attributes["__contravariant__"] = core.BoolValue(false)
+		return core.None, nil
+	}))
+	typeVarClass.SetMethod("__repr__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return core.StringValue("TypeVar"), nil
+		}
+		if self, ok := args[0].(*core.Instance); ok {
+			if name, found := self.Attributes["__name__"]; found {
+				return core.StringValue("~" + name.String()), nil
+			}
+		}
+		return core.StringValue("TypeVar"), nil
+	}))
 	typingModule.SetWithKey("TypeVar", core.StringValue("TypeVar"), typeVarClass)
 
 	// ParamSpec - class for parameter specifications
 	paramSpecClass := core.NewClass("ParamSpec", nil)
+	paramSpecClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return core.None, nil
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		self.Attributes["__name__"] = args[1]
+		return core.None, nil
+	}))
 	typingModule.SetWithKey("ParamSpec", core.StringValue("ParamSpec"), paramSpecClass)
 
 	// TypeVarTuple - class for type variable tuples
 	typeVarTupleClass := core.NewClass("TypeVarTuple", nil)
+	typeVarTupleClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return core.None, nil
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		self.Attributes["__name__"] = args[1]
+		return core.None, nil
+	}))
 	typingModule.SetWithKey("TypeVarTuple", core.StringValue("TypeVarTuple"), typeVarTupleClass)
 
 	// ParamSpecArgs - class for ParamSpec args

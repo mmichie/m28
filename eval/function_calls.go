@@ -677,6 +677,7 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			env:        ctx, // Capture current environment
 			isLambda:   true,
 		}
+		setFunctionModule(fn, ctx)
 
 		// Check if this is a generator function
 		return makeGeneratorFunction(fn), nil
@@ -715,6 +716,7 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		env:        ctx, // Capture current environment
 		isLambda:   true,
 	}
+	setFunctionModule(fn, ctx)
 
 	// Check if this is a generator function
 	return makeGeneratorFunction(fn), nil

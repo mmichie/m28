@@ -7,6 +7,19 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// setFunctionModule sets the __module__ attribute on a function based on
+// the current context's __name__ variable. This ensures that functions
+// defined in imported modules have the correct module reference for
+// global variable lookups.
+func setFunctionModule(fn *UserFunction, ctx *core.Context) {
+	// Look up __name__ from the context to get the current module name
+	if nameVal, err := ctx.Lookup("__name__"); err == nil {
+		if nameStr, ok := nameVal.(core.StringValue); ok {
+			fn.BaseObject.SetAttr("__module__", nameStr)
+		}
+	}
+}
+
 // unwrapLocated recursively unwraps LocatedValue wrappers from a value
 // This is necessary because AST ToIR() wraps values in LocatedValue to preserve
 // source location, but special forms need the underlying value for type assertions
@@ -50,6 +63,12 @@ func assignVariable(ctx *core.Context, name string, value core.Value) error {
 	if ctx.IsGlobal(name) {
 		// Assign to the global context
 		ctx.Global.Define(name, value)
+		// Also sync to ModuleDict for private variables (Define() skips them)
+		// This ensures module-level access like module._var reflects changes
+		if ctx.Global.ModuleDict != nil && len(name) > 0 && name[0] == '_' {
+			key := core.ValueToKey(core.StringValue(name))
+			ctx.Global.ModuleDict.SetWithKey(key, core.StringValue(name), value)
+		}
 		return nil
 	}
 
@@ -353,6 +372,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				env:        ctx,
 				name:       string(name),
 			}
+			setFunctionModule(function, ctx)
 
 			// Check if this is a generator function
 			finalFunc := makeGeneratorFunction(function)
@@ -386,6 +406,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			env:        ctx,
 			name:       string(name),
 		}
+		setFunctionModule(function, ctx)
 
 		// Check if this is a generator function
 		finalFunc := makeGeneratorFunction(function)
@@ -442,6 +463,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					env:        ctx,
 					name:       string(name),
 				}
+				setFunctionModule(function, ctx)
 
 				// Check if this is a generator function
 				finalFunc := makeGeneratorFunction(function)
@@ -485,6 +507,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				env:        ctx,
 				name:       string(name),
 			}
+			setFunctionModule(function, ctx)
 
 			// Check if this is a generator function
 			finalFunc := makeGeneratorFunction(function)

@@ -361,6 +361,9 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 // partialModule is the dict that will be populated during evaluation for circular import support
 func (l *ModuleLoaderEnhanced) createModuleContext(cacheName, path string, partialModule *DictValue) *Context {
 	moduleCtx := NewContext(l.ctx.Global)
+	// Important: Set the module context's Global to itself, not the parent.
+	// In Python, 'global' refers to the module's namespace, not builtins.
+	moduleCtx.Global = moduleCtx
 	// Link the context to the partial module dict for real-time syncing
 	moduleCtx.ModuleDict = partialModule
 	moduleCtx.Define("__name__", StringValue(cacheName))

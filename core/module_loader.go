@@ -106,6 +106,9 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 
 	// Create a new module context
 	moduleCtx := NewContext(l.ctx.Global)
+	// Important: Set the module context's Global to itself, not the parent.
+	// In Python, 'global' refers to the module's namespace, not builtins.
+	moduleCtx.Global = moduleCtx
 
 	// Define the special __name__ variable
 	moduleCtx.Define("__name__", StringValue(cacheName))

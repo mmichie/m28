@@ -1387,6 +1387,7 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 			env:        ctx,
 			name:       name,
 		}
+		setFunctionModule(method, ctx)
 
 		// Check if this is a generator function (contains yield) and wrap it
 		return makeGeneratorFunction(method), nil
@@ -1420,6 +1421,7 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 		env:        ctx,
 		name:       name,
 	}
+	setFunctionModule(method, ctx)
 
 	// Check if this is a generator function (contains yield) and wrap it
 	return makeGeneratorFunction(method), nil

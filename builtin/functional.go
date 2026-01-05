@@ -35,6 +35,85 @@ func RegisterFunctional(ctx *core.Context) {
 	ctx.Define("any", core.NewBuiltinFunction(AnyBuilder()))
 }
 
+// MapIterator is a lazy iterator that applies a function to each element
+type MapIterator struct {
+	fn               core.Callable
+	iterators        []core.Iterator
+	originalIterables []core.Iterable
+	ctx              *core.Context
+	exhausted        bool
+}
+
+// Type returns the type name
+func (m *MapIterator) Type() core.Type {
+	return "map"
+}
+
+// String returns a string representation
+func (m *MapIterator) String() string {
+	return "<map object>"
+}
+
+// Iterator returns self (map objects are their own iterators)
+func (m *MapIterator) Iterator() core.Iterator {
+	return m
+}
+
+// Next returns the next mapped value
+func (m *MapIterator) Next() (core.Value, bool) {
+	if m.exhausted {
+		return nil, false
+	}
+
+	// Collect values from all iterators
+	args := make([]core.Value, len(m.iterators))
+	for i, iter := range m.iterators {
+		val, hasNext := iter.Next()
+		if !hasNext {
+			m.exhausted = true
+			return nil, false
+		}
+		args[i] = val
+	}
+
+	// Apply the function
+	result, err := m.fn.Call(args, m.ctx)
+	if err != nil {
+		// In case of error, stop iteration
+		m.exhausted = true
+		return nil, false
+	}
+
+	return result, true
+}
+
+// Reset resets the iterator to the beginning
+func (m *MapIterator) Reset() {
+	m.exhausted = false
+	for i, iterable := range m.originalIterables {
+		m.iterators[i] = iterable.Iterator()
+	}
+}
+
+// GetAttr implements attribute access for map objects
+func (m *MapIterator) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return m, nil
+		}), true
+	case "__next__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			val, hasNext := m.Next()
+			if !hasNext {
+				return nil, &core.StopIteration{}
+			}
+			return val, nil
+		}), true
+	}
+	return nil, false
+}
+
 // MapBuilder creates the map function
 func MapBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -50,36 +129,26 @@ func MapBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
-		// Get all iterables
+		// Get all iterables and create their iterators
 		iterables := make([]core.Iterable, v.Count()-1)
+		iterators := make([]core.Iterator, v.Count()-1)
 		for i := 1; i < v.Count(); i++ {
 			iter, err := types.RequireIterable(v.Get(i), "map() argument")
 			if err != nil {
 				return nil, err
 			}
 			iterables[i-1] = iter
+			iterators[i-1] = iter.Iterator()
 		}
 
-		// TODO(M28-5beb): Return map iterator when implemented
-		// For now, return a simple list implementation
-		result := make([]core.Value, 0)
-		// This is a simplified implementation for demonstration
-		if len(iterables) > 0 {
-			// Just handle single iterable case for now
-			iter := iterables[0].Iterator()
-			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				mapped, err := fn.Call([]core.Value{val}, ctx)
-				if err != nil {
-					return nil, err
-				}
-				result = append(result, mapped)
-			}
-		}
-		return core.NewList(result...), nil
+		// Return a lazy map iterator
+		return &MapIterator{
+			fn:                fn,
+			iterators:         iterators,
+			originalIterables: iterables,
+			ctx:               ctx,
+			exhausted:         false,
+		}, nil
 	}
 }
 

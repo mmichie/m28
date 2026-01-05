@@ -331,6 +331,27 @@ func structPack(format string, values []core.Value) ([]byte, error) {
 				}
 				result = append(result, byte(uint8(num)))
 
+			case 'c': // char (single byte from bytes object)
+				if valueIdx >= len(values) {
+					return nil, &core.TypeError{Message: "pack() requires more arguments"}
+				}
+				val := values[valueIdx]
+				valueIdx++
+				switch v := val.(type) {
+				case core.BytesValue:
+					if len(v) != 1 {
+						return nil, &core.TypeError{Message: "char format requires a bytes object of length 1"}
+					}
+					result = append(result, v[0])
+				case core.StringValue:
+					if len(v) != 1 {
+						return nil, &core.TypeError{Message: "char format requires a bytes object of length 1"}
+					}
+					result = append(result, v[0])
+				default:
+					return nil, &core.TypeError{Message: "char format requires a bytes object of length 1"}
+				}
+
 			case 'h': // signed short
 				if valueIdx >= len(values) {
 					return nil, &core.TypeError{Message: "pack() requires more arguments"}
@@ -402,6 +423,20 @@ func structPack(format string, values []core.Value) ([]byte, error) {
 				result = append(result, buf...)
 
 			case 'Q': // unsigned long long
+				if valueIdx >= len(values) {
+					return nil, &core.TypeError{Message: "pack() requires more arguments"}
+				}
+				val := values[valueIdx]
+				valueIdx++
+				num, err := toInt64(val)
+				if err != nil {
+					return nil, err
+				}
+				buf := make([]byte, 8)
+				byteOrder.PutUint64(buf, uint64(num))
+				result = append(result, buf...)
+
+			case 'P', 'n', 'N': // pointer, ssize_t, size_t (8 bytes on 64-bit)
 				if valueIdx >= len(values) {
 					return nil, &core.TypeError{Message: "pack() requires more arguments"}
 				}
@@ -559,6 +594,13 @@ func structUnpack(format string, buffer []byte) ([]core.Value, error) {
 				result = append(result, core.NumberValue(float64(buffer[bufIdx])))
 				bufIdx++
 
+			case 'c': // char (single byte as bytes object)
+				if bufIdx >= len(buffer) {
+					return nil, &core.ValueError{Message: fmt.Sprintf("unpack requires a buffer of %d bytes", bufIdx+1)}
+				}
+				result = append(result, core.BytesValue([]byte{buffer[bufIdx]}))
+				bufIdx++
+
 			case 'h': // signed short
 				if bufIdx+2 > len(buffer) {
 					return nil, &core.ValueError{Message: fmt.Sprintf("unpack requires a buffer of %d bytes", bufIdx+2)}
@@ -600,6 +642,14 @@ func structUnpack(format string, buffer []byte) ([]core.Value, error) {
 				bufIdx += 8
 
 			case 'Q': // unsigned long long
+				if bufIdx+8 > len(buffer) {
+					return nil, &core.ValueError{Message: fmt.Sprintf("unpack requires a buffer of %d bytes", bufIdx+8)}
+				}
+				val := byteOrder.Uint64(buffer[bufIdx : bufIdx+8])
+				result = append(result, core.NumberValue(float64(val)))
+				bufIdx += 8
+
+			case 'P', 'n', 'N': // pointer, ssize_t, size_t (8 bytes on 64-bit)
 				if bufIdx+8 > len(buffer) {
 					return nil, &core.ValueError{Message: fmt.Sprintf("unpack requires a buffer of %d bytes", bufIdx+8)}
 				}
@@ -676,13 +726,15 @@ func structCalcsize(format string) (int, error) {
 		}
 
 		switch ch {
-		case 'x', '?', 'b', 'B':
+		case 'x', 'c', '?', 'b', 'B':
 			size += count
 		case 'h', 'H':
 			size += 2 * count
 		case 'i', 'I', 'l', 'L', 'f':
 			size += 4 * count
-		case 'q', 'Q', 'd':
+		case 'q', 'Q', 'd', 'P', 'n', 'N':
+			// P = pointer (platform dependent, 8 bytes on 64-bit)
+			// n = ssize_t, N = size_t (both 8 bytes on 64-bit)
 			size += 8 * count
 		case 's', 'p':
 			size += count

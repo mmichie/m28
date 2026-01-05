@@ -31,6 +31,13 @@ func Init_CtypesModule() *core.DictValue {
 		}
 		return core.None, nil
 	}))
+	// from_param - classmethod for converting Python values to C parameters
+	simpleCDataClass.SetMethod("from_param", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) > 0 {
+			return args[0], nil
+		}
+		return core.None, nil
+	}))
 	module.Set("_SimpleCData", simpleCDataClass)
 
 	// PyCSimpleType - metaclass for simple C types
@@ -117,6 +124,26 @@ func Init_CtypesModule() *core.DictValue {
 	// CFuncPtr - base class for C function pointers
 	cfuncptrClass := core.NewClass("CFuncPtr", nil)
 	cfuncptrClass.Module = "_ctypes"
+	// CFuncPtr can be called with an address or callable
+	cfuncptrClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return core.None, nil
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		if len(args) > 1 {
+			// Store the address or callable
+			self.Attributes["_addr"] = args[1]
+		}
+		return core.None, nil
+	}))
+	// Make instances callable
+	cfuncptrClass.SetMethod("__call__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Stub - just return None for now
+		return core.None, nil
+	}))
 	module.Set("CFuncPtr", cfuncptrClass)
 
 	// ArgumentError - exception raised for invalid arguments
@@ -195,7 +222,40 @@ func Init_CtypesModule() *core.DictValue {
 	// sizeof - get the size of a ctypes type or instance
 	module.Set("sizeof", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			// Return a reasonable default size
+			if len(args) < 1 {
+				return nil, &core.TypeError{Message: "sizeof() takes exactly 1 argument"}
+			}
+
+			// Get the type object (either directly or from instance's class)
+			typeObj := args[0]
+			if inst, ok := args[0].(*core.Instance); ok {
+				typeObj = inst.Class
+			}
+
+			// Try to get _type_ attribute (struct format code)
+			if obj, ok := typeObj.(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				if typeAttr, found := obj.GetAttr("_type_"); found {
+					if typeStr, ok := typeAttr.(core.StringValue); ok {
+						// Use struct.calcsize to get the size
+						size := ctypesSizeofFormat(string(typeStr))
+						return core.NumberValue(size), nil
+					}
+				}
+			}
+
+			// Also check class attributes for Class types
+			if cls, ok := typeObj.(*core.Class); ok {
+				if typeAttr, found := cls.GetAttr("_type_"); found {
+					if typeStr, ok := typeAttr.(core.StringValue); ok {
+						size := ctypesSizeofFormat(string(typeStr))
+						return core.NumberValue(size), nil
+					}
+				}
+			}
+
+			// Default size for unknown types
 			return core.NumberValue(8), nil
 		}))
 
@@ -221,9 +281,89 @@ func Init_CtypesModule() *core.DictValue {
 	// POINTER - create a pointer type
 	module.Set("POINTER", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			// Return the pointer class
-			return pointerClass, nil
+			// Create a new pointer type class for each call
+			// This allows setting attributes like from_param on individual pointer types
+			ptrType := core.NewClassWithParents("LP_c_type", []*core.Class{pointerClass})
+			ptrType.Module = "_ctypes"
+			if len(args) > 0 {
+				ptrType.SetAttr("_type_", args[0])
+			}
+			// from_param - classmethod for converting Python values to C parameters
+			ptrType.SetMethod("from_param", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+				if len(args) > 0 {
+					return args[0], nil
+				}
+				return core.None, nil
+			}))
+			return ptrType, nil
+		}))
+
+	// _pointer_type_cache - dict used to cache pointer types
+	// This is imported by ctypes/__init__.py
+	pointerTypeCache := core.NewDict()
+	module.Set("_pointer_type_cache", pointerTypeCache)
+
+	// _cast - internal cast function
+	module.Set("_cast", core.NewBuiltinFunction(
+		func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 2 {
+				return core.None, nil
+			}
+			// Return first argument for now (no-op cast)
+			return args[0], nil
+		}))
+
+	// _string_at - get string at address
+	module.Set("_string_at", core.NewBuiltinFunction(
+		func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.BytesValue(""), nil
+		}))
+
+	// _wstring_at - get wstring at address
+	module.Set("_wstring_at", core.NewBuiltinFunction(
+		func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.StringValue(""), nil
 		}))
 
 	return module
+}
+
+// ctypesSizeofFormat returns the size in bytes for a ctypes format character
+// These match Python's struct format codes
+func ctypesSizeofFormat(format string) int {
+	if len(format) == 0 {
+		return 0
+	}
+
+	// Handle the format character
+	switch format[0] {
+	case 'c', 'b', 'B': // char, signed/unsigned char
+		return 1
+	case 'h', 'H': // short, unsigned short
+		return 2
+	case 'i', 'I', 'l', 'L': // int/long, unsigned int/long (4 bytes on most platforms)
+		return 4
+	case 'q', 'Q': // long long, unsigned long long
+		return 8
+	case 'n', 'N': // ssize_t, size_t
+		return 8
+	case 'f': // float
+		return 4
+	case 'd': // double
+		return 8
+	case 'g': // long double (platform-dependent, 16 on many systems)
+		return 16
+	case 'P': // pointer
+		return 8
+	case 'z', 'Z': // c_char_p, c_wchar_p (pointers)
+		return 8
+	case 'O': // py_object (pointer)
+		return 8
+	case '?': // bool
+		return 1
+	case 'u': // wchar_t (platform-dependent)
+		return 4
+	default:
+		return 8 // Default to pointer size
+	}
 }
