@@ -19,7 +19,7 @@
 (print "  Received:" (nth result 0))
 (print "  Channel open:" (nth result 1))
 (= test-val (nth result 0))
-(assert (= test-val 42) "Should receive 42 from channel")
+(assert (== test-val 42) "Should receive 42 from channel")
 (assert (nth result 1) "Channel should still be open")
 
 # Test 3: try-send and try-recv
@@ -41,7 +41,7 @@
 (print "  Success:" (nth recv-result1 1))
 (print "  Channel open:" (nth recv-result1 2))
 (= test-val (nth recv-result1 0))
-(assert (= test-val "hello") "Should receive 'hello' from channel")
+(assert (== test-val "hello") "Should receive 'hello' from channel")
 (assert (nth recv-result1 1) "try-recv success flag should be true")
 (assert (nth recv-result1 2) "Channel should still be open")
 
@@ -80,7 +80,7 @@
 (= result (recv ch))
 (print "  Goroutine sent:" (nth result 0))
 (= msg (nth result 0))
-(assert (= msg "done") "Goroutine should send 'done'")
+(assert (== msg "done") "Goroutine should send 'done'")
 
 # Test 6: Multiple goroutines
 (print "Test 6: Multiple goroutines")
@@ -101,6 +101,6 @@
   (print "  Received from goroutine:" value))
 
 (print "  Total sum:" sum)
-(assert (= sum 10) "Sum of 0+1+2+3+4 should be 10")
+(assert (== sum 10) "Sum of 0+1+2+3+4 should be 10")
 
 (print "All concurrency tests passed!")
