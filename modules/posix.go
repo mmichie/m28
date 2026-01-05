@@ -3,6 +3,7 @@ package modules
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/mmichie/m28/core"
 )
@@ -374,6 +375,150 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs map[string]
 	return statResult, nil
 }
 
+// DirEntry represents a directory entry from os.scandir
+// Supports attribute access for name, path, and methods is_dir(), is_file(), is_symlink()
+type DirEntry struct {
+	core.BaseObject
+	name      string
+	path      string
+	isDir     bool
+	isSymlink bool
+}
+
+// Type returns the type name
+func (d *DirEntry) Type() core.Type {
+	return core.Type("DirEntry")
+}
+
+// String returns a string representation
+func (d *DirEntry) String() string {
+	return fmt.Sprintf("<DirEntry '%s'>", d.name)
+}
+
+// GetAttr implements Object interface for attribute access
+func (d *DirEntry) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "name":
+		return core.StringValue(d.name), true
+	case "path":
+		return core.StringValue(d.path), true
+	case "is_dir":
+		isDir := d.isDir
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.BoolValue(isDir), nil
+		}), true
+	case "is_file":
+		isDir := d.isDir
+		isSymlink := d.isSymlink
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.BoolValue(!isDir && !isSymlink), nil
+		}), true
+	case "is_symlink":
+		isSymlink := d.isSymlink
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.BoolValue(isSymlink), nil
+		}), true
+	}
+	return nil, false
+}
+
+// SetAttr implements Object interface
+func (d *DirEntry) SetAttr(name string, value core.Value) error {
+	return fmt.Errorf("DirEntry does not support attribute assignment")
+}
+
+// ScandirIterator wraps directory entries with context manager support
+// This is needed because CPython's os.walk uses "with scandir_it:" syntax
+type ScandirIterator struct {
+	core.BaseObject
+	entries []os.DirEntry
+	path    string
+	index   int
+	closed  bool
+}
+
+// Type returns the type name
+func (s *ScandirIterator) Type() core.Type {
+	return core.Type("ScandirIterator")
+}
+
+// GetAttr implements Object interface
+func (s *ScandirIterator) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__enter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return s, nil
+		}), true
+	case "__exit__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			s.closed = true
+			return core.Nil, nil
+		}), true
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return s, nil
+		}), true
+	case "__next__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return s.Next()
+		}), true
+	case "close":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			s.closed = true
+			return core.Nil, nil
+		}), true
+	}
+	return nil, false
+}
+
+// SetAttr implements Object interface
+func (s *ScandirIterator) SetAttr(name string, value core.Value) error {
+	return fmt.Errorf("ScandirIterator does not support attribute assignment")
+}
+
+// Next returns the next DirEntry or signals StopIteration
+func (s *ScandirIterator) Next() (core.Value, error) {
+	if s.closed || s.index >= len(s.entries) {
+		return nil, &core.StopIteration{}
+	}
+
+	entry := s.entries[s.index]
+	s.index++
+
+	// Create a proper DirEntry object with attribute access
+	dirEntry := &DirEntry{
+		name:      entry.Name(),
+		path:      filepath.Join(s.path, entry.Name()),
+		isDir:     entry.IsDir(),
+		isSymlink: entry.Type()&os.ModeSymlink != 0,
+	}
+
+	return dirEntry, nil
+}
+
+// Iterator returns the iterator (self)
+func (s *ScandirIterator) Iterator() core.Iterator {
+	return &scandirCoreIterator{s: s}
+}
+
+// scandirCoreIterator adapts ScandirIterator to core.Iterator
+type scandirCoreIterator struct {
+	s *ScandirIterator
+}
+
+func (i *scandirCoreIterator) Next() (core.Value, bool) {
+	val, err := i.s.Next()
+	if err != nil {
+		return nil, false
+	}
+	return val, true
+}
+
+func (i *scandirCoreIterator) Reset() {
+	i.s.index = 0
+	i.s.closed = false
+}
+
 // posixScandir implements a simplified scandir function
 // Returns an iterator of DirEntry objects for a directory
 func posixScandir(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -395,19 +540,11 @@ func posixScandir(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, core.NewOSError(err.Error(), path)
 	}
 
-	// Create a list of DirEntry-like objects
-	result := core.NewList()
-	for _, entry := range entries {
-		dirEntry := core.NewDict()
-		dirEntry.SetWithKey("name", core.StringValue("name"), core.StringValue(entry.Name()))
-		dirEntry.SetWithKey("is_dir", core.StringValue("is_dir"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			return core.BoolValue(entry.IsDir()), nil
-		}))
-		dirEntry.SetWithKey("is_file", core.StringValue("is_file"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			return core.BoolValue(!entry.IsDir()), nil
-		}))
-		result.Append(dirEntry)
-	}
-
-	return result, nil
+	// Return a ScandirIterator with context manager support
+	return &ScandirIterator{
+		entries: entries,
+		path:    path,
+		index:   0,
+		closed:  false,
+	}, nil
 }
