@@ -1,20 +1,63 @@
 package modules
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/mmichie/m28/core"
 )
 
 // Init_WarningsModule creates and returns the _warnings module stub
-// This is a minimal stub that provides just enough for importlib to work.
-// It intentionally does NOT provide warn/warn_explicit so that warnings.py
-// uses its pure Python fallback implementation which has full functionality.
+// This is a minimal stub that provides the C extension interface for warnings.py
 func Init_WarningsModule() *core.DictValue {
 	warningsModule := core.NewDict()
 
-	// NOTE: We intentionally do NOT provide warn() and warn_explicit() here.
-	// When warnings.py tries "from _warnings import warn", it will fail for those
-	// specific imports and fall back to its pure Python implementation.
-	// This gives us full warning functionality without implementing the C extension.
+	// warn - emit a warning message
+	warningsModule.Set("warn", &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "warn",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("warn() missing required argument: 'message'")
+			}
+			message := core.PrintValue(args[0])
+			category := "UserWarning"
+			if len(args) >= 2 {
+				if str, ok := args[1].(core.StringValue); ok {
+					category = string(str)
+				} else if cls, ok := args[1].(*core.Class); ok {
+					category = cls.Name
+				}
+			}
+			fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
+			return core.None, nil
+		},
+	})
+
+	// warn_explicit - emit a warning with explicit location
+	warningsModule.Set("warn_explicit", &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "warn_explicit",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 4 {
+				return nil, fmt.Errorf("warn_explicit() requires at least 4 arguments")
+			}
+			message := core.PrintValue(args[0])
+			category := "Warning"
+			if str, ok := args[1].(core.StringValue); ok {
+				category = string(str)
+			} else if cls, ok := args[1].(*core.Class); ok {
+				category = cls.Name
+			}
+			filename := core.PrintValue(args[2])
+			lineno := 0
+			if num, ok := args[3].(core.NumberValue); ok {
+				lineno = int(num)
+			}
+			fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, message)
+			return core.None, nil
+		},
+	})
 
 	// filters - list of warning filters
 	warningsModule.Set("filters", core.NewList())
