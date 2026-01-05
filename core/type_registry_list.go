@@ -158,6 +158,100 @@ func getListMethods() map[string]*MethodDescriptor {
 				return NewList(result...), nil
 			},
 		},
+		"get": {
+			Name:    "get",
+			Arity:   1,
+			Doc:     "Get item by index (M28 convenience method)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				list := receiver.(*ListValue)
+				if len(args) != 1 {
+					return nil, &TypeError{Message: fmt.Sprintf("get() takes exactly 1 argument (%d given)", len(args))}
+				}
+				idx, ok := args[0].(NumberValue)
+				if !ok {
+					return nil, &TypeError{Message: "list indices must be integers"}
+				}
+				index := int(idx)
+				if index < 0 {
+					index = list.Len() + index
+				}
+				if index < 0 || index >= list.Len() {
+					return nil, &IndexError{Index: int(idx), Length: list.Len()}
+				}
+				return list.Items()[index], nil
+			},
+		},
+		"contains": {
+			Name:    "contains",
+			Arity:   1,
+			Doc:     "Check if list contains a value (M28 convenience method)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				list := receiver.(*ListValue)
+				if len(args) != 1 {
+					return nil, &TypeError{Message: fmt.Sprintf("contains() takes exactly 1 argument (%d given)", len(args))}
+				}
+				for _, item := range list.Items() {
+					if EqualValues(item, args[0]) {
+						return BoolValue(true), nil
+					}
+				}
+				return BoolValue(false), nil
+			},
+		},
+		"map": {
+			Name:    "map",
+			Arity:   1,
+			Doc:     "Apply a function to all elements and return a new list (M28 convenience method)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				list := receiver.(*ListValue)
+				if len(args) != 1 {
+					return nil, &TypeError{Message: fmt.Sprintf("map() takes exactly 1 argument (%d given)", len(args))}
+				}
+				fn, ok := args[0].(Callable)
+				if !ok {
+					return nil, &TypeError{Message: "map() argument must be callable"}
+				}
+				result := NewList()
+				for _, item := range list.Items() {
+					mapped, err := fn.Call([]Value{item}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					result.Append(mapped)
+				}
+				return result, nil
+			},
+		},
+		"filter": {
+			Name:    "filter",
+			Arity:   1,
+			Doc:     "Return a new list with elements that satisfy the predicate (M28 convenience method)",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				list := receiver.(*ListValue)
+				if len(args) != 1 {
+					return nil, &TypeError{Message: fmt.Sprintf("filter() takes exactly 1 argument (%d given)", len(args))}
+				}
+				fn, ok := args[0].(Callable)
+				if !ok {
+					return nil, &TypeError{Message: "filter() argument must be callable"}
+				}
+				result := NewList()
+				for _, item := range list.Items() {
+					pred, err := fn.Call([]Value{item}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					if IsTruthy(pred) {
+						result.Append(item)
+					}
+				}
+				return result, nil
+			},
+		},
 		"__len__": {
 			Name:    "__len__",
 			Arity:   0,

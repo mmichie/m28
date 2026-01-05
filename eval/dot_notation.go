@@ -3,6 +3,7 @@ package eval
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mmichie/m28/common/suggestions"
 	"github.com/mmichie/m28/core"
@@ -22,11 +23,17 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("error evaluating object: %v", err)
 	}
 
-	// Get the property name
+	// Get the property name - can be a string or symbol
 	propVal := unwrapLocated(args.Items()[1])
-	propName, ok := propVal.(core.StringValue)
-	if !ok {
-		return nil, fmt.Errorf("property name must be a string, got %T", propVal)
+	var propName core.StringValue
+	switch v := propVal.(type) {
+	case core.StringValue:
+		propName = v
+	case core.SymbolValue:
+		// Convert symbol to string for property access
+		propName = core.StringValue(v)
+	default:
+		return nil, fmt.Errorf("property name must be a string or symbol, got %T", propVal)
 	}
 
 	// Check if it's a numeric index
@@ -296,41 +303,47 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return value, nil
 	}
 
+	// Special handling for basic types that don't implement Object (or implement it partially)
+	// These type-specific handlers are tried when GetAttr didn't find the attribute
 	if !found {
-		// Generate suggestion based on available attributes
-		availableAttrs := getAvailableAttributes(obj)
-		suggestion := generateAttributeSuggestion(string(propName), availableAttrs)
-		return nil, &core.AttributeError{
-			ObjType:    string(obj.Type()),
-			AttrName:   string(propName),
-			Suggestion: suggestion,
+		// Check if it's a method call (has args or __call__ marker)
+		isMethodCall := args.Len() > 2
+		methodArgs := args.Items()[2:]
+
+		// Check for __call__ marker
+		if isMethodCall && args.Len() == 3 {
+			unwrapped := unwrapLocated(args.Items()[2])
+			if str, ok := unwrapped.(core.StringValue); ok && string(str) == "__call__" {
+				// It's a method call with no args
+				methodArgs = []core.Value{}
+			}
+		}
+
+		switch v := obj.(type) {
+		case *core.ListValue:
+			return getListAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
+		case core.StringValue:
+			return getStringAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
+		case *core.DictValue:
+			return getDictAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
+		case *core.SetValue:
+			return getSetAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
+		case core.TupleValue:
+			return getTupleAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
+		default:
+			// Generate suggestion based on available attributes
+			availableAttrs := getAvailableAttributes(obj)
+			suggestion := generateAttributeSuggestion(string(propName), availableAttrs)
+			return nil, &core.AttributeError{
+				ObjType:    string(obj.Type()),
+				AttrName:   string(propName),
+				Suggestion: suggestion,
+			}
 		}
 	}
 
-	// Special handling for basic types that don't implement Object
-	// Check if it's a method call (has args or __call__ marker)
-	isMethodCall := args.Len() > 2
-	methodArgs := args.Items()[2:]
-
-	// Check for __call__ marker
-	if isMethodCall && args.Len() == 3 {
-		unwrapped := unwrapLocated(args.Items()[2])
-		if str, ok := unwrapped.(core.StringValue); ok && string(str) == "__call__" {
-			// It's a method call with no args
-			methodArgs = []core.Value{}
-		}
-	}
-
-	switch v := obj.(type) {
-	case *core.ListValue:
-		return getListAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
-	case core.StringValue:
-		return getStringAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
-	case *core.DictValue:
-		return getDictAttr(v, string(propName), isMethodCall, core.NewList(methodArgs...), ctx)
-	default:
-		return nil, fmt.Errorf("%s does not support attribute access", obj.Type())
-	}
+	// This should not be reached - found was true and should have been handled above
+	return nil, fmt.Errorf("unexpected state: attribute '%s' found but not handled", string(propName))
 }
 
 // getByIndex gets a value by numeric index
@@ -371,37 +384,63 @@ func getByIndex(obj core.Value, idx int) (core.Value, error) {
 
 // getListAttr handles attribute access for lists
 func getListAttr(lst *core.ListValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
-	// Check for list methods
-	switch attr {
-	case "append":
-		if !isCall {
-			return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("append() takes exactly one argument")
-				}
-				lst.Append(args[0])
-				return core.Nil, nil
-			}), nil
-		}
-		// Direct call
-		if args.Len() != 1 {
-			return nil, fmt.Errorf("append() takes exactly one argument")
-		}
-		val, err := Eval(args.Items()[0], ctx)
-		if err != nil {
-			return nil, err
-		}
-		lst.Append(val)
-		return core.Nil, nil
+	// Get the type descriptor for list
+	td := core.GetTypeDescriptor("list")
 
+	// Handle special M28 type protocol attributes that auto-call
+	// These are accessed as properties but behave as method calls
+	switch attr {
 	case "length", "len":
 		return core.NumberValue(lst.Len()), nil
 
-	default:
-		return nil, &core.AttributeError{
-			ObjType:  "list",
-			AttrName: attr,
+	case "pop":
+		// (. list pop) should call pop() with no args (remove last element)
+		// (. list pop 0) should call pop(0) (remove element at index 0)
+		if td != nil {
+			if method, ok := td.Methods["pop"]; ok && method.Handler != nil {
+				evalArgs := make([]core.Value, args.Len())
+				for i, arg := range args.Items() {
+					var err error
+					evalArgs[i], err = Eval(arg, ctx)
+					if err != nil {
+						return nil, err
+					}
+				}
+				return method.Handler(lst, evalArgs, ctx)
+			}
 		}
+		return nil, &core.AttributeError{ObjType: "list", AttrName: attr}
+	}
+
+	// Check type descriptor for other methods
+	if td != nil {
+		if method, ok := td.Methods[attr]; ok {
+			if !isCall {
+				// Return bound method
+				return &core.BoundMethod{
+					Receiver: lst,
+					Method:   method,
+					TypeDesc: td,
+				}, nil
+			}
+			// Direct call
+			if method.Handler != nil {
+				evalArgs := make([]core.Value, args.Len())
+				for i, arg := range args.Items() {
+					var err error
+					evalArgs[i], err = Eval(arg, ctx)
+					if err != nil {
+						return nil, err
+					}
+				}
+				return method.Handler(lst, evalArgs, ctx)
+			}
+		}
+	}
+
+	return nil, &core.AttributeError{
+		ObjType:  "list",
+		AttrName: attr,
 	}
 }
 
@@ -409,6 +448,59 @@ func getListAttr(lst *core.ListValue, attr string, isCall bool, args *core.ListV
 func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Get the type descriptor for string
 	td := core.GetTypeDescriptor("string")
+
+	// Handle special M28 type protocol attributes that auto-call
+	// These are accessed as properties but behave as method calls
+	switch attr {
+	case "length", "len":
+		return core.NumberValue(len(string(str))), nil
+
+	case "upper":
+		return core.StringValue(strings.ToUpper(string(str))), nil
+
+	case "lower":
+		return core.StringValue(strings.ToLower(string(str))), nil
+
+	case "strip":
+		return core.StringValue(strings.TrimSpace(string(str))), nil
+
+	case "lstrip":
+		return core.StringValue(strings.TrimLeft(string(str), " \t\n\r")), nil
+
+	case "rstrip":
+		return core.StringValue(strings.TrimRight(string(str), " \t\n\r")), nil
+
+	case "contains":
+		// Need an argument for contains
+		if td != nil {
+			if method, ok := td.Methods["contains"]; ok && method.Handler != nil {
+				evalArgs := make([]core.Value, args.Len())
+				for i, arg := range args.Items() {
+					var err error
+					evalArgs[i], err = Eval(arg, ctx)
+					if err != nil {
+						return nil, err
+					}
+				}
+				return method.Handler(str, evalArgs, ctx)
+			}
+		}
+		// Fallback: implement directly
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("contains() requires an argument")
+		}
+		subVal, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		subStr, ok := subVal.(core.StringValue)
+		if !ok {
+			return nil, fmt.Errorf("contains() argument must be a string")
+		}
+		return core.BoolValue(strings.Contains(string(str), string(subStr))), nil
+	}
+
+	// Check type descriptor for other methods
 	if td != nil {
 		if method, ok := td.Methods[attr]; ok {
 			if !isCall {
@@ -434,27 +526,129 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.Li
 		}
 	}
 
-	// Fallback for basic attributes
-	switch attr {
-	case "length", "len":
-		return core.NumberValue(len(string(str))), nil
-	default:
-		return nil, &core.AttributeError{
-			ObjType:  "string",
-			AttrName: attr,
-		}
+	return nil, &core.AttributeError{
+		ObjType:  "string",
+		AttrName: attr,
 	}
 }
 
 // getDictAttr handles attribute access for dicts
 func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Get the type descriptor for dict
+	td := core.GetTypeDescriptor("dict")
+
+	// Handle special M28 type protocol attributes that auto-call
+	switch attr {
+	case "length", "len":
+		return core.NumberValue(dict.Size()), nil
+
+	case "contains":
+		// Need an argument for contains
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("contains() requires an argument")
+		}
+		keyVal, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		_, exists := dict.GetValue(keyVal)
+		return core.BoolValue(exists), nil
+
+	case "keys":
+		// Return list of keys
+		origKeys := dict.OriginalKeys()
+		result := core.NewList()
+		for _, key := range origKeys {
+			result.Append(key)
+		}
+		return result, nil
+
+	case "values":
+		// Return list of values
+		result := core.NewList()
+		for _, key := range dict.OriginalKeys() {
+			if val, exists := dict.GetValue(key); exists {
+				result.Append(val)
+			}
+		}
+		return result, nil
+
+	case "items":
+		// Return list of [key, value] tuples
+		result := core.NewList()
+		for _, key := range dict.OriginalKeys() {
+			if val, exists := dict.GetValue(key); exists {
+				result.Append(core.TupleValue{key, val})
+			}
+		}
+		return result, nil
+
+	case "set":
+		// Set a key-value pair
+		if args.Len() < 2 {
+			return nil, fmt.Errorf("set() requires key and value arguments")
+		}
+		keyVal, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		valVal, err := Eval(args.Items()[1], ctx)
+		if err != nil {
+			return nil, err
+		}
+		dict.SetValue(keyVal, valVal)
+		return core.Nil, nil
+
+	case "delete":
+		// Delete a key
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("delete() requires a key argument")
+		}
+		keyVal, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		dict.DeleteValue(keyVal)
+		return core.Nil, nil
+
+	case "clear":
+		// Clear all entries by deleting each key
+		// Make a copy of keys to avoid modifying while iterating
+		keys := make([]string, len(dict.Keys()))
+		copy(keys, dict.Keys())
+		for _, key := range keys {
+			dict.Delete(key)
+		}
+		return core.Nil, nil
+
+	case "update":
+		// Update with another dict
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("update() requires an argument")
+		}
+		otherArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		other, ok := otherArg.(*core.DictValue)
+		if !ok {
+			return nil, fmt.Errorf("update() argument must be a dict")
+		}
+		// Copy all entries from other to dict
+		for _, key := range other.OriginalKeys() {
+			if val, exists := other.GetValue(key); exists {
+				dict.SetValue(key, val)
+			}
+		}
+		return core.Nil, nil
+	}
+
 	// First, check if it's a dictionary key access
 	if val, exists := dict.Get(attr); exists {
 		return val, nil
 	}
 
 	// Otherwise, check for dict methods
-	td := core.GetTypeDescriptor("dict")
 	if td != nil {
 		if method, ok := td.Methods[attr]; ok {
 			if !isCall {
@@ -487,6 +681,224 @@ func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.List
 		ObjType:    "dict",
 		AttrName:   attr,
 		Suggestion: suggestion,
+	}
+}
+
+// getSetAttr handles attribute access for sets
+func getSetAttr(set *core.SetValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Get the type descriptor for set
+	td := core.GetTypeDescriptor("set")
+
+	// Handle special M28 type protocol attributes that auto-call
+	switch attr {
+	case "length", "len":
+		return core.NumberValue(set.Size()), nil
+
+	case "contains":
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("contains() requires an argument")
+		}
+		valArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		return core.BoolValue(set.Contains(valArg)), nil
+
+	case "add":
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("add() requires an argument")
+		}
+		valArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		set.Add(valArg)
+		return core.Nil, nil
+
+	case "remove":
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("remove() requires an argument")
+		}
+		valArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		set.Remove(valArg)
+		return core.Nil, nil
+
+	case "union":
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("union() requires an argument")
+		}
+		otherArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		other, ok := otherArg.(*core.SetValue)
+		if !ok {
+			return nil, fmt.Errorf("union() argument must be a set")
+		}
+		result := core.NewSet()
+		for _, item := range set.Items() {
+			result.Add(item)
+		}
+		for _, item := range other.Items() {
+			result.Add(item)
+		}
+		return result, nil
+
+	case "intersection":
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("intersection() requires an argument")
+		}
+		otherArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		other, ok := otherArg.(*core.SetValue)
+		if !ok {
+			return nil, fmt.Errorf("intersection() argument must be a set")
+		}
+		result := core.NewSet()
+		for _, item := range set.Items() {
+			if other.Contains(item) {
+				result.Add(item)
+			}
+		}
+		return result, nil
+
+	case "difference":
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("difference() requires an argument")
+		}
+		otherArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		other, ok := otherArg.(*core.SetValue)
+		if !ok {
+			return nil, fmt.Errorf("difference() argument must be a set")
+		}
+		result := core.NewSet()
+		for _, item := range set.Items() {
+			if !other.Contains(item) {
+				result.Add(item)
+			}
+		}
+		return result, nil
+	}
+
+	// Check type descriptor for other methods
+	if td != nil {
+		if method, ok := td.Methods[attr]; ok {
+			if !isCall {
+				return &core.BoundMethod{
+					Receiver: set,
+					Method:   method,
+					TypeDesc: td,
+				}, nil
+			}
+			if method.Handler != nil {
+				evalArgs := make([]core.Value, args.Len())
+				for i, arg := range args.Items() {
+					var err error
+					evalArgs[i], err = Eval(arg, ctx)
+					if err != nil {
+						return nil, err
+					}
+				}
+				return method.Handler(set, evalArgs, ctx)
+			}
+		}
+	}
+
+	return nil, &core.AttributeError{
+		ObjType:  "set",
+		AttrName: attr,
+	}
+}
+
+// getTupleAttr handles attribute access for tuples
+func getTupleAttr(tuple core.TupleValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
+	// Get the type descriptor for tuple
+	td := core.GetTypeDescriptor("tuple")
+
+	// Handle special M28 type protocol attributes that auto-call
+	switch attr {
+	case "length", "len":
+		return core.NumberValue(len(tuple)), nil
+
+	case "get":
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("get() requires an index argument")
+		}
+		idxArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		idx, ok := idxArg.(core.NumberValue)
+		if !ok {
+			return nil, fmt.Errorf("tuple indices must be integers")
+		}
+		index := int(idx)
+		if index < 0 {
+			index = len(tuple) + index
+		}
+		if index < 0 || index >= len(tuple) {
+			return nil, &core.IndexError{Index: int(idx), Length: len(tuple)}
+		}
+		return tuple[index], nil
+
+	case "contains":
+		if args.Len() < 1 {
+			return nil, fmt.Errorf("contains() requires an argument")
+		}
+		valArg, err := Eval(args.Items()[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range tuple {
+			if core.EqualValues(item, valArg) {
+				return core.BoolValue(true), nil
+			}
+		}
+		return core.BoolValue(false), nil
+
+	case "tolist":
+		result := core.NewList()
+		for _, item := range tuple {
+			result.Append(item)
+		}
+		return result, nil
+	}
+
+	// Check type descriptor for other methods
+	if td != nil {
+		if method, ok := td.Methods[attr]; ok {
+			if !isCall {
+				return &core.BoundMethod{
+					Receiver: tuple,
+					Method:   method,
+					TypeDesc: td,
+				}, nil
+			}
+			if method.Handler != nil {
+				evalArgs := make([]core.Value, args.Len())
+				for i, arg := range args.Items() {
+					var err error
+					evalArgs[i], err = Eval(arg, ctx)
+					if err != nil {
+						return nil, err
+					}
+				}
+				return method.Handler(tuple, evalArgs, ctx)
+			}
+		}
+	}
+
+	return nil, &core.AttributeError{
+		ObjType:  "tuple",
+		AttrName: attr,
 	}
 }
 

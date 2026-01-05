@@ -108,6 +108,15 @@ func (l *ListValue) String() string {
 
 // GetAttr implements Object interface using TypeDescriptor
 func (l *ListValue) GetAttr(name string) (Value, bool) {
+	// Special M28 type protocol attributes that auto-call or return properties
+	// These are handled specially by getListAttr in eval/dot_notation.go
+	switch name {
+	case "length", "len", "pop":
+		// Return not found so these fall through to getListAttr
+		// which handles them as auto-calling methods
+		return nil, false
+	}
+
 	desc := GetTypeDescriptor(ListType)
 	if desc != nil {
 		val, err := desc.GetAttribute(l, name)
@@ -554,6 +563,14 @@ func (it *dictIterator) GetAttr(name string) (Value, bool) {
 
 // GetAttr implements Object interface using TypeDescriptor
 func (d *DictValue) GetAttr(name string) (Value, bool) {
+	// Special M28 type protocol attributes that auto-call or return properties
+	// These are handled specially by getDictAttr in eval/dot_notation.go
+	switch name {
+	case "length", "len", "contains", "keys", "values", "items", "set", "delete", "clear", "update":
+		// Return not found so these fall through to getDictAttr
+		return nil, false
+	}
+
 	// First try to find the key with string prefix
 	// This handles dot notation access like dict.key
 	stringKey := fmt.Sprintf("s:%s", name)
@@ -614,6 +631,12 @@ func (t TupleValue) String() string {
 
 // GetAttr implements Object interface using TypeDescriptor
 func (t TupleValue) GetAttr(name string) (Value, bool) {
+	// Special M28 type protocol attributes that auto-call or return properties
+	switch name {
+	case "length", "len", "get", "contains", "tolist":
+		return nil, false
+	}
+
 	desc := GetTypeDescriptor(TupleType)
 	if desc != nil {
 		val, err := desc.GetAttribute(t, name)
@@ -843,6 +866,13 @@ func (s *SetValue) Items() []Value {
 
 // GetAttr implements Object interface using TypeDescriptor
 func (s *SetValue) GetAttr(name string) (Value, bool) {
+	// Special M28 type protocol attributes that auto-call or return properties
+	// These are handled specially in eval
+	switch name {
+	case "length", "len", "contains", "add", "remove", "union", "intersection", "difference":
+		return nil, false
+	}
+
 	desc := GetTypeDescriptor(SetType)
 	if desc != nil {
 		val, err := desc.GetAttribute(s, name)
