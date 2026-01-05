@@ -4,16 +4,16 @@
 
 (def test-advanced (lambda ()
   
-  ; Test module system
+  # Test module system
   (test/test-suite "Module System" (lambda ()
     
     (test/run-test "Import" (lambda ()
-      ; We already imported test_framework
+      # We already imported test_framework
       (test/assert-not-nil test/assert "Import with alias works")
       (test/assert-type test/assert "function" "Imported function type")))
     
     (test/run-test "Module Creation" (lambda ()
-      ; Create a simple module in memory
+      # Create a simple module in memory
       (def my-module (dict
         "version" "1.0"
         "add" (lambda (a b) (+ a b))
@@ -21,7 +21,7 @@
       (test/assert-eq "1.0" (get my-module "version") "Module attribute")
       (test/assert-eq 7 ((get my-module "add") 3 4) "Module function"))))
   
-  ; Test class system
+  # Test class system
   (test/test-suite "Class System" (lambda ()
     
     (test/run-test "Class Definition" (lambda ()
@@ -82,7 +82,7 @@
       (def c (Child))
       (test/assert-eq "Hello from Parent and Child" (c.greet) "Super call"))))
   
-  ; Test generators
+  # Test generators
   (test/test-suite "Generators" (lambda ()
     
     (test/run-test "Basic Generator" (lambda ()
@@ -120,7 +120,7 @@
       (test/assert-eq 0 (send g 5) "Send value")
       (test/assert-eq 5 (next g) "Updated state"))))
   
-  ; Test context managers
+  # Test context managers
   (test/test-suite "Context Managers" (lambda ()
     
     (test/run-test "Basic With" (lambda ()
@@ -158,7 +158,7 @@
       
       (test/assert-true cleanup-run "Cleanup on exception"))))
   
-  ; Test async/concurrent features
+  # Test async/concurrent features
   (test/test-suite "Async/Concurrent" (lambda ()
     
     (test/run-test "Async Function" (lambda ()
@@ -187,7 +187,7 @@
       (def msg (recv! ch))
       (test/assert-eq "from goroutine" msg "Go form communication"))))
   
-  ; Test object protocol
+  # Test object protocol
   (test/test-suite "Object Protocol" (lambda ()
     
     (test/run-test "Getattr/Setattr" (lambda ()
@@ -218,7 +218,7 @@
       (test/assert-eq 5 s.length "String length")
       (test/assert-true (s.startswith "hel") "String predicate"))))
   
-  ; Test advanced list operations
+  # Test advanced list operations
   (test/test-suite "Advanced Collections" (lambda ()
     
     (test/run-test "List Comprehension Style" (lambda ()

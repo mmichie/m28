@@ -7,10 +7,10 @@
   (print (+ "\nBenchmark: " name))
   (print (+ "Iterations: " (str iterations)))
   
-  ; Warm up
+  # Warm up
   (for i in (range 10) (fn))
   
-  ; Time the actual run
+  # Time the actual run
   (def start (current-time-millis))
   (for i in (range iterations) (fn))
   (def end (current-time-millis))
@@ -25,15 +25,15 @@
 
 # Helper to get current time in milliseconds
 (def current-time-millis (lambda ()
-  ; This would need to be implemented as a builtin
-  ; For now, we'll use a counter
+  # This would need to be implemented as a builtin
+  # For now, we'll use a counter
   0))
 
 # Benchmarks
 (def run-benchmarks (lambda ()
   (print "=== M28 Performance Benchmarks ===")
   
-  ; Arithmetic operations
+  # Arithmetic operations
   (print "\n## Arithmetic Operations")
   
   (time-it "Integer addition" 100000 (lambda ()
@@ -46,7 +46,7 @@
     (for i in (range 1 21)
       (set! product (* product 1.1)))))
   
-  ; List operations
+  # List operations
   (print "\n## List Operations")
   
   (time-it "List append" 10000 (lambda ()
@@ -60,7 +60,7 @@
     (for i in (range 100)
       (set! sum (+ sum (nth lst i))))))
   
-  ; Dictionary operations
+  # Dictionary operations
   (print "\n## Dictionary Operations")
   
   (time-it "Dict insert" 10000 (lambda ()
@@ -76,7 +76,7 @@
     (for i in (range 100)
       (set! sum (+ sum (get d (str i)))))))
   
-  ; Function calls
+  # Function calls
   (print "\n## Function Calls")
   
   (def fib (lambda (n)
@@ -96,7 +96,7 @@
   (time-it "Iterative factorial(100)" 10000 (lambda ()
     (fact-iter 100)))
   
-  ; String operations
+  # String operations
   (print "\n## String Operations")
   
   (time-it "String concatenation" 10000 (lambda ()
@@ -111,7 +111,7 @@
     (replace s "test" "benchmark")
     (split s " ")))
   
-  ; Higher-order functions
+  # Higher-order functions
   (print "\n## Higher-Order Functions")
   
   (time-it "Map operation" 1000 (lambda ()
@@ -123,7 +123,7 @@
   (time-it "Reduce operation" 1000 (lambda ()
     (reduce + (range 1000) 0)))
   
-  ; Object operations
+  # Object operations
   (print "\n## Object Operations")
   
   (class Point Object
@@ -146,7 +146,7 @@
   (time-it "Method calls" 100000 (lambda ()
     (p1.distance p2)))
   
-  ; Async operations (if supported)
+  # Async operations (if supported)
   (print "\n## Async Operations")
   
   (time-it "Task creation" 1000 (lambda ()
@@ -161,7 +161,7 @@
 (def memory-test (lambda ()
   (print "\n=== Memory Usage Test ===")
   
-  ; Create large data structures
+  # Create large data structures
   (print "Creating large list...")
   (def big-list (range 10000))
   (print (+ "List created with " (str (len big-list)) " elements"))

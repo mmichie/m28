@@ -19,4 +19,3 @@
 
 (print "Assignment worked, no error:" (not caught2))
 (print "a =" a "b =" b)
-EOF && ./bin/m28 tests/try-test.m28 < /dev/null

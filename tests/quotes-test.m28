@@ -4,7 +4,7 @@
 (= quoted_dict {'a': 1, 'b': 2})
 
 # Access dictionary value
-(def a_value (get quoted_dict "a"))
+(= a_value (get quoted_dict "a"))
 
 # Print results
 (print "Dictionary:" quoted_dict)

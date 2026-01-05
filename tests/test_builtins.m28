@@ -3,7 +3,7 @@
 (import "test_framework" as test)
 
 (def test-builtins (lambda ()
-  ; Test arithmetic functions
+  # Test arithmetic functions
   (test/test-suite "Arithmetic Functions" (lambda ()
     
     (test/run-test "Basic Math" (lambda ()
@@ -23,7 +23,7 @@
       (test/assert-eq 1 (% 10 3) "Modulo positive")
       (test/assert-eq 2 (% 17 5) "Modulo"))))
   
-  ; Test string functions
+  # Test string functions
   (test/test-suite "String Functions" (lambda ()
     
     (test/run-test "Case Conversion" (lambda ()
@@ -43,7 +43,7 @@
       (test/assert-eq -1 (find "hello" "xyz") "Find not found")
       (test/assert-eq 2 (count "hello world" "l") "Count occurrences"))))
   
-  ; Test slice function
+  # Test slice function
   (test/test-suite "Slice Function" (lambda ()
     
     (test/run-test "Slice Creation" (lambda ()
@@ -67,7 +67,7 @@
       (= s (slice None None 2))
       (test/assert-eq [0, 2, 4, 6, 8] lst[s] "list[slice(None,None,2)]"))))
   
-  ; Test type functions
+  # Test type functions
   (test/test-suite "Type Functions" (lambda ()
     
     (test/run-test "Type Checking" (lambda ()
@@ -84,7 +84,7 @@
       (test/assert-eq {"a": 1} (dict "a" 1) "Create dict")
       (test/assert-eq #{1, 2, 3} (set [1, 2, 3, 2]) "Create set"))))
   
-  ; Test sequence functions
+  # Test sequence functions
   (test/test-suite "Sequence Functions" (lambda ()
     
     (test/run-test "Range" (lambda ()
@@ -104,7 +104,7 @@
       (test/assert-eq [[1, "a"], [2, "b"]]
         (zip [1, 2] ["a", "b", "c"]) "Zip different length"))))
   
-  ; Test functional programming
+  # Test functional programming
   (test/test-suite "Functional Programming" (lambda ()
     
     (test/run-test "Map" (lambda ()
@@ -131,7 +131,7 @@
       (test/assert-true (any [false, true, false]) "Any with true")
       (test/assert-false (any [false, false, false]) "Any all false"))))
   
-  ; Test I/O functions (basic)
+  # Test I/O functions (basic)
   (test/test-suite "I/O Functions" (lambda ()
     
     (test/run-test "Print" (lambda ()
@@ -144,7 +144,7 @@
       (test/assert-eq "\"hello\"" (repr "hello") "Repr string")
       (test/assert-eq "[1, 2, 3]" (repr [1, 2, 3]) "Repr list"))))
   
-  ; Test list operations
+  # Test list operations
   (test/test-suite "List Operations" (lambda ()
     
     (test/run-test "List Manipulation" (lambda ()
@@ -161,7 +161,7 @@
       (test/assert-true (contains [1, 2, 3] 2) "Contains element")
       (test/assert-false (contains [1, 2, 3] 4) "Not contains"))))
   
-  ; Test dictionary operations
+  # Test dictionary operations
   (test/test-suite "Dictionary Operations" (lambda ()
     
     (test/run-test "Dict Access" (lambda ()

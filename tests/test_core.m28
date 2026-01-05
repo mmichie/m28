@@ -3,7 +3,7 @@
 (import "test_framework" as test)
 
 (def test-core (lambda ()
-  ; Test basic data types
+  # Test basic data types
   (test/test-suite "Core Data Types" (lambda ()
     
     (test/run-test "Numbers" (lambda ()
@@ -32,7 +32,7 @@
       (test/assert-false (= nil false) "Nil is not false")
       (test/assert-false (= nil 0) "Nil is not zero"))))
   
-  ; Test collections
+  # Test collections
   (test/test-suite "Collections" (lambda ()
     
     (test/run-test "Lists" (lambda ()
@@ -63,7 +63,7 @@
       (test/assert-false (contains s 4) "Set not contains")
       (test/assert-type #{} "set" "Empty set type"))))
   
-  ; Test variables and functions
+  # Test variables and functions
   (test/test-suite "Variables and Functions" (lambda ()
     
     (test/run-test "Variable Definition" (lambda ()
@@ -103,7 +103,7 @@
       (test/assert-eq 2 (c1) "Counter 1 second call")
       (test/assert-eq 1 (c2) "Counter 2 first call"))))
   
-  ; Test control flow
+  # Test control flow
   (test/test-suite "Control Flow" (lambda ()
     
     (test/run-test "If Expression" (lambda ()
@@ -139,7 +139,7 @@
         "Let binding")
       (test/assert-eq 10 x "Let doesn't affect outer"))))
   
-  ; Test loops
+  # Test loops
   (test/test-suite "Loops" (lambda ()
     
     (test/run-test "For Loop" (lambda ()

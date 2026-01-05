@@ -11,4 +11,3 @@
 (print "a =" a)
 (print "b =" b)
 (print "c =" c)
-EOF < /dev/null
