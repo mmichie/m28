@@ -111,7 +111,7 @@ func (l *ListValue) GetAttr(name string) (Value, bool) {
 	// Special M28 type protocol attributes that auto-call or return properties
 	// These are handled specially by getListAttr in eval/dot_notation.go
 	switch name {
-	case "length", "len", "pop":
+	case "length", "len", "pop", "reverse", "sort", "copy":
 		// Return not found so these fall through to getListAttr
 		// which handles them as auto-calling methods
 		return nil, false

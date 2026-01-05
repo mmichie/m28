@@ -1,73 +1,73 @@
 # Test string methods
 
 # Test upper and lower
-(assert (== ("hello".upper) "HELLO") "upper() failed")
-(assert (== ("WORLD".lower) "world") "lower() failed")
+(assert (== (. "hello" upper) "HELLO") "upper() failed")
+(assert (== (. "WORLD" lower) "world") "lower() failed")
 
 # Test strip methods
-(assert (== ("  hello  ".strip) "hello") "strip() failed")
-(assert (== ("  hello  ".lstrip) "hello  ") "lstrip() failed")
-(assert (== ("  hello  ".rstrip) "  hello") "rstrip() failed")
+(assert (== (. "  hello  " strip) "hello") "strip() failed")
+(assert (== (. "  hello  " lstrip) "hello  ") "lstrip() failed")
+(assert (== (. "  hello  " rstrip) "  hello") "rstrip() failed")
 
 # Test replace
-(assert (== ("hello world".replace "world" "python") "hello python") "replace() failed")
-(assert (== ("aaa".replace "a" "b") "bbb") "replace() multiple failed")
+(assert (== (. "hello world" replace "world" "python") "hello python") "replace() failed")
+(assert (== (. "aaa" replace "a" "b") "bbb") "replace() multiple failed")
 
 # Test split
-(= parts ("hello world".split))
+(= parts (. "hello world" split " "))
 (assert (== (len parts) 2) "split() length failed")
-(assert (== (get-item parts 0) "hello") "split()[0] failed")
-(assert (== (get-item parts 1) "world") "split()[1] failed")
+(assert (== (nth parts 0) "hello") "split()[0] failed")
+(assert (== (nth parts 1) "world") "split()[1] failed")
 
 # Test split with delimiter
-(= parts2 ("a,b,c".split ","))
+(= parts2 (. "a,b,c" split ","))
 (assert (== (len parts2) 3) "split(',') length failed")
-(assert (== (get-item parts2 0) "a") "split(',')[0] failed")
-(assert (== (get-item parts2 1) "b") "split(',')[1] failed")
-(assert (== (get-item parts2 2) "c") "split(',')[2] failed")
+(assert (== (nth parts2 0) "a") "split(',')[0] failed")
+(assert (== (nth parts2 1) "b") "split(',')[1] failed")
+(assert (== (nth parts2 2) "c") "split(',')[2] failed")
 
 # Test join - with variables to avoid parsing issues
-(= words ["hello" "world"])
-(assert (== (" ".join words) "hello world") "join() failed")
-(= letters ["a" "b" "c"])
-(assert (== (",".join letters) "a,b,c") "join() with comma failed")
+(= words ["hello", "world"])
+(assert (== (. " " join words) "hello world") "join() failed")
+(= letters ["a", "b", "c"])
+(assert (== (. "," join letters) "a,b,c") "join() with comma failed")
 
 # Test startswith and endswith
-(assert ("hello world".startswith "hello") "startswith() true case failed")
-(assert (not ("hello world".startswith "world")) "startswith() false case failed")
-(assert ("hello world".endswith "world") "endswith() true case failed")
-(assert (not ("hello world".endswith "hello")) "endswith() false case failed")
+(assert (. "hello world" startswith "hello") "startswith() true case failed")
+(assert (not (. "hello world" startswith "world")) "startswith() false case failed")
+(assert (. "hello world" endswith "world") "endswith() true case failed")
+(assert (not (. "hello world" endswith "hello")) "endswith() false case failed")
 
 # Test find
-(assert (== ("hello world".find "world") 6) "find() found case failed")
-(assert (== ("hello world".find "xyz") -1) "find() not found case failed")
+(assert (== (. "hello world" find "world") 6) "find() found case failed")
+(assert (== (. "hello world" find "xyz") -1) "find() not found case failed")
 
 # Test index (should raise error if not found)
-(assert (== ("hello world".index "world") 6) "index() found case failed")
+(assert (== (. "hello world" index "world") 6) "index() found case failed")
 (try
-  ("hello world".index "xyz")
+  (. "hello world" index "xyz")
   (assert false "index() should have raised error")
   (except Exception e
     (assert true "index() correctly raised error")))
 
 # Test count
-(assert (== ("hello hello hello".count "hello") 3) "count() failed")
-(assert (== ("aaa".count "a") 3) "count() single char failed")
+(assert (== (. "hello hello hello" count "hello") 3) "count() failed")
+(assert (== (. "aaa" count "a") 3) "count() single char failed")
 
 # Test capitalize and title
-(assert (== ("hello world".capitalize) "Hello world") "capitalize() failed")
-(assert (== ("hello world".title) "Hello World") "title() failed")
+(assert (== (. "hello world" capitalize) "Hello world") "capitalize() failed")
+(assert (== (. "hello world" title) "Hello World") "title() failed")
 
 # Test is* methods
-(assert ("123".isdigit) "isdigit() true case failed")
-(assert (not ("12a".isdigit)) "isdigit() false case failed")
-(assert ("abc".isalpha) "isalpha() true case failed")
-(assert (not ("ab1".isalpha)) "isalpha() false case failed")
-(assert ("   ".isspace) "isspace() true case failed")
-(assert (not ("  a ".isspace)) "isspace() false case failed")
+(assert (. "123" isdigit) "isdigit() true case failed")
+(assert (not (. "12a" isdigit)) "isdigit() false case failed")
+(assert (. "abc" isalpha) "isalpha() true case failed")
+(assert (not (. "ab1" isalpha)) "isalpha() false case failed")
+(assert (. "   " isspace) "isspace() true case failed")
+(assert (not (. "  a " isspace)) "isspace() false case failed")
 
 # Test format
-(assert (== ("Hello, {}!".format "World") "Hello, World!") "format() single arg failed")
-(assert (== ("{} + {} = {}".format 1 2 3) "1 + 2 = 3") "format() multiple args failed")
+(assert (== (. "Hello, {}!" format "World") "Hello, World!") "format() single arg failed")
+(assert (== (. "{} + {} = {}" format 1 2 3) "1 + 2 = 3") "format() multiple args failed")
 
 (print "All string method tests passed!")

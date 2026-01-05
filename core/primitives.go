@@ -235,7 +235,8 @@ func (s StringValue) GetAttr(name string) (Value, bool) {
 	// Special M28 type protocol attributes that auto-call or return properties
 	// These are handled specially by getStringAttr in eval/dot_notation.go
 	switch name {
-	case "length", "len", "upper", "lower", "strip", "lstrip", "rstrip", "contains":
+	case "length", "len", "upper", "lower", "strip", "lstrip", "rstrip", "contains",
+		"capitalize", "title", "isdigit", "isalpha", "isspace":
 		// Return not found so these fall through to getStringAttr
 		// which handles them as auto-calling methods
 		return nil, false

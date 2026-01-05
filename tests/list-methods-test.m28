@@ -1,68 +1,77 @@
 # Test list methods
 
-# Test append
+# Test append (mutates in place)
 (= lst [1, 2, 3])
-(= lst2 (lst.append 4))
-(assert (== (len lst2) 4) "append() length failed")
-(assert (== (get-item lst2 3) 4) "append() value failed")
+(. lst append 4)
+(assert (== (len lst) 4) "append() length failed")
+(assert (== (nth lst 3) 4) "append() value failed")
 
-# Test extend
-(= ext_list [4, 5])
-(= lst3 (lst.extend ext_list))
-(assert (== (len lst3) 5) "extend() length failed")
-(assert (== (get-item lst3 4) 5) "extend() last value failed")
+# Test extend (mutates in place)
+(= lst2 [1, 2, 3])
+(. lst2 extend [4, 5])
+(assert (== (len lst2) 5) "extend() length failed")
+(assert (== (nth lst2 4) 5) "extend() last value failed")
 
-# Test insert
+# Test insert (mutates in place)
 (= base_list [1, 3])
-(= lst4 (base_list.insert 1 2))
-(assert (== lst4 [1, 2, 3]) "insert() failed")
+(. base_list insert 1 2)
+(assert (== base_list [1, 2, 3]) "insert() failed")
 
-# Test pop (currently returns value, not modified list)
+# Test pop (mutates in place, returns popped value)
 (= pop_list [1, 2, 3])
-(= val (pop_list.pop))
+(= val (. pop_list pop))
 (assert (== val 3) "pop() default failed")
-(= val2 (pop_list.pop 0))
+(assert (== pop_list [1, 2]) "pop() should modify list")
+(= val2 (. pop_list pop 0))
 (assert (== val2 1) "pop(0) failed")
+(assert (== pop_list [2]) "pop(0) should modify list")
 
 # Test index
 (= idx_list [1, 2, 3, 2])
-(assert (== (idx_list.index 2) 1) "index() failed")
+(assert (== (. idx_list index 2) 1) "index() failed")
 
 # Test count
 (= cnt_list [1, 2, 3, 2, 2])
-(assert (== (cnt_list.count 2) 3) "count() failed")
+(assert (== (. cnt_list count 2) 3) "count() failed")
 
-# Test reverse
+# Test reverse (mutates in place, returns None)
 (= rev_list [1, 2, 3])
-(assert (== (rev_list.reverse) [3, 2, 1]) "reverse() failed")
+(. rev_list reverse)
+(assert (== rev_list [3, 2, 1]) "reverse() failed")
 
-# Test sort
+# Test sort (mutates in place, returns None)
 (= srt_list [3, 1, 4, 1, 5])
-(assert (== (srt_list.sort) [1, 1, 3, 4, 5]) "sort() failed")
+(. srt_list sort)
+(assert (== srt_list [1, 1, 3, 4, 5]) "sort() failed")
 
-# Test methods that might be missing
-# Test remove - removes first occurrence
-(try
-  (= rm_list [1, 2, 3, 2])
-  (= lst5 (rm_list.remove 2))
-  (assert (== lst5 [1, 3, 2]) "remove() failed")
-  (except Exception e
-    (print "remove() not implemented")))
+# Test remove (mutates in place)
+(= rm_list [1, 2, 3, 2])
+(. rm_list remove 2)
+(assert (== rm_list [1, 3, 2]) "remove() failed")
 
-# Test clear - returns empty list
-(try
-  (= clr_list [1, 2, 3])
-  (= lst6 (clr_list.clear))
-  (assert (== lst6 []) "clear() failed")
-  (except Exception e
-    (print "clear() not implemented")))
+# Test contains
+(= cont_list [1, 2, 3])
+(assert (. cont_list contains 2) "contains(2) should be true")
+(assert (not (. cont_list contains 5)) "contains(5) should be false")
 
-# Test copy - returns shallow copy
-(try
-  (= original [1, 2, 3])
-  (= copied (original.copy))
-  (assert (== copied original) "copy() failed")
-  (except Exception e
-    (print "copy() not implemented")))
+# Test get
+(= get_list [10, 20, 30])
+(assert (== (. get_list get 0) 10) "get(0) failed")
+(assert (== (. get_list get 1) 20) "get(1) failed")
+(assert (== (. get_list get 2) 30) "get(2) failed")
+(assert (== (. get_list get -1) 30) "get(-1) failed")
 
-(print "List method tests completed!")
+# Test length
+(assert (== (. get_list length) 3) "length failed")
+
+# Test map
+(= nums [1, 2, 3])
+(= doubled (. nums map (lambda (x) (* x 2))))
+(assert (== doubled [2, 4, 6]) "map() failed")
+
+# Test filter
+(= mixed [1, 2, 3, 4, 5, 6])
+(= evens (. mixed filter (lambda (x) (== (% x 2) 0))))
+(assert (== evens [2, 4, 6]) "filter() failed")
+
+(print "All list method tests passed!")

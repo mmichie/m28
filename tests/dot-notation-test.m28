@@ -7,13 +7,13 @@
 (print "-- Test 1: String Method Access --")
 (= text "hello world")
 
-(print "text.upper():" (text.upper))
+(print "text.upper():" (. text upper))
 (print "Expected: HELLO WORLD")
 
-(print "text.split():" (text.split))  
+(print "text.split():" (. text split " "))
 (print "Expected: [\"hello\", \"world\"]")
 
-(print "text.replace('world', 'M28'):" (text.replace "world" "M28"))
+(print "text.replace('world', 'M28'):" (. text replace "world" "M28"))
 (print "Expected: hello M28")
 
 # Test 2: List methods
@@ -38,25 +38,25 @@
 (print "\n-- Test 3: Dictionary Method Access --")
 (= data {"a": 1, "b": 2, "c": 3})
 
-(print "data.keys():" (list (data.keys)))
-(print "Expected: [\"s:a\", \"s:b\", \"s:c\"]")
+(print "data.keys():" (. data keys))
+(print "Expected: [\"a\", \"b\", \"c\"]")
 
-(print "data.values():" (list (data.values)))
+(print "data.values():" (. data values))
 (print "Expected: [1, 2, 3]")
 
-(print "data.get('a'):" (data.get "a"))
+(print "data.get('a'):" (. data get "a"))
 (print "Expected: 1")
 
-(print "data.get('d', 'default'):" (data.get "d" "default"))
+(print "data.get('d', 'default'):" (. data get "d" "default"))
 (print "Expected: default")
 
 # Test 4: Module access (if math module is available)
 (print "\n-- Test 4: Module Access --")
 (try
   (import "math")
-  (print "math.sqrt(16):" (math.sqrt 16))
+  (print "math.sqrt(16):" (. math sqrt 16))
   (print "Expected: 4")
-  (print "math.pi:" math.pi)
+  (print "math.pi:" (. math pi))
   (print "Expected: 3.141592...")
   (except e
     (print "Math module not available, skipping test")))
@@ -65,11 +65,11 @@
 (print "\n-- Test 5: Method Chaining --")
 (= sentence "  HELLO WORLD  ")
 
-(print "sentence.strip().lower():" ((sentence.strip).lower))
+(print "sentence.strip().lower():" (. (. sentence strip) lower))
 (print "Expected: hello world")
 
 (= words ["apple", "banana", "cherry"])
-(print "' '.join(words).upper():" ((" ".join words).upper))
+(print "' '.join(words).upper():" (. (. " " join words) upper))
 (print "Expected: APPLE BANANA CHERRY")
 
 (print "\n===== Dot Notation Tests Complete =====")

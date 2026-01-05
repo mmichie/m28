@@ -393,11 +393,15 @@ func getListAttr(lst *core.ListValue, attr string, isCall bool, args *core.ListV
 	case "length", "len":
 		return core.NumberValue(lst.Len()), nil
 
-	case "pop":
-		// (. list pop) should call pop() with no args (remove last element)
-		// (. list pop 0) should call pop(0) (remove element at index 0)
+	case "pop", "reverse", "sort", "copy":
+		// These methods auto-call when accessed
+		// (. list pop) calls pop() with no args
+		// (. list pop 0) calls pop(0)
+		// (. list reverse) calls reverse()
+		// (. list sort) calls sort()
+		// (. list copy) calls copy()
 		if td != nil {
-			if method, ok := td.Methods["pop"]; ok && method.Handler != nil {
+			if method, ok := td.Methods[attr]; ok && method.Handler != nil {
 				evalArgs := make([]core.Value, args.Len())
 				for i, arg := range args.Items() {
 					var err error
@@ -469,6 +473,52 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.Li
 
 	case "rstrip":
 		return core.StringValue(strings.TrimRight(string(str), " \t\n\r")), nil
+
+	case "capitalize":
+		s := string(str)
+		if len(s) == 0 {
+			return str, nil
+		}
+		return core.StringValue(strings.ToUpper(s[:1]) + strings.ToLower(s[1:])), nil
+
+	case "title":
+		return core.StringValue(strings.Title(string(str))), nil
+
+	case "isdigit":
+		s := string(str)
+		if len(s) == 0 {
+			return core.BoolValue(false), nil
+		}
+		for _, r := range s {
+			if r < '0' || r > '9' {
+				return core.BoolValue(false), nil
+			}
+		}
+		return core.BoolValue(true), nil
+
+	case "isalpha":
+		s := string(str)
+		if len(s) == 0 {
+			return core.BoolValue(false), nil
+		}
+		for _, r := range s {
+			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
+				return core.BoolValue(false), nil
+			}
+		}
+		return core.BoolValue(true), nil
+
+	case "isspace":
+		s := string(str)
+		if len(s) == 0 {
+			return core.BoolValue(false), nil
+		}
+		for _, r := range s {
+			if r != ' ' && r != '\t' && r != '\n' && r != '\r' {
+				return core.BoolValue(false), nil
+			}
+		}
+		return core.BoolValue(true), nil
 
 	case "contains":
 		// Need an argument for contains

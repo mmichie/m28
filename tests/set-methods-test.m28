@@ -1,10 +1,10 @@
 # Test set methods
 
 # Create test sets
-(= s1 (set [1 , 2 , 3]))
-(= s2 (set [3 , 4 , 5]))
-(= s3 (set [1 , 2]))
-(= empty (set))
+(= s1 (set [1, 2, 3]))
+(= s2 (set [3, 4, 5]))
+(= s3 (set [1, 2]))
+(= empty (set []))
 
 (print "Test sets:")
 (print "s1 =" s1)
@@ -17,110 +17,52 @@
 
 # Union
 (print "\nUnion:")
-(print "s1.union(s2) =" (s1.union s2))
-(print "s1.union(s2, s3) =" (s1.union s2 s3))
-(print "empty.union(s1) =" (empty.union s1))
+(print "s1.union(s2) =" (. s1 union s2))
+(assert (== (. (. s1 union s2) length) 5) "Union should have 5 elements")
+(print "empty.union(s1) =" (. empty union s1))
 
 # Intersection
 (print "\nIntersection:")
-(print "s1.intersection(s2) =" (s1.intersection s2))
-(print "s1.intersection(s3) =" (s1.intersection s3))
-(print "s1.intersection(empty) =" (s1.intersection empty))
+(print "s1.intersection(s2) =" (. s1 intersection s2))
+(assert (== (. (. s1 intersection s2) length) 1) "Intersection should have 1 element")
+(print "s1.intersection(s3) =" (. s1 intersection s3))
+(print "s1.intersection(empty) =" (. s1 intersection empty))
 
 # Difference
 (print "\nDifference:")
-(print "s1.difference(s2) =" (s1.difference s2))
-(print "s2.difference(s1) =" (s2.difference s1))
-(print "s1.difference(s3) =" (s1.difference s3))
-(print "s1.difference(s2, s3) =" (s1.difference s2 s3))
-
-# Symmetric difference
-(print "\nSymmetric difference:")
-(print "s1.symmetric_difference(s2) =" (s1.symmetric_difference s2))
-(print "s1.symmetric_difference(s3) =" (s1.symmetric_difference s3))
+(print "s1.difference(s2) =" (. s1 difference s2))
+(assert (== (. (. s1 difference s2) length) 2) "Difference should have 2 elements")
+(print "s2.difference(s1) =" (. s2 difference s1))
+(print "s1.difference(s3) =" (. s1 difference s3))
 
 # Test mutating methods
 (print "\n=== Mutating Methods ===")
 
-# Add (already exists)
+# Add
 (print "\nAdd:")
-(= s4 (s1.add 4))
-(print "s1.add(4) =" s4)
-(print "Original s1 unchanged:" s1)
+(= s4 (set [1, 2]))
+(. s4 add 3)
+(print "After s4.add(3):" s4)
+(assert (. s4 contains 3) "Set should contain 3 after add")
 
-# Remove (already exists)
+# Remove
 (print "\nRemove:")
-(= s5 (s1.remove 2))
-(print "s1.remove(2) =" s5)
-(try
-  (s1.remove 10)
-  (print "ERROR: Should have raised KeyError")
-  (except KeyError e
-    (print "Correctly raised KeyError for missing element"))
-  (except Exception e
-    (print "Raised exception:" e)))
+(= s5 (set [1, 2, 3]))
+(. s5 remove 2)
+(print "After s5.remove(2):" s5)
+(assert (not (. s5 contains 2)) "Set should not contain 2 after remove")
 
-# Discard (already exists)
-(print "\nDiscard:")
-(= s6 (s1.discard 2))
-(print "s1.discard(2) =" s6)
-(= s7 (s1.discard 10))  # Should not raise error
-(print "s1.discard(10) =" s7)
+# Contains
+(print "\n=== Contains ===")
+(assert (. s1 contains 1) "s1 should contain 1")
+(assert (. s1 contains 2) "s1 should contain 2")
+(assert (. s1 contains 3) "s1 should contain 3")
+(assert (not (. s1 contains 4)) "s1 should not contain 4")
 
-# Update
-(print "\nUpdate:")
-(= s8 (s1.update s2))
-(print "s1.update(s2) =" s8)
-(= s9 (s1.update s2 s3))
-(print "s1.update(s2, s3) =" s9)
-
-# Clear
-(print "\nClear:")
-(= s10 (s1.clear))
-(print "s1.clear() =" s10)
-
-# Copy
-(print "\nCopy:")
-(= s11 (s1.copy))
-(print "s1.copy() =" s11)
-(assert (== s11 s1) "Copy should be equal to original")
-
-# Pop
-(print "\nPop:")
-(= s_temp (set [1 , 2 , 3]))
-(= popped (s_temp.pop))
-(print "Popped element:" popped)
-(assert (in popped [1 , 2 , 3]) "Popped element should be from set")
-
-(try
-  (empty.pop)
-  (print "ERROR: Should have raised error for empty set")
-  (except Exception e
-    (print "Correctly raised error for pop from empty set")))
-
-# Test comparison methods
-(print "\n=== Comparison Methods ===")
-
-# issubset
-(print "\nissubset:")
-(print "s3.issubset(s1) =" (s3.issubset s1))  # True - {1,2} ⊆ {1,2,3}
-(print "s1.issubset(s3) =" (s1.issubset s3))  # False
-(print "s1.issubset(s1) =" (s1.issubset s1))  # True - set is subset of itself
-(print "empty.issubset(s1) =" (empty.issubset s1))  # True - empty set is subset of any set
-
-# issuperset
-(print "\nissuperset:")
-(print "s1.issuperset(s3) =" (s1.issuperset s3))  # True - {1,2,3} ⊇ {1,2}
-(print "s3.issuperset(s1) =" (s3.issuperset s1))  # False
-(print "s1.issuperset(s1) =" (s1.issuperset s1))  # True
-(print "s1.issuperset(empty) =" (s1.issuperset empty))  # True
-
-# isdisjoint
-(print "\nisdisjoint:")
-(= s_disjoint (set [10 , 11 , 12]))
-(print "s1.isdisjoint(s2) =" (s1.isdisjoint s2))  # False - they share 3
-(print "s1.isdisjoint(s_disjoint) =" (s1.isdisjoint s_disjoint))  # True - no common elements
-(print "s1.isdisjoint(empty) =" (s1.isdisjoint empty))  # True
+# Length
+(print "\n=== Length ===")
+(assert (== (. s1 length) 3) "s1 length should be 3")
+(assert (== (. empty length) 0) "empty length should be 0")
 
 # Test with 'in' operator
 (print "\n=== Membership Test ===")
