@@ -19,7 +19,7 @@
 (assert (== (get-item d "b") 20) "dict set-item")
 
 # Test tuple indexing (read-only)
-(= t (1, 2, 3))
+(= t (tuple [1, 2, 3]))
 (assert (== (get-item t 0) 1) "tuple get-item")
 (assert (== (get-item t -1) 3) "tuple get-item negative")
 
@@ -28,4 +28,4 @@
 (assert (== (get-item s 0) "h") "string get-item first")
 (assert (== (get-item s -1) "o") "string get-item last")
 
-print("Basic container protocol tests passed!")
+(print "Basic container protocol tests passed!")
