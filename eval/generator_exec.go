@@ -651,13 +651,13 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 					Kind: StepLoopNext,
 				})
 
-				// Steps 3+: Loop body
+				// Steps 3+: Loop body (use appendStepsWithOffset for proper jump target adjustment)
 				for i := 3; i < n.Len(); i++ {
 					substeps, err := transformToSteps(n.Items()[i])
 					if err != nil {
 						return nil, err
 					}
-					steps = append(steps, substeps...)
+					steps = appendStepsWithOffset(steps, substeps)
 				}
 
 				// Final step: Jump back to loop next
@@ -691,13 +691,13 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 					Arg:  -1, // Will be filled in later with end step
 				})
 
-				// Steps 2+: Loop body
+				// Steps 2+: Loop body (use appendStepsWithOffset for proper jump target adjustment)
 				for _, bodyExpr := range body {
 					substeps, err := transformToSteps(bodyExpr)
 					if err != nil {
 						return nil, err
 					}
-					steps = append(steps, substeps...)
+					steps = appendStepsWithOffset(steps, substeps)
 				}
 
 				// Final step: Jump back to condition check
@@ -870,13 +870,13 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 					steps[len(steps)-1].Node = core.NewList(contextExpr, varPattern)
 				}
 
-				// Transform body into steps
+				// Transform body into steps (use appendStepsWithOffset for proper jump target adjustment)
 				for _, stmt := range body {
 					substeps, err := transformToSteps(stmt)
 					if err != nil {
 						return nil, err
 					}
-					steps = append(steps, substeps...)
+					steps = appendStepsWithOffset(steps, substeps)
 				}
 
 				// Step N: WithExit - call __exit__
@@ -922,13 +922,13 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 					Arg:  -1, // Will be filled in later
 				})
 
-				// Transform try body
+				// Transform try body (use appendStepsWithOffset for proper jump target adjustment)
 				for _, stmt := range tryBody {
 					substeps, err := transformToSteps(stmt)
 					if err != nil {
 						return nil, err
 					}
-					steps = append(steps, substeps...)
+					steps = appendStepsWithOffset(steps, substeps)
 				}
 
 				// Mark end of try block - jump past except handlers
@@ -958,12 +958,13 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 						Kind: StepFinallyStart,
 					})
 
+					// Use appendStepsWithOffset for proper jump target adjustment
 					for _, stmt := range finallyBody {
 						substeps, err := transformToSteps(stmt)
 						if err != nil {
 							return nil, err
 						}
-						steps = append(steps, substeps...)
+						steps = appendStepsWithOffset(steps, substeps)
 					}
 
 					steps = append(steps, ExecutionStep{
