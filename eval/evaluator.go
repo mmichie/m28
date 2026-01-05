@@ -174,9 +174,10 @@ func init() {
 		// Note: "def" is registered by special_forms/register.go
 		"=":                assignForm,
 		"annotated-assign": annotatedAssignForm,
-		"quote":            quoteForm,
-		"lambda":           lambdaForm,
-		"fn":               lambdaForm, // Alias for lambda
+		"quote":  quoteForm,
+		"lambda": lambdaForm,
+		// Note: "fn" was removed as an alias for lambda because it conflicts with
+		// Python code that uses "fn" as a variable name (e.g., fn = some_func; fn(args))
 
 		// Module system (will be overridden by enhanced version)
 		// "import": importForm,

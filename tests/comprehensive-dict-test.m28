@@ -2,7 +2,7 @@
 # Tests all aspects of dictionary implementation and methods
 
 # Test helper to print test results
-(= assert-equal (fn [expected actual test-name]
+(= assert-equal (lambda [expected actual test-name]
   (print (if (= expected actual)
            (+ "✓ PASS: " test-name)
            (+ "✗ FAIL: " test-name " (Expected: " expected ", Got: " actual ")")))))
@@ -183,7 +183,7 @@
 (= complex-dict {})
 (dict.set complex-dict "list" [1, 2, 3])
 (dict.set complex-dict "dict" {"nested": true})
-(dict.set complex-dict "function" (fn [x] (* x x)))
+(dict.set complex-dict "function" (lambda [x] (* x x)))
 (assert-equal 3 (length (get complex-dict "list")) "Dictionary with list value")
 (assert-equal true (get (get complex-dict "dict") "nested") "Dictionary with nested dict")
 

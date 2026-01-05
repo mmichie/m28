@@ -648,11 +648,14 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 		)
 	}
 
-	// Special handling: if callee is an attribute access (. obj "name"),
+	// Special handling: if callee is a SIMPLE attribute access (. obj "name"),
 	// convert it to a method call form: (. obj "name" args...)
 	// This handles: {}.keys() -> (. {} "keys" __call__) instead of ((. {} "keys"))
+	// IMPORTANT: Only apply this to exactly 3-element dot forms (simple attribute access).
+	// If the form has more elements like (. obj "f" arg1), it's already a method call
+	// and should NOT be extended - this enables chained calls like obj.f(1)(2).
 	if sexpr, ok := callee.(*ast.SExpr); ok {
-		if len(sexpr.Elements) >= 3 {
+		if len(sexpr.Elements) == 3 {
 			if ident, ok := sexpr.Elements[0].(*ast.Identifier); ok && ident.Name == "." {
 				// It's an attribute access: (. obj "name")
 				// Check if this is a simple method call (no unpacking markers)
