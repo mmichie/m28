@@ -877,7 +877,7 @@ func createDictClass() *DictType {
 
 		dict := core.NewDict()
 
-		// Convert iterable to list of keys
+		// Convert iterable to list of keys using iterator protocol
 		switch v := iterable.(type) {
 		case *core.ListValue:
 			for _, key := range v.Items() {
@@ -895,6 +895,18 @@ func createDictClass() *DictType {
 			// String is iterable in Python - each character is a key
 			for _, ch := range string(v) {
 				if err := dict.SetValue(core.StringValue(string(ch)), value); err != nil {
+					return nil, err
+				}
+			}
+		case core.Iterable:
+			// Handle any iterable (including map, filter, etc.)
+			iter := v.Iterator()
+			for {
+				key, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				if err := dict.SetValue(key, value); err != nil {
 					return nil, err
 				}
 			}

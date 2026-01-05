@@ -388,6 +388,83 @@ func RegisterTypes(ctx *core.Context) {
 		return core.None, nil
 	}))
 
+	// Add __setattr__ method to object
+	// object.__setattr__(self, name, value) - sets an attribute on the instance
+	// This is the default implementation that super().__setattr__() calls
+	// IMPORTANT: Must call SetAttrDefault to avoid infinite recursion
+	objectClass.SetMethod("__setattr__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 3 {
+			return nil, &core.TypeError{Message: "__setattr__() takes exactly 3 arguments"}
+		}
+		self := args[0]
+		name, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, &core.TypeError{Message: "attribute name must be string"}
+		}
+		value := args[2]
+
+		// For instances, use SetAttrDefault to avoid recursion
+		// (SetAttr would call __setattr__ again)
+		if inst, ok := self.(*core.Instance); ok {
+			if err := inst.SetAttrDefault(string(name), value); err != nil {
+				return nil, err
+			}
+			return core.None, nil
+		}
+		// For other objects, use SetAttr
+		if obj, ok := self.(core.Object); ok {
+			if err := obj.SetAttr(string(name), value); err != nil {
+				return nil, err
+			}
+			return core.None, nil
+		}
+		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object has no attribute '%s'", self.Type(), name)}
+	}))
+
+	// Add __delattr__ method to object
+	// object.__delattr__(self, name) - deletes an attribute from the instance
+	objectClass.SetMethod("__delattr__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, &core.TypeError{Message: "__delattr__() takes exactly 2 arguments"}
+		}
+		self := args[0]
+		name, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, &core.TypeError{Message: "attribute name must be string"}
+		}
+
+		// Delete the attribute from the object
+		if inst, ok := self.(*core.Instance); ok {
+			if _, exists := inst.Attributes[string(name)]; exists {
+				delete(inst.Attributes, string(name))
+				return core.None, nil
+			}
+			return nil, &core.AttributeError{ObjType: inst.Class.Name, AttrName: string(name)}
+		}
+		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object has no attribute '%s'", self.Type(), name)}
+	}))
+
+	// Add __getattribute__ method to object
+	// object.__getattribute__(self, name) - gets an attribute from the instance
+	objectClass.SetMethod("__getattribute__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, &core.TypeError{Message: "__getattribute__() takes exactly 2 arguments"}
+		}
+		self := args[0]
+		name, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, &core.TypeError{Message: "attribute name must be string"}
+		}
+
+		// Get the attribute from the object
+		if obj, ok := self.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+			if val, found := obj.GetAttr(string(name)); found {
+				return val, nil
+			}
+		}
+		return nil, &core.AttributeError{ObjType: string(self.Type()), AttrName: string(name)}
+	}))
+
 	ctx.Define("object", objectClass)
 
 	// int - Python int constructor
