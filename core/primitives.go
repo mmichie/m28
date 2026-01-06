@@ -406,9 +406,10 @@ var NotImplemented = &NotImplementedValue{}
 // BuiltinFunction represents a Go function that can be called from M28
 type BuiltinFunction struct {
 	BaseObject
-	fn       func(args []Value, ctx *Context) (Value, error)
-	name     string
-	registry *MethodRegistry
+	fn               func(args []Value, ctx *Context) (Value, error)
+	name             string
+	registry         *MethodRegistry
+	acceptsAnyKwargs bool // If true, silently ignore kwargs (legacy behavior)
 }
 
 // NewBuiltinFunction creates a new builtin function
@@ -439,18 +440,43 @@ func NewNamedBuiltinFunction(name string, fn func(args []Value, ctx *Context) (V
 	return f
 }
 
+// NewBuiltinFunctionIgnoringKwargs creates a builtin function that silently ignores kwargs.
+// Use this for legacy builtins that need to accept any kwargs for compatibility.
+// Most new builtins should use NewBuiltinFunction (which errors on unexpected kwargs)
+// or BuiltinFunctionWithKwargs (which handles kwargs explicitly).
+func NewBuiltinFunctionIgnoringKwargs(name string, fn func(args []Value, ctx *Context) (Value, error)) *BuiltinFunction {
+	f := &BuiltinFunction{
+		BaseObject:       *NewBaseObject(FunctionType),
+		fn:               fn,
+		name:             name,
+		acceptsAnyKwargs: true,
+	}
+
+	// Initialize the method registry
+	f.registry = f.createRegistry()
+
+	return f
+}
+
 // Call implements Callable.Call
 func (f *BuiltinFunction) Call(args []Value, ctx *Context) (Value, error) {
 	return f.fn(args, ctx)
 }
 
 // CallWithKeywords implements keyword argument support for BuiltinFunction
-// For Python compatibility, builtin functions ignore unknown keyword arguments
-// by default. Functions that need to handle kwargs should use BuiltinFunctionWithKwargs.
+// By default, errors on unexpected keyword arguments (matching Python's behavior).
+// Use NewBuiltinFunctionIgnoringKwargs for legacy builtins that need to accept any kwargs.
 func (f *BuiltinFunction) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
-	// Default behavior: ignore keyword arguments and just call with positional args
-	// This matches Python's behavior for most builtin functions that accept **kwargs
-	// but don't actually use them (e.g., for compatibility)
+	if len(kwargs) > 0 {
+		if f.acceptsAnyKwargs {
+			// Legacy behavior: silently ignore kwargs
+			return f.fn(args, ctx)
+		}
+		// Error on unexpected kwargs (matches Python behavior)
+		for key := range kwargs {
+			return nil, fmt.Errorf("%s() got an unexpected keyword argument '%s'", f.name, key)
+		}
+	}
 	return f.fn(args, ctx)
 }
 

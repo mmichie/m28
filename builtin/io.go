@@ -14,17 +14,54 @@ import (
 // RegisterIO registers I/O functions using the builder framework
 func RegisterIO(ctx *core.Context) {
 	// print - print objects to stdout
-	// BEFORE: 11 lines
-	// AFTER: 8 lines with validation
-	ctx.Define("print", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// Print can take any number of arguments
-		parts := make([]string, len(args))
-		for i, arg := range args {
-			parts[i] = core.PrintValueWithoutQuotes(arg)
-		}
-		fmt.Println(strings.Join(parts, " "))
-		return core.NilValue{}, nil
-	}))
+	// Supports sep= and end= keyword arguments like Python's print()
+	printFunc := &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "print",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			// Default values for sep and end (Python defaults)
+			sep := " "
+			end := "\n"
+
+			// Check for sep= kwarg
+			if sepVal, ok := kwargs["sep"]; ok {
+				if sepVal == core.None {
+					sep = " " // None means use default
+				} else if s, ok := sepVal.(core.StringValue); ok {
+					sep = string(s)
+				} else {
+					return nil, fmt.Errorf("sep must be None or a string, not %s", sepVal.Type())
+				}
+			}
+
+			// Check for end= kwarg
+			if endVal, ok := kwargs["end"]; ok {
+				if endVal == core.None {
+					end = "\n" // None means use default
+				} else if s, ok := endVal.(core.StringValue); ok {
+					end = string(s)
+				} else {
+					return nil, fmt.Errorf("end must be None or a string, not %s", endVal.Type())
+				}
+			}
+
+			// Check for unexpected kwargs
+			for key := range kwargs {
+				if key != "sep" && key != "end" && key != "file" && key != "flush" {
+					return nil, fmt.Errorf("print() got an unexpected keyword argument '%s'", key)
+				}
+			}
+
+			// Print can take any number of arguments
+			parts := make([]string, len(args))
+			for i, arg := range args {
+				parts[i] = core.PrintValueWithoutQuotes(arg)
+			}
+			fmt.Print(strings.Join(parts, sep) + end)
+			return core.NilValue{}, nil
+		},
+	}
+	ctx.Define("print", printFunc)
 
 	// input - read line from stdin with optional prompt
 	// BEFORE: 23 lines
