@@ -124,6 +124,89 @@ func InitIOModule() *core.DictValue {
 	fileIOClass := core.NewClass("FileIO", rawIOBaseClass)
 	ioModule.Set("FileIO", fileIOClass)
 
+	// IncrementalNewlineDecoder - codec for universal newlines mode
+	// Translates \r\n and \r into \n
+	incrementalNewlineDecoderClass := core.NewClass("IncrementalNewlineDecoder", nil)
+	incrementalNewlineDecoderClass.SetMethod("__init__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// __init__(self, decoder, translate, errors='strict')
+		if len(args) < 1 {
+			return core.None, nil
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		// Store decoder (can be None)
+		if len(args) > 1 {
+			self.Attributes["decoder"] = args[1]
+		} else {
+			self.Attributes["decoder"] = core.None
+		}
+		// Store translate flag
+		if len(args) > 2 {
+			self.Attributes["translate"] = args[2]
+		} else {
+			self.Attributes["translate"] = core.True
+		}
+		// Store errors mode
+		if len(args) > 3 {
+			self.Attributes["errors"] = args[3]
+		} else {
+			self.Attributes["errors"] = core.StringValue("strict")
+		}
+		// Initialize newlines tracking
+		self.Attributes["newlines"] = core.None
+		return core.None, nil
+	}))
+	incrementalNewlineDecoderClass.SetMethod("decode", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// decode(self, input, final=False)
+		if len(args) < 2 {
+			return core.StringValue(""), nil
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.StringValue(""), nil
+		}
+		input := args[1]
+
+		// Get input as string
+		var inputStr string
+		switch v := input.(type) {
+		case core.StringValue:
+			inputStr = string(v)
+		case core.BytesValue:
+			inputStr = string(v)
+		default:
+			inputStr = input.String()
+		}
+
+		// Check if we should translate newlines
+		translate := true
+		if t, ok := self.Attributes["translate"]; ok {
+			translate = core.IsTruthy(t)
+		}
+
+		if translate {
+			// Translate \r\n and \r to \n
+			result := strings.ReplaceAll(inputStr, "\r\n", "\n")
+			result = strings.ReplaceAll(result, "\r", "\n")
+			return core.StringValue(result), nil
+		}
+
+		return core.StringValue(inputStr), nil
+	}))
+	incrementalNewlineDecoderClass.SetMethod("reset", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.None, nil
+	}))
+	incrementalNewlineDecoderClass.SetMethod("getstate", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Return (buffer, flag) tuple
+		return core.TupleValue{core.BytesValue{}, core.NumberValue(0)}, nil
+	}))
+	incrementalNewlineDecoderClass.SetMethod("setstate", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.None, nil
+	}))
+	ioModule.Set("IncrementalNewlineDecoder", incrementalNewlineDecoderClass)
+
 	return ioModule
 }
 
