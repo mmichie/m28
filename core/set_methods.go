@@ -80,7 +80,7 @@ func InitSetMethods() {
 		},
 	}
 
-	// difference - return difference of sets
+	// difference - return difference of sets (accepts any iterable)
 	setType.Methods["difference"] = &MethodDescriptor{
 		Name:    "difference",
 		Arity:   -1, // Variable args
@@ -95,15 +95,28 @@ func InitSetMethods() {
 				result.items[k] = v
 			}
 
-			// Remove items from other sets
+			// Remove items from other iterables
 			for _, arg := range args {
-				other, ok := arg.(*SetValue)
-				if !ok {
-					return nil, &TypeError{Message: fmt.Sprintf("difference() argument must be a set, not %s", arg.Type())}
+				// Check if it's a set (fast path)
+				if other, ok := arg.(*SetValue); ok {
+					for k := range other.items {
+						delete(result.items, k)
+					}
+					continue
 				}
-				for k := range other.items {
-					delete(result.items, k)
+				// Check if it's an iterable
+				if iterable, ok := arg.(Iterable); ok {
+					iter := iterable.Iterator()
+					for {
+						val, hasNext := iter.Next()
+						if !hasNext {
+							break
+						}
+						result.Remove(val)
+					}
+					continue
 				}
+				return nil, &TypeError{Message: fmt.Sprintf("difference() argument must be an iterable, not %s", arg.Type())}
 			}
 
 			return result, nil
