@@ -368,6 +368,8 @@ func (l *ModuleLoaderEnhanced) createModuleContext(cacheName, path string, parti
 	moduleCtx.ModuleDict = partialModule
 	moduleCtx.Define("__name__", StringValue(cacheName))
 	moduleCtx.Define("__file__", StringValue(path))
+	// __doc__ is None by default, set by module docstring if present
+	moduleCtx.Define("__doc__", None)
 	// Initialize empty __annotations__ dict for PEP 526 support
 	// Python automatically creates this dict for modules that use annotations
 	moduleCtx.Define("__annotations__", NewDict())

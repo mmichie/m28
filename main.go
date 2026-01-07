@@ -278,6 +278,7 @@ func main() {
 		mainDict := core.NewDict()
 		globalCtx.ModuleDict = mainDict
 		globalCtx.Define("__name__", core.StringValue("__main__"))
+		globalCtx.Define("__doc__", core.None)
 
 		// Register __main__ in sys.modules
 		mainModule := core.NewModule("__main__", "<command-line>")
@@ -312,6 +313,7 @@ func main() {
 		mainDict := core.NewDict()
 		globalCtx.ModuleDict = mainDict
 		globalCtx.Define("__name__", core.StringValue("__main__"))
+		globalCtx.Define("__doc__", core.None)
 
 		// Register __main__ in sys.modules
 		mainModule := core.NewModule("__main__", "<command-line>")
@@ -581,6 +583,7 @@ func executeFile(filename string, ctx *core.Context, errorFormatter *parser.Erro
 	// Set __file__ and __name__ in context
 	ctx.Define("__file__", core.StringValue(filename))
 	ctx.Define("__name__", core.StringValue("__main__"))
+	ctx.Define("__doc__", core.None)
 
 	// Register __main__ module in sys.modules so unittest and other modules can find it
 	// Create a module object that wraps the execution context

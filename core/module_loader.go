@@ -113,6 +113,8 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 	// Define the special __name__ variable
 	moduleCtx.Define("__name__", StringValue(cacheName))
 	moduleCtx.Define("__file__", StringValue(path))
+	// __doc__ is None by default, set by module docstring if present
+	moduleCtx.Define("__doc__", None)
 
 	// Parse the module content
 	expr, err := l.parseFunc(content)
