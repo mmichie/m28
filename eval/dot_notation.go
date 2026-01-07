@@ -784,18 +784,30 @@ func getSetAttr(set *core.SetValue, attr string, isCall bool, args *core.ListVal
 		if err != nil {
 			return nil, err
 		}
-		other, ok := otherArg.(*core.SetValue)
-		if !ok {
-			return nil, fmt.Errorf("union() argument must be a set")
-		}
 		result := core.NewSet()
 		for _, item := range set.Items() {
 			result.Add(item)
 		}
-		for _, item := range other.Items() {
-			result.Add(item)
+		// Check if it's a set (fast path)
+		if other, ok := otherArg.(*core.SetValue); ok {
+			for _, item := range other.Items() {
+				result.Add(item)
+			}
+			return result, nil
 		}
-		return result, nil
+		// Check if it's an iterable
+		if iterable, ok := otherArg.(core.Iterable); ok {
+			iter := iterable.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				result.Add(val)
+			}
+			return result, nil
+		}
+		return nil, fmt.Errorf("union() argument must be an iterable, not %s", otherArg.Type())
 
 	case "intersection":
 		if args.Len() < 1 {
@@ -805,9 +817,22 @@ func getSetAttr(set *core.SetValue, attr string, isCall bool, args *core.ListVal
 		if err != nil {
 			return nil, err
 		}
-		other, ok := otherArg.(*core.SetValue)
-		if !ok {
-			return nil, fmt.Errorf("intersection() argument must be a set")
+		// Convert to set for membership testing
+		var other *core.SetValue
+		if s, ok := otherArg.(*core.SetValue); ok {
+			other = s
+		} else if iterable, ok := otherArg.(core.Iterable); ok {
+			other = core.NewSet()
+			iter := iterable.Iterator()
+			for {
+				val, hasNext := iter.Next()
+				if !hasNext {
+					break
+				}
+				other.Add(val)
+			}
+		} else {
+			return nil, fmt.Errorf("intersection() argument must be an iterable, not %s", otherArg.Type())
 		}
 		result := core.NewSet()
 		for _, item := range set.Items() {

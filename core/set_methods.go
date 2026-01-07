@@ -14,7 +14,7 @@ func InitSetMethods() {
 
 	// Set operation methods
 
-	// union - return union of sets
+	// union - return union of sets (accepts any iterable)
 	setType.Methods["union"] = &MethodDescriptor{
 		Name:    "union",
 		Arity:   -1, // Variable args
@@ -29,43 +29,83 @@ func InitSetMethods() {
 				result.items[k] = v
 			}
 
-			// Add items from all other sets
+			// Add items from all other iterables
 			for _, arg := range args {
-				other, ok := arg.(*SetValue)
-				if !ok {
-					return nil, &TypeError{Message: fmt.Sprintf("union() argument must be a set, not %s", arg.Type())}
+				// Check if it's a set (fast path)
+				if other, ok := arg.(*SetValue); ok {
+					for k, v := range other.items {
+						result.items[k] = v
+					}
+					continue
 				}
-				for k, v := range other.items {
-					result.items[k] = v
+				// Check if it's an iterable
+				if iterable, ok := arg.(Iterable); ok {
+					iter := iterable.Iterator()
+					for {
+						val, hasNext := iter.Next()
+						if !hasNext {
+							break
+						}
+						result.Add(val)
+					}
+					continue
 				}
+				return nil, &TypeError{Message: fmt.Sprintf("union() argument must be an iterable, not %s", arg.Type())}
 			}
 
 			return result, nil
 		},
 	}
 
-	// intersection - return intersection of sets
+	// intersection - return intersection of sets (accepts any iterable)
 	setType.Methods["intersection"] = &MethodDescriptor{
 		Name:    "intersection",
 		Arity:   -1, // Variable args
 		Doc:     "Return intersection of sets",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			set := receiver.(*SetValue)
+
+			// With no args, return a copy of the set
 			if len(args) == 0 {
-				return nil, &TypeError{Message: "intersection() requires at least one argument"}
+				result := NewSet()
+				for k, v := range set.items {
+					result.items[k] = v
+				}
+				return result, nil
 			}
 
-			set := receiver.(*SetValue)
+			// Convert all args to sets for efficient membership testing
+			otherSets := make([]*SetValue, len(args))
+			for i, arg := range args {
+				// Check if it's already a set (fast path)
+				if other, ok := arg.(*SetValue); ok {
+					otherSets[i] = other
+					continue
+				}
+				// Check if it's an iterable - convert to set
+				if iterable, ok := arg.(Iterable); ok {
+					other := NewSet()
+					iter := iterable.Iterator()
+					for {
+						val, hasNext := iter.Next()
+						if !hasNext {
+							break
+						}
+						other.Add(val)
+					}
+					otherSets[i] = other
+					continue
+				}
+				return nil, &TypeError{Message: fmt.Sprintf("intersection() argument must be an iterable, not %s", arg.Type())}
+			}
+
 			result := NewSet()
 
 			// Check each item in this set
 			for k, v := range set.items {
 				inAll := true
-				for _, arg := range args {
-					other, ok := arg.(*SetValue)
-					if !ok {
-						return nil, &TypeError{Message: fmt.Sprintf("intersection() argument must be a set, not %s", arg.Type())}
-					}
+				for _, other := range otherSets {
 					if !other.Contains(v) {
 						inAll = false
 						break
@@ -123,7 +163,7 @@ func InitSetMethods() {
 		},
 	}
 
-	// symmetric_difference - return symmetric difference
+	// symmetric_difference - return symmetric difference (accepts any iterable)
 	setType.Methods["symmetric_difference"] = &MethodDescriptor{
 		Name:    "symmetric_difference",
 		Arity:   1,
@@ -131,9 +171,23 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			other, ok := args[0].(*SetValue)
-			if !ok {
-				return nil, &TypeError{Message: fmt.Sprintf("symmetric_difference() argument must be a set, not %s", args[0].Type())}
+
+			// Convert arg to set if needed
+			var other *SetValue
+			if s, ok := args[0].(*SetValue); ok {
+				other = s
+			} else if iterable, ok := args[0].(Iterable); ok {
+				other = NewSet()
+				iter := iterable.Iterator()
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					other.Add(val)
+				}
+			} else {
+				return nil, &TypeError{Message: fmt.Sprintf("symmetric_difference() argument must be an iterable, not %s", args[0].Type())}
 			}
 
 			result := NewSet()
@@ -270,7 +324,7 @@ func InitSetMethods() {
 
 	// Comparison methods
 
-	// issubset - test if this set is subset of other
+	// issubset - test if this set is subset of other (accepts any iterable)
 	setType.Methods["issubset"] = &MethodDescriptor{
 		Name:    "issubset",
 		Arity:   1,
@@ -278,9 +332,23 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			other, ok := args[0].(*SetValue)
-			if !ok {
-				return nil, &TypeError{Message: fmt.Sprintf("issubset() argument must be a set, not %s", args[0].Type())}
+
+			// Convert arg to set if needed
+			var other *SetValue
+			if s, ok := args[0].(*SetValue); ok {
+				other = s
+			} else if iterable, ok := args[0].(Iterable); ok {
+				other = NewSet()
+				iter := iterable.Iterator()
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					other.Add(val)
+				}
+			} else {
+				return nil, &TypeError{Message: fmt.Sprintf("issubset() argument must be an iterable, not %s", args[0].Type())}
 			}
 
 			// Check if all items in this set are in other
@@ -294,7 +362,7 @@ func InitSetMethods() {
 		},
 	}
 
-	// issuperset - test if this set is superset of other
+	// issuperset - test if this set is superset of other (accepts any iterable)
 	setType.Methods["issuperset"] = &MethodDescriptor{
 		Name:    "issuperset",
 		Arity:   1,
@@ -302,23 +370,36 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			other, ok := args[0].(*SetValue)
-			if !ok {
-				return nil, &TypeError{Message: fmt.Sprintf("issuperset() argument must be a set, not %s", args[0].Type())}
-			}
 
-			// Check if all items in other are in this set
-			for _, v := range other.items {
-				if !set.Contains(v) {
-					return False, nil
+			// For issuperset, we iterate over the other iterable and check membership
+			// Check if it's a set (fast path)
+			if other, ok := args[0].(*SetValue); ok {
+				for _, v := range other.items {
+					if !set.Contains(v) {
+						return False, nil
+					}
 				}
+				return True, nil
 			}
-
-			return True, nil
+			// Check if it's an iterable
+			if iterable, ok := args[0].(Iterable); ok {
+				iter := iterable.Iterator()
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					if !set.Contains(val) {
+						return False, nil
+					}
+				}
+				return True, nil
+			}
+			return nil, &TypeError{Message: fmt.Sprintf("issuperset() argument must be an iterable, not %s", args[0].Type())}
 		},
 	}
 
-	// isdisjoint - test if sets have no common elements
+	// isdisjoint - test if sets have no common elements (accepts any iterable)
 	setType.Methods["isdisjoint"] = &MethodDescriptor{
 		Name:    "isdisjoint",
 		Arity:   1,
@@ -326,19 +407,36 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			other, ok := args[0].(*SetValue)
-			if !ok {
-				return nil, &TypeError{Message: fmt.Sprintf("isdisjoint() argument must be a set, not %s", args[0].Type())}
-			}
 
-			// Check if any item in this set is in other
-			for _, v := range set.items {
-				if other.Contains(v) {
-					return False, nil
+			// Check if it's a set (fast path)
+			if other, ok := args[0].(*SetValue); ok {
+				for _, v := range set.items {
+					if other.Contains(v) {
+						return False, nil
+					}
 				}
+				return True, nil
 			}
-
-			return True, nil
+			// Check if it's an iterable - convert to set for membership testing
+			if iterable, ok := args[0].(Iterable); ok {
+				other := NewSet()
+				iter := iterable.Iterator()
+				for {
+					val, hasNext := iter.Next()
+					if !hasNext {
+						break
+					}
+					other.Add(val)
+				}
+				// Check if any item in this set is in other
+				for _, v := range set.items {
+					if other.Contains(v) {
+						return False, nil
+					}
+				}
+				return True, nil
+			}
+			return nil, &TypeError{Message: fmt.Sprintf("isdisjoint() argument must be an iterable, not %s", args[0].Type())}
 		},
 	}
 
