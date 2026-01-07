@@ -393,13 +393,13 @@ func getListAttr(lst *core.ListValue, attr string, isCall bool, args *core.ListV
 	case "length", "len":
 		return core.NumberValue(lst.Len()), nil
 
-	case "pop", "reverse", "sort", "copy":
+	case "pop", "reverse", "copy":
 		// These methods auto-call when accessed
 		// (. list pop) calls pop() with no args
 		// (. list pop 0) calls pop(0)
 		// (. list reverse) calls reverse()
-		// (. list sort) calls sort()
 		// (. list copy) calls copy()
+		// NOTE: sort is excluded to support kwargs (key=, reverse=)
 		if td != nil {
 			if method, ok := td.Methods[attr]; ok && method.Handler != nil {
 				evalArgs := make([]core.Value, args.Len())

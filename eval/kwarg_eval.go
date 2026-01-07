@@ -383,7 +383,7 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 	// For functions that don't support keyword arguments,
 	// only allow calls with no keyword arguments
 	if len(keywordArgs) > 0 {
-		return nil, fmt.Errorf("function does not support keyword arguments")
+		return nil, fmt.Errorf("function (type %T) does not support keyword arguments", fn)
 	}
 
 	// Call as normal with just positional arguments

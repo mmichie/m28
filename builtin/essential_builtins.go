@@ -351,100 +351,111 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 
 	// __import__(name, globals=None, locals=None, fromlist=(), level=0)
 	// This is the function that the import statement calls
-	ctx.Define("__import__", core.NewBuiltinFunction(func(args []core.Value, innerCtx *core.Context) (core.Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("__import__() requires at least 1 argument (0 given)")
-		}
+	importFunc := &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "__import__",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, innerCtx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__import__() requires at least 1 argument (0 given)")
+			}
 
-		// Get module name
-		nameVal, ok := args[0].(core.StringValue)
-		if !ok {
-			return nil, fmt.Errorf("__import__() argument 1 must be str, not %T", args[0])
-		}
-		moduleName := string(nameVal)
+			// Get module name
+			nameVal, ok := args[0].(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("__import__() argument 1 must be str, not %T", args[0])
+			}
+			moduleName := string(nameVal)
 
-		// Special case: __main__ module
-		// Return the actual __main__ module from sys.modules if it exists
-		if moduleName == "__main__" {
-			// Try to get sys.modules
-			if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
-				if sysModulesVal, ok := sysModule.Get("modules"); ok {
-					if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
-						key := core.ValueToKey(core.StringValue("__main__"))
-						if mainModule, ok := sysModulesDict.Get(key); ok {
-							return mainModule, nil
+			// Special case: __main__ module
+			// Return the actual __main__ module from sys.modules if it exists
+			if moduleName == "__main__" {
+				// Try to get sys.modules
+				if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
+					if sysModulesVal, ok := sysModule.Get("modules"); ok {
+						if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
+							key := core.ValueToKey(core.StringValue("__main__"))
+							if mainModule, ok := sysModulesDict.Get(key); ok {
+								return mainModule, nil
+							}
+						}
+					}
+				}
+
+				// Fallback: return a mock __main__ module if not found in sys.modules
+				mainModule := core.NewDict()
+				mainModule.Set("__name__", core.StringValue("__main__"))
+				mainModule.Set("__file__", core.StringValue("<stdin>"))
+				mainModule.Set("__package__", core.None)
+				return mainModule, nil
+			}
+
+			// Get fromlist from args[3] or kwargs["fromlist"]
+			var fromlist []string
+			var fromlistVal core.Value
+			if len(args) > 3 {
+				fromlistVal = args[3]
+			} else if fl, ok := kwargs["fromlist"]; ok {
+				fromlistVal = fl
+			}
+			if fromlistVal != nil {
+				switch fl := fromlistVal.(type) {
+				case *core.ListValue:
+					for _, item := range fl.Items() {
+						if strVal, ok := item.(core.StringValue); ok {
+							fromlist = append(fromlist, string(strVal))
+						}
+					}
+				case core.TupleValue:
+					for _, item := range fl {
+						if strVal, ok := item.(core.StringValue); ok {
+							fromlist = append(fromlist, string(strVal))
 						}
 					}
 				}
 			}
 
-			// Fallback: return a mock __main__ module if not found in sys.modules
-			mainModule := core.NewDict()
-			mainModule.Set("__name__", core.StringValue("__main__"))
-			mainModule.Set("__file__", core.StringValue("<stdin>"))
-			mainModule.Set("__package__", core.None)
-			return mainModule, nil
-		}
+			// Use the module loader to load the module
+			// Get the global context (use ctx not innerCtx for module loading)
+			globalCtx := ctx
+			if globalCtx.Global != nil {
+				globalCtx = globalCtx.Global
+			}
 
-		// Get fromlist if provided (args[3])
-		var fromlist []string
-		if len(args) > 3 {
-			switch fl := args[3].(type) {
-			case *core.ListValue:
-				for _, item := range fl.Items() {
-					if strVal, ok := item.(core.StringValue); ok {
-						fromlist = append(fromlist, string(strVal))
+			// Try to load the module
+			loader := core.GetModuleLoader()
+			module, err := loader.LoadModule(moduleName, globalCtx)
+			if err != nil {
+				return nil, fmt.Errorf("ImportError: %v", err)
+			}
+
+			// If fromlist is empty or module is a package, return the top-level module
+			// Otherwise return the final module
+			if len(fromlist) == 0 {
+				// Special case: "." should be returned as-is, not treated as a dotted import
+				if moduleName != "." {
+					// Return the top-level module (e.g., for "import os.path", return os)
+					topLevel := moduleName
+					for i, ch := range moduleName {
+						if ch == '.' {
+							topLevel = moduleName[:i]
+							break
+						}
 					}
-				}
-			case core.TupleValue:
-				for _, item := range fl {
-					if strVal, ok := item.(core.StringValue); ok {
-						fromlist = append(fromlist, string(strVal))
+					if topLevel != moduleName {
+						// Load and return the top-level
+						topModule, err := loader.LoadModule(topLevel, globalCtx)
+						if err != nil {
+							return nil, fmt.Errorf("ImportError: %v", err)
+						}
+						return topModule, nil
 					}
 				}
 			}
-		}
 
-		// Use the module loader to load the module
-		// Get the global context (use ctx not innerCtx for module loading)
-		globalCtx := ctx
-		if globalCtx.Global != nil {
-			globalCtx = globalCtx.Global
-		}
-
-		// Try to load the module
-		loader := core.GetModuleLoader()
-		module, err := loader.LoadModule(moduleName, globalCtx)
-		if err != nil {
-			return nil, fmt.Errorf("ImportError: %v", err)
-		}
-
-		// If fromlist is empty or module is a package, return the top-level module
-		// Otherwise return the final module
-		if len(fromlist) == 0 {
-			// Special case: "." should be returned as-is, not treated as a dotted import
-			if moduleName != "." {
-				// Return the top-level module (e.g., for "import os.path", return os)
-				topLevel := moduleName
-				for i, ch := range moduleName {
-					if ch == '.' {
-						topLevel = moduleName[:i]
-						break
-					}
-				}
-				if topLevel != moduleName {
-					// Load and return the top-level
-					topModule, err := loader.LoadModule(topLevel, globalCtx)
-					if err != nil {
-						return nil, fmt.Errorf("ImportError: %v", err)
-					}
-					return topModule, nil
-				}
-			}
-		}
-
-		return module, nil
-	}))
+			return module, nil
+		},
+	}
+	ctx.Define("__import__", importFunc)
 }
 
 // isAttributeError checks if an error is an AttributeError
