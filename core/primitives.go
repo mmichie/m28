@@ -415,7 +415,7 @@ type BuiltinFunction struct {
 // NewBuiltinFunction creates a new builtin function
 func NewBuiltinFunction(fn func(args []Value, ctx *Context) (Value, error)) *BuiltinFunction {
 	f := &BuiltinFunction{
-		BaseObject: *NewBaseObject(FunctionType),
+		BaseObject: *NewBaseObject(BuiltinFunctionType),
 		fn:         fn,
 		name:       "",
 	}
@@ -429,7 +429,7 @@ func NewBuiltinFunction(fn func(args []Value, ctx *Context) (Value, error)) *Bui
 // NewNamedBuiltinFunction creates a new builtin function with a name
 func NewNamedBuiltinFunction(name string, fn func(args []Value, ctx *Context) (Value, error)) *BuiltinFunction {
 	f := &BuiltinFunction{
-		BaseObject: *NewBaseObject(FunctionType),
+		BaseObject: *NewBaseObject(BuiltinFunctionType),
 		fn:         fn,
 		name:       name,
 	}
@@ -446,7 +446,7 @@ func NewNamedBuiltinFunction(name string, fn func(args []Value, ctx *Context) (V
 // or BuiltinFunctionWithKwargs (which handles kwargs explicitly).
 func NewBuiltinFunctionIgnoringKwargs(name string, fn func(args []Value, ctx *Context) (Value, error)) *BuiltinFunction {
 	f := &BuiltinFunction{
-		BaseObject:       *NewBaseObject(FunctionType),
+		BaseObject:       *NewBaseObject(BuiltinFunctionType),
 		fn:               fn,
 		name:             name,
 		acceptsAnyKwargs: true,
@@ -507,7 +507,7 @@ func (f *BuiltinFunctionWithKwargs) String() string {
 
 // Type implements Value.Type
 func (f *BuiltinFunctionWithKwargs) Type() Type {
-	return FunctionType
+	return BuiltinFunctionType
 }
 
 // GetAttr implements attribute access for BuiltinFunctionWithKwargs
@@ -525,6 +525,9 @@ func (f *BuiltinFunctionWithKwargs) GetAttr(name string) (Value, bool) {
 		return StringValue("<anonymous>"), true
 	case "__module__":
 		return StringValue("builtins"), true
+	case "__self__":
+		// Built-in functions have __self__ pointing to their module
+		return None, true
 	case "__defaults__":
 		// Builtin functions have no defaults
 		return None, true
@@ -769,6 +772,11 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 		return StringValue("<builtin_function>"), true
 	case "__module__":
 		return StringValue("builtins"), true
+	case "__self__":
+		// Built-in functions have __self__ pointing to their module
+		// For most builtins, this is the builtins module
+		// Return None for now (Python returns the module object)
+		return None, true
 	case "__doc__":
 		return None, true
 	case "__annotations__":

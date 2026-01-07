@@ -22,9 +22,10 @@ var (
 	ListTypeClass     *core.Class
 	TupleTypeClass    *core.Class
 	SetTypeClass      *core.Class
-	FunctionTypeClass *core.Class
-	MethodTypeClass   *core.Class // For bound methods
-	TypeMetaclass     *TypeType   // The type metaclass (for class ABCMeta(type):)
+	FunctionTypeClass        *core.Class
+	BuiltinFunctionTypeClass *core.Class // For builtin_function_or_method
+	MethodTypeClass          *core.Class // For bound methods
+	TypeMetaclass            *TypeType   // The type metaclass (for class ABCMeta(type):)
 	StrTypeClass      *StrType    // Global str class instance
 	DictTypeClass     *DictType   // Global dict class instance (set by RegisterCollections)
 	// Cache for dynamically created type classes
@@ -53,6 +54,8 @@ func RegisterTypes(ctx *core.Context) {
 	SetTypeClass.Module = "builtins"
 	FunctionTypeClass = core.NewClass("function", nil)
 	FunctionTypeClass.Module = "builtins"
+	BuiltinFunctionTypeClass = core.NewClass("builtin_function_or_method", nil)
+	BuiltinFunctionTypeClass.Module = "builtins"
 	MethodTypeClass = core.NewClass("method", nil) // For bound methods
 	MethodTypeClass.Module = "builtins"
 
@@ -1129,7 +1132,9 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		case *core.SetValue:
 			return SetTypeClass, nil
 		case *core.BuiltinFunction:
-			return FunctionTypeClass, nil
+			return BuiltinFunctionTypeClass, nil
+		case *core.BuiltinFunctionWithKwargs:
+			return BuiltinFunctionTypeClass, nil
 		case *core.BoundMethod:
 			return MethodTypeClass, nil
 		case *core.BoundInstanceMethod:
