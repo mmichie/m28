@@ -1372,13 +1372,18 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 			paramSyms = append(paramSyms, sym)
 		}
 
+		// Extract docstring from body
+		docstring, remainingBody := extractDocstring(body)
+
 		// Create method body
 		var methodBody core.Value
-		if len(body) == 1 {
-			methodBody = body[0]
+		if len(remainingBody) == 0 {
+			methodBody = core.None
+		} else if len(remainingBody) == 1 {
+			methodBody = remainingBody[0]
 		} else {
 			// Wrap in do
-			methodBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
+			methodBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, remainingBody...)...)
 		}
 
 		// Create the method with legacy params
@@ -1388,6 +1393,7 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 			body:       methodBody,
 			env:        ctx,
 			name:       name,
+			docstring:  docstring,
 		}
 		setFunctionModule(method, ctx)
 
@@ -1396,13 +1402,18 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 	}
 
 	// New-style method with signature
+	// Extract docstring from body
+	docstring, remainingBody := extractDocstring(body)
+
 	// Create method body
 	var methodBody core.Value
-	if len(body) == 1 {
-		methodBody = body[0]
+	if len(remainingBody) == 0 {
+		methodBody = core.None
+	} else if len(remainingBody) == 1 {
+		methodBody = remainingBody[0]
 	} else {
 		// Wrap in do
-		methodBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
+		methodBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, remainingBody...)...)
 	}
 
 	// Build legacy params list for backward compatibility
@@ -1422,6 +1433,7 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 		body:       methodBody,
 		env:        ctx,
 		name:       name,
+		docstring:  docstring,
 	}
 	setFunctionModule(method, ctx)
 

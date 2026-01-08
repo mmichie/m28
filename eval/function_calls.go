@@ -157,6 +157,7 @@ type UserFunction struct {
 	env       *core.Context
 	name      string // Optional function name
 	isLambda  bool   // True for lambda expressions (implicitly return body value)
+	docstring string // Function docstring (first string literal in body)
 }
 
 // Call implements Callable.Call
@@ -381,6 +382,10 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		// Check if __doc__ was explicitly set
 		if val, ok := f.BaseObject.GetAttr("__doc__"); ok {
 			return val, true
+		}
+		// Return the captured docstring if available
+		if f.docstring != "" {
+			return core.StringValue(f.docstring), true
 		}
 		// Default to None for no docstring
 		return core.None, true

@@ -182,9 +182,16 @@ func Init_SREModule() *core.DictValue {
 			if len(matchArgs) < 1 {
 				return nil, fmt.Errorf("match() takes at least 1 argument")
 			}
-			searchStr, ok := matchArgs[0].(core.StringValue)
-			if !ok {
-				return nil, fmt.Errorf("match() argument must be a string")
+			var searchStr string
+			switch v := matchArgs[0].(type) {
+			case core.StringValue:
+				searchStr = string(v)
+			case core.BytesValue:
+				searchStr = string(v)
+			case core.NilValue:
+				return core.None, nil // No match on None
+			default:
+				return nil, fmt.Errorf("match() argument must be a string or bytes, not %s", matchArgs[0].Type())
 			}
 
 			// Convert pattern to Go-compatible regex
@@ -200,7 +207,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Match from the beginning of the string
-			loc := re.FindStringSubmatchIndex(string(searchStr))
+			loc := re.FindStringSubmatchIndex(searchStr)
 			if loc == nil || loc[0] != 0 {
 				// No match or match doesn't start at beginning
 				return core.None, nil
@@ -210,7 +217,7 @@ func Init_SREModule() *core.DictValue {
 			matchObj := core.NewDict()
 
 			// Extract the full match and groups
-			matches := re.FindStringSubmatch(string(searchStr))
+			matches := re.FindStringSubmatch(searchStr)
 			if len(matches) > 0 {
 				// groups() returns just the captured groups (not the full match)
 				groupsList := core.NewList()
@@ -286,9 +293,16 @@ func Init_SREModule() *core.DictValue {
 			if len(searchArgs) < 1 {
 				return nil, fmt.Errorf("search() takes at least 1 argument")
 			}
-			searchStr, ok := searchArgs[0].(core.StringValue)
-			if !ok {
-				return nil, fmt.Errorf("search() argument must be a string")
+			var searchStr string
+			switch v := searchArgs[0].(type) {
+			case core.StringValue:
+				searchStr = string(v)
+			case core.BytesValue:
+				searchStr = string(v)
+			case core.NilValue:
+				return core.None, nil // No match on None
+			default:
+				return nil, fmt.Errorf("search() argument must be a string or bytes, not %s", searchArgs[0].Type())
 			}
 
 			// Convert pattern to Go-compatible regex (same logic as findall)
@@ -304,7 +318,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Find first match
-			match := re.FindStringIndex(string(searchStr))
+			match := re.FindStringIndex(searchStr)
 			if match == nil {
 				return core.None, nil
 			}
@@ -313,7 +327,7 @@ func Init_SREModule() *core.DictValue {
 			matchObj := core.NewDict()
 			matchObj.Set("start", core.NumberValue(float64(match[0])))
 			matchObj.Set("end", core.NumberValue(float64(match[1])))
-			matchText := string(searchStr)[match[0]:match[1]]
+			matchText := searchStr[match[0]:match[1]]
 			matchObj.Set("group", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 				// group() or group(0) returns the full match
 				if len(args) == 0 || (len(args) == 1 && args[0] == core.NumberValue(0)) {
@@ -349,9 +363,16 @@ func Init_SREModule() *core.DictValue {
 			if len(findallArgs) < 1 {
 				return nil, fmt.Errorf("findall() takes at least 1 argument")
 			}
-			searchStr, ok := findallArgs[0].(core.StringValue)
-			if !ok {
-				return nil, fmt.Errorf("findall() argument must be a string")
+			var searchStr string
+			switch v := findallArgs[0].(type) {
+			case core.StringValue:
+				searchStr = string(v)
+			case core.BytesValue:
+				searchStr = string(v)
+			case core.NilValue:
+				return core.NewList(), nil // Empty list on None
+			default:
+				return nil, fmt.Errorf("findall() argument must be a string or bytes, not %s", findallArgs[0].Type())
 			}
 
 			// Convert pattern to Go-compatible regex
@@ -438,7 +459,7 @@ func Init_SREModule() *core.DictValue {
 
 			if hasIndentLookahead {
 				// For transformed indent pattern, use FindAllStringSubmatch to get groups
-				matches := re.FindAllStringSubmatch(string(searchStr), -1)
+				matches := re.FindAllStringSubmatch(searchStr, -1)
 				for _, match := range matches {
 					if len(match) > 1 {
 						// Return the captured group (the indent spaces)
@@ -449,7 +470,7 @@ func Init_SREModule() *core.DictValue {
 				}
 			} else {
 				// Check if pattern has capturing groups
-				matches := re.FindAllStringSubmatch(string(searchStr), -1)
+				matches := re.FindAllStringSubmatch(searchStr, -1)
 				for _, match := range matches {
 					if re.NumSubexp() > 0 && len(match) > 1 {
 						// Return captured groups like Python
@@ -491,9 +512,16 @@ func Init_SREModule() *core.DictValue {
 				return core.NewList(), nil
 			}
 
-			str, ok := splitArgs[0].(core.StringValue)
-			if !ok {
-				return nil, fmt.Errorf("split() argument must be a string")
+			var str string
+			switch v := splitArgs[0].(type) {
+			case core.StringValue:
+				str = string(v)
+			case core.BytesValue:
+				str = string(v)
+			case core.NilValue:
+				return core.NewList(), nil // Empty list on None
+			default:
+				return nil, fmt.Errorf("split() argument must be a string or bytes, not %s", splitArgs[0].Type())
 			}
 
 			// Get maxsplit parameter (0 means unlimited)
@@ -527,21 +555,19 @@ func Init_SREModule() *core.DictValue {
 				return nil, fmt.Errorf("invalid regex pattern: %v", err)
 			}
 
-			s := string(str)
-
 			// If pattern doesn't match at all, return original string in list
-			if !re.MatchString(s) {
+			if !re.MatchString(str) {
 				result := core.NewList()
-				result.Append(core.StringValue(s))
+				result.Append(core.StringValue(str))
 				return result, nil
 			}
 
 			// Find all matches with their submatch indices
 			// This gives us: [match_start, match_end, group1_start, group1_end, ...]
-			allMatches := re.FindAllStringSubmatchIndex(s, -1)
+			allMatches := re.FindAllStringSubmatchIndex(str, -1)
 			if len(allMatches) == 0 {
 				result := core.NewList()
-				result.Append(core.StringValue(s))
+				result.Append(core.StringValue(str))
 				return result, nil
 			}
 
@@ -560,7 +586,7 @@ func Init_SREModule() *core.DictValue {
 				matchEnd := match[1]
 
 				// Add the part before this match
-				result.Append(core.StringValue(s[lastEnd:matchStart]))
+				result.Append(core.StringValue(str[lastEnd:matchStart]))
 
 				// Add any captured groups (indices 2+ in the match array)
 				// match[0:2] is the full match, match[2:4] is group 1, etc.
@@ -568,7 +594,7 @@ func Init_SREModule() *core.DictValue {
 					groupStart := match[i]
 					groupEnd := match[i+1]
 					if groupStart >= 0 && groupEnd >= 0 {
-						result.Append(core.StringValue(s[groupStart:groupEnd]))
+						result.Append(core.StringValue(str[groupStart:groupEnd]))
 					} else {
 						// Group didn't participate in match (optional group)
 						result.Append(core.None)
@@ -580,7 +606,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Add the remainder after the last match
-			result.Append(core.StringValue(s[lastEnd:]))
+			result.Append(core.StringValue(str[lastEnd:]))
 
 			return result, nil
 		}))
@@ -610,9 +636,16 @@ func Init_SREModule() *core.DictValue {
 			if len(finditerArgs) < 1 {
 				return nil, fmt.Errorf("finditer() takes at least 1 argument")
 			}
-			searchStr, ok := finditerArgs[0].(core.StringValue)
-			if !ok {
-				return nil, fmt.Errorf("finditer() argument must be a string")
+			var searchStr string
+			switch v := finditerArgs[0].(type) {
+			case core.StringValue:
+				searchStr = string(v)
+			case core.BytesValue:
+				searchStr = string(v)
+			case core.NilValue:
+				return core.NewList(), nil // Empty list on None
+			default:
+				return nil, fmt.Errorf("finditer() argument must be a string or bytes, not %s", finditerArgs[0].Type())
 			}
 
 			// Convert pattern to Go-compatible regex
@@ -680,8 +713,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Find all matches with indices
-			s := string(searchStr)
-			allMatches := re.FindAllStringSubmatchIndex(s, -1)
+			allMatches := re.FindAllStringSubmatchIndex(searchStr, -1)
 
 			// Create a list of match objects
 			result := core.NewList()
@@ -690,13 +722,13 @@ func Init_SREModule() *core.DictValue {
 				if len(match) >= 2 {
 					matchObj.SetValue(core.StringValue("start"), core.NumberValue(match[0]))
 					matchObj.SetValue(core.StringValue("end"), core.NumberValue(match[1]))
-					matchObj.SetValue(core.StringValue("_match"), core.StringValue(s[match[0]:match[1]]))
+					matchObj.SetValue(core.StringValue("_match"), core.StringValue(searchStr[match[0]:match[1]]))
 
 					// Add groups
 					groups := core.NewList()
 					for i := 2; i < len(match); i += 2 {
 						if match[i] >= 0 && match[i+1] >= 0 {
-							groups.Append(core.StringValue(s[match[i]:match[i+1]]))
+							groups.Append(core.StringValue(searchStr[match[i]:match[i+1]]))
 						} else {
 							groups.Append(core.None)
 						}

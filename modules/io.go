@@ -35,8 +35,11 @@ func InitIOModule() *core.DictValue {
 	ioModule.SetWithKey("StringIO", core.StringValue("StringIO"), core.NewBuiltinFunction(newStringIO))
 	// Register BytesIO class
 	ioModule.SetWithKey("BytesIO", core.StringValue("BytesIO"), core.NewBuiltinFunction(newBytesIO))
-	// Register TextIOWrapper class
-	ioModule.SetWithKey("TextIOWrapper", core.StringValue("TextIOWrapper"), core.NewBuiltinFunction(newTextIOWrapper))
+	// Register TextIOWrapper class - supports kwargs like encoding=, line_buffering=
+	ioModule.SetWithKey("TextIOWrapper", core.StringValue("TextIOWrapper"), &core.BuiltinFunctionWithKwargs{
+		Name: "TextIOWrapper",
+		Fn:   newTextIOWrapper,
+	})
 
 	// text_encoding(encoding, stacklevel=2) - returns encoding or 'locale' if None
 	// Added in Python 3.10, used by tempfile and other modules
@@ -435,14 +438,16 @@ type TextIOWrapper struct {
 	buffer_io core.Value // Underlying binary stream
 }
 
-func newTextIOWrapper(args []core.Value, ctx *core.Context) (core.Value, error) {
+func newTextIOWrapper(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
 	v := validation.NewArgs("TextIOWrapper", args)
 
 	// TextIOWrapper(buffer, encoding=None, errors=None, newline=None, line_buffering=False)
-	// For now, we only care about the buffer argument
+	// For now, we only care about the buffer argument - kwargs are accepted but ignored
 	if err := v.Range(1, 5); err != nil {
 		return nil, err
 	}
+	// Accept but ignore kwargs: encoding, errors, newline, line_buffering, write_through
+	_ = kwargs
 
 	t := &TextIOWrapper{
 		pos:       0,
@@ -454,6 +459,7 @@ func newTextIOWrapper(args []core.Value, ctx *core.Context) (core.Value, error) 
 	obj.SetWithKey("write", core.StringValue("write"), core.NewBuiltinFunction(t.write))
 	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(t.read))
 	obj.SetWithKey("readline", core.StringValue("readline"), core.NewBuiltinFunction(t.readline))
+	obj.SetWithKey("readlines", core.StringValue("readlines"), core.NewBuiltinFunction(t.readlines))
 	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		obj.SetWithKey("closed", core.StringValue("closed"), core.BoolValue(true))
 		return core.None, nil
@@ -470,7 +476,10 @@ func newTextIOWrapper(args []core.Value, ctx *core.Context) (core.Value, error) 
 		}
 		return core.NumberValue(t.pos), nil
 	}))
-	obj.SetWithKey("__enter__", core.StringValue("__enter__"), core.NewBuiltinFunction(t.enter))
+	obj.SetWithKey("__enter__", core.StringValue("__enter__"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// Return self (the wrapper object) for context manager protocol
+		return obj, nil
+	}))
 	obj.SetWithKey("__exit__", core.StringValue("__exit__"), core.NewBuiltinFunction(t.exit))
 	obj.SetWithKey("closed", core.StringValue("closed"), core.BoolValue(false))
 
@@ -497,9 +506,89 @@ func (t *TextIOWrapper) read(args []core.Value, ctx *core.Context) (core.Value, 
 }
 
 func (t *TextIOWrapper) readline(args []core.Value, ctx *core.Context) (core.Value, error) {
-	// For now, just return empty string
-	// In a real implementation, this would read one line from the buffer
+	// Read from underlying buffer_io if available
+	if t.buffer_io != nil {
+		if attrProvider, ok := t.buffer_io.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+			if callable, ok := attrProvider.GetAttr("readline"); ok {
+				if fn, ok := callable.(core.Callable); ok {
+					result, err := fn.Call(nil, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Convert bytes to string if needed
+					switch v := result.(type) {
+					case core.BytesValue:
+						return core.StringValue(string(v)), nil
+					case core.StringValue:
+						return v, nil
+					default:
+						return core.StringValue(""), nil
+					}
+				}
+			}
+		}
+	}
 	return core.StringValue(""), nil
+}
+
+func (t *TextIOWrapper) readlines(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Read all lines from underlying buffer_io
+	result := core.NewList()
+	if t.buffer_io != nil {
+		if attrProvider, ok := t.buffer_io.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+			if callable, ok := attrProvider.GetAttr("readlines"); ok {
+				if fn, ok := callable.(core.Callable); ok {
+					lines, err := fn.Call(nil, ctx)
+					if err != nil {
+						return nil, err
+					}
+					// Convert bytes to strings if needed
+					if list, ok := lines.(*core.ListValue); ok {
+						for _, item := range list.Items() {
+							switch v := item.(type) {
+							case core.BytesValue:
+								result.Append(core.StringValue(string(v)))
+							case core.StringValue:
+								result.Append(v)
+							default:
+								result.Append(item)
+							}
+						}
+						return result, nil
+					}
+					return lines, nil
+				}
+			}
+			// Fallback: read entire content and split by lines
+			if callable, ok := attrProvider.GetAttr("read"); ok {
+				if fn, ok := callable.(core.Callable); ok {
+					content, err := fn.Call([]core.Value{core.NumberValue(-1)}, ctx)
+					if err != nil {
+						return nil, err
+					}
+					var text string
+					switch v := content.(type) {
+					case core.BytesValue:
+						text = string(v)
+					case core.StringValue:
+						text = string(v)
+					}
+					if text != "" {
+						lines := strings.Split(text, "\n")
+						for i, line := range lines {
+							if i < len(lines)-1 {
+								result.Append(core.StringValue(line + "\n"))
+							} else if line != "" {
+								result.Append(core.StringValue(line))
+							}
+						}
+					}
+					return result, nil
+				}
+			}
+		}
+	}
+	return result, nil
 }
 
 func (t *TextIOWrapper) close(args []core.Value, ctx *core.Context) (core.Value, error) {

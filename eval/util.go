@@ -20,6 +20,49 @@ func setFunctionModule(fn *UserFunction, ctx *core.Context) {
 	}
 }
 
+// extractDocstring extracts a docstring from the function body if the first
+// statement is a string literal. Returns the docstring and the remaining body.
+func extractDocstring(body []core.Value) (string, []core.Value) {
+	if len(body) == 0 {
+		return "", body
+	}
+
+	// Check if first statement is a string literal (docstring)
+	first := unwrapLocated(body[0])
+	if str, ok := first.(core.StringValue); ok {
+		return string(str), body[1:]
+	}
+
+	// Check if body is a single (do ...) form and extract docstring from it
+	if len(body) == 1 {
+		if list, ok := first.(*core.ListValue); ok && list.Len() > 1 {
+			items := list.Items()
+			if sym, ok := items[0].(core.SymbolValue); ok && sym == "do" {
+				// This is a (do ...) form
+				if list.Len() > 2 {
+					// Check if second element (first statement) is a string
+					firstStmt := unwrapLocated(items[1])
+					if str, ok := firstStmt.(core.StringValue); ok {
+						// Reconstruct the body without the docstring
+						remaining := items[2:]
+						if len(remaining) == 1 {
+							// Single remaining statement
+							return string(str), remaining
+						}
+						// Multiple remaining statements - keep in do form
+						newDo := make([]core.Value, 0, len(remaining)+1)
+						newDo = append(newDo, core.SymbolValue("do"))
+						newDo = append(newDo, remaining...)
+						return string(str), []core.Value{core.NewList(newDo...)}
+					}
+				}
+			}
+		}
+	}
+
+	return "", body
+}
+
 // unwrapLocated recursively unwraps LocatedValue wrappers from a value
 // This is necessary because AST ToIR() wraps values in LocatedValue to preserve
 // source location, but special forms need the underlying value for type assertions
@@ -355,14 +398,20 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// Create function body (implicit do)
 			body := args.Items()[1:]
-			var functionBody core.Value
 
-			if len(body) == 1 {
+			// Extract docstring from body
+			docstring, remainingBody := extractDocstring(body)
+
+			var functionBody core.Value
+			if len(remainingBody) == 0 {
+				// Only docstring, body is the docstring itself (it will be a no-op)
+				functionBody = core.None
+			} else if len(remainingBody) == 1 {
 				// Single expression body
-				functionBody = body[0]
+				functionBody = remainingBody[0]
 			} else {
 				// Multi-expression body, wrap in do
-				functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
+				functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, remainingBody...)...)
 			}
 
 			function := &UserFunction{
@@ -371,6 +420,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				body:       functionBody,
 				env:        ctx,
 				name:       string(name),
+				docstring:  docstring,
 			}
 			setFunctionModule(function, ctx)
 
@@ -388,14 +438,20 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Create function body (implicit do) for new-style function
 		body := args.Items()[1:]
-		var functionBody core.Value
 
-		if len(body) == 1 {
+		// Extract docstring from body
+		docstring, remainingBody := extractDocstring(body)
+
+		var functionBody core.Value
+		if len(remainingBody) == 0 {
+			// Only docstring, body returns None
+			functionBody = core.None
+		} else if len(remainingBody) == 1 {
 			// Single expression body
-			functionBody = body[0]
+			functionBody = remainingBody[0]
 		} else {
 			// Multi-expression body, wrap in do
-			functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
+			functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, remainingBody...)...)
 		}
 
 		// Create the function with signature
@@ -405,6 +461,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			body:       functionBody,
 			env:        ctx,
 			name:       string(name),
+			docstring:  docstring,
 		}
 		setFunctionModule(function, ctx)
 
@@ -446,14 +503,19 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				// Create function body (implicit do)
 				body := args.Items()[2:]
-				var functionBody core.Value
 
-				if len(body) == 1 {
+				// Extract docstring from body
+				docstring, remainingBody := extractDocstring(body)
+
+				var functionBody core.Value
+				if len(remainingBody) == 0 {
+					functionBody = core.None
+				} else if len(remainingBody) == 1 {
 					// Single expression body
-					functionBody = body[0]
+					functionBody = remainingBody[0]
 				} else {
 					// Multi-expression body, wrap in do
-					functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
+					functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, remainingBody...)...)
 				}
 
 				function := &UserFunction{
@@ -462,6 +524,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					body:       functionBody,
 					env:        ctx,
 					name:       string(name),
+					docstring:  docstring,
 				}
 				setFunctionModule(function, ctx)
 
@@ -480,14 +543,19 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// Create function body (implicit do)
 			body := args.Items()[2:]
-			var functionBody core.Value
 
-			if len(body) == 1 {
+			// Extract docstring from body
+			docstring, remainingBody := extractDocstring(body)
+
+			var functionBody core.Value
+			if len(remainingBody) == 0 {
+				functionBody = core.None
+			} else if len(remainingBody) == 1 {
 				// Single expression body
-				functionBody = body[0]
+				functionBody = remainingBody[0]
 			} else {
 				// Multi-expression body, wrap in do
-				functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, body...)...)
+				functionBody = core.NewList(append([]core.Value{core.SymbolValue("do")}, remainingBody...)...)
 			}
 
 			// Build legacy params list for backward compatibility
@@ -506,6 +574,7 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				body:       functionBody,
 				env:        ctx,
 				name:       string(name),
+				docstring:  docstring,
 			}
 			setFunctionModule(function, ctx)
 
