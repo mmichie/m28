@@ -573,6 +573,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		if list, ok := stmt.(*core.ListValue); ok && list.Len() == 0 {
 			continue
 		}
+		// Unwrap LocatedValue if present (docstrings can be wrapped)
+		stmt = unwrapLocated(stmt)
 		// Check if it's a string (docstring)
 		if str, ok := stmt.(core.StringValue); ok {
 			class.Doc = string(str)

@@ -196,8 +196,8 @@ func (f *File) Read(size int) (Value, error) {
 		if f.isText {
 			return StringValue(string(content)), nil
 		}
-		// For binary mode, we'd return bytes, but for now return string
-		return StringValue(string(content)), nil
+		// Binary mode returns bytes
+		return BytesValue(content), nil
 	}
 
 	// Read specified number of bytes
@@ -210,7 +210,8 @@ func (f *File) Read(size int) (Value, error) {
 	if f.isText {
 		return StringValue(string(buf[:n])), nil
 	}
-	return StringValue(string(buf[:n])), nil
+	// Binary mode returns bytes
+	return BytesValue(buf[:n]), nil
 }
 
 // Write writes to the file
@@ -246,14 +247,23 @@ func (f *File) ReadLine() (Value, error) {
 	if err != nil {
 		if err == io.EOF {
 			if line != "" {
-				return StringValue(line), nil
+				if f.isText {
+					return StringValue(line), nil
+				}
+				return BytesValue([]byte(line)), nil
 			}
-			return StringValue(""), io.EOF
+			if f.isText {
+				return StringValue(""), io.EOF
+			}
+			return BytesValue([]byte{}), io.EOF
 		}
 		return nil, &OSError{Message: fmt.Sprintf("error reading line: %v", err)}
 	}
 
-	return StringValue(line), nil
+	if f.isText {
+		return StringValue(line), nil
+	}
+	return BytesValue([]byte(line)), nil
 }
 
 // ReadLines reads all lines
@@ -270,7 +280,12 @@ func (f *File) ReadLines() (Value, error) {
 	scanner := bufio.NewScanner(f.reader)
 
 	for scanner.Scan() {
-		lines.Append(StringValue(scanner.Text() + "\n"))
+		text := scanner.Text() + "\n"
+		if f.isText {
+			lines.Append(StringValue(text))
+		} else {
+			lines.Append(BytesValue([]byte(text)))
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
