@@ -830,12 +830,12 @@ func InitStringMethods() {
 
 	td.Methods["count"] = &MethodDescriptor{
 		Name:    "count",
-		Arity:   1,
-		Doc:     "Return the number of non-overlapping occurrences of substring",
+		Arity:   -1, // Variable arity: 1-3 arguments
+		Doc:     "Return the number of non-overlapping occurrences of substring sub in string s[start:end]",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, &TypeError{Message: fmt.Sprintf("count() takes exactly one argument (%d given)", len(args))}
+			if len(args) < 1 || len(args) > 3 {
+				return nil, &TypeError{Message: fmt.Sprintf("count() takes 1 to 3 arguments (%d given)", len(args))}
 			}
 
 			s := string(receiver.(StringValue))
@@ -844,7 +844,48 @@ func InitStringMethods() {
 				return nil, &TypeError{Message: "count() argument must be a string"}
 			}
 
-			return NumberValue(strings.Count(s, string(sub))), nil
+			// Handle optional start and end arguments
+			start := 0
+			end := len(s)
+
+			if len(args) >= 2 {
+				if startNum, ok := args[1].(NumberValue); ok {
+					start = int(startNum)
+					if start < 0 {
+						start = len(s) + start
+						if start < 0 {
+							start = 0
+						}
+					}
+					if start > len(s) {
+						start = len(s)
+					}
+				}
+			}
+
+			if len(args) >= 3 {
+				if endNum, ok := args[2].(NumberValue); ok {
+					end = int(endNum)
+					if end < 0 {
+						end = len(s) + end
+						if end < 0 {
+							end = 0
+						}
+					}
+					if end > len(s) {
+						end = len(s)
+					}
+				}
+			}
+
+			// Ensure start <= end
+			if start > end {
+				return NumberValue(0), nil
+			}
+
+			// Count in the substring
+			searchStr := s[start:end]
+			return NumberValue(strings.Count(searchStr, string(sub))), nil
 		},
 	}
 

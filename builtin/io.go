@@ -146,7 +146,9 @@ func OpenBuilderWithKwargs() func([]core.Value, map[string]core.Value, *core.Con
 		// The encoding parameter is accepted but currently not used
 		file, err := core.NewFile(filename, mode)
 		if err != nil {
-			return nil, errors.NewRuntimeError("open", err.Error())
+			// Preserve the original error type (OSError, etc.)
+			// instead of wrapping in RuntimeError
+			return nil, err
 		}
 
 		return file, nil

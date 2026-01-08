@@ -281,6 +281,15 @@ func createFileObject(f *os.File) *core.DictValue {
 	obj.SetWithKey("flush", core.StringValue("flush"), core.NewBuiltinFunction(fileWrapper.flush))
 	obj.SetWithKey("getvalue", core.StringValue("getvalue"), core.NewBuiltinFunction(fileWrapper.getvalue))
 
+	// Add encoding attribute (Python stdout/stderr have this)
+	obj.SetWithKey("encoding", core.StringValue("encoding"), core.StringValue("utf-8"))
+
+	// Add other standard file attributes
+	obj.SetWithKey("errors", core.StringValue("errors"), core.StringValue("strict"))
+	obj.SetWithKey("newlines", core.StringValue("newlines"), core.None)
+	obj.SetWithKey("buffer", core.StringValue("buffer"), core.None)
+	obj.SetWithKey("line_buffering", core.StringValue("line_buffering"), core.BoolValue(true))
+
 	return obj
 }
 

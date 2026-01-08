@@ -103,13 +103,28 @@ func addExtendedSysFunctions(sysModule *core.DictValue) {
 	}))
 
 	// Display/exception hooks
-	sysModule.Set("displayhook", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// displayhook is called to print the result of expressions in the REPL
+	displayhookFn := core.NewNamedBuiltinFunction("displayhook", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) > 0 && args[0] != core.None {
 			// Print the value
 			return core.None, nil
 		}
 		return core.None, nil
-	}))
+	})
+	sysModule.Set("displayhook", displayhookFn)
+	// __displayhook__ is the original displayhook (sys.displayhook can be replaced, this is always the original)
+	sysModule.Set("__displayhook__", displayhookFn)
+
+	// __excepthook__ is the original excepthook (sys.excepthook can be replaced, this is always the original)
+	// excepthook is already defined in sys.go, we need to get a reference or create a similar one
+	excepthookFn := core.NewNamedBuiltinFunction("excepthook", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 3 {
+			return nil, core.NewTypeError("tuple", nil, "excepthook() requires 3 arguments")
+		}
+		// For now, just return None (the real implementation is in sys.go)
+		return core.None, nil
+	})
+	sysModule.Set("__excepthook__", excepthookFn)
 
 	sysModule.Set("unraisablehook", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil

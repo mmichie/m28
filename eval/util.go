@@ -865,15 +865,10 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 						return nil, err
 					}
 
-					// Convert value to a sequence
-					var values []core.Value
-					switch v := value.(type) {
-					case core.TupleValue:
-						values = []core.Value(v)
-					case *core.ListValue:
-						values = v.Items()
-					default:
-						return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-sequence %s", value.Type())}
+					// Convert value to a sequence (supports tuples, lists, and iterables like range)
+					values, err := extractSequenceValues(value)
+					if err != nil {
+						return nil, err
 					}
 
 					// Calculate minimum required length
@@ -1052,16 +1047,10 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 				return nil, err
 			}
 
-			// Check if it's a tuple or list
-			var values []core.Value
-			switch v := value.(type) {
-			case core.TupleValue:
-				values = v
-			case *core.ListValue:
-				values = v.Items()
-			default:
-				// If not a sequence, error
-				return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-sequence %s", value.Type())}
+			// Extract sequence values (supports tuples, lists, and iterables like range)
+			values, err := extractSequenceValues(value)
+			if err != nil {
+				return nil, err
 			}
 
 			// Check length match
@@ -1250,15 +1239,10 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 			t = actualPattern
 
 			// Tuple unpacking: (= (x, y) [10, 20]) or (= (a (*unpack b) c) [1, 2, 3, 4])
-			// The value must be a tuple or list
-			var values []core.Value
-			switch v := value.(type) {
-			case core.TupleValue:
-				values = []core.Value(v)
-			case *core.ListValue:
-				values = v.Items()
-			default:
-				return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-sequence %s", value.Type())}
+			// Extract sequence values (supports tuples, lists, and iterables like range)
+			values, err := extractSequenceValues(value)
+			if err != nil {
+				return nil, err
 			}
 
 			if hasStarUnpack {

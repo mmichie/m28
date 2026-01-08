@@ -571,8 +571,22 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 		return nil, false
 	}
 
-	// First try to find the key with string prefix
-	// This handles dot notation access like dict.key
+	// IMPORTANT: Check methods FIRST, then keys
+	// This matches Python behavior where d.get always returns the method,
+	// even if the dict contains a key named "get".
+	// Use d['get'] to access keys that shadow methods.
+
+	// First check TypeDescriptor for methods
+	desc := GetTypeDescriptor(DictType)
+	if desc != nil {
+		val, err := desc.GetAttribute(d, name)
+		if err == nil {
+			return val, true
+		}
+	}
+
+	// Then try to find the key with string prefix
+	// This handles dot notation access like dict.key for non-method names
 	stringKey := fmt.Sprintf("s:%s", name)
 	if val, exists := d.entries[stringKey]; exists {
 		return val, true
@@ -581,15 +595,6 @@ func (d *DictValue) GetAttr(name string) (Value, bool) {
 	// Also check without prefix (for backwards compatibility)
 	if val, exists := d.entries[name]; exists {
 		return val, true
-	}
-
-	// Then check TypeDescriptor for methods
-	desc := GetTypeDescriptor(DictType)
-	if desc != nil {
-		val, err := desc.GetAttribute(d, name)
-		if err == nil {
-			return val, true
-		}
 	}
 
 	// Finally check BaseObject

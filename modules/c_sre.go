@@ -9,6 +9,68 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// processVerbosePattern converts a VERBOSE mode regex pattern to a standard pattern
+// by stripping comments (# to end of line) and unescaped whitespace
+func processVerbosePattern(pattern string) string {
+	var result strings.Builder
+	i := 0
+	inCharClass := false
+
+	for i < len(pattern) {
+		ch := pattern[i]
+
+		// Handle escape sequences
+		if ch == '\\' && i+1 < len(pattern) {
+			result.WriteByte(ch)
+			result.WriteByte(pattern[i+1])
+			i += 2
+			continue
+		}
+
+		// Track character class state
+		if ch == '[' && !inCharClass {
+			inCharClass = true
+			result.WriteByte(ch)
+			i++
+			continue
+		}
+		if ch == ']' && inCharClass {
+			inCharClass = false
+			result.WriteByte(ch)
+			i++
+			continue
+		}
+
+		// Inside character class, keep everything
+		if inCharClass {
+			result.WriteByte(ch)
+			i++
+			continue
+		}
+
+		// Handle comments (# to end of line)
+		if ch == '#' {
+			// Skip to end of line
+			for i < len(pattern) && pattern[i] != '\n' {
+				i++
+			}
+			continue
+		}
+
+		// Handle whitespace (skip unescaped whitespace outside char class)
+		if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
+			i++
+			continue
+		}
+
+		// Keep all other characters
+		result.WriteByte(ch)
+		i++
+	}
+
+	return result.String()
+}
+
 // Init_SREModule initializes the _sre C extension stub module
 // This provides minimal regex engine support for Python stdlib modules
 func Init_SREModule() *core.DictValue {
@@ -379,8 +441,13 @@ func Init_SREModule() *core.DictValue {
 			// Go's regexp doesn't support lookaheads (?=...), so we need to convert them
 			goPattern := string(patternStr)
 
+			// Handle VERBOSE flag (64) - strip comments and whitespace
+			if flags&64 != 0 {
+				goPattern = processVerbosePattern(goPattern)
+			}
+
 			// Apply Python regex flags as Go inline flags
-			// Python flags: IGNORECASE=2, MULTILINE=8, DOTALL=16
+			// Python flags: IGNORECASE=2, MULTILINE=8, DOTALL=16, VERBOSE=64
 			flagPrefix := ""
 			if flags&2 != 0 { // IGNORECASE
 				flagPrefix += "i"
@@ -651,6 +718,11 @@ func Init_SREModule() *core.DictValue {
 			// Convert pattern to Go-compatible regex
 			goPattern := string(patternStr)
 
+			// Handle VERBOSE flag (64) - strip comments and whitespace
+			if flags&64 != 0 {
+				goPattern = processVerbosePattern(goPattern)
+			}
+
 			// Apply Python regex flags as Go inline flags
 			flagPrefix := ""
 			if flags&2 != 0 { // IGNORECASE
@@ -720,9 +792,12 @@ func Init_SREModule() *core.DictValue {
 			for _, match := range allMatches {
 				matchObj := core.NewDict()
 				if len(match) >= 2 {
-					matchObj.SetValue(core.StringValue("start"), core.NumberValue(match[0]))
-					matchObj.SetValue(core.StringValue("end"), core.NumberValue(match[1]))
-					matchObj.SetValue(core.StringValue("_match"), core.StringValue(searchStr[match[0]:match[1]]))
+					// Store internal values with underscore prefix
+					matchStart := match[0]
+					matchEnd := match[1]
+					matchObj.SetValue(core.StringValue("_start"), core.NumberValue(matchStart))
+					matchObj.SetValue(core.StringValue("_end"), core.NumberValue(matchEnd))
+					matchObj.SetValue(core.StringValue("_match"), core.StringValue(searchStr[matchStart:matchEnd]))
 
 					// Add groups
 					groups := core.NewList()
@@ -738,6 +813,25 @@ func Init_SREModule() *core.DictValue {
 					// Add group method
 					matchObj.SetValue(core.StringValue("group"), core.NewNamedBuiltinFunction("group", func(groupArgs []core.Value, groupCtx *core.Context) (core.Value, error) {
 						if len(groupArgs) == 0 {
+							if m, ok := matchObj.GetValue(core.StringValue("_match")); ok {
+								return m, nil
+							}
+							return core.StringValue(""), nil
+						}
+						// Handle named groups
+						if name, ok := groupArgs[0].(core.StringValue); ok {
+							if g, ok := matchObj.GetValue(core.StringValue("_groups")); ok {
+								if groupsList, ok := g.(*core.ListValue); ok {
+									// Try to find group by name - for now return first group or match
+									_ = name
+									if groupsList.Len() > 0 {
+										if val, err := groupsList.GetItem(0); err == nil {
+											return val, nil
+										}
+									}
+								}
+							}
+							// If named group not found, return the full match
 							if m, ok := matchObj.GetValue(core.StringValue("_match")); ok {
 								return m, nil
 							}
@@ -765,20 +859,16 @@ func Init_SREModule() *core.DictValue {
 						return core.None, nil
 					}))
 
-					// Add start method
+					// Add start method - capture start value in closure
+					startVal := core.NumberValue(matchStart)
 					matchObj.SetValue(core.StringValue("start"), core.NewNamedBuiltinFunction("start", func(startArgs []core.Value, startCtx *core.Context) (core.Value, error) {
-						if s, ok := matchObj.GetValue(core.StringValue("start")); ok {
-							return s, nil
-						}
-						return core.NumberValue(0), nil
+						return startVal, nil
 					}))
 
-					// Add end method
+					// Add end method - capture end value in closure
+					endVal := core.NumberValue(matchEnd)
 					matchObj.SetValue(core.StringValue("end"), core.NewNamedBuiltinFunction("end", func(endArgs []core.Value, endCtx *core.Context) (core.Value, error) {
-						if e, ok := matchObj.GetValue(core.StringValue("end")); ok {
-							return e, nil
-						}
-						return core.NumberValue(0), nil
+						return endVal, nil
 					}))
 				}
 				result.Append(matchObj)

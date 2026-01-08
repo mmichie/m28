@@ -92,12 +92,12 @@ func extractSequenceValues(value core.Value) ([]core.Value, error) {
 
 	default:
 		// Try to get an iterator
-		if iteratorObj, ok := value.(interface{ Iterator() core.Iterator }); ok {
+		if iteratorObj, hasIter := value.(interface{ Iterator() core.Iterator }); hasIter {
 			iter := iteratorObj.Iterator()
 			values := []core.Value{}
 			for {
-				val, done := iter.Next()
-				if done {
+				val, ok := iter.Next()
+				if !ok {
 					break
 				}
 				values = append(values, val)
