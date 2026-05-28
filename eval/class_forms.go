@@ -623,6 +623,50 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Check for def form (methods), = form (class variables), or if form (conditional defs)
 			firstItem := unwrapLocated(sItems[0])
 			if sym, ok := firstItem.(core.SymbolValue); ok {
+				// Decorator forms: (@decorator-name (def name ...))
+				// The decorator evaluates the inner def (which defines the function),
+				// then applies the decorator and re-defines it. We need to
+				// also register the final result with the class.
+				if strings.HasPrefix(string(sym), "@") {
+					// Track variables before so we can detect new definitions
+					beforeVars := make(map[string]bool)
+					for varName := range classBodyCtx.Vars {
+						beforeVars[varName] = true
+					}
+
+					if _, err := Eval(stmt, classBodyCtx); err != nil {
+						return nil, err
+					}
+
+					// Find new (or replaced) names and register them with the class
+					// Walk down nested decorator forms to find the underlying def to learn the name
+					funcName := extractDecoratedName(s)
+					if funcName != "" {
+						if val, ok := classBodyCtx.Vars[funcName]; ok {
+							if userFn, isFn := val.(*UserFunction); isFn {
+								class.SetMethod(funcName, userFn)
+							} else {
+								// Decorator returned something other than a UserFunction
+								// (e.g., a wrapper builtin function). Store as class attribute
+								// so MRO lookups can still find it.
+								class.SetMethod(funcName, val)
+							}
+						}
+					} else {
+						// Could not statically determine name; fall back to scanning newly
+						// defined names in the class body context.
+						for varName, varValue := range classBodyCtx.Vars {
+							if beforeVars[varName] {
+								continue
+							}
+							if strings.HasPrefix(varName, "__") && strings.HasSuffix(varName, "__") {
+								continue
+							}
+							class.SetMethod(varName, varValue)
+						}
+					}
+					continue
+				}
 				switch string(sym) {
 				case "if":
 					// Special handling for if statements at class level
@@ -1353,6 +1397,57 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	ctx.Define(string(className), class)
 
 	return class, nil
+}
+
+// extractDecoratedName walks down nested decorator forms to find the underlying
+// def form, returning the function name being decorated. Returns "" if it can't
+// determine the name (e.g. the inner form isn't a def).
+func extractDecoratedName(decorForm *core.ListValue) string {
+	// Form looks like: (@decorator (@maybe-other-decorator (def name ...)))
+	// or with arguments: (@decorator-call (def name ...))
+	// We walk down the second argument until we find a def form.
+	current := decorForm
+	for {
+		if current.Len() < 2 {
+			return ""
+		}
+		inner, ok := unwrapLocated(current.Items()[1]).(*core.ListValue)
+		if !ok || inner.Len() == 0 {
+			return ""
+		}
+		firstSym, isSym := unwrapLocated(inner.Items()[0]).(core.SymbolValue)
+		if !isSym {
+			return ""
+		}
+		name := string(firstSym)
+		if strings.HasPrefix(name, "@") {
+			current = inner
+			continue
+		}
+		if name == "def" && inner.Len() >= 2 {
+			// (def funcName ...) or (def (funcName ...) ...)
+			defTarget := unwrapLocated(inner.Items()[1])
+			if nameSym, ok := defTarget.(core.SymbolValue); ok {
+				return string(nameSym)
+			}
+			if nameList, ok := defTarget.(*core.ListValue); ok && nameList.Len() > 0 {
+				if nameSym, ok := unwrapLocated(nameList.Items()[0]).(core.SymbolValue); ok {
+					return string(nameSym)
+				}
+			}
+			return ""
+		}
+		if name == "async" && inner.Len() >= 3 {
+			// (async def funcName ...)
+			if defSym, ok := unwrapLocated(inner.Items()[1]).(core.SymbolValue); ok && string(defSym) == "def" {
+				if nameSym, ok := unwrapLocated(inner.Items()[2]).(core.SymbolValue); ok {
+					return string(nameSym)
+				}
+			}
+			return ""
+		}
+		return ""
+	}
 }
 
 // createMethod creates a method from a parameter list and body

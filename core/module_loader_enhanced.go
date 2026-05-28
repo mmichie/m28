@@ -321,6 +321,46 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 		return nil, NewModuleNotFoundError(name)
 	}
 
+	// For dotted module names (e.g., "collections.abc"), load the parent package first.
+	// This matches Python's import semantics where the parent's __init__.py runs before
+	// the submodule loads. The parent may register the submodule in sys.modules
+	// (e.g., collections/__init__.py does `sys.modules['collections.abc'] = _collections_abc`).
+	if lastDot := strings.LastIndex(name, "."); lastDot > 0 {
+		parentName := name[:lastDot]
+		Log.Debug(SubsystemImport, "Loading parent package before submodule", "module", name, "parent", parentName)
+		if _, parentErr := l.LoadModule(parentName, l.GetContext()); parentErr == nil {
+			// Parent loaded successfully - the submodule may now be in sys.modules
+			// (e.g., collections/__init__.py registers 'collections.abc')
+			if module := l.checkSysModules(name); module != nil {
+				Log.Info(SubsystemImport, "Module found in sys.modules after loading parent", "module", name, "parent", parentName)
+				registry.StoreModule(cacheName, module, fmt.Sprintf("<from sys.modules via %s>", parentName), []string{})
+				return module, nil
+			}
+			// Or it may be available as an attribute of the parent
+			if parentMod, found := registry.GetModule(parentName); found {
+				childName := name[lastDot+1:]
+				if childVal, ok := parentMod.Get(childName); ok {
+					if childDict, ok := childVal.(*DictValue); ok {
+						Log.Info(SubsystemImport, "Module found as attribute of parent", "module", name, "parent", parentName)
+						registry.StoreModule(cacheName, childDict, fmt.Sprintf("<from parent %s>", parentName), []string{})
+						return childDict, nil
+					}
+					if childMod, ok := childVal.(*Module); ok {
+						if dictVal, ok := childMod.GetAttr("__dict__"); ok {
+							if dict, ok := dictVal.(*DictValue); ok {
+								Log.Info(SubsystemImport, "Module found as Module-attribute of parent", "module", name, "parent", parentName)
+								registry.StoreModule(cacheName, dict, fmt.Sprintf("<from parent %s>", parentName), []string{})
+								return dict, nil
+							}
+						}
+					}
+				}
+			}
+		} else {
+			Log.Debug(SubsystemImport, "Parent package load failed, continuing with direct load", "module", name, "parent", parentName, "error", parentErr)
+		}
+	}
+
 	// Create partial module and store in registry BEFORE loading
 	// This enables circular imports to access the partial module during evaluation
 	partialModule := NewDict()

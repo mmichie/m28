@@ -506,13 +506,24 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// (except Type handler...) - catch specific type
 		// (except Type var handler...) - catch specific type with variable (legacy)
 		// (except Type as var handler...) - catch specific type with variable (Python style)
+		// (except (. obj attr) as var handler...) - catch type from attribute expression
 		// (except as var handler...) - catch all with variable (Python style)
 		// (except* Type handler...) - match Type within exception group
 		// (except* Type as var handler...) - match Type with variable binding
 		var excType string
-		var excTypes []string // For tuple exception types like (ValueError, TypeError)
+		var excTypes []string  // For tuple exception types like (ValueError, TypeError)
+		var excTypeExpr core.Value // For expression-based exception types like self.foo
 		var excVar string
 		var handlerStart int = 1
+
+		// hasAsAfter returns true if the element at index `idx` is the symbol "as"
+		hasAsAfter := func(idx int) bool {
+			if exceptClause.Len() <= idx {
+				return false
+			}
+			asSym, ok := exceptClause.GetItemAsSymbol(idx)
+			return ok && string(asSym) == "as"
+		}
 
 		if exceptClause.Len() > 1 {
 			// Use smart accessor to get unwrapped second element
@@ -531,12 +542,21 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					handlerStart = 2
 
 					// Check for "as" syntax
-					if exceptClause.Len() > 3 {
-						if asSym, ok := exceptClause.GetItemAsSymbol(2); ok && string(asSym) == "as" {
-							if varSym, ok := exceptClause.GetItemAsSymbol(3); ok {
-								excVar = string(varSym)
-								handlerStart = 4
-							}
+					if hasAsAfter(2) {
+						if varSym, ok := exceptClause.GetItemAsSymbol(3); ok {
+							excVar = string(varSym)
+							handlerStart = 4
+						}
+					}
+				} else {
+					// It's a non-tuple-literal list - treat as expression to evaluate
+					// (e.g., (. self failureException) for self.failureException)
+					excTypeExpr = secondElem
+					handlerStart = 2
+					if hasAsAfter(2) {
+						if varSym, ok := exceptClause.GetItemAsSymbol(3); ok {
+							excVar = string(varSym)
+							handlerStart = 4
 						}
 					}
 				}
@@ -551,24 +571,22 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						excVar = string(varSym)
 						handlerStart = 3
 					}
+				} else if hasAsAfter(2) {
+					// (except SomeName as var handler...) - SomeName must be the exception type
+					// regardless of whether it's a known exception name
+					excType = symStr
+					handlerStart = 2
+					if varSym, ok := exceptClause.GetItemAsSymbol(3); ok {
+						excVar = string(varSym)
+						handlerStart = 4
+					}
 				} else if isExceptionType(symStr) || isLikelyExceptionType(symStr) {
 					// It's an exception type
 					excType = symStr
 					handlerStart = 2
 
-					// Check for "as" syntax
-					if exceptClause.Len() > 3 && handlerStart == 2 {
-						if asSym, ok := exceptClause.GetItemAsSymbol(2); ok && string(asSym) == "as" {
-							// (except Type as var handler...)
-							if varSym, ok := exceptClause.GetItemAsSymbol(3); ok {
-								excVar = string(varSym)
-								handlerStart = 4
-							}
-						}
-					}
-
 					// Legacy: Check if next element is a variable name (lowercase)
-					if excVar == "" && exceptClause.Len() > 2 {
+					if exceptClause.Len() > 2 {
 						if varSym, ok := exceptClause.GetItemAsSymbol(2); ok {
 							varStr := string(varSym)
 							if len(varStr) > 0 && varStr[0] >= 'a' && varStr[0] <= 'z' {
@@ -581,6 +599,41 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					// Legacy: It's a variable name for catch-all
 					excVar = symStr
 					handlerStart = 2
+				}
+			} else {
+				// Any other value (call expression, etc) - evaluate it as exception type
+				excTypeExpr = secondElem
+				handlerStart = 2
+				if hasAsAfter(2) {
+					if varSym, ok := exceptClause.GetItemAsSymbol(3); ok {
+						excVar = string(varSym)
+						handlerStart = 4
+					}
+				}
+			}
+		}
+
+		// If we have an expression-based exception type, evaluate it now to get the class.
+		// The result may be a single class or a tuple of classes.
+		if excTypeExpr != nil {
+			evaluated, evalErr := Eval(excTypeExpr, ctx)
+			if evalErr != nil {
+				return nil, evalErr
+			}
+			// Tuple of exception classes
+			if tup, ok := evaluated.(core.TupleValue); ok {
+				for _, item := range tup {
+					if cls, ok := item.(*core.Class); ok {
+						excTypes = append(excTypes, cls.Name)
+						// Register the class so the lookup below finds it
+						ctx.Define(cls.Name, cls)
+					}
+				}
+			} else if cls, ok := evaluated.(*core.Class); ok {
+				excType = cls.Name
+				// Make sure the class name resolves in the current context for matching
+				if _, err := ctx.Lookup(cls.Name); err != nil {
+					ctx.Define(cls.Name, cls)
 				}
 			}
 		}

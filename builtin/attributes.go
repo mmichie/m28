@@ -123,10 +123,18 @@ func RegisterAttributes(ctx *core.Context) {
 				nameSet[methodName] = true
 			}
 
+			// Add class attributes (includes decorated methods stored as attributes)
+			for attrName := range class.Attributes {
+				nameSet[attrName] = true
+			}
+
 			// Add inherited methods from parents
 			for _, parent := range class.Parents {
 				for methodName := range parent.Methods {
 					nameSet[methodName] = true
+				}
+				for attrName := range parent.Attributes {
+					nameSet[attrName] = true
 				}
 			}
 

@@ -77,8 +77,11 @@ func Init_SREModule() *core.DictValue {
 	module := core.NewDict()
 
 	// MAGIC - version identifier for the SRE module
-	// Must match the MAGIC in re._constants (Python 3.12 = 20221023)
-	module.Set("MAGIC", core.NumberValue(20221023))
+	// Must match the MAGIC in re._constants. Different Python versions use different values:
+	//   Python 3.12 = 20221023
+	//   Python 3.13 = 20230612
+	// We default to 20230612 since we typically run against Python 3.13 stdlib.
+	module.Set("MAGIC", core.NumberValue(20230612))
 
 	// CODESIZE - size of regex opcode in bytes (typically 2 or 4)
 	module.Set("CODESIZE", core.NumberValue(4))
