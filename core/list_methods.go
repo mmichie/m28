@@ -64,6 +64,9 @@ func InitListMethods() {
 		Doc:     "Remove first occurrence of value. Raises ValueError if not found.",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: fmt.Sprintf("list.remove() takes exactly one argument (%d given)", len(args))}
+			}
 			list := receiver.(*ListValue)
 			value := args[0]
 

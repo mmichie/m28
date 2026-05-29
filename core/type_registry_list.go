@@ -682,6 +682,9 @@ func listMethodIndex(receiver Value, args []Value, ctx *Context) (Value, error) 
 			if start < 0 {
 				start = list.Len() + start
 			}
+			if start < 0 {
+				start = 0
+			}
 		}
 	}
 
@@ -690,6 +693,9 @@ func listMethodIndex(receiver Value, args []Value, ctx *Context) (Value, error) 
 			stop = int(s)
 			if stop < 0 {
 				stop = list.Len() + stop
+			}
+			if stop < 0 {
+				stop = 0
 			}
 		}
 	}

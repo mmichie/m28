@@ -1,88 +1,175 @@
 {
-  "python_version": "3.12",
-  "last_updated": "2025-11-22",
+  "python_version": "3.13.13",
+  "last_updated": "2026-05-28",
   "summary": {
-    "total_tests": 36,
-    "passing": 0,
-    "failing": 0,
-    "not_implemented": 36,
-    "success_rate": 0
+    "fully_passing": ["test_augassign"],
+    "partial_passing": [
+      "test_string (22/38)",
+      "test_decorators (9/16)",
+      "test_unary (4/6)",
+      "test_binop (6/12)"
+    ],
+    "blocked_by_imports": [
+      "test_grammar", "test_syntax", "test_types", "test_builtin", "test_compare",
+      "test_list", "test_dict", "test_set", "test_tuple", "test_bytes",
+      "test_exceptions", "test_raise", "test_with", "test_scope",
+      "test_call", "test_functools", "test_class", "test_descr",
+      "test_generators", "test_genexps", "test_listcomps", "test_dictcomps",
+      "test_setcomps", "test_unpack", "test_unpack_ex", "test_iter",
+      "test_itertools", "test_contextlib"
+    ]
   },
   "tiers": {
     "tier1_core": {
       "description": "Core language features",
       "priority": 1,
       "tests": {
-        "test_grammar": {"status": "not_run", "source": "cpython/Lib/test/test_grammar.py"},
-        "test_syntax": {"status": "not_run", "source": "cpython/Lib/test/test_syntax.py"},
-        "test_types": {"status": "not_run", "source": "cpython/Lib/test/test_types.py"},
-        "test_builtin": {"status": "not_run", "source": "cpython/Lib/test/test_builtin.py"},
-        "test_binop": {"status": "not_run", "source": "cpython/Lib/test/test_binop.py"},
-        "test_unary": {"status": "not_run", "source": "cpython/Lib/test/test_unary.py"},
-        "test_compare": {"status": "not_run", "source": "cpython/Lib/test/test_compare.py"}
+        "test_grammar": {
+          "status": "blocked",
+          "blocker": "needs test.support which needs inspect/dataclasses/typing",
+          "source": "cpython/Lib/test/test_grammar.py"
+        },
+        "test_syntax": {
+          "status": "blocked",
+          "blocker": "needs test.support",
+          "source": "cpython/Lib/test/test_syntax.py"
+        },
+        "test_types": {
+          "status": "blocked",
+          "blocker": "needs test.support",
+          "source": "cpython/Lib/test/test_types.py"
+        },
+        "test_builtin": {
+          "status": "blocked",
+          "blocker": "parse errors in test file",
+          "source": "cpython/Lib/test/test_builtin.py"
+        },
+        "test_binop": {
+          "status": "partial",
+          "tests_run": 12,
+          "failures": 4,
+          "errors": 2,
+          "passing": 6,
+          "notes": "Rat fraction class tests fail on equality between Rat and float",
+          "source": "cpython/Lib/test/test_binop.py"
+        },
+        "test_unary": {
+          "status": "partial",
+          "tests_run": 6,
+          "failures": 1,
+          "errors": 1,
+          "passing": 4,
+          "notes": "test_no_overflow needs eval+bigint; test_bad_types: +b'a' should raise TypeError",
+          "source": "cpython/Lib/test/test_unary.py"
+        },
+        "test_compare": {
+          "status": "blocked",
+          "blocker": "module evaluation failed",
+          "source": "cpython/Lib/test/test_compare.py"
+        }
       }
     },
     "tier2_data_structures": {
       "description": "Data structures and collections",
       "priority": 2,
       "tests": {
-        "test_list": {"status": "not_run", "source": "cpython/Lib/test/test_list.py"},
-        "test_dict": {"status": "not_run", "source": "cpython/Lib/test/test_dict.py"},
-        "test_set": {"status": "not_run", "source": "cpython/Lib/test/test_set.py"},
-        "test_tuple": {"status": "not_run", "source": "cpython/Lib/test/test_tuple.py"},
-        "test_string": {"status": "not_run", "source": "cpython/Lib/test/test_string.py"},
-        "test_bytes": {"status": "not_run", "source": "cpython/Lib/test/test_bytes.py"}
+        "test_list": {
+          "status": "blocked",
+          "blocker": "needs test.list_tests which needs test.support",
+          "source": "cpython/Lib/test/test_list.py"
+        },
+        "test_dict": {
+          "status": "blocked",
+          "blocker": "needs test.support",
+          "source": "cpython/Lib/test/test_dict.py"
+        },
+        "test_set": {
+          "status": "blocked",
+          "blocker": "needs test.support",
+          "source": "cpython/Lib/test/test_set.py"
+        },
+        "test_tuple": {
+          "status": "blocked",
+          "blocker": "needs test.seq_tests / test.support",
+          "source": "cpython/Lib/test/test_tuple.py"
+        },
+        "test_string": {
+          "status": "partial",
+          "tests_run": 38,
+          "failures": 2,
+          "errors": 14,
+          "passing": 22,
+          "notes": "Formatter.format breaks when get_field is present (M28 parser/eval bug, under investigation); Template.is_valid; minor escape/edge cases",
+          "source": "cpython/Lib/test/test_string.py"
+        },
+        "test_bytes": {
+          "status": "blocked",
+          "blocker": "parse error: @check_bytes_warnings",
+          "source": "cpython/Lib/test/test_bytes.py"
+        }
       }
     },
     "tier3_control_flow": {
       "description": "Control flow and exceptions",
       "priority": 3,
       "tests": {
-        "test_exceptions": {"status": "not_run", "source": "cpython/Lib/test/test_exceptions.py"},
-        "test_raise": {"status": "not_run", "source": "cpython/Lib/test/test_raise.py"},
-        "test_with": {"status": "not_run", "source": "cpython/Lib/test/test_with.py"},
-        "test_scope": {"status": "not_run", "source": "cpython/Lib/test/test_scope.py"}
+        "test_exceptions": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_exceptions.py"},
+        "test_raise": {"status": "blocked", "blocker": "needs test.support", "source": "cpython/Lib/test/test_raise.py"},
+        "test_with": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_with.py"},
+        "test_scope": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_scope.py"}
       }
     },
     "tier4_functions_oop": {
       "description": "Functions and object-oriented programming",
       "priority": 4,
       "tests": {
-        "test_call": {"status": "not_run", "source": "cpython/Lib/test/test_call.py"},
-        "test_functools": {"status": "not_run", "source": "cpython/Lib/test/test_functools.py"},
-        "test_decorators": {"status": "not_run", "source": "cpython/Lib/test/test_decorators.py"},
-        "test_class": {"status": "not_run", "source": "cpython/Lib/test/test_class.py"},
-        "test_descr": {"status": "not_run", "source": "cpython/Lib/test/test_descr.py"}
+        "test_call": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_call.py"},
+        "test_functools": {"status": "blocked", "blocker": "needs test.support", "source": "cpython/Lib/test/test_functools.py"},
+        "test_decorators": {
+          "status": "partial",
+          "tests_run": 16,
+          "errors": 7,
+          "passing": 9,
+          "source": "cpython/Lib/test/test_decorators.py"
+        },
+        "test_class": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_class.py"},
+        "test_descr": {"status": "blocked", "blocker": "needs test.support", "source": "cpython/Lib/test/test_descr.py"}
       }
     },
     "tier5_advanced": {
       "description": "Advanced language features",
       "priority": 5,
       "tests": {
-        "test_generators": {"status": "not_run", "source": "cpython/Lib/test/test_generators.py"},
-        "test_genexps": {"status": "not_run", "source": "cpython/Lib/test/test_genexps.py"},
-        "test_listcomps": {"status": "not_run", "source": "cpython/Lib/test/test_listcomps.py"},
-        "test_dictcomps": {"status": "not_run", "source": "cpython/Lib/test/test_dictcomps.py"},
-        "test_setcomps": {"status": "not_run", "source": "cpython/Lib/test/test_setcomps.py"},
-        "test_unpack": {"status": "not_run", "source": "cpython/Lib/test/test_unpack.py"},
-        "test_unpack_ex": {"status": "not_run", "source": "cpython/Lib/test/test_unpack_ex.py"},
-        "test_iter": {"status": "not_run", "source": "cpython/Lib/test/test_iter.py"},
-        "test_itertools": {"status": "not_run", "source": "cpython/Lib/test/test_itertools.py"},
-        "test_contextlib": {"status": "not_run", "source": "cpython/Lib/test/test_contextlib.py"}
+        "test_generators": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_generators.py"},
+        "test_genexps": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_genexps.py"},
+        "test_listcomps": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_listcomps.py"},
+        "test_dictcomps": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_dictcomps.py"},
+        "test_setcomps": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_setcomps.py"},
+        "test_unpack": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_unpack.py"},
+        "test_unpack_ex": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_unpack_ex.py"},
+        "test_iter": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_iter.py"},
+        "test_itertools": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_itertools.py"},
+        "test_contextlib": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_contextlib.py"}
       }
     },
     "tier6_assignment": {
       "description": "Assignment and augmented assignment",
       "priority": 6,
       "tests": {
-        "test_augassign": {"status": "not_run", "source": "cpython/Lib/test/test_augassign.py"}
+        "test_augassign": {
+          "status": "passing",
+          "tests_run": 7,
+          "passing": 7,
+          "source": "cpython/Lib/test/test_augassign.py"
+        }
       }
     }
   },
   "notes": [
-    "Tests run directly from CPython 3.12 stdlib (not simplified versions)",
-    "All test files exist in CPython stdlib and are verified",
-    "Focus on pure-Python language features, not C implementation details",
-    "Run with: ./tests/run_cpython_regression.sh"
+    "Tests run directly from CPython 3.13.13 stdlib (tests/cpython-source/, gitignored).",
+    "Run a single test: PYTHONPATH=tests/cpython-source/Lib ./bin/m28 tests/cpython-source/Lib/test/test_<name>.py",
+    "Many tests are blocked by `test.support` which depends on dataclasses → inspect → typing.",
+    "Unblocking that chain would dramatically expand the runnable test set.",
+    "The 'unblocking' biggest wins would be: typing.Protocol __protocol_attrs__ support, and a minimal test.support stub."
   ]
 }
