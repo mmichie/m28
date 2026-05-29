@@ -187,6 +187,21 @@ func splitLoopVariables(varStr string) []string {
 func (p *PythonParser) parseForStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_FOR)
 
+	// Detect "complex" for-targets that the simple string-based loop variable
+	// path can't represent — attributes (foo.bar), subscripts (foo[i]), or
+	// tuples containing them (e.g. `for (l[0], l) in pairs:`). These are valid
+	// Python but rare. When we see one, parse the target as a general expression
+	// and rewrite the loop into:
+	//
+	//     for __m28_loopvar_N in iter:
+	//         <target> = __m28_loopvar_N
+	//         <body>
+	//
+	// so the complex assignment is handled by the existing assignment path.
+	if p.forTargetHasComplexPattern() {
+		return p.parseForStatementWithComplexTarget(tok)
+	}
+
 	// Parse loop variables using parseLoopVariables to support:
 	// - Single variable: for x in ...
 	// - Tuple unpacking: for x, y in ...
@@ -219,6 +234,128 @@ func (p *PythonParser) parseForStatement() ast.ASTNode {
 	} else {
 		return ast.NewForFormMulti(variables, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
 	}
+}
+
+// forTargetHasComplexPattern peeks ahead from the current position (which should
+// be at the start of the for-target, right after `for`) until it hits TOKEN_IN
+// at depth 0, looking for a subscript `[` or attribute `.` access. Tracks
+// parens, brackets, and braces so that nested patterns are handled correctly.
+//
+// Examples that return true:
+//
+//	for foo.bar in iter
+//	for foo[i] in iter
+//	for (a, foo[i]) in iter
+//
+// Examples that return false:
+//
+//	for x in iter
+//	for x, y in iter
+//	for (a, b) in iter
+//	for first, *rest in iter
+func (p *PythonParser) forTargetHasComplexPattern() bool {
+	// `parenDepth` tracks ( ) only — inside a function-call-style expression on
+	// the iterable we'd never get here. `bracketDepth` and `braceDepth` are used
+	// just for noise-resistance in unusual macro-expanded inputs.
+	parenDepth := 0
+	bracketDepth := 0
+	braceDepth := 0
+	for i := p.current; i < len(p.tokens); i++ {
+		tok := p.tokens[i]
+		switch tok.Type {
+		case TOKEN_LPAREN:
+			parenDepth++
+		case TOKEN_RPAREN:
+			parenDepth--
+		case TOKEN_LBRACKET:
+			// At depth 0, an identifier followed by [ is a subscript target
+			// (e.g. `for values[i] in ...`). Inside parens too: `for (a, b[i]) in ...`
+			// Either way, this is complex.
+			if i > p.current && p.tokens[i-1].Type == TOKEN_IDENTIFIER {
+				return true
+			}
+			bracketDepth++
+		case TOKEN_RBRACKET:
+			bracketDepth--
+		case TOKEN_LBRACE:
+			braceDepth++
+		case TOKEN_RBRACE:
+			braceDepth--
+		case TOKEN_DOT:
+			if parenDepth == 0 || parenDepth > 0 {
+				return true
+			}
+		case TOKEN_IN:
+			if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 {
+				return false
+			}
+		case TOKEN_NEWLINE, TOKEN_COLON, TOKEN_EOF:
+			if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 {
+				// Hit end of statement without finding `in` — let the normal
+				// parser handle the syntax error.
+				return false
+			}
+		}
+	}
+	return false
+}
+
+// parseForStatementWithComplexTarget handles for-loops where the target contains
+// a subscript or attribute access. The target is parsed as an expression and the
+// loop is rewritten to bind a synthetic temporary then assign-through to the
+// real target inside the body.
+func (p *PythonParser) parseForStatementWithComplexTarget(forTok Token) ast.ASTNode {
+	// Parse target as one or more postfix expressions separated by commas.
+	// We stop at TOKEN_IN — parseExpression / parseAssignmentValue would happily
+	// pull `in` into a comparison and consume the iterable too.
+	parseOneTarget := func() ast.ASTNode {
+		if p.check(TOKEN_STAR) {
+			starTok := p.advance()
+			expr := p.parsePostfix()
+			return ast.NewSExpr([]ast.ASTNode{
+				ast.NewIdentifier("*unpack-iter", p.makeLocation(starTok), ast.SyntaxPython),
+				expr,
+			}, p.makeLocation(starTok), ast.SyntaxPython)
+		}
+		return p.parsePostfix()
+	}
+
+	var target ast.ASTNode = parseOneTarget()
+	if p.check(TOKEN_COMMA) {
+		// Build a tuple-literal SExpr
+		elements := []ast.ASTNode{target}
+		for p.check(TOKEN_COMMA) {
+			p.advance()
+			if p.check(TOKEN_IN) {
+				break
+			}
+			elements = append(elements, parseOneTarget())
+		}
+		tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(forTok), ast.SyntaxPython)
+		allElements := append([]ast.ASTNode{tupleSym}, elements...)
+		target = ast.NewSExpr(allElements, p.makeLocation(forTok), ast.SyntaxPython)
+	}
+
+	p.expect(TOKEN_IN)
+	iterable := p.parseForIterable()
+	body := p.parseBlock()
+
+	var elseBody []ast.ASTNode
+	if p.check(TOKEN_ELSE) {
+		p.advance()
+		elseBody = p.parseBlock()
+	}
+
+	tempName := fmt.Sprintf("__m28_loopvar_%d_%d", forTok.Line, forTok.Col)
+	tempIdent := ast.NewIdentifier(tempName, p.makeLocation(forTok), ast.SyntaxPython)
+	assignStmt := ast.NewAssignForm(target, tempIdent, p.makeLocation(forTok), ast.SyntaxPython)
+
+	// Prepend the synthetic assignment to the original body
+	newBody := make([]ast.ASTNode, 0, len(body)+1)
+	newBody = append(newBody, assignStmt)
+	newBody = append(newBody, body...)
+
+	return ast.NewForForm(tempName, iterable, newBody, elseBody, p.makeLocation(forTok), ast.SyntaxPython)
 }
 
 // parseForIterable parses the iterable expression in a for loop
