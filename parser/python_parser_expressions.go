@@ -1353,6 +1353,64 @@ func (p *PythonParser) parseLoopVariables() string {
 	return first
 }
 
+// parseComprehensionTarget parses the target of a comprehension's `for` clause.
+//
+// If the target is a simple pattern (names + nested tuples) it returns the
+// variable string from parseLoopVariables and leaves element untouched.
+//
+// If the target is complex (contains a subscript or attribute access — which
+// the string-based loop-variable encoding can't represent), it:
+//  1. Parses the target as a postfix expression (or tuple of postfix expressions),
+//  2. Returns a synthetic temp variable name,
+//  3. Wraps the comprehension element so the assignment happens before user code:
+//     element -> (do (= complex-target __tmp) original-element)
+//
+// This is the comprehension counterpart to parseForStatementWithComplexTarget.
+func (p *PythonParser) parseComprehensionTarget(element ast.ASTNode, tok Token) (string, ast.ASTNode) {
+	if !p.forTargetHasComplexPattern() {
+		return p.parseLoopVariables(), element
+	}
+
+	parseOne := func() ast.ASTNode {
+		if p.check(TOKEN_STAR) {
+			starTok := p.advance()
+			expr := p.parsePostfix()
+			return ast.NewSExpr([]ast.ASTNode{
+				ast.NewIdentifier("*unpack-iter", p.makeLocation(starTok), ast.SyntaxPython),
+				expr,
+			}, p.makeLocation(starTok), ast.SyntaxPython)
+		}
+		return p.parsePostfix()
+	}
+
+	var target ast.ASTNode = parseOne()
+	if p.check(TOKEN_COMMA) {
+		elements := []ast.ASTNode{target}
+		for p.check(TOKEN_COMMA) {
+			p.advance()
+			if p.check(TOKEN_IN) {
+				break
+			}
+			elements = append(elements, parseOne())
+		}
+		tupleSym := ast.NewIdentifier("tuple-literal", p.makeLocation(tok), ast.SyntaxPython)
+		all := append([]ast.ASTNode{tupleSym}, elements...)
+		target = ast.NewSExpr(all, p.makeLocation(tok), ast.SyntaxPython)
+	}
+
+	loc := p.makeLocation(tok)
+	tempName := fmt.Sprintf("__m28_compvar_%d_%d", tok.Line, tok.Col)
+	tempIdent := ast.NewIdentifier(tempName, loc, ast.SyntaxPython)
+	// (do (= target __tmp) original-element)
+	assign := ast.NewAssignForm(target, tempIdent, loc, ast.SyntaxPython)
+	doExpr := ast.NewSExpr([]ast.ASTNode{
+		ast.NewIdentifier("do", loc, ast.SyntaxPython),
+		assign,
+		element,
+	}, loc, ast.SyntaxPython)
+	return tempName, doExpr
+}
+
 // parseLoopVariableElement parses a single element of loop variables (can be nested)
 func (p *PythonParser) parseLoopVariableElement() string {
 	if p.check(TOKEN_LPAREN) {
@@ -1404,7 +1462,10 @@ func (p *PythonParser) parseListComprehension(element ast.ASTNode, tok Token) as
 	for p.check(TOKEN_FOR) {
 		p.advance() // consume FOR
 
-		variable := p.parseLoopVariables()
+		// Detect complex targets (subscripts / attribute access) and rewrite
+		// the element to perform the assignment before user code sees it.
+		var variable string
+		variable, element = p.parseComprehensionTarget(element, tok)
 
 		p.expect(TOKEN_IN)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
@@ -1468,7 +1529,11 @@ func (p *PythonParser) parseDictComprehension(key, value ast.ASTNode, tok Token)
 	for p.check(TOKEN_FOR) {
 		p.advance() // consume FOR
 
-		variable := p.parseLoopVariables()
+		// For complex targets, wrap just the key. The eval order in a dict
+		// comprehension is key-first per iteration, so the assignment
+		// happens once and the value sees the bound names.
+		var variable string
+		variable, key = p.parseComprehensionTarget(key, tok)
 
 		p.expect(TOKEN_IN)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
@@ -1524,7 +1589,8 @@ func (p *PythonParser) parseSetComprehension(element ast.ASTNode, tok Token) ast
 	for p.check(TOKEN_FOR) {
 		p.advance() // consume FOR
 
-		variable := p.parseLoopVariables()
+		var variable string
+		variable, element = p.parseComprehensionTarget(element, tok)
 
 		p.expect(TOKEN_IN)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
@@ -1580,7 +1646,8 @@ func (p *PythonParser) parseGeneratorExpression(element ast.ASTNode, tok Token) 
 	for p.check(TOKEN_FOR) {
 		p.advance() // consume FOR
 
-		variable := p.parseLoopVariables()
+		var variable string
+		variable, element = p.parseComprehensionTarget(element, tok)
 
 		p.expect(TOKEN_IN)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
@@ -1640,7 +1707,8 @@ func (p *PythonParser) parseGeneratorExpressionNoParen(element ast.ASTNode, tok 
 	for p.check(TOKEN_FOR) {
 		p.advance() // consume FOR
 
-		variable := p.parseLoopVariables()
+		var variable string
+		variable, element = p.parseComprehensionTarget(element, tok)
 
 		p.expect(TOKEN_IN)
 		// Use parseOr instead of parseExpression to avoid parsing 'if' as ternary operator
