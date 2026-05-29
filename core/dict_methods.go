@@ -63,12 +63,12 @@ func InitDictMethods() {
 			}
 
 			if len(args) > 1 {
-				return nil, fmt.Errorf("update() takes at most 1 argument (%d given)", len(args))
+				return nil, &TypeError{Message: fmt.Sprintf("update() takes at most 1 argument (%d given)", len(args))}
 			}
 
 			other, ok := args[0].(*DictValue)
 			if !ok {
-				return nil, fmt.Errorf("update expects a dict, got %s", args[0].Type())
+				return nil, &TypeError{Message: fmt.Sprintf("update expects a dict, got %s", args[0].Type())}
 			}
 
 			// Update dict in place by copying all entries from other
@@ -111,7 +111,7 @@ func InitDictMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 2 {
-				return nil, fmt.Errorf("__setitem__ takes exactly 2 arguments")
+				return nil, &TypeError{Message: "__setitem__ takes exactly 2 arguments"}
 			}
 			dict := receiver.(*DictValue)
 			key := args[0]
@@ -150,14 +150,14 @@ func InitDictMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) < 1 || len(args) > 2 {
-				return nil, fmt.Errorf("get() takes 1 or 2 arguments")
+				return nil, &TypeError{Message: "get() takes 1 or 2 arguments"}
 			}
 			dict := receiver.(*DictValue)
 			searchKey := args[0]
 
 			// Check if key is hashable
 			if !IsHashable(searchKey) {
-				return nil, fmt.Errorf("unhashable type: '%s'", searchKey.Type())
+				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
 			}
 
 			// For instances with custom __hash__, use __eq__ comparison
@@ -195,14 +195,14 @@ func InitDictMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
 			if len(args) < 1 || len(args) > 2 {
-				return nil, fmt.Errorf("pop expects 1 or 2 arguments")
+				return nil, &TypeError{Message: "pop expects 1 or 2 arguments"}
 			}
 
 			searchKey := args[0]
 
 			// Check if key is hashable
 			if !IsHashable(searchKey) {
-				return nil, fmt.Errorf("unhashable type: '%s'", searchKey.Type())
+				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
 			}
 
 			// For instances with custom __hash__, use __eq__ comparison
@@ -249,14 +249,14 @@ func InitDictMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
 			if len(args) < 1 || len(args) > 2 {
-				return nil, fmt.Errorf("setdefault expects 1 or 2 arguments")
+				return nil, &TypeError{Message: "setdefault expects 1 or 2 arguments"}
 			}
 
 			searchKey := args[0]
 
 			// Check if key is hashable
 			if !IsHashable(searchKey) {
-				return nil, fmt.Errorf("unhashable type: '%s'", searchKey.Type())
+				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
 			}
 
 			// For instances with custom __hash__, use __eq__ comparison
@@ -504,7 +504,7 @@ func InitDictMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__getitem__ takes exactly 1 argument")
+				return nil, &TypeError{Message: "__getitem__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
 			searchKey := args[0]
@@ -537,7 +537,7 @@ func InitDictMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__delitem__ takes exactly 1 argument")
+				return nil, &TypeError{Message: "__delitem__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
 			searchKey := args[0]
@@ -575,7 +575,7 @@ func InitDictMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__contains__ takes exactly 1 argument")
+				return nil, &TypeError{Message: "__contains__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
 			searchKey := args[0]
@@ -641,12 +641,12 @@ func InitDictMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__or__ takes exactly 1 argument")
+				return nil, &TypeError{Message: "__or__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
 			other, ok := args[0].(*DictValue)
 			if !ok {
-				return nil, fmt.Errorf("unsupported operand type(s) for |: 'dict' and '%s'", args[0].Type())
+				return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for |: 'dict' and '%s'", args[0].Type())}
 			}
 
 			// Create a new dict with all entries from self
@@ -682,12 +682,12 @@ func InitDictMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 1 {
-				return nil, fmt.Errorf("__ior__ takes exactly 1 argument")
+				return nil, &TypeError{Message: "__ior__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
 			other, ok := args[0].(*DictValue)
 			if !ok {
-				return nil, fmt.Errorf("unsupported operand type(s) for |=: 'dict' and '%s'", args[0].Type())
+				return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for |=: 'dict' and '%s'", args[0].Type())}
 			}
 
 			// Update dict in place with entries from other

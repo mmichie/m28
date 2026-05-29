@@ -276,6 +276,39 @@ def threading_setup():
     return (0, ())
 
 
+class SuppressCrashReport:
+    """Context manager that suppresses crash reports (Windows). No-op on Linux."""
+    def __enter__(self):
+        return self
+    def __exit__(self, *exc):
+        return False
+
+
+def disable_faulthandler():
+    """No-op context manager."""
+    class _Ctx:
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+    return _Ctx()
+
+
+def reset_default_excepthook():
+    """No-op."""
+    pass
+
+
+def force_not_colorized(test):
+    """No-op decorator."""
+    return test
+
+
+def force_not_colorized_test_class(cls):
+    """No-op class decorator."""
+    return cls
+
+
 def get_c_recursion_limit():
     """Approximate CPython's C recursion limit. M28 doesn't enforce it."""
     return 1500

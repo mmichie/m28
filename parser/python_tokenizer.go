@@ -1151,19 +1151,36 @@ func (t *PythonTokenizer) scanString(quote byte, start, startLine, startCol int)
 
 // scanBytesString scans a bytes literal (b"..." or b'...')
 func (t *PythonTokenizer) scanBytesString(quote byte, start, startLine, startCol int) Token {
+	// Check for triple-quoted bytes literal (b"""...""" or b'''...''')
+	isTriple := false
+	if !t.isAtEnd() && t.peek() == quote {
+		if t.pos+1 < len(t.input) && t.input[t.pos+1] == quote {
+			isTriple = true
+			t.advance() // second quote
+			t.advance() // third quote
+		}
+	}
+
 	var value []byte
 
 	for {
 		if t.isAtEnd() {
 			t.errors = append(t.errors, t.makeUnterminatedStringError(
-				startLine, startCol, start, quote, false, "b"+string(value)))
+				startLine, startCol, start, quote, isTriple, "b"+string(value)))
 			break
 		}
 
 		ch := t.peek()
 
 		// Check for end of string
-		if ch == quote {
+		if !isTriple && ch == quote {
+			t.advance()
+			break
+		}
+		if isTriple && ch == quote && t.pos+2 < len(t.input) &&
+			t.input[t.pos+1] == quote && t.input[t.pos+2] == quote {
+			t.advance()
+			t.advance()
 			t.advance()
 			break
 		}
