@@ -346,6 +346,28 @@ ALWAYS_EQ = _ALWAYS_EQ()
 NEVER_EQ = _NEVER_EQ()
 
 
+class BrokenIter:
+    """Iterator that can be configured to fail at various points.
+
+    Used by container tests to verify error handling around iteration.
+    """
+    def __init__(self, init_raises=False, next_raises=False, iter_raises=False):
+        if init_raises:
+            1 / 0
+        self.next_raises = next_raises
+        self.iter_raises = iter_raises
+
+    def __next__(self):
+        if self.next_raises:
+            1 / 0
+        raise StopIteration
+
+    def __iter__(self):
+        if self.iter_raises:
+            1 / 0
+        return self
+
+
 # Comparable sentinels used by tests for ordering (similar to ALWAYS_EQ).
 class _LARGEST:
     def __le__(self, other): return self is other
@@ -400,5 +422,5 @@ __all__ = [
     'HOST', 'HOSTv4', 'HOSTv6', 'TESTFN',
     'SHORT_TIMEOUT', 'LONG_TIMEOUT', 'LOOPBACK_TIMEOUT', 'INTERNET_TIMEOUT',
     'NHASHBITS', 'collision_stats',
-    'ALWAYS_EQ', 'NEVER_EQ', 'LARGEST', 'SMALLEST',
+    'ALWAYS_EQ', 'NEVER_EQ', 'LARGEST', 'SMALLEST', 'BrokenIter',
 ]

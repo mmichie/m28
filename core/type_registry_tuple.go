@@ -123,6 +123,9 @@ func getTupleMethods() map[string]*MethodDescriptor {
 						if start < 0 {
 							start = len(tuple) + start
 						}
+						if start < 0 {
+							start = 0
+						}
 					}
 				}
 
@@ -131,6 +134,9 @@ func getTupleMethods() map[string]*MethodDescriptor {
 						stop = int(s)
 						if stop < 0 {
 							stop = len(tuple) + stop
+						}
+						if stop < 0 {
+							stop = 0
 						}
 					}
 				}

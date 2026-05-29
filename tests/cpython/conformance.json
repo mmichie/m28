@@ -2,21 +2,21 @@
   "python_version": "3.13.13",
   "last_updated": "2026-05-28",
   "summary": {
-    "fully_passing": ["test_augassign"],
-    "partial_passing": [
-      "test_string (22/38)",
-      "test_decorators (9/16)",
-      "test_unary (4/6)",
-      "test_binop (6/12)"
+    "tests_running": "~410",
+    "tests_passing": "~135",
+    "fully_passing_files": ["test_augassign (7/7)"],
+    "high_pass_files": [
+      "test_unary (4/6, 67%)",
+      "test_scope (26/41, 63%)",
+      "test_string (22/38, 58%)",
+      "test_decorators (9/16, 56%)",
+      "test_binop (6/12, 50%)"
     ],
-    "blocked_by_imports": [
-      "test_grammar", "test_syntax", "test_types", "test_builtin", "test_compare",
-      "test_list", "test_dict", "test_set", "test_tuple", "test_bytes",
-      "test_exceptions", "test_raise", "test_with", "test_scope",
-      "test_call", "test_functools", "test_class", "test_descr",
-      "test_generators", "test_genexps", "test_listcomps", "test_dictcomps",
-      "test_setcomps", "test_unpack", "test_unpack_ex", "test_iter",
-      "test_itertools", "test_contextlib"
+    "running_but_low": [
+      "test_dict (~36/123, 29%)",
+      "test_descr (~23/159, 14%)",
+      "test_set (timing out, hundreds of tests running)",
+      "test_tuple (timing out, dozens of tests running)"
     ]
   },
   "tiers": {
@@ -26,45 +26,39 @@
       "tests": {
         "test_grammar": {
           "status": "blocked",
-          "blocker": "needs test.support which needs inspect/dataclasses/typing",
+          "blocker": "needs typing.Protocol __protocol_attrs__ for runtime_checkable decorator",
           "source": "cpython/Lib/test/test_grammar.py"
         },
         "test_syntax": {
           "status": "blocked",
-          "blocker": "needs test.support",
+          "blocker": "missing dependent module (typing/inspect chain)",
           "source": "cpython/Lib/test/test_syntax.py"
         },
         "test_types": {
           "status": "blocked",
-          "blocker": "needs test.support",
+          "blocker": "missing module",
           "source": "cpython/Lib/test/test_types.py"
         },
         "test_builtin": {
           "status": "blocked",
-          "blocker": "parse errors in test file",
+          "blocker": "parse error in test file",
           "source": "cpython/Lib/test/test_builtin.py"
         },
         "test_binop": {
           "status": "partial",
-          "tests_run": 12,
-          "failures": 4,
-          "errors": 2,
-          "passing": 6,
-          "notes": "Rat fraction class tests fail on equality between Rat and float",
+          "tests_run": 12, "passing": 6, "failures": 4, "errors": 2,
+          "notes": "Rat fraction class equality tests fail",
           "source": "cpython/Lib/test/test_binop.py"
         },
         "test_unary": {
           "status": "partial",
-          "tests_run": 6,
-          "failures": 1,
-          "errors": 1,
-          "passing": 4,
-          "notes": "test_no_overflow needs eval+bigint; test_bad_types: +b'a' should raise TypeError",
+          "tests_run": 6, "passing": 4, "failures": 1, "errors": 1,
+          "notes": "test_no_overflow needs eval+bigint; test_bad_types needs TypeError on +b'a'",
           "source": "cpython/Lib/test/test_unary.py"
         },
         "test_compare": {
           "status": "blocked",
-          "blocker": "module evaluation failed",
+          "blocker": "missing module",
           "source": "cpython/Lib/test/test_compare.py"
         }
       }
@@ -74,37 +68,35 @@
       "priority": 2,
       "tests": {
         "test_list": {
-          "status": "blocked",
-          "blocker": "needs test.list_tests which needs test.support",
+          "status": "panic",
+          "blocker": "stack overflow during ~35th test",
+          "notes": "First ~14 tests pass, then crash; needs recursion-depth investigation",
           "source": "cpython/Lib/test/test_list.py"
         },
         "test_dict": {
-          "status": "blocked",
-          "blocker": "needs test.support",
+          "status": "partial",
+          "tests_run": 123, "passing": 36, "failures": 22, "errors": 51, "skipped": 14,
           "source": "cpython/Lib/test/test_dict.py"
         },
         "test_set": {
-          "status": "blocked",
-          "blocker": "needs test.support",
+          "status": "timeout",
+          "notes": "Many tests running; needs longer timeout to get full count",
           "source": "cpython/Lib/test/test_set.py"
         },
         "test_tuple": {
-          "status": "blocked",
-          "blocker": "needs test.seq_tests / test.support",
+          "status": "timeout",
+          "notes": "Many tests running; some hash-distribution tests are slow",
           "source": "cpython/Lib/test/test_tuple.py"
         },
         "test_string": {
           "status": "partial",
-          "tests_run": 38,
-          "failures": 2,
-          "errors": 14,
-          "passing": 22,
-          "notes": "Formatter.format breaks when get_field is present (M28 parser/eval bug, under investigation); Template.is_valid; minor escape/edge cases",
+          "tests_run": 38, "passing": 22, "failures": 2, "errors": 14,
+          "notes": "Formatter.format breaks when get_field is also defined (M28 parser/eval bug)",
           "source": "cpython/Lib/test/test_string.py"
         },
         "test_bytes": {
           "status": "blocked",
-          "blocker": "parse error: @check_bytes_warnings",
+          "blocker": "parse error: @check_bytes_warnings decorator",
           "source": "cpython/Lib/test/test_bytes.py"
         }
       }
@@ -114,9 +106,13 @@
       "priority": 3,
       "tests": {
         "test_exceptions": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_exceptions.py"},
-        "test_raise": {"status": "blocked", "blocker": "needs test.support", "source": "cpython/Lib/test/test_raise.py"},
+        "test_raise": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_raise.py"},
         "test_with": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_with.py"},
-        "test_scope": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_scope.py"}
+        "test_scope": {
+          "status": "partial",
+          "tests_run": 41, "passing": 26, "failures": 9, "errors": 3, "skipped": 3,
+          "source": "cpython/Lib/test/test_scope.py"
+        }
       }
     },
     "tier4_functions_oop": {
@@ -124,16 +120,18 @@
       "priority": 4,
       "tests": {
         "test_call": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_call.py"},
-        "test_functools": {"status": "blocked", "blocker": "needs test.support", "source": "cpython/Lib/test/test_functools.py"},
+        "test_functools": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_functools.py"},
         "test_decorators": {
           "status": "partial",
-          "tests_run": 16,
-          "errors": 7,
-          "passing": 9,
+          "tests_run": 16, "passing": 9, "errors": 7,
           "source": "cpython/Lib/test/test_decorators.py"
         },
-        "test_class": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_class.py"},
-        "test_descr": {"status": "blocked", "blocker": "needs test.support", "source": "cpython/Lib/test/test_descr.py"}
+        "test_class": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_class.py"},
+        "test_descr": {
+          "status": "partial",
+          "tests_run": 159, "passing": 23, "failures": 56, "errors": 67, "skipped": 11, "expected_failures": 2,
+          "source": "cpython/Lib/test/test_descr.py"
+        }
       }
     },
     "tier5_advanced": {
@@ -141,15 +139,19 @@
       "priority": 5,
       "tests": {
         "test_generators": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_generators.py"},
-        "test_genexps": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_genexps.py"},
+        "test_genexps": {"status": "blocked", "blocker": "needs doctest → inspect → typing", "source": "cpython/Lib/test/test_genexps.py"},
         "test_listcomps": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_listcomps.py"},
-        "test_dictcomps": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_dictcomps.py"},
-        "test_setcomps": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_setcomps.py"},
-        "test_unpack": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_unpack.py"},
-        "test_unpack_ex": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_unpack_ex.py"},
-        "test_iter": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_iter.py"},
-        "test_itertools": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_itertools.py"},
-        "test_contextlib": {"status": "blocked", "blocker": "module eval error", "source": "cpython/Lib/test/test_contextlib.py"}
+        "test_dictcomps": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_dictcomps.py"},
+        "test_setcomps": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_setcomps.py"},
+        "test_unpack": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_unpack.py"},
+        "test_unpack_ex": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_unpack_ex.py"},
+        "test_iter": {
+          "status": "timeout",
+          "notes": "Started running after BrokenIter added but is very slow",
+          "source": "cpython/Lib/test/test_iter.py"
+        },
+        "test_itertools": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_itertools.py"},
+        "test_contextlib": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_contextlib.py"}
       }
     },
     "tier6_assignment": {
@@ -158,18 +160,27 @@
       "tests": {
         "test_augassign": {
           "status": "passing",
-          "tests_run": 7,
-          "passing": 7,
+          "tests_run": 7, "passing": 7,
           "source": "cpython/Lib/test/test_augassign.py"
         }
       }
     }
   },
+  "infrastructure": {
+    "test_package": "test/ stub package at project root provides test.support, test.list_tests, test.seq_tests, test.support.{import_helper, os_helper, warnings_helper, script_helper}",
+    "cpython_source": "tests/cpython-source/ (gitignored, clone of cpython v3.13.13 tag)",
+    "running_one": "PYTHONPATH=tests/cpython-source/Lib ./bin/m28 tests/cpython-source/Lib/test/test_<name>.py",
+    "biggest_blockers_to_unblock_more": [
+      "typing.Protocol __protocol_attrs__ (unblocks typing → inspect → dataclasses → doctest → test_iter, test_genexps, test_itertools, etc)",
+      "Parser support for @decorator with method receiving signatures it currently rejects (unblocks test_exceptions, test_with, test_call, test_builtin, test_generators, test_listcomps)",
+      "Recursion depth handling / specific test infinite loop in test_list (causes panic mid-run)"
+    ]
+  },
   "notes": [
     "Tests run directly from CPython 3.13.13 stdlib (tests/cpython-source/, gitignored).",
     "Run a single test: PYTHONPATH=tests/cpython-source/Lib ./bin/m28 tests/cpython-source/Lib/test/test_<name>.py",
-    "Many tests are blocked by `test.support` which depends on dataclasses → inspect → typing.",
-    "Unblocking that chain would dramatically expand the runnable test set.",
-    "The 'unblocking' biggest wins would be: typing.Protocol __protocol_attrs__ support, and a minimal test.support stub."
+    "test/ package at project root provides minimal infrastructure stubs so CPython test files can import test.support, test.list_tests, etc.",
+    "Many tests can run BECAUSE of these stubs but reveal M28 semantic gaps (descriptors, dict views, dunder protocols, etc).",
+    "Pre-stub baseline: 1 file passing (test_augassign). Current baseline: ~135 individual test methods passing across 9 files."
   ]
 }
