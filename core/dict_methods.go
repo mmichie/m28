@@ -3,8 +3,54 @@ package core
 import (
 	"fmt"
 	"log"
-	"strconv"
 )
+
+// iterableToSliceForDict converts any iterable value (list, tuple, set, string,
+// generator) into a []Value so dict.fromkeys can iterate it.
+func iterableToSliceForDict(v Value) ([]Value, error) {
+	switch x := v.(type) {
+	case *ListValue:
+		return x.Items(), nil
+	case TupleValue:
+		out := make([]Value, len(x))
+		copy(out, x)
+		return out, nil
+	case *SetValue:
+		var out []Value
+		for _, item := range x.Items() {
+			out = append(out, item)
+		}
+		return out, nil
+	case StringValue:
+		out := make([]Value, 0, len(x))
+		for _, r := range string(x) {
+			out = append(out, StringValue(string(r)))
+		}
+		return out, nil
+	case *DictValue:
+		out := make([]Value, 0, x.Size())
+		for _, k := range x.Keys() {
+			origKey, ok := x.keys[k]
+			if ok {
+				out = append(out, origKey)
+			}
+		}
+		return out, nil
+	}
+	if obj, ok := v.(interface{ Iterator() Iterator }); ok {
+		iter := obj.Iterator()
+		var out []Value
+		for {
+			val, more := iter.Next()
+			if !more {
+				break
+			}
+			out = append(out, val)
+		}
+		return out, nil
+	}
+	return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", v.Type())}
+}
 
 // instanceNeedsEqComparison checks if an instance has a custom __hash__ that
 // could cause hash collisions requiring __eq__ comparison
@@ -368,117 +414,87 @@ func InitDictMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
 			newDict := NewDict()
-
-			// Copy all key-value pairs
 			for _, k := range dict.Keys() {
 				v, _ := dict.Get(k)
-				newDict.Set(k, v)
+				if origKey, exists := dict.keys[k]; exists {
+					newDict.SetWithKey(k, origKey, v)
+				} else {
+					newDict.Set(k, v)
+				}
 			}
-
 			return newDict, nil
 		},
 	}
 
-	// Add items method
+	// fromkeys is a classmethod in Python — d.fromkeys(iter, value=None) builds
+	// a new dict with each item of iter as a key, all sharing `value`. We accept
+	// the call on both the class and any instance.
+	dictType.Methods["fromkeys"] = &MethodDescriptor{
+		Name:    "fromkeys",
+		Arity:   -1,
+		Doc:     "Create a new dict with keys from iterable and values set to value.",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) < 1 {
+				return nil, &TypeError{Message: "fromkeys() requires at least 1 argument"}
+			}
+			var defaultValue Value = None
+			if len(args) >= 2 {
+				defaultValue = args[1]
+			}
+			newDict := NewDict()
+			items, err := iterableToSliceForDict(args[0])
+			if err != nil {
+				return nil, err
+			}
+			for _, k := range items {
+				if err := newDict.SetValue(k, defaultValue); err != nil {
+					return nil, err
+				}
+			}
+			return newDict, nil
+		},
+	}
+
+	// Add items method - returns a dict_items view
 	dictType.Methods["items"] = &MethodDescriptor{
 		Name:    "items",
 		Arity:   0,
-		Doc:     "Return a list of (key, value) tuples",
+		Doc:     "Return a new view of the dictionary's items (key, value) pairs",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			dict := receiver.(*DictValue)
-			items := make([]Value, 0, dict.Size())
-
-			// Create tuples for each key-value pair
-			for _, k := range dict.Keys() {
-				v, _ := dict.Get(k)
-				// Get the original key value
-				var keyVal Value
-				if origKey, exists := dict.keys[k]; exists {
-					keyVal = origKey
-				} else {
-					keyVal = StringValue(k)
-				}
-				pair := TupleValue{keyVal, v}
-				items = append(items, pair)
+			if len(args) != 0 {
+				return nil, &TypeError{Message: fmt.Sprintf("items() takes no arguments (%d given)", len(args))}
 			}
-
-			return NewList(items...), nil
+			return NewDictView(receiver.(*DictValue), DictItemsViewKind), nil
 		},
 	}
 
-	// Add keys method
+	// Add keys method - returns a dict_keys view
 	dictType.Methods["keys"] = &MethodDescriptor{
 		Name:    "keys",
 		Arity:   0,
-		Doc:     "Return a list of all keys",
+		Doc:     "Return a new view of the dictionary's keys",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			dict := receiver.(*DictValue)
-			keys := dict.Keys()
-			keyValues := make([]Value, len(keys))
-			for i, k := range keys {
-				// Get the original key value from the keys map
-				if origKey, exists := dict.keys[k]; exists {
-					keyValues[i] = origKey
-				} else {
-					// Fallback: reconstruct original key from internal representation
-					// This handles cases where keys weren't tracked (legacy code paths)
-					var cleanKey Value
-					if len(k) > 2 && k[1] == ':' {
-						// Has a type prefix like "s:", "i:", "f:", etc.
-						prefix := k[0:2]
-						keyStr := k[2:]
-						switch prefix {
-						case "s:":
-							cleanKey = StringValue(keyStr)
-						case "i:":
-							// Try to parse back to int
-							if i, err := strconv.ParseInt(keyStr, 10, 64); err == nil {
-								cleanKey = NumberValue(i)
-							} else {
-								cleanKey = StringValue(keyStr)
-							}
-						case "f:":
-							// Try to parse back to float
-							if f, err := strconv.ParseFloat(keyStr, 64); err == nil {
-								cleanKey = NumberValue(f)
-							} else {
-								cleanKey = StringValue(keyStr)
-							}
-						case "b:":
-							cleanKey = BoolValue(keyStr == "true")
-						case "n:":
-							cleanKey = Nil
-						default:
-							cleanKey = StringValue(k)
-						}
-					} else {
-						cleanKey = StringValue(k)
-					}
-					keyValues[i] = cleanKey
-				}
+			if len(args) != 0 {
+				return nil, &TypeError{Message: fmt.Sprintf("keys() takes no arguments (%d given)", len(args))}
 			}
-			return NewList(keyValues...), nil
+			return NewDictView(receiver.(*DictValue), DictKeysViewKind), nil
 		},
 	}
 
-	// Add values method
+	// Add values method - returns a dict_values view
 	dictType.Methods["values"] = &MethodDescriptor{
 		Name:    "values",
 		Arity:   0,
-		Doc:     "Return a list of all values",
+		Doc:     "Return a new view of the dictionary's values",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			dict := receiver.(*DictValue)
-			values := make([]Value, 0, dict.Size())
-
-			for _, k := range dict.Keys() {
-				v, _ := dict.Get(k)
-				values = append(values, v)
+			if len(args) != 0 {
+				return nil, &TypeError{Message: fmt.Sprintf("values() takes no arguments (%d given)", len(args))}
 			}
-
-			return NewList(values...), nil
+			return NewDictView(receiver.(*DictValue), DictValuesViewKind), nil
 		},
 	}
 
@@ -634,6 +650,8 @@ func InitDictMethods() {
 	}
 
 	// Add __or__ method (dict | other)
+	// Per Python, only dict on the RHS is accepted; everything else returns
+	// NotImplemented so the interpreter can try other.__ror__.
 	dictType.Methods["__or__"] = &MethodDescriptor{
 		Name:    "__or__",
 		Arity:   1,
@@ -646,10 +664,9 @@ func InitDictMethods() {
 			dict := receiver.(*DictValue)
 			other, ok := args[0].(*DictValue)
 			if !ok {
-				return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for |: 'dict' and '%s'", args[0].Type())}
+				return NotImplemented, nil
 			}
 
-			// Create a new dict with all entries from self
 			result := NewDict()
 			for _, k := range dict.Keys() {
 				v, _ := dict.Get(k)
@@ -660,7 +677,6 @@ func InitDictMethods() {
 				}
 			}
 
-			// Add/override with entries from other
 			for _, k := range other.Keys() {
 				v, _ := other.Get(k)
 				if origKey, exists := other.keys[k]; exists {
@@ -674,7 +690,43 @@ func InitDictMethods() {
 		},
 	}
 
-	// Add __ior__ method (dict |= other)
+	// Add __ror__ method so that 'other | dict' delegates correctly.
+	dictType.Methods["__ror__"] = &MethodDescriptor{
+		Name:    "__ror__",
+		Arity:   1,
+		Doc:     "Return a new dict with items from other and self (other | d)",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__ror__ takes exactly 1 argument"}
+			}
+			dict := receiver.(*DictValue)
+			other, ok := args[0].(*DictValue)
+			if !ok {
+				return NotImplemented, nil
+			}
+			result := NewDict()
+			for _, k := range other.Keys() {
+				v, _ := other.Get(k)
+				if origKey, exists := other.keys[k]; exists {
+					result.SetWithKey(k, origKey, v)
+				} else {
+					result.Set(k, v)
+				}
+			}
+			for _, k := range dict.Keys() {
+				v, _ := dict.Get(k)
+				if origKey, exists := dict.keys[k]; exists {
+					result.SetWithKey(k, origKey, v)
+				} else {
+					result.Set(k, v)
+				}
+			}
+			return result, nil
+		},
+	}
+
+	// Add __ior__ method (dict |= other) — accepts any dict or iterable of pairs.
 	dictType.Methods["__ior__"] = &MethodDescriptor{
 		Name:    "__ior__",
 		Arity:   1,
@@ -685,21 +737,39 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: "__ior__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
-			other, ok := args[0].(*DictValue)
-			if !ok {
+			if other, ok := args[0].(*DictValue); ok {
+				for _, k := range other.Keys() {
+					v, _ := other.Get(k)
+					if origKey, exists := other.keys[k]; exists {
+						dict.SetWithKey(k, origKey, v)
+					} else {
+						dict.Set(k, v)
+					}
+				}
+				return dict, nil
+			}
+			// Iterable of pairs.
+			items, err := iterableValues(args[0])
+			if err != nil {
 				return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for |=: 'dict' and '%s'", args[0].Type())}
 			}
-
-			// Update dict in place with entries from other
-			for _, k := range other.Keys() {
-				v, _ := other.Get(k)
-				if origKey, exists := other.keys[k]; exists {
-					dict.SetWithKey(k, origKey, v)
-				} else {
-					dict.Set(k, v)
+			for i, item := range items {
+				if pair, ok := item.(TupleValue); ok && len(pair) == 2 {
+					dict.SetValue(pair[0], pair[1])
+					continue
 				}
+				if lst, ok := item.(*ListValue); ok && lst.Len() == 2 {
+					dict.SetValue(lst.Items()[0], lst.Items()[1])
+					continue
+				}
+				length := -1
+				if pair, ok := item.(TupleValue); ok {
+					length = len(pair)
+				} else if lst, ok := item.(*ListValue); ok {
+					length = lst.Len()
+				}
+				return nil, &ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, length)}
 			}
-
 			return dict, nil
 		},
 	}

@@ -5,6 +5,31 @@ import (
 	"strings"
 )
 
+// setFromIterable converts any iterable Value into a *SetValue.
+// Used by set's binary operations so they accept sets, frozensets,
+// dict views, lists, and tuples on the right-hand side.
+func setFromIterable(v Value) (*SetValue, error) {
+	if s, ok := v.(*SetValue); ok {
+		return s, nil
+	}
+	if fs, ok := v.(*FrozenSetValue); ok {
+		out := NewSet()
+		for _, item := range fs.items {
+			out.Add(item)
+		}
+		return out, nil
+	}
+	items, err := iterableValues(v)
+	if err != nil {
+		return nil, err
+	}
+	out := NewSet()
+	for _, item := range items {
+		out.Add(item)
+	}
+	return out, nil
+}
+
 // registerSetType registers the set type descriptor with all its methods
 func registerSetType() {
 	RegisterType(&TypeDescriptor{
@@ -511,8 +536,8 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-				other, ok := args[0].(*SetValue)
-				if !ok {
+				other, err := setFromIterable(args[0])
+				if err != nil {
 					return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for -: 'set' and '%s'", args[0].Type())}
 				}
 
@@ -536,8 +561,8 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-				other, ok := args[0].(*SetValue)
-				if !ok {
+				other, err := setFromIterable(args[0])
+				if err != nil {
 					return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for |: 'set' and '%s'", args[0].Type())}
 				}
 
@@ -562,8 +587,8 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-				other, ok := args[0].(*SetValue)
-				if !ok {
+				other, err := setFromIterable(args[0])
+				if err != nil {
 					return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for &: 'set' and '%s'", args[0].Type())}
 				}
 
@@ -587,8 +612,8 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-				other, ok := args[0].(*SetValue)
-				if !ok {
+				other, err := setFromIterable(args[0])
+				if err != nil {
 					return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for ^: 'set' and '%s'", args[0].Type())}
 				}
 

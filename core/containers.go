@@ -369,41 +369,47 @@ func (d *DictValue) Set(key string, value Value) {
 		d.orderedKeys = append(d.orderedKeys, key)
 	}
 	d.entries[key] = value
-	// Reconstruct original key from internal representation if not already tracked
+	// Reconstruct original key from internal representation if not already tracked.
+	// NOTE: ValueToKey uses "n:" for numbers and "nil" (no prefix) for None.
 	if _, exists := d.keys[key]; !exists {
-		// Extract original key by stripping type prefix
 		var origKey Value
-		if len(key) > 2 && key[1] == ':' {
-			// Has a type prefix like "s:", "i:", "f:", etc.
+		if key == "nil" {
+			origKey = Nil
+		} else if len(key) > 2 && key[1] == ':' {
 			prefix := key[0:2]
 			cleanKey := key[2:]
 			switch prefix {
 			case "s:":
 				origKey = StringValue(cleanKey)
+			case "n:":
+				// Numbers — parsed as float, but use the simplest int form when exact.
+				if f, err := strconv.ParseFloat(cleanKey, 64); err == nil {
+					if f == float64(int64(f)) {
+						origKey = NumberValue(int64(f))
+					} else {
+						origKey = NumberValue(f)
+					}
+				} else {
+					origKey = StringValue(cleanKey)
+				}
 			case "i:":
-				// Try to parse back to int
 				if i, err := strconv.ParseInt(cleanKey, 10, 64); err == nil {
 					origKey = NumberValue(i)
 				} else {
-					origKey = StringValue(cleanKey) // Fallback
+					origKey = StringValue(cleanKey)
 				}
 			case "f:":
-				// Try to parse back to float
 				if f, err := strconv.ParseFloat(cleanKey, 64); err == nil {
 					origKey = NumberValue(f)
 				} else {
-					origKey = StringValue(cleanKey) // Fallback
+					origKey = StringValue(cleanKey)
 				}
 			case "b:":
 				origKey = BoolValue(cleanKey == "true")
-			case "n:":
-				origKey = Nil
 			default:
-				// Unknown prefix - use string
 				origKey = StringValue(key)
 			}
 		} else {
-			// No prefix - use as string
 			origKey = StringValue(key)
 		}
 		d.keys[key] = origKey
@@ -493,6 +499,20 @@ func (d *DictValue) OriginalKeys() []Value {
 		}
 	}
 	return result
+}
+
+// OriginalKeyValue returns the original (pre-conversion) key value for an
+// internal key representation, if known. Returns (nil, false) otherwise.
+func (d *DictValue) OriginalKeyValue(internalKey string) (Value, bool) {
+	v, ok := d.keys[internalKey]
+	return v, ok
+}
+
+// Clear removes all entries from the dict in place.
+func (d *DictValue) Clear() {
+	for _, k := range d.Keys() {
+		d.Delete(k)
+	}
 }
 
 // Iterator implements Iterable for dicts (iterates over keys)
@@ -1103,3 +1123,510 @@ func (fs *FrozenSetValue) Iterator() Iterator {
 var (
 	EmptyTuple = TupleValue{}
 )
+
+// DictViewKind identifies the kind of dict view (keys, values, or items).
+type DictViewKind int
+
+const (
+	DictKeysViewKind DictViewKind = iota
+	DictValuesViewKind
+	DictItemsViewKind
+)
+
+// Dict view type constants (used as Python type names).
+const (
+	DictKeysType   Type = "dict_keys"
+	DictValuesType Type = "dict_values"
+	DictItemsType  Type = "dict_items"
+)
+
+// DictView is a live view into a dict's keys, values, or items.
+// Like CPython's dict_keys/dict_values/dict_items, mutations of the
+// underlying dict are visible through the view.
+type DictView struct {
+	BaseObject
+	dict *DictValue
+	kind DictViewKind
+}
+
+// NewDictView constructs a view over d of the given kind.
+func NewDictView(d *DictValue, kind DictViewKind) *DictView {
+	var typ Type
+	switch kind {
+	case DictKeysViewKind:
+		typ = DictKeysType
+	case DictValuesViewKind:
+		typ = DictValuesType
+	case DictItemsViewKind:
+		typ = DictItemsType
+	}
+	return &DictView{
+		BaseObject: *NewBaseObject(typ),
+		dict:       d,
+		kind:       kind,
+	}
+}
+
+// Type returns the view's Python type name.
+func (v *DictView) Type() Type {
+	switch v.kind {
+	case DictKeysViewKind:
+		return DictKeysType
+	case DictValuesViewKind:
+		return DictValuesType
+	case DictItemsViewKind:
+		return DictItemsType
+	}
+	return "dict_view"
+}
+
+// Kind returns which kind of view this is.
+func (v *DictView) Kind() DictViewKind {
+	return v.kind
+}
+
+// Dict returns the backing dict.
+func (v *DictView) Dict() *DictValue {
+	return v.dict
+}
+
+// snapshot returns the current items the view exposes.
+func (v *DictView) snapshot() []Value {
+	keys := v.dict.Keys()
+	out := make([]Value, 0, len(keys))
+	for _, k := range keys {
+		switch v.kind {
+		case DictKeysViewKind:
+			if orig, ok := v.dict.keys[k]; ok {
+				out = append(out, orig)
+			} else {
+				out = append(out, StringValue(k))
+			}
+		case DictValuesViewKind:
+			if val, ok := v.dict.Get(k); ok {
+				out = append(out, val)
+			}
+		case DictItemsViewKind:
+			var keyVal Value
+			if orig, ok := v.dict.keys[k]; ok {
+				keyVal = orig
+			} else {
+				keyVal = StringValue(k)
+			}
+			val, _ := v.dict.Get(k)
+			out = append(out, TupleValue{keyVal, val})
+		}
+	}
+	return out
+}
+
+// Size returns the number of items in the view.
+func (v *DictView) Size() int {
+	return v.dict.Size()
+}
+
+// Contains reports whether the view contains x.
+// For keys: x must equal a key. For values: x must equal a value.
+// For items: x must be a 2-tuple matching some (key, value).
+func (v *DictView) Contains(x Value) bool {
+	switch v.kind {
+	case DictKeysViewKind:
+		_, ok := v.dict.GetValue(x)
+		return ok
+	case DictValuesViewKind:
+		for _, k := range v.dict.Keys() {
+			val, _ := v.dict.Get(k)
+			if EqualValues(val, x) {
+				return true
+			}
+		}
+		return false
+	case DictItemsViewKind:
+		pair, ok := x.(TupleValue)
+		if !ok || len(pair) != 2 {
+			return false
+		}
+		val, ok := v.dict.GetValue(pair[0])
+		if !ok {
+			return false
+		}
+		return EqualValues(val, pair[1])
+	}
+	return false
+}
+
+// String renders the view as Python does: "dict_keys([...])" etc.
+func (v *DictView) String() string {
+	items := v.snapshot()
+	parts := make([]string, len(items))
+	for i, it := range items {
+		parts[i] = Repr(it)
+	}
+	var name string
+	switch v.kind {
+	case DictKeysViewKind:
+		name = "dict_keys"
+	case DictValuesViewKind:
+		name = "dict_values"
+	case DictItemsViewKind:
+		name = "dict_items"
+	}
+	return name + "([" + strings.Join(parts, ", ") + "])"
+}
+
+// GetAttr exposes dunder methods (__len__, __iter__, __contains__) and
+// .mapping per Python's view protocol.
+func (v *DictView) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "mapping":
+		return v.dict, true
+	case "__len__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return NumberValue(v.Size()), nil
+		}), true
+	case "__iter__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return v.Iterator().(Value), nil
+		}), true
+	case "__contains__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
+			}
+			return BoolValue(v.Contains(args[0])), nil
+		}), true
+	case "__reversed__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			items := v.snapshot()
+			rev := make([]Value, len(items))
+			for i, it := range items {
+				rev[len(items)-1-i] = it
+			}
+			return &dictViewIterator{items: rev, index: 0}, nil
+		}), true
+	case "__eq__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__eq__ takes exactly one argument"}
+			}
+			return BoolValue(dictViewSetCompare(v, args[0], "==")), nil
+		}), true
+	case "__ne__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__ne__ takes exactly one argument"}
+			}
+			return BoolValue(!dictViewSetCompare(v, args[0], "==")), nil
+		}), true
+	case "__lt__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__lt__ takes exactly one argument"}
+			}
+			return BoolValue(dictViewSetCompare(v, args[0], "<")), nil
+		}), true
+	case "__le__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__le__ takes exactly one argument"}
+			}
+			return BoolValue(dictViewSetCompare(v, args[0], "<=")), nil
+		}), true
+	case "__gt__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__gt__ takes exactly one argument"}
+			}
+			return BoolValue(dictViewSetCompare(v, args[0], ">")), nil
+		}), true
+	case "__ge__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__ge__ takes exactly one argument"}
+			}
+			return BoolValue(dictViewSetCompare(v, args[0], ">=")), nil
+		}), true
+	case "__sub__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__sub__ takes exactly one argument"}
+			}
+			return dictViewSetOp(v, args[0], "-")
+		}), true
+	case "__or__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__or__ takes exactly one argument"}
+			}
+			return dictViewSetOp(v, args[0], "|")
+		}), true
+	case "__and__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__and__ takes exactly one argument"}
+			}
+			return dictViewSetOp(v, args[0], "&")
+		}), true
+	case "__xor__":
+		if v.kind == DictValuesViewKind {
+			return nil, false
+		}
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__xor__ takes exactly one argument"}
+			}
+			return dictViewSetOp(v, args[0], "^")
+		}), true
+	case "isdisjoint":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "isdisjoint() takes exactly one argument"}
+			}
+			otherItems, err := iterableValues(args[0])
+			if err != nil {
+				return nil, err
+			}
+			myItems := v.snapshot()
+			for _, x := range otherItems {
+				for _, y := range myItems {
+					if EqualValues(x, y) {
+						return BoolValue(false), nil
+					}
+				}
+			}
+			return BoolValue(true), nil
+		}), true
+	}
+	return v.BaseObject.GetAttr(name)
+}
+
+// iterableValues converts any iterable Value to a []Value.
+func iterableValues(v Value) ([]Value, error) {
+	switch x := v.(type) {
+	case *ListValue:
+		return x.Items(), nil
+	case TupleValue:
+		out := make([]Value, len(x))
+		copy(out, x)
+		return out, nil
+	case *SetValue:
+		return x.Items(), nil
+	case *FrozenSetValue:
+		out := make([]Value, 0, len(x.items))
+		for _, item := range x.items {
+			out = append(out, item)
+		}
+		return out, nil
+	case *DictView:
+		return x.snapshot(), nil
+	case *DictValue:
+		view := NewDictView(x, DictKeysViewKind)
+		return view.snapshot(), nil
+	}
+	if obj, ok := v.(interface{ Iterator() Iterator }); ok {
+		iter := obj.Iterator()
+		var out []Value
+		for {
+			val, more := iter.Next()
+			if !more {
+				break
+			}
+			out = append(out, val)
+		}
+		return out, nil
+	}
+	return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", v.Type())}
+}
+
+// dictViewSetOp implements set operations (&, |, -, ^) on dict views,
+// returning a new set.
+func dictViewSetOp(v *DictView, other Value, op string) (Value, error) {
+	otherItems, err := iterableValues(other)
+	if err != nil {
+		return nil, &TypeError{Message: fmt.Sprintf("unsupported operand type(s) for %s: '%s' and '%s'", op, v.Type(), other.Type())}
+	}
+	myItems := v.snapshot()
+	result := NewSet()
+	switch op {
+	case "-":
+		for _, x := range myItems {
+			found := false
+			for _, y := range otherItems {
+				if EqualValues(x, y) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				result.Add(x)
+			}
+		}
+	case "|":
+		for _, x := range myItems {
+			result.Add(x)
+		}
+		for _, y := range otherItems {
+			result.Add(y)
+		}
+	case "&":
+		for _, x := range myItems {
+			for _, y := range otherItems {
+				if EqualValues(x, y) {
+					result.Add(x)
+					break
+				}
+			}
+		}
+	case "^":
+		for _, x := range myItems {
+			found := false
+			for _, y := range otherItems {
+				if EqualValues(x, y) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				result.Add(x)
+			}
+		}
+		for _, y := range otherItems {
+			found := false
+			for _, x := range myItems {
+				if EqualValues(x, y) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				result.Add(y)
+			}
+		}
+	}
+	return result, nil
+}
+
+// dictViewSetCompare implements comparison ops (==, <, <=, >, >=) on
+// dict views, treating them as sets of their elements.
+func dictViewSetCompare(v *DictView, other Value, op string) bool {
+	otherItems, err := iterableValues(other)
+	if err != nil {
+		return false
+	}
+	myItems := v.snapshot()
+	containsAll := func(super, sub []Value) bool {
+		for _, x := range sub {
+			found := false
+			for _, y := range super {
+				if EqualValues(x, y) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+		return true
+	}
+	mySubsetOf := containsAll(otherItems, myItems)
+	otherSubsetOfMe := containsAll(myItems, otherItems)
+	equal := mySubsetOf && otherSubsetOfMe
+	switch op {
+	case "==":
+		return equal
+	case "<":
+		return mySubsetOf && !equal
+	case "<=":
+		return mySubsetOf
+	case ">":
+		return otherSubsetOfMe && !equal
+	case ">=":
+		return otherSubsetOfMe
+	}
+	return false
+}
+
+// Iterator implements Iterable.
+func (v *DictView) Iterator() Iterator {
+	return &dictViewIterator{items: v.snapshot(), index: 0}
+}
+
+type dictViewIterator struct {
+	items []Value
+	index int
+}
+
+func (it *dictViewIterator) Next() (Value, bool) {
+	if it.index >= len(it.items) {
+		return nil, false
+	}
+	val := it.items[it.index]
+	it.index++
+	return val, true
+}
+
+func (it *dictViewIterator) Reset() {
+	it.index = 0
+}
+
+func (it *dictViewIterator) Type() Type {
+	return "dict_view_iterator"
+}
+
+func (it *dictViewIterator) String() string {
+	return "<dict_view_iterator>"
+}
+
+func (it *dictViewIterator) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "__iter__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return it, nil
+		}), true
+	case "__next__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			val, ok := it.Next()
+			if !ok {
+				return nil, &stopIterationError{}
+			}
+			return val, nil
+		}), true
+	case "__length_hint__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			remaining := len(it.items) - it.index
+			if remaining < 0 {
+				remaining = 0
+			}
+			return NumberValue(remaining), nil
+		}), true
+	}
+	return nil, false
+}

@@ -313,10 +313,22 @@ func Is() func([]core.Value, *core.Context) (core.Value, error) {
 			return core.BoolValue(string(leftStr) == string(rightStr)), nil
 		}
 
-		// For numbers, only small integers are interned in Python (-5 to 256)
-		// For simplicity, we don't implement number interning yet
-		// This means 'x is y' for numbers will generally be False unless
-		// they're actually the same object in memory
+		// Python interns small integers (-5 to 256) so 'x is y' is True
+		// when x and y are equal small ints. Mirror that here.
+		leftNum, leftIsNum := left.(core.NumberValue)
+		rightNum, rightIsNum := right.(core.NumberValue)
+		if leftIsNum && rightIsNum {
+			lf, rf := float64(leftNum), float64(rightNum)
+			if lf == rf && lf == float64(int64(lf)) {
+				i := int64(lf)
+				if i >= -5 && i <= 256 {
+					return core.BoolValue(true), nil
+				}
+			}
+			return core.BoolValue(false), nil
+		}
+
+		// For other types, default to false.
 		return core.BoolValue(false), nil
 	}
 }

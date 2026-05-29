@@ -128,6 +128,21 @@ func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
 	return nil, nil, false
 }
 
+// isBuiltinTypeName reports whether `name` is one of the built-in container /
+// primitive types that have their own Call methods (so subclasses inherit
+// constructor-with-args behaviour from them). Names cover both the Python
+// surface name and the M28-internal type name (e.g. "str" and "string").
+func isBuiltinTypeName(name string) bool {
+	switch name {
+	case "dict", "list", "tuple", "set", "frozenset", "str", "string",
+		"int", "number", "float", "bytes", "bytearray", "complex", "bool",
+		"range", "type", "object", "slice", "memoryview",
+		"Exception", "BaseException":
+		return true
+	}
+	return false
+}
+
 // classInheritsType returns true if cls is the `type` metaclass or transitively
 // inherits from it. Used by Super.GetAttr to decide whether to fall back to
 // parent.GetAttr for dunder methods (which are provided by type's defaults,
@@ -817,8 +832,21 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			}
 		}
 
-		// If neither is overridden, class takes no arguments
-		if !hasCustomInit && !hasCustomNew {
+		// Also count a built-in parent class as "custom init" — `dict`, `list`,
+		// `set`, `str`, `int`, etc. accept constructor arguments via their own
+		// Call methods even though their __init__ isn't recorded in Methods.
+		// Without this, `class D(dict): pass; D({1:2})` errors with
+		// "D() takes no arguments".
+		hasBuiltinParent := false
+		for _, parent := range c.Parents {
+			if isBuiltinTypeName(parent.Name) {
+				hasBuiltinParent = true
+				break
+			}
+		}
+
+		// If neither is overridden and there's no built-in parent, class takes no arguments
+		if !hasCustomInit && !hasCustomNew && !hasBuiltinParent {
 			return nil, &TypeError{Message: fmt.Sprintf("%s() takes no arguments", c.Name)}
 		}
 	}

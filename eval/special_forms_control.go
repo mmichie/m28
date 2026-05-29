@@ -264,7 +264,13 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 	case *core.ZeroDivisionError:
 		return createPythonExceptionInstance(ctx, "ZeroDivisionError", errMsg)
 	case *core.KeyError:
-		return createPythonExceptionInstance(ctx, "KeyError", errMsg)
+		// Python's KeyError uses the missing key (not a formatted message)
+		// as its single argument: args == (key,)
+		inst := createPythonExceptionInstance(ctx, "KeyError", errMsg)
+		if instance, ok := inst.(*core.Instance); ok && e.Key != nil && e.Message == "" {
+			instance.SetAttr("args", core.TupleValue{e.Key})
+		}
+		return inst
 	case *core.IndexError:
 		return createPythonExceptionInstance(ctx, "IndexError", errMsg)
 	case *core.ModuleNotFoundError:

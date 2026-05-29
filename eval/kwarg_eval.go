@@ -314,7 +314,7 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 					// Original key must be a string for keyword arguments
 					keyStr, ok := origKey.(core.StringValue)
 					if !ok {
-						return nil, fmt.Errorf("** unpacking requires string keys, got %s", origKey.Type())
+						return nil, &core.TypeError{Message: fmt.Sprintf("keywords must be strings (got %s)", origKey.Type())}
 					}
 					paramName = string(keyStr)
 					found = true

@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"unsafe"
+)
 
 // Repr returns the developer-friendly representation of a value
 // This checks for __repr__ methods on objects and falls back to default representations
@@ -246,20 +249,29 @@ func formatDictRepr(dict *DictValue) string {
 	if dict.Size() == 0 {
 		return "{}"
 	}
-
-	result := "{"
-	first := true
-	for k, v := range dict.entries {
-		if !first {
-			result += ", "
+	return withCycleDetection(uintptr(unsafe.Pointer(dict)), func() string {
+		result := "{"
+		first := true
+		for _, k := range dict.orderedKeys {
+			v, ok := dict.entries[k]
+			if !ok {
+				continue
+			}
+			if !first {
+				result += ", "
+			}
+			first = false
+			var key Value
+			if orig, has := dict.keys[k]; has {
+				key = orig
+			} else {
+				key = dict.keyFromString(k)
+			}
+			result += Repr(key) + ": " + Repr(v)
 		}
-		first = false
-		// Extract the actual key value from the internal key format
-		key := dict.keyFromString(k)
-		result += Repr(key) + ": " + Repr(v)
-	}
-	result += "}"
-	return result
+		result += "}"
+		return result
+	})
 }
 
 func formatSetRepr(set *SetValue) string {

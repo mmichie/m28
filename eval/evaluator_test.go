@@ -178,9 +178,10 @@ func TestEval_Dict(t *testing.T) {
 		t.Errorf("key2 value = %v, want \"value\"", val2)
 	}
 
-	// Verify it's a copy, not the same object
-	if resultDict == dict {
-		t.Error("Eval() returned same dict object instead of copy")
+	// Eval must preserve identity for runtime dict values so that
+	// self-references (d[k] = d) and shared aliases survive.
+	if resultDict != dict {
+		t.Error("Eval() copied dict; expected identity to be preserved")
 	}
 }
 
@@ -215,9 +216,10 @@ func TestEval_Set(t *testing.T) {
 		t.Error("Expected 3 to be in result set")
 	}
 
-	// Verify it's a copy, not the same object
-	if resultSet == set {
-		t.Error("Eval() returned same set object instead of copy")
+	// Eval must preserve identity for runtime set values; copying
+	// would break shared mutations and `is` semantics.
+	if resultSet != set {
+		t.Error("Eval() copied set; expected identity to be preserved")
 	}
 }
 

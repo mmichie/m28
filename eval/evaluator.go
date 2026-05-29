@@ -120,31 +120,12 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		core.DebugLog("[EVAL-LIST] Treating as function call\n")
 		return evalFunctionCallWithKeywords(v, ctx)
 
-	case *core.DictValue:
-		// Dicts need to be copied to avoid shared mutable state
-		// Each evaluation of {} should create a fresh dict
-		newDict := core.NewDict()
-		// Copy key-value pairs from the original dict
-		for _, key := range v.OriginalKeys() {
-			if val, found := v.GetValue(key); found {
-				newDict.SetValue(key, val)
-			}
-		}
-		return newDict, nil
-
-	case *core.SetValue:
-		// Sets need to be copied to avoid shared mutable state
-		// Each evaluation of {x, y, z} should create a fresh set
-		newSet := core.NewSet()
-		iter := v.Iterator()
-		for {
-			item, ok := iter.Next()
-			if !ok {
-				break
-			}
-			newSet.Add(item)
-		}
-		return newSet, nil
+	case *core.DictValue, *core.SetValue:
+		// Runtime container values evaluate to themselves so identity
+		// is preserved (e.g. d[k] = d must store a self-reference).
+		// Dict/set *literals* in source are parsed as (dict-literal ...)
+		// / (set-literal ...) and never reach this branch.
+		return v, nil
 
 	default:
 		// Other values evaluate to themselves

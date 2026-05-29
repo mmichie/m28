@@ -868,6 +868,152 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 			}
 			return core.None, nil
 		}), true
+	case "move_to_end":
+		// move_to_end(key, last=True) — move key to either end of the order.
+		// last=True moves to the end (default), last=False moves to front.
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, &core.TypeError{Message: "move_to_end() requires at least 1 argument"}
+			}
+			key := core.ValueToKey(args[0])
+			val, ok := od.dict.Get(key)
+			if !ok {
+				return nil, &core.KeyError{Message: key}
+			}
+			origKey := args[0]
+			toEnd := true
+			if len(args) >= 2 {
+				if b, ok := args[1].(core.BoolValue); ok {
+					toEnd = bool(b)
+				}
+			}
+			od.dict.Delete(key)
+			if toEnd {
+				od.dict.SetWithKey(key, origKey, val)
+				return core.None, nil
+			}
+			// Prepending: re-insert this key, then re-insert everything else
+			// after it (preserving relative order).
+			savedKeys := od.dict.Keys()
+			savedOrig := od.dict.OriginalKeys()
+			savedVals := make([]core.Value, len(savedKeys))
+			for i, k := range savedKeys {
+				v, _ := od.dict.Get(k)
+				savedVals[i] = v
+			}
+			for _, k := range savedKeys {
+				od.dict.Delete(k)
+			}
+			od.dict.SetWithKey(key, origKey, val)
+			for i, k := range savedKeys {
+				od.dict.SetWithKey(k, savedOrig[i], savedVals[i])
+			}
+			return core.None, nil
+		}), true
+	case "popitem":
+		// popitem(last=True) — remove and return a (key, value) pair from
+		// either end of the order.
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			toEnd := true
+			if len(args) >= 1 {
+				if b, ok := args[0].(core.BoolValue); ok {
+					toEnd = bool(b)
+				}
+			}
+			keys := od.dict.Keys()
+			origs := od.dict.OriginalKeys()
+			if len(keys) == 0 {
+				return nil, &core.KeyError{Message: "dictionary is empty"}
+			}
+			var idx int
+			if toEnd {
+				idx = len(keys) - 1
+			} else {
+				idx = 0
+			}
+			k := keys[idx]
+			origKey := origs[idx]
+			val, _ := od.dict.Get(k)
+			od.dict.Delete(k)
+			return core.TupleValue{origKey, val}, nil
+		}), true
+	case "pop":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, &core.TypeError{Message: "pop() requires at least 1 argument"}
+			}
+			key := core.ValueToKey(args[0])
+			val, ok := od.dict.Get(key)
+			if !ok {
+				if len(args) >= 2 {
+					return args[1], nil
+				}
+				return nil, &core.KeyError{Message: key}
+			}
+			od.dict.Delete(key)
+			return val, nil
+		}), true
+	case "setdefault":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, &core.TypeError{Message: "setdefault() requires at least 1 argument"}
+			}
+			key := core.ValueToKey(args[0])
+			if val, ok := od.dict.Get(key); ok {
+				return val, nil
+			}
+			var def core.Value = core.None
+			if len(args) >= 2 {
+				def = args[1]
+			}
+			od.dict.SetWithKey(key, args[0], def)
+			return def, nil
+		}), true
+	case "update":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return core.None, nil
+			}
+			switch other := args[0].(type) {
+			case *core.DictValue:
+				for _, k := range other.Keys() {
+					v, _ := other.Get(k)
+					origKey, ok := other.OriginalKeyValue(k)
+					if !ok {
+						origKey = core.StringValue(k)
+					}
+					od.dict.SetWithKey(k, origKey, v)
+				}
+			case *OrderedDict:
+				for _, k := range other.dict.Keys() {
+					v, _ := other.dict.Get(k)
+					origKey, ok := other.dict.OriginalKeyValue(k)
+					if !ok {
+						origKey = core.StringValue(k)
+					}
+					od.dict.SetWithKey(k, origKey, v)
+				}
+			}
+			return core.None, nil
+		}), true
+	case "clear":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			od.dict.Clear()
+			return core.None, nil
+		}), true
+	case "copy":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			newOd := NewOrderedDict()
+			for _, k := range od.dict.Keys() {
+				v, _ := od.dict.Get(k)
+				origKey, ok := od.dict.OriginalKeyValue(k)
+				if !ok {
+					origKey = core.StringValue(k)
+				}
+				newOd.dict.SetWithKey(k, origKey, v)
+			}
+			return newOd, nil
+		}), true
 	}
 	return nil, false
 }

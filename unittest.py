@@ -110,6 +110,22 @@ class TestCase:
             function, args, kwargs = self._cleanups.pop()
             function(*args, **kwargs)
 
+    def subTest(self, msg=None, **params):
+        """Context manager for parameterised sub-tests.
+
+        Real unittest reports each sub-test separately and continues past
+        failures. M28's stub just runs the block; if the block raises, the
+        exception propagates as a normal test failure. This is enough for
+        most CPython tests to make progress instead of skipping the whole
+        method.
+        """
+        class _SubTest:
+            def __enter__(self_inner):
+                return self_inner
+            def __exit__(self_inner, exc_type, exc_val, exc_tb):
+                return False
+        return _SubTest()
+
     # ---- Test execution ----
 
     def skipTest(self, reason):
