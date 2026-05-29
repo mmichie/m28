@@ -1308,6 +1308,13 @@ func (p *PythonParser) parseLoopVariables() string {
 			return result
 		}
 
+		// Star-unpacking: *name (PEP 3132)
+		if p.check(TOKEN_STAR) {
+			p.advance()
+			varTok := p.expect(TOKEN_IDENTIFIER)
+			return "*" + varTok.Lexeme
+		}
+
 		// Simple identifier
 		varTok := p.expect(TOKEN_IDENTIFIER)
 		return varTok.Lexeme
@@ -1372,6 +1379,14 @@ func (p *PythonParser) parseLoopVariableElement() string {
 		}
 		result += ")"
 		return result
+	}
+
+	// Star-unpacking: *name (PEP 3132)
+	// e.g. `for first, *rest in pairs:`
+	if p.check(TOKEN_STAR) {
+		p.advance()
+		varTok := p.expect(TOKEN_IDENTIFIER)
+		return "*" + varTok.Lexeme
 	}
 
 	// Simple identifier

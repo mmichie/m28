@@ -50,17 +50,59 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 			return err
 		}
 
-		// Check length match
-		if len(values) != actualPattern.Len() {
-			if len(values) < actualPattern.Len() {
-				return fmt.Errorf("not enough values to unpack (expected %d, got %d)", actualPattern.Len(), len(values))
+		// Look for a star pattern (`*name`) — at most one is allowed per
+		// PEP 3132. The star target collects everything not consumed by
+		// the fixed patterns before and after it (as a list).
+		patternItems := actualPattern.Items()
+		starIdx := -1
+		for i, sub := range patternItems {
+			if sym, ok := unwrapLocated(sub).(core.SymbolValue); ok {
+				if len(sym) > 0 && sym[0] == '*' {
+					if starIdx != -1 {
+						return fmt.Errorf("multiple starred expressions in assignment")
+					}
+					starIdx = i
+				}
 			}
-			return fmt.Errorf("too many values to unpack (expected %d, got %d)", actualPattern.Len(), len(values))
 		}
 
-		// Recursively unpack each sub-pattern with its corresponding value
-		for i, subPattern := range actualPattern.Items() {
-			if err := UnpackPattern(subPattern, values[i], ctx); err != nil {
+		if starIdx == -1 {
+			// No star — exact length match required
+			if len(values) != len(patternItems) {
+				if len(values) < len(patternItems) {
+					return fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(patternItems), len(values))
+				}
+				return fmt.Errorf("too many values to unpack (expected %d, got %d)", len(patternItems), len(values))
+			}
+			for i, subPattern := range patternItems {
+				if err := UnpackPattern(subPattern, values[i], ctx); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		// Star present: minimum required values = patternItems - 1 (all fixed targets)
+		fixedCount := len(patternItems) - 1
+		if len(values) < fixedCount {
+			return fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", fixedCount, len(values))
+		}
+		// Bind fixed targets before the star
+		for i := 0; i < starIdx; i++ {
+			if err := UnpackPattern(patternItems[i], values[i], ctx); err != nil {
+				return err
+			}
+		}
+		// Bind the star target to the collected middle portion
+		starName := string(unwrapLocated(patternItems[starIdx]).(core.SymbolValue))[1:]
+		afterCount := len(patternItems) - starIdx - 1
+		middleEnd := len(values) - afterCount
+		middle := make([]core.Value, middleEnd-starIdx)
+		copy(middle, values[starIdx:middleEnd])
+		ctx.Define(starName, core.NewList(middle...))
+		// Bind fixed targets after the star
+		for j := 0; j < afterCount; j++ {
+			if err := UnpackPattern(patternItems[starIdx+1+j], values[middleEnd+j], ctx); err != nil {
 				return err
 			}
 		}

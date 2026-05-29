@@ -309,6 +309,212 @@ def force_not_colorized_test_class(cls):
     return cls
 
 
+def requires_limited_api(test):
+    """Decorator: skip when limited C API isn't available."""
+    return unittest.skip("limited C API not supported in M28")(test)
+
+
+def requires_fork(test):
+    return unittest.skip("os.fork() not supported in M28 test stub")(test)
+
+
+def requires_IEEE_754(test):
+    return test  # Most platforms have IEEE 754
+
+
+def requires_zlib(test):
+    """Decorator: skip when zlib isn't available."""
+    try:
+        import zlib  # noqa: F401
+        return test
+    except ImportError:
+        return unittest.skip("zlib not available")(test)
+
+
+def requires_bz2(test):
+    try:
+        import bz2  # noqa: F401
+        return test
+    except ImportError:
+        return unittest.skip("bz2 not available")(test)
+
+
+def requires_lzma(test):
+    try:
+        import lzma  # noqa: F401
+        return test
+    except ImportError:
+        return unittest.skip("lzma not available")(test)
+
+
+def requires_hashdigest(digestname, openssl=False, usedforsecurity=True):
+    """Decorator: skip when a hash algorithm is not available."""
+    def decorator(test):
+        return unittest.skip(f"hashdigest {digestname!r} not available")(test)
+    return decorator
+
+
+def import_helper_msg(msg):
+    return None
+
+
+def system_must_validate_cert(f):
+    return f
+
+
+def python_is_optimized():
+    return False
+
+
+def perf_counter():
+    import time
+    return time.perf_counter()
+
+
+# These constants are queried defensively by some test modules.
+Py_DEBUG = False
+Py_GIL_DISABLED = False
+TEST_HOME_DIR = '.'
+TEST_DATA_DIR = '.'
+TEST_SUPPORT_DIR = '.'
+
+
+def is_resource_enabled(resource):
+    return False
+
+
+def use_old_parser():
+    return False
+
+
+def get_pagesize():
+    return 4096
+
+
+def set_recursion_limit(limit):
+    """Context manager to set sys.recursionlimit temporarily.
+
+    M28 doesn't enforce recursion limit, so this is a no-op context manager.
+    """
+    class _Ctx:
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+    return _Ctx()
+
+
+def infinite_recursion(max_depth=None):
+    """Context manager that raises if recursion exceeds max_depth. No-op."""
+    class _Ctx:
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+    return _Ctx()
+
+
+def setswitchinterval(interval):
+    """No-op context manager."""
+    class _Ctx:
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+    return _Ctx()
+
+
+def adjust_int_max_str_digits(max_digits):
+    class _Ctx:
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+    return _Ctx()
+
+
+def skip_if_sanitizer(msg=None, *, address=False, memory=False, thread=False, ub=False):
+    def decorator(test):
+        return test
+    return decorator
+
+
+def thread_unsafe(reason):
+    def decorator(test):
+        return test
+    return decorator
+
+
+def has_subprocess_support():
+    return False
+
+
+def has_socket_support():
+    try:
+        import socket  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def get_signal_name(signum):
+    """Look up signal name by number, or return numeric string."""
+    try:
+        import signal
+        for name in dir(signal):
+            if name.startswith('SIG') and not name.startswith('SIG_'):
+                if getattr(signal, name, None) == signum:
+                    return name
+    except Exception:
+        pass
+    return str(signum)
+
+
+# Many CPython test files pull in narrow architecture/platform skip
+# decorators from test.support. Enumerate the common ones so they import.
+def _make_skip(reason):
+    def decorator(test):
+        return unittest.skip(reason)(test)
+    return decorator
+
+
+skip_on_s390x = _make_skip("s390x-specific test")
+skip_emscripten_stack_overflow = _make_skip("emscripten-specific")
+skip_wasi_stack_overflow = _make_skip("wasi-specific")
+skip_if_buildbot = _make_skip("buildbot-specific")
+skip_if_buggy_ucrt_strfptime = _make_skip("ucrt-specific")
+skip_if_pgo_task = _make_skip("PGO-specific")
+skip_if_sanitizer_msan = _make_skip("MSAN-specific")
+skip_unless_xattr = _make_skip("xattr not available")
+skip_unless_symlink = _make_skip("symlink not supported")
+skip_unless_bind_unix_socket = _make_skip("unix bind not supported")
+
+
+# Catch-all: many CPython test files import narrow predicate decorators
+# from test.support that we don't model. Python's module __getattr__ hook
+# (PEP 562) is used to manufacture defaults so the import succeeds.
+#
+# Important: default `requires_*` to NO-OP (test runs as-is). Defaulting
+# to skip would silently disable hundreds of tests that don't actually
+# need the missing feature for their assertions to be valid on M28.
+# Specific architecture/platform skips above stay as real skips.
+def _noop_decorator(name):
+    def decorator(test_or_obj):
+        return test_or_obj
+    decorator.__name__ = name
+    return decorator
+
+
+def __getattr__(name):
+    if (name.startswith('requires_') or name.startswith('skip_unless_')):
+        return _noop_decorator(name)
+    if name.startswith('skip_if_') or name.startswith('skip_on_'):
+        return _make_skip(f"{name} not implemented in M28 test stub")
+    if name.startswith('is_') or name.startswith('has_'):
+        return False
+    raise AttributeError(f"module 'test.support' has no attribute {name!r}")
+
+
 def get_c_recursion_limit():
     """Approximate CPython's C recursion limit. M28 doesn't enforce it."""
     return 1500

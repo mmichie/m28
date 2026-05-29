@@ -10,7 +10,75 @@ func Init_ContextvarsModule() *core.DictValue {
 	contextvarsModule := core.NewDict()
 
 	// ContextVar - class for context variables
+	//   ContextVar(name, *, default=MISSING)
+	// Stores the name as __name__ and the default (or sentinel) for later get().
 	contextVarClass := core.NewClass("ContextVar", nil)
+	contextVarMissing := core.NewDict() // sentinel for "no default"
+	contextVarClass.SetMethod("__init__", &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "ContextVar.__init__",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 2 {
+				return nil, &core.TypeError{Message: "ContextVar() takes a name argument"}
+			}
+			self, ok := args[0].(*core.Instance)
+			if !ok {
+				return core.None, nil
+			}
+			self.Attributes["__name__"] = args[1]
+			self.Attributes["_value"] = core.Value(contextVarMissing)
+			if def, ok := kwargs["default"]; ok {
+				self.Attributes["_default"] = def
+			} else {
+				self.Attributes["_default"] = core.Value(contextVarMissing)
+			}
+			return core.None, nil
+		},
+	})
+	contextVarClass.SetMethod("get", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, &core.TypeError{Message: "get() missing self"}
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		// If a current value has been set, return it
+		if v, ok := self.Attributes["_value"]; ok && v != core.Value(contextVarMissing) {
+			return v, nil
+		}
+		// Else fall back to explicit get(default) argument, then __init__ default
+		if len(args) >= 2 {
+			return args[1], nil
+		}
+		if d, ok := self.Attributes["_default"]; ok && d != core.Value(contextVarMissing) {
+			return d, nil
+		}
+		return nil, &core.AttributeError{ObjType: "ContextVar", AttrName: "value"}
+	}))
+	contextVarClass.SetMethod("set", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, &core.TypeError{Message: "set() requires a value"}
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		oldValue := self.Attributes["_value"]
+		self.Attributes["_value"] = args[1]
+		return oldValue, nil
+	}))
+	contextVarClass.SetMethod("reset", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return core.None, nil
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return core.None, nil
+		}
+		self.Attributes["_value"] = args[1]
+		return core.None, nil
+	}))
 	contextvarsModule.SetWithKey("ContextVar", core.StringValue("ContextVar"), contextVarClass)
 
 	// Context - class representing an execution context

@@ -732,7 +732,10 @@ func (p *PythonParser) parseChainedAssignment(target ast.ASTNode) ast.ASTNode {
 
 // parseAssignmentValue parses the right-hand side of an assignment, handling tuple formation
 func (p *PythonParser) parseAssignmentValue(tok Token) ast.ASTNode {
-	expr := p.parseExpression()
+	// parseListElement permits `*expr` for unpacking inside the implicit tuple
+	// on the RHS, e.g. `args = *args, *kwargs.values()`. If there's no comma
+	// afterwards it's just a normal expression.
+	expr := p.parseListElement()
 
 	// Check for comma on right side (tuple formation)
 	if !p.check(TOKEN_COMMA) {
@@ -749,7 +752,7 @@ func (p *PythonParser) parseAssignmentValue(tok Token) ast.ASTNode {
 			hasTrailingComma = true
 			break
 		}
-		elements = append(elements, p.parseExpression())
+		elements = append(elements, p.parseListElement())
 	}
 
 	// Create tuple for right side
@@ -1078,6 +1081,14 @@ func (p *PythonParser) validateAssignmentTarget(target ast.ASTNode) string {
 		return ""
 
 	case *ast.Literal:
+		// Empty list/tuple as target is valid: `[] = iter` exhausts the iterator
+		// (degenerate unpacking with zero targets).
+		if lst, ok := n.Value.(*core.ListValue); ok && lst.Len() == 0 {
+			return ""
+		}
+		if tup, ok := n.Value.(core.TupleValue); ok && len(tup) == 0 {
+			return ""
+		}
 		// Literals cannot be assigned to
 		return "cannot assign to literal here. Maybe you meant '==' instead of '='?"
 

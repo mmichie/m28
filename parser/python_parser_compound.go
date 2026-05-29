@@ -990,14 +990,18 @@ func (p *PythonParser) parseWithStatementWithAsync(isAsync bool) ast.ASTNode {
 		var target ast.ASTNode
 		if p.check(TOKEN_AS) {
 			p.advance()
-			// Check if target is a tuple (starts with LPAREN) or simple identifier
-			if p.check(TOKEN_LPAREN) {
-				// Parse tuple unpacking: (a, b, c)
-				target = p.parsePrimary()
-			} else {
-				// Simple identifier
-				varTok := p.expect(TOKEN_IDENTIFIER)
-				variable = varTok.Lexeme
+			// Parse the as-target. In Python the target can be:
+			//   - a plain name:  with X as v:
+			//   - an attribute:  with X as self.foo:
+			//   - a subscript:   with X as d['key']:
+			//   - a tuple:       with X as (a, b):
+			// Use parsePostfix so primary + dot/subscript chains are accepted.
+			// If it ends up as a bare Identifier, keep the simple Variable path
+			// (the eval side has a fast path for that).
+			target = p.parsePostfix()
+			if ident, ok := target.(*ast.Identifier); ok {
+				variable = ident.Name
+				target = nil
 			}
 		}
 
