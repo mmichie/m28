@@ -134,5 +134,49 @@ func InitOpcodeModule() *core.DictValue {
 		return core.NumberValue(0), nil
 	}))
 
+	// Helper to make a predicate that returns False unconditionally. The opcode.py
+	// module uses these to classify CPython bytecodes (has_arg, has_const, etc).
+	// M28 doesn't interpret CPython bytecode, so returning False is harmless: the
+	// resulting opcode classification lists (hasarg, hasconst, etc.) will simply
+	// be empty, which is correct because no operation in M28 produces these ops.
+	stubPredicate := func(name string) core.Value {
+		return core.NewNamedBuiltinFunction(name, func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.BoolValue(false), nil
+		})
+	}
+	module.Set("has_arg", stubPredicate("has_arg"))
+	module.Set("has_const", stubPredicate("has_const"))
+	module.Set("has_name", stubPredicate("has_name"))
+	module.Set("has_jump", stubPredicate("has_jump"))
+	module.Set("has_free", stubPredicate("has_free"))
+	module.Set("has_local", stubPredicate("has_local"))
+	module.Set("has_exc", stubPredicate("has_exc"))
+	module.Set("is_valid", stubPredicate("is_valid"))
+
+	// get_intrinsic1_descs / get_intrinsic2_descs / get_nb_ops return tuples of
+	// strings describing CPython intrinsic calls and numeric binary ops. They're
+	// used by opcode.py to construct lookup tables; empty tuples keep those tables
+	// empty without raising errors.
+	emptyTupleFn := func(name string) core.Value {
+		return core.NewNamedBuiltinFunction(name, func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.TupleValue{}, nil
+		})
+	}
+	module.Set("get_intrinsic1_descs", emptyTupleFn("get_intrinsic1_descs"))
+	module.Set("get_intrinsic2_descs", emptyTupleFn("get_intrinsic2_descs"))
+	module.Set("get_nb_ops", emptyTupleFn("get_nb_ops"))
+
+	// ENABLE_SPECIALIZATION is a build-time flag - report as False (no specialization)
+	module.Set("ENABLE_SPECIALIZATION", core.BoolValue(false))
+
+	// get_executor / get_specialization_stats - tier 2 interpreter introspection.
+	// M28 has no tier 2; these always return None so dis.py's import doesn't fail.
+	module.Set("get_executor", core.NewNamedBuiltinFunction("get_executor", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.None, nil
+	}))
+	module.Set("get_specialization_stats", core.NewNamedBuiltinFunction("get_specialization_stats", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.None, nil
+	}))
+
 	return module
 }

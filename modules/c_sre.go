@@ -9,6 +9,320 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// buildSreMatchObject constructs a Match-like dict for a single regex match,
+// suitable for passing to a callable repl in pattern.sub().
+// `m` is the FindAllStringSubmatchIndex slice for one match:
+//
+//	[matchStart, matchEnd, g1Start, g1End, g2Start, g2End, ...]
+func buildSreMatchObject(input string, m []int, groupNames []string) *core.DictValue {
+	matchText := input[m[0]:m[1]]
+	matchObj := core.NewDict()
+	// Capture groups as a slice for use by start()/end() — these are methods in
+	// Python's match object, not attributes.
+	groupSpan := func(groupArg core.Value) (int, int, error) {
+		switch g := groupArg.(type) {
+		case core.NumberValue:
+			idx := int(g)
+			if idx < 0 || 2*idx+1 >= len(m) {
+				return 0, 0, fmt.Errorf("no such group")
+			}
+			return m[2*idx], m[2*idx+1], nil
+		case core.StringValue:
+			name := string(g)
+			for i, n := range groupNames {
+				if n == name {
+					if 2*i+1 < len(m) {
+						return m[2*i], m[2*i+1], nil
+					}
+					return 0, 0, fmt.Errorf("no such group")
+				}
+			}
+			return 0, 0, fmt.Errorf("no such group: %q", name)
+		default:
+			return 0, 0, fmt.Errorf("group argument must be int or str")
+		}
+	}
+	matchObj.Set("start", core.NewNamedBuiltinFunction("start", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		var arg core.Value = core.NumberValue(0)
+		if len(args) > 0 {
+			arg = args[0]
+		}
+		s, _, err := groupSpan(arg)
+		if err != nil {
+			return nil, err
+		}
+		return core.NumberValue(float64(s)), nil
+	}))
+	matchObj.Set("end", core.NewNamedBuiltinFunction("end", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		var arg core.Value = core.NumberValue(0)
+		if len(args) > 0 {
+			arg = args[0]
+		}
+		_, e, err := groupSpan(arg)
+		if err != nil {
+			return nil, err
+		}
+		return core.NumberValue(float64(e)), nil
+	}))
+	// Capture all groups including the full match (index 0)
+	allGroups := make([]string, len(m)/2)
+	groupPresent := make([]bool, len(m)/2)
+	for i := 0; i < len(m)/2; i++ {
+		if m[2*i] >= 0 {
+			allGroups[i] = input[m[2*i]:m[2*i+1]]
+			groupPresent[i] = true
+		}
+	}
+	matchObj.Set("group", core.NewNamedBuiltinFunction("group", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.StringValue(matchText), nil
+		}
+		results := make([]core.Value, 0, len(args))
+		for _, arg := range args {
+			switch g := arg.(type) {
+			case core.NumberValue:
+				idx := int(g)
+				if idx < 0 || idx >= len(allGroups) {
+					return nil, fmt.Errorf("no such group")
+				}
+				if !groupPresent[idx] {
+					results = append(results, core.None)
+				} else {
+					results = append(results, core.StringValue(allGroups[idx]))
+				}
+			case core.StringValue:
+				name := string(g)
+				idx := -1
+				for i, n := range groupNames {
+					if n == name {
+						idx = i
+						break
+					}
+				}
+				if idx < 0 {
+					return nil, fmt.Errorf("no such group: %q", name)
+				}
+				if !groupPresent[idx] {
+					results = append(results, core.None)
+				} else {
+					results = append(results, core.StringValue(allGroups[idx]))
+				}
+			default:
+				return nil, fmt.Errorf("group() argument must be int or str")
+			}
+		}
+		if len(results) == 1 {
+			return results[0], nil
+		}
+		return core.TupleValue(results), nil
+	}))
+	matchObj.Set("groups", core.NewNamedBuiltinFunction("groups", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		def := core.Value(core.None)
+		if len(args) > 0 {
+			def = args[0]
+		}
+		result := make(core.TupleValue, 0, len(allGroups)-1)
+		for i := 1; i < len(allGroups); i++ {
+			if groupPresent[i] {
+				result = append(result, core.StringValue(allGroups[i]))
+			} else {
+				result = append(result, def)
+			}
+		}
+		return result, nil
+	}))
+	matchObj.Set("groupdict", core.NewNamedBuiltinFunction("groupdict", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		def := core.Value(core.None)
+		if len(args) > 0 {
+			def = args[0]
+		}
+		d := core.NewDict()
+		for i, name := range groupNames {
+			if name == "" || i == 0 {
+				continue
+			}
+			if i >= len(allGroups) {
+				continue
+			}
+			if groupPresent[i] {
+				d.Set(name, core.StringValue(allGroups[i]))
+			} else {
+				d.Set(name, def)
+			}
+		}
+		return d, nil
+	}))
+	matchObj.Set("span", core.NewNamedBuiltinFunction("span", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.TupleValue{core.NumberValue(float64(m[0])), core.NumberValue(float64(m[1]))}, nil
+	}))
+	return matchObj
+}
+
+// expandSreReplacement processes Python-style backreferences in a sub() replacement
+// string: \1 .. \99 for numbered groups, \g<name> / \g<n> for named groups,
+// and \\ for a literal backslash.
+func expandSreReplacement(repl string, input string, m []int, groupNames []string) string {
+	var out strings.Builder
+	for i := 0; i < len(repl); i++ {
+		ch := repl[i]
+		if ch != '\\' {
+			out.WriteByte(ch)
+			continue
+		}
+		// Backslash escape
+		if i+1 >= len(repl) {
+			out.WriteByte('\\')
+			continue
+		}
+		next := repl[i+1]
+		switch {
+		case next == '\\':
+			out.WriteByte('\\')
+			i++
+		case next == 'n':
+			out.WriteByte('\n')
+			i++
+		case next == 't':
+			out.WriteByte('\t')
+			i++
+		case next == 'r':
+			out.WriteByte('\r')
+			i++
+		case next >= '0' && next <= '9':
+			// \N or \NN — numbered group reference
+			end := i + 2
+			if end < len(repl) && repl[end] >= '0' && repl[end] <= '9' {
+				end++
+			}
+			n := 0
+			for j := i + 1; j < end; j++ {
+				n = n*10 + int(repl[j]-'0')
+			}
+			if 2*n+1 < len(m) && m[2*n] >= 0 {
+				out.WriteString(input[m[2*n]:m[2*n+1]])
+			}
+			i = end - 1
+		case next == 'g' && i+2 < len(repl) && repl[i+2] == '<':
+			// \g<name> or \g<n>
+			end := i + 3
+			for end < len(repl) && repl[end] != '>' {
+				end++
+			}
+			if end >= len(repl) {
+				out.WriteByte('\\')
+				continue
+			}
+			ref := repl[i+3 : end]
+			n := -1
+			// Try numeric
+			isNum := len(ref) > 0
+			for _, c := range ref {
+				if c < '0' || c > '9' {
+					isNum = false
+					break
+				}
+			}
+			if isNum {
+				for _, c := range ref {
+					n = max(n, 0)*10 + int(c-'0')
+				}
+			} else {
+				for j, name := range groupNames {
+					if name == ref {
+						n = j
+						break
+					}
+				}
+			}
+			if n >= 0 && 2*n+1 < len(m) && m[2*n] >= 0 {
+				out.WriteString(input[m[2*n]:m[2*n+1]])
+			}
+			i = end
+		default:
+			out.WriteByte('\\')
+			out.WriteByte(next)
+			i++
+		}
+	}
+	return out.String()
+}
+
+// compilePythonRegex turns a Python regex pattern string + flags integer into a
+// Go *regexp.Regexp. It mirrors the transformations applied in findall/sub/etc.
+// to handle Python flags (IGNORECASE, MULTILINE, DOTALL, VERBOSE) and a handful
+// of common features Go's regexp doesn't support natively (lookaheads).
+func compilePythonRegex(patternStr string, flags int) (*regexp.Regexp, error) {
+	goPattern := patternStr
+
+	// Handle VERBOSE flag (64) - strip comments and whitespace
+	if flags&64 != 0 {
+		goPattern = processVerbosePattern(goPattern)
+	}
+
+	// Apply Python regex flags as Go inline flags
+	// Python flags: IGNORECASE=2, MULTILINE=8, DOTALL=16, VERBOSE=64
+	flagPrefix := ""
+	if flags&2 != 0 {
+		flagPrefix += "i"
+	}
+	if flags&8 != 0 {
+		flagPrefix += "m"
+	}
+	if flags&16 != 0 {
+		flagPrefix += "s"
+	}
+	if flagPrefix != "" {
+		goPattern = "(?" + flagPrefix + ")" + goPattern
+	}
+
+	// Common lookahead simplifications (best-effort)
+	if strings.Contains(goPattern, `(?=\s|$)`) {
+		goPattern = strings.ReplaceAll(goPattern, `+(?=\s|$)`, ``)
+	}
+	if strings.Contains(goPattern, `(?=\S)`) {
+		goPattern = strings.ReplaceAll(goPattern, `(?=\S)`, `\S`)
+	}
+
+	// Python's scoped flag syntax `(?a:pattern)`, `(?i:pattern)`, etc. — Go's RE2
+	// doesn't support these. Rewrite them to non-capturing groups; for `a` (ASCII)
+	// we just drop the flag since the inner pattern usually uses [a-z] explicitly.
+	for _, scoped := range []string{"a", "i", "L", "m", "s", "u", "x"} {
+		marker := "(?" + scoped + ":"
+		for {
+			idx := strings.Index(goPattern, marker)
+			if idx < 0 {
+				break
+			}
+			goPattern = goPattern[:idx] + "(?:" + goPattern[idx+len(marker):]
+		}
+	}
+
+	// Strip negative lookahead (?!...) — Go's RE2 doesn't support it
+	for strings.Contains(goPattern, `(?!`) {
+		start := strings.Index(goPattern, `(?!`)
+		if start < 0 {
+			break
+		}
+		depth := 1
+		end := start + 3
+		for end < len(goPattern) && depth > 0 {
+			if goPattern[end] == '(' {
+				depth++
+			} else if goPattern[end] == ')' {
+				depth--
+			}
+			end++
+		}
+		if depth == 0 {
+			goPattern = goPattern[:start] + goPattern[end:]
+		} else {
+			break
+		}
+	}
+
+	return regexp.Compile(goPattern)
+}
+
 // processVerbosePattern converts a VERBOSE mode regex pattern to a standard pattern
 // by stripping comments (# to end of line) and unescaped whitespace
 func processVerbosePattern(pattern string) string {
@@ -568,13 +882,95 @@ func Init_SREModule() *core.DictValue {
 		}))
 
 		pattern.SetValue(core.StringValue("sub"), core.NewNamedBuiltinFunction("sub", func(subArgs []core.Value, subCtx *core.Context) (core.Value, error) {
-			// Just return the original string for now
-			if len(subArgs) >= 2 {
-				if str, ok := subArgs[1].(core.StringValue); ok {
-					return str, nil
+			// Python: pattern.sub(repl, string, count=0)
+			// repl may be a string (with backrefs) or a callable that takes a Match
+			if len(subArgs) < 2 {
+				return nil, fmt.Errorf("sub() takes at least 2 arguments")
+			}
+			repl := subArgs[0]
+			var input string
+			switch v := subArgs[1].(type) {
+			case core.StringValue:
+				input = string(v)
+			case core.BytesValue:
+				input = string(v)
+			default:
+				return nil, fmt.Errorf("sub() second argument must be a string, not %s", subArgs[1].Type())
+			}
+			count := 0
+			if len(subArgs) >= 3 {
+				if n, ok := subArgs[2].(core.NumberValue); ok {
+					count = int(n)
 				}
 			}
-			return core.StringValue(""), nil
+
+			// Get pattern string and flags from the closed-over pattern dict
+			patternKey := core.ValueToKey(core.StringValue("pattern"))
+			patternVal, ok := pattern.Get(patternKey)
+			if !ok {
+				return nil, fmt.Errorf("pattern object has no pattern string")
+			}
+			patternStr, ok := patternVal.(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("pattern must be a string")
+			}
+			flagsKey := core.ValueToKey(core.StringValue("flags"))
+			flagsVal, _ := pattern.Get(flagsKey)
+			flags := 0
+			if f, ok := flagsVal.(core.NumberValue); ok {
+				flags = int(f)
+			}
+
+			re, err := compilePythonRegex(string(patternStr), flags)
+			if err != nil {
+				return core.StringValue(input), nil
+			}
+
+			// Find match indices (with submatches) so we can build the result
+			matches := re.FindAllStringSubmatchIndex(input, -1)
+			if len(matches) == 0 {
+				return core.StringValue(input), nil
+			}
+			if count > 0 && count < len(matches) {
+				matches = matches[:count]
+			}
+
+			// Group names from the compiled pattern
+			groupNames := re.SubexpNames()
+
+			callable, isCallable := repl.(core.Callable)
+
+			var out strings.Builder
+			prev := 0
+			for _, m := range matches {
+				start, end := m[0], m[1]
+				out.WriteString(input[prev:start])
+
+				var replacement string
+				if isCallable {
+					// Build a Match-like object and call the replacement
+					matchObj := buildSreMatchObject(input, m, groupNames)
+					result, err := callable.Call([]core.Value{matchObj}, subCtx)
+					if err != nil {
+						return nil, err
+					}
+					if s, ok := result.(core.StringValue); ok {
+						replacement = string(s)
+					} else {
+						replacement = fmt.Sprintf("%v", result)
+					}
+				} else if rs, ok := repl.(core.StringValue); ok {
+					// Process Python-style backreferences in the replacement string
+					replacement = expandSreReplacement(string(rs), input, m, groupNames)
+				} else {
+					return nil, fmt.Errorf("sub() repl must be string or callable, not %s", repl.Type())
+				}
+
+				out.WriteString(replacement)
+				prev = end
+			}
+			out.WriteString(input[prev:])
+			return core.StringValue(out.String()), nil
 		}))
 
 		pattern.SetValue(core.StringValue("split"), core.NewNamedBuiltinFunction("split", func(splitArgs []core.Value, splitCtx *core.Context) (core.Value, error) {

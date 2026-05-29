@@ -41,8 +41,13 @@ var builtinModules = map[string]ModuleInitializer{
 	"_warnings":                  Init_WarningsModule,                // C extension stub for warnings.py (provides _defaultaction etc.)
 	"_heapq":                     Init_HeapqModule,                   // C extension module for heapq.py (priority queue)
 	"_locale":                    Init_LocaleModule,                  // C extension module for locale support (UTF-8 defaults)
-	"_frozen_importlib":          Init_FrozenImportlibModule,         // C extension stub for CPython's frozen import machinery
-	"_frozen_importlib_external": Init_FrozenImportlibExternalModule, // C extension stub for CPython's frozen external import machinery
+	// _frozen_importlib / _frozen_importlib_external are intentionally NOT registered.
+	// CPython provides them as frozen modules containing the import bootstrap code.
+	// M28 has its own import system, so we let `import _frozen_importlib` raise
+	// ImportError (via cExtensionModules check). This lets importlib/__init__.py
+	// fall back to its `except ImportError` branch that loads importlib/_bootstrap.py
+	// directly - that pure-Python file has __import__, ModuleSpec, BuiltinImporter,
+	// FrozenImporter, etc. as real Python objects.
 	"marshal":                    InitMarshalModule,                  // C extension module for bytecode serialization
 	"_opcode":                    InitOpcodeModule,                   // C extension module for bytecode opcodes
 	"_operator":                  InitOperatorModule,                 // C extension module for operator functions

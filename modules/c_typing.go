@@ -116,5 +116,13 @@ func Init_TypingModule() *core.DictValue {
 	genericClass := core.NewClass("Generic", nil)
 	typingModule.SetWithKey("Generic", core.StringValue("Generic"), genericClass)
 
+	// NoDefault - sentinel singleton used by typing.py to distinguish
+	// "no default" from a default of None for TypeVars/ParamSpecs.
+	// CPython exposes it as a unique instance of NoDefaultType; the value
+	// identity is what matters, so a unique dict serves the purpose.
+	noDefaultType := core.NewClass("NoDefaultType", nil)
+	noDefault := core.NewInstance(noDefaultType)
+	typingModule.SetWithKey("NoDefault", core.StringValue("NoDefault"), noDefault)
+
 	return typingModule
 }
