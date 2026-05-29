@@ -128,6 +128,25 @@ func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
 	return nil, nil, false
 }
 
+// classInheritsType returns true if cls is the `type` metaclass or transitively
+// inherits from it. Used by Super.GetAttr to decide whether to fall back to
+// parent.GetAttr for dunder methods (which are provided by type's defaults,
+// not in any Methods/Attributes map).
+func classInheritsType(cls *Class) bool {
+	if cls == nil {
+		return false
+	}
+	if cls.Name == "type" {
+		return true
+	}
+	for _, p := range cls.Parents {
+		if classInheritsType(p) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsSubclass checks if child is a subclass of parent (strict or not)
 // Returns true if child == parent or child inherits from parent
 func IsSubclass(child, parent *Class) bool {
@@ -2003,22 +2022,25 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 				}
 				return bindMethod(attr, parent, name), true
 			}
-			// Also check GetAttr for built-in methods like type.__init__
-			// Only do this for metaclasses (type and its subclasses)
-			if name == "__init__" && parent.Name == "type" {
-				if method, ok := parent.GetAttr(name); ok {
-					if debugSuperGetAttr {
-						fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via %s.GetAttr (type metaclass)\n", name, parent.Name)
-					}
-					return bindMethod(method, parent, name), true
-				}
-			}
 			// Recursively check parent's parents
 			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
 				if debugSuperGetAttr {
 					fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via %s.GetMethodWithClass (defined in %s)\n", name, parent.Name, defClass.Name)
 				}
 				return bindMethod(method, defClass, name), true
+			}
+			// Fall back to parent.GetAttr for built-in dunder methods like
+			// type.__init__ / type.__call__ / type.__new__. These are provided
+			// by Class.GetAttr's default handlers and aren't in Methods/Attributes.
+			// This makes super().__init__() work in metaclasses that inherit
+			// through other metaclasses (e.g. _ProtocolMeta → ABCMeta → type).
+			if strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") && classInheritsType(parent) {
+				if method, ok := parent.GetAttr(name); ok {
+					if debugSuperGetAttr {
+						fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via %s.GetAttr (metaclass)\n", name, parent.Name)
+					}
+					return bindMethod(method, parent, name), true
+				}
 			}
 		}
 	} else {
