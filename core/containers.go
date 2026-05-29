@@ -96,11 +96,12 @@ func (l *ListValue) String() string {
 		return "[]"
 	}
 
-	// Use cycle detection to prevent infinite recursion
+	// Python's str(list) == repr(list); both use repr() on each element so
+	// strings inside print as 'foo' (single-quoted, Python default).
 	return withCycleDetection(uintptr(unsafe.Pointer(l)), func() string {
 		elements := make([]string, len(l.items))
 		for i, v := range l.items {
-			elements[i] = PrintValue(v)
+			elements[i] = Repr(v)
 		}
 		return "[" + strings.Join(elements, ", ") + "]"
 	})
@@ -620,16 +621,18 @@ func (t TupleValue) Type() Type {
 
 // String implements Value.String
 func (t TupleValue) String() string {
+	// In Python, str(tuple) == repr(tuple) - both use repr() on each element.
+	// This produces single-quoted strings (Python default), matching CPython.
 	if len(t) == 0 {
 		return "()"
 	}
 	if len(t) == 1 {
-		return "(" + PrintValue(t[0]) + ",)"
+		return "(" + Repr(t[0]) + ",)"
 	}
 
 	elements := make([]string, len(t))
 	for i, v := range t {
-		elements[i] = PrintValue(v)
+		elements[i] = Repr(v)
 	}
 	return "(" + strings.Join(elements, ", ") + ")"
 }

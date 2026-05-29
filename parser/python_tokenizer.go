@@ -1054,6 +1054,16 @@ func (t *PythonTokenizer) scanString(quote byte, start, startLine, startCol int)
 					value.WriteByte('\t')
 				case 'r':
 					value.WriteByte('\r')
+				case 'a':
+					value.WriteByte('\a')
+				case 'b':
+					value.WriteByte('\b')
+				case 'f':
+					value.WriteByte('\f')
+				case 'v':
+					value.WriteByte('\v')
+				case '0':
+					value.WriteByte(0)
 				case '\\':
 					value.WriteByte('\\')
 				case '\'':
@@ -1172,6 +1182,14 @@ func (t *PythonTokenizer) scanBytesString(quote byte, start, startLine, startCol
 					value = append(value, '\t')
 				case 'r':
 					value = append(value, '\r')
+				case 'a':
+					value = append(value, '\a')
+				case 'b':
+					value = append(value, '\b')
+				case 'f':
+					value = append(value, '\f')
+				case 'v':
+					value = append(value, '\v')
 				case '\\':
 					value = append(value, '\\')
 				case '\'':
