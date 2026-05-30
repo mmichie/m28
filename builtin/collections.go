@@ -8,6 +8,40 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// classmethodValue is a descriptor that, when accessed on a class, binds the class
+// as the first argument to the wrapped function (similar to Python's classmethod).
+type classmethodValue struct {
+	core.BaseObject
+	fn func([]core.Value, *core.Context) (core.Value, error)
+}
+
+func (c *classmethodValue) Type() core.Type  { return "classmethod_descriptor" }
+func (c *classmethodValue) String() string   { return "<classmethod_descriptor>" }
+func (c *classmethodValue) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	return c.fn(args, ctx)
+}
+func (c *classmethodValue) GetAttr(name string) (core.Value, bool) {
+	if name == "__get__" {
+		fn := c.fn
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// args = [instance_or_None, owner_class]
+			// When accessed as class attribute: args = [None, owner_class]
+			if len(args) >= 2 {
+				cls := args[1]
+				// Return a bound function that prepends cls
+				return core.NewBuiltinFunction(func(innerArgs []core.Value, innerCtx *core.Context) (core.Value, error) {
+					newArgs := make([]core.Value, len(innerArgs)+1)
+					newArgs[0] = cls
+					copy(newArgs[1:], innerArgs)
+					return fn(newArgs, innerCtx)
+				}), nil
+			}
+			return core.NewBuiltinFunction(fn), nil
+		}), true
+	}
+	return nil, false
+}
+
 // convertToSlice converts an iterable value to a slice of values
 // This is shared logic for list(), tuple(), and set() constructors
 func convertToSlice(arg core.Value) ([]core.Value, error) {
@@ -895,12 +929,25 @@ func createDictClass() *DictType {
 
 	// Add fromkeys class method
 	// dict.fromkeys(iterable, value=None) -> new dict with keys from iterable
-	class.SetMethod("fromkeys", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// fromkeys is a classmethod; when called on an instance (e.g. d.fromkeys(...))
-		// M28 prepends the instance/dict as args[0]. Skip it.
+	fromkeysImpl := func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// fromkeys is a classmethod. M28 prepends the class/instance as args[0].
+		// Extract cls (the class to create) from args[0], then get the iterable.
+		var cls core.Value // the class to instantiate (or nil → use plain dict)
 		if len(args) > 0 {
-			switch args[0].(type) {
-			case *core.DictValue, *core.Instance, *DictType, *core.Class:
+			switch v := args[0].(type) {
+			case *DictType:
+				cls = nil // plain dict
+				args = args[1:]
+			case *core.Class:
+				cls = v
+				args = args[1:]
+			case *core.DictValue:
+				cls = nil
+				args = args[1:]
+			case *core.Instance:
+				if v.BackingDict != nil {
+					cls = v.Class // use the instance's class
+				}
 				args = args[1:]
 			}
 		}
@@ -914,11 +961,7 @@ func createDictClass() *DictType {
 			value = args[1]
 		}
 
-		dict := core.NewDict()
-
-		// Iterate over the input. Dicts iterate over their keys; other
-		// iterables (including dict subclass instances via BackingDict)
-		// go through the iterator protocol.
+		// Collect keys from iterable
 		var keys []core.Value
 		var err error
 		switch v := iterable.(type) {
@@ -928,21 +971,54 @@ func createDictClass() *DictType {
 			if v.BackingDict != nil {
 				keys = v.BackingDict.OriginalKeys()
 			} else {
-				keys, err = convertToSlice(iterable)
+				keys, err = core.IterableValuesCtx(iterable, ctx)
 			}
 		default:
-			keys, err = convertToSlice(iterable)
+			keys, err = core.IterableValuesCtx(iterable, ctx)
 		}
 		if err != nil {
 			return nil, err
 		}
+
+		// Create the result container - use the class if provided, else plain dict
+		if cls != nil {
+			if callable, ok := cls.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				result, err := callable.Call([]core.Value{}, ctx)
+				if err != nil {
+					return nil, err
+				}
+				// Populate the result using __setitem__ for proper subclass support
+				for _, key := range keys {
+					if found, setErr := types.CallSetItem(result, key, value, ctx); found {
+						if setErr != nil {
+							return nil, setErr
+						}
+					} else if resultDict, ok := result.(*core.DictValue); ok {
+						if setErr := resultDict.SetValue(key, value); setErr != nil {
+							return nil, setErr
+						}
+					}
+				}
+				return result, nil
+			}
+		}
+
+		// Fall back to plain dict
+		dict := core.NewDict()
 		for _, key := range keys {
 			if err := dict.SetValue(key, value); err != nil {
 				return nil, err
 			}
 		}
 		return dict, nil
-	}))
+	}
+	// Wrap the fromkeys impl as a classmethod descriptor so that
+	// dictlike.fromkeys('a') → fromkeys(dictlike, 'a')
+	class.SetMethod("fromkeys", &classmethodValue{
+		fn: fromkeysImpl,
+	})
 
 	return &DictType{Class: class}
 }

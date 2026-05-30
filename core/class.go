@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -961,12 +960,8 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 					if c.Name == "TestProgram" {
 						Log.Debug(SubsystemEval, "Class __init__ returned error", "class", c.Name, "error", err)
 					}
-					// Check if it's SystemExit - propagate it without wrapping
-					var sysExit *SystemExit
-					if errors.As(err, &sysExit) {
-						return nil, err
-					}
-					return nil, fmt.Errorf("error in %s.__init__: %w", c.Name, err)
+					// Propagate all errors from __init__ without wrapping
+					return nil, err
 				}
 			} else if callable, ok := initMethod.(interface {
 				Call([]Value, *Context) (Value, error)
@@ -978,12 +973,8 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				}
 				_, err := callable.Call(initArgs, initCtx)
 				if err != nil {
-					// Check if it's SystemExit - propagate it without wrapping
-					var sysExit *SystemExit
-					if errors.As(err, &sysExit) {
-						return nil, err
-					}
-					return nil, fmt.Errorf("error in %s.__init__: %w", c.Name, err)
+					// Propagate all errors from __init__ without wrapping
+					return nil, err
 				}
 			}
 		}
