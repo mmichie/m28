@@ -34,9 +34,26 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 				if boolResult, ok := result.(BoolValue); ok {
 					return bool(boolResult), nil
 				}
-				// NotImplemented should fall back to identity comparison
+				// NotImplemented should try reflected operation
 				if result == NotImplemented {
+					// Try b.__eq__(a) if b is an instance
 					if bInst, ok := b.(*Instance); ok {
+						if eqMethodB, ok := bInst.GetAttr("__eq__"); ok {
+							if callableB, ok := eqMethodB.(interface {
+								Call([]Value, *Context) (Value, error)
+							}); ok {
+								resultB, errB := callableB.Call([]Value{a}, ctx)
+								if errB != nil {
+									return false, errB
+								}
+								if resultB != NotImplemented {
+									if boolResult, ok := resultB.(BoolValue); ok {
+										return bool(boolResult), nil
+									}
+									return IsTruthy(resultB), nil
+								}
+							}
+						}
 						return aInst == bInst, nil
 					}
 					return false, nil
@@ -94,6 +111,51 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 	return EqualValues(a, b), nil
 }
 
+// equalWithReflection compares two values with full Python __eq__ semantics including
+// reflected operation (b.__eq__(a) when a.__eq__(b) returns NotImplemented).
+// Used for dict value comparison where Python semantics require reflection.
+func equalWithReflection(a, b Value, ctx *Context) (bool, error) {
+	// First try a.__eq__(b)
+	if aInst, ok := a.(*Instance); ok {
+		if eqMethod, ok := aInst.GetAttr("__eq__"); ok {
+			if callable, ok := eqMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				result, err := callable.Call([]Value{b}, ctx)
+				if err != nil {
+					return false, err
+				}
+				if result != NotImplemented {
+					if boolResult, ok := result.(BoolValue); ok {
+						return bool(boolResult), nil
+					}
+					return IsTruthy(result), nil
+				}
+			}
+		}
+	}
+	// Try b.__eq__(a) (reflected)
+	if bInst, ok := b.(*Instance); ok {
+		if eqMethod, ok := bInst.GetAttr("__eq__"); ok {
+			if callable, ok := eqMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				result, err := callable.Call([]Value{a}, ctx)
+				if err != nil {
+					return false, err
+				}
+				if result != NotImplemented {
+					if boolResult, ok := result.(BoolValue); ok {
+						return bool(boolResult), nil
+					}
+					return IsTruthy(result), nil
+				}
+			}
+		}
+	}
+	return EqualValues(a, b), nil
+}
+
 // DictEqualWithError compares two dicts for equality, propagating errors from key/value __eq__.
 // It uses the full Python equality semantics: for each key k1 in d1, finds k2 in d2 with
 // k1==k2 (using __eq__), then checks if the values are equal.
@@ -109,8 +171,8 @@ func DictEqualWithError(d1, d2 *DictValue, ctx *Context) (bool, error) {
 		}
 		// Try direct key lookup first (fast path for non-instance keys)
 		if v2, exists := d2.entries[internalKey]; exists {
-			// Keys match by string representation, compare values
-			eq, err := EqualValuesWithError(v1, v2, ctx)
+			// Keys match by string representation, compare values with full Python semantics
+			eq, err := equalWithReflection(v1, v2, ctx)
 			if err != nil {
 				return false, err
 			}
@@ -126,13 +188,15 @@ func DictEqualWithError(d1, d2 *DictValue, ctx *Context) (bool, error) {
 			if origKey2 == nil {
 				origKey2 = StringValue(internalKey2)
 			}
+			// For key comparison, use EqualValuesWithError (not reflected)
+			// since keys should be self-equalizing via __eq__
 			eq, err := EqualValuesWithError(origKey1, origKey2, ctx)
 			if err != nil {
 				return false, err
 			}
 			if eq {
-				// Keys match, compare values
-				valEq, err := EqualValuesWithError(v1, v2, ctx)
+				// Keys match, compare values with full Python semantics
+				valEq, err := equalWithReflection(v1, v2, ctx)
 				if err != nil {
 					return false, err
 				}
