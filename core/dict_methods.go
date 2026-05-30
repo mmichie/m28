@@ -95,56 +95,130 @@ func InitDictMethods() {
 	}
 
 	// Add update method
-	dictType.Methods["update"] = &MethodDescriptor{
-		Name:    "update",
-		Arity:   -1, // 0 or 1 args
-		Doc:     "Update dict with key/value pairs from another dict (mutates in place, returns None)",
-		Builtin: true,
-		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+	dictUpdatePositional := func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
 
-			// If no args, just return None
 			if len(args) == 0 {
 				return None, nil
 			}
-
 			if len(args) > 1 {
 				return nil, &TypeError{Message: fmt.Sprintf("update() takes at most 1 argument (%d given)", len(args))}
 			}
 
-			other, ok := args[0].(*DictValue)
-			if !ok {
-				return nil, &TypeError{Message: fmt.Sprintf("update expects a dict, got %s", args[0].Type())}
-			}
-
-			// Update dict in place by copying all entries from other
-			for _, k := range other.Keys() {
-				v, _ := other.Get(k)
-				// Get the original key value
-				origKey, exists := other.keys[k]
-				if !exists {
-					origKey = StringValue(k) // Fallback
-				}
-
-				// For instances with custom __hash__, check if key exists using __eq__
-				if instanceNeedsEqComparison(origKey) {
-					internalKey, _, found, err := dictFindKeyWithEq(dict, origKey, ctx)
-					if err != nil {
-						return nil, err // Propagate __eq__ exception
+			// Real dict — fast path that preserves original key values.
+			if other, ok := args[0].(*DictValue); ok {
+				for _, k := range other.Keys() {
+					v, _ := other.Get(k)
+					origKey, exists := other.keys[k]
+					if !exists {
+						origKey = StringValue(k)
 					}
-					if found {
-						// Update existing key
-						dict.SetWithKey(internalKey, origKey, v)
+					if instanceNeedsEqComparison(origKey) {
+						internalKey, _, found, err := dictFindKeyWithEq(dict, origKey, ctx)
+						if err != nil {
+							return nil, err
+						}
+						if found {
+							dict.SetWithKey(internalKey, origKey, v)
+						} else {
+							dict.SetWithKey(k, origKey, v)
+						}
 					} else {
-						// Add new key
 						dict.SetWithKey(k, origKey, v)
 					}
-				} else {
-					dict.SetWithKey(k, origKey, v)
+				}
+				return None, nil
+			}
+
+			// Dict subclass instance (BackingDict).
+			if inst, ok := args[0].(*Instance); ok && inst.BackingDict != nil {
+				for _, k := range inst.BackingDict.Keys() {
+					v, _ := inst.BackingDict.Get(k)
+					if orig, ok := inst.BackingDict.keys[k]; ok {
+						dict.SetWithKey(k, orig, v)
+					} else {
+						dict.Set(k, v)
+					}
+				}
+				return None, nil
+			}
+
+			// Mapping protocol: anything with .keys() is treated as a mapping;
+			// values come from .__getitem__(k). Per CPython, .keys() runs
+			// before __getitem__ is required, so its exceptions propagate.
+			if obj, ok := args[0].(interface{ GetAttr(string) (Value, bool) }); ok {
+				if keysAttr, found := obj.GetAttr("keys"); found {
+					if keysCall, ok := keysAttr.(interface {
+						Call([]Value, *Context) (Value, error)
+					}); ok {
+						keys, err := keysCall.Call(nil, ctx)
+						if err != nil {
+							return nil, err
+						}
+						items, err := iterableValues(keys)
+						if err != nil {
+							return nil, err
+						}
+						getitemAttr, hasGetitem := obj.GetAttr("__getitem__")
+						getitemCall, _ := getitemAttr.(interface {
+							Call([]Value, *Context) (Value, error)
+						})
+						if !hasGetitem || getitemCall == nil {
+							return nil, &AttributeError{ObjType: string(args[0].Type()), Message: fmt.Sprintf("'%s' object has no attribute '__getitem__'", args[0].Type())}
+						}
+						for _, k := range items {
+							v, err := getitemCall.Call([]Value{k}, ctx)
+							if err != nil {
+								return nil, err
+							}
+							if err := dict.SetValue(k, v); err != nil {
+								return nil, err
+							}
+						}
+						return None, nil
+					}
 				}
 			}
 
-			// Return None (Python's dict.update() returns None)
+			// Iterable of 2-element sequences.
+			items, err := iterableValues(args[0])
+			if err != nil {
+				return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", args[0].Type())}
+			}
+			for i, item := range items {
+				if pair, ok := item.(TupleValue); ok && len(pair) == 2 {
+					if err := dict.SetValue(pair[0], pair[1]); err != nil {
+						return nil, err
+					}
+					continue
+				}
+				if lst, ok := item.(*ListValue); ok && lst.Len() == 2 {
+					if err := dict.SetValue(lst.Items()[0], lst.Items()[1]); err != nil {
+						return nil, err
+					}
+					continue
+				}
+				return nil, &ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, sequenceLength(item))}
+			}
+
+			return None, nil
+	}
+	dictType.Methods["update"] = &MethodDescriptor{
+		Name:    "update",
+		Arity:   -1,
+		Doc:     "Update dict with key/value pairs from another dict, mapping, or iterable of pairs, plus keyword args (mutates in place, returns None)",
+		Builtin: true,
+		Handler: dictUpdatePositional,
+		KwargHandler: func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+			if _, err := dictUpdatePositional(receiver, args, ctx); err != nil {
+				return nil, err
+			}
+			dict := receiver.(*DictValue)
+			for k, v := range kwargs {
+				if err := dict.SetValue(StringValue(k), v); err != nil {
+					return nil, err
+				}
+			}
 			return None, nil
 		},
 	}
@@ -370,12 +444,14 @@ func InitDictMethods() {
 		Doc:     "Remove and return an arbitrary (key, value) pair as a tuple. Raises KeyError if dict is empty",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			if len(args) != 0 {
+				return nil, &TypeError{Message: fmt.Sprintf("popitem() takes no arguments (%d given)", len(args))}
+			}
 			dict := receiver.(*DictValue)
 
-			// Check if dict is empty
 			keys := dict.Keys()
 			if len(keys) == 0 {
-				return nil, &KeyError{Key: StringValue("dictionary is empty")}
+				return nil, &KeyError{Key: StringValue("dictionary is empty"), Message: "popitem(): dictionary is empty"}
 			}
 
 			// Get the last key (LIFO behavior like Python 3.7+)

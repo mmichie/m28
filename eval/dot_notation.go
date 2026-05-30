@@ -651,71 +651,9 @@ func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.List
 		}
 		return core.Nil, nil
 
-	case "update":
-		// Update with another dict (Python: dict.update([other], **kwargs))
-		// d.update() with no args is a no-op.
-		if args.Len() < 1 {
-			return core.Nil, nil
-		}
-		otherArg, err := Eval(args.Items()[0], ctx)
-		if err != nil {
-			return nil, err
-		}
-		// Accept a dict directly...
-		if other, ok := otherArg.(*core.DictValue); ok {
-			for _, key := range other.OriginalKeys() {
-				if val, exists := other.GetValue(key); exists {
-					dict.SetValue(key, val)
-				}
-			}
-			return core.Nil, nil
-		}
-		// ...or any object with .keys() and __getitem__ (mapping protocol)...
-		if obj, ok := otherArg.(interface{ GetAttr(string) (core.Value, bool) }); ok {
-			if keysMethod, ok := obj.GetAttr("keys"); ok {
-				if callable, ok := keysMethod.(core.Callable); ok {
-					keysResult, err := callable.Call(nil, ctx)
-					if err == nil {
-						items, err := convertIterableToSlice(keysResult)
-						if err == nil {
-							for _, k := range items {
-								if getitem, ok := obj.GetAttr("__getitem__"); ok {
-									if gc, ok := getitem.(core.Callable); ok {
-										v, err := gc.Call([]core.Value{k}, ctx)
-										if err != nil {
-											return nil, err
-										}
-										if err := dict.SetValue(k, v); err != nil {
-											return nil, err
-										}
-									}
-								}
-							}
-							return core.Nil, nil
-						}
-					}
-				}
-			}
-		}
-		// ...or an iterable of 2-element sequences.
-		items, iterErr := convertIterableToSlice(otherArg)
-		if iterErr == nil {
-			for i, item := range items {
-				var k, v core.Value
-				if lst, ok := item.(*core.ListValue); ok && lst.Len() == 2 {
-					k, v = lst.Items()[0], lst.Items()[1]
-				} else if tup, ok := item.(core.TupleValue); ok && len(tup) == 2 {
-					k, v = tup[0], tup[1]
-				} else {
-					return nil, &core.ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d is not a 2-tuple", i)}
-				}
-				if err := dict.SetValue(k, v); err != nil {
-					return nil, err
-				}
-			}
-			return core.Nil, nil
-		}
-		return nil, &core.TypeError{Message: fmt.Sprintf("update() argument must be a dict or iterable of pairs, not %s", otherArg.Type())}
+	// "update" intentionally not auto-called here: it must dispatch through
+	// the type descriptor's method so keyword arguments (d.update(x=1))
+	// are routed correctly. The auto-call path only sees positional args.
 	}
 
 	// First, check if it's a dictionary key access

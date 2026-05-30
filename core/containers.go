@@ -1462,7 +1462,82 @@ func iterableValues(v Value) ([]Value, error) {
 		}
 		return out, nil
 	}
+	// Python iterator protocol: call __iter__ to get an iterator, then
+	// drive it with __next__ until StopIteration. Lets user-defined
+	// classes (Instances) work as iterables without implementing the Go
+	// Iterator interface.
+	if obj, ok := v.(interface {
+		GetAttr(string) (Value, bool)
+	}); ok {
+		if iterAttr, found := obj.GetAttr("__iter__"); found {
+			if callable, ok := iterAttr.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				iter, err := callable.Call(nil, nil)
+				if err != nil {
+					return nil, err
+				}
+				return drainPythonIterator(iter)
+			}
+		}
+	}
 	return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", v.Type())}
+}
+
+// drainPythonIterator drives a Python iterator (an object with __next__)
+// until StopIteration. Used to drain user-defined iterator instances.
+func drainPythonIterator(iter Value) ([]Value, error) {
+	if iter == nil {
+		return nil, &TypeError{Message: "iter returned nil"}
+	}
+	// Native Iterator? Just walk it.
+	if it, ok := iter.(Iterator); ok {
+		var out []Value
+		for {
+			val, more := it.Next()
+			if !more {
+				break
+			}
+			out = append(out, val)
+		}
+		return out, nil
+	}
+	obj, ok := iter.(interface {
+		GetAttr(string) (Value, bool)
+	})
+	if !ok {
+		return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not an iterator", iter.Type())}
+	}
+	nextAttr, found := obj.GetAttr("__next__")
+	if !found {
+		return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not an iterator", iter.Type())}
+	}
+	callable, ok := nextAttr.(interface {
+		Call([]Value, *Context) (Value, error)
+	})
+	if !ok {
+		return nil, &TypeError{Message: "__next__ is not callable"}
+	}
+	var out []Value
+	for {
+		val, err := callable.Call(nil, nil)
+		if err != nil {
+			// StopIteration ends iteration; any other error propagates.
+			if _, isStop := err.(*StopIteration); isStop {
+				break
+			}
+			if _, isStop := err.(*stopIterationError); isStop {
+				break
+			}
+			// Match by error message as a fallback for wrapped exceptions.
+			if err.Error() == "StopIteration" {
+				break
+			}
+			return nil, err
+		}
+		out = append(out, val)
+	}
+	return out, nil
 }
 
 // dictViewSetOp implements set operations (&, |, -, ^) on dict views,
@@ -1531,6 +1606,76 @@ func dictViewSetOp(v *DictView, other Value, op string) (Value, error) {
 		}
 	}
 	return result, nil
+}
+
+// populateDictFromArgs fills d with entries from positional + keyword
+// args following Python's dict() constructor rules:
+//   - 0 args -> empty dict (caller already handled)
+//   - 1 arg that's a mapping -> copy items
+//   - 1 arg that's an iterable of pairs -> add each pair
+//   - kwargs always overlay last
+func populateDictFromArgs(d *DictValue, args []Value, kwargs map[string]Value) error {
+	if len(args) > 1 {
+		return &TypeError{Message: fmt.Sprintf("dict expected at most 1 argument, got %d", len(args))}
+	}
+	if len(args) == 1 {
+		switch src := args[0].(type) {
+		case *DictValue:
+			for _, k := range src.Keys() {
+				v, _ := src.Get(k)
+				if orig, ok := src.keys[k]; ok {
+					d.SetWithKey(k, orig, v)
+				} else {
+					d.Set(k, v)
+				}
+			}
+		case *Instance:
+			if src.BackingDict != nil {
+				for _, k := range src.BackingDict.Keys() {
+					v, _ := src.BackingDict.Get(k)
+					if orig, ok := src.BackingDict.keys[k]; ok {
+						d.SetWithKey(k, orig, v)
+					} else {
+						d.Set(k, v)
+					}
+				}
+			} else {
+				return &TypeError{Message: "dict() argument must be a dict or iterable of pairs"}
+			}
+		default:
+			items, err := iterableValues(args[0])
+			if err != nil {
+				return &TypeError{Message: "dict() argument must be a dict or iterable of pairs"}
+			}
+			for i, item := range items {
+				if pair, ok := item.(TupleValue); ok && len(pair) == 2 {
+					d.SetValue(pair[0], pair[1])
+					continue
+				}
+				if lst, ok := item.(*ListValue); ok && lst.Len() == 2 {
+					d.SetValue(lst.Items()[0], lst.Items()[1])
+					continue
+				}
+				return &ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, sequenceLength(item))}
+			}
+		}
+	}
+	for k, v := range kwargs {
+		d.SetValue(StringValue(k), v)
+	}
+	return nil
+}
+
+func sequenceLength(v Value) int {
+	switch x := v.(type) {
+	case *ListValue:
+		return x.Len()
+	case TupleValue:
+		return len(x)
+	case StringValue:
+		return len(string(x))
+	}
+	return -1
 }
 
 // dictViewSetCompare implements comparison ops (==, <, <=, >, >=) on

@@ -147,15 +147,19 @@ func isBuiltinTypeName(name string) bool {
 // inherits from it. Used by Super.GetAttr to decide whether to fall back to
 // parent.GetAttr for dunder methods (which are provided by type's defaults,
 // not in any Methods/Attributes map).
-func classInheritsType(cls *Class) bool {
+func classInheritsType(cls *Class, names ...string) bool {
 	if cls == nil {
 		return false
 	}
-	if cls.Name == "type" {
+	target := "type"
+	if len(names) > 0 {
+		target = names[0]
+	}
+	if cls.Name == target {
 		return true
 	}
 	for _, p := range cls.Parents {
-		if classInheritsType(p) {
+		if classInheritsType(p, target) {
 			return true
 		}
 	}
@@ -884,6 +888,31 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 		instance = NewInstance(c)
 	}
 
+	// If the class inherits from dict (transitively) and no custom
+	// __init__ is taking over the storage, attach a backing dict so the
+	// instance can be subscripted and used as a mapping. If args were
+	// passed, populate from them following the dict() constructor rules.
+	if inst, ok := instance.(*Instance); ok && classInheritsType(c, "dict") && inst.BackingDict == nil {
+		inst.BackingDict = NewDict()
+		// Seed the backing dict from constructor args, the way dict() does.
+		// Only do this when the subclass doesn't define its own __init__.
+		_, definingClass, hasInit := c.GetMethodWithClass("__init__")
+		userInit := hasInit && definingClass.Name != "object" && definingClass.Name != "dict"
+		if !userInit && len(args) > 0 {
+			if err := populateDictFromArgs(inst.BackingDict, args, kwargs); err != nil {
+				return nil, err
+			}
+			// Args were consumed by dict-init; don't pass to a no-op __init__.
+			args = nil
+			kwargs = nil
+		} else if !userInit && len(kwargs) > 0 {
+			for k, v := range kwargs {
+				inst.BackingDict.SetValue(StringValue(k), v)
+			}
+			kwargs = nil
+		}
+	}
+
 	// Call __init__ if it exists and instance is of the right type
 	// Call __init__ if __new__ returned an instance of this class or a subclass
 	if inst, ok := instance.(*Instance); ok && IsInstanceOf(inst, c) {
@@ -969,6 +998,148 @@ type Instance struct {
 	Class      *Class           // The class this is an instance of
 	Attributes map[string]Value // Instance attributes (__dict__)
 	SlotValues []Value          // Slot values (if class uses __slots__)
+
+	// BackingDict holds the underlying dict storage when the instance's
+	// class inherits from dict. It lets `class D(dict)` instances support
+	// d[k], d[k] = v, len(d), iteration, and forwarded dict methods
+	// (get/keys/values/items/...).
+	BackingDict *DictValue
+}
+
+// dictMethodOnInstance returns a bound dict method (or dunder synthesised
+// from the backing dict) for the given name, so dict-subclass instances
+// can transparently use dict methods like get/keys/values/items/setdefault
+// and dunders like __len__/__iter__/__getitem__/__setitem__/__contains__.
+func dictMethodOnInstance(inst *Instance, name string) (Value, bool) {
+	d := inst.BackingDict
+	if d == nil {
+		return nil, false
+	}
+	// Synthesise key dunders directly (these don't appear in MethodRegistry
+	// in a way that binds cleanly to an Instance receiver).
+	switch name {
+	case "__len__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return NumberValue(d.Size()), nil
+		}), true
+	case "__iter__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return d.Iterator().(Value), nil
+		}), true
+	case "__getitem__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__getitem__ takes exactly 1 argument"}
+			}
+			if v, ok := d.GetValue(args[0]); ok {
+				return v, nil
+			}
+			// Try __missing__ on the subclass.
+			if m, _, ok := inst.Class.GetMethodWithClass("__missing__"); ok {
+				if callable, ok := m.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); ok {
+					return callable.Call([]Value{inst, args[0]}, ctx)
+				}
+			}
+			return nil, &KeyError{Key: args[0]}
+		}), true
+	case "__setitem__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 2 {
+				return nil, &TypeError{Message: "__setitem__ takes exactly 2 arguments"}
+			}
+			return Nil, d.SetValue(args[0], args[1])
+		}), true
+	case "__delitem__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__delitem__ takes exactly 1 argument"}
+			}
+			if !d.DeleteValue(args[0]) {
+				return nil, &KeyError{Key: args[0]}
+			}
+			return Nil, nil
+		}), true
+	case "__contains__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__contains__ takes exactly 1 argument"}
+			}
+			_, ok := d.GetValue(args[0])
+			return BoolValue(ok), nil
+		}), true
+	case "__bool__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return BoolValue(d.Size() > 0), nil
+		}), true
+	case "__eq__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__eq__ takes exactly 1 argument"}
+			}
+			otherDict := extractBackingDict(args[0])
+			if otherDict == nil {
+				return BoolValue(false), nil
+			}
+			return BoolValue(dictEqual(d, otherDict)), nil
+		}), true
+	case "__ne__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "__ne__ takes exactly 1 argument"}
+			}
+			otherDict := extractBackingDict(args[0])
+			if otherDict == nil {
+				return BoolValue(true), nil
+			}
+			return BoolValue(!dictEqual(d, otherDict)), nil
+		}), true
+	case "__repr__", "__str__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return StringValue(d.String()), nil
+		}), true
+	}
+	// Look up named dict methods (get/keys/values/items/...) via the
+	// dict type descriptor and bind them to the backing dict.
+	desc := GetTypeDescriptor("dict")
+	if desc == nil {
+		return nil, false
+	}
+	if m, ok := desc.Methods[name]; ok {
+		handler := m.Handler
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return handler(d, args, ctx)
+		}), true
+	}
+	return nil, false
+}
+
+// extractBackingDict returns a *DictValue from v if v is either a dict
+// or a dict-subclass instance.
+func extractBackingDict(v Value) *DictValue {
+	switch x := v.(type) {
+	case *DictValue:
+		return x
+	case *Instance:
+		return x.BackingDict
+	}
+	return nil
+}
+
+// dictEqual reports whether two dicts have the same keys and equal values.
+func dictEqual(a, b *DictValue) bool {
+	if a.Size() != b.Size() {
+		return false
+	}
+	for _, k := range a.Keys() {
+		av, _ := a.Get(k)
+		bv, ok := b.Get(k)
+		if !ok || !EqualValues(av, bv) {
+			return false
+		}
+	}
+	return true
 }
 
 // NewInstance creates a new instance of a class
@@ -1371,6 +1542,14 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 			}
 		}
 		return attr, true
+	}
+
+	// Step 4.5: Forward dict methods to BackingDict for dict-subclass instances.
+	// Lets `class D(dict): pass; d=D({1:2}); d.get(1)` work as expected.
+	if i.BackingDict != nil {
+		if v, ok := dictMethodOnInstance(i, name); ok {
+			return v, true
+		}
 	}
 
 	// Step 5: Call __getattr__ if it exists (Python protocol)
