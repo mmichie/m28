@@ -293,10 +293,18 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 			return nil, err
 		}
 
-		// Must be a dict
-		dict, ok := val.(*core.DictValue)
-		if !ok {
-			return nil, fmt.Errorf("** unpacking requires a dict, got %s", val.Type())
+		// Accept a dict or a dict-subclass Instance (via BackingDict).
+		var dict *core.DictValue
+		switch x := val.(type) {
+		case *core.DictValue:
+			dict = x
+		case *core.Instance:
+			if x.BackingDict != nil {
+				dict = x.BackingDict
+			}
+		}
+		if dict == nil {
+			return nil, &core.TypeError{Message: fmt.Sprintf("argument after ** must be a mapping, not %s", val.Type())}
 		}
 
 		// Unpack the dict into keyword arguments

@@ -877,43 +877,31 @@ func createDictClass() *DictType {
 
 		dict := core.NewDict()
 
-		// Convert iterable to list of keys using iterator protocol
+		// Iterate over the input. Dicts iterate over their keys; other
+		// iterables (including dict subclass instances via BackingDict)
+		// go through the iterator protocol.
+		var keys []core.Value
+		var err error
 		switch v := iterable.(type) {
-		case *core.ListValue:
-			for _, key := range v.Items() {
-				if err := dict.SetValue(key, value); err != nil {
-					return nil, err
-				}
-			}
-		case core.TupleValue:
-			for _, key := range v {
-				if err := dict.SetValue(key, value); err != nil {
-					return nil, err
-				}
-			}
-		case core.StringValue:
-			// String is iterable in Python - each character is a key
-			for _, ch := range string(v) {
-				if err := dict.SetValue(core.StringValue(string(ch)), value); err != nil {
-					return nil, err
-				}
-			}
-		case core.Iterable:
-			// Handle any iterable (including map, filter, etc.)
-			iter := v.Iterator()
-			for {
-				key, hasNext := iter.Next()
-				if !hasNext {
-					break
-				}
-				if err := dict.SetValue(key, value); err != nil {
-					return nil, err
-				}
+		case *core.DictValue:
+			keys = v.OriginalKeys()
+		case *core.Instance:
+			if v.BackingDict != nil {
+				keys = v.BackingDict.OriginalKeys()
+			} else {
+				keys, err = convertToSlice(iterable)
 			}
 		default:
-			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not iterable", iterable.Type())}
+			keys, err = convertToSlice(iterable)
 		}
-
+		if err != nil {
+			return nil, err
+		}
+		for _, key := range keys {
+			if err := dict.SetValue(key, value); err != nil {
+				return nil, err
+			}
+		}
 		return dict, nil
 	}))
 

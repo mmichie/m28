@@ -313,6 +313,27 @@ func ReversedBuilder() builders.BuiltinFunc {
 			}
 		}
 
+		// Dicts reverse over their keys in insertion order. The
+		// __len__/__getitem__ path below would treat the dict like a
+		// sequence and look up d[len-1..0], which fails for non-int keys.
+		if d, ok := obj.(*core.DictValue); ok {
+			keys := d.OriginalKeys()
+			result := make([]core.Value, len(keys))
+			for i, k := range keys {
+				result[len(keys)-1-i] = k
+			}
+			return core.NewList(result...), nil
+		}
+		// Dict-subclass instances reverse over their backing dict's keys.
+		if inst, ok := obj.(*core.Instance); ok && inst.BackingDict != nil {
+			keys := inst.BackingDict.OriginalKeys()
+			result := make([]core.Value, len(keys))
+			for i, k := range keys {
+				result[len(keys)-1-i] = k
+			}
+			return core.NewList(result...), nil
+		}
+
 		// If it's a built-in sequence type, we can reverse it directly
 		if list, ok := types.AsList(obj); ok {
 			// Create reversed list

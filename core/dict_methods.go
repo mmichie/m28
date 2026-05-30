@@ -8,48 +8,27 @@ import (
 // iterableToSliceForDict converts any iterable value (list, tuple, set, string,
 // generator) into a []Value so dict.fromkeys can iterate it.
 func iterableToSliceForDict(v Value) ([]Value, error) {
-	switch x := v.(type) {
-	case *ListValue:
-		return x.Items(), nil
-	case TupleValue:
-		out := make([]Value, len(x))
-		copy(out, x)
-		return out, nil
-	case *SetValue:
-		var out []Value
-		for _, item := range x.Items() {
-			out = append(out, item)
-		}
-		return out, nil
-	case StringValue:
-		out := make([]Value, 0, len(x))
-		for _, r := range string(x) {
-			out = append(out, StringValue(string(r)))
-		}
-		return out, nil
-	case *DictValue:
-		out := make([]Value, 0, x.Size())
-		for _, k := range x.Keys() {
-			origKey, ok := x.keys[k]
-			if ok {
+	// Dicts iterate over keys (using OriginalKeyValue to get the real key).
+	if d, ok := v.(*DictValue); ok {
+		out := make([]Value, 0, d.Size())
+		for _, k := range d.Keys() {
+			if origKey, ok := d.keys[k]; ok {
 				out = append(out, origKey)
 			}
 		}
 		return out, nil
 	}
-	if obj, ok := v.(interface{ Iterator() Iterator }); ok {
-		iter := obj.Iterator()
-		var out []Value
-		for {
-			val, more := iter.Next()
-			if !more {
-				break
+	// Dict-subclass instances delegate to their backing dict.
+	if inst, ok := v.(*Instance); ok && inst.BackingDict != nil {
+		out := make([]Value, 0, inst.BackingDict.Size())
+		for _, k := range inst.BackingDict.Keys() {
+			if origKey, ok := inst.BackingDict.keys[k]; ok {
+				out = append(out, origKey)
 			}
-			out = append(out, val)
 		}
 		return out, nil
 	}
-	return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", v.Type())}
+	return iterableValues(v)
 }
 
 // instanceNeedsEqComparison checks if an instance has a custom __hash__ that
