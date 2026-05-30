@@ -297,8 +297,11 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
 			}
 
-			// For instances with custom __hash__, use __eq__ comparison
-			if instanceNeedsEqComparison(searchKey) {
+			// For instances with custom __hash__, call __hash__ first then use __eq__
+			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
+				if _, err := computeInstanceKey(inst, ctx); err != nil {
+					return nil, err
+				}
 				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
 				if err != nil {
 					return nil, err // Propagate __eq__ exception
@@ -626,8 +629,11 @@ func InitDictMethods() {
 			dict := receiver.(*DictValue)
 			searchKey := args[0]
 
-			// For instances with custom __hash__, use __eq__ comparison
-			if instanceNeedsEqComparison(searchKey) {
+			// For instances with custom __hash__, call __hash__ first then use __eq__
+			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
+				if _, err := computeInstanceKey(inst, ctx); err != nil {
+					return nil, err
+				}
 				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
 				if err != nil {
 					return nil, err // Propagate __eq__ exception
@@ -659,8 +665,11 @@ func InitDictMethods() {
 			dict := receiver.(*DictValue)
 			searchKey := args[0]
 
-			// For instances with custom __hash__, use __eq__ comparison
-			if instanceNeedsEqComparison(searchKey) {
+			// For instances with custom __hash__, call __hash__ first then use __eq__
+			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
+				if _, err := computeInstanceKey(inst, ctx); err != nil {
+					return nil, err
+				}
 				internalKey, _, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
 				if err != nil {
 					return nil, err // Propagate __eq__ exception
@@ -697,8 +706,11 @@ func InitDictMethods() {
 			dict := receiver.(*DictValue)
 			searchKey := args[0]
 
-			// For instances with custom __hash__, use __eq__ comparison
-			if instanceNeedsEqComparison(searchKey) {
+			// For instances with custom __hash__, call __hash__ first then use __eq__
+			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
+				if _, err := computeInstanceKey(inst, ctx); err != nil {
+					return nil, err
+				}
 				_, _, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
 				if err != nil {
 					return nil, err // Propagate __eq__ exception
