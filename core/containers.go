@@ -16,6 +16,38 @@ var (
 	visited   = make(map[uint64]map[uintptr]bool) // goroutine ID -> visited set
 )
 
+// withCycleDetectionErr runs f with cycle detection, returning (placeholder, nil) on cycles
+// and propagating errors from f.
+func withCycleDetectionErr(ptr uintptr, placeholder string, f func() (string, error)) (string, bool, error) {
+	gid := getGoroutineID()
+
+	visitedMu.Lock()
+	if visited[gid] == nil {
+		visited[gid] = make(map[uintptr]bool)
+	}
+	goroutineVisited := visited[gid]
+
+	if goroutineVisited[ptr] {
+		visitedMu.Unlock()
+		return placeholder, true, nil
+	}
+
+	goroutineVisited[ptr] = true
+	visitedMu.Unlock()
+
+	defer func() {
+		visitedMu.Lock()
+		delete(goroutineVisited, ptr)
+		if len(goroutineVisited) == 0 {
+			delete(visited, gid)
+		}
+		visitedMu.Unlock()
+	}()
+
+	s, err := f()
+	return s, false, err
+}
+
 // withCycleDetection runs f with cycle detection for the given pointer
 func withCycleDetection(ptr uintptr, f func() string) string {
 	gid := getGoroutineID()
@@ -421,9 +453,10 @@ func (d *DictValue) Set(key string, value Value) {
 // SetWithKey sets a value with both key representation and original key
 // This is the preferred method for setting dict values
 func (d *DictValue) SetWithKey(keyRepr string, origKey Value, value Value) {
-	// Track insertion order for new keys
+	// Track insertion order and structural changes for new keys
 	if _, exists := d.entries[keyRepr]; !exists {
 		d.orderedKeys = append(d.orderedKeys, keyRepr)
+		d.modCount++
 	}
 	d.entries[keyRepr] = value
 	d.keys[keyRepr] = origKey
@@ -569,6 +602,9 @@ func (it *dictIterator) GetAttr(name string) (Value, bool) {
 	}
 	if name == "__next__" {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if it.dict != nil && it.dict.modCount != it.startMod {
+				return nil, &RuntimeError{Message: "dictionary changed size during iteration"}
+			}
 			val, ok := it.Next()
 			if !ok {
 				return nil, &stopIterationError{}
@@ -1476,7 +1512,8 @@ func iterableValues(v Value) ([]Value, error) {
 	if obj, ok := v.(interface {
 		GetAttr(string) (Value, bool)
 	}); ok {
-		if iterAttr, found := obj.GetAttr("__iter__"); found {
+		iterAttr, found := obj.GetAttr("__iter__")
+		if found {
 			if callable, ok := iterAttr.(interface {
 				Call([]Value, *Context) (Value, error)
 			}); ok {
@@ -1489,6 +1526,112 @@ func iterableValues(v Value) ([]Value, error) {
 		}
 	}
 	return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", v.Type())}
+}
+
+// iterableValuesCtx is like iterableValues but passes a context to Python method calls.
+func iterableValuesCtx(v Value, ctx *Context) ([]Value, error) {
+	switch x := v.(type) {
+	case *ListValue:
+		return x.Items(), nil
+	case TupleValue:
+		out := make([]Value, len(x))
+		copy(out, x)
+		return out, nil
+	case *SetValue:
+		return x.Items(), nil
+	case *FrozenSetValue:
+		out := make([]Value, 0, len(x.items))
+		for _, item := range x.items {
+			out = append(out, item)
+		}
+		return out, nil
+	case *DictView:
+		return x.snapshot(), nil
+	case *DictValue:
+		view := NewDictView(x, DictKeysViewKind)
+		return view.snapshot(), nil
+	}
+	if obj, ok := v.(interface{ Iterator() Iterator }); ok {
+		iter := obj.Iterator()
+		var out []Value
+		for {
+			val, more := iter.Next()
+			if !more {
+				break
+			}
+			out = append(out, val)
+		}
+		return out, nil
+	}
+	if obj, ok := v.(interface {
+		GetAttr(string) (Value, bool)
+	}); ok {
+		iterAttr, found := obj.GetAttr("__iter__")
+		if found {
+			if callable, ok := iterAttr.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				iter, err := callable.Call(nil, ctx)
+				if err != nil {
+					return nil, err
+				}
+				return drainPythonIteratorCtx(iter, ctx)
+			}
+		}
+	}
+	return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", v.Type())}
+}
+
+// drainPythonIteratorCtx drives a Python iterator with a context.
+func drainPythonIteratorCtx(iter Value, ctx *Context) ([]Value, error) {
+	if iter == nil {
+		return nil, &TypeError{Message: "iter returned nil"}
+	}
+	if it, ok := iter.(Iterator); ok {
+		var out []Value
+		for {
+			val, more := it.Next()
+			if !more {
+				break
+			}
+			out = append(out, val)
+		}
+		return out, nil
+	}
+	obj, ok := iter.(interface {
+		GetAttr(string) (Value, bool)
+	})
+	if !ok {
+		return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not an iterator", iter.Type())}
+	}
+	nextAttr, found := obj.GetAttr("__next__")
+	if !found {
+		return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not an iterator", iter.Type())}
+	}
+	callable, ok := nextAttr.(interface {
+		Call([]Value, *Context) (Value, error)
+	})
+	if !ok {
+		return nil, &TypeError{Message: "__next__ is not callable"}
+	}
+	var out []Value
+	for {
+		val, err := callable.Call(nil, ctx)
+		if err != nil {
+			if _, isStop := err.(*StopIteration); isStop {
+				break
+			}
+			if _, isStop := err.(*stopIterationError); isStop {
+				break
+			}
+			if err.Error() == "StopIteration" {
+				break
+			}
+			return nil, err
+		}
+		out = append(out, val)
+	}
+	return out, nil
 }
 
 // drainPythonIterator drives a Python iterator (an object with __next__)

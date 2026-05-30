@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"log"
+	"unsafe"
 )
 
 // iterableToSliceForDict converts any iterable value (list, tuple, set, string,
@@ -44,6 +45,29 @@ func instanceNeedsEqComparison(v Value) bool {
 	// Check if class defines __hash__ (not inherited from object)
 	_, hasOwnHash := inst.Class.Methods["__hash__"]
 	return hasOwnHash
+}
+
+// computeInstanceKey calls __hash__ on an instance that defines it, then
+// returns a string key derived from the hash value. Propagates exceptions.
+func computeInstanceKey(v *Instance, ctx *Context) (string, error) {
+	hashAttr, found := v.GetAttr("__hash__")
+	if !found {
+		return ValueToKey(v), nil
+	}
+	callable, ok := hashAttr.(interface {
+		Call([]Value, *Context) (Value, error)
+	})
+	if !ok {
+		return ValueToKey(v), nil
+	}
+	result, err := callable.Call(nil, ctx)
+	if err != nil {
+		return "", err
+	}
+	if num, ok := result.(NumberValue); ok {
+		return fmt.Sprintf("p:%d", int64(float64(num))), nil
+	}
+	return ValueToKey(v), nil
 }
 
 // dictFindKeyWithEq finds a key in the dict by comparing with __eq__
@@ -134,7 +158,7 @@ func InitDictMethods() {
 						if err != nil {
 							return nil, err
 						}
-						items, err := iterableValues(keys)
+						items, err := iterableValuesCtx(keys, ctx)
 						if err != nil {
 							return nil, err
 						}
@@ -160,9 +184,9 @@ func InitDictMethods() {
 			}
 
 			// Iterable of 2-element sequences.
-			items, err := iterableValues(args[0])
+			items, err := iterableValuesCtx(args[0], ctx)
 			if err != nil {
-				return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", args[0].Type())}
+				return nil, err
 			}
 			for i, item := range items {
 				if pair, ok := item.(TupleValue); ok && len(pair) == 2 {
@@ -221,8 +245,12 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
 			}
 
-			// For instances with custom __hash__, check for existing key with __eq__
-			if instanceNeedsEqComparison(key) {
+			// For instances with custom __hash__, call __hash__ first (may raise),
+			// then check for existing key with __eq__
+			if inst, ok := key.(*Instance); ok && instanceNeedsEqComparison(key) {
+				if _, err := computeInstanceKey(inst, ctx); err != nil {
+					return nil, err
+				}
 				internalKey, _, found, err := dictFindKeyWithEq(dict, key, ctx)
 				if err != nil {
 					return nil, err // Propagate __eq__ exception
@@ -304,8 +332,12 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
 			}
 
-			// For instances with custom __hash__, use __eq__ comparison
-			if instanceNeedsEqComparison(searchKey) {
+			// For instances with custom __hash__, call __hash__ first (may raise),
+			// then use __eq__ comparison
+			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
+				if _, err := computeInstanceKey(inst, ctx); err != nil {
+					return nil, err
+				}
 				internalKey, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
 				if err != nil {
 					return nil, err // Propagate __eq__ exception
@@ -358,8 +390,12 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
 			}
 
-			// For instances with custom __hash__, use __eq__ comparison
-			if instanceNeedsEqComparison(searchKey) {
+			// For instances with custom __hash__, call __hash__ first (may raise),
+			// then use __eq__ comparison
+			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
+				if _, err := computeInstanceKey(inst, ctx); err != nil {
+					return nil, err
+				}
 				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
 				if err != nil {
 					return nil, err // Propagate __eq__ exception
@@ -666,6 +702,23 @@ func InitDictMethods() {
 		},
 	}
 
+	// Add __reversed__ method
+	dictType.Methods["__reversed__"] = &MethodDescriptor{
+		Name:    "__reversed__",
+		Arity:   0,
+		Doc:     "Return a reverse iterator over the dictionary keys",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			dict := receiver.(*DictValue)
+			keys := dict.OriginalKeys()
+			reversed := make([]Value, len(keys))
+			for i, k := range keys {
+				reversed[len(keys)-1-i] = k
+			}
+			return &dictViewIterator{items: reversed, index: 0, dict: nil, startMod: 0}, nil
+		},
+	}
+
 	// Add __iter__ method
 	dictType.Methods["__iter__"] = &MethodDescriptor{
 		Name:    "__iter__",
@@ -674,33 +727,7 @@ func InitDictMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
-			// Create an iterator that returns keys
-			keys := dict.Keys()
-			keyValues := make([]Value, len(keys))
-			for i, k := range keys {
-				// Get the original key value from the keys map
-				if origKey, exists := dict.keys[k]; exists {
-					keyValues[i] = origKey
-				} else {
-					// Fallback: reconstruct original key
-					if len(k) > 2 && k[1] == ':' {
-						keyValues[i] = StringValue(k[2:])
-					} else {
-						keyValues[i] = StringValue(k)
-					}
-				}
-			}
-			// Create a list and call __iter__ on it to get a proper iterator
-			keysList := NewList(keyValues...)
-			if iter, ok := keysList.GetAttr("__iter__"); ok {
-				if callable, ok := iter.(interface {
-					Call([]Value, *Context) (Value, error)
-				}); ok {
-					return callable.Call([]Value{}, ctx)
-				}
-			}
-			// Fallback: return the list if __iter__ not found
-			return keysList, nil
+			return dict.Iterator().(*dictIterator), nil
 		},
 	}
 
@@ -829,6 +856,102 @@ func InitDictMethods() {
 		},
 	}
 
-	// Add fromkeys class method (would need special handling)
-	// For now, we'll skip this as it requires class method support
+	// Add __repr__ method - propagates exceptions from values' __repr__
+	dictType.Methods["__repr__"] = &MethodDescriptor{
+		Name:    "__repr__",
+		Arity:   0,
+		Doc:     "Return a string representation of the dict",
+		Builtin: true,
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			dict := receiver.(*DictValue)
+			s, err := dictReprWithCtx(dict, ctx)
+			if err != nil {
+				return nil, err
+			}
+			return StringValue(s), nil
+		},
+	}
+}
+
+const maxDictReprDepth = 200
+
+// dictReprWithCtx produces repr(d) while propagating any exceptions from
+// __repr__ methods of keys or values.
+func dictReprWithCtx(dict *DictValue, ctx *Context) (string, error) {
+	return dictReprWithDepth(dict, ctx, 0)
+}
+
+func dictReprWithDepth(dict *DictValue, ctx *Context, depth int) (string, error) {
+	if depth > maxDictReprDepth {
+		return "", &RecursionError{Message: "maximum recursion depth exceeded while getting the repr of an object"}
+	}
+	if len(dict.orderedKeys) == 0 {
+		return "{}", nil
+	}
+	s, isCycle, err := withCycleDetectionErr(uintptr(unsafe.Pointer(dict)), "{...}", func() (string, error) {
+		result := "{"
+		first := true
+		for _, k := range dict.orderedKeys {
+			v, exists := dict.entries[k]
+			if !exists {
+				continue
+			}
+			origKey, _ := dict.keys[k]
+			if origKey == nil {
+				origKey = StringValue(k)
+			}
+			if !first {
+				result += ", "
+			}
+			first = false
+			keyRepr, err := reprWithDepth(origKey, ctx, depth+1)
+			if err != nil {
+				return "", err
+			}
+			valRepr, err := reprWithDepth(v, ctx, depth+1)
+			if err != nil {
+				return "", err
+			}
+			result += keyRepr + ": " + valRepr
+		}
+		return result + "}", nil
+	})
+	if isCycle || err != nil {
+		return s, err
+	}
+	return s, nil
+}
+
+// reprWithCtx calls __repr__ on val with the given context, propagating errors.
+// Only calls __repr__ for Python class instances; built-in types use Repr().
+func reprWithCtx(val Value, ctx *Context) (string, error) {
+	return reprWithDepth(val, ctx, 0)
+}
+
+func reprWithDepth(val Value, ctx *Context, depth int) (string, error) {
+	if val == nil {
+		return "None", nil
+	}
+	// For nested dicts, recurse through dictReprWithDepth to propagate errors.
+	if d, ok := val.(*DictValue); ok {
+		return dictReprWithDepth(d, ctx, depth)
+	}
+	// Only use context-aware repr for Python instances (not built-in types).
+	// Built-in types (list, etc.) use Repr() which has cycle detection.
+	if inst, ok := val.(*Instance); ok {
+		if reprMethod, found := inst.GetAttr("__repr__"); found {
+			if callable, ok := reprMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				result, err := callable.Call(nil, ctx)
+				if err != nil {
+					return "", err
+				}
+				if s, ok := result.(StringValue); ok {
+					return string(s), nil
+				}
+			}
+		}
+	}
+	return Repr(val), nil
 }

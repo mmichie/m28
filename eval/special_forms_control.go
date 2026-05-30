@@ -287,6 +287,10 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return createPythonExceptionInstance(ctx, "AttributeError", msg)
 	case *core.ValueError:
 		return createPythonExceptionInstance(ctx, "ValueError", errMsg)
+	case *core.RuntimeError:
+		return createPythonExceptionInstance(ctx, "RuntimeError", errMsg)
+	case *core.RecursionError:
+		return createPythonExceptionInstance(ctx, "RecursionError", errMsg)
 	case *core.AssertionError:
 		return createPythonExceptionInstance(ctx, "AssertionError", errMsg)
 	case *core.SystemExit:

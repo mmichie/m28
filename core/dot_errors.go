@@ -354,6 +354,42 @@ func NewFileNotFoundError(message string, filename string) *FileNotFoundError {
 	}
 }
 
+// RuntimeError represents a runtime error (Python's RuntimeError)
+type RuntimeError struct {
+	Message  string
+	Location *SourceLocation
+}
+
+func (e *RuntimeError) Error() string {
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", e.Message, e.Location.String())
+	}
+	return e.Message
+}
+
+// NewRuntimeError creates a new RuntimeError
+func NewRuntimeError(msg string) *RuntimeError {
+	return &RuntimeError{Message: msg}
+}
+
+// RecursionError represents Python's RecursionError (maximum recursion depth exceeded)
+type RecursionError struct {
+	Message  string
+	Location *SourceLocation
+}
+
+func (e *RecursionError) Error() string {
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", e.Message, e.Location.String())
+	}
+	return e.Message
+}
+
+// NewRecursionError creates a new RecursionError
+func NewRecursionError(msg string) *RecursionError {
+	return &RecursionError{Message: msg}
+}
+
 // NewTypeError creates a new type error
 func NewTypeError(expected string, got Value, context string) *TypeError {
 	var gotType string
@@ -446,6 +482,20 @@ func WrapEvalError(err error, message string, ctx *Context) *EvalError {
 		return &EvalError{
 			Type:       "ZeroDivisionError",
 			Message:    "division by zero",
+			Wrapped:    err,
+			StackTrace: stackTrace,
+		}
+	case *RuntimeError:
+		return &EvalError{
+			Type:       "RuntimeError",
+			Message:    typedErr.Message,
+			Wrapped:    err,
+			StackTrace: stackTrace,
+		}
+	case *RecursionError:
+		return &EvalError{
+			Type:       "RecursionError",
+			Message:    typedErr.Message,
 			Wrapped:    err,
 			StackTrace: stackTrace,
 		}

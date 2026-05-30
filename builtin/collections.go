@@ -865,6 +865,14 @@ func createDictClass() *DictType {
 	// Add fromkeys class method
 	// dict.fromkeys(iterable, value=None) -> new dict with keys from iterable
 	class.SetMethod("fromkeys", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		// fromkeys is a classmethod; when called on an instance (e.g. d.fromkeys(...))
+		// M28 prepends the instance/dict as args[0]. Skip it.
+		if len(args) > 0 {
+			switch args[0].(type) {
+			case *core.DictValue, *core.Instance, *DictType, *core.Class:
+				args = args[1:]
+			}
+		}
 		if len(args) < 1 || len(args) > 2 {
 			return nil, &core.TypeError{Message: fmt.Sprintf("fromkeys() takes 1 or 2 positional arguments (%d given)", len(args))}
 		}

@@ -148,8 +148,8 @@ func (td *TypeDescriptor) CallMethod(receiver Value, methodName string, args []V
 
 	// Check arity (-1 means variadic)
 	if method.Arity >= 0 && len(args) != method.Arity {
-		return nil, fmt.Errorf("%s.%s() takes %d arguments, got %d",
-			td.PythonName, methodName, method.Arity, len(args))
+		return nil, &TypeError{Message: fmt.Sprintf("%s.%s() takes %d arguments, got %d",
+			td.PythonName, methodName, method.Arity, len(args))}
 	}
 
 	return method.Handler(receiver, args, ctx)
@@ -287,6 +287,11 @@ func (bm *BoundMethod) Call(args []Value, ctx *Context) (Value, error) {
 	if bm.Method.Handler == nil {
 		return nil, fmt.Errorf("method %s has nil handler", bm.Method.Name)
 	}
+	// Check arity
+	if bm.Method.Arity >= 0 && len(args) != bm.Method.Arity {
+		return nil, &TypeError{Message: fmt.Sprintf("%s() takes %d arguments (%d given)",
+			bm.Method.Name, bm.Method.Arity, len(args))}
+	}
 	return bm.Method.Handler(bm.Receiver, args, ctx)
 }
 
@@ -303,6 +308,11 @@ func (bm *BoundMethod) CallWithKeywords(args []Value, kwargs map[string]Value, c
 
 	// Otherwise, if there are no keyword arguments, use the regular handler
 	if len(kwargs) == 0 && bm.Method.Handler != nil {
+		// Check arity
+		if bm.Method.Arity >= 0 && len(args) != bm.Method.Arity {
+			return nil, &TypeError{Message: fmt.Sprintf("%s() takes %d arguments (%d given)",
+				bm.Method.Name, bm.Method.Arity, len(args))}
+		}
 		return bm.Method.Handler(bm.Receiver, args, ctx)
 	}
 

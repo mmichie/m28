@@ -93,6 +93,14 @@ func nextFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 				}
 				return nil, err
 			}
+			// Check by error message as fallback (handles core.stopIterationError)
+			if err.Error() == "StopIteration" {
+				stopErr := &protocols.StopIteration{}
+				if hasDefault {
+					return defaultValue, nil
+				}
+				return nil, stopErr
+			}
 			return nil, err
 		}
 		return result, nil

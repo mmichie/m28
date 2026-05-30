@@ -6,6 +6,7 @@ import (
 
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/core/protocols"
 )
 
 // ArgumentElement represents a single argument element (regular or unpacking)
@@ -380,6 +381,13 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 			}
 			// Preserve Exception for proper try/except matching
 			if _, ok := err.(*Exception); ok {
+				return nil, err
+			}
+			// Preserve StopIteration so callers can catch it
+			if _, ok := err.(*protocols.StopIteration); ok {
+				return nil, err
+			}
+			if _, ok := err.(*core.StopIteration); ok {
 				return nil, err
 			}
 			// Wrap error with call stack

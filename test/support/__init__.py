@@ -516,8 +516,8 @@ def __getattr__(name):
 
 
 def get_c_recursion_limit():
-    """Approximate CPython's C recursion limit. M28 doesn't enforce it."""
-    return 1500
+    """Approximate CPython's C recursion limit."""
+    return 200
 
 
 def get_attribute(obj, name):
