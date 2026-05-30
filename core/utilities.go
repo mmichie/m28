@@ -94,6 +94,62 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 	return EqualValues(a, b), nil
 }
 
+// DictEqualWithError compares two dicts for equality, propagating errors from key/value __eq__.
+// It uses the full Python equality semantics: for each key k1 in d1, finds k2 in d2 with
+// k1==k2 (using __eq__), then checks if the values are equal.
+func DictEqualWithError(d1, d2 *DictValue, ctx *Context) (bool, error) {
+	if d1.Size() != d2.Size() {
+		return false, nil
+	}
+	// For each key in d1, find matching key in d2
+	for internalKey, v1 := range d1.entries {
+		origKey1 := d1.keys[internalKey]
+		if origKey1 == nil {
+			origKey1 = StringValue(internalKey)
+		}
+		// Try direct key lookup first (fast path for non-instance keys)
+		if v2, exists := d2.entries[internalKey]; exists {
+			// Keys match by string representation, compare values
+			eq, err := EqualValuesWithError(v1, v2, ctx)
+			if err != nil {
+				return false, err
+			}
+			if !eq {
+				return false, nil
+			}
+			continue
+		}
+		// Slow path: search d2 for a key that's equal to origKey1 using __eq__
+		found := false
+		for internalKey2, v2 := range d2.entries {
+			origKey2 := d2.keys[internalKey2]
+			if origKey2 == nil {
+				origKey2 = StringValue(internalKey2)
+			}
+			eq, err := EqualValuesWithError(origKey1, origKey2, ctx)
+			if err != nil {
+				return false, err
+			}
+			if eq {
+				// Keys match, compare values
+				valEq, err := EqualValuesWithError(v1, v2, ctx)
+				if err != nil {
+					return false, err
+				}
+				if !valEq {
+					return false, nil
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // ComputeHash computes the hash of a value, calling __hash__ for instances
 // Returns the hash value and any error from __hash__
 func ComputeHash(v Value, ctx *Context) (int64, error) {

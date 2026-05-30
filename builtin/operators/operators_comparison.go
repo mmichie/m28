@@ -167,6 +167,18 @@ func compareEqual(left, right core.Value, ctx *core.Context) (core.Value, error)
 		}
 	}
 
+	// For dicts, use context-aware equality to propagate __eq__ exceptions
+	if ld, ok := left.(*core.DictValue); ok {
+		if rd, ok := right.(*core.DictValue); ok {
+			eq, err := core.DictEqualWithError(ld, rd, ctx)
+			if err != nil {
+				return nil, err
+			}
+			return core.BoolValue(eq), nil
+		}
+		return core.BoolValue(false), nil
+	}
+
 	// Fall back to built-in equality
 	return core.BoolValue(core.EqualValues(left, right)), nil
 }
