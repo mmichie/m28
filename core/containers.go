@@ -312,6 +312,7 @@ type DictValue struct {
 	entries     map[string]Value
 	keys        map[string]Value // Maps string representation to original key value
 	orderedKeys []string         // Tracks insertion order of keys
+	modCount    uint64           // Structural-modification counter (insert/delete of keys)
 }
 
 // NewDict creates a new dictionary
@@ -367,6 +368,7 @@ func (d *DictValue) Set(key string, value Value) {
 	// Track insertion order for new keys
 	if _, exists := d.entries[key]; !exists {
 		d.orderedKeys = append(d.orderedKeys, key)
+		d.modCount++
 	}
 	d.entries[key] = value
 	// Reconstruct original key from internal representation if not already tracked.
@@ -430,6 +432,9 @@ func (d *DictValue) SetWithKey(keyRepr string, origKey Value, value Value) {
 // Delete removes a key by internal representation
 // INTERNAL: Callers should use ValueToKey() to convert keys first
 func (d *DictValue) Delete(key string) {
+	if _, existed := d.entries[key]; existed {
+		d.modCount++
+	}
 	delete(d.entries, key)
 	delete(d.keys, key)
 	// Remove from orderedKeys
@@ -518,16 +523,18 @@ func (d *DictValue) Clear() {
 // Iterator implements Iterable for dicts (iterates over keys)
 func (d *DictValue) Iterator() Iterator {
 	return &dictIterator{
-		dict:  d,
-		keys:  d.OriginalKeys(),
-		index: 0,
+		dict:     d,
+		keys:     d.OriginalKeys(),
+		index:    0,
+		startMod: d.modCount,
 	}
 }
 
 type dictIterator struct {
-	dict  *DictValue
-	keys  []Value
-	index int
+	dict     *DictValue
+	keys     []Value
+	index    int
+	startMod uint64
 }
 
 func (it *dictIterator) Next() (Value, bool) {
@@ -1721,12 +1728,14 @@ func dictViewSetCompare(v *DictView, other Value, op string) bool {
 
 // Iterator implements Iterable.
 func (v *DictView) Iterator() Iterator {
-	return &dictViewIterator{items: v.snapshot(), index: 0}
+	return &dictViewIterator{items: v.snapshot(), index: 0, dict: v.dict, startMod: v.dict.modCount}
 }
 
 type dictViewIterator struct {
-	items []Value
-	index int
+	items    []Value
+	index    int
+	dict     *DictValue // backing dict for mutation detection (may be nil)
+	startMod uint64
 }
 
 func (it *dictViewIterator) Next() (Value, bool) {
@@ -1758,6 +1767,9 @@ func (it *dictViewIterator) GetAttr(name string) (Value, bool) {
 		}), true
 	case "__next__":
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if it.dict != nil && it.dict.modCount != it.startMod {
+				return nil, &RuntimeError{Message: "dictionary changed size during iteration"}
+			}
 			val, ok := it.Next()
 			if !ok {
 				return nil, &stopIterationError{}
