@@ -461,6 +461,38 @@ func (d *DictType) GetClass() *core.Class {
 	return d.Class
 }
 
+// GetAttr extends Class.GetAttr to also expose TypeDescriptor dict methods
+// as unbound methods (e.g. dict.items, dict.keys, dict.values).
+func (d *DictType) GetAttr(name string) (core.Value, bool) {
+	// Try the class first (has fromkeys, copy, etc.)
+	if v, ok := d.Class.GetAttr(name); ok {
+		return v, true
+	}
+	// Fall back to TypeDescriptor to expose instance methods as unbound callables
+	td := core.GetTypeDescriptor(core.DictType)
+	if td != nil {
+		if method, ok := td.GetMethod(name); ok {
+			capturedMethod := method
+			capturedName := name
+			return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+				if len(args) < 1 {
+					return nil, &core.TypeError{Message: fmt.Sprintf("descriptor '%s' of 'dict' object needs an argument", capturedName)}
+				}
+				receiver := args[0]
+				// If receiver is a dict subclass instance, use its backing dict
+				if inst, ok := receiver.(*core.Instance); ok && inst.BackingDict != nil {
+					receiver = inst.BackingDict
+				}
+				if _, ok := receiver.(*core.DictValue); !ok {
+					return nil, &core.TypeError{Message: fmt.Sprintf("descriptor '%s' requires a 'dict' object but received '%s'", capturedName, args[0].Type())}
+				}
+				return capturedMethod.Handler(receiver, args[1:], ctx)
+			}), true
+		}
+	}
+	return nil, false
+}
+
 // Call implements the callable interface for dict() construction
 func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	dict := core.NewDict()
@@ -498,7 +530,11 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 			// Copy the dictionary by iterating over items
 			for _, key := range v.Keys() {
 				if val, ok := v.Get(key); ok {
-					dict.Set(key, val)
+					if orig, ok2 := v.OriginalKeyValue(key); ok2 {
+						dict.SetWithKey(key, orig, val)
+					} else {
+						dict.Set(key, val)
+					}
 				}
 			}
 		case *core.ListValue:
@@ -540,15 +576,10 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 						// Call .items()
 						itemsResult, err := callable.Call([]core.Value{}, ctx)
 						if err == nil {
-							// itemsResult should be an iterable of (key, value) pairs
-							if iterable, ok := itemsResult.(core.Iterable); ok {
-								iter := iterable.Iterator()
-								for {
-									item, hasNext := iter.Next()
-									if !hasNext {
-										break
-									}
-									// Item should be a pair (tuple or list)
+							// Use iterableValuesCtx to handle any iterable (list, iterator, etc.)
+							items, err := core.IterableValuesCtx(itemsResult, ctx)
+							if err == nil {
+								for i, item := range items {
 									var key, value core.Value
 									if pair, ok := item.(*core.ListValue); ok && pair.Len() == 2 {
 										key = pair.Items()[0]
@@ -557,7 +588,7 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 										key = tuple[0]
 										value = tuple[1]
 									} else {
-										return nil, &core.ValueError{Message: "dictionary update sequence element is not a 2-element sequence"}
+										return nil, &core.ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d is not a 2-element sequence", i)}
 									}
 									if err := dict.SetValue(key, value); err != nil {
 										return nil, err

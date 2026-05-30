@@ -784,6 +784,13 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 			return nil, &core.TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
 		}
 
+		// For instances with custom __hash__, call it (may raise) and use result in key
+		if inst, ok := key.(*core.Instance); ok && core.InstanceNeedsEqComparison(key) {
+			if _, err := core.ComputeInstanceKey(inst, ctx); err != nil {
+				return nil, err
+			}
+		}
+
 		// Convert key to string representation
 		keyStr := core.ValueToKey(key)
 

@@ -32,6 +32,16 @@ func iterableToSliceForDict(v Value) ([]Value, error) {
 	return iterableValues(v)
 }
 
+// InstanceNeedsEqComparison is the exported version of instanceNeedsEqComparison.
+func InstanceNeedsEqComparison(v Value) bool {
+	return instanceNeedsEqComparison(v)
+}
+
+// ComputeInstanceKey is the exported version of computeInstanceKey.
+func ComputeInstanceKey(v *Instance, ctx *Context) (string, error) {
+	return computeInstanceKey(v, ctx)
+}
+
 // instanceNeedsEqComparison checks if an instance has a custom __hash__ that
 // could cause hash collisions requiring __eq__ comparison
 func instanceNeedsEqComparison(v Value) bool {

@@ -1528,6 +1528,11 @@ func iterableValues(v Value) ([]Value, error) {
 	return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", v.Type())}
 }
 
+// IterableValuesCtx is the exported version of iterableValuesCtx.
+func IterableValuesCtx(v Value, ctx *Context) ([]Value, error) {
+	return iterableValuesCtx(v, ctx)
+}
+
 // iterableValuesCtx is like iterableValues but passes a context to Python method calls.
 func iterableValuesCtx(v Value, ctx *Context) ([]Value, error) {
 	switch x := v.(type) {

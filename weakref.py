@@ -3,11 +3,15 @@
 # This provides a simplified WeakKeyDictionary that acts as a regular dict
 # until M28 implements proper weak reference semantics
 
-# Simple ref function that returns the object itself (no actual weak reference)
-def ref(obj, callback=None):
-    """Create a weak reference to obj. Since M28 doesn't have weak references yet,
-    this just returns the object itself."""
-    return obj
+class ref:
+    """Simplified weak reference. Since M28 doesn't have actual weak references,
+    this holds a strong reference and is callable (returning the object or None)."""
+    def __init__(self, obj, callback=None):
+        self._obj = obj
+    def __call__(self):
+        return self._obj
+    def __repr__(self):
+        return f'<weakref at {id(self):#x}; to {type(self._obj).__name__}>'
 
 # Simple proxy function that returns the object itself
 def proxy(obj, callback=None):
