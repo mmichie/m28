@@ -1355,7 +1355,7 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__eq__ takes exactly one argument"}
 			}
-			return BoolValue(dictViewSetCompare(v, args[0], "==")), nil
+			result, err := dictViewSetCompareCtx(v, args[0], "==", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
 		}), true
 	case "__ne__":
 		if v.kind == DictValuesViewKind {
@@ -1365,7 +1365,7 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__ne__ takes exactly one argument"}
 			}
-			return BoolValue(!dictViewSetCompare(v, args[0], "==")), nil
+			result, err := dictViewSetCompareCtx(v, args[0], "==", ctx); if err != nil { return nil, err }; return BoolValue(!result), nil
 		}), true
 	case "__lt__":
 		if v.kind == DictValuesViewKind {
@@ -1375,7 +1375,7 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__lt__ takes exactly one argument"}
 			}
-			return BoolValue(dictViewSetCompare(v, args[0], "<")), nil
+			result, err := dictViewSetCompareCtx(v, args[0], "<", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
 		}), true
 	case "__le__":
 		if v.kind == DictValuesViewKind {
@@ -1385,7 +1385,7 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__le__ takes exactly one argument"}
 			}
-			return BoolValue(dictViewSetCompare(v, args[0], "<=")), nil
+			result, err := dictViewSetCompareCtx(v, args[0], "<=", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
 		}), true
 	case "__gt__":
 		if v.kind == DictValuesViewKind {
@@ -1395,7 +1395,7 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__gt__ takes exactly one argument"}
 			}
-			return BoolValue(dictViewSetCompare(v, args[0], ">")), nil
+			result, err := dictViewSetCompareCtx(v, args[0], ">", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
 		}), true
 	case "__ge__":
 		if v.kind == DictValuesViewKind {
@@ -1405,7 +1405,7 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__ge__ takes exactly one argument"}
 			}
-			return BoolValue(dictViewSetCompare(v, args[0], ">=")), nil
+			result, err := dictViewSetCompareCtx(v, args[0], ">=", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
 		}), true
 	case "__sub__":
 		if v.kind == DictValuesViewKind {
@@ -1836,42 +1836,58 @@ func sequenceLength(v Value) int {
 // dictViewSetCompare implements comparison ops (==, <, <=, >, >=) on
 // dict views, treating them as sets of their elements.
 func dictViewSetCompare(v *DictView, other Value, op string) bool {
-	otherItems, err := iterableValues(other)
+	result, _ := dictViewSetCompareCtx(v, other, op, nil)
+	return result
+}
+
+// dictViewSetCompareCtx is the context-aware version that propagates __eq__ errors.
+func dictViewSetCompareCtx(v *DictView, other Value, op string, ctx *Context) (bool, error) {
+	otherItems, err := iterableValuesCtx(other, ctx)
 	if err != nil {
-		return false
+		return false, err
 	}
 	myItems := v.snapshot()
-	containsAll := func(super, sub []Value) bool {
+	containsAll := func(super, sub []Value) (bool, error) {
 		for _, x := range sub {
 			found := false
 			for _, y := range super {
-				if EqualValues(x, y) {
+				eq, err := EqualValuesWithError(x, y, ctx)
+				if err != nil {
+					return false, err
+				}
+				if eq {
 					found = true
 					break
 				}
 			}
 			if !found {
-				return false
+				return false, nil
 			}
 		}
-		return true
+		return true, nil
 	}
-	mySubsetOf := containsAll(otherItems, myItems)
-	otherSubsetOfMe := containsAll(myItems, otherItems)
+	mySubsetOf, err := containsAll(otherItems, myItems)
+	if err != nil {
+		return false, err
+	}
+	otherSubsetOfMe, err := containsAll(myItems, otherItems)
+	if err != nil {
+		return false, err
+	}
 	equal := mySubsetOf && otherSubsetOfMe
 	switch op {
 	case "==":
-		return equal
+		return equal, nil
 	case "<":
-		return mySubsetOf && !equal
+		return mySubsetOf && !equal, nil
 	case "<=":
-		return mySubsetOf
+		return mySubsetOf, nil
 	case ">":
-		return otherSubsetOfMe && !equal
+		return otherSubsetOfMe && !equal, nil
 	case ">=":
-		return otherSubsetOfMe
+		return otherSubsetOfMe, nil
 	}
-	return false
+	return false, nil
 }
 
 // Iterator implements Iterable.

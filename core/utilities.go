@@ -52,6 +52,44 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 		return false, nil
 	}
 
+	// For compound types, recursively compare with error propagation
+	if aT, ok := a.(TupleValue); ok {
+		if bT, ok := b.(TupleValue); ok {
+			if len(aT) != len(bT) {
+				return false, nil
+			}
+			for i := range aT {
+				eq, err := EqualValuesWithError(aT[i], bT[i], ctx)
+				if err != nil {
+					return false, err
+				}
+				if !eq {
+					return false, nil
+				}
+			}
+			return true, nil
+		}
+		return false, nil
+	}
+	if aL, ok := a.(*ListValue); ok {
+		if bL, ok := b.(*ListValue); ok {
+			if aL.Len() != bL.Len() {
+				return false, nil
+			}
+			for i := range aL.Items() {
+				eq, err := EqualValuesWithError(aL.Items()[i], bL.Items()[i], ctx)
+				if err != nil {
+					return false, err
+				}
+				if !eq {
+					return false, nil
+				}
+			}
+			return true, nil
+		}
+		return false, nil
+	}
+
 	// For non-instances, use existing EqualValues (which doesn't raise errors)
 	return EqualValues(a, b), nil
 }
