@@ -1,11 +1,15 @@
 {
   "python_version": "3.13.13",
-  "last_updated": "2026-05-28",
+  "last_updated": "2026-05-30",
   "summary": {
-    "tests_running": "~410",
-    "tests_passing": "~135",
-    "fully_passing_files": ["test_augassign (7/7)"],
+    "tests_running": "~510",
+    "tests_passing": "~272",
+    "fully_passing_files": [
+      "test_augassign (7/7)"
+    ],
     "high_pass_files": [
+      "test_list (47/50, 94%)",
+      "test_dict (90/123, 73%)",
       "test_unary (4/6, 67%)",
       "test_scope (26/41, 63%)",
       "test_string (22/38, 58%)",
@@ -13,7 +17,6 @@
       "test_binop (6/12, 50%)"
     ],
     "running_but_low": [
-      "test_dict (~36/123, 29%)",
       "test_descr (~23/159, 14%)",
       "test_set (timing out, hundreds of tests running)",
       "test_tuple (timing out, dozens of tests running)"
@@ -68,14 +71,15 @@
       "priority": 2,
       "tests": {
         "test_list": {
-          "status": "panic",
-          "blocker": "stack overflow during ~35th test",
-          "notes": "First ~14 tests pass, then crash; needs recursion-depth investigation",
+          "status": "partial",
+          "tests_run": 50, "passing": 47, "failures": 0, "errors": 2, "skipped": 1,
+          "notes": "errors are test_iterator_pickle and test_reversed_pickle (pickle not supported for list iterators); skipped is @cpython_only test_preallocation",
           "source": "cpython/Lib/test/test_list.py"
         },
         "test_dict": {
           "status": "partial",
-          "tests_run": 123, "passing": 36, "failures": 22, "errors": 51, "skipped": 14,
+          "tests_run": 123, "passing": 90, "failures": 7, "errors": 12, "skipped": 14,
+          "notes": "Pickling tests (6), __dict__ mutation, str subclass issues, exec(), hash-based key equality",
           "source": "cpython/Lib/test/test_dict.py"
         },
         "test_set": {
@@ -173,7 +177,7 @@
     "biggest_blockers_to_unblock_more": [
       "typing.Protocol __protocol_attrs__ (unblocks typing → inspect → dataclasses → doctest → test_iter, test_genexps, test_itertools, etc)",
       "Parser support for @decorator with method receiving signatures it currently rejects (unblocks test_exceptions, test_with, test_call, test_builtin, test_generators, test_listcomps)",
-      "Recursion depth handling / specific test infinite loop in test_list (causes panic mid-run)"
+      "Pickle support for list iterators (unblocks test_iterator_pickle, test_reversed_pickle in test_list)"
     ]
   },
   "notes": [
@@ -181,6 +185,8 @@
     "Run a single test: PYTHONPATH=tests/cpython-source/Lib ./bin/m28 tests/cpython-source/Lib/test/test_<name>.py",
     "test/ package at project root provides minimal infrastructure stubs so CPython test files can import test.support, test.list_tests, etc.",
     "Many tests can run BECAUSE of these stubs but reveal M28 semantic gaps (descriptors, dict views, dunder protocols, etc).",
-    "Pre-stub baseline: 1 file passing (test_augassign). Current baseline: ~135 individual test methods passing across 9 files."
+    "Pre-stub baseline: 1 file passing (test_augassign). Current baseline: ~272 individual test methods passing across 9 files.",
+    "test_list went from 34/50 → 47/50 (May 30, 2026): ListInstance attrs, list subclass __init__/__new__, extended slice assignment, BigInt index clamping, context-aware list comparison.",
+    "test_dict went from ~36/123 → 90/123 (May 28, 2026): modCount mutation detection, __hash__ dispatch, classmethod fromkeys, cycle-detection repr, full __eq__ semantics."
   ]
 }
