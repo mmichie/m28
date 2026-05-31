@@ -178,34 +178,10 @@ func Init_FunctoolsModule() *core.DictValue {
 	// Can be used as @lru_cache or @lru_cache(maxsize=N, typed=True)
 	functoolsModule.Set("lru_cache", &lruCacheBuiltin{})
 
-	// cmp_to_key - Convert old-style comparison function to key function
-	functoolsModule.Set("cmp_to_key", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("cmp_to_key", args)
-		if err := v.Exact(1); err != nil {
-			return nil, err
-		}
-
-		cmpFunc, err := types.RequireCallable(v.Get(0), "cmp_to_key() argument")
-		if err != nil {
-			return nil, err
-		}
-
-		// Create a key function that wraps the comparison
-		keyFunc := core.NewBuiltinFunction(func(callArgs []core.Value, callCtx *core.Context) (core.Value, error) {
-			if len(callArgs) != 1 {
-				return nil, errors.NewRuntimeError("cmp_to_key", "key function takes exactly one argument")
-			}
-
-			// Return a wrapper that can be compared
-			wrapper := core.NewDict()
-			wrapper.Set("value", callArgs[0])
-			wrapper.Set("cmp", cmpFunc)
-
-			return wrapper, nil
-		})
-
-		return keyFunc, nil
-	}))
+	// cmp_to_key - NOT exported from _functools so that functools.py uses its
+	// pure Python implementation (which creates a proper class with __lt__ etc.)
+	// The Python fallback in functools.py handles this correctly.
+	// (The Go dict-wrapper approach doesn't support rich comparison.)
 
 	// wraps - Decorator that updates wrapper function to look like wrapped
 	// Copies metadata from wrapped to wrapper function

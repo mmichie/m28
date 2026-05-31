@@ -115,9 +115,9 @@ func registerNumberType() {
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					// Handle NumberValue directly
 					if n, ok := receiver.(NumberValue); ok {
-						intVal := int(n)
-						// Check if the number is actually an integer
-						if float64(intVal) != float64(n) {
+						f := float64(n)
+						// Must be an integer-valued float (no fractional part)
+						if f != math.Trunc(f) {
 							return nil, &TypeError{Message: "__index__ returned non-integer value"}
 						}
 						return NumberValue(float64(n)), nil

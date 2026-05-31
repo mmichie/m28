@@ -291,6 +291,8 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return createPythonExceptionInstance(ctx, "RuntimeError", errMsg)
 	case *core.RecursionError:
 		return createPythonExceptionInstance(ctx, "RecursionError", errMsg)
+	case *core.OverflowError:
+		return createPythonExceptionInstance(ctx, "OverflowError", errMsg)
 	case *core.AssertionError:
 		return createPythonExceptionInstance(ctx, "AssertionError", errMsg)
 	case *core.SystemExit:

@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/mmichie/m28/core"
 )
@@ -226,13 +227,19 @@ func CallIndex(obj core.Value, ctx *core.Context) (int, bool, error) {
 		return 0, true, &core.TypeError{Message: fmt.Sprintf("__index__ returned non-int (type %s)", result.Type())}
 	}
 
-	// Check if it's an integer value (not a float)
-	intVal := int(num)
-	if float64(intVal) != float64(num) {
+	f := float64(num)
+	// Must be integer-valued (no fractional part)
+	if f != math.Trunc(f) {
 		return 0, true, &core.TypeError{Message: fmt.Sprintf("__index__ returned non-integer value %v", num)}
 	}
-
-	return intVal, true, nil
+	// Clamp very large values to int bounds (CPython clamps to PY_SSIZE_T_MAX)
+	if f >= math.MaxInt64 {
+		return math.MaxInt, true, nil
+	}
+	if f <= math.MinInt64 {
+		return math.MinInt, true, nil
+	}
+	return int(f), true, nil
 }
 
 // CallContains calls __contains__ on an object (item in self)
@@ -475,14 +482,27 @@ func ToIndex(obj core.Value, ctx *core.Context) (int, error) {
 		return intVal, nil
 	}
 
+	// BigIntValue: large integer — clamp to int bounds
+	if big, ok := obj.(core.BigIntValue); ok {
+		if big.Sign() < 0 {
+			return math.MinInt, nil
+		}
+		return math.MaxInt, nil
+	}
+
 	// Fall back to NumberValue for built-in numeric types
 	if num, ok := obj.(core.NumberValue); ok {
-		intVal := int(num)
-		// Check if it's actually an integer
-		if float64(intVal) != float64(num) {
+		f := float64(num)
+		if f != math.Trunc(f) {
 			return 0, fmt.Errorf("slice indices must be integers or None, not float")
 		}
-		return intVal, nil
+		if f >= math.MaxInt64 {
+			return math.MaxInt, nil
+		}
+		if f <= math.MinInt64 {
+			return math.MinInt, nil
+		}
+		return int(f), nil
 	}
 
 	// Not convertible to index

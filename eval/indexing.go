@@ -9,76 +9,18 @@ import (
 )
 
 // handleSliceAssignment handles slice assignment (obj[start:end] = values)
-func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Value) (core.Value, error) {
+func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Value, ctx *core.Context) (core.Value, error) {
 	// Only support slice assignment for lists
 	list, ok := obj.(*core.ListValue)
 	if !ok {
 		return nil, &core.TypeError{Message: fmt.Sprintf("slice assignment only supported for lists, not %s", obj.Type())}
 	}
 
-	// Extract slice parameters
-	var start, stop *int
-
-	// Convert slice values to integers
-	if slice.Start != nil && slice.Start != core.Nil {
-		val, err := types.ToIndex(slice.Start, nil)
-		if err != nil {
-			return nil, err
-		}
-		start = &val
-	}
-
-	if slice.Stop != nil && slice.Stop != core.Nil {
-		val, err := types.ToIndex(slice.Stop, nil)
-		if err != nil {
-			return nil, err
-		}
-		stop = &val
-	}
-
-	// For now, only support step=None (which means step=1)
-	if slice.Step != nil && slice.Step != core.Nil {
-		return nil, &core.ValueError{Message: "slice assignment with step not yet supported"}
-	}
-
-	// Convert value to a list of values to insert
-	var valuesList *core.ListValue
-	switch v := value.(type) {
-	case *core.ListValue:
-		valuesList = v
-	case core.TupleValue:
-		valuesList = core.NewList([]core.Value(v)...)
-	case core.StringValue:
-		// String unpacking: each character becomes an element
-		items := make([]core.Value, 0, len(string(v)))
-		for _, ch := range string(v) {
-			items = append(items, core.StringValue(string(ch)))
-		}
-		valuesList = core.NewList(items...)
-	default:
-		// Try to iterate
-		if iterable, ok := value.(core.Iterable); ok {
-			items := make([]core.Value, 0)
-			iter := iterable.Iterator()
-			for {
-				item, ok := iter.Next()
-				if !ok {
-					break
-				}
-				items = append(items, item)
-			}
-			valuesList = core.NewList(items...)
-		} else {
-			return nil, &core.TypeError{Message: "can only assign an iterable to a slice"}
-		}
-	}
-
-	// Use the built-in SetSlice method
-	err := list.SetSlice(start, stop, valuesList)
+	// Delegate to core.ListSetItemSlice which handles both simple and extended slices
+	_, err := core.ListSetItemSlice(list, slice, value, ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	// Return the assigned value to support chained assignments
 	return value, nil
 }
@@ -161,7 +103,7 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Handle slice assignment (obj[start:end] = values)
 	if sliceVal, ok := key.(*core.SliceValue); ok {
-		return handleSliceAssignment(obj, sliceVal, value)
+		return handleSliceAssignment(obj, sliceVal, value, ctx)
 	}
 
 	// First, try dunder method __setitem__
@@ -279,20 +221,18 @@ func sliceList(list []core.Value, start, end, step *int) (core.Value, error) {
 	// Normalize indices
 	startIdx, endIdx, stepVal := normalizeSliceIndices(length, start, end, step)
 
-	// Build result
+	// Build result using multiplication-based indexing to avoid overflow with large step
 	result := make([]core.Value, 0)
-
-	if stepVal > 0 {
-		for i := startIdx; i < endIdx; i += stepVal {
-			if i >= 0 && i < length {
-				result = append(result, list[i])
-			}
-		}
-	} else {
-		for i := startIdx; i > endIdx; i += stepVal {
-			if i >= 0 && i < length {
-				result = append(result, list[i])
-			}
+	var count int
+	if stepVal > 0 && startIdx < endIdx {
+		count = (endIdx-startIdx-1)/stepVal + 1
+	} else if stepVal < 0 && startIdx > endIdx {
+		count = (startIdx-endIdx-1)/(-stepVal) + 1
+	}
+	for k := 0; k < count; k++ {
+		i := startIdx + k*stepVal
+		if i >= 0 && i < length {
+			result = append(result, list[i])
 		}
 	}
 

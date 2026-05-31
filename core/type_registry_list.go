@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 )
@@ -395,12 +396,20 @@ func getListMethods() map[string]*MethodDescriptor {
 				if !ok {
 					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
 				}
-				count := int(n)
+				f := float64(n)
+				if f >= math.MaxInt64 || f <= math.MinInt64 {
+					return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+				}
+				count := int64(f)
 				if count <= 0 {
 					return NewList(), nil
 				}
-				result := make([]Value, 0, list.Len()*count)
-				for i := 0; i < count; i++ {
+				const maxItems = 1<<31 - 1 // ~2B items max
+				if count > maxItems || (list.Len() > 0 && count > maxItems/int64(list.Len())) {
+					return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+				}
+				result := make([]Value, 0, list.Len()*int(count))
+				for i := int64(0); i < count; i++ {
 					result = append(result, list.Items()...)
 				}
 				return NewList(result...), nil
@@ -420,17 +429,25 @@ func getListMethods() map[string]*MethodDescriptor {
 				if !ok {
 					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
 				}
-				count := int(n)
+				f := float64(n)
+				if f >= math.MaxInt64 || f <= math.MinInt64 {
+					return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+				}
+				count := int64(f)
 				if count <= 0 {
 					// Clear the list in place
 					list.items = []Value{}
 					return list, nil
 				}
+				const maxItems = 1<<31 - 1
+				if count > maxItems || (list.Len() > 0 && count > maxItems/int64(list.Len())) {
+					return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+				}
 				// Store original items
 				original := make([]Value, list.Len())
 				copy(original, list.Items())
 				// Extend (count-1) more times in place
-				for i := 1; i < count; i++ {
+				for i := int64(1); i < count; i++ {
 					list.items = append(list.items, original...)
 				}
 				return list, nil
@@ -630,8 +647,13 @@ func listMethodRemove(receiver Value, args []Value, ctx *Context) (Value, error)
 	}
 
 	list := receiver.(*ListValue)
-	for i, item := range list.Items() {
-		if EqualValues(item, args[0]) {
+	searchVal := args[0]
+	for i := 0; i < len(list.items); i++ {
+		equal, err := equalWithReflection(list.items[i], searchVal, ctx)
+		if err != nil {
+			return nil, err
+		}
+		if equal {
 			// Mutate the list by removing the item
 			list.items = append(list.items[:i], list.items[i+1:]...)
 			return None, nil
@@ -715,7 +737,8 @@ func listMethodIndex(receiver Value, args []Value, ctx *Context) (Value, error) 
 
 	searchVal := args[0]
 	for i := start; i < stop && i < list.Len(); i++ {
-		equal, err := equalWithReflection(searchVal, list.items[i], ctx)
+		// CPython list.index checks item == v (list element first, like list.remove)
+		equal, err := equalWithReflection(list.items[i], searchVal, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -734,8 +757,9 @@ func listMethodCount(receiver Value, args []Value, ctx *Context) (Value, error) 
 	list := receiver.(*ListValue)
 	searchVal := args[0]
 	count := 0
+	// CPython compares item == searchVal (element first, like __contains__)
 	for _, item := range list.items {
-		equal, err := equalWithReflection(searchVal, item, ctx)
+		equal, err := equalWithReflection(item, searchVal, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -753,11 +777,15 @@ func listMethodSort(receiver Value, args []Value, ctx *Context) (Value, error) {
 
 	list := receiver.(*ListValue)
 
-	// Sort the items in place using Go's sort package
-	sort.Slice(list.items, func(i, j int) bool {
-		// TODO(M28-b902): Implement proper comparison
-		// For now, compare as strings
-		return Repr(list.items[i]) < Repr(list.items[j])
+	// Sort in-place using natural comparison (numeric for numbers, string for strings)
+	var sortErr error
+	sort.SliceStable(list.items, func(i, j int) bool {
+		if sortErr != nil {
+			return false
+		}
+		a, b := list.items[i], list.items[j]
+		cmp := Compare(a, b)
+		return cmp < 0
 	})
 
 	return None, nil
@@ -850,32 +878,63 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 		}
 	}
 
+	// Record original list length to detect mutation during sort
+	origLen := list.Len()
+
 	// Sort using Go's sort package
 	var sortErr error
-	sort.SliceStable(keyedItems, func(i, j int) bool {
-		if sortErr != nil {
-			return false
+	// pyLessThan returns true if a < b using Python's __lt__ protocol
+	pyLessThan := func(a, b Value) (bool, bool, error) {
+		// Try a.__lt__(b) first
+		type getAttrer interface {
+			GetAttr(string) (Value, bool)
 		}
-		a, b := keyedItems[i].keyValue, keyedItems[j].keyValue
-		// Try __lt__ first (Python's primary comparison method for sorting)
-		if aObj, ok := a.(Object); ok {
+		if aObj, ok := a.(getAttrer); ok {
 			if ltMethod, exists := aObj.GetAttr("__lt__"); exists {
 				if callable, ok := ltMethod.(interface {
 					Call([]Value, *Context) (Value, error)
 				}); ok {
 					result, err := callable.Call([]Value{b}, ctx)
 					if err != nil {
-						sortErr = err
-						return false
+						return false, false, err
 					}
 					if result != NotImplemented {
-						isLess := IsTruthy(result)
-						if reverse {
-							return !isLess && !EqualValues(a, b)
-						}
-						return isLess
+						return IsTruthy(result), true, nil
 					}
 				}
+			}
+		}
+		return false, false, nil
+	}
+	sort.SliceStable(keyedItems, func(i, j int) bool {
+		if sortErr != nil {
+			return false
+		}
+		// Check for list mutation during sort (Python's "list modified during sort")
+		if list.Len() != origLen {
+			sortErr = &ValueError{Message: "list modified during sort"}
+			return false
+		}
+		a, b := keyedItems[i].keyValue, keyedItems[j].keyValue
+		if reverse {
+			// For descending: a > b means a should come first → b < a
+			isLess, found, err := pyLessThan(b, a)
+			if err != nil {
+				sortErr = err
+				return false
+			}
+			if found {
+				return isLess
+			}
+		} else {
+			// For ascending: a < b
+			isLess, found, err := pyLessThan(a, b)
+			if err != nil {
+				sortErr = err
+				return false
+			}
+			if found {
+				return isLess
 			}
 		}
 		// Fall back to numeric/string comparison
@@ -966,6 +1025,11 @@ func listMethodSetItem(receiver Value, args []Value, ctx *Context) (Value, error
 
 	list := receiver.(*ListValue)
 
+	// Handle slice key
+	if slice, ok := args[0].(*SliceValue); ok {
+		return listSetItemSlice(list, slice, args[1], ctx)
+	}
+
 	// Use toIndex for proper integer conversion (supports __index__)
 	// toIndex already handles the TypeError with the right message
 	i, err := toIndex(args[0], ctx)
@@ -985,6 +1049,163 @@ func listMethodSetItem(receiver Value, args []Value, ctx *Context) (Value, error
 		return nil, err
 	}
 
+	return None, nil
+}
+
+// ListSetItemSlice handles list[slice] = value, including extended slices (step != 1).
+// Exported for use by eval/indexing.go.
+func ListSetItemSlice(list *ListValue, slice *SliceValue, value Value, ctx *Context) (Value, error) {
+	return listSetItemSlice(list, slice, value, ctx)
+}
+
+// listSetItemSlice handles list[slice] = value, including extended slices (step != 1).
+func listSetItemSlice(list *ListValue, slice *SliceValue, value Value, ctx *Context) (Value, error) {
+	length := list.Len()
+
+	// Extract step first — validates it and determines direction
+	step := 1
+	if slice.Step != nil && slice.Step != Nil {
+		s, err := toIndex(slice.Step, ctx)
+		if err != nil {
+			return nil, err
+		}
+		if s == 0 {
+			return nil, &ValueError{Message: "slice step cannot be zero"}
+		}
+		step = s
+	}
+
+	// Convert value to list of items to insert/replace
+	var newItems []Value
+	switch v := value.(type) {
+	case *ListValue:
+		newItems = v.items
+	case TupleValue:
+		newItems = []Value(v)
+	default:
+		// Try Go Iterable interface first, then Python __iter__ protocol
+		if iter, ok := value.(Iterable); ok {
+			it := iter.Iterator()
+			for {
+				val, ok := it.Next()
+				if !ok {
+					break
+				}
+				newItems = append(newItems, val)
+			}
+		} else {
+			// Try Python __iter__ / context-aware iteration
+			items, err := IterableValuesCtx(value, ctx)
+			if err != nil {
+				return nil, &TypeError{Message: "can only assign an iterable to a slice"}
+			}
+			newItems = items
+		}
+	}
+
+	// Compute start and stop indices based on step direction
+	var start, stop int
+	if step > 0 {
+		start = 0
+		stop = length
+	} else {
+		start = length - 1
+		stop = -1
+	}
+
+	if slice.Start != nil && slice.Start != Nil {
+		s, err := toIndex(slice.Start, ctx)
+		if err != nil {
+			return nil, err
+		}
+		start = s
+		if start < 0 {
+			start = length + start
+		}
+		if step > 0 {
+			if start < 0 {
+				start = 0
+			} else if start > length {
+				start = length
+			}
+		} else {
+			if start < -1 {
+				start = -1
+			} else if start >= length {
+				start = length - 1
+			}
+		}
+	}
+
+	if slice.Stop != nil && slice.Stop != Nil {
+		s, err := toIndex(slice.Stop, ctx)
+		if err != nil {
+			return nil, err
+		}
+		stop = s
+		if stop < 0 {
+			stop = length + stop
+		}
+		if step > 0 {
+			if stop < 0 {
+				stop = 0
+			} else if stop > length {
+				stop = length
+			}
+		} else {
+			if stop < -1 {
+				stop = -1
+			} else if stop >= length {
+				stop = length
+			}
+		}
+	}
+
+	// Simple slice (step == 1 or step == -1 without gaps)
+	if step == 1 {
+		// CPython: if stop < start, clamp stop = start (empty slice = insertion at start)
+		if stop < start {
+			stop = start
+		}
+		valList := NewList(newItems...)
+		return None, list.SetSlice(&start, &stop, valList)
+	}
+
+	// Extended slice: compute count and indices without risking integer overflow.
+	// Use multiplication-based index computation instead of repeated addition.
+	var sliceCount int
+	if step > 0 && start < stop {
+		sliceCount = (stop-start-1)/step + 1
+	} else if step < 0 && start > stop {
+		sliceCount = (start-stop-1)/(-step) + 1
+	}
+	indices := make([]int, sliceCount)
+	for k := range indices {
+		indices[k] = start + k*step
+	}
+
+	// Extended slice assignment: lengths must match
+	if len(newItems) != len(indices) {
+		return nil, &ValueError{
+			Message: fmt.Sprintf("attempt to assign sequence of size %d to extended slice of size %d",
+				len(newItems), len(indices)),
+		}
+	}
+
+	// Validate all indices are still in bounds (the list may have been mutated
+	// while iterating the RHS value). CPython raises ValueError in this case.
+	for _, idx := range indices {
+		if idx < 0 || idx >= len(list.items) {
+			return nil, &ValueError{
+				Message: fmt.Sprintf("list assignment index out of range"),
+			}
+		}
+	}
+
+	// Replace each selected item in place
+	for i, idx := range indices {
+		list.items[idx] = newItems[i]
+	}
 	return None, nil
 }
 
@@ -1032,15 +1253,19 @@ func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error
 		// Normalize indices (using same logic as slicing)
 		startIdx, stopIdx, stepVal := normalizeSliceIndicesForDel(length, start, stop, step)
 
-		// Create set of indices to delete
-		indicesToDelete := make(map[int]bool)
-		if stepVal > 0 {
-			for i := startIdx; i < stopIdx; i += stepVal {
-				indicesToDelete[i] = true
-			}
-		} else {
-			for i := startIdx; i > stopIdx; i += stepVal {
-				indicesToDelete[i] = true
+		// Create set of indices to delete using multiplication-based counting
+		// to avoid overflow with very large step values.
+		var delCount int
+		if stepVal > 0 && startIdx < stopIdx {
+			delCount = (stopIdx-startIdx-1)/stepVal + 1
+		} else if stepVal < 0 && startIdx > stopIdx {
+			delCount = (startIdx-stopIdx-1)/(-stepVal) + 1
+		}
+		indicesToDelete := make(map[int]bool, delCount)
+		for k := 0; k < delCount; k++ {
+			idx := startIdx + k*stepVal
+			if idx >= 0 && idx < length {
+				indicesToDelete[idx] = true
 			}
 		}
 
@@ -1167,22 +1392,45 @@ func toIndex(obj Value, ctx *Context) (int, error) {
 				if !ok {
 					return 0, &TypeError{Message: fmt.Sprintf("__index__ returned non-int type %s", result.Type())}
 				}
-				intVal := int(num)
-				if float64(intVal) != float64(num) {
+				f := float64(num)
+				if f != math.Trunc(f) {
 					return 0, &TypeError{Message: fmt.Sprintf("__index__ returned non-integer value %v", num)}
 				}
-				return intVal, nil
+				// Clamp very large values (CPython clamps to PY_SSIZE_T_MAX)
+				if f >= math.MaxInt64 {
+					return math.MaxInt, nil
+				}
+				if f <= math.MinInt64 {
+					return math.MinInt, nil
+				}
+				return int(f), nil
 			}
 		}
 	}
 
+	// BigIntValue: large integer — clamp to int bounds (always out of range for list indices)
+	if big, ok := obj.(BigIntValue); ok {
+		if big.Sign() < 0 {
+			return math.MinInt, nil
+		}
+		return math.MaxInt, nil
+	}
+
 	// Fall back to NumberValue for built-in numeric types
 	if num, ok := obj.(NumberValue); ok {
-		intVal := int(num)
-		if float64(intVal) != float64(num) {
+		f := float64(num)
+		// Must be an integer-valued float (no fractional part)
+		if f != math.Trunc(f) {
 			return 0, &TypeError{Message: "list indices must be integers or slices, not float"}
 		}
-		return intVal, nil
+		// Clamp very large values to int bounds (CPython clamps to PY_SSIZE_T_MAX)
+		if f >= math.MaxInt64 {
+			return math.MaxInt, nil
+		}
+		if f <= math.MinInt64 {
+			return math.MinInt, nil
+		}
+		return int(f), nil
 	}
 
 	// Not convertible to index
@@ -1191,6 +1439,80 @@ func toIndex(obj Value, ctx *Context) (int, error) {
 		typeName = desc.PythonName
 	}
 	return 0, &TypeError{Message: fmt.Sprintf("list indices must be integers or slices, not %s", typeName)}
+}
+
+// listCompareCtx performs lexicographic comparison of two lists with context
+// for proper __lt__/__eq__ dispatch on elements.
+// Returns (-1,nil) if a < b, (0,nil) if a == b, (1,nil) if a > b, (_,err) on error.
+func listCompareCtx(a, b *ListValue, ctx *Context) (int, error) {
+	// Iterate live (not via snapshot) to detect mutations during comparison
+	i := 0
+	for i < a.Len() && i < b.Len() {
+		ai := a.items[i]
+		bi := b.items[i]
+		// First check equality
+		eq, err := EqualValuesWithError(ai, bi, ctx)
+		if err != nil {
+			return 0, err
+		}
+		if !eq {
+			// Elements differ: determine ordering
+			// Try ai < bi via __lt__
+			isLt, err := callLtWithReflection(ai, bi, ctx)
+			if err != nil {
+				return 0, err
+			}
+			if isLt {
+				return -1, nil
+			}
+			return 1, nil
+		}
+		i++
+	}
+	// Exhausted elements; compare sizes accounting for live mutations
+	if a.Len() < b.Len() {
+		return -1, nil
+	} else if a.Len() > b.Len() {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+// callLtWithReflection tries a.__lt__(b); if NotImplemented, tries b.__gt__(a);
+// if both NotImplemented, raises TypeError.
+func callLtWithReflection(a, b Value, ctx *Context) (bool, error) {
+	// Try a.__lt__(b)
+	if aObj, ok := a.(interface{ GetAttr(string) (Value, bool) }); ok {
+		if ltMethod, found := aObj.GetAttr("__lt__"); found {
+			if callable, ok := ltMethod.(interface{ Call([]Value, *Context) (Value, error) }); ok {
+				result, err := callable.Call([]Value{b}, ctx)
+				if err != nil {
+					return false, err
+				}
+				if result != NotImplemented {
+					return IsTruthy(result), nil
+				}
+			}
+		}
+	}
+	// Try b.__gt__(a) (reflected)
+	if bObj, ok := b.(interface{ GetAttr(string) (Value, bool) }); ok {
+		if gtMethod, found := bObj.GetAttr("__gt__"); found {
+			if callable, ok := gtMethod.(interface{ Call([]Value, *Context) (Value, error) }); ok {
+				result, err := callable.Call([]Value{a}, ctx)
+				if err != nil {
+					return false, err
+				}
+				if result != NotImplemented {
+					return IsTruthy(result), nil
+				}
+			}
+		}
+	}
+	// Both returned NotImplemented → TypeError
+	aType := GetPythonTypeName(a)
+	bType := GetPythonTypeName(b)
+	return false, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of '%s' and '%s'", aType, bType)}
 }
 
 // listCompare performs lexicographic comparison of two lists
@@ -1297,46 +1619,74 @@ func listMethodLt(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
 		return nil, &TypeError{Message: "__lt__ takes exactly one argument"}
 	}
-	list1 := receiver.(*ListValue)
-	list2, ok := args[0].(*ListValue)
-	if !ok {
-		return nil, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of 'list' and '%s'", args[0].Type())}
+	list1 := toListValue(receiver)
+	list2 := toListValue(args[0])
+	if list2 == nil {
+		return NotImplemented, nil
 	}
-	return BoolValue(listCompare(list1, list2) < 0), nil
+	cmp, err := listCompareCtx(list1, list2, ctx)
+	if err != nil {
+		return nil, err
+	}
+	return BoolValue(cmp < 0), nil
 }
 
 func listMethodLe(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
 		return nil, &TypeError{Message: "__le__ takes exactly one argument"}
 	}
-	list1 := receiver.(*ListValue)
-	list2, ok := args[0].(*ListValue)
-	if !ok {
-		return nil, &TypeError{Message: fmt.Sprintf("'<=' not supported between instances of 'list' and '%s'", args[0].Type())}
+	list1 := toListValue(receiver)
+	list2 := toListValue(args[0])
+	if list2 == nil {
+		return NotImplemented, nil
 	}
-	return BoolValue(listCompare(list1, list2) <= 0), nil
+	cmp, err := listCompareCtx(list1, list2, ctx)
+	if err != nil {
+		return nil, err
+	}
+	return BoolValue(cmp <= 0), nil
 }
 
 func listMethodGt(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
 		return nil, &TypeError{Message: "__gt__ takes exactly one argument"}
 	}
-	list1 := receiver.(*ListValue)
-	list2, ok := args[0].(*ListValue)
-	if !ok {
-		return nil, &TypeError{Message: fmt.Sprintf("'>' not supported between instances of 'list' and '%s'", args[0].Type())}
+	list1 := toListValue(receiver)
+	list2 := toListValue(args[0])
+	if list2 == nil {
+		return NotImplemented, nil
 	}
-	return BoolValue(listCompare(list1, list2) > 0), nil
+	cmp, err := listCompareCtx(list1, list2, ctx)
+	if err != nil {
+		return nil, err
+	}
+	return BoolValue(cmp > 0), nil
 }
 
 func listMethodGe(receiver Value, args []Value, ctx *Context) (Value, error) {
 	if len(args) != 1 {
 		return nil, &TypeError{Message: "__ge__ takes exactly one argument"}
 	}
-	list1 := receiver.(*ListValue)
-	list2, ok := args[0].(*ListValue)
-	if !ok {
-		return nil, &TypeError{Message: fmt.Sprintf("'>=' not supported between instances of 'list' and '%s'", args[0].Type())}
+	list1 := toListValue(receiver)
+	list2 := toListValue(args[0])
+	if list2 == nil {
+		return NotImplemented, nil
 	}
-	return BoolValue(listCompare(list1, list2) >= 0), nil
+	cmp, err := listCompareCtx(list1, list2, ctx)
+	if err != nil {
+		return nil, err
+	}
+	return BoolValue(cmp >= 0), nil
+}
+
+// toListValue extracts the underlying *ListValue from a *ListValue or *ListInstance.
+// Returns nil if the value is neither.
+func toListValue(v Value) *ListValue {
+	if lv, ok := v.(*ListValue); ok {
+		return lv
+	}
+	if li, ok := v.(*ListInstance); ok {
+		return li.Data
+	}
+	return nil
 }

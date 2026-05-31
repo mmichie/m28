@@ -167,6 +167,21 @@ func compareEqual(left, right core.Value, ctx *core.Context) (core.Value, error)
 		}
 	}
 
+	// For lists and list subclasses, use context-aware equality so that:
+	// - Mutations during element __eq__ are visible (live comparison, not snapshots)
+	// - Reflected __eq__ is tried when the first returns NotImplemented
+	_, leftIsListV := left.(*core.ListValue)
+	_, leftIsListI := left.(*core.ListInstance)
+	_, rightIsListV := right.(*core.ListValue)
+	_, rightIsListI := right.(*core.ListInstance)
+	if leftIsListV || leftIsListI || rightIsListV || rightIsListI {
+		eq, err := core.EqualValuesWithError(left, right, ctx)
+		if err != nil {
+			return nil, err
+		}
+		return core.BoolValue(eq), nil
+	}
+
 	// For dicts, use context-aware equality to propagate __eq__ exceptions
 	if ld, ok := left.(*core.DictValue); ok {
 		if rd, ok := right.(*core.DictValue); ok {

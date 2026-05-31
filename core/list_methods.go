@@ -5,9 +5,10 @@ import (
 	"log"
 )
 
-// simpleListIterator is a simple list iterator for __iter__
+// simpleListIterator is a simple list iterator for __iter__.
+// It detaches from the list when exhausted, matching CPython semantics.
 type simpleListIterator struct {
-	list  *ListValue
+	list  *ListValue // nil when exhausted
 	index int
 }
 
@@ -16,30 +17,59 @@ func (s *simpleListIterator) Type() Type {
 }
 
 func (s *simpleListIterator) String() string {
-	return fmt.Sprintf("<list_iterator at %d>", s.index)
+	return fmt.Sprintf("<list_iterator object>")
+}
+
+// Next implements Iterator for Go-level iteration (for loops, list())
+func (s *simpleListIterator) Next() (Value, bool) {
+	if s.list == nil {
+		return nil, false
+	}
+	if s.index >= s.list.Len() {
+		s.list = nil // detach when exhausted
+		return nil, false
+	}
+	val := s.list.items[s.index]
+	s.index++
+	return val, true
+}
+
+// Reset resets the iterator (not commonly needed, but satisfies Iterator interface)
+func (s *simpleListIterator) Reset() {
+	s.index = 0
+}
+
+// Iterator implements Iterable - returns self
+func (s *simpleListIterator) Iterator() Iterator {
+	return s
 }
 
 func (s *simpleListIterator) GetAttr(name string) (Value, bool) {
-	if name == "__iter__" {
+	switch name {
+	case "__iter__":
 		// Per Python iterator protocol: __iter__ returns the iterator itself
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			return s, nil
 		}), true
-	}
-	if name == "__next__" {
+	case "__next__":
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if s.list == nil {
+				return nil, fmt.Errorf("StopIteration")
+			}
 			if s.index < s.list.Len() {
-				val := s.list.Items()[s.index]
+				val := s.list.items[s.index]
 				s.index++
 				return val, nil
 			}
-			// Return StopIteration error
+			s.list = nil // detach when exhausted
 			return nil, fmt.Errorf("StopIteration")
 		}), true
-	}
-	if name == "__length_hint__" {
+	case "__length_hint__":
 		// PEP 424: Return estimated remaining length
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if s.list == nil {
+				return NumberValue(0), nil
+			}
 			remaining := s.list.Len() - s.index
 			if remaining < 0 {
 				remaining = 0
@@ -139,11 +169,12 @@ func InitListMethods() {
 			list := receiver.(*ListValue)
 			value := args[0]
 
-			// Find the first occurrence using Python's comparison protocol:
-			// Python calls value == item (not item == value), with reflection.
+			// Find the first occurrence using Python's comparison protocol.
+			// CPython's list.remove checks item == value (list element first),
+			// not value == item.
 			index := -1
 			for i, item := range list.Items() {
-				equal, err := equalWithReflection(value, item, ctx)
+				equal, err := equalWithReflection(item, value, ctx)
 				if err != nil {
 					return nil, err
 				}

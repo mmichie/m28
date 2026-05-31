@@ -821,16 +821,16 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 		hasCustomInit := false
 		hasCustomNew := false
 
-		// Check if __init__ is overridden (not from object)
+		// Check if __init__ is overridden (not from object or builtin types)
 		if _, defClass, ok := c.GetMethodWithClass("__init__"); ok {
-			if defClass.Name != "object" {
+			if defClass.Name != "object" && !isBuiltinTypeName(defClass.Name) {
 				hasCustomInit = true
 			}
 		}
 
-		// Check if __new__ is overridden (not from object)
+		// Check if __new__ is overridden (not from object or builtin types)
 		if _, defClass, ok := c.GetMethodWithClass("__new__"); ok {
-			if defClass.Name != "object" {
+			if defClass.Name != "object" && !isBuiltinTypeName(defClass.Name) {
 				hasCustomNew = true
 			}
 		}
@@ -852,6 +852,24 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 		if !hasCustomInit && !hasCustomNew && !hasBuiltinParent {
 			return nil, &TypeError{Message: fmt.Sprintf("%s() takes no arguments", c.Name)}
 		}
+
+		// If kwargs are provided but neither __init__ nor __new__ accepts them,
+		// and the parent is a list-like type that doesn't accept kwargs, raise TypeError.
+		if len(kwargs) > 0 && !hasCustomInit && !hasCustomNew {
+			for _, parent := range c.Parents {
+				if parent.Name == "list" {
+					return nil, &TypeError{Message: fmt.Sprintf("%s() takes no keyword arguments", c.Name)}
+				}
+			}
+		}
+	}
+
+	// Check if this class has a user-defined __new__ (not from object or builtin types)
+	userDefinedNew := false
+	if _, defClass, ok := c.GetMethodWithClass("__new__"); ok {
+		if defClass.Name != "object" && !isBuiltinTypeName(defClass.Name) {
+			userDefinedNew = true
+		}
 	}
 
 	var instance Value
@@ -867,20 +885,32 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			newMethod = cm.Function
 		}
 
-		// Call __new__ with positional args only
-		// In Python, __new__ typically only receives positional args,
-		// while keyword args are handled by __init__
-		if callable, ok := newMethod.(interface {
-			Call([]Value, *Context) (Value, error)
-		}); ok {
-			result, err := callable.Call(newArgs, ctx)
-			if err != nil {
-				return nil, fmt.Errorf("error in %s.__new__: %w", c.Name, err)
+		// Pass kwargs to __new__ only if it's user-defined; builtin __new__ doesn't accept arbitrary kwargs
+		var newErr error
+		if userDefinedNew {
+			if kwargsCallable, ok := newMethod.(interface {
+				CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+			}); ok {
+				instance, newErr = kwargsCallable.CallWithKeywords(newArgs, kwargs, ctx)
+			} else if callable, ok := newMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				instance, newErr = callable.Call(newArgs, ctx)
+			} else {
+				instance = NewInstance(c)
 			}
-			instance = result
 		} else {
-			// __new__ exists but isn't callable, fall back to default
-			instance = NewInstance(c)
+			// Builtin __new__: only pass positional args
+			if callable, ok := newMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
+				instance, newErr = callable.Call(newArgs, ctx)
+			} else {
+				instance = NewInstance(c)
+			}
+		}
+		if newErr != nil {
+			return nil, fmt.Errorf("error in %s.__new__: %w", c.Name, newErr)
 		}
 	} else {
 		// No __new__, use default instance creation
@@ -909,6 +939,32 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				inst.BackingDict.SetValue(StringValue(k), v)
 			}
 			kwargs = nil
+		}
+	}
+
+	// Call __init__ for list subclass instances (*ListInstance)
+	if listInst, ok := instance.(*ListInstance); ok {
+		if initMethod, definingClass, ok := c.GetMethodWithClass("__init__"); ok {
+			if definingClass.Name != "object" && definingClass.Name != "list" {
+				initCtx := NewContext(ctx)
+				initCtx.Define("__class__", definingClass)
+				initArgs := append([]Value{listInst}, args...)
+				if kwargsCallable, ok := initMethod.(interface {
+					CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+				}); ok {
+					_, err := kwargsCallable.CallWithKeywords(initArgs, kwargs, initCtx)
+					if err != nil {
+						return nil, err
+					}
+				} else if callable, ok := initMethod.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); ok {
+					_, err := callable.Call(initArgs, initCtx)
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
 		}
 	}
 
@@ -1208,8 +1264,9 @@ func (t *TupleInstance) GetAttr(name string) (Value, bool) {
 
 // ListInstance represents an instance of a class that inherits from list
 type ListInstance struct {
-	Data  *ListValue // The underlying list data
-	Class *Class     // The class this list is an instance of
+	Data       *ListValue        // The underlying list data
+	Class      *Class            // The class this list is an instance of
+	Attributes map[string]Value  // Instance attributes (e.g., set by __init__)
 }
 
 // IteratorWrapper wraps a Go Iterator to make it a Value with __next__
@@ -1270,8 +1327,9 @@ func (b *BoundListMethod) Call(args []Value, ctx *Context) (Value, error) {
 // NewListInstance creates a new list instance of a class
 func NewListInstance(class *Class, data *ListValue) *ListInstance {
 	return &ListInstance{
-		Data:  data,
-		Class: class,
+		Data:       data,
+		Class:      class,
+		Attributes: make(map[string]Value),
 	}
 }
 
@@ -1300,11 +1358,27 @@ func (l *ListInstance) Items() []Value {
 	return l.Data.Items()
 }
 
+// SetAttr sets an instance attribute on the list instance
+func (l *ListInstance) SetAttr(name string, value Value) error {
+	if l.Attributes == nil {
+		l.Attributes = make(map[string]Value)
+	}
+	l.Attributes[name] = value
+	return nil
+}
+
 // GetAttr gets an attribute from the list's class
 func (l *ListInstance) GetAttr(name string) (Value, bool) {
 	// Special case for __class__
 	if name == "__class__" {
 		return l.Class, true
+	}
+
+	// Check instance attributes first (set by __init__ etc.)
+	if l.Attributes != nil {
+		if val, ok := l.Attributes[name]; ok {
+			return val, true
+		}
 	}
 
 	// Delegate list methods to the underlying list data
@@ -1339,7 +1413,7 @@ func (l *ListInstance) GetAttr(name string) (Value, bool) {
 		}), true
 	}
 
-	// Look up in the class
+	// Look up in the class hierarchy (user-defined overrides)
 	if attr, defClass, found := l.Class.GetMethodWithClass(name); found {
 		// Check if it's callable - if so, bind it as a method
 		if callable, ok := attr.(interface {
@@ -1354,6 +1428,12 @@ func (l *ListInstance) GetAttr(name string) (Value, bool) {
 			}
 			return boundMethod, true
 		}
+		return attr, true
+	}
+
+	// Fall back to underlying list data methods so list subclasses
+	// inherit all list methods (count, index, remove, sort, etc.)
+	if attr, found := l.Data.GetAttr(name); found {
 		return attr, true
 	}
 	return nil, false
@@ -1501,6 +1581,11 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 					}
 				}
 			}
+		}
+
+		// Static methods should not be bound to the instance
+		if sm, ok := classAttr.(*StaticMethodValue); ok {
+			return sm.Function, true
 		}
 
 		// Not a descriptor, check if it's a regular method that needs binding

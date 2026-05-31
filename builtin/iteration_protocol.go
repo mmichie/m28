@@ -23,7 +23,11 @@ func iterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Check if the returned value has __next__ (is an iterator)
-		if iterObj, ok := iter.(core.Object); ok {
+		// Use a broader interface check than core.Object (which requires SetAttr/CallMethod)
+		type hasGetAttr interface {
+			GetAttr(string) (core.Value, bool)
+		}
+		if iterObj, ok := iter.(hasGetAttr); ok {
 			if _, hasNext := iterObj.GetAttr("__next__"); hasNext {
 				// Has __next__, so it's a valid iterator
 				return iter, nil

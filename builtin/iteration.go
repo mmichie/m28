@@ -43,13 +43,9 @@ func IterBuilder() builders.BuiltinFunc {
 
 		// Single argument - get iterator
 		if v.Count() == 1 {
-			// For now, just return the iterable itself
-			// TODO(M28-5beb): Return proper iterator object when implemented
-			if iterable, ok := types.AsIterable(obj); ok {
-				return iterable, nil
-			}
-
-			// Try __iter__ method
+			// Try __iter__ method FIRST (respects Python's iterator protocol).
+			// This allows types like list (which also implement Go's Iterable)
+			// to return proper iterator objects instead of themselves.
 			if o, ok := obj.(core.Object); ok {
 				if method, exists := o.GetAttr("__iter__"); exists {
 					if callable, ok := types.AsCallable(method); ok {
@@ -57,10 +53,14 @@ func IterBuilder() builders.BuiltinFunc {
 						if err != nil {
 							return nil, err
 						}
-						// Return result as is
 						return result, nil
 					}
 				}
+			}
+
+			// Fall back to Go Iterable interface (ranges, etc.)
+			if iterable, ok := types.AsIterable(obj); ok {
+				return iterable, nil
 			}
 
 			return nil, errors.NewTypeError("iter", "argument must be iterable", string(obj.Type()))

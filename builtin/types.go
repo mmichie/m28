@@ -195,7 +195,18 @@ func RegisterTypes(ctx *core.Context) {
 		return listData, nil
 	})
 	listNew.SetAttr("__name__", core.StringValue("__new__"))
-	ListTypeClass.SetMethod("__new__", &core.ClassMethodValue{Function: listNew})
+	// Register as a plain function, not a classmethod, because:
+	// - Class.CallWithKeywords already prepends `cls` before calling __new__
+	// - When accessed via super().__new__, BoundClassMethod would prepend cls again
+	ListTypeClass.SetMethod("__new__", listNew)
+
+	// list.__init__ — called by super().__init__(iterable) in list subclasses.
+	// __new__ already populated the list, so __init__ just accepts and ignores args.
+	listInit := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.Nil, nil
+	})
+	listInit.SetAttr("__name__", core.StringValue("__init__"))
+	ListTypeClass.SetMethod("__init__", listInit)
 
 	// Add __code__ and __globals__ as class attributes on function type
 	// These are descriptor objects that Python uses to access function attributes
@@ -1150,6 +1161,8 @@ func (t *TypeType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		case core.Callable:
 			return FunctionTypeClass, nil
 		case *core.Instance:
+			return v.Class, nil
+		case *core.ListInstance:
 			return v.Class, nil
 		case *core.GenericAlias:
 			// type(list[int]) returns GenericAlias class

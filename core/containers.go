@@ -285,6 +285,11 @@ func (l *ListValue) SetSlice(start, end *int, values *ListValue) error {
 		}
 	}
 
+	// CPython clamps stop to start when stop < start: slice is empty, insertion at start.
+	if endIdx < startIdx {
+		endIdx = startIdx
+	}
+
 	// Replace the slice
 	newItems := make([]Value, 0, len(l.items)-endIdx+startIdx+len(values.items))
 	newItems = append(newItems, l.items[:startIdx]...)
@@ -311,7 +316,9 @@ func (l *ListValue) Extend(values []Value) {
 
 // Iterator implements Iterable
 func (l *ListValue) Iterator() Iterator {
-	return &listIterator{
+	// Use simpleListIterator which detaches from the list when exhausted,
+	// matching CPython semantics (once exhausted, new elements aren't seen).
+	return &simpleListIterator{
 		list:  l,
 		index: 0,
 	}

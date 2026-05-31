@@ -88,21 +88,37 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 		}
 		return false, nil
 	}
-	if aL, ok := a.(*ListValue); ok {
-		if bL, ok := b.(*ListValue); ok {
-			if aL.Len() != bL.Len() {
-				return false, nil
-			}
-			for i := range aL.Items() {
-				eq, err := EqualValuesWithError(aL.Items()[i], bL.Items()[i], ctx)
+	// Helper: extract *ListValue from either *ListValue or *ListInstance
+	asListData := func(v Value) (*ListValue, bool) {
+		if lv, ok := v.(*ListValue); ok {
+			return lv, true
+		}
+		if li, ok := v.(*ListInstance); ok {
+			return li.Data, true
+		}
+		return nil, false
+	}
+	if aL, ok := asListData(a); ok {
+		if bL, ok := asListData(b); ok {
+			// Compare element-wise live (not via snapshot) to match CPython semantics:
+			// mutations during __eq__ are visible in subsequent bound checks.
+			i := 0
+			for i < aL.Len() && i < bL.Len() {
+				eq, err := EqualValuesWithError(aL.items[i], bL.items[i], ctx)
 				if err != nil {
 					return false, err
 				}
 				if !eq {
-					return false, nil
+					break
 				}
+				i++
 			}
-			return true, nil
+			// If we exhausted one (or both) lists, compare current sizes.
+			// Mutations during __eq__ can change sizes, matching CPython behavior.
+			if i >= aL.Len() || i >= bL.Len() {
+				return aL.Len() == bL.Len(), nil
+			}
+			return false, nil
 		}
 		return false, nil
 	}
@@ -386,12 +402,38 @@ func EqualValues(a, b Value) bool {
 		_, ok := b.(NilValue)
 		return ok
 	case *ListValue:
+		var bData *ListValue
 		if bVal, ok := b.(*ListValue); ok {
-			if aVal.Len() != bVal.Len() {
+			bData = bVal
+		} else if bVal, ok := b.(*ListInstance); ok {
+			bData = bVal.Data
+		}
+		if bData != nil {
+			if aVal.Len() != bData.Len() {
 				return false
 			}
 			aItems := aVal.Items()
-			bItems := bVal.Items()
+			bItems := bData.Items()
+			for i := range aItems {
+				if !EqualValues(aItems[i], bItems[i]) {
+					return false
+				}
+			}
+			return true
+		}
+	case *ListInstance:
+		var bData *ListValue
+		if bVal, ok := b.(*ListValue); ok {
+			bData = bVal
+		} else if bVal, ok := b.(*ListInstance); ok {
+			bData = bVal.Data
+		}
+		if bData != nil {
+			if aVal.Data.Len() != bData.Len() {
+				return false
+			}
+			aItems := aVal.Data.Items()
+			bItems := bData.Items()
 			for i := range aItems {
 				if !EqualValues(aItems[i], bItems[i]) {
 					return false

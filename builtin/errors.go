@@ -409,6 +409,10 @@ func RegisterErrors(ctx *core.Context) {
 	overflowErrorClass := core.NewClass("OverflowError", arithmeticErrorClass)
 	ctx.Define("OverflowError", overflowErrorClass)
 
+	// MemoryError - raised when an operation runs out of memory
+	memoryErrorClass := core.NewClass("MemoryError", exceptionClass)
+	ctx.Define("MemoryError", memoryErrorClass)
+
 	// FloatingPointError - raised when floating point operation fails
 	floatingPointErrorClass := core.NewClass("FloatingPointError", arithmeticErrorClass)
 	ctx.Define("FloatingPointError", floatingPointErrorClass)

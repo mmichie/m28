@@ -152,25 +152,29 @@ func RegisterCollections(ctx *core.Context) {
 			step = args[2]
 		}
 
-		// Validate that arguments are None or integers
+		// Validate that arguments are None or integers (including BigIntValue)
+		isIntLike := func(v core.Value) bool {
+			if types.IsNumber(v) {
+				return true
+			}
+			_, isBig := v.(core.BigIntValue)
+			return isBig
+		}
 		if start != core.Nil {
-			if !types.IsNumber(start) {
+			if !isIntLike(start) {
 				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", start.Type())}
 			}
 		}
 		if stop != core.Nil {
-			if !types.IsNumber(stop) {
+			if !isIntLike(stop) {
 				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", stop.Type())}
 			}
 		}
 		if step != core.Nil {
-			if !types.IsNumber(step) {
+			if !isIntLike(step) {
 				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", step.Type())}
 			}
-			// Check that step is not zero
-			if num, ok := types.AsNumber(step); ok && int64(num) == 0 {
-				return nil, &core.ValueError{Message: "slice step cannot be zero"}
-			}
+			// Note: step==0 is allowed at construction time; error is raised at use time.
 		}
 
 		return &core.SliceValue{
@@ -288,7 +292,30 @@ func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 	}
 	if len(args) == 1 {
 		// Python-style: Convert iterable to list
-		items, err := convertToSlice(args[0])
+		// First try Go-level iterable checks (fast path)
+		if _, ok := types.AsList(args[0]); ok {
+			items, err := convertToSlice(args[0])
+			if err != nil {
+				return nil, err
+			}
+			return core.NewList(items...), nil
+		}
+		if _, ok := types.AsTuple(args[0]); ok {
+			items, err := convertToSlice(args[0])
+			if err != nil {
+				return nil, err
+			}
+			return core.NewList(items...), nil
+		}
+		if _, ok := types.AsString(args[0]); ok {
+			items, err := convertToSlice(args[0])
+			if err != nil {
+				return nil, err
+			}
+			return core.NewList(items...), nil
+		}
+		// Use Python __iter__ protocol (propagates exceptions like KeyboardInterrupt)
+		items, err := core.IterableValuesCtx(args[0], ctx)
 		if err != nil {
 			return nil, err
 		}

@@ -390,6 +390,15 @@ func NewRecursionError(msg string) *RecursionError {
 	return &RecursionError{Message: msg}
 }
 
+// OverflowError represents Python's OverflowError (arithmetic overflow)
+type OverflowError struct {
+	Message string
+}
+
+func (e *OverflowError) Error() string {
+	return e.Message
+}
+
 // NewTypeError creates a new type error
 func NewTypeError(expected string, got Value, context string) *TypeError {
 	var gotType string
