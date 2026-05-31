@@ -12,6 +12,199 @@ import (
 // !s - str() - default string representation
 // !r - repr() - quoted string representation
 // !a - ascii() - like repr() but escape non-ASCII characters
+// strFormat implements str.format(args, **kwargs) with full Python semantics:
+// positional {0}/{} and keyword {name} field access, conversion (!r/!s/!a),
+// format specs (:>10.2f), and attribute/index sub-fields (e.g. {obj.attr}).
+func strFormat(s string, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	result := &strings.Builder{}
+	autoIdx := 0
+	i := 0
+	for i < len(s) {
+		ch := s[i]
+		if ch == '{' {
+			if i+1 < len(s) && s[i+1] == '{' {
+				result.WriteByte('{')
+				i += 2
+				continue
+			}
+			// Find the closing '}'
+			j := i + 1
+			depth := 1
+			for j < len(s) && depth > 0 {
+				if s[j] == '{' {
+					depth++
+				} else if s[j] == '}' {
+					depth--
+				}
+				j++
+			}
+			if depth != 0 {
+				return nil, &ValueError{Message: "unmatched '{' in format string"}
+			}
+			spec := s[i+1 : j-1]
+
+			// Split field from format_spec at ':'
+			var fieldExpr, formatSpec string
+			colonIdx := strings.IndexByte(spec, ':')
+			if colonIdx >= 0 {
+				fieldExpr = spec[:colonIdx]
+				formatSpec = spec[colonIdx+1:]
+			} else {
+				fieldExpr = spec
+			}
+
+			// Split conversion from field at '!'
+			var conversion string
+			bangIdx := strings.IndexByte(fieldExpr, '!')
+			if bangIdx >= 0 {
+				conversion = fieldExpr[bangIdx+1:]
+				fieldExpr = fieldExpr[:bangIdx]
+				if conversion != "r" && conversion != "s" && conversion != "a" {
+					return nil, &ValueError{Message: fmt.Sprintf("unknown conversion specifier '!%s'", conversion)}
+				}
+			}
+
+			// Resolve the value for fieldExpr
+			val, err := resolveFormatField(fieldExpr, args, kwargs, &autoIdx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Apply conversion
+			if conversion != "" {
+				val, err = applyConversion(val, conversion)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			// Apply format spec
+			formatted, err := formatValueWithSpec(val, formatSpec)
+			if err != nil {
+				return nil, err
+			}
+			result.WriteString(formatted)
+			i = j
+		} else if ch == '}' {
+			if i+1 < len(s) && s[i+1] == '}' {
+				result.WriteByte('}')
+				i += 2
+				continue
+			}
+			return nil, &ValueError{Message: "single '}' encountered in format string"}
+		} else {
+			result.WriteByte(ch)
+			i++
+		}
+	}
+	return StringValue(result.String()), nil
+}
+
+// resolveFormatField resolves a format field expression like "0", "name",
+// "obj.attr", "obj[key]" against positional args and kwargs.
+func resolveFormatField(field string, args []Value, kwargs map[string]Value, autoIdx *int) (Value, error) {
+	if field == "" {
+		// Auto-numbering: {}
+		idx := *autoIdx
+		*autoIdx++
+		if idx >= len(args) {
+			return nil, &IndexError{Message: fmt.Sprintf("replacement index %d out of range for positional args tuple", idx)}
+		}
+		return args[idx], nil
+	}
+
+	// Split off attribute/index lookups: "obj.attr", "obj[key]"
+	// The root name is up to the first '.' or '['
+	root := field
+	rest := ""
+	for k, c := range field {
+		if c == '.' || c == '[' {
+			root = field[:k]
+			rest = field[k:]
+			break
+		}
+	}
+
+	// Resolve root: integer index or keyword name
+	var val Value
+	if n, err := fmt.Sscanf(root, "%d", new(int)); n == 1 && err == nil {
+		var idx int
+		fmt.Sscanf(root, "%d", &idx)
+		if idx >= len(args) {
+			return nil, &IndexError{Message: fmt.Sprintf("replacement index %d out of range for positional args tuple", idx)}
+		}
+		val = args[idx]
+	} else if root != "" {
+		var ok bool
+		if kwargs != nil {
+			val, ok = kwargs[root]
+		}
+		if !ok {
+			return nil, &KeyError{Key: StringValue(root)}
+		}
+	} else {
+		idx := *autoIdx
+		*autoIdx++
+		if idx >= len(args) {
+			return nil, &IndexError{Message: fmt.Sprintf("replacement index %d out of range for positional args tuple", idx)}
+		}
+		val = args[idx]
+	}
+
+	// Walk attribute/index lookups
+	for rest != "" {
+		if rest[0] == '.' {
+			// Attribute: .attr
+			end := 1
+			for end < len(rest) && rest[end] != '.' && rest[end] != '[' {
+				end++
+			}
+			attr := rest[1:end]
+			rest = rest[end:]
+			if obj, ok := val.(interface{ GetAttr(string) (Value, bool) }); ok {
+				if v, found := obj.GetAttr(attr); found {
+					val = v
+					continue
+				}
+			}
+			return nil, &AttributeError{ObjType: string(val.Type()), AttrName: attr}
+		} else if rest[0] == '[' {
+			// Index: [key] or [n]
+			end := strings.IndexByte(rest, ']')
+			if end < 0 {
+				return nil, &ValueError{Message: "invalid format field: missing ']'"}
+			}
+			key := rest[1:end]
+			rest = rest[end+1:]
+			if n, err := fmt.Sscanf(key, "%d", new(int)); n == 1 && err == nil {
+				var idx int
+				fmt.Sscanf(key, "%d", &idx)
+				if lst, ok := val.(*ListValue); ok {
+					if idx < 0 || idx >= lst.Len() {
+						return nil, &IndexError{Index: idx}
+					}
+					val = lst.items[idx]
+				} else {
+					return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not subscriptable", val.Type())}
+				}
+			} else {
+				if d, ok := val.(*DictValue); ok {
+					if v, exists := d.entries[key]; exists {
+						val = v
+					} else {
+						return nil, &KeyError{Key: StringValue(key)}
+					}
+				} else {
+					return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not subscriptable with key '%s'", val.Type(), key)}
+				}
+			}
+		} else {
+			break
+		}
+	}
+	return val, nil
+}
+
 func applyConversion(value Value, conversion string) (Value, error) {
 	switch conversion {
 	case "s":
@@ -890,123 +1083,40 @@ func InitStringMethods() {
 	}
 
 	td.Methods["format"] = &MethodDescriptor{
-		Name:    "format",
-		Arity:   -1,
-		Doc:     "Return a formatted version of the string",
+		Name:         "format",
+		Arity:        -1,
+		Doc:          "Return a formatted version of the string",
+		Builtin:      true,
+		KwargHandler: func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+			return strFormat(string(receiver.(StringValue)), args, kwargs, ctx)
+		},
+		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			return strFormat(string(receiver.(StringValue)), args, nil, ctx)
+		},
+	}
+
+	// format_map - like format but takes a single mapping argument
+	td.Methods["format_map"] = &MethodDescriptor{
+		Name:    "format_map",
+		Arity:   1,
+		Doc:     "Return a formatted version of the string using a mapping",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			s := string(receiver.(StringValue))
-			result := &strings.Builder{}
-
-			autoArgIndex := 0
-			i := 0
-
-			for i < len(s) {
-				// Look for '{'
-				if s[i] == '{' {
-					// Check for escaped brace
-					if i+1 < len(s) && s[i+1] == '{' {
-						result.WriteByte('{')
-						i += 2
-						continue
-					}
-
-					// Find the matching '}'
-					j := i + 1
-					depth := 1
-					for j < len(s) && depth > 0 {
-						if s[j] == '{' {
-							depth++
-						} else if s[j] == '}' {
-							depth--
-						}
-						j++
-					}
-
-					if depth != 0 {
-						return nil, &ValueError{Message: "unmatched '{' in format string"}
-					}
-
-					// Extract the format spec
-					spec := s[i+1 : j-1]
-
-					// Parse the spec: [field][!conversion][:format_spec]
-					var fieldSpec, conversion, formatSpec string
-					var argIndex int
-
-					// Split on ':' to separate field from format spec
-					colonIdx := strings.IndexByte(spec, ':')
-					if colonIdx >= 0 {
-						fieldSpec = spec[:colonIdx]
-						formatSpec = spec[colonIdx+1:]
-					} else {
-						fieldSpec = spec
-					}
-
-					// Check for conversion specifier (!r, !s, !a)
-					bangIdx := strings.IndexByte(fieldSpec, '!')
-					if bangIdx >= 0 {
-						conversion = fieldSpec[bangIdx+1:]
-						fieldSpec = fieldSpec[:bangIdx]
-						// Validate conversion specifier
-						if conversion != "r" && conversion != "s" && conversion != "a" {
-							return nil, &ValueError{Message: fmt.Sprintf("invalid conversion specifier '!%s' in format string", conversion)}
-						}
-					}
-
-					// Determine which argument to use
-					if fieldSpec == "" {
-						// Auto-indexing: {}
-						argIndex = autoArgIndex
-						autoArgIndex++
-					} else {
-						// Try to parse as integer
-						var err error
-						_, err = fmt.Sscanf(fieldSpec, "%d", &argIndex)
-						if err != nil {
-							return nil, &ValueError{Message: fmt.Sprintf("invalid field name '%s' in format string", fieldSpec)}
-						}
-					}
-
-					if argIndex >= len(args) {
-						return nil, &ValueError{Message: fmt.Sprintf("replacement index %d out of range for positional args tuple", argIndex)}
-					}
-
-					// Apply conversion if specified
-					value := args[argIndex]
-					if conversion != "" {
-						var err error
-						value, err = applyConversion(value, conversion)
-						if err != nil {
-							return nil, err
-						}
-					}
-
-					// Format the argument
-					formatted, err := formatValueWithSpec(value, formatSpec)
-					if err != nil {
-						return nil, err
-					}
-					result.WriteString(formatted)
-
-					i = j
-				} else if s[i] == '}' {
-					// Check for escaped brace
-					if i+1 < len(s) && s[i+1] == '}' {
-						result.WriteByte('}')
-						i += 2
-						continue
-					}
-					return nil, &ValueError{Message: "single '}' encountered in format string"}
-				} else {
-					result.WriteByte(s[i])
-					i++
+			if len(args) != 1 {
+				return nil, &TypeError{Message: "format_map() takes exactly one argument"}
+			}
+			// Build kwargs from the mapping
+			kwargs := make(map[string]Value)
+			if d, ok := args[0].(*DictValue); ok {
+				for k, v := range d.entries {
+					kwargs[k] = v
 				}
 			}
-
-			return StringValue(result.String()), nil
+			return strFormat(s, nil, kwargs, ctx)
 		},
 	}
+
 
 	td.Methods["lstrip"] = &MethodDescriptor{
 		Name:    "lstrip",
