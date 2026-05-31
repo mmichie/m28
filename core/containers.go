@@ -16,6 +16,46 @@ var (
 	visited   = make(map[uint64]map[uintptr]bool) // goroutine ID -> visited set
 )
 
+// reprDepthMu protects the reprDepth map
+var reprDepthMu sync.Mutex
+
+// reprDepth tracks the current repr recursion depth per goroutine
+var reprDepthMap = make(map[uint64]int)
+
+const maxListReprDepth = 200
+
+// getReprDepth returns the current repr depth for this goroutine
+func getReprDepth() int {
+	gid := getGoroutineID()
+	reprDepthMu.Lock()
+	d := reprDepthMap[gid]
+	reprDepthMu.Unlock()
+	return d
+}
+
+// pushReprDepth increments the repr depth and returns the new depth
+func pushReprDepth() int {
+	gid := getGoroutineID()
+	reprDepthMu.Lock()
+	reprDepthMap[gid]++
+	d := reprDepthMap[gid]
+	reprDepthMu.Unlock()
+	return d
+}
+
+// popReprDepth decrements the repr depth
+func popReprDepth() {
+	gid := getGoroutineID()
+	reprDepthMu.Lock()
+	if reprDepthMap[gid] > 0 {
+		reprDepthMap[gid]--
+	}
+	if reprDepthMap[gid] == 0 {
+		delete(reprDepthMap, gid)
+	}
+	reprDepthMu.Unlock()
+}
+
 // withCycleDetectionErr runs f with cycle detection, returning (placeholder, nil) on cycles
 // and propagating errors from f.
 func withCycleDetectionErr(ptr uintptr, placeholder string, f func() (string, error)) (string, bool, error) {
@@ -50,6 +90,11 @@ func withCycleDetectionErr(ptr uintptr, placeholder string, f func() (string, er
 
 // withCycleDetection runs f with cycle detection for the given pointer
 func withCycleDetection(ptr uintptr, f func() string) string {
+	return withCycleDetectionPlaceholder(ptr, "{...}", f)
+}
+
+// withCycleDetectionPlaceholder runs f with cycle detection, returning placeholder on cycles
+func withCycleDetectionPlaceholder(ptr uintptr, placeholder string, f func() string) string {
 	gid := getGoroutineID()
 
 	visitedMu.Lock()
@@ -60,7 +105,7 @@ func withCycleDetection(ptr uintptr, f func() string) string {
 
 	if goroutineVisited[ptr] {
 		visitedMu.Unlock()
-		return "{...}" // Circular reference
+		return placeholder // Circular reference
 	}
 
 	goroutineVisited[ptr] = true
@@ -130,7 +175,7 @@ func (l *ListValue) String() string {
 
 	// Python's str(list) == repr(list); both use repr() on each element so
 	// strings inside print as 'foo' (single-quoted, Python default).
-	return withCycleDetection(uintptr(unsafe.Pointer(l)), func() string {
+	return withCycleDetectionPlaceholder(uintptr(unsafe.Pointer(l)), "[...]", func() string {
 		elements := make([]string, len(l.items))
 		for i, v := range l.items {
 			elements[i] = Repr(v)

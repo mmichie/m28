@@ -129,33 +129,9 @@ func RegisterList(ctx *core.Context) {
 	// reversed - returns reversed copy of sequence
 	// BEFORE: 33 lines
 	// AFTER: Using type helpers
-	ctx.Define("reversed", core.NewBuiltinFunction(builders.UnarySequence("reversed", func(seq core.Value) (core.Value, error) {
-		if str, ok := types.AsString(seq); ok {
-			// Reverse string
-			runes := []rune(str)
-			for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-				runes[i], runes[j] = runes[j], runes[i]
-			}
-			return core.StringValue(string(runes)), nil
-		}
-		if list, ok := types.AsList(seq); ok {
-			// Reverse list
-			result := make([]core.Value, list.Len())
-			for i, j := 0, list.Len()-1; i < list.Len(); i, j = i+1, j-1 {
-				result[i] = list.Items()[j]
-			}
-			return core.NewList(result...), nil
-		}
-		if tuple, ok := types.AsTuple(seq); ok {
-			// Reverse tuple
-			result := make(core.TupleValue, len(tuple))
-			for i, j := 0, len(tuple)-1; i < len(tuple); i, j = i+1, j-1 {
-				result[i] = tuple[j]
-			}
-			return core.NewList(result...), nil
-		}
-		return nil, errors.NewTypeError("reversed", "sequence", string(seq.Type()))
-	})))
+	// reversed() is now fully implemented in iteration.go (ReversedBuilder)
+	// This placeholder ensures the function exists during RegisterList
+	// It will be overwritten by RegisterIteration which runs after.
 
 	// concat - concatenates multiple sequences
 	// BEFORE: 50 lines

@@ -152,6 +152,9 @@ func getListMethods() map[string]*MethodDescriptor {
 			Doc:     "Return a shallow copy of the list",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				if len(args) > 0 {
+					return nil, &TypeError{Message: fmt.Sprintf("copy() takes no arguments (%d given)", len(args))}
+				}
 				list := receiver.(*ListValue)
 				result := make([]Value, list.Len())
 				copy(result, list.Items())
@@ -250,6 +253,30 @@ func getListMethods() map[string]*MethodDescriptor {
 					}
 				}
 				return result, nil
+			},
+		},
+		"__init__": {
+			Name:    "__init__",
+			Arity:   -1,
+			Doc:     "Initialize the list, optionally from an iterable",
+			Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				list := receiver.(*ListValue)
+				if len(args) == 0 {
+					// Clear the list
+					list.items = list.items[:0]
+					return None, nil
+				}
+				if len(args) == 1 {
+					// Reinitialize from iterable
+					newItems, err := iterableValues(args[0])
+					if err != nil {
+						return nil, err
+					}
+					list.items = newItems
+					return None, nil
+				}
+				return nil, &TypeError{Message: fmt.Sprintf("list.__init__() takes at most 1 argument (%d given)", len(args))}
 			},
 		},
 		"__len__": {
@@ -557,36 +584,11 @@ func listMethodExtend(receiver Value, args []Value, ctx *Context) (Value, error)
 	}
 	list := receiver.(*ListValue)
 
-	// Handle different iterable types
-	var toExtend []Value
-	switch v := args[0].(type) {
-	case *ListValue:
-		toExtend = v.Items()
-	case TupleValue:
-		toExtend = v
-	case StringValue:
-		// String is iterable, each character becomes an element
-		s := string(v)
-		toExtend = make([]Value, len(s))
-		for i, ch := range s {
-			toExtend[i] = StringValue(string(ch))
-		}
-	default:
-		if iterable, ok := args[0].(Iterable); ok {
-			iter := iterable.Iterator()
-			for {
-				val, ok := iter.Next()
-				if !ok {
-					break
-				}
-				toExtend = append(toExtend, val)
-			}
-		} else {
-			return nil, &TypeError{Message: "extend() argument must be iterable"}
-		}
+	items, err := iterableValuesCtx(args[0], ctx)
+	if err != nil {
+		return nil, &TypeError{Message: "extend() argument must be iterable"}
 	}
-
-	list.Extend(toExtend)
+	list.Extend(items)
 	return None, nil
 }
 
@@ -639,28 +641,32 @@ func listMethodRemove(receiver Value, args []Value, ctx *Context) (Value, error)
 }
 
 func listMethodPop(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) > 1 {
+		return nil, &TypeError{Message: fmt.Sprintf("pop() takes at most 1 argument (%d given)", len(args))}
+	}
+
 	list := receiver.(*ListValue)
 	if list.Len() == 0 {
-		return nil, &IndexError{Index: -1, Length: 0}
+		return nil, &IndexError{Message: "pop from empty list", Index: -1, Length: 0}
 	}
 
 	idx := list.Len() - 1
-	if len(args) > 0 {
-		idxVal, ok := args[0].(NumberValue)
-		if !ok {
-			return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", args[0].Type())}
+	if len(args) == 1 {
+		i, err := toIndex(args[0], ctx)
+		if err != nil {
+			return nil, err
 		}
-		idx = int(idxVal)
+		idx = i
 		if idx < 0 {
 			idx = list.Len() + idx
 		}
 		if idx < 0 || idx >= list.Len() {
-			return nil, &IndexError{Index: idx, Length: list.Len()}
+			return nil, &IndexError{Message: "pop index out of range", Index: idx, Length: list.Len()}
 		}
 	}
 
 	// Get the element to return
-	element := list.Items()[idx]
+	element := list.items[idx]
 
 	// Mutate the list by removing the element
 	list.items = append(list.items[:idx], list.items[idx+1:]...)
@@ -672,41 +678,52 @@ func listMethodIndex(receiver Value, args []Value, ctx *Context) (Value, error) 
 	if len(args) < 1 {
 		return nil, &TypeError{Message: "index() takes at least 1 argument (0 given)"}
 	}
+	if len(args) > 3 {
+		return nil, &TypeError{Message: fmt.Sprintf("index() takes at most 3 arguments (%d given)", len(args))}
+	}
 
 	list := receiver.(*ListValue)
 	start, stop := 0, list.Len()
 
 	if len(args) > 1 {
-		if s, ok := args[1].(NumberValue); ok {
-			start = int(s)
-			if start < 0 {
-				start = list.Len() + start
-			}
-			if start < 0 {
-				start = 0
-			}
+		s, err := toIndex(args[1], ctx)
+		if err != nil {
+			return nil, err
+		}
+		start = s
+		if start < 0 {
+			start = list.Len() + start
+		}
+		if start < 0 {
+			start = 0
 		}
 	}
 
 	if len(args) > 2 {
-		if s, ok := args[2].(NumberValue); ok {
-			stop = int(s)
-			if stop < 0 {
-				stop = list.Len() + stop
-			}
-			if stop < 0 {
-				stop = 0
-			}
+		s, err := toIndex(args[2], ctx)
+		if err != nil {
+			return nil, err
+		}
+		stop = s
+		if stop < 0 {
+			stop = list.Len() + stop
+		}
+		if stop < 0 {
+			stop = 0
 		}
 	}
 
-	items := list.Items()
+	searchVal := args[0]
 	for i := start; i < stop && i < list.Len(); i++ {
-		if EqualValues(items[i], args[0]) {
+		equal, err := equalWithReflection(searchVal, list.items[i], ctx)
+		if err != nil {
+			return nil, err
+		}
+		if equal {
 			return NumberValue(i), nil
 		}
 	}
-	return nil, &ValueError{Message: fmt.Sprintf("%v is not in list", args[0])}
+	return nil, &ValueError{Message: fmt.Sprintf("%v is not in list", PrintValue(searchVal))}
 }
 
 func listMethodCount(receiver Value, args []Value, ctx *Context) (Value, error) {
@@ -715,9 +732,14 @@ func listMethodCount(receiver Value, args []Value, ctx *Context) (Value, error) 
 	}
 
 	list := receiver.(*ListValue)
+	searchVal := args[0]
 	count := 0
-	for _, item := range list.Items() {
-		if EqualValues(item, args[0]) {
+	for _, item := range list.items {
+		equal, err := equalWithReflection(searchVal, item, ctx)
+		if err != nil {
+			return nil, err
+		}
+		if equal {
 			count++
 		}
 	}
@@ -725,6 +747,10 @@ func listMethodCount(receiver Value, args []Value, ctx *Context) (Value, error) 
 }
 
 func listMethodSort(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) > 0 {
+		return nil, &TypeError{Message: "sort() takes no positional arguments"}
+	}
+
 	list := receiver.(*ListValue)
 
 	// Sort the items in place using Go's sort package
@@ -740,6 +766,11 @@ func listMethodSort(receiver Value, args []Value, ctx *Context) (Value, error) {
 // listMethodSortWithKwargs implements list.sort() with keyword arguments (key=, reverse=)
 func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
 	list := receiver.(*ListValue)
+
+	// sort() takes no positional arguments
+	if len(args) > 0 {
+		return nil, &TypeError{Message: fmt.Sprintf("sort() takes no positional arguments")}
+	}
 
 	// Extract keyword arguments
 	var keyFunc Value
@@ -820,13 +851,43 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 	}
 
 	// Sort using Go's sort package
+	var sortErr error
 	sort.SliceStable(keyedItems, func(i, j int) bool {
-		cmp := Compare(keyedItems[i].keyValue, keyedItems[j].keyValue)
+		if sortErr != nil {
+			return false
+		}
+		a, b := keyedItems[i].keyValue, keyedItems[j].keyValue
+		// Try __lt__ first (Python's primary comparison method for sorting)
+		if aObj, ok := a.(Object); ok {
+			if ltMethod, exists := aObj.GetAttr("__lt__"); exists {
+				if callable, ok := ltMethod.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); ok {
+					result, err := callable.Call([]Value{b}, ctx)
+					if err != nil {
+						sortErr = err
+						return false
+					}
+					if result != NotImplemented {
+						isLess := IsTruthy(result)
+						if reverse {
+							return !isLess && !EqualValues(a, b)
+						}
+						return isLess
+					}
+				}
+			}
+		}
+		// Fall back to numeric/string comparison
+		cmp := Compare(a, b)
 		if reverse {
 			return cmp > 0
 		}
 		return cmp < 0
 	})
+	if sortErr != nil {
+		return nil, sortErr
+	}
 
 	// Update the list items in place
 	for i, ki := range keyedItems {
@@ -837,6 +898,9 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 }
 
 func listMethodReverse(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) > 0 {
+		return nil, &TypeError{Message: fmt.Sprintf("reverse() takes no arguments (%d given)", len(args))}
+	}
 	list := receiver.(*ListValue)
 	// Reverse the items in place
 	for i, j := 0, list.Len()-1; i < j; i, j = i+1, j-1 {
@@ -901,12 +965,13 @@ func listMethodSetItem(receiver Value, args []Value, ctx *Context) (Value, error
 	}
 
 	list := receiver.(*ListValue)
-	idx, ok := args[0].(NumberValue)
-	if !ok {
-		return nil, &TypeError{Message: "list indices must be integers"}
-	}
 
-	i := int(idx)
+	// Use toIndex for proper integer conversion (supports __index__)
+	// toIndex already handles the TypeError with the right message
+	i, err := toIndex(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
 	if i < 0 {
 		i = list.Len() + i
 	}
@@ -916,8 +981,7 @@ func listMethodSetItem(receiver Value, args []Value, ctx *Context) (Value, error
 	}
 
 	// Mutate the list by setting the item
-	err := list.SetItem(i, args[1])
-	if err != nil {
+	if err := list.SetItem(i, args[1]); err != nil {
 		return nil, err
 	}
 
@@ -1116,13 +1180,17 @@ func toIndex(obj Value, ctx *Context) (int, error) {
 	if num, ok := obj.(NumberValue); ok {
 		intVal := int(num)
 		if float64(intVal) != float64(num) {
-			return 0, &TypeError{Message: "list indices must be integers, not float"}
+			return 0, &TypeError{Message: "list indices must be integers or slices, not float"}
 		}
 		return intVal, nil
 	}
 
 	// Not convertible to index
-	return 0, &TypeError{Message: fmt.Sprintf("list indices must be integers, not %s", obj.Type())}
+	typeName := string(obj.Type())
+	if desc := GetTypeDescriptorForValue(obj); desc != nil {
+		typeName = desc.PythonName
+	}
+	return 0, &TypeError{Message: fmt.Sprintf("list indices must be integers or slices, not %s", typeName)}
 }
 
 // listCompare performs lexicographic comparison of two lists

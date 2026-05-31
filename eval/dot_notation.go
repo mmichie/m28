@@ -394,14 +394,19 @@ func getListAttr(lst *core.ListValue, attr string, isCall bool, args *core.ListV
 		return core.NumberValue(lst.Len()), nil
 
 	case "pop", "reverse", "copy":
-		// These methods auto-call when accessed
-		// (. list pop) calls pop() with no args
-		// (. list pop 0) calls pop(0)
-		// (. list reverse) calls reverse()
-		// (. list copy) calls copy()
+		// When called with isCall=true, auto-call the method with any provided args.
+		// When accessed as an attribute (isCall=false), return a bound method.
 		// NOTE: sort is excluded to support kwargs (key=, reverse=)
 		if td != nil {
 			if method, ok := td.Methods[attr]; ok && method.Handler != nil {
+				if !isCall {
+					// Return bound method so it can be called later
+					return &core.BoundMethod{
+						Receiver: lst,
+						Method:   method,
+						TypeDesc: td,
+					}, nil
+				}
 				evalArgs := make([]core.Value, args.Len())
 				for i, arg := range args.Items() {
 					var err error

@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"strings"
 	"unsafe"
 )
 
@@ -211,19 +212,37 @@ func reprNamedCallable(val Value) string {
 }
 
 func formatListRepr(list *ListValue) string {
-	if list.Len() == 0 {
+	return listReprWithDepth(list)
+}
+
+// listReprWithDepth formats a list repr with depth tracking.
+// Returns the repr string, or panics with *RecursionError if depth > maxListReprDepth.
+// The panic is caught by the repr() builtin to raise RecursionError to Python.
+func listReprWithDepth(list *ListValue) string {
+	n := list.Len()
+	if n == 0 {
 		return "[]"
 	}
 
-	result := "["
-	for i, item := range list.Items() {
-		if i > 0 {
-			result += ", "
-		}
-		result += Repr(item)
+	depth := pushReprDepth()
+	defer popReprDepth()
+
+	if depth > maxListReprDepth {
+		panic(&RecursionError{Message: "maximum recursion depth exceeded while getting the repr of an object"})
 	}
-	result += "]"
-	return result
+
+	return withCycleDetectionPlaceholder(uintptr(unsafe.Pointer(list)), "[...]", func() string {
+		// Iterate live against the list's current length (like CPython).
+		// This correctly handles mutation during iteration (e.g., test_repr_mutate).
+		var elements []string
+		for i := 0; i < list.Len(); i++ {
+			if i >= len(list.items) {
+				break
+			}
+			elements = append(elements, Repr(list.items[i]))
+		}
+		return "[" + strings.Join(elements, ", ") + "]"
+	})
 }
 
 func formatTupleRepr(tuple TupleValue) string {

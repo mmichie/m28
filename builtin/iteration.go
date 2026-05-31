@@ -334,14 +334,9 @@ func ReversedBuilder() builders.BuiltinFunc {
 			return core.NewList(result...), nil
 		}
 
-		// If it's a built-in sequence type, we can reverse it directly
+		// If it's a built-in list, return a proper reverse iterator
 		if list, ok := types.AsList(obj); ok {
-			// Create reversed list
-			result := make([]core.Value, list.Len())
-			for i := 0; i < list.Len(); i++ {
-				result[i] = list.Items()[list.Len()-1-i]
-			}
-			return core.NewList(result...), nil
+			return core.NewListReverseIterator(list), nil
 		}
 
 		if tuple, ok := types.AsTuple(obj); ok {

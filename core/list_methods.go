@@ -50,6 +50,75 @@ func (s *simpleListIterator) GetAttr(name string) (Value, bool) {
 	return nil, false
 }
 
+// listReverseIterator iterates over a list in reverse order.
+// It implements both Iterator (for Go-level iteration) and
+// the Python iterator protocol via GetAttr (__iter__, __next__).
+type listReverseIterator struct {
+	list  *ListValue
+	index int // starts at len-1, decrements; -1 means exhausted
+}
+
+func (r *listReverseIterator) Type() Type {
+	return "list_reverseiterator"
+}
+
+func (r *listReverseIterator) String() string {
+	return "<list_reverseiterator object>"
+}
+
+// Next implements Iterator for Go-level iteration (for loops, list())
+func (r *listReverseIterator) Next() (Value, bool) {
+	if r.index < 0 || r.index >= r.list.Len() {
+		return nil, false
+	}
+	val := r.list.items[r.index]
+	r.index--
+	return val, true
+}
+
+// Reset resets the iterator to the start (end of the list)
+func (r *listReverseIterator) Reset() {
+	r.index = r.list.Len() - 1
+}
+
+// Iterator implements Iterable - returns self
+func (r *listReverseIterator) Iterator() Iterator {
+	return r
+}
+
+func (r *listReverseIterator) GetAttr(name string) (Value, bool) {
+	switch name {
+	case "__iter__":
+		// Per Python iterator protocol: __iter__ returns the iterator itself
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return r, nil
+		}), true
+	case "__next__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			if r.index >= 0 && r.index < r.list.Len() {
+				val := r.list.items[r.index]
+				r.index--
+				return val, nil
+			}
+			return nil, fmt.Errorf("StopIteration")
+		}), true
+	case "__length_hint__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			remaining := r.index + 1
+			if remaining < 0 {
+				remaining = 0
+			}
+			return NumberValue(remaining), nil
+		}), true
+	}
+	return nil, false
+}
+
+// NewListReverseIterator creates a new reverse iterator for a list
+func NewListReverseIterator(list *ListValue) *listReverseIterator {
+	return &listReverseIterator{list: list, index: list.Len() - 1}
+}
+
 // InitListMethods adds additional methods to the list type descriptor
 func InitListMethods() {
 	listType := GetTypeDescriptor("list")
@@ -60,7 +129,7 @@ func InitListMethods() {
 	// Add remove method
 	listType.Methods["remove"] = &MethodDescriptor{
 		Name:    "remove",
-		Arity:   1,
+		Arity:   -1,
 		Doc:     "Remove first occurrence of value. Raises ValueError if not found.",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
@@ -70,10 +139,15 @@ func InitListMethods() {
 			list := receiver.(*ListValue)
 			value := args[0]
 
-			// Find the first occurrence
+			// Find the first occurrence using Python's comparison protocol:
+			// Python calls value == item (not item == value), with reflection.
 			index := -1
 			for i, item := range list.Items() {
-				if EqualValues(item, value) {
+				equal, err := equalWithReflection(value, item, ctx)
+				if err != nil {
+					return nil, err
+				}
+				if equal {
 					index = i
 					break
 				}

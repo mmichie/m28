@@ -167,13 +167,25 @@ func emitSyntaxWarning(filename string, lineno int, ctx *core.Context) error {
 // RegisterMisc registers miscellaneous functions
 func RegisterMisc(ctx *core.Context) {
 	// repr - return string representation
-	ctx.Define("repr", core.NewNamedBuiltinFunction("repr", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("repr", core.NewNamedBuiltinFunction("repr", func(args []core.Value, ctx *core.Context) (retVal core.Value, retErr error) {
 		v := validation.NewArgs("repr", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err
 		}
 
 		val := v.Get(0)
+
+		// Catch RecursionError panics from deeply nested repr calls
+		defer func() {
+			if r := recover(); r != nil {
+				if re, ok := r.(*core.RecursionError); ok {
+					retVal = nil
+					retErr = re
+				} else {
+					panic(r) // re-panic non-RecursionError panics
+				}
+			}
+		}()
 
 		// Try __repr__ dunder method first
 		if str, found, err := types.CallRepr(val, ctx); found {
