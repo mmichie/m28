@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
@@ -47,6 +48,80 @@ func InitThreadModule() *core.DictValue {
 			}()
 
 			return core.NumberValue(float64(threadID)), nil
+		}))
+
+	// start_joinable_thread(function, *, handle=None, daemon=True) -> handle
+	// Python 3.13 joinable-thread API used by threading.py. Runs function in a
+	// goroutine and marks the handle done when it returns.
+	threadModule.SetWithKey("start_joinable_thread", core.StringValue("start_joinable_thread"),
+		&core.BuiltinFunctionWithKwargs{
+			BaseObject: *core.NewBaseObject(core.FunctionType),
+			Name:       "start_joinable_thread",
+			Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+				if len(args) < 1 {
+					return nil, &core.TypeError{Message: "start_joinable_thread() missing required argument: 'function'"}
+				}
+				fn, ok := args[0].(interface {
+					Call([]core.Value, *core.Context) (core.Value, error)
+				})
+				if !ok {
+					return nil, &core.TypeError{Message: "start_joinable_thread() argument must be callable"}
+				}
+				var handle *ThreadHandle
+				if h, ok := kwargs["handle"]; ok {
+					handle, _ = h.(*ThreadHandle)
+				}
+				if handle == nil {
+					handle = newThreadHandle(0)
+				}
+				id := atomic.AddInt64(&threadIDCounter, 1)
+				handle.mu.Lock()
+				handle.ident = id
+				handle.mu.Unlock()
+				go func() {
+					defer handle.setDone()
+					defer func() { _ = recover() }() // a thread panic must not crash the process
+					_, _ = fn.Call(nil, ctx)
+				}()
+				return handle, nil
+			},
+		})
+
+	// _make_thread_handle(ident) -> handle for an already-running thread
+	// (main/dummy threads); not marked done.
+	threadModule.SetWithKey("_make_thread_handle", core.StringValue("_make_thread_handle"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			var id int64
+			if len(args) >= 1 {
+				if n, ok := args[0].(core.NumberValue); ok {
+					id = int64(n)
+				}
+			}
+			return newThreadHandle(id), nil
+		}))
+
+	// _ThreadHandle() -> a fresh, unstarted thread handle
+	threadModule.SetWithKey("_ThreadHandle", core.StringValue("_ThreadHandle"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return newThreadHandle(0), nil
+		}))
+
+	// _get_main_thread_ident() -> int
+	threadModule.SetWithKey("_get_main_thread_ident", core.StringValue("_get_main_thread_ident"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.NumberValue(1), nil
+		}))
+
+	// _is_main_interpreter() -> bool. M28 runs a single interpreter.
+	threadModule.SetWithKey("_is_main_interpreter", core.StringValue("_is_main_interpreter"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.BoolValue(true), nil
+		}))
+
+	// _shutdown() — called at interpreter exit; no-op for M28's goroutine threads.
+	threadModule.SetWithKey("_shutdown", core.StringValue("_shutdown"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.Nil, nil
 		}))
 
 	// allocate_lock() -> Lock
@@ -183,9 +258,12 @@ func InitThreadModule() *core.DictValue {
 	errorClass := core.NewClassWithParents("error", []*core.Class{})
 	threadModule.SetWithKey("error", core.StringValue("error"), errorClass)
 
-	// LockType - the type of lock objects
-	lockType := core.NewClass("LockType", nil)
-	threadModule.SetWithKey("LockType", core.StringValue("LockType"), lockType)
+	// LockType - the lock constructor. threading.py does `Lock = _thread.LockType`
+	// and then `Lock()`, so calling it must return a working lock instance.
+	threadModule.SetWithKey("LockType", core.StringValue("LockType"),
+		core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return newThreadLock(), nil
+		}))
 
 	// _local - thread-local storage class
 	localClass := core.NewClass("_local", nil)
@@ -360,4 +438,86 @@ func (l *ThreadLock) GetAttr(name string) (core.Value, bool) {
 
 func (l *ThreadLock) SetAttr(name string, value core.Value) error {
 	return fmt.Errorf("cannot set attribute '%s' on lock object", name)
+}
+
+// ThreadHandle implements _thread._ThreadHandle: a joinable handle for a thread
+// started via start_joinable_thread (Python 3.13 threading API). The wrapped
+// goroutine closes doneCh when it finishes.
+type ThreadHandle struct {
+	core.BaseObject
+	mu     sync.Mutex
+	ident  int64
+	done   bool
+	doneCh chan struct{}
+}
+
+func newThreadHandle(ident int64) *ThreadHandle {
+	return &ThreadHandle{
+		BaseObject: *core.NewBaseObject(core.Type("_thread._ThreadHandle")),
+		ident:      ident,
+		doneCh:     make(chan struct{}),
+	}
+}
+
+func (h *ThreadHandle) setDone() {
+	h.mu.Lock()
+	if !h.done {
+		h.done = true
+		close(h.doneCh)
+	}
+	h.mu.Unlock()
+}
+
+func (h *ThreadHandle) isDone() bool {
+	h.mu.Lock()
+	d := h.done
+	h.mu.Unlock()
+	return d
+}
+
+func (h *ThreadHandle) Type() core.Type { return core.Type("_thread._ThreadHandle") }
+
+func (h *ThreadHandle) String() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return fmt.Sprintf("<_thread._ThreadHandle ident=%d done=%v>", h.ident, h.done)
+}
+
+// GetAttr exposes the handle's ident attribute and is_done/join/_set_done methods.
+func (h *ThreadHandle) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "ident":
+		h.mu.Lock()
+		id := h.ident
+		h.mu.Unlock()
+		if id == 0 {
+			return core.None, true
+		}
+		return core.NumberValue(float64(id)), true
+	case "is_done":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.BoolValue(h.isDone()), nil
+		}), true
+	case "_set_done":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			h.setDone()
+			return core.Nil, nil
+		}), true
+	case "join":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// join(timeout=None): wait until the thread finishes, up to timeout seconds.
+			if len(args) >= 1 {
+				if n, ok := args[0].(core.NumberValue); ok && float64(n) >= 0 {
+					select {
+					case <-h.doneCh:
+					case <-time.After(time.Duration(float64(n) * float64(time.Second))):
+					}
+					return core.None, nil
+				}
+			}
+			<-h.doneCh
+			return core.None, nil
+		}), true
+	}
+	return h.BaseObject.GetAttr(name)
 }
