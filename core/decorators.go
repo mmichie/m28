@@ -125,6 +125,25 @@ func (p *PropertyValue) SetAttr(name string, value Value) error {
 	return fmt.Errorf("cannot set attributes on property")
 }
 
+// wrapperDelegateAttr returns the attributes that staticmethod and classmethod
+// objects expose: __func__/__wrapped__ point at the wrapped function, and a set
+// of identifying dunder attributes are delegated to it, matching CPython.
+// It intentionally does not handle __get__/__set__/__delete__ so the descriptor
+// protocol continues to be resolved by the concrete type switches in class.go.
+func wrapperDelegateAttr(fn Value, name string) (Value, bool) {
+	switch name {
+	case "__func__", "__wrapped__":
+		return fn, true
+	case "__module__", "__qualname__", "__name__", "__doc__", "__annotations__":
+		if obj, ok := fn.(interface {
+			GetAttr(string) (Value, bool)
+		}); ok {
+			return obj.GetAttr(name)
+		}
+	}
+	return nil, false
+}
+
 // StaticMethodValue represents a Python static method
 type StaticMethodValue struct {
 	Function Value
@@ -137,7 +156,12 @@ func (s *StaticMethodValue) Type() Type {
 
 // String implements Value.String
 func (s *StaticMethodValue) String() string {
-	return "<staticmethod>"
+	return fmt.Sprintf("<staticmethod(%s)>", Repr(s.Function))
+}
+
+// GetAttr implements attribute access for static methods.
+func (s *StaticMethodValue) GetAttr(name string) (Value, bool) {
+	return wrapperDelegateAttr(s.Function, name)
 }
 
 // Call implements Callable.Call
@@ -160,15 +184,11 @@ func (c *ClassMethodValue) Type() Type {
 
 // String implements Value.String
 func (c *ClassMethodValue) String() string {
-	return "<classmethod>"
+	return fmt.Sprintf("<classmethod(%s)>", Repr(c.Function))
 }
 
 // GetAttr implements attribute access for classmethods
 func (c *ClassMethodValue) GetAttr(name string) (Value, bool) {
-	// Expose __func__ to get the underlying function
-	if name == "__func__" {
-		return c.Function, true
-	}
 	// Implement descriptor protocol __get__
 	if name == "__get__" {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
@@ -186,7 +206,8 @@ func (c *ClassMethodValue) GetAttr(name string) (Value, bool) {
 			}, nil
 		}), true
 	}
-	return nil, false
+	// __func__, __wrapped__, and delegated identifying dunder attributes.
+	return wrapperDelegateAttr(c.Function, name)
 }
 
 // BoundClassMethod represents a class method bound to a specific class

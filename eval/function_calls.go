@@ -158,6 +158,18 @@ type UserFunction struct {
 	name      string // Optional function name
 	isLambda  bool   // True for lambda expressions (implicitly return body value)
 	docstring string // Function docstring (first string literal in body)
+	dict      *core.DictValue // Live __dict__ for arbitrary user-set attributes
+}
+
+// ensureDict lazily creates the function's live __dict__ used to store
+// arbitrary user-set attributes (e.g. func.x = 1 or func.__dict__['x'] = 1).
+// Returning the same object every time makes func.__dict__ a live mapping,
+// matching CPython semantics.
+func (f *UserFunction) ensureDict() *core.DictValue {
+	if f.dict == nil {
+		f.dict = core.NewDict()
+	}
+	return f.dict
 }
 
 // Call implements Callable.Call
@@ -491,23 +503,10 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 
 		return globalsDict, true
 	case "__dict__":
-		// Return function's namespace/attributes as a dict
-		// This should contain custom user-set attributes, not special function attrs
-		funcDict := core.NewDict()
-		// Get all attributes from BaseObject and add them to the dict
-		// Exclude special function attributes that have dedicated handling
-		specialAttrs := map[string]bool{
-			"__name__": true, "__qualname__": true, "__module__": true,
-			"__doc__": true, "__annotations__": true, "__type_params__": true,
-		}
-		f.BaseObject.ForEachAttr(func(name string, value core.Value) {
-			if !specialAttrs[name] {
-				// Use SetWithKey with proper key formatting for dict access
-				keyVal := core.StringValue(name)
-				funcDict.SetWithKey(core.ValueToKey(keyVal), keyVal, value)
-			}
-		})
-		return funcDict, true
+		// Return the function's live namespace. This is the SAME object every
+		// time, so func.__dict__['x'] = 1 and func.__dict__.update(...) mutate
+		// the function's attributes, matching CPython semantics.
+		return f.ensureDict(), true
 	case "__closure__":
 		// Return tuple of closure cells (or None for no closure)
 		// For now, return a tuple with a dummy cell to avoid subscript errors
@@ -519,8 +518,11 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		if val, ok := f.BaseObject.GetAttr("__annotations__"); ok {
 			return val, true
 		}
-		// Return empty dict for annotations by default
-		return core.NewDict(), true
+		// Lazily create and store a stable empty dict so that repeated access
+		// returns the same object (func.__annotations__ is func.__annotations__).
+		annots := core.NewDict()
+		f.BaseObject.SetAttr("__annotations__", annots)
+		return annots, true
 	case "__defaults__":
 		// Return default argument values as a tuple
 		if f.signature != nil {
@@ -615,6 +617,12 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		// This is important for decorators that use func.__call__
 		return f, true
 	default:
+		// Arbitrary user-set attributes live in the function's __dict__.
+		if f.dict != nil {
+			if v, ok := f.dict.GetValue(core.StringValue(name)); ok {
+				return v, true
+			}
+		}
 		return f.BaseObject.GetAttr(name)
 	}
 }
@@ -632,9 +640,16 @@ func (f *UserFunction) SetAttr(name string, value core.Value) error {
 	case "__qualname__", "__module__", "__doc__", "__annotations__", "__type_params__":
 		// Store in BaseObject for later retrieval
 		return f.BaseObject.SetAttr(name, value)
+	case "__dict__":
+		// Replacing __dict__ wholesale: adopt the given dict as the live store.
+		if d, ok := value.(*core.DictValue); ok {
+			f.dict = d
+			return nil
+		}
+		return fmt.Errorf("__dict__ must be set to a dictionary, not '%s'", value.Type())
 	default:
-		// Allow setting arbitrary attributes
-		return f.BaseObject.SetAttr(name, value)
+		// Arbitrary user-set attributes live in the function's live __dict__.
+		return f.ensureDict().SetValue(core.StringValue(name), value)
 	}
 }
 

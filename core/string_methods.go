@@ -211,11 +211,12 @@ func applyConversion(value Value, conversion string) (Value, error) {
 		// str() conversion - default string representation
 		return StringValue(PrintValueWithoutQuotes(value)), nil
 	case "r":
-		// repr() conversion - quoted representation
-		return StringValue(PrintValue(value)), nil
+		// repr() conversion - must match the repr() builtin (core.Repr),
+		// not String(): e.g. 'hi' not "hi", <function f at 0x..> not <function f(x)>.
+		return StringValue(Repr(value)), nil
 	case "a":
 		// ascii() conversion - repr() with non-ASCII escaped
-		repr := PrintValue(value)
+		repr := Repr(value)
 		// Escape non-ASCII characters
 		var result strings.Builder
 		for _, r := range repr {
@@ -677,8 +678,8 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			} else {
 				return nil, &TypeError{Message: fmt.Sprintf("%%f format: a number is required, not %s", value.Type())}
 			}
-		case 'r': // Repr
-			formatted = value.String()
+		case 'r': // Repr - must match the repr() builtin, not String()
+			formatted = Repr(value)
 		case 'c': // Character
 			if num, ok := value.(NumberValue); ok {
 				formatted = string(rune(int(num)))

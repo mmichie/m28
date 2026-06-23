@@ -127,7 +127,8 @@
         "test_functools": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_functools.py"},
         "test_decorators": {
           "status": "partial",
-          "tests_run": 16, "passing": 9, "errors": 7,
+          "tests_run": 16, "passing": 13, "failures": 0, "errors": 3,
+          "notes": "Live function __dict__, staticmethod/classmethod __func__/__wrapped__ + attr delegation, and repr()-consistent !r/%r added. Remaining: test_dbcheck (eval of code object), test_errors (parser), test_eval_order (decorator arg count)",
           "source": "cpython/Lib/test/test_decorators.py"
         },
         "test_class": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_class.py"},
