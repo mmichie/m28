@@ -1652,6 +1652,36 @@ func (i *IntType) CallWithKeywords(args []core.Value, kwargs map[string]core.Val
 	return IntBuilder()(finalArgs, ctx)
 }
 
+// addNumericReprMethods gives a numeric class (int/float) __repr__ and __str__
+// that render subclass instances as the number they wrap (stored in __value__),
+// matching CPython where e.g. repr(MyInt(7)) == '7'. Plain numbers are
+// NumberValue/BigIntValue (not instances) and keep using the built-in number
+// repr, so this only affects subclass instances.
+func addNumericReprMethods(class *core.Class) {
+	mk := func(name string) *core.BuiltinFunction {
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			// Called on the class itself (e.g. repr(int)) with no instance.
+			if len(args) < 1 {
+				return core.StringValue(fmt.Sprintf("<class '%s'>", class.Name)), nil
+			}
+			switch recv := args[0].(type) {
+			case *core.Instance:
+				if v, ok := recv.Attributes["__value__"]; ok {
+					return core.StringValue(core.Repr(v)), nil
+				}
+				// Subclass instance without a stored value: generic fallback
+				// rather than erroring.
+				return core.StringValue(fmt.Sprintf("<%s object>", recv.Class.Name)), nil
+			case core.NumberValue, core.BigIntValue:
+				return core.StringValue(core.Repr(recv)), nil
+			}
+			return nil, &core.TypeError{Message: fmt.Sprintf("descriptor '%s' requires a number, got %s", name, args[0].Type())}
+		})
+	}
+	class.SetMethod("__repr__", mk("__repr__"))
+	class.SetMethod("__str__", mk("__str__"))
+}
+
 // createIntClass creates the int class that can be used with isinstance
 func createIntClass(objectClass *core.Class) *IntType {
 	class := core.NewClass("int", objectClass)
@@ -1930,6 +1960,9 @@ func createIntClass(objectClass *core.Class) *IntType {
 		return core.NumberValue(float64(bitLen)), nil
 	}))
 
+	// Render int subclass instances as their integer value (repr/str/format).
+	addNumericReprMethods(class)
+
 	return &IntType{Class: class}
 }
 
@@ -2129,6 +2162,38 @@ func (f *FloatType) CallWithKeywords(args []core.Value, kwargs map[string]core.V
 func createFloatClass() *FloatType {
 	class := core.NewClass("float", nil)
 
+	// float.__new__(cls, value=0.0) — for subclasses, store the float in
+	// __value__ so the instance behaves like the float it wraps (repr, ==,
+	// arithmetic via NumBacking). Plain float() returns the NumberValue directly.
+	class.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 1 {
+			return nil, &core.TypeError{Message: "__new__() missing 1 required positional argument: 'cls'"}
+		}
+		var cls *core.Class
+		switch c := args[0].(type) {
+		case *core.Class:
+			cls = c
+		case *FloatType:
+			cls = c.Class
+		default:
+			return nil, &core.TypeError{Message: fmt.Sprintf("float.__new__(X): X must be a type, not %s", args[0].Type())}
+		}
+		var value core.Value = core.NumberValue(0)
+		if len(args) > 1 {
+			result, err := FloatBuilder()(args[1:], ctx)
+			if err != nil {
+				return nil, err
+			}
+			value = result
+		}
+		if cls.Name == "float" {
+			return value, nil
+		}
+		instance := core.NewInstance(cls)
+		instance.Attributes["__value__"] = value
+		return instance, nil
+	}))
+
 	// Add __getformat__ class method (used to detect IEEE 754 format)
 	// Python's float.__getformat__("double") returns "IEEE, little-endian" or similar
 	class.Methods["__getformat__"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -2184,6 +2249,9 @@ func createFloatClass() *FloatType {
 
 		return core.NumberValue(f), nil
 	})
+
+	// Render float subclass instances as their numeric value (repr/str/format).
+	addNumericReprMethods(class)
 
 	return &FloatType{Class: class}
 }
