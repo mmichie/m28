@@ -942,6 +942,28 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 		}
 	}
 
+	// If the class inherits from str (transitively), attach a backing string so
+	// the instance behaves like the string it wraps. str is immutable, so the
+	// value comes from the constructor argument (str(arg)); default to "".
+	if inst, ok := instance.(*Instance); ok && (classInheritsType(c, "string") || classInheritsType(c, "str")) && inst.BackingStr == nil {
+		_, definingClass, hasInit := c.GetMethodWithClass("__init__")
+		userInit := hasInit && definingClass.Name != "object" && definingClass.Name != "str" && definingClass.Name != "string"
+		s := StringValue("")
+		if len(args) > 0 {
+			if sv, ok := StrBacking(args[0]); ok {
+				s = sv
+			} else {
+				s = StringValue(PrintValueWithoutQuotes(args[0]))
+			}
+		}
+		inst.BackingStr = &s
+		// A plain str subclass with no user __init__ consumes its value arg here.
+		if !userInit {
+			args = nil
+			kwargs = nil
+		}
+	}
+
 	// Call __init__ for list subclass instances (*ListInstance)
 	if listInst, ok := instance.(*ListInstance); ok {
 		if initMethod, definingClass, ok := c.GetMethodWithClass("__init__"); ok {
@@ -1051,6 +1073,26 @@ type Instance struct {
 	// d[k], d[k] = v, len(d), iteration, and forwarded dict methods
 	// (get/keys/values/items/...).
 	BackingDict *DictValue
+
+	// BackingStr holds the underlying string value when the instance's class
+	// inherits from str. It lets `class S(str)` instances behave like the
+	// string they wrap: str()/repr()/==, len, iteration, indexing, and the
+	// forwarded str methods (upper/split/encode/...). nil when not a str subclass.
+	BackingStr *StringValue
+}
+
+// StrBacking returns the underlying string value and true if v is either a
+// plain StringValue or a str-subclass instance carrying a BackingStr.
+func StrBacking(v Value) (StringValue, bool) {
+	switch s := v.(type) {
+	case StringValue:
+		return s, true
+	case *Instance:
+		if s.BackingStr != nil {
+			return *s.BackingStr, true
+		}
+	}
+	return "", false
 }
 
 // dictMethodOnInstance returns a bound dict method (or dunder synthesised

@@ -127,6 +127,16 @@ func compareEqual(left, right core.Value, ctx *core.Context) (core.Value, error)
 		return core.BoolValue(false), nil
 	}
 
+	// str-subclass instances compare by their backing string value (the
+	// inherited str.__eq__ behavior), unless a subclass defines a custom __eq__.
+	// Done before the __eq__ dispatch so object's default __eq__ (identity) does
+	// not shadow string equality for plain str subclasses.
+	if ls, ok := core.StrBacking(left); ok {
+		if rs, ok := core.StrBacking(right); ok && !core.HasUserEq(left) && !core.HasUserEq(right) {
+			return core.BoolValue(ls == rs), nil
+		}
+	}
+
 	// Python operator precedence: if right's class is a strict subclass of left's class,
 	// try right's method first
 	var leftClass, rightClass *core.Class

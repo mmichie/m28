@@ -8,8 +8,24 @@ import (
 	"sync"
 )
 
-// EqualValuesWithError compares two values for equality and returns any error from __eq__
-// This is used by dict operations where __eq__ exceptions should propagate
+// HasUserEq reports whether v is an instance whose class hierarchy defines
+// __eq__ somewhere other than the built-in object/str bases. Such an override
+// must take precedence over comparing str-subclass instances by value.
+func HasUserEq(v Value) bool {
+	if inst, ok := v.(*Instance); ok {
+		if _, defining, ok := inst.Class.GetMethodWithClass("__eq__"); ok {
+			switch defining.Name {
+			case "object", "str", "string":
+				return false
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// EqualValuesWithError compares two values for equality and returns any error from __eq__.
+// This is used by dict operations where __eq__ exceptions should propagate.
 func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 	// Check nil values first
 	if a == nil && b == nil {
@@ -17,6 +33,14 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 	}
 	if a == nil || b == nil {
 		return false, nil
+	}
+
+	// str-subclass instances compare by their backing string (the inherited
+	// str.__eq__ behavior), unless either side defines a custom __eq__.
+	if as, aok := StrBacking(a); aok {
+		if bs, bok := StrBacking(b); bok && !HasUserEq(a) && !HasUserEq(b) {
+			return as == bs, nil
+		}
 	}
 
 	// For instances, check if they have a custom __eq__ method
@@ -295,6 +319,14 @@ func EqualValues(a, b Value) bool {
 	}
 	if a == nil || b == nil {
 		return false
+	}
+
+	// str-subclass instances compare by their backing string unless either side
+	// defines a custom __eq__ (mirrors EqualValuesWithError).
+	if as, aok := StrBacking(a); aok {
+		if bs, bok := StrBacking(b); bok && !HasUserEq(a) && !HasUserEq(b) {
+			return as == bs
+		}
 	}
 
 	// Check by type
@@ -627,6 +659,12 @@ func ValueToKey(v Value) string {
 			valueToKeyInProgress.Store(goid, depth)
 		}
 	}()
+
+	// str-subclass instances hash and key like the string they wrap, so that
+	// d[S("a")] finds d["a"] and S("a") in {"a"} is true.
+	if inst, ok := v.(*Instance); ok && inst.BackingStr != nil {
+		return fmt.Sprintf("s:%s", string(*inst.BackingStr))
+	}
 
 	// For primitive types
 	switch val := v.(type) {

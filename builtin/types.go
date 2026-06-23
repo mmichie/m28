@@ -1522,6 +1522,14 @@ func createStrClass() *StrType {
 					return nil, &core.TypeError{Message: fmt.Sprintf("%s() missing 1 required positional argument", name)}
 				}
 				receiver := args[0]
+				// Unwrap str-subclass instances to their underlying string so the
+				// handlers (which expect a StringValue) work and never panic.
+				if sv, ok := core.StrBacking(receiver); ok {
+					receiver = sv
+				} else if _, isStr := receiver.(core.StringValue); !isStr {
+					return nil, &core.TypeError{Message: fmt.Sprintf(
+						"descriptor '%s' requires a 'str' object but received a '%s'", name, receiver.Type())}
+				}
 				methodArgs := args[1:]
 				return handler(receiver, methodArgs, ctx)
 			})

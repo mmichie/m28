@@ -134,7 +134,8 @@
         "test_class": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_class.py"},
         "test_descr": {
           "status": "partial",
-          "tests_run": 159, "passing": 23, "failures": 56, "errors": 67, "skipped": 11, "expected_failures": 2,
+          "tests_run": 159, "passing": 27, "failures": 63, "errors": 56, "skipped": 11, "expected_failures": 2,
+          "notes": "No longer panics: str subclasses now carry a backing string (Instance.BackingStr), str methods unwrap it, and ==/str()/len/index/in work. Remaining failures are deeper descriptor/metaclass features.",
           "source": "cpython/Lib/test/test_descr.py"
         }
       }
