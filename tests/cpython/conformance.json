@@ -128,7 +128,12 @@
       "description": "Functions and object-oriented programming",
       "priority": 4,
       "tests": {
-        "test_call": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_call.py"},
+        "test_call": {
+          "status": "partial",
+          "tests_run": 184, "passing": 2, "errors": 2, "skipped": 180,
+          "notes": "Runs; 180 skipped (need _testcapi). ** unpacking now accepts any mapping (keys()+__getitem__), fixing test_kwargs_order for OrderedDict. Remaining errors: compile(optimize=) kwarg, 500-arg function.",
+          "source": "cpython/Lib/test/test_call.py"
+        },
         "test_functools": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_functools.py"},
         "test_decorators": {
           "status": "partial",

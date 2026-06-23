@@ -304,6 +304,16 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 				dict = x.BackingDict
 			}
 		}
+		// Otherwise accept any mapping: an object exposing keys() and
+		// __getitem__ (CPython's ** protocol). Covers collections.OrderedDict,
+		// defaultdict, and user mappings.
+		if dict == nil {
+			if built, ok, err := dictFromMapping(val, ctx); err != nil {
+				return nil, err
+			} else if ok {
+				dict = built
+			}
+		}
 		if dict == nil {
 			return nil, &core.TypeError{Message: fmt.Sprintf("argument after ** must be a mapping, not %s", val.Type())}
 		}
@@ -487,4 +497,66 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 	}
 
 	return result, nil
+}
+
+// dictFromMapping builds a DictValue from any object implementing the mapping
+// protocol: a keys() method plus __getitem__. This is how CPython's ** unpacking
+// accepts arbitrary mappings (e.g. collections.OrderedDict, which is not a plain
+// dict in M28). Returns ok=false if v is not a mapping.
+func dictFromMapping(v core.Value, ctx *core.Context) (*core.DictValue, bool, error) {
+	obj, ok := v.(interface {
+		GetAttr(string) (core.Value, bool)
+	})
+	if !ok {
+		return nil, false, nil
+	}
+	keysAttr, ok := obj.GetAttr("keys")
+	if !ok {
+		return nil, false, nil
+	}
+	getitemAttr, ok := obj.GetAttr("__getitem__")
+	if !ok {
+		return nil, false, nil
+	}
+	keysCallable, ok := keysAttr.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, false, nil
+	}
+	getitem, ok := getitemAttr.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, false, nil
+	}
+
+	keysResult, err := keysCallable.Call(nil, ctx)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Collect the keys from the common iterable return types.
+	var keys []core.Value
+	switch k := keysResult.(type) {
+	case *core.ListValue:
+		keys = k.Items()
+	case core.TupleValue:
+		keys = []core.Value(k)
+	default:
+		// Not an iterable shape we can unpack; let the caller report TypeError.
+		return nil, false, nil
+	}
+
+	built := core.NewDict()
+	for _, key := range keys {
+		val, err := getitem.Call([]core.Value{key}, ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if err := built.SetValue(key, val); err != nil {
+			return nil, false, err
+		}
+	}
+	return built, true, nil
 }
