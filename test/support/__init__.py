@@ -24,6 +24,10 @@ is_android = False
 is_emscripten = False
 is_wasi = False
 
+# True only on a CPython debug build with reference tracing. M28 is never such a
+# build; computed the same way CPython's test.support does.
+Py_TRACE_REFS = hasattr(sys, 'getobjects')
+
 
 # Some CPython tests check whether they're on CPython specifically and skip
 # implementation-specific behavior on other interpreters. M28 is not CPython.

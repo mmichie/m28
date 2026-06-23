@@ -109,7 +109,12 @@
       "description": "Control flow and exceptions",
       "priority": 3,
       "tests": {
-        "test_exceptions": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_exceptions.py"},
+        "test_exceptions": {
+          "status": "partial",
+          "tests_run": 104, "passing": 15, "failures": 19, "errors": 57, "skipped": 13,
+          "notes": "No longer crashes with a Go stack overflow: the interpreter now enforces sys.getrecursionlimit() (default 1000) and raises RecursionError. support.Py_TRACE_REFS stub added. Remaining errors are deeper exception/traceback features.",
+          "source": "cpython/Lib/test/test_exceptions.py"
+        },
         "test_raise": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_raise.py"},
         "test_with": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_with.py"},
         "test_scope": {

@@ -211,6 +211,16 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	// super() in nested classes - the defining class's __class__ is correct, not the caller's.
 	funcEnv := core.NewContext(f.env)
 	funcEnv.IsFunctionScope = true
+	// Track call depth to raise RecursionError before the Go stack overflows.
+	// ctx can be nil on some internal call paths (e.g. repr/hash), so guard it.
+	callerDepth := 0
+	if ctx != nil {
+		callerDepth = ctx.Depth
+	}
+	funcEnv.Depth = callerDepth + 1
+	if funcEnv.Depth > core.GetRecursionLimit() {
+		return nil, &core.RecursionError{Message: "maximum recursion depth exceeded"}
+	}
 	core.DebugLog("[CALL] Created funcEnv for %s\n", f.name)
 
 	// Use new signature-based binding if available
@@ -293,6 +303,16 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 	// super() in nested classes - the defining class's __class__ is correct, not the caller's.
 	funcEnv := core.NewContext(f.env)
 	funcEnv.IsFunctionScope = true
+	// Track call depth to raise RecursionError before the Go stack overflows.
+	// ctx can be nil on some internal call paths (e.g. repr/hash), so guard it.
+	callerDepth := 0
+	if ctx != nil {
+		callerDepth = ctx.Depth
+	}
+	funcEnv.Depth = callerDepth + 1
+	if funcEnv.Depth > core.GetRecursionLimit() {
+		return nil, &core.RecursionError{Message: "maximum recursion depth exceeded"}
+	}
 
 	// Use new signature-based binding if available
 	if f.signature != nil {

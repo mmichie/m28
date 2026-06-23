@@ -65,6 +65,12 @@ type Context struct {
 	// must therefore skip any class scopes higher in the chain.
 	IsFunctionScope bool
 
+	// Depth is the dynamic call-stack depth (number of active user-function
+	// frames). It is propagated to child contexts and incremented at each
+	// function-call boundary so the interpreter can raise RecursionError before
+	// the Go stack overflows. See GetRecursionLimit.
+	Depth int
+
 	// Optional module dict to sync definitions to (for circular import support)
 	// When set, Define() will also update this dict in real-time
 	ModuleDict *DictValue
@@ -102,10 +108,24 @@ func NewContext(outer *Context) *Context {
 		// Call stack operations use ctx.Global.CallStack via PushStack/PopStack
 		ctx.Global = outer.Global
 		ctx.Metadata = outer.Metadata
+		// Inherit call depth; function-call sites bump it by one when binding
+		// the new frame (see UserFunction.Call / CallWithKwargs).
+		ctx.Depth = outer.Depth
 	}
 
 	return ctx
 }
+
+// recursionLimit is the maximum number of active user-function frames before
+// the interpreter raises RecursionError. Matches CPython's default of 1000.
+// Read/written via sys.getrecursionlimit / sys.setrecursionlimit.
+var recursionLimit = 1000
+
+// GetRecursionLimit returns the current Python recursion limit.
+func GetRecursionLimit() int { return recursionLimit }
+
+// SetRecursionLimit sets the Python recursion limit (must be >= 1).
+func SetRecursionLimit(n int) { recursionLimit = n }
 
 // WithMetadata creates a new context with a specific metadata table
 // Useful for module imports or testing

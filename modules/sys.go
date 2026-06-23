@@ -11,10 +11,11 @@ import (
 )
 
 // Global variables for sys module state
+// Note: the recursion limit lives in the core package (core.GetRecursionLimit /
+// core.SetRecursionLimit) so the evaluator can enforce it; sys just delegates.
 var (
-	recursionLimit = 1000
-	sysModules     = core.NewDict() // Tracks loaded modules
-	sysPath        = initSysPath()  // Module search path
+	sysModules = core.NewDict() // Tracks loaded modules
+	sysPath    = initSysPath()  // Module search path
 )
 
 // initSysPath initializes sys.path with reasonable defaults
@@ -384,7 +385,7 @@ func exitFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 // getRecursionLimit returns the current recursion limit
 func getRecursionLimit(args []core.Value, ctx *core.Context) (core.Value, error) {
-	return core.NumberValue(int64(recursionLimit)), nil
+	return core.NumberValue(int64(core.GetRecursionLimit())), nil
 }
 
 // setRecursionLimit sets the recursion limit
@@ -403,7 +404,7 @@ func setRecursionLimit(args []core.Value, ctx *core.Context) (core.Value, error)
 		return nil, fmt.Errorf("recursion limit must be at least 1")
 	}
 
-	recursionLimit = int(limit)
+	core.SetRecursionLimit(int(limit))
 	return core.NilValue{}, nil
 }
 
