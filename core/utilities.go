@@ -15,7 +15,24 @@ func HasUserEq(v Value) bool {
 	if inst, ok := v.(*Instance); ok {
 		if _, defining, ok := inst.Class.GetMethodWithClass("__eq__"); ok {
 			switch defining.Name {
-			case "object", "str", "string":
+			case "object", "str", "string", "int", "float":
+				return false
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// HasUserNe reports whether v is an instance whose class hierarchy defines a
+// custom __ne__ (outside the built-in bases). The built-in default __ne__ is
+// unreliable for operands whose __eq__ returns NotImplemented, so callers should
+// prefer negating __eq__ unless a real override exists.
+func HasUserNe(v Value) bool {
+	if inst, ok := v.(*Instance); ok {
+		if _, defining, ok := inst.Class.GetMethodWithClass("__ne__"); ok {
+			switch defining.Name {
+			case "object", "str", "string", "int", "float":
 				return false
 			}
 			return true
@@ -40,6 +57,21 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 	if as, aok := StrBacking(a); aok {
 		if bs, bok := StrBacking(b); bok && !HasUserEq(a) && !HasUserEq(b) {
 			return as == bs, nil
+		}
+	}
+	// int/float-subclass instances compare by their numeric __value__ (only when
+	// an Instance is involved, so plain-number BigInt logic below is preserved).
+	if _, ai := a.(*Instance); ai {
+		if an, ok := NumBacking(a); ok {
+			if bn, ok := NumBacking(b); ok && !HasUserEq(a) && !HasUserEq(b) {
+				return an == bn, nil
+			}
+		}
+	} else if _, bi := b.(*Instance); bi {
+		if bn, ok := NumBacking(b); ok {
+			if an, ok := NumBacking(a); ok && !HasUserEq(a) && !HasUserEq(b) {
+				return an == bn, nil
+			}
 		}
 	}
 
@@ -326,6 +358,21 @@ func EqualValues(a, b Value) bool {
 	if as, aok := StrBacking(a); aok {
 		if bs, bok := StrBacking(b); bok && !HasUserEq(a) && !HasUserEq(b) {
 			return as == bs
+		}
+	}
+	// int/float-subclass instances compare by their numeric __value__ (only when
+	// an Instance is involved, so plain-number BigInt logic below is preserved).
+	if _, ai := a.(*Instance); ai {
+		if an, ok := NumBacking(a); ok {
+			if bn, ok := NumBacking(b); ok && !HasUserEq(a) && !HasUserEq(b) {
+				return an == bn
+			}
+		}
+	} else if _, bi := b.(*Instance); bi {
+		if bn, ok := NumBacking(b); ok {
+			if an, ok := NumBacking(a); ok && !HasUserEq(a) && !HasUserEq(b) {
+				return an == bn
+			}
 		}
 	}
 

@@ -137,6 +137,19 @@ func compareEqual(left, right core.Value, ctx *core.Context) (core.Value, error)
 		}
 	}
 
+	// Likewise, int/float-subclass instances compare by their numeric __value__,
+	// unless a subclass overrides __eq__. Restricted to cases involving an
+	// Instance so plain number comparisons keep using the BigInt-aware logic.
+	_, lInst := left.(*core.Instance)
+	_, rInst := right.(*core.Instance)
+	if lInst || rInst {
+		if ln, ok := core.NumBacking(left); ok {
+			if rn, ok := core.NumBacking(right); ok && !core.HasUserEq(left) && !core.HasUserEq(right) {
+				return core.BoolValue(ln == rn), nil
+			}
+		}
+	}
+
 	// Python operator precedence: if right's class is a strict subclass of left's class,
 	// try right's method first
 	var leftClass, rightClass *core.Class
@@ -232,6 +245,18 @@ func compareNotEqual(left, right core.Value, ctx *core.Context) (core.Value, err
 		rightClass = rightInst.Class
 	}
 
+	// str/num-subclass instances: != is the negation of value equality, mirroring
+	// the == fast paths in compareEqual. Only fires when a subclass instance is
+	// involved and neither side overrides __eq__/__ne__, so the __ne__=None
+	// blocking idiom and custom __ne__ below are untouched.
+	if backedValueNeFastPath(left, right) {
+		equal, err := compareEqual(left, right, ctx)
+		if err != nil {
+			return nil, err
+		}
+		return core.BoolValue(!core.IsTruthy(equal)), nil
+	}
+
 	// If right operand's class is a strict subclass of left operand's class,
 	// try right operand's __ne__ first
 	if leftClass != nil && rightClass != nil && core.IsStrictSubclass(rightClass, leftClass) {
@@ -262,6 +287,32 @@ func compareNotEqual(left, right core.Value, ctx *core.Context) (core.Value, err
 		return nil, err
 	}
 	return core.BoolValue(!core.IsTruthy(equal)), nil
+}
+
+// backedValueNeFastPath reports whether left != right should be decided purely by
+// negating value equality: a str- or int/float-subclass instance is involved on
+// at least one side, both sides reduce to the same backing kind, and neither side
+// overrides __eq__ or __ne__.
+func backedValueNeFastPath(left, right core.Value) bool {
+	_, lInst := left.(*core.Instance)
+	_, rInst := right.(*core.Instance)
+	if !lInst && !rInst {
+		return false
+	}
+	if core.HasUserEq(left) || core.HasUserEq(right) || core.HasUserNe(left) || core.HasUserNe(right) {
+		return false
+	}
+	if _, ok := core.StrBacking(left); ok {
+		if _, ok := core.StrBacking(right); ok {
+			return true
+		}
+	}
+	if _, ok := core.NumBacking(left); ok {
+		if _, ok := core.NumBacking(right); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // LessThan implements the < operator using protocol-based dispatch

@@ -1095,6 +1095,24 @@ func StrBacking(v Value) (StringValue, bool) {
 	return "", false
 }
 
+// NumBacking returns the underlying numeric value and true if v is either a
+// plain NumberValue or an int/float-subclass instance, which store their value
+// in the __value__ attribute. Used so subclass instances compare and key like
+// the number they wrap.
+func NumBacking(v Value) (NumberValue, bool) {
+	switch n := v.(type) {
+	case NumberValue:
+		return n, true
+	case *Instance:
+		if raw, ok := n.Attributes["__value__"]; ok {
+			if num, ok := raw.(NumberValue); ok {
+				return num, true
+			}
+		}
+	}
+	return 0, false
+}
+
 // dictMethodOnInstance returns a bound dict method (or dunder synthesised
 // from the backing dict) for the given name, so dict-subclass instances
 // can transparently use dict methods like get/keys/values/items/setdefault
