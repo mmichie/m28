@@ -28,6 +28,9 @@ is_wasi = False
 # build; computed the same way CPython's test.support does.
 Py_TRACE_REFS = hasattr(sys, 'getobjects')
 
+# Largest Py_ssize_t value (used by memory-limit guards in many tests).
+MAX_Py_ssize_t = sys.maxsize
+
 
 # Some CPython tests check whether they're on CPython specifically and skip
 # implementation-specific behavior on other interpreters. M28 is not CPython.
