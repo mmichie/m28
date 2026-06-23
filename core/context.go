@@ -54,6 +54,17 @@ type Context struct {
 	// Variables declared as nonlocal in this scope (Python nonlocal statement)
 	NonlocalVars map[string]bool
 
+	// IsClassScope marks a context as a class body namespace. Per Python scoping
+	// rules, class namespaces do NOT participate in name resolution inside nested
+	// functions (methods): a bare name in a method never resolves to a sibling
+	// method or class variable. See lookupWithDepth.
+	IsClassScope bool
+
+	// IsFunctionScope marks a context as a function's local scope. Used by
+	// lookupWithDepth to know when a lookup has crossed a function boundary and
+	// must therefore skip any class scopes higher in the chain.
+	IsFunctionScope bool
+
 	// Optional module dict to sync definitions to (for circular import support)
 	// When set, Define() will also update this dict in real-time
 	ModuleDict *DictValue
@@ -235,10 +246,14 @@ func (c *Context) Lookup(name string) (Value, error) {
 			return op, nil
 		}
 	}
-	return c.lookupWithDepth(name, 0)
+	return c.lookupWithDepth(name, 0, false)
 }
 
-func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
+// lookupWithDepth resolves a name walking the scope chain. crossedFunction is
+// true once the walk has passed through a function-local scope; while it is
+// true, class-body scopes are skipped (except for __class__), implementing
+// Python's rule that the class namespace is invisible to bare names in methods.
+func (c *Context) lookupWithDepth(name string, depth int, crossedFunction bool) (Value, error) {
 	// Prevent infinite loops in context chain
 	if depth > 100 {
 		Log.Error(SubsystemScope, "Lookup depth exceeded - possible circular context chain", "name", name)
@@ -275,17 +290,22 @@ func (c *Context) lookupWithDepth(name string, depth int) (Value, error) {
 		}
 	}
 
-	// Then check current scope Vars (for true local variables)
-	if val, ok := c.Vars[name]; ok {
-		if debugLookups && depth < 5 {
-			Log.Debug(SubsystemScope, "Variable found in local scope", "name", name)
+	// Then check current scope Vars (for true local variables).
+	// Skip a class body's namespace once we've crossed a function boundary:
+	// a bare name in a method must not resolve to a sibling method or class
+	// variable. __class__ is the sole exception (implicit super() closure cell).
+	if !(c.IsClassScope && crossedFunction && name != "__class__") {
+		if val, ok := c.Vars[name]; ok {
+			if debugLookups && depth < 5 {
+				Log.Debug(SubsystemScope, "Variable found in local scope", "name", name)
+			}
+			return val, nil
 		}
-		return val, nil
 	}
 
 	// Check outer scopes
 	if c.Outer != nil {
-		return c.Outer.lookupWithDepth(name, depth+1)
+		return c.Outer.lookupWithDepth(name, depth+1, crossedFunction || c.IsFunctionScope)
 	}
 
 	// If we reached the end of the scope chain and have a Global context,

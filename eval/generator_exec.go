@@ -116,6 +116,7 @@ type WithState struct {
 func NewGeneratorExecState(function *UserFunction, args []core.Value, ctx *core.Context) (*GeneratorExecState, error) {
 	// Create local context with function's environment as parent
 	locals := core.NewContext(function.env)
+	locals.IsFunctionScope = true
 
 	// Bind arguments to parameters
 	if function.signature != nil {

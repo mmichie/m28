@@ -394,13 +394,20 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 		paramName := string(param.Name)
 
 		// Check if provided as keyword argument
-		if kwValue, ok := kwargs[paramName]; ok {
-			// Positional-only parameters cannot be passed by keyword (PEP 570)
-			if param.PositionalOnly {
+		kwValue, hasKw := kwargs[paramName]
+		if hasKw && param.PositionalOnly {
+			// PEP 570: a keyword that matches a positional-only parameter name
+			// is only an error if there is no **kwargs to absorb it. Otherwise
+			// the keyword is left in kwargs (collected by **kwargs) and the
+			// parameter is bound positionally / from its default.
+			if sig.KeywordParam == nil {
 				return &core.TypeError{
 					Message: fmt.Sprintf("'%s' is a positional-only parameter", paramName),
 				}
 			}
+			hasKw = false
+		}
+		if hasKw {
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
 			delete(kwargs, paramName)
@@ -415,7 +422,8 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 			boundParams[paramName] = true
 			argIndex++
 		} else {
-			return fmt.Errorf("missing required argument: %s", paramName)
+			// CPython raises TypeError for argument-count mismatches.
+			return &core.TypeError{Message: fmt.Sprintf("missing required argument: %s", paramName)}
 		}
 	}
 
@@ -424,13 +432,18 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 		paramName := string(param.Name)
 
 		// Check if provided as keyword argument
-		if kwValue, ok := kwargs[paramName]; ok {
-			// Positional-only parameters cannot be passed by keyword (PEP 570)
-			if param.PositionalOnly {
+		kwValue, hasKw := kwargs[paramName]
+		if hasKw && param.PositionalOnly {
+			// PEP 570: see note above — leave the keyword for **kwargs unless
+			// there is no **kwargs, in which case it is an error.
+			if sig.KeywordParam == nil {
 				return &core.TypeError{
 					Message: fmt.Sprintf("'%s' is a positional-only parameter", paramName),
 				}
 			}
+			hasKw = false
+		}
+		if hasKw {
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
 			delete(kwargs, paramName)
@@ -486,9 +499,9 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 		// Python requires *args to be a tuple, not a list
 		bindCtx.Define(string(*sig.RestParam), core.TupleValue(restArgs))
 	} else if argIndex < len(args) {
-		// Too many positional arguments
-		return fmt.Errorf("too many positional arguments: expected at most %d, got %d",
-			len(sig.RequiredParams)+len(sig.OptionalParams), len(args))
+		// Too many positional arguments (CPython raises TypeError).
+		return &core.TypeError{Message: fmt.Sprintf("too many positional arguments: expected at most %d, got %d",
+			len(sig.RequiredParams)+len(sig.OptionalParams), len(args))}
 	}
 
 	// 4. Collect remaining keyword arguments into **kwargs if present
@@ -503,9 +516,9 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 		}
 		bindCtx.Define(string(*sig.KeywordParam), kwargsDict)
 	} else if len(kwargs) > 0 {
-		// Unexpected keyword arguments
+		// Unexpected keyword arguments (CPython raises TypeError).
 		for k := range kwargs {
-			return fmt.Errorf("unexpected keyword argument: %s", k)
+			return &core.TypeError{Message: fmt.Sprintf("unexpected keyword argument: %s", k)}
 		}
 	}
 

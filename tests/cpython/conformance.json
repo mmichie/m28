@@ -94,8 +94,8 @@
         },
         "test_string": {
           "status": "partial",
-          "tests_run": 38, "passing": 22, "failures": 2, "errors": 14,
-          "notes": "Formatter.format breaks when get_field is also defined (M28 parser/eval bug)",
+          "tests_run": 38, "passing": 33, "failures": 4, "errors": 1,
+          "notes": "Fixed by class-scope name resolution (methods no longer see sibling methods), PEP 570 positional-only+**kwargs binding, and TypeError for arg-count errors. Remaining: get_identifiers (regex named groups), auto_numbering, format-spec padding, Template col/is_valid.",
           "source": "cpython/Lib/test/test_string.py"
         },
         "test_bytes": {
@@ -114,7 +114,7 @@
         "test_with": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_with.py"},
         "test_scope": {
           "status": "partial",
-          "tests_run": 41, "passing": 26, "failures": 9, "errors": 3, "skipped": 3,
+          "tests_run": 41, "passing": 31, "failures": 8, "errors": 2, "skipped": 3,
           "source": "cpython/Lib/test/test_scope.py"
         }
       }

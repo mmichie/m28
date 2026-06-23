@@ -210,6 +210,7 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	// We do NOT copy __class__ from the call context because that would break
 	// super() in nested classes - the defining class's __class__ is correct, not the caller's.
 	funcEnv := core.NewContext(f.env)
+	funcEnv.IsFunctionScope = true
 	core.DebugLog("[CALL] Created funcEnv for %s\n", f.name)
 
 	// Use new signature-based binding if available
@@ -222,7 +223,7 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	} else {
 		// Legacy: simple parameter binding
 		if len(args) != len(f.params) {
-			return nil, fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
+			return nil, &core.TypeError{Message: fmt.Sprintf("expected %d arguments, got %d", len(f.params), len(args))}
 		}
 
 		for i, param := range f.params {
@@ -291,6 +292,7 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 	// We do NOT copy __class__ from the call context because that would break
 	// super() in nested classes - the defining class's __class__ is correct, not the caller's.
 	funcEnv := core.NewContext(f.env)
+	funcEnv.IsFunctionScope = true
 
 	// Use new signature-based binding if available
 	if f.signature != nil {
@@ -308,7 +310,7 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 			return nil, err
 		}
 		if len(args) != len(f.params) {
-			err := fmt.Errorf("expected %d arguments, got %d", len(f.params), len(args))
+			err := &core.TypeError{Message: fmt.Sprintf("expected %d arguments, got %d", len(f.params), len(args))}
 			core.TraceExitFunction(f.name, nil, err)
 			return nil, err
 		}

@@ -557,6 +557,9 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Create a class-body context that allows accessing class members as they're defined
 	// This enables patterns like: __await__ = __iter__
 	classBodyCtx := core.NewContext(ctx)
+	// Mark as a class scope so that bare names in methods do not resolve to
+	// sibling methods or class variables (Python scoping rule). See lookupWithDepth.
+	classBodyCtx.IsClassScope = true
 
 	// CRITICAL: Set __class__ in the class body context
 	// This ensures that methods defined in this class capture the correct __class__
