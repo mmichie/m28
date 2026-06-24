@@ -46,6 +46,15 @@ def check_impl_detail(**kwargs):
     return True
 
 
+def linked_to_musl():
+    """Whether the interpreter is linked against the musl C library.
+
+    Used by tests (e.g. test_math) to skip libm edge cases that differ on
+    musl. M28 is a Go program, not linked to musl, so this is always False.
+    """
+    return False
+
+
 def cpython_only(test):
     """Decorator skipping the test when not running on CPython."""
     return unittest.skip("CPython-specific test, skipped on M28")(test)
