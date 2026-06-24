@@ -667,7 +667,7 @@ func (it *dictIterator) GetAttr(name string) (Value, bool) {
 			}
 			val, ok := it.Next()
 			if !ok {
-				return nil, &stopIterationError{}
+				return nil, &StopIteration{}
 			}
 			return val, nil
 		}), true
@@ -836,7 +836,7 @@ func (it *tupleIterator) GetAttr(name string) (Value, bool) {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			val, ok := it.Next()
 			if !ok {
-				return nil, &stopIterationError{}
+				return nil, &StopIteration{}
 			}
 			return val, nil
 		}), true
@@ -1141,14 +1141,6 @@ func (it *setIterator) String() string {
 	return "<set_iterator>"
 }
 
-// stopIterationError is a local type to signal iterator exhaustion
-// This matches protocols.StopIteration but avoids circular imports
-type stopIterationError struct{}
-
-func (e *stopIterationError) Error() string {
-	return "StopIteration"
-}
-
 // GetAttr implements Object interface for iterator protocol
 func (it *setIterator) GetAttr(name string) (Value, bool) {
 	if name == "__iter__" {
@@ -1161,7 +1153,7 @@ func (it *setIterator) GetAttr(name string) (Value, bool) {
 			val, ok := it.Next()
 			if !ok {
 				// Return StopIteration error
-				return nil, &stopIterationError{}
+				return nil, &StopIteration{}
 			}
 			return val, nil
 		}), true
@@ -1757,7 +1749,7 @@ func drainPythonIteratorCtx(iter Value, ctx *Context) ([]Value, error) {
 			if _, isStop := err.(*StopIteration); isStop {
 				break
 			}
-			if _, isStop := err.(*stopIterationError); isStop {
+			if _, isStop := err.(*StopIteration); isStop {
 				break
 			}
 			if err.Error() == "StopIteration" {
@@ -1812,7 +1804,7 @@ func drainPythonIterator(iter Value) ([]Value, error) {
 			if _, isStop := err.(*StopIteration); isStop {
 				break
 			}
-			if _, isStop := err.(*stopIterationError); isStop {
+			if _, isStop := err.(*StopIteration); isStop {
 				break
 			}
 			// Match by error message as a fallback for wrapped exceptions.
@@ -2074,7 +2066,7 @@ func (it *dictViewIterator) GetAttr(name string) (Value, bool) {
 			}
 			val, ok := it.Next()
 			if !ok {
-				return nil, &stopIterationError{}
+				return nil, &StopIteration{}
 			}
 			return val, nil
 		}), true

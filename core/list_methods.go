@@ -54,7 +54,7 @@ func (s *simpleListIterator) GetAttr(name string) (Value, bool) {
 	case "__next__":
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			if s.list == nil {
-				return nil, fmt.Errorf("StopIteration")
+				return nil, &StopIteration{}
 			}
 			if s.index < s.list.Len() {
 				val := s.list.items[s.index]
@@ -62,7 +62,7 @@ func (s *simpleListIterator) GetAttr(name string) (Value, bool) {
 				return val, nil
 			}
 			s.list = nil // detach when exhausted
-			return nil, fmt.Errorf("StopIteration")
+			return nil, &StopIteration{}
 		}), true
 	case "__length_hint__":
 		// PEP 424: Return estimated remaining length
@@ -130,7 +130,7 @@ func (r *listReverseIterator) GetAttr(name string) (Value, bool) {
 				r.index--
 				return val, nil
 			}
-			return nil, fmt.Errorf("StopIteration")
+			return nil, &StopIteration{}
 		}), true
 	case "__length_hint__":
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {

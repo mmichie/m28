@@ -180,7 +180,7 @@ func (it *rangeIterator) GetAttr(name string) (Value, bool) {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			val, ok := it.Next()
 			if !ok {
-				return nil, fmt.Errorf("StopIteration")
+				return nil, &StopIteration{}
 			}
 			return val, nil
 		}), true
