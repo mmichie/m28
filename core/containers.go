@@ -514,6 +514,14 @@ func (d *DictValue) SetWithKey(keyRepr string, origKey Value, value Value) {
 	d.keys[keyRepr] = origKey
 }
 
+// Update copies every entry from other into d (like dict.update), preserving
+// each entry's original key object and insertion order.
+func (d *DictValue) Update(other *DictValue) {
+	for _, keyRepr := range other.orderedKeys {
+		d.SetWithKey(keyRepr, other.keys[keyRepr], other.entries[keyRepr])
+	}
+}
+
 // Delete removes a key by internal representation
 // INTERNAL: Callers should use ValueToKey() to convert keys first
 func (d *DictValue) Delete(key string) {

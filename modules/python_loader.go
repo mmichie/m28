@@ -482,11 +482,53 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 	}
 
+	// Honor module self-replacement: a module may reassign its own sys.modules
+	// entry during execution (e.g. decimal.py does `sys.modules[__name__] =
+	// _pydecimal`). Mirror the replacement's namespace into our cached module
+	// dict so `import name` and the registry cache expose the replacement.
+	if replaced := lookupSysModule(name); replaced != nil && replaced != partialModule {
+		partialModule.Update(replaced)
+	}
+
 	// Register the module in sys.modules so Python code can find it
 	// This is essential for importlib and other modules that check sys.modules
 	registerModuleInSysModules(name, partialModule)
 
 	return partialModule, nil
+}
+
+// lookupSysModule returns the dict currently stored at sys.modules[name], or nil.
+func lookupSysModule(name string) *core.DictValue {
+	sysModule, ok := GetBuiltinModule("sys")
+	if !ok {
+		return nil
+	}
+	sysModulesVal, ok := sysModule.Get("modules")
+	if !ok {
+		return nil
+	}
+	sysModulesDict, ok := sysModulesVal.(*core.DictValue)
+	if !ok {
+		return nil
+	}
+	key := core.ValueToKey(core.StringValue(name))
+	v, ok := sysModulesDict.Get(key)
+	if !ok {
+		return nil
+	}
+	switch m := v.(type) {
+	case *core.DictValue:
+		return m
+	case *core.Module:
+		// A module reassigned itself to another module object (e.g.
+		// `sys.modules[__name__] = _pydecimal`). Expose its namespace dict.
+		if dictVal, ok := m.GetAttr("__dict__"); ok {
+			if d, ok := dictVal.(*core.DictValue); ok {
+				return d
+			}
+		}
+	}
+	return nil
 }
 
 // registerModuleInSysModules registers a loaded module in sys.modules

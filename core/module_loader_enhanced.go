@@ -305,6 +305,14 @@ func (l *ModuleLoaderEnhanced) loadM28Module(registry *ModuleRegistry, cacheName
 	// Note: No need to call exportModuleVars here anymore
 	// The module dict was populated in real-time during evaluation via Context.Define()
 
+	// Honor module self-replacement: a module may reassign its own sys.modules
+	// entry during execution (e.g. decimal.py does `sys.modules[__name__] =
+	// _pydecimal`). Mirror the replacement's namespace into our module dict so
+	// `import name` and the registry cache expose the replacement.
+	if replaced := l.checkSysModules(cacheName); replaced != nil && replaced != partialModule {
+		partialModule.Update(replaced)
+	}
+
 	// Update registry with complete module
 	registry.StoreModule(cacheName, partialModule, path, []string{})
 
