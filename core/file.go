@@ -81,6 +81,15 @@ func NewFile(path string, mode string) (*File, error) {
 
 	var err error
 
+	// Python's 't' (text) flag is the default and may be combined with any
+	// mode (e.g. "wt", "rt", "wt+"). Strip it so the switch below — which keys
+	// off the r/w/a(+)/b combinations — handles those forms. isText was already
+	// derived from the original mode (presence of 'b').
+	mode = strings.ReplaceAll(mode, "t", "")
+	if mode == "" {
+		mode = "r"
+	}
+
 	// Parse mode
 	switch mode {
 	case "r", "rb":
