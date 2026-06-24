@@ -911,7 +911,8 @@ func InitStringMethods() {
 				return nil, &TypeError{Message: "find() argument must be a string"}
 			}
 
-			// Optional start parameter (default 0)
+			// Optional start parameter (default 0). Negative values count from
+			// the end, matching Python slice semantics.
 			start := 0
 			if len(args) >= 2 {
 				startNum, ok := args[1].(NumberValue)
@@ -920,14 +921,18 @@ func InitStringMethods() {
 				}
 				start = int(startNum)
 				if start < 0 {
-					start = 0
+					start = len(s) + start
+					if start < 0 {
+						start = 0
+					}
 				}
 				if start > len(s) {
 					start = len(s)
 				}
 			}
 
-			// Optional end parameter (default len(s))
+			// Optional end parameter (default len(s)). Negative values count from
+			// the end, matching Python slice semantics.
 			end := len(s)
 			if len(args) >= 3 {
 				endNum, ok := args[2].(NumberValue)
@@ -936,11 +941,20 @@ func InitStringMethods() {
 				}
 				end = int(endNum)
 				if end < 0 {
-					end = 0
+					end = len(s) + end
+					if end < 0 {
+						end = 0
+					}
 				}
 				if end > len(s) {
 					end = len(s)
 				}
+			}
+
+			// If start is past end the search window is empty, so report
+			// "not found" rather than slicing s[start:end] (which would panic).
+			if start > end {
+				return NumberValue(-1), nil
 			}
 
 			// Search within the slice
