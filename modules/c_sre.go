@@ -373,12 +373,13 @@ func cleanPythonRegex(patternStr string, flags int) string {
 }
 
 // stripLookarounds rewrites a Python regex into one Go's RE2 engine can compile.
-// It removes lookaround assertions RE2 lacks — lookahead (?=...) and negative
-// lookahead (?!...) — and maps the Python-only end-of-string anchor \Z to Go's
-// \z. Dropping a (non-consuming) lookaround makes the pattern more permissive
-// but compilable; a pattern that still contained one would otherwise fail to
-// compile entirely, so this only converts hard failures into working (if looser)
-// matches. Used at every regex compile site for consistency.
+// It removes lookaround assertions RE2 lacks — lookahead (?=...), negative
+// lookahead (?!...), lookbehind (?<=...) and negative lookbehind (?<!...) — and
+// maps the Python-only end-of-string anchor \Z to Go's \z. Dropping a
+// (non-consuming) lookaround makes the pattern more permissive but compilable; a
+// pattern that still contained one would otherwise fail to compile entirely, so
+// this only converts hard failures into working (if looser) matches. Used at
+// every regex compile site for consistency.
 func stripLookarounds(goPattern string) string {
 	// A couple of common lookahead shapes have better consuming-equivalents.
 	if strings.Contains(goPattern, `(?=\s|$)`) {
@@ -387,6 +388,9 @@ func stripLookarounds(goPattern string) string {
 	if strings.Contains(goPattern, `(?=\S)`) {
 		goPattern = strings.ReplaceAll(goPattern, `(?=\S)`, `\S`)
 	}
+	// Strip the 4-char lookbehind markers before the 3-char lookahead markers.
+	goPattern = stripLookaroundMarker(goPattern, `(?<=`)
+	goPattern = stripLookaroundMarker(goPattern, `(?<!`)
 	goPattern = stripLookaroundMarker(goPattern, `(?!`)
 	goPattern = stripLookaroundMarker(goPattern, `(?=`)
 	// Python's \Z (end of string) is spelled \z in Go's RE2.
@@ -395,7 +399,7 @@ func stripLookarounds(goPattern string) string {
 }
 
 // stripLookaroundMarker removes every "marker...)" group (paren-balanced) from
-// goPattern. marker is "(?=" or "(?!".
+// goPattern. marker is one of "(?=", "(?!", "(?<=", "(?<!".
 func stripLookaroundMarker(goPattern, marker string) string {
 	for {
 		start := strings.Index(goPattern, marker)
