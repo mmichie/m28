@@ -2300,6 +2300,24 @@ func (s *Super) String() string {
 }
 
 // GetAttr gets an attribute from the parent class
+// defaultObjectNew returns object.__new__: it allocates a blank instance of the
+// class passed as its first argument. super().__new__(cls) resolves here when no
+// class in the MRO defines its own __new__ — every class ultimately inherits
+// object.__new__, which M28 handles specially (in callConstructor) rather than
+// storing it in a class's Methods map.
+func defaultObjectNew() Value {
+	return NewNamedBuiltinFunction("__new__", func(args []Value, ctx *Context) (Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("object.__new__(): not enough arguments")
+		}
+		cls, ok := args[0].(*Class)
+		if !ok {
+			return nil, fmt.Errorf("object.__new__(X): X is not a type object (%s)", args[0].Type())
+		}
+		return NewInstance(cls), nil
+	})
+}
+
 func (s *Super) GetAttr(name string) (Value, bool) {
 	debugSuperGetAttr := os.Getenv("M28_DEBUG_SUPER") != ""
 	if debugSuperGetAttr {
@@ -2447,6 +2465,11 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 							return v, true
 						}
 					}
+					// Not found in MRO. Every class inherits object.__new__,
+					// so super().__new__(cls) falls back to it here.
+					if name == "__new__" {
+						return defaultObjectNew(), true
+					}
 					// Not found in MRO
 					if debugSuperGetAttr {
 						fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] %s not found in MRO\n", name)
@@ -2529,6 +2552,13 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 				return bindMethod(method, s.Class, name), true
 			}
 		}
+	}
+
+	// Every class inherits object.__new__, so super().__new__(cls) — common in
+	// __new__ overrides like Fraction's — falls back to it when no class in the
+	// hierarchy defines its own.
+	if name == "__new__" {
+		return defaultObjectNew(), true
 	}
 
 	if debugSuperGetAttr {
