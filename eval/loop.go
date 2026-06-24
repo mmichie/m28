@@ -329,6 +329,25 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, err
 	}
 
+	// Python for-else: the loop body is wrapped as (do body...), optionally
+	// followed by a second (do else...). Separate the else clause so it runs
+	// once after the loop completes without break (including for empty
+	// iterables) instead of on every iteration.
+	var elseClause []core.Value
+	if len(body) >= 2 {
+		if firstDo, ok := body[0].(*core.ListValue); ok && firstDo.Len() > 0 {
+			if sym, ok := firstDo.Items()[0].(core.SymbolValue); ok && string(sym) == "do" {
+				if elseDo, ok := body[1].(*core.ListValue); ok && elseDo.Len() > 0 {
+					if sym, ok := elseDo.Items()[0].(core.SymbolValue); ok && string(sym) == "do" {
+						elseClause = elseDo.Items()[1:]
+						body = body[:1] // keep only the loop-body do-block
+					}
+				}
+			}
+		}
+	}
+	brokeOut := false
+
 	// Create a body function that evaluates all expressions
 	bodyFunc := func(item core.Value) (core.Value, error) {
 		// Use generic unpacking to bind variables
@@ -357,6 +376,7 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				if debugLoops := os.Getenv("M28_DEBUG_LOOPS"); debugLoops != "" {
 					fmt.Fprintf(os.Stderr, "[DEBUG LOOP] Body expr %d returned Break\n", i)
 				}
+				brokeOut = true
 				return Break, nil
 			}
 			if _, ok := result.(*ContinueValue); ok {
@@ -698,6 +718,21 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		} else {
 			return nil, TypeError{Expected: "iterable", Got: sequence.Type()}
+		}
+	}
+
+	// Run the for-else clause when the loop finished without break (this
+	// includes the empty-iterable case, where the body never ran).
+	if !brokeOut && len(elseClause) > 0 {
+		for _, expr := range elseClause {
+			result, err := Eval(expr, ctx)
+			if err != nil {
+				return nil, err
+			}
+			if ret, ok := result.(*ReturnValue); ok {
+				return ret, nil
+			}
+			lastResult = result
 		}
 	}
 
