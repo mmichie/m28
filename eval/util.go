@@ -343,12 +343,12 @@ func evaluateDefaultValues(signature *FunctionSignature, ctx *core.Context) erro
 				continue
 			}
 
-			// For symbols like "None", keep them unevaluated
-			// They will be evaluated at call time to get the singleton
-			if _, ok := defaultVal.(core.SymbolValue); ok {
-				// Keep as unevaluated symbol
-				continue
-			}
+			// Symbols (bare names) ARE evaluated here, at definition time, so a
+			// variable default is captured then — matching Python. e.g.
+			// [(lambda i=i: i) for i in range(5)] must capture each loop value,
+			// not re-resolve i at call time. None/True/False resolve to the same
+			// singleton whenever evaluated, so this is safe for them too; an
+			// as-yet-undefined symbol falls through to the err path and stays lazy.
 
 			evaluatedDefault, err := Eval(signature.OptionalParams[i].DefaultValue, ctx)
 			if err != nil {
