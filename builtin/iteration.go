@@ -358,6 +358,23 @@ func ReversedBuilder() builders.BuiltinFunc {
 			return core.NewList(result...), nil
 		}
 
+		// bytes/bytearray reverse over their integer byte values
+		if b, ok := obj.(core.BytesValue); ok {
+			result := make([]core.Value, len(b))
+			for i := 0; i < len(b); i++ {
+				result[i] = core.NumberValue(b[len(b)-1-i])
+			}
+			return core.NewList(result...), nil
+		}
+		if ba, ok := obj.(*core.ByteArrayValue); ok {
+			data := ba.GetData()
+			result := make([]core.Value, len(data))
+			for i := 0; i < len(data); i++ {
+				result[i] = core.NumberValue(data[len(data)-1-i])
+			}
+			return core.NewList(result...), nil
+		}
+
 		// If object has __len__ and __getitem__, use them for reverse iteration
 		if hasLen && hasGetitem {
 			// Get the length
