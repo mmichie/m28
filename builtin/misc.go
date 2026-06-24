@@ -442,17 +442,29 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
-		s, err := v.GetString(0)
-		if err != nil {
-			return nil, err
+		// ord() accepts a length-1 str (returns its code point) or a length-1
+		// bytes/bytearray (returns the byte value).
+		switch arg := v.Get(0).(type) {
+		case core.StringValue:
+			runes := []rune(string(arg))
+			if len(runes) != 1 {
+				return nil, &core.TypeError{Message: fmt.Sprintf("ord() expected a character, but string of length %d found", len(runes))}
+			}
+			return core.NumberValue(int(runes[0])), nil
+		case core.BytesValue:
+			if len(arg) != 1 {
+				return nil, &core.TypeError{Message: fmt.Sprintf("ord() expected a character, but string of length %d found", len(arg))}
+			}
+			return core.NumberValue(int(arg[0])), nil
+		case *core.ByteArrayValue:
+			data := arg.GetData()
+			if len(data) != 1 {
+				return nil, &core.TypeError{Message: fmt.Sprintf("ord() expected a character, but string of length %d found", len(data))}
+			}
+			return core.NumberValue(int(data[0])), nil
+		default:
+			return nil, &core.TypeError{Message: fmt.Sprintf("ord() expected string of length 1, but %s found", v.Get(0).Type())}
 		}
-
-		runes := []rune(s)
-		if len(runes) != 1 {
-			return nil, &core.TypeError{Message: fmt.Sprintf("ord() expected a character, but string of length %d found", len(runes))}
-		}
-
-		return core.NumberValue(int(runes[0])), nil
 	}))
 
 	// hex - convert integer to hexadecimal string
