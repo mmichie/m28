@@ -232,6 +232,13 @@ func (e *AssertionError) Error() string {
 	return msg
 }
 
+// BuiltinAssertionError holds the real AssertionError class registered at
+// startup. The assert statement constructs its exception instance from this
+// class directly (rather than via a name lookup) so that `assert` is immune to
+// AssertionError being shadowed in user code, matching CPython's
+// LOAD_ASSERTION_ERROR semantics. It is nil until the builtins are registered.
+var BuiltinAssertionError *Class
+
 // NewAssertionError creates a new assertion error
 func NewAssertionError(msg string) *AssertionError {
 	return &AssertionError{Message: msg}

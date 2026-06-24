@@ -652,6 +652,9 @@ func RegisterErrors(ctx *core.Context) {
 	// AssertionError - raised when an assert statement fails
 	assertionErrorClass := core.NewClass("AssertionError", exceptionClass)
 	ctx.Define("AssertionError", assertionErrorClass)
+	// Record the real class so the assert statement is immune to shadowing
+	// (see core.BuiltinAssertionError).
+	core.BuiltinAssertionError = assertionErrorClass
 
 	// Warning - base class for warning categories
 	warningClass := core.NewClass("Warning", baseExceptionClass)

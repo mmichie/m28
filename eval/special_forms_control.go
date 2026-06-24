@@ -296,6 +296,14 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 	case *core.OverflowError:
 		return createPythonExceptionInstance(ctx, "OverflowError", errMsg)
 	case *core.AssertionError:
+		// Build the instance from the real AssertionError class rather than a
+		// name lookup, so a failed `assert` raises a genuine AssertionError even
+		// when the name is shadowed in user code (CPython LOAD_ASSERTION_ERROR).
+		if core.BuiltinAssertionError != nil {
+			if inst, instErr := core.BuiltinAssertionError.Call([]core.Value{core.StringValue(errMsg)}, ctx); instErr == nil {
+				return inst
+			}
+		}
 		return createPythonExceptionInstance(ctx, "AssertionError", errMsg)
 	case *core.SystemExit:
 		// SystemExit should be converted to a Python SystemExit instance
