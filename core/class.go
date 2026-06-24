@@ -394,6 +394,16 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return TupleValue(bases), true
 	}
 
+	// __base__ is the single "most derived" base — the first entry of __bases__
+	// (M28 adds object to a base class's parents, so this is object for a plain
+	// class). object itself has no base, so it reports None.
+	if name == "__base__" {
+		if len(c.Parents) > 0 {
+			return c.Parents[0], true
+		}
+		return None, true
+	}
+
 	// Special handling for __mro__ (Method Resolution Order)
 	if name == "__mro__" {
 		// Build the MRO tuple using C3 linearization
