@@ -1815,6 +1815,13 @@ func dictViewSetOp(v *DictView, other Value, op string) (Value, error) {
 	return result, nil
 }
 
+// PopulateDictFromArgs is the exported form of populateDictFromArgs, used by the
+// dict class's __init__ (in the builtin package) so super().__init__(...) in a
+// dict subclass populates the backing dict.
+func PopulateDictFromArgs(d *DictValue, args []Value, kwargs map[string]Value) error {
+	return populateDictFromArgs(d, args, kwargs)
+}
+
 // populateDictFromArgs fills d with entries from positional + keyword
 // args following Python's dict() constructor rules:
 //   - 0 args -> empty dict (caller already handled)

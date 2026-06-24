@@ -932,6 +932,33 @@ func hexDigitValue(c byte) int {
 func createDictClass() *DictType {
 	class := core.NewClass("dict", nil)
 
+	// dict.__init__(self, [mapping_or_iterable], **kwargs) — populates self's
+	// backing dict. Called via super().__init__(...) in dict subclasses such as
+	// collections.Counter. Without this, dict lacked __init__ entirely and the
+	// MRO of a dict subclass doesn't reach object, so super().__init__() raised
+	// "'super' object has no attribute '__init__'".
+	dictInit := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) == 0 {
+			return core.Nil, nil
+		}
+		inst, ok := args[0].(*core.Instance)
+		if !ok {
+			// Called on a plain dict (or unexpected receiver) — nothing to do.
+			return core.Nil, nil
+		}
+		if inst.BackingDict == nil {
+			inst.BackingDict = core.NewDict()
+		}
+		if rest := args[1:]; len(rest) > 0 {
+			if err := core.PopulateDictFromArgs(inst.BackingDict, rest, nil); err != nil {
+				return nil, err
+			}
+		}
+		return core.Nil, nil
+	})
+	dictInit.SetAttr("__name__", core.StringValue("__init__"))
+	class.SetMethod("__init__", dictInit)
+
 	// Add .copy unbound method that can be accessed as dict.copy
 	class.SetMethod("copy", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
