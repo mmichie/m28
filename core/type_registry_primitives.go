@@ -1686,6 +1686,21 @@ func registerBytesType() {
 						result[i] = byte(intVal)
 					}
 					return BytesValue(result), nil
+				case TupleValue:
+					// Convert tuple of numbers to bytes
+					result := make([]byte, len(v))
+					for i, val := range v {
+						num, ok := val.(NumberValue)
+						if !ok {
+							return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", val.Type())}
+						}
+						intVal := int(num)
+						if intVal < 0 || intVal > 255 {
+							return nil, &ValueError{Message: "bytes must be in range(0, 256)"}
+						}
+						result[i] = byte(intVal)
+					}
+					return BytesValue(result), nil
 				case *ByteArrayValue:
 					// Copy from bytearray
 					result := make([]byte, len(v.data))
@@ -1727,6 +1742,27 @@ func registerBytesType() {
 					}
 					return BytesValue(result), nil
 				default:
+					// Any other iterable of ints (range, generators, dict views).
+					if iterable, ok := v.(Iterable); ok {
+						var result []byte
+						iter := iterable.Iterator()
+						for {
+							item, ok := iter.Next()
+							if !ok {
+								break
+							}
+							num, ok := item.(NumberValue)
+							if !ok {
+								return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", item.Type())}
+							}
+							intVal := int(num)
+							if intVal < 0 || intVal > 255 {
+								return nil, &ValueError{Message: "bytes must be in range(0, 256)"}
+							}
+							result = append(result, byte(intVal))
+						}
+						return BytesValue(result), nil
+					}
 					return nil, &TypeError{Message: fmt.Sprintf("cannot convert '%s' object to bytes", v.Type())}
 				}
 			}
