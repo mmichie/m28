@@ -1759,6 +1759,70 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 // Implements Python's attribute setting protocol:
 // 1. Check for custom __setattr__ in the class hierarchy and call it
 // 2. Otherwise use default behavior (descriptor protocol + instance dict)
+// isExceptionSpecialAttr reports whether name is one of BaseException's
+// type-checked, undeletable special attributes.
+func isExceptionSpecialAttr(name string) bool {
+	switch name {
+	case "args", "__traceback__", "__cause__", "__context__":
+		return true
+	}
+	return false
+}
+
+// isBaseExceptionInstance reports whether v is an instance of a BaseException
+// subclass.
+func isBaseExceptionInstance(v Value) bool {
+	if inst, ok := v.(*Instance); ok {
+		return isClassSubclassOf(inst.Class, "BaseException")
+	}
+	return false
+}
+
+// isIterableValue reports whether v can be iterated (used to validate that an
+// exception's args is set to an iterable, matching CPython).
+func isIterableValue(v Value) bool {
+	switch v.(type) {
+	case NumberValue, BigIntValue, BoolValue, NilValue:
+		return false
+	case TupleValue, *ListValue, StringValue, *DictValue, *SetValue, BytesValue:
+		return true
+	}
+	if _, ok := v.(interface{ Iterator() Iterator }); ok {
+		return true
+	}
+	if o, ok := v.(interface{ GetAttr(string) (Value, bool) }); ok {
+		if _, has := o.GetAttr("__iter__"); has {
+			return true
+		}
+	}
+	return false
+}
+
+// validateExceptionSetAttr enforces BaseException's special-attribute types.
+func validateExceptionSetAttr(name string, value Value) error {
+	switch name {
+	case "args":
+		if !isIterableValue(value) {
+			return &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", GetPythonTypeName(value))}
+		}
+	case "__traceback__":
+		if value != None && value != Nil {
+			if _, ok := value.(*TracebackType); !ok {
+				return &TypeError{Message: "__traceback__ must be a traceback or None"}
+			}
+		}
+	case "__cause__":
+		if value != None && value != Nil && !isBaseExceptionInstance(value) {
+			return &TypeError{Message: "exception cause must be None or derive from BaseException"}
+		}
+	case "__context__":
+		if value != None && value != Nil && !isBaseExceptionInstance(value) {
+			return &TypeError{Message: "exception context must be None or derive from BaseException"}
+		}
+	}
+	return nil
+}
+
 func (i *Instance) SetAttr(name string, value Value) error {
 	// Check for custom __setattr__ in the class hierarchy
 	// Look in class methods (not GetAttr which returns the builtin fallback)
@@ -1786,6 +1850,16 @@ func (i *Instance) SetAttr(name string, value Value) error {
 // 1. Check for data descriptor with __set__ in class
 // 2. Set in instance __dict__
 func (i *Instance) SetAttrDefault(name string, value Value) error {
+	// BaseException enforces the types of its special attributes (CPython): args
+	// must be iterable, __traceback__ a traceback or None, __cause__/__context__
+	// None or a BaseException. Done here (rather than SetAttr) so it also covers
+	// the setattr() builtin, which goes through the default __setattr__ dunder.
+	if isExceptionSpecialAttr(name) && isClassSubclassOf(i.Class, "BaseException") {
+		if err := validateExceptionSetAttr(name, value); err != nil {
+			return err
+		}
+	}
+
 	// Check for data descriptor in class with __set__
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
 		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
@@ -1846,6 +1920,13 @@ func (i *Instance) DelAttr(name string) error {
 // 1. Check for descriptor with __delete__ in class
 // 2. Delete from instance __dict__
 func (i *Instance) DelAttrDefault(name string) error {
+	// BaseException's special attributes may not be deleted (CPython). Done here
+	// (rather than DelAttr) so it also covers the delattr() builtin, which goes
+	// through the default __delattr__ dunder.
+	if isExceptionSpecialAttr(name) && isClassSubclassOf(i.Class, "BaseException") {
+		return &TypeError{Message: fmt.Sprintf("%s may not be deleted", name)}
+	}
+
 	// Check for descriptor in class with __delete__
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
 		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
