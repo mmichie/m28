@@ -8,10 +8,76 @@ import (
 	"github.com/mmichie/m28/core/protocols"
 )
 
+// callableIterator implements the two-argument iter(callable, sentinel) form:
+// it calls callable() on each __next__ and stops once the result equals the
+// sentinel.
+type callableIterator struct {
+	core.BaseObject
+	callable core.Value
+	sentinel core.Value
+	ctx      *core.Context
+	done     bool
+}
+
+func (ci *callableIterator) Type() core.Type { return "callable_iterator" }
+
+func (ci *callableIterator) advance() (core.Value, error) {
+	if ci.done {
+		return nil, &core.StopIteration{}
+	}
+	callable, ok := ci.callable.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, &core.TypeError{Message: "iter(v, w): v must be callable"}
+	}
+	result, err := callable.Call(nil, ci.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if core.EqualValues(result, ci.sentinel) {
+		ci.done = true
+		return nil, &core.StopIteration{}
+	}
+	return result, nil
+}
+
+// Next implements core.Iterator so for-loops can drive it directly.
+func (ci *callableIterator) Next() (core.Value, bool) {
+	val, err := ci.advance()
+	if err != nil {
+		return nil, false
+	}
+	return val, true
+}
+
+func (ci *callableIterator) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return ci, nil
+		}), true
+	case "__next__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return ci.advance()
+		}), true
+	}
+	return ci.BaseObject.GetAttr(name)
+}
+
 // iterFunc implements the iter() builtin
 func iterFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Two-argument form: iter(callable, sentinel).
+	if len(args) == 2 {
+		return &callableIterator{
+			BaseObject: *core.NewBaseObject(core.Type("callable_iterator")),
+			callable:   args[0],
+			sentinel:   args[1],
+			ctx:        ctx,
+		}, nil
+	}
 	if len(args) != 1 {
-		return nil, &core.TypeError{Message: fmt.Sprintf("iter() takes exactly one argument (%d given)", len(args))}
+		return nil, &core.TypeError{Message: fmt.Sprintf("iter() takes one or two arguments (%d given)", len(args))}
 	}
 
 	obj := args[0]
