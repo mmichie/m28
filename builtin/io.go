@@ -9,7 +9,47 @@ import (
 	"github.com/mmichie/m28/common/errors"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
+	"github.com/mmichie/m28/modules"
 )
+
+// printTarget resolves where print() should write: the file= keyword argument
+// when given, otherwise the current sys.stdout (which Python code may have
+// reassigned, e.g. via contextlib.redirect_stdout). Returns nil when neither is
+// available (very early init), in which case the caller falls back to os.Stdout.
+func printTarget(kwargs map[string]core.Value) core.Value {
+	if fileVal, ok := kwargs["file"]; ok && fileVal != core.None {
+		return fileVal
+	}
+	if sysMod, ok := modules.GetBuiltinModule("sys"); ok {
+		if stdoutVal, found := sysMod.GetAttr("stdout"); found {
+			return stdoutVal
+		}
+	}
+	return nil
+}
+
+// writeToTarget writes text to a file-like object via its write() method.
+// Returns false if the target has no callable write attribute.
+func writeToTarget(target core.Value, text string, ctx *core.Context) (bool, error) {
+	obj, ok := target.(interface {
+		GetAttr(string) (core.Value, bool)
+	})
+	if !ok {
+		return false, nil
+	}
+	writeAttr, found := obj.GetAttr("write")
+	if !found {
+		return false, nil
+	}
+	callable, ok := writeAttr.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return false, nil
+	}
+	_, err := callable.Call([]core.Value{core.StringValue(text)}, ctx)
+	return true, err
+}
 
 // RegisterIO registers I/O functions using the builder framework
 func RegisterIO(ctx *core.Context) {
@@ -57,7 +97,17 @@ func RegisterIO(ctx *core.Context) {
 			for i, arg := range args {
 				parts[i] = core.PrintValueWithoutQuotes(arg)
 			}
-			fmt.Print(strings.Join(parts, sep) + end)
+			text := strings.Join(parts, sep) + end
+
+			// Write to file= or the current sys.stdout via its write() method, so
+			// reassigning sys.stdout (e.g. contextlib.redirect_stdout) is honored.
+			// Fall back to Go's stdout when no writable target is available.
+			if target := printTarget(kwargs); target != nil {
+				if written, err := writeToTarget(target, text, ctx); written {
+					return core.NilValue{}, err
+				}
+			}
+			fmt.Print(text)
 			return core.NilValue{}, nil
 		},
 	}
