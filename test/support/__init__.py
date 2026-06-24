@@ -14,6 +14,7 @@
 # files can load and the platform-independent assertions inside them can run.
 
 
+import contextlib
 import sys
 import unittest
 
@@ -85,6 +86,52 @@ def linked_to_musl():
     musl. M28 is a Go program, not linked to musl, so this is always False.
     """
     return False
+
+
+@contextlib.contextmanager
+def swap_attr(obj, attr, new_val):
+    """Temporarily swap obj.attr to new_val, restoring the old value after.
+
+    If attr doesn't exist it is created and then deleted. The old value (or
+    None) is yielded to the optional `as` target.
+    """
+    if hasattr(obj, attr):
+        real_val = getattr(obj, attr)
+        setattr(obj, attr, new_val)
+        try:
+            yield real_val
+        finally:
+            setattr(obj, attr, real_val)
+    else:
+        setattr(obj, attr, new_val)
+        try:
+            yield
+        finally:
+            if hasattr(obj, attr):
+                delattr(obj, attr)
+
+
+@contextlib.contextmanager
+def swap_item(obj, item, new_val):
+    """Temporarily swap obj[item] to new_val, restoring the old value after.
+
+    If item doesn't exist it is created and then deleted. The old value (or
+    None) is yielded to the optional `as` target.
+    """
+    if item in obj:
+        real_val = obj[item]
+        obj[item] = new_val
+        try:
+            yield real_val
+        finally:
+            obj[item] = real_val
+    else:
+        obj[item] = new_val
+        try:
+            yield
+        finally:
+            if item in obj:
+                del obj[item]
 
 
 def cpython_only(test):
