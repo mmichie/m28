@@ -40,8 +40,10 @@ func registerControlFlowForms() {
 	eval.RegisterSpecialForm("break", breakForm)
 	eval.RegisterSpecialForm("continue", continueForm)
 
-	// Pattern matching (Python 3.10+)
-	eval.RegisterSpecialForm("match", matchForm)
+	// Pattern matching (Python 3.10+). Registered as "match-stmt" (the symbol
+	// MatchForm.ToIR emits) so the soft keyword "match" remains usable as an
+	// ordinary identifier/callable; only genuine match statements dispatch here.
+	eval.RegisterSpecialForm("match-stmt", matchForm)
 }
 
 // registerLogicalForms registers special forms for logical operators

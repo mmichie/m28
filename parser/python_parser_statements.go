@@ -85,21 +85,12 @@ func (p *PythonParser) parseStatement() ast.ASTNode {
 	case TOKEN_DEL:
 		return p.parseDelStatement()
 	case TOKEN_IDENTIFIER:
-		// Check for soft keywords (match)
-		// Only treat "match" as keyword if not followed by assignment
-		if p.peek().Lexeme == "match" {
-			// Look ahead to see if this is a match statement or variable assignment
-			// match statement: match expr:
-			// variable: match = value or match, rest = value (tuple unpacking)
-			if p.current+1 < len(p.tokens) {
-				nextToken := p.tokens[p.current+1].Type
-				// If next token is = or , (tuple unpacking), it's an assignment, not match statement
-				if nextToken != TOKEN_ASSIGN && nextToken != TOKEN_COMMA {
-					// Not an assignment, could be match statement
-					// Parse and see what happens
-					return p.parseMatchStatement()
-				}
-			}
+		// "match" is a soft keyword: it only introduces a match statement when
+		// the logical line is "match <subject>:". In any other position it is an
+		// ordinary identifier: match(x) (call), match = y (assignment),
+		// match.attr, match[i], match: T (annotation), match, y = ... (unpacking).
+		if p.peek().Lexeme == "match" && p.looksLikeMatchStatement() {
+			return p.parseMatchStatement()
 		}
 		// Fall through to expression statement
 		return p.parseExpressionStatement()

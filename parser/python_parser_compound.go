@@ -1190,6 +1190,48 @@ func (p *PythonParser) parseWithStatementWithAsync(isAsync bool) ast.ASTNode {
 	return ast.NewWithForm(items, body, p.makeLocation(tok), ast.SyntaxPython)
 }
 
+// looksLikeMatchStatement reports whether the "match" soft keyword at the
+// current position begins a match statement ("match <subject>:") rather than an
+// ordinary expression whose leading identifier happens to be "match" (e.g.
+// match(x), match = y, match.attr, match[i], match: T).
+//
+// A match-statement header ends with a colon at bracket depth zero and has a
+// non-empty subject between "match" and that colon. We scan the remaining
+// tokens of the current logical line, tracking bracket depth: a top-level colon
+// preceded by at least one subject token means it is a match statement. A
+// top-level statement terminator (newline/semicolon/EOF) reached first means it
+// is an ordinary expression.
+func (p *PythonParser) looksLikeMatchStatement() bool {
+	depth := 0
+	sawSubject := false
+	for i := p.current + 1; i < len(p.tokens); i++ {
+		switch p.tokens[i].Type {
+		case TOKEN_LPAREN, TOKEN_LBRACKET, TOKEN_LBRACE:
+			depth++
+			sawSubject = true
+		case TOKEN_RPAREN, TOKEN_RBRACKET, TOKEN_RBRACE:
+			if depth > 0 {
+				depth--
+			}
+			sawSubject = true
+		case TOKEN_COLON:
+			if depth == 0 {
+				// A top-level colon is the match header terminator, but only
+				// when a subject preceded it ("match:" alone is an annotation).
+				return sawSubject
+			}
+			sawSubject = true
+		case TOKEN_NEWLINE, TOKEN_SEMICOLON, TOKEN_EOF:
+			if depth == 0 {
+				return false
+			}
+		default:
+			sawSubject = true
+		}
+	}
+	return false
+}
+
 // parseMatchStatement parses: match subject: case pattern: block ...
 func (p *PythonParser) parseMatchStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_IDENTIFIER) // "match" as soft keyword

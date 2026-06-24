@@ -1406,15 +1406,20 @@ func (m *MatchForm) String() string {
 }
 
 // ToIR lowers match statement to IR
-// Generates: (match subject (case pattern [if guard] body...) ...)
+// Generates: (match-stmt subject (case pattern [if guard] body...) ...)
+//
+// The head symbol is "match-stmt" rather than "match" so that a genuine match
+// statement never collides with an ordinary identifier named "match" (e.g. the
+// "match = _compile_pattern(pat)" / "match(name)" pattern in fnmatch). The bare
+// symbol "match" stays available for variable lookup and function calls.
 func (m *MatchForm) ToIR() core.Value {
 	if len(m.Cases) == 0 {
 		return core.SymbolValue("nil")
 	}
 
-	// Build the match expression: (match subject case1 case2 ...)
+	// Build the match expression: (match-stmt subject case1 case2 ...)
 	result := make([]core.Value, 0, len(m.Cases)+2)
-	result = append(result, core.SymbolValue("match"))
+	result = append(result, core.SymbolValue("match-stmt"))
 	result = append(result, m.Subject.ToIR())
 
 	// Build each case clause: (case pattern [if guard] body...)
