@@ -688,6 +688,44 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 			}
 			return core.False, nil
 		}), true
+	case "remove":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, &core.TypeError{Message: "remove() requires exactly 1 argument"}
+			}
+			for i, it := range dq.items {
+				if core.EqualValues(it, args[0]) {
+					dq.items = append(dq.items[:i], dq.items[i+1:]...)
+					return core.Nil, nil
+				}
+			}
+			return nil, &core.ValueError{Message: "deque.remove(x): x not in deque"}
+		}), true
+	case "count":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, &core.TypeError{Message: "count() requires exactly 1 argument"}
+			}
+			n := 0
+			for _, it := range dq.items {
+				if core.EqualValues(it, args[0]) {
+					n++
+				}
+			}
+			return core.NumberValue(n), nil
+		}), true
+	case "index":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, &core.TypeError{Message: "index() requires at least 1 argument"}
+			}
+			for i, it := range dq.items {
+				if core.EqualValues(it, args[0]) {
+					return core.NumberValue(i), nil
+				}
+			}
+			return nil, &core.ValueError{Message: fmt.Sprintf("%s is not in deque", core.PrintValue(args[0]))}
+		}), true
 	}
 	return nil, false
 }
