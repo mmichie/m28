@@ -116,7 +116,12 @@
           "source": "cpython/Lib/test/test_exceptions.py"
         },
         "test_raise": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_raise.py"},
-        "test_with": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_with.py"},
+        "test_with": {
+          "status": "partial",
+          "tests_run": 51, "passing": 25, "failures": 11, "errors": 15,
+          "notes": "Runs. 22->25 when `with cm as obj.attr:` / `as lst[0]:` stopped wrongly unpacking (UnpackPattern now treats a (. ...)/get-item S-expr as a single assignable target). Remaining: deeper context-manager protocol/exception-propagation behavior.",
+          "source": "cpython/Lib/test/test_with.py"
+        },
         "test_scope": {
           "status": "partial",
           "tests_run": 41, "passing": 31, "failures": 8, "errors": 2, "skipped": 3,
