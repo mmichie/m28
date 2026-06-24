@@ -2352,6 +2352,20 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 							}
 						}
 					}
+					// Not found in any MRO class's Methods/Attributes. For a
+					// subclass of a builtin container, fall back to the instance's
+					// builtin methods (e.g. dict.update, dict.get) so
+					// super().<method>(...) works. dictMethodOnInstance returns a
+					// closure over the backing dict that takes the user's args
+					// directly, so return it as-is (no self re-binding).
+					if s.Instance.BackingDict != nil {
+						if v, ok := dictMethodOnInstance(s.Instance, name); ok {
+							if debugSuperGetAttr {
+								fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Found %s via BackingDict\n", name)
+							}
+							return v, true
+						}
+					}
 					// Not found in MRO
 					if debugSuperGetAttr {
 						fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] %s not found in MRO\n", name)
