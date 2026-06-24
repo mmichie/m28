@@ -135,6 +135,10 @@ func InitMathModule() *core.DictValue {
 		return math.Gamma(x), nil
 	})))
 
+	// Error functions
+	mathModule.Set("erf", core.NewBuiltinFunction(builders.UnaryNumberSimple("erf", math.Erf)))
+	mathModule.Set("erfc", core.NewBuiltinFunction(builders.UnaryNumberSimple("erfc", math.Erfc)))
+
 	// Angle conversion
 	mathModule.Set("degrees", core.NewBuiltinFunction(builders.UnaryNumber("degrees", func(x float64) (float64, error) {
 		return x * 180.0 / math.Pi, nil
