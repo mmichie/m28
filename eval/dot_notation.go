@@ -454,6 +454,23 @@ func getListAttr(lst *core.ListValue, attr string, isCall bool, args *core.ListV
 }
 
 // getStringAttr handles attribute access for strings
+func stripChars(args *core.ListValue) (string, bool) {
+	if args == nil || args.Len() == 0 {
+		return "", false
+	}
+	first := args.Items()[0]
+	if located, ok := first.(core.LocatedValue); ok {
+		first = located.Value
+	}
+	if _, isNil := first.(core.NilValue); isNil {
+		return "", false
+	}
+	if str, ok := first.(core.StringValue); ok {
+		return string(str), true
+	}
+	return "", false
+}
+
 func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Get the type descriptor for string
 	td := core.GetTypeDescriptor("string")
@@ -471,13 +488,22 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.Li
 		return core.StringValue(strings.ToLower(string(str))), nil
 
 	case "strip":
+		if chars, ok := stripChars(args); ok {
+			return core.StringValue(strings.Trim(string(str), chars)), nil
+		}
 		return core.StringValue(strings.TrimSpace(string(str))), nil
 
 	case "lstrip":
-		return core.StringValue(strings.TrimLeft(string(str), " \t\n\r")), nil
+		if chars, ok := stripChars(args); ok {
+			return core.StringValue(strings.TrimLeft(string(str), chars)), nil
+		}
+		return core.StringValue(strings.TrimLeft(string(str), " \t\n\r\f\v")), nil
 
 	case "rstrip":
-		return core.StringValue(strings.TrimRight(string(str), " \t\n\r")), nil
+		if chars, ok := stripChars(args); ok {
+			return core.StringValue(strings.TrimRight(string(str), chars)), nil
+		}
+		return core.StringValue(strings.TrimRight(string(str), " \t\n\r\f\v")), nil
 
 	case "capitalize":
 		s := string(str)
@@ -656,9 +682,9 @@ func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.List
 		}
 		return core.Nil, nil
 
-	// "update" intentionally not auto-called here: it must dispatch through
-	// the type descriptor's method so keyword arguments (d.update(x=1))
-	// are routed correctly. The auto-call path only sees positional args.
+		// "update" intentionally not auto-called here: it must dispatch through
+		// the type descriptor's method so keyword arguments (d.update(x=1))
+		// are routed correctly. The auto-call path only sees positional args.
 	}
 
 	// First, check if it's a dictionary key access
