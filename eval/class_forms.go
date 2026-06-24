@@ -545,6 +545,18 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// Set __module__ to the defining module's name (the __name__ in scope),
+	// instead of the hard-coded "__main__". This makes cls.__module__ correct for
+	// classes defined in imported modules — needed by repr, pickling, and enum's
+	// @global_enum.
+	if class != nil {
+		if nameVal, err := ctx.Lookup("__name__"); err == nil {
+			if nameStr, ok := nameVal.(core.StringValue); ok {
+				class.Module = string(nameStr)
+			}
+		}
+	}
+
 	// Set __qualname__ attribute (qualified name)
 	// For now, just use the class name (simple case)
 	// TODO(M28-2854): Handle nested classes (e.g., "Outer.Inner") and local classes (e.g., "func.<locals>.Local")
