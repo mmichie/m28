@@ -22,9 +22,11 @@ func RegisterStringFormatFunctions(ctx *core.Context) {
 	ctx.Define("format-expr", core.NewBuiltinFunction(FormatExprFunc))
 }
 
-// FormatExprFunc handles format expressions from enhanced f-strings
+// FormatExprFunc handles format expressions from enhanced f-strings. It is
+// registered as the builtin `format-expr`, so its arguments arrive already
+// evaluated — the value must not be evaluated a second time.
 func FormatExprFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
-	formatted, err := formatExpression(args, ctx)
+	formatted, err := formatExpressionImpl(args, ctx, true)
 	if err != nil {
 		return nil, err
 	}
@@ -100,23 +102,37 @@ func FormatFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return core.StringValue(result), nil
 }
 
-// formatExpression formats a Python-style format expression
+// formatExpression formats a Python-style format expression whose first
+// argument is an unevaluated AST node (used by the StrFormatFunc concatenation
+// path, which passes raw form elements).
 func formatExpression(args []core.Value, ctx *core.Context) (string, error) {
+	return formatExpressionImpl(args, ctx, false)
+}
+
+// formatExpressionImpl formats a format expression. When alreadyEvaluated is
+// true the first argument is a runtime value (the builtin `format-expr` call
+// pre-evaluates its arguments) and must NOT be re-evaluated: re-evaluating a
+// runtime list value would treat it as a call `(elem0 elem1 ...)` and fail.
+func formatExpressionImpl(args []core.Value, ctx *core.Context, alreadyEvaluated bool) (string, error) {
 	v := validation.NewArgs("format-expr", args)
 	if err := v.Min(1); err != nil {
 		return "", err
 	}
 
-	// Evaluate the expression
+	// Evaluate the expression (unless the caller already did).
 	expr := v.Get(0)
-	value, err := eval.Eval(expr, ctx)
-	if err != nil {
-		// If it's a raw string, use it as-is
-		if str, ok := types.AsString(expr); ok {
-			value = core.StringValue(str)
-		} else {
-			return "", err
+	value := expr
+	if !alreadyEvaluated {
+		evaluated, err := eval.Eval(expr, ctx)
+		if err != nil {
+			// If it's a raw string, use it as-is
+			if str, ok := types.AsString(expr); ok {
+				evaluated = core.StringValue(str)
+			} else {
+				return "", err
+			}
 		}
+		value = evaluated
 	}
 
 	// Default format
