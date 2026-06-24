@@ -39,6 +39,16 @@ func InitCodecsModule() *core.DictValue {
 		return core.None, nil
 	}))
 
+	// unregister(search_function) - remove a previously registered search function
+	module.Set("unregister", core.NewNamedBuiltinFunction("unregister", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, core.NewTypeError("unregister", nil, "unregister() takes exactly 1 argument")
+		}
+		// Remove the first matching search function; ignore if not present.
+		_, _ = codecSearchRegistry.CallMethod("remove", []core.Value{args[0]}, ctx)
+		return core.None, nil
+	}))
+
 	// lookup(encoding) - lookup a codec by encoding name
 	module.Set("lookup", core.NewNamedBuiltinFunction("lookup", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
