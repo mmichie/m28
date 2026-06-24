@@ -152,7 +152,9 @@ func RegisterCollections(ctx *core.Context) {
 			step = args[2]
 		}
 
-		// Validate that arguments are None or integers (including BigIntValue)
+		// Coerce each bound: None and ints/BigInts pass through; an object with
+		// __index__ is converted (CPython honors __index__ for slice bounds);
+		// anything else is a TypeError. step==0 is allowed at construction time.
 		isIntLike := func(v core.Value) bool {
 			if types.IsNumber(v) {
 				return true
@@ -160,21 +162,24 @@ func RegisterCollections(ctx *core.Context) {
 			_, isBig := v.(core.BigIntValue)
 			return isBig
 		}
-		if start != core.Nil {
-			if !isIntLike(start) {
-				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", start.Type())}
+		coerce := func(v core.Value) (core.Value, error) {
+			if v == core.Nil || isIntLike(v) {
+				return v, nil
 			}
+			if i, err := types.ToIndex(v, ctx); err == nil {
+				return core.NumberValue(float64(i)), nil
+			}
+			return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", v.Type())}
 		}
-		if stop != core.Nil {
-			if !isIntLike(stop) {
-				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", stop.Type())}
-			}
+		var cerr error
+		if start, cerr = coerce(start); cerr != nil {
+			return nil, cerr
 		}
-		if step != core.Nil {
-			if !isIntLike(step) {
-				return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", step.Type())}
-			}
-			// Note: step==0 is allowed at construction time; error is raised at use time.
+		if stop, cerr = coerce(stop); cerr != nil {
+			return nil, cerr
+		}
+		if step, cerr = coerce(step); cerr != nil {
+			return nil, cerr
 		}
 
 		return &core.SliceValue{
