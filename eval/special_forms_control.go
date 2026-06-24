@@ -616,6 +616,13 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 							handlerStart = 4
 						}
 					}
+				} else if firstSym, ok := tupleList.GetItemAsSymbol(0); ok && string(firstSym) == "do" {
+					// Bare `except:` whose body lowered to a (do ...) block. The
+					// (do ...) is the handler body, NOT an exception-type expression:
+					// leave excType empty (catch-all) and handlerStart at 1 so
+					// Items()[1] (the body) runs as the handler. Treating it as a type
+					// expression would evaluate the body here and, if it raised, skip
+					// matching and the finally clause entirely.
 				} else {
 					// It's a non-tuple-literal list - treat as expression to evaluate
 					// (e.g., (. self failureException) for self.failureException)
