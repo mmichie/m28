@@ -800,6 +800,26 @@ func (di *DequeIterator) Reset() {
 	di.index = 0
 }
 
+// GetAttr exposes the Python iterator protocol (__iter__/__next__) so the
+// deque iterator is accepted by `iter()`/for-loops, not just Go-level Iterator().
+func (di *DequeIterator) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return di, nil
+		}), true
+	case "__next__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			v, ok := di.Next()
+			if !ok {
+				return nil, fmt.Errorf("StopIteration")
+			}
+			return v, nil
+		}), true
+	}
+	return nil, false
+}
+
 // OrderedDict is a dictionary that maintains insertion order
 // Since M28's DictValue already maintains order, this is essentially a wrapper
 type OrderedDict struct {
