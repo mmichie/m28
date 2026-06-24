@@ -998,7 +998,14 @@ func createDictClass() *DictType {
 				cls = nil // plain dict
 				args = args[1:]
 			case *core.Class:
-				cls = v
+				// The base dict class must yield a plain dict (a *DictValue), so
+				// that builtins type-asserting *DictValue (e.g. str.translate)
+				// accept the result. Only a genuine subclass yields an instance.
+				if v.Name == "dict" {
+					cls = nil
+				} else {
+					cls = v
+				}
 				args = args[1:]
 			case *core.DictValue:
 				cls = nil
