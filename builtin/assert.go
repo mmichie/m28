@@ -1,8 +1,6 @@
 package builtin
 
 import (
-	"fmt"
-
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
 )
@@ -23,8 +21,11 @@ func RegisterAssertBuiltins(ctx *core.Context) {
 		if !condition {
 			var message string
 			if v.Count() > 1 {
-				// Use the second argument as the error message
-				message = fmt.Sprintf("%v", v.Get(1))
+				// Use the second argument as the error message. Render it with
+				// str() semantics (no surrounding quotes for strings) so that
+				// `assert cond, "msg"` yields AssertionError("msg"), matching
+				// CPython where str(e) == "msg" rather than '"msg"'.
+				message = core.PrintValueWithoutQuotes(v.Get(1))
 			} else {
 				message = "Assertion failed"
 			}
