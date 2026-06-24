@@ -54,7 +54,9 @@ func Init_ContextvarsModule() *core.DictValue {
 		if d, ok := self.Attributes["_default"]; ok && d != core.Value(contextVarMissing) {
 			return d, nil
 		}
-		return nil, &core.AttributeError{ObjType: "ContextVar", AttrName: "value"}
+		// No value and no default: CPython raises LookupError (which callers like
+		// decimal.getcontext() catch), not AttributeError.
+		return nil, &core.LookupError{Message: "ContextVar has no value"}
 	}))
 	contextVarClass.SetMethod("set", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {

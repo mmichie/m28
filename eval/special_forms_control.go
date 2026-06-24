@@ -263,6 +263,8 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		return createPythonExceptionInstance(ctx, "TypeError", errMsg)
 	case *core.ZeroDivisionError:
 		return createPythonExceptionInstance(ctx, "ZeroDivisionError", errMsg)
+	case *core.LookupError:
+		return createPythonExceptionInstance(ctx, "LookupError", errMsg)
 	case *core.KeyError:
 		// Python's KeyError uses the missing key (not a formatted message)
 		// as its single argument: args == (key,)

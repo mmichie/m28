@@ -146,6 +146,20 @@ func (e *IndexError) Error() string {
 }
 
 // KeyError represents a missing dictionary key
+// LookupError is the base of KeyError/IndexError. Raised directly when a generic
+// lookup fails — e.g. contextvars.ContextVar.get() with no value and no default.
+type LookupError struct {
+	Message  string
+	Location *SourceLocation
+}
+
+func (e *LookupError) Error() string {
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", e.Message, e.Location.String())
+	}
+	return e.Message
+}
+
 type KeyError struct {
 	Key      Value
 	Message  string // Optional custom message (if empty, uses "key not found: {Key}")

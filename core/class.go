@@ -142,6 +142,23 @@ func isBuiltinTypeName(name string) bool {
 	return false
 }
 
+// hasNonObjectBuiltinAncestor reports whether c transitively inherits from a
+// built-in type other than object (which itself takes no constructor args). Used
+// so that multi-level subclasses of arg-accepting built-ins — notably deep
+// exception hierarchies like InvalidOperation -> DecimalException ->
+// ArithmeticError -> Exception — are recognized as accepting constructor args.
+func hasNonObjectBuiltinAncestor(c *Class) bool {
+	for _, parent := range c.Parents {
+		if parent.Name != "object" && isBuiltinTypeName(parent.Name) {
+			return true
+		}
+		if hasNonObjectBuiltinAncestor(parent) {
+			return true
+		}
+	}
+	return false
+}
+
 // classInheritsType returns true if cls is the `type` metaclass or transitively
 // inherits from it. Used by Super.GetAttr to decide whether to fall back to
 // parent.GetAttr for dunder methods (which are provided by type's defaults,
@@ -846,6 +863,11 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				hasBuiltinParent = true
 				break
 			}
+		}
+		// Also recognize a deeper builtin ancestor (e.g. a multi-level exception
+		// hierarchy), excluding object which takes no constructor args.
+		if !hasBuiltinParent {
+			hasBuiltinParent = hasNonObjectBuiltinAncestor(c)
 		}
 
 		// If neither is overridden and there's no built-in parent, class takes no arguments
