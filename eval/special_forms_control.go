@@ -447,17 +447,28 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	var result core.Value = core.Nil
 	var tryErr error
 
+	tryCtrlFlow := false
 	for _, expr := range tryBody {
 		result, tryErr = Eval(expr, ctx)
 		if tryErr != nil {
+			break
+		}
+		// A return/break/continue in the try body stops the body and, per Python
+		// semantics, skips the else clause (it still runs finally below).
+		switch result.(type) {
+		case *ReturnValue, *BreakValue, *ContinueValue:
+			tryCtrlFlow = true
+		}
+		if tryCtrlFlow {
 			break
 		}
 	}
 
 	// If no error, run else clause (if present), then finally, and return
 	if tryErr == nil {
-		// Execute else clause if present (only runs when no exception occurred)
-		if elseClause != nil && elseClause.Len() > 1 {
+		// Execute else clause if present — only when no exception occurred AND
+		// the try body didn't return/break/continue out of the block.
+		if !tryCtrlFlow && elseClause != nil && elseClause.Len() > 1 {
 			for _, expr := range elseClause.Items()[1:] {
 				var elseErr error
 				result, elseErr = Eval(expr, ctx)
