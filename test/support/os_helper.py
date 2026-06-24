@@ -23,6 +23,13 @@ def can_chmod():
     return hasattr(os, 'chmod')
 
 
+def skip_unless_working_chmod(test):
+    """Skip tests that require a working os.chmod()."""
+    if not can_chmod():
+        return unittest.skip("requires working os.chmod()")(test)
+    return test
+
+
 def can_xattr():
     return hasattr(os, 'getxattr')
 

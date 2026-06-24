@@ -15,6 +15,7 @@
 
 
 import contextlib
+import functools
 import sys
 import unittest
 
@@ -24,6 +25,8 @@ is_jython = False
 is_android = False
 is_emscripten = False
 is_wasi = False
+is_apple_mobile = sys.platform in {"ios", "tvos", "watchos"}
+is_apple = is_apple_mobile or sys.platform == "darwin"
 
 # True only on a CPython debug build with reference tracing. M28 is never such a
 # build; computed the same way CPython's test.support does.
@@ -63,6 +66,38 @@ class ResourceDenied(unittest.SkipTest):
 
 def darwin_malloc_err_warning(test_name):
     """No-op on M28 (only relevant to macOS malloc-debugging environments)."""
+
+
+def subTests(arg_names, arg_values, /, *, _do_cleanups=False):
+    """Run a test method as multiple subtests over the given parameters.
+
+    Mirrors CPython's test.support.subTests: arg_names is a sequence (or
+    comma/space-separated string) of parameter names; arg_values is a sequence
+    of value tuples (or single values when there is one parameter).
+    """
+    single_param = False
+    if isinstance(arg_names, str):
+        arg_names = arg_names.replace(',', ' ').split()
+        if len(arg_names) == 1:
+            single_param = True
+    arg_values = tuple(arg_values)
+
+    def decorator(func):
+        if isinstance(func, type):
+            raise TypeError('subTests() can only decorate methods, not classes')
+
+        @functools.wraps(func)
+        def wrapper(self, /, *args, **kwargs):
+            for values in arg_values:
+                if single_param:
+                    values = (values,)
+                subtest_kwargs = dict(zip(arg_names, values))
+                with self.subTest(**subtest_kwargs):
+                    func(self, *args, **kwargs, **subtest_kwargs)
+                if _do_cleanups:
+                    self.doCleanups()
+        return wrapper
+    return decorator
 
 
 # Some CPython tests check whether they're on CPython specifically and skip
