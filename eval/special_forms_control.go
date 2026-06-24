@@ -1031,6 +1031,52 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 //	(raise ExceptionType "message")
 //	(raise (ExceptionType args...))
 //	(raise) - re-raise current exception
+// setImplicitExceptionContext implements PEP 3134 implicit chaining: when an
+// exception is raised while another is being handled, the new exception's
+// __context__ is set to the one being handled. An existing context/cause is not
+// overwritten, and a cycle is never created.
+func setImplicitExceptionContext(exc core.Value, ctx *core.Context) {
+	inst, ok := exc.(*core.Instance)
+	if !ok {
+		return
+	}
+	curVal, err := ctx.Lookup("__current_exception__")
+	if err != nil {
+		return
+	}
+	cur, ok := curVal.(*core.Instance)
+	if !ok || cur == inst {
+		return
+	}
+	// Don't overwrite an already-set context (e.g. an earlier raise or explicit cause).
+	if existing, has := inst.GetAttr("__context__"); has && existing != core.None && existing != core.Nil {
+		return
+	}
+	// Avoid creating a cycle: if inst already appears in cur's context chain, skip.
+	// The chain may itself already contain a (user-created) cycle, so guard the
+	// walk with a visited set to ensure termination.
+	visited := map[*core.Instance]bool{}
+	for c := cur; c != nil; {
+		if c == inst {
+			return
+		}
+		if visited[c] {
+			break // pre-existing cycle in the chain; inst is not in it
+		}
+		visited[c] = true
+		nxt, has := c.GetAttr("__context__")
+		if !has {
+			break
+		}
+		ni, ok := nxt.(*core.Instance)
+		if !ok {
+			break
+		}
+		c = ni
+	}
+	_ = inst.SetAttr("__context__", cur)
+}
+
 func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Bare raise - re-raise current exception
 	if args.Len() == 0 {
@@ -1100,6 +1146,7 @@ func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 				}
 
+				setImplicitExceptionContext(excObj, ctx)
 				return nil, &Exception{
 					Type:    excType,
 					Message: message,
@@ -1128,6 +1175,7 @@ func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 
 			// Return exception with class name as type
+			setImplicitExceptionContext(instance, ctx)
 			return nil, &Exception{
 				Type:    class.Name,
 				Message: "",
@@ -1154,6 +1202,7 @@ func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 			}
 
+			setImplicitExceptionContext(inst, ctx)
 			return nil, &Exception{
 				Type:    inst.Class.Name,
 				Message: message,
