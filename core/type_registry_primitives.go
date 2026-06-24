@@ -2123,6 +2123,15 @@ func registerComplexType() {
 						r := real(complex128(c1))
 						i := imag(complex128(c1))
 						return BoolValue(i == 0 && r == float64(c2)), nil
+					case BoolValue:
+						// bool is an int subclass: False==0, True==1
+						r := real(complex128(c1))
+						i := imag(complex128(c1))
+						v := 0.0
+						if bool(c2) {
+							v = 1.0
+						}
+						return BoolValue(i == 0 && r == v), nil
 					}
 					return False, nil
 				},
