@@ -823,8 +823,14 @@ func IsTruthy(v Value) bool {
 		return false
 	}
 
-	// First, check if the value has a __bool__ method
-	if obj, ok := v.(Object); ok {
+	// First, check if the value has a __bool__ or __len__ method. Use the narrow
+	// GetAttr interface rather than the full Object interface: Go-backed types
+	// like collections.deque expose __bool__/__len__ via GetAttr but don't
+	// implement CallMethod, so requiring Object would skip them and fall through
+	// to the default "truthy", making e.g. `while deque:` loop forever.
+	if obj, ok := v.(interface {
+		GetAttr(string) (Value, bool)
+	}); ok {
 		if boolMethod, hasBool := obj.GetAttr("__bool__"); hasBool {
 			if callable, isCallable := boolMethod.(interface {
 				Call([]Value, *Context) (Value, error)

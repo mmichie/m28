@@ -167,7 +167,12 @@
           "source": "cpython/Lib/test/test_iter.py"
         },
         "test_itertools": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_itertools.py"},
-        "test_contextlib": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_contextlib.py"}
+        "test_contextlib": {
+          "status": "partial",
+          "tests_run": 91, "passing": 51, "failures": 18, "errors": 22,
+          "notes": "Runs. Jumped 39->51 when collections.deque truthiness was fixed (was always-truthy because IsTruthy required the full Object interface, which deque lacks): ExitStack's `while self._exit_callbacks:` looped forever -> 'pop from an empty deque'. deque is now iterable too.",
+          "source": "cpython/Lib/test/test_contextlib.py"
+        }
       }
     },
     "tier6_assignment": {

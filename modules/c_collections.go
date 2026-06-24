@@ -672,8 +672,29 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 			}
 			return nil, &core.TypeError{Message: "deque indices must be integers"}
 		}), true
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return NewDequeIterator(dq), nil
+		}), true
+	case "__contains__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, &core.TypeError{Message: "__contains__ requires exactly 1 argument"}
+			}
+			for _, it := range dq.items {
+				if core.EqualValues(it, args[0]) {
+					return core.True, nil
+				}
+			}
+			return core.False, nil
+		}), true
 	}
 	return nil, false
+}
+
+// Iterator implements core.Iterable so deque works with for/list/iter/unpacking.
+func (dq *Deque) Iterator() core.Iterator {
+	return NewDequeIterator(dq)
 }
 
 // SetAttr implements attribute setting
