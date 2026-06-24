@@ -87,6 +87,25 @@ type Context struct {
 	// Location stack for tracking source locations during evaluation
 	// Eliminates need for LocatedValue unwrapping in evaluator internals
 	LocationStack []*SourceLocation
+
+	// BuiltinSnapshot holds the original builtin name->value bindings, captured
+	// just after the builtins are registered (set on the global/main context
+	// only; nil elsewhere). In the main module, builtins and module globals
+	// share one namespace, so deleting a module-level name that shadows a
+	// builtin would otherwise destroy the builtin for every module. Delete uses
+	// this to restore the builtin instead. See SnapshotBuiltins and Delete.
+	BuiltinSnapshot map[string]Value
+}
+
+// SnapshotBuiltins records the current Vars as the builtin baseline so that a
+// later `del` of a shadowed builtin can restore it (see BuiltinSnapshot). Call
+// once, after builtins are registered and before user code runs.
+func (c *Context) SnapshotBuiltins() {
+	snap := make(map[string]Value, len(c.Vars))
+	for k, v := range c.Vars {
+		snap[k] = v
+	}
+	c.BuiltinSnapshot = snap
 }
 
 // NewContext creates a new evaluation context
@@ -222,8 +241,15 @@ func (c *Context) Delete(name string) error {
 		key := ValueToKey(StringValue(name))
 		if _, ok := c.ModuleDict.Get(key); ok {
 			c.ModuleDict.Delete(key)
-			// Also delete from Vars if present
-			delete(c.Vars, name)
+			// Keep Vars in sync. In the main module, builtins live in Vars
+			// alongside module globals; if this name shadows a builtin, restore
+			// the original builtin rather than deleting it (which would corrupt
+			// the builtin for every module). Otherwise remove it.
+			if orig, isBuiltin := c.BuiltinSnapshot[name]; isBuiltin {
+				c.Vars[name] = orig
+			} else {
+				delete(c.Vars, name)
+			}
 			return nil
 		}
 	}

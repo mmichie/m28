@@ -214,6 +214,10 @@ func main() {
 	// Initialize the global context with built-in values and functions
 	initializeGlobalContext(globalCtx)
 
+	// Capture the builtin baseline so that `del`-ing a module-level name that
+	// shadows a builtin restores the builtin instead of destroying it.
+	globalCtx.SnapshotBuiltins()
+
 	// Initialize sys.argv with program name (will be overridden if script is provided)
 	// Access sys module directly from the builtin modules cache
 	if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
