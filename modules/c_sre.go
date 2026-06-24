@@ -1269,91 +1269,15 @@ func Init_SREModule() *core.DictValue {
 			// Find all matches with indices
 			allMatches := re.FindAllStringSubmatchIndex(searchStr, -1)
 
-			// Create a list of match objects
+			// Create a list of match objects. Use the shared buildSreMatchObject
+			// so finditer matches support named groups, groups(), groupdict(),
+			// and span() identically to search()/match() results.
+			groupNames := re.SubexpNames()
 			result := core.NewList()
 			for _, match := range allMatches {
-				matchObj := core.NewDict()
 				if len(match) >= 2 {
-					// Store internal values with underscore prefix
-					matchStart := match[0]
-					matchEnd := match[1]
-					matchObj.SetValue(core.StringValue("_start"), core.NumberValue(matchStart))
-					matchObj.SetValue(core.StringValue("_end"), core.NumberValue(matchEnd))
-					matchObj.SetValue(core.StringValue("_match"), core.StringValue(searchStr[matchStart:matchEnd]))
-
-					// Add groups
-					groups := core.NewList()
-					for i := 2; i < len(match); i += 2 {
-						if match[i] >= 0 && match[i+1] >= 0 {
-							groups.Append(core.StringValue(searchStr[match[i]:match[i+1]]))
-						} else {
-							groups.Append(core.None)
-						}
-					}
-					matchObj.SetValue(core.StringValue("_groups"), groups)
-
-					// Add group method
-					matchObj.SetValue(core.StringValue("group"), core.NewNamedBuiltinFunction("group", func(groupArgs []core.Value, groupCtx *core.Context) (core.Value, error) {
-						if len(groupArgs) == 0 {
-							if m, ok := matchObj.GetValue(core.StringValue("_match")); ok {
-								return m, nil
-							}
-							return core.StringValue(""), nil
-						}
-						// Handle named groups
-						if name, ok := groupArgs[0].(core.StringValue); ok {
-							if g, ok := matchObj.GetValue(core.StringValue("_groups")); ok {
-								if groupsList, ok := g.(*core.ListValue); ok {
-									// Try to find group by name - for now return first group or match
-									_ = name
-									if groupsList.Len() > 0 {
-										if val, err := groupsList.GetItem(0); err == nil {
-											return val, nil
-										}
-									}
-								}
-							}
-							// If named group not found, return the full match
-							if m, ok := matchObj.GetValue(core.StringValue("_match")); ok {
-								return m, nil
-							}
-							return core.StringValue(""), nil
-						}
-						groupNum := 0
-						if n, ok := groupArgs[0].(core.NumberValue); ok {
-							groupNum = int(n)
-						}
-						if groupNum == 0 {
-							if m, ok := matchObj.GetValue(core.StringValue("_match")); ok {
-								return m, nil
-							}
-							return core.StringValue(""), nil
-						}
-						if g, ok := matchObj.GetValue(core.StringValue("_groups")); ok {
-							if groupsList, ok := g.(*core.ListValue); ok {
-								if groupNum-1 < groupsList.Len() {
-									if val, err := groupsList.GetItem(groupNum - 1); err == nil {
-										return val, nil
-									}
-								}
-							}
-						}
-						return core.None, nil
-					}))
-
-					// Add start method - capture start value in closure
-					startVal := core.NumberValue(matchStart)
-					matchObj.SetValue(core.StringValue("start"), core.NewNamedBuiltinFunction("start", func(startArgs []core.Value, startCtx *core.Context) (core.Value, error) {
-						return startVal, nil
-					}))
-
-					// Add end method - capture end value in closure
-					endVal := core.NumberValue(matchEnd)
-					matchObj.SetValue(core.StringValue("end"), core.NewNamedBuiltinFunction("end", func(endArgs []core.Value, endCtx *core.Context) (core.Value, error) {
-						return endVal, nil
-					}))
+					result.Append(buildSreMatchObject(searchStr, match, groupNames))
 				}
-				result.Append(matchObj)
 			}
 
 			return result, nil
