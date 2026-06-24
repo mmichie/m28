@@ -688,14 +688,23 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("lambda: parameters must be a list, got %T: %#v", firstArg, firstArg)
 	}
 
+	// Unwrap LocatedValue wrappers so default-valued params like `(i 5)` are
+	// seen as plain lists (matches how def passes its params). Without this,
+	// ParseParameterList rejects `lambda i=5: i` and we fall back to the
+	// symbols-only path, which errors on the default.
+	rawItems := paramList.Items()
+	paramItems := make([]core.Value, len(rawItems))
+	for idx, it := range rawItems {
+		paramItems[idx] = unwrapLocated(it)
+	}
+
 	// Try to parse as new-style parameter list with defaults
-	signature, err := ParseParameterList(paramList.Items())
+	signature, err := ParseParameterList(paramItems)
 	if err != nil {
 		// Fall back to legacy simple parameter parsing
-		params := make([]core.SymbolValue, 0, paramList.Len())
-		for _, p := range paramList.Items() {
-			pVal := unwrapLocated(p)
-			sym, ok := pVal.(core.SymbolValue)
+		params := make([]core.SymbolValue, 0, len(paramItems))
+		for _, p := range paramItems {
+			sym, ok := p.(core.SymbolValue)
 			if !ok {
 				return nil, fmt.Errorf("lambda: parameters must be symbols")
 			}
