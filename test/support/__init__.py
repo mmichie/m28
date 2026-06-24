@@ -68,6 +68,14 @@ def darwin_malloc_err_warning(test_name):
     """No-op on M28 (only relevant to macOS malloc-debugging environments)."""
 
 
+def maybe_get_event_loop_policy():
+    """Return the global asyncio event loop policy if set, else None.
+
+    M28 has no asyncio event loop policy, so this is always None.
+    """
+    return None
+
+
 def subTests(arg_names, arg_values, /, *, _do_cleanups=False):
     """Run a test method as multiple subtests over the given parameters.
 

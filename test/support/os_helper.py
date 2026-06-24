@@ -8,6 +8,62 @@ TESTFN = '@test_file'
 SAVEDCWD = os.getcwd()
 
 
+class EnvironmentVarGuard:
+    """Class to help protect the environment variable properly.
+
+    Can be used as a context manager. Restores os.environ to its original
+    state on exit, like CPython's test.support.os_helper.EnvironmentVarGuard.
+    """
+
+    def __init__(self):
+        self._environ = os.environ
+        self._changed = {}
+
+    def __getitem__(self, envvar):
+        return self._environ[envvar]
+
+    def __setitem__(self, envvar, value):
+        if envvar not in self._changed:
+            self._changed[envvar] = self._environ.get(envvar)
+        self._environ[envvar] = value
+
+    def __delitem__(self, envvar):
+        if envvar not in self._changed:
+            self._changed[envvar] = self._environ.get(envvar)
+        if envvar in self._environ:
+            del self._environ[envvar]
+
+    def __iter__(self):
+        return iter(self._environ)
+
+    def __len__(self):
+        return len(self._environ)
+
+    def keys(self):
+        return self._environ.keys()
+
+    def get(self, envvar, default=None):
+        return self._environ.get(envvar, default)
+
+    def set(self, envvar, value):
+        self[envvar] = value
+
+    def unset(self, envvar):
+        if envvar in self._environ:
+            del self[envvar]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *ignore_exc):
+        for envvar, value in self._changed.items():
+            if value is None:
+                if envvar in self._environ:
+                    del self._environ[envvar]
+            else:
+                self._environ[envvar] = value
+
+
 def can_symlink():
     """Return True if symlinks work on this OS."""
     return hasattr(os, 'symlink')
