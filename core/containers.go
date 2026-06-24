@@ -895,9 +895,77 @@ func (s *SliceValue) GetAttr(name string) (Value, bool) {
 			return Nil, true
 		}
 		return s.Step, true
+	case "indices":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return s.indices(args, ctx)
+		}), true
 	default:
 		return nil, false
 	}
+}
+
+// indices implements slice.indices(length): returns the (start, stop, step)
+// tuple to use when slicing a sequence of the given length, applying __index__,
+// negative-index wrapping, and clamping exactly as CPython does.
+func (s *SliceValue) indices(args []Value, ctx *Context) (Value, error) {
+	if len(args) != 1 {
+		return nil, &TypeError{Message: fmt.Sprintf("indices() takes exactly one argument (%d given)", len(args))}
+	}
+	length, err := toIndex(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	if length < 0 {
+		return nil, &ValueError{Message: "length should not be negative"}
+	}
+
+	step := 1
+	if s.Step != nil && s.Step != Nil {
+		if step, err = toIndex(s.Step, ctx); err != nil {
+			return nil, err
+		}
+		if step == 0 {
+			return nil, &ValueError{Message: "slice step cannot be zero"}
+		}
+	}
+
+	lower, upper := 0, length
+	if step < 0 {
+		lower, upper = -1, length-1
+	}
+
+	clamp := func(v Value, noneDefault int) (int, error) {
+		if v == nil || v == Nil {
+			return noneDefault, nil
+		}
+		i, err := toIndex(v, ctx)
+		if err != nil {
+			return 0, err
+		}
+		if i < 0 {
+			i += length
+			if i < lower {
+				i = lower
+			}
+		} else if i > upper {
+			i = upper
+		}
+		return i, nil
+	}
+
+	startDefault, stopDefault := lower, upper
+	if step < 0 {
+		startDefault, stopDefault = upper, lower
+	}
+	start, err := clamp(s.Start, startDefault)
+	if err != nil {
+		return nil, err
+	}
+	stop, err := clamp(s.Stop, stopDefault)
+	if err != nil {
+		return nil, err
+	}
+	return TupleValue{NumberValue(start), NumberValue(stop), NumberValue(step)}, nil
 }
 
 // SetAttr implements Object.SetAttr (not supported for slices)
@@ -907,6 +975,9 @@ func (s *SliceValue) SetAttr(name string, value Value) error {
 
 // CallMethod implements Object.CallMethod
 func (s *SliceValue) CallMethod(name string, args []Value, ctx *Context) (Value, error) {
+	if name == "indices" {
+		return s.indices(args, ctx)
+	}
 	return nil, fmt.Errorf("slice has no method named %s", name)
 }
 
