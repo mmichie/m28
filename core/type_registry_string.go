@@ -6,6 +6,54 @@ import (
 	"unicode"
 )
 
+// affixInt extracts an int from a start/end argument to startswith/endswith.
+func affixInt(v Value) (int, bool) {
+	switch n := v.(type) {
+	case NumberValue:
+		return int(n), true
+	case BoolValue:
+		if bool(n) {
+			return 1, true
+		}
+		return 0, true
+	}
+	return 0, false
+}
+
+// affixSubstring returns s[start:end] (Python slice semantics) where start and
+// end come from args[idx] and args[idx+1] if present (None/absent -> full range).
+// Used by startswith/endswith to honor their optional position arguments.
+func affixSubstring(s string, args []Value, idx int) string {
+	runes := []rune(s)
+	n := len(runes)
+	clamp := func(v int) int {
+		if v < 0 {
+			v += n
+			if v < 0 {
+				v = 0
+			}
+		} else if v > n {
+			v = n
+		}
+		return v
+	}
+	start, end := 0, n
+	if len(args) > idx && args[idx] != nil && args[idx] != None && args[idx] != Nil {
+		if iv, ok := affixInt(args[idx]); ok {
+			start = clamp(iv)
+		}
+	}
+	if len(args) > idx+1 && args[idx+1] != nil && args[idx+1] != None && args[idx+1] != Nil {
+		if iv, ok := affixInt(args[idx+1]); ok {
+			end = clamp(iv)
+		}
+	}
+	if start > end {
+		return ""
+	}
+	return string(runes[start:end])
+}
+
 // registerStringType registers the string type descriptor with all its methods
 func registerStringType() {
 	RegisterType(&TypeDescriptor{
@@ -88,21 +136,19 @@ func getStringMethods() map[string]*MethodDescriptor {
 		},
 		"startswith": {
 			Name:    "startswith",
-			Arity:   1,
-			Doc:     "Return True if string starts with the prefix, otherwise False",
+			Arity:   -1,
+			Doc:     "Return True if string starts with the prefix, otherwise False. With optional start, test begins at that position; with optional end, stop comparing at that position.",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, &TypeError{Message: "startswith() takes exactly one argument"}
+				if len(args) < 1 || len(args) > 3 {
+					return nil, &TypeError{Message: "startswith() takes from 1 to 3 arguments"}
 				}
-				s := string(receiver.(StringValue))
+				// Apply optional start/end positions (CPython slice semantics).
+				s := affixSubstring(string(receiver.(StringValue)), args, 1)
 
-				// Handle single string prefix
 				if prefix, ok := args[0].(StringValue); ok {
 					return BoolValue(strings.HasPrefix(s, string(prefix))), nil
 				}
-
-				// Handle tuple of string prefixes
 				if prefixTuple, ok := args[0].(TupleValue); ok {
 					for _, prefixVal := range prefixTuple {
 						prefix, ok := prefixVal.(StringValue)
@@ -116,26 +162,23 @@ func getStringMethods() map[string]*MethodDescriptor {
 					return BoolValue(false), nil
 				}
 
-				return nil, &TypeError{Message: "startswith() argument must be a string or tuple of strings"}
+				return nil, &TypeError{Message: "startswith first arg must be str or a tuple of str, not " + string(args[0].Type())}
 			},
 		},
 		"endswith": {
 			Name:    "endswith",
-			Arity:   1,
-			Doc:     "Return True if string ends with the suffix, otherwise False",
+			Arity:   -1,
+			Doc:     "Return True if string ends with the suffix, otherwise False. With optional start/end, test within that slice.",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, &TypeError{Message: "endswith() takes exactly one argument"}
+				if len(args) < 1 || len(args) > 3 {
+					return nil, &TypeError{Message: "endswith() takes from 1 to 3 arguments"}
 				}
-				s := string(receiver.(StringValue))
+				s := affixSubstring(string(receiver.(StringValue)), args, 1)
 
-				// Handle single string suffix
 				if suffix, ok := args[0].(StringValue); ok {
 					return BoolValue(strings.HasSuffix(s, string(suffix))), nil
 				}
-
-				// Handle tuple of string suffixes
 				if suffixTuple, ok := args[0].(TupleValue); ok {
 					for _, suffixVal := range suffixTuple {
 						suffix, ok := suffixVal.(StringValue)
@@ -149,7 +192,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 					return BoolValue(false), nil
 				}
 
-				return nil, &TypeError{Message: "endswith() argument must be a string or tuple of strings"}
+				return nil, &TypeError{Message: "endswith first arg must be str or a tuple of str, not " + string(args[0].Type())}
 			},
 		},
 		"find": {

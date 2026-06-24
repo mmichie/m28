@@ -810,15 +810,16 @@ func InitStringMethods() {
 
 	td.Methods["startswith"] = &MethodDescriptor{
 		Name:    "startswith",
-		Arity:   1,
-		Doc:     "Return True if string starts with the prefix, otherwise return False",
+		Arity:   -1, // 1-3 args: prefix[, start[, end]]
+		Doc:     "Return True if string starts with the prefix, otherwise return False. With optional start, test begins there; with optional end, stop comparing there.",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, &TypeError{Message: fmt.Sprintf("startswith() takes exactly one argument (%d given)", len(args))}
+			if len(args) < 1 || len(args) > 3 {
+				return nil, &TypeError{Message: fmt.Sprintf("startswith() takes from 1 to 3 arguments (%d given)", len(args))}
 			}
 
-			s := string(receiver.(StringValue))
+			// Apply optional start/end positions (CPython slice semantics).
+			s := affixSubstring(string(receiver.(StringValue)), args, 1)
 
 			// Handle single string prefix
 			if prefix, ok := args[0].(StringValue); ok {
@@ -839,21 +840,22 @@ func InitStringMethods() {
 				return BoolValue(false), nil
 			}
 
-			return nil, &TypeError{Message: "startswith() argument must be a string or tuple of strings"}
+			return nil, &TypeError{Message: "startswith first arg must be str or a tuple of str, not " + string(args[0].Type())}
 		},
 	}
 
 	td.Methods["endswith"] = &MethodDescriptor{
 		Name:    "endswith",
-		Arity:   1,
-		Doc:     "Return True if string ends with the suffix, otherwise return False",
+		Arity:   -1, // 1-3 args: suffix[, start[, end]]
+		Doc:     "Return True if string ends with the suffix, otherwise return False. With optional start/end, test within that slice.",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, &TypeError{Message: fmt.Sprintf("endswith() takes exactly one argument (%d given)", len(args))}
+			if len(args) < 1 || len(args) > 3 {
+				return nil, &TypeError{Message: fmt.Sprintf("endswith() takes from 1 to 3 arguments (%d given)", len(args))}
 			}
 
-			s := string(receiver.(StringValue))
+			// Apply optional start/end positions (CPython slice semantics).
+			s := affixSubstring(string(receiver.(StringValue)), args, 1)
 
 			// Handle single string suffix
 			if suffix, ok := args[0].(StringValue); ok {
@@ -874,7 +876,7 @@ func InitStringMethods() {
 				return BoolValue(false), nil
 			}
 
-			return nil, &TypeError{Message: "endswith() argument must be a string or tuple of strings"}
+			return nil, &TypeError{Message: "endswith first arg must be str or a tuple of str, not " + string(args[0].Type())}
 		},
 	}
 
