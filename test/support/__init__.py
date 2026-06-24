@@ -60,6 +60,24 @@ def impl_detail(msg=None, **guards):
     return unittest.skip(msg)
 
 
+def run_with_locale(catstr, *locales):
+    """Decorator to run a test under one of the given locales.
+
+    M28 has minimal locale support, so this runs the test under the default
+    locale (equivalent to CPython's behavior when the requested locales are
+    unavailable but '' is among them)."""
+    def deco(func):
+        return func
+    return deco
+
+
+def run_with_locales(catstr, *locales):
+    """Like run_with_locale; M28 runs once under the default locale."""
+    def deco(func):
+        return func
+    return deco
+
+
 def requires(resource, msg=None):
     """Decorator skipping the test when a resource isn't available."""
     return unittest.skip(msg or f"requires resource {resource!r}")
