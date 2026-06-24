@@ -254,7 +254,22 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 		}
 
 		excValue = excInstance
-		// excTraceback would be set if we had proper traceback objects
+		// Pass a real traceback object (not None) as __exit__'s third argument, as
+		// CPython does. M28 does not build frame-linked tracebacks yet, but the
+		// argument must not be None when an exception propagates through `with`.
+		// Reuse the exception's __traceback__ when already set so nested with
+		// statements observe the same object.
+		if inst, ok := excInstance.(*core.Instance); ok {
+			if tb, has := inst.GetAttr("__traceback__"); has && tb != nil && tb != core.None && tb != core.Nil {
+				excTraceback = tb
+			} else {
+				tb := core.NewTraceback()
+				_ = inst.SetAttr("__traceback__", tb)
+				excTraceback = tb
+			}
+		} else {
+			excTraceback = core.NewTraceback()
+		}
 	}
 
 	suppress, exitErr := cm.Exit(excType, excValue, excTraceback)
