@@ -522,6 +522,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		var value Value
 		var fmtType byte
 		var leftAlign bool
+		var zeroPad bool
 		var width int
 		var hasWidth bool
 
@@ -587,12 +588,16 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			// Parse format specifier (simplified version)
 			// Full format: %[flags][width][.precision]type
 
-			// Skip optional flags (-, +, 0, space, #)
+			// Parse optional flags (-, +, 0, space, #)
 			leftAlign = false
+			zeroPad = false
 			for i < len(formatStr) && (formatStr[i] == '-' || formatStr[i] == '+' ||
 				formatStr[i] == '0' || formatStr[i] == ' ' || formatStr[i] == '#') {
 				if formatStr[i] == '-' {
 					leftAlign = true
+				}
+				if formatStr[i] == '0' {
+					zeroPad = true
 				}
 				i++
 			}
@@ -734,11 +739,21 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		if hasWidth {
 			currentLen := len(formatted)
 			if width > currentLen {
-				padding := strings.Repeat(" ", width-currentLen)
-				if leftAlign {
-					formatted = formatted + padding
+				n := width - currentLen
+				// The '0' flag zero-pads numeric conversions (ignored when
+				// left-aligned, matching Python). Zeros go after any sign.
+				isNumeric := strings.IndexByte("diouxXeEfFgG", fmtType) >= 0
+				if zeroPad && !leftAlign && isNumeric {
+					zeros := strings.Repeat("0", n)
+					if len(formatted) > 0 && (formatted[0] == '-' || formatted[0] == '+') {
+						formatted = string(formatted[0]) + zeros + formatted[1:]
+					} else {
+						formatted = zeros + formatted
+					}
+				} else if leftAlign {
+					formatted = formatted + strings.Repeat(" ", n)
 				} else {
-					formatted = padding + formatted
+					formatted = strings.Repeat(" ", n) + formatted
 				}
 			}
 		}
