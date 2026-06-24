@@ -1065,6 +1065,34 @@ func (state *GeneratorExecState) routeToFinally() bool {
 	return false
 }
 
+// Close throws GeneratorExit into the generator so its finally blocks run, then
+// swallows the GeneratorExit (or StopIteration) that normally results. It mirrors
+// CPython's generator.close(): an unstarted or finished generator is simply
+// marked closed; if the generator yields again it is a RuntimeError; any other
+// exception propagates.
+func (state *GeneratorExecState) Close() (core.Value, error) {
+	if !state.started || state.completed {
+		state.completed = true
+		return core.Nil, nil
+	}
+	// Throw(None) injects a GeneratorExit (see createExceptionFromThrowArgs).
+	result, err := state.Throw(core.None, core.None, core.None)
+	state.completed = true
+	if err != nil {
+		if ex, ok := err.(*Exception); ok && ex.Type == "GeneratorExit" {
+			return core.Nil, nil
+		}
+		if _, ok := err.(*core.StopIteration); ok {
+			return core.Nil, nil
+		}
+		// A different exception (e.g. raised in a finally block) propagates.
+		return nil, err
+	}
+	// The generator yielded a value instead of exiting on GeneratorExit.
+	_ = result
+	return nil, core.NewRuntimeError("generator ignored GeneratorExit")
+}
+
 // Throw throws an exception into the generator
 func (state *GeneratorExecState) Throw(excType core.Value, excValue core.Value, excTb core.Value) (core.Value, error) {
 	// If generator hasn't started, just raise the exception

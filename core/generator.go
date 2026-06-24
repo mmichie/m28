@@ -10,6 +10,7 @@ type GeneratorExecutor interface {
 	Next() (Value, error)
 	Send(Value) (Value, error)
 	Throw(excType Value, excValue Value, excTb Value) (Value, error)
+	Close() (Value, error)
 }
 
 // GeneratorExecFactory creates a GeneratorExecutor for a given function and arguments
@@ -774,6 +775,19 @@ func createExceptionFromThrow(excType Value, excValue Value, excTb Value) error 
 
 // Close closes the generator
 func (g *Generator) Close() (Value, error) {
+	// Already finished: nothing to clean up.
+	if g.state == GeneratorCompleted {
+		g.state = GeneratorCompleted
+		return Nil, nil
+	}
+	// For function generators, delegate so GeneratorExit is thrown in and any
+	// finally blocks run (CPython semantics). Other generator kinds (expressions)
+	// have no user finally blocks, so just mark them closed.
+	if g.execState != nil {
+		result, err := g.execState.Close()
+		g.state = GeneratorCompleted
+		return result, err
+	}
 	g.state = GeneratorCompleted
 	return Nil, nil
 }
