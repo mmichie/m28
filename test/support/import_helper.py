@@ -14,8 +14,27 @@ def import_module(name, deprecated=False, *, required_on=()):
 
 
 def import_fresh_module(name, fresh=(), blocked=(), *, deprecated=False):
-    """Import a "fresh" copy of `name`. Best-effort: returns the cached one."""
-    return import_module(name)
+    """Import a "fresh" copy of `name`, returned as a module object.
+
+    M28 has no C accelerator modules. When `fresh` names a C extension we
+    can't provide (e.g. ['_decimal'] to force the accelerated build), the
+    caller wants that accelerated variant, which is unavailable -> return
+    None (matching CPython on a build compiled without it). Otherwise return
+    the module. The `import ... as` form binds a proper module object (not
+    the raw namespace dict), so the result is hashable and usable as a dict
+    key, which several tests (e.g. test_decimal) rely on.
+    """
+    for modname in fresh:
+        try:
+            exec("import " + modname, {})
+        except ImportError:
+            return None
+    ns = {}
+    try:
+        exec("import " + name + " as _m", ns)
+    except ImportError:
+        return None
+    return ns["_m"]
 
 
 def unload(name):

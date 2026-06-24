@@ -32,6 +32,38 @@ Py_TRACE_REFS = hasattr(sys, 'getobjects')
 MAX_Py_ssize_t = sys.maxsize
 
 
+# Regression-test exception hierarchy (mirrors CPython's test.support). Many
+# test modules import these to signal/handle test failures.
+class Error(Exception):
+    """Base class for regression test exceptions."""
+
+
+class TestFailed(Error):
+    """Test failed."""
+
+
+class TestFailedWithDetails(TestFailed):
+    """Test failed, carrying error/failure details."""
+
+    def __init__(self, msg, errors, failures):
+        self.msg = msg
+        self.errors = errors
+        self.failures = failures
+        super().__init__(msg, errors, failures)
+
+
+class TestDidNotRun(Error):
+    """Test did not run any subtests."""
+
+
+class ResourceDenied(unittest.SkipTest):
+    """Test skipped because it requested a disallowed resource."""
+
+
+def darwin_malloc_err_warning(test_name):
+    """No-op on M28 (only relevant to macOS malloc-debugging environments)."""
+
+
 # Some CPython tests check whether they're on CPython specifically and skip
 # implementation-specific behavior on other interpreters. M28 is not CPython.
 def check_impl_detail(**kwargs):
