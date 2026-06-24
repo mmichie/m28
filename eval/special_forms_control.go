@@ -440,8 +440,22 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Helper to run finally clause
 	// Returns (finallyResult, finallyErr)
 	// If finally block contains return/break/continue, finallyResult will be non-nil
-	runFinally := func() (core.Value, error) {
+	runFinally := func(activeErr error) (core.Value, error) {
 		if finallyClause != nil && finallyClause.Len() > 1 {
+			// If an exception is propagating into the finally, expose it as the
+			// active exception so a raise inside the finally chains its
+			// __context__ to it (PEP 3134).
+			if activeErr != nil {
+				prev, hadPrev := ctx.Vars["__current_exception__"]
+				ctx.Vars["__current_exception__"] = errorToExceptionInstance(activeErr, ctx)
+				defer func() {
+					if hadPrev {
+						ctx.Vars["__current_exception__"] = prev
+					} else {
+						delete(ctx.Vars, "__current_exception__")
+					}
+				}()
+			}
 			var finallyResult core.Value
 			for _, expr := range finallyClause.Items()[1:] {
 				var err error
@@ -496,7 +510,7 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				result, elseErr = Eval(expr, ctx)
 				if elseErr != nil {
 					// Error in else clause becomes the new error
-					finallyResult, finallyErr := runFinally()
+					finallyResult, finallyErr := runFinally(elseErr)
 					if finallyErr != nil {
 						return nil, finallyErr
 					}
@@ -517,7 +531,7 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
-		finallyResult, finallyErr := runFinally()
+		finallyResult, finallyErr := runFinally(nil)
 		if finallyErr != nil {
 			return nil, finallyErr
 		}
@@ -997,7 +1011,7 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Run finally clause
-	finallyResult, finallyErr := runFinally()
+	finallyResult, finallyErr := runFinally(tryErr)
 	if finallyErr != nil {
 		return nil, finallyErr
 	}
