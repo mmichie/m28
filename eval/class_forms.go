@@ -893,13 +893,24 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 									continue
 								}
 							}
-							// Check if this is a tuple unpacking pattern at class level
-							// e.g., (a, b) = (1, 2) or [a, b] = [1, 2]
-							// Python doesn't support this at class level, but the transpiler might generate it
-							// For now, just evaluate it as an expression
+							// Tuple/list unpacking assignment at class level, e.g.
+							// `__add__, __radd__ = _operator_fallbacks(...)` (which
+							// Fraction and many numeric types use). Evaluate it, then
+							// promote every name it binds in the class body into the
+							// class's attributes — otherwise the unpacked methods are
+							// invisible to attribute lookup and operator dispatch.
+							beforeVars := make(map[string]bool)
+							for varName := range classBodyCtx.Vars {
+								beforeVars[varName] = true
+							}
 							_, err := Eval(stmt, classBodyCtx)
 							if err != nil {
 								return nil, err
+							}
+							for varName, varValue := range classBodyCtx.Vars {
+								if !beforeVars[varName] {
+									class.SetClassAttr(varName, varValue)
+								}
 							}
 							continue
 						}
@@ -1046,7 +1057,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Check for __slots__ and set up slot descriptors
-	if slotsAttr, hasSlots := class.GetClassAttr("__slots__"); hasSlots {
+	slotsAttr, hasSlotsAttr := class.GetClassAttr("__slots__")
+	if hasSlotsAttr {
 		if debugClass {
 			fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Setting up __slots__ for class '%s'\n", className)
 		}
@@ -1152,6 +1164,15 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					// Check if __new__ returned a class or something else
 					if newClass, ok := result.(*core.Class); ok {
 						class = newClass
+						// A metaclass builds the class via type.__new__, which
+						// doesn't process __slots__. Re-run slot setup on the
+						// result so instances allocate SlotValues; otherwise
+						// attribute assignment fails with "object has no slots".
+						if hasSlotsAttr && len(class.SlotNames) == 0 {
+							if err := core.SetupSlots(class, slotsAttr); err != nil {
+								return nil, &core.TypeError{Message: fmt.Sprintf("error setting up __slots__ for class '%s': %v", className, err)}
+							}
+						}
 						if debugClass {
 							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] metaclass.__new__ returned new class\n")
 						}
