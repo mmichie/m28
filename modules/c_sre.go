@@ -251,7 +251,25 @@ func expandSreReplacement(repl string, input string, m []int, groupNames []strin
 // Go *regexp.Regexp. It mirrors the transformations applied in findall/sub/etc.
 // to handle Python flags (IGNORECASE, MULTILINE, DOTALL, VERBOSE) and a handful
 // of common features Go's regexp doesn't support natively (lookaheads).
+// patternFlags reads the integer flags stored on a compiled-pattern dict.
+func patternFlags(pattern *core.DictValue) int {
+	if fv, ok := pattern.Get(core.ValueToKey(core.StringValue("flags"))); ok {
+		if fn, ok := fv.(core.NumberValue); ok {
+			return int(fn)
+		}
+	}
+	return 0
+}
+
 func compilePythonRegex(patternStr string, flags int) (*regexp.Regexp, error) {
+	return regexp.Compile(cleanPythonRegex(patternStr, flags))
+}
+
+// cleanPythonRegex applies every Python->RE2 transformation and returns the
+// resulting Go-compatible pattern string (without compiling it). Callers that
+// need to wrap the pattern (e.g. fullmatch anchoring it with \A...\z) use this
+// so the wrapper sees the fully-cleaned pattern.
+func cleanPythonRegex(patternStr string, flags int) string {
 	goPattern := patternStr
 
 	// Handle VERBOSE flag (64) - strip comments and whitespace
@@ -349,7 +367,9 @@ func compilePythonRegex(patternStr string, flags int) (*regexp.Regexp, error) {
 		}
 	}
 
-	return regexp.Compile(goPattern)
+	// Final pass: strip any remaining lookarounds and map Python's \Z anchor to
+	// Go's \z (RE2 rejects \Z). Idempotent with the handling above.
+	return stripLookarounds(goPattern)
 }
 
 // stripLookarounds rewrites a Python regex into one Go's RE2 engine can compile.
@@ -658,7 +678,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Compile and execute the regex
-			re, err := regexp.Compile(stripLookarounds(goPattern))
+			re, err := compilePythonRegex(goPattern, patternFlags(pattern))
 			if err != nil {
 				return nil, fmt.Errorf("invalid regex pattern: %v", err)
 			}
@@ -670,68 +690,49 @@ func Init_SREModule() *core.DictValue {
 				return core.None, nil
 			}
 
-			// Create a match object (simplified - just a dict with basic info)
-			matchObj := core.NewDict()
+			// Build a full match object (supports named groups, groupdict, span).
+			return buildSreMatchObject(searchStr, loc, re.SubexpNames()), nil
+		}))
 
-			// Extract the full match and groups
-			matches := re.FindStringSubmatch(searchStr)
-			if len(matches) > 0 {
-				// groups() returns just the captured groups (not the full match)
-				groupsList := core.NewList()
-				for i := 1; i < len(matches); i++ {
-					groupsList.Append(core.StringValue(matches[i]))
-				}
-
-				matchObj.SetValue(core.StringValue("_groups"), groupsList)
-				matchObj.SetValue(core.StringValue("_match"), core.StringValue(matches[0]))
-				matchObj.SetValue(core.StringValue("_all_matches"), core.NewList(
-					func() []core.Value {
-						result := make([]core.Value, len(matches))
-						for i, m := range matches {
-							result[i] = core.StringValue(m)
-						}
-						return result
-					}()...,
-				))
-
-				// Add groups() method
-				matchObj.SetValue(core.StringValue("groups"), core.NewNamedBuiltinFunction("groups", func(groupArgs []core.Value, groupCtx *core.Context) (core.Value, error) {
-					key := core.ValueToKey(core.StringValue("_groups"))
-					if groups, ok := matchObj.Get(key); ok {
-						// Convert list to tuple
-						if groupsList, ok := groups.(*core.ListValue); ok {
-							return core.TupleValue(groupsList.Items()), nil
-						}
-						return groups, nil
-					}
-					return core.TupleValue([]core.Value{}), nil
-				}))
-
-				// Add group() method
-				matchObj.SetValue(core.StringValue("group"), core.NewNamedBuiltinFunction("group", func(groupArgs []core.Value, groupCtx *core.Context) (core.Value, error) {
-					// group(0) returns the full match, group(1) returns first group, etc.
-					var index int
-					if len(groupArgs) == 0 {
-						index = 0 // default to full match
-					} else if n, ok := groupArgs[0].(core.NumberValue); ok {
-						index = int(n)
-					} else {
-						return nil, fmt.Errorf("group() argument must be an integer")
-					}
-
-					key := core.ValueToKey(core.StringValue("_all_matches"))
-					if allMatches, ok := matchObj.Get(key); ok {
-						if matchList, ok := allMatches.(*core.ListValue); ok {
-							if index >= 0 && index < matchList.Len() {
-								return matchList.Items()[index], nil
-							}
-						}
-					}
-					return core.None, nil
-				}))
+		pattern.SetValue(core.StringValue("fullmatch"), core.NewNamedBuiltinFunction("fullmatch", func(fmArgs []core.Value, fmCtx *core.Context) (core.Value, error) {
+			patternVal, ok := pattern.Get(core.ValueToKey(core.StringValue("pattern")))
+			if !ok {
+				return nil, fmt.Errorf("pattern object has no pattern string")
+			}
+			patternStr, ok := patternVal.(core.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("pattern must be a string")
 			}
 
-			return matchObj, nil
+			if len(fmArgs) < 1 {
+				return nil, fmt.Errorf("fullmatch() takes at least 1 argument")
+			}
+			var searchStr string
+			switch v := fmArgs[0].(type) {
+			case core.StringValue:
+				searchStr = string(v)
+			case core.BytesValue:
+				searchStr = string(v)
+			case core.NilValue:
+				return core.None, nil
+			default:
+				return nil, fmt.Errorf("fullmatch() argument must be a string or bytes, not %s", fmArgs[0].Type())
+			}
+
+			// Anchor the (fully-cleaned) pattern at both ends so RE2 itself
+			// enforces that the entire string is consumed. The wrapper group is
+			// non-capturing, preserving the user's capture-group numbering.
+			cleaned := cleanPythonRegex(string(patternStr), patternFlags(pattern))
+			re, err := regexp.Compile(`\A(?:` + cleaned + `)\z`)
+			if err != nil {
+				return nil, fmt.Errorf("invalid regex pattern: %v", err)
+			}
+
+			loc := re.FindStringSubmatchIndex(searchStr)
+			if loc == nil {
+				return core.None, nil
+			}
+			return buildSreMatchObject(searchStr, loc, re.SubexpNames()), nil
 		}))
 
 		pattern.SetValue(core.StringValue("search"), core.NewNamedBuiltinFunction("search", func(searchArgs []core.Value, searchCtx *core.Context) (core.Value, error) {
@@ -769,7 +770,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Compile and execute the regex
-			re, err := regexp.Compile(stripLookarounds(goPattern))
+			re, err := compilePythonRegex(goPattern, patternFlags(pattern))
 			if err != nil {
 				return nil, fmt.Errorf("invalid regex pattern: %v", err)
 			}
@@ -910,7 +911,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Compile and execute the regex
-			re, err := regexp.Compile(stripLookarounds(goPattern))
+			re, err := compilePythonRegex(goPattern, patternFlags(pattern))
 			if err != nil {
 				// If pattern still can't compile, return empty list instead of error
 				return core.NewList(), nil
@@ -1094,7 +1095,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Compile the regex
-			re, err := regexp.Compile(stripLookarounds(goPattern))
+			re, err := compilePythonRegex(goPattern, patternFlags(pattern))
 			if err != nil {
 				return nil, fmt.Errorf("invalid regex pattern: %v", err)
 			}
@@ -1254,7 +1255,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Compile the regex
-			re, err := regexp.Compile(stripLookarounds(goPattern))
+			re, err := compilePythonRegex(goPattern, patternFlags(pattern))
 			if err != nil {
 				// If pattern still can't compile, return empty list instead of error
 				// This allows code to continue even with unsupported regex features
