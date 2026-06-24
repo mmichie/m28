@@ -96,6 +96,7 @@ type TryState struct {
 	EndStep     int   // Step after the entire try/except/finally
 	InFinally   bool  // Whether we're currently in the finally block
 	InExcept    bool  // Whether we're currently in an except handler
+	Reraise     error // Exception to re-raise once this block's finally completes
 }
 
 // LoopState tracks the state of an active loop
@@ -162,12 +163,16 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 
 	// Execute steps until we hit a yield or complete
 	for state.CurrentStep < len(state.Steps) {
-		// Check if there's a pending error from throw()
-		// If there is, just propagate it and let normal exception handling deal with it
+		// A pending exception (from throw(), or from a statement that errored)
+		// must run any enclosing finally blocks before it propagates out of the
+		// generator. Route it to the nearest not-yet-run finally; if there is
+		// none, propagate it to the caller.
 		if state.pendingError != nil {
+			if state.routeToFinally() {
+				continue
+			}
 			err := state.pendingError
 			state.pendingError = nil
-			// Treat this like any other error - it will be caught by try/except if present
 			return nil, err
 		}
 
@@ -184,21 +189,10 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 					return nil, &core.StopIteration{Value: ret.Value}
 				}
 			} else {
-				// If we're in a try block, jump to except handler (or finally)
-				if len(state.TryStates) > 0 {
-					tryState := &state.TryStates[len(state.TryStates)-1]
-					if !tryState.InExcept && !tryState.InFinally {
-						// Jump to first except handler and save error
-						if len(tryState.ExceptSteps) > 0 && tryState.ExceptSteps[0] > 0 {
-							state.pendingError = err
-							tryState.InExcept = true
-							state.CurrentStep = tryState.ExceptSteps[0]
-							continue
-						}
-					}
-				}
-				// Not in a try block or already in except/finally - propagate error
-				return nil, err
+				// Defer to the pending-error handler at the top of the loop, which
+				// runs any enclosing finally block before the error propagates.
+				state.pendingError = err
+				continue
 			}
 
 			state.CurrentStep++
@@ -420,15 +414,21 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			state.CurrentStep++
 
 		case StepFinallyEnd:
-			// Pop try state
+			// Pop try state, capturing any exception deferred through this finally.
+			var reraise error
 			if len(state.TryStates) > 0 {
+				reraise = state.TryStates[len(state.TryStates)-1].Reraise
 				state.TryStates = state.TryStates[:len(state.TryStates)-1]
 			}
-			// Check if there's a pending error to re-raise
+			// An exception raised inside the finally body itself takes precedence
+			// over one that was merely passing through.
+			if state.pendingError == nil {
+				state.pendingError = reraise
+			}
+			// If an exception is still propagating, let the top of the loop route
+			// it to an outer finally or out of the generator.
 			if state.pendingError != nil {
-				err := state.pendingError
-				state.pendingError = nil
-				return nil, err
+				continue
 			}
 			// Jump to step after finally
 			state.CurrentStep = step.Arg
@@ -1034,6 +1034,35 @@ func (state *GeneratorExecState) Send(value core.Value) (core.Value, error) {
 
 	// Continue execution
 	return state.Next()
+}
+
+// routeToFinally redirects state.pendingError into the nearest enclosing
+// try/finally block whose finally has not run yet, so generator cleanup
+// (try/finally, including @contextmanager) executes before the exception
+// propagates. The exception is stashed on the TryState and re-raised at
+// StepFinallyEnd. Returns true if it jumped to a finally block. Try blocks with
+// except handlers (and no finally) are not handled here and cause the caller to
+// propagate the exception instead.
+func (state *GeneratorExecState) routeToFinally() bool {
+	for i := len(state.TryStates) - 1; i >= 0; i-- {
+		ts := &state.TryStates[i]
+		if ts.InFinally {
+			continue // this block's finally is already running
+		}
+		handler := ts.ExceptSteps[0]
+		if handler <= 0 || handler >= len(state.Steps) {
+			continue
+		}
+		if state.Steps[handler].Kind != StepFinallyStart {
+			continue // an except handler, not a bare finally
+		}
+		ts.InFinally = true
+		ts.Reraise = state.pendingError
+		state.pendingError = nil
+		state.CurrentStep = handler
+		return true
+	}
+	return false
 }
 
 // Throw throws an exception into the generator
