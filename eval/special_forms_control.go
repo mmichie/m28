@@ -378,6 +378,20 @@ func createPythonExceptionInstance(ctx *core.Context, exceptionType string, mess
 //	(try body (except Type handler)) ; catch specific type
 //	(try body (except Type var handler)) ; catch specific type with variable
 //	(try body ... (finally cleanup))
+// isNonExceptionLiteral reports whether v is a constant literal that plainly
+// cannot be an exception class (number, string, bool). It is used to reject
+// `except 42:` / `except (ValueError, 42):` with a TypeError while leaving
+// genuine class objects (including metaclass instances) untouched. None is
+// deliberately excluded so that a bare `except:` whose body is `None` is not
+// misread as an invalid handler type.
+func isNonExceptionLiteral(v core.Value) bool {
+	switch v.(type) {
+	case core.NumberValue, core.StringValue, core.BoolValue:
+		return true
+	}
+	return false
+}
+
 func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() == 0 {
 		return nil, fmt.Errorf("try requires at least a body")
@@ -570,6 +584,13 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					for i := 1; i < tupleList.Len(); i++ {
 						if typeSym, ok := tupleList.GetItemAsSymbol(i); ok {
 							excTypes = append(excTypes, string(typeSym))
+							continue
+						}
+						// A literal constant in the tuple (e.g. `except (ValueError, 42):`)
+						// is not an exception class — CPython raises TypeError when it is
+						// reached while matching, rather than silently ignoring it.
+						if elem, _ := tupleList.GetItemUnwrapped(i); isNonExceptionLiteral(elem) {
+							return nil, &core.TypeError{Message: "catching classes that do not inherit from BaseException is not allowed"}
 						}
 					}
 					handlerStart = 2
@@ -649,6 +670,13 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// If we have an expression-based exception type, evaluate it now to get the class.
 		// The result may be a single class or a tuple of classes.
 		if excTypeExpr != nil {
+			// `except 42:` / `except "x":` — a constant literal written directly as
+			// the handler type is a TypeError in CPython, not a silent catch-all.
+			// Check the source node (not the evaluated value) so that a bare-except
+			// body which merely happens to evaluate to a constant is unaffected.
+			if isNonExceptionLiteral(unwrapLocated(excTypeExpr)) {
+				return nil, &core.TypeError{Message: "catching classes that do not inherit from BaseException is not allowed"}
+			}
 			evaluated, evalErr := Eval(excTypeExpr, ctx)
 			if evalErr != nil {
 				return nil, evalErr
