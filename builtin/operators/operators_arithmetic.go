@@ -246,6 +246,16 @@ func negateValue(value core.Value, ctx *core.Context) (core.Value, error) {
 		return num.Negate()
 	}
 
+	// BigInt negation (BigIntValue is not a NumberValue, so the Switch below
+	// would otherwise report a bogus "bad operand type for unary -").
+	if bigVal, ok := value.(core.BigIntValue); ok {
+		neg := new(big.Int).Neg(bigVal.GetBigInt())
+		if numVal, ok := core.DemoteToNumber(core.NewBigInt(neg)); ok {
+			return numVal, nil
+		}
+		return core.NewBigInt(neg), nil
+	}
+
 	// Fall back to type-based negation
 	return types.Switch(value).
 		Number(func(n float64) (core.Value, error) {
