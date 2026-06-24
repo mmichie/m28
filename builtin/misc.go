@@ -175,6 +175,13 @@ func RegisterMisc(ctx *core.Context) {
 
 		val := v.Get(0)
 
+		// Enforce the integer string-conversion digit limit for large ints.
+		if bigVal, ok := val.(core.BigIntValue); ok {
+			if d := core.CountIntStrDigits(bigVal.String()); core.IntStrDigitLimitExceeded(d, 10) {
+				return nil, core.NewValueError(fmt.Sprintf("Exceeds the limit (%d digits) for integer string conversion; use sys.set_int_max_str_digits() to increase the limit", core.IntMaxStrDigits))
+			}
+		}
+
 		// Catch RecursionError panics from deeply nested repr calls
 		defer func() {
 			if r := recover(); r != nil {

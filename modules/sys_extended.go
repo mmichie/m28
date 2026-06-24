@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"fmt"
+
 	"github.com/mmichie/m28/core"
 )
 
@@ -179,10 +181,23 @@ func addExtendedSysFunctions(sysModule *core.DictValue) {
 
 	// Int max str digits (Python 3.11+)
 	sysModule.Set("get_int_max_str_digits", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		return core.NumberValue(4300), nil
+		return core.NumberValue(float64(core.IntMaxStrDigits)), nil
 	}))
 
 	sysModule.Set("set_int_max_str_digits", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("set_int_max_str_digits() takes exactly one argument (%d given)", len(args))}
+		}
+		n, ok := args[0].(core.NumberValue)
+		if !ok || float64(n) != float64(int(n)) {
+			return nil, &core.TypeError{Message: "'int' object expected"}
+		}
+		limit := int(n)
+		// 0 disables the limit; otherwise CPython requires limit >= 640.
+		if limit != 0 && limit < 640 {
+			return nil, &core.ValueError{Message: "maxdigits must be 0 or larger than 640"}
+		}
+		core.IntMaxStrDigits = limit
 		return core.None, nil
 	}))
 

@@ -558,6 +558,9 @@ func IntBuilder() builders.BuiltinFunc {
 			case core.StringValue:
 				// Try to parse as integer
 				s := strings.TrimSpace(string(x))
+				if d := core.CountIntStrDigits(s); core.IntStrDigitLimitExceeded(d, 10) {
+					return nil, errors.NewValueError("int", fmt.Sprintf("Exceeds the limit (%d digits) for integer string conversion: value has %d digits; use sys.set_int_max_str_digits() to increase the limit", core.IntMaxStrDigits, d))
+				}
 				if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 					return core.NumberValue(float64(i)), nil
 				}
@@ -632,6 +635,11 @@ func IntBuilder() builders.BuiltinFunc {
 		} else if base == 2 && len(s) >= 2 && strings.ToLower(s[:2]) == "0b" {
 			// Strip 0b prefix for binary parsing
 			sStripped = s[2:]
+		}
+
+		// Enforce the integer string-conversion digit limit (non-power-of-2 bases).
+		if d := core.CountIntStrDigits(sStripped); core.IntStrDigitLimitExceeded(d, actualBase) {
+			return nil, errors.NewValueError("int", fmt.Sprintf("Exceeds the limit (%d digits) for integer string conversion: value has %d digits; use sys.set_int_max_str_digits() to increase the limit", core.IntMaxStrDigits, d))
 		}
 
 		// Try standard int64 parsing first (faster for small numbers)
@@ -1013,6 +1021,13 @@ func (s *StrType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 	}
 
 	val := args[0]
+
+	// Enforce the integer string-conversion digit limit for large ints.
+	if bigVal, ok := val.(core.BigIntValue); ok {
+		if d := core.CountIntStrDigits(bigVal.String()); core.IntStrDigitLimitExceeded(d, 10) {
+			return nil, errors.NewValueError("str", fmt.Sprintf("Exceeds the limit (%d digits) for integer string conversion; use sys.set_int_max_str_digits() to increase the limit", core.IntMaxStrDigits))
+		}
+	}
 
 	// Special case: if val is a Class, don't try to call its __str__ method
 	// Classes should use their own String() method for representation

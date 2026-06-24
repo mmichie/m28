@@ -42,6 +42,38 @@ type BigIntValue struct {
 	value *big.Int
 }
 
+// IntMaxStrDigits limits the number of digits allowed when converting between
+// large integers and strings (CPython 3.11+ sys.get/set_int_max_str_digits).
+// A value of 0 disables the limit. The limit applies to non-power-of-2 bases.
+var IntMaxStrDigits = 4300
+
+// IntStrDigitLimitExceeded reports whether converting an integer with the given
+// number of (value) digits in the given base would exceed IntMaxStrDigits.
+// Power-of-2 bases (2, 4, 8, 16, 32) and base 0 are never limited.
+func IntStrDigitLimitExceeded(digits, base int) bool {
+	if IntMaxStrDigits == 0 || digits <= IntMaxStrDigits {
+		return false
+	}
+	switch base {
+	case 0, 2, 4, 8, 16, 32:
+		return false
+	}
+	return true
+}
+
+// CountIntStrDigits counts the value characters (alphanumerics) in s, ignoring a
+// leading/trailing sign, whitespace, and underscores -- i.e. the digit count
+// used for the integer string-conversion limit.
+func CountIntStrDigits(s string) int {
+	n := 0
+	for _, c := range s {
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			n++
+		}
+	}
+	return n
+}
+
 // NewBigInt creates a BigIntValue from a big.Int (makes a copy)
 func NewBigInt(i *big.Int) BigIntValue {
 	return BigIntValue{value: new(big.Int).Set(i)}
