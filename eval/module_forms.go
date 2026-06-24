@@ -273,6 +273,19 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 					// Also try with "s:" prefix (symbol key format)
 					val, ok = parentModule.Get("s:" + spec.name)
 				}
+				if !ok {
+					// Standard module dunders are defined in the module's context
+					// but Context.Define deliberately keeps them out of the export
+					// dict (so they don't leak into `from m import *`). They're
+					// still valid for explicit imports like
+					// `from _pydatetime import __doc__` (datetime does this).
+					switch spec.name {
+					case "__name__":
+						val, ok = core.StringValue(moduleName), true
+					case "__doc__", "__file__", "__package__", "__loader__", "__spec__", "__builtins__":
+						val, ok = core.None, true
+					}
+				}
 				if ok {
 					// Found as attribute - define in context
 					targetName := spec.name
