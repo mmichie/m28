@@ -17,17 +17,38 @@ import (
 // - Exception handling (try/except/finally)
 // - Context managers (with)
 
+// parseInlineSuite parses one or more semicolon-separated simple statements on
+// a single line (the suite after a ':' that is not followed by a NEWLINE), e.g.
+// "a = 1; b = 2". Statement parsers consume their own trailing ';' or NEWLINE,
+// so continuation is detected from the previously consumed token.
+func (p *PythonParser) parseInlineSuite() []ast.ASTNode {
+	statements := []ast.ASTNode{}
+	for {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			statements = append(statements, stmt)
+		}
+		// A pending semicolon means parseStatement did not consume it; advance.
+		if p.check(TOKEN_SEMICOLON) {
+			p.advance()
+		}
+		// Continue only when a semicolon separated this statement from the next
+		// one still on this line; a consumed NEWLINE (or EOF) ends the suite.
+		if p.previous().Type == TOKEN_SEMICOLON && !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
+			continue
+		}
+		break
+	}
+	return statements
+}
+
 func (p *PythonParser) parseBlock() []ast.ASTNode {
 	p.expect(TOKEN_COLON)
 
-	// Support single-line statements: if condition: return value
+	// Support single-line suites, including semicolon-separated simple
+	// statements: "if c: return v" and "if c: a = 1; b = 2".
 	if !p.check(TOKEN_NEWLINE) {
-		// Parse a single statement on the same line
-		stmt := p.parseStatement()
-		if stmt != nil {
-			return []ast.ASTNode{stmt}
-		}
-		return []ast.ASTNode{}
+		return p.parseInlineSuite()
 	}
 
 	p.expect(TOKEN_NEWLINE)
@@ -534,8 +555,13 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 			bodyNode = ast.NewBlockForm(statements, p.makeLocation(tok), ast.SyntaxPython)
 		}
 	} else {
-		// Inline statement: def f(): pass
-		bodyNode = p.parseStatement()
+		// Inline statement(s): def f(): pass  /  def f(): a = 1; b = 2
+		statements := p.parseInlineSuite()
+		if len(statements) == 1 {
+			bodyNode = statements[0]
+		} else {
+			bodyNode = ast.NewBlockForm(statements, p.makeLocation(tok), ast.SyntaxPython)
+		}
 	}
 
 	return ast.NewDefForm(name, params, bodyNode, returnType, decorators, isAsync, p.makeLocation(tok), ast.SyntaxPython)
