@@ -867,20 +867,12 @@ func registerBytesType() {
 					if len(args) != 1 {
 						return nil, &TypeError{Message: "__eq__ takes exactly one argument"}
 					}
-					b1 := receiver.(BytesValue)
-					b2, ok := args[0].(BytesValue)
+					// bytes compares equal to a bytearray with the same contents.
+					b2, ok := asByteSlice(args[0])
 					if !ok {
 						return False, nil
 					}
-					if len(b1) != len(b2) {
-						return False, nil
-					}
-					for i := range b1 {
-						if b1[i] != b2[i] {
-							return False, nil
-						}
-					}
-					return True, nil
+					return BoolValue(compareBytesLex([]byte(receiver.(BytesValue)), b2) == 0), nil
 				},
 			},
 			"upper": {
@@ -1516,24 +1508,11 @@ func registerBytesType() {
 				Doc:     "Return self<value",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					b1 := receiver.(BytesValue)
-					b2, ok := args[0].(BytesValue)
+					b2, ok := asByteSlice(args[0])
 					if !ok {
 						return nil, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of 'bytes' and '%s'", args[0].Type())}
 					}
-					minLen := len(b1)
-					if len(b2) < minLen {
-						minLen = len(b2)
-					}
-					for i := 0; i < minLen; i++ {
-						if b1[i] < b2[i] {
-							return True, nil
-						}
-						if b1[i] > b2[i] {
-							return False, nil
-						}
-					}
-					return BoolValue(len(b1) < len(b2)), nil
+					return BoolValue(compareBytesLex([]byte(receiver.(BytesValue)), b2) < 0), nil
 				},
 			},
 			"__le__": {
@@ -1542,24 +1521,11 @@ func registerBytesType() {
 				Doc:     "Return self<=value",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					b1 := receiver.(BytesValue)
-					b2, ok := args[0].(BytesValue)
+					b2, ok := asByteSlice(args[0])
 					if !ok {
 						return nil, &TypeError{Message: fmt.Sprintf("'<=' not supported between instances of 'bytes' and '%s'", args[0].Type())}
 					}
-					minLen := len(b1)
-					if len(b2) < minLen {
-						minLen = len(b2)
-					}
-					for i := 0; i < minLen; i++ {
-						if b1[i] < b2[i] {
-							return True, nil
-						}
-						if b1[i] > b2[i] {
-							return False, nil
-						}
-					}
-					return BoolValue(len(b1) <= len(b2)), nil
+					return BoolValue(compareBytesLex([]byte(receiver.(BytesValue)), b2) <= 0), nil
 				},
 			},
 			"__gt__": {
@@ -1568,24 +1534,11 @@ func registerBytesType() {
 				Doc:     "Return self>value",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					b1 := receiver.(BytesValue)
-					b2, ok := args[0].(BytesValue)
+					b2, ok := asByteSlice(args[0])
 					if !ok {
 						return nil, &TypeError{Message: fmt.Sprintf("'>' not supported between instances of 'bytes' and '%s'", args[0].Type())}
 					}
-					minLen := len(b1)
-					if len(b2) < minLen {
-						minLen = len(b2)
-					}
-					for i := 0; i < minLen; i++ {
-						if b1[i] > b2[i] {
-							return True, nil
-						}
-						if b1[i] < b2[i] {
-							return False, nil
-						}
-					}
-					return BoolValue(len(b1) > len(b2)), nil
+					return BoolValue(compareBytesLex([]byte(receiver.(BytesValue)), b2) > 0), nil
 				},
 			},
 			"__ge__": {
@@ -1594,24 +1547,11 @@ func registerBytesType() {
 				Doc:     "Return self>=value",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					b1 := receiver.(BytesValue)
-					b2, ok := args[0].(BytesValue)
+					b2, ok := asByteSlice(args[0])
 					if !ok {
 						return nil, &TypeError{Message: fmt.Sprintf("'>=' not supported between instances of 'bytes' and '%s'", args[0].Type())}
 					}
-					minLen := len(b1)
-					if len(b2) < minLen {
-						minLen = len(b2)
-					}
-					for i := 0; i < minLen; i++ {
-						if b1[i] > b2[i] {
-							return True, nil
-						}
-						if b1[i] < b2[i] {
-							return False, nil
-						}
-					}
-					return BoolValue(len(b1) >= len(b2)), nil
+					return BoolValue(compareBytesLex([]byte(receiver.(BytesValue)), b2) >= 0), nil
 				},
 			},
 			"__rmul__": {
@@ -1790,6 +1730,42 @@ func registerBytesType() {
 			return v.(BytesValue).String()
 		},
 	})
+}
+
+// asByteSlice returns the raw bytes of a bytes or bytearray value. Python lets
+// the two be ordered against each other, so comparison ops accept either.
+func asByteSlice(v Value) ([]byte, bool) {
+	switch x := v.(type) {
+	case BytesValue:
+		return []byte(x), true
+	case *ByteArrayValue:
+		return x.GetData(), true
+	}
+	return nil, false
+}
+
+// compareBytesLex returns -1/0/1 for lexicographic byte-slice comparison.
+func compareBytesLex(a, b []byte) int {
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+	for i := 0; i < minLen; i++ {
+		if a[i] < b[i] {
+			return -1
+		}
+		if a[i] > b[i] {
+			return 1
+		}
+	}
+	switch {
+	case len(a) < len(b):
+		return -1
+	case len(a) > len(b):
+		return 1
+	default:
+		return 0
+	}
 }
 
 // registerByteArrayType registers the bytearray type descriptor
@@ -1984,6 +1960,58 @@ func registerByteArrayType() {
 						}
 					}
 					return True, nil
+				},
+			},
+			"__lt__": {
+				Name:    "__lt__",
+				Arity:   1,
+				Doc:     "Return self<value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b2, ok := asByteSlice(args[0])
+					if !ok {
+						return nil, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of 'bytearray' and '%s'", args[0].Type())}
+					}
+					return BoolValue(compareBytesLex(receiver.(*ByteArrayValue).GetData(), b2) < 0), nil
+				},
+			},
+			"__le__": {
+				Name:    "__le__",
+				Arity:   1,
+				Doc:     "Return self<=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b2, ok := asByteSlice(args[0])
+					if !ok {
+						return nil, &TypeError{Message: fmt.Sprintf("'<=' not supported between instances of 'bytearray' and '%s'", args[0].Type())}
+					}
+					return BoolValue(compareBytesLex(receiver.(*ByteArrayValue).GetData(), b2) <= 0), nil
+				},
+			},
+			"__gt__": {
+				Name:    "__gt__",
+				Arity:   1,
+				Doc:     "Return self>value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b2, ok := asByteSlice(args[0])
+					if !ok {
+						return nil, &TypeError{Message: fmt.Sprintf("'>' not supported between instances of 'bytearray' and '%s'", args[0].Type())}
+					}
+					return BoolValue(compareBytesLex(receiver.(*ByteArrayValue).GetData(), b2) > 0), nil
+				},
+			},
+			"__ge__": {
+				Name:    "__ge__",
+				Arity:   1,
+				Doc:     "Return self>=value",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b2, ok := asByteSlice(args[0])
+					if !ok {
+						return nil, &TypeError{Message: fmt.Sprintf("'>=' not supported between instances of 'bytearray' and '%s'", args[0].Type())}
+					}
+					return BoolValue(compareBytesLex(receiver.(*ByteArrayValue).GetData(), b2) >= 0), nil
 				},
 			},
 		},
