@@ -3,8 +3,29 @@ package eval
 import (
 	"fmt"
 
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 )
+
+// pythonIteratorAdapter adapts a Python iterator (an object with __next__) to
+// core.Iterator, so a generator's `for`/`yield from` can drive instances whose
+// __iter__ returns such an iterator (custom classes, MutableMapping views, …).
+type pythonIteratorAdapter struct {
+	iter core.Value
+	ctx  *core.Context
+}
+
+func (a *pythonIteratorAdapter) Next() (core.Value, bool) {
+	item, found, err := types.CallNext(a.iter, a.ctx)
+	if err != nil || !found {
+		// StopIteration (or any error) ends iteration; core.Iterator has no way
+		// to surface a non-StopIteration error here.
+		return nil, false
+	}
+	return item, true
+}
+
+func (a *pythonIteratorAdapter) Reset() {}
 
 func init() {
 	// Register the generator execution factory
@@ -365,6 +386,13 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 				} else if iterable, ok := iterableVal.(interface{ Iterator() core.Iterator }); ok {
 					// Value is an iterable with Iterator() method
 					iterator = iterable.Iterator()
+				} else if pyIter, found, err := types.CallIter(iterableVal, state.Locals); found {
+					// Python iterator protocol: instances with __iter__ (custom
+					// classes, MutableMapping views iterated by `yield from`, …).
+					if err != nil {
+						return nil, err
+					}
+					iterator = &pythonIteratorAdapter{iter: pyIter, ctx: state.Locals}
 				} else {
 					return nil, fmt.Errorf("for loop iterable must be iterable, got %T", iterableVal)
 				}
