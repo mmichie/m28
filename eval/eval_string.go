@@ -34,9 +34,21 @@ func EvalString(input string, ctx *core.Context) (core.Value, error) {
 			return evalPythonNodes(nodes, ctx)
 		}
 
-		// Python parsing failed: try the S-expression parser for '('-prefixed
-		// input (genuine M28 S-expressions).
-		if strings.HasPrefix(trimmed, "(") {
+		// Python parsing failed. Only fall back to the S-expression parser when
+		// the tokens are individually valid — a genuine M28 S-expression like
+		// (print "x") is well-formed lexically but invalid Python grammar. If the
+		// stream contains a TOKEN_ERROR (e.g. a malformed numeric literal such as
+		// 1.5_j_), the input is genuinely invalid Python; surface it as a
+		// SyntaxError rather than letting the S-expression parser mis-read it
+		// (which would turn a SyntaxError into a spurious NameError).
+		hasLexError := false
+		for i := range tokens {
+			if tokens[i].Type == parser.TOKEN_ERROR {
+				hasLexError = true
+				break
+			}
+		}
+		if !hasLexError && strings.HasPrefix(trimmed, "(") {
 			if expr, sexprErr := parser.NewParser().Parse(input); sexprErr == nil {
 				return Eval(expr, ctx)
 			}
