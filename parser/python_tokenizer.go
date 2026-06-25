@@ -1484,10 +1484,10 @@ func validateUnderscores(lexeme string) string {
 		}
 	}
 
-	// Check for underscore immediately after prefix (0b_, 0x_, 0o_)
-	if digitStart > 0 && digitStart < len(lexeme) && lexeme[digitStart] == '_' {
-		return "invalid decimal literal"
-	}
+	// A single underscore immediately after a base prefix is valid per PEP 515
+	// (the grammar is e.g. "0x" (["_"] hexdigit)+), so 0x_FF, 0b_1010 and 0o_77
+	// are accepted. A bare "0x_" with no digits is still rejected later by the
+	// empty-cleanLexeme check, and double underscores are caught by the loop.
 
 	// Check for trailing underscore
 	if len(lexeme) > 0 && lexeme[len(lexeme)-1] == '_' {
