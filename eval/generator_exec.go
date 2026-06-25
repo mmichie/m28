@@ -36,14 +36,14 @@ func (a *protocolsIteratorAdapter) Reset() {
 }
 
 // createGeneratorExecState is the factory function for creating generator execution state
-func createGeneratorExecState(function core.Value, args []core.Value, ctx *core.Context) (core.GeneratorExecutor, error) {
+func createGeneratorExecState(function core.Value, args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.GeneratorExecutor, error) {
 	// The function should be a UserFunction
 	userFunc, ok := function.(*UserFunction)
 	if !ok {
 		return nil, fmt.Errorf("generator function must be a UserFunction, got %T", function)
 	}
 
-	return NewGeneratorExecState(userFunc, args, ctx)
+	return NewGeneratorExecState(userFunc, args, kwargs, ctx)
 }
 
 // StepKind represents the type of execution step
@@ -114,20 +114,23 @@ type WithState struct {
 }
 
 // NewGeneratorExecState creates a new execution state for a generator
-func NewGeneratorExecState(function *UserFunction, args []core.Value, ctx *core.Context) (*GeneratorExecState, error) {
+func NewGeneratorExecState(function *UserFunction, args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (*GeneratorExecState, error) {
 	// Create local context with function's environment as parent
 	locals := core.NewContext(function.env)
 	locals.IsFunctionScope = true
 
 	// Bind arguments to parameters
 	if function.signature != nil {
-		// Use signature-based binding
-		err := function.signature.BindArguments(function.name, args, nil, function.env, locals)
+		// Use signature-based binding (handles keyword arguments and defaults)
+		err := function.signature.BindArguments(function.name, args, kwargs, function.env, locals)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		// Legacy parameter binding
+		if len(kwargs) > 0 {
+			return nil, fmt.Errorf("%s() does not accept keyword arguments", function.name)
+		}
 		if len(args) != len(function.params) {
 			return nil, fmt.Errorf("generator function expected %d arguments, got %d", len(function.params), len(args))
 		}

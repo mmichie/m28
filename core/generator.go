@@ -13,9 +13,10 @@ type GeneratorExecutor interface {
 	Close() (Value, error)
 }
 
-// GeneratorExecFactory creates a GeneratorExecutor for a given function and arguments
+// GeneratorExecFactory creates a GeneratorExecutor for a given function, its
+// positional arguments and keyword arguments
 // This is set by the eval package to avoid circular dependency
-var GeneratorExecFactory func(function Value, args []Value, ctx *Context) (GeneratorExecutor, error)
+var GeneratorExecFactory func(function Value, args []Value, kwargs map[string]Value, ctx *Context) (GeneratorExecutor, error)
 
 // Generator represents a generator object
 type Generator struct {
@@ -928,7 +929,7 @@ func (gf *GeneratorFunction) Call(args []Value, ctx *Context) (Value, error) {
 
 	// If we have a factory, create execution state
 	if GeneratorExecFactory != nil {
-		execState, err := GeneratorExecFactory(gf.Function, args, ctx)
+		execState, err := GeneratorExecFactory(gf.Function, args, nil, ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create generator execution state: %v", err)
 		}
@@ -949,40 +950,29 @@ func (gf *GeneratorFunction) CallWithKeywords(args []Value, kwargs map[string]Va
 		return gf.Call(args, ctx)
 	}
 
-	// Check if the underlying function supports keyword arguments
-	if _, ok := gf.Function.(interface {
-		CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
-	}); ok {
-		// Create a new generator
-		gen := NewGenerator(gf.Name, gf.Function, ctx)
+	// Create a new generator
+	gen := NewGenerator(gf.Name, gf.Function, ctx)
 
-		// Create execution state with keyword arguments
-		if GeneratorExecFactory != nil {
-			// We need to call the underlying function with kwargs to get the execution state
-			// For now, merge kwargs into args using the function's parameter names
-			execState, err := GeneratorExecFactory(gf.Function, args, ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create generator execution state: %v", err)
-			}
-			gen.SetExecState(execState)
-		} else {
-			// Fallback: Store the arguments for old-style execution
-			gen.SetAttr("__args__", NewList(args...))
-			// Create dict from kwargs
-			kwargsDict := NewDict()
-			for k, v := range kwargs {
-				kwargsDict.Set(k, v)
-			}
-			gen.SetAttr("__kwargs__", kwargsDict)
-			gen.SetAttr("__function__", gf.Function)
+	// Create execution state with keyword arguments. The factory binds them via
+	// the function signature (which also rejects unexpected keywords), so a
+	// generator honors keyword arguments exactly like a regular function.
+	if GeneratorExecFactory != nil {
+		execState, err := GeneratorExecFactory(gf.Function, args, kwargs, ctx)
+		if err != nil {
+			return nil, err
 		}
-		return gen, nil
+		gen.SetExecState(execState)
+	} else {
+		// Fallback: Store the arguments for old-style execution
+		gen.SetAttr("__args__", NewList(args...))
+		kwargsDict := NewDict()
+		for k, v := range kwargs {
+			kwargsDict.Set(k, v)
+		}
+		gen.SetAttr("__kwargs__", kwargsDict)
+		gen.SetAttr("__function__", gf.Function)
 	}
-
-	// If function doesn't support kwargs, error
-	return nil, &TypeError{
-		Message: fmt.Sprintf("%s() does not accept keyword arguments", gf.Name),
-	}
+	return gen, nil
 }
 
 // GetAttr implements attribute access for generator functions
