@@ -226,7 +226,7 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	// Use new signature-based binding if available
 	if f.signature != nil {
 		// For now, we don't support keyword arguments in calls, just positional
-		err := f.signature.BindArguments(args, nil, f.env, funcEnv)
+		err := f.signature.BindArguments(f.name, args, nil, f.env, funcEnv)
 		if err != nil {
 			return nil, err
 		}
@@ -317,7 +317,7 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 	// Use new signature-based binding if available
 	if f.signature != nil {
 		// Signature supports keyword arguments
-		err := f.signature.BindArguments(args, kwargs, f.env, funcEnv)
+		err := f.signature.BindArguments(f.name, args, kwargs, f.env, funcEnv)
 		if err != nil {
 			core.TraceExitFunction(f.name, nil, err)
 			return nil, err

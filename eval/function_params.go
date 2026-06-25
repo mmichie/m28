@@ -335,7 +335,45 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 }
 
 // BindArguments binds arguments to parameters according to the signature
-func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string]core.Value, evalCtx *core.Context, bindCtx *core.Context) error {
+// tooManyPositionalError builds CPython's TypeError for passing too many
+// positional arguments, e.g. "f() takes from 1 to 2 positional arguments but 3
+// were given" (or "f() takes 2 positional arguments but 3 were given" when there
+// are no optional positional params).
+func tooManyPositionalError(funcName string, sig *FunctionSignature, got int) *core.TypeError {
+	if funcName == "" {
+		funcName = "<lambda>"
+	}
+	minPos := 0
+	for _, p := range sig.RequiredParams {
+		if !p.KeywordOnly {
+			minPos++
+		}
+	}
+	maxPos := minPos
+	for _, p := range sig.OptionalParams {
+		if !p.KeywordOnly {
+			maxPos++
+		}
+	}
+
+	var takes string
+	if minPos == maxPos {
+		plural := "s"
+		if maxPos == 1 {
+			plural = ""
+		}
+		takes = fmt.Sprintf("%d positional argument%s", maxPos, plural)
+	} else {
+		takes = fmt.Sprintf("from %d to %d positional arguments", minPos, maxPos)
+	}
+	were := "were"
+	if got == 1 {
+		were = "was"
+	}
+	return &core.TypeError{Message: fmt.Sprintf("%s() takes %s but %d %s given", funcName, takes, got, were)}
+}
+
+func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, kwargs map[string]core.Value, evalCtx *core.Context, bindCtx *core.Context) error {
 	// Track which parameters have been bound
 	boundParams := make(map[string]bool)
 	argIndex := 0
@@ -355,9 +393,7 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 
 	// Check for too many positional arguments early (unless we have *args)
 	if sig.RestParam == nil && len(args) > maxPositional {
-		return &core.TypeError{
-			Message: fmt.Sprintf("too many positional arguments: expected at most %d, got %d", maxPositional, len(args)),
-		}
+		return tooManyPositionalError(funcName, sig, len(args))
 	}
 
 	// Debug: print signature info
@@ -500,8 +536,7 @@ func (sig *FunctionSignature) BindArguments(args []core.Value, kwargs map[string
 		bindCtx.Define(string(*sig.RestParam), core.TupleValue(restArgs))
 	} else if argIndex < len(args) {
 		// Too many positional arguments (CPython raises TypeError).
-		return &core.TypeError{Message: fmt.Sprintf("too many positional arguments: expected at most %d, got %d",
-			len(sig.RequiredParams)+len(sig.OptionalParams), len(args))}
+		return tooManyPositionalError(funcName, sig, len(args))
 	}
 
 	// 4. Collect remaining keyword arguments into **kwargs if present

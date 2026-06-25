@@ -122,7 +122,7 @@ func NewGeneratorExecState(function *UserFunction, args []core.Value, ctx *core.
 	// Bind arguments to parameters
 	if function.signature != nil {
 		// Use signature-based binding
-		err := function.signature.BindArguments(args, nil, function.env, locals)
+		err := function.signature.BindArguments(function.name, args, nil, function.env, locals)
 		if err != nil {
 			return nil, err
 		}
