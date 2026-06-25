@@ -1,6 +1,30 @@
 package core
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+// IsIndexError reports whether err represents a Python IndexError — either the
+// native *IndexError raised by built-in sequence indexing, or a raised Python
+// exception that subclasses IndexError. The old-style sequence protocol (a
+// for-loop or the `in` operator over an object that defines __getitem__ but no
+// __iter__) uses this to detect end-of-sequence: __getitem__ is probed at
+// indices 0, 1, 2, ... until it raises IndexError.
+func IsIndexError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var idxErr *IndexError
+	if errors.As(err, &idxErr) {
+		return true
+	}
+	var pyErr *PythonError
+	if errors.As(err, &pyErr) {
+		return pyErr.IsSubclassOf("IndexError")
+	}
+	return false
+}
 
 // Error message templates for dot notation
 const (

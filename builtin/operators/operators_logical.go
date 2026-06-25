@@ -166,20 +166,39 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 			return core.BoolValue(exists), nil
 
 		default:
-			// Try duck-typing for dict-like objects (e.g., OrderedDict)
-			// Try __getitem__ to check if key exists
-			if _, found, err := types.CallDunder(container, "__getitem__", []core.Value{value}, ctx); found {
+			if _, isInstance := container.(*core.Instance); isInstance {
+				// User-defined classes that expose __getitem__ but neither
+				// __contains__ nor __iter__ follow CPython's old-style sequence
+				// protocol: probe obj[0], obj[1], ..., comparing each item to
+				// value and stopping when __getitem__ raises IndexError (the
+				// index is the position, never the searched value).
+				for i := 0; ; i++ {
+					item, found, err := types.CallDunder(container, "__getitem__", []core.Value{core.NumberValue(float64(i))}, ctx)
+					if !found {
+						break // no __getitem__; fall through to other strategies
+					}
+					if err != nil {
+						if core.IsIndexError(err) {
+							// Reached the end of the sequence without a match.
+							return core.BoolValue(false), nil
+						}
+						return nil, err
+					}
+					if core.SameObject(value, item) || core.EqualValues(value, item) {
+						return core.BoolValue(true), nil
+					}
+				}
+			} else if _, found, err := types.CallDunder(container, "__getitem__", []core.Value{value}, ctx); found {
+				// Native dict-like objects (e.g. OrderedDict) that lack
+				// __contains__: treat __getitem__ as a key lookup — success
+				// means the key is present, KeyError means it is absent.
 				if err != nil {
-					// __getitem__ raised an error (likely KeyError), key doesn't exist
-					// Check if it's a KeyError using errors.As
 					var keyErr *core.KeyError
 					if goerrors.As(err, &keyErr) {
 						return core.BoolValue(false), nil
 					}
-					// Some other error, propagate it
 					return nil, err
 				}
-				// __getitem__ succeeded, key exists
 				return core.BoolValue(true), nil
 			}
 			// Try iterating through the container (for generators, iterators, etc.)

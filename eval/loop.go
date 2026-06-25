@@ -627,7 +627,12 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					if getitemFunc, ok := getitemVal.(core.Callable); ok {
 						item, err = getitemFunc.Call([]core.Value{indexVal}, ctx)
 						if err != nil {
-							// Check if it's an IndexError (end of sequence)
+							// Check if it's an IndexError (end of sequence). This
+							// covers both the native *core.IndexError raised by
+							// built-in indexing and a raised Python IndexError.
+							if core.IsIndexError(err) {
+								break // End of iteration
+							}
 							if exc, ok := err.(*Exception); ok && exc.Type == "IndexError" {
 								break // End of iteration
 							}
