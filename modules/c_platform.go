@@ -382,40 +382,47 @@ func InitGrpModule() *core.DictValue {
 
 	// getgrgid(gid) - get group database entry by GID
 	grpModule.Set("getgrgid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("getgrgid() missing required argument: gid")
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("getgrgid() takes exactly one argument (%d given)", len(args))}
 		}
-		gid, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("getgrgid() argument must be an integer")
-		}
-
-		// Try to get current user's group
-		currentUser, err := user.Current()
-		if err == nil {
-			currentGID, _ := strconv.Atoi(currentUser.Gid)
-			if int(gid) == currentGID {
-				return makeGroupStruct(int(gid), "users"), nil
+		switch gid := args[0].(type) {
+		case core.NumberValue:
+			if float64(gid) != math.Trunc(float64(gid)) {
+				return nil, &core.TypeError{Message: "getgrgid(): an integer is required"}
 			}
+			// Try to get current user's group
+			currentUser, err := user.Current()
+			if err == nil {
+				currentGID, _ := strconv.Atoi(currentUser.Gid)
+				if int(gid) == currentGID {
+					return makeGroupStruct(int(gid), "users"), nil
+				}
+			}
+			return nil, &core.KeyError{Key: core.NumberValue(gid), Message: fmt.Sprintf("getgrgid(): gid not found: %d", int(gid))}
+		case core.BigIntValue:
+			return nil, &core.KeyError{Key: gid, Message: "getgrgid(): gid not found"}
+		default:
+			return nil, &core.TypeError{Message: "getgrgid(): an integer is required"}
 		}
-
-		return nil, fmt.Errorf("getgrgid(): gid not found: %d", int(gid))
 	}))
 
 	// getgrnam(name) - get group database entry by name
 	grpModule.Set("getgrnam", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("getgrnam() missing required argument: name")
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("getgrnam() takes exactly one argument (%d given)", len(args))}
 		}
 		name, ok := args[0].(core.StringValue)
 		if !ok {
-			return nil, fmt.Errorf("getgrnam() argument must be a string")
+			return nil, &core.TypeError{Message: "getgrnam() argument must be str"}
+		}
+		if strings.IndexByte(string(name), 0) >= 0 {
+			return nil, &core.ValueError{Message: "embedded null character"}
 		}
 
 		// Try to look up group
 		g, err := user.LookupGroup(string(name))
 		if err != nil {
-			return nil, fmt.Errorf("getgrnam(): name not found: %s", name)
+			return nil, &core.KeyError{Key: name, Message: fmt.Sprintf("getgrnam(): name not found: %s", string(name))}
 		}
 		gid, _ := strconv.Atoi(g.Gid)
 		return makeGroupStruct(gid, g.Name), nil
@@ -423,21 +430,126 @@ func InitGrpModule() *core.DictValue {
 
 	// getgrall() - get all group database entries
 	grpModule.Set("getgrall", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// Return empty list (can't easily enumerate all groups)
-		return core.NewList(), nil
+		if len(args) != 0 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("getgrall() takes no arguments (%d given)", len(args))}
+		}
+		// We cannot enumerate the whole group database portably, but returning at
+		// least the current user's primary group lets callers iterate.
+		currentUser, err := user.Current()
+		if err != nil {
+			return core.NewList(), nil
+		}
+		g, err := user.LookupGroupId(currentUser.Gid)
+		if err != nil {
+			return core.NewList(), nil
+		}
+		gid, _ := strconv.Atoi(g.Gid)
+		return core.NewList(makeGroupStruct(gid, g.Name)), nil
 	}))
 
 	return grpModule
 }
 
-// makeGroupStruct creates a group struct tuple
-func makeGroupStruct(gid int, name string) core.TupleValue {
-	// struct_group: (gr_name, gr_passwd, gr_gid, gr_mem)
-	return core.TupleValue{
-		core.StringValue(name),    // gr_name
-		core.StringValue("x"),     // gr_passwd (placeholder)
-		core.NumberValue(gid),     // gr_gid
-		core.NewList(),            // gr_mem (empty list)
+// StructGroup represents a grp.struct_group with both tuple and attribute
+// access, mirroring StructPasswd.
+type StructGroup struct {
+	core.BaseObject
+	values []core.Value
+	names  []string
+}
+
+func (s *StructGroup) Type() core.Type { return "grp.struct_group" }
+
+func (s *StructGroup) String() string {
+	return fmt.Sprintf("grp.struct_group(gr_name=%q, gr_passwd=%q, gr_gid=%v, gr_mem=%v)",
+		s.values[0], s.values[1], s.values[2], s.values[3])
+}
+
+func (s *StructGroup) GetAttr(name string) (core.Value, bool) {
+	for i, n := range s.names {
+		if n == name {
+			return s.values[i], true
+		}
+	}
+	switch name {
+	case "__len__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.NumberValue(len(s.values)), nil
+		}), true
+	case "__getitem__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__getitem__ requires an index")
+			}
+			return s.GetItem(args[0])
+		}), true
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return &structPasswdIterator{values: s.values, index: 0}, nil
+		}), true
+	case "n_fields", "n_sequence_fields":
+		return core.NumberValue(len(s.values)), true
+	case "n_unnamed_fields":
+		return core.NumberValue(0), true
+	}
+	return nil, false
+}
+
+func (s *StructGroup) GetItem(key core.Value) (core.Value, error) {
+	idx, ok := key.(core.NumberValue)
+	if !ok {
+		return nil, fmt.Errorf("indices must be integers, not %s", key.Type())
+	}
+	i := int(idx)
+	if i < 0 {
+		i = len(s.values) + i
+	}
+	if i < 0 || i >= len(s.values) {
+		return nil, fmt.Errorf("index out of range")
+	}
+	return s.values[i], nil
+}
+
+func (s *StructGroup) Len() int { return len(s.values) }
+
+// Iterator implements core.Iterable so struct_group unpacks/iterates as a
+// 4-element sequence.
+func (s *StructGroup) Iterator() core.Iterator {
+	return &structPasswdIterator{values: s.values, index: 0}
+}
+
+// EqualsValue compares struct_group by value, like the tuple it subclasses.
+func (s *StructGroup) EqualsValue(other core.Value) bool {
+	var otherVals []core.Value
+	switch o := other.(type) {
+	case *StructGroup:
+		otherVals = o.values
+	case core.TupleValue:
+		otherVals = []core.Value(o)
+	default:
+		return false
+	}
+	if len(s.values) != len(otherVals) {
+		return false
+	}
+	for i := range s.values {
+		if !core.EqualValues(s.values[i], otherVals[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// makeGroupStruct creates a struct_group: (gr_name, gr_passwd, gr_gid, gr_mem).
+func makeGroupStruct(gid int, name string) *StructGroup {
+	return &StructGroup{
+		values: []core.Value{
+			core.StringValue(name),
+			core.StringValue("x"),
+			core.NumberValue(gid),
+			core.NewList(),
+		},
+		names: []string{"gr_name", "gr_passwd", "gr_gid", "gr_mem"},
 	}
 }
 
