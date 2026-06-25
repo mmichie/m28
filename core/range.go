@@ -273,6 +273,37 @@ func (r *RangeValue) createRegistry() *MethodRegistry {
 			return BoolValue(r.Contains(args[0])), nil
 		}),
 
+		// index method - return the index of a value, or raise ValueError
+		MakeMethod("index", 1, "Return the index of value", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			r, err := TypedReceiver[*RangeValue](receiver, "index")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("index", args, 1); err != nil {
+				return nil, err
+			}
+			num, ok := args[0].(NumberValue)
+			if !ok || !r.Contains(args[0]) {
+				return nil, &ValueError{Message: fmt.Sprintf("%s is not in range", Repr(args[0]))}
+			}
+			return NumberValue(int((float64(num) - r.Start) / r.Step)), nil
+		}),
+
+		// count method - return 1 if value is in the range, else 0
+		MakeMethod("count", 1, "Return the number of occurrences of value", func(receiver Value, args []Value, ctx *Context) (Value, error) {
+			r, err := TypedReceiver[*RangeValue](receiver, "count")
+			if err != nil {
+				return nil, err
+			}
+			if err := ValidateArity("count", args, 1); err != nil {
+				return nil, err
+			}
+			if r.Contains(args[0]) {
+				return NumberValue(1), nil
+			}
+			return NumberValue(0), nil
+		}),
+
 		// __iter__ method
 		MakeIterMethod(),
 
@@ -343,55 +374,70 @@ func (r *RangeValue) GetAttr(name string) (Value, bool) {
 func (r *RangeValue) getSlice(slice *SliceValue) (Value, error) {
 	length := r.Length()
 
-	// Determine start index
-	start := 0
-	if slice.Start != nil {
-		if num, ok := slice.Start.(NumberValue); ok {
-			start = int(num)
-			if start < 0 {
-				start = length + start
-			}
-			if start < 0 {
-				start = 0
-			}
-			if start > length {
-				start = length
-			}
-		}
-	}
-
-	// Determine stop index
-	stop := length
-	if slice.Stop != nil {
-		if num, ok := slice.Stop.(NumberValue); ok {
-			stop = int(num)
-			if stop < 0 {
-				stop = length + stop
-			}
-			if stop < 0 {
-				stop = 0
-			}
-			if stop > length {
-				stop = length
-			}
-		}
-	}
-
-	// Determine step
+	// Step (default 1, may be negative)
 	step := 1
-	if slice.Step != nil {
+	if slice.Step != nil && slice.Step != Nil {
 		if num, ok := slice.Step.(NumberValue); ok {
 			step = int(num)
-			if step == 0 {
-				return nil, fmt.Errorf("slice step cannot be zero")
-			}
 		}
 	}
+	if step == 0 {
+		return nil, fmt.Errorf("slice step cannot be zero")
+	}
 
-	// Calculate new range parameters
+	// Bounds for index clamping, per Python's slice.indices(length).
+	lower, upper := 0, length
+	if step < 0 {
+		lower, upper = -1, length-1
+	}
+
+	clamp := func(v *Value, def int) int {
+		if v == nil || *v == nil || *v == Nil {
+			return def
+		}
+		num, ok := (*v).(NumberValue)
+		if !ok {
+			return def
+		}
+		idx := int(num)
+		if idx < 0 {
+			idx += length
+			if idx < lower {
+				idx = lower
+			}
+		} else if idx > upper {
+			idx = upper
+		}
+		return idx
+	}
+
+	// start defaults to upper for negative step, lower otherwise; stop is the
+	// opposite default.
+	startDef, stopDef := lower, upper
+	if step < 0 {
+		startDef, stopDef = upper, lower
+	}
+	start := clamp(&slice.Start, startDef)
+	stop := clamp(&slice.Stop, stopDef)
+
+	// Number of elements the slice selects.
+	slicelen := 0
+	if step > 0 {
+		if stop > start {
+			slicelen = (stop-start-1)/step + 1
+		}
+	} else {
+		if start > stop {
+			slicelen = (start-stop-1)/(-step) + 1
+		}
+	}
+	if slicelen <= 0 {
+		return NewRangeValue(0, 0, 1) // empty range
+	}
+
+	// Map the slice's index space onto the range's actual values.
 	newStart := r.Start + float64(start)*r.Step
-	newStop := r.Start + float64(stop)*r.Step
 	newStep := r.Step * float64(step)
-
+	newStop := newStart + float64(slicelen)*newStep
 	return NewRangeValue(newStart, newStop, newStep)
 }

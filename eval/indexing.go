@@ -47,7 +47,7 @@ func GetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Check if key is a slice object
 	if slice, ok := key.(*core.SliceValue); ok {
 		// Handle slicing with slice object
-		return handleSliceObject(obj, slice)
+		return handleSliceObject(obj, slice, ctx)
 	}
 
 	// First, try dunder method __getitem__
@@ -395,7 +395,7 @@ func normalizeSliceIndices(length int, start, end, step *int) (int, int, int) {
 }
 
 // handleSliceObject handles slicing with a slice object
-func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, error) {
+func handleSliceObject(obj core.Value, slice *core.SliceValue, ctx *core.Context) (core.Value, error) {
 	// Extract slice parameters
 	var start, stop, step *int
 
@@ -448,6 +448,12 @@ func handleSliceObject(obj core.Value, slice *core.SliceValue) (core.Value, erro
 	case *core.ByteArrayValue:
 		return sliceByteArray(v, start, stop, step)
 	default:
+		// Fall back to the object's own __getitem__ with the slice object, so
+		// range and user-defined classes that implement slice handling work
+		// (Python calls obj.__getitem__(slice) for obj[a:b]).
+		if result, found, err := types.CallGetItem(obj, slice, ctx); found {
+			return result, err
+		}
 		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not subscriptable", core.GetPythonTypeName(v))}
 	}
 }
