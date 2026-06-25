@@ -937,6 +937,19 @@ skipScientific:
 		cleanLexeme = cleanLexeme[:len(cleanLexeme)-1] // remove j/J suffix
 	}
 
+	// Python forbids leading zeros in decimal *integer* literals (09, 0_7): a
+	// decimal integer must be a single run of zeros or start with a nonzero
+	// digit. This applies only to plain integers — floats (09.5), exponents
+	// (09e5) and imaginaries (09j) use the unrestricted digitpart grammar and
+	// are fine, as are all-zero literals (0, 00, 0_0).
+	if !isComplex && !hasDecimalPoint && !strings.ContainsAny(cleanLexeme, "eE") {
+		if len(cleanLexeme) > 1 && cleanLexeme[0] == '0' && strings.TrimLeft(cleanLexeme, "0") != "" {
+			return Token{Type: TOKEN_ERROR, Lexeme: lexeme,
+				Value: core.StringValue("leading zeros in decimal integer literals are not permitted; use an 0o prefix for octal integers"),
+				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+		}
+	}
+
 	// Parse the number
 	var value core.Value
 	if isComplex {
