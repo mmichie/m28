@@ -10,43 +10,56 @@ import (
 	"os"
 )
 
-// EvalString parses and evaluates a string in the given context
+// EvalString parses and evaluates a string in the given context.
+//
+// M28 targets Python semantics, so the Python parser is tried first — even when
+// the input begins with '('. Many valid Python expressions start with '(':
+// (True), (1, 2), (1,), (a + b), and generator expressions. Routing every
+// '('-prefixed input to the S-expression parser (as this once did) broke eval()
+// of such expressions. Only when Python parsing fails do we fall back to the
+// M28 S-expression parser, and only for '('-prefixed input — that preserves
+// deliberately-non-Python forms like (print "x") and (+ 1 2), which are not
+// valid Python and so fail the Python parse first.
+//
+// The fallback triggers on a Python *parse* error only; a successful Python
+// parse is always used (so there is no double evaluation and runtime errors
+// such as NameError are surfaced rather than masked by a second attempt).
 func EvalString(input string, ctx *core.Context) (core.Value, error) {
-	// Auto-detect syntax: if it starts with '(', use S-expression parser
-	// Otherwise, use Python parser
 	trimmed := strings.TrimSpace(input)
 
+	tokens, tokErr := parser.NewPythonTokenizer(input).Tokenize()
+	if tokErr == nil {
+		nodes, parseErr := parser.NewPythonParser(tokens, "<eval>", input).Parse()
+		if parseErr == nil {
+			return evalPythonNodes(nodes, ctx)
+		}
+
+		// Python parsing failed: try the S-expression parser for '('-prefixed
+		// input (genuine M28 S-expressions).
+		if strings.HasPrefix(trimmed, "(") {
+			if expr, sexprErr := parser.NewParser().Parse(input); sexprErr == nil {
+				return Eval(expr, ctx)
+			}
+		}
+
+		// Surface the original Python parse error as a SyntaxError.
+		errMsg := parseErr.Error()
+		if strings.Contains(errMsg, "parse error") || strings.Contains(errMsg, "Unexpected token") {
+			return nil, fmt.Errorf("SyntaxError: %s", errMsg)
+		}
+		return nil, parseErr
+	}
+
+	// Python tokenization failed: fall back to S-expression parsing for
+	// '('-prefixed input, otherwise surface the tokenizer error.
 	if strings.HasPrefix(trimmed, "(") {
-		// Use M28 S-expression parser
-		p := parser.NewParser()
-		expr, err := p.Parse(input)
-		if err != nil {
-			return nil, err
+		expr, sexprErr := parser.NewParser().Parse(input)
+		if sexprErr != nil {
+			return nil, sexprErr
 		}
 		return Eval(expr, ctx)
 	}
-
-	// Use Python parser (default)
-	tokenizer := parser.NewPythonTokenizer(input)
-	tokens, err := tokenizer.Tokenize()
-	if err != nil {
-		return nil, err
-	}
-
-	pythonParser := parser.NewPythonParser(tokens, "<eval>", input)
-	nodes, err := pythonParser.Parse()
-	if err != nil {
-		// Check if this is a parse error - if so, convert to SyntaxError
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "parse error") || strings.Contains(errMsg, "Unexpected token") {
-			// Format as SyntaxError for proper exception handling
-			return nil, fmt.Errorf("SyntaxError: %s", errMsg)
-		}
-		return nil, err
-	}
-
-	// Convert AST nodes to IR and evaluate
-	return evalPythonNodes(nodes, ctx)
+	return nil, tokErr
 }
 
 // evalPythonNodes evaluates Python AST nodes
