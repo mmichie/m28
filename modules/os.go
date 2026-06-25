@@ -427,7 +427,12 @@ func osEnvironDict() *core.DictValue {
 			if e[i] == '=' {
 				key := e[:i]
 				value := e[i+1:]
-				result.SetWithKey(key, core.StringValue(key), core.StringValue(value))
+				// posix.environ is bytes-keyed (the OS environment is bytes);
+				// os.py's _Environ looks up data[key.encode()], so the dict must
+				// use bytes keys/values for os.environ['HOME'] to resolve. Use
+				// SetValue so the internal key matches ValueToKey (SetWithKey with
+				// a raw string stored entries lookups never found).
+				_ = result.SetValue(core.BytesValue(key), core.BytesValue(value))
 				break
 			}
 		}
