@@ -261,12 +261,18 @@ func osListdir(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	path := "."
+	// A bytes path yields bytes filenames, mirroring CPython.
+	asBytes := false
 	if v.Count() > 0 {
-		p, err := v.GetString(0)
-		if err != nil {
-			return nil, err
+		switch p := args[0].(type) {
+		case core.StringValue:
+			path = string(p)
+		case core.BytesValue:
+			path = string(p)
+			asBytes = true
+		default:
+			return nil, &core.TypeError{Message: fmt.Sprintf("listdir: path should be string or bytes, not %s", core.GetPythonTypeName(args[0]))}
 		}
-		path = p
 	}
 
 	entries, readErr := os.ReadDir(path)
@@ -276,7 +282,11 @@ func osListdir(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	result := make([]core.Value, len(entries))
 	for i, entry := range entries {
-		result[i] = core.StringValue(entry.Name())
+		if asBytes {
+			result[i] = core.BytesValue(entry.Name())
+		} else {
+			result[i] = core.StringValue(entry.Name())
+		}
 	}
 
 	return core.NewList(result...), nil
