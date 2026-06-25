@@ -1697,6 +1697,53 @@ func addNumericReprMethods(class *core.Class) {
 	class.SetMethod("__str__", mk("__str__"))
 }
 
+// intOperandValue extracts the underlying numeric value of an int, bool, or
+// int-subclass instance (Instance carrying a numeric __value__) for arithmetic.
+func intOperandValue(v core.Value) (float64, bool) {
+	switch x := v.(type) {
+	case core.NumberValue:
+		return float64(x), true
+	case core.BoolValue:
+		if x {
+			return 1, true
+		}
+		return 0, true
+	case *core.Instance:
+		if val, ok := x.Attributes["__value__"]; ok {
+			if n, ok := val.(core.NumberValue); ok {
+				return float64(n), true
+			}
+		}
+	}
+	return 0, false
+}
+
+// intArithMethod builds a binary int dunder computing op over numeric operands.
+// It returns NotImplemented for non-numeric operands so the interpreter can try
+// the reflected operation or sequence protocols (e.g. int * list). When
+// reflected is true the operands are swapped (for __radd__/__rsub__/__rmul__).
+// This lets int subclasses inherit working arithmetic; CPython returns a plain
+// int for such operations, matching the NumberValue results produced here.
+func intArithMethod(name string, reflected bool, op func(a, b float64) core.Value) *core.BuiltinFunction {
+	return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 2 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("%s() takes exactly 2 arguments (%d given)", name, len(args))}
+		}
+		self, ok := intOperandValue(args[0])
+		if !ok {
+			return core.NotImplemented, nil
+		}
+		other, ok := intOperandValue(args[1])
+		if !ok {
+			return core.NotImplemented, nil
+		}
+		if reflected {
+			return op(other, self), nil
+		}
+		return op(self, other), nil
+	})
+}
+
 // createIntClass creates the int class that can be used with isinstance
 func createIntClass(objectClass *core.Class) *IntType {
 	class := core.NewClass("int", objectClass)
@@ -1871,6 +1918,15 @@ func createIntClass(objectClass *core.Class) *IntType {
 
 		return core.NotImplemented, nil
 	}))
+
+	// Arithmetic dunders so int subclasses inherit working +, -, * (both direct
+	// and reflected). Division-family dunders are intentionally omitted here
+	// (they need zero-division handling) and continue to use existing paths.
+	class.SetMethod("__radd__", intArithMethod("__radd__", true, func(a, b float64) core.Value { return core.NumberValue(a + b) }))
+	class.SetMethod("__sub__", intArithMethod("__sub__", false, func(a, b float64) core.Value { return core.NumberValue(a - b) }))
+	class.SetMethod("__rsub__", intArithMethod("__rsub__", true, func(a, b float64) core.Value { return core.NumberValue(a - b) }))
+	class.SetMethod("__mul__", intArithMethod("__mul__", false, func(a, b float64) core.Value { return core.NumberValue(a * b) }))
+	class.SetMethod("__rmul__", intArithMethod("__rmul__", true, func(a, b float64) core.Value { return core.NumberValue(a * b) }))
 
 	// Add from_bytes class method - converts bytes to int
 	// int.from_bytes(bytes, byteorder, *, signed=False)
