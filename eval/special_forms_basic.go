@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/core"
 )
 
@@ -391,7 +392,7 @@ func returnForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 // importForm implements the import special form
 
-func convertIterableToSlice(iterable core.Value) ([]core.Value, error) {
+func convertIterableToSlice(iterable core.Value, ctx *core.Context) ([]core.Value, error) {
 	var items []core.Value
 	switch v := iterable.(type) {
 	case *core.ListValue:
@@ -404,7 +405,7 @@ func convertIterableToSlice(iterable core.Value) ([]core.Value, error) {
 			items = append(items, core.StringValue(string(ch)))
 		}
 	default:
-		// Try using Iterator interface
+		// Try using the Go Iterator interface
 		if iterableObj, ok := v.(core.Iterable); ok {
 			iter := iterableObj.Iterator()
 			for {
@@ -414,9 +415,31 @@ func convertIterableToSlice(iterable core.Value) ([]core.Value, error) {
 				}
 				items = append(items, val)
 			}
-		} else {
-			return nil, &core.TypeError{Message: fmt.Sprintf("value must be iterable, got %s", v.Type())}
+			return items, nil
 		}
+		// Fall back to the Python iterator protocol (__iter__/__next__), so
+		// comprehensions iterate custom classes, MutableMapping subclasses
+		// (e.g. os.environ) and other instances exactly like a for loop does.
+		if iter, found, err := types.CallIter(v, ctx); found {
+			if err != nil {
+				return nil, err
+			}
+			for {
+				item, ok, err := types.CallNext(iter, ctx)
+				if err != nil {
+					if isStopIteration(err) {
+						break
+					}
+					return nil, err
+				}
+				if !ok {
+					break
+				}
+				items = append(items, item)
+			}
+			return items, nil
+		}
+		return nil, &core.TypeError{Message: fmt.Sprintf("value must be iterable, got %s", v.Type())}
 	}
 	return items, nil
 }
@@ -595,7 +618,7 @@ func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Convert iterable to a sequence we can iterate over
-	items, err := convertIterableToSlice(iterable)
+	items, err := convertIterableToSlice(iterable, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list comprehension: %w", err)
 	}
@@ -690,7 +713,7 @@ func listCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core
 		}
 
 		// Convert to slice
-		items, err := convertIterableToSlice(iterable)
+		items, err := convertIterableToSlice(iterable, ctx)
 		if err != nil {
 			return fmt.Errorf("clause %d: %w", clauseIdx, err)
 		}
@@ -750,7 +773,7 @@ func DictCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Convert iterable to a sequence we can iterate over
-	items, err := convertIterableToSlice(iterable)
+	items, err := convertIterableToSlice(iterable, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("dict comprehension: %w", err)
 	}
@@ -859,7 +882,7 @@ func dictCompMultiClause(keyExpr, valueExpr core.Value, clausesList *core.ListVa
 		}
 
 		// Convert to slice
-		items, err := convertIterableToSlice(iterable)
+		items, err := convertIterableToSlice(iterable, ctx)
 		if err != nil {
 			return fmt.Errorf("clause %d: %w", clauseIdx, err)
 		}
@@ -923,7 +946,7 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Convert iterable to a sequence we can iterate over
-	items, err := convertIterableToSlice(iterable)
+	items, err := convertIterableToSlice(iterable, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("set comprehension: %w", err)
 	}
@@ -1018,7 +1041,7 @@ func setCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 		}
 
 		// Convert to slice
-		items, err := convertIterableToSlice(iterable)
+		items, err := convertIterableToSlice(iterable, ctx)
 		if err != nil {
 			return fmt.Errorf("clause %d: %w", clauseIdx, err)
 		}
@@ -1241,7 +1264,7 @@ func listLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 					return nil, err
 				}
 				// Unpack the iterable into the result
-				items, err := convertIterableToSlice(val)
+				items, err := convertIterableToSlice(val, ctx)
 				if err != nil {
 					return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-iterable: %v", err)}
 				}
@@ -1305,7 +1328,7 @@ func tupleLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, erro
 					return nil, err
 				}
 				// Unpack the iterable into the result
-				items, err := convertIterableToSlice(val)
+				items, err := convertIterableToSlice(val, ctx)
 				if err != nil {
 					return nil, &core.TypeError{Message: fmt.Sprintf("cannot unpack non-iterable: %v", err)}
 				}
