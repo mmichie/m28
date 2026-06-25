@@ -516,13 +516,18 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.Li
 	case "title":
 		return core.StringValue(strings.Title(string(str))), nil
 
+	// isdigit / isalpha / isspace are handled directly here (rather than via the
+	// type-descriptor delegation below) so the S-expression form (. s isdigit)
+	// evaluates the predicate, matching the other directly-handled methods such
+	// as lower/upper. Keep the Unicode semantics in sync with the canonical
+	// versions in core/string_methods.go (isalnum/islower/... delegate there).
 	case "isdigit":
 		s := string(str)
 		if len(s) == 0 {
 			return core.BoolValue(false), nil
 		}
 		for _, r := range s {
-			if r < '0' || r > '9' {
+			if !unicode.IsDigit(r) {
 				return core.BoolValue(false), nil
 			}
 		}
@@ -534,7 +539,7 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.Li
 			return core.BoolValue(false), nil
 		}
 		for _, r := range s {
-			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
+			if !unicode.IsLetter(r) {
 				return core.BoolValue(false), nil
 			}
 		}
@@ -545,8 +550,6 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.Li
 		if len(s) == 0 {
 			return core.BoolValue(false), nil
 		}
-		// Match Python's Unicode-aware str.isspace (and core/string_methods.go):
-		// e.g. NO-BREAK SPACE (\xa0) and IDEOGRAPHIC SPACE (　) count too.
 		for _, r := range s {
 			if !unicode.IsSpace(r) {
 				return core.BoolValue(false), nil

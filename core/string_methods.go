@@ -1194,8 +1194,10 @@ func InitStringMethods() {
 			if len(s) == 0 {
 				return False, nil
 			}
+			// Unicode-aware, matching Python: e.g. Arabic-Indic and other Nd
+			// digits count, not just ASCII 0-9.
 			for _, r := range s {
-				if r < '0' || r > '9' {
+				if !unicode.IsDigit(r) {
 					return False, nil
 				}
 			}
@@ -1213,8 +1215,10 @@ func InitStringMethods() {
 			if len(s) == 0 {
 				return False, nil
 			}
+			// Unicode-aware, matching Python: accented and non-Latin letters
+			// (café, naïve, Москва, 日本語) count, not just ASCII a-zA-Z.
 			for _, r := range s {
-				if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
+				if !unicode.IsLetter(r) {
 					return False, nil
 				}
 			}
