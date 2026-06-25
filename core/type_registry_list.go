@@ -1060,7 +1060,11 @@ func listSetItemSlice(list *ListValue, slice *SliceValue, value Value, ctx *Cont
 	var newItems []Value
 	switch v := value.(type) {
 	case *ListValue:
-		newItems = v.items
+		// Copy the backing slice so we never read from an array we are about to
+		// mutate. This matters when the RHS is (or shares storage with) the target
+		// list, e.g. `a[::-1] = a`; CPython materializes the RHS before assigning.
+		newItems = make([]Value, len(v.items))
+		copy(newItems, v.items)
 	case TupleValue:
 		newItems = []Value(v)
 	default:
