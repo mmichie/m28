@@ -143,7 +143,7 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 
 		case *core.ListValue:
 			for _, item := range c.Items() {
-				if core.EqualValues(value, item) {
+				if core.SameObject(value, item) || core.EqualValues(value, item) {
 					return core.BoolValue(true), nil
 				}
 			}
@@ -151,7 +151,7 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 
 		case core.TupleValue:
 			for _, item := range c {
-				if core.EqualValues(value, item) {
+				if core.SameObject(value, item) || core.EqualValues(value, item) {
 					return core.BoolValue(true), nil
 				}
 			}
@@ -190,7 +190,7 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 					if !hasNext {
 						break
 					}
-					if core.EqualValues(value, item) {
+					if core.SameObject(value, item) || core.EqualValues(value, item) {
 						return core.BoolValue(true), nil
 					}
 				}

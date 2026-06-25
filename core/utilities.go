@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"math"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -132,7 +134,7 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 				return false, nil
 			}
 			for i := range aT {
-				eq, err := EqualValuesWithError(aT[i], bT[i], ctx)
+				eq, err := identicalOrEqualCtx(aT[i], bT[i], ctx)
 				if err != nil {
 					return false, err
 				}
@@ -160,7 +162,7 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 			// mutations during __eq__ are visible in subsequent bound checks.
 			i := 0
 			for i < aL.Len() && i < bL.Len() {
-				eq, err := EqualValuesWithError(aL.items[i], bL.items[i], ctx)
+				eq, err := identicalOrEqualCtx(aL.items[i], bL.items[i], ctx)
 				if err != nil {
 					return false, err
 				}
@@ -344,6 +346,53 @@ func ComputeHash(v Value, ctx *Context) (int64, error) {
 }
 
 // EqualValues compares two values for equality
+// SameObject reports whether a and b are the same object for the purposes of
+// Python's identity (`is`) semantics, as used by membership testing where
+// `x in s` is defined as `any(x is e or x == e for e in s)`. The identity
+// branch matters for elements that are not equal to themselves, such as
+// float('nan') or objects whose __eq__ never returns true.
+//
+// Floats (and other numbers) are unboxed value types in M28, so true object
+// identity cannot be tracked; identity is approximated by comparing the raw
+// bit pattern, which makes `nan is nan` hold for one and the same value while
+// leaving ordinary numbers — already handled by EqualValues — unaffected.
+// Reference types fall back to Go pointer identity.
+func SameObject(a, b Value) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	switch av := a.(type) {
+	case NumberValue:
+		bv, ok := b.(NumberValue)
+		return ok && math.Float64bits(float64(av)) == math.Float64bits(float64(bv))
+	case StringValue, BoolValue, NilValue, BytesValue, SymbolValue, TupleValue:
+		// Value types whose object identity is not tracked separately from their
+		// contents: callers compare them with EqualValues (which itself applies
+		// the identity-or-equal rule element-wise for tuples). Skip reflection on
+		// these hot paths and never report them as "the same object" here.
+		return false
+	}
+	// Reference types: pointer identity.
+	ra := reflect.ValueOf(a)
+	rb := reflect.ValueOf(b)
+	if ra.Kind() == reflect.Pointer && rb.Kind() == reflect.Pointer {
+		return ra.Pointer() == rb.Pointer()
+	}
+	return false
+}
+
+// identicalOrEqualCtx implements CPython's per-element comparison rule
+// (`x is y or x == y`) used by sequence equality and membership testing. The
+// identity branch short-circuits __eq__, so elements that are the same object
+// compare equal even when their __eq__ would not (e.g. float('nan') or objects
+// whose __eq__ never returns true). Any error from a user __eq__ is propagated.
+func identicalOrEqualCtx(a, b Value, ctx *Context) (bool, error) {
+	if SameObject(a, b) {
+		return true, nil
+	}
+	return EqualValuesWithError(a, b, ctx)
+}
+
 func EqualValues(a, b Value) bool {
 	// Check nil values first
 	if a == nil && b == nil {
@@ -494,7 +543,7 @@ func EqualValues(a, b Value) bool {
 			aItems := aVal.Items()
 			bItems := bData.Items()
 			for i := range aItems {
-				if !EqualValues(aItems[i], bItems[i]) {
+				if !SameObject(aItems[i], bItems[i]) && !EqualValues(aItems[i], bItems[i]) {
 					return false
 				}
 			}
@@ -514,7 +563,7 @@ func EqualValues(a, b Value) bool {
 			aItems := aVal.Data.Items()
 			bItems := bData.Items()
 			for i := range aItems {
-				if !EqualValues(aItems[i], bItems[i]) {
+				if !SameObject(aItems[i], bItems[i]) && !EqualValues(aItems[i], bItems[i]) {
 					return false
 				}
 			}
@@ -526,7 +575,7 @@ func EqualValues(a, b Value) bool {
 				return false
 			}
 			for i := range aVal {
-				if !EqualValues(aVal[i], bVal[i]) {
+				if !SameObject(aVal[i], bVal[i]) && !EqualValues(aVal[i], bVal[i]) {
 					return false
 				}
 			}

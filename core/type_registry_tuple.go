@@ -222,7 +222,7 @@ func getTupleMethods() map[string]*MethodDescriptor {
 				}
 				tuple := receiver.(TupleValue)
 				for _, item := range tuple {
-					if EqualValues(item, args[0]) {
+					if SameObject(args[0], item) || EqualValues(item, args[0]) {
 						return True, nil
 					}
 				}

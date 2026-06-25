@@ -86,6 +86,12 @@ func dictFindKeyWithEq(dict *DictValue, searchKey Value, ctx *Context) (string, 
 	// For instances with custom __hash__, we need to compare with all stored keys
 	// using __eq__ because they might have the same hash
 	for internalKey, storedKey := range dict.keys {
+		// CPython compares keys with `is or ==`, so a key that is the same object
+		// is found even when its __eq__ never returns true (e.g. a NaN key).
+		if SameObject(storedKey, searchKey) {
+			val, _ := dict.Get(internalKey)
+			return internalKey, val, true, nil
+		}
 		// Use EqualValuesWithError to properly propagate __eq__ exceptions
 		equal, err := EqualValuesWithError(storedKey, searchKey, ctx)
 		if err != nil {

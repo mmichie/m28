@@ -59,7 +59,7 @@ func (l *ListContainer) Size() int {
 // Contains checks if the list contains an item
 func (l *ListContainer) Contains(item core.Value) bool {
 	for _, elem := range l.list.Items() {
-		if core.EqualValues(elem, item) {
+		if core.SameObject(item, elem) || core.EqualValues(elem, item) {
 			return true
 		}
 	}
@@ -143,7 +143,7 @@ func (t *TupleContainer) Size() int {
 // Contains checks if the tuple contains an item
 func (t *TupleContainer) Contains(item core.Value) bool {
 	for _, elem := range t.tuple {
-		if core.EqualValues(elem, item) {
+		if core.SameObject(item, elem) || core.EqualValues(elem, item) {
 			return true
 		}
 	}

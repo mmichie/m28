@@ -676,13 +676,34 @@ func (dq *Deque) GetAttr(name string) (core.Value, bool) {
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return NewDequeIterator(dq), nil
 		}), true
+	case "__eq__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, &core.TypeError{Message: "__eq__ requires exactly 1 argument"}
+			}
+			other, ok := args[0].(*Deque)
+			if !ok {
+				return core.False, nil
+			}
+			if len(dq.items) != len(other.items) {
+				return core.False, nil
+			}
+			// CPython compares elements with `is or ==` (identity short-circuits
+			// __eq__), so deques of the same not-self-equal objects are equal.
+			for i := range dq.items {
+				if !core.SameObject(dq.items[i], other.items[i]) && !core.EqualValues(dq.items[i], other.items[i]) {
+					return core.False, nil
+				}
+			}
+			return core.True, nil
+		}), true
 	case "__contains__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
 				return nil, &core.TypeError{Message: "__contains__ requires exactly 1 argument"}
 			}
 			for _, it := range dq.items {
-				if core.EqualValues(it, args[0]) {
+				if core.SameObject(args[0], it) || core.EqualValues(it, args[0]) {
 					return core.True, nil
 				}
 			}
