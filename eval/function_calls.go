@@ -675,6 +675,24 @@ func (f *UserFunction) SetAttr(name string, value core.Value) error {
 	}
 }
 
+// DelAttr deletes a function attribute (e.g. `del func.x`). Arbitrary user-set
+// attributes live in the function's __dict__; a few structural attributes
+// cannot be deleted, matching CPython.
+func (f *UserFunction) DelAttr(name string) error {
+	switch name {
+	case "__name__", "__qualname__", "__dict__":
+		return &core.AttributeError{ObjType: "function", Message: fmt.Sprintf("__%s__ may not be deleted", name)}
+	}
+	if f.dict != nil && f.dict.DeleteValue(core.StringValue(name)) {
+		return nil
+	}
+	// Fall back to special attributes stored on the BaseObject (e.g. __doc__).
+	if err := f.BaseObject.DelAttr(name); err == nil {
+		return nil
+	}
+	return &core.AttributeError{ObjType: "function", Message: fmt.Sprintf("'function' object has no attribute '%s'", name)}
+}
+
 // lambdaForm implements the lambda special form
 func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() < 2 {

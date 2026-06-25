@@ -140,6 +140,19 @@ func (o *BaseObject) SetAttr(name string, value Value) error {
 	return nil
 }
 
+// DelAttr removes an attribute from the object, returning an AttributeError if
+// it is not present.
+func (o *BaseObject) DelAttr(name string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	if _, ok := o.attrs[name]; !ok {
+		return &AttributeError{ObjType: string(o.typ), Message: fmt.Sprintf("'%s' object has no attribute '%s'", o.typ, name)}
+	}
+	delete(o.attrs, name)
+	return nil
+}
+
 // ForEachAttr iterates over all attributes in the object
 func (o *BaseObject) ForEachAttr(fn func(name string, value Value)) {
 	o.mu.RLock()
