@@ -30,6 +30,16 @@ func invertValue(value core.Value, ctx *core.Context) (core.Value, error) {
 		return result, err
 	}
 
+	// Bitwise NOT of a big integer (~x == -(x+1)); the type switch below only
+	// covers fixed-size ints and bools.
+	if bigVal, ok := value.(core.BigIntValue); ok {
+		result := core.NewBigInt(new(big.Int).Not(bigVal.GetBigInt()))
+		if num, ok := core.DemoteToNumber(result); ok {
+			return num, nil
+		}
+		return result, nil
+	}
+
 	// Fall back to integer bitwise inversion
 	return types.Switch(value).
 		Bool(func(b bool) (core.Value, error) {

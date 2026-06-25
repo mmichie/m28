@@ -185,6 +185,12 @@ func positiveValue(value core.Value, ctx *core.Context) (core.Value, error) {
 		return result, err
 	}
 
+	// Unary + on a big integer is the identity (the type switch below only
+	// covers fixed-size numbers and bools).
+	if big, ok := value.(core.BigIntValue); ok {
+		return big, nil
+	}
+
 	// For numeric types and bools, convert to number
 	return types.Switch(value).
 		Number(func(n float64) (core.Value, error) {
