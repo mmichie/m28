@@ -2258,8 +2258,10 @@ func stringSplitlinesImpl(receiver Value, args []Value, kwargs map[string]Value)
 		}
 	}
 
-	// Add the last line if there's anything left
-	if currentLine.Len() > 0 || len(lines) == 0 {
+	// Add the trailing line only when it has content. An empty string yields no
+	// lines at all ("".splitlines() == []), and a string ending in a line break
+	// does not produce a spurious empty final line.
+	if currentLine.Len() > 0 {
 		lines = append(lines, currentLine.String())
 	}
 
