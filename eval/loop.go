@@ -714,10 +714,10 @@ func ForForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					lastResult = result
 				}
 			} else {
-				return nil, TypeError{Expected: "iterable", Got: sequence.Type()}
+				return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not iterable", core.GetPythonTypeName(sequence))}
 			}
 		} else {
-			return nil, TypeError{Expected: "iterable", Got: sequence.Type()}
+			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not iterable", core.GetPythonTypeName(sequence))}
 		}
 	}
 

@@ -46,11 +46,7 @@ func evalFunctionCall(expr *core.ListValue, ctx *core.Context) (core.Value, erro
 			return result, err
 		}
 
-		errMsg := "function call"
-		if symbolName != "" {
-			errMsg = fmt.Sprintf("calling '%s'", symbolName)
-		}
-		return nil, core.NewTypeError("callable", fn, errMsg)
+		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not callable", core.GetPythonTypeName(fn))}
 	}
 
 	// Add function name to call stack if available

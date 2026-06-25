@@ -420,7 +420,7 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 			return result, err
 		}
 
-		return nil, core.NewTypeError("callable", fn, "function call")
+		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object is not callable", core.GetPythonTypeName(fn))}
 	}
 
 	// Add function name to call stack if available
