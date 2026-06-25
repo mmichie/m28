@@ -654,12 +654,20 @@ func (f *UserFunction) SetAttr(name string, value core.Value) error {
 	// Allow setting special attributes
 	switch name {
 	case "__name__":
-		// Update the function name
-		if str, ok := value.(core.StringValue); ok {
-			f.name = string(str)
+		// __name__ must be a string (CPython raises TypeError otherwise).
+		str, ok := value.(core.StringValue)
+		if !ok {
+			return &core.TypeError{Message: fmt.Sprintf("__name__ must be set to a string object, not '%s'", value.Type())}
+		}
+		f.name = string(str)
+		return f.BaseObject.SetAttr(name, value)
+	case "__qualname__":
+		// __qualname__ must be a string and is independent of __name__.
+		if _, ok := value.(core.StringValue); !ok {
+			return &core.TypeError{Message: fmt.Sprintf("__qualname__ must be set to a string object, not '%s'", value.Type())}
 		}
 		return f.BaseObject.SetAttr(name, value)
-	case "__qualname__", "__module__", "__doc__", "__annotations__", "__type_params__":
+	case "__module__", "__doc__", "__annotations__", "__type_params__":
 		// Store in BaseObject for later retrieval
 		return f.BaseObject.SetAttr(name, value)
 	case "__dict__":
