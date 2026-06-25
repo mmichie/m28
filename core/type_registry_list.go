@@ -387,33 +387,14 @@ func getListMethods() map[string]*MethodDescriptor {
 			Arity:   1,
 			Doc:     "Repeat list n times",
 			Builtin: true,
-			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, &TypeError{Message: "__mul__ takes exactly one argument"}
-				}
-				list := receiver.(*ListValue)
-				n, err := repeatCount(args[0], ctx)
-				if err != nil {
-					return nil, err
-				}
-				f := float64(n)
-				if f >= math.MaxInt64 || f <= math.MinInt64 {
-					return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
-				}
-				count := int64(f)
-				if count <= 0 {
-					return NewList(), nil
-				}
-				const maxItems = 1<<31 - 1 // ~2B items max
-				if count > maxItems || (list.Len() > 0 && count > maxItems/int64(list.Len())) {
-					return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
-				}
-				result := make([]Value, 0, list.Len()*int(count))
-				for i := int64(0); i < count; i++ {
-					result = append(result, list.Items()...)
-				}
-				return NewList(result...), nil
-			},
+			Handler: listRepeatHandler,
+		},
+		"__rmul__": {
+			Name:    "__rmul__",
+			Arity:   1,
+			Doc:     "Repeat list n times (reversed operand)",
+			Builtin: true,
+			Handler: listRepeatHandler,
 		},
 		"__imul__": {
 			Name:    "__imul__",
@@ -1481,6 +1462,36 @@ func repeatCount(arg Value, ctx *Context) (NumberValue, error) {
 		}
 	}
 	return 0, &TypeError{Message: "can't multiply sequence by non-int"}
+}
+
+// listRepeatHandler implements list repetition for both __mul__ and __rmul__
+// (repetition is commutative, so list * n and n * list share this logic).
+func listRepeatHandler(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) != 1 {
+		return nil, &TypeError{Message: "list repetition takes exactly one argument"}
+	}
+	list := receiver.(*ListValue)
+	n, err := repeatCount(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	f := float64(n)
+	if f >= math.MaxInt64 || f <= math.MinInt64 {
+		return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+	}
+	count := int64(f)
+	if count <= 0 {
+		return NewList(), nil
+	}
+	const maxItems = 1<<31 - 1 // ~2B items max
+	if count > maxItems || (list.Len() > 0 && count > maxItems/int64(list.Len())) {
+		return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+	}
+	result := make([]Value, 0, list.Len()*int(count))
+	for i := int64(0); i < count; i++ {
+		result = append(result, list.Items()...)
+	}
+	return NewList(result...), nil
 }
 
 // listCompareCtx performs lexicographic comparison of two lists with context

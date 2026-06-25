@@ -366,21 +366,14 @@ func getStringMethods() map[string]*MethodDescriptor {
 			Arity:   1,
 			Doc:     "Return self*n",
 			Builtin: true,
-			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, &TypeError{Message: "__mul__ takes exactly one argument"}
-				}
-				s := string(receiver.(StringValue))
-				n, err := repeatCount(args[0], ctx)
-				if err != nil {
-					return nil, err
-				}
-				count := int(n)
-				if count <= 0 {
-					return StringValue(""), nil
-				}
-				return StringValue(strings.Repeat(s, count)), nil
-			},
+			Handler: stringRepeatHandler,
+		},
+		"__rmul__": {
+			Name:    "__rmul__",
+			Arity:   1,
+			Doc:     "Return n*self",
+			Builtin: true,
+			Handler: stringRepeatHandler,
 		},
 		"encode": {
 			Name:    "encode",
@@ -598,6 +591,24 @@ func stringMethodReplace(receiver Value, args []Value, ctx *Context) (Value, err
 
 	result := strings.Replace(s, string(old), string(new), count)
 	return StringValue(result), nil
+}
+
+// stringRepeatHandler implements string repetition for both __mul__ and
+// __rmul__ (repetition is commutative, so s * n and n * s share this logic).
+func stringRepeatHandler(receiver Value, args []Value, ctx *Context) (Value, error) {
+	if len(args) != 1 {
+		return nil, &TypeError{Message: "string repetition takes exactly one argument"}
+	}
+	s := string(receiver.(StringValue))
+	n, err := repeatCount(args[0], ctx)
+	if err != nil {
+		return nil, err
+	}
+	count := int(n)
+	if count <= 0 {
+		return StringValue(""), nil
+	}
+	return StringValue(strings.Repeat(s, count)), nil
 }
 
 func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, error) {
