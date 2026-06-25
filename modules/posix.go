@@ -40,6 +40,7 @@ func InitPosixModule() *core.DictValue {
 	// File tests
 	copyFunction("isfile")
 	copyFunction("isdir")
+	copyFunction("access")
 
 	// System info
 	copyFunction("uname")

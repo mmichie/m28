@@ -448,9 +448,27 @@ func addOSProcessStubs(osModule *core.DictValue) {
 	osModule.Set("execve", core.NewBuiltinFunction(stub))
 	osModule.Set("_exit", core.NewBuiltinFunction(stub))
 
-	// Additional stubs
+	// os.access(path, mode): test real accessibility via access(2). mode is the
+	// bitwise OR of F_OK/R_OK/W_OK/X_OK. Returns False (not an error) when the
+	// check fails, matching CPython.
 	osModule.Set("access", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		return core.True, nil // Always accessible stub
+		if len(args) < 2 {
+			return nil, &core.TypeError{Message: "access expected at least 2 arguments"}
+		}
+		var path string
+		switch p := args[0].(type) {
+		case core.StringValue:
+			path = string(p)
+		case core.BytesValue:
+			path = string(p)
+		default:
+			return nil, &core.TypeError{Message: "access: path should be string or bytes"}
+		}
+		mode, ok := args[1].(core.NumberValue)
+		if !ok {
+			return nil, &core.TypeError{Message: "access: mode should be an integer"}
+		}
+		return core.BoolValue(syscall.Access(path, uint32(mode)) == nil), nil
 	}))
 
 	osModule.Set("chmod", core.NewBuiltinFunction(stub))
