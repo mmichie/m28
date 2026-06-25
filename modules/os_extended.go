@@ -471,7 +471,29 @@ func addOSProcessStubs(osModule *core.DictValue) {
 		return core.BoolValue(syscall.Access(path, uint32(mode)) == nil), nil
 	}))
 
-	osModule.Set("chmod", core.NewBuiltinFunction(stub))
+	// os.chmod(path, mode): really change the file mode bits via chmod(2).
+	osModule.Set("chmod", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, &core.TypeError{Message: "chmod expected at least 2 arguments"}
+		}
+		var path string
+		switch p := args[0].(type) {
+		case core.StringValue:
+			path = string(p)
+		case core.BytesValue:
+			path = string(p)
+		default:
+			return nil, &core.TypeError{Message: "chmod: path should be string or bytes"}
+		}
+		mode, ok := args[1].(core.NumberValue)
+		if !ok {
+			return nil, &core.TypeError{Message: "chmod: mode should be an integer"}
+		}
+		if err := syscall.Chmod(path, uint32(mode)); err != nil {
+			return nil, core.OSErrorFromGo(err, path)
+		}
+		return core.None, nil
+	}))
 	osModule.Set("chown", core.NewBuiltinFunction(stub))
 	osModule.Set("umask", core.NewBuiltinFunction(stub))
 	osModule.Set("sync", core.NewBuiltinFunction(stub))

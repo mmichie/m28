@@ -41,6 +41,7 @@ func InitPosixModule() *core.DictValue {
 	copyFunction("isfile")
 	copyFunction("isdir")
 	copyFunction("access")
+	copyFunction("chmod")
 
 	// System info
 	copyFunction("uname")
