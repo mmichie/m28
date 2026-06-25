@@ -100,14 +100,24 @@ func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 						}
 					}
 
+					// Count regular params after * (up to a **kwargs). A keyword-only
+					// separator can be followed by several params (def f(*, k1, k2));
+					// *args varargs is a single collector. So 2+ following params
+					// means this is unambiguously a separator, even when * is first
+					// (def f(*, k1, k2) — no params before *).
+					regularParamsAfter := 0
+					for j := i + 1; j < len(paramList); j++ {
+						if p, ok := paramList[j].(core.SymbolValue); ok && strings.HasPrefix(string(p), "**") {
+							break
+						}
+						regularParamsAfter++
+					}
+
 					isArgsPattern := false
-					if !hasRegularParamsBefore {
-						// No regular params before * → this is varargs like def f(*args)
+					if !hasRegularParamsBefore && regularParamsAfter < 2 {
+						// No regular params before * and a single following name →
+						// varargs like def f(*args).
 						isArgsPattern = true
-					} else {
-						// Has regular params before * → this is separator like def f(a, *, b)
-						// Don't treat as varargs pattern
-						isArgsPattern = false
 					}
 
 					if isArgsPattern {
