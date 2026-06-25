@@ -375,6 +375,37 @@ func NewFileNotFoundError(message string, filename string) *FileNotFoundError {
 	}
 }
 
+// NotADirectoryError represents Python's NotADirectoryError (subclass of OSError):
+// raised when a directory operation targets something that is not a directory.
+type NotADirectoryError struct {
+	Message  string
+	Errno    int
+	Filename string
+	Location *SourceLocation
+}
+
+func (e *NotADirectoryError) Error() string {
+	msg := e.Message
+	if msg == "" {
+		msg = "Not a directory"
+	}
+	if e.Filename != "" {
+		msg = fmt.Sprintf("%s: %s", msg, e.Filename)
+	}
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
+}
+
+// NewNotADirectoryError creates a new NotADirectoryError
+func NewNotADirectoryError(message string, filename string) *NotADirectoryError {
+	return &NotADirectoryError{
+		Message:  message,
+		Filename: filename,
+	}
+}
+
 // RuntimeError represents a runtime error (Python's RuntimeError)
 type RuntimeError struct {
 	Message  string

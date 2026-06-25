@@ -96,10 +96,12 @@ func isExceptionType(name string) bool {
 		"KeyError":          true,
 		"IndexError":        true,
 		"AttributeError":    true,
-		"RuntimeError":      true,
-		"FileNotFoundError": true,
-		"PermissionError":   true,
-		"AssertionError":    true,
+		"RuntimeError":       true,
+		"OSError":            true,
+		"FileNotFoundError":  true,
+		"NotADirectoryError": true,
+		"PermissionError":    true,
+		"AssertionError":     true,
 	}
 	return knownTypes[name]
 }
@@ -119,6 +121,20 @@ func isLikelyExceptionType(name string) bool {
 		return true
 	}
 	return false
+}
+
+// setExceptionFilename sets the .filename attribute that OSError-family
+// exceptions expose: the path involved, or None when it is unknown.
+func setExceptionFilename(inst core.Value, filename string) {
+	instance, ok := inst.(*core.Instance)
+	if !ok {
+		return
+	}
+	if filename == "" {
+		instance.SetAttr("filename", core.Nil)
+	} else {
+		instance.SetAttr("filename", core.StringValue(filename))
+	}
 }
 
 // errorToExceptionInstance converts any error into a Python exception instance
@@ -249,9 +265,17 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		// StopIteration from iterators
 		return createPythonExceptionInstance(ctx, "StopIteration", errMsg)
 	case *core.FileNotFoundError:
-		return createPythonExceptionInstance(ctx, "FileNotFoundError", errMsg)
+		inst := createPythonExceptionInstance(ctx, "FileNotFoundError", errMsg)
+		setExceptionFilename(inst, e.Filename)
+		return inst
+	case *core.NotADirectoryError:
+		inst := createPythonExceptionInstance(ctx, "NotADirectoryError", errMsg)
+		setExceptionFilename(inst, e.Filename)
+		return inst
 	case *core.OSError:
-		return createPythonExceptionInstance(ctx, "OSError", errMsg)
+		inst := createPythonExceptionInstance(ctx, "OSError", errMsg)
+		setExceptionFilename(inst, e.Filename)
+		return inst
 	case *core.NameError:
 		// Include suggestion in error message if present
 		msg := errMsg

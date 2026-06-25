@@ -2,11 +2,31 @@ package core
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+	"syscall"
 )
+
+// OSErrorFromGo maps a Go filesystem error to the matching Python OSError
+// subclass, carrying path as the exception's .filename. ENOENT becomes
+// FileNotFoundError and ENOTDIR becomes NotADirectoryError; anything else
+// stays a plain OSError.
+func OSErrorFromGo(err error, path string) error {
+	if err == nil {
+		return nil
+	}
+	switch {
+	case os.IsNotExist(err) || errors.Is(err, syscall.ENOENT):
+		return NewFileNotFoundError(err.Error(), path)
+	case errors.Is(err, syscall.ENOTDIR):
+		return NewNotADirectoryError(err.Error(), path)
+	default:
+		return NewOSError(err.Error(), path)
+	}
+}
 
 // File represents a file object
 type File struct {
@@ -95,7 +115,7 @@ func NewFile(path string, mode string) (*File, error) {
 	case "r", "rb":
 		f.file, err = os.Open(path)
 		if err != nil {
-			return nil, &OSError{Message: fmt.Sprintf("cannot open file '%s': %v", path, err)}
+			return nil, OSErrorFromGo(err, path)
 		}
 		f.reader = bufio.NewReader(f.file)
 
@@ -109,14 +129,14 @@ func NewFile(path string, mode string) (*File, error) {
 	case "a", "ab":
 		f.file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return nil, &OSError{Message: fmt.Sprintf("cannot open file '%s' for append: %v", path, err)}
+			return nil, OSErrorFromGo(err, path)
 		}
 		f.writer = bufio.NewWriter(f.file)
 
 	case "r+", "rb+", "r+b":
 		f.file, err = os.OpenFile(path, os.O_RDWR, 0644)
 		if err != nil {
-			return nil, &OSError{Message: fmt.Sprintf("cannot open file '%s' for read/write: %v", path, err)}
+			return nil, OSErrorFromGo(err, path)
 		}
 		f.reader = bufio.NewReader(f.file)
 		f.writer = bufio.NewWriter(f.file)

@@ -247,7 +247,7 @@ func osChdir(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	if chdirErr := os.Chdir(path); chdirErr != nil {
-		return nil, fmt.Errorf("os.chdir: %v", chdirErr)
+		return nil, core.OSErrorFromGo(chdirErr, path)
 	}
 
 	return core.None, nil
@@ -277,7 +277,7 @@ func osListdir(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	entries, readErr := os.ReadDir(path)
 	if readErr != nil {
-		return nil, fmt.Errorf("os.listdir: %v", readErr)
+		return nil, core.OSErrorFromGo(readErr, path)
 	}
 
 	result := make([]core.Value, len(entries))
@@ -361,7 +361,7 @@ func osRemove(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	if removeErr := os.Remove(path); removeErr != nil {
-		return nil, fmt.Errorf("os.remove: %v", removeErr)
+		return nil, core.OSErrorFromGo(removeErr, path)
 	}
 
 	return core.None, nil

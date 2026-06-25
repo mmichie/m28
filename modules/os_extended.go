@@ -289,7 +289,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		if !ok {
 			return nil, core.NewTypeError("str", args[0], "rmdir() argument")
 		}
-		return core.None, os.Remove(string(path))
+		return core.None, core.OSErrorFromGo(os.Remove(string(path)), string(path))
 	}))
 
 	osModule.Set("removedirs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
