@@ -1168,10 +1168,20 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 			if t.Len() == 3 {
 				unwrappedFirst := unwrapLocated(t.Items()[0])
 				if getItemSym, ok := unwrappedFirst.(core.SymbolValue); ok && string(getItemSym) == "get-item" {
-					// Index assignment: (get-item obj index) = value
-					// Convert to (set-item obj index value)
-					setItemArgs := core.NewList(t.Items()[1], t.Items()[2], value)
-					return SetItemForm(setItemArgs, ctx)
+					// Index assignment: (get-item obj index) = value. Evaluate the
+					// target object and key, but reuse the already-evaluated value
+					// so a chained assignment like d[k] = r = [1, 2] keeps d[k] and
+					// r as the same object (routing back through SetItemForm would
+					// re-evaluate and rebuild the list).
+					obj, err := Eval(t.Items()[1], ctx)
+					if err != nil {
+						return nil, err
+					}
+					idx, err := Eval(t.Items()[2], ctx)
+					if err != nil {
+						return nil, err
+					}
+					return setItemEvaluated(obj, idx, value, ctx)
 				}
 			}
 		}

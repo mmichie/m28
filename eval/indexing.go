@@ -101,6 +101,14 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("error evaluating value: %w", err)
 	}
 
+	return setItemEvaluated(obj, key, value, ctx)
+}
+
+// setItemEvaluated assigns value to obj[key] given already-evaluated operands.
+// Callers that have an evaluated value (e.g. chained assignment d[k] = r = expr)
+// use this directly so the value is not re-evaluated — re-evaluating an already
+// built list/dict would rebuild it and break object identity.
+func setItemEvaluated(obj, key, value core.Value, ctx *core.Context) (core.Value, error) {
 	// Handle slice assignment (obj[start:end] = values)
 	if sliceVal, ok := key.(*core.SliceValue); ok {
 		return handleSliceAssignment(obj, sliceVal, value, ctx)
@@ -117,8 +125,7 @@ func SetItemForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Then try protocol-based indexing
 	if indexable, ok := protocols.GetIndexableOps(obj); ok {
-		err = indexable.SetIndex(key, value)
-		if err != nil {
+		if err := indexable.SetIndex(key, value); err != nil {
 			return nil, err
 		}
 		// Return the assigned value to support chained assignments
