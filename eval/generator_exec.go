@@ -65,7 +65,13 @@ const (
 	StepFinallyEnd                     // End of finally block
 	StepWithEnter                      // Enter context manager
 	StepWithExit                       // Exit context manager
+	StepContinue                       // continue: jump to the enclosing loop's next-iteration step
+	StepBreak                          // break: jump past the enclosing loop
 )
+
+// loopControlUnpatched marks a StepContinue/StepBreak whose jump target has not
+// yet been resolved to its enclosing loop. The enclosing for/while patches it.
+const loopControlUnpatched = -1
 
 // ExecutionStep represents one step in generator execution
 type ExecutionStep struct {
@@ -230,6 +236,26 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 
 			state.completed = true
 			return nil, &core.StopIteration{Value: returnValue}
+
+		case StepContinue:
+			if step.Arg < 0 {
+				// continue outside a loop (shouldn't happen) — fall through.
+				state.CurrentStep++
+			} else {
+				state.CurrentStep = step.Arg
+			}
+
+		case StepBreak:
+			if step.Arg < 0 {
+				state.CurrentStep++
+			} else {
+				// Breaking out of a for loop abandons its iterator, so drop the
+				// loop state the for-loop pushed in StepLoopInit.
+				if step.Label == "for" && len(state.LoopStates) > 0 {
+					state.LoopStates = state.LoopStates[:len(state.LoopStates)-1]
+				}
+				state.CurrentStep = step.Arg
+			}
 
 		case StepLoopInit:
 			// Initialize a for loop
@@ -531,13 +557,35 @@ func appendStepsWithOffset(steps []ExecutionStep, substeps []ExecutionStep) []Ex
 		// Adjust jump targets for control flow steps
 		if substep.Arg >= 0 {
 			switch substep.Kind {
-			case StepIfStart, StepIfEnd, StepLoopInit, StepLoopNext, StepLoopEnd, StepWhileCondition, StepTryStart, StepTryEnd:
+			case StepIfStart, StepIfEnd, StepLoopInit, StepLoopNext, StepLoopEnd, StepWhileCondition, StepTryStart, StepTryEnd, StepContinue, StepBreak:
 				adjusted.Arg = substep.Arg + offset
 			}
 		}
 		steps = append(steps, adjusted)
 	}
 	return steps
+}
+
+// patchLoopControl resolves the StepContinue/StepBreak placeholders that belong
+// to the loop whose body occupies steps[bodyStart:bodyEnd]. Placeholders already
+// resolved by a nested loop (Arg != loopControlUnpatched) are left untouched, so
+// each continue/break is bound to its innermost enclosing loop. continueTarget is
+// the loop's next-iteration step; breakTarget is the step just past the loop.
+// breakLabel ("for" for for-loops) tells the executor to discard the loop's
+// iterator state when breaking.
+func patchLoopControl(steps []ExecutionStep, bodyStart, bodyEnd, continueTarget, breakTarget int, breakLabel string) {
+	for i := bodyStart; i < bodyEnd && i < len(steps); i++ {
+		if steps[i].Arg != loopControlUnpatched {
+			continue
+		}
+		switch steps[i].Kind {
+		case StepContinue:
+			steps[i].Arg = continueTarget
+		case StepBreak:
+			steps[i].Arg = breakTarget
+			steps[i].Label = breakLabel
+		}
+	}
 }
 
 func transformToSteps(node core.Value) ([]ExecutionStep, error) {
@@ -674,6 +722,10 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 				// Fill in the end step for loop init
 				steps[loopStart].Arg = loopEndStep + 1
 
+				// Resolve continue/break in this loop's body: continue advances the
+				// iterator, break exits past the loop (discarding its iterator state).
+				patchLoopControl(steps, loopNextStep+1, loopEndStep, loopNextStep, loopEndStep+1, "for")
+
 				return steps, nil
 
 			case "while":
@@ -713,6 +765,10 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 
 				// Fill in the end step for condition (where to jump if condition is false)
 				steps[conditionStep].Arg = loopEndStep + 1
+
+				// Resolve continue/break in this loop's body: continue re-checks the
+				// condition, break exits past the loop.
+				patchLoopControl(steps, conditionStep+1, loopEndStep, conditionStep, loopEndStep+1, "")
 
 				return steps, nil
 
@@ -995,6 +1051,21 @@ func transformToSteps(node core.Value) ([]ExecutionStep, error) {
 					steps[tryEndIdx].Arg = afterTryIdx
 				}
 
+				return steps, nil
+
+			case "continue":
+				// Jump target resolved by the enclosing loop (patchLoopControl).
+				steps = append(steps, ExecutionStep{
+					Kind: StepContinue,
+					Arg:  loopControlUnpatched,
+				})
+				return steps, nil
+
+			case "break":
+				steps = append(steps, ExecutionStep{
+					Kind: StepBreak,
+					Arg:  loopControlUnpatched,
+				})
 				return steps, nil
 
 			default:
