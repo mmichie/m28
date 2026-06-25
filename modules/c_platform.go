@@ -177,6 +177,30 @@ func (s *StructPasswd) GetAttr(name string) (core.Value, bool) {
 	return nil, false
 }
 
+// EqualsValue compares a struct_passwd by value, like the tuple it subclasses
+// in CPython: equal to another struct_passwd or a plain tuple with the same
+// fields. Without this, two getpwnam() results compared only by identity.
+func (s *StructPasswd) EqualsValue(other core.Value) bool {
+	var otherVals []core.Value
+	switch o := other.(type) {
+	case *StructPasswd:
+		otherVals = o.values
+	case core.TupleValue:
+		otherVals = []core.Value(o)
+	default:
+		return false
+	}
+	if len(s.values) != len(otherVals) {
+		return false
+	}
+	for i := range s.values {
+		if !core.EqualValues(s.values[i], otherVals[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // GetItem implements indexed access
 func (s *StructPasswd) GetItem(key core.Value) (core.Value, error) {
 	idx, ok := key.(core.NumberValue)

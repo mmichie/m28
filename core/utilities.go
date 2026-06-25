@@ -648,6 +648,12 @@ func EqualValues(a, b Value) bool {
 			return aVal == bVal
 		}
 	default:
+		// Types that compare by value via a self-describing equality interface,
+		// e.g. structseq results such as pwd.struct_passwd, which behave like a
+		// tuple of their fields.
+		if aEq, ok := a.(interface{ EqualsValue(Value) bool }); ok {
+			return aEq.EqualsValue(b)
+		}
 		// Handle types that wrap Class (like IntType, StrType, etc.)
 		if aWrapper, ok := a.(interface{ GetClass() *Class }); ok {
 			aClass := aWrapper.GetClass()
