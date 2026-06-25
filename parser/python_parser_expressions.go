@@ -605,7 +605,10 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 				kwargs = append(kwargs, kwPair)
 			} else {
 				if seenKeyword {
-					p.error("Positional argument after keyword argument")
+					// Match CPython's exact wording (and eval/kwarg_eval.go) so
+					// assertRaisesRegex(SyntaxError, "positional argument follows
+					// keyword argument") matches.
+					p.error("positional argument follows keyword argument")
 					return nil
 				}
 				expr := p.parseExpression()
