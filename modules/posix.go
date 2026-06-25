@@ -368,6 +368,18 @@ func (f *KwargsPosixStat) String() string {
 	return "<built-in function lstat>"
 }
 
+// GetAttr exposes __name__/__qualname__ so the function can be introspected
+// (e.g. error messages that format fn.__name__).
+func (f *KwargsPosixStat) GetAttr(name string) (core.Value, bool) {
+	if name == "__name__" || name == "__qualname__" {
+		if f.followSymlinks {
+			return core.StringValue("stat"), true
+		}
+		return core.StringValue("lstat"), true
+	}
+	return f.BaseObject.GetAttr(name)
+}
+
 // Call implements regular Call interface
 func (f *KwargsPosixStat) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return f.CallWithKeywords(args, nil, ctx)
