@@ -106,6 +106,14 @@ func InitPosixModule() *core.DictValue {
 	// Add scandir - returns iterator of directory entries
 	posixModule.SetWithKey("scandir", core.StringValue("scandir"), core.NewBuiltinFunction(posixScandir))
 
+	// Add DirEntry as a type object so isinstance(x, os.DirEntry) works. The
+	// entries yielded by scandir report Type() == "DirEntry", which the generic
+	// isinstance fallback matches against this class's name. shutil._samefile
+	// relies on isinstance(path, os.DirEntry) and otherwise raises AttributeError.
+	dirEntryType := core.NewClass("DirEntry", nil)
+	dirEntryType.Module = "posix"
+	posixModule.SetWithKey("DirEntry", core.StringValue("DirEntry"), dirEntryType)
+
 	// Add filesystem encoding functions
 	posixModule.SetWithKey("getfilesystemencoding", core.StringValue("getfilesystemencoding"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.StringValue("utf-8"), nil
@@ -447,24 +455,29 @@ func (d *DirEntry) GetAttr(name string) (core.Value, bool) {
 	case "path":
 		return core.StringValue(d.path), true
 	case "is_dir":
+		// is_dir/is_file accept a follow_symlinks keyword in CPython. The fields
+		// come from Go's DirEntry, whose IsDir()/Type() do not follow symlinks,
+		// so the answer already matches follow_symlinks=False; accept and ignore
+		// the keyword (shutil.rmtree calls is_dir(follow_symlinks=False) and its
+		// `except OSError` does not catch an unexpected-keyword TypeError).
 		isDir := d.isDir
-		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.NewBuiltinFunctionIgnoringKwargs("is_dir", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(isDir), nil
 		}), true
 	case "is_file":
 		isDir := d.isDir
 		isSymlink := d.isSymlink
-		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.NewBuiltinFunctionIgnoringKwargs("is_file", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(!isDir && !isSymlink), nil
 		}), true
 	case "is_symlink":
 		isSymlink := d.isSymlink
-		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.NewBuiltinFunctionIgnoringKwargs("is_symlink", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(isSymlink), nil
 		}), true
 	case "is_junction":
 		// Junctions are Windows-specific, always False on Unix
-		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		return core.NewBuiltinFunctionIgnoringKwargs("is_junction", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BoolValue(false), nil
 		}), true
 	}
