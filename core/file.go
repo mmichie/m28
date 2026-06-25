@@ -413,6 +413,18 @@ func (f *File) createRegistry() *MethodRegistry {
 
 	// Register methods
 	registry.RegisterMethods(
+		// fileno method - return the underlying file descriptor
+		MakeMethod("fileno", 0, "Return the underlying file descriptor",
+			func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				file, err := TypedReceiver[*File](receiver, "fileno")
+				if err != nil {
+					return nil, err
+				}
+				if file.closed || file.file == nil {
+					return nil, &ValueError{Message: "I/O operation on closed file"}
+				}
+				return NumberValue(file.file.Fd()), nil
+			}),
 		// read method
 		MakeMethod("read", -1, "Read from file. read() reads entire file, read(n) reads n bytes",
 			func(receiver Value, args []Value, ctx *Context) (Value, error) {
