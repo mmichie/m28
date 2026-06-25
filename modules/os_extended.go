@@ -11,6 +11,18 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// envString extracts a string from a str or bytes value. The os environment
+// functions accept either, since os.py keeps the posix environment as bytes.
+func envString(v core.Value) (string, bool) {
+	switch s := v.(type) {
+	case core.StringValue:
+		return string(s), true
+	case core.BytesValue:
+		return string(s), true
+	}
+	return "", false
+}
+
 // addExtendedOSFunctions adds all the additional os module functions
 // to match CPython's os module interface
 func addExtendedOSFunctions(osModule *core.DictValue) {
@@ -142,26 +154,28 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 	// Environment variables
 	osModule.Set("putenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
-			return nil, core.NewTypeError("str", nil, "putenv() argument")
+			return nil, &core.TypeError{Message: "putenv() takes exactly 2 arguments"}
 		}
-		key, ok1 := args[0].(core.StringValue)
-		val, ok2 := args[1].(core.StringValue)
+		// os.py's _Environ keeps the posix environment as bytes, so it calls
+		// putenv with bytes keys/values; accept either str or bytes.
+		key, ok1 := envString(args[0])
+		val, ok2 := envString(args[1])
 		if !ok1 || !ok2 {
-			return nil, core.NewTypeError("str", nil, "putenv() argument")
+			return nil, &core.TypeError{Message: "putenv() arguments must be str or bytes"}
 		}
-		os.Setenv(string(key), string(val))
+		os.Setenv(key, val)
 		return core.None, nil
 	}))
 
 	osModule.Set("unsetenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
-			return nil, core.NewTypeError("str", nil, "unsetenv() argument")
+			return nil, &core.TypeError{Message: "unsetenv() takes exactly 1 argument"}
 		}
-		key, ok := args[0].(core.StringValue)
+		key, ok := envString(args[0])
 		if !ok {
-			return nil, core.NewTypeError("str", args[0], "unsetenv() argument")
+			return nil, &core.TypeError{Message: "unsetenv() argument must be str or bytes"}
 		}
-		os.Unsetenv(string(key))
+		os.Unsetenv(key)
 		return core.None, nil
 	}))
 
@@ -248,9 +262,25 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 	}))
 
 	osModule.Set("fstat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: "fstat() takes exactly 1 argument"}
+		}
+		fdNum, ok := args[0].(core.NumberValue)
+		if !ok {
+			return nil, &core.TypeError{Message: "fstat: fd should be an integer"}
+		}
+		var st syscall.Stat_t
+		if err := syscall.Fstat(int(fdNum), &st); err != nil {
+			return nil, core.OSErrorFromGo(err, "")
+		}
 		result := core.NewDict()
-		result.Set("st_mode", core.NumberValue(0))
-		result.Set("st_size", core.NumberValue(0))
+		result.Set("st_mode", core.NumberValue(float64(st.Mode)))
+		result.Set("st_ino", core.NumberValue(float64(st.Ino)))
+		result.Set("st_dev", core.NumberValue(float64(st.Dev)))
+		result.Set("st_nlink", core.NumberValue(float64(st.Nlink)))
+		result.Set("st_uid", core.NumberValue(float64(st.Uid)))
+		result.Set("st_gid", core.NumberValue(float64(st.Gid)))
+		result.Set("st_size", core.NumberValue(float64(st.Size)))
 		return result, nil
 	}))
 
