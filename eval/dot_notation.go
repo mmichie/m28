@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/mmichie/m28/common/suggestions"
 	"github.com/mmichie/m28/core"
@@ -544,8 +545,10 @@ func getStringAttr(str core.StringValue, attr string, isCall bool, args *core.Li
 		if len(s) == 0 {
 			return core.BoolValue(false), nil
 		}
+		// Match Python's Unicode-aware str.isspace (and core/string_methods.go):
+		// e.g. NO-BREAK SPACE (\xa0) and IDEOGRAPHIC SPACE (　) count too.
 		for _, r := range s {
-			if r != ' ' && r != '\t' && r != '\n' && r != '\r' {
+			if !unicode.IsSpace(r) {
 				return core.BoolValue(false), nil
 			}
 		}
