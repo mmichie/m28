@@ -2,9 +2,11 @@ package modules
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/user"
 	"strconv"
+	"strings"
 
 	"github.com/mmichie/m28/core"
 )
@@ -222,6 +224,12 @@ func (s *StructPasswd) Len() int {
 	return len(s.values)
 }
 
+// Iterator implements core.Iterable so struct_passwd unpacks and iterates as a
+// 7-element sequence, e.g. `for n, p, u, g, gecos, d, s in getpwall(): ...`.
+func (s *StructPasswd) Iterator() core.Iterator {
+	return &structPasswdIterator{values: s.values, index: 0}
+}
+
 // structPasswdIterator for iterating over struct_passwd
 type structPasswdIterator struct {
 	core.BaseObject
@@ -251,6 +259,22 @@ func (it *structPasswdIterator) GetAttr(name string) (core.Value, bool) {
 	return nil, false
 }
 
+// Next implements core.Iterator so struct_passwd works with Go-side iteration
+// (sequence unpacking, list(), etc.).
+func (it *structPasswdIterator) Next() (core.Value, bool) {
+	if it.index >= len(it.values) {
+		return nil, false
+	}
+	val := it.values[it.index]
+	it.index++
+	return val, true
+}
+
+// Reset restarts iteration from the first field.
+func (it *structPasswdIterator) Reset() {
+	it.index = 0
+}
+
 // InitPwdModule creates a stub for the pwd Unix password database module
 func InitPwdModule() *core.DictValue {
 	pwdModule := core.NewDict()
@@ -261,47 +285,58 @@ func InitPwdModule() *core.DictValue {
 
 	// getpwuid(uid) - get password database entry by UID
 	pwdModule.Set("getpwuid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("getpwuid() missing required argument: uid")
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("getpwuid() takes exactly one argument (%d given)", len(args))}
 		}
-		uid, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, fmt.Errorf("getpwuid() argument must be an integer")
-		}
-
-		// Try to get the current user if uid matches
-		currentUser, err := user.Current()
-		if err == nil {
-			currentUID, _ := strconv.Atoi(currentUser.Uid)
-			if int(uid) == currentUID {
-				return makePasswdStruct(currentUser), nil
+		switch uid := args[0].(type) {
+		case core.NumberValue:
+			if float64(uid) != math.Trunc(float64(uid)) {
+				return nil, &core.TypeError{Message: "getpwuid(): an integer is required"}
 			}
+			// Try to get the current user if uid matches
+			currentUser, err := user.Current()
+			if err == nil {
+				currentUID, _ := strconv.Atoi(currentUser.Uid)
+				if int(uid) == currentUID {
+					return makePasswdStruct(currentUser), nil
+				}
+			}
+			// Unknown uid, like CPython, is a KeyError.
+			return nil, &core.KeyError{Key: core.NumberValue(uid), Message: fmt.Sprintf("getpwuid(): uid not found: %d", int(uid))}
+		case core.BigIntValue:
+			// A valid integer too large for any real uid: never the current user.
+			return nil, &core.KeyError{Key: uid, Message: "getpwuid(): uid not found"}
+		default:
+			return nil, &core.TypeError{Message: "getpwuid(): an integer is required"}
 		}
-
-		// For other UIDs, return a stub
-		return nil, fmt.Errorf("getpwuid(): uid not found: %d", int(uid))
 	}))
 
 	// getpwnam(name) - get password database entry by name
 	pwdModule.Set("getpwnam", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("getpwnam() missing required argument: name")
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("getpwnam() takes exactly one argument (%d given)", len(args))}
 		}
 		name, ok := args[0].(core.StringValue)
 		if !ok {
-			return nil, fmt.Errorf("getpwnam() argument must be a string")
+			return nil, &core.TypeError{Message: "getpwnam() argument must be str"}
+		}
+		if strings.IndexByte(string(name), 0) >= 0 {
+			return nil, &core.ValueError{Message: "embedded null character"}
 		}
 
 		// Try to look up the user
 		u, err := user.Lookup(string(name))
 		if err != nil {
-			return nil, fmt.Errorf("getpwnam(): name not found: %s", name)
+			return nil, &core.KeyError{Key: name, Message: fmt.Sprintf("getpwnam(): name not found: %s", string(name))}
 		}
 		return makePasswdStruct(u), nil
 	}))
 
 	// getpwall() - get all password database entries
 	pwdModule.Set("getpwall", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 0 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("getpwall() takes no arguments (%d given)", len(args))}
+		}
 		// Return list with just current user
 		currentUser, err := user.Current()
 		if err != nil {
