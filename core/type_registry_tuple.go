@@ -197,13 +197,13 @@ func getTupleMethods() map[string]*MethodDescriptor {
 					return result, nil
 				}
 
-				// Handle index
-				idx, ok := args[0].(NumberValue)
-				if !ok {
-					return nil, &TypeError{Message: "tuple indices must be integers"}
+				// Handle index (accepts ints and any object with __index__)
+				idxInt, err := sequenceIndex(args[0], ctx, "tuple")
+				if err != nil {
+					return nil, err
 				}
 
-				i, err := NormalizeIndex(int(idx), len(tuple))
+				i, err := NormalizeIndex(idxInt, len(tuple))
 				if err != nil {
 					return nil, err
 				}

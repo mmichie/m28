@@ -637,13 +637,13 @@ func stringMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, err
 		return StringValue(string(result)), nil
 	}
 
-	// Handle index
-	idx, ok := args[0].(NumberValue)
-	if !ok {
-		return nil, &TypeError{Message: "string indices must be integers"}
+	// Handle index (accepts ints and any object with __index__)
+	idxInt, err := sequenceIndex(args[0], ctx, "string")
+	if err != nil {
+		return nil, err
 	}
 
-	i, err := NormalizeIndex(int(idx), runeLen)
+	i, err := NormalizeIndex(idxInt, runeLen)
 	if err != nil {
 		return nil, err
 	}

@@ -1441,6 +1441,28 @@ func toIndex(obj Value, ctx *Context) (int, error) {
 	return 0, &TypeError{Message: fmt.Sprintf("list indices must be integers or slices, not %s", typeName)}
 }
 
+// sequenceIndex converts a non-slice subscript argument to an int index for a
+// sequence whose Python type is typeName (e.g. "tuple", "string"). Plain numbers
+// keep their existing handling; any object implementing the __index__ protocol
+// is honored; anything else yields a "<typeName> indices must be integers"
+// TypeError so each sequence reports its own name.
+func sequenceIndex(arg Value, ctx *Context, typeName string) (int, error) {
+	if num, ok := arg.(NumberValue); ok {
+		// Reject non-integer floats (s[1.5]) like Python and list indexing do.
+		f := float64(num)
+		if f != math.Trunc(f) {
+			return 0, &TypeError{Message: fmt.Sprintf("%s indices must be integers", typeName)}
+		}
+		return int(f), nil
+	}
+	if attrObj, ok := arg.(interface{ GetAttr(string) (Value, bool) }); ok {
+		if _, exists := attrObj.GetAttr("__index__"); exists {
+			return toIndex(arg, ctx)
+		}
+	}
+	return 0, &TypeError{Message: fmt.Sprintf("%s indices must be integers", typeName)}
+}
+
 // listCompareCtx performs lexicographic comparison of two lists with context
 // for proper __lt__/__eq__ dispatch on elements.
 // Returns (-1,nil) if a < b, (0,nil) if a == b, (1,nil) if a > b, (_,err) on error.
