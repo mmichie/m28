@@ -1531,9 +1531,40 @@ func listCompareCtx(a, b *ListValue, ctx *Context) (int, error) {
 	return 0, nil
 }
 
+// numericOrderValue returns the comparable float64 for orderable numeric
+// primitives (int/float and bool, where bool counts as 0/1).
+func numericOrderValue(v Value) (float64, bool) {
+	switch x := v.(type) {
+	case NumberValue:
+		return float64(x), true
+	case BoolValue:
+		if x {
+			return 1, true
+		}
+		return 0, true
+	}
+	return 0, false
+}
+
 // callLtWithReflection tries a.__lt__(b); if NotImplemented, tries b.__gt__(a);
 // if both NotImplemented, raises TypeError.
 func callLtWithReflection(a, b Value, ctx *Context) (bool, error) {
+	// Fast path for orderable primitives. NumberValue/BoolValue/StringValue do
+	// not expose usable __lt__ dunders via GetAttr, so without this list element
+	// comparison ([1,2] < [1,3]) wrongly raised "'<' not supported between
+	// instances of 'int' and 'int'". Mixed/incomparable primitives fall through
+	// to the dunder path below, which yields the correct TypeError.
+	if af, aok := numericOrderValue(a); aok {
+		if bf, bok := numericOrderValue(b); bok {
+			return af < bf, nil
+		}
+	}
+	if as, ok := a.(StringValue); ok {
+		if bs, ok := b.(StringValue); ok {
+			return string(as) < string(bs), nil
+		}
+	}
+
 	// Try a.__lt__(b)
 	if aObj, ok := a.(interface{ GetAttr(string) (Value, bool) }); ok {
 		if ltMethod, found := aObj.GetAttr("__lt__"); found {
