@@ -10,7 +10,6 @@ func InitStatModule() *core.DictValue {
 	module.Set("__doc__", core.StringValue("Constants and functions for interpreting stat() results"))
 
 	// File type constants (high 4 bits of mode)
-	module.Set("S_IFMT", core.NumberValue(0o170000))   // bit mask for file type
 	module.Set("S_IFSOCK", core.NumberValue(0o140000)) // socket
 	module.Set("S_IFLNK", core.NumberValue(0o120000))  // symbolic link
 	module.Set("S_IFREG", core.NumberValue(0o100000))  // regular file
@@ -36,39 +35,52 @@ func InitStatModule() *core.DictValue {
 	module.Set("S_IWOTH", core.NumberValue(0o0002)) // others write
 	module.Set("S_IXOTH", core.NumberValue(0o0001)) // others execute
 
-	// Helper functions
-	module.Set("S_ISDIR", core.NewNamedBuiltinFunction("S_ISDIR", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, core.NewTypeError("S_ISDIR", nil, "S_ISDIR() takes exactly 1 argument")
-		}
-		mode, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, core.NewTypeError("S_ISDIR", args[0], "an integer is required")
-		}
-		return core.BoolValue(int(mode)&0o170000 == 0o040000), nil
-	}))
+	// Mask functions. In CPython these are exposed by the _stat C extension as
+	// functions (not int constants); stat.py's pure-Python definitions are then
+	// overridden by `from _stat import *`, so S_IFMT must be callable.
+	module.Set("S_IMODE", statMaskFunc("S_IMODE", 0o7777))
+	module.Set("S_IFMT", statMaskFunc("S_IFMT", 0o170000))
 
-	module.Set("S_ISREG", core.NewNamedBuiltinFunction("S_ISREG", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, core.NewTypeError("S_ISREG", nil, "S_ISREG() takes exactly 1 argument")
-		}
-		mode, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, core.NewTypeError("S_ISREG", args[0], "an integer is required")
-		}
-		return core.BoolValue(int(mode)&0o170000 == 0o100000), nil
-	}))
-
-	module.Set("S_ISLNK", core.NewNamedBuiltinFunction("S_ISLNK", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, core.NewTypeError("S_ISLNK", nil, "S_ISLNK() takes exactly 1 argument")
-		}
-		mode, ok := args[0].(core.NumberValue)
-		if !ok {
-			return nil, core.NewTypeError("S_ISLNK", args[0], "an integer is required")
-		}
-		return core.BoolValue(int(mode)&0o170000 == 0o120000), nil
-	}))
+	// File-type predicates. S_ISFIFO/S_ISCHR/S_ISBLK/S_ISSOCK were previously
+	// missing, which forced stat.py's pure-Python fallbacks (themselves broken
+	// once S_IFMT became an int). Provide the full set the C extension exports.
+	module.Set("S_ISDIR", statTypePredicate("S_ISDIR", 0o040000))
+	module.Set("S_ISREG", statTypePredicate("S_ISREG", 0o100000))
+	module.Set("S_ISLNK", statTypePredicate("S_ISLNK", 0o120000))
+	module.Set("S_ISFIFO", statTypePredicate("S_ISFIFO", 0o010000))
+	module.Set("S_ISCHR", statTypePredicate("S_ISCHR", 0o020000))
+	module.Set("S_ISBLK", statTypePredicate("S_ISBLK", 0o060000))
+	module.Set("S_ISSOCK", statTypePredicate("S_ISSOCK", 0o140000))
 
 	return module
+}
+
+// statMaskFunc builds a _stat function that masks its single integer argument,
+// e.g. S_IFMT(mode) == mode & 0o170000 and S_IMODE(mode) == mode & 0o7777.
+func statMaskFunc(name string, mask int) core.Value {
+	return core.NewNamedBuiltinFunction(name, func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, core.NewTypeError(name, nil, name+"() takes exactly 1 argument")
+		}
+		mode, ok := args[0].(core.NumberValue)
+		if !ok {
+			return nil, core.NewTypeError(name, args[0], "an integer is required")
+		}
+		return core.NumberValue(int(mode) & mask), nil
+	})
+}
+
+// statTypePredicate builds a _stat S_IS* function that tests the file-type bits
+// of a mode against the given type constant.
+func statTypePredicate(name string, typeBits int) core.Value {
+	return core.NewNamedBuiltinFunction(name, func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, core.NewTypeError(name, nil, name+"() takes exactly 1 argument")
+		}
+		mode, ok := args[0].(core.NumberValue)
+		if !ok {
+			return nil, core.NewTypeError(name, args[0], "an integer is required")
+		}
+		return core.BoolValue(int(mode)&0o170000 == typeBits), nil
+	})
 }
