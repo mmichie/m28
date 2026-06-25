@@ -373,6 +373,38 @@ func tooManyPositionalError(funcName string, sig *FunctionSignature, got int) *c
 	return &core.TypeError{Message: fmt.Sprintf("%s() takes %s but %d %s given", funcName, takes, got, were)}
 }
 
+// callableName returns funcName or a placeholder for anonymous functions.
+func callableName(funcName string) string {
+	if funcName == "" {
+		return "<lambda>"
+	}
+	return funcName
+}
+
+// missingRequiredError builds CPython's "<name>() missing N required positional
+// argument(s): 'a' and 'b'" TypeError.
+func missingRequiredError(funcName string, missing []string) *core.TypeError {
+	n := len(missing)
+	quoted := make([]string, n)
+	for i, m := range missing {
+		quoted[i] = "'" + m + "'"
+	}
+	var names string
+	switch n {
+	case 1:
+		names = quoted[0]
+	case 2:
+		names = quoted[0] + " and " + quoted[1]
+	default:
+		names = strings.Join(quoted[:n-1], ", ") + ", and " + quoted[n-1]
+	}
+	plural := "s"
+	if n == 1 {
+		plural = ""
+	}
+	return &core.TypeError{Message: fmt.Sprintf("%s() missing %d required positional argument%s: %s", callableName(funcName), n, plural, names)}
+}
+
 func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, kwargs map[string]core.Value, evalCtx *core.Context, bindCtx *core.Context) error {
 	// Track which parameters have been bound
 	boundParams := make(map[string]bool)
@@ -426,6 +458,7 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 	}
 
 	// 1. Bind required parameters
+	var missingRequired []string
 	for _, param := range sig.RequiredParams {
 		paramName := string(param.Name)
 
@@ -443,6 +476,11 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 			}
 			hasKw = false
 		}
+		// A non-keyword-only parameter whose positional slot is also filled and
+		// that is given by keyword gets multiple values (CPython TypeError).
+		if hasKw && !param.KeywordOnly && argIndex < len(args) {
+			return &core.TypeError{Message: fmt.Sprintf("%s() got multiple values for argument '%s'", callableName(funcName), paramName)}
+		}
 		if hasKw {
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
@@ -458,9 +496,13 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 			boundParams[paramName] = true
 			argIndex++
 		} else {
-			// CPython raises TypeError for argument-count mismatches.
-			return &core.TypeError{Message: fmt.Sprintf("missing required argument: %s", paramName)}
+			// Collect all missing required positional args for one CPython-style
+			// "missing N required positional arguments" error.
+			missingRequired = append(missingRequired, paramName)
 		}
+	}
+	if len(missingRequired) > 0 {
+		return missingRequiredError(funcName, missingRequired)
 	}
 
 	// 2. Bind optional parameters with defaults
@@ -478,6 +520,9 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 				}
 			}
 			hasKw = false
+		}
+		if hasKw && !param.KeywordOnly && argIndex < len(args) {
+			return &core.TypeError{Message: fmt.Sprintf("%s() got multiple values for argument '%s'", callableName(funcName), paramName)}
 		}
 		if hasKw {
 			bindCtx.Define(paramName, kwValue)
@@ -553,7 +598,7 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 	} else if len(kwargs) > 0 {
 		// Unexpected keyword arguments (CPython raises TypeError).
 		for k := range kwargs {
-			return &core.TypeError{Message: fmt.Sprintf("unexpected keyword argument: %s", k)}
+			return &core.TypeError{Message: fmt.Sprintf("%s() got an unexpected keyword argument '%s'", callableName(funcName), k)}
 		}
 	}
 
