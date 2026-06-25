@@ -362,10 +362,23 @@ func RangeBuilder() builders.BuiltinFunc {
 			return nil, err
 		}
 
+		// range() accepts ints, int subclasses, and any object implementing the
+		// __index__ protocol (Python interprets each argument as an integer).
+		rangeArg := func(i int) (float64, error) {
+			arg := v.Get(i)
+			if f, ok := intOperandValue(arg); ok {
+				return f, nil
+			}
+			if idx, err := types.ToIndex(arg, ctx); err == nil {
+				return float64(idx), nil
+			}
+			return 0, &core.TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", core.GetPythonTypeName(arg))}
+		}
+
 		switch v.Count() {
 		case 1:
 			// range(stop)
-			stop, err := v.GetNumber(0)
+			stop, err := rangeArg(0)
 			if err != nil {
 				return nil, err
 			}
@@ -373,12 +386,12 @@ func RangeBuilder() builders.BuiltinFunc {
 
 		case 2:
 			// range(start, stop)
-			start, err := v.GetNumber(0)
+			start, err := rangeArg(0)
 			if err != nil {
 				return nil, err
 			}
 
-			stop, err := v.GetNumber(1)
+			stop, err := rangeArg(1)
 			if err != nil {
 				return nil, err
 			}
@@ -386,17 +399,17 @@ func RangeBuilder() builders.BuiltinFunc {
 
 		case 3:
 			// range(start, stop, step)
-			start, err := v.GetNumber(0)
+			start, err := rangeArg(0)
 			if err != nil {
 				return nil, err
 			}
 
-			stop, err := v.GetNumber(1)
+			stop, err := rangeArg(1)
 			if err != nil {
 				return nil, err
 			}
 
-			step, err := v.GetNumber(2)
+			step, err := rangeArg(2)
 			if err != nil {
 				return nil, err
 			}
