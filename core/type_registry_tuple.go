@@ -259,9 +259,9 @@ func getTupleMethods() map[string]*MethodDescriptor {
 					return nil, &TypeError{Message: "__mul__ takes exactly one argument"}
 				}
 				tuple := receiver.(TupleValue)
-				n, ok := args[0].(NumberValue)
-				if !ok {
-					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
+				n, err := repeatCount(args[0], ctx)
+				if err != nil {
+					return nil, err
 				}
 				count := int(n)
 				if count <= 0 {
@@ -284,9 +284,9 @@ func getTupleMethods() map[string]*MethodDescriptor {
 					return nil, &TypeError{Message: "__rmul__ takes exactly one argument"}
 				}
 				tuple := receiver.(TupleValue)
-				n, ok := args[0].(NumberValue)
-				if !ok {
-					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
+				n, err := repeatCount(args[0], ctx)
+				if err != nil {
+					return nil, err
 				}
 				count := int(n)
 				if count <= 0 {

@@ -392,9 +392,9 @@ func getListMethods() map[string]*MethodDescriptor {
 					return nil, &TypeError{Message: "__mul__ takes exactly one argument"}
 				}
 				list := receiver.(*ListValue)
-				n, ok := args[0].(NumberValue)
-				if !ok {
-					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
+				n, err := repeatCount(args[0], ctx)
+				if err != nil {
+					return nil, err
 				}
 				f := float64(n)
 				if f >= math.MaxInt64 || f <= math.MinInt64 {
@@ -425,9 +425,9 @@ func getListMethods() map[string]*MethodDescriptor {
 					return nil, &TypeError{Message: "__imul__ takes exactly one argument"}
 				}
 				list := receiver.(*ListValue)
-				n, ok := args[0].(NumberValue)
-				if !ok {
-					return nil, &TypeError{Message: "can't multiply sequence by non-int"}
+				n, err := repeatCount(args[0], ctx)
+				if err != nil {
+					return nil, err
 				}
 				f := float64(n)
 				if f >= math.MaxInt64 || f <= math.MinInt64 {
@@ -1461,6 +1461,26 @@ func sequenceIndex(arg Value, ctx *Context, typeName string) (int, error) {
 		}
 	}
 	return 0, &TypeError{Message: fmt.Sprintf("%s indices must be integers", typeName)}
+}
+
+// repeatCount converts a sequence-repetition operand (seq * n) to a count,
+// honoring the __index__ protocol so e.g. numpy-style integer objects work.
+// Numbers pass through unchanged; anything else without __index__ yields the
+// Python "can't multiply sequence by non-int" TypeError.
+func repeatCount(arg Value, ctx *Context) (NumberValue, error) {
+	if n, ok := arg.(NumberValue); ok {
+		return n, nil
+	}
+	if attrObj, ok := arg.(interface{ GetAttr(string) (Value, bool) }); ok {
+		if _, exists := attrObj.GetAttr("__index__"); exists {
+			idx, err := toIndex(arg, ctx)
+			if err != nil {
+				return 0, err
+			}
+			return NumberValue(idx), nil
+		}
+	}
+	return 0, &TypeError{Message: "can't multiply sequence by non-int"}
 }
 
 // listCompareCtx performs lexicographic comparison of two lists with context

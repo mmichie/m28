@@ -371,9 +371,9 @@ func getStringMethods() map[string]*MethodDescriptor {
 					return nil, &TypeError{Message: "__mul__ takes exactly one argument"}
 				}
 				s := string(receiver.(StringValue))
-				n, ok := args[0].(NumberValue)
-				if !ok {
-					return nil, &TypeError{Message: "*: unsupported operand type(s) for *: 'string'"}
+				n, err := repeatCount(args[0], ctx)
+				if err != nil {
+					return nil, err
 				}
 				count := int(n)
 				if count <= 0 {
