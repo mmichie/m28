@@ -119,6 +119,47 @@ type WithState struct {
 	EnterValue     core.Value          // Value returned by __enter__
 }
 
+// wrapBodyStopIteration implements PEP 479: a StopIteration that escapes a
+// generator's body is replaced with RuntimeError("generator raised
+// StopIteration"), chained to the original StopIteration as both __cause__ and
+// __context__ (with __suppress_context__). Non-StopIteration errors and the
+// executor's own completion signals pass through untouched.
+func wrapBodyStopIteration(err error, ctx *core.Context) error {
+	if err == nil {
+		return nil
+	}
+	check := err
+	if evalErr, ok := err.(*core.EvalError); ok && evalErr.Wrapped != nil {
+		check = evalErr.Wrapped
+	}
+	// StopIteration reaches here in several shapes: the typed core error (from
+	// builtin iterators), an *Exception with Type "StopIteration" (from
+	// `raise StopIteration`), or a PythonError wrapping a StopIteration instance.
+	isStopIter := false
+	switch e := check.(type) {
+	case *core.StopIteration:
+		isStopIter = true
+	case *Exception:
+		isStopIter = e.Type == "StopIteration"
+	case *core.PythonError:
+		if e.Instance != nil && e.Instance.Class != nil {
+			isStopIter = e.Instance.Class.Name == "StopIteration"
+		}
+	}
+	if !isStopIter {
+		return err
+	}
+	siInst := errorToExceptionInstance(check, ctx)
+	reInst := createPythonExceptionInstance(ctx, "RuntimeError", "generator raised StopIteration")
+	if inst, ok := reInst.(*core.Instance); ok {
+		inst.SetAttr("__cause__", siInst)
+		inst.SetAttr("__context__", siInst)
+		inst.SetAttr("__suppress_context__", core.True)
+		return core.NewPythonError(inst)
+	}
+	return core.NewRuntimeError("generator raised StopIteration")
+}
+
 // NewGeneratorExecState creates a new execution state for a generator
 func NewGeneratorExecState(function *UserFunction, args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (*GeneratorExecState, error) {
 	// Create local context with function's environment as parent
@@ -200,7 +241,7 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			} else {
 				// Defer to the pending-error handler at the top of the loop, which
 				// runs any enclosing finally block before the error propagates.
-				state.pendingError = err
+				state.pendingError = wrapBodyStopIteration(err, state.Locals)
 				continue
 			}
 
@@ -212,7 +253,7 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			if step.Node != nil {
 				val, err := Eval(step.Node, state.Locals)
 				if err != nil {
-					return nil, err
+					return nil, wrapBodyStopIteration(err, state.Locals)
 				}
 				yieldValue = val
 			}
