@@ -9,6 +9,118 @@ import (
 )
 
 // RegisterTimeModule registers the time module
+var structTimeNames = []string{"tm_year", "tm_mon", "tm_mday", "tm_hour", "tm_min", "tm_sec", "tm_wday", "tm_yday", "tm_isdst"}
+
+// StructTime represents a time.struct_time: a 9-element sequence (tuple
+// subclass in CPython) with both indexed and named field access.
+type StructTime struct {
+	core.BaseObject
+	values []core.Value
+}
+
+func (s *StructTime) Type() core.Type { return "time.struct_time" }
+
+func (s *StructTime) String() string {
+	return fmt.Sprintf("time.struct_time(tm_year=%v, tm_mon=%v, tm_mday=%v, tm_hour=%v, tm_min=%v, tm_sec=%v, tm_wday=%v, tm_yday=%v, tm_isdst=%v)",
+		s.values[0], s.values[1], s.values[2], s.values[3], s.values[4], s.values[5], s.values[6], s.values[7], s.values[8])
+}
+
+func (s *StructTime) GetAttr(name string) (core.Value, bool) {
+	for i, n := range structTimeNames {
+		if n == name {
+			return s.values[i], true
+		}
+	}
+	switch name {
+	case "__len__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.NumberValue(len(s.values)), nil
+		}), true
+	case "__getitem__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("__getitem__ requires an index")
+			}
+			return s.GetItem(args[0])
+		}), true
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return &structPasswdIterator{values: s.values, index: 0}, nil
+		}), true
+	case "n_fields", "n_sequence_fields":
+		return core.NumberValue(len(s.values)), true
+	case "n_unnamed_fields":
+		return core.NumberValue(0), true
+	}
+	return nil, false
+}
+
+func (s *StructTime) GetItem(key core.Value) (core.Value, error) {
+	idx, ok := key.(core.NumberValue)
+	if !ok {
+		return nil, fmt.Errorf("indices must be integers, not %s", key.Type())
+	}
+	i := int(idx)
+	if i < 0 {
+		i = len(s.values) + i
+	}
+	if i < 0 || i >= len(s.values) {
+		return nil, fmt.Errorf("tuple index out of range")
+	}
+	return s.values[i], nil
+}
+
+func (s *StructTime) Len() int { return len(s.values) }
+
+// Iterator lets struct_time unpack/iterate as a 9-element sequence.
+func (s *StructTime) Iterator() core.Iterator {
+	return &structPasswdIterator{values: s.values, index: 0}
+}
+
+// EqualsValue compares struct_time by value, like the tuple it subclasses.
+func (s *StructTime) EqualsValue(other core.Value) bool {
+	vals, ok := structTimeValues(other)
+	if !ok || len(vals) != len(s.values) {
+		return false
+	}
+	for i := range s.values {
+		if !core.EqualValues(s.values[i], vals[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// structTimeFromTime builds a struct_time from a Go time, using Python's
+// tm_wday convention (Monday=0; Go's Weekday has Sunday=0).
+func structTimeFromTime(t time.Time, isdst int) *StructTime {
+	return &StructTime{values: []core.Value{
+		core.NumberValue(t.Year()),
+		core.NumberValue(int(t.Month())),
+		core.NumberValue(t.Day()),
+		core.NumberValue(t.Hour()),
+		core.NumberValue(t.Minute()),
+		core.NumberValue(t.Second()),
+		core.NumberValue((int(t.Weekday()) + 6) % 7),
+		core.NumberValue(t.YearDay()),
+		core.NumberValue(isdst),
+	}}
+}
+
+// structTimeValues extracts the field values from a struct_time, tuple or list,
+// so callers like mktime/strftime accept any of them.
+func structTimeValues(v core.Value) ([]core.Value, bool) {
+	switch t := v.(type) {
+	case *StructTime:
+		return t.values, true
+	case core.TupleValue:
+		return []core.Value(t), true
+	case *core.ListValue:
+		return t.Items(), true
+	}
+	return nil, false
+}
+
 func InitTimeModule() *core.DictValue {
 	// Create module as a dict
 	timeModule := core.NewDict()
@@ -142,22 +254,11 @@ func InitTimeModule() *core.DictValue {
 
 		// Convert to local time
 		t = t.Local()
-
-		// Create struct_time tuple
-		// Python struct_time: (tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst)
-		structTime := core.TupleValue{
-			core.NumberValue(t.Year()),         // tm_year
-			core.NumberValue(int(t.Month())),   // tm_mon (1-12)
-			core.NumberValue(t.Day()),          // tm_mday (1-31)
-			core.NumberValue(t.Hour()),         // tm_hour (0-23)
-			core.NumberValue(t.Minute()),       // tm_min (0-59)
-			core.NumberValue(t.Second()),       // tm_sec (0-59)
-			core.NumberValue(int(t.Weekday())), // tm_wday (0=Monday in Python, but Go uses 0=Sunday)
-			core.NumberValue(t.YearDay()),      // tm_yday (1-366)
-			core.NumberValue(-1),               // tm_isdst (-1 = unknown)
+		isdst := 0
+		if t.IsDST() {
+			isdst = 1
 		}
-
-		return structTime, nil
+		return structTimeFromTime(t, isdst), nil
 	}))
 
 	// gmtime() - convert seconds since epoch to UTC time struct
@@ -184,21 +285,7 @@ func InitTimeModule() *core.DictValue {
 
 		// Convert to UTC
 		t = t.UTC()
-
-		// Create struct_time tuple
-		structTime := core.TupleValue{
-			core.NumberValue(t.Year()),
-			core.NumberValue(int(t.Month())),
-			core.NumberValue(t.Day()),
-			core.NumberValue(t.Hour()),
-			core.NumberValue(t.Minute()),
-			core.NumberValue(t.Second()),
-			core.NumberValue(int(t.Weekday())),
-			core.NumberValue(t.YearDay()),
-			core.NumberValue(0), // tm_isdst = 0 for UTC
-		}
-
-		return structTime, nil
+		return structTimeFromTime(t, 0), nil
 	}))
 
 	// strftime() - format time according to a format string
@@ -218,10 +305,8 @@ func InitTimeModule() *core.DictValue {
 		if v.Count() == 1 {
 			t = time.Now()
 		} else {
-			// Parse time tuple if provided
-			timeTuple := args[1]
-			if tuple, ok := timeTuple.(core.TupleValue); ok && len(tuple) >= 6 {
-				// Extract year, month, day, hour, minute, second from tuple
+			// Parse time tuple if provided (struct_time, tuple or list)
+			if tuple, ok := structTimeValues(args[1]); ok && len(tuple) >= 6 {
 				year := int(tuple[0].(core.NumberValue))
 				month := time.Month(int(tuple[1].(core.NumberValue)))
 				day := int(tuple[2].(core.NumberValue))
@@ -247,9 +332,8 @@ func InitTimeModule() *core.DictValue {
 			return nil, err
 		}
 
-		// Parse time tuple
-		timeTuple := args[0]
-		tuple, ok := timeTuple.(core.TupleValue)
+		// Parse time tuple (accepts struct_time, tuple or list)
+		tuple, ok := structTimeValues(args[0])
 		if !ok || len(tuple) < 6 {
 			return nil, fmt.Errorf("mktime() argument must be a 9-tuple")
 		}
@@ -288,19 +372,8 @@ func InitTimeModule() *core.DictValue {
 			return nil, fmt.Errorf("time data '%s' does not match format '%s'", dateStr, formatStr)
 		}
 
-		// Return struct_time tuple
-		structTime := core.TupleValue{
-			core.NumberValue(t.Year()),
-			core.NumberValue(int(t.Month())),
-			core.NumberValue(t.Day()),
-			core.NumberValue(t.Hour()),
-			core.NumberValue(t.Minute()),
-			core.NumberValue(t.Second()),
-			core.NumberValue(int(t.Weekday())),
-			core.NumberValue(t.YearDay()),
-			core.NumberValue(-1), // tm_isdst
-		}
-		return structTime, nil
+		// Return struct_time (tm_isdst = -1, unknown)
+		return structTimeFromTime(t, -1), nil
 	}))
 
 	// time_ns() - return current time in nanoseconds since epoch (Python 3.7+)
@@ -351,7 +424,7 @@ func InitTimeModule() *core.DictValue {
 		if v.Count() == 0 {
 			t = time.Now()
 		} else {
-			tuple, ok := args[0].(core.TupleValue)
+			tuple, ok := structTimeValues(args[0])
 			if !ok || len(tuple) < 6 {
 				return nil, fmt.Errorf("asctime() argument must be a 9-tuple")
 			}
@@ -367,6 +440,24 @@ func InitTimeModule() *core.DictValue {
 		// Format like "Mon Jan  2 15:04:05 2006"
 		result := t.Format("Mon Jan _2 15:04:05 2006")
 		return core.StringValue(result), nil
+	}))
+
+	// struct_time(sequence) - construct a struct_time from a 9-element sequence
+	timeModule.SetWithKey("struct_time", core.StringValue("struct_time"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs("struct_time", args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+		vals, ok := structTimeValues(args[0])
+		if !ok {
+			return nil, fmt.Errorf("constructor requires a sequence")
+		}
+		if len(vals) < 9 || len(vals) > 11 {
+			return nil, fmt.Errorf("time.struct_time() takes a 9-sequence (%d-sequence given)", len(vals))
+		}
+		out := make([]core.Value, 9)
+		copy(out, vals[:9])
+		return &StructTime{values: out}, nil
 	}))
 
 	return timeModule
