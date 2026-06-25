@@ -55,17 +55,27 @@ func (fi *FileIterator) Next() (Value, bool) {
 
 	line, err := fi.file.ReadLine()
 	if err != nil {
-		if err == io.EOF {
-			fi.finished = true
-			// If we got a line with EOF, return it
-			if line != nil && line.String() != "" {
-				return line, true
-			}
-			return nil, false
-		}
-		// For other errors, just stop iteration
+		// Any read error stops iteration.
 		fi.finished = true
 		return nil, false
+	}
+	// ReadLine now returns the empty string (not an error) at EOF. Iterating a
+	// file stops there rather than yielding "" (a blank line is "\n", not "").
+	// Compare the raw contents, not String(), which is the repr.
+	switch v := line.(type) {
+	case nil:
+		fi.finished = true
+		return nil, false
+	case StringValue:
+		if string(v) == "" {
+			fi.finished = true
+			return nil, false
+		}
+	case BytesValue:
+		if len(v) == 0 {
+			fi.finished = true
+			return nil, false
+		}
 	}
 
 	return line, true
@@ -275,16 +285,14 @@ func (f *File) ReadLine() (Value, error) {
 	line, err := f.reader.ReadString('\n')
 	if err != nil {
 		if err == io.EOF {
-			if line != "" {
-				if f.isText {
-					return StringValue(line), nil
-				}
-				return BytesValue([]byte(line)), nil
-			}
+			// At EOF, return whatever partial last line was read (possibly the
+			// empty string) WITHOUT an error, matching CPython's readline(): the
+			// standard `while line := f.readline()` idiom relies on an empty
+			// string, not an exception, to signal end of file.
 			if f.isText {
-				return StringValue(""), io.EOF
+				return StringValue(line), nil
 			}
-			return BytesValue([]byte{}), io.EOF
+			return BytesValue([]byte(line)), nil
 		}
 		return nil, &OSError{Message: fmt.Sprintf("error reading line: %v", err)}
 	}
