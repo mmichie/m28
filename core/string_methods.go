@@ -216,25 +216,32 @@ func applyConversion(value Value, conversion string) (Value, error) {
 		return StringValue(Repr(value)), nil
 	case "a":
 		// ascii() conversion - repr() with non-ASCII escaped
-		repr := Repr(value)
-		// Escape non-ASCII characters
-		var result strings.Builder
-		for _, r := range repr {
-			if r < 128 {
-				result.WriteRune(r)
-			} else {
-				// Escape as \uXXXX or \UXXXXXXXX
-				if r <= 0xFFFF {
-					result.WriteString(fmt.Sprintf("\\u%04x", r))
-				} else {
-					result.WriteString(fmt.Sprintf("\\U%08x", r))
-				}
-			}
-		}
-		return StringValue(result.String()), nil
+		return StringValue(asciiOf(value)), nil
 	default:
 		return nil, &ValueError{Message: fmt.Sprintf("unknown conversion specifier '!%s'", conversion)}
 	}
+}
+
+// asciiOf returns the ascii() representation of value: repr() with every
+// non-ASCII character escaped, matching CPython (\xXX for U+0080..U+00FF,
+// \uXXXX up to U+FFFF, \UXXXXXXXX beyond). Used by both the !a string
+// conversion and the %a printf-style format code.
+func asciiOf(value Value) string {
+	repr := Repr(value)
+	var result strings.Builder
+	for _, r := range repr {
+		switch {
+		case r < 128:
+			result.WriteRune(r)
+		case r <= 0xFF:
+			result.WriteString(fmt.Sprintf("\\x%02x", r))
+		case r <= 0xFFFF:
+			result.WriteString(fmt.Sprintf("\\u%04x", r))
+		default:
+			result.WriteString(fmt.Sprintf("\\U%08x", r))
+		}
+	}
+	return result.String()
 }
 
 // formatValueWithSpec formats a value according to a Python-style format specification
@@ -685,6 +692,8 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			}
 		case 'r': // Repr - must match the repr() builtin, not String()
 			formatted = Repr(value)
+		case 'a': // ascii() - repr() with non-ASCII escaped
+			formatted = asciiOf(value)
 		case 'c': // Character
 			if num, ok := value.(NumberValue); ok {
 				formatted = string(rune(int(num)))
