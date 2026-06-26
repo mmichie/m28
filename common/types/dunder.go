@@ -55,6 +55,46 @@ func CallDunder(obj core.Value, method string, args []core.Value, ctx *core.Cont
 	return result, true, err
 }
 
+// CallDunderRaw is like CallDunder but does NOT hide a NotImplemented result.
+// It returns (result, exists, err) where exists reports whether the method was
+// found and called, so callers can distinguish "method returned NotImplemented"
+// from "no such method". result may be core.NotImplemented. The rich-comparison
+// operators use this to implement reflected-operation and identity fallbacks
+// correctly (object.__ne__ must return NotImplemented when __eq__ does, so the
+// reflected __ne__ is tried before falling back to identity).
+func CallDunderRaw(obj core.Value, method string, args []core.Value, ctx *core.Context) (core.Value, bool, error) {
+	attrObj, ok := obj.(interface {
+		GetAttr(string) (core.Value, bool)
+	})
+	if !ok {
+		return nil, false, nil
+	}
+
+	methodVal, exists := attrObj.GetAttr(method)
+	if !exists {
+		return nil, false, nil
+	}
+
+	callable, ok := methodVal.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		// Mirror CallDunder: a descriptor whose __get__ raised (swallowed) is
+		// treated as not found so fallback behavior applies.
+		if descr, hasAttr := methodVal.(interface{ GetAttr(string) (core.Value, bool) }); hasAttr {
+			if _, hasGet := descr.GetAttr("__get__"); hasGet {
+				return nil, false, nil
+			}
+		}
+		return nil, true, &core.TypeError{
+			Message: fmt.Sprintf("'%s' object attribute '%s' is not callable", obj.Type(), method),
+		}
+	}
+
+	result, err := callable.Call(args, ctx)
+	return result, true, err
+}
+
 // HasDunder checks if an object has a dunder method
 func HasDunder(obj core.Value, method string) bool {
 	attrObj, ok := obj.(interface {

@@ -715,13 +715,14 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 				if err != nil {
 					return nil, err
 				}
-				// If __eq__ is NotImplemented -- e.g. object()'s default identity
-				// __eq__ comparing two different objects -- mirror CPython's
-				// object.__ne__ and fall back to identity instead of computing
-				// `not NotImplemented` (which is False): a != b is `a is not b`.
-				// Without this, object() != object() returned False.
+				// If __eq__ is NotImplemented, object.__ne__ also returns
+				// NotImplemented (rather than computing `not NotImplemented`).
+				// The != operator then tries the reflected __ne__ and finally
+				// falls back to identity (a != b is `a is not b`). Returning
+				// NotImplemented here (instead of identity directly) is what lets
+				// a reflected __ne__ run first -- see compareNotEqual.
 				if _, isNotImpl := result.(*NotImplementedValue); isNotImpl {
-					return BoolValue(self != other), nil
+					return NotImplemented, nil
 				}
 				return BoolValue(!IsTruthy(result)), nil
 			}

@@ -257,31 +257,40 @@ func compareNotEqual(left, right core.Value, ctx *core.Context) (core.Value, err
 		return core.BoolValue(!core.IsTruthy(equal)), nil
 	}
 
-	// If right operand's class is a strict subclass of left operand's class,
-	// try right operand's __ne__ first
+	// Determine try order: if right's class strictly subclasses left's, the
+	// reflected __ne__ (on right) is tried first (Python operator precedence).
+	firstObj, secondObj := left, right
 	if leftClass != nil && rightClass != nil && core.IsStrictSubclass(rightClass, leftClass) {
-		// Try __ne__ on right operand first (reflected operation)
-		if result, found, err := types.CallDunder(right, "__ne__", []core.Value{left}, ctx); found {
-			return result, err
-		}
-		// Then try __ne__ on left operand
-		if result, found, err := types.CallDunder(left, "__ne__", []core.Value{right}, ctx); found {
-			return result, err
-		}
-	} else {
-		// Normal order: try left first, then right
-		// Try __ne__ on left operand
-		if result, found, err := types.CallDunder(left, "__ne__", []core.Value{right}, ctx); found {
-			return result, err
-		}
+		firstObj, secondObj = right, left
+	}
 
-		// Try __ne__ on right operand
-		if result, found, err := types.CallDunder(right, "__ne__", []core.Value{left}, ctx); found {
-			return result, err
+	// Try __ne__ on each operand in turn. A method returning a concrete
+	// (non-NotImplemented) result decides the comparison. CallDunderRaw reports
+	// whether a __ne__ was actually present, so we can distinguish "returned
+	// NotImplemented" from "no __ne__".
+	sawNe := false
+	for _, pair := range [][2]core.Value{{firstObj, secondObj}, {secondObj, firstObj}} {
+		result, exists, err := types.CallDunderRaw(pair[0], "__ne__", []core.Value{pair[1]}, ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			continue
+		}
+		sawNe = true
+		if _, isNI := result.(*core.NotImplementedValue); !isNI {
+			return result, nil
 		}
 	}
 
-	// Fall back to negation of equality
+	if sawNe {
+		// A __ne__ was present but returned NotImplemented. object.__ne__ has
+		// already consulted __eq__, so the final fallback is identity, matching
+		// CPython (a != b is `a is not b`).
+		return core.BoolValue(!core.SameObject(left, right)), nil
+	}
+
+	// Neither operand provides __ne__: fall back to the negation of equality.
 	equal, err := compareEqual(left, right, ctx)
 	if err != nil {
 		return nil, err
