@@ -1,6 +1,11 @@
 package modules
 
-import "github.com/mmichie/m28/core"
+import (
+	"fmt"
+
+	"github.com/mmichie/m28/common/types"
+	"github.com/mmichie/m28/core"
+)
 
 // InitOperatorModule creates the _operator module
 // Note: Most operator functionality is in the pure Python operator.py module
@@ -10,6 +15,35 @@ func InitOperatorModule() *core.DictValue {
 
 	// Module docstring
 	module.Set("__doc__", core.StringValue("Operator interface"))
+
+	// index(a) - return a converted to an integer via the __index__ protocol
+	// (CPython's PyNumber_Index). Integers and int subclasses are returned
+	// unchanged (the short-circuit is why operator.index() on an int subclass
+	// yields the int value, not the overridden __index__); any other object is
+	// asked for __index__, whose result must itself be an int or TypeError is
+	// raised. operator.py defines a pure-Python index() that simply calls
+	// a.__index__() with no validation; importing this one via
+	// `from _operator import *` overrides it with the validating version.
+	module.Set("index", core.NewNamedBuiltinFunction("index", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, core.NewTypeError("index", nil, "index expected 1 argument")
+		}
+		v := args[0]
+		if core.IsIntValue(v) {
+			return v, nil
+		}
+		result, found, err := types.CallDunder(v, "__index__", []core.Value{}, ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", v.Type())}
+		}
+		if !core.IsIntValue(result) {
+			return nil, &core.TypeError{Message: fmt.Sprintf("__index__ returned non-int (type %s)", result.Type())}
+		}
+		return result, nil
+	}))
 
 	// length_hint(obj, default=0) - get length hint for iteration (PEP 424)
 	module.Set("length_hint", core.NewNamedBuiltinFunction("length_hint", func(args []core.Value, ctx *core.Context) (core.Value, error) {

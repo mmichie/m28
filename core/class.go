@@ -182,6 +182,25 @@ func classInheritsType(cls *Class, names ...string) bool {
 	return false
 }
 
+// IsIntValue reports whether v is a Python int: a whole-number NumberValue,
+// BigIntValue, BoolValue (bool is a subclass of int), or an instance of an int
+// subclass. It is used to short-circuit values that are already integers, e.g.
+// by operator.index / PyNumber_Index, which return such values unchanged rather
+// than consulting __index__. A non-integral NumberValue (e.g. 1.5) returns
+// false so callers fall through to __index__ and reject it; whole-number floats
+// like 2.0 are treated as ints, since NumberValue carries no int/float tag.
+func IsIntValue(v Value) bool {
+	switch val := v.(type) {
+	case NumberValue:
+		return IsInteger(float64(val))
+	case BigIntValue, BoolValue:
+		return true
+	case *Instance:
+		return classInheritsType(val.Class, "int")
+	}
+	return false
+}
+
 // IsSubclass checks if child is a subclass of parent (strict or not)
 // Returns true if child == parent or child inherits from parent
 func IsSubclass(child, parent *Class) bool {
