@@ -40,15 +40,17 @@ func (f *KwargsBuiltinFunction) CallWithKeywords(args []core.Value, kwargs map[s
 
 // Type returns the function type
 func (f *KwargsBuiltinFunction) Type() core.Type {
-	return core.FunctionType
+	// builtin_function_or_method, like CPython -- not FunctionType, which would
+	// make repr() fall back to the generic "<function at 0x...>" form.
+	return core.BuiltinFunctionType
 }
 
 // String returns string representation
 func (f *KwargsBuiltinFunction) String() string {
 	if f.name != "" {
-		return fmt.Sprintf("<builtin '%s'>", f.name)
+		return fmt.Sprintf("<built-in function %s>", f.name)
 	}
-	return "<builtin>"
+	return "<built-in function>"
 }
 
 // createRegistry sets up all properties for KwargsBuiltinFunction

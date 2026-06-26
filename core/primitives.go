@@ -567,9 +567,9 @@ func (f *BuiltinFunctionWithKwargs) CallWithKeywords(args []Value, kwargs map[st
 // String implements Value.String
 func (f *BuiltinFunctionWithKwargs) String() string {
 	if f.Name != "" {
-		return fmt.Sprintf("<builtin function %s>", f.Name)
+		return fmt.Sprintf("<built-in function %s>", f.Name)
 	}
-	return "<builtin function>"
+	return "<built-in function>"
 }
 
 // Type implements Value.Type
