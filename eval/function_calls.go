@@ -431,9 +431,24 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		var defaults []core.Value
 
 		if f.signature != nil {
-			// New-style function with signature
-			argCount = len(f.signature.RequiredParams) + len(f.signature.OptionalParams)
-			kwonlyargcount = 0 // M28 doesn't support keyword-only params yet
+			// New-style function with signature. Keyword-only params (those after
+			// the bare * separator) are tracked via ParameterInfo.KeywordOnly and
+			// counted separately, so co_argcount counts only positional params and
+			// co_kwonlyargcount counts the keyword-only ones (matching CPython).
+			for _, param := range f.signature.RequiredParams {
+				if param.KeywordOnly {
+					kwonlyargcount++
+				} else {
+					argCount++
+				}
+			}
+			for _, param := range f.signature.OptionalParams {
+				if param.KeywordOnly {
+					kwonlyargcount++
+				} else {
+					argCount++
+				}
+			}
 
 			// Build varnames list
 			for _, param := range f.signature.RequiredParams {
@@ -542,12 +557,21 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		f.BaseObject.SetAttr("__annotations__", annots)
 		return annots, true
 	case "__defaults__":
-		// Return default argument values as a tuple
+		// Tuple of default values for positional parameters, or None when there
+		// are none. Keyword-only defaults live in __kwdefaults__, so they are
+		// excluded here (matching CPython).
 		if f.signature != nil {
 			var defaults []core.Value
 			for _, param := range f.signature.OptionalParams {
+				if param.KeywordOnly {
+					continue
+				}
 				if param.DefaultValue != nil {
-					defaults = append(defaults, param.DefaultValue)
+					// Unwrap the source-location wrapper so a literal default is
+					// returned as the real value (CPython evaluates defaults at
+					// def time); otherwise __defaults__ holds a LocatedValue that
+					// fails == and arithmetic against the bare value.
+					defaults = append(defaults, unwrapLocated(param.DefaultValue))
 				}
 			}
 			if len(defaults) > 0 {
@@ -556,8 +580,22 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		}
 		return core.None, true
 	case "__kwdefaults__":
-		// Return keyword-only default argument values as a dict
-		// M28 doesn't support keyword-only params yet, so always return None
+		// Dict of default values for keyword-only parameters, or None when no
+		// keyword-only parameter has a default (CPython semantics).
+		if f.signature != nil {
+			kwdefaults := core.NewDict()
+			found := false
+			for _, param := range f.signature.OptionalParams {
+				if param.KeywordOnly && param.DefaultValue != nil {
+					if err := kwdefaults.SetValue(core.StringValue(string(param.Name)), unwrapLocated(param.DefaultValue)); err == nil {
+						found = true
+					}
+				}
+			}
+			if found {
+				return kwdefaults, true
+			}
+		}
 		return core.None, true
 	case "__type_params__":
 		// Check if __type_params__ was explicitly set
