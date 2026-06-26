@@ -110,6 +110,13 @@ class TestCase:
             function, args, kwargs = self._cleanups.pop()
             function(*args, **kwargs)
 
+    def enterContext(self, cm):
+        """Enter the context manager and register its __exit__ as a cleanup,
+        returning the result of __enter__ (like unittest's enterContext)."""
+        result = cm.__enter__()
+        self.addCleanup(cm.__exit__, None, None, None)
+        return result
+
     def subTest(self, msg=None, **params):
         """Context manager for parameterised sub-tests.
 
