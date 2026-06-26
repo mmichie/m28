@@ -1266,13 +1266,11 @@ func listMethodDelItem(receiver Value, args []Value, ctx *Context) (Value, error
 		return None, nil
 	}
 
-	// Handle single index deletion: del list[i]
-	idx, ok := args[0].(NumberValue)
-	if !ok {
-		return nil, &TypeError{Message: fmt.Sprintf("list indices must be integers or slices, not %s", args[0].Type())}
+	// Handle single index deletion: del list[i] (honors the __index__ protocol)
+	i, err := toIndex(args[0], ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	i := int(idx)
 	if i < 0 {
 		i = list.Len() + i
 	}
