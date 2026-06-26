@@ -19,6 +19,31 @@ import (
 //
 // value: the value to unpack (must be iterable if pattern is a list)
 // ctx: the context to bind variables in
+// starTargetName returns the variable name bound by a star unpacking target and
+// true when sub is one. It accepts both shapes that reach the unpacker: a bare
+// `*name` SymbolValue (from an unparenthesised `a, *b, c` target) and a
+// `(*unpack name)` / `(*unpack-iter name)` ListValue (from a parenthesised or
+// bracketed `(a, *b, c)` / `[a, *b, c]` target, including `with ... as (a, *b)`).
+func starTargetName(sub core.Value) (string, bool) {
+	sub = unwrapLocated(sub)
+	if sym, ok := sub.(core.SymbolValue); ok {
+		if len(sym) > 0 && sym[0] == '*' {
+			return string(sym)[1:], true
+		}
+		return "", false
+	}
+	if list, ok := sub.(*core.ListValue); ok && list.Len() == 2 {
+		if marker, ok := unwrapLocated(list.Items()[0]).(core.SymbolValue); ok {
+			if string(marker) == "*unpack" || string(marker) == "*unpack-iter" {
+				if name, ok := unwrapLocated(list.Items()[1]).(core.SymbolValue); ok {
+					return string(name), true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
 func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) error {
 	// Unwrap LocatedValue wrappers from pattern to get the actual pattern structure
 	pattern = unwrapLocated(pattern)
@@ -63,19 +88,17 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 			return err
 		}
 
-		// Look for a star pattern (`*name`) — at most one is allowed per
-		// PEP 3132. The star target collects everything not consumed by
-		// the fixed patterns before and after it (as a list).
+		// Look for a star pattern — at most one is allowed per PEP 3132. The
+		// star target collects everything not consumed by the fixed patterns
+		// before and after it (as a list).
 		patternItems := actualPattern.Items()
 		starIdx := -1
 		for i, sub := range patternItems {
-			if sym, ok := unwrapLocated(sub).(core.SymbolValue); ok {
-				if len(sym) > 0 && sym[0] == '*' {
-					if starIdx != -1 {
-						return fmt.Errorf("multiple starred expressions in assignment")
-					}
-					starIdx = i
+			if _, isStar := starTargetName(sub); isStar {
+				if starIdx != -1 {
+					return fmt.Errorf("multiple starred expressions in assignment")
 				}
+				starIdx = i
 			}
 		}
 
@@ -107,7 +130,7 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 			}
 		}
 		// Bind the star target to the collected middle portion
-		starName := string(unwrapLocated(patternItems[starIdx]).(core.SymbolValue))[1:]
+		starName, _ := starTargetName(patternItems[starIdx])
 		afterCount := len(patternItems) - starIdx - 1
 		middleEnd := len(values) - afterCount
 		middle := make([]core.Value, middleEnd-starIdx)

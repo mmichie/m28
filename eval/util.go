@@ -1195,11 +1195,13 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 			if _, ok := unwrappedElem.(core.SymbolValue); ok {
 				continue
 			}
-			// Check if it's (*unpack var)
+			// Check if it's a star target: (*unpack var) from a bare `a, *b, c`
+			// target, or (*unpack-iter var) from a parenthesised/bracketed
+			// `(a, *b, c)` / `[a, *b, c]` target (which reuses the spread marker).
 			if elemList, ok := unwrappedElem.(*core.ListValue); ok {
 				if elemList.Len() == 2 {
 					unwrappedSym := unwrapLocated(elemList.Items()[0])
-					if sym, ok := unwrappedSym.(core.SymbolValue); ok && string(sym) == "*unpack" {
+					if sym, ok := unwrappedSym.(core.SymbolValue); ok && (string(sym) == "*unpack" || string(sym) == "*unpack-iter") {
 						unwrappedVar := unwrapLocated(elemList.Items()[1])
 						if _, ok := unwrappedVar.(core.SymbolValue); ok {
 							hasStarUnpack = true
@@ -1242,7 +1244,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 							if elemList, ok := unwrappedElem.(*core.ListValue); ok {
 								if elemList.Len() == 2 {
 									unwrappedSym := unwrapLocated(elemList.Items()[0])
-									if sym, ok := unwrappedSym.(core.SymbolValue); ok && string(sym) == "*unpack" {
+									if sym, ok := unwrappedSym.(core.SymbolValue); ok && (string(sym) == "*unpack" || string(sym) == "*unpack-iter") {
 										hasStarUnpack = true
 										starIndex = i
 										break
