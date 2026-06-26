@@ -252,13 +252,13 @@ func (r *RangeValue) createRegistry() *MethodRegistry {
 				return r.getSlice(slice)
 			}
 
-			// Handle integer index
-			idx, ok := args[0].(NumberValue)
-			if !ok {
-				return nil, fmt.Errorf("range indices must be integers")
+			// Handle integer index (honors the __index__ protocol)
+			idx, err := sequenceIndex(args[0], ctx, "range")
+			if err != nil {
+				return nil, err
 			}
 
-			return r.GetItem(int(idx))
+			return r.GetItem(idx)
 		}),
 
 		// __contains__ method
