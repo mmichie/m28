@@ -169,17 +169,15 @@ func formatExpressionImpl(args []core.Value, ctx *core.Context, alreadyEvaluated
 	if conversion != "" {
 		switch conversion {
 		case "r":
-			// repr() - should return a quoted string representation
-			if str, ok := types.AsString(value); ok {
-				value = core.StringValue(fmt.Sprintf("%q", str))
-			} else {
-				value = core.StringValue(core.PrintValue(value))
-			}
+			// repr() - calls __repr__ (core.Repr also quotes strings correctly).
+			// Must NOT use PrintValue, which gives the default object repr.
+			value = core.StringValue(core.Repr(value))
 		case "s":
-			value = core.StringValue(value.String())
+			// str() - calls __str__.
+			value = core.StringValue(core.PrintValueWithoutQuotes(value))
 		case "a":
-			// ASCII representation - escape non-ASCII
-			s := value.String()
+			// ascii() - repr() with non-ASCII escaped.
+			s := core.Repr(value)
 			var result strings.Builder
 			for _, r := range s {
 				if r > core.ASCIIMax {
