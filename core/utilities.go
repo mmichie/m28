@@ -365,12 +365,25 @@ func SameObject(a, b Value) bool {
 	case NumberValue:
 		bv, ok := b.(NumberValue)
 		return ok && math.Float64bits(float64(av)) == math.Float64bits(float64(bv))
-	case StringValue, BoolValue, NilValue, BytesValue, SymbolValue, TupleValue:
+	case StringValue, BoolValue, NilValue, BytesValue, SymbolValue:
 		// Value types whose object identity is not tracked separately from their
-		// contents: callers compare them with EqualValues (which itself applies
-		// the identity-or-equal rule element-wise for tuples). Skip reflection on
+		// contents: callers compare them with EqualValues. Skip reflection on
 		// these hot paths and never report them as "the same object" here.
 		return false
+	case TupleValue:
+		bv, ok := b.(TupleValue)
+		if !ok {
+			return false
+		}
+		// Tuple identity must agree with id() and CPython `is`: two references
+		// to the same tuple object share a backing array (x is x; y = x), while
+		// separately-built tuples do not. Empty tuples compare equal, like
+		// CPython's interned (). Previously this returned false unconditionally,
+		// so even `x is x` was false for a tuple.
+		if len(av) == 0 || len(bv) == 0 {
+			return len(av) == 0 && len(bv) == 0
+		}
+		return reflect.ValueOf(av).Pointer() == reflect.ValueOf(bv).Pointer()
 	}
 	// Reference types: pointer identity.
 	ra := reflect.ValueOf(a)

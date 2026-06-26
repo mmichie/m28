@@ -312,6 +312,25 @@ func Is() func([]core.Value, *core.Context) (core.Value, error) {
 			return core.BoolValue(false), nil
 		}
 
+		// Handle TupleValue specially - slices can't be compared with ==.
+		// Tuple identity is backing-array identity (x is x; y = x are the same
+		// object), matching id(); separately-built tuples are different objects.
+		// Empty tuples compare equal, like CPython's interned (). Previously
+		// tuples fell through to the default and even `x is x` was False.
+		leftTuple, leftIsTuple := left.(core.TupleValue)
+		rightTuple, rightIsTuple := right.(core.TupleValue)
+		if leftIsTuple && rightIsTuple {
+			if len(leftTuple) == 0 || len(rightTuple) == 0 {
+				return core.BoolValue(len(leftTuple) == 0 && len(rightTuple) == 0), nil
+			}
+			leftPtr := reflect.ValueOf(leftTuple).Pointer()
+			rightPtr := reflect.ValueOf(rightTuple).Pointer()
+			return core.BoolValue(leftPtr == rightPtr && len(leftTuple) == len(rightTuple)), nil
+		}
+		if leftIsTuple || rightIsTuple {
+			return core.BoolValue(false), nil
+		}
+
 		// For reference types (dicts, sets, objects), use pointer comparison
 		switch left.(type) {
 		case *core.DictValue, *core.SetValue:
