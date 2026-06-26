@@ -683,6 +683,14 @@ func FloatBuilder() builders.BuiltinFunc {
 		switch x := val.(type) {
 		case core.NumberValue:
 			return x, nil
+		case core.BigIntValue:
+			// Convert an arbitrary-precision int to the nearest float, raising
+			// OverflowError when it exceeds the float64 range (as CPython does).
+			f := x.ToFloat64()
+			if math.IsInf(f, 0) {
+				return nil, &core.OverflowError{Message: "int too large to convert to float"}
+			}
+			return core.NumberValue(f), nil
 		case core.StringValue:
 			s := strings.TrimSpace(string(x))
 			// Handle special values
