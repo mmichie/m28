@@ -498,43 +498,29 @@ func TestParseDictLiteral(t *testing.T) {
 			t.Fatalf("Parse error for %q: %v", tt.source, err)
 		}
 
-		// Empty dicts remain as Literal nodes, non-empty dicts are SExpr
-		if tt.expected == 0 {
-			literal, ok := nodes[0].(*ast.Literal)
-			if !ok {
-				t.Fatalf("Expected Literal for empty dict %q, got %T", tt.source, nodes[0])
-			}
+		// Dict literals are SExpr nodes representing (dict-literal k1 v1 ...);
+		// an empty {} is (dict-literal) with zero pairs. (Empty dicts used to be
+		// a Literal node wrapping a single parse-time DictValue, which aliased
+		// one dict object across every evaluation -- now fixed.)
+		sexpr, ok := nodes[0].(*ast.SExpr)
+		if !ok {
+			t.Fatalf("Expected SExpr for %q, got %T", tt.source, nodes[0])
+		}
 
-			dict, ok := literal.Value.(*core.DictValue)
-			if !ok {
-				t.Fatalf("Expected DictValue for %q, got %T", tt.source, literal.Value)
-			}
+		// Check it starts with "dict-literal"
+		if len(sexpr.Elements) < 1 {
+			t.Fatalf("Expected at least 1 element in SExpr for %q", tt.source)
+		}
 
-			if dict.Size() != 0 {
-				t.Errorf("Expected empty dict for %q, got %d elements", tt.source, dict.Size())
-			}
-		} else {
-			// Dict literals are now SExpr nodes representing (dict-literal k1 v1 k2 v2 ...)
-			sexpr, ok := nodes[0].(*ast.SExpr)
-			if !ok {
-				t.Fatalf("Expected SExpr for %q, got %T", tt.source, nodes[0])
-			}
+		ident, ok := sexpr.Elements[0].(*ast.Identifier)
+		if !ok || ident.Name != "dict-literal" {
+			t.Fatalf("Expected first element to be 'dict-literal' for %q, got %v", tt.source, sexpr.Elements[0])
+		}
 
-			// Check it starts with "dict-literal"
-			if len(sexpr.Elements) < 1 {
-				t.Fatalf("Expected at least 1 element in SExpr for %q", tt.source)
-			}
-
-			ident, ok := sexpr.Elements[0].(*ast.Identifier)
-			if !ok || ident.Name != "dict-literal" {
-				t.Fatalf("Expected first element to be 'dict-literal' for %q, got %v", tt.source, sexpr.Elements[0])
-			}
-
-			// Number of key-value pairs is (total - 1) / 2
-			numPairs := (len(sexpr.Elements) - 1) / 2
-			if numPairs != tt.expected {
-				t.Errorf("Expected %d pairs for %q, got %d", tt.expected, tt.source, numPairs)
-			}
+		// Number of key-value pairs is (total - 1) / 2
+		numPairs := (len(sexpr.Elements) - 1) / 2
+		if numPairs != tt.expected {
+			t.Errorf("Expected %d pairs for %q, got %d", tt.expected, tt.source, numPairs)
 		}
 	}
 }

@@ -1135,9 +1135,14 @@ func (p *PythonParser) parseDictOrSetLiteral() ast.ASTNode {
 	tok := p.expect(TOKEN_LBRACE)
 
 	if p.check(TOKEN_RBRACE) {
-		// Empty dict (not set, since {} is dict in Python)
+		// Empty dict (not set, since {} is dict in Python). Emit (dict-literal)
+		// so each evaluation produces a FRESH dict. Returning a Literal that
+		// wraps a single parse-time core.NewDict() shared one dict object across
+		// every evaluation of this node -- e.g. `self.x = {}` in __init__ aliased
+		// the same dict across all instances.
 		p.advance()
-		return ast.NewLiteral(core.NewDict(), p.makeLocation(tok), ast.SyntaxPython)
+		dictLiteralSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
+		return ast.NewSExpr([]ast.ASTNode{dictLiteralSym}, p.makeLocation(tok), ast.SyntaxPython)
 	}
 
 	// Check for ** unpacking - if so, it's definitely a dict
