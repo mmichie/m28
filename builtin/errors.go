@@ -278,6 +278,12 @@ func RegisterErrors(ctx *core.Context) {
 	systemExitClass := core.NewClass("SystemExit", baseExceptionClass)
 	ctx.Define("SystemExit", systemExitClass)
 
+	// GeneratorExit - raised inside a generator/coroutine when it is closed.
+	// Important: inherits from BaseException, not Exception, so a bare
+	// `except Exception` does not swallow generator cleanup.
+	generatorExitClass := core.NewClass("GeneratorExit", baseExceptionClass)
+	ctx.Define("GeneratorExit", generatorExitClass)
+
 	// Exception inherits from BaseException
 	exceptionClass := core.NewClass("Exception", baseExceptionClass)
 
@@ -309,6 +315,14 @@ func RegisterErrors(ctx *core.Context) {
 	}))
 
 	ctx.Define("Exception", exceptionClass)
+
+	// BufferError - raised when a buffer-related operation cannot be performed
+	bufferErrorClass := core.NewClass("BufferError", exceptionClass)
+	ctx.Define("BufferError", bufferErrorClass)
+
+	// ReferenceError - raised when a weak reference proxy accesses a dead referent
+	referenceErrorClass := core.NewClass("ReferenceError", exceptionClass)
+	ctx.Define("ReferenceError", referenceErrorClass)
 
 	// ExceptionGroup - exception group for grouping exceptions (Python 3.11+)
 	// In Python it inherits from both Exception and BaseExceptionGroup
@@ -604,6 +618,10 @@ func RegisterErrors(ctx *core.Context) {
 	// InterruptedError - raised when a system call is interrupted
 	interruptedErrorClass := core.NewClass("InterruptedError", osErrorClass)
 	ctx.Define("InterruptedError", interruptedErrorClass)
+
+	// ChildProcessError - raised when an operation on a child process fails
+	childProcessErrorClass := core.NewClass("ChildProcessError", osErrorClass)
+	ctx.Define("ChildProcessError", childProcessErrorClass)
 
 	// ConnectionError - base class for connection-related errors
 	connectionErrorClass := core.NewClass("ConnectionError", osErrorClass)
