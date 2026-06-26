@@ -779,10 +779,14 @@ func registerBytesType() {
 						}
 						encoding = string(enc)
 					}
-					if encoding != "utf-8" {
-						return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
+					decoded, ok, err := DecodeBytes([]byte(b), encoding)
+					if err != nil {
+						return nil, err
 					}
-					return StringValue(string(b)), nil
+					if !ok {
+						return nil, &LookupError{Message: fmt.Sprintf("unknown encoding: %s", encoding)}
+					}
+					return StringValue(decoded), nil
 				},
 			},
 			"hex": {
@@ -1716,10 +1720,14 @@ func registerBytesType() {
 				if !ok {
 					return nil, &TypeError{Message: fmt.Sprintf("bytes() argument 2 must be str, not %s", args[1].Type())}
 				}
-				if string(enc) != "utf-8" {
-					return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
+				encoded, ok, err := EncodeString(string(str), string(enc))
+				if err != nil {
+					return nil, err
 				}
-				return BytesValue([]byte(string(str))), nil
+				if !ok {
+					return nil, &LookupError{Message: fmt.Sprintf("unknown encoding: %s", string(enc))}
+				}
+				return BytesValue(encoded), nil
 			}
 			return nil, &TypeError{Message: fmt.Sprintf("bytes() takes at most 2 arguments (%d given)", len(args))}
 		},
@@ -1801,10 +1809,14 @@ func registerByteArrayType() {
 						}
 						encoding = string(enc)
 					}
-					if encoding != "utf-8" {
-						return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
+					decoded, ok, err := DecodeBytes(b.data, encoding)
+					if err != nil {
+						return nil, err
 					}
-					return StringValue(string(b.data)), nil
+					if !ok {
+						return nil, &LookupError{Message: fmt.Sprintf("unknown encoding: %s", encoding)}
+					}
+					return StringValue(decoded), nil
 				},
 			},
 			"hex": {
@@ -2062,10 +2074,14 @@ func registerByteArrayType() {
 				if !ok {
 					return nil, &TypeError{Message: fmt.Sprintf("bytearray() argument 2 must be str, not %s", args[1].Type())}
 				}
-				if string(enc) != "utf-8" {
-					return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
+				encoded, ok, err := EncodeString(string(str), string(enc))
+				if err != nil {
+					return nil, err
 				}
-				return NewByteArray([]byte(string(str))), nil
+				if !ok {
+					return nil, &LookupError{Message: fmt.Sprintf("unknown encoding: %s", string(enc))}
+				}
+				return NewByteArray(encoded), nil
 			}
 			return nil, &TypeError{Message: fmt.Sprintf("bytearray() takes at most 2 arguments (%d given)", len(args))}
 		},

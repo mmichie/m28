@@ -1016,8 +1016,31 @@ func (s *StrType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 		return core.StringValue(""), nil
 	}
 
+	// Two/three-arg form: str(bytes, encoding[, errors]) decodes a bytes-like
+	// object. Mirrors CPython, where the encoding argument is only valid for a
+	// bytes-like first argument (decoding a str is unsupported).
 	if len(args) > 1 {
-		return nil, errors.NewTypeError("str", "str() takes at most 1 argument", fmt.Sprintf("%d given", len(args)))
+		enc, ok := args[1].(core.StringValue)
+		if !ok {
+			return nil, errors.NewTypeError("str", "str() argument 'encoding' must be str", string(args[1].Type()))
+		}
+		var raw []byte
+		switch b := args[0].(type) {
+		case core.BytesValue:
+			raw = []byte(b)
+		case *core.ByteArrayValue:
+			raw = b.GetData()
+		default:
+			return nil, errors.NewTypeError("str", "decoding to str: need a bytes-like object", string(args[0].Type()))
+		}
+		decoded, known, err := core.DecodeBytes(raw, string(enc))
+		if err != nil {
+			return nil, err
+		}
+		if !known {
+			return nil, &core.LookupError{Message: fmt.Sprintf("unknown encoding: %s", string(enc))}
+		}
+		return core.StringValue(decoded), nil
 	}
 
 	val := args[0]

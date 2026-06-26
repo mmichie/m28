@@ -390,10 +390,14 @@ func getStringMethods() map[string]*MethodDescriptor {
 					}
 					encoding = string(enc)
 				}
-				if encoding != "utf-8" {
-					return nil, &ValueError{Message: "only utf-8 encoding is currently supported"}
+				encoded, ok, err := EncodeString(s, encoding)
+				if err != nil {
+					return nil, err
 				}
-				return BytesValue([]byte(s)), nil
+				if !ok {
+					return nil, &LookupError{Message: fmt.Sprintf("unknown encoding: %s", encoding)}
+				}
+				return BytesValue(encoded), nil
 			},
 		},
 		"isidentifier": {
