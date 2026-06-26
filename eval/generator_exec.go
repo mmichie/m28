@@ -232,8 +232,11 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 
 	state.started = true
 
-	// Execute steps until we hit a yield or complete
-	for state.CurrentStep < len(state.Steps) {
+	// Execute steps until we hit a yield or complete. The `|| pendingError`
+	// guard ensures a thrown exception is still raised even when the generator
+	// is resumed at/after its final step (CurrentStep >= len): otherwise the
+	// loop would not run and throw() would be swallowed into a StopIteration.
+	for state.CurrentStep < len(state.Steps) || state.pendingError != nil {
 		// A pending exception (from throw(), or from a statement that errored)
 		// must run any enclosing finally blocks before it propagates out of the
 		// generator. Route it to the nearest not-yet-run finally; if there is
@@ -1302,18 +1305,16 @@ func createExceptionFromThrowArgs(excType core.Value, excValue core.Value, excTb
 		}
 	}
 
-	// Get exception message from excValue
+	// If an exception INSTANCE was supplied as the value, propagate that exact
+	// instance so its object identity survives the throw. contextlib's
+	// @contextmanager relies on `exc is not value` to tell whether a thrown
+	// exception (e.g. StopIteration) was re-raised unchanged; rebuilding a fresh
+	// Exception here broke that check and silently suppressed it.
 	if excValue != core.None && excValue != core.Nil {
 		if inst, ok := excValue.(*core.Instance); ok {
-			// Get message from instance args
-			if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
-				if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
-					if msgStr, ok := argsTuple[0].(core.StringValue); ok {
-						message = string(msgStr)
-					}
-				}
-			}
-		} else if str, ok := excValue.(core.StringValue); ok {
+			return core.NewPythonError(inst)
+		}
+		if str, ok := excValue.(core.StringValue); ok {
 			message = string(str)
 		}
 	}
