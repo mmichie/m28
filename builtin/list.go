@@ -208,39 +208,64 @@ func RegisterList(ctx *core.Context) {
 			}
 		}
 
-		// Sort using the appropriate comparison
-		if keyFunc != nil {
-			// Sort using key function
-			// First, compute all keys
-			keys := make([]core.Value, len(items))
-			for i, item := range items {
-				keyResult, err := keyFunc.Call([]core.Value{item}, ctx)
+		// Pair each item with its sort key (the item itself when no key
+		// function is given), then sort with a comparison that matches
+		// list.sort(): try __lt__, else fall back to core.Compare (numeric /
+		// string). The previous implementation compared items by their
+		// .String() form, so numbers (and any object) sorted lexically --
+		// e.g. sorted([10, 2]) returned [10, 2].
+		type keyedItem struct {
+			item core.Value
+			key  core.Value
+		}
+		keyed := make([]keyedItem, len(items))
+		for i, item := range items {
+			k := item
+			if keyFunc != nil {
+				kr, err := keyFunc.Call([]core.Value{item}, ctx)
 				if err != nil {
 					return nil, err
 				}
-				keys[i] = keyResult
+				k = kr
 			}
-
-			// Sort based on keys
-			sort.Slice(items, func(i, j int) bool {
-				cmp := keys[i].String() < keys[j].String()
-				if reverse {
-					return !cmp
-				}
-				return cmp
-			})
-		} else {
-			// Sort without key function
-			sort.Slice(items, func(i, j int) bool {
-				cmp := items[i].String() < items[j].String()
-				if reverse {
-					return !cmp
-				}
-				return cmp
-			})
+			keyed[i] = keyedItem{item: item, key: k}
 		}
 
-		return core.NewList(items...), nil
+		less := func(a, b core.Value) (bool, error) {
+			if isLess, found, err := types.CallLt(a, b, ctx); found {
+				if err != nil {
+					return false, err
+				}
+				return isLess, nil
+			}
+			return core.Compare(a, b) < 0, nil
+		}
+
+		var sortErr error
+		sort.SliceStable(keyed, func(i, j int) bool {
+			if sortErr != nil {
+				return false
+			}
+			a, b := keyed[i].key, keyed[j].key
+			if reverse {
+				a, b = b, a
+			}
+			isLess, err := less(a, b)
+			if err != nil {
+				sortErr = err
+				return false
+			}
+			return isLess
+		})
+		if sortErr != nil {
+			return nil, sortErr
+		}
+
+		sortedItems := make([]core.Value, len(keyed))
+		for i, ki := range keyed {
+			sortedItems[i] = ki.item
+		}
+		return core.NewList(sortedItems...), nil
 	}))
 }
 
