@@ -58,6 +58,30 @@ func RegisterTypes(ctx *core.Context) {
 	BuiltinFunctionTypeClass.Module = "builtins"
 	MethodTypeClass = core.NewClass("method", nil) // For bound methods
 	MethodTypeClass.Module = "builtins"
+	// types.MethodType(func, instance) builds a bound method, equivalent to
+	// func.__get__(instance). __new__ receives the class as its first argument.
+	MethodTypeClass.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 3 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("method() takes exactly 2 arguments (%d given)", len(args)-1)}
+		}
+		fn, inst := args[1], args[2]
+		// Prefer the descriptor protocol (yields a real bound method with
+		// __func__/__self__) for callables that support it -- Python functions do.
+		if bound, found, err := types.CallDunder(fn, "__get__", []core.Value{inst}, ctx); found {
+			return bound, err
+		}
+		// Fall back for callables without __get__ (e.g. builtins): a callable that
+		// prepends the bound instance, mirroring CPython's method object.
+		callable, ok := fn.(interface {
+			Call([]core.Value, *core.Context) (core.Value, error)
+		})
+		if !ok {
+			return nil, &core.TypeError{Message: "first argument must be callable"}
+		}
+		return core.NewBuiltinFunction(func(callArgs []core.Value, ctx *core.Context) (core.Value, error) {
+			return callable.Call(append([]core.Value{inst}, callArgs...), ctx)
+		}), nil
+	}))
 
 	// Register type descriptor for NoneType to handle __class__
 	noneTypeDesc := &core.TypeDescriptor{
