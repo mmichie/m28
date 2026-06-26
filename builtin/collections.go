@@ -667,6 +667,38 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 				}
 			}
 
+			// Mapping protocol: an object exposing keys() (but no usable items())
+			// is converted via obj[k] for each k in obj.keys() -- CPython's dict()
+			// mapping rule, covering custom mappings.
+			if objWithAttr, ok := args[0].(interface {
+				GetAttr(string) (core.Value, bool)
+			}); ok {
+				keysMethod, hasKeys := objWithAttr.GetAttr("keys")
+				getitemMethod, hasGetitem := objWithAttr.GetAttr("__getitem__")
+				if hasKeys && hasGetitem {
+					keysCallable, kok := keysMethod.(core.Callable)
+					getitemCallable, gok := getitemMethod.(core.Callable)
+					if kok && gok {
+						keysResult, err := keysCallable.Call([]core.Value{}, ctx)
+						if err == nil {
+							keys, err := core.IterableValuesCtx(keysResult, ctx)
+							if err == nil {
+								for _, k := range keys {
+									v, err := getitemCallable.Call([]core.Value{k}, ctx)
+									if err != nil {
+										return nil, err
+									}
+									if err := dict.SetValue(k, v); err != nil {
+										return nil, err
+									}
+								}
+								return dict, nil
+							}
+						}
+					}
+				}
+			}
+
 			// Try to treat as a general iterable (handles generators, iterators, etc.)
 			if iterable, ok := args[0].(core.Iterable); ok {
 				iter := iterable.Iterator()
