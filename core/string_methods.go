@@ -605,6 +605,8 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		var zeroPad bool
 		var width int
 		var hasWidth bool
+		var precision int
+		var hasPrecision bool
 
 		// Check for %(name)s dictionary-style formatting
 		if formatStr[i] == '(' {
@@ -637,11 +639,18 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 				i++
 			}
 
-			// Skip optional .precision
+			// Parse optional .precision (a bare "." means precision 0).
+			precision = 0
+			hasPrecision = false
 			if i < len(formatStr) && formatStr[i] == '.' {
 				i++
+				hasPrecision = true
+				precStart := i
 				for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
 					i++
+				}
+				if i > precStart {
+					fmt.Sscanf(formatStr[precStart:i], "%d", &precision)
 				}
 			}
 
@@ -711,11 +720,18 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 				}
 			}
 
-			// Skip optional .precision
+			// Parse optional .precision (a bare "." means precision 0).
+			precision = 0
+			hasPrecision = false
 			if i < len(formatStr) && formatStr[i] == '.' {
 				i++
+				hasPrecision = true
+				precStart := i
 				for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
 					i++
+				}
+				if i > precStart {
+					fmt.Sscanf(formatStr[precStart:i], "%d", &precision)
 				}
 			}
 
@@ -744,6 +760,10 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			} else {
 				formatted = PrintValueWithoutQuotes(value)
 			}
+			// A precision on %s truncates the string to that many characters.
+			if hasPrecision && precision < len([]rune(formatted)) {
+				formatted = string([]rune(formatted)[:precision])
+			}
 		case 'd', 'i': // Integer
 			if num, ok := value.(NumberValue); ok {
 				formatted = fmt.Sprintf("%d", int64(num))
@@ -759,14 +779,27 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			} else {
 				return nil, &TypeError{Message: fmt.Sprintf("%%d format: a number is required, not %s", value.Type())}
 			}
-		case 'f', 'F': // Float
+		case 'f', 'F', 'e', 'E', 'g', 'G': // Float formats (fixed, exponential, general)
+			var f float64
 			if num, ok := value.(NumberValue); ok {
-				formatted = fmt.Sprintf("%f", float64(num))
+				f = float64(num)
 			} else if bi, ok := value.(BigIntValue); ok {
-				formatted = fmt.Sprintf("%f", bi.ToFloat64())
+				f = bi.ToFloat64()
+			} else if b, ok := value.(BoolValue); ok {
+				if b {
+					f = 1
+				}
 			} else {
-				return nil, &TypeError{Message: fmt.Sprintf("%%f format: a number is required, not %s", value.Type())}
+				return nil, &TypeError{Message: fmt.Sprintf("%%%c format: a number is required, not %s", fmtType, value.Type())}
 			}
+			// Python (like C printf) defaults float precision to 6 when the
+			// spec omits it; an explicit ".N" overrides. Go's verbs match
+			// Python's once the precision is supplied, so thread it through.
+			prec := 6
+			if hasPrecision {
+				prec = precision
+			}
+			formatted = fmt.Sprintf("%.*"+string(fmtType), prec, f)
 		case 'r': // Repr - must match the repr() builtin, not String()
 			formatted = Repr(value)
 		case 'a': // ascii() - repr() with non-ASCII escaped
