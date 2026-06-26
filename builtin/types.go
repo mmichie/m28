@@ -1012,7 +1012,7 @@ func FormatBuilder() builders.BuiltinFunc {
 			formatSpec = spec
 		}
 
-		// Try __format__ dunder method first
+		// Try __format__ dunder method first (user types / overrides).
 		if str, found, err := types.CallFormat(val, formatSpec, ctx); found {
 			if err != nil {
 				return nil, err
@@ -1020,14 +1020,15 @@ func FormatBuilder() builders.BuiltinFunc {
 			return core.StringValue(str), nil
 		}
 
-		// Fall back to str() conversion if no __format__ method
-		// For built-in types, convert appropriately
-		if str, ok := val.(core.StringValue); ok {
-			// Strings should return themselves, not their repr
-			return str, nil
+		// No __format__ dunder: apply the format spec directly, the same way
+		// str.format()'s replacement fields do for built-in types. Previously
+		// this returned the value unchanged, so format("bar", "^6") ignored the
+		// spec and returned "bar" instead of " bar  ".
+		result, err := applyFormatSpecString(val, formatSpec, ctx)
+		if err != nil {
+			return nil, err
 		}
-		// For other types, use String() method
-		return core.StringValue(val.String()), nil
+		return core.StringValue(result), nil
 	}
 }
 
