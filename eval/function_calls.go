@@ -155,6 +155,95 @@ type UserFunction struct {
 	isLambda  bool   // True for lambda expressions (implicitly return body value)
 	docstring string // Function docstring (first string literal in body)
 	dict      *core.DictValue // Live __dict__ for arbitrary user-set attributes
+
+	// __defaults__ / __kwdefaults__ overrides. nil means "not overridden" (use
+	// the signature as defined). When set (to a tuple/dict, or to None via
+	// assignment or del), the call path uses a signature rebuilt from
+	// origSignature; the getters return the stored override directly. This keeps
+	// the rebuild on the cold attribute-set path, leaving normal calls untouched.
+	defaultsOverride   core.Value         // nil unset; None=no positional defaults; TupleValue=defaults
+	kwdefaultsOverride core.Value         // nil unset; None=no kw-only defaults; *DictValue=kw defaults
+	origSignature      *FunctionSignature // signature as originally defined (captured on first override)
+}
+
+// applyDefaultOverrides rebuilds f.signature from f.origSignature to reflect the
+// current __defaults__ / __kwdefaults__ overrides. __defaults__ supplies default
+// values for the trailing positional parameters (CPython maps the tuple to the
+// last len(tuple) of them); __kwdefaults__ supplies defaults for keyword-only
+// parameters by name. A parameter that loses its default becomes required.
+func (f *UserFunction) applyDefaultOverrides() {
+	if f.origSignature == nil {
+		return
+	}
+	orig := f.origSignature
+
+	// Split original params into positional and keyword-only, preserving order.
+	var pos, kw []ParameterInfo
+	collect := func(params []ParameterInfo) {
+		for _, p := range params {
+			if p.KeywordOnly {
+				kw = append(kw, p)
+			} else {
+				pos = append(pos, p)
+			}
+		}
+	}
+	collect(orig.RequiredParams)
+	collect(orig.OptionalParams)
+
+	// __defaults__: map the trailing positional params to the override tuple.
+	if f.defaultsOverride != nil {
+		for i := range pos {
+			pos[i].HasDefault = false
+			pos[i].DefaultValue = nil
+		}
+		if tup, ok := f.defaultsOverride.(core.TupleValue); ok {
+			start := len(pos) - len(tup)
+			if start < 0 {
+				start = 0
+			}
+			for i := start; i < len(pos); i++ {
+				pos[i].HasDefault = true
+				pos[i].DefaultValue = tup[i-start]
+			}
+		}
+	}
+
+	// __kwdefaults__: keyword-only params present in the dict get that default;
+	// the rest become required.
+	if f.kwdefaultsOverride != nil {
+		dict, _ := f.kwdefaultsOverride.(*core.DictValue)
+		for i := range kw {
+			kw[i].HasDefault = false
+			kw[i].DefaultValue = nil
+			if dict != nil {
+				if v, found := dict.GetValue(core.StringValue(string(kw[i].Name))); found {
+					kw[i].HasDefault = true
+					kw[i].DefaultValue = v
+				}
+			}
+		}
+	}
+
+	// Rebuild Required (no default) then Optional (with default), positional
+	// before keyword-only within each so BindArguments binds positionals in order.
+	var req, opt []ParameterInfo
+	for _, group := range [][]ParameterInfo{pos, kw} {
+		for _, p := range group {
+			if p.HasDefault {
+				opt = append(opt, p)
+			} else {
+				req = append(req, p)
+			}
+		}
+	}
+
+	f.signature = &FunctionSignature{
+		RequiredParams: req,
+		OptionalParams: opt,
+		RestParam:      orig.RestParam,
+		KeywordParam:   orig.KeywordParam,
+	}
 }
 
 // ensureDict lazily creates the function's live __dict__ used to store
@@ -557,6 +646,10 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		f.BaseObject.SetAttr("__annotations__", annots)
 		return annots, true
 	case "__defaults__":
+		// An explicit override (set or deleted) takes precedence.
+		if f.defaultsOverride != nil {
+			return f.defaultsOverride, true
+		}
 		// Tuple of default values for positional parameters, or None when there
 		// are none. Keyword-only defaults live in __kwdefaults__, so they are
 		// excluded here (matching CPython).
@@ -580,6 +673,10 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		}
 		return core.None, true
 	case "__kwdefaults__":
+		// An explicit override (set or deleted) takes precedence.
+		if f.kwdefaultsOverride != nil {
+			return f.kwdefaultsOverride, true
+		}
 		// Dict of default values for keyword-only parameters, or None when no
 		// keyword-only parameter has a default (CPython semantics).
 		if f.signature != nil {
@@ -704,6 +801,33 @@ func (f *UserFunction) SetAttr(name string, value core.Value) error {
 	case "__module__", "__doc__", "__annotations__", "__type_params__":
 		// Store in BaseObject for later retrieval
 		return f.BaseObject.SetAttr(name, value)
+	case "__defaults__":
+		// Replacing __defaults__ changes the defaults of the trailing positional
+		// parameters (and which parameters are required) for subsequent calls.
+		switch value.(type) {
+		case core.TupleValue, core.NilValue:
+		default:
+			return &core.TypeError{Message: fmt.Sprintf("__defaults__ must be set to a tuple object, not '%s'", value.Type())}
+		}
+		if f.origSignature == nil {
+			f.origSignature = f.signature
+		}
+		f.defaultsOverride = value
+		f.applyDefaultOverrides()
+		return nil
+	case "__kwdefaults__":
+		// Replacing __kwdefaults__ changes the defaults of keyword-only params.
+		switch value.(type) {
+		case *core.DictValue, core.NilValue:
+		default:
+			return &core.TypeError{Message: fmt.Sprintf("__kwdefaults__ must be set to a dict object, not '%s'", value.Type())}
+		}
+		if f.origSignature == nil {
+			f.origSignature = f.signature
+		}
+		f.kwdefaultsOverride = value
+		f.applyDefaultOverrides()
+		return nil
 	case "__dict__":
 		// Replacing __dict__ wholesale: adopt the given dict as the live store.
 		if d, ok := value.(*core.DictValue); ok {
@@ -724,6 +848,22 @@ func (f *UserFunction) DelAttr(name string) error {
 	switch name {
 	case "__name__", "__qualname__", "__dict__":
 		return &core.AttributeError{ObjType: "function", Message: fmt.Sprintf("__%s__ may not be deleted", name)}
+	case "__defaults__":
+		// del func.__defaults__ removes all positional defaults (CPython sets it
+		// to None), making those parameters required again.
+		if f.origSignature == nil {
+			f.origSignature = f.signature
+		}
+		f.defaultsOverride = core.None
+		f.applyDefaultOverrides()
+		return nil
+	case "__kwdefaults__":
+		if f.origSignature == nil {
+			f.origSignature = f.signature
+		}
+		f.kwdefaultsOverride = core.None
+		f.applyDefaultOverrides()
+		return nil
 	}
 	if f.dict != nil && f.dict.DeleteValue(core.StringValue(name)) {
 		return nil
