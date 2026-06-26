@@ -9,6 +9,21 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
+// maxExactIntLiteral is 2^53, the largest magnitude an integer literal can have
+// while still being exactly representable as M28's float64-backed NumberValue.
+const maxExactIntLiteral = int64(1) << 53
+
+// intTokenValue returns the value for an integer literal that parsed into an
+// int64: a plain NumberValue within float64's exact-integer range, and a
+// BigIntValue beyond it so large literals (e.g. 9007199254740993) keep full
+// precision instead of silently rounding.
+func intTokenValue(i int64) core.Value {
+	if i > maxExactIntLiteral || i < -maxExactIntLiteral {
+		return core.NewBigIntFromInt64(i)
+	}
+	return core.NumberValue(i)
+}
+
 // PythonTokenizer performs lexical analysis on Python source code
 // Key differences from M28 tokenizer:
 // 1. Indentation-aware (generates INDENT/DEDENT tokens)
@@ -690,14 +705,7 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 			// Try parsing as signed int64 first
 			if i, err := strconv.ParseInt(cleanLexeme, 2, 64); err == nil {
 				return Token{
-					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
-					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
-				}
-			}
-			// If that fails (overflow), try unsigned int64
-			if u, err := strconv.ParseUint(cleanLexeme, 2, 64); err == nil {
-				return Token{
-					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(float64(u)),
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: intTokenValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
@@ -737,14 +745,7 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 			// Try parsing as signed int64 first
 			if i, err := strconv.ParseInt(cleanLexeme, 8, 64); err == nil {
 				return Token{
-					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
-					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
-				}
-			}
-			// If that fails (overflow), try unsigned int64
-			if u, err := strconv.ParseUint(cleanLexeme, 8, 64); err == nil {
-				return Token{
-					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(float64(u)),
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: intTokenValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
@@ -785,14 +786,7 @@ func (t *PythonTokenizer) scanNumber(start, startLine, startCol int) Token {
 			// Try parsing as signed int64 first
 			if i, err := strconv.ParseInt(cleanLexeme, 16, 64); err == nil {
 				return Token{
-					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(i),
-					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
-				}
-			}
-			// If that fails (overflow), try unsigned int64
-			if u, err := strconv.ParseUint(cleanLexeme, 16, 64); err == nil {
-				return Token{
-					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: core.NumberValue(float64(u)),
+					Type: TOKEN_NUMBER, Lexeme: lexeme, Value: intTokenValue(i),
 					Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos,
 				}
 			}
@@ -973,19 +967,15 @@ skipScientific:
 			value = core.NumberValue(0.0)
 		}
 	} else {
-		// Integer
+		// Integer. Values beyond int64 (and beyond float64's exact range) use
+		// arbitrary-precision BigInt so the literal keeps full precision.
 		if i, err := strconv.ParseInt(cleanLexeme, 10, 64); err == nil {
-			value = core.NumberValue(i)
-		} else if u, err := strconv.ParseUint(cleanLexeme, 10, 64); err == nil {
-			value = core.NumberValue(float64(u))
+			value = intTokenValue(i)
+		} else if bigInt, err := core.NewBigIntFromString(cleanLexeme, 10); err == nil {
+			value = bigInt
 		} else {
-			// Use arbitrary-precision BigInt for very large integers
-			if bigInt, err := core.NewBigIntFromString(cleanLexeme, 10); err == nil {
-				value = bigInt
-			} else {
-				// Parse error - shouldn't happen if lexer scanned valid digits
-				value = core.NumberValue(0)
-			}
+			// Parse error - shouldn't happen if lexer scanned valid digits
+			value = core.NumberValue(0)
 		}
 	}
 
