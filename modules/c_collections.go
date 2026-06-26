@@ -508,18 +508,16 @@ func (dd *DefaultDict) GetAttr(name string) (core.Value, bool) {
 			if len(args) != 2 {
 				return nil, &core.TypeError{Message: "__setitem__ requires exactly 2 arguments"}
 			}
-			key := core.ValueToKey(args[0])
-			dd.dict.Set(key, args[1])
+			// SetValue tracks the original key value (Set with a raw ValueToKey
+			// string loses it, so keys()/items() returned internal "s:a" forms).
+			if err := dd.dict.SetValue(args[0], args[1]); err != nil {
+				return nil, err
+			}
 			return core.Nil, nil
 		}), true
 	case "keys":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			keys := dd.dict.Keys()
-			result := make([]core.Value, len(keys))
-			for i, k := range keys {
-				result[i] = core.StringValue(k)
-			}
-			return core.NewList(result...), nil
+			return core.NewList(dd.dict.OriginalKeys()...), nil
 		}), true
 	case "values":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -530,6 +528,18 @@ func (dd *DefaultDict) GetAttr(name string) (core.Value, bool) {
 				}
 			}
 			return core.NewList(values...), nil
+		}), true
+	case "items":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			origKeys := dd.dict.OriginalKeys()
+			internalKeys := dd.dict.Keys()
+			items := make([]core.Value, 0, len(origKeys))
+			for i, k := range internalKeys {
+				if val, ok := dd.dict.Get(k); ok {
+					items = append(items, core.TupleValue{origKeys[i], val})
+				}
+			}
+			return core.NewList(items...), nil
 		}), true
 	}
 	return nil, false
@@ -560,7 +570,10 @@ func (dd *DefaultDict) Get(key core.Value, ctx *core.Context) (core.Value, error
 		if err != nil {
 			return nil, err
 		}
-		dd.dict.Set(k, val)
+		// SetValue tracks the original key so keys()/items() return it.
+		if err := dd.dict.SetValue(key, val); err != nil {
+			return nil, err
+		}
 		return val, nil
 	}
 
