@@ -247,7 +247,12 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			}
 			err := state.pendingError
 			state.pendingError = nil
-			return nil, err
+			// A StopIteration escaping the generator body becomes RuntimeError
+			// (PEP 479). Body-statement errors are already wrapped at their
+			// source, but a throw()-injected StopIteration reaches here raw;
+			// wrap it so e.g. contextlib's @contextmanager sees the RuntimeError
+			// (with __cause__ set to the StopIteration) it expects.
+			return nil, wrapBodyStopIteration(err, state.Locals)
 		}
 
 		step := state.Steps[state.CurrentStep]
@@ -1287,17 +1292,10 @@ func createExceptionFromThrowArgs(excType core.Value, excValue core.Value, excTb
 	} else if str, ok := excType.(core.StringValue); ok {
 		typeName = string(str)
 	} else if inst, ok := excType.(*core.Instance); ok {
-		// It's an exception instance - get the class name and message
-		typeName = inst.Class.Name
-		if argsAttr, hasArgs := inst.GetAttr("args"); hasArgs {
-			if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
-				if msgStr, ok := argsTuple[0].(core.StringValue); ok {
-					message = string(msgStr)
-				}
-			}
-		}
-		// Return early since we already have everything from the instance
-		return &Exception{Type: typeName, Message: message}
+		// throw() was given an exception instance directly (the modern
+		// single-argument form, e.g. contextlib does `gen.throw(value)`).
+		// Propagate that exact instance so its identity survives.
+		return core.NewPythonError(inst)
 	} else {
 		// Unknown type - create a descriptive error
 		return &core.TypeError{
