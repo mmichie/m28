@@ -1566,26 +1566,35 @@ func registerBytesType() {
 					return BoolValue(compareBytesLex([]byte(receiver.(BytesValue)), b2) >= 0), nil
 				},
 			},
+			// Repetition: handles int/bool/__index__ counts (was NumberValue-only).
+			"__mul__": {
+				Name:    "__mul__",
+				Arity:   1,
+				Doc:     "Return self*value (repetition)",
+				Builtin: true,
+				Handler: bytesRepeatHandler,
+			},
 			"__rmul__": {
 				Name:    "__rmul__",
 				Arity:   1,
-				Doc:     "Return value*self (reversed operand for multiplication)",
+				Doc:     "Return value*self (repetition)",
+				Builtin: true,
+				Handler: bytesRepeatHandler,
+			},
+			// Integer/__index__ subscript (slices handled by the evaluator first);
+			// also makes hasattr(b, '__getitem__') true.
+			"__getitem__": {
+				Name:    "__getitem__",
+				Arity:   1,
+				Doc:     "Return self[index]",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 					b := receiver.(BytesValue)
-					n, ok := args[0].(NumberValue)
-					if !ok {
-						return NotImplemented, nil
+					idx, err := sequenceIndex(args[0], ctx, "bytes")
+					if err != nil {
+						return nil, err
 					}
-					count := int(n)
-					if count <= 0 {
-						return BytesValue([]byte{}), nil
-					}
-					result := make([]byte, 0, len(b)*count)
-					for i := 0; i < count; i++ {
-						result = append(result, b...)
-					}
-					return BytesValue(result), nil
+					return b.GetItem(idx)
 				},
 			},
 		},
@@ -1784,45 +1793,67 @@ func compareBytesLex(a, b []byte) int {
 	}
 }
 
-// byteArrayRepeatHandler implements bytearray repetition for both __mul__ and
-// __rmul__ (repetition is commutative): bytearray * n and n * bytearray.
-func byteArrayRepeatHandler(receiver Value, args []Value, ctx *Context) (Value, error) {
-	b := receiver.(*ByteArrayValue).GetData()
-	var count int
-	switch a := args[0].(type) {
+// resolveRepeatCount resolves a sequence-repetition operand (seq * n) to a count,
+// honoring int/bool and the __index__ protocol, and raising OverflowError for a
+// big-int count (it can never fit an allocatable length). handled is false for a
+// non-index operand, so the caller returns NotImplemented and lets the reflected
+// operation run.
+func resolveRepeatCount(v Value, ctx *Context) (count int, handled bool, err error) {
+	switch a := v.(type) {
 	case NumberValue:
-		count = int(a)
+		return int(a), true, nil
 	case BoolValue:
 		if a {
-			count = 1
+			return 1, true, nil
 		}
+		return 0, true, nil
 	case BigIntValue:
-		// A big-int count can never fit an allocatable length.
-		return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
-	default:
-		// Accept any object with __index__ (CPython's sequence-repeat rule).
-		if attrObj, ok := args[0].(interface{ GetAttr(string) (Value, bool) }); ok {
-			if _, has := attrObj.GetAttr("__index__"); has {
-				idx, err := toIndex(args[0], ctx)
-				if err != nil {
-					return nil, err
-				}
-				count = idx
-			} else {
-				return NotImplemented, nil
-			}
-		} else {
-			return NotImplemented, nil
+		return 0, true, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+	}
+	if attrObj, ok := v.(interface{ GetAttr(string) (Value, bool) }); ok {
+		if _, has := attrObj.GetAttr("__index__"); has {
+			idx, e := toIndex(v, ctx)
+			return idx, true, e
 		}
 	}
+	return 0, false, nil
+}
+
+// repeatByteSlice builds the repetition of b by count, count<=0 giving empty.
+func repeatByteSlice(b []byte, count int) []byte {
 	if count <= 0 {
-		return NewByteArray([]byte{}), nil
+		return []byte{}
 	}
 	result := make([]byte, 0, len(b)*count)
 	for i := 0; i < count; i++ {
 		result = append(result, b...)
 	}
-	return NewByteArray(result), nil
+	return result
+}
+
+// byteArrayRepeatHandler implements bytearray repetition for both __mul__ and
+// __rmul__ (repetition is commutative): bytearray * n and n * bytearray.
+func byteArrayRepeatHandler(receiver Value, args []Value, ctx *Context) (Value, error) {
+	count, handled, err := resolveRepeatCount(args[0], ctx)
+	if !handled {
+		return NotImplemented, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return NewByteArray(repeatByteSlice(receiver.(*ByteArrayValue).GetData(), count)), nil
+}
+
+// bytesRepeatHandler implements bytes repetition for both __mul__ and __rmul__.
+func bytesRepeatHandler(receiver Value, args []Value, ctx *Context) (Value, error) {
+	count, handled, err := resolveRepeatCount(args[0], ctx)
+	if !handled {
+		return NotImplemented, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return BytesValue(repeatByteSlice([]byte(receiver.(BytesValue)), count)), nil
 }
 
 // registerByteArrayType registers the bytearray type descriptor
@@ -1857,6 +1888,23 @@ func registerByteArrayType() {
 				Doc:     "Return value*self (repetition)",
 				Builtin: true,
 				Handler: byteArrayRepeatHandler,
+			},
+			// Integer/__index__ subscript. Slices are handled by the evaluator
+			// before __getitem__ is consulted; this also makes the dunder exist
+			// (hasattr(ba, '__getitem__')).
+			"__getitem__": {
+				Name:    "__getitem__",
+				Arity:   1,
+				Doc:     "Return self[index]",
+				Builtin: true,
+				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+					b := receiver.(*ByteArrayValue)
+					idx, err := sequenceIndex(args[0], ctx, "bytearray")
+					if err != nil {
+						return nil, err
+					}
+					return b.GetItem(idx)
+				},
 			},
 			"decode": {
 				Name:    "decode",
