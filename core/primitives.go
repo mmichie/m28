@@ -781,14 +781,11 @@ func (f *BuiltinFunction) GetAttr(name string) (Value, bool) {
 	// This allows pprint and other modules to use function.__repr__ as a type marker
 	if name == "__repr__" {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if len(args) != 1 {
-				return nil, fmt.Errorf("__repr__ requires exactly 1 argument")
-			}
-			funcName := f.name
-			if funcName == "" {
-				funcName = "builtin_function"
-			}
-			return StringValue(fmt.Sprintf("<%s object>", funcName)), nil
+			// f is captured in the closure, so no self argument is required --
+			// repr() invokes this dunder with zero args. Render the same
+			// "<built-in function name>" form as core.Repr's default, rather
+			// than the old "<name object>" placeholder.
+			return StringValue(reprBuiltinFunction(f)), nil
 		}), true
 	}
 
