@@ -219,6 +219,13 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 	// Format: "ExceptionType: message"
 	if idx := strings.Index(errMsg, ": "); idx > 0 {
 		possibleType := errMsg[:idx]
+		// ArgumentError is M28's internal name (from common/errors and the
+		// validation package) for a wrong-argument-count error. Python has no
+		// such type -- it raises TypeError for these -- so map it to TypeError
+		// so user code can `except TypeError` / assertRaises(TypeError, ...).
+		if possibleType == "ArgumentError" {
+			return createPythonExceptionInstance(ctx, "TypeError", errMsg[idx+2:])
+		}
 		// List of known exception types that might be in error messages
 		knownTypes := []string{
 			"SyntaxError", "TypeError", "ValueError", "NameError",
