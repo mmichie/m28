@@ -1768,11 +1768,37 @@ func intArithMethod(name string, reflected bool, op func(a, b float64) core.Valu
 		if !ok {
 			return core.NotImplemented, nil
 		}
+		a, b := self, other
 		if reflected {
-			return op(other, self), nil
+			a, b = other, self
 		}
-		return op(self, other), nil
+		result := op(a, b)
+		// Integer +, - and * that leave float64's exact-integer range are
+		// recomputed in arbitrary precision, so large products/sums of small
+		// ints (e.g. a factorial) stay exact instead of silently rounding.
+		if rn, isNum := result.(core.NumberValue); isNum {
+			if sym := arithOpSymbol(name); sym != "" {
+				if p, promoted := core.PromoteIntOverflow(sym, a, b, float64(rn)); promoted {
+					return p, nil
+				}
+			}
+		}
+		return result, nil
 	})
+}
+
+// arithOpSymbol maps an int dunder name to its +/-/* operator symbol for
+// overflow promotion, or "" for dunders that are not exact-integer arithmetic.
+func arithOpSymbol(name string) string {
+	switch name {
+	case "__add__", "__radd__":
+		return "+"
+	case "__sub__", "__rsub__":
+		return "-"
+	case "__mul__", "__rmul__":
+		return "*"
+	}
+	return ""
 }
 
 // createIntClass creates the int class that can be used with isinstance

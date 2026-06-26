@@ -46,7 +46,11 @@ func registerNumberType() {
 
 					// Handle NumberValue + NumberValue
 					if b, ok := args[0].(NumberValue); ok {
-						return NumberValue(a + float64(b)), nil
+						sum := a + float64(b)
+						if p, ok := PromoteIntOverflow("+", a, float64(b), sum); ok {
+							return p, nil
+						}
+						return NumberValue(sum), nil
 					}
 
 					// Handle addition with int subclass instances
@@ -64,7 +68,11 @@ func registerNumberType() {
 						if bool(b) {
 							bNum = 1.0
 						}
-						return NumberValue(a + bNum), nil
+						sum := a + bNum
+						if p, ok := PromoteIntOverflow("+", a, bNum, sum); ok {
+							return p, nil
+						}
+						return NumberValue(sum), nil
 					}
 
 					// Handle NumberValue + ComplexValue

@@ -211,6 +211,41 @@ func DemoteToNumber(b BigIntValue) (NumberValue, bool) {
 	return 0, false
 }
 
+// PromoteIntOverflow recomputes an integer +, - or * of two NumberValue
+// operands in arbitrary precision when the float64 result has left float64's
+// exact-integer range (2^53), so e.g. a factorial built from small ints stays
+// exact. result is the already-computed float64 result, used as a cheap gate so
+// the common small-int path stays fast. ok is false (keep the plain float
+// result) when either operand is a non-integral float or the result is still
+// exactly representable.
+func PromoteIntOverflow(op string, a, b, result float64) (Value, bool) {
+	if math.Abs(result) < MaxSafeInt {
+		return nil, false // exactly representable in float64
+	}
+	if a != math.Trunc(a) || b != math.Trunc(b) ||
+		math.IsInf(a, 0) || math.IsInf(b, 0) {
+		return nil, false // a true float is involved: result stays float
+	}
+	ai := PromoteToBigInt(NumberValue(a)).GetBigInt()
+	bi := PromoteToBigInt(NumberValue(b)).GetBigInt()
+	var r *big.Int
+	switch op {
+	case "+":
+		r = new(big.Int).Add(ai, bi)
+	case "-":
+		r = new(big.Int).Sub(ai, bi)
+	case "*":
+		r = new(big.Int).Mul(ai, bi)
+	default:
+		return nil, false
+	}
+	bv := NewBigInt(r)
+	if n, ok := DemoteToNumber(bv); ok {
+		return n, true
+	}
+	return bv, true
+}
+
 // ComplexValue represents a complex number value
 type ComplexValue complex128
 
