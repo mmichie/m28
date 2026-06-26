@@ -728,97 +728,69 @@ func RegisterMisc(ctx *core.Context) {
 
 	// compile - compile source into a code object
 	// Parses source and emits warnings for problematic patterns
-	ctx.Define("compile", core.NewNamedBuiltinFunction("compile", func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("compile", args)
-		// compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1)
-		if err := v.Min(3); err != nil {
-			return nil, err
-		}
-		if err := v.Max(6); err != nil {
-			return nil, err
-		}
-
-		// Get source code
-		source, err := v.GetString(0)
-		if err != nil {
-			return nil, err
-		}
-
-		filename, err := v.GetString(1)
-		if err != nil {
-			return nil, err
-		}
-
-		// mode (exec, eval, single) - not used for now
-		_, err = v.GetString(2)
-		if err != nil {
-			return nil, err
-		}
-
-		// Parse the source to check for problematic patterns
-		// We need to emit SyntaxWarnings for assert statements with tuple conditions
-		if err := checkAssertPatterns(source, filename, ctx); err != nil {
-			// Check if this is a SyntaxWarning being treated as error
-			// CPython's compile() converts SyntaxWarning to SyntaxError
-			// Check for eval.Exception (the common exception type in M28)
-			if evalExc, ok := err.(*eval.Exception); ok && evalExc.Type == "SyntaxWarning" {
-				// Convert SyntaxWarning to SyntaxError to match CPython behavior
-				// Look up SyntaxError class and create a proper instance with attributes
-				if syntaxErrorClass, lookupErr := ctx.Lookup("SyntaxError"); lookupErr == nil {
-					if cls, ok := syntaxErrorClass.(*core.Class); ok {
-						inst := core.NewInstance(cls)
-						// Set SyntaxError-specific attributes
-						// CPython sets offset=1 for assertion warnings
-						inst.SetAttr("msg", core.StringValue(evalExc.Message))
-						inst.SetAttr("lineno", core.NumberValue(1))
-						inst.SetAttr("offset", core.NumberValue(1))
-						inst.SetAttr("text", core.Nil)
-						inst.SetAttr("filename", core.StringValue(filename))
-						// args tuple: (msg, (filename, lineno, offset, text))
-						inst.SetAttr("args", core.TupleValue{
-							core.StringValue(evalExc.Message),
-							core.TupleValue{
-								core.StringValue(filename),
-								core.NumberValue(1),
-								core.NumberValue(1),
-								core.Nil,
-							},
-						})
-						return nil, core.NewPythonError(inst)
-					}
-				}
-				// Fallback to eval.Exception if class lookup fails
-				return nil, &eval.Exception{
-					Type:    "SyntaxError",
-					Message: evalExc.Message,
+	ctx.Define("compile", &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "compile",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			// compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1)
+			// M28's compile() is a placeholder that ignores flags/dont_inherit/
+			// optimize, but it must accept them -- positionally or by keyword --
+			// rather than reject the call (CPython accepts both forms).
+			for k := range kwargs {
+				switch k {
+				case "flags", "dont_inherit", "optimize", "_feature_version":
+					// accepted and ignored
+				default:
+					return nil, &core.TypeError{Message: fmt.Sprintf("compile() got an unexpected keyword argument '%s'", k)}
 				}
 			}
-			// Also check for core.PythonError
-			if pyErr, ok := err.(*core.PythonError); ok {
-				if pyErr.GetExceptionType() == "SyntaxWarning" {
+			v := validation.NewArgs("compile", args)
+			if err := v.Min(3); err != nil {
+				return nil, err
+			}
+			if err := v.Max(6); err != nil {
+				return nil, err
+			}
+
+			// Get source code
+			source, err := v.GetString(0)
+			if err != nil {
+				return nil, err
+			}
+
+			filename, err := v.GetString(1)
+			if err != nil {
+				return nil, err
+			}
+
+			// mode (exec, eval, single) - not used for now
+			_, err = v.GetString(2)
+			if err != nil {
+				return nil, err
+			}
+
+			// Parse the source to check for problematic patterns
+			// We need to emit SyntaxWarnings for assert statements with tuple conditions
+			if err := checkAssertPatterns(source, filename, ctx); err != nil {
+				// Check if this is a SyntaxWarning being treated as error
+				// CPython's compile() converts SyntaxWarning to SyntaxError
+				// Check for eval.Exception (the common exception type in M28)
+				if evalExc, ok := err.(*eval.Exception); ok && evalExc.Type == "SyntaxWarning" {
 					// Convert SyntaxWarning to SyntaxError to match CPython behavior
-					// Look up SyntaxError class and create instance
+					// Look up SyntaxError class and create a proper instance with attributes
 					if syntaxErrorClass, lookupErr := ctx.Lookup("SyntaxError"); lookupErr == nil {
 						if cls, ok := syntaxErrorClass.(*core.Class); ok {
-							// Get message from the original warning
-							msg := "assertion is always true, perhaps remove parentheses?"
-							if pyErr.Instance != nil {
-								if argsAttr, hasArgs := pyErr.Instance.GetAttr("args"); hasArgs {
-									if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
-										msg = argsTuple[0].String()
-									}
-								}
-							}
-							// Create SyntaxError instance with proper attributes
-							// CPython sets offset=1 for assertion warnings
 							inst := core.NewInstance(cls)
-							inst.SetAttr("msg", core.StringValue(msg))
+							// Set SyntaxError-specific attributes
+							// CPython sets offset=1 for assertion warnings
+							inst.SetAttr("msg", core.StringValue(evalExc.Message))
 							inst.SetAttr("lineno", core.NumberValue(1))
 							inst.SetAttr("offset", core.NumberValue(1))
 							inst.SetAttr("text", core.Nil)
 							inst.SetAttr("filename", core.StringValue(filename))
+							// args tuple: (msg, (filename, lineno, offset, text))
 							inst.SetAttr("args", core.TupleValue{
-								core.StringValue(msg),
+								core.StringValue(evalExc.Message),
 								core.TupleValue{
 									core.StringValue(filename),
 									core.NumberValue(1),
@@ -829,15 +801,58 @@ func RegisterMisc(ctx *core.Context) {
 							return nil, core.NewPythonError(inst)
 						}
 					}
+					// Fallback to eval.Exception if class lookup fails
+					return nil, &eval.Exception{
+						Type:    "SyntaxError",
+						Message: evalExc.Message,
+					}
 				}
+				// Also check for core.PythonError
+				if pyErr, ok := err.(*core.PythonError); ok {
+					if pyErr.GetExceptionType() == "SyntaxWarning" {
+						// Convert SyntaxWarning to SyntaxError to match CPython behavior
+						// Look up SyntaxError class and create instance
+						if syntaxErrorClass, lookupErr := ctx.Lookup("SyntaxError"); lookupErr == nil {
+							if cls, ok := syntaxErrorClass.(*core.Class); ok {
+								// Get message from the original warning
+								msg := "assertion is always true, perhaps remove parentheses?"
+								if pyErr.Instance != nil {
+									if argsAttr, hasArgs := pyErr.Instance.GetAttr("args"); hasArgs {
+										if argsTuple, ok := argsAttr.(core.TupleValue); ok && len(argsTuple) > 0 {
+											msg = argsTuple[0].String()
+										}
+									}
+								}
+								// Create SyntaxError instance with proper attributes
+								// CPython sets offset=1 for assertion warnings
+								inst := core.NewInstance(cls)
+								inst.SetAttr("msg", core.StringValue(msg))
+								inst.SetAttr("lineno", core.NumberValue(1))
+								inst.SetAttr("offset", core.NumberValue(1))
+								inst.SetAttr("text", core.Nil)
+								inst.SetAttr("filename", core.StringValue(filename))
+								inst.SetAttr("args", core.TupleValue{
+									core.StringValue(msg),
+									core.TupleValue{
+										core.StringValue(filename),
+										core.NumberValue(1),
+										core.NumberValue(1),
+										core.Nil,
+									},
+								})
+								return nil, core.NewPythonError(inst)
+							}
+						}
+					}
+				}
+				return nil, err
 			}
-			return nil, err
-		}
 
-		// Return a code object placeholder
-		// TODO(M28-4604): Implement actual bytecode compilation
-		return core.NewCodeObject(core.Nil), nil
-	}))
+			// Return a code object placeholder
+			// TODO(M28-4604): Implement actual bytecode compilation
+			return core.NewCodeObject(core.Nil), nil
+		},
+	})
 }
 
 // Migration Statistics:
