@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
@@ -175,12 +176,16 @@ func RegisterErrors(ctx *core.Context) {
 		// Get class name
 		className := self.Class.Name
 
-		// Get the args attribute for display
+		// Get the args attribute for display. CPython formats an exception's
+		// repr as ClassName(repr(arg0), repr(arg1), ...) — every arg via repr
+		// (so strings use single quotes), not just the first via str().
 		if argsVal, hasArgs := self.Attributes["args"]; hasArgs {
 			if argsTuple, ok := argsVal.(core.TupleValue); ok && len(argsTuple) > 0 {
-				// Format like: ImportError('message')
-				msg := argsTuple[0].String()
-				return core.StringValue(fmt.Sprintf("%s(%s)", className, msg)), nil
+				parts := make([]string, len(argsTuple))
+				for i, a := range argsTuple {
+					parts[i] = core.Repr(a)
+				}
+				return core.StringValue(fmt.Sprintf("%s(%s)", className, strings.Join(parts, ", "))), nil
 			}
 		}
 
