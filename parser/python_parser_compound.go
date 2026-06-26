@@ -1165,6 +1165,11 @@ func (p *PythonParser) parseWithStatementWithAsync(isAsync bool) ast.ASTNode {
 			if ident, ok := target.(*ast.Identifier); ok {
 				variable = ident.Name
 				target = nil
+			} else if errMsg := p.validateAssignmentTarget(target); errMsg != "" {
+				// The as-target must be assignable, e.g. `with cm as None:` and
+				// `with cm as (a, None):` are SyntaxErrors just like `None = x`.
+				p.error(errMsg)
+				return nil
 			}
 		}
 
