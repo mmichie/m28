@@ -328,8 +328,10 @@ func (w *contextManagerWrapper) Exit(excType, excValue, excTraceback Value) (boo
 			return false, err
 		}
 
-		// Check if exception should be suppressed
-		return IsTruthy(result), nil
+		// Check if the exception should be suppressed. Evaluating the result's
+		// truthiness may itself raise (e.g. a __bool__ that errors); that
+		// exception must propagate, not be swallowed (CPython issue 4589).
+		return IsTruthyErr(result)
 	}
 	return false, fmt.Errorf("__exit__ is not callable")
 }

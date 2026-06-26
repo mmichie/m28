@@ -888,6 +888,51 @@ func Compare(a, b Value) int {
 }
 
 // IsTruthy determines if a value is truthy
+// IsTruthyErr is like IsTruthy but propagates an exception raised by a
+// __bool__ or __len__ method instead of swallowing it. Use it where Python
+// requires such an exception to surface — e.g. evaluating a with-statement
+// __exit__ result, where `__bool__` raising must abort suppression and
+// propagate (CPython issue 4589).
+func IsTruthyErr(v Value) (bool, error) {
+	if v == nil {
+		return false, nil
+	}
+	if obj, ok := v.(interface {
+		GetAttr(string) (Value, bool)
+	}); ok {
+		if boolMethod, hasBool := obj.GetAttr("__bool__"); hasBool {
+			if callable, isCallable := boolMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); isCallable {
+				result, err := callable.Call([]Value{}, nil)
+				if err != nil {
+					return false, err
+				}
+				if boolVal, isBool := result.(BoolValue); isBool {
+					return bool(boolVal), nil
+				}
+				// Non-bool result: match IsTruthy's lenient behavior.
+				return true, nil
+			}
+		}
+		if lenMethod, hasLen := obj.GetAttr("__len__"); hasLen {
+			if callable, isCallable := lenMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); isCallable {
+				result, err := callable.Call([]Value{}, nil)
+				if err != nil {
+					return false, err
+				}
+				if numVal, isNum := result.(NumberValue); isNum {
+					return float64(numVal) != 0, nil
+				}
+			}
+		}
+	}
+	// No __bool__/__len__ (or non-numeric __len__): defer to the plain rules.
+	return IsTruthy(v), nil
+}
+
 func IsTruthy(v Value) bool {
 	// Nil checks
 	if v == nil {
