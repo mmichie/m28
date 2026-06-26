@@ -91,6 +91,26 @@ func registerFrozenSetType() {
 	})
 }
 
+// setOperandItems returns the elements, membership test and size of a set or
+// frozenset operand, so frozenset subset/superset comparisons accept either
+// type (Python compares frozensets and sets interchangeably).
+func setOperandItems(v Value) (items []Value, contains func(Value) bool, size int, ok bool) {
+	var m map[string]Value
+	switch s := v.(type) {
+	case *FrozenSetValue:
+		m, contains, size, ok = s.items, s.Contains, s.Size(), true
+	case *SetValue:
+		m, contains, size, ok = s.items, s.Contains, s.Size(), true
+	default:
+		return nil, nil, 0, false
+	}
+	items = make([]Value, 0, len(m))
+	for _, item := range m {
+		items = append(items, item)
+	}
+	return items, contains, size, ok
+}
+
 // getFrozenSetMethods returns all frozenset methods (read-only operations only)
 func getFrozenSetMethods() map[string]*MethodDescriptor {
 	return map[string]*MethodDescriptor{
@@ -106,6 +126,76 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 					result.Add(item)
 				}
 				return result, nil
+			},
+		},
+		"__le__": {
+			Name: "__le__", Arity: 1, Doc: "Subset test (self <= other)", Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				fs := receiver.(*FrozenSetValue)
+				_, contains, _, ok := setOperandItems(args[0])
+				if !ok {
+					return nil, NewTypeError("set or frozenset", args[0], "__le__ argument")
+				}
+				for _, item := range fs.items {
+					if !contains(item) {
+						return False, nil
+					}
+				}
+				return True, nil
+			},
+		},
+		"__lt__": {
+			Name: "__lt__", Arity: 1, Doc: "Proper-subset test (self < other)", Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				fs := receiver.(*FrozenSetValue)
+				_, contains, size, ok := setOperandItems(args[0])
+				if !ok {
+					return nil, NewTypeError("set or frozenset", args[0], "__lt__ argument")
+				}
+				if fs.Size() >= size {
+					return False, nil
+				}
+				for _, item := range fs.items {
+					if !contains(item) {
+						return False, nil
+					}
+				}
+				return True, nil
+			},
+		},
+		"__ge__": {
+			Name: "__ge__", Arity: 1, Doc: "Superset test (self >= other)", Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				fs := receiver.(*FrozenSetValue)
+				items, _, _, ok := setOperandItems(args[0])
+				if !ok {
+					return nil, NewTypeError("set or frozenset", args[0], "__ge__ argument")
+				}
+				for _, item := range items {
+					if !fs.Contains(item) {
+						return False, nil
+					}
+				}
+				return True, nil
+			},
+		},
+		"__gt__": {
+			Name: "__gt__", Arity: 1, Doc: "Proper-superset test (self > other)", Builtin: true,
+			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				fs := receiver.(*FrozenSetValue)
+				items, _, size, ok := setOperandItems(args[0])
+				if !ok {
+					return nil, NewTypeError("set or frozenset", args[0], "__gt__ argument")
+				}
+				if fs.Size() <= size {
+					return False, nil
+				}
+				for _, item := range items {
+					if !fs.Contains(item) {
+						return False, nil
+					}
+				}
+				return True, nil
 			},
 		},
 		"union": {

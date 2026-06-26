@@ -52,18 +52,20 @@ func InitCollectionsModule() *core.DictValue {
 
 	// Register defaultdict class
 	collectionsModule.Set("defaultdict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 1 {
-			return nil, &core.TypeError{Message: "defaultdict requires at least 1 argument (default_factory)"}
+		// defaultdict([default_factory[, ...]]): default_factory defaults to None
+		// (a missing key then raises KeyError, like a plain dict).
+		var factory core.Value = core.None
+		rest := args
+		if len(args) > 0 {
+			factory = args[0]
+			rest = args[1:]
 		}
-
-		// First argument is the default factory
-		factory := args[0]
 
 		dd := NewDefaultDict(factory)
 
-		// If there's a second argument, it should be a dict or iterable of pairs
-		if len(args) > 1 {
-			if dict, ok := args[1].(*core.DictValue); ok {
+		// Any remaining argument initializes the dict (mapping of pairs).
+		if len(rest) > 0 {
+			if dict, ok := rest[0].(*core.DictValue); ok {
 				for _, key := range dict.Keys() {
 					if val, ok := dict.Get(key); ok {
 						dd.dict.Set(key, val)
@@ -543,6 +545,11 @@ func (dd *DefaultDict) Get(key core.Value, ctx *core.Context) (core.Value, error
 	k := core.ValueToKey(key)
 	if val, ok := dd.dict.Get(k); ok {
 		return val, nil
+	}
+
+	// With no default_factory (None), a missing key raises KeyError like a dict.
+	if dd.defaultFactory == nil || dd.defaultFactory == core.None {
+		return nil, &core.KeyError{Key: key}
 	}
 
 	// Call the factory function with the provided context
