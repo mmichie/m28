@@ -921,9 +921,35 @@ func (s *SliceValue) GetAttr(name string) (Value, bool) {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
 			return s.indices(args, ctx)
 		}), true
+	case "__hash__":
+		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
+			return s.hashValue(ctx)
+		}), true
 	default:
 		return nil, false
 	}
+}
+
+// hashValue computes the hash of a slice from its (start, stop, step). Slices
+// are hashable (CPython 3.12+); a bound that is itself unhashable makes the
+// slice unhashable, raising TypeError like CPython.
+func (s *SliceValue) hashValue(ctx *Context) (Value, error) {
+	var h int64
+	for _, part := range []Value{s.Start, s.Stop, s.Step} {
+		p := part
+		if p == nil {
+			p = Nil
+		}
+		if !IsHashable(p) {
+			return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", p.Type())}
+		}
+		ph, err := ComputeHash(p, ctx)
+		if err != nil {
+			return nil, err
+		}
+		h = 31*h + ph
+	}
+	return NumberValue(h), nil
 }
 
 // indices implements slice.indices(length): returns the (start, stop, step)
