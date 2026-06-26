@@ -490,7 +490,15 @@ func (dd *DefaultDict) Type() core.Type {
 
 // String implements Value.String
 func (dd *DefaultDict) String() string {
-	return fmt.Sprintf("defaultdict(%s, %s)", dd.defaultFactory.String(), dd.dict.String())
+	factory := dd.defaultFactory
+	if factory == nil {
+		factory = core.None
+	}
+	// Cycle guard (gh-145492): a factory or value whose __repr__ reprs this
+	// defaultdict must not recurse forever -- CPython shows "defaultdict(...)".
+	return core.WithReprCycleDetection(dd, "defaultdict(...)", func() string {
+		return fmt.Sprintf("defaultdict(%s, %s)", core.Repr(factory), core.Repr(dd.dict))
+	})
 }
 
 // GetAttr implements attribute access
@@ -541,12 +549,38 @@ func (dd *DefaultDict) GetAttr(name string) (core.Value, bool) {
 			}
 			return core.NewList(items...), nil
 		}), true
+	case "default_factory":
+		// The factory is a public, mutable attribute (defaults to None).
+		if dd.defaultFactory == nil {
+			return core.None, true
+		}
+		return dd.defaultFactory, true
+	case "__missing__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) != 1 {
+				return nil, &core.TypeError{Message: "__missing__() takes exactly one argument"}
+			}
+			return dd.Missing(args[0], ctx)
+		}), true
+	case "copy", "__copy__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return dd.Copy(), nil
+		}), true
+	case "__len__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return core.NumberValue(dd.dict.Size()), nil
+		}), true
 	}
 	return nil, false
 }
 
-// SetAttr implements attribute setting
+// SetAttr implements attribute setting. default_factory is a public, mutable
+// attribute on a defaultdict; everything else is read-only.
 func (dd *DefaultDict) SetAttr(name string, value core.Value) error {
+	if name == "default_factory" {
+		dd.defaultFactory = value
+		return nil
+	}
 	return &core.AttributeError{Message: fmt.Sprintf("cannot set attribute '%s' on defaultdict", name)}
 }
 
@@ -578,6 +612,42 @@ func (dd *DefaultDict) Get(key core.Value, ctx *core.Context) (core.Value, error
 	}
 
 	return nil, &core.TypeError{Message: "default_factory is not callable"}
+}
+
+// Missing implements __missing__(key): with no default_factory it raises
+// KeyError; otherwise it calls the factory, stores key->value, and returns it.
+func (dd *DefaultDict) Missing(key core.Value, ctx *core.Context) (core.Value, error) {
+	if dd.defaultFactory == nil || dd.defaultFactory == core.None {
+		return nil, &core.KeyError{Key: key}
+	}
+	callable, ok := dd.defaultFactory.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return nil, &core.TypeError{Message: "default_factory is not callable"}
+	}
+	val, err := callable.Call([]core.Value{}, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := dd.dict.SetValue(key, val); err != nil {
+		return nil, err
+	}
+	return val, nil
+}
+
+// Copy returns a shallow copy: a new defaultdict with the same factory and the
+// same key/value pairs.
+func (dd *DefaultDict) Copy() *DefaultDict {
+	clone := NewDefaultDict(dd.defaultFactory)
+	internalKeys := dd.dict.Keys()
+	origKeys := dd.dict.OriginalKeys()
+	for i, k := range internalKeys {
+		if val, ok := dd.dict.Get(k); ok {
+			_ = clone.dict.SetValue(origKeys[i], val)
+		}
+	}
+	return clone
 }
 
 // Deque is a double-ended queue

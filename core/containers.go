@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"hash/fnv"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -91,6 +92,19 @@ func withCycleDetectionErr(ptr uintptr, placeholder string, f func() (string, er
 // withCycleDetection runs f with cycle detection for the given pointer
 func withCycleDetection(ptr uintptr, f func() string) string {
 	return withCycleDetectionPlaceholder(ptr, "{...}", f)
+}
+
+// WithReprCycleDetection runs f with per-goroutine cycle detection keyed on the
+// identity of obj (which must be a pointer), returning placeholder when obj is
+// already being repr'd in the current goroutine. Container types implemented
+// outside the core package (e.g. collections.defaultdict) use this to break
+// repr recursion the same way dict/list do internally.
+func WithReprCycleDetection(obj any, placeholder string, f func() string) string {
+	rv := reflect.ValueOf(obj)
+	if rv.Kind() != reflect.Ptr {
+		return f()
+	}
+	return withCycleDetectionPlaceholder(rv.Pointer(), placeholder, f)
 }
 
 // withCycleDetectionPlaceholder runs f with cycle detection, returning placeholder on cycles
