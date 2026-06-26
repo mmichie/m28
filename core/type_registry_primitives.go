@@ -1784,6 +1784,47 @@ func compareBytesLex(a, b []byte) int {
 	}
 }
 
+// byteArrayRepeatHandler implements bytearray repetition for both __mul__ and
+// __rmul__ (repetition is commutative): bytearray * n and n * bytearray.
+func byteArrayRepeatHandler(receiver Value, args []Value, ctx *Context) (Value, error) {
+	b := receiver.(*ByteArrayValue).GetData()
+	var count int
+	switch a := args[0].(type) {
+	case NumberValue:
+		count = int(a)
+	case BoolValue:
+		if a {
+			count = 1
+		}
+	case BigIntValue:
+		// A big-int count can never fit an allocatable length.
+		return nil, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+	default:
+		// Accept any object with __index__ (CPython's sequence-repeat rule).
+		if attrObj, ok := args[0].(interface{ GetAttr(string) (Value, bool) }); ok {
+			if _, has := attrObj.GetAttr("__index__"); has {
+				idx, err := toIndex(args[0], ctx)
+				if err != nil {
+					return nil, err
+				}
+				count = idx
+			} else {
+				return NotImplemented, nil
+			}
+		} else {
+			return NotImplemented, nil
+		}
+	}
+	if count <= 0 {
+		return NewByteArray([]byte{}), nil
+	}
+	result := make([]byte, 0, len(b)*count)
+	for i := 0; i < count; i++ {
+		result = append(result, b...)
+	}
+	return NewByteArray(result), nil
+}
+
 // registerByteArrayType registers the bytearray type descriptor
 func registerByteArrayType() {
 	RegisterType(&TypeDescriptor{
@@ -1801,6 +1842,21 @@ func registerByteArrayType() {
 					// Use IteratorValue() which returns the iterator as a Value
 					return b.IteratorValue(), nil
 				},
+			},
+			// Repetition: bytearray * int and int * bytearray (commutative).
+			"__mul__": {
+				Name:    "__mul__",
+				Arity:   1,
+				Doc:     "Return self*value (repetition)",
+				Builtin: true,
+				Handler: byteArrayRepeatHandler,
+			},
+			"__rmul__": {
+				Name:    "__rmul__",
+				Arity:   1,
+				Doc:     "Return value*self (repetition)",
+				Builtin: true,
+				Handler: byteArrayRepeatHandler,
 			},
 			"decode": {
 				Name:    "decode",
