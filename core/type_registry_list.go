@@ -1456,6 +1456,11 @@ func repeatCount(arg Value, ctx *Context) (NumberValue, error) {
 	if n, ok := arg.(NumberValue); ok {
 		return n, nil
 	}
+	if _, ok := arg.(BigIntValue); ok {
+		// A big-int count is far larger than any sequence M28 can allocate,
+		// so it can never fit an index-sized integer (CPython raises the same).
+		return 0, &OverflowError{Message: "cannot fit 'int' into an index-sized integer"}
+	}
 	if attrObj, ok := arg.(interface{ GetAttr(string) (Value, bool) }); ok {
 		if _, exists := attrObj.GetAttr("__index__"); exists {
 			idx, err := toIndex(arg, ctx)

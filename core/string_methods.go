@@ -747,6 +747,8 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		case 'd', 'i': // Integer
 			if num, ok := value.(NumberValue); ok {
 				formatted = fmt.Sprintf("%d", int64(num))
+			} else if bi, ok := value.(BigIntValue); ok {
+				formatted = bi.GetBigInt().String()
 			} else if b, ok := value.(BoolValue); ok {
 				// In Python, bool is a subclass of int, so True is 1 and False is 0
 				if b {
@@ -760,6 +762,8 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		case 'f', 'F': // Float
 			if num, ok := value.(NumberValue); ok {
 				formatted = fmt.Sprintf("%f", float64(num))
+			} else if bi, ok := value.(BigIntValue); ok {
+				formatted = fmt.Sprintf("%f", bi.ToFloat64())
 			} else {
 				return nil, &TypeError{Message: fmt.Sprintf("%%f format: a number is required, not %s", value.Type())}
 			}
@@ -770,6 +774,12 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		case 'c': // Character
 			if num, ok := value.(NumberValue); ok {
 				formatted = string(rune(int(num)))
+			} else if bi, ok := value.(BigIntValue); ok {
+				if i64, fits := bi.ToInt64(); fits && i64 >= 0 && i64 <= 0x10FFFF {
+					formatted = string(rune(i64))
+				} else {
+					return nil, &OverflowError{Message: "%c arg not in range(0x110000)"}
+				}
 			} else if str, ok := value.(StringValue); ok {
 				if len(str) == 1 {
 					formatted = string(str)
@@ -785,6 +795,12 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 					formatted = fmt.Sprintf("%x", int64(num))
 				} else {
 					formatted = fmt.Sprintf("%X", int64(num))
+				}
+			} else if bi, ok := value.(BigIntValue); ok {
+				if fmtType == 'x' {
+					formatted = fmt.Sprintf("%x", bi.GetBigInt())
+				} else {
+					formatted = fmt.Sprintf("%X", bi.GetBigInt())
 				}
 			} else if b, ok := value.(BoolValue); ok {
 				// In Python, bool is a subclass of int, so True is 1 and False is 0
@@ -803,6 +819,8 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		case 'o': // Octal
 			if num, ok := value.(NumberValue); ok {
 				formatted = fmt.Sprintf("%o", int64(num))
+			} else if bi, ok := value.(BigIntValue); ok {
+				formatted = fmt.Sprintf("%o", bi.GetBigInt())
 			} else if b, ok := value.(BoolValue); ok {
 				// In Python, bool is a subclass of int, so True is 1 and False is 0
 				if b {
