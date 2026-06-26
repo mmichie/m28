@@ -466,13 +466,13 @@ func RegisterTypes(ctx *core.Context) {
 			return nil, &core.TypeError{Message: "attribute name must be string"}
 		}
 
-		// Delete the attribute from the object
+		// Delegate to the instance's default deletion, which honors the
+		// descriptor protocol: a data descriptor with __delete__ (e.g. a
+		// property or DynamicClassAttribute deleter) is invoked before falling
+		// back to removing the instance __dict__ entry. Deleting directly from
+		// inst.Attributes here (as before) silently bypassed those deleters.
 		if inst, ok := self.(*core.Instance); ok {
-			if _, exists := inst.Attributes[string(name)]; exists {
-				delete(inst.Attributes, string(name))
-				return core.None, nil
-			}
-			return nil, &core.AttributeError{ObjType: inst.Class.Name, AttrName: string(name)}
+			return core.None, inst.DelAttrDefault(string(name))
 		}
 		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object has no attribute '%s'", self.Type(), name)}
 	}))
