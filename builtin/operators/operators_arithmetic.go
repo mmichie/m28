@@ -56,6 +56,11 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 		return result, err
 	}
 
+	// Arbitrary-precision integers (and big/number/bool/float mixes).
+	if result, handled, err := bigIntArith("+", left, right); handled {
+		return result, err
+	}
+
 	// Try protocol-based numeric operations
 	if leftNum, ok := protocols.GetNumericOps(left); ok {
 		return leftNum.Add(right)
@@ -294,39 +299,9 @@ func subtractTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 		return result, err
 	}
 
-	// Check if we have BigInt operands
-	leftBig, leftIsBig := left.(core.BigIntValue)
-	rightBig, rightIsBig := right.(core.BigIntValue)
-
-	if leftIsBig || rightIsBig {
-		// Promote both to BigInt if needed
-		if !leftIsBig {
-			if leftNum, ok := left.(core.NumberValue); ok {
-				leftBig = core.PromoteToBigInt(leftNum)
-			} else {
-				return nil, errors.NewTypeError("-", "unsupported operand type(s)",
-					"'"+string(left.Type())+"' and '"+string(right.Type())+"'")
-			}
-		}
-		if !rightIsBig {
-			if rightNum, ok := right.(core.NumberValue); ok {
-				rightBig = core.PromoteToBigInt(rightNum)
-			} else {
-				return nil, errors.NewTypeError("-", "unsupported operand type(s)",
-					"'"+string(left.Type())+"' and '"+string(right.Type())+"'")
-			}
-		}
-
-		// Compute with BigInt
-		result := new(big.Int).Sub(leftBig.GetBigInt(), rightBig.GetBigInt())
-		bigIntResult := core.NewBigInt(result)
-
-		// Try to demote to NumberValue if it fits
-		if numVal, ok := core.DemoteToNumber(bigIntResult); ok {
-			return numVal, nil
-		}
-
-		return bigIntResult, nil
+	// Arbitrary-precision integers (and big/number/bool/float mixes).
+	if result, handled, err := bigIntArith("-", left, right); handled {
+		return result, err
 	}
 
 	// Try protocol-based numeric operations
@@ -395,6 +370,12 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 
 	// Try __rmul__ on right operand
 	if result, found, err := types.CallDunder(right, "__rmul__", []core.Value{left}, ctx); found {
+		return result, err
+	}
+
+	// Arbitrary-precision integers (and big/number/bool/float mixes). Skipped
+	// for sequence repetition, where one operand is a str/list/tuple.
+	if result, handled, err := bigIntArith("*", left, right); handled {
 		return result, err
 	}
 
@@ -628,6 +609,12 @@ func divideValue(left, right core.Value, ctx *core.Context) (core.Value, error) 
 		return result, err
 	}
 
+	// Arbitrary-precision integers (and big/number/bool/float mixes). True
+	// division always yields a float.
+	if result, handled, err := bigIntArith("/", left, right); handled {
+		return result, err
+	}
+
 	// Try protocol-based numeric operations
 	if leftNum, ok := protocols.GetNumericOps(left); ok {
 		return leftNum.Divide(right)
@@ -699,6 +686,11 @@ func floorDivideValue(left, right core.Value, ctx *core.Context) (core.Value, er
 		return result, err
 	}
 
+	// Arbitrary-precision integers (and big/number/bool/float mixes).
+	if result, handled, err := bigIntArith("//", left, right); handled {
+		return result, err
+	}
+
 	// Fall back to numeric floor division
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
@@ -749,6 +741,12 @@ func moduloTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Try __rmod__ on right operand
 	if result, found, err := types.CallDunder(right, "__rmod__", []core.Value{left}, ctx); found {
+		return result, err
+	}
+
+	// Arbitrary-precision integers (and big/number/bool/float mixes). Guarded
+	// so str/bytes %-formatting (handled below) is not intercepted.
+	if result, handled, err := bigIntArith("%", left, right); handled {
 		return result, err
 	}
 
