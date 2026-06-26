@@ -172,8 +172,26 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 		if objWithAttrs, ok := obj.(interface {
 			GetAttr(string) (core.Value, bool)
 		}); ok {
-			_, found := objWithAttrs.GetAttr(name)
-			return core.BoolValue(found), nil
+			value, found := objWithAttrs.GetAttr(name)
+			if !found {
+				return core.False, nil
+			}
+			// CPython's hasattr is `try: getattr(...); except AttributeError`.
+			// GetAttr hands back the property object itself (rather than the
+			// gotten value) when its getter raised, so invoke the getter and
+			// report False only when it raises AttributeError -- otherwise
+			// hasattr(obj, prop) is True even though obj.prop would raise.
+			if prop, ok := value.(*core.PropertyValue); ok && prop.Getter != nil {
+				if getter, ok := prop.Getter.(core.Callable); ok {
+					if _, err := getter.Call([]core.Value{obj}, ctx); err != nil {
+						if isAttributeError(err) {
+							return core.False, nil
+						}
+						return nil, err
+					}
+				}
+			}
+			return core.True, nil
 		}
 
 		// Check type descriptor methods
