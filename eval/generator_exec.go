@@ -556,7 +556,7 @@ func (state *GeneratorExecState) Next() (core.Value, error) {
 			// Check if it's a context manager
 			cm, ok := core.IsContextManager(mgrValue)
 			if !ok {
-				return nil, fmt.Errorf("'%s' object does not support the context manager protocol", mgrValue.Type())
+				return nil, contextManagerProtocolError(mgrValue)
 			}
 
 			// Call __enter__

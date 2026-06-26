@@ -161,6 +161,26 @@ func parseManagerList(list *core.ListValue) []withManager {
 	return managers
 }
 
+// contextManagerProtocolError builds the TypeError raised when a `with`
+// subject is not a context manager. CPython raises TypeError and, when the
+// object has __enter__ but is missing __exit__, appends "(missing __exit__
+// method)" (and likewise for a missing __enter__ on an otherwise-__exit__ object).
+func contextManagerProtocolError(mgrValue core.Value) error {
+	msg := fmt.Sprintf("'%s' object does not support the context manager protocol", mgrValue.Type())
+	if obj, ok := mgrValue.(interface {
+		GetAttr(string) (core.Value, bool)
+	}); ok {
+		_, hasEnter := obj.GetAttr("__enter__")
+		_, hasExit := obj.GetAttr("__exit__")
+		if hasEnter && !hasExit {
+			msg += " (missing __exit__ method)"
+		} else if !hasEnter && hasExit {
+			msg += " (missing __enter__ method)"
+		}
+	}
+	return &core.TypeError{Message: msg}
+}
+
 // executeWith executes a with statement with proper enter/exit handling
 func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (core.Value, error) {
 	if len(managers) == 0 {
@@ -181,7 +201,7 @@ func executeWith(managers []withManager, body []core.Value, ctx *core.Context) (
 	// Check if it's a context manager
 	cm, ok := core.IsContextManager(mgrValue)
 	if !ok {
-		return nil, fmt.Errorf("'%s' object does not support the context manager protocol", mgrValue.Type())
+		return nil, contextManagerProtocolError(mgrValue)
 	}
 
 	// Call __enter__
