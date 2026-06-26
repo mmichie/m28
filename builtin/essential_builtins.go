@@ -177,21 +177,15 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 				return core.False, nil
 			}
 			// CPython's hasattr is `try: getattr(...); except AttributeError`.
-			// GetAttr hands back the property object itself (rather than the
-			// gotten value) when its getter raised, so invoke the getter and
-			// report False only when it raises AttributeError -- otherwise
-			// hasattr(obj, prop) is True even though obj.prop would raise.
-			if prop, ok := value.(*core.PropertyValue); ok && prop.Getter != nil {
-				if getter, ok := prop.Getter.(core.Callable); ok {
-					if _, err := getter.Call([]core.Value{obj}, ctx); err != nil {
-						if isAttributeError(err) {
-							return core.False, nil
-						}
-						return nil, err
-					}
-				}
+			// GetAttr hands back the property object itself when its getter
+			// raised, so invoke it: a getter raising AttributeError means False,
+			// any other exception propagates (otherwise hasattr(obj, prop) is
+			// True even though obj.prop would raise).
+			_, gotten, err := resolvePropertyGet(obj, value, ctx)
+			if err != nil {
+				return nil, err
 			}
-			return core.True, nil
+			return core.BoolValue(gotten), nil
 		}
 
 		// Check type descriptor methods
@@ -232,11 +226,19 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 				if callable, ok := method.(core.Callable); ok {
 					result, err := callable.Call([]core.Value{core.StringValue(name)}, ctx)
 					if err == nil {
-						return result, nil
-					}
-					// If __getattribute__ raises AttributeError, continue to normal lookup
-					// For other errors, return them
-					if !isAttributeError(err) {
+						// __getattribute__ may hand back a property object whose
+						// getter raised; invoke it so the value/error surfaces.
+						v, gotten, gerr := resolvePropertyGet(obj, result, ctx)
+						if gerr != nil {
+							return nil, gerr
+						}
+						if gotten {
+							return v, nil
+						}
+						// getter raised AttributeError: fall through to default/__getattr__
+					} else if !isAttributeError(err) {
+						// If __getattribute__ raises AttributeError, continue to
+						// normal lookup; for other errors, return them.
 						return nil, err
 					}
 				}
@@ -248,7 +250,14 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			GetAttr(string) (core.Value, bool)
 		}); ok {
 			if val, found := objWithAttrs.GetAttr(name); found {
-				return val, nil
+				v, gotten, gerr := resolvePropertyGet(obj, val, ctx)
+				if gerr != nil {
+					return nil, gerr
+				}
+				if gotten {
+					return v, nil
+				}
+				// getter raised AttributeError: fall through to default/error
 			}
 		}
 
@@ -483,6 +492,36 @@ func isAttributeError(err error) bool {
 	}
 	msg := err.Error()
 	return contains(msg, "attribute") || contains(msg, "AttributeError")
+}
+
+// resolvePropertyGet invokes a property's getter when attribute resolution
+// handed back the property object itself. M28's GetAttr does this when a
+// getter raised, because its (Value, bool) signature cannot carry the error;
+// callers that don't re-invoke (getattr/hasattr) would otherwise see the raw
+// property instead of the value or the error.
+//
+// Returns (value, true, nil) on success -- and for any non-property value,
+// which passes through unchanged; (nil, false, nil) when the getter raised
+// AttributeError, so the caller can fall through to a default / report "no
+// attribute" / answer False; and (nil, false, err) to propagate any other
+// exception (CPython only maps AttributeError to the not-found path).
+func resolvePropertyGet(obj, value core.Value, ctx *core.Context) (core.Value, bool, error) {
+	prop, ok := value.(*core.PropertyValue)
+	if !ok || prop.Getter == nil {
+		return value, true, nil
+	}
+	getter, ok := prop.Getter.(core.Callable)
+	if !ok {
+		return value, true, nil
+	}
+	result, err := getter.Call([]core.Value{obj}, ctx)
+	if err != nil {
+		if isAttributeError(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return result, true, nil
 }
 
 // contains checks if string s contains substr (case-insensitive helper)
