@@ -132,54 +132,25 @@ func RegisterCollections(ctx *core.Context) {
 			return nil, err
 		}
 
-		var start, stop, step core.Value
-
+		// slice() stores its arguments verbatim. Like CPython, it does NOT
+		// validate that start/stop/step are integers -- e.g. slice('a', 'b') and
+		// slice(SomeObject()) are legal. The integer requirement is enforced
+		// later, when the slice is actually used to index a sequence (via
+		// types.ToIndex) or through slice.indices().
+		var start, stop, step core.Value = core.Nil, core.Nil, core.Nil
 		switch v.Count() {
 		case 1:
 			// slice(stop)
-			start = core.Nil
 			stop = args[0]
-			step = core.Nil
 		case 2:
 			// slice(start, stop)
 			start = args[0]
 			stop = args[1]
-			step = core.Nil
 		case 3:
 			// slice(start, stop, step)
 			start = args[0]
 			stop = args[1]
 			step = args[2]
-		}
-
-		// Coerce each bound: None and ints/BigInts pass through; an object with
-		// __index__ is converted (CPython honors __index__ for slice bounds);
-		// anything else is a TypeError. step==0 is allowed at construction time.
-		isIntLike := func(v core.Value) bool {
-			if types.IsNumber(v) {
-				return true
-			}
-			_, isBig := v.(core.BigIntValue)
-			return isBig
-		}
-		coerce := func(v core.Value) (core.Value, error) {
-			if v == core.Nil || isIntLike(v) {
-				return v, nil
-			}
-			if i, err := types.ToIndex(v, ctx); err == nil {
-				return core.NumberValue(float64(i)), nil
-			}
-			return nil, &core.TypeError{Message: fmt.Sprintf("slice indices must be integers or None, not %s", v.Type())}
-		}
-		var cerr error
-		if start, cerr = coerce(start); cerr != nil {
-			return nil, cerr
-		}
-		if stop, cerr = coerce(stop); cerr != nil {
-			return nil, cerr
-		}
-		if step, cerr = coerce(step); cerr != nil {
-			return nil, cerr
 		}
 
 		return &core.SliceValue{
