@@ -785,14 +785,15 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-				other, ok := args[0].(*SetValue)
+				_, contains, _, ok := setOperandItems(args[0])
 				if !ok {
-					return nil, NewTypeError("set", args[0], "__le__ argument")
+					return nil, NewTypeError("set or frozenset", args[0], "__le__ argument")
 				}
 
-				// Check if all items in this set are in other
+				// Check if all items in this set are in other (subset). set and
+				// frozenset are comparable to each other, like CPython.
 				for _, item := range set.items {
-					if !other.Contains(item) {
+					if !contains(item) {
 						return False, nil
 					}
 				}
@@ -810,13 +811,13 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-				other, ok := args[0].(*SetValue)
+				items, _, _, ok := setOperandItems(args[0])
 				if !ok {
-					return nil, NewTypeError("set", args[0], "__ge__ argument")
+					return nil, NewTypeError("set or frozenset", args[0], "__ge__ argument")
 				}
 
-				// Check if all items in other are in this set
-				for _, item := range other.items {
+				// Check if all items in other are in this set (superset).
+				for _, item := range items {
 					if !set.Contains(item) {
 						return False, nil
 					}
@@ -835,25 +836,19 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-				other, ok := args[0].(*SetValue)
+				_, contains, size, ok := setOperandItems(args[0])
 				if !ok {
-					return nil, NewTypeError("set", args[0], "__lt__ argument")
+					return nil, NewTypeError("set or frozenset", args[0], "__lt__ argument")
 				}
 
-				// Must be subset AND not equal
-				isSubset := true
+				// Proper subset: every item is in other and other has more.
+				if set.Size() >= size {
+					return False, nil
+				}
 				for _, item := range set.items {
-					if !other.Contains(item) {
-						isSubset = false
-						break
+					if !contains(item) {
+						return False, nil
 					}
-				}
-				if !isSubset {
-					return False, nil
-				}
-				// Check they're not equal (other must have more items)
-				if set.Size() >= other.Size() {
-					return False, nil
 				}
 				return True, nil
 			},
@@ -869,25 +864,20 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-				other, ok := args[0].(*SetValue)
+				items, _, size, ok := setOperandItems(args[0])
 				if !ok {
-					return nil, NewTypeError("set", args[0], "__gt__ argument")
+					return nil, NewTypeError("set or frozenset", args[0], "__gt__ argument")
 				}
 
-				// Must be superset AND not equal
-				isSuperset := true
-				for _, item := range other.items {
+				// Proper superset: every item of other is in this set and this
+				// set has more.
+				if set.Size() <= size {
+					return False, nil
+				}
+				for _, item := range items {
 					if !set.Contains(item) {
-						isSuperset = false
-						break
+						return False, nil
 					}
-				}
-				if !isSuperset {
-					return False, nil
-				}
-				// Check they're not equal (this set must have more items)
-				if set.Size() <= other.Size() {
-					return False, nil
 				}
 				return True, nil
 			},

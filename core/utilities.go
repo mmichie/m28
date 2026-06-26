@@ -595,26 +595,25 @@ func EqualValues(a, b Value) bool {
 			return true
 		}
 	case *SetValue:
-		if bVal, ok := b.(*SetValue); ok {
-			if aVal.Size() != bVal.Size() {
+		// set and frozenset compare equal by value (CPython), so accept either.
+		if _, contains, size, ok := setOperandItems(b); ok {
+			if aVal.Size() != size {
 				return false
 			}
-			// Check if all items in a are in b
 			for _, v := range aVal.items {
-				if !bVal.Contains(v) {
+				if !contains(v) {
 					return false
 				}
 			}
 			return true
 		}
 	case *FrozenSetValue:
-		if bVal, ok := b.(*FrozenSetValue); ok {
-			if aVal.Size() != bVal.Size() {
+		if _, contains, size, ok := setOperandItems(b); ok {
+			if aVal.Size() != size {
 				return false
 			}
-			// Check if all items in a are in b
 			for _, v := range aVal.items {
-				if !bVal.Contains(v) {
+				if !contains(v) {
 					return false
 				}
 			}
