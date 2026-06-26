@@ -78,6 +78,17 @@ func strFormat(s string, args []Value, kwargs map[string]Value, ctx *Context) (V
 				}
 			}
 
+			// Resolve any nested replacement fields in the format spec
+			// (dynamic width/precision, e.g. "{:^{}}" or "{:.{}f}"). These
+			// draw from the same autoIdx, so they consume positional args in
+			// the order they appear after the outer field's own value.
+			if strings.IndexByte(formatSpec, '{') >= 0 {
+				formatSpec, err = resolveNestedSpec(formatSpec, args, kwargs, &autoIdx)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			// Apply format spec
 			formatted, err := formatValueWithSpec(val, formatSpec)
 			if err != nil {
@@ -203,6 +214,68 @@ func resolveFormatField(field string, args []Value, kwargs map[string]Value, aut
 		}
 	}
 	return val, nil
+}
+
+// resolveNestedSpec substitutes one level of nested replacement fields inside a
+// format spec — Python's dynamic width/precision, e.g. "^{}" -> "^6" or
+// ".{prec}f" -> ".2f". Nested auto-fields ({}) draw from the shared autoIdx, so
+// they consume positional arguments in order alongside the outer fields. A
+// nested field may carry a conversion (!r/!s/!a) but, per Python, not a further
+// nested format spec.
+func resolveNestedSpec(spec string, args []Value, kwargs map[string]Value, autoIdx *int) (string, error) {
+	var b strings.Builder
+	i := 0
+	for i < len(spec) {
+		ch := spec[i]
+		switch ch {
+		case '{':
+			if i+1 < len(spec) && spec[i+1] == '{' {
+				b.WriteByte('{')
+				i += 2
+				continue
+			}
+			j := i + 1
+			for j < len(spec) && spec[j] != '}' {
+				j++
+			}
+			if j >= len(spec) {
+				return "", &ValueError{Message: "unmatched '{' in format spec"}
+			}
+			field := spec[i+1 : j]
+			var conversion string
+			if bang := strings.IndexByte(field, '!'); bang >= 0 {
+				conversion = field[bang+1:]
+				field = field[:bang]
+			}
+			val, err := resolveFormatField(field, args, kwargs, autoIdx)
+			if err != nil {
+				return "", err
+			}
+			if conversion != "" {
+				if val, err = applyConversion(val, conversion); err != nil {
+					return "", err
+				}
+			}
+			s, err := formatValueWithSpec(val, "")
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(s)
+			i = j + 1
+		case '}':
+			if i+1 < len(spec) && spec[i+1] == '}' {
+				b.WriteByte('}')
+				i += 2
+				continue
+			}
+			b.WriteByte('}')
+			i++
+		default:
+			b.WriteByte(ch)
+			i++
+		}
+	}
+	return b.String(), nil
 }
 
 func applyConversion(value Value, conversion string) (Value, error) {
