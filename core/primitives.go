@@ -624,10 +624,10 @@ func (f *BuiltinFunctionWithKwargs) SetAttr(name string, value Value) {
 
 // String implements Value.String
 func (f *BuiltinFunction) String() string {
-	if f.name != "" {
-		return fmt.Sprintf("<builtin function %s>", f.name)
-	}
-	return "<builtin function>"
+	// Match repr() (reprBuiltinFunction): "<built-in function name>". Previously
+	// String() said "<builtin function ...>" (no hyphen), so str()/dict display
+	// disagreed with repr().
+	return reprBuiltinFunction(f)
 }
 
 // createRegistry sets up all properties for BuiltinFunction

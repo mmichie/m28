@@ -430,26 +430,9 @@ func (d *DictValue) Type() Type {
 
 // String implements Value.String
 func (d *DictValue) String() string {
-	if len(d.entries) == 0 {
-		return "{}"
-	}
-
-	// Use cycle detection to prevent infinite recursion
-	return withCycleDetection(uintptr(unsafe.Pointer(d)), func() string {
-		// Use insertion order for consistent output (Python 3.7+ behavior)
-		parts := make([]string, 0, len(d.orderedKeys))
-		for _, k := range d.orderedKeys {
-			v := d.entries[k]
-			// Use original key if available, otherwise use string representation
-			if origKey, hasOrig := d.keys[k]; hasOrig {
-				parts = append(parts, fmt.Sprintf("%s: %s", PrintValue(origKey), PrintValue(v)))
-			} else {
-				parts = append(parts, fmt.Sprintf("%q: %s", k, PrintValue(v)))
-			}
-		}
-
-		return "{" + strings.Join(parts, ", ") + "}"
-	})
+	// In Python str(dict) == repr(dict): keys and values use repr (single-quoted
+	// strings). Delegate to formatDictRepr so str()/print() agree with repr().
+	return formatDictRepr(d)
 }
 
 // Get retrieves a value by internal key representation
@@ -1050,23 +1033,9 @@ func (s *SetValue) Type() Type {
 
 // String implements Value.String
 func (s *SetValue) String() string {
-	if len(s.items) == 0 {
-		return "set()"
-	}
-
-	// Sort for consistent output
-	keys := make([]string, 0, len(s.items))
-	for k := range s.items {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	elements := make([]string, 0, len(keys))
-	for _, k := range keys {
-		elements = append(elements, PrintValue(s.items[k]))
-	}
-
-	return "{" + strings.Join(elements, ", ") + "}"
+	// In Python str(set) == repr(set): elements use repr (single-quoted strings).
+	// Delegate to formatSetRepr so str()/print() agree with repr().
+	return formatSetRepr(s)
 }
 
 // Add adds a value to the set
@@ -1247,7 +1216,8 @@ func (fs *FrozenSetValue) String() string {
 
 	elements := make([]string, 0, len(keys))
 	for _, k := range keys {
-		elements = append(elements, PrintValue(fs.items[k]))
+		// repr() of each element (single-quoted strings) so str()==repr().
+		elements = append(elements, Repr(fs.items[k]))
 	}
 
 	return "frozenset({" + strings.Join(elements, ", ") + "})"

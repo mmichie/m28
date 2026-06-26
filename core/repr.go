@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"unsafe"
 )
@@ -298,14 +299,20 @@ func formatSetRepr(set *SetValue) string {
 		return "set()"
 	}
 
+	// Sort by internal key for deterministic output. Python sets are unordered,
+	// but M28 sorts so str()/repr() are reproducible and identical to each other.
+	keys := make([]string, 0, len(set.items))
+	for k := range set.items {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	result := "{"
-	first := true
-	for _, item := range set.items {
-		if !first {
+	for i, k := range keys {
+		if i > 0 {
 			result += ", "
 		}
-		first = false
-		result += Repr(item)
+		result += Repr(set.items[k])
 	}
 	result += "}"
 	return result
