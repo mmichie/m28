@@ -370,7 +370,13 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 				case *FrozenSetValue:
 					otherItems = other.items
 				case *SetValue:
-					otherItems = other.items
+					// A set keys its internal map by ValueToKey, but otherContains
+					// below looks up by PrintValue; rebuild with PrintValue keys so
+					// the schemes match (else frozenset.issubset(set) is always False).
+					otherItems = make(map[string]Value)
+					for _, item := range other.items {
+						otherItems[PrintValue(item)] = item
+					}
 				case StringValue:
 					// String is iterable - each character becomes an item
 					otherItems = make(map[string]Value)
