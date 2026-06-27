@@ -664,6 +664,9 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		var fmtType byte
 		var leftAlign bool
 		var zeroPad bool
+		var plusFlag bool
+		var spaceFlag bool
+		var altFlag bool
 		var width int
 		var hasWidth bool
 		var precision int
@@ -741,13 +744,22 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			// Parse optional flags (-, +, 0, space, #)
 			leftAlign = false
 			zeroPad = false
+			plusFlag = false
+			spaceFlag = false
+			altFlag = false
 			for i < len(formatStr) && (formatStr[i] == '-' || formatStr[i] == '+' ||
 				formatStr[i] == '0' || formatStr[i] == ' ' || formatStr[i] == '#') {
-				if formatStr[i] == '-' {
+				switch formatStr[i] {
+				case '-':
 					leftAlign = true
-				}
-				if formatStr[i] == '0' {
+				case '0':
 					zeroPad = true
+				case '+':
+					plusFlag = true
+				case ' ':
+					spaceFlag = true
+				case '#':
+					altFlag = true
 				}
 				i++
 			}
@@ -927,6 +939,36 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			}
 		default:
 			return nil, &ValueError{Message: fmt.Sprintf("unsupported format character '%c'", fmtType)}
+		}
+
+		// Apply the # (alternate form) prefix for integer bases, then the
+		// + / space sign flag. The default Go verbs used above omit both.
+		if altFlag {
+			var prefix string
+			switch fmtType {
+			case 'x':
+				prefix = "0x"
+			case 'X':
+				prefix = "0X"
+			case 'o':
+				prefix = "0o"
+			}
+			if prefix != "" {
+				if len(formatted) > 0 && (formatted[0] == '-' || formatted[0] == '+') {
+					formatted = string(formatted[0]) + prefix + formatted[1:]
+				} else {
+					formatted = prefix + formatted
+				}
+			}
+		}
+		if (plusFlag || spaceFlag) && strings.IndexByte("diouxXeEfFgG", fmtType) >= 0 {
+			if len(formatted) == 0 || (formatted[0] != '-' && formatted[0] != '+') {
+				if plusFlag {
+					formatted = "+" + formatted
+				} else {
+					formatted = " " + formatted
+				}
+			}
 		}
 
 		// Apply width padding if specified
