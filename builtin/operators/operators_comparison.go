@@ -113,6 +113,11 @@ func Equal() func([]core.Value, *core.Context) (core.Value, error) {
 
 // compareEqual compares two values for equality
 func compareEqual(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// tuple-subclass instances (namedtuple etc.) compare like the tuple they
+	// inherit from, unless the class defines its own __eq__.
+	left = core.UnwrapTupleInstance(left)
+	right = core.UnwrapTupleInstance(right)
+
 	// Special handling for Class objects - use the default __eq__ from type, not instance methods
 	// This prevents trying to call instance methods like TestCase.__eq__(self, other) on the class itself
 	if leftClass, ok := left.(*core.Class); ok {
@@ -338,6 +343,8 @@ func LessThan() func([]core.Value, *core.Context) (core.Value, error) {
 
 // compareLessThan compares if left < right
 func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	left = core.UnwrapTupleInstance(left)
+	right = core.UnwrapTupleInstance(right)
 	// Try __lt__ on left operand
 	if result, found, err := types.CallDunder(left, "__lt__", []core.Value{right}, ctx); found {
 		return result, err
@@ -466,6 +473,8 @@ func LessThanOrEqual() func([]core.Value, *core.Context) (core.Value, error) {
 
 // compareLessThanOrEqual compares if left <= right
 func compareLessThanOrEqual(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	left = core.UnwrapTupleInstance(left)
+	right = core.UnwrapTupleInstance(right)
 	// Try __le__ on left operand
 	if result, found, err := types.CallDunder(left, "__le__", []core.Value{right}, ctx); found {
 		return result, err
@@ -555,6 +564,8 @@ func GreaterThan() func([]core.Value, *core.Context) (core.Value, error) {
 
 // compareGreaterThan compares if left > right
 func compareGreaterThan(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	left = core.UnwrapTupleInstance(left)
+	right = core.UnwrapTupleInstance(right)
 	// Try __gt__ on left operand
 	if result, found, err := types.CallDunder(left, "__gt__", []core.Value{right}, ctx); found {
 		return result, err
@@ -682,6 +693,8 @@ func GreaterThanOrEqual() func([]core.Value, *core.Context) (core.Value, error) 
 
 // compareGreaterThanOrEqual compares if left >= right
 func compareGreaterThanOrEqual(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	left = core.UnwrapTupleInstance(left)
+	right = core.UnwrapTupleInstance(right)
 	// Try __ge__ on left operand
 	if result, found, err := types.CallDunder(left, "__ge__", []core.Value{right}, ctx); found {
 		return result, err

@@ -1375,10 +1375,32 @@ func (t *TupleInstance) GetAttr(name string) (Value, bool) {
 	if name == "__class__" {
 		return t.Class, true
 	}
-	// Look up in the class
+
+	// Inherited tuple behavior: forward the sequence dunders to the backing
+	// tuple data so tuple-subclass instances behave like the tuple they wrap
+	// (indexing, len, ==, hashing, membership). This must take precedence over
+	// the generic class lookup, which otherwise resolves __getitem__ to the
+	// class's __class_getitem__ (turning e[0] into the generic alias E[0]). A
+	// class that *explicitly* defines one of these in its own method table
+	// still wins (checked via t.Class.Methods, not the inheriting GetAttr).
+	switch name {
+	case "__getitem__", "__len__", "__contains__", "__iter__", "__add__",
+		"__mul__", "__rmul__", "__eq__", "__ne__", "__lt__", "__le__",
+		"__gt__", "__ge__", "__hash__", "count", "index":
+		if _, explicit := t.Class.Methods[name]; !explicit {
+			if desc := GetTypeDescriptor(TupleType); desc != nil {
+				if m, err := desc.GetAttribute(t.Data, name); err == nil {
+					return m, true
+				}
+			}
+		}
+	}
+
+	// Look up in the class (covers explicit overrides and all other attrs).
 	if attr, found := t.Class.GetAttr(name); found {
 		return attr, true
 	}
+
 	return nil, false
 }
 

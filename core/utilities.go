@@ -54,6 +54,10 @@ func EqualValuesWithError(a, b Value, ctx *Context) (bool, error) {
 		return false, nil
 	}
 
+	// tuple-subclass instances compare by their backing tuple data.
+	a = UnwrapTupleInstance(a)
+	b = UnwrapTupleInstance(b)
+
 	// str-subclass instances compare by their backing string (the inherited
 	// str.__eq__ behavior), unless either side defines a custom __eq__.
 	if as, aok := StrBacking(a); aok {
@@ -406,6 +410,18 @@ func identicalOrEqualCtx(a, b Value, ctx *Context) (bool, error) {
 	return EqualValuesWithError(a, b, ctx)
 }
 
+// UnwrapTupleInstance returns a tuple-subclass instance's backing tuple data so
+// it compares like the tuple it inherits from (namedtuple etc.), unless the
+// class defines its own __eq__. Other values are returned unchanged.
+func UnwrapTupleInstance(v Value) Value {
+	if ti, ok := v.(*TupleInstance); ok {
+		if _, explicit := ti.Class.Methods["__eq__"]; !explicit {
+			return ti.Data
+		}
+	}
+	return v
+}
+
 func EqualValues(a, b Value) bool {
 	// Check nil values first
 	if a == nil && b == nil {
@@ -414,6 +430,10 @@ func EqualValues(a, b Value) bool {
 	if a == nil || b == nil {
 		return false
 	}
+
+	// tuple-subclass instances compare by their backing tuple data.
+	a = UnwrapTupleInstance(a)
+	b = UnwrapTupleInstance(b)
 
 	// str-subclass instances compare by their backing string unless either side
 	// defines a custom __eq__ (mirrors EqualValuesWithError).
