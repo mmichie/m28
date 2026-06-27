@@ -106,9 +106,9 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 			// No star — exact length match required
 			if len(values) != len(patternItems) {
 				if len(values) < len(patternItems) {
-					return fmt.Errorf("not enough values to unpack (expected %d, got %d)", len(patternItems), len(values))
+					return core.NewValueError(fmt.Sprintf("not enough values to unpack (expected %d, got %d)", len(patternItems), len(values)))
 				}
-				return fmt.Errorf("too many values to unpack (expected %d, got %d)", len(patternItems), len(values))
+				return core.NewValueError(fmt.Sprintf("too many values to unpack (expected %d, got %d)", len(patternItems), len(values)))
 			}
 			for i, subPattern := range patternItems {
 				if err := UnpackPattern(subPattern, values[i], ctx); err != nil {
@@ -121,7 +121,7 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 		// Star present: minimum required values = patternItems - 1 (all fixed targets)
 		fixedCount := len(patternItems) - 1
 		if len(values) < fixedCount {
-			return fmt.Errorf("not enough values to unpack (expected at least %d, got %d)", fixedCount, len(values))
+			return core.NewValueError(fmt.Sprintf("not enough values to unpack (expected at least %d, got %d)", fixedCount, len(values)))
 		}
 		// Bind fixed targets before the star
 		for i := 0; i < starIdx; i++ {
