@@ -394,6 +394,14 @@ func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, err
 		return core.BoolValue(leftBig.GetBigInt().Cmp(rightBig.GetBigInt()) < 0), nil
 	}
 
+	// str and str-subclass instances order by their backing string value
+	// (reached when no __lt__/__gt__ resolved the comparison above).
+	if ls, ok := core.StrBacking(left); ok {
+		if rs, ok2 := core.StrBacking(right); ok2 {
+			return core.BoolValue(string(ls) < string(rs)), nil
+		}
+	}
+
 	// Fall back to type-based comparison
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
@@ -473,6 +481,13 @@ func compareLessThanOrEqual(left, right core.Value, ctx *core.Context) (core.Val
 		cmp, err := leftCmp.Compare(right)
 		if err == nil {
 			return core.BoolValue(cmp <= 0), nil
+		}
+	}
+
+	// str and str-subclass instances order by their backing string value.
+	if ls, ok := core.StrBacking(left); ok {
+		if rs, ok2 := core.StrBacking(right); ok2 {
+			return core.BoolValue(string(ls) <= string(rs)), nil
 		}
 	}
 
@@ -596,6 +611,13 @@ func compareGreaterThan(left, right core.Value, ctx *core.Context) (core.Value, 
 		return core.BoolValue(leftBig.GetBigInt().Cmp(rightBig.GetBigInt()) > 0), nil
 	}
 
+	// str and str-subclass instances order by their backing string value.
+	if ls, ok := core.StrBacking(left); ok {
+		if rs, ok2 := core.StrBacking(right); ok2 {
+			return core.BoolValue(string(ls) > string(rs)), nil
+		}
+	}
+
 	// Fall back to type-based comparison
 	return types.Switch(left).
 		Number(func(leftNum float64) (core.Value, error) {
@@ -675,6 +697,13 @@ func compareGreaterThanOrEqual(left, right core.Value, ctx *core.Context) (core.
 		cmp, err := leftCmp.Compare(right)
 		if err == nil {
 			return core.BoolValue(cmp >= 0), nil
+		}
+	}
+
+	// str and str-subclass instances order by their backing string value.
+	if ls, ok := core.StrBacking(left); ok {
+		if rs, ok2 := core.StrBacking(right); ok2 {
+			return core.BoolValue(string(ls) >= string(rs)), nil
 		}
 	}
 
