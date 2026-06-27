@@ -128,15 +128,28 @@ func RegisterAttributes(ctx *core.Context) {
 				nameSet[attrName] = true
 			}
 
-			// Add inherited methods from parents
-			for _, parent := range class.Parents {
-				for methodName := range parent.Methods {
-					nameSet[methodName] = true
-				}
-				for attrName := range parent.Attributes {
-					nameSet[attrName] = true
+			// Add inherited methods/attributes from the FULL ancestor chain (the
+			// whole MRO), not just direct parents -- dir() includes every
+			// inherited name. Methods defined in a grandparent (e.g. abstract
+			// methods on a numbers ABC) were previously missing.
+			visited := make(map[*core.Class]bool)
+			var walk func(cl *core.Class)
+			walk = func(cl *core.Class) {
+				for _, parent := range cl.Parents {
+					if visited[parent] {
+						continue
+					}
+					visited[parent] = true
+					for methodName := range parent.Methods {
+						nameSet[methodName] = true
+					}
+					for attrName := range parent.Attributes {
+						nameSet[attrName] = true
+					}
+					walk(parent)
 				}
 			}
+			walk(class)
 
 			// Add standard class attributes
 			nameSet["__name__"] = true

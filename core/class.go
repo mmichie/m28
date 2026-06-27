@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"unsafe"
 )
@@ -819,9 +820,53 @@ func (c *Class) Call(args []Value, ctx *Context) (Value, error) {
 	return c.CallWithKeywords(args, nil, ctx)
 }
 
+// checkAbstractInstantiation returns a TypeError if this class still has
+// unimplemented abstract methods (a non-empty __abstractmethods__ frozenset
+// computed by _abc_init). The class's OWN value is checked, not an inherited
+// one, so a concrete subclass with an empty set instantiates fine.
+func (c *Class) checkAbstractInstantiation() error {
+	absVal, ok := c.Attributes["__abstractmethods__"]
+	if !ok {
+		return nil
+	}
+	fs, ok := absVal.(*FrozenSetValue)
+	if !ok || fs.Size() == 0 {
+		return nil
+	}
+	names := make([]string, 0, fs.Size())
+	for it := fs.Iterator(); ; {
+		v, ok := it.Next()
+		if !ok {
+			break
+		}
+		if s, ok := v.(StringValue); ok {
+			names = append(names, string(s))
+		}
+	}
+	sort.Strings(names)
+	for i, n := range names {
+		names[i] = "'" + n + "'"
+	}
+	methodWord := "methods"
+	if len(names) == 1 {
+		methodWord = "method"
+	}
+	return &TypeError{Message: fmt.Sprintf(
+		"Can't instantiate abstract class %s without an implementation for abstract %s %s",
+		c.Name, methodWord, strings.Join(names, ", "))}
+}
+
 // CallWithKeywords implements keyword argument support for class instantiation
 // This is the generic solution that unlocks full Python compatibility for all classes
 func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+	// PEP 3119: a class with unimplemented abstract methods cannot be
+	// instantiated (CPython raises this in object.__new__). Checked before the
+	// metaclass __call__ dispatch so it fires for ABCMeta classes too (ABCMeta
+	// inherits type.__call__, which would otherwise divert past this check).
+	if err := c.checkAbstractInstantiation(); err != nil {
+		return nil, err
+	}
+
 	// Python metaclass protocol:
 	// If the class has a metaclass with __call__, invoke that first
 	// This allows metaclasses to control instance creation (e.g., for enum singletons)
