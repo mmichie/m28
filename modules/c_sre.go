@@ -687,11 +687,32 @@ func Init_SREModule() *core.DictValue {
 				return nil, fmt.Errorf("invalid regex pattern: %v", err)
 			}
 
-			// Match from the beginning of the string
-			loc := re.FindStringSubmatchIndex(searchStr)
-			if loc == nil || loc[0] != 0 {
-				// No match or match doesn't start at beginning
+			// Optional start position: pattern.match(string, pos) anchors the
+			// match at pos. Match the slice from pos, require it to start there,
+			// then shift the indices back to the full string.
+			startPos := 0
+			if len(matchArgs) >= 2 {
+				if p, ok := matchArgs[1].(core.NumberValue); ok {
+					startPos = int(p)
+				}
+			}
+			if startPos < 0 {
+				startPos = 0
+			}
+			if startPos > len(searchStr) {
 				return core.None, nil
+			}
+			loc := re.FindStringSubmatchIndex(searchStr[startPos:])
+			if loc == nil || loc[0] != 0 {
+				// No match or match doesn't start at pos
+				return core.None, nil
+			}
+			if startPos > 0 {
+				for i := range loc {
+					if loc[i] >= 0 {
+						loc[i] += startPos
+					}
+				}
 			}
 
 			// Build a full match object (supports named groups, groupdict, span).
@@ -779,26 +800,38 @@ func Init_SREModule() *core.DictValue {
 				return nil, fmt.Errorf("invalid regex pattern: %v", err)
 			}
 
-			// Find first match
-			match := re.FindStringIndex(searchStr)
-			if match == nil {
+			// Optional start position: pattern.search(string, pos). Go's regexp
+			// has no offset search, so search the slice from pos and shift the
+			// indices back (fine for the unanchored patterns this is used with).
+			startPos := 0
+			if len(searchArgs) >= 2 {
+				if p, ok := searchArgs[1].(core.NumberValue); ok {
+					startPos = int(p)
+				}
+			}
+			if startPos < 0 {
+				startPos = 0
+			}
+			if startPos > len(searchStr) {
 				return core.None, nil
 			}
 
-			// Create a Match object
-			matchObj := core.NewDict()
-			matchObj.Set("start", core.NumberValue(float64(match[0])))
-			matchObj.Set("end", core.NumberValue(float64(match[1])))
-			matchText := searchStr[match[0]:match[1]]
-			matchObj.Set("group", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-				// group() or group(0) returns the full match
-				if len(args) == 0 || (len(args) == 1 && args[0] == core.NumberValue(0)) {
-					return core.StringValue(matchText), nil
+			// Find the first match and build a real match object via the shared
+			// helper, so start()/end()/span()/group()/groups() are all callable
+			// and capture groups work (the old inline builder set start/end to
+			// bare numbers, so match.start() raised "'start' is not callable").
+			loc := re.FindStringSubmatchIndex(searchStr[startPos:])
+			if loc == nil {
+				return core.None, nil
+			}
+			if startPos > 0 {
+				for i := range loc {
+					if loc[i] >= 0 {
+						loc[i] += startPos
+					}
 				}
-				return core.StringValue(matchText), nil
-			}))
-
-			return matchObj, nil
+			}
+			return buildSreMatchObject(searchStr, loc, re.SubexpNames()), nil
 		}))
 
 		pattern.SetValue(core.StringValue("findall"), core.NewNamedBuiltinFunction("findall", func(findallArgs []core.Value, findallCtx *core.Context) (core.Value, error) {
