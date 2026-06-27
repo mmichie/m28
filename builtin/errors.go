@@ -214,6 +214,34 @@ func RegisterErrors(ctx *core.Context) {
 		return self, nil
 	}))
 
+	// Add add_note method to BaseException (PEP 678): append a string note to
+	// the exception's __notes__ list, creating it on first use.
+	baseExceptionClass.SetMethod("add_note", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) < 2 {
+			return nil, &core.TypeError{Message: "add_note() takes exactly one argument (0 given)"}
+		}
+		self, ok := args[0].(*core.Instance)
+		if !ok {
+			return nil, fmt.Errorf("add_note() first argument must be an exception instance")
+		}
+		note := args[1]
+		if _, ok := core.StrBacking(note); !ok {
+			return nil, &core.TypeError{Message: fmt.Sprintf("add_note() argument must be a str, not %s", note.Type())}
+		}
+		if existing, ok := self.Attributes["__notes__"]; ok {
+			notesList, isList := existing.(*core.ListValue)
+			if !isList {
+				return nil, &core.TypeError{Message: "Cannot add note: __notes__ is not a list"}
+			}
+			notesList.Append(note)
+			return core.None, nil
+		}
+		notesList := core.NewList()
+		self.Attributes["__notes__"] = notesList
+		notesList.Append(note)
+		return core.None, nil
+	}))
+
 	ctx.Define("BaseException", baseExceptionClass)
 
 	// BaseExceptionGroup - base class for exception groups (Python 3.11+)

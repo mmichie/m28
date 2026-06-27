@@ -941,9 +941,20 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			hasBuiltinParent = hasNonObjectBuiltinAncestor(c)
 		}
 
-		// If neither is overridden and there's no built-in parent, class takes no arguments
+		// If neither is overridden and there's no built-in parent, the class takes
+		// no arguments. BaseException is the exception root: it has a real
+		// *args-accepting __init__ but no parent and a built-in name, so the checks
+		// above miss it (subclasses are covered by the built-in-parent check). It
+		// accepts positional args but, like CPython's built-in exceptions, no
+		// keyword args.
 		if !hasCustomInit && !hasCustomNew && !hasBuiltinParent {
-			return nil, &TypeError{Message: fmt.Sprintf("%s() takes no arguments", c.Name)}
+			if c.Name == "BaseException" {
+				if len(kwargs) > 0 {
+					return nil, &TypeError{Message: fmt.Sprintf("%s() takes no keyword arguments", c.Name)}
+				}
+			} else {
+				return nil, &TypeError{Message: fmt.Sprintf("%s() takes no arguments", c.Name)}
+			}
 		}
 
 		// If kwargs are provided but neither __init__ nor __new__ accepts them,
