@@ -742,6 +742,28 @@ func (p *PythonParser) shouldBreakParameterLoop() bool {
 // validateParameters checks for invalid parameter patterns
 // Python requires at least one keyword-only parameter after a bare *
 func (p *PythonParser) validateParameters(params []ast.Parameter, tok Token) {
+	// Check for duplicate parameter names
+	// (CPython: SyntaxError "duplicate argument 'X' in function definition")
+	seen := make(map[string]bool)
+	for _, param := range params {
+		name := param.Name
+		// Skip the bare * keyword-only separator - it is not a real parameter
+		if name == "*" && !param.IsVarArgs {
+			continue
+		}
+		// Strip the *args / **kwargs prefixes to get the bare parameter name
+		if param.IsVarArgs && len(name) > 1 {
+			name = name[1:]
+		} else if param.IsKwargs && len(name) > 2 {
+			name = name[2:]
+		}
+		if seen[name] {
+			p.error(fmt.Sprintf("duplicate argument '%s' in function definition", name))
+			return
+		}
+		seen[name] = true
+	}
+
 	// Find bare * (keyword-only separator without a name)
 	barStarIndex := -1
 	for i, param := range params {
