@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 	"unsafe"
 )
 
@@ -132,8 +133,19 @@ func reprString(s StringValue) string {
 		case '\t':
 			result += "\\t"
 		default:
-			if ch < ASCIIPrintableMin || ch == ASCIIDel {
-				result += fmt.Sprintf("\\x%02x", ch)
+			// Escape any non-printable character, matching CPython's repr.
+			// Go's unicode.IsPrint matches str.isprintable (categories L/M/N/P/S
+			// plus ASCII space), so this also catches C1 controls (\x80-\x9f) and
+			// non-printable Unicode (e.g. ͸, ​) that were left literal.
+			if !unicode.IsPrint(ch) {
+				switch {
+				case ch < 0x100:
+					result += fmt.Sprintf("\\x%02x", ch)
+				case ch < 0x10000:
+					result += fmt.Sprintf("\\u%04x", ch)
+				default:
+					result += fmt.Sprintf("\\U%08x", ch)
+				}
 			} else {
 				result += string(ch)
 			}
