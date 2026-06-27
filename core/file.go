@@ -159,6 +159,14 @@ func NewFile(path string, mode string) (*File, error) {
 		f.reader = bufio.NewReader(f.file)
 		f.writer = bufio.NewWriter(f.file)
 
+	case "a+", "ab+", "a+b":
+		f.file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			return nil, OSErrorFromGo(err, path)
+		}
+		f.reader = bufio.NewReader(f.file)
+		f.writer = bufio.NewWriter(f.file)
+
 	default:
 		return nil, &ValueError{Message: fmt.Sprintf("invalid file mode: %s", mode)}
 	}
@@ -455,11 +463,19 @@ func (f *File) createRegistry() *MethodRegistry {
 					return nil, err
 				}
 
-				// For strings, write the actual string content, not the repr
+				// Write the actual content, not the repr. Bytes-like values
+				// (binary mode) must write their raw bytes -- previously they
+				// went through PrintValue and wrote the repr (e.g. b'...'),
+				// corrupting every binary write (file copies, etc.).
 				var data string
-				if s, ok := args[0].(StringValue); ok {
-					data = string(s)
-				} else {
+				switch v := args[0].(type) {
+				case StringValue:
+					data = string(v)
+				case BytesValue:
+					data = string(v)
+				case *ByteArrayValue:
+					data = string(v.GetData())
+				default:
 					data = PrintValue(args[0])
 				}
 

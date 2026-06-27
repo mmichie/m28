@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mmichie/m28/core"
 )
@@ -501,29 +502,83 @@ func addOSProcessStubs(osModule *core.DictValue) {
 		return core.BoolValue(syscall.Access(path, uint32(mode)) == nil), nil
 	}))
 
-	// os.chmod(path, mode): really change the file mode bits via chmod(2).
-	osModule.Set("chmod", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) < 2 {
-			return nil, &core.TypeError{Message: "chmod expected at least 2 arguments"}
-		}
-		var path string
-		switch p := args[0].(type) {
-		case core.StringValue:
-			path = string(p)
-		case core.BytesValue:
-			path = string(p)
-		default:
-			return nil, &core.TypeError{Message: "chmod: path should be string or bytes"}
-		}
-		mode, ok := args[1].(core.NumberValue)
-		if !ok {
-			return nil, &core.TypeError{Message: "chmod: mode should be an integer"}
-		}
-		if err := syscall.Chmod(path, uint32(mode)); err != nil {
-			return nil, core.OSErrorFromGo(err, path)
-		}
-		return core.None, nil
-	}))
+	// os.chmod(path, mode, *, follow_symlinks=True): change file mode bits via
+	// chmod(2). follow_symlinks is accepted (shutil.copystat passes it) but only
+	// the follow=True behaviour is implemented (lchmod is not).
+	osModule.Set("chmod", &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "chmod",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 2 {
+				return nil, &core.TypeError{Message: "chmod expected at least 2 arguments"}
+			}
+			var path string
+			switch p := args[0].(type) {
+			case core.StringValue:
+				path = string(p)
+			case core.BytesValue:
+				path = string(p)
+			default:
+				return nil, &core.TypeError{Message: "chmod: path should be string or bytes"}
+			}
+			mode, ok := args[1].(core.NumberValue)
+			if !ok {
+				return nil, &core.TypeError{Message: "chmod: mode should be an integer"}
+			}
+			if err := syscall.Chmod(path, uint32(mode)); err != nil {
+				return nil, core.OSErrorFromGo(err, path)
+			}
+			return core.None, nil
+		},
+	})
+
+	// os.utime(path, times=None, *, ns=None, follow_symlinks=True): set the
+	// access and modified times. ns=(atime_ns, mtime_ns) takes precedence over
+	// times=(atime, mtime) seconds; both omitted sets the current time. Needed by
+	// shutil.copystat/copy2 to propagate timestamps.
+	osModule.Set("utime", &core.BuiltinFunctionWithKwargs{
+		BaseObject: *core.NewBaseObject(core.FunctionType),
+		Name:       "utime",
+		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			if len(args) < 1 {
+				return nil, &core.TypeError{Message: "utime: missing path argument"}
+			}
+			var path string
+			switch p := args[0].(type) {
+			case core.StringValue:
+				path = string(p)
+			case core.BytesValue:
+				path = string(p)
+			default:
+				return nil, &core.TypeError{Message: "utime: path should be string or bytes"}
+			}
+			now := time.Now()
+			atime, mtime := now, now
+			if nsVal, ok := kwargs["ns"]; ok && nsVal != core.None {
+				if tup, ok := nsVal.(core.TupleValue); ok && len(tup) == 2 {
+					if a, ok := tup[0].(core.NumberValue); ok {
+						atime = time.Unix(0, int64(a))
+					}
+					if m, ok := tup[1].(core.NumberValue); ok {
+						mtime = time.Unix(0, int64(m))
+					}
+				}
+			} else if len(args) >= 2 && args[1] != core.None {
+				if tup, ok := args[1].(core.TupleValue); ok && len(tup) == 2 {
+					if a, ok := tup[0].(core.NumberValue); ok {
+						atime = time.Unix(0, int64(float64(a)*1e9))
+					}
+					if m, ok := tup[1].(core.NumberValue); ok {
+						mtime = time.Unix(0, int64(float64(m)*1e9))
+					}
+				}
+			}
+			if err := os.Chtimes(path, atime, mtime); err != nil {
+				return nil, core.OSErrorFromGo(err, path)
+			}
+			return core.None, nil
+		},
+	})
 	osModule.Set("chown", core.NewBuiltinFunction(stub))
 	osModule.Set("umask", core.NewBuiltinFunction(stub))
 	osModule.Set("sync", core.NewBuiltinFunction(stub))

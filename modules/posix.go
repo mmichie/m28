@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/mmichie/m28/core"
 )
@@ -42,6 +43,7 @@ func InitPosixModule() *core.DictValue {
 	copyFunction("isdir")
 	copyFunction("access")
 	copyFunction("chmod")
+	copyFunction("utime")
 
 	// System info
 	copyFunction("uname")
@@ -433,6 +435,28 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs map[string]
 	statResult.SetWithKey("st_mtime", core.StringValue("st_mtime"), core.NumberValue(float64(info.ModTime().Unix())))
 	// Convert Go's FileMode to Unix st_mode
 	statResult.SetWithKey("st_mode", core.StringValue("st_mode"), core.NumberValue(float64(fileModeToUnixMode(info.Mode()))))
+
+	// Full timestamp + identity fields from the underlying syscall stat, so
+	// st_atime/st_ctime, the nanosecond variants (st_*_ns, required by
+	// shutil.copystat/copy2), and st_ino/st_dev/st_nlink/st_uid/st_gid are
+	// present like CPython's stat_result.
+	if sys, ok := info.Sys().(*syscall.Stat_t); ok {
+		atNano := sys.Atim.Nano()
+		mtNano := sys.Mtim.Nano()
+		ctNano := sys.Ctim.Nano()
+		set := func(name string, v core.Value) { statResult.SetWithKey(name, core.StringValue(name), v) }
+		set("st_atime", core.NumberValue(float64(atNano)/1e9))
+		set("st_mtime", core.NumberValue(float64(mtNano)/1e9))
+		set("st_ctime", core.NumberValue(float64(ctNano)/1e9))
+		set("st_atime_ns", core.NumberValue(float64(atNano)))
+		set("st_mtime_ns", core.NumberValue(float64(mtNano)))
+		set("st_ctime_ns", core.NumberValue(float64(ctNano)))
+		set("st_ino", core.NumberValue(float64(sys.Ino)))
+		set("st_dev", core.NumberValue(float64(sys.Dev)))
+		set("st_nlink", core.NumberValue(float64(sys.Nlink)))
+		set("st_uid", core.NumberValue(float64(sys.Uid)))
+		set("st_gid", core.NumberValue(float64(sys.Gid)))
+	}
 
 	// Add is_dir method
 	isDir := info.IsDir()
