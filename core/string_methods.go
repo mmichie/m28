@@ -394,9 +394,19 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 		fmt.Sscanf(spec[widthStart:i], "%d", &width)
 	}
 
-	// Skip grouping option (,)
-	if i < len(spec) && spec[i] == ',' {
+	// Grouping option (',' or '_'). NOTE: application of the separator is not
+	// yet implemented on this (.format() method) path -- see formatValueWithSpec
+	// vs builtin parseFormatSpecString. But a second grouping char is invalid
+	// and must raise, matching CPython's exact messages.
+	if i < len(spec) && (spec[i] == ',' || spec[i] == '_') {
+		grp := spec[i]
 		i++
+		if i < len(spec) && (spec[i] == ',' || spec[i] == '_') {
+			if spec[i] == grp {
+				return "", &ValueError{Message: fmt.Sprintf("Cannot specify '%c' with '%c'.", grp, grp)}
+			}
+			return "", &ValueError{Message: "Cannot specify both ',' and '_'."}
+		}
 	}
 
 	// Parse precision

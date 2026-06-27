@@ -310,6 +310,15 @@ func parseFormatSpecString(spec string) (*FormatSpec, error) {
 	if i < len(runes) && (runes[i] == ',' || runes[i] == '_') {
 		fs.Grouping = runes[i]
 		i++
+		// A second grouping char is invalid (CPython rejects it). Matching the
+		// exact messages: same char -> "Cannot specify 'X' with 'X'.", a mix of
+		// ',' and '_' -> "Cannot specify both ',' and '_'."
+		if i < len(runes) && (runes[i] == ',' || runes[i] == '_') {
+			if runes[i] == fs.Grouping {
+				return nil, &core.ValueError{Message: fmt.Sprintf("Cannot specify '%c' with '%c'.", fs.Grouping, fs.Grouping)}
+			}
+			return nil, &core.ValueError{Message: "Cannot specify both ',' and '_'."}
+		}
 	}
 
 	// Precision
