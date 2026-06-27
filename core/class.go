@@ -265,6 +265,28 @@ func (c *Class) SetClassAttr(name string, value Value) {
 	c.Attributes[name] = value
 }
 
+// resolveClassAttrValue applies class-access semantics to a value found in the
+// class namespace: __init_subclass__ is implicitly a classmethod bound to cls;
+// a descriptor's __get__(None, cls) is invoked (classmethod/staticmethod;
+// property returns itself on class access); otherwise the value is returned
+// unchanged.
+func (c *Class) resolveClassAttrValue(name string, value Value) Value {
+	if name == "__init_subclass__" {
+		return &BoundClassMethod{Class: c, Function: value}
+	}
+	if descriptor, hasGet := value.(interface{ GetAttr(string) (Value, bool) }); hasGet {
+		if getMethod, found := descriptor.GetAttr("__get__"); found {
+			if callable, ok := getMethod.(Callable); ok {
+				// Call __get__(None, class) for class attribute access.
+				if result, err := callable.Call([]Value{None, c}, nil); err == nil {
+					return result
+				}
+			}
+		}
+	}
+	return value
+}
+
 // GetAttr implements Object interface for classes
 func (c *Class) GetAttr(name string) (Value, bool) {
 	// Special handling for __class__ - a class's __class__ is its metaclass
@@ -563,58 +585,24 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 	}
 
 	// First check methods
-	if method, ok := c.GetMethod(name); ok {
-		// __init_subclass__ is implicitly a classmethod in Python
-		// When accessed from a class, it should auto-bind cls
-		// Check this BEFORE the descriptor protocol to override the default behavior
-		if name == "__init_subclass__" {
-			if funcVal, ok := method.(Value); ok {
-				return &BoundClassMethod{
-					Class:    c,
-					Function: funcVal,
-				}, true
-			}
+	// An attribute set directly on THIS class shadows a method inherited from a
+	// base (Python MRO: a class's own __dict__ precedes its bases'). Checked
+	// before GetMethod, which walks the full MRO and would otherwise mask e.g. a
+	// setattr override (or abc.update_abstractmethods) of an inherited method.
+	if _, ownMethod := c.Methods[name]; !ownMethod {
+		if ownAttr, ok := c.Attributes[name]; ok {
+			return c.resolveClassAttrValue(name, ownAttr), true
 		}
-		// Invoke descriptor protocol for classmethods and staticmethods
-		if descriptor, hasGet := method.(interface{ GetAttr(string) (Value, bool) }); hasGet {
-			if getMethod, found := descriptor.GetAttr("__get__"); found {
-				if callable, ok := getMethod.(Callable); ok {
-					// Call __get__(None, class) for class attribute access
-					result, err := callable.Call([]Value{None, c}, nil)
-					if err == nil {
-						return result, true
-					}
-				}
-			}
-		}
-		return method, true
 	}
 
-	// Then check attributes
+	// Check methods (own and inherited via the MRO)
+	if method, ok := c.GetMethod(name); ok {
+		return c.resolveClassAttrValue(name, method), true
+	}
+
+	// Then check attributes (own and inherited)
 	if attr, ok := c.GetClassAttr(name); ok {
-		// __init_subclass__ is implicitly a classmethod in Python
-		// Check this BEFORE the descriptor protocol
-		if name == "__init_subclass__" {
-			if funcVal, ok := attr.(Value); ok {
-				return &BoundClassMethod{
-					Class:    c,
-					Function: funcVal,
-				}, true
-			}
-		}
-		// Invoke descriptor protocol if the attribute has __get__
-		if descriptor, hasGet := attr.(interface{ GetAttr(string) (Value, bool) }); hasGet {
-			if getMethod, found := descriptor.GetAttr("__get__"); found {
-				if callable, ok := getMethod.(Callable); ok {
-					// Call __get__(None, class) for class attribute access
-					result, err := callable.Call([]Value{None, c}, nil)
-					if err == nil {
-						return result, true
-					}
-				}
-			}
-		}
-		return attr, true
+		return c.resolveClassAttrValue(name, attr), true
 	}
 
 	// Provide default magic methods that Python classes automatically have
