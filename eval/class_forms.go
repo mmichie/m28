@@ -2209,7 +2209,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 	}
 
 	if !isClass {
-		return nil, &core.TypeError{Message: fmt.Sprintf("isinstance second argument must be a class or string type name, got %T: %v", classVal, classVal)}
+		return nil, &core.TypeError{Message: "isinstance() arg 2 must be a type, a tuple of types, or a union"}
 	}
 
 	// Handle primitive types (StringValue, NumberValue, etc.) that are not Instances
@@ -2506,9 +2506,11 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		}
 	}
 
-	if !ok1 || !ok2 {
-		// Debug: show what types we got
-		return nil, &core.TypeError{Message: fmt.Sprintf("issubclass arguments must be classes (got subclass=%T ok1=%v, baseclass=%T ok2=%v)", subClassVal, ok1, baseClassVal, ok2)}
+	if !ok1 {
+		return nil, &core.TypeError{Message: "issubclass() arg 1 must be a class"}
+	}
+	if !ok2 {
+		return nil, &core.TypeError{Message: "issubclass() arg 2 must be a class, a tuple of classes, or a union"}
 	}
 
 	// Check inheritance chain using BFS
