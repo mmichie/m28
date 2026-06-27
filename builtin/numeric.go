@@ -3,6 +3,7 @@ package builtin
 import (
 	"fmt"
 	"math"
+	"strconv"
 
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
@@ -116,7 +117,22 @@ func RegisterNumeric(ctx *core.Context) {
 			return core.NumberValue(bankersRound(num)), nil
 		}
 
-		// Round to n decimal places
+		if ndigitsInt > 0 {
+			// Round the EXACT float64 to n decimals via correct decimal rounding
+			// (round-half-to-even), matching CPython. Pre-multiplying by 10^n
+			// adds a second rounding error: 2.675*100 == 267.5 in float64, which
+			// would round to 2.68 instead of CPython's 2.67.
+			if math.IsNaN(num) || math.IsInf(num, 0) {
+				return core.NumberValue(num), nil
+			}
+			rounded, err := strconv.ParseFloat(strconv.FormatFloat(num, 'f', ndigitsInt, 64), 64)
+			if err != nil {
+				return core.NumberValue(num), nil
+			}
+			return core.NumberValue(rounded), nil
+		}
+
+		// Negative ndigits: round to the nearest 10^(-ndigits).
 		multiplier := math.Pow(10, float64(ndigitsInt))
 		return core.NumberValue(bankersRound(num*multiplier) / multiplier), nil
 	}))
