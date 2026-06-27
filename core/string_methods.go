@@ -318,6 +318,46 @@ func asciiOf(value Value) string {
 }
 
 // formatValueWithSpec formats a value according to a Python-style format specification
+// addThousandsSeparator inserts a grouping separator (',' or '_') every three
+// digits of the integer part of a formatted number string, preserving any sign
+// and fractional/exponent tail. Mirrors builtin/string_format.go's helper (core
+// cannot import builtin).
+func addThousandsSeparator(s string, sep rune) string {
+	// Split off a fractional/exponent tail so only the integer part is grouped.
+	intPart := s
+	tail := ""
+	if dot := strings.IndexByte(s, '.'); dot >= 0 {
+		intPart = s[:dot]
+		tail = s[dot:]
+	}
+
+	sign := ""
+	if len(intPart) > 0 && (intPart[0] == '+' || intPart[0] == '-' || intPart[0] == ' ') {
+		sign = string(intPart[0])
+		intPart = intPart[1:]
+	}
+
+	// Only group runs of plain digits (leave things like 'inf'/'nan' alone).
+	for _, r := range intPart {
+		if r < '0' || r > '9' {
+			return s
+		}
+	}
+	if len(intPart) <= 3 {
+		return sign + intPart + tail
+	}
+
+	var grouped []rune
+	n := len(intPart)
+	for i, r := range intPart {
+		if i > 0 && (n-i)%3 == 0 {
+			grouped = append(grouped, sep)
+		}
+		grouped = append(grouped, r)
+	}
+	return sign + string(grouped) + tail
+}
+
 func formatValueWithSpec(value Value, spec string) (string, error) {
 	if spec == "" {
 		// No format spec - use default formatting
@@ -344,6 +384,7 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 	var width int
 	var precision int = -1
 	var fmtType rune
+	var grouping rune
 
 	// Parse fill and align (must be first)
 	if len(spec) >= 2 {
@@ -399,11 +440,11 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 	// vs builtin parseFormatSpecString. But a second grouping char is invalid
 	// and must raise, matching CPython's exact messages.
 	if i < len(spec) && (spec[i] == ',' || spec[i] == '_') {
-		grp := spec[i]
+		grouping = rune(spec[i])
 		i++
 		if i < len(spec) && (spec[i] == ',' || spec[i] == '_') {
-			if spec[i] == grp {
-				return "", &ValueError{Message: fmt.Sprintf("Cannot specify '%c' with '%c'.", grp, grp)}
+			if rune(spec[i]) == grouping {
+				return "", &ValueError{Message: fmt.Sprintf("Cannot specify '%c' with '%c'.", grouping, grouping)}
 			}
 			return "", &ValueError{Message: "Cannot specify both ',' and '_'."}
 		}
@@ -519,6 +560,16 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 				result = "+" + result
 			case ' ':
 				result = " " + result
+			}
+		}
+
+		// Apply digit grouping (thousands separator) for decimal/float types.
+		// (Edge case: combined with zero-pad-to-width the separators are not
+		// woven into the leading zeros -- rare, and previously ungrouped anyway.)
+		if grouping != 0 {
+			switch fmtType {
+			case 0, 'd', 'f', 'F', 'g', 'G', '%', 'n':
+				result = addThousandsSeparator(result, grouping)
 			}
 		}
 	} else if str, ok := value.(StringValue); ok {
