@@ -1193,6 +1193,19 @@ func (t *PythonTokenizer) scanBytesString(quote byte, start, startLine, startCol
 			t.advance()
 			if !t.isAtEnd() {
 				escaped := t.peek()
+				// Line continuation: a backslash immediately followed by a
+				// newline removes both (matches the regular-string scanner and
+				// CPython). Without this, b"a\<LF>b" wrongly keeps the backslash
+				// and newline instead of producing b"ab".
+				if escaped == '\n' {
+					t.advance() // consume the newline (advance tracks line/col)
+					continue
+				}
+				if escaped == '\r' && t.pos+1 < len(t.input) && t.input[t.pos+1] == '\n' {
+					t.advance() // consume \r
+					t.advance() // consume \n
+					continue
+				}
 				t.advance()
 
 				switch escaped {
