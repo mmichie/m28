@@ -1318,6 +1318,30 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// PEP 487: call __set_name__(owner, name) on every namespace value whose
+	// TYPE defines it (looked up on the type via GetMethodWithClass, NOT through
+	// instance __getattr__), before __init_subclass__ -- matching type.__new__.
+	for attrName, attrVal := range class.Attributes {
+		inst, ok := attrVal.(*core.Instance)
+		if !ok {
+			continue
+		}
+		setName, _, ok := inst.Class.GetMethodWithClass("__set_name__")
+		if !ok {
+			continue
+		}
+		callable, ok := setName.(interface {
+			Call([]core.Value, *core.Context) (core.Value, error)
+		})
+		if !ok {
+			continue
+		}
+		// Raw method from the type: pass self (the descriptor), owner, name.
+		if _, err := callable.Call([]core.Value{inst, class, core.StringValue(attrName)}, ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	// Call __init_subclass__ on parent classes (Python 3.6+)
 	// This is called when a class is subclassed
 	if debugClass {
