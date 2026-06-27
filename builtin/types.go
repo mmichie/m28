@@ -757,11 +757,28 @@ func IsInstanceBuilder() builders.BuiltinFunc {
 		// Handle tuple of types
 		if tuple, ok := typeArg.(core.TupleValue); ok {
 			for _, t := range tuple {
+				if res, handled, err := metaCheckHook("__instancecheck__", t, obj, ctx); handled {
+					if err != nil {
+						return nil, err
+					}
+					if res {
+						return core.BoolValue(true), nil
+					}
+					continue
+				}
 				if isInstanceOf(obj, t) {
 					return core.BoolValue(true), nil
 				}
 			}
 			return core.BoolValue(false), nil
+		}
+
+		// PEP 3119: a custom __instancecheck__ on the type's metaclass wins.
+		if res, handled, err := metaCheckHook("__instancecheck__", typeArg, obj, ctx); handled {
+			if err != nil {
+				return nil, err
+			}
+			return core.BoolValue(res), nil
 		}
 
 		// Single type check
@@ -780,6 +797,34 @@ func IsSubclassBuilder() builders.BuiltinFunc {
 
 		subArg := v.Get(0)
 		baseArg := v.Get(1)
+
+		// PEP 3119: a custom __subclasscheck__ on the base's metaclass wins, even
+		// when the subclass argument is a builtin type (e.g. issubclass(int, ABC)).
+		if tuple, ok := baseArg.(core.TupleValue); ok {
+			allHooked := true
+			for _, t := range tuple {
+				res, handled, err := metaCheckHook("__subclasscheck__", t, subArg, ctx)
+				if err != nil {
+					return nil, err
+				}
+				if !handled {
+					allHooked = false
+					continue
+				}
+				if res {
+					return core.BoolValue(true), nil
+				}
+			}
+			if allHooked {
+				return core.BoolValue(false), nil
+			}
+			// Otherwise fall through to the default handling below.
+		} else if res, handled, err := metaCheckHook("__subclasscheck__", baseArg, subArg, ctx); handled {
+			if err != nil {
+				return nil, err
+			}
+			return core.BoolValue(res), nil
+		}
 
 		// Handle builtin type constructors (e.g., bool, int, str)
 		if subBF, ok := subArg.(*core.BuiltinFunction); ok {
@@ -844,6 +889,42 @@ func IsSubclassBuilder() builders.BuiltinFunc {
 
 		return nil, errors.NewTypeError("issubclass", "arg 2 must be a class or tuple of classes", string(typeArg.Type()))
 	}
+}
+
+// metaCheckHook consults a custom __instancecheck__/__subclasscheck__ defined on
+// classinfo's metaclass (PEP 3119). It returns (result, handled, err): handled
+// is true only when classinfo is a class whose METACLASS provides the method
+// (so `isinstance(x, ABC)` for a metaclass ABC that merely *defines*
+// __instancecheck__ for its own instances is left to the default check). The
+// method is invoked as classinfo.<method>(arg), i.e. bound with cls=classinfo.
+func metaCheckHook(method string, classinfo, arg core.Value, ctx *core.Context) (bool, bool, error) {
+	cls, ok := classinfo.(*core.Class)
+	if !ok {
+		return false, false, nil
+	}
+	// Only treat it as a hook when the metaclass supplies the method.
+	metacls, ok := cls.Metaclass.(*core.Class)
+	if !ok {
+		return false, false, nil
+	}
+	if _, found := metacls.GetAttr(method); !found {
+		return false, false, nil
+	}
+	bound, found := cls.GetAttr(method)
+	if !found {
+		return false, false, nil
+	}
+	callable, ok := bound.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return false, false, nil
+	}
+	result, err := callable.Call([]core.Value{arg}, ctx)
+	if err != nil {
+		return false, true, err
+	}
+	return core.IsTruthy(result), true, nil
 }
 
 // Helper function for isinstance checks
