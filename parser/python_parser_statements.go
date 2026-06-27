@@ -610,8 +610,10 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 		return p.parseAnnotatedAssignment(expr)
 	}
 
-	// Check for comma (tuple formation on left side of assignment)
-	if p.check(TOKEN_COMMA) {
+	// Check for comma (tuple formation on the left of an assignment, or a bare
+	// tuple expression statement).
+	sawComma := p.check(TOKEN_COMMA)
+	if sawComma {
 		expr = p.parseTuplePattern(expr)
 	}
 
@@ -625,7 +627,18 @@ func (p *PythonParser) parseExpressionStatement() ast.ASTNode {
 		return p.parseAugmentedAssignment(expr)
 	}
 
-	// Bare expression statement
+	// Bare expression statement. A comma list with no assignment is a tuple
+	// literal -- `x,` or `1, 2, 3` -- not an unpacking target (which as a bare
+	// statement would otherwise be mis-evaluated as a call).
+	if sawComma {
+		if sexpr, ok := expr.(*ast.SExpr); ok {
+			loc := p.makeLocation(p.peek())
+			elems := make([]ast.ASTNode, 0, len(sexpr.Elements)+1)
+			elems = append(elems, ast.NewIdentifier("tuple-literal", loc, ast.SyntaxPython))
+			elems = append(elems, sexpr.Elements...)
+			expr = ast.NewSExpr(elems, loc, ast.SyntaxPython)
+		}
+	}
 	p.consumeStatementTerminator()
 	return expr
 }
@@ -654,8 +667,10 @@ func (p *PythonParser) parseTuplePattern(firstExpr ast.ASTNode) ast.ASTNode {
 		hasComma = true
 		p.advance() // consume comma
 
-		// Check for trailing comma before assignment or end of line
-		if p.check(TOKEN_ASSIGN) || p.check(TOKEN_NEWLINE) {
+		// Check for trailing comma before assignment or end of the statement
+		// (newline, semicolon, or end of input -- e.g. a bare `x,` tuple).
+		if p.check(TOKEN_ASSIGN) || p.check(TOKEN_NEWLINE) ||
+			p.check(TOKEN_SEMICOLON) || p.isAtEnd() {
 			break
 		}
 
