@@ -549,6 +549,8 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 
 		p.expect(TOKEN_DEDENT)
 
+		p.validateGlobalDeclarations(statements)
+
 		if len(statements) == 1 {
 			bodyNode = statements[0]
 		} else {
@@ -557,6 +559,7 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 	} else {
 		// Inline statement(s): def f(): pass  /  def f(): a = 1; b = 2
 		statements := p.parseInlineSuite()
+		p.validateGlobalDeclarations(statements)
 		if len(statements) == 1 {
 			bodyNode = statements[0]
 		} else {
@@ -565,6 +568,66 @@ func (p *PythonParser) parseDefStatement(decorators []ast.ASTNode, isAsync bool)
 	}
 
 	return ast.NewDefForm(name, params, bodyNode, returnType, decorators, isAsync, p.makeLocation(tok), ast.SyntaxPython)
+}
+
+// validateGlobalDeclarations rejects a `global NAME` statement when NAME was
+// already used or assigned earlier in the same function body (CPython raises
+// SyntaxError "name 'X' is used prior to global declaration"). Names inside
+// nested def/class/lambda bodies belong to other scopes and are not counted.
+func (p *PythonParser) validateGlobalDeclarations(statements []ast.ASTNode) {
+	referenced := map[string]bool{}
+	for _, stmt := range statements {
+		p.checkGlobalAfterUse(stmt, referenced)
+		if len(p.errors) > 0 {
+			return
+		}
+	}
+}
+
+// checkGlobalAfterUse walks a statement in textual (pre-order) order: it records
+// every referenced name, and when it reaches a `global` declaration it errors if
+// any declared name was already recorded. It does not descend into nested-scope
+// bodies (def/class/lambda), whose names belong to a different scope.
+func (p *PythonParser) checkGlobalAfterUse(node ast.ASTNode, referenced map[string]bool) {
+	switch n := node.(type) {
+	case nil:
+		return
+	case *ast.Identifier:
+		referenced[n.Name] = true
+	case *ast.DefForm:
+		referenced[n.Name] = true // bound in the enclosing scope; body is a new scope
+	case *ast.ClassForm:
+		referenced[n.Name] = true
+	case *ast.AssignForm:
+		p.checkGlobalAfterUse(n.Target, referenced)
+		p.checkGlobalAfterUse(n.Value, referenced)
+	case *ast.AnnotatedAssignForm:
+		p.checkGlobalAfterUse(n.Target, referenced)
+		p.checkGlobalAfterUse(n.Value, referenced)
+	case *ast.SExpr:
+		if len(n.Elements) > 0 {
+			if head, ok := n.Elements[0].(*ast.Identifier); ok {
+				switch head.Name {
+				case "lambda":
+					return // nested scope
+				case "global":
+					for _, e := range n.Elements[1:] {
+						if id, ok := e.(*ast.Identifier); ok && referenced[id.Name] {
+							p.error(fmt.Sprintf("name '%s' is used prior to global declaration", id.Name))
+							return
+						}
+					}
+					return // the global declaration itself does not "use" the names
+				}
+			}
+		}
+		for _, e := range n.Elements {
+			p.checkGlobalAfterUse(e, referenced)
+			if len(p.errors) > 0 {
+				return
+			}
+		}
+	}
 }
 
 // parseParameters parses: (param (: type)? (= default)?, ...)*
