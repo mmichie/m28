@@ -1935,6 +1935,10 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 							match = actualType == "dict"
 						case "set":
 							match = actualType == "set"
+						case "frozenset":
+							match = actualType == "frozenset"
+						case "complex":
+							match = actualType == "complex"
 						case "bytes":
 							match = actualType == "bytes"
 						}
@@ -2111,6 +2115,10 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 					return core.BoolValue(actualType == "dict"), nil
 				case "set":
 					return core.BoolValue(actualType == "set"), nil
+				case "frozenset":
+					return core.BoolValue(actualType == "frozenset"), nil
+				case "complex":
+					return core.BoolValue(actualType == "complex"), nil
 				case "bytes":
 					return core.BoolValue(actualType == "bytes"), nil
 				}
