@@ -1,9 +1,6 @@
 package modules
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/mmichie/m28/core"
 )
 
@@ -12,52 +9,20 @@ import (
 func Init_WarningsModule() *core.DictValue {
 	warningsModule := core.NewDict()
 
-	// warn - emit a warning message
-	warningsModule.Set("warn", &core.BuiltinFunctionWithKwargs{
-		BaseObject: *core.NewBaseObject(core.FunctionType),
-		Name:       "warn",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-			if len(args) < 1 {
-				return nil, fmt.Errorf("warn() missing required argument: 'message'")
-			}
-			message := core.PrintValue(args[0])
-			category := "UserWarning"
-			if len(args) >= 2 {
-				if str, ok := args[1].(core.StringValue); ok {
-					category = string(str)
-				} else if cls, ok := args[1].(*core.Class); ok {
-					category = cls.Name
-				}
-			}
-			fmt.Fprintf(os.Stderr, "<string>:1: %s: %s\n", category, message)
-			return core.None, nil
-		},
-	})
-
-	// warn_explicit - emit a warning with explicit location
-	warningsModule.Set("warn_explicit", &core.BuiltinFunctionWithKwargs{
-		BaseObject: *core.NewBaseObject(core.FunctionType),
-		Name:       "warn_explicit",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-			if len(args) < 4 {
-				return nil, fmt.Errorf("warn_explicit() requires at least 4 arguments")
-			}
-			message := core.PrintValue(args[0])
-			category := "Warning"
-			if str, ok := args[1].(core.StringValue); ok {
-				category = string(str)
-			} else if cls, ok := args[1].(*core.Class); ok {
-				category = cls.Name
-			}
-			filename := core.PrintValue(args[2])
-			lineno := 0
-			if num, ok := args[3].(core.NumberValue); ok {
-				lineno = int(num)
-			}
-			fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, message)
-			return core.None, nil
-		},
-	})
+	// NOTE: warn / warn_explicit are deliberately NOT provided here.
+	//
+	// CPython's warnings.py does `from _warnings import (filters, _defaultaction,
+	// _onceregistry, warn, warn_explicit, _filters_mutated)` inside a
+	// `try/except ImportError`. When _warnings supplies warn/warn_explicit they
+	// override warnings.py's pure-Python versions. A Go stub for warn cannot call
+	// back into the module-level `_showwarnmsg_impl` hook that catch_warnings(
+	// record=True) installs, so a stubbed warn breaks assertWarns / catch_warnings
+	// recording (it just prints to stderr).
+	//
+	// By omitting warn/warn_explicit, the `from _warnings import (...)` above
+	// raises ImportError, so warnings.py keeps its own correct pure-Python warn /
+	// warn_explicit, which honour filters and _showwarnmsg_impl. This follows the
+	// project rule of letting pure-Python stdlib run directly.
 
 	// filters - list of warning filters
 	warningsModule.Set("filters", core.NewList())

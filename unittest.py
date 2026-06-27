@@ -60,6 +60,58 @@ class _AssertRaisesContext:
         return True
 
 
+class _AssertWarnsContext:
+    """Context manager for assertWarns / assertWarnsRegex."""
+
+    def __init__(self, expected, test_case, expected_regex=None):
+        self.expected = expected
+        self.test_case = test_case
+        self.expected_regex = expected_regex
+        self.warning = None
+        self.filename = None
+        self.lineno = None
+
+    def __enter__(self):
+        import warnings
+        # Record all warnings raised inside the block.
+        self.warnings_manager = warnings.catch_warnings(record=True)
+        self.warnings = self.warnings_manager.__enter__()
+        warnings.resetwarnings()
+        warnings.simplefilter("always")
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.warnings_manager.__exit__(exc_type, exc_value, tb)
+        if exc_type is not None:
+            # Let unexpected exceptions propagate.
+            return False
+        try:
+            exc_name = self.expected.__name__
+        except AttributeError:
+            exc_name = str(self.expected)
+        first_matching = None
+        for m in self.warnings:
+            w = m.message
+            if not isinstance(w, self.expected):
+                continue
+            if first_matching is None:
+                first_matching = w
+            if self.expected_regex is not None:
+                import re
+                if not re.search(self.expected_regex, str(w)):
+                    continue
+            # Found a matching warning; store details for later inspection.
+            self.warning = w
+            self.filename = m.filename
+            self.lineno = m.lineno
+            return True
+        if first_matching is not None:
+            raise AssertionError(
+                f'"{self.expected_regex}" does not match "{first_matching}"'
+            )
+        raise AssertionError(f"{exc_name} not triggered")
+
+
 class TestCase:
     """Base class for all M28 unittest tests."""
 
@@ -338,6 +390,31 @@ class TestCase:
 
     def assertRaisesRegex(self, expected_exception, expected_regex, *args, **kwargs):
         context = _AssertRaisesContext(expected_exception, self, expected_regex)
+        if not args:
+            return context
+        callable_obj = args[0]
+        with context:
+            callable_obj(*args[1:], **kwargs)
+
+    def assertWarns(self, expected_warning, *args, **kwargs):
+        """Assert that the block / callable triggers expected_warning.
+
+        Usage:
+          with self.assertWarns(UserWarning):
+              do_something()
+
+          self.assertWarns(UserWarning, do_something, arg1, arg2)
+        """
+        context = _AssertWarnsContext(expected_warning, self)
+        if not args:
+            return context
+        callable_obj = args[0]
+        with context:
+            callable_obj(*args[1:], **kwargs)
+
+    def assertWarnsRegex(self, expected_warning, expected_regex, *args, **kwargs):
+        """Like assertWarns but also checks the warning message matches a regex."""
+        context = _AssertWarnsContext(expected_warning, self, expected_regex)
         if not args:
             return context
         callable_obj = args[0]
