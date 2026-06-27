@@ -507,6 +507,13 @@ func isAttributeError(err error) bool {
 // exception (CPython only maps AttributeError to the not-found path).
 func resolvePropertyGet(obj, value core.Value, ctx *core.Context) (core.Value, bool, error) {
 	if prop, ok := value.(*core.PropertyValue); ok {
+		// A property accessed on a CLASS (not an instance) returns the descriptor
+		// itself, like CPython's property.__get__(None, cls). Only instance access
+		// invokes the getter; invoking it here with the class as self would call
+		// fget(cls) and wrongly return its result (or raise on self attribute use).
+		if _, isClass := obj.(*core.Class); isClass {
+			return value, true, nil
+		}
 		if prop.Getter == nil {
 			return value, true, nil
 		}
