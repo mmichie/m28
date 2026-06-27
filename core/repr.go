@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"unicode"
@@ -157,7 +158,17 @@ func reprString(s StringValue) string {
 
 // reprNumber returns numeric representation
 func reprNumber(n NumberValue) string {
-	return fmt.Sprintf("%g", float64(n))
+	f := float64(n)
+	// Python spells these inf/-inf/nan, not Go's +Inf/-Inf/NaN.
+	switch {
+	case math.IsInf(f, 1):
+		return "inf"
+	case math.IsInf(f, -1):
+		return "-inf"
+	case math.IsNaN(f):
+		return "nan"
+	}
+	return fmt.Sprintf("%g", f)
 }
 
 // reprBool returns boolean representation (True/False)

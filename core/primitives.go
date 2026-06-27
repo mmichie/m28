@@ -19,9 +19,18 @@ func (n NumberValue) Type() Type {
 
 // String implements Value.String
 func (n NumberValue) String() string {
+	f := float64(n)
+	// Python spells these inf/-inf/nan, not Go's +Inf/-Inf/NaN.
+	switch {
+	case math.IsInf(f, 1):
+		return "inf"
+	case math.IsInf(f, -1):
+		return "-inf"
+	case math.IsNaN(f):
+		return "nan"
+	}
 	// Format the number to avoid unnecessary decimal places
-	s := strconv.FormatFloat(float64(n), 'f', -1, 64)
-	return s
+	return strconv.FormatFloat(f, 'f', -1, 64)
 }
 
 // GetAttr implements basic number methods using TypeDescriptor
