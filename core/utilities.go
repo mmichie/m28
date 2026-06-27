@@ -838,9 +838,12 @@ func ValueToKey(v Value) string {
 		// For frozensets, use the hash value
 		return fmt.Sprintf("fs:%d", val.Hash())
 	case *Class:
-		// For classes, use the class name and pointer address for uniqueness
-		// Classes are hashable by identity in Python
-		return fmt.Sprintf("cls:%s:%p", val.Name, v)
+		// Type objects compare equal by name in M28 (class __eq__ is name-based),
+		// so they must key by name too -- otherwise int and int.mro()[0] (a
+		// *Class) are == but distinct dict/set keys, breaking `int.mro()[0] in
+		// {int}` (the test_typechecks failure). Builtin constructors (e.g.
+		// *IntType) key the same way via the GetClass() branch below.
+		return fmt.Sprintf("type:%s", val.Name)
 	case *Instance:
 		// For instances of hashable types (like int subclasses),
 		// use the underlying value if available
@@ -858,6 +861,12 @@ func ValueToKey(v Value) string {
 		// For other instances, use pointer address
 		return fmt.Sprintf("p:%p", v)
 	default:
+		// Builtin type objects (int, str, list, ...) are wrappers embedding a
+		// *Class and exposing it via GetClass(); key them by name so they match
+		// their *Class form (e.g. int and int.mro()[0]).
+		if tp, ok := v.(interface{ GetClass() *Class }); ok {
+			return fmt.Sprintf("type:%s", tp.GetClass().Name)
+		}
 		// Check if it's a Callable (function) - use pointer address for identity
 		if _, ok := v.(Callable); ok {
 			return fmt.Sprintf("fn:%p", v)
