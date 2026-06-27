@@ -105,6 +105,16 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 			core.DebugLog("[EVAL-LIST] First element is symbol: %s\n", string(sym))
 
 			if handler, ok := specialForms[string(sym)]; ok {
+				// A user binding shadows a "collidable" special form whose name
+				// is also a valid Python identifier commonly bound as a function
+				// (e.g. quote() in urllib/shlex/quopri). Without this, quote(x)
+				// desugars to (quote x) and the Lisp quote special form returns
+				// the symbol x unevaluated instead of calling the function. Only
+				// redirect when the name actually resolves to a callable.
+				if collidableSpecialForms[string(sym)] && boundToCallable(string(sym), ctx) {
+					core.DebugLog("[EVAL-LIST] Special form %s shadowed by callable binding; calling as function\n", string(sym))
+					return evalFunctionCallWithKeywords(v, ctx)
+				}
 				core.DebugLog("[EVAL-LIST] Is special form: %s\n", string(sym))
 				return handler(core.NewList(v.Items()[1:]...), ctx)
 			}
@@ -140,6 +150,27 @@ type SpecialFormHandler func(args *core.ListValue, ctx *core.Context) (core.Valu
 
 // specialForms maps special form names to their handlers
 var specialForms map[string]SpecialFormHandler
+
+// collidableSpecialForms are special-form names that are also valid Python
+// identifiers commonly bound as functions, so a binding must take precedence
+// over the special form when one exists in scope. `quote` collides with
+// urllib/shlex/quopri's quote(); without this the Lisp quote special form
+// would swallow the call (quote(x) -> (quote x) -> the symbol x).
+var collidableSpecialForms = map[string]bool{
+	"quote": true,
+}
+
+// boundToCallable reports whether name resolves to a callable value in ctx.
+func boundToCallable(name string, ctx *core.Context) bool {
+	val, err := ctx.Lookup(name)
+	if err != nil {
+		return false
+	}
+	_, ok := val.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	return ok
+}
 
 // specialFormsRegistry tracks where special forms are registered for duplicate detection
 var specialFormsRegistry = core.NewRegistry("special form")
