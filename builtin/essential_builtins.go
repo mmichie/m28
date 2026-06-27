@@ -506,22 +506,53 @@ func isAttributeError(err error) bool {
 // attribute" / answer False; and (nil, false, err) to propagate any other
 // exception (CPython only maps AttributeError to the not-found path).
 func resolvePropertyGet(obj, value core.Value, ctx *core.Context) (core.Value, bool, error) {
-	prop, ok := value.(*core.PropertyValue)
-	if !ok || prop.Getter == nil {
-		return value, true, nil
-	}
-	getter, ok := prop.Getter.(core.Callable)
-	if !ok {
-		return value, true, nil
-	}
-	result, err := getter.Call([]core.Value{obj}, ctx)
-	if err != nil {
-		if isAttributeError(err) {
-			return nil, false, nil
+	if prop, ok := value.(*core.PropertyValue); ok {
+		if prop.Getter == nil {
+			return value, true, nil
 		}
-		return nil, false, err
+		getter, ok := prop.Getter.(core.Callable)
+		if !ok {
+			return value, true, nil
+		}
+		result, err := getter.Call([]core.Value{obj}, ctx)
+		if err != nil {
+			if isAttributeError(err) {
+				return nil, false, nil
+			}
+			return nil, false, err
+		}
+		return result, true, nil
 	}
-	return result, true, nil
+
+	// Generic data descriptor (e.g. types.DynamicClassAttribute): a class-level
+	// descriptor instance with a real __get__ is resolved by invoking __get__,
+	// like attribute access does, so a getter that raises AttributeError reports
+	// the attribute as absent (matching CPython hasattr/getattr). __get__ is
+	// looked up on the class (not via __getattr__) to avoid false positives.
+	if inst, ok := value.(*core.Instance); ok {
+		if getMethod, _, ok := inst.Class.GetMethodWithClass("__get__"); ok {
+			if callable, ok := getMethod.(core.Callable); ok {
+				var owner core.Value = core.None
+				if o, ok := obj.(interface {
+					GetAttr(string) (core.Value, bool)
+				}); ok {
+					if cls, ok := o.GetAttr("__class__"); ok {
+						owner = cls
+					}
+				}
+				result, err := callable.Call([]core.Value{inst, obj, owner}, ctx)
+				if err != nil {
+					if isAttributeError(err) {
+						return nil, false, nil
+					}
+					return nil, false, err
+				}
+				return result, true, nil
+			}
+		}
+	}
+
+	return value, true, nil
 }
 
 // contains checks if string s contains substr (case-insensitive helper)
