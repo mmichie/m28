@@ -84,15 +84,15 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			// Check if this is a function stored in instance __dict__
 			// Functions in instance __dict__ should NOT be bound as methods
 			skipDescriptor := false
-			if inst, isInst := obj.(*core.Instance); isInst {
-				// Check if the attribute is in the instance's __dict__
-				if _, inInstanceDict := inst.Attributes[string(propName)]; inInstanceDict {
-					// It's from instance __dict__ - check if it's a function
-					if _, isFunc := value.(*UserFunction); isFunc {
-						skipDescriptor = true
-					} else if _, isGenFunc := value.(*core.GeneratorFunction); isGenFunc {
-						skipDescriptor = true
-					}
+			if _, isInst := obj.(*core.Instance); isInst {
+				// A raw function reaching here came from the instance __dict__ or
+				// from __getattr__, never from the class (Instance.GetAttr already
+				// returns class methods bound). Python binds only functions found
+				// in the class, so neither of these is bound as a method.
+				if _, isFunc := value.(*UserFunction); isFunc {
+					skipDescriptor = true
+				} else if _, isGenFunc := value.(*core.GeneratorFunction); isGenFunc {
+					skipDescriptor = true
 				}
 			}
 
