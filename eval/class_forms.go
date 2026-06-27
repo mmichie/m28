@@ -1338,6 +1338,21 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 		// Raw method from the type: pass self (the descriptor), owner, name.
 		if _, err := callable.Call([]core.Value{inst, class, core.StringValue(attrName)}, ctx); err != nil {
+			// CPython annotates the exception with a note identifying the failed
+			// __set_name__ call (descriptor type, attribute name, owning class)
+			// before propagating it out of the class definition.
+			if excInst, ok := errorToExceptionInstance(err, ctx).(*core.Instance); ok {
+				note := core.StringValue(fmt.Sprintf(
+					"Error calling __set_name__ on '%s' instance '%s' in '%s'",
+					inst.Class.Name, attrName, class.Name))
+				notes, _ := excInst.Attributes["__notes__"].(*core.ListValue)
+				if notes == nil {
+					notes = core.NewList()
+					excInst.Attributes["__notes__"] = notes
+				}
+				notes.Append(note)
+				return nil, core.NewPythonError(excInst)
+			}
 			return nil, err
 		}
 	}
