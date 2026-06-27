@@ -1759,6 +1759,92 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 }
 
 // isinstanceForm checks if an object is an instance of a class
+// derivesFromABCMeta reports whether cls is, or inherits from, ABCMeta (by name).
+func derivesFromABCMeta(cls *core.Class) bool {
+	if cls == nil {
+		return false
+	}
+	if cls.Name == "ABCMeta" {
+		return true
+	}
+	for _, p := range cls.Parents {
+		if derivesFromABCMeta(p) {
+			return true
+		}
+	}
+	return false
+}
+
+// metaclassCheck consults a custom __instancecheck__/__subclasscheck__ defined
+// on classinfo's metaclass (PEP 3119). handled is true only when classinfo is a
+// class whose METACLASS (a *Class -- i.e. a user metaclass, not the builtin
+// type) provides the method, so normal classes fall through to the default
+// check. The method is invoked as classinfo.<method>(arg), bound with cls=classinfo.
+func metaclassCheck(method string, classinfo, arg core.Value, ctx *core.Context) (bool, bool, error) {
+	cls, ok := classinfo.(*core.Class)
+	if !ok {
+		return false, false, nil
+	}
+	metacls, ok := cls.Metaclass.(*core.Class)
+	if !ok {
+		return false, false, nil
+	}
+	// ABCMeta's __subclasscheck__/__instancecheck__ delegate to a stubbed _abc
+	// helper in M28, so they would wrongly answer False. Skip the hook for
+	// ABCMeta-based classes and let the default inheritance check handle them
+	// (the behavior before this hook existed); virtual-subclass registration is
+	// unsupported either way.
+	if derivesFromABCMeta(metacls) {
+		return false, false, nil
+	}
+	if _, found := metacls.GetAttr(method); !found {
+		return false, false, nil
+	}
+	bound, found := cls.GetAttr(method)
+	if !found {
+		return false, false, nil
+	}
+	callable, ok := bound.(interface {
+		Call([]core.Value, *core.Context) (core.Value, error)
+	})
+	if !ok {
+		return false, false, nil
+	}
+	result, err := callable.Call([]core.Value{arg}, ctx)
+	if err != nil {
+		return false, true, err
+	}
+	return core.IsTruthy(result), true, nil
+}
+
+// metaclassCheckArg dispatches __instancecheck__/__subclasscheck__ for a single
+// classinfo or a tuple of them, returning (result, handled, err). For a tuple,
+// it is handled only if every element is hooked (otherwise the caller falls
+// through to the default per-element handling).
+func metaclassCheckArg(method string, classinfo, arg core.Value, ctx *core.Context) (bool, bool, error) {
+	if tuple, ok := classinfo.(core.TupleValue); ok {
+		allHooked := true
+		for _, t := range tuple {
+			res, handled, err := metaclassCheck(method, t, arg, ctx)
+			if err != nil {
+				return false, true, err
+			}
+			if !handled {
+				allHooked = false
+				continue
+			}
+			if res {
+				return true, true, nil
+			}
+		}
+		if allHooked {
+			return false, true, nil
+		}
+		return false, false, nil
+	}
+	return metaclassCheck(method, classinfo, arg, ctx)
+}
+
 func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 2 {
 		return nil, &core.TypeError{Message: "isinstance requires 2 arguments"}
@@ -1774,6 +1860,15 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 	classVal, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// PEP 3119: a custom __instancecheck__ on the class's metaclass takes over
+	// (also for a tuple of classes, when every element is hooked).
+	if res, handled, hookErr := metaclassCheckArg("__instancecheck__", classVal, obj, ctx); handled {
+		if hookErr != nil {
+			return nil, hookErr
+		}
+		return core.BoolValue(res), nil
 	}
 
 	// Handle tuple of types - check if obj is instance of any type in the tuple
@@ -2276,6 +2371,15 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 	baseClassVal, err := Eval(args.Items()[1], ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// PEP 3119: a custom __subclasscheck__ on the base's metaclass takes over,
+	// even when the subclass argument is a builtin type (issubclass(int, ABC)).
+	if res, handled, hookErr := metaclassCheckArg("__subclasscheck__", baseClassVal, subClassVal, ctx); handled {
+		if hookErr != nil {
+			return nil, hookErr
+		}
+		return core.BoolValue(res), nil
 	}
 
 	// Extract classes, handling wrapper types and builtin type constructors
