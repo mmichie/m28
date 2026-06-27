@@ -103,7 +103,9 @@ func (f *FrameType) String() string {
 // CodeType represents a Python code object
 type CodeType struct {
 	BaseObject
-	Function Value // Reference to the function this code belongs to
+	Function Value  // Reference to the function this code belongs to
+	Source   string // Source passed to compile(), so eval()/exec() can run it
+	Mode     string // compile mode: "eval", "exec", or "single"
 }
 
 // PythonError wraps a Python exception instance so it can propagate through Go's error system

@@ -537,9 +537,17 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
-		// Get the code string
-		codeStr, err := v.GetString(0)
-		if err != nil {
+		// Get the code string, or the source of a compiled code object. A code
+		// object without source -- e.g. a function's __code__ (which may contain
+		// free variables) -- cannot be executed directly and raises TypeError.
+		var codeStr string
+		var err error
+		if code, ok := v.Get(0).(*core.CodeType); ok {
+			if code.Source == "" {
+				return nil, &core.TypeError{Message: "code object passed to eval() may not contain free variables"}
+			}
+			codeStr = code.Source
+		} else if codeStr, err = v.GetString(0); err != nil {
 			return nil, err
 		}
 
@@ -609,9 +617,17 @@ func RegisterMisc(ctx *core.Context) {
 			return nil, err
 		}
 
-		// Get the code string
-		codeStr, err := v.GetString(0)
-		if err != nil {
+		// Get the code string, or the source of a compiled code object. A code
+		// object without source -- e.g. a function's __code__ (which may contain
+		// free variables) -- cannot be executed directly and raises TypeError.
+		var codeStr string
+		var err error
+		if code, ok := v.Get(0).(*core.CodeType); ok {
+			if code.Source == "" {
+				return nil, &core.TypeError{Message: "code object passed to exec() may not contain free variables"}
+			}
+			codeStr = code.Source
+		} else if codeStr, err = v.GetString(0); err != nil {
 			return nil, err
 		}
 
@@ -763,8 +779,8 @@ func RegisterMisc(ctx *core.Context) {
 				return nil, err
 			}
 
-			// mode (exec, eval, single) - not used for now
-			_, err = v.GetString(2)
+			// mode (exec, eval, single)
+			mode, err := v.GetString(2)
 			if err != nil {
 				return nil, err
 			}
@@ -850,7 +866,10 @@ func RegisterMisc(ctx *core.Context) {
 
 			// Return a code object placeholder
 			// TODO(M28-4604): Implement actual bytecode compilation
-			return core.NewCodeObject(core.Nil), nil
+			code := core.NewCodeObject(core.Nil)
+			code.Source = source
+			code.Mode = mode
+			return code, nil
 		},
 	})
 }
