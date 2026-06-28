@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/mmichie/m28/builtin"
@@ -30,6 +32,10 @@ var (
 	printAST    = flag.Bool("ast", false, "Print AST (same as -parse)")
 	printIR     = flag.Bool("ir", false, "Print IR before execution")
 	pythonMode  = flag.Bool("python", false, "Enable Python mode for REPL")
+
+	// Profiling flags (used by the performance benchmark harness; see benchmarks/)
+	cpuProfile = flag.String("cpuprofile", "", "Write a CPU profile to the given file")
+	memProfile = flag.String("memprofile", "", "Write a heap profile to the given file after execution")
 
 	// Debug/logging flags
 	debugSubsystems = flag.String("debug", "", "Enable debug logging for subsystems (comma-separated: parser,import,eval,builtin,scope or 'all')")
@@ -192,6 +198,40 @@ func main() {
 
 	// Initialize logger before anything else
 	initializeLogger()
+
+	// Profiling hooks for the benchmark harness. Profiles are flushed by
+	// deferred calls, which run on every normal `return` from main. Error
+	// paths that call os.Exit do NOT flush — benchmark cases are expected to
+	// run to successful completion.
+	if *cpuProfile != "" {
+		f, err := os.Create(*cpuProfile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not create CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Fprintf(os.Stderr, "could not start CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer func() {
+			pprof.StopCPUProfile()
+			_ = f.Close()
+		}()
+	}
+	if *memProfile != "" {
+		defer func() {
+			f, err := os.Create(*memProfile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "could not create memory profile: %v\n", err)
+				return
+			}
+			defer f.Close()
+			runtime.GC() // materialize up-to-date heap statistics
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				fmt.Fprintf(os.Stderr, "could not write memory profile: %v\n", err)
+			}
+		}()
+	}
 
 	// Show help
 	if *showHelp {
