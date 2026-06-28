@@ -46,6 +46,23 @@ func Add() func([]core.Value, *core.Context) (core.Value, error) {
 
 // addTwo adds two values using protocol dispatch
 func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Fast path: native number + native number, the overwhelmingly common case.
+	// This mirrors the NumberValue __add__ handler exactly (including the
+	// integer overflow -> big.Int promotion) but skips the dunder dispatch,
+	// which otherwise allocates a BoundMethod and an argument slice on every
+	// single arithmetic operation. It is only taken when BOTH operands are a
+	// plain NumberValue, so no user-defined __add__/__radd__ override can apply
+	// and the result is identical to the dunder path.
+	if l, ok := left.(core.NumberValue); ok {
+		if r, ok := right.(core.NumberValue); ok {
+			sum := float64(l) + float64(r)
+			if p, ok := core.PromoteIntOverflow("+", float64(l), float64(r), sum); ok {
+				return p, nil
+			}
+			return core.NumberValue(sum), nil
+		}
+	}
+
 	// First, try dunder method on left operand
 	if result, found, err := types.CallAdd(left, right, ctx); found {
 		return result, err
