@@ -304,16 +304,16 @@ func TestQuoteForm_Basic(t *testing.T) {
 	// Quote a symbol - should not evaluate it
 	args := core.NewList(core.SymbolValue("undefined_var"))
 
-	result, err := quoteForm(args, ctx)
+	result, err := QuoteForm(args, ctx)
 	if err != nil {
-		t.Fatalf("quoteForm() error = %v", err)
+		t.Fatalf("QuoteForm() error = %v", err)
 	}
 
 	// Should return the symbol itself, not try to look it up
 	if sym, ok := result.(core.SymbolValue); !ok {
-		t.Errorf("quoteForm() returned %T, want core.SymbolValue", result)
+		t.Errorf("QuoteForm() returned %T, want core.SymbolValue", result)
 	} else if string(sym) != "undefined_var" {
-		t.Errorf("quoteForm() = %q, want \"undefined_var\"", string(sym))
+		t.Errorf("QuoteForm() = %q, want \"undefined_var\"", string(sym))
 	}
 }
 
@@ -323,13 +323,13 @@ func TestQuoteForm_Error(t *testing.T) {
 	// Quote with no arguments
 	args := core.NewList()
 
-	_, err := quoteForm(args, ctx)
+	_, err := QuoteForm(args, ctx)
 	if err == nil {
-		t.Fatal("quoteForm() expected error for no arguments, got nil")
+		t.Fatal("QuoteForm() expected error for no arguments, got nil")
 	}
 
 	if !strings.Contains(err.Error(), "requires 1 argument") && !strings.Contains(err.Error(), "exactly 1 argument") {
-		t.Errorf("quoteForm() error = %v, want error about argument count", err)
+		t.Errorf("QuoteForm() error = %v, want error about argument count", err)
 	}
 }
 

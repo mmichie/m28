@@ -157,7 +157,7 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 
 // assignComplexTarget assigns an already-evaluated value to a single attribute
 // (`(. obj attr)`) or subscript (`(get-item obj idx)`) target. Mirrors the
-// corresponding cases in assignForm, but for a value that is already evaluated
+// corresponding cases in assignFormInternal, but for a value that is already evaluated
 // (as in `with cm as obj.attr:` / `for lst[0] in ...`).
 func assignComplexTarget(target *core.ListValue, value core.Value, ctx *core.Context) error {
 	head, _ := unwrapLocated(target.Items()[0]).(core.SymbolValue)

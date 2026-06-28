@@ -191,17 +191,20 @@ var specialFormsRegistry = core.NewRegistry("special form")
 
 func init() {
 	specialForms = map[string]SpecialFormHandler{
-		// Control flow
-		"if":     ifForm,
-		"do":     doForm,
-		"return": returnForm,
+		// Control flow. These register the canonical implementations directly so
+		// package eval is self-contained for its own tests; special_forms/
+		// register.go re-registers the same functions (it cannot import-cycle
+		// back, so the registration is intentionally duplicated, not the logic).
+		"if":     IfForm,
+		"do":     DoForm,
+		"return": ReturnForm,
 
 		// Definitions
 		// Note: "def" is registered by special_forms/register.go
-		"=":                assignForm,
+		"=":                AssignForm,
 		"annotated-assign": annotatedAssignForm,
-		"quote":  quoteForm,
-		"lambda": lambdaForm,
+		"quote":            QuoteForm,
+		"lambda":           lambdaForm,
 		// Note: "fn" was removed as an alias for lambda because it conflicts with
 		// Python code that uses "fn" as a variable name (e.g., fn = some_func; fn(args))
 
@@ -279,5 +282,3 @@ func RegisterSpecialForm(name string, handler SpecialFormHandler) {
 	}
 	specialForms[name] = handler
 }
-
-// ifForm delegates to IfForm in util.go

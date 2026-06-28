@@ -59,13 +59,13 @@ func TestIfForm(t *testing.T) {
 			// Create if form: (if condition trueBranch falseBranch)
 			args := core.NewList(tt.condition, tt.trueBranch, tt.falseBranch)
 
-			result, err := ifForm(args, ctx)
+			result, err := IfForm(args, ctx)
 			if err != nil {
-				t.Fatalf("ifForm() error = %v", err)
+				t.Fatalf("IfForm() error = %v", err)
 			}
 
 			if result != tt.expected {
-				t.Errorf("ifForm() = %v, want %v", result, tt.expected)
+				t.Errorf("IfForm() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
@@ -77,22 +77,22 @@ func TestIfForm_WithoutElse(t *testing.T) {
 	// Test if without else branch
 	// (if true 42) should return 42
 	args := core.NewList(core.BoolValue(true), core.NumberValue(42))
-	result, err := ifForm(args, ctx)
+	result, err := IfForm(args, ctx)
 	if err != nil {
-		t.Fatalf("ifForm() error = %v", err)
+		t.Fatalf("IfForm() error = %v", err)
 	}
 	if result != core.NumberValue(42) {
-		t.Errorf("ifForm() = %v, want 42", result)
+		t.Errorf("IfForm() = %v, want 42", result)
 	}
 
 	// (if false 42) should return nil
 	args = core.NewList(core.BoolValue(false), core.NumberValue(42))
-	result, err = ifForm(args, ctx)
+	result, err = IfForm(args, ctx)
 	if err != nil {
-		t.Fatalf("ifForm() error = %v", err)
+		t.Fatalf("IfForm() error = %v", err)
 	}
 	if result != core.Nil {
-		t.Errorf("ifForm() = %v, want nil", result)
+		t.Errorf("IfForm() = %v, want nil", result)
 	}
 }
 
@@ -118,12 +118,12 @@ func TestIfForm_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ifForm(tt.args, ctx)
+			_, err := IfForm(tt.args, ctx)
 			if err == nil {
-				t.Fatal("ifForm() expected error, got nil")
+				t.Fatal("IfForm() expected error, got nil")
 			}
 			if !strings.Contains(err.Error(), tt.errMatch) {
-				t.Errorf("ifForm() error = %v, want error containing %q", err, tt.errMatch)
+				t.Errorf("IfForm() error = %v, want error containing %q", err, tt.errMatch)
 			}
 		})
 	}
@@ -163,13 +163,13 @@ func TestAssignForm(t *testing.T) {
 			// Create assign form: (= varName value)
 			args := core.NewList(core.SymbolValue(tt.varName), tt.value)
 
-			result, err := assignForm(args, ctx)
+			result, err := AssignForm(args, ctx)
 			if err != nil {
-				t.Fatalf("assignForm() error = %v", err)
+				t.Fatalf("AssignForm() error = %v", err)
 			}
 
 			if result != tt.expected {
-				t.Errorf("assignForm() = %v, want %v", result, tt.expected)
+				t.Errorf("AssignForm() = %v, want %v", result, tt.expected)
 			}
 
 			// Verify the variable is set in context
@@ -214,14 +214,14 @@ func TestQuoteForm(t *testing.T) {
 			// Create quote form: (quote arg)
 			args := core.NewList(tt.arg)
 
-			result, err := quoteForm(args, ctx)
+			result, err := QuoteForm(args, ctx)
 			if err != nil {
-				t.Fatalf("quoteForm() error = %v", err)
+				t.Fatalf("QuoteForm() error = %v", err)
 			}
 
 			// For complex types like lists, compare string representations
 			if result.String() != tt.expected.String() {
-				t.Errorf("quoteForm() = %v, want %v", result, tt.expected)
+				t.Errorf("QuoteForm() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
@@ -239,14 +239,14 @@ func TestDoForm(t *testing.T) {
 		core.SymbolValue("z"),
 	)
 
-	result, err := doForm(args, ctx)
+	result, err := DoForm(args, ctx)
 	if err != nil {
-		t.Fatalf("doForm() error = %v", err)
+		t.Fatalf("DoForm() error = %v", err)
 	}
 
 	// Should return the last value
 	if result != core.NumberValue(3) {
-		t.Errorf("doForm() = %v, want 3", result)
+		t.Errorf("DoForm() = %v, want 3", result)
 	}
 
 	// Verify all variables were set
@@ -272,13 +272,13 @@ func TestDoForm_Empty(t *testing.T) {
 	// Empty do form should return nil
 	args := core.NewList()
 
-	result, err := doForm(args, ctx)
+	result, err := DoForm(args, ctx)
 	if err != nil {
-		t.Fatalf("doForm() error = %v", err)
+		t.Fatalf("DoForm() error = %v", err)
 	}
 
 	if result != core.Nil {
-		t.Errorf("doForm() = %v, want nil", result)
+		t.Errorf("DoForm() = %v, want nil", result)
 	}
 }
 
