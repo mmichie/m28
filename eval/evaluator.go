@@ -91,7 +91,7 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 			return core.NewList(), nil
 		}
 
-		core.DebugLog("[EVAL-LIST] Evaluating list with %d elements, first: %T\n", v.Len(), v.Items()[0])
+		core.DebugLog("[EVAL-LIST] Evaluating list with %d elements, first: %T\n", v.Len(), v.ItemsRef()[0])
 
 		// Check if it's a decorator form (@decorator ...)
 		if isDecoratorForm(v) {
@@ -116,7 +116,9 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 					return evalFunctionCallWithKeywords(v, ctx)
 				}
 				core.DebugLog("[EVAL-LIST] Is special form: %s\n", string(sym))
-				return handler(core.NewList(v.Items()[1:]...), ctx)
+				// ItemsRef avoids a full slice copy here; NewList still makes the
+				// handler's own private copy, so handlers may freely mutate it.
+				return handler(core.NewList(v.ItemsRef()[1:]...), ctx)
 			}
 
 			// Check if it's a macro call (function with __macro__ attribute)
