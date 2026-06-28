@@ -726,8 +726,14 @@ func FloatBuilder() builders.BuiltinFunc {
 			case "nan":
 				return core.NumberValue(math.NaN()), nil
 			}
-			// Try to parse as float
-			if f, err := strconv.ParseFloat(s, 64); err == nil {
+			// Try to parse as float. An out-of-range value still parses (ParseFloat
+			// returns ±Inf for overflow, 0 for underflow, with ErrRange), matching
+			// Python: float('1e400') == inf.
+			f, err := strconv.ParseFloat(s, 64)
+			if err == nil {
+				return core.NumberValue(f), nil
+			}
+			if ne, ok := err.(*strconv.NumError); ok && ne.Err == strconv.ErrRange {
 				return core.NumberValue(f), nil
 			}
 			return nil, errors.NewValueError("float", fmt.Sprintf("could not convert string to float: '%s'", s))

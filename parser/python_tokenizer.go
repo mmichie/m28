@@ -960,12 +960,16 @@ skipScientific:
 		}
 		value = core.ComplexValue(complex(0, imagPart))
 	} else if hasDecimalPoint || strings.ContainsAny(cleanLexeme, "eE") {
-		// Float
-		if f, err := strconv.ParseFloat(cleanLexeme, 64); err == nil {
-			value = core.NumberValue(f)
-		} else {
-			value = core.NumberValue(0.0)
+		// Float. On an out-of-range literal ParseFloat still returns the right
+		// value (±Inf for overflow, 0 for underflow) alongside ErrRange, which
+		// matches Python: 1e400 -> inf, 1e-400 -> 0.
+		f, err := strconv.ParseFloat(cleanLexeme, 64)
+		if err != nil {
+			if ne, ok := err.(*strconv.NumError); !ok || ne.Err != strconv.ErrRange {
+				f = 0.0
+			}
 		}
+		value = core.NumberValue(f)
 	} else {
 		// Integer. Values beyond int64 (and beyond float64's exact range) use
 		// arbitrary-precision BigInt so the literal keeps full precision.
