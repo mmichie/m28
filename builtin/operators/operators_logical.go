@@ -99,6 +99,13 @@ func Or() func([]core.Value, *core.Context) (core.Value, error) {
 	}
 }
 
+// membershipEqual reports whether `value` matches `item` for the `in` operator,
+// honoring a custom/reflected __eq__ (see core.ContainsEqual). Used by the
+// container fallbacks below for objects whose type has no __contains__ dunder.
+func membershipEqual(value, item core.Value, ctx *core.Context) (bool, error) {
+	return core.ContainsEqual(value, item, ctx)
+}
+
 // In implements the in operator using protocol-based dispatch
 func In() func([]core.Value, *core.Context) (core.Value, error) {
 	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -143,7 +150,11 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 
 		case *core.ListValue:
 			for _, item := range c.Items() {
-				if core.SameObject(value, item) || core.EqualValues(value, item) {
+				eq, err := membershipEqual(value, item, ctx)
+				if err != nil {
+					return nil, err
+				}
+				if eq {
 					return core.BoolValue(true), nil
 				}
 			}
@@ -151,7 +162,11 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 
 		case core.TupleValue:
 			for _, item := range c {
-				if core.SameObject(value, item) || core.EqualValues(value, item) {
+				eq, err := membershipEqual(value, item, ctx)
+				if err != nil {
+					return nil, err
+				}
+				if eq {
 					return core.BoolValue(true), nil
 				}
 			}
@@ -184,7 +199,11 @@ func In() func([]core.Value, *core.Context) (core.Value, error) {
 						}
 						return nil, err
 					}
-					if core.SameObject(value, item) || core.EqualValues(value, item) {
+					eq, err := membershipEqual(value, item, ctx)
+					if err != nil {
+						return nil, err
+					}
+					if eq {
 						return core.BoolValue(true), nil
 					}
 				}

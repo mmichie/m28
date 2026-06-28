@@ -361,6 +361,34 @@ func ComputeHash(v Value, ctx *Context) (int64, error) {
 // bit pattern, which makes `nan is nan` hold for one and the same value while
 // leaving ordinary numbers — already handled by EqualValues — unaffected.
 // Reference types fall back to Go pointer identity.
+// ContainsEqual reports whether searchVal equals element for a membership test
+// (the `in` operator). CPython compares searchVal == element with full rich
+// comparison (__eq__ plus the reflected __eq__). EqualValuesWithError only
+// reflects from its first operand, so when only `element` is a user instance we
+// swap the operands to make sure that instance's __eq__ is consulted -- e.g.
+// AllEq() in [1] and 1 in [AllEq()] are both true.
+func ContainsEqual(searchVal, element Value, ctx *Context) (bool, error) {
+	if SameObject(searchVal, element) {
+		return true, nil
+	}
+	_, sInst := searchVal.(*Instance)
+	_, eInst := element.(*Instance)
+	if !sInst && !eInst {
+		// Neither side can define a custom __eq__; use the fast Go equality.
+		return EqualValues(searchVal, element), nil
+	}
+	// CPython evaluates `element == searchVal` (the container item's __eq__ runs
+	// first, then the reflected one), which matters for asymmetric __eq__: e.g.
+	// ALWAYS_EQ in [NEVER_EQ] is False because NEVER_EQ.__eq__ answers first.
+	// EqualValuesWithError only reflects from its first operand, so put the
+	// element first when it is an instance; otherwise searchVal must be the
+	// instance, so put it first to reach its __eq__.
+	if eInst {
+		return EqualValuesWithError(element, searchVal, ctx)
+	}
+	return EqualValuesWithError(searchVal, element, ctx)
+}
+
 func SameObject(a, b Value) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
