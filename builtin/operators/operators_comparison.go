@@ -337,6 +337,11 @@ func LessThan() func([]core.Value, *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
+		if a, ok := args[0].(core.NumberValue); ok {
+			if b, ok := args[1].(core.NumberValue); ok {
+				return core.BoolValue(a < b), nil
+			}
+		}
 		return compareLessThan(args[0], args[1], ctx)
 	}
 }
@@ -467,6 +472,11 @@ func LessThanOrEqual() func([]core.Value, *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
+		if a, ok := args[0].(core.NumberValue); ok {
+			if b, ok := args[1].(core.NumberValue); ok {
+				return core.BoolValue(a <= b), nil
+			}
+		}
 		return compareLessThanOrEqual(args[0], args[1], ctx)
 	}
 }
@@ -558,6 +568,11 @@ func GreaterThan() func([]core.Value, *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
+		if a, ok := args[0].(core.NumberValue); ok {
+			if b, ok := args[1].(core.NumberValue); ok {
+				return core.BoolValue(a > b), nil
+			}
+		}
 		return compareGreaterThan(args[0], args[1], ctx)
 	}
 }
@@ -687,6 +702,11 @@ func GreaterThanOrEqual() func([]core.Value, *core.Context) (core.Value, error) 
 			return nil, err
 		}
 
+		if a, ok := args[0].(core.NumberValue); ok {
+			if b, ok := args[1].(core.NumberValue); ok {
+				return core.BoolValue(a >= b), nil
+			}
+		}
 		return compareGreaterThanOrEqual(args[0], args[1], ctx)
 	}
 }

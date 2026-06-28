@@ -306,6 +306,20 @@ func negateValue(value core.Value, ctx *core.Context) (core.Value, error) {
 
 // subtractTwo subtracts right from left
 func subtractTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Fast path: native number - native number, the common case. Mirrors addTwo
+	// (including overflow -> big.Int via PromoteIntOverflow) and is only taken
+	// when both operands are plain NumberValue, so no user __sub__/__rsub__
+	// override can apply; the result is identical to the dispatch path below.
+	if l, ok := left.(core.NumberValue); ok {
+		if r, ok := right.(core.NumberValue); ok {
+			diff := float64(l) - float64(r)
+			if p, ok := core.PromoteIntOverflow("-", float64(l), float64(r), diff); ok {
+				return p, nil
+			}
+			return core.NumberValue(diff), nil
+		}
+	}
+
 	// Try __sub__ on left operand
 	if result, found, err := types.CallSub(left, right, ctx); found {
 		return result, err
@@ -380,6 +394,19 @@ func Multiply() func([]core.Value, *core.Context) (core.Value, error) {
 
 // multiplyTwo multiplies two values
 func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// Fast path: native number * native number. Mirrors addTwo (including
+	// overflow -> big.Int). Sequence repetition (number * str/list) is
+	// unaffected because it requires a non-number operand, which skips this.
+	if l, ok := left.(core.NumberValue); ok {
+		if r, ok := right.(core.NumberValue); ok {
+			prod := float64(l) * float64(r)
+			if p, ok := core.PromoteIntOverflow("*", float64(l), float64(r), prod); ok {
+				return p, nil
+			}
+			return core.NumberValue(prod), nil
+		}
+	}
+
 	// Try __mul__ on left operand
 	if result, found, err := types.CallMul(left, right, ctx); found {
 		return result, err
