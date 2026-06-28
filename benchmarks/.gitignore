@@ -1,0 +1,4 @@
+# Per-run artifacts (the committed baseline.json is the source of truth).
+bench.json
+.microbench-baseline.txt
+*.prof

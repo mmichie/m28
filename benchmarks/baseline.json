@@ -1,0 +1,132 @@
+{
+  "timestamp": "2026-06-28T01:58:04Z",
+  "m28_bin": "./bin/m28",
+  "python": "python3",
+  "runs": 3,
+  "py_startup_ms": 30.346865,
+  "m28_startup_ms": 8.62531,
+  "geomean_ratio": 126.2492021818217,
+  "geomean_adj_ratio": 1037.0505974588934,
+  "cases": [
+    {
+      "case": "arith_bigint",
+      "status": "ok",
+      "py_ms": 33.243196,
+      "m28_ms": 3891.914832,
+      "py_median_ms": 33.473846,
+      "m28_median_ms": 3957.082439,
+      "ratio": 117.07402717837358,
+      "adj_ratio": 1340.7616470631308
+    },
+    {
+      "case": "arith_int",
+      "status": "ok",
+      "py_ms": 32.029466,
+      "m28_ms": 4372.443926,
+      "py_median_ms": 32.978776,
+      "m28_median_ms": 4399.722705,
+      "ratio": 136.51316965446753,
+      "adj_ratio": 2593.4957937146146
+    },
+    {
+      "case": "attr_method",
+      "status": "ok",
+      "py_ms": 33.807302,
+      "m28_ms": 5252.115286,
+      "py_median_ms": 35.535962,
+      "m28_median_ms": 5331.955748,
+      "ratio": 155.35446413322188,
+      "adj_ratio": 1515.2681513924401
+    },
+    {
+      "case": "comprehension",
+      "status": "ok",
+      "py_ms": 35.009043,
+      "m28_ms": 3785.507341,
+      "py_median_ms": 39.674995,
+      "m28_median_ms": 3797.444794,
+      "ratio": 108.12941504856332,
+      "adj_ratio": 810.1110749096243
+    },
+    {
+      "case": "dict_ops",
+      "status": "ok",
+      "py_ms": 31.357796,
+      "m28_ms": 5934.687978,
+      "py_median_ms": 33.824479,
+      "m28_median_ms": 5946.102632,
+      "ratio": 189.25717795982854,
+      "adj_ratio": 5861.985306613412
+    },
+    {
+      "case": "exceptions",
+      "status": "ok",
+      "py_ms": 34.912405,
+      "m28_ms": 5141.041004,
+      "py_median_ms": 35.581653,
+      "m28_median_ms": 5145.633148,
+      "ratio": 147.25542408207053,
+      "adj_ratio": 1124.1639968108923
+    },
+    {
+      "case": "iteration",
+      "status": "ok",
+      "py_ms": 32.212799,
+      "m28_ms": 4562.394671,
+      "py_median_ms": 32.677508,
+      "m28_median_ms": 4567.012435,
+      "ratio": 141.63297858717587,
+      "adj_ratio": 2440.477187831944
+    },
+    {
+      "case": "list_ops",
+      "status": "ok",
+      "py_ms": 31.532349,
+      "m28_ms": 4927.635703,
+      "py_median_ms": 31.833926,
+      "m28_median_ms": 4993.640143,
+      "ratio": 156.27239515203894,
+      "adj_ratio": 4149.36885947006
+    },
+    {
+      "case": "recursion_fib",
+      "status": "ok",
+      "py_ms": 30.381323,
+      "m28_ms": 5985.556257,
+      "py_median_ms": 31.096987,
+      "m28_median_ms": 6089.300868,
+      "ratio": 197.0143386119163,
+      "adj_ratio": 197.0143386119163
+    },
+    {
+      "case": "regex_match",
+      "status": "ok",
+      "py_ms": 40.002012,
+      "m28_ms": 3349.690483,
+      "py_median_ms": 41.520332,
+      "m28_median_ms": 3430.377003,
+      "ratio": 83.73805005108242,
+      "adj_ratio": 346.0398037440549
+    },
+    {
+      "case": "scope_lookup",
+      "status": "ok",
+      "py_ms": 71.191135,
+      "m28_ms": 3727.477693,
+      "py_median_ms": 72.106489,
+      "m28_median_ms": 4006.731552,
+      "ratio": 52.358733892920796,
+      "adj_ratio": 91.04954949617168
+    },
+    {
+      "case": "string_ops",
+      "status": "ok",
+      "py_ms": 34.908972,
+      "m28_ms": 4001.270719,
+      "py_median_ms": 35.595499,
+      "m28_median_ms": 4011.624726,
+      "ratio": 114.62012456282014,
+      "adj_ratio": 875.1757486179089
+    }
+  ]
+}

@@ -5,6 +5,7 @@ BINARY_NAME=m28
 BINARY_DIR=bin
 SRC_DIR=./
 PKG_DIRS=$(shell go list ./... | grep -v /vendor/)
+BENCH_N?=3
 
 # Default target
 all: build
@@ -65,6 +66,10 @@ help:
 	@echo "  make deps         - Install and tidy up dependencies."
 	@echo "  make run          - Start the REPL."
 	@echo "  make fmt          - Format Go code using gofmt."
+	@echo "  make bench        - Macro benchmarks: m28 vs CPython, scored + diffed vs baseline."
+	@echo "  make bench-go     - Micro benchmarks: Go hot-path ns/op + allocs/op."
+	@echo "  make bench-go-save / bench-go-stat - Save then benchstat-compare micro results."
+	@echo "  make bench-update-baseline - Refresh benchmarks/baseline.json."
 	@echo "  make all          - Default, build the project."
 	@echo "  make help         - Display this help."
 
@@ -73,6 +78,33 @@ fmt:
 	@echo "Formatting Go code..."
 	@gofmt -w -s $(shell find . -name "*.go" -not -path "./vendor/*")
 
+# --- Performance benchmark harness (see benchmarks/ and benchmarks/LOOP.md) ---
+
+# Macro tier: run each benchmarks/cases/*.py under m28 and CPython, score the
+# slowdown ratios, and diff against benchmarks/baseline.json.
+bench: build
+	@go run ./cmd/bench -n $(BENCH_N)
+
+# Overwrite the committed baseline with a fresh, higher-confidence run.
+bench-update-baseline: build
+	@go run ./cmd/bench -n 5 -update-baseline
+
+# Micro tier: Go benchmarks of internal hot paths (ns/op + allocs/op).
+bench-go:
+	@go test ./benchmarks/ -bench=. -benchmem -run='^$$' -count=1
+
+# Save the current micro results as the comparison point for bench-go-stat.
+bench-go-save:
+	@go test ./benchmarks/ -bench=. -benchmem -run='^$$' -count=10 > benchmarks/.microbench-baseline.txt
+	@echo "saved micro baseline -> benchmarks/.microbench-baseline.txt"
+
+# Compare current micro results against the saved baseline using benchstat.
+bench-go-stat:
+	@go test ./benchmarks/ -bench=. -benchmem -run='^$$' -count=10 > /tmp/m28-microbench-new.txt
+	@command -v benchstat >/dev/null 2>&1 \
+		&& benchstat benchmarks/.microbench-baseline.txt /tmp/m28-microbench-new.txt \
+		|| echo "install benchstat: go install golang.org/x/perf/cmd/benchstat@latest"
+
 # Special targets
-.PHONY: all build test m28-test clean deps run help fmt
+.PHONY: all build test m28-test clean deps run help fmt bench bench-update-baseline bench-go bench-go-save bench-go-stat
 
