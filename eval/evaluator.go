@@ -85,6 +85,18 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		}
 		return val, nil
 
+	case *slotRef:
+		// Resolution layer: a local read is a direct slot-frame index, with no
+		// scope-map lookup. A nil slot means the local has not been assigned yet
+		// on this code path (Python's UnboundLocalError).
+		val := ctx.Locals[v.slot]
+		if val == nil {
+			return nil, core.WrapEvalError(
+				&core.UnboundLocalError{Name: v.name, Location: ctx.CurrentLocation()},
+				"unbound local", ctx)
+		}
+		return val, nil
+
 	case *core.ListValue:
 		// Empty list evaluates to a fresh empty list (avoid shared mutable state)
 		if v.Len() == 0 {

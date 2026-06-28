@@ -283,6 +283,11 @@ func errorToExceptionInstance(err error, ctx *core.Context) core.Value {
 		inst := createPythonExceptionInstance(ctx, "OSError", errMsg)
 		setExceptionFilename(inst, e.Filename)
 		return inst
+	case *core.UnboundLocalError:
+		// Subclass of NameError; raised by the resolution layer for a local read
+		// before assignment. Map to the dedicated class so both
+		// `except UnboundLocalError` and `except NameError` catch it.
+		return createPythonExceptionInstance(ctx, "UnboundLocalError", errMsg)
 	case *core.NameError:
 		// Include suggestion in error message if present
 		msg := errMsg

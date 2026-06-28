@@ -71,6 +71,16 @@ type Context struct {
 	// the Go stack overflows. See GetRecursionLimit.
 	Depth int
 
+	// Locals is the slot frame for a function executing under the resolution
+	// layer (see eval/resolve.go). When non-nil, the function's local variables
+	// live here, indexed by slot, instead of in Vars; the function body was
+	// rewritten at analysis time so each local read/write is a direct slice
+	// access (slotRef) rather than a map lookup. nil for every other context,
+	// and never propagated to child contexts by NewContext, so an inner call
+	// frame gets its own slots (or none). A nil entry means the local is unbound
+	// (read-before-assignment -> UnboundLocalError).
+	Locals []Value
+
 	// Optional module dict to sync definitions to (for circular import support)
 	// When set, Define() will also update this dict in real-time
 	ModuleDict *DictValue

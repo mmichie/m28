@@ -94,6 +94,24 @@ func (e *NameError) Error() string {
 	return msg
 }
 
+// UnboundLocalError is raised when a function-local variable is read before it
+// has been assigned. In Python it is a subclass of NameError; the resolution
+// layer (eval/resolve.go) raises it when a slot holds no value yet. Carrying a
+// dedicated Go type lets the try/except matcher map it to the right Python
+// class (see eval/special_forms_control.go).
+type UnboundLocalError struct {
+	Name     string
+	Location *SourceLocation
+}
+
+func (e *UnboundLocalError) Error() string {
+	msg := fmt.Sprintf("local variable '%s' referenced before assignment", e.Name)
+	if e.Location != nil {
+		return fmt.Sprintf("%s at %s", msg, e.Location.String())
+	}
+	return msg
+}
+
 // TypeError is raised when a type error occurs
 type TypeError struct {
 	Message  string

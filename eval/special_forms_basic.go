@@ -26,6 +26,18 @@ func assignForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	target := args.Items()[0]
 	core.DebugLog("[ASSIGN] Target type: %T\n", target)
 
+	// Resolution layer: a slot target stores straight into the function's slot
+	// frame (no scope-map write). resolveBody only emits these for bare local
+	// targets, so there is nothing else to handle here.
+	if sr, ok := target.(*slotRef); ok {
+		value, err := Eval(args.Items()[1], ctx)
+		if err != nil {
+			return nil, err
+		}
+		ctx.Locals[sr.slot] = value
+		return value, nil
+	}
+
 	// Check if target is a list
 	if targetList, ok := target.(*core.ListValue); ok {
 		core.DebugLog("[ASSIGN] Target is a list with %d elements\n", targetList.Len())

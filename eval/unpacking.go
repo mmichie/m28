@@ -49,6 +49,12 @@ func UnpackPattern(pattern core.Value, value core.Value, ctx *core.Context) erro
 	pattern = unwrapLocated(pattern)
 
 	switch p := pattern.(type) {
+	case *slotRef:
+		// Resolution layer: a slot-bound for-loop target (e.g. `for i in ...`)
+		// writes straight into the function's slot frame.
+		ctx.Locals[p.slot] = value
+		return nil
+
 	case core.SymbolValue:
 		// Simple binding: just assign value to variable
 		ctx.Define(string(p), value)

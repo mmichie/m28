@@ -164,6 +164,119 @@ type UserFunction struct {
 	defaultsOverride   core.Value         // nil unset; None=no positional defaults; TupleValue=defaults
 	kwdefaultsOverride core.Value         // nil unset; None=no kw-only defaults; *DictValue=kw defaults
 	origSignature      *FunctionSignature // signature as originally defined (captured on first override)
+
+	// Resolution-layer state, computed lazily on first call (ensureResolved).
+	// When slotBody != nil the function runs on a flat slot frame (callSlots)
+	// instead of map-based scope; otherwise it uses the ordinary path. Computed
+	// once per function object; resolveTried also caches the negative result.
+	resolveTried bool
+	slotBody     core.Value // rewritten body with slotRefs; nil => not slot-eligible
+	numSlots     int        // size of the slot frame
+	numParams    int        // positional params, bound into slots 0..numParams-1
+}
+
+// ensureResolved runs the slot-frame analysis once. Afterwards f.slotBody is
+// non-nil iff the function can execute on a slot frame: it needs a simple
+// signature (only required positional params — no defaults, *args, **kwargs, or
+// keyword-only params, so positional args map 1:1 onto the leading slots) and a
+// body the resolution pass fully understands. Anything else leaves slotBody nil
+// and the function keeps using map-based scope.
+func (f *UserFunction) ensureResolved() {
+	if f.resolveTried {
+		return
+	}
+	f.resolveTried = true
+
+	paramNames, ok := f.simpleParamNames()
+	if !ok {
+		return
+	}
+	res, ok := analyzeLocals(paramNames, f.body, isSpecialFormName)
+	if !ok {
+		return
+	}
+	rewritten, ok := resolveBody(f.body, res.slots, isSpecialFormName)
+	if !ok {
+		return
+	}
+	// Publish numParams/numSlots before slotBody so a reader that sees a
+	// non-nil slotBody also sees consistent frame sizes.
+	f.numParams = len(paramNames)
+	f.numSlots = len(res.slots)
+	f.slotBody = rewritten
+}
+
+// simpleParamNames returns the positional parameter names in declaration order,
+// or ok=false when the signature is anything callSlots cannot bind by position
+// alone (defaults, *args, **kwargs, or keyword-only params). The legacy
+// params-only path is always simple.
+func (f *UserFunction) simpleParamNames() ([]string, bool) {
+	if f.signature != nil {
+		sig := f.signature
+		if sig.RestParam != nil || sig.KeywordParam != nil || len(sig.OptionalParams) > 0 {
+			return nil, false
+		}
+		names := make([]string, 0, len(sig.RequiredParams))
+		for _, p := range sig.RequiredParams {
+			if p.KeywordOnly {
+				return nil, false
+			}
+			names = append(names, string(p.Name))
+		}
+		return names, true
+	}
+	names := make([]string, len(f.params))
+	for i, p := range f.params {
+		names[i] = string(p)
+	}
+	return names, true
+}
+
+// callSlots executes a slot-eligible function: it binds positional args to the
+// leading slots and evaluates the pre-resolved body against the slot frame,
+// bypassing map-based scope. The caller guarantees len(args) == f.numParams and
+// no keyword arguments, so binding is a positional copy.
+func (f *UserFunction) callSlots(args []core.Value, ctx *core.Context) (core.Value, error) {
+	core.TraceEnterFunction(f.name, args)
+
+	funcEnv := core.NewContext(f.env)
+	funcEnv.IsFunctionScope = true
+	// Track call depth to raise RecursionError before the Go stack overflows.
+	callerDepth := 0
+	if ctx != nil {
+		callerDepth = ctx.Depth
+	}
+	funcEnv.Depth = callerDepth + 1
+	if funcEnv.Depth > core.GetRecursionLimit() {
+		return nil, &core.RecursionError{Message: "maximum recursion depth exceeded"}
+	}
+
+	// Slots 0..numParams-1 hold the parameters in order; later slots start
+	// unbound (nil) until first assignment (read-before-assign => UnboundLocalError).
+	locals := make([]core.Value, f.numSlots)
+	copy(locals, args)
+	funcEnv.Locals = locals
+
+	result, err := Eval(f.slotBody, funcEnv)
+	if err != nil {
+		core.TraceExitFunction(f.name, nil, err)
+		return nil, err
+	}
+
+	if ret, ok := result.(*ReturnValue); ok {
+		core.TraceExitFunction(f.name, ret.Value, nil)
+		return ret.Value, nil
+	}
+	if _, ok := result.(*core.YieldValue); ok {
+		return nil, fmt.Errorf("yield outside of generator function")
+	}
+	// Lambda bodies implicitly return their value; def bodies return None.
+	if f.isLambda {
+		core.TraceExitFunction(f.name, result, nil)
+		return result, nil
+	}
+	core.TraceExitFunction(f.name, core.None, nil)
+	return core.None, nil
 }
 
 // applyDefaultOverrides rebuilds f.signature from f.origSignature to reflect the
@@ -259,6 +372,14 @@ func (f *UserFunction) ensureDict() *core.DictValue {
 
 // Call implements Callable.Call
 func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
+	// Resolution layer: a simple-signature function with a slot-compiled body
+	// runs on a flat slot frame, given the right positional arity. callSlots
+	// owns its own tracing, so this returns before the map-based path below.
+	f.ensureResolved()
+	if f.slotBody != nil && len(args) == f.numParams {
+		return f.callSlots(args, ctx)
+	}
+
 	// Trace function entry
 	core.TraceEnterFunction(f.name, args)
 
@@ -379,6 +500,14 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 
 // CallWithKwargs calls the function with positional and keyword arguments
 func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	// Resolution layer: when called purely positionally with the right arity, a
+	// slot-eligible function uses the slot frame. Any keyword arguments fall
+	// through to the map-based path, which binds them correctly.
+	f.ensureResolved()
+	if f.slotBody != nil && len(kwargs) == 0 && len(args) == f.numParams {
+		return f.callSlots(args, ctx)
+	}
+
 	// Trace function entry
 	core.TraceEnterFunction(f.name, args)
 

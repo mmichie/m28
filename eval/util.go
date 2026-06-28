@@ -815,6 +815,18 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 		return nil, ErrArgCount("= requires at least 2 arguments")
 	}
 
+	// Resolution layer: a slot target (emitted by resolveBody for a bare local)
+	// stores straight into the function's slot frame, no scope-map write. Such a
+	// form is always (= <slotRef> value), so there is nothing else to handle.
+	if sr, ok := args.Items()[0].(*slotRef); ok {
+		value, err := Eval(args.Items()[1], ctx)
+		if err != nil {
+			return nil, err
+		}
+		ctx.Locals[sr.slot] = value
+		return value, nil
+	}
+
 	// Check for multiple assignment (= a b expr) or (= a b c d ...)
 	if args.Len() > 2 {
 		// Multiple assignment
