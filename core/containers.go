@@ -176,6 +176,18 @@ func (l *ListValue) Items() []Value {
 	return items
 }
 
+// ItemsRef returns the underlying items slice WITHOUT copying. The caller must
+// treat it as read-only: do not mutate or retain it, as it aliases the list's
+// storage. Use Items() whenever the result might be mutated or stored. This
+// exists for hot read-only paths (e.g. call dispatch) where Items()'s defensive
+// copy dominates allocation profiles.
+func (l *ListValue) ItemsRef() []Value {
+	if l == nil {
+		return nil
+	}
+	return l.items
+}
+
 // Type implements Value.Type
 func (l *ListValue) Type() Type {
 	return ListType

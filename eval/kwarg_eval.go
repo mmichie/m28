@@ -26,7 +26,7 @@ type ArgumentInfo struct {
 // It looks for patterns like: symbol = value in the argument list
 // Also handles *args and **kwargs unpacking
 func parseKeywordArguments(args *core.ListValue) ([]core.Value, map[string]core.Value, error) {
-	info, err := parseArgumentsWithUnpacking(args)
+	info, err := parseArgumentsWithUnpacking(args.ItemsRef())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -45,18 +45,29 @@ func parseKeywordArguments(args *core.ListValue) ([]core.Value, map[string]core.
 }
 
 // parseArgumentsWithUnpacking extracts all argument information including unpacking
-func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
-	info := &ArgumentInfo{
-		Elements:     []ArgumentElement{},
-		KeywordExprs: make(map[string]core.Value),
+func parseArgumentsWithUnpacking(items []core.Value) (*ArgumentInfo, error) {
+	// Both fields are lazily allocated: the common call has only positional
+	// args (KeywordExprs stays nil) and Elements grows via append from nil.
+	info := &ArgumentInfo{}
+
+	// addKeyword records a keyword arg, allocating the map on first use.
+	addKeyword := func(name string, value core.Value) error {
+		if _, exists := info.KeywordExprs[name]; exists {
+			return fmt.Errorf("duplicate keyword argument: %s", name)
+		}
+		if info.KeywordExprs == nil {
+			info.KeywordExprs = make(map[string]core.Value)
+		}
+		info.KeywordExprs[name] = value
+		return nil
 	}
 
 	i := 0
 	seenKeyword := false
 
-	for i < args.Len() {
+	for i < len(items) {
 		// Check for unpacking operators (unwrap LocatedValues first)
-		arg := args.Items()[i]
+		arg := items[i]
 		if located, ok := arg.(core.LocatedValue); ok {
 			arg = located.Unwrap()
 		}
@@ -66,12 +77,12 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 
 			// Check for **unpack marker (parser creates: ["**unpack", <expr>])
 			if symStr == "**unpack" {
-				if i+1 >= args.Len() {
+				if i+1 >= len(items) {
 					return nil, fmt.Errorf("** unpacking requires an expression")
 				}
 				info.Elements = append(info.Elements, ArgumentElement{
 					IsKwUnpack: true,
-					Expr:       args.Items()[i+1],
+					Expr:       items[i+1],
 				})
 				i += 2 // Skip marker and expression
 				continue
@@ -79,7 +90,7 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 
 			// Check for *unpack marker (parser creates: ["*unpack", <expr>])
 			if symStr == "*unpack" {
-				if i+1 >= args.Len() {
+				if i+1 >= len(items) {
 					return nil, fmt.Errorf("* unpacking requires an expression")
 				}
 				if seenKeyword {
@@ -87,7 +98,7 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 				}
 				info.Elements = append(info.Elements, ArgumentElement{
 					IsUnpack: true,
-					Expr:     args.Items()[i+1],
+					Expr:     items[i+1],
 				})
 				i += 2 // Skip marker and expression
 				continue
@@ -103,11 +114,11 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 
 				// Check if next argument is the expression to unpack (parser style)
 				// Parser generates: ["**kwargs", (dict-literal ...)]
-				if i+1 < args.Len() {
+				if i+1 < len(items) {
 					// Use the next argument as the dict expression
 					info.Elements = append(info.Elements, ArgumentElement{
 						IsKwUnpack: true,
-						Expr:       args.Items()[i+1],
+						Expr:       items[i+1],
 					})
 					i += 2 // Skip marker and dict expression
 					continue
@@ -141,20 +152,17 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 		}
 
 		// Check if this is a keyword argument pattern: symbol = value
-		if i+2 < args.Len() {
-			if sym, ok := args.Items()[i].(core.SymbolValue); ok {
-				if eq, ok := args.Items()[i+1].(core.SymbolValue); ok && string(eq) == "=" {
+		if i+2 < len(items) {
+			if sym, ok := items[i].(core.SymbolValue); ok {
+				if eq, ok := items[i+1].(core.SymbolValue); ok && string(eq) == "=" {
 					// This is a keyword argument
 					paramName := string(sym)
-					paramValue := args.Items()[i+2]
+					paramValue := items[i+2]
 					seenKeyword = true
 
-					// Check for duplicate keyword arguments
-					if _, exists := info.KeywordExprs[paramName]; exists {
-						return nil, fmt.Errorf("duplicate keyword argument: %s", paramName)
+					if err := addKeyword(paramName, paramValue); err != nil {
+						return nil, err
 					}
-
-					info.KeywordExprs[paramName] = paramValue
 					i += 3 // Skip symbol, =, and value
 					continue
 				}
@@ -170,7 +178,7 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 		info.Elements = append(info.Elements, ArgumentElement{
 			IsUnpack:   false,
 			IsKwUnpack: false,
-			Expr:       args.Items()[i],
+			Expr:       items[i],
 		})
 		i++
 	}
@@ -180,9 +188,13 @@ func parseArgumentsWithUnpacking(args *core.ListValue) (*ArgumentInfo, error) {
 
 // evalFunctionCallWithKeywords evaluates a function call with keyword argument support
 func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core.Value, error) {
+	// items aliases the call expression's storage (read-only here); ItemsRef
+	// avoids the defensive slice copy Items() would make on this very hot path.
+	items := expr.ItemsRef()
+
 	// Check if the function is referenced by a symbol (for better error messages)
 	var symbolName string
-	first := expr.Items()[0]
+	first := items[0]
 	// Unwrap LocatedValue if needed
 	if located, ok := first.(core.LocatedValue); ok {
 		first = located.Value
@@ -190,28 +202,27 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 	if sym, ok := first.(core.SymbolValue); ok {
 		symbolName = string(sym)
 	}
-	core.DebugLog("[KWCALL] evalFunctionCallWithKeywords: %s, %d args\n", symbolName, expr.Len()-1)
+	core.DebugLog("[KWCALL] evalFunctionCallWithKeywords: %s, %d args\n", symbolName, len(items)-1)
 
 	// Evaluate the function
 	core.DebugLog("[KWCALL] Evaluating function expression\n")
-	fn, err := Eval(expr.Items()[0], ctx)
+	fn, err := Eval(items[0], ctx)
 	if err != nil {
 		return nil, err
 	}
 	core.DebugLog("[KWCALL] Function evaluated: %T\n", fn)
 
-	// Parse arguments including unpacking
+	// Parse arguments including unpacking. Pass the args sub-slice directly so
+	// no intermediate list is allocated.
 	core.DebugLog("[KWCALL] Parsing arguments with unpacking\n")
-	argsList := core.NewList(expr.Items()[1:]...)
-
-	argInfo, err := parseArgumentsWithUnpacking(argsList)
+	argInfo, err := parseArgumentsWithUnpacking(items[1:])
 	if err != nil {
 		return nil, err
 	}
 	core.DebugLog("[KWCALL] Arguments parsed, processing positional args\n")
 
 	// Process all positional elements in order
-	positionalArgs := make([]core.Value, 0)
+	positionalArgs := make([]core.Value, 0, len(argInfo.Elements))
 	for _, elem := range argInfo.Elements {
 		if elem.IsKwUnpack {
 			// Handle **kwargs unpacking later
@@ -272,8 +283,25 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 		}
 	}
 
+	// Allocate the keyword map only when the call actually has keyword args or a
+	// ** unpacking; the common positional call leaves it nil (which the call
+	// paths treat as "no kwargs"). This keeps the write sites below safe: each
+	// only runs when keywords/**unpack are present, i.e. when the map exists.
+	var keywordArgs map[string]core.Value
+	needKeywords := len(argInfo.KeywordExprs) > 0
+	if !needKeywords {
+		for _, elem := range argInfo.Elements {
+			if elem.IsKwUnpack {
+				needKeywords = true
+				break
+			}
+		}
+	}
+	if needKeywords {
+		keywordArgs = make(map[string]core.Value)
+	}
+
 	// Evaluate keyword arguments
-	keywordArgs := make(map[string]core.Value)
 	for name, expr := range argInfo.KeywordExprs {
 		evalArg, err := Eval(expr, ctx)
 		if err != nil {
