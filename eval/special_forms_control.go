@@ -10,45 +10,6 @@ import (
 	"github.com/mmichie/m28/core/protocols"
 )
 
-func importForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
-	if args.Len() != 1 {
-		return nil, fmt.Errorf("import requires 1 argument")
-	}
-
-	// Get the module name
-	var moduleName string
-	switch name := args.Items()[0].(type) {
-	case core.StringValue:
-		moduleName = string(name)
-	case core.SymbolValue:
-		moduleName = string(name)
-	default:
-		return nil, fmt.Errorf("import: argument must be a string or symbol")
-	}
-
-	// Get the module loader
-	loader := core.GetModuleLoader()
-	if loader == nil {
-		return nil, fmt.Errorf("no module loader registered")
-	}
-
-	// Load the module
-	module, err := loader.LoadModule(moduleName, ctx)
-	if err != nil {
-		// If it's already an ImportError, return it directly so it can be caught by try/except
-		if _, ok := err.(*core.ImportError); ok {
-			return nil, err
-		}
-		// Otherwise wrap with context
-		return nil, fmt.Errorf("failed to import module %s: %v", moduleName, err)
-	}
-
-	// Store module in the context
-	ctx.Define(moduleName, module)
-
-	return module, nil
-}
-
 // ReturnValue represents a return value from a function
 
 type Exception struct {

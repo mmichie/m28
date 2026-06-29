@@ -25,15 +25,6 @@ var reprDepthMap = make(map[uint64]int)
 
 const maxListReprDepth = 200
 
-// getReprDepth returns the current repr depth for this goroutine
-func getReprDepth() int {
-	gid := getGoroutineID()
-	reprDepthMu.Lock()
-	d := reprDepthMap[gid]
-	reprDepthMu.Unlock()
-	return d
-}
-
 // pushReprDepth increments the repr depth and returns the new depth
 func pushReprDepth() int {
 	gid := getGoroutineID()
@@ -1983,13 +1974,6 @@ func sequenceLength(v Value) int {
 		return len(string(x))
 	}
 	return -1
-}
-
-// dictViewSetCompare implements comparison ops (==, <, <=, >, >=) on
-// dict views, treating them as sets of their elements.
-func dictViewSetCompare(v *DictView, other Value, op string) bool {
-	result, _ := dictViewSetCompareCtx(v, other, op, nil)
-	return result
 }
 
 // dictViewSetCompareCtx is the context-aware version that propagates __eq__ errors.

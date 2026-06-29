@@ -22,28 +22,6 @@ type ArgumentInfo struct {
 	KeywordExprs map[string]core.Value // Regular keyword arguments
 }
 
-// parseKeywordArguments extracts keyword arguments from a function call
-// It looks for patterns like: symbol = value in the argument list
-// Also handles *args and **kwargs unpacking
-func parseKeywordArguments(args *core.ListValue) ([]core.Value, map[string]core.Value, error) {
-	info, err := parseArgumentsWithUnpacking(args.ItemsRef())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// For backward compatibility, extract simple positional args
-	positional := []core.Value{}
-	for _, elem := range info.Elements {
-		if elem.IsUnpack || elem.IsKwUnpack {
-			// Use the new evaluation function instead
-			return nil, nil, fmt.Errorf("argument unpacking requires evalFunctionCallWithKeywords")
-		}
-		positional = append(positional, elem.Expr)
-	}
-
-	return positional, info.KeywordExprs, nil
-}
-
 // parseArgumentsWithUnpacking extracts all argument information including unpacking
 func parseArgumentsWithUnpacking(items []core.Value) (*ArgumentInfo, error) {
 	// Both fields are lazily allocated: the common call has only positional

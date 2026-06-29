@@ -439,13 +439,6 @@ func (l *ModuleLoaderEnhanced) parseAndEvaluateModule(content string, moduleCtx 
 	return nil
 }
 
-// extractModuleExports extracts module exports from context
-func extractModuleExports(moduleCtx *Context) *DictValue {
-	moduleDict := NewDict()
-	exportModuleVars(moduleDict, moduleCtx)
-	return moduleDict
-}
-
 // exportModuleVars populates a module dict with exports from context
 func exportModuleVars(moduleDict *DictValue, moduleCtx *Context) {
 	// Check if __exports__ is defined

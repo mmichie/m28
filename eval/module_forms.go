@@ -594,36 +594,6 @@ func exportForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	return core.Nil, nil
 }
 
-// loadModule loads a module and returns a Module object
-func loadModule(moduleName string, ctx *core.Context) (*core.Module, error) {
-	// Get the module loader
-	loader := core.GetModuleLoader()
-	if loader == nil {
-		return nil, &core.ImportError{
-			ModuleName: moduleName,
-			Message:    "no module loader registered",
-		}
-	}
-
-	// Use the loader to load the module
-	dictModule, err := loader.LoadModule(moduleName, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert dict-based module to new Module type
-	module := core.NewModule(moduleName, "")
-
-	// Add all dict entries as exports
-	for _, key := range dictModule.Keys() {
-		if val, ok := dictModule.Get(key); ok {
-			module.Export(key, val)
-		}
-	}
-
-	return module, nil
-}
-
 // RegisterModuleForms registers the enhanced import/export forms
 func RegisterModuleForms() {
 	// Override the basic import with our enhanced version

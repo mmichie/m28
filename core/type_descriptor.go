@@ -406,17 +406,3 @@ func (td *TypeDescriptor) GetTypeObject() Value {
 func (td *TypeDescriptor) SetTypeObject(typeObj Value) {
 	td.typeObject = typeObj
 }
-
-// Standard type representations
-func defaultRepr(v Value) string {
-	return v.String()
-}
-
-func defaultStr(v Value) string {
-	// For most types, str() removes quotes
-	s := v.String()
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		return s[1 : len(s)-1]
-	}
-	return s
-}

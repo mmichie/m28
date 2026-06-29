@@ -950,12 +950,6 @@ func dictReprWithDepth(dict *DictValue, ctx *Context, depth int) (string, error)
 	return s, nil
 }
 
-// reprWithCtx calls __repr__ on val with the given context, propagating errors.
-// Only calls __repr__ for Python class instances; built-in types use Repr().
-func reprWithCtx(val Value, ctx *Context) (string, error) {
-	return reprWithDepth(val, ctx, 0)
-}
-
 func reprWithDepth(val Value, ctx *Context, depth int) (string, error) {
 	if val == nil {
 		return "None", nil
