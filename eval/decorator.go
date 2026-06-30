@@ -95,8 +95,9 @@ func isDecoratorForm(list *core.ListValue) bool {
 		return false
 	}
 
-	// Check if first element is a symbol starting with @
-	if sym, ok := list.Items()[0].(core.SymbolValue); ok {
+	// Check if first element is a symbol starting with @. This runs on every
+	// list evaluation, so use ItemsRef (read-only) to avoid copying the slice.
+	if sym, ok := list.ItemsRef()[0].(core.SymbolValue); ok {
 		return strings.HasPrefix(string(sym), "@")
 	}
 

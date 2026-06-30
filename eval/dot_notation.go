@@ -18,14 +18,19 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("dot notation requires at least 2 arguments, got %d", args.Len())
 	}
 
+	// items aliases args' storage; args is already DotForm's private copy (the
+	// special-form dispatcher passes a fresh list), so reading it is safe and
+	// avoids the per-access slice copy Items() would make on this hot path.
+	items := args.ItemsRef()
+
 	// Evaluate the object
-	obj, err := Eval(args.Items()[0], ctx)
+	obj, err := Eval(items[0], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating object: %v", err)
 	}
 
 	// Get the property name - can be a string or symbol
-	propVal := unwrapLocated(args.Items()[1])
+	propVal := unwrapLocated(items[1])
 	var propName core.StringValue
 	switch v := propVal.(type) {
 	case core.StringValue:
@@ -37,10 +42,16 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("property name must be a string or symbol, got %T", propVal)
 	}
 
-	// Check if it's a numeric index
-	if idx, err := strconv.Atoi(string(propName)); err == nil {
-		// Numeric index access
-		return getByIndex(obj, idx)
+	// Check if it's a numeric index (e.g. tuple.0). Attribute names are almost
+	// always identifiers, so gate the parse on a leading digit/sign to avoid a
+	// failed strconv.Atoi (which allocates an error) on every attribute access.
+	if n := len(propName); n > 0 {
+		if c := propName[0]; c == '-' || (c >= '0' && c <= '9') {
+			if idx, err := strconv.Atoi(string(propName)); err == nil {
+				// Numeric index access
+				return getByIndex(obj, idx)
+			}
+		}
 	}
 
 	// Check if object supports GetAttr (either full Object interface or just GetAttr)
