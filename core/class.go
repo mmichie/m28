@@ -2096,107 +2096,38 @@ func (bm *BoundInstanceMethod) String() string {
 
 // Call implements Callable interface
 func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
-	// Create a new context with __class__ set for super() support
-	methodCtx := NewContext(ctx)
-
-	// Determine the class to use for super
-	classForSuper := bm.DefiningClass
-	if classForSuper == nil {
-		// If DefiningClass is not set, use the instance's class
-		classForSuper = bm.Instance.Class
-	}
-
-	// Debug output for super() investigation (controlled by M28_DEBUG_SUPER env var)
-	if debugSuper {
-		if methodFunc, ok := bm.Method.(interface{ String() string }); ok {
-			defClassName := "nil"
-			if bm.DefiningClass != nil {
-				defClassName = bm.DefiningClass.Name
-			}
-			fmt.Fprintf(os.Stderr, "[DEBUG BoundInstanceMethod.Call] Method: %s, DefiningClass: %s, Instance.Class: %v, classForSuper: %v\n",
-				methodFunc.String(),
-				defClassName,
-				bm.Instance.Class.Name,
-				classForSuper.Name)
-		}
-	}
-
-	// CRITICAL: Always set __class__ to the defining class for this method
-	// This is required for super() to work correctly in parent class methods
-	// When Parent.__init__ calls super().__init__(), super() needs to use
-	// Parent's __class__, not Child's, so it finds GrandParent.__init__
-	if debugSuper {
-		prevClass := "nil"
-		if ctx != nil {
-			if val, err := ctx.Lookup("__class__"); err == nil {
-				if cls, ok := val.(*Class); ok {
-					prevClass = cls.Name
-				}
-			}
-		}
-		fmt.Fprintf(os.Stderr, "[DEBUG BoundInstanceMethod] Setting __class__ from %s to %s\n", prevClass, classForSuper.Name)
-	}
-	methodCtx.Define("__class__", classForSuper)
-	// Note: Don't define super here - let it come from the builtin function
-	// which will look up __class__ from the context
-
-	// Prepend instance as first argument (self)
+	// A method's own captured environment (f.env) already carries the __class__
+	// cell super() needs, so there is no need to allocate a wrapper context per
+	// call to inject it (the prior code did, costing a Context + a map entry on
+	// every method call). UserFunction.Call uses the passed ctx only for call
+	// depth, which NewContext inherits, so depth tracking is unchanged. This also
+	// matches CPython, where super()'s __class__ comes from the defining scope.
 	callArgs := append([]Value{bm.Instance}, args...)
-	return bm.Method.Call(callArgs, methodCtx)
+	return bm.Method.Call(callArgs, ctx)
 }
 
 // CallWithKeywords implements keyword argument support for bound instance methods
 func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
-	// Create a new context with __class__ set for super() support
-	methodCtx := NewContext(ctx)
-
-	// Determine the class to use for super
-	classForSuper := bm.DefiningClass
-	if classForSuper == nil {
-		// If DefiningClass is not set, use the instance's class
-		classForSuper = bm.Instance.Class
-	}
-
-	// CRITICAL: Always set __class__ to the defining class for this method
-	// This is required for super() to work correctly in parent class methods
-	// When Parent.__init__ calls super().__init__(), super() needs to use
-	// Parent's __class__, not Child's, so it finds GrandParent.__init__
-	if debugSuper {
-		prevClass := "nil"
-		if ctx != nil {
-			if val, err := ctx.Lookup("__class__"); err == nil {
-				if cls, ok := val.(*Class); ok {
-					prevClass = cls.Name
-				}
-			}
-		}
-		fmt.Fprintf(os.Stderr, "[DEBUG BoundInstanceMethod] Setting __class__ from %s to %s\n", prevClass, classForSuper.Name)
-	}
-	methodCtx.Define("__class__", classForSuper)
-	// Note: Don't define super here - let it come from the builtin function
-
-	// Prepend instance as first argument (self)
+	// As in Call, the method's captured environment already carries __class__
+	// for super(), so no per-call wrapper context is allocated to inject it.
 	callArgs := append([]Value{bm.Instance}, args...)
 
 	// Check if the underlying method supports keyword arguments
 	if kwargsMethod, ok := bm.Method.(interface {
 		CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
 	}); ok {
-		return kwargsMethod.CallWithKeywords(callArgs, kwargs, methodCtx)
+		return kwargsMethod.CallWithKeywords(callArgs, kwargs, ctx)
 	}
 
 	// If method doesn't support kwargs but is a Callable, try calling it with kwargs as positional
 	// This handles cases where the method's Call interface may internally support kwargs
 	if len(kwargs) > 0 {
-		// Try to use eval.EvalKwargCall which handles UserFunctions with signatures
-		// 		fmt.Printf("[DEBUG BoundInstanceMethod] Method type: %T\n", bm.Method)
-		// 		fmt.Printf("[DEBUG BoundInstanceMethod] Falling back to regular Call - kwargs will be lost\n")
 		// For now, we just error. TODO(M28-8da4): integrate with kwarg_eval
 		return nil, &TypeError{Message: "method does not support keyword arguments"}
 	}
 
 	// Fall back to regular Call
-	return bm.Method.Call(callArgs, methodCtx)
+	return bm.Method.Call(callArgs, ctx)
 }
 
 // GetAttr implements attribute access for bound instance methods
