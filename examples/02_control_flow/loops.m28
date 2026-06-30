@@ -129,7 +129,7 @@
 (= b 1)
 
 (while (< (len fib_nums) n)
-  (= fib_nums (+ fib_nums (list a)))
+  (= fib_nums (+ fib_nums [a]))
   (= temp (+ a b))
   (= a b)
   (= b temp))

@@ -57,19 +57,19 @@
 (print "✓ reversed() with __reversed__() works")
 
 # Test reversed() with list
-(= list_rev (reversed [1 2 3 4 5]))
+(= list_rev (list (reversed [1 2 3 4 5])))
 (print (+ "reversed([1,2,3,4,5]) = " (str list_rev)))
 (assert (== list_rev [5 4 3 2 1]) "reversed() works with lists")
 (print "✓ reversed() with lists works")
 
 # Test reversed() with tuple
-(= tuple_rev (reversed (tuple [10 20 30])))
+(= tuple_rev (list (reversed (tuple [10 20 30]))))
 (print (+ "reversed((10, 20, 30)) = " (str tuple_rev)))
 (assert (== tuple_rev [30 20 10]) "reversed() works with tuples")
 (print "✓ reversed() with tuples works")
 
 # Test reversed() with string
-(= str_rev (reversed "hello"))
+(= str_rev (list (reversed "hello")))
 (print (+ "reversed('hello') = " (str str_rev)))
 (assert (== str_rev ["o" "l" "l" "e" "h"]) "reversed() works with strings")
 (print "✓ reversed() with strings works")
@@ -97,7 +97,7 @@
 (print (+ "Display: " display))
 (assert (== display "[4 items]") "format() works on custom class")
 
-(= rev_items (reversed dlist))
+(= rev_items (list (reversed dlist)))
 (print (+ "Reversed items: " (str rev_items)))
 (assert (== rev_items [4 3 2 1]) "reversed() works on custom class")
 
