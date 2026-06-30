@@ -801,10 +801,38 @@ var valueToKeyInProgress sync.Map // map[goroutineID]int
 
 // ValueToKey converts a value to a string key for use in sets and dicts
 func ValueToKey(v Value) string {
-	// Get goroutine ID (approximation using stack pointer)
-	goid := getGoroutineID()
+	// Fast path: non-recursive keys (primitives and str-subclass instances) need
+	// no recursion guard, so handle them before the expensive getGoroutineID()
+	// stack walk the guard requires. Attribute-name lookups (string keys) take
+	// this path on every method/attribute access, so it must stay allocation-free.
+	if inst, ok := v.(*Instance); ok && inst.BackingStr != nil {
+		return "s:" + string(*inst.BackingStr)
+	}
+	switch val := v.(type) {
+	case NumberValue:
+		return fmt.Sprintf("n:%g", float64(val))
+	case StringValue:
+		return "s:" + string(val)
+	case BoolValue:
+		// In Python, True == 1 and False == 0, and they share the same hash
+		// So True and 1 should be the same dict key
+		if bool(val) {
+			return "n:1"
+		}
+		return "n:0"
+	case NilValue:
+		return "nil"
+	case BytesValue:
+		return fmt.Sprintf("bytes:%x", []byte(val))
+	case ComplexValue:
+		r := real(complex128(val))
+		i := imag(complex128(val))
+		return fmt.Sprintf("c:%g+%gj", r, i)
+	}
 
-	// Check if we're already inside ValueToKey for this goroutine
+	// Composite/recursive keys (tuple, frozenset, objects with custom __hash__):
+	// guard against deep or cyclic recursion, keyed by goroutine.
+	goid := getGoroutineID()
 	val, _ := valueToKeyInProgress.Load(goid)
 	depth := 0
 	if val != nil {
@@ -824,35 +852,6 @@ func ValueToKey(v Value) string {
 			valueToKeyInProgress.Store(goid, depth)
 		}
 	}()
-
-	// str-subclass instances hash and key like the string they wrap, so that
-	// d[S("a")] finds d["a"] and S("a") in {"a"} is true.
-	if inst, ok := v.(*Instance); ok && inst.BackingStr != nil {
-		return fmt.Sprintf("s:%s", string(*inst.BackingStr))
-	}
-
-	// For primitive types
-	switch val := v.(type) {
-	case NumberValue:
-		return fmt.Sprintf("n:%g", float64(val))
-	case StringValue:
-		return fmt.Sprintf("s:%s", string(val))
-	case BoolValue:
-		// In Python, True == 1 and False == 0, and they share the same hash
-		// So True and 1 should be the same dict key
-		if bool(val) {
-			return "n:1"
-		}
-		return "n:0"
-	case NilValue:
-		return "nil"
-	case BytesValue:
-		return fmt.Sprintf("bytes:%x", []byte(val))
-	case ComplexValue:
-		r := real(complex128(val))
-		i := imag(complex128(val))
-		return fmt.Sprintf("c:%g+%gj", r, i)
-	}
 
 	switch val := v.(type) {
 	case TupleValue:
