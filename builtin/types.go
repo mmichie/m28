@@ -15,19 +15,19 @@ import (
 
 // Type classes for built-in types
 var (
-	NumberTypeClass   *core.Class // Single number type for M28's unified NumberValue
-	IntTypeClass      *IntType    // Global int class instance
-	BoolTypeClass     *core.Class
-	NoneTypeClass     *core.Class
-	ListTypeClass     *core.Class
-	TupleTypeClass    *core.Class
-	SetTypeClass      *core.Class
+	NumberTypeClass          *core.Class // Single number type for M28's unified NumberValue
+	IntTypeClass             *IntType    // Global int class instance
+	BoolTypeClass            *core.Class
+	NoneTypeClass            *core.Class
+	ListTypeClass            *core.Class
+	TupleTypeClass           *core.Class
+	SetTypeClass             *core.Class
 	FunctionTypeClass        *core.Class
 	BuiltinFunctionTypeClass *core.Class // For builtin_function_or_method
 	MethodTypeClass          *core.Class // For bound methods
 	TypeMetaclass            *TypeType   // The type metaclass (for class ABCMeta(type):)
-	StrTypeClass      *StrType    // Global str class instance
-	DictTypeClass     *DictType   // Global dict class instance (set by RegisterCollections)
+	StrTypeClass             *StrType    // Global str class instance
+	DictTypeClass            *DictType   // Global dict class instance (set by RegisterCollections)
 	// Cache for dynamically created type classes
 	typeClassCache = make(map[string]*core.Class)
 )
@@ -490,7 +490,9 @@ func RegisterTypes(ctx *core.Context) {
 		}
 
 		// Get the attribute from the object
-		if obj, ok := self.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if obj, ok := self.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if val, found := obj.GetAttr(string(name)); found {
 				return val, nil
 			}
@@ -2469,31 +2471,90 @@ func createFloatClass() *FloatType {
 
 		hexStr := strings.TrimSpace(string(s))
 
-		// Handle special values
-		lower := strings.ToLower(hexStr)
-		switch lower {
-		case "inf", "infinity":
+		// Handle special values (case-insensitive, optional sign).
+		switch strings.ToLower(hexStr) {
+		case "inf", "infinity", "+inf", "+infinity":
 			return core.NumberValue(math.Inf(1)), nil
 		case "-inf", "-infinity":
 			return core.NumberValue(math.Inf(-1)), nil
-		case "nan":
+		case "nan", "+nan", "-nan":
 			return core.NumberValue(math.NaN()), nil
 		}
 
-		// Try to parse as hex float using strconv
-		// Go's ParseFloat with hex prefix handles Python's hex format
-		f, err := strconv.ParseFloat(hexStr, 64)
+		// Normalize Python's hex-float syntax into the form Go's ParseFloat
+		// accepts. Python always interprets the digits as hexadecimal and allows
+		// omitting the "0x" prefix and/or the "p" exponent: "1.5" -> 1.3125,
+		// "0x10" -> 16.0, "0x.8p1" -> 1.0. Go requires both "0x" and a "p"
+		// exponent, so add whichever is missing.
+		norm := hexStr
+		sign := ""
+		if strings.HasPrefix(norm, "+") {
+			norm = norm[1:]
+		} else if strings.HasPrefix(norm, "-") {
+			sign, norm = "-", norm[1:]
+		}
+		if !strings.HasPrefix(norm, "0x") && !strings.HasPrefix(norm, "0X") {
+			norm = "0x" + norm
+		}
+		if !strings.ContainsAny(norm, "pP") {
+			norm += "p0"
+		}
+
+		f, err := strconv.ParseFloat(sign+norm, 64)
 		if err != nil {
-			return nil, &core.ValueError{Message: fmt.Sprintf("could not convert string to float: '%s'", hexStr)}
+			// Go reports both overflow and underflow as ErrRange. Overflow
+			// yields ±Inf and is an OverflowError in CPython; underflow yields 0
+			// (or a subnormal) and is accepted silently, matching CPython.
+			if ne, ok := err.(*strconv.NumError); ok && ne.Err == strconv.ErrRange {
+				if math.IsInf(f, 0) {
+					return nil, &core.OverflowError{Message: "hexadecimal value too large to represent as a float"}
+				}
+				return core.NumberValue(f), nil
+			}
+			return nil, &core.ValueError{Message: fmt.Sprintf("invalid hexadecimal floating-point string: '%s'", hexStr)}
 		}
 
 		return core.NumberValue(f), nil
+	})
+
+	// Add hex as an (unbound) method on the float class, so `float.hex` works
+	// (e.g. `toHex = float.hex; toHex(x)`) and matches the instance method
+	// `(x).hex()`. Both route through core.FloatHex for an identical, CPython-
+	// accurate format.
+	class.Methods["hex"] = core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		if len(args) != 1 {
+			return nil, &core.TypeError{Message: fmt.Sprintf("hex() takes exactly one argument (%d given)", len(args))}
+		}
+		f, ok := floatValueOf(args[0])
+		if !ok {
+			return nil, core.NewTypeError("float", args[0], "hex()")
+		}
+		return core.StringValue(core.FloatHex(f)), nil
 	})
 
 	// Render float subclass instances as their numeric value (repr/str/format).
 	addNumericReprMethods(class)
 
 	return &FloatType{Class: class}
+}
+
+// floatValueOf extracts a float64 from a float value or a float-subclass
+// instance (which stores its value under __value__). Returns ok=false for
+// anything that is not float-like.
+func floatValueOf(v core.Value) (float64, bool) {
+	switch x := v.(type) {
+	case core.NumberValue:
+		return float64(x), true
+	case core.BigIntValue:
+		// M28 unifies int/float as NumberValue and promotes large integer-valued
+		// results to BigIntValue; accept it so float.hex works on those values.
+		return x.ToFloat64(), true
+	case *core.Instance:
+		if nv, ok := x.Attributes["__value__"].(core.NumberValue); ok {
+			return float64(nv), true
+		}
+	}
+	return 0, false
 }
 
 // Migration Statistics:

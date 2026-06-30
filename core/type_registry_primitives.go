@@ -9,6 +9,38 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// FloatHex formats a float64 as CPython's float.hex() string: a sign, "0x",
+// a leading 1 (normal) or 0 (subnormal/zero), exactly 13 hex mantissa digits,
+// and a "p"-prefixed signed power-of-two exponent with no zero padding -- e.g.
+// 1.0 -> "0x1.0000000000000p+0", 3.14159 -> "0x1.921f9f01b866ep+1",
+// 0.0 -> "0x0.0p+0", 5e-324 -> "0x0.0000000000001p-1022". Go's strconv 'x'
+// format differs (minimal mantissa, zero-padded exponent), so format manually.
+func FloatHex(f float64) string {
+	switch {
+	case math.IsNaN(f):
+		return "nan"
+	case math.IsInf(f, 1):
+		return "inf"
+	case math.IsInf(f, -1):
+		return "-inf"
+	}
+	bits := math.Float64bits(f)
+	sign := ""
+	if bits>>63 != 0 {
+		sign = "-"
+	}
+	expBits := int((bits >> 52) & 0x7FF)
+	mantissa := bits & 0xFFFFFFFFFFFFF // low 52 bits
+	if expBits == 0 && mantissa == 0 {
+		return sign + "0x0.0p+0"
+	}
+	lead, exp := 1, expBits-1023
+	if expBits == 0 { // subnormal: implicit leading 0, fixed exponent
+		lead, exp = 0, -1022
+	}
+	return fmt.Sprintf("%s0x%d.%013xp%+d", sign, lead, mantissa, exp)
+}
+
 // registerNumberType registers the number type descriptor
 func registerNumberType() {
 	RegisterType(&TypeDescriptor{
@@ -385,30 +417,7 @@ func registerNumberType() {
 				Doc:     "Return a hexadecimal representation of a float",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					n := float64(receiver.(NumberValue))
-
-					// Handle special cases
-					if math.IsNaN(n) {
-						return StringValue("nan"), nil
-					}
-					if math.IsInf(n, 1) {
-						return StringValue("inf"), nil
-					}
-					if math.IsInf(n, -1) {
-						return StringValue("-inf"), nil
-					}
-					if n == 0 {
-						if math.Signbit(n) {
-							return StringValue("-0x0.0p+0"), nil
-						}
-						return StringValue("0x0.0p+0"), nil
-					}
-
-					// Use Go's hex format and convert to Python format
-					// Go: %x gives e.g. "0x1.921fb54442d18p+01"
-					// Python: "0x1.921fb54442d18p+1" (no leading zero on exponent)
-					result := strconv.FormatFloat(n, 'x', -1, 64)
-					return StringValue(result), nil
+					return StringValue(FloatHex(float64(receiver.(NumberValue)))), nil
 				},
 			},
 			"__float__": {
