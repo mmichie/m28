@@ -132,15 +132,23 @@ func SetupSlots(class *Class, slotsValue Value) error {
 	var allSlotNames []string
 	var startIndex int
 
-	// Inherit slots from parent classes
-	if len(class.Parents) > 0 {
-		parent := class.Parents[0] // Use first parent
-		if parent.HasSlots() {
-			// Inherit parent slots
-			allSlotNames = make([]string, len(parent.SlotNames))
-			copy(allSlotNames, parent.SlotNames)
-			startIndex = len(allSlotNames)
+	// Inherit slots from the slot-bearing base. With multiple inheritance the
+	// base carrying the instance layout need not be the first parent: e.g.
+	// pathlib's PosixPath(Path, PurePosixPath) gets PurePath's slots through its
+	// SECOND base, so inheriting only from Parents[0] would undersize the slot
+	// frame. Python permits at most one "solid base" with a non-empty slot
+	// layout, so pick the parent with the most slots (any others are layout-
+	// compatible, i.e. empty-slot, bases).
+	var solidBase *Class
+	for _, parent := range class.Parents {
+		if parent.HasSlots() && (solidBase == nil || len(parent.SlotNames) > len(solidBase.SlotNames)) {
+			solidBase = parent
 		}
+	}
+	if solidBase != nil {
+		allSlotNames = make([]string, len(solidBase.SlotNames))
+		copy(allSlotNames, solidBase.SlotNames)
+		startIndex = len(allSlotNames)
 	}
 
 	// Extract new slot names from this class's __slots__ attribute
