@@ -1450,9 +1450,9 @@ func (t *TupleInstance) GetAttr(name string) (Value, bool) {
 
 // ListInstance represents an instance of a class that inherits from list
 type ListInstance struct {
-	Data       *ListValue        // The underlying list data
-	Class      *Class            // The class this list is an instance of
-	Attributes map[string]Value  // Instance attributes (e.g., set by __init__)
+	Data       *ListValue       // The underlying list data
+	Class      *Class           // The class this list is an instance of
+	Attributes map[string]Value // Instance attributes (e.g., set by __init__)
 }
 
 // IteratorWrapper wraps a Go Iterator to make it a Value with __next__
@@ -2064,6 +2064,14 @@ func (i *Instance) DelAttrDefault(name string) error {
 }
 
 // BoundInstanceMethod represents a method bound to an instance
+// debugSuper caches the M28_DEBUG_SUPER developer toggle. It is read once at
+// startup so method dispatch (BoundInstanceMethod.Call, on every call) does not
+// pay an environment lookup per call.
+var debugSuper = os.Getenv("M28_DEBUG_SUPER") != ""
+
+// DebugSuperEnabled reports whether the M28_DEBUG_SUPER toggle is set (cached).
+func DebugSuperEnabled() bool { return debugSuper }
+
 type BoundInstanceMethod struct {
 	Instance *Instance
 	Method   interface {
@@ -2099,7 +2107,6 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 	}
 
 	// Debug output for super() investigation (controlled by M28_DEBUG_SUPER env var)
-	debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
 	if debugSuper {
 		if methodFunc, ok := bm.Method.(interface{ String() string }); ok {
 			defClassName := "nil"
@@ -2154,7 +2161,6 @@ func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]
 	// This is required for super() to work correctly in parent class methods
 	// When Parent.__init__ calls super().__init__(), super() needs to use
 	// Parent's __class__, not Child's, so it finds GrandParent.__init__
-	debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
 	if debugSuper {
 		prevClass := "nil"
 		if ctx != nil {
@@ -2423,7 +2429,7 @@ func defaultObjectNew() Value {
 }
 
 func (s *Super) GetAttr(name string) (Value, bool) {
-	debugSuperGetAttr := os.Getenv("M28_DEBUG_SUPER") != ""
+	debugSuperGetAttr := debugSuper
 	if debugSuperGetAttr {
 		instClass := "nil"
 		if s.Instance != nil {

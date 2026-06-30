@@ -1628,7 +1628,7 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// IMPORTANT: Check cls BEFORE self to handle nested class scenarios correctly.
 				// In nested classes, 'self' from an outer method might be in the context chain,
 				// but we want to use the local 'cls' parameter for __new__ methods.
-				debugSuper := os.Getenv("M28_DEBUG_SUPER") != ""
+				debugSuper := core.DebugSuperEnabled()
 
 				// Check for cls parameter first (used in __new__, __init_subclass__, classmethods, etc.)
 				if clsVal, err := ctx.Lookup("cls"); err == nil {
