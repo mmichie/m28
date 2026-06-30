@@ -258,7 +258,10 @@ func TestOperatorMultiply(t *testing.T) {
 			args:    []core.Value{str("a"), str("b")},
 			want:    nil,
 			wantErr: true,
-			errMsg:  "*: unsupported operand type(s) for *: 'string'",
+			// Multiplying a sequence by a non-int: matches CPython's wording
+			// ("can't multiply sequence by non-int ...") rather than the generic
+			// "unsupported operand type(s)" used for unsupported scalar types.
+			errMsg: "can't multiply sequence by non-int",
 		},
 		{
 			name:    "list * number",

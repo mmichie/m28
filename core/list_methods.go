@@ -9,6 +9,7 @@ import (
 // It detaches from the list when exhausted, matching CPython semantics.
 type simpleListIterator struct {
 	list  *ListValue // nil when exhausted
+	orig  *ListValue // retained so Reset can re-attach after exhaustion
 	index int
 }
 
@@ -34,9 +35,11 @@ func (s *simpleListIterator) Next() (Value, bool) {
 	return val, true
 }
 
-// Reset resets the iterator (not commonly needed, but satisfies Iterator interface)
+// Reset rewinds the iterator to the start. Next detaches s.list on exhaustion,
+// so re-attach from the retained original list to make the iterator reusable.
 func (s *simpleListIterator) Reset() {
 	s.index = 0
+	s.list = s.orig
 }
 
 // Iterator implements Iterable - returns self
@@ -231,7 +234,7 @@ func InitListMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			list := receiver.(*ListValue)
-			return &simpleListIterator{list: list, index: 0}, nil
+			return &simpleListIterator{list: list, orig: list, index: 0}, nil
 		},
 	}
 }

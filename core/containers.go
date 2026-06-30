@@ -337,6 +337,7 @@ func (l *ListValue) Iterator() Iterator {
 	// matching CPython semantics (once exhausted, new elements aren't seen).
 	return &simpleListIterator{
 		list:  l,
+		orig:  l,
 		index: 0,
 	}
 }
@@ -1491,7 +1492,11 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__eq__ takes exactly one argument"}
 			}
-			result, err := dictViewSetCompareCtx(v, args[0], "==", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
+			result, err := dictViewSetCompareCtx(v, args[0], "==", ctx)
+			if err != nil {
+				return nil, err
+			}
+			return BoolValue(result), nil
 		}), true
 	case "__ne__":
 		if v.kind == DictValuesViewKind {
@@ -1501,7 +1506,11 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__ne__ takes exactly one argument"}
 			}
-			result, err := dictViewSetCompareCtx(v, args[0], "==", ctx); if err != nil { return nil, err }; return BoolValue(!result), nil
+			result, err := dictViewSetCompareCtx(v, args[0], "==", ctx)
+			if err != nil {
+				return nil, err
+			}
+			return BoolValue(!result), nil
 		}), true
 	case "__lt__":
 		if v.kind == DictValuesViewKind {
@@ -1511,7 +1520,11 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__lt__ takes exactly one argument"}
 			}
-			result, err := dictViewSetCompareCtx(v, args[0], "<", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
+			result, err := dictViewSetCompareCtx(v, args[0], "<", ctx)
+			if err != nil {
+				return nil, err
+			}
+			return BoolValue(result), nil
 		}), true
 	case "__le__":
 		if v.kind == DictValuesViewKind {
@@ -1521,7 +1534,11 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__le__ takes exactly one argument"}
 			}
-			result, err := dictViewSetCompareCtx(v, args[0], "<=", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
+			result, err := dictViewSetCompareCtx(v, args[0], "<=", ctx)
+			if err != nil {
+				return nil, err
+			}
+			return BoolValue(result), nil
 		}), true
 	case "__gt__":
 		if v.kind == DictValuesViewKind {
@@ -1531,7 +1548,11 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__gt__ takes exactly one argument"}
 			}
-			result, err := dictViewSetCompareCtx(v, args[0], ">", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
+			result, err := dictViewSetCompareCtx(v, args[0], ">", ctx)
+			if err != nil {
+				return nil, err
+			}
+			return BoolValue(result), nil
 		}), true
 	case "__ge__":
 		if v.kind == DictValuesViewKind {
@@ -1541,7 +1562,11 @@ func (v *DictView) GetAttr(name string) (Value, bool) {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "__ge__ takes exactly one argument"}
 			}
-			result, err := dictViewSetCompareCtx(v, args[0], ">=", ctx); if err != nil { return nil, err }; return BoolValue(result), nil
+			result, err := dictViewSetCompareCtx(v, args[0], ">=", ctx)
+			if err != nil {
+				return nil, err
+			}
+			return BoolValue(result), nil
 		}), true
 	case "__sub__":
 		if v.kind == DictValuesViewKind {
