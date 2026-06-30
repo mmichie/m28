@@ -85,17 +85,13 @@ func Eval(expr core.Value, ctx *core.Context) (core.Value, error) {
 		}
 		return val, nil
 
-	case *slotRef:
-		// Resolution layer: a local read is a direct slot-frame index, with no
-		// scope-map lookup. A nil slot means the local has not been assigned yet
-		// on this code path (Python's UnboundLocalError).
-		val := ctx.Locals[v.slot]
-		if val == nil {
-			return nil, core.WrapEvalError(
-				&core.UnboundLocalError{Name: v.name, Location: ctx.CurrentLocation()},
-				"unbound local", ctx)
-		}
-		return val, nil
+	case irNode:
+		// Resolution layer 3: a compiled node (slot read, operator, call, if,
+		// return, do, assign, ...) evaluates itself directly, bypassing the
+		// special-form dispatch and generic call machinery below. Reached both
+		// at the slot-body root and whenever a reused form handler (ForForm,
+		// WhileForm, DoForm) evaluates a compiled child.
+		return v.evalIR(ctx)
 
 	case *core.ListValue:
 		// Empty list evaluates to a fresh empty list (avoid shared mutable state)

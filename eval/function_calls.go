@@ -29,9 +29,9 @@ type UserFunction struct {
 	signature *FunctionSignature // New: full signature with defaults
 	body      core.Value
 	env       *core.Context
-	name      string // Optional function name
-	isLambda  bool   // True for lambda expressions (implicitly return body value)
-	docstring string // Function docstring (first string literal in body)
+	name      string          // Optional function name
+	isLambda  bool            // True for lambda expressions (implicitly return body value)
+	docstring string          // Function docstring (first string literal in body)
 	dict      *core.DictValue // Live __dict__ for arbitrary user-set attributes
 
 	// __defaults__ / __kwdefaults__ overrides. nil means "not overridden" (use
@@ -77,11 +77,15 @@ func (f *UserFunction) ensureResolved() {
 	if !ok {
 		return
 	}
+	// Resolution layer 3: compile the slot-rewritten body into IR nodes that
+	// evaluate themselves directly. compileIR never fails — anything it does not
+	// model stays as the rewritten value and runs the layer-2 way through Eval.
+	compiled := compileIR(rewritten)
 	// Publish numParams/numSlots before slotBody so a reader that sees a
 	// non-nil slotBody also sees consistent frame sizes.
 	f.numParams = len(paramNames)
 	f.numSlots = len(res.slots)
-	f.slotBody = rewritten
+	f.slotBody = compiled
 }
 
 // simpleParamNames returns the positional parameter names in declaration order,
