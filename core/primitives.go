@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/big"
 	"strconv"
+	"sync"
 
 	"github.com/shopspring/decimal"
 )
@@ -488,6 +489,24 @@ type BuiltinFunction struct {
 	acceptsAnyKwargs bool // If true, silently ignore kwargs (legacy behavior)
 }
 
+var (
+	builtinFnRegistry     *MethodRegistry
+	builtinFnRegistryOnce sync.Once
+)
+
+// sharedBuiltinFnRegistry returns the property/method registry shared by every
+// BuiltinFunction. The registry's getters read the receiver passed at access
+// time rather than any captured function, so it is identical for all builtins
+// and is built once. Previously each constructor rebuilt ~9 property
+// descriptors plus a registry, which dominated allocation on method- and
+// attribute-heavy code (every builtin/bound-method object paid for it).
+func sharedBuiltinFnRegistry() *MethodRegistry {
+	builtinFnRegistryOnce.Do(func() {
+		builtinFnRegistry = (&BuiltinFunction{}).createRegistry()
+	})
+	return builtinFnRegistry
+}
+
 // NewBuiltinFunction creates a new builtin function
 func NewBuiltinFunction(fn func(args []Value, ctx *Context) (Value, error)) *BuiltinFunction {
 	f := &BuiltinFunction{
@@ -497,7 +516,7 @@ func NewBuiltinFunction(fn func(args []Value, ctx *Context) (Value, error)) *Bui
 	}
 
 	// Initialize the method registry
-	f.registry = f.createRegistry()
+	f.registry = sharedBuiltinFnRegistry()
 
 	return f
 }
@@ -511,7 +530,7 @@ func NewNamedBuiltinFunction(name string, fn func(args []Value, ctx *Context) (V
 	}
 
 	// Initialize the method registry
-	f.registry = f.createRegistry()
+	f.registry = sharedBuiltinFnRegistry()
 
 	return f
 }
@@ -529,7 +548,7 @@ func NewBuiltinFunctionIgnoringKwargs(name string, fn func(args []Value, ctx *Co
 	}
 
 	// Initialize the method registry
-	f.registry = f.createRegistry()
+	f.registry = sharedBuiltinFnRegistry()
 
 	return f
 }
