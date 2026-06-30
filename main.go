@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"strings"
 
@@ -195,6 +196,17 @@ func initializeLogger() {
 func main() {
 	// Parse command line flags
 	flag.Parse()
+
+	// Raise the GC target above Go's default (GOGC=100) unless the user set GOGC
+	// explicitly. M28 allocates heavily on numeric/dict-heavy code (boxed values,
+	// big.Int results), so the default GC collected very frequently — ~40-50% of
+	// CPU on bigint-heavy programs went to GC scanning. Collecting less often is a
+	// large, low-risk win (e.g. the CPython test_long suite: 22.9s -> ~16s); a
+	// CLI interpreter is short-lived, so the extra heap headroom is cheap. Users
+	// who need to cap memory can still set GOGC (this respects an explicit value).
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(400)
+	}
 
 	// Initialize logger before anything else
 	initializeLogger()
