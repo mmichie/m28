@@ -27,3 +27,4 @@ bin/
 tests/cpython-source/
 *.backup
 .worktrees/
+test_temp.txt

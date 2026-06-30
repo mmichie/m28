@@ -1,0 +1,40 @@
+# Lefthook git hooks for M28.
+#
+# Lefthook is wired globally via git's core.hooksPath (~/.config/git/hooks),
+# whose shim runs `lefthook <hook>` for every repo. Until this file existed,
+# lefthook found no configuration here and let every commit through regardless
+# of test state -- which is why commits with broken tests slipped past.
+#
+# pre-commit blocks a commit whose Go code does not build, fails `go vet`, or
+# fails the test suite. Commands are piped, so the cheapest check (build) runs
+# first and a failure short-circuits the rest.
+#
+# Bypass in an emergency with:  LEFTHOOK=0 git commit ...
+
+pre-commit:
+  piped: true
+  commands:
+    1_fmt:
+      glob: "*.go"
+      # Fail if any staged Go file is not gofmt-clean; list the offenders.
+      run: |
+        unformatted=$(gofmt -l {staged_files})
+        if [ -n "$unformatted" ]; then
+          echo "gofmt needed (run: gofmt -w <files>):"
+          echo "$unformatted"
+          exit 1
+        fi
+    2_build:
+      glob: "*.go"
+      run: go build ./...
+    3_vet:
+      glob: "*.go"
+      run: go vet ./...
+    4_test:
+      glob: "*.go"
+      run: go test ./...
+
+pre-push:
+  commands:
+    test:
+      run: go test ./...
