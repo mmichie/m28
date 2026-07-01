@@ -318,6 +318,53 @@ func asciiOf(value Value) string {
 }
 
 // formatValueWithSpec formats a value according to a Python-style format specification
+// groupedWidth returns the width of d digits once grouped every groupSize with a
+// separator (d + number of separators).
+func groupedWidth(d, groupSize int) int {
+	if d <= 0 {
+		return 0
+	}
+	return d + (d-1)/groupSize
+}
+
+// zeroFillGrouped zero-pads the integer part of a formatted number to a minimum
+// field width and groups it, weaving the separators through the leading zeros as
+// CPython does for e.g. "{:012,.2f}".format(1234.5) == "0,001,234.50". result is
+// the ungrouped number string. Because a separator may land on the width
+// boundary, the output can be one wider than width (CPython's behavior:
+// "{:08,d}".format(100) == "0,000,100").
+func zeroFillGrouped(result string, sep rune, groupSize, width int) string {
+	s := result
+	sign := ""
+	if len(s) > 0 && (s[0] == '+' || s[0] == '-' || s[0] == ' ') {
+		sign, s = s[:1], s[1:]
+	}
+	prefix := ""
+	if groupSize == 4 && len(s) >= 2 && s[0] == '0' {
+		switch s[1] {
+		case 'x', 'X', 'o', 'O', 'b', 'B':
+			prefix, s = s[:2], s[2:]
+		}
+	}
+	// Split the fractional/exponent tail (only decimal/float have one).
+	digits, tail := s, ""
+	if groupSize == 3 {
+		if idx := strings.IndexAny(s, ".eE"); idx >= 0 {
+			digits, tail = s[:idx], s[idx:]
+		}
+	}
+	// Grow the digit count until the grouped integer part fills the field.
+	target := width - len(sign) - len(prefix) - len(tail)
+	d := len(digits)
+	for groupedWidth(d, groupSize) < target {
+		d++
+	}
+	if d > len(digits) {
+		digits = strings.Repeat("0", d-len(digits)) + digits
+	}
+	return sign + prefix + addThousandsSeparator(digits, sep, groupSize) + tail
+}
+
 // addThousandsSeparator inserts a grouping separator (',' or '_') every
 // groupSize digits of the integer part of a formatted number string, preserving
 // any sign and fractional/exponent tail. Decimal/float use groupSize 3; binary,
@@ -484,6 +531,9 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 
 	// Format the value
 	var result string
+	// Set when zero-fill + grouping already produced a width-filled result, so
+	// the generic width/padding step below is skipped.
+	zeroFilledGrouped := false
 
 	if f, ok := AsFloat(value); ok {
 		// Number formatting (int or float). A BigIntValue must use its exact
@@ -600,21 +650,29 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 			}
 		}
 
-		// Apply digit grouping (thousands separator).
-		// (Edge case: combined with zero-pad-to-width the separators are not
-		// woven into the leading zeros -- rare, and previously ungrouped anyway.)
+		// Apply digit grouping (thousands separator). Zero-fill defers grouping to
+		// the width step below so the separators can be woven into the leading
+		// zeros (CPython's "=" fill with grouping).
+		groupSize := 0
 		if grouping != 0 {
 			switch fmtType {
 			case 0, 'd', 'f', 'F', 'g', 'G', '%', 'n', 'e', 'E':
-				// Decimal/float group by 3 (',' or '_').
-				result = addThousandsSeparator(result, grouping, 3)
+				groupSize = 3 // decimal/float group by 3 (',' or '_')
 			case 'b', 'o', 'x', 'X':
-				// Binary/octal/hex group by 4, and only '_' is allowed.
-				if grouping == ',' {
+				if grouping == ',' { // only '_' is allowed for these
 					return "", &ValueError{Message: fmt.Sprintf("Cannot specify ',' with '%c'.", fmtType)}
 				}
-				result = addThousandsSeparator(result, grouping, 4)
+				groupSize = 4 // binary/octal/hex group by 4
 			}
+		}
+		if groupSize != 0 && !zero {
+			result = addThousandsSeparator(result, grouping, groupSize)
+		}
+		if groupSize != 0 && zero {
+			// zeroFillGrouped both zero-pads to width and groups; the normal
+			// width step is skipped for this case (handled below).
+			result = zeroFillGrouped(result, grouping, groupSize, width)
+			zeroFilledGrouped = true
 		}
 	} else if str, ok := value.(StringValue); ok {
 		// String formatting
@@ -626,8 +684,9 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 		result = PrintValueWithoutQuotes(value)
 	}
 
-	// Apply width and alignment
-	if width > 0 && len(result) < width {
+	// Apply width and alignment (skipped when zero-fill+grouping already filled
+	// the field, weaving separators through the leading zeros above).
+	if width > 0 && len(result) < width && !zeroFilledGrouped {
 		padding := width - len(result)
 		fillStr := string(fill)
 		if zero && fillStr == " " {
