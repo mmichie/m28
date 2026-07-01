@@ -1,11 +1,11 @@
 # M28 Language Specification
 
-This directory contains the official specification, implementation roadmap, and testing strategy for the M28 language.
+This directory contains the official specification and testing strategy for the M28 language.
 
 ## Core Documents
 
 - [**Language Specification**](language-specification.md) - Complete language definition and semantics
-- [**Implementation Roadmap**](implementation-roadmap.md) - Development plan and timeline 
+- [**Compiler Architecture**](../design/compiler-architecture.md) - Current architecture and development plan (work items are tracked in beads: `bd ready`)
 - [**Testing Strategy**](test-strategy.md) - Approach to testing the language implementation
 
 ## Document Status

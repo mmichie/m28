@@ -301,6 +301,5 @@ If `when` were a function, `body` would always be evaluated before the function 
 
 ## See Also
 
-- [S-Strings Documentation](SSTRINGS.md) - Template-based code generation
-- [ROADMAP.md](../ROADMAP.md) - Future macro system enhancements
-- [Parser Documentation](PARSER.md) - How `@` symbols are parsed
+- [S-Strings Design](design/s-strings.md) - Template-based code generation (proposed)
+- [Compiler Architecture](design/compiler-architecture.md) - Where macros sit (the surface-forms layer); future macro work is tracked in beads

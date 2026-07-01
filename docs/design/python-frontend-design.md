@@ -1,5 +1,10 @@
 # Python Frontend Design
 
+> **Status (2026-07): Implemented.** Historical design record; the Python
+> frontend is live (`parser/python_tokenizer.go`, `parser/python_parser*.go`,
+> `core/ast`) and runs the CPython stdlib directly. Current architecture:
+> [compiler-architecture.md](./compiler-architecture.md).
+
 ## Overview
 
 With the AST layer (Phases 1-3) complete, we have the foundation to add a full Python frontend. This document explores what that would look like.

@@ -1,1602 +1,380 @@
 # M28 Compiler Architecture
 
-## Executive Summary
+**Version:** 2.0 (2026-07-01)
+**Status:** Living document, and the north star for structural work.
 
-M28 is designed as a **multi-frontend, multi-backend language platform** that supports multiple syntaxes (Python, Lisp, future languages) and multiple execution strategies (interpreter, bytecode, native compilation). The architecture uses a **High-Level Intermediate Representation (HIR)** as the universal pivot point between frontends and backends.
-
-**Key Design Principles:**
-- **Language-neutral core** - HIR represents semantics, not syntax
-- **Clean layer separation** - Frontends, HIR, and backends are independent
-- **Incremental migration** - Add frontends/backends without breaking existing code
-- **Performance path** - Clear evolution from interpreted → bytecode → native
-- **Both static and dynamic** - Single architecture supports both typing disciplines
-
-**Current State (Nov 2024):**
-- ✅ M28 Lisp frontend with Pythonic sugar
-- ✅ Tree-walking interpreter backend
-- ✅ AST layer with source locations
-- 🚧 HIR layer (using core.Value, needs formalization)
-- 📋 Bytecode VM backend (designed, not implemented)
-- 📋 Python frontend (designed, partially implemented)
-- 📋 LLVM/WASM backends (future)
+Version 1.0 (November 2025, in git history) proposed a multi-backend execution
+ladder: interpreter, then a register bytecode VM (3-10x), then LLVM (50-100x),
+then WASM. That ladder was superseded by measurement — see
+[The evidence that changed the plan](#the-evidence-that-changed-the-plan).
+This version keeps v1's multi-frontend insight and replaces its execution and
+performance story with what the data supports.
 
 ---
 
-## Table of Contents
+## Executive summary
 
-1. [Architecture Overview](#architecture-overview)
-2. [Layer 1: Frontends](#layer-1-frontends)
-3. [Layer 2: HIR (High-Level IR)](#layer-2-hir-high-level-ir)
-4. [Layer 3: Backends](#layer-3-backends)
-5. [Static vs Dynamic Languages](#static-vs-dynamic-languages)
-6. [Why Custom HIR (Not LLVM)](#why-custom-hir-not-llvm)
-7. [Migration Strategy](#migration-strategy)
-8. [Implementation Guide](#implementation-guide)
-9. [Performance Evolution](#performance-evolution)
-10. [References](#references)
+M28 is a **multi-frontend, single-runtime language platform**: multiple
+surface syntaxes (Python, M28 s-expressions, potentially others) share one
+semantic core — a Python-compatible object model — and one execution engine,
+a **resolved tree-walking interpreter**.
 
----
+The v1 architecture assumed speed would come from execution tiers. Our own
+experiments killed that assumption: at the same value model, a resolved
+tree-walk equals a bytecode VM. Speed comes from resolution, operator
+specialization, and eventually value representation — all changes to the one
+engine we already have. Compliance comes from consolidating the runtime so
+each Python semantic has exactly one implementation. Differentiation from
+CPython comes from the product layer around the engine — embedding,
+distribution, sandboxing, macros — not from the execution strategy.
 
-## Architecture Overview
+**Principles**
 
-### The Big Picture
+1. **Evidence over architecture.** No tier, pass, or rewrite lands without a
+   measurement that demands it. The v1 plan failed this test; the vmspike and
+   the perf loop (`benchmarks/LOOP.md`) are the correction.
+2. **One implementation per semantic.** Every duplicated semantic is a
+   conformance-divergence factory. Epic: M28-j9o.
+3. **Python semantics are the contract.** All frontends, current and future,
+   inherit the Python object model. The conformance suite is the contract's
+   teeth. Campaign: M28-a6b8.
+4. **Resolution is the compiler.** parse -> macroexpand -> resolve -> lower ->
+   execute. Names get their meaning at resolve time, not at eval time.
+   Epic: M28-b5c6.
+5. **Differentiate in the product layer.** Epic: M28-9t2.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                    FRONTENDS                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │  Python  │  │   M28    │  │  Future  │              │
-│  │  Parser  │  │  Parser  │  │ Language │              │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
-│       │             │              │                     │
-│       └─────────────┴──────────────┘                    │
-│                     │                                    │
-│              Language-Specific AST                       │
-│         (Python AST, M28 AST, etc.)                      │
-└──────────────────────────────────────────────────────────┘
-                      │
-                      ↓ Lower to HIR
-┌──────────────────────────────────────────────────────────┐
-│                 HIR (High-Level IR)                       │
-│                                                          │
-│  Language-neutral representation of program semantics   │
-│  - Operations: Call, Binding, Conditional, Loop, etc.   │
-│  - Optional type information (for gradual typing)       │
-│  - Optimizable (constant folding, DCE, inlining)        │
-│  - Not LLVM - higher level, easier to work with         │
-└──────────────────────────────────────────────────────────┘
-                      │
-                      ↓ Backend lowering
-┌──────────────────────────────────────────────────────────┐
-│                    BACKENDS                              │
-│                                                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
-│  │Interpreter  │  │  Bytecode   │  │    LLVM     │    │
-│  │ (current)   │  │     VM      │  │  (future)   │    │
-│  │   1x        │  │   3-10x     │  │   50-100x   │    │
-│  └─────────────┘  └─────────────┘  └─────────────┘    │
-│                                                          │
-│  ┌─────────────┐                                        │
-│  │    WASM     │                                        │
-│  │  (future)   │                                        │
-│  │  portable   │                                        │
-│  └─────────────┘                                        │
-└──────────────────────────────────────────────────────────┘
-```
-
-### Key Insight: No M×N Problem
-
-Without a pivot IR, supporting M frontends and N backends requires M×N compilers:
-
-```
-Bad: Direct compilation
-Python  →  Interpreter
-Python  →  Bytecode
-Python  →  LLVM
-M28     →  Interpreter
-M28     →  Bytecode
-M28     →  LLVM
-= 6 compilers for 2 languages × 3 backends
-```
-
-With HIR as pivot, you only need M+N components:
-
-```
-Good: HIR as pivot
-Python  ↘
-M28     → HIR → Interpreter
-Future  ↗     → Bytecode
-              → LLVM
-= 3 frontends + 3 backends = 6 components (vs 9)
-```
+Work items in this document reference beads issues (`bd show <id>`).
 
 ---
 
-## Layer 1: Frontends
+## Where things stand (July 2026)
 
-### What is a Frontend?
-
-A frontend is responsible for:
-1. **Parsing** source code into a language-specific AST
-2. **Lowering** the AST to HIR
-3. **Preserving** source locations, type hints, comments
-
-### Frontend Interface
-
-```go
-// frontend/common/interface.go
-package common
-
-import "github.com/mmichie/m28/hir"
-
-// Frontend represents a language frontend
-type Frontend interface {
-    Name() string                        // "python", "m28", "javascript"
-    Parse(source string) (AST, error)    // Parse source → language AST
-}
-
-// AST represents a language-specific abstract syntax tree
-type AST interface {
-    Lower() (*hir.Module, error)         // Lower to HIR
-    Language() string                    // Which language produced this
-}
-```
-
-### M28 Lisp Frontend
-
-**Status:** ✅ Working (current implementation)
-
-```
-Source: (def add (a b) (+ a b))
-   ↓ parser/parser.go
-M28 AST with Pythonic sugar support
-   ↓ ast.ToIR()
-HIR (currently core.Value, needs formalization)
-```
-
-**Features:**
-- S-expression syntax: `(+ 1 2)`
-- Pythonic sugar: `print("hello")` → `(print "hello")`
-- Infix operators: `x * 2` → `(* x 2)`
-- Assignment: `x = 10` → `(= x 10)`
-
-**Directory structure (proposed):**
-```
-frontend/m28/
-├── parser.go       # M28 parser (from parser/parser.go)
-├── ast.go          # M28-specific AST nodes
-├── lower.go        # M28 AST → HIR lowering
-└── desugar.go      # Pythonic sugar → canonical M28
-```
-
-### Python Frontend
-
-**Status:** 🚧 Partially implemented
-
-```
-Source: def add(a, b): return a + b
-   ↓ parser/python_parser.go
-Python AST (python_nodes.go)
-   ↓ ast.ToIR()
-HIR (same as M28!)
-```
-
-**Features:**
-- Full Python syntax (indentation-based)
-- Type hints: `def f(x: int) -> int:`
-- Comprehensions: `[x*x for x in range(10)]`
-- Classes: `class Foo: ...`
-- Context managers: `with open(f) as file:`
-
-**Directory structure (proposed):**
-```
-frontend/python/
-├── tokenizer.go    # Indentation-aware tokenizer
-├── parser.go       # Python statement parser
-├── ast.go          # Python-specific AST nodes (from core/ast/python_nodes.go)
-├── lower.go        # Python AST → HIR lowering
-└── desugar.go      # Python features → HIR primitives
-```
-
-### Adding a New Frontend (e.g., JavaScript)
-
-**Steps:**
-1. Create `frontend/javascript/` directory
-2. Implement parser (tokens → JS AST)
-3. Implement lowering (JS AST → HIR)
-4. That's it! Works with all backends automatically
-
-**Example:**
-```go
-// frontend/javascript/lower.go
-
-func (jsAST *JSFunctionDecl) Lower() *hir.Function {
-    return &hir.Function{
-        Name: jsAST.Name,
-        Params: lowerParams(jsAST.Params),
-        Body: lowerBody(jsAST.Body),
-        // HIR doesn't care that this came from JavaScript!
-    }
-}
-```
+- **Both frontends are real.** `.py` files and CPython's pure-Python stdlib
+  parse and execute directly (`parser/python_tokenizer.go`,
+  `parser/python_parser*.go` -> `core/ast` -> `ToIR()` -> s-expression surface
+  forms). `.m28` files accept full Python syntax as well as s-expressions.
+- **Conformance:** 526/943 CPython-derived unit tests passing
+  (`conformance.json`; campaign epic M28-a6b8, the active P0 work).
+- **Performance:** macro-benchmark geomean is ~3.7x CPython, down from ~126x
+  at campaign start (epic M28-e42e). The worst remaining case is
+  `regex_match` — M28 interprets CPython's `re.py` wrapper per call.
+- **The resolution layer exists** (layers 1-3): `eval/resolve.go`
+  (`analyzeLocals`, `resolveBody` -> slot-indexed locals) and
+  `eval/resolve_ir.go` (`compileIR` -> self-evaluating typed IR nodes), applied
+  lazily to functions with simple positional signatures, with an always-correct
+  fallback to the plain tree walk.
+- **Scale:** ~126k LOC of Go. core 38k, modules 19.5k, eval 19.4k,
+  builtin 18.8k, parser 17k.
 
 ---
 
-## Layer 2: HIR (High-Level IR)
+## The evidence that changed the plan
 
-### What is HIR?
+The vmspike experiment (`vmspike/`, commit b276449) built a throwaway bytecode
+VM and a resolved tree-walk over the same benchmark and measured the ladder
+(N=2000, speedups vs the then-current tree-walk):
 
-HIR (High-Level Intermediate Representation) is M28's **language-neutral representation** of program semantics. It's the pivot point between frontends and backends.
+| Rung | Model | Speedup |
+|------|-------|---------|
+| resolved-dispatch | typed IR + slot locals, tree-walk | 2.3x |
+| resolved-fast | resolved + inline numeric operators | 10.7x |
+| vm-boxed | bytecode + slots, same boxed values | 9.5x |
+| vm-unboxed | bytecode + raw float64 | 94x |
 
-**Design goals:**
-- **Language-neutral** - No Python-isms, no Lisp-isms
-- **Semantic** - Represents what the code does, not how it's written
-- **High-level** - Easier than LLVM, harder than AST
-- **Optimizable** - Clean structure for optimization passes
-- **Executable** - Can be interpreted directly
-- **Lowerable** - Can be compiled to bytecode/LLVM/WASM
+Reading: **a bytecode VM equals a resolved tree-walk at the same value model**
+(9.5x vs 10.7x — bytecode itself buys nothing). The real levers are
+(1) operator specialization, (2) resolution + slot locals, (3) value unboxing,
+and all three are available to the tree-walk. A VM earns its complexity only
+for resumable frames (generators, async, deep recursion) — never for
+arithmetic speed.
 
-### HIR Node Types
-
-```go
-// hir/operation.go
-package hir
-
-// Module is the top-level compilation unit
-type Module struct {
-    Name      string
-    Functions []*Function
-    Globals   []*Binding
-    Source    *SourceInfo
-}
-
-// Function represents a callable
-type Function struct {
-    Name       string
-    Params     []*Parameter
-    Body       Operation      // Single operation (often Block)
-    ReturnType *TypeInfo      // Optional (for gradual typing)
-    Source     *SourceInfo
-}
-
-type Parameter struct {
-    Name    string
-    Type    *TypeInfo      // Optional
-    Default Operation      // Optional
-}
-
-// Operation is the fundamental HIR node
-type Operation interface {
-    OpType() OpKind
-    TypeInfo() *TypeInfo   // Optional type info
-    Source() *SourceInfo   // Source location
-}
-
-// Core operation types
-type (
-    // Literals
-    IntLit    struct { Value int64 }
-    FloatLit  struct { Value float64 }
-    StringLit struct { Value string }
-    BoolLit   struct { Value bool }
-    NoneLit   struct {}
-
-    // Collections
-    ListLit   struct { Elements []Operation }
-    DictLit   struct { Pairs [][2]Operation }
-    TupleLit  struct { Elements []Operation }
-    SetLit    struct { Elements []Operation }
-
-    // Variables
-    LoadVar   struct { Name string }
-    StoreVar  struct { Name string; Value Operation }
-
-    // Control flow
-    Call      struct {
-        Function Operation
-        Args     []Operation
-        Kwargs   map[string]Operation
-    }
-
-    If        struct {
-        Condition Operation
-        Then      Operation
-        Else      Operation
-    }
-
-    Block     struct {
-        Ops []Operation
-    }
-
-    Return    struct {
-        Value Operation
-    }
-
-    Loop      struct {
-        Iterator  Operation
-        LoopVar   string
-        Body      Operation
-    }
-
-    // Type guards (for optimization)
-    Guard     struct {
-        Value    Operation
-        Expected *TypeInfo
-    }
-)
-
-// Type information (for gradual typing)
-type TypeInfo struct {
-    Kind       TypeKind           // Any, Concrete, Generic, Union
-    Concrete   *ConcreteType      // For static types: int, str, MyClass
-    Generic    []TypeConstraint   // For generics: List[T]
-    Runtime    bool               // True = check at runtime, False = compile-time
-}
-```
-
-### Example: Python → HIR
-
-**Python source:**
-```python
-def factorial(n):
-    if n <= 1:
-        return 1
-    return n * factorial(n - 1)
-```
-
-**HIR:**
-```go
-&hir.Function{
-    Name: "factorial",
-    Params: []*Parameter{{Name: "n", Type: nil}},
-    Body: &hir.If{
-        Condition: &hir.Call{
-            Function: &hir.LoadVar{Name: "<="},
-            Args: []Operation{
-                &hir.LoadVar{Name: "n"},
-                &hir.IntLit{Value: 1},
-            },
-        },
-        Then: &hir.Return{
-            Value: &hir.IntLit{Value: 1},
-        },
-        Else: &hir.Return{
-            Value: &hir.Call{
-                Function: &hir.LoadVar{Name: "*"},
-                Args: []Operation{
-                    &hir.LoadVar{Name: "n"},
-                    &hir.Call{
-                        Function: &hir.LoadVar{Name: "factorial"},
-                        Args: []Operation{
-                            &hir.Call{
-                                Function: &hir.LoadVar{Name: "-"},
-                                Args: []Operation{
-                                    &hir.LoadVar{Name: "n"},
-                                    &hir.IntLit{Value: 1},
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    },
-}
-```
-
-### Example: M28 → HIR
-
-**M28 source:**
-```lisp
-(def factorial (n)
-  (if (<= n 1)
-      1
-      (* n (factorial (- n 1)))))
-```
-
-**HIR:** *Exactly the same as Python!*
-
-This is the key insight: **different syntaxes → same HIR**.
-
-### HIR Optimization Passes
-
-HIR's clean structure enables optimization:
-
-```go
-// hir/passes/constant_fold.go
-
-// Before optimization:
-&hir.Call{
-    Function: &hir.LoadVar{Name: "+"},
-    Args: []Operation{
-        &hir.IntLit{Value: 1},
-        &hir.IntLit{Value: 2},
-    },
-}
-
-// After constant folding:
-&hir.IntLit{Value: 3}
-
-// hir/passes/inline.go
-
-// Before inlining:
-&hir.Call{
-    Function: &hir.LoadVar{Name: "double"},  // def double(x): x * 2
-    Args: []Operation{&hir.IntLit{Value: 5}},
-}
-
-// After inlining:
-&hir.Call{
-    Function: &hir.LoadVar{Name: "*"},
-    Args: []Operation{
-        &hir.IntLit{Value: 5},
-        &hir.IntLit{Value: 2},
-    },
-}
-
-// Then constant fold again:
-&hir.IntLit{Value: 10}
-```
+The subsequent campaign validated profile-first over architecture-first. The
+two biggest single wins were not architectural at all: a per-key
+goroutine-ID stack walk hiding under dict/global lookups (`ValueToKey`;
+geomean ~79x -> ~5.6x) and GC frequency (GOGC=400 default; ~5.1x -> ~3.7x).
+The lessons are encoded in `benchmarks/LOOP.md`: judge changes by M28 absolute
+time, alloc-count is not wall-clock, and check GC tuning before big rewrites.
 
 ---
 
-## Layer 3: Backends
+## The architecture: six layers
 
-### What is a Backend?
+```
+   .py           .m28          (future language)
+    |              |              |
+    v              v              v
++---------------------------------------+  L1  FRONTENDS (syntax only)
+|  python tokenizer/parser | m28 reader |
++---------------------------------------+
+    |  core/ast + ToIR()      |
+    v                         v
++---------------------------------------+  L2  SURFACE FORMS
+|  s-expressions (core.Value)           |      macros, REPL,
+|  + LocatedValue source positions      |      metaprogramming
++---------------------------------------+
+    |  resolve + lower  (THE COMPILER)
+    v
++---------------------------------------+  L3  RESOLVER + TYPED IR
+|  slot locals, resolved heads, irNodes |
++---------------------------------------+
+    |  execute
+    v
++---------------------------------------+  L4  EXECUTION
+|  resolved tree-walk                   |      (frame tier later, only
+|  (fallback: plain s-expr walk)        |       for resumable semantics)
++---------------------------------------+
+    |  every semantic operation
+    v
++---------------------------------------+  L5  RUNTIME / OBJECT MODEL
+|  types, dunders, MRO, dicts, imports  |      the ONE place Python
++---------------------------------------+      semantics live
 
-A backend is responsible for:
-1. **Executing** HIR (interpreter)
-2. **Compiling** HIR to bytecode/native code
-3. **Optimizing** for its execution model
-
-### Backend Interface
-
-```go
-// backend/common/interface.go
-package common
-
-import "github.com/mmichie/m28/hir"
-
-// Backend represents a compilation/execution target
-type Backend interface {
-    Name() string                                     // "interpreter", "bytecode", "llvm"
-    Execute(module *hir.Module) (Result, error)      // Execute HIR
-
-    // Capabilities
-    RequiresTypeInfo() bool                           // True for AOT compilers
-    SupportsGradualTyping() bool                      // Can use optional type hints
-}
-
-type Result struct {
-    Value  interface{}   // Result value (backend-specific)
-    Output string        // Any output produced
-}
++---------------------------------------+  L6  PRODUCT SURFACES
+|  CLI | REPL | embed API | wasm builds |
++---------------------------------------+
 ```
 
-### Interpreter Backend
+The v1 "no MxN problem" insight survives: M frontends and N consumers meet at
+a shared pivot. What defines the pivot is not a Go package — it is the
+**surface-form contract plus the IR spec plus the conformance suite**.
 
-**Status:** ✅ Working (current implementation)
+### L1: Frontends
 
-**How it works:**
-```go
-// backend/interpreter/eval.go
+A frontend turns source text into surface forms with source locations.
+Nothing else. Today:
 
-func Eval(op hir.Operation, ctx *Context) (Value, error) {
-    switch op := op.(type) {
-    case *hir.IntLit:
-        return IntValue(op.Value), nil
+- **Python:** `parser/python_tokenizer.go` (indentation-aware) +
+  `parser/python_parser*.go` -> `core/ast` nodes -> `ToIR()` -> surface forms.
+- **M28:** `parser/parser.go` emits surface forms directly, desugaring
+  Pythonic sugar (infix, `x = v`, `f(x)`) inline.
 
-    case *hir.LoadVar:
-        return ctx.Get(op.Name)
+Planned (M28-a472): a `Frontend` interface with dialect selection by file
+extension or pragma. Today `.m28` execution and `EvalString` try the full
+Python parser and fall back to the s-expression parser on failure
+(`main.go`, `eval/eval_string.go`) — a double parse that produces error
+messages blaming the wrong grammar.
 
-    case *hir.Call:
-        fn := Eval(op.Function, ctx)
-        args := evalArgs(op.Args, ctx)
-        return Call(fn, args, ctx)
+**Constraint for future languages:** a new frontend inherits the Python object
+model. That is the price of one runtime — the same deal JVM and BEAM languages
+make — and it is what keeps a new language at M+N cost instead of MxN.
+Package moves into a `frontend/` directory tree are deferred until the
+consolidation epic lands; moving files does not move semantics.
 
-    case *hir.If:
-        cond := Eval(op.Condition, ctx)
-        if ToBool(cond) {
-            return Eval(op.Then, ctx)
-        }
-        return Eval(op.Else, ctx)
-    }
-}
-```
+### L2: Surface forms
 
-**Performance:** 1x (baseline)
+S-expressions as `core.Value`, wrapped in `LocatedValue` for positions. This
+is v1's "HIR" — it stays, but as the *surface*, not the executed form. Macros
+(`docs/MACROS.md`), the REPL, and metaprogramming live here; this layer is why
+the executed IR can change shape without breaking user-visible
+metaprogramming.
 
-**Pros:**
-- Simple, easy to debug
-- Direct mapping from HIR
-- Good for REPL, development
+### L3: Resolver + typed IR — the compiler proper
 
-**Cons:**
-- Slow (tree-walking overhead)
-- Type checks every operation
-- Heavy GC pressure
+What exists (applied lazily per function, memoized, always with fallback):
 
-**Directory structure (current):**
-```
-eval/                    # Should become backend/interpreter/
-├── evaluator.go         # Main eval loop
-├── function_params.go   # Parameter binding
-├── class_forms.go       # Class evaluation
-└── ...
-```
+- `eval/resolve.go` — `analyzeLocals` classifies slot eligibility;
+  `resolveBody` rewrites local reads/writes to slot references.
+- `eval/resolve_ir.go` — `compileIR` lowers the rewritten body to
+  self-evaluating IR nodes (const/symbol/seq/if/return/assign/call/operator)
+  with an inline numeric fast path. Tracebacks are preserved byte-identically
+  (LocatedValue handling is unchanged).
 
-### Bytecode VM Backend
+Planned, in order:
 
-**Status:** 📋 Designed (see mir-bytecode-vm.md)
+1. **Resolver as single arbiter** (M28-ehi). Today meaning is decided before
+   scope: special forms dispatch from a map ahead of user bindings
+   (`eval/evaluator.go`; the `quote`-yields-to-binding hack patches one case),
+   and `Context.Lookup` consults the operator registry before any scope
+   (`core/context.go`), so operators and form names are not shadowable.
+   Resolution must decide what a head symbol means: it is a special form only
+   if scope does not bind it. Fixes the shadowing bug class and removes
+   per-eval map lookups.
+2. **Closure cells** (M28-osj). Real cell objects (shared slots) so captured
+   locals work with slot frames; `__closure__` becomes real. Prerequisite for
+   widening.
+3. **Widen eligibility** (M28-6mf) construct by construct — defaults/kwargs,
+   try/with, comprehensions, tuple targets — until the IR path is the common
+   path and raw s-expr walking is only the REPL/macro/bootstrap path.
+4. **IR spec** (M28-a88f). The missing piece is the contract, not more node
+   types: node inventory, scoping and slot rules, eligibility gates, fallback
+   semantics, and how frontends target surface forms. `docs/design/ir-spec.md`,
+   versioned.
 
-**How it works:**
-```
-HIR → Bytecode Compiler → Bytecode (.m28c)
-                              ↓
-                         VM Execution
-```
+### L4: Execution
 
-**Sample bytecode:**
-```
-factorial:
-  LOAD_VAR      r0, "n"
-  LOAD_CONST_I  r1, 1
-  LE            r2, r0, r1
-  JUMP_IF_FALSE r2, REC
-    RETURN        r0
-  REC:
-    LOAD_VAR      r3, "factorial"
-    LOAD_VAR      r4, "n"
-    LOAD_CONST_I  r5, 1
-    SUB           r6, r4, r5
-    CALL_1        r7, r3, r6
-    LOAD_VAR      r8, "n"
-    MUL           r9, r8, r7
-    RETURN        r9
-```
+The resolved tree-walk is the engine. There is exactly one future execution
+addition on the books, and it is semantic, not speed:
 
-**Performance:** 3-10x (vs interpreter)
+- **Frame-based tier for resumable semantics** (M28-8jo, deferred).
+  Generators currently run on a bespoke step machine
+  (`eval/generator_exec.go`), async wraps goroutines, and recursion depth is
+  bounded by Go stacks. When that pressure is real, a frame-based interpreter
+  over the *same resolved IR and same value model* is the answer. Design
+  constraints: `docs/design/mir-bytecode-vm.md`.
 
-**Pros:**
-- Much faster than tree-walking
-- Type specialization opportunities
-- Can cache compiled code (.m28c files)
-- Foundation for JIT
+Explicitly not on the books: an LLVM backend (native compilation of untyped
+Python semantics is PyPy/Graal-scale effort; if native ever matters it is a
+typed-subset AOT gated on the type system epic M28-b20f), and a WASM codegen
+backend (Go compiles the whole interpreter to wasm/wasip1 — M28-5uc).
 
-**Cons:**
-- More complex than interpreter
-- Compilation overhead (amortized)
-- Debugging harder (but solvable with source maps)
+### L5: Runtime / object model
 
-**Directory structure (proposed):**
-```
-backend/bytecode/
-├── compiler.go          # HIR → Bytecode
-├── vm.go                # Bytecode execution
-├── opcodes.go           # Instruction definitions
-├── optimize.go          # Bytecode optimization passes
-└── serialize.go         # .m28c format
-```
+The single place Python semantics live: types, dunder dispatch, MRO,
+containers, the import system. Everything above calls into it; fast paths
+elsewhere are legal only as provably-equivalent inlinings of the canonical
+implementation, with the conformance suite as the proof.
 
-### LLVM Backend
+Today this layer fails the "single place" test — see the
+[consolidation debt register](#consolidation-debt-register). Fixing that is
+epic M28-j9o and is a de facto prerequisite for the resolver work: the
+compiler can only trust a canonical semantic path once there is one.
 
-**Status:** 📋 Future
+### L6: Product surfaces
 
-**How it works:**
-```
-HIR → LLVM Lowering → LLVM IR → LLVM Optimization → Native code
-```
+Where "more useful than CPython alone" lives (epic M28-9t2):
 
-**Performance:** 50-100x (vs interpreter) for compute-heavy code
-
-**Pros:**
-- Native code performance
-- Free optimizations from LLVM
-- Cross-platform compilation
-
-**Cons:**
-- Complex integration
-- Long compilation times
-- Harder to debug
-- Needs runtime support for dynamic features
-
-**When to build:**
-- After bytecode VM is working
-- When performance is critical (numerical, games)
-- When you want ahead-of-time compilation
-
-**Directory structure (future):**
-```
-backend/llvm/
-├── codegen.go           # HIR → LLVM IR
-├── runtime.go           # Runtime support (GC, etc.)
-└── optimize.go          # LLVM-specific optimizations
-```
-
-### WASM Backend
-
-**Status:** 📋 Future
-
-**How it works:**
-```
-HIR → WASM Lowering → WASM Module → Browser/WASI runtime
-```
-
-**Performance:** 10-50x (vs interpreter), portable
-
-**Pros:**
-- Runs in browsers
-- Portable (Linux, Mac, Windows, WASI)
-- Good performance
-- Sandboxed by default
-
-**Cons:**
-- Still needs runtime support
-- Limited debugging
-- WASM has restrictions (linear memory, etc.)
-
-**When to build:**
-- After bytecode VM
-- For web deployment
-- For portable distribution
-
-**Directory structure (future):**
-```
-backend/wasm/
-├── codegen.go           # HIR → WASM
-├── runtime.go           # WASM runtime support
-└── bindings.go          # JS/WASI bindings
-```
+- **Embeddable Go API** (M28-6cc6): "Lua for Go, but Python" — config,
+  plugins, game scripting, rule engines. `embed/` exists; the API needs
+  design and commitment.
+- **Self-contained single binary** (M28-hmz): today
+  `modules/python_finder.go` shells out to `python3` to find a stdlib, which
+  silently breaks the static-binary story. Bundle a pinned stdlib snapshot.
+- **Capability-based sandboxing** (M28-6y9): per-interpreter fs/net/clock/
+  import policy at the Go module boundary — something CPython embedding
+  cannot offer.
+- **Concurrency without a GIL** (M28-b9y): `go`/channels already run on
+  goroutines. The credible model is isolates — one interpreter per domain,
+  channels between them, no shared mutable Python heap. Shared-heap free
+  threading is an explicit non-goal.
+- **Browser/portable deployment** (M28-5uc): wasm/wasip1 builds of the
+  interpreter.
+- **Dual syntax + macros over Python semantics**: the one thing CPython
+  structurally cannot offer (`docs/MACROS.md`, `docs/design/s-strings.md`).
+- **Tooling**: structured logging exists (`core/logging.go`); LSP/DAP and
+  developer tooling under epic M28-2d6f.
 
 ---
 
-## Static vs Dynamic Languages
+## Consolidation debt register
 
-### The Challenge
+The current known violations of "one implementation per semantic", with their
+issues. Each lands as its own conformance-gated ratchet.
 
-**Dynamic languages** (Python, M28, Ruby):
-- Types determined at runtime
-- Variables can change type
-- Duck typing
-- Flexible but slower
-
-**Static languages** (TypeScript, Rust, Go):
-- Types determined at compile-time
-- Type checking before execution
-- Explicit types
-- Less flexible but faster
-
-**Question:** Can one architecture handle both?
-
-**Answer:** Yes! With optional type information in HIR.
-
-### HIR with Optional Types
-
-```go
-type TypeInfo struct {
-    Kind       TypeKind           // Any, Concrete, Generic, Union
-    Concrete   *ConcreteType      // Specific type (if known)
-    Runtime    bool               // True = check at runtime
-}
-
-type TypeKind int
-const (
-    TypeAny TypeKind = iota        // Dynamic: anything goes
-    TypeConcrete                   // Static: int, str, MyClass
-    TypeGeneric                    // Static: List[T]
-    TypeUnion                      // Static or gradual: int | str
-)
-```
-
-### Example: Same HIR, Different Types
-
-**Python (dynamic):**
-```python
-def greet(name):
-    return f"Hello, {name}"
-```
-
-**HIR:**
-```go
-&hir.Function{
-    Name: "greet",
-    Params: []*Parameter{
-        {Name: "name", Type: &TypeInfo{Kind: TypeAny}},  // No type constraint
-    },
-    ReturnType: &TypeInfo{Kind: TypeAny},
-    Body: /* ... */,
-}
-```
-
-**TypeScript (static):**
-```typescript
-function greet(name: string): string {
-    return `Hello, ${name}`;
-}
-```
-
-**HIR:**
-```go
-&hir.Function{
-    Name: "greet",
-    Params: []*Parameter{
-        {Name: "name", Type: &TypeInfo{
-            Kind: TypeConcrete,
-            Concrete: &ConcreteType{Name: "string"},
-            Runtime: false,  // Already type-checked by TypeScript
-        }},
-    },
-    ReturnType: &TypeInfo{
-        Kind: TypeConcrete,
-        Concrete: &ConcreteType{Name: "string"},
-        Runtime: false,
-    },
-    Body: /* ... */,
-}
-```
-
-**Key insight:** Same HIR structure, different type annotations!
-
-### How Backends Use Type Info
-
-**Interpreter:**
-```go
-func (e *Evaluator) evalCall(op *hir.Call) (Value, error) {
-    fn := e.eval(op.Function)
-    args := e.evalArgs(op.Args)
-
-    // Dynamic: Always check types at runtime
-    if op.TypeInfo() == nil || op.TypeInfo().Runtime {
-        if err := checkTypes(fn, args); err != nil {
-            return nil, err
-        }
-    }
-    // Static: Types already checked, skip
-
-    return call(fn, args)
-}
-```
-
-**Bytecode VM:**
-```go
-func (c *Compiler) compileCall(op *hir.Call) []Instruction {
-    instrs := []Instruction{}
-
-    if op.TypeInfo() != nil && !op.TypeInfo().Runtime {
-        // Static: Direct call (fast!)
-        instrs = append(instrs, CALL_DIRECT)
-    } else {
-        // Dynamic: Dynamic dispatch (slower but flexible)
-        instrs = append(instrs, CALL_DYNAMIC)
-    }
-
-    return instrs
-}
-```
-
-**LLVM Backend:**
-```go
-func (g *Generator) genCall(op *hir.Call) llvm.Value {
-    if op.TypeInfo() != nil && !op.TypeInfo().Runtime {
-        // Static: Generate optimal native code
-        // - No runtime type checks
-        // - Direct call
-        // - Can inline
-        return g.genStaticCall(op)
-    } else {
-        // Dynamic: Use runtime support
-        // - Include type tags
-        // - Indirect call
-        // - Runtime checks
-        return g.genDynamicCall(op)
-    }
-}
-```
-
-### Gradual Typing
-
-Python with type hints gets the best of both worlds:
-
-```python
-# Python with type hints
-def add(x: int, y: int) -> int:
-    return x + y
-
-# Can optionally enforce at runtime
-```
-
-**HIR:**
-```go
-&hir.Function{
-    Params: []*Parameter{
-        {Name: "x", Type: &TypeInfo{
-            Kind: TypeConcrete,
-            Concrete: &ConcreteType{Name: "int"},
-            Runtime: true,  // Python checks at runtime (not compile-time)
-        }},
-    },
-}
-```
-
-Backends can:
-- **Interpreter:** Check types at runtime (Python semantics)
-- **Bytecode VM:** Add type guards, specialize hot paths
-- **LLVM:** Generate fast path with guards, slow path for type errors
+| Semantic | Today | Issue |
+|----------|-------|-------|
+| Arithmetic dispatch | >=5 implementations of `+`: `builtin/operators/operators_arithmetic.go` (addTwo + types.Switch), `core/type_registry_primitives.go` dunders, `builtin/types.go` int/float classes via `__value__`, `core/protocols/numeric.go`, `eval/resolve_ir.go` fastNumOp; bigint promotion duplicated | M28-lel |
+| Format specs | `builtin/string_format.go` vs `core/string_methods.go` formatValueWithSpec (str.format drops grouping separators) vs `common/types/dunder.go` CallFormat; f-string parsing exists twice | M28-efl |
+| MRO | BFS traversal in `core/class.go` while comments claim C3; diamond inheritance diverges | M28-b4b |
+| Dict/set keying | string encoding via `core.ValueToKey` + parallel key maps instead of hash/eq | M28-5k9 |
+| Method registries | `TypeDescriptor` vs `MethodRegistry`, 84 distinct GetAttr implementations | M28-6jr |
+| Module caches | `core.ModuleRegistry` + `modules.moduleCache` + `sys.modules`, reconciled by hand twice; dead `DefaultModuleLoader` | M28-bfw |
+| Error types | eval-local error types parallel to core Python errors | M28-7886 |
+| Dead code | `env/`, `LispNumber`/`LispString`, legacy char-based parser family, `string_legacy.go`, dual param binding | M28-ob9 |
 
 ---
 
-## Why Custom HIR (Not LLVM)
+## Performance strategy
 
-### The Question
+The ladder, in risk-adjusted order (epic M28-e42e, runbook
+`benchmarks/LOOP.md`):
 
-Should M28 use LLVM IR directly instead of inventing a custom HIR?
+1. **Operator specialization** — mostly done (`+ - * < <= > >= == !=`);
+   remaining `/ // % **` (M28-2gb).
+2. **Resolution** — layers 1-3 landed; widening (M28-6mf) is both the perf
+   rung and the architecture.
+3. **Value unboxing** — the path past CPython (vmspike unboxed rung: 94x).
+   Deliberately last: re-profile from the current ~3.7x baseline first;
+   GOGC=400 already captured much of the GC win, and unboxing is the biggest,
+   riskiest change.
 
-### The Answer: Custom HIR Now, LLVM Later
+Plus the one targeted wall: **native `re` fast path** (M28-dgh) — `import re`
+resolves to CPython's `re/__init__.py`, so every match pays ~2ms of
+interpreter overhead running the pure-Python wrapper; route it to
+`modules/c_sre.go`.
 
-**Reasons:**
-
-#### 1. LLVM IR is Too Low-Level
-
-**Example: Python `x = [1, 2, 3]` in LLVM:**
-```llvm
-; Allocate Python list object
-%list_ptr = call ptr @PyList_New(i64 3)
-
-; Create integer objects
-%int1 = call ptr @PyLong_FromLong(i64 1)
-%int2 = call ptr @PyLong_FromLong(i64 2)
-%int3 = call ptr @PyLong_FromLong(i64 3)
-
-; Add to list
-call void @PyList_SetItem(ptr %list_ptr, i64 0, ptr %int1)
-call void @PyList_SetItem(ptr %list_ptr, i64 1, ptr %int2)
-call void @PyList_SetItem(ptr %list_ptr, i64 2, ptr %int3)
-
-; Store in variable
-store ptr %list_ptr, ptr %x_slot
-```
-
-**Custom HIR:**
-```go
-&hir.StoreVar{
-    Name: "x",
-    Value: &hir.ListLit{
-        Elements: []Operation{
-            &hir.IntLit{Value: 1},
-            &hir.IntLit{Value: 2},
-            &hir.IntLit{Value: 3},
-        },
-    },
-}
-```
-
-Much simpler! HIR is at the right abstraction level.
-
-#### 2. LLVM Requires SSA Form
-
-**SSA (Static Single Assignment):** Every variable assigned exactly once.
-
-**Python code:**
-```python
-x = 1
-x = x + 1
-print(x)
-```
-
-**LLVM IR requires:**
-```llvm
-%x1 = add i64 0, 1
-%x2 = add i64 %x1, 1
-call void @print(i64 %x2)
-```
-
-This is painful for dynamic languages where variables change frequently!
-
-**Custom HIR:**
-```go
-&hir.StoreVar{Name: "x", Value: &hir.IntLit{Value: 1}}
-&hir.StoreVar{Name: "x", Value: &hir.Call{...}}  // x = x + 1
-&hir.Call{Function: "print", Args: []{&hir.LoadVar{Name: "x"}}}
-```
-
-Natural representation of mutable variables.
-
-#### 3. LLVM is Statically Typed
-
-LLVM requires you to specify types everywhere (`i64`, `i32`, `ptr`).
-
-M28 is dynamically typed. We'd need to:
-- Box everything in tagged unions
-- Build entire Python object model in LLVM
-- Implement GC in LLVM
-- Handle dynamic dispatch
-
-This is a **lot of work** and makes iteration slow.
-
-#### 4. Custom HIR Enables Rapid Iteration
-
-**Time to implement:**
-- Custom HIR: ~1 week (100-500 lines)
-- LLVM integration: ~3-6 months (5000+ lines)
-
-**Development cycle:**
-- Custom HIR: Change IR → test → iterate (minutes)
-- LLVM: Change lowering → recompile → debug LLVM crashes → iterate (hours)
-
-#### 5. Real-World Evidence
-
-Languages that started with custom IR:
-
-| Language | Initial IR | Later added LLVM? |
-|----------|-----------|------------------|
-| Python   | Bytecode  | ✅ (PyPy, Pyston) |
-| Ruby     | Bytecode  | ✅ (TruffleRuby) |
-| JavaScript | Bytecode | ✅ (WebKit) |
-| Julia    | LLVM directly | ⚠️ Took years, very complex |
-
-**Pattern:** Start simple (bytecode), add LLVM when needed for performance.
-
-### The Migration Path
-
-```
-Phase 1: Custom HIR + Interpreter (now)
-   - Fast iteration
-   - ~1000 lines of code
-   - Works for development
-
-Phase 2: Custom HIR + Bytecode VM (next)
-   - 3-10x faster
-   - ~3000 lines of code
-   - Production-ready
-
-Phase 3: Custom HIR → LLVM Backend (later)
-   - 50-100x faster for compute
-   - ~5000+ lines of code
-   - When you need peak performance
-```
-
-### HIR Designed for LLVM Lowering
-
-Even though we're not using LLVM now, HIR is designed to lower cleanly:
-
-```go
-// hir/operation.go - Structured for LLVM lowering
-
-type If struct {
-    Condition Operation
-    Then      Operation
-    Else      Operation
-}
-
-// Later: backend/llvm/codegen.go
-func (g *Generator) genIf(op *hir.If) llvm.Value {
-    // HIR's explicit structure maps cleanly to LLVM basic blocks
-    condBB := g.createBlock("cond")
-    thenBB := g.createBlock("then")
-    elseBB := g.createBlock("else")
-    mergeBB := g.createBlock("merge")
-
-    // Generate condition
-    cond := g.gen(op.Condition)
-    g.builder.CreateCondBr(cond, thenBB, elseBB)
-
-    // Generate branches...
-}
-```
-
-HIR's clean structure (expressions, explicit control flow) makes LLVM lowering straightforward when you're ready.
+Method (hard-won, encoded in LOOP.md): judge by M28 absolute ms, never the
+noisy CPython ratio; alloc-count without wall-clock is not a win; profile the
+whole program, not the case you expect; GC tuning before rewrites. Non-goals:
+JIT, competing with PyPy.
 
 ---
 
-## Migration Strategy
+## Compliance strategy
 
-### Current State (Nov 2024)
-
-```
-Parser → core.Value (acting as HIR) → Evaluator
-```
-
-**Problems:**
-- `core.Value` does double duty (runtime values + IR)
-- Can't optimize IR without affecting runtime
-- Hard to add backends
-
-### Phase 1: Formalize HIR (1-2 months)
-
-**Goal:** Split IR from runtime values
-
-**Tasks:**
-1. Create `hir/` package with operation types
-2. Create `hir.Op → core.Value` adapter (for compatibility)
-3. Update parser to emit HIR (instead of core.Value directly)
-4. Keep evaluator unchanged (use adapter)
-
-**Result:**
-```
-Parser → HIR → Adapter → core.Value → Evaluator
-```
-
-**Code:**
-```go
-// hir/operation.go
-type IntLit struct { Value int64 }
-func (i *IntLit) ToCoreValue() core.Value {
-    return core.NewNumber(float64(i.Value))
-}
-
-// Evaluator uses core.Value (unchanged)
-func Eval(v core.Value, ctx *Context) (core.Value, error) {
-    // Existing code works!
-}
-```
-
-**Deliverables:**
-- [ ] `hir/operation.go` - Core HIR types (~200 lines)
-- [ ] `hir/builder.go` - HIR construction helpers (~100 lines)
-- [ ] `hir/adapter.go` - HIR → core.Value conversion (~100 lines)
-- [ ] Update parser to emit HIR
-- [ ] All tests pass (behavior unchanged)
-
-### Phase 2: Optimize HIR (1 month)
-
-**Goal:** Add optimization passes on HIR
-
-**Tasks:**
-1. Implement constant folding pass
-2. Implement dead code elimination
-3. Implement inline simple functions
-4. Add optimization flags to CLI
-
-**Result:**
-```
-Parser → HIR → Optimize → Adapter → core.Value → Evaluator
-```
-
-**Code:**
-```go
-// hir/passes/constant_fold.go
-func ConstantFold(module *Module) {
-    // (+ 1 2) → 3
-}
-
-// hir/passes/inline.go
-func InlineSimpleFunctions(module *Module) {
-    // Replace small function calls with body
-}
-
-// main.go
-if *optimize {
-    module = passes.ConstantFold(module)
-    module = passes.Inline(module)
-}
-```
-
-**Deliverables:**
-- [ ] `hir/passes/constant_fold.go` (~100 lines)
-- [ ] `hir/passes/dead_code.go` (~100 lines)
-- [ ] `hir/passes/inline.go` (~200 lines)
-- [ ] Benchmarks showing optimization benefits
-
-### Phase 3: Separate Frontend (1-2 months)
-
-**Goal:** Clean frontend/backend separation
-
-**Tasks:**
-1. Move parser code to `frontend/m28/`
-2. Move Python parser to `frontend/python/`
-3. Add frontend abstraction
-4. File extension detection (.py vs .m28)
-
-**Result:**
-```
-frontend/python/ → HIR → Optimize → Backend
-frontend/m28/    ↗
-```
-
-**Directory structure:**
-```
-frontend/
-├── common/
-│   └── interface.go     # Frontend interface
-├── m28/
-│   ├── parser.go
-│   ├── ast.go
-│   └── lower.go
-└── python/
-    ├── parser.go
-    ├── ast.go
-    └── lower.go
-
-hir/
-├── operation.go         # HIR types
-├── builder.go           # Construction helpers
-└── passes/              # Optimization passes
-
-backend/
-├── common/
-│   └── interface.go     # Backend interface
-└── interpreter/
-    ├── eval.go
-    └── runtime.go
-```
-
-**Deliverables:**
-- [ ] Clean frontend/HIR/backend separation
-- [ ] Both Python and M28 frontends working
-- [ ] File extension detection
-- [ ] All tests passing
-
-### Phase 4: Bytecode Backend (2-3 months)
-
-**Goal:** Add bytecode VM for performance
-
-**Tasks:**
-1. Design instruction set
-2. Implement HIR → Bytecode compiler
-3. Implement bytecode VM
-4. Add optimization (type specialization)
-5. Add .m28c serialization
-
-**Result:**
-```
-Frontend → HIR → Optimize → Bytecode Compiler → VM
-                         ↘ Interpreter (fallback)
-```
-
-**Deliverables:**
-- [ ] `backend/bytecode/compiler.go`
-- [ ] `backend/bytecode/vm.go`
-- [ ] 3-10x speedup on benchmarks
-- [ ] .m28c file format
-- [ ] CLI commands (compile, disassemble)
-
-### Phase 5: LLVM Backend (Future, 6+ months)
-
-**Goal:** Native code compilation
-
-**Tasks:**
-1. Implement HIR → LLVM IR lowering
-2. Build runtime support (GC, objects)
-3. Integrate LLVM optimization passes
-4. Support ahead-of-time compilation
-
-**Result:**
-```
-Frontend → HIR → Optimize → LLVM Codegen → LLVM → Native code
-                         ↘ Bytecode VM
-                         ↘ Interpreter
-```
-
-**Deliverables:**
-- [ ] `backend/llvm/codegen.go`
-- [ ] `backend/llvm/runtime.go`
-- [ ] 50-100x speedup for numerical code
-- [ ] Standalone executables
-
-### Phase 6: WASM Backend (Future, 3-6 months)
-
-**Goal:** Web and portable deployment
-
-**Tasks:**
-1. Implement HIR → WASM lowering
-2. Build WASM runtime bindings
-3. Browser deployment
-4. WASI support
-
-**Result:**
-```
-Frontend → HIR → WASM Codegen → WASM module → Browser/WASI
-```
-
-**Deliverables:**
-- [ ] `backend/wasm/codegen.go`
-- [ ] Browser demo
-- [ ] WASI support for server deployment
+- **The conformance ratchet** (M28-a6b8): CPython-derived unit tests scored in
+  `conformance.json` (526/943). Every semantic change is gated on it; the
+  number only goes up.
+- **CPython stdlib policy** (CLAUDE.md): pure-Python stdlib runs directly;
+  only C extensions get Go implementations under `modules/`; stubbing a
+  pure-Python module requires a documented language-feature reason.
+- **One implementation per semantic** (M28-j9o): most conformance failures are
+  object-model gaps, and duplicated semantics are how divergence sneaks back.
+- **Tracebacks are part of the contract**: the IR path preserves
+  LocatedValue handling so tracebacks stay byte-identical to the tree-walk.
 
 ---
 
-## Implementation Guide
+## What we are explicitly NOT doing
 
-### How to Add a Frontend
-
-**Example: Adding a Ruby frontend**
-
-1. **Create directory structure:**
-```bash
-mkdir -p frontend/ruby
-cd frontend/ruby
-```
-
-2. **Create Ruby AST types:**
-```go
-// frontend/ruby/ast.go
-package ruby
-
-type RubyAST struct {
-    Statements []Statement
-}
-
-type DefStatement struct {
-    Name   string
-    Params []string
-    Body   []Statement
-}
-
-// etc...
-```
-
-3. **Implement parser:**
-```go
-// frontend/ruby/parser.go
-package ruby
-
-func Parse(source string) (*RubyAST, error) {
-    // Tokenize Ruby code
-    // Parse into Ruby AST
-    return ast, nil
-}
-```
-
-4. **Implement HIR lowering:**
-```go
-// frontend/ruby/lower.go
-package ruby
-
-func (ast *RubyAST) Lower() (*hir.Module, error) {
-    module := &hir.Module{Name: "main"}
-
-    for _, stmt := range ast.Statements {
-        op := lowerStatement(stmt)
-        module.AddOperation(op)
-    }
-
-    return module, nil
-}
-
-func lowerStatement(stmt Statement) hir.Operation {
-    switch s := stmt.(type) {
-    case *DefStatement:
-        return &hir.Function{
-            Name: s.Name,
-            Params: lowerParams(s.Params),
-            Body: lowerBody(s.Body),
-        }
-    // etc...
-    }
-}
-```
-
-5. **Register frontend:**
-```go
-// main.go
-
-func selectFrontend(filename string) frontend.Frontend {
-    switch filepath.Ext(filename) {
-    case ".py":
-        return frontend.NewPythonFrontend()
-    case ".m28":
-        return frontend.NewM28Frontend()
-    case ".rb":
-        return frontend.NewRubyFrontend()  // <-- Add this
-    default:
-        return frontend.NewM28Frontend()
-    }
-}
-```
-
-6. **Done!** Ruby code now works with all backends (interpreter, bytecode, LLVM, etc.)
-
-### How to Add a Backend
-
-**Example: Adding a JavaScript backend**
-
-1. **Create directory structure:**
-```bash
-mkdir -p backend/javascript
-cd backend/javascript
-```
-
-2. **Implement HIR → JS lowering:**
-```go
-// backend/javascript/codegen.go
-package javascript
-
-import "github.com/mmichie/m28/hir"
-
-type Generator struct {
-    output strings.Builder
-}
-
-func (g *Generator) Generate(module *hir.Module) (string, error) {
-    for _, fn := range module.Functions {
-        g.genFunction(fn)
-    }
-    return g.output.String(), nil
-}
-
-func (g *Generator) genFunction(fn *hir.Function) {
-    g.output.WriteString(fmt.Sprintf("function %s(", fn.Name))
-
-    // Parameters
-    for i, param := range fn.Params {
-        if i > 0 {
-            g.output.WriteString(", ")
-        }
-        g.output.WriteString(param.Name)
-    }
-
-    g.output.WriteString(") {\n")
-    g.genOperation(fn.Body)
-    g.output.WriteString("}\n")
-}
-
-func (g *Generator) genOperation(op hir.Operation) {
-    switch op := op.(type) {
-    case *hir.IntLit:
-        g.output.WriteString(fmt.Sprintf("%d", op.Value))
-
-    case *hir.Call:
-        g.genOperation(op.Function)
-        g.output.WriteString("(")
-        for i, arg := range op.Args {
-            if i > 0 {
-                g.output.WriteString(", ")
-            }
-            g.genOperation(arg)
-        }
-        g.output.WriteString(")")
-
-    case *hir.Return:
-        g.output.WriteString("return ")
-        g.genOperation(op.Value)
-        g.output.WriteString(";\n")
-
-    // etc...
-    }
-}
-```
-
-3. **Implement backend interface:**
-```go
-// backend/javascript/backend.go
-
-type JSBackend struct{}
-
-func (b *JSBackend) Name() string {
-    return "javascript"
-}
-
-func (b *JSBackend) Execute(module *hir.Module) (common.Result, error) {
-    gen := &Generator{}
-    jsCode, err := gen.Generate(module)
-    if err != nil {
-        return common.Result{}, err
-    }
-
-    // Could execute with Node.js or just return code
-    return common.Result{
-        Output: jsCode,
-    }, nil
-}
-```
-
-4. **Register backend:**
-```go
-// main.go
-
-func selectBackend(name string) backend.Backend {
-    switch name {
-    case "interpreter":
-        return backend.NewInterpreter()
-    case "bytecode":
-        return backend.NewBytecodeVM()
-    case "javascript":
-        return backend.NewJSBackend()  // <-- Add this
-    default:
-        return backend.NewInterpreter()
-    }
-}
-```
-
-5. **Use it:**
-```bash
-# Compile M28 to JavaScript
-m28 --backend=javascript factorial.m28 > factorial.js
-
-# Run with Node.js
-node factorial.js
-```
-
-### How to Add an Optimization Pass
-
-**Example: Adding loop unrolling**
-
-```go
-// hir/passes/unroll.go
-package passes
-
-func UnrollLoops(module *Module) {
-    for _, fn := range module.Functions {
-        fn.Body = unrollOperation(fn.Body)
-    }
-}
-
-func unrollOperation(op Operation) Operation {
-    switch op := op.(type) {
-    case *Loop:
-        // If loop count is small constant, unroll
-        if count := getConstantIterCount(op); count > 0 && count < 4 {
-            return unrollLoop(op, count)
-        }
-        return op
-
-    case *Block:
-        for i, child := range op.Ops {
-            op.Ops[i] = unrollOperation(child)
-        }
-        return op
-
-    default:
-        return op
-    }
-}
-
-func unrollLoop(loop *Loop, count int) Operation {
-    // Replace loop with repeated body
-    ops := make([]Operation, count)
-    for i := 0; i < count; i++ {
-        ops[i] = cloneAndSubstitute(loop.Body, loop.LoopVar, IntLit{Value: int64(i)})
-    }
-    return &Block{Ops: ops}
-}
-```
-
-**Use it:**
-```go
-// main.go
-
-if *optimize {
-    module = passes.ConstantFold(module)
-    module = passes.UnrollLoops(module)      // <-- Add this
-    module = passes.DeadCodeElimination(module)
-}
-```
+- **Bytecode VM for speed** — falsified by vmspike (b276449).
+- **LLVM backend / JIT** — wrong effort-to-win ratio for untyped Python
+  semantics; typed-subset AOT only, gated on M28-b20f, only with real demand.
+- **WASM codegen backend** — Go's wasm/wasip1 build target ships the whole
+  interpreter instead (M28-5uc).
+- **Shared-heap free threading** — isolates + channels instead (M28-b9y).
+- **CPython C-API compatibility** — that moat belongs to CPython; M28's
+  extension story is Go-native modules.
+- **Package reshuffle before consolidation** — `frontend/`/`backend/`
+  directory moves wait until M28-j9o lands.
+- **Speculative IR optimization passes** — folding/DCE/inlining land only if
+  a profile demands them (that closed M28-160a).
+- **Stubbing pure-Python stdlib** — fix the language feature instead.
 
 ---
 
-## Performance Evolution
+## Sequencing
 
-### Expected Performance at Each Stage
+1. **Docs + tracker aligned to evidence** — this document; beads epics
+   reorganized (done 2026-07-01).
+2. **Runtime consolidation** (M28-j9o) — ratchet by ratchet, conformance-gated,
+   alongside the ongoing conformance campaign (M28-a6b8).
+3. **Resolver work** (M28-b5c6): arbiter (M28-ehi) -> cells (M28-osj) ->
+   widen (M28-6mf), with the IR spec (M28-a88f) written as the coverage grows.
+4. **Perf ladder** (M28-e42e) continues measurement-first; unboxing decided
+   after a fresh profile.
+5. **Product track** (M28-9t2) in parallel — embed API and stdlib bundling
+   touch different code.
 
-| Stage | Backend | Speedup | When | Use Case |
-|-------|---------|---------|------|----------|
-| 1 | Interpreter | 1x | Now | Development, REPL |
-| 2 | Bytecode VM | 3-10x | Next 3-6 mo | Production, general use |
-| 3 | LLVM AOT | 50-100x | Future | Numerical, games, servers |
-| 4 | LLVM JIT | 100-200x | Future | Long-running processes |
+---
 
-### Benchmark Example: Fibonacci(35)
+## How to add a frontend (current reality)
 
-```python
-def fibonacci(n):
-    if n <= 1:
-        return n
-    return fibonacci(n-1) + fibonacci(n-2)
-```
-
-**Projected performance:**
-- Interpreter: 5000ms (baseline)
-- Bytecode VM: 500-1000ms (5-10x)
-- Bytecode VM + type guards: 200-400ms (12-25x)
-- LLVM: 50-100ms (50-100x)
-- C (reference): 40ms
-
-### When to Use Each Backend
-
-**Interpreter:**
-- REPL sessions
-- Debugging
-- Quick scripts
-- Development
-
-**Bytecode VM:**
-- Production web services
-- CLI tools
-- General applications
-- Default for most code
-
-**LLVM:**
-- Numerical computation
-- Game engines
-- High-performance servers
-- Batch processing
-
-**WASM:**
-- Web applications
-- Sandboxed execution
-- Portable deployment
-- Cross-platform tools
+1. Write a tokenizer/parser that produces either `core/ast` nodes with
+   `ToIR()` (what Python does) or surface forms directly (what M28 does).
+   Preserve source locations (`LocatedValue`).
+2. Lower your language's constructs to Python-semantics surface forms —
+   your language inherits M28's object model, numbers, and exceptions.
+3. Register dialect selection (extension/pragma) — see M28-a472 for the
+   interface this is converging on.
+4. Do not touch L3-L5. If your language needs a semantic the runtime lacks,
+   that is a runtime feature first, a frontend feature second.
 
 ---
 
 ## References
 
-### Related M28 Docs
+**Internal**
+- `vmspike/` and commit b276449 — the experiment that set the execution
+  strategy.
+- `benchmarks/LOOP.md` — performance loop runbook.
+- `eval/resolve.go`, `eval/resolve_ir.go` — the live resolution layer.
+- [MIR Bytecode VM](./mir-bytecode-vm.md) — superseded speed-tier design;
+  retained constraints for the future frame tier (M28-8jo).
+- [Python frontend docs](./python-frontend-design.md) — historical design
+  records of the shipped frontend.
 
-- [AST and IR Design](./ast-ir-multiple-frontends.md) - AST layer (being superseded by this doc)
-- [MIR Bytecode VM](./mir-bytecode-vm.md) - Bytecode backend design
-- [Python Frontend](./python-frontend-design.md) - Python frontend specifics
-
-### External Resources
-
-**Compiler Architecture:**
-- [LLVM Architecture](https://llvm.org/docs/LangRef.html)
-- [GCC Internals](https://gcc.gnu.org/onlinedocs/gccint/)
-- [Crafting Interpreters](https://craftinginterpreters.com/) - Excellent book on bytecode VMs
-
-**Multi-Frontend Examples:**
-- [GraalVM Truffle](https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/) - Framework for multiple languages
-- [LLVM](https://llvm.org/) - C, C++, Rust, Swift all use LLVM IR
-- [JVM](https://en.wikipedia.org/wiki/Java_virtual_machine) - Java, Kotlin, Scala, Clojure share JVM
-
-**Language-Specific:**
-- [Python AST](https://docs.python.org/3/library/ast.html)
-- [Python Bytecode](https://docs.python.org/3/library/dis.html)
-- [PyPy Architecture](https://doc.pypy.org/en/latest/architecture.html) - Python on LLVM
-
-**IR Design:**
-- [Sea of Nodes](https://darksi.de/d.sea-of-nodes/) - Modern IR design
-- [SSA Form](https://en.wikipedia.org/wiki/Static_single-assignment_form)
-- [CPS](https://en.wikipedia.org/wiki/Continuation-passing_style) - Alternative IR style
-
----
-
-## Appendices
-
-### Appendix A: HIR Complete Reference
-
-See `hir/operation.go` for complete HIR node definitions.
-
-### Appendix B: Bytecode Instruction Set
-
-See [MIR Bytecode VM Design](./mir-bytecode-vm.md) for complete instruction set.
-
-### Appendix C: Migration Checklist
-
-**Phase 1: Formalize HIR**
-- [ ] Create `hir/` package
-- [ ] Define operation types
-- [ ] Implement HIR → core.Value adapter
-- [ ] Update parser to emit HIR
-- [ ] All tests pass
-
-**Phase 2: Optimize HIR**
-- [ ] Constant folding pass
-- [ ] Dead code elimination
-- [ ] Simple inlining
-- [ ] Benchmark improvements
-
-**Phase 3: Separate Frontend**
-- [ ] Move to `frontend/` structure
-- [ ] Clean interfaces
-- [ ] File extension detection
-- [ ] Multiple frontends working
-
-**Phase 4: Bytecode Backend**
-- [ ] Instruction set design
-- [ ] HIR → Bytecode compiler
-- [ ] VM implementation
-- [ ] .m28c serialization
-- [ ] 3-10x speedup achieved
-
-**Phase 5: LLVM Backend (Future)**
-- [ ] HIR → LLVM IR lowering
-- [ ] Runtime support
-- [ ] Integration tests
-- [ ] 50-100x speedup for numerical code
-
----
-
-**Document Version:** 1.0
-**Last Updated:** November 2024
-**Status:** Living document - will be updated as architecture evolves
+**External**
+- Crafting Interpreters (Nystrom) — tree-walk and bytecode trade-offs.
+- The Implementation of Lua 5.0; V8 Ignition design notes.
+- GraalVM Truffle — the multi-frontend/one-runtime deal.
+- PyPy architecture — why AOT/JIT for Python is a research program.

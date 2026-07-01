@@ -1,5 +1,9 @@
 # Phase B: Python AST Nodes - Design Document
 
+> **Status (2026-07): Implemented.** Historical design record; see
+> [compiler-architecture.md](./compiler-architecture.md) for the current
+> architecture.
+
 ## Overview
 
 Phase B adds Python-specific AST node types to represent constructs that don't exist in the base Lisp syntax.

@@ -1,6 +1,11 @@
 # Python Frontend Implementation Progress
 
-## Status: Phase A Complete - Tokenizer Implemented ✅
+## Status: Implemented (historical record)
+
+All phases are complete and the Python frontend is live; `.py` files and the
+CPython stdlib execute directly. The snapshot below is from the Phase A era
+and is retained as a design record. Current architecture:
+[compiler-architecture.md](./compiler-architecture.md).
 
 ### Completed Work
 

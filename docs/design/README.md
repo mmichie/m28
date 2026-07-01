@@ -1,76 +1,46 @@
 # M28 Design Documents
 
-This directory contains design documents for M28's architecture and features.
+Design documents for M28's architecture and features. Work items referenced
+in these docs live in the beads tracker (`bd show <id>`, `bd ready`).
 
-## Primary Architecture Document
+## Primary architecture document
 
-📘 **[Compiler Architecture](./compiler-architecture.md)** - **START HERE**
+**[Compiler Architecture](./compiler-architecture.md)** — START HERE. v2
+(2026-07): multi-frontend, single-runtime platform; resolver + typed IR as the
+compiler; resolved tree-walk execution; consolidation debt register;
+performance and compliance strategy; what we are explicitly not building.
 
-The comprehensive architecture guide covering:
-- Multi-frontend, multi-backend design
-- HIR (High-Level IR) as pivot point
-- How to add frontends and backends
-- Static vs dynamic language support
-- Migration strategy from current state to full architecture
+## Execution designs
 
-## Backend Designs
+- **[Bytecode VM](./mir-bytecode-vm.md)** — SUPERSEDED as a speed tier
+  (vmspike, commit b276449). Retained as design constraints for a future
+  frame-based tier for resumable semantics (M28-8jo, deferred).
 
-- **[MIR Bytecode VM](./mir-bytecode-vm.md)** - Detailed bytecode VM design (register-based, 3-10x speedup)
+## Frontend designs (historical — the Python frontend shipped)
 
-## Frontend Designs
+These are retained as design records; the implementation is live
+(`parser/python_tokenizer.go`, `parser/python_parser*.go`, `core/ast`).
 
-**Python Frontend:**
-- **[Python Frontend Design](./python-frontend-design.md)** - Overview of Python syntax support
-- **[Python Frontend Progress](./python-frontend-progress.md)** - Implementation status tracker
-- **[Phase B: Python Nodes](./phase-b-python-nodes-design.md)** - Python-specific AST node design
-- **[Phase C: Python Parser](./phase-c-python-parser-design.md)** - Python parser implementation
+- **[Python Frontend Design](./python-frontend-design.md)**
+- **[Python Frontend Progress](./python-frontend-progress.md)**
+- **[Phase B: Python Nodes](./phase-b-python-nodes-design.md)**
+- **[Phase C: Python Parser](./phase-c-python-parser-design.md)**
 
-## Feature Designs
+## Feature designs
 
-- **[Type Enhancement Plan](./type-enhancement-plan.md)** - Type system improvements
-- **[S-Strings](./s-strings.md)** - Metaprogramming with syntax strings
-- **[Tuples and Functional Lists](./tuple-and-functional-lists.md)** - Tuple/list design decisions
-
-## Document Organization
-
-```
-compiler-architecture.md    ← Main architecture (read this first!)
-│
-├── Backend designs
-│   └── mir-bytecode-vm.md
-│
-├── Frontend designs
-│   ├── python-frontend-design.md
-│   ├── python-frontend-progress.md
-│   ├── phase-b-python-nodes-design.md
-│   └── phase-c-python-parser-design.md
-│
-└── Feature designs
-    ├── type-enhancement-plan.md
-    ├── s-strings.md
-    └── tuple-and-functional-lists.md
-```
-
-## Quick Links
-
-**Want to understand M28's architecture?** → Start with [Compiler Architecture](./compiler-architecture.md)
-
-**Want to add a new language frontend?** → See "How to Add a Frontend" in [Compiler Architecture](./compiler-architecture.md#how-to-add-a-frontend)
-
-**Want to add a new backend?** → See "How to Add a Backend" in [Compiler Architecture](./compiler-architecture.md#how-to-add-a-backend)
-
-**Want to implement Python support?** → See [Python Frontend Design](./python-frontend-design.md)
-
-**Want to build the bytecode VM?** → See [MIR Bytecode VM](./mir-bytecode-vm.md)
-
-**Working on type system?** → See [Type Enhancement Plan](./type-enhancement-plan.md)
+- **[S-Strings](./s-strings.md)** — metaprogramming with syntax strings.
+  Status: proposed, not implemented.
+- **[Type Enhancement Plan](./type-enhancement-plan.md)** — tuple/list work
+  shipped; remaining type-system direction is tracked under epic M28-b20f.
+- **[Tuples and Functional Lists](./tuple-and-functional-lists.md)** —
+  historical; implemented.
 
 ## Contributing
 
-When adding a new design document:
+When adding a design document:
 
-1. Add it to this README in the appropriate section
-2. Link to it from the main architecture doc if relevant
-3. Keep docs focused - split large topics into multiple docs
-4. Include examples and code snippets
-5. Mark status (Design, In Progress, Implemented)
+1. Add it to this README in the appropriate section.
+2. Put a status line at the top (Proposed / In progress / Implemented /
+   Superseded) and keep it current — stale "north star" docs actively mislead.
+3. Reference beads issue IDs for the work items the doc creates.
+4. No emojis in docs.

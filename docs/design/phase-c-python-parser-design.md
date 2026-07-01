@@ -1,5 +1,9 @@
 # Phase C: Python Parser - Design Document
 
+> **Status (2026-07): Implemented.** Historical design record; see
+> [compiler-architecture.md](./compiler-architecture.md) for the current
+> architecture.
+
 ## Overview
 
 Phase C implements a recursive descent parser that converts Python tokens (from Phase A) into Python AST nodes (from Phase B), which then desugar to S-expression IR via ToIR().

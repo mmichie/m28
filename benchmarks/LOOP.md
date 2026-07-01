@@ -13,10 +13,10 @@ instead of a pass count, and the profiler tells you what to fix.
   `./bin/m28` and `python3`, best-of-N. Writes `benchmarks/bench.json` and diffs
   `benchmarks/baseline.json`. **This picks the target.**
   - The `ratio`/`adj` columns ("how many x slower than CPython") are *context*.
-    Because M28 is 50–1000x slower, each case's CPython time is near its own
-    startup/noise floor, so the ratio carries CPython-side noise and `adj`
-    (startup-subtracted) is noisier still — use them to rank subsystems, not to
-    judge a change.
+    Each case's CPython time is near its own startup/noise floor (CPython
+    finishes in milliseconds; M28's geomean is ~3.7x CPython as of 2026-07),
+    so the ratio carries CPython-side noise and `adj` (startup-subtracted) is
+    noisier still — use them to rank subsystems, not to judge a change.
   - The `vs base` column compares **M28's absolute time** to the baseline. That
     is the stable signal (M28 time is dominated by steady-state work) and is
     what tells you whether a change actually helped or regressed a case.
@@ -90,13 +90,18 @@ instead of a pass count, and the profiler tells you what to fix.
   startup (builtin registration, builtins preload). If its ratio is high, that
   is its own optimization.
 
-## Known first targets (from prior investigation)
+## Current targets (2026-07, epic M28-e42e)
 
-- `regex_match` — M28 runs CPython's `re.py` per call (~1000x). Biggest single
-  ratio; needs a native fast path, not a micro-tweak.
-- `arith_*` — numeric dispatch layering.
-- `scope_lookup` — `lookupWithDepth` runs on every name reference.
-- `attr_method` — `GetAttrWithRegistry` on every method call.
+Campaign state: geomean ~3.7x CPython (from ~126x at campaign start). The
+original first targets are largely done: scope_lookup is near CPython parity
+(resolution layers 1-3), and the arith/attr/dict cases dropped 14-41x via the
+ValueToKey/getGoroutineID fix and the GOGC=400 default. Remaining, in order:
+
+- `regex_match` — M28 interprets CPython's `re.py` wrapper per call; needs the
+  native c_sre fast path (M28-dgh), not micro-tweaks. Biggest remaining ratio.
+- `/`, `//`, `%`, `**` still lack native numeric fast paths (M28-2gb).
+- Value unboxing (the path past CPython; vmspike unboxed rung: 94x) is
+  deliberately last — re-profile from the current baseline before committing.
 
 ## Adding a case
 
