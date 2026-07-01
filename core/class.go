@@ -1630,23 +1630,50 @@ func (i *Instance) Type() Type {
 	return Type(i.Class.Name)
 }
 
-// String returns the string representation of the instance
+// String returns the string representation of the instance, following CPython's
+// str() resolution: a user-defined __str__ wins, else it falls back to a
+// user-defined __repr__, else the default "<Name instance at addr>". The
+// object-base defaults are skipped (object.__str__ just re-enters here, and its
+// __repr__ is the same default format), so we check the defining class.
 func (i *Instance) String() string {
-	// Check for __str__ method
-	if strMethod, ok := i.GetAttr("__str__"); ok {
-		if callable, ok := strMethod.(interface {
-			Call([]Value, *Context) (Value, error)
-		}); ok {
-			result, err := callable.Call([]Value{}, nil)
-			if err == nil {
-				if str, ok := result.(StringValue); ok {
-					return string(str)
-				}
-			}
-		}
+	if s, ok := i.callNoArgDunderStr("__str__"); ok {
+		return s
 	}
-
+	if s, ok := i.callNoArgDunderStr("__repr__"); ok {
+		return s
+	}
 	return fmt.Sprintf("<%s instance at %p>", i.Class.Name, i)
+}
+
+// callNoArgDunderStr calls a user-defined (non-object-base) __str__/__repr__ and
+// returns its string result. ok is false when the method is undefined, inherited
+// only from object, errored, or didn't return a string.
+func (i *Instance) callNoArgDunderStr(name string) (string, bool) {
+	if i.Class == nil {
+		return "", false
+	}
+	_, defClass, ok := i.Class.GetMethodWithClass(name)
+	if !ok || defClass == nil || defClass.Name == "object" {
+		return "", false
+	}
+	method, ok := i.GetAttr(name)
+	if !ok {
+		return "", false
+	}
+	callable, ok := method.(interface {
+		Call([]Value, *Context) (Value, error)
+	})
+	if !ok {
+		return "", false
+	}
+	result, err := callable.Call([]Value{}, nil)
+	if err != nil {
+		return "", false
+	}
+	if str, ok := result.(StringValue); ok {
+		return string(str), true
+	}
+	return "", false
 }
 
 // GetAttr implements Object interface for instances

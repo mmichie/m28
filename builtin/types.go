@@ -390,12 +390,9 @@ func RegisterTypes(ctx *core.Context) {
 		if len(args) < 1 {
 			return nil, &core.TypeError{Message: "__str__() missing 1 required positional argument: 'self'"}
 		}
-		// Return a simple string representation
-		// For instances, format directly without calling String() to avoid recursion
-		if inst, ok := args[0].(*core.Instance); ok {
-			return core.StringValue(fmt.Sprintf("<%s instance at %p>", inst.Class.Name, inst)), nil
-		}
-		// For other types, use String() method
+		// Delegate to the value's String(). For instances this follows CPython's
+		// str()->__repr__ fallback: Instance.String() skips the object-base
+		// __str__ (this method) via the defining class, so there is no recursion.
 		return core.StringValue(args[0].String()), nil
 	}))
 
