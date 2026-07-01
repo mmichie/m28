@@ -4,10 +4,13 @@ import "github.com/mmichie/m28/core"
 
 // Type checking predicates - return bool for easy conditional logic
 
-// IsNumber checks if value is a NumberValue
+// IsNumber checks if value is a real fixed-size number (int or float).
 func IsNumber(v core.Value) bool {
-	_, ok := v.(core.NumberValue)
-	return ok
+	switch v.(type) {
+	case core.NumberValue, core.FloatValue:
+		return true
+	}
+	return false
 }
 
 // IsString checks if value is a StringValue

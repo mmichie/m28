@@ -12,11 +12,17 @@ func AsNumber(v core.Value) (float64, bool) {
 	if num, ok := v.(core.NumberValue); ok {
 		return float64(num), true
 	}
-	// Check for int subclass instances (like _NamedIntConstant)
+	if f, ok := v.(core.FloatValue); ok {
+		return float64(f), true
+	}
+	// Check for int/float subclass instances (like _NamedIntConstant)
 	// These are Instance objects with __value__ attribute
 	if inst, ok := v.(*core.Instance); ok {
 		if valueAttr, exists := inst.Attributes["__value__"]; exists {
-			if num, ok := valueAttr.(core.NumberValue); ok {
+			switch num := valueAttr.(type) {
+			case core.NumberValue:
+				return float64(num), true
+			case core.FloatValue:
 				return float64(num), true
 			}
 		}

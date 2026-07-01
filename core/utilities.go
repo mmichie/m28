@@ -492,6 +492,10 @@ func EqualValues(a, b Value) bool {
 		if bVal, ok := b.(NumberValue); ok {
 			return float64(aVal) == float64(bVal)
 		}
+		// int == float compares by numeric value (1 == 1.0)
+		if bVal, ok := b.(FloatValue); ok {
+			return float64(aVal) == float64(bVal)
+		}
 		// Allow comparison with BigInt
 		if bVal, ok := b.(BigIntValue); ok {
 			// Convert NumberValue to BigInt and compare
@@ -509,6 +513,18 @@ func EqualValues(a, b Value) bool {
 		if bVal, ok := b.(ComplexValue); ok {
 			return complex(float64(aVal), 0) == complex128(bVal)
 		}
+	case FloatValue:
+		// float compares by numeric value against any real number.
+		if bf, ok := AsFloat(b); ok {
+			// BigInt may exceed float64's exact range; compare precisely.
+			if bBig, ok := b.(BigIntValue); ok {
+				return floatEqualsBigInt(float64(aVal), bBig)
+			}
+			return float64(aVal) == bf
+		}
+		if bVal, ok := b.(ComplexValue); ok {
+			return complex(float64(aVal), 0) == complex128(bVal)
+		}
 	case BigIntValue:
 		if bVal, ok := b.(BigIntValue); ok {
 			return aVal.GetBigInt().Cmp(bVal.GetBigInt()) == 0
@@ -517,6 +533,10 @@ func EqualValues(a, b Value) bool {
 		if bVal, ok := b.(NumberValue); ok {
 			bBig := PromoteToBigInt(bVal)
 			return aVal.GetBigInt().Cmp(bBig.GetBigInt()) == 0
+		}
+		// int(big) == float compares by numeric value.
+		if bVal, ok := b.(FloatValue); ok {
+			return floatEqualsBigInt(float64(bVal), aVal)
 		}
 	case StringValue:
 		if bVal, ok := b.(StringValue); ok {
@@ -810,6 +830,10 @@ func ValueToKey(v Value) string {
 	}
 	switch val := v.(type) {
 	case NumberValue:
+		return fmt.Sprintf("n:%g", float64(val))
+	case FloatValue:
+		// Same key space as NumberValue so an int and an equal float map to one
+		// dict/set slot (1 and 1.0 are the same key, matching CPython).
 		return fmt.Sprintf("n:%g", float64(val))
 	case StringValue:
 		return "s:" + string(val)

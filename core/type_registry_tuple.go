@@ -365,6 +365,14 @@ func hashValue(v Value) int64 {
 		}
 		// For floats, use bit representation
 		return int64(n * 1000000)
+	case FloatValue:
+		// Must match NumberValue's hash so an int and an equal float collide
+		// (hash(1) == hash(1.0)), which dict/set membership relies on.
+		n := float64(val)
+		if n == float64(int64(n)) {
+			return int64(n)
+		}
+		return int64(n * 1000000)
 	case StringValue:
 		// Simple hash for strings
 		hash := int64(5381)

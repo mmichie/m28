@@ -11,29 +11,30 @@ type Type string
 
 // Predefined type constants
 const (
-	NumberType    Type = "number"
-	BigIntType    Type = "int" // Arbitrary precision integer (Python: int)
-	StringType    Type = "string"
-	BoolType      Type = "bool"
-	NilType       Type = "nil"
-	SymbolType    Type = "symbol"
-	ListType      Type = "list"
-	DictType      Type = "dict"
-	TupleType     Type = "tuple"
-	SetType       Type = "set"
-	FrozenSetType Type = "frozenset"
+	NumberType          Type = "number"
+	FloatType           Type = "float" // IEEE 754 double (Python: float)
+	BigIntType          Type = "int"   // Arbitrary precision integer (Python: int)
+	StringType          Type = "string"
+	BoolType            Type = "bool"
+	NilType             Type = "nil"
+	SymbolType          Type = "symbol"
+	ListType            Type = "list"
+	DictType            Type = "dict"
+	TupleType           Type = "tuple"
+	SetType             Type = "set"
+	FrozenSetType       Type = "frozenset"
 	FunctionType        Type = "function"
 	BuiltinFunctionType Type = "builtin_function_or_method"
 	MethodType          Type = "method"
-	ModuleType    Type = "module"
-	ClassType     Type = "class"
-	ExceptionType Type = "exception"
-	SliceType     Type = "slice"
-	RangeType     Type = "range"
-	BytesType     Type = "bytes"
-	ByteArrayType Type = "bytearray"
-	DecimalType   Type = "decimal"
-	ComplexType   Type = "complex"
+	ModuleType          Type = "module"
+	ClassType           Type = "class"
+	ExceptionType       Type = "exception"
+	SliceType           Type = "slice"
+	RangeType           Type = "range"
+	BytesType           Type = "bytes"
+	ByteArrayType       Type = "bytearray"
+	DecimalType         Type = "decimal"
+	ComplexType         Type = "complex"
 )
 
 // Value is the base interface for all values in the language
@@ -190,6 +191,8 @@ func GetPythonTypeName(val Value) string {
 		return "NoneType"
 	case NumberValue:
 		return "int"
+	case FloatValue:
+		return "float"
 	case BigIntValue:
 		return "int"
 	case StringValue:

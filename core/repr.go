@@ -72,6 +72,8 @@ func reprBuiltinType(val Value) string {
 		return reprString(v)
 	case NumberValue:
 		return reprNumber(v)
+	case FloatValue:
+		return PyFloatRepr(float64(v))
 	case BoolValue:
 		return reprBool(v)
 	case NilValue:
