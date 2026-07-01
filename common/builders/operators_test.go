@@ -259,9 +259,9 @@ func TestOperatorMultiply(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 			// Multiplying a sequence by a non-int: matches CPython's wording
-			// ("can't multiply sequence by non-int ...") rather than the generic
-			// "unsupported operand type(s)" used for unsupported scalar types.
-			errMsg: "can't multiply sequence by non-int",
+			// ("can't multiply sequence by non-int of type 'X'") rather than the
+			// generic "unsupported operand type(s)" used for scalar types.
+			errMsg: "can't multiply sequence by non-int of type 'str'",
 		},
 		{
 			name:    "list * number",

@@ -108,9 +108,7 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					return core.ComplexValue(complex(leftNum, 0) + rightComplex), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("+",
-						"unsupported operand type(s)",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewBinaryOpError("+", left, right)
 				}).
 				Execute()
 		}).
@@ -125,9 +123,7 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					return core.ComplexValue(leftComplex + rightComplex), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("+",
-						"unsupported operand type(s)",
-						"'complex' and '"+string(r.Type())+"'")
+					return nil, core.NewBinaryOpError("+", left, right)
 				}).
 				Execute()
 		}).
@@ -137,8 +133,7 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					return core.StringValue(leftStr + rightStr), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("+",
-						"can only concatenate str (not \""+string(r.Type())+"\") to str", "")
+					return nil, core.NewConcatError("str", r)
 				}).
 				Execute()
 		}).
@@ -151,8 +146,7 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					return core.NewList(result...), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("+",
-						"can only concatenate list (not \""+string(r.Type())+"\") to list", "")
+					return nil, core.NewConcatError("list", r)
 				}).
 				Execute()
 		}).
@@ -168,8 +162,7 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					return core.BytesValue(result), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("+",
-						"can only concatenate bytes (not \""+string(r.Type())+"\") to bytes", "")
+					return nil, core.NewConcatError("bytes", r)
 				}).
 				Execute()
 		}).
@@ -191,16 +184,12 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					return core.NumberValue(leftNum + rightNum), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("+",
-						"unsupported operand type(s)",
-						"'bool' and '"+string(r.Type())+"'")
+					return nil, core.NewBinaryOpError("+", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("+",
-				"unsupported operand type(s)",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewBinaryOpError("+", left, right)
 		}).
 		Execute()
 }
@@ -369,16 +358,12 @@ func subtractTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 					return core.NumberValue(leftNum - rightNum), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("-",
-						"unsupported operand type(s)",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewBinaryOpError("-", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("-",
-				"unsupported operand type(s)",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewBinaryOpError("-", left, right)
 		}).
 		Execute()
 }
@@ -528,9 +513,7 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 				return nil, errors.NewTypeError("*",
 					"can't multiply sequence by non-int of type 'float'", "")
 			}
-			return nil, errors.NewTypeError("*",
-				"unsupported operand type(s)",
-				"'float' and '"+string(right.Type())+"'")
+			return nil, core.NewBinaryOpError("*", left, right)
 		}).
 		String(func(leftStr string) (core.Value, error) {
 			// String * Number (repetition)
@@ -602,9 +585,7 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 				"can't multiply sequence of type 'tuple' by non-int of type '"+string(right.Type())+"'", "")
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("*",
-				"unsupported operand type(s)",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewBinaryOpError("*", left, right)
 		}).
 		Execute()
 }
@@ -633,9 +614,7 @@ func MatMul() func([]core.Value, *core.Context) (core.Value, error) {
 		}
 
 		// No __matmul__ or __rmatmul__ method found
-		return nil, errors.NewTypeError("@",
-			"unsupported operand type(s) for @",
-			"'"+string(left.Type())+"' and '"+string(right.Type())+"'")
+		return nil, core.NewBinaryOpError("@", left, right)
 	}
 }
 
@@ -714,16 +693,12 @@ func divideValue(left, right core.Value, ctx *core.Context) (core.Value, error) 
 					return core.FloatValue(leftNum / rightNum), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("/",
-						"unsupported operand type(s)",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewBinaryOpError("/", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("/",
-				"unsupported operand type(s)",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewBinaryOpError("/", left, right)
 		}).
 		Execute()
 }
@@ -792,16 +767,12 @@ func floorDivideValue(left, right core.Value, ctx *core.Context) (core.Value, er
 					return core.NumberValue(result), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("//",
-						"unsupported operand type(s)",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewBinaryOpError("//", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("//",
-				"unsupported operand type(s)",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewBinaryOpError("//", left, right)
 		}).
 		Execute()
 }
@@ -867,16 +838,12 @@ func moduloTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					return core.NumberValue(result), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("%",
-						"unsupported operand type(s)",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewBinaryOpError("%", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("%",
-				"unsupported operand type(s)",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewBinaryOpError("%", left, right)
 		}).
 		Execute()
 }
@@ -979,16 +946,12 @@ func powerTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 					return core.FloatValue(result), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("**",
-						"unsupported operand type(s)",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewBinaryOpError("**", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("**",
-				"unsupported operand type(s)",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewBinaryOpError("**", left, right)
 		}).
 		Execute()
 }
@@ -1003,15 +966,11 @@ func bigIntPower(left, right core.Value) (core.Value, error) {
 		leftBig = l.GetBigInt()
 	case core.NumberValue:
 		if !core.IsInteger(float64(l)) {
-			return nil, errors.NewTypeError("**",
-				"unsupported operand type(s)",
-				"'float' (for BigInt power)")
+			return nil, core.NewBinaryOpError("**", left, right)
 		}
 		leftBig = core.PromoteToBigInt(l).GetBigInt()
 	default:
-		return nil, errors.NewTypeError("**",
-			"unsupported operand type(s)",
-			"'"+string(left.Type())+"'")
+		return nil, core.NewBinaryOpError("**", left, right)
 	}
 
 	switch r := right.(type) {
@@ -1019,15 +978,11 @@ func bigIntPower(left, right core.Value) (core.Value, error) {
 		rightBig = r.GetBigInt()
 	case core.NumberValue:
 		if !core.IsInteger(float64(r)) {
-			return nil, errors.NewTypeError("**",
-				"unsupported operand type(s)",
-				"'float' (for BigInt power)")
+			return nil, core.NewBinaryOpError("**", left, right)
 		}
 		rightBig = core.PromoteToBigInt(r).GetBigInt()
 	default:
-		return nil, errors.NewTypeError("**",
-			"unsupported operand type(s)",
-			"'"+string(right.Type())+"'")
+		return nil, core.NewBinaryOpError("**", left, right)
 	}
 
 	// Check exponent is non-negative

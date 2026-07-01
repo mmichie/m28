@@ -18,11 +18,12 @@ var _ Numeric = &NumericOps{}
 // We use extension methods pattern since we can't modify core.NumberValue directly
 type NumericOps struct {
 	value float64
+	orig  core.Value // original operand, for correct type names in error messages
 }
 
 // NewNumericOps creates a NumericOps wrapper for a number
 func NewNumericOps(n core.NumberValue) *NumericOps {
-	return &NumericOps{value: float64(n)}
+	return &NumericOps{value: float64(n), orig: n}
 }
 
 // Add implements Numeric.Add
@@ -48,8 +49,7 @@ func (n *NumericOps) Add(other core.Value) (core.Value, error) {
 			}
 			return result, nil
 		}
-		return nil, errors.NewTypeError("+", "unsupported operand type(s)",
-			fmt.Sprintf("'number' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("+", n.orig, other)
 	}
 }
 
@@ -73,8 +73,7 @@ func (n *NumericOps) Subtract(other core.Value) (core.Value, error) {
 			}
 			return result, nil
 		}
-		return nil, errors.NewTypeError("-", "unsupported operand type(s)",
-			fmt.Sprintf("'number' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("-", n.orig, other)
 	}
 }
 
@@ -144,8 +143,7 @@ func (n *NumericOps) Multiply(other core.Value) (core.Value, error) {
 			}
 			return result, nil
 		}
-		return nil, errors.NewTypeError("*", "unsupported operand type(s)",
-			fmt.Sprintf("'float' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("*", n.orig, other)
 	}
 }
 
@@ -165,8 +163,7 @@ func (n *NumericOps) Divide(other core.Value) (core.Value, error) {
 			}
 			return result, nil
 		}
-		return nil, errors.NewTypeError("/", "unsupported operand type(s)",
-			fmt.Sprintf("'float' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("/", n.orig, other)
 	}
 }
 
@@ -187,8 +184,7 @@ func (n *NumericOps) Modulo(other core.Value) (core.Value, error) {
 		}
 		return core.NumberValue(result), nil
 	default:
-		return nil, errors.NewTypeError("%", "unsupported operand type(s)",
-			fmt.Sprintf("'float' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("%", n.orig, other)
 	}
 }
 
@@ -251,8 +247,7 @@ func (n *NumericOps) Power(other core.Value) (core.Value, error) {
 		result := cmplx.Pow(base, exp)
 		return core.ComplexValue(result), nil
 	default:
-		return nil, errors.NewTypeError("**", "unsupported operand type(s)",
-			fmt.Sprintf("'float' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("**", n.orig, other)
 	}
 }
 
@@ -294,34 +289,44 @@ func (d *DunderNumeric) callDunder(method string, args []core.Value) (core.Value
 	return callable.Call(args, d.ctx)
 }
 
+// arith calls the named arithmetic dunder, or returns the canonical
+// "unsupported operand type(s)" TypeError when the object lacks it (so e.g.
+// `[] - []` reports the real types, not "object has no __sub__ method").
+func (d *DunderNumeric) arith(op, dunder string, other core.Value) (core.Value, error) {
+	if _, ok := d.obj.GetAttr(dunder); !ok {
+		return nil, core.NewBinaryOpError(op, d.obj, other)
+	}
+	return d.callDunder(dunder, []core.Value{other})
+}
+
 // Add implements Numeric.Add by calling __add__
 func (d *DunderNumeric) Add(other core.Value) (core.Value, error) {
-	return d.callDunder("__add__", []core.Value{other})
+	return d.arith("+", "__add__", other)
 }
 
 // Subtract implements Numeric.Subtract by calling __sub__
 func (d *DunderNumeric) Subtract(other core.Value) (core.Value, error) {
-	return d.callDunder("__sub__", []core.Value{other})
+	return d.arith("-", "__sub__", other)
 }
 
 // Multiply implements Numeric.Multiply by calling __mul__
 func (d *DunderNumeric) Multiply(other core.Value) (core.Value, error) {
-	return d.callDunder("__mul__", []core.Value{other})
+	return d.arith("*", "__mul__", other)
 }
 
 // Divide implements Numeric.Divide by calling __truediv__
 func (d *DunderNumeric) Divide(other core.Value) (core.Value, error) {
-	return d.callDunder("__truediv__", []core.Value{other})
+	return d.arith("/", "__truediv__", other)
 }
 
 // Modulo implements Numeric.Modulo by calling __mod__
 func (d *DunderNumeric) Modulo(other core.Value) (core.Value, error) {
-	return d.callDunder("__mod__", []core.Value{other})
+	return d.arith("%", "__mod__", other)
 }
 
 // Power implements Numeric.Power by calling __pow__
 func (d *DunderNumeric) Power(other core.Value) (core.Value, error) {
-	return d.callDunder("__pow__", []core.Value{other})
+	return d.arith("**", "__pow__", other)
 }
 
 // Negate implements Numeric.Negate by calling __neg__
@@ -344,13 +349,14 @@ func GetNumericOps(v core.Value) (Numeric, bool) {
 		// paths before this; NumericOps is only reached here for the mixed
 		// float-with-complex (and dunder-object) fall-through, which correctly
 		// promotes to complex.
-		return NewNumericOps(core.NumberValue(float64(val))), true
+		return &NumericOps{value: float64(val), orig: val}, true
 	case core.BoolValue:
 		// Python: bools behave like ints in arithmetic (True=1, False=0)
+		f := 0.0
 		if bool(val) {
-			return NewNumericOps(core.NumberValue(1)), true
+			f = 1.0
 		}
-		return NewNumericOps(core.NumberValue(0)), true
+		return &NumericOps{value: f, orig: val}, true
 	case core.ComplexValue:
 		return NewComplexNumericOps(val), true
 	default:
@@ -388,8 +394,7 @@ func (c *ComplexNumericOps) Add(other core.Value) (core.Value, error) {
 		// Complex + Complex = Complex
 		return core.ComplexValue(c.value + complex128(v)), nil
 	default:
-		return nil, errors.NewTypeError("+", "unsupported operand type(s)",
-			fmt.Sprintf("'complex' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("+", core.ComplexValue(c.value), other)
 	}
 }
 
@@ -403,8 +408,7 @@ func (c *ComplexNumericOps) Subtract(other core.Value) (core.Value, error) {
 	case core.ComplexValue:
 		return core.ComplexValue(c.value - complex128(v)), nil
 	default:
-		return nil, errors.NewTypeError("-", "unsupported operand type(s)",
-			fmt.Sprintf("'complex' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("-", core.ComplexValue(c.value), other)
 	}
 }
 
@@ -418,8 +422,7 @@ func (c *ComplexNumericOps) Multiply(other core.Value) (core.Value, error) {
 	case core.ComplexValue:
 		return core.ComplexValue(c.value * complex128(v)), nil
 	default:
-		return nil, errors.NewTypeError("*", "unsupported operand type(s)",
-			fmt.Sprintf("'complex' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("*", core.ComplexValue(c.value), other)
 	}
 }
 
@@ -442,8 +445,7 @@ func (c *ComplexNumericOps) Divide(other core.Value) (core.Value, error) {
 		}
 		return core.ComplexValue(c.value / complex128(v)), nil
 	default:
-		return nil, errors.NewTypeError("/", "unsupported operand type(s)",
-			fmt.Sprintf("'complex' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("/", core.ComplexValue(c.value), other)
 	}
 }
 
@@ -475,8 +477,7 @@ func (c *ComplexNumericOps) Power(other core.Value) (core.Value, error) {
 		}
 		return nil, errors.NewTypeError("**", "complex power with non-integer exponent not yet supported", "")
 	default:
-		return nil, errors.NewTypeError("**", "unsupported operand type(s)",
-			fmt.Sprintf("'complex' and '%s'", other.Type()))
+		return nil, core.NewBinaryOpError("**", core.ComplexValue(c.value), other)
 	}
 }
 

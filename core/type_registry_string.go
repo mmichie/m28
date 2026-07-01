@@ -356,7 +356,7 @@ func getStringMethods() map[string]*MethodDescriptor {
 				s1 := string(receiver.(StringValue))
 				s2, ok := args[0].(StringValue)
 				if !ok {
-					return nil, &TypeError{Message: "can only concatenate str to str"}
+					return nil, NewConcatError("str", args[0])
 				}
 				return StringValue(s1 + string(s2)), nil
 			},

@@ -345,7 +345,7 @@ func getListMethods() map[string]*MethodDescriptor {
 				list1 := receiver.(*ListValue)
 				list2, ok := args[0].(*ListValue)
 				if !ok {
-					return nil, &TypeError{Message: "can only concatenate list to list"}
+					return nil, NewConcatError("list", args[0])
 				}
 				result := make([]Value, list1.Len()+list2.Len())
 				copy(result, list1.Items())
@@ -380,7 +380,7 @@ func getListMethods() map[string]*MethodDescriptor {
 							list.items = append(list.items, val)
 						}
 					} else {
-						return nil, &TypeError{Message: "can only concatenate list to list"}
+						return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", GetPythonTypeName(args[0]))}
 					}
 				}
 				return list, nil
@@ -1472,7 +1472,7 @@ func repeatCount(arg Value, ctx *Context) (NumberValue, error) {
 			return NumberValue(idx), nil
 		}
 	}
-	return 0, &TypeError{Message: "can't multiply sequence by non-int"}
+	return 0, &TypeError{Message: fmt.Sprintf("can't multiply sequence by non-int of type '%s'", GetPythonTypeName(arg))}
 }
 
 // listRepeatHandler implements list repetition for both __mul__ and __rmul__

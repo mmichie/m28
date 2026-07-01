@@ -1,7 +1,6 @@
 package operators
 
 import (
-	"github.com/mmichie/m28/common/errors"
 	"github.com/mmichie/m28/common/types"
 	"github.com/mmichie/m28/common/validation"
 	"github.com/mmichie/m28/core"
@@ -43,9 +42,7 @@ func compareValues(left, right core.Value, ctx *core.Context) (int, error) {
 		if rightTuple, ok := right.(core.TupleValue); ok {
 			return compareTuples(leftTuple, rightTuple, ctx)
 		}
-		return 0, errors.NewTypeError("<",
-			"'<' not supported between instances of",
-			"'tuple' and '"+string(right.Type())+"'")
+		return 0, core.NewComparisonError("<", left, right)
 	}
 
 	// Real numbers where a float is involved: compare as float64 (int/float
@@ -78,9 +75,7 @@ func compareValues(left, right core.Value, ctx *core.Context) (int, error) {
 		if rightBig, ok := right.(core.BigIntValue); ok {
 			return core.PromoteToBigInt(leftNum).GetBigInt().Cmp(rightBig.GetBigInt()), nil
 		}
-		return 0, errors.NewTypeError("<",
-			"'<' not supported between instances of",
-			"'"+string(left.Type())+"' and '"+string(right.Type())+"'")
+		return 0, core.NewComparisonError("<", left, right)
 	}
 
 	// Handle strings
@@ -93,9 +88,7 @@ func compareValues(left, right core.Value, ctx *core.Context) (int, error) {
 			}
 			return 0, nil
 		}
-		return 0, errors.NewTypeError("<",
-			"'<' not supported between instances of",
-			"'str' and '"+string(right.Type())+"'")
+		return 0, core.NewComparisonError("<", left, right)
 	}
 
 	// Handle BigInt
@@ -107,14 +100,10 @@ func compareValues(left, right core.Value, ctx *core.Context) (int, error) {
 			rightBig := core.PromoteToBigInt(rightNum)
 			return leftBig.GetBigInt().Cmp(rightBig.GetBigInt()), nil
 		}
-		return 0, errors.NewTypeError("<",
-			"'<' not supported between instances of",
-			"'int' and '"+string(right.Type())+"'")
+		return 0, core.NewComparisonError("<", left, right)
 	}
 
-	return 0, errors.NewTypeError("<",
-		"'<' not supported between instances of",
-		"'"+string(left.Type())+"' and '"+string(right.Type())+"'")
+	return 0, core.NewComparisonError("<", left, right)
 }
 
 // Comparison Operators
@@ -397,29 +386,21 @@ func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, err
 		if !leftIsBig {
 			if leftNum, ok := left.(core.NumberValue); ok {
 				if !core.IsInteger(float64(leftNum)) {
-					return nil, errors.NewTypeError("<",
-						"'<' not supported between instances of",
-						"'float' and 'int'")
+					return nil, core.NewComparisonError("<", left, right)
 				}
 				leftBig = core.PromoteToBigInt(leftNum)
 			} else {
-				return nil, errors.NewTypeError("<",
-					"'<' not supported between instances of",
-					"'"+string(left.Type())+"' and 'int'")
+				return nil, core.NewComparisonError("<", left, right)
 			}
 		}
 		if !rightIsBig {
 			if rightNum, ok := right.(core.NumberValue); ok {
 				if !core.IsInteger(float64(rightNum)) {
-					return nil, errors.NewTypeError("<",
-						"'<' not supported between instances of",
-						"'int' and 'float'")
+					return nil, core.NewComparisonError("<", left, right)
 				}
 				rightBig = core.PromoteToBigInt(rightNum)
 			} else {
-				return nil, errors.NewTypeError("<",
-					"'<' not supported between instances of",
-					"'int' and '"+string(right.Type())+"'")
+				return nil, core.NewComparisonError("<", left, right)
 			}
 		}
 
@@ -442,9 +423,7 @@ func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, err
 					return core.BoolValue(leftNum < rightNum), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("<",
-						"'<' not supported between instances of",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError("<", left, right)
 				}).
 				Execute()
 		}).
@@ -454,9 +433,7 @@ func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, err
 					return core.BoolValue(leftStr < rightStr), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("<",
-						"'<' not supported between instances of",
-						"'str' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError("<", left, right)
 				}).
 				Execute()
 		}).
@@ -470,16 +447,12 @@ func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, err
 					return core.BoolValue(cmp < 0), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("<",
-						"'<' not supported between instances of",
-						"'tuple' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError("<", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("<",
-				"'<' not supported for",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewComparisonError("<", left, right)
 		}).
 		Execute()
 }
@@ -538,9 +511,7 @@ func compareLessThanOrEqual(left, right core.Value, ctx *core.Context) (core.Val
 					return core.BoolValue(leftNum <= rightNum), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("<=",
-						"'<=' not supported between instances of",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError("<=", left, right)
 				}).
 				Execute()
 		}).
@@ -550,9 +521,7 @@ func compareLessThanOrEqual(left, right core.Value, ctx *core.Context) (core.Val
 					return core.BoolValue(leftStr <= rightStr), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("<=",
-						"'<=' not supported between instances of",
-						"'str' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError("<=", left, right)
 				}).
 				Execute()
 		}).
@@ -566,16 +535,12 @@ func compareLessThanOrEqual(left, right core.Value, ctx *core.Context) (core.Val
 					return core.BoolValue(cmp <= 0), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError("<=",
-						"'<=' not supported between instances of",
-						"'tuple' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError("<=", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError("<=",
-				"'<=' not supported for",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewComparisonError("<=", left, right)
 		}).
 		Execute()
 }
@@ -628,29 +593,21 @@ func compareGreaterThan(left, right core.Value, ctx *core.Context) (core.Value, 
 		if !leftIsBig {
 			if leftNum, ok := left.(core.NumberValue); ok {
 				if !core.IsInteger(float64(leftNum)) {
-					return nil, errors.NewTypeError(">",
-						"'>' not supported between instances of",
-						"'float' and 'int'")
+					return nil, core.NewComparisonError(">", left, right)
 				}
 				leftBig = core.PromoteToBigInt(leftNum)
 			} else {
-				return nil, errors.NewTypeError(">",
-					"'>' not supported between instances of",
-					"'"+string(left.Type())+"' and 'int'")
+				return nil, core.NewComparisonError(">", left, right)
 			}
 		}
 		if !rightIsBig {
 			if rightNum, ok := right.(core.NumberValue); ok {
 				if !core.IsInteger(float64(rightNum)) {
-					return nil, errors.NewTypeError(">",
-						"'>' not supported between instances of",
-						"'int' and 'float'")
+					return nil, core.NewComparisonError(">", left, right)
 				}
 				rightBig = core.PromoteToBigInt(rightNum)
 			} else {
-				return nil, errors.NewTypeError(">",
-					"'>' not supported between instances of",
-					"'int' and '"+string(right.Type())+"'")
+				return nil, core.NewComparisonError(">", left, right)
 			}
 		}
 
@@ -672,9 +629,7 @@ func compareGreaterThan(left, right core.Value, ctx *core.Context) (core.Value, 
 					return core.BoolValue(leftNum > rightNum), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError(">",
-						"'>' not supported between instances of",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError(">", left, right)
 				}).
 				Execute()
 		}).
@@ -684,9 +639,7 @@ func compareGreaterThan(left, right core.Value, ctx *core.Context) (core.Value, 
 					return core.BoolValue(leftStr > rightStr), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError(">",
-						"'>' not supported between instances of",
-						"'str' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError(">", left, right)
 				}).
 				Execute()
 		}).
@@ -700,16 +653,12 @@ func compareGreaterThan(left, right core.Value, ctx *core.Context) (core.Value, 
 					return core.BoolValue(cmp > 0), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError(">",
-						"'>' not supported between instances of",
-						"'tuple' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError(">", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError(">",
-				"'>' not supported for",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewComparisonError(">", left, right)
 		}).
 		Execute()
 }
@@ -768,9 +717,7 @@ func compareGreaterThanOrEqual(left, right core.Value, ctx *core.Context) (core.
 					return core.BoolValue(leftNum >= rightNum), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError(">=",
-						"'>=' not supported between instances of",
-						"'float' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError(">=", left, right)
 				}).
 				Execute()
 		}).
@@ -780,9 +727,7 @@ func compareGreaterThanOrEqual(left, right core.Value, ctx *core.Context) (core.
 					return core.BoolValue(leftStr >= rightStr), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError(">=",
-						"'>=' not supported between instances of",
-						"'str' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError(">=", left, right)
 				}).
 				Execute()
 		}).
@@ -796,16 +741,12 @@ func compareGreaterThanOrEqual(left, right core.Value, ctx *core.Context) (core.
 					return core.BoolValue(cmp >= 0), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
-					return nil, errors.NewTypeError(">=",
-						"'>=' not supported between instances of",
-						"'tuple' and '"+string(r.Type())+"'")
+					return nil, core.NewComparisonError(">=", left, right)
 				}).
 				Execute()
 		}).
 		Default(func(l core.Value) (core.Value, error) {
-			return nil, errors.NewTypeError(">=",
-				"'>=' not supported for",
-				"'"+string(l.Type())+"'")
+			return nil, core.NewComparisonError(">=", left, right)
 		}).
 		Execute()
 }
