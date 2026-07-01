@@ -588,6 +588,13 @@ func WrapEvalError(err error, message string, ctx *Context) *EvalError {
 			Wrapped:    err,
 			StackTrace: stackTrace,
 		}
+	case *OverflowError:
+		return &EvalError{
+			Type:       "OverflowError",
+			Message:    typedErr.Message,
+			Wrapped:    err,
+			StackTrace: stackTrace,
+		}
 	case *RuntimeError:
 		return &EvalError{
 			Type:       "RuntimeError",

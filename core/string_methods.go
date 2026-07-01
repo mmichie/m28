@@ -474,7 +474,10 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 	var result string
 
 	if f, ok := AsFloat(value); ok {
-		// Number formatting (int or float)
+		// Number formatting (int or float). A BigIntValue must use its exact
+		// value for integer formats, not the lossy float64 from AsFloat; only
+		// the float formats ('f','e','g','%') convert to float (as CPython does).
+		bigInt, isBig := value.(BigIntValue)
 		switch fmtType {
 		case 'f', 'F':
 			// Fixed-point
@@ -510,28 +513,48 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 			}
 		case 'd':
 			// Integer decimal
-			result = fmt.Sprintf("%.0f", math.Trunc(f))
+			if isBig {
+				result = bigInt.String()
+			} else {
+				result = fmt.Sprintf("%.0f", math.Trunc(f))
+			}
 		case 'x':
 			// Hexadecimal (lowercase)
-			result = fmt.Sprintf("%x", int64(f))
+			if isBig {
+				result = bigInt.GetBigInt().Text(16)
+			} else {
+				result = fmt.Sprintf("%x", int64(f))
+			}
 			if alt {
 				result = "0x" + result
 			}
 		case 'X':
 			// Hexadecimal (uppercase)
-			result = fmt.Sprintf("%X", int64(f))
+			if isBig {
+				result = strings.ToUpper(bigInt.GetBigInt().Text(16))
+			} else {
+				result = fmt.Sprintf("%X", int64(f))
+			}
 			if alt {
 				result = "0X" + result
 			}
 		case 'o':
 			// Octal
-			result = fmt.Sprintf("%o", int64(f))
+			if isBig {
+				result = bigInt.GetBigInt().Text(8)
+			} else {
+				result = fmt.Sprintf("%o", int64(f))
+			}
 			if alt && !strings.HasPrefix(result, "0") {
 				result = "0" + result
 			}
 		case 'b':
 			// Binary
-			result = strconv.FormatInt(int64(f), 2)
+			if isBig {
+				result = bigInt.GetBigInt().Text(2)
+			} else {
+				result = strconv.FormatInt(int64(f), 2)
+			}
 			if alt {
 				result = "0b" + result
 			}
@@ -544,7 +567,9 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 			result = fmt.Sprintf("%.*f%%", prec, f*100)
 		default:
 			// Default number formatting
-			if f == math.Floor(f) {
+			if isBig {
+				result = bigInt.String()
+			} else if f == math.Floor(f) {
 				result = fmt.Sprintf("%.0f", f)
 			} else if precision >= 0 {
 				result = fmt.Sprintf("%.*f", precision, f)
@@ -610,10 +635,13 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 				result = strings.Repeat(fillStr, padding) + result
 			}
 		default:
-			// Default: right align for numbers, left for strings
-			if _, ok := value.(NumberValue); ok {
+			// Default: right align for numbers, left for everything else
+			// (CPython). Must cover every real numeric type, not just the
+			// fixed-size int, else floats/bigints wrongly left-align.
+			switch value.(type) {
+			case NumberValue, FloatValue, BigIntValue, BoolValue, ComplexValue:
 				result = strings.Repeat(fillStr, padding) + result
-			} else {
+			default:
 				result = result + strings.Repeat(fillStr, padding)
 			}
 		}

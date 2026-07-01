@@ -133,6 +133,14 @@ func formatPythonError(err error) string {
 		return fmt.Sprintf("OSError: %s", e.Message)
 	case *core.AssertionError:
 		return fmt.Sprintf("AssertionError: %s", e.Message)
+	case *core.OverflowError:
+		return fmt.Sprintf("OverflowError: %s", e.Message)
+	case *core.ZeroDivisionError:
+		return fmt.Sprintf("ZeroDivisionError: %s", e.Error())
+	case *core.RuntimeError:
+		return fmt.Sprintf("RuntimeError: %s", e.Message)
+	case *core.RecursionError:
+		return fmt.Sprintf("RecursionError: %s", e.Message)
 	case *core.StopIteration:
 		if e.Message != "" {
 			return fmt.Sprintf("StopIteration: %s", e.Message)
@@ -145,8 +153,9 @@ func formatPythonError(err error) string {
 		}
 		return e.Error()
 	default:
-		// Try to extract type name from error string if it's already formatted
-		errStr := err.Error()
+		// Use the fully-unwrapped error's message (not the EvalError wrapper's),
+		// so an unlisted Python exception isn't shown as "EvalError: error in X".
+		errStr := underlyingErr.Error()
 		if strings.Contains(errStr, ": ") {
 			// Already looks like "TypeName: message"
 			return errStr
