@@ -50,7 +50,7 @@ func InitMathModule() *core.DictValue {
 			}
 		}
 		// Fall back to numeric conversion
-		num, ok := args[0].(core.NumberValue)
+		num, ok := core.AsFloat(args[0])
 		if !ok {
 			return nil, errors.NewTypeError("floor", "number", string(args[0].Type()))
 		}
@@ -69,7 +69,7 @@ func InitMathModule() *core.DictValue {
 			}
 		}
 		// Fall back to numeric conversion
-		num, ok := args[0].(core.NumberValue)
+		num, ok := core.AsFloat(args[0])
 		if !ok {
 			return nil, errors.NewTypeError("ceil", "number", string(args[0].Type()))
 		}
@@ -88,7 +88,7 @@ func InitMathModule() *core.DictValue {
 			}
 		}
 		// Fall back to numeric conversion
-		num, ok := args[0].(core.NumberValue)
+		num, ok := core.AsFloat(args[0])
 		if !ok {
 			return nil, errors.NewTypeError("trunc", "number", string(args[0].Type()))
 		}
@@ -98,7 +98,7 @@ func InitMathModule() *core.DictValue {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("modf", "exactly 1 argument", "got different count")
 		}
-		num, ok := args[0].(core.NumberValue)
+		num, ok := core.AsFloat(args[0])
 		if !ok {
 			return nil, errors.NewTypeError("modf", "float", string(args[0].Type()))
 		}
@@ -187,8 +187,8 @@ func InitMathModule() *core.DictValue {
 		if len(args) != 2 {
 			return nil, errors.NewRuntimeError("gcd", "gcd expected 2 arguments")
 		}
-		aNum, ok1 := args[0].(core.NumberValue)
-		bNum, ok2 := args[1].(core.NumberValue)
+		aNum, ok1 := core.AsFloat(args[0])
+		bNum, ok2 := core.AsFloat(args[1])
 		if !ok1 || !ok2 {
 			return nil, errors.NewRuntimeError("gcd", "arguments must be integers")
 		}
@@ -217,8 +217,8 @@ func InitMathModule() *core.DictValue {
 		if len(args) != 2 {
 			return nil, errors.NewTypeError("ldexp", "exactly 2 arguments", "got different count")
 		}
-		x, ok1 := args[0].(core.NumberValue)
-		i, ok2 := args[1].(core.NumberValue)
+		x, ok1 := core.AsFloat(args[0])
+		i, ok2 := core.AsFloat(args[1])
 		if !ok1 || !ok2 {
 			return nil, errors.NewTypeError("ldexp", "number", "got non-number")
 		}
@@ -230,7 +230,7 @@ func InitMathModule() *core.DictValue {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("frexp", "exactly 1 argument", "got different count")
 		}
-		x, ok := args[0].(core.NumberValue)
+		x, ok := core.AsFloat(args[0])
 		if !ok {
 			return nil, errors.NewTypeError("frexp", "number", string(args[0].Type()))
 		}
@@ -251,9 +251,9 @@ func InitMathModule() *core.DictValue {
 		if len(args) != 3 {
 			return nil, errors.NewTypeError("fma", "exactly 3 arguments", "got different count")
 		}
-		x, ok1 := args[0].(core.NumberValue)
-		y, ok2 := args[1].(core.NumberValue)
-		z, ok3 := args[2].(core.NumberValue)
+		x, ok1 := core.AsFloat(args[0])
+		y, ok2 := core.AsFloat(args[1])
+		z, ok3 := core.AsFloat(args[2])
 		if !ok1 || !ok2 || !ok3 {
 			return nil, errors.NewTypeError("fma", "number", "got non-number")
 		}
@@ -265,7 +265,7 @@ func InitMathModule() *core.DictValue {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("ulp", "exactly 1 argument", "got different count")
 		}
-		xv, ok := args[0].(core.NumberValue)
+		xv, ok := core.AsFloat(args[0])
 		if !ok {
 			return nil, errors.NewTypeError("ulp", "number", string(args[0].Type()))
 		}
@@ -311,15 +311,15 @@ func InitMathModule() *core.DictValue {
 			if len(args) != 2 {
 				return nil, errors.NewTypeError("isclose", "exactly 2 positional arguments", "got different count")
 			}
-			a, ok1 := args[0].(core.NumberValue)
-			b, ok2 := args[1].(core.NumberValue)
+			a, ok1 := core.AsFloat(args[0])
+			b, ok2 := core.AsFloat(args[1])
 			if !ok1 || !ok2 {
 				return nil, errors.NewTypeError("isclose", "number", "got non-number")
 			}
 			relTol, absTol := 1e-09, 0.0
 			for name, dst := range map[string]*float64{"rel_tol": &relTol, "abs_tol": &absTol} {
 				if v, ok := kwargs[name]; ok {
-					n, ok := v.(core.NumberValue)
+					n, ok := core.AsFloat(v)
 					if !ok {
 						return nil, errors.NewTypeError("isclose", "number", name)
 					}
@@ -409,7 +409,7 @@ func InitMathModule() *core.DictValue {
 			}
 			result := 1.0
 			if v, ok := kwargs["start"]; ok {
-				n, ok := v.(core.NumberValue)
+				n, ok := core.AsFloat(v)
 				if !ok {
 					return nil, errors.NewTypeError("prod", "number", "start")
 				}
@@ -420,7 +420,7 @@ func InitMathModule() *core.DictValue {
 				return nil, err
 			}
 			for _, it := range items {
-				n, ok := it.(core.NumberValue)
+				n, ok := core.AsFloat(it)
 				if !ok {
 					return nil, errors.NewTypeError("prod", "number", string(it.Type()))
 				}
@@ -448,8 +448,8 @@ func InitMathModule() *core.DictValue {
 		}
 		var sum float64
 		for i := range p {
-			px, ok1 := p[i].(core.NumberValue)
-			qx, ok2 := q[i].(core.NumberValue)
+			px, ok1 := core.AsFloat(p[i])
+			qx, ok2 := core.AsFloat(q[i])
 			if !ok1 || !ok2 {
 				return nil, errors.NewTypeError("dist", "number", "coordinate")
 			}
@@ -470,7 +470,7 @@ func InitMathModule() *core.DictValue {
 		}
 		values := make([]float64, 0, len(items))
 		for _, it := range items {
-			n, ok := it.(core.NumberValue)
+			n, ok := core.AsFloat(it)
 			if !ok {
 				return nil, errors.NewTypeError("fsum", "number", string(it.Type()))
 			}
@@ -511,7 +511,7 @@ func InitMathModule() *core.DictValue {
 
 // mathIntArg extracts an integer-valued argument, rejecting non-integral floats.
 func mathIntArg(fname string, v core.Value) (int64, error) {
-	n, ok := v.(core.NumberValue)
+	n, ok := core.AsFloat(v)
 	if !ok {
 		return 0, errors.NewTypeError(fname, "integer", string(v.Type()))
 	}

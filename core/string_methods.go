@@ -363,13 +363,14 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 		// No format spec - use default formatting
 		if str, ok := value.(StringValue); ok {
 			return string(str), nil
-		} else if num, ok := value.(NumberValue); ok {
-			f := float64(num)
+		} else if _, ok := value.(NumberValue); ok {
+			f, _ := AsFloat(value)
 			if f == math.Floor(f) {
 				return fmt.Sprintf("%.0f", f), nil
 			}
 			return fmt.Sprintf("%g", f), nil
 		}
+		// A float with no spec uses its Python repr (str(float)), e.g. "3.0".
 		return PrintValueWithoutQuotes(value), nil
 	}
 
@@ -472,9 +473,8 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 	// Format the value
 	var result string
 
-	if num, ok := value.(NumberValue); ok {
-		f := float64(num)
-		// Number formatting
+	if f, ok := AsFloat(value); ok {
+		// Number formatting (int or float)
 		switch fmtType {
 		case 'f', 'F':
 			// Fixed-point
@@ -840,6 +840,9 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 		case 'd', 'i': // Integer
 			if num, ok := value.(NumberValue); ok {
 				formatted = fmt.Sprintf("%d", int64(num))
+			} else if fv, ok := value.(FloatValue); ok {
+				// Python's %d truncates a float toward zero ("%d" % 2.7 == "2").
+				formatted = fmt.Sprintf("%d", int64(float64(fv)))
 			} else if bi, ok := value.(BigIntValue); ok {
 				formatted = bi.GetBigInt().String()
 			} else if b, ok := value.(BoolValue); ok {
@@ -856,6 +859,8 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 			var f float64
 			if num, ok := value.(NumberValue); ok {
 				f = float64(num)
+			} else if fv, ok := value.(FloatValue); ok {
+				f = float64(fv)
 			} else if bi, ok := value.(BigIntValue); ok {
 				f = bi.ToFloat64()
 			} else if b, ok := value.(BoolValue); ok {
@@ -1351,10 +1356,10 @@ func InitStringMethods() {
 	}
 
 	td.Methods["format"] = &MethodDescriptor{
-		Name:         "format",
-		Arity:        -1,
-		Doc:          "Return a formatted version of the string",
-		Builtin:      true,
+		Name:    "format",
+		Arity:   -1,
+		Doc:     "Return a formatted version of the string",
+		Builtin: true,
 		KwargHandler: func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
 			return strFormat(string(receiver.(StringValue)), args, kwargs, ctx)
 		},
@@ -1384,7 +1389,6 @@ func InitStringMethods() {
 			return strFormat(s, nil, kwargs, ctx)
 		},
 	}
-
 
 	td.Methods["lstrip"] = &MethodDescriptor{
 		Name:    "lstrip",

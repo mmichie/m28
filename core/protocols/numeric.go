@@ -470,9 +470,9 @@ func (c *ComplexNumericOps) Negate() (core.Value, error) {
 
 // Absolute implements Numeric.Absolute for complex numbers
 func (c *ComplexNumericOps) Absolute() (core.Value, error) {
-	// Absolute value of complex number is its magnitude
+	// Absolute value of complex number is its magnitude, a float.
 	real := real(c.value)
 	imag := imag(c.value)
 	magnitude := math.Sqrt(real*real + imag*imag)
-	return core.NumberValue(magnitude), nil
+	return core.FloatValue(magnitude), nil
 }

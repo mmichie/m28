@@ -253,6 +253,9 @@ func RegisterNumeric(ctx *core.Context) {
 
 		// Use the Iterator protocol to support all iterables (including generators)
 		sum := start
+		// A float start or any float element makes the result a float, matching
+		// CPython (sum([1.5, 2.5]) == 4.0, sum([1, 2]) == 3).
+		isFloat := v.Count() == 2 && core.IsFloatValue(v.Get(1))
 
 		if iter, ok := iterable.(core.Iterable); ok {
 			iterator := iter.Iterator()
@@ -260,6 +263,9 @@ func RegisterNumeric(ctx *core.Context) {
 				item, hasNext := iterator.Next()
 				if !hasNext {
 					break
+				}
+				if core.IsFloatValue(item) {
+					isFloat = true
 				}
 				num, err := types.RequireNumber(item, "sum() element")
 				if err != nil {
@@ -280,6 +286,9 @@ func RegisterNumeric(ctx *core.Context) {
 			}
 
 			for _, item := range items {
+				if core.IsFloatValue(item) {
+					isFloat = true
+				}
 				num, err := types.RequireNumber(item, "sum() element")
 				if err != nil {
 					return nil, &core.TypeError{Message: fmt.Sprintf("unsupported operand type(s) for +: 'float' and '%s'", item.Type())}
@@ -288,6 +297,9 @@ func RegisterNumeric(ctx *core.Context) {
 			}
 		}
 
+		if isFloat {
+			return core.FloatValue(sum), nil
+		}
 		return core.NumberValue(sum), nil
 	}))
 
@@ -504,18 +516,25 @@ func findExtreme(items []core.Value, keyFunc core.Value, ctx *core.Context, isMi
 
 		// Compare keys
 		shouldReplace := false
-		switch k1 := resultKey.(type) {
-		case core.NumberValue:
-			if k2, ok := itemKey.(core.NumberValue); ok {
-				if isMin {
-					shouldReplace = k2 < k1
-				} else {
-					shouldReplace = k2 > k1
-				}
-			} else {
+		// Real numbers (int/float/bigint/bool, in any mix) compare by value.
+		if k1f, ok := core.AsFloat(resultKey); ok {
+			k2f, ok2 := core.AsFloat(itemKey)
+			if !ok2 {
 				return nil, &core.TypeError{Message: fmt.Sprintf("'%s' not supported between instances of '%s' and '%s'",
-					map[bool]string{true: "<", false: ">"}[isMin], itemKey.Type(), k1.Type())}
+					map[bool]string{true: "<", false: ">"}[isMin], core.GetPythonTypeName(itemKey), core.GetPythonTypeName(resultKey))}
 			}
+			if isMin {
+				shouldReplace = k2f < k1f
+			} else {
+				shouldReplace = k2f > k1f
+			}
+			if shouldReplace {
+				result = item
+				resultKey = itemKey
+			}
+			continue
+		}
+		switch k1 := resultKey.(type) {
 		case core.StringValue:
 			if k2, ok := itemKey.(core.StringValue); ok {
 				if isMin {

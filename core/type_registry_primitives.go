@@ -2280,7 +2280,8 @@ func registerComplexType() {
 					c := receiver.(ComplexValue)
 					r := real(complex128(c))
 					i := imag(complex128(c))
-					return NumberValue(math.Sqrt(r*r + i*i)), nil
+					// abs(complex) is a float (the magnitude).
+					return FloatValue(math.Sqrt(r*r + i*i)), nil
 				},
 			},
 			"__bool__": {

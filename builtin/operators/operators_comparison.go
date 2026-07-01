@@ -48,6 +48,22 @@ func compareValues(left, right core.Value, ctx *core.Context) (int, error) {
 			"'tuple' and '"+string(right.Type())+"'")
 	}
 
+	// Real numbers where a float is involved: compare as float64 (int/float
+	// mixes, e.g. 1 < 2.5 or min(1, 2.5)). Pure int/int and big-int cases fall
+	// through to the exact-integer paths below.
+	if core.IsFloatValue(left) || core.IsFloatValue(right) {
+		if lf, lok := core.AsFloat(left); lok {
+			if rf, rok := core.AsFloat(right); rok {
+				if lf < rf {
+					return -1, nil
+				} else if lf > rf {
+					return 1, nil
+				}
+				return 0, nil
+			}
+		}
+	}
+
 	// Handle numbers
 	if leftNum, ok := left.(core.NumberValue); ok {
 		if rightNum, ok := right.(core.NumberValue); ok {
@@ -57,6 +73,10 @@ func compareValues(left, right core.Value, ctx *core.Context) (int, error) {
 				return 1, nil
 			}
 			return 0, nil
+		}
+		// int vs big int: compare in arbitrary precision.
+		if rightBig, ok := right.(core.BigIntValue); ok {
+			return core.PromoteToBigInt(leftNum).GetBigInt().Cmp(rightBig.GetBigInt()), nil
 		}
 		return 0, errors.NewTypeError("<",
 			"'<' not supported between instances of",
