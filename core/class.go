@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -1630,12 +1631,34 @@ func (i *Instance) Type() Type {
 	return Type(i.Class.Name)
 }
 
+// instanceStrKey identifies an instance being stringified on a goroutine.
+type instanceStrKey struct {
+	goid uint64
+	inst *Instance
+}
+
+// instanceStrInProgress guards against a __str__/__repr__ that stringifies self
+// (e.g. `return "%s" % self`). That recurses str -> object.__str__ -> String()
+// -> __repr__ -> str -> ... without passing through the eval recursion limit
+// (String() has no ctx), so it would overflow the Go stack instead of raising
+// RecursionError. On re-entry for the same instance we return the default
+// representation, breaking the cycle. Keyed by instance so legitimate deep
+// nesting of DISTINCT instances is unaffected.
+var instanceStrInProgress sync.Map // instanceStrKey -> struct{}
+
 // String returns the string representation of the instance, following CPython's
 // str() resolution: a user-defined __str__ wins, else it falls back to a
 // user-defined __repr__, else the default "<Name instance at addr>". The
 // object-base defaults are skipped (object.__str__ just re-enters here, and its
 // __repr__ is the same default format), so we check the defining class.
 func (i *Instance) String() string {
+	key := instanceStrKey{getGoroutineID(), i}
+	if _, busy := instanceStrInProgress.Load(key); busy {
+		return fmt.Sprintf("<%s instance at %p>", i.Class.Name, i)
+	}
+	instanceStrInProgress.Store(key, struct{}{})
+	defer instanceStrInProgress.Delete(key)
+
 	if s, ok := i.callNoArgDunderStr("__str__"); ok {
 		return s
 	}
