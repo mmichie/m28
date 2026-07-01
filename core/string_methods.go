@@ -318,11 +318,12 @@ func asciiOf(value Value) string {
 }
 
 // formatValueWithSpec formats a value according to a Python-style format specification
-// addThousandsSeparator inserts a grouping separator (',' or '_') every three
-// digits of the integer part of a formatted number string, preserving any sign
-// and fractional/exponent tail. Mirrors builtin/string_format.go's helper (core
-// cannot import builtin).
-func addThousandsSeparator(s string, sep rune) string {
+// addThousandsSeparator inserts a grouping separator (',' or '_') every
+// groupSize digits of the integer part of a formatted number string, preserving
+// any sign and fractional/exponent tail. Decimal/float use groupSize 3; binary,
+// octal and hex use 4 (only with '_', per CPython). Mirrors
+// builtin/string_format.go's helper (core cannot import builtin).
+func addThousandsSeparator(s string, sep rune, groupSize int) string {
 	// Split off a fractional/exponent tail so only the integer part is grouped.
 	intPart := s
 	tail := ""
@@ -337,25 +338,36 @@ func addThousandsSeparator(s string, sep rune) string {
 		intPart = intPart[1:]
 	}
 
-	// Only group runs of plain digits (leave things like 'inf'/'nan' alone).
+	// Skip an alt-form radix prefix (0x/0o/0b) so only the digits are grouped.
+	prefix := ""
+	if len(intPart) >= 2 && intPart[0] == '0' {
+		switch intPart[1] {
+		case 'x', 'X', 'o', 'O', 'b', 'B':
+			prefix = intPart[:2]
+			intPart = intPart[2:]
+		}
+	}
+
+	// Only group runs of digits (0-9a-fA-F, covering hex); 'inf'/'nan' contain
+	// non-hex letters (i/n) so they are left alone.
 	for _, r := range intPart {
-		if r < '0' || r > '9' {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
 			return s
 		}
 	}
-	if len(intPart) <= 3 {
-		return sign + intPart + tail
+	if len(intPart) <= groupSize {
+		return sign + prefix + intPart + tail
 	}
 
 	var grouped []rune
 	n := len(intPart)
 	for i, r := range intPart {
-		if i > 0 && (n-i)%3 == 0 {
+		if i > 0 && (n-i)%groupSize == 0 {
 			grouped = append(grouped, sep)
 		}
 		grouped = append(grouped, r)
 	}
-	return sign + string(grouped) + tail
+	return sign + prefix + string(grouped) + tail
 }
 
 func formatValueWithSpec(value Value, spec string) (string, error) {
@@ -588,13 +600,20 @@ func formatValueWithSpec(value Value, spec string) (string, error) {
 			}
 		}
 
-		// Apply digit grouping (thousands separator) for decimal/float types.
+		// Apply digit grouping (thousands separator).
 		// (Edge case: combined with zero-pad-to-width the separators are not
 		// woven into the leading zeros -- rare, and previously ungrouped anyway.)
 		if grouping != 0 {
 			switch fmtType {
-			case 0, 'd', 'f', 'F', 'g', 'G', '%', 'n':
-				result = addThousandsSeparator(result, grouping)
+			case 0, 'd', 'f', 'F', 'g', 'G', '%', 'n', 'e', 'E':
+				// Decimal/float group by 3 (',' or '_').
+				result = addThousandsSeparator(result, grouping, 3)
+			case 'b', 'o', 'x', 'X':
+				// Binary/octal/hex group by 4, and only '_' is allowed.
+				if grouping == ',' {
+					return "", &ValueError{Message: fmt.Sprintf("Cannot specify ',' with '%c'.", fmtType)}
+				}
+				result = addThousandsSeparator(result, grouping, 4)
 			}
 		}
 	} else if str, ok := value.(StringValue); ok {
