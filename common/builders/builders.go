@@ -46,10 +46,44 @@ func UnaryNumber(name string, fn func(float64) (float64, error)) BuiltinFunc {
 }
 
 // UnaryNumberSimple is for functions that can't fail
+// UnaryNumberSimple is for math functions that map one number to a float and
+// can't fail (sqrt, sin, cos, ...). The result is a Python float (FloatValue),
+// matching CPython where these always return float even for integral results
+// (math.sqrt(4) == 2.0). Functions that return int/bool (factorial, isnan) use
+// UnaryNumber instead.
 func UnaryNumberSimple(name string, fn func(float64) float64) BuiltinFunc {
-	return UnaryNumber(name, func(n float64) (float64, error) {
-		return fn(n), nil
-	})
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs(name, args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+		num, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
+		}
+		return core.FloatValue(fn(num)), nil
+	}
+}
+
+// UnaryFloat is like UnaryNumber but returns a Python float. Use it for math
+// functions that can fail with a domain error yet always yield a float
+// (sqrt, gamma, radians, ...). Integer/bool-returning ones stay on UnaryNumber.
+func UnaryFloat(name string, fn func(float64) (float64, error)) BuiltinFunc {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs(name, args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+		num, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
+		}
+		result, err := fn(num)
+		if err != nil {
+			return nil, errors.Wrap(err, errors.RuntimeError, name)
+		}
+		return core.FloatValue(result), nil
+	}
 }
 
 // BinaryNumber creates a function that operates on two numbers
@@ -80,11 +114,24 @@ func BinaryNumber(name string, fn func(float64, float64) (float64, error)) Built
 	}
 }
 
-// BinaryNumberSimple is for functions that can't fail
+// BinaryNumberSimple is for math functions of two numbers that return a float
+// and can't fail (atan2, hypot, copysign, ...). The result is a Python float.
 func BinaryNumberSimple(name string, fn func(float64, float64) float64) BuiltinFunc {
-	return BinaryNumber(name, func(a, b float64) (float64, error) {
-		return fn(a, b), nil
-	})
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs(name, args)
+		if err := v.Exact(2); err != nil {
+			return nil, err
+		}
+		a, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
+		}
+		b, err := v.GetNumber(1)
+		if err != nil {
+			return nil, err
+		}
+		return core.FloatValue(fn(a, b)), nil
+	}
 }
 
 // VariadicNumber creates a function that operates on multiple numbers

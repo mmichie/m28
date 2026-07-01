@@ -767,15 +767,8 @@ func toInt64(val core.Value) (int64, error) {
 }
 
 func toFloat64(val core.Value) (float64, error) {
-	switch v := val.(type) {
-	case core.NumberValue:
-		return float64(v), nil
-	case core.BoolValue:
-		if bool(v) {
-			return 1.0, nil
-		}
-		return 0.0, nil
-	default:
-		return 0, &core.TypeError{Message: fmt.Sprintf("cannot convert %s to float", val.Type())}
+	if f, ok := core.AsFloat(val); ok {
+		return f, nil
 	}
+	return 0, &core.TypeError{Message: fmt.Sprintf("cannot convert %s to float", val.Type())}
 }

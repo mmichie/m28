@@ -599,6 +599,9 @@ func EqualValues(a, b Value) bool {
 		if bVal, ok := b.(NumberValue); ok {
 			return complex128(aVal) == complex(float64(bVal), 0)
 		}
+		if bVal, ok := b.(FloatValue); ok {
+			return complex128(aVal) == complex(float64(bVal), 0)
+		}
 		// Complex can be compared to bool (0 or 1 with imaginary part 0)
 		if bVal, ok := b.(BoolValue); ok {
 			expected := complex(0, 0)

@@ -2325,6 +2325,10 @@ func registerComplexType() {
 						r := real(complex128(c1))
 						i := imag(complex128(c1))
 						return BoolValue(i == 0 && r == float64(c2)), nil
+					case FloatValue:
+						r := real(complex128(c1))
+						i := imag(complex128(c1))
+						return BoolValue(i == 0 && r == float64(c2)), nil
 					case BoolValue:
 						// bool is an int subclass: False==0, True==1
 						r := real(complex128(c1))
@@ -2401,6 +2405,8 @@ func registerComplexType() {
 					return ComplexValue(complex(0, 0)), nil
 				case NumberValue:
 					return ComplexValue(complex(float64(v), 0)), nil
+				case FloatValue:
+					return ComplexValue(complex(float64(v), 0)), nil
 				case ComplexValue:
 					return v, nil
 				case StringValue:
@@ -2427,6 +2433,8 @@ func registerComplexType() {
 					}
 				case NumberValue:
 					realPart = float64(r)
+				case FloatValue:
+					realPart = float64(r)
 				case ComplexValue:
 					return nil, &TypeError{Message: "complex() can't take second arg if first is a string"}
 				default:
@@ -2441,6 +2449,8 @@ func registerComplexType() {
 						imagPart = 0
 					}
 				case NumberValue:
+					imagPart = float64(i)
+				case FloatValue:
 					imagPart = float64(i)
 				default:
 					return nil, &TypeError{Message: fmt.Sprintf("complex() second argument must be a number, not '%s'", i.Type())}

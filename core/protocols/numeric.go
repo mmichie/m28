@@ -339,6 +339,12 @@ func GetNumericOps(v core.Value) (Numeric, bool) {
 	switch val := v.(type) {
 	case core.NumberValue:
 		return NewNumericOps(val), true
+	case core.FloatValue:
+		// Pure-float arithmetic is intercepted by the operators' float fast
+		// paths before this; NumericOps is only reached here for the mixed
+		// float-with-complex (and dunder-object) fall-through, which correctly
+		// promotes to complex.
+		return NewNumericOps(core.NumberValue(float64(val))), true
 	case core.BoolValue:
 		// Python: bools behave like ints in arithmetic (True=1, False=0)
 		if bool(val) {
@@ -376,6 +382,8 @@ func (c *ComplexNumericOps) Add(other core.Value) (core.Value, error) {
 	case core.NumberValue:
 		// Complex + Number = Complex
 		return core.ComplexValue(c.value + complex(float64(v), 0)), nil
+	case core.FloatValue:
+		return core.ComplexValue(c.value + complex(float64(v), 0)), nil
 	case core.ComplexValue:
 		// Complex + Complex = Complex
 		return core.ComplexValue(c.value + complex128(v)), nil
@@ -390,6 +398,8 @@ func (c *ComplexNumericOps) Subtract(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
 		return core.ComplexValue(c.value - complex(float64(v), 0)), nil
+	case core.FloatValue:
+		return core.ComplexValue(c.value - complex(float64(v), 0)), nil
 	case core.ComplexValue:
 		return core.ComplexValue(c.value - complex128(v)), nil
 	default:
@@ -403,6 +413,8 @@ func (c *ComplexNumericOps) Multiply(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
 		return core.ComplexValue(c.value * complex(float64(v), 0)), nil
+	case core.FloatValue:
+		return core.ComplexValue(c.value * complex(float64(v), 0)), nil
 	case core.ComplexValue:
 		return core.ComplexValue(c.value * complex128(v)), nil
 	default:
@@ -415,6 +427,11 @@ func (c *ComplexNumericOps) Multiply(other core.Value) (core.Value, error) {
 func (c *ComplexNumericOps) Divide(other core.Value) (core.Value, error) {
 	switch v := other.(type) {
 	case core.NumberValue:
+		if float64(v) == 0 {
+			return nil, core.NewZeroDivisionError()
+		}
+		return core.ComplexValue(c.value / complex(float64(v), 0)), nil
+	case core.FloatValue:
 		if float64(v) == 0 {
 			return nil, core.NewZeroDivisionError()
 		}

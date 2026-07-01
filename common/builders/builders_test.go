@@ -80,12 +80,11 @@ func TestUnaryNumber(t *testing.T) {
 					t.Errorf("UnaryNumber() error = %v, want %v", err.Error(), tt.errMsg)
 				}
 			} else {
-				if n, ok := got.(core.NumberValue); ok {
-					if float64(n) != tt.want {
-						t.Errorf("UnaryNumber() = %v, want %v", float64(n), tt.want)
-					}
-				} else {
-					t.Errorf("UnaryNumber() returned non-number: %v", got)
+				// UnaryNumberSimple returns a Python float (FloatValue).
+				if _, ok := got.(core.FloatValue); !ok {
+					t.Errorf("UnaryNumberSimple() returned non-float type %T: %v", got, got)
+				} else if f, ok := core.AsFloat(got); !ok || f != tt.want {
+					t.Errorf("UnaryNumberSimple() = %v, want %v", got, tt.want)
 				}
 			}
 		})

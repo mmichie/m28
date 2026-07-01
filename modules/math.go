@@ -15,7 +15,7 @@ func InitMathModule() *core.DictValue {
 	mathModule := core.NewDict()
 
 	// Trigonometric functions
-	mathModule.Set("sqrt", core.NewBuiltinFunction(builders.UnaryNumber("sqrt", func(n float64) (float64, error) {
+	mathModule.Set("sqrt", core.NewBuiltinFunction(builders.UnaryFloat("sqrt", func(n float64) (float64, error) {
 		if n < 0 {
 			return 0, errors.NewValueError("sqrt", "math domain error")
 		}
@@ -121,14 +121,14 @@ func InitMathModule() *core.DictValue {
 	mathModule.Set("atanh", core.NewBuiltinFunction(builders.UnaryNumberSimple("atanh", math.Atanh)))
 
 	// Gamma functions (needed by random module)
-	mathModule.Set("lgamma", core.NewBuiltinFunction(builders.UnaryNumber("lgamma", func(x float64) (float64, error) {
+	mathModule.Set("lgamma", core.NewBuiltinFunction(builders.UnaryFloat("lgamma", func(x float64) (float64, error) {
 		if x <= 0 && x == math.Floor(x) {
 			return 0, errors.NewValueError("lgamma", "math domain error")
 		}
 		result, _ := math.Lgamma(x) // Ignore sign, return log of absolute value
 		return result, nil
 	})))
-	mathModule.Set("gamma", core.NewBuiltinFunction(builders.UnaryNumber("gamma", func(x float64) (float64, error) {
+	mathModule.Set("gamma", core.NewBuiltinFunction(builders.UnaryFloat("gamma", func(x float64) (float64, error) {
 		if x <= 0 && x == math.Floor(x) {
 			return 0, errors.NewValueError("gamma", "math domain error")
 		}
@@ -140,10 +140,10 @@ func InitMathModule() *core.DictValue {
 	mathModule.Set("erfc", core.NewBuiltinFunction(builders.UnaryNumberSimple("erfc", math.Erfc)))
 
 	// Angle conversion
-	mathModule.Set("degrees", core.NewBuiltinFunction(builders.UnaryNumber("degrees", func(x float64) (float64, error) {
+	mathModule.Set("degrees", core.NewBuiltinFunction(builders.UnaryFloat("degrees", func(x float64) (float64, error) {
 		return x * 180.0 / math.Pi, nil
 	})))
-	mathModule.Set("radians", core.NewBuiltinFunction(builders.UnaryNumber("radians", func(x float64) (float64, error) {
+	mathModule.Set("radians", core.NewBuiltinFunction(builders.UnaryFloat("radians", func(x float64) (float64, error) {
 		return x * math.Pi / 180.0, nil
 	})))
 
