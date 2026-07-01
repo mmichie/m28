@@ -151,14 +151,15 @@ func TestFloatBuiltin(t *testing.T) {
 				return
 			}
 			if !tt.wantErr {
-				if numResult, ok := result.(core.NumberValue); ok {
-					if numExpected, ok := tt.expected.(core.NumberValue); ok {
-						if math.Abs(float64(numResult-numExpected)) > 0.001 {
-							t.Errorf("float() = %v, want %v", result, tt.expected)
-						}
-					}
+				// float() must return a Python float (FloatValue), not an int.
+				if _, isFloat := result.(core.FloatValue); !isFloat {
+					t.Errorf("float() returned non-float type %T: %v", result, result)
 				} else {
-					t.Errorf("float() returned non-number: %v", result)
+					got, _ := core.AsFloat(result)
+					want, _ := core.AsFloat(tt.expected)
+					if math.Abs(got-want) > 0.001 {
+						t.Errorf("float() = %v, want %v", result, tt.expected)
+					}
 				}
 			}
 		})

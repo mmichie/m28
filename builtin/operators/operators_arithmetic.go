@@ -63,6 +63,11 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// Float fast path: any float operand promotes the result to float.
+	if r, ok, err := floatBinaryFast("+", left, right); ok {
+		return r, err
+	}
+
 	// First, try dunder method on left operand
 	if result, found, err := types.CallAdd(left, right, ctx); found {
 		return result, err
@@ -202,6 +207,11 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 
 // positiveValue implements unary + operator
 func positiveValue(value core.Value, ctx *core.Context) (core.Value, error) {
+	// Float fast path: +float stays a float.
+	if f, ok := value.(core.FloatValue); ok {
+		return f, nil
+	}
+
 	// Try __pos__ dunder method
 	if result, found, err := types.CallDunder(value, "__pos__", []core.Value{}, ctx); found {
 		return result, err
@@ -264,6 +274,12 @@ func Subtract() func([]core.Value, *core.Context) (core.Value, error) {
 
 // negateValue negates a single value
 func negateValue(value core.Value, ctx *core.Context) (core.Value, error) {
+	// Float fast path: -float stays a float (the numeric Switch below would
+	// otherwise rebuild it as an int NumberValue).
+	if f, ok := value.(core.FloatValue); ok {
+		return core.FloatValue(-float64(f)), nil
+	}
+
 	// Try __neg__ dunder method
 	if result, found, err := types.CallDunder(value, "__neg__", []core.Value{}, ctx); found {
 		return result, err
@@ -318,6 +334,11 @@ func subtractTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 			}
 			return core.NumberValue(diff), nil
 		}
+	}
+
+	// Float fast path: any float operand promotes the result to float.
+	if r, ok, err := floatBinaryFast("-", left, right); ok {
+		return r, err
 	}
 
 	// Try __sub__ on left operand
@@ -405,6 +426,12 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 			}
 			return core.NumberValue(prod), nil
 		}
+	}
+
+	// Float fast path: any float operand promotes the result to float. (Sequence
+	// repetition needs a non-numeric operand, which floatBinaryFast declines.)
+	if r, ok, err := floatBinaryFast("*", left, right); ok {
+		return r, err
 	}
 
 	// Try __mul__ on left operand
@@ -643,6 +670,18 @@ func Divide() func([]core.Value, *core.Context) (core.Value, error) {
 
 // divideValue divides left by right
 func divideValue(left, right core.Value, ctx *core.Context) (core.Value, error) {
+	// True division of two real numbers always yields a float (4/2 == 2.0).
+	// BigInt operands fall through to bigIntArith, which divides in full
+	// precision before rounding to float.
+	if isFixedReal(left) && isFixedReal(right) {
+		lf, _ := core.AsFloat(left)
+		rf, _ := core.AsFloat(right)
+		if rf == 0 {
+			return nil, core.NewZeroDivisionError()
+		}
+		return core.FloatValue(lf / rf), nil
+	}
+
 	// Try __truediv__ on left operand
 	if result, found, err := types.CallDunder(left, "__truediv__", []core.Value{right}, ctx); found {
 		return result, err
@@ -672,7 +711,7 @@ func divideValue(left, right core.Value, ctx *core.Context) (core.Value, error) 
 					if rightNum == 0 {
 						return nil, &core.ZeroDivisionError{}
 					}
-					return core.NumberValue(leftNum / rightNum), nil
+					return core.FloatValue(leftNum / rightNum), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
 					return nil, errors.NewTypeError("/",
@@ -728,6 +767,11 @@ func floorDivideValue(left, right core.Value, ctx *core.Context) (core.Value, er
 	// Try __rfloordiv__ on right operand
 	if result, found, err := types.CallDunder(right, "__rfloordiv__", []core.Value{left}, ctx); found {
 		return result, err
+	}
+
+	// Float fast path: any float operand yields a float (7.0 // 2 == 3.0).
+	if r, ok, err := floatBinaryFast("//", left, right); ok {
+		return r, err
 	}
 
 	// Arbitrary-precision integers (and big/number/bool/float mixes).
@@ -786,6 +830,13 @@ func moduloTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 	// Try __rmod__ on right operand
 	if result, found, err := types.CallDunder(right, "__rmod__", []core.Value{left}, ctx); found {
 		return result, err
+	}
+
+	// Float fast path: any float operand yields a float (7.0 % 2 == 1.0).
+	// Declined when an operand is non-numeric so str/bytes %-formatting below
+	// is not intercepted.
+	if r, ok, err := floatBinaryFast("%", left, right); ok {
+		return r, err
 	}
 
 	// Arbitrary-precision integers (and big/number/bool/float mixes). Guarded
@@ -856,6 +907,21 @@ func powerTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 		return result, err
 	}
 
+	// Float fast path: any float operand makes the result a float (2 ** 0.5,
+	// 3.0 ** 2 == 9.0). A finite base/exponent overflowing float64 raises
+	// OverflowError, matching CPython (2.0 ** 2000).
+	if core.IsFloatValue(left) || core.IsFloatValue(right) {
+		if lf, ok := core.AsFloat(left); ok {
+			if rf, ok := core.AsFloat(right); ok {
+				res := math.Pow(lf, rf)
+				if math.IsInf(res, 0) && !math.IsInf(lf, 0) && !math.IsInf(rf, 0) {
+					return nil, &core.OverflowError{Message: "(34, 'Numerical result out of range')"}
+				}
+				return core.FloatValue(res), nil
+			}
+		}
+	}
+
 	// Try protocol-based numeric operations
 	if leftNum, ok := protocols.GetNumericOps(left); ok {
 		return leftNum.Power(right)
@@ -907,9 +973,10 @@ func powerTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 						return core.NumberValue(result), nil
 					}
 
-					// For non-integer or negative exponents, use float math
+					// For non-integer or negative exponents, the result is a
+					// float (e.g. 10 ** -1 == 0.1, 2 ** 0.5).
 					result := math.Pow(leftNum, rightNum)
-					return core.NumberValue(result), nil
+					return core.FloatValue(result), nil
 				}).
 				Default(func(r core.Value) (core.Value, error) {
 					return nil, errors.NewTypeError("**",
@@ -970,7 +1037,7 @@ func bigIntPower(left, right core.Value) (core.Value, error) {
 		leftFloat, _ := new(big.Float).SetInt(leftBig).Float64()
 		rightFloat, _ := new(big.Float).SetInt(rightBig).Float64()
 		result := math.Pow(leftFloat, rightFloat)
-		return core.NumberValue(result), nil
+		return core.FloatValue(result), nil
 	}
 
 	// Check exponent is reasonable size (prevent DoS)

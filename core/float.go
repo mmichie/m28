@@ -25,15 +25,11 @@ func (f FloatValue) String() string {
 	return PyFloatRepr(float64(f))
 }
 
-// GetAttr resolves float methods. Float and int currently share the numeric type
-// descriptor; identity (type()/isinstance) is handled separately by Go type.
+// GetAttr resolves float methods via the dedicated float type descriptor. It does
+// NOT fall back to the int (NumberType) descriptor: those handlers assert a
+// NumberValue receiver and would panic on a FloatValue.
 func (f FloatValue) GetAttr(name string) (Value, bool) {
 	if desc := GetTypeDescriptor(FloatType); desc != nil {
-		if val, err := desc.GetAttribute(f, name); err == nil {
-			return val, true
-		}
-	}
-	if desc := GetTypeDescriptor(NumberType); desc != nil {
 		if val, err := desc.GetAttribute(f, name); err == nil {
 			return val, true
 		}

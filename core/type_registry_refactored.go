@@ -28,6 +28,7 @@ func registerObjectTypes() {
 // registerPrimitiveTypes registers number, string, bool, nil, symbol, bytes, bytearray, complex, and decimal types
 func registerPrimitiveTypes() {
 	registerNumberType()
+	registerFloatType()
 	registerStringType()
 	registerBoolType()
 	registerNilType()

@@ -534,9 +534,12 @@ func (p *Parser) parseAtomFromToken() (core.Value, error) {
 				if !prevIsLParenInSexpr {
 					p.advanceToken() // consume -
 					p.advanceToken() // consume number
-					// Create negative number
-					if num, ok := nextTok.Value.(core.NumberValue); ok {
+					// Create negative number, preserving int vs float identity.
+					switch num := nextTok.Value.(type) {
+					case core.NumberValue:
 						return core.NumberValue(-float64(num)), nil
+					case core.FloatValue:
+						return core.FloatValue(-float64(num)), nil
 					}
 				}
 			}
@@ -2430,6 +2433,10 @@ func (p *Parser) parseNumber() (core.Value, error) {
 		return nil, p.error(fmt.Sprintf("invalid number: %s", numStr))
 	}
 
+	// A decimal point or exponent makes it a Python float; otherwise an int.
+	if strings.ContainsAny(numStr, ".eE") {
+		return core.FloatValue(num), nil
+	}
 	return core.NumberValue(num), nil
 }
 

@@ -693,22 +693,27 @@ func FloatBuilder() builders.BuiltinFunc {
 
 		// Python float() with no args returns 0.0
 		if v.Count() == 0 {
-			return core.NumberValue(0.0), nil
+			return core.FloatValue(0.0), nil
 		}
 
 		val := v.Get(0)
+
+		// A float stays itself.
+		if f, ok := val.(core.FloatValue); ok {
+			return f, nil
+		}
 
 		// Try __float__ dunder method first
 		if floatVal, found, err := types.CallFloat(val, ctx); found {
 			if err != nil {
 				return nil, err
 			}
-			return core.NumberValue(floatVal), nil
+			return core.FloatValue(floatVal), nil
 		}
 
 		switch x := val.(type) {
 		case core.NumberValue:
-			return x, nil
+			return core.FloatValue(float64(x)), nil
 		case core.BigIntValue:
 			// Convert an arbitrary-precision int to the nearest float, raising
 			// OverflowError when it exceeds the float64 range (as CPython does).
@@ -716,34 +721,34 @@ func FloatBuilder() builders.BuiltinFunc {
 			if math.IsInf(f, 0) {
 				return nil, &core.OverflowError{Message: "int too large to convert to float"}
 			}
-			return core.NumberValue(f), nil
+			return core.FloatValue(f), nil
 		case core.StringValue:
 			s := strings.TrimSpace(string(x))
 			// Handle special values
 			switch strings.ToLower(s) {
-			case "inf", "infinity":
-				return core.NumberValue(math.Inf(1)), nil
+			case "inf", "infinity", "+inf", "+infinity":
+				return core.FloatValue(math.Inf(1)), nil
 			case "-inf", "-infinity":
-				return core.NumberValue(math.Inf(-1)), nil
-			case "nan":
-				return core.NumberValue(math.NaN()), nil
+				return core.FloatValue(math.Inf(-1)), nil
+			case "nan", "+nan", "-nan":
+				return core.FloatValue(math.NaN()), nil
 			}
 			// Try to parse as float. An out-of-range value still parses (ParseFloat
 			// returns ±Inf for overflow, 0 for underflow, with ErrRange), matching
 			// Python: float('1e400') == inf.
 			f, err := strconv.ParseFloat(s, 64)
 			if err == nil {
-				return core.NumberValue(f), nil
+				return core.FloatValue(f), nil
 			}
 			if ne, ok := err.(*strconv.NumError); ok && ne.Err == strconv.ErrRange {
-				return core.NumberValue(f), nil
+				return core.FloatValue(f), nil
 			}
 			return nil, errors.NewValueError("float", fmt.Sprintf("could not convert string to float: '%s'", s))
 		case core.BoolValue:
 			if bool(x) {
-				return core.NumberValue(1.0), nil
+				return core.FloatValue(1.0), nil
 			}
-			return core.NumberValue(0.0), nil
+			return core.FloatValue(0.0), nil
 		default:
 			return nil, errors.NewTypeError("float", "number or string", string(val.Type()))
 		}
@@ -943,7 +948,9 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 		typeName := string(t)
 		switch obj.(type) {
 		case core.NumberValue:
-			return typeName == string(core.NumberType) || typeName == "int" || typeName == "float"
+			return typeName == string(core.NumberType) || typeName == "int"
+		case core.FloatValue:
+			return typeName == string(core.FloatType) || typeName == "float"
 		case core.BigIntValue:
 			return typeName == string(core.BigIntType) || typeName == "int"
 		case core.StringValue:
@@ -993,6 +1000,17 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 			return core.IsInstanceOf(inst, t.Class)
 		}
 		return false
+	case *FloatType:
+		// float matches only FloatValue (and float-subclass instances). A plain
+		// int is NOT a float. Must precede *core.Class because FloatType embeds it.
+		switch obj.(type) {
+		case core.FloatValue:
+			return true
+		case *core.Instance:
+			inst := obj.(*core.Instance)
+			return core.IsInstanceOf(inst, t.Class)
+		}
+		return false
 	case *BoolType:
 		// Special handling for bool type - only BoolValue is an instance of bool
 		// NumberValue (int) is NOT an instance of bool
@@ -1022,7 +1040,9 @@ func isInstanceOf(obj, typeVal core.Value) bool {
 				case *core.ListValue:
 					return typeName == "list"
 				case core.NumberValue:
-					return typeName == "int" || typeName == "float"
+					return typeName == "int"
+				case core.FloatValue:
+					return typeName == "float"
 				case core.BigIntValue:
 					return typeName == "int"
 				case core.StringValue:

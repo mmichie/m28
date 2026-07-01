@@ -22,6 +22,9 @@ func numericOperand(v core.Value) (asFloat float64, asInt *big.Int, ok bool) {
 			return f, core.PromoteToBigInt(x).GetBigInt(), true
 		}
 		return f, nil, true // non-integral float
+	case core.FloatValue:
+		// A float operand forces the whole expression to float (asInt nil).
+		return float64(x), nil, true
 	case core.BoolValue:
 		if bool(x) {
 			return 1, big.NewInt(1), true
@@ -89,17 +92,17 @@ func bigIntArith(op string, left, right core.Value) (core.Value, bool, error) {
 	switch op {
 	case "+":
 		if useFloat {
-			return core.NumberValue(lf + rf), true, nil
+			return core.FloatValue(lf + rf), true, nil
 		}
 		return demoteBig(new(big.Int).Add(la, ra)), true, nil
 	case "-":
 		if useFloat {
-			return core.NumberValue(lf - rf), true, nil
+			return core.FloatValue(lf - rf), true, nil
 		}
 		return demoteBig(new(big.Int).Sub(la, ra)), true, nil
 	case "*":
 		if useFloat {
-			return core.NumberValue(lf * rf), true, nil
+			return core.FloatValue(lf * rf), true, nil
 		}
 		return demoteBig(new(big.Int).Mul(la, ra)), true, nil
 	case "/":
@@ -108,19 +111,19 @@ func bigIntArith(op string, left, right core.Value) (core.Value, bool, error) {
 			if rf == 0 {
 				return nil, true, core.NewZeroDivisionError()
 			}
-			return core.NumberValue(lf / rf), true, nil
+			return core.FloatValue(lf / rf), true, nil
 		}
 		if ra.Sign() == 0 {
 			return nil, true, core.NewZeroDivisionError()
 		}
 		quo, _ := new(big.Float).Quo(new(big.Float).SetInt(la), new(big.Float).SetInt(ra)).Float64()
-		return core.NumberValue(quo), true, nil
+		return core.FloatValue(quo), true, nil
 	case "//":
 		if useFloat {
 			if rf == 0 {
 				return nil, true, core.NewZeroDivisionError()
 			}
-			return core.NumberValue(math.Floor(lf / rf)), true, nil
+			return core.FloatValue(math.Floor(lf / rf)), true, nil
 		}
 		if ra.Sign() == 0 {
 			return nil, true, core.NewZeroDivisionError()
@@ -132,7 +135,7 @@ func bigIntArith(op string, left, right core.Value) (core.Value, bool, error) {
 			if rf == 0 {
 				return nil, true, core.NewZeroDivisionError()
 			}
-			return core.NumberValue(pyFloatMod(lf, rf)), true, nil
+			return core.FloatValue(pyFloatMod(lf, rf)), true, nil
 		}
 		if ra.Sign() == 0 {
 			return nil, true, core.NewZeroDivisionError()

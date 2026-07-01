@@ -387,10 +387,16 @@ func (t *Tokenizer) scanNumber(start, startLine, startCol int) Token {
 		return t.errorToken(fmt.Sprintf("invalid number: %v", err), start, startLine, startCol)
 	}
 
+	// A decimal point or exponent makes it a Python float; otherwise an int.
+	var value core.Value = core.NumberValue(num)
+	if strings.ContainsAny(lexeme, ".eE") {
+		value = core.FloatValue(num)
+	}
+
 	return Token{
 		Type:     TOKEN_NUMBER,
 		Lexeme:   lexeme,
-		Value:    core.NumberValue(num),
+		Value:    value,
 		Line:     startLine,
 		Col:      startCol,
 		StartPos: start,

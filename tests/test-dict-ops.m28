@@ -133,7 +133,7 @@
 # Convert numbers to strings
 (= stringified (map-values prices (lambda (v) (return (str v)))))
 (print (+ "Stringified: " (str stringified)))
-(assert (== (get-item stringified "apple") "1") "map-values can change value types")
+(assert (== (get-item stringified "apple") "1.0") "map-values can change value types")
 
 (print "✓ map-values works")
 

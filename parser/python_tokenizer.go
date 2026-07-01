@@ -940,7 +940,7 @@ skipScientific:
 		if len(cleanLexeme) > 1 && cleanLexeme[0] == '0' && strings.TrimLeft(cleanLexeme, "0") != "" {
 			return Token{Type: TOKEN_ERROR, Lexeme: lexeme,
 				Value: core.StringValue("leading zeros in decimal integer literals are not permitted; use an 0o prefix for octal integers"),
-				Line: startLine, Col: startCol, StartPos: start, EndPos: t.pos}
+				Line:  startLine, Col: startCol, StartPos: start, EndPos: t.pos}
 		}
 	}
 
@@ -969,7 +969,7 @@ skipScientific:
 				f = 0.0
 			}
 		}
-		value = core.NumberValue(f)
+		value = core.FloatValue(f)
 	} else {
 		// Integer. Values beyond int64 (and beyond float64's exact range) use
 		// arbitrary-precision BigInt so the literal keeps full precision.

@@ -755,7 +755,7 @@ func EqualValues(a, b Value) bool {
 // IsHashable determines if a value can be used as a dictionary key
 func IsHashable(v Value) bool {
 	switch v.(type) {
-	case NumberValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class, BytesValue, ComplexValue, *Module:
+	case NumberValue, FloatValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class, BytesValue, ComplexValue, *Module:
 		// Modules (like classes and functions) are hashable by identity in
 		// Python, so they can be used as dict keys / set members. ValueToKey
 		// and ComputeHash already key them by pointer.

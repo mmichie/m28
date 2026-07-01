@@ -1377,7 +1377,7 @@ func toIndex(obj Value, ctx *Context) (int, error) {
 				// Ensure result is an integer
 				num, ok := result.(NumberValue)
 				if !ok {
-					return 0, &TypeError{Message: fmt.Sprintf("__index__ returned non-int type %s", result.Type())}
+					return 0, &TypeError{Message: fmt.Sprintf("__index__ returned non-int (type %s)", GetPythonTypeName(result))}
 				}
 				f := float64(num)
 				if f != math.Trunc(f) {
@@ -1579,7 +1579,9 @@ func callLtWithReflection(a, b Value, ctx *Context) (bool, error) {
 	// Try a.__lt__(b)
 	if aObj, ok := a.(interface{ GetAttr(string) (Value, bool) }); ok {
 		if ltMethod, found := aObj.GetAttr("__lt__"); found {
-			if callable, ok := ltMethod.(interface{ Call([]Value, *Context) (Value, error) }); ok {
+			if callable, ok := ltMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
 				result, err := callable.Call([]Value{b}, ctx)
 				if err != nil {
 					return false, err
@@ -1593,7 +1595,9 @@ func callLtWithReflection(a, b Value, ctx *Context) (bool, error) {
 	// Try b.__gt__(a) (reflected)
 	if bObj, ok := b.(interface{ GetAttr(string) (Value, bool) }); ok {
 		if gtMethod, found := bObj.GetAttr("__gt__"); found {
-			if callable, ok := gtMethod.(interface{ Call([]Value, *Context) (Value, error) }); ok {
+			if callable, ok := gtMethod.(interface {
+				Call([]Value, *Context) (Value, error)
+			}); ok {
 				result, err := callable.Call([]Value{a}, ctx)
 				if err != nil {
 					return false, err

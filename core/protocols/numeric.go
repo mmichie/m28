@@ -227,8 +227,14 @@ func (n *NumericOps) Power(other core.Value) (core.Value, error) {
 			}
 		}
 
-		// Safe to use float64
-		return core.NumberValue(math.Pow(leftNum, rightNum)), nil
+		// A negative exponent or non-integer operand yields a float in Python
+		// (10 ** -1 == 0.1); an integer base to a non-negative integer power
+		// stays an int.
+		result := math.Pow(leftNum, rightNum)
+		if !leftIsInt || !rightIsInt || rightNum < 0 {
+			return core.FloatValue(result), nil
+		}
+		return core.NumberValue(result), nil
 	case core.BoolValue:
 		// Python: True == 1, False == 0
 		var rightNum float64

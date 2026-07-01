@@ -1845,6 +1845,21 @@ func metaclassCheckArg(method string, classinfo, arg core.Value, ctx *core.Conte
 	return metaclassCheck(method, classinfo, arg, ctx)
 }
 
+// numericTypeNameMatch reports whether a value whose Type() string is actualType
+// is an instance of the builtin numeric type named typeName. It follows CPython's
+// int/float split: "int" covers number (fixed int), bigint, and bool (bool is a
+// subclass of int); "float" covers only float. ok is false when typeName is not a
+// numeric builtin, so callers keep their remaining cases.
+func numericTypeNameMatch(typeName, actualType string) (match bool, ok bool) {
+	switch typeName {
+	case "int":
+		return actualType == "number" || actualType == "bigint" || actualType == "bool", true
+	case "float":
+		return actualType == "float", true
+	}
+	return false, false
+}
+
 func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() != 2 {
 		return nil, &core.TypeError{Message: "isinstance requires 2 arguments"}
@@ -1886,7 +1901,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				match := false
 				switch expectedType {
 				case "int", "float":
-					match = actualType == "number" || (expectedType == "int" && actualType == "bigint") || (expectedType == "int" && actualType == "bool")
+					match, _ = numericTypeNameMatch(expectedType, actualType)
 				case "str":
 					match = actualType == "string"
 				case "bool":
@@ -1924,7 +1939,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 						case "list":
 							match = actualType == "list"
 						case "int", "float":
-							match = actualType == "number" || (typeName == "int" && actualType == "bigint") || (typeName == "int" && actualType == "bool")
+							match, _ = numericTypeNameMatch(typeName, actualType)
 						case "str":
 							match = actualType == "string"
 						case "bool":
@@ -1965,7 +1980,11 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 						return core.True, nil
 					}
 				case core.NumberValue:
-					if class.Name == "number" || class.Name == "int" || class.Name == "float" {
+					if class.Name == "number" || class.Name == "int" {
+						return core.True, nil
+					}
+				case core.FloatValue:
+					if class.Name == "float" {
 						return core.True, nil
 					}
 				case core.BigIntValue:
@@ -2020,7 +2039,11 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 						return core.True, nil
 					}
 				case core.NumberValue:
-					if class.Name == "number" || class.Name == "int" || class.Name == "float" {
+					if class.Name == "number" || class.Name == "int" {
+						return core.True, nil
+					}
+				case core.FloatValue:
+					if class.Name == "float" {
 						return core.True, nil
 					}
 				case core.BigIntValue:
@@ -2071,7 +2094,8 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		// Handle Python type name aliases
 		switch expectedType {
 		case "int", "float":
-			return core.BoolValue(actualType == "number" || (expectedType == "int" && actualType == "bigint") || (expectedType == "int" && actualType == "bool")), nil
+			m, _ := numericTypeNameMatch(expectedType, actualType)
+			return core.BoolValue(m), nil
 		case "str":
 			return core.BoolValue(actualType == "string"), nil
 		case "bool":
@@ -2104,7 +2128,8 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				case "list":
 					return core.BoolValue(actualType == "list"), nil
 				case "int", "float":
-					return core.BoolValue(actualType == "number" || (typeName == "int" && actualType == "bigint") || (typeName == "int" && actualType == "bool")), nil
+					m, _ := numericTypeNameMatch(typeName, actualType)
+					return core.BoolValue(m), nil
 				case "str":
 					return core.BoolValue(actualType == "string"), nil
 				case "bool":
@@ -2140,7 +2165,7 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				case "list":
 					match = actualType == "list"
 				case "int", "float":
-					match = actualType == "number" || (typeName == "int" && actualType == "bigint") || (typeName == "int" && actualType == "bool")
+					match, _ = numericTypeNameMatch(typeName, actualType)
 				case "str":
 					match = actualType == "string"
 				case "bool":
@@ -2222,8 +2247,13 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				return core.True, nil
 			}
 		case core.NumberValue:
-			// Check if class is the number/int/float class
-			if class.Name == "number" || class.Name == "int" || class.Name == "float" {
+			// Check if class is the number/int class
+			if class.Name == "number" || class.Name == "int" {
+				return core.True, nil
+			}
+		case core.FloatValue:
+			// Check if class is the float class
+			if class.Name == "float" {
 				return core.True, nil
 			}
 		case core.BigIntValue:

@@ -30,7 +30,7 @@ func TestParseLiteral(t *testing.T) {
 		expected core.Value
 	}{
 		{"42", core.NumberValue(42)},
-		{"3.14", core.NumberValue(3.14)},
+		{"3.14", core.FloatValue(3.14)},
 		{`"hello"`, core.StringValue("hello")},
 		{"True", core.BoolValue(true)},
 		{"False", core.BoolValue(false)},

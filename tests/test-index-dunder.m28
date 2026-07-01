@@ -52,7 +52,7 @@
     (assert False "Should have raised error for non-integer __index__"))
   (except e
     # Success - error was raised as expected
-    (assert (in "__index__ returned non-integer" (str e))
+    (assert (in "__index__ returned non-int" (str e))
             "Error message for non-integer __index__")))
 
 # Test 8: Error handling - missing __index__ on non-number
@@ -77,7 +77,7 @@
     (assert False "Should have raised error for float index"))
   (except e
     # Success - error was raised as expected
-    (assert (in "non-integer" (str e)) "Error message for float index")))
+    (assert (in "not float" (str e)) "Error message for float index")))
 
 # Test 10: Slicing with custom __index__ in all positions
 (= s1 (MyIndex 0))

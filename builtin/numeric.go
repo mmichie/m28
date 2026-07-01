@@ -192,10 +192,12 @@ func RegisterNumeric(ctx *core.Context) {
 		quotient := math.Floor(a / b)
 		remainder := a - quotient*b
 
-		return core.TupleValue{
-			core.NumberValue(quotient),
-			core.NumberValue(remainder),
-		}, nil
+		// A float operand makes both results floats (divmod(7.5, 2) ==
+		// (3.0, 1.5)); two ints yield ints.
+		if core.IsFloatValue(left) || core.IsFloatValue(right) {
+			return core.TupleValue{core.FloatValue(quotient), core.FloatValue(remainder)}, nil
+		}
+		return core.TupleValue{core.NumberValue(quotient), core.NumberValue(remainder)}, nil
 	}))
 
 	// pow - power function (also available as ** operator)

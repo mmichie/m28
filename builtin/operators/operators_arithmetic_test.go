@@ -527,11 +527,13 @@ func valuesEqual(a, b core.Value) bool {
 }
 
 func valuesApproxEqual(a, b core.Value, epsilon float64) bool {
-	// Handle numbers with approximate comparison
-	av, aOk := a.(core.NumberValue)
-	bv, bOk := b.(core.NumberValue)
+	// Handle any real numbers (int or float) by value, so FloatValue(5.0)
+	// matches NumberValue(5): true division and fractional powers now yield a
+	// float where they once produced an integer.
+	av, aOk := core.AsFloat(a)
+	bv, bOk := core.AsFloat(b)
 	if aOk && bOk {
-		return math.Abs(float64(av)-float64(bv)) < epsilon
+		return math.Abs(av-bv) < epsilon
 	}
 
 	// Handle complex numbers with approximate comparison

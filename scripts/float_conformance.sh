@@ -46,10 +46,25 @@ exprs=(
   "float('inf')" "float('-inf')" "float('nan') != float('nan')"
 )
 
+# Extract a Python exception class name (e.g. OverflowError) from output, else "".
+errtype() { printf '%s\n' "$1" | grep -oE '[A-Za-z]+Error' | tail -1; }
+
 pass=0; fail=0; failures=()
 for e in "${exprs[@]}"; do
   want=$($PY -c "print(repr($e))" 2>&1)
-  got=$($M28 -e "print(repr($e))" 2>&1 | head -1)
+  got=$($M28 -e "print(repr($e))" 2>&1)
+  wantErr=$(errtype "$want")
+  if [ -n "$wantErr" ]; then
+    # CPython raises: pass if M28 raises the same exception type.
+    gotErr=$(errtype "$got")
+    if [ "$wantErr" = "$gotErr" ]; then
+      pass=$((pass+1)); [ $verbose -eq 1 ] && printf 'OK   %-28s raises %s\n' "$e" "$wantErr"
+    else
+      fail=$((fail+1)); failures+=("$(printf '%-28s want=raise %-16s got=%s' "$e" "$wantErr" "${gotErr:-$(printf '%s' "$got" | head -1)}")")
+    fi
+    continue
+  fi
+  got=$(printf '%s' "$got" | head -1)
   if [ "$want" = "$got" ]; then
     pass=$((pass+1))
     [ $verbose -eq 1 ] && printf 'OK   %-28s %s\n' "$e" "$got"

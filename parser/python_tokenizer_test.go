@@ -351,9 +351,10 @@ func TestPythonTokenizer_NumberParsing(t *testing.T) {
 		expected core.Value
 	}{
 		{"42", core.NumberValue(42)},
-		{"3.14", core.NumberValue(3.14)},
-		{"1e10", core.NumberValue(1e10)},
-		{"2.5e-3", core.NumberValue(2.5e-3)},
+		// A decimal point or exponent makes a Python float (FloatValue).
+		{"3.14", core.FloatValue(3.14)},
+		{"1e10", core.FloatValue(1e10)},
+		{"2.5e-3", core.FloatValue(2.5e-3)},
 	}
 
 	for _, tt := range tests {

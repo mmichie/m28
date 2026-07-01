@@ -92,13 +92,10 @@ func (a *Args) GetNumber(index int) (float64, error) {
 		return 0, errors.NewArgumentError(a.function, index+1, len(a.args))
 	}
 
-	if num, ok := a.args[index].(core.NumberValue); ok {
-		return float64(num), nil
-	}
-
-	// Also accept BigIntValue and convert to float64 (may lose precision for large values)
-	if bigInt, ok := a.args[index].(core.BigIntValue); ok {
-		return bigInt.ToFloat64(), nil
+	// Accept any real number: int (NumberValue), float (FloatValue), arbitrary-
+	// precision int (BigIntValue, may lose precision), or bool.
+	if f, ok := core.AsFloat(a.args[index]); ok {
+		return f, nil
 	}
 
 	return 0, errors.NewTypeError(a.function, "number", string(a.args[index].Type()))
@@ -290,8 +287,8 @@ func (a *Args) paramName(index int) string {
 func (a *Args) ExtractNumbers() ([]float64, error) {
 	numbers := make([]float64, len(a.args))
 	for i, arg := range a.args {
-		if num, ok := arg.(core.NumberValue); ok {
-			numbers[i] = float64(num)
+		if f, ok := core.AsFloat(arg); ok {
+			numbers[i] = f
 		} else {
 			return nil, errors.NewTypeErrorf(a.function,
 				"all arguments must be numbers, argument %d is %s", i+1, string(arg.Type()))
