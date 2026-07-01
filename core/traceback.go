@@ -123,13 +123,16 @@ func (te *TracebackError) FormatTraceback() string {
 	}
 
 	// Add the error message
-	sb.WriteString(formatErrorMessage(te.Err))
+	sb.WriteString(FormatErrorMessage(te.Err))
 
 	return sb.String()
 }
 
-// formatErrorMessage formats an error in Python style
-func formatErrorMessage(err error) string {
+// FormatErrorMessage formats an error in CPython's "ExceptionType: message"
+// style, unwrapping EvalError so a wrapped exception shows its own type. It is
+// the single source of truth for the final line of a traceback and for the
+// top-level display of an uncaught error.
+func FormatErrorMessage(err error) string {
 	if err == nil {
 		return "Error: <nil>"
 	}
@@ -143,18 +146,44 @@ func formatErrorMessage(err error) string {
 	case *AttributeError:
 		return fmt.Sprintf("AttributeError: %s", e.Message)
 	case *KeyError:
-		return fmt.Sprintf("KeyError: %s", e.Message)
+		// CPython shows the missing key's repr: KeyError: 'b'
+		if e.Message != "" {
+			return fmt.Sprintf("KeyError: %s", e.Message)
+		}
+		return fmt.Sprintf("KeyError: %s", Repr(e.Key))
 	case *IndexError:
-		return fmt.Sprintf("IndexError: %s", e.Message)
+		return fmt.Sprintf("IndexError: %s", e.Error())
 	case *NameError:
 		return fmt.Sprintf("NameError: name '%s' is not defined", e.Name)
 	case *ImportError:
 		return fmt.Sprintf("ImportError: %s", e.Message)
+	case *OverflowError:
+		return fmt.Sprintf("OverflowError: %s", e.Message)
+	case *ZeroDivisionError:
+		return fmt.Sprintf("ZeroDivisionError: %s", e.Error())
+	case *RuntimeError:
+		return fmt.Sprintf("RuntimeError: %s", e.Message)
+	case *RecursionError:
+		return fmt.Sprintf("RecursionError: %s", e.Message)
+	case *AssertionError:
+		return fmt.Sprintf("AssertionError: %s", e.Message)
+	case *FileNotFoundError:
+		return fmt.Sprintf("FileNotFoundError: %s", e.Message)
+	case *OSError:
+		return fmt.Sprintf("OSError: %s", e.Message)
+	case *LookupError:
+		return fmt.Sprintf("LookupError: %s", e.Message)
 	case *StopIteration:
 		if e.Message != "" {
 			return fmt.Sprintf("StopIteration: %s", e.Message)
 		}
 		return "StopIteration"
+	case *EvalError:
+		// Show the wrapped exception's own type, not "EvalError".
+		if e.Wrapped != nil {
+			return FormatErrorMessage(e.Wrapped)
+		}
+		return e.Error()
 	case *ExceptionValue:
 		return e.String()
 	default:

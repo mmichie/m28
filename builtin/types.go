@@ -598,7 +598,7 @@ func IntBuilder() builders.BuiltinFunc {
 				if f, err := strconv.ParseFloat(s, 64); err == nil {
 					return core.NumberValue(float64(int(f))), nil
 				}
-				return nil, errors.NewValueError("int", fmt.Sprintf("invalid literal for int() with base 10: '%s'", s))
+				return nil, &core.ValueError{Message: fmt.Sprintf("invalid literal for int() with base 10: '%s'", s)}
 			case core.BoolValue:
 				if bool(x) {
 					return core.NumberValue(1), nil
@@ -678,7 +678,7 @@ func IntBuilder() builders.BuiltinFunc {
 			return bi, nil
 		}
 
-		return nil, errors.NewValueError("int", fmt.Sprintf("invalid literal for int() with base %d: '%s'", base, s))
+		return nil, &core.ValueError{Message: fmt.Sprintf("invalid literal for int() with base %d: '%s'", base, s)}
 	}
 }
 

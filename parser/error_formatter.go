@@ -59,8 +59,8 @@ func (ef *ErrorFormatter) FormatError(err error) string {
 	}
 
 	if loc == nil {
-		// No location info - return basic error
-		return ef.colorError(err.Error())
+		// No location info - return basic error, with its Python type prefix.
+		return ef.colorError(core.FormatErrorMessage(err))
 	}
 
 	var b strings.Builder
@@ -78,8 +78,8 @@ func (ef *ErrorFormatter) FormatError(err error) string {
 		b.WriteString(context)
 	}
 
-	// Error message - use the original error message which includes context
-	b.WriteString(ef.colorError(err.Error()))
+	// Error message - Python-style "ExceptionType: message" (unwrapping EvalError)
+	b.WriteString(ef.colorError(core.FormatErrorMessage(err)))
 	b.WriteString("\n")
 
 	// Add suggestion if this is an error type with a suggestion
