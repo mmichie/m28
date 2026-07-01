@@ -1,20 +1,28 @@
 {
   "python_version": "3.13.13",
-  "last_updated": "2026-05-30",
+  "last_updated": "2026-07-01",
   "summary": {
-    "tests_running": "~510",
-    "tests_passing": "~272",
+    "tests_running": "943",
+    "tests_passing": "526",
     "fully_passing_files": [
-      "test_augassign (7/7)"
+      "test_augassign (7/7)",
+      "test_call (4/184, 180 skipped)",
+      "test_decorators (16/16)",
+      "test_string (38/38)",
+      "test_unpack (1/1)"
     ],
     "high_pass_files": [
-      "test_list (47/50, 94%)",
+      "test_with (50/51, 98%)",
+      "test_compare (15/16, 94%)",
+      "test_binop (11/12, 92%)",
+      "test_list (61/67, 91%)",
+      "test_dictcomps (9/10, 90%)",
+      "test_unary (5/6, 83%)",
+      "test_contextlib (71/91, 78%)",
       "test_dict (90/123, 73%)",
-      "test_unary (4/6, 67%)",
-      "test_scope (26/41, 63%)",
-      "test_string (22/38, 58%)",
-      "test_decorators (9/16, 56%)",
-      "test_binop (6/12, 50%)"
+      "test_scope (28/41, 68%)",
+      "test_grammar (52/79, 66%)",
+      "test_listcomps (36/59, 61%)"
     ],
     "running_but_low": [
       "test_descr (~23/159, 14%)",
@@ -28,40 +36,60 @@
       "priority": 1,
       "tests": {
         "test_grammar": {
-          "status": "blocked",
-          "blocker": "needs typing.Protocol __protocol_attrs__ for runtime_checkable decorator",
+          "status": "partial",
+          "tests_run": 79,
+          "passing": 52,
+          "failures": 14,
+          "errors": 13,
+          "skipped": 0,
           "source": "cpython/Lib/test/test_grammar.py"
         },
         "test_syntax": {
-          "status": "blocked",
-          "blocker": "missing dependent module (typing/inspect chain)",
+          "status": "partial",
+          "tests_run": 37,
+          "passing": 3,
+          "failures": 26,
+          "errors": 1,
+          "skipped": 7,
           "source": "cpython/Lib/test/test_syntax.py"
         },
         "test_types": {
           "status": "blocked",
-          "blocker": "missing module",
+          "blocker": "submodule load failed: no module named 'test.support.iter_builtin_types'",
           "source": "cpython/Lib/test/test_types.py"
         },
         "test_builtin": {
           "status": "blocked",
-          "blocker": "parse error in test file",
+          "blocker": "LookupError: unknown encoding: raw-unicode-escape",
           "source": "cpython/Lib/test/test_builtin.py"
         },
         "test_binop": {
           "status": "partial",
-          "tests_run": 12, "passing": 6, "failures": 4, "errors": 2,
+          "tests_run": 12,
+          "passing": 11,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
           "notes": "Rat fraction class equality tests fail",
           "source": "cpython/Lib/test/test_binop.py"
         },
         "test_unary": {
           "status": "partial",
-          "tests_run": 6, "passing": 4, "failures": 1, "errors": 1,
+          "tests_run": 6,
+          "passing": 5,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
           "notes": "test_no_overflow needs eval+bigint; test_bad_types needs TypeError on +b'a'",
           "source": "cpython/Lib/test/test_unary.py"
         },
         "test_compare": {
-          "status": "blocked",
-          "blocker": "missing module",
+          "status": "partial",
+          "tests_run": 16,
+          "passing": 15,
+          "failures": 0,
+          "errors": 1,
+          "skipped": 0,
           "source": "cpython/Lib/test/test_compare.py"
         }
       }
@@ -72,35 +100,49 @@
       "tests": {
         "test_list": {
           "status": "partial",
-          "tests_run": 50, "passing": 47, "failures": 0, "errors": 2, "skipped": 1,
+          "tests_run": 67,
+          "passing": 61,
+          "failures": 1,
+          "errors": 4,
+          "skipped": 1,
           "notes": "errors are test_iterator_pickle and test_reversed_pickle (pickle not supported for list iterators); skipped is @cpython_only test_preallocation",
           "source": "cpython/Lib/test/test_list.py"
         },
         "test_dict": {
           "status": "partial",
-          "tests_run": 123, "passing": 90, "failures": 7, "errors": 12, "skipped": 14,
+          "tests_run": 123,
+          "passing": 90,
+          "failures": 7,
+          "errors": 12,
+          "skipped": 14,
           "notes": "Pickling tests (6), __dict__ mutation, str subclass issues, exec(), hash-based key equality",
           "source": "cpython/Lib/test/test_dict.py"
         },
         "test_set": {
-          "status": "timeout",
+          "status": "blocked",
+          "blocker": "crash: Go runtime error (pre-existing; also crashes on base build",
           "notes": "Many tests running; needs longer timeout to get full count",
           "source": "cpython/Lib/test/test_set.py"
         },
         "test_tuple": {
           "status": "timeout",
+          "note": "timed out after 100s",
           "notes": "Many tests running; some hash-distribution tests are slow",
           "source": "cpython/Lib/test/test_tuple.py"
         },
         "test_string": {
-          "status": "partial",
-          "tests_run": 38, "passing": 33, "failures": 4, "errors": 1,
+          "status": "passing",
+          "tests_run": 38,
+          "passing": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
           "notes": "Fixed by class-scope name resolution (methods no longer see sibling methods), PEP 570 positional-only+**kwargs binding, and TypeError for arg-count errors. Remaining: get_identifiers (regex named groups), auto_numbering, format-spec padding, Template col/is_valid.",
           "source": "cpython/Lib/test/test_string.py"
         },
         "test_bytes": {
           "status": "blocked",
-          "blocker": "parse error: @check_bytes_warnings decorator",
+          "blocker": "Check for hidden control characters or use proper encoding",
           "source": "cpython/Lib/test/test_bytes.py"
         }
       }
@@ -111,20 +153,36 @@
       "tests": {
         "test_exceptions": {
           "status": "partial",
-          "tests_run": 104, "passing": 15, "failures": 19, "errors": 57, "skipped": 13,
+          "tests_run": 104,
+          "passing": 29,
+          "failures": 22,
+          "errors": 40,
+          "skipped": 13,
           "notes": "No longer crashes with a Go stack overflow: the interpreter now enforces sys.getrecursionlimit() (default 1000) and raises RecursionError. support.Py_TRACE_REFS stub added. Remaining errors are deeper exception/traceback features.",
           "source": "cpython/Lib/test/test_exceptions.py"
         },
-        "test_raise": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_raise.py"},
+        "test_raise": {
+          "status": "blocked",
+          "blocker": "Exception: MyException",
+          "source": "cpython/Lib/test/test_raise.py"
+        },
         "test_with": {
           "status": "partial",
-          "tests_run": 51, "passing": 25, "failures": 11, "errors": 15,
+          "tests_run": 51,
+          "passing": 50,
+          "failures": 0,
+          "errors": 1,
+          "skipped": 0,
           "notes": "Runs. 22->25 when `with cm as obj.attr:` / `as lst[0]:` stopped wrongly unpacking (UnpackPattern now treats a (. ...)/get-item S-expr as a single assignable target). Remaining: deeper context-manager protocol/exception-propagation behavior.",
           "source": "cpython/Lib/test/test_with.py"
         },
         "test_scope": {
           "status": "partial",
-          "tests_run": 41, "passing": 31, "failures": 8, "errors": 2, "skipped": 3,
+          "tests_run": 41,
+          "passing": 28,
+          "failures": 8,
+          "errors": 2,
+          "skipped": 3,
           "source": "cpython/Lib/test/test_scope.py"
         }
       }
@@ -134,22 +192,38 @@
       "priority": 4,
       "tests": {
         "test_call": {
-          "status": "partial",
-          "tests_run": 184, "passing": 2, "errors": 2, "skipped": 180,
+          "status": "passing",
+          "tests_run": 184,
+          "passing": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 180,
           "notes": "Runs; 180 skipped (need _testcapi). ** unpacking now accepts any mapping (keys()+__getitem__), fixing test_kwargs_order for OrderedDict. Remaining errors: compile(optimize=) kwarg, 500-arg function.",
           "source": "cpython/Lib/test/test_call.py"
         },
-        "test_functools": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_functools.py"},
+        "test_functools": {
+          "status": "blocked",
+          "blocker": "error evaluating dict key: NameError: name '**unpack' is not defined",
+          "source": "cpython/Lib/test/test_functools.py"
+        },
         "test_decorators": {
-          "status": "partial",
-          "tests_run": 16, "passing": 13, "failures": 0, "errors": 3,
+          "status": "passing",
+          "tests_run": 16,
+          "passing": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
           "notes": "Live function __dict__, staticmethod/classmethod __func__/__wrapped__ + attr delegation, and repr()-consistent !r/%r added. Remaining: test_dbcheck (eval of code object), test_errors (parser), test_eval_order (decorator arg count)",
           "source": "cpython/Lib/test/test_decorators.py"
         },
-        "test_class": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_class.py"},
+        "test_class": {
+          "status": "blocked",
+          "blocker": "Exception: no module named '_testinternalcapi'",
+          "source": "cpython/Lib/test/test_class.py"
+        },
         "test_descr": {
-          "status": "partial",
-          "tests_run": 159, "passing": 27, "failures": 63, "errors": 56, "skipped": 11, "expected_failures": 2,
+          "status": "blocked",
+          "blocker": "crash: Go stack overflow / deep recursion (pre-existing",
           "notes": "No longer panics: str subclasses now carry a backing string (Instance.BackingStr), str methods unwrap it, and ==/str()/len/index/in work. Remaining failures are deeper descriptor/metaclass features.",
           "source": "cpython/Lib/test/test_descr.py"
         }
@@ -159,22 +233,75 @@
       "description": "Advanced language features",
       "priority": 5,
       "tests": {
-        "test_generators": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_generators.py"},
-        "test_genexps": {"status": "blocked", "blocker": "needs doctest → inspect → typing", "source": "cpython/Lib/test/test_genexps.py"},
-        "test_listcomps": {"status": "blocked", "blocker": "parse error", "source": "cpython/Lib/test/test_listcomps.py"},
-        "test_dictcomps": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_dictcomps.py"},
-        "test_setcomps": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_setcomps.py"},
-        "test_unpack": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_unpack.py"},
-        "test_unpack_ex": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_unpack_ex.py"},
+        "test_generators": {
+          "status": "blocked",
+          "blocker": "Exception: E",
+          "source": "cpython/Lib/test/test_generators.py"
+        },
+        "test_genexps": {
+          "status": "blocked",
+          "blocker": "0 tests ran (doctest-based or no unittest cases)",
+          "source": "cpython/Lib/test/test_genexps.py"
+        },
+        "test_listcomps": {
+          "status": "partial",
+          "tests_run": 59,
+          "passing": 36,
+          "failures": 13,
+          "errors": 10,
+          "skipped": 0,
+          "source": "cpython/Lib/test/test_listcomps.py"
+        },
+        "test_dictcomps": {
+          "status": "partial",
+          "tests_run": 10,
+          "passing": 9,
+          "failures": 0,
+          "errors": 1,
+          "skipped": 0,
+          "source": "cpython/Lib/test/test_dictcomps.py"
+        },
+        "test_setcomps": {
+          "status": "partial",
+          "tests_run": 1,
+          "passing": 0,
+          "failures": 0,
+          "errors": 1,
+          "skipped": 0,
+          "source": "cpython/Lib/test/test_setcomps.py"
+        },
+        "test_unpack": {
+          "status": "passing",
+          "tests_run": 1,
+          "passing": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "source": "cpython/Lib/test/test_unpack.py"
+        },
+        "test_unpack_ex": {
+          "status": "blocked",
+          "blocker": "0 tests ran (doctest-based or no unittest cases)",
+          "source": "cpython/Lib/test/test_unpack_ex.py"
+        },
         "test_iter": {
           "status": "timeout",
+          "note": "timed out after 100s",
           "notes": "Started running after BrokenIter added but is very slow",
           "source": "cpython/Lib/test/test_iter.py"
         },
-        "test_itertools": {"status": "blocked", "blocker": "missing module", "source": "cpython/Lib/test/test_itertools.py"},
+        "test_itertools": {
+          "status": "blocked",
+          "blocker": "AttributeError:",
+          "source": "cpython/Lib/test/test_itertools.py"
+        },
         "test_contextlib": {
           "status": "partial",
-          "tests_run": 91, "passing": 51, "failures": 18, "errors": 22,
+          "tests_run": 91,
+          "passing": 71,
+          "failures": 12,
+          "errors": 8,
+          "skipped": 0,
           "notes": "Runs. Jumped 39->51 when collections.deque truthiness was fixed (was always-truthy because IsTruthy required the full Object interface, which deque lacks): ExitStack's `while self._exit_callbacks:` looped forever -> 'pop from an empty deque'. deque is now iterable too.",
           "source": "cpython/Lib/test/test_contextlib.py"
         }
@@ -186,7 +313,11 @@
       "tests": {
         "test_augassign": {
           "status": "passing",
-          "tests_run": 7, "passing": 7,
+          "tests_run": 7,
+          "passing": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
           "source": "cpython/Lib/test/test_augassign.py"
         }
       }
@@ -197,7 +328,7 @@
     "cpython_source": "tests/cpython-source/ (gitignored, clone of cpython v3.13.13 tag)",
     "running_one": "PYTHONPATH=tests/cpython-source/Lib ./bin/m28 tests/cpython-source/Lib/test/test_<name>.py",
     "biggest_blockers_to_unblock_more": [
-      "typing.Protocol __protocol_attrs__ (unblocks typing → inspect → dataclasses → doctest → test_iter, test_genexps, test_itertools, etc)",
+      "typing.Protocol __protocol_attrs__ (unblocks typing \u2192 inspect \u2192 dataclasses \u2192 doctest \u2192 test_iter, test_genexps, test_itertools, etc)",
       "Parser support for @decorator with method receiving signatures it currently rejects (unblocks test_exceptions, test_with, test_call, test_builtin, test_generators, test_listcomps)",
       "Pickle support for list iterators (unblocks test_iterator_pickle, test_reversed_pickle in test_list)"
     ]
@@ -208,7 +339,7 @@
     "test/ package at project root provides minimal infrastructure stubs so CPython test files can import test.support, test.list_tests, etc.",
     "Many tests can run BECAUSE of these stubs but reveal M28 semantic gaps (descriptors, dict views, dunder protocols, etc).",
     "Pre-stub baseline: 1 file passing (test_augassign). Current baseline: ~272 individual test methods passing across 9 files.",
-    "test_list went from 34/50 → 47/50 (May 30, 2026): ListInstance attrs, list subclass __init__/__new__, extended slice assignment, BigInt index clamping, context-aware list comparison.",
-    "test_dict went from ~36/123 → 90/123 (May 28, 2026): modCount mutation detection, __hash__ dispatch, classmethod fromkeys, cycle-detection repr, full __eq__ semantics."
+    "test_list went from 34/50 \u2192 47/50 (May 30, 2026): ListInstance attrs, list subclass __init__/__new__, extended slice assignment, BigInt index clamping, context-aware list comparison.",
+    "test_dict went from ~36/123 \u2192 90/123 (May 28, 2026): modCount mutation detection, __hash__ dispatch, classmethod fromkeys, cycle-detection repr, full __eq__ semantics."
   ]
 }
