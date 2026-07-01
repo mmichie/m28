@@ -675,13 +675,30 @@ func executeFile(filename string, ctx *core.Context, errorFormatter *parser.Erro
 	return executeM28File(filename, string(content), ctx)
 }
 
-// executeM28File executes an M28 (.m28) file
+// executeM28File executes an M28 (.m28) file.
+//
+// It prefers the full Python parser so that standard-Python .m28 source works
+// (indented blocks, bare `return` statements, etc.), and falls back to the
+// S-expression parser for Lispy M28 source, which the Python grammar rejects.
+// This mirrors EvalString (the -e path) and .py files. S-expression files fail
+// the Python grammar reliably (space-separated call args, `=` as a form, etc.),
+// so the fallback is taken for them without ambiguity.
 func executeM28File(filename, content string, ctx *core.Context) error {
-	// Create M28 parser
+	if ptokens, terr := parser.NewPythonTokenizer(content).Tokenize(); terr == nil {
+		if nodes, perr := parser.NewPythonParser(ptokens, filename, content).Parse(); perr == nil {
+			for _, node := range nodes {
+				if _, err := eval.Eval(node.ToIR(), ctx); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}
+
+	// S-expression fallback (the historical M28 path).
 	p := parser.NewParser()
 	p.SetFilename(filename)
 
-	// Parse the content
 	expr, err := p.Parse(content)
 	if err != nil {
 		// Check if it's a ParseError and format with context
