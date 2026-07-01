@@ -148,23 +148,14 @@ func InitMathModule() *core.DictValue {
 	})))
 
 	// Floating point inspection
-	mathModule.Set("isnan", core.NewBuiltinFunction(builders.UnaryNumber("isnan", func(x float64) (float64, error) {
-		if math.IsNaN(x) {
-			return 1, nil // True
-		}
-		return 0, nil // False
+	mathModule.Set("isnan", core.NewBuiltinFunction(builders.UnaryBool("isnan", func(x float64) bool {
+		return math.IsNaN(x)
 	})))
-	mathModule.Set("isinf", core.NewBuiltinFunction(builders.UnaryNumber("isinf", func(x float64) (float64, error) {
-		if math.IsInf(x, 0) {
-			return 1, nil // True
-		}
-		return 0, nil // False
+	mathModule.Set("isinf", core.NewBuiltinFunction(builders.UnaryBool("isinf", func(x float64) bool {
+		return math.IsInf(x, 0)
 	})))
-	mathModule.Set("isfinite", core.NewBuiltinFunction(builders.UnaryNumber("isfinite", func(x float64) (float64, error) {
-		if !math.IsNaN(x) && !math.IsInf(x, 0) {
-			return 1, nil // True
-		}
-		return 0, nil // False
+	mathModule.Set("isfinite", core.NewBuiltinFunction(builders.UnaryBool("isfinite", func(x float64) bool {
+		return !math.IsNaN(x) && !math.IsInf(x, 0)
 	})))
 
 	// Integer math functions

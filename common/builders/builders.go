@@ -65,6 +65,22 @@ func UnaryNumberSimple(name string, fn func(float64) float64) BuiltinFunc {
 	}
 }
 
+// UnaryBool creates a math predicate over one number that returns a Python bool
+// (math.isnan/isinf/isfinite), matching CPython rather than returning 1/0.
+func UnaryBool(name string, fn func(float64) bool) BuiltinFunc {
+	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		v := validation.NewArgs(name, args)
+		if err := v.Exact(1); err != nil {
+			return nil, err
+		}
+		num, err := v.GetNumber(0)
+		if err != nil {
+			return nil, err
+		}
+		return core.BoolValue(fn(num)), nil
+	}
+}
+
 // UnaryFloat is like UnaryNumber but returns a Python float. Use it for math
 // functions that can fail with a domain error yet always yield a float
 // (sqrt, gamma, radians, ...). Integer/bool-returning ones stay on UnaryNumber.
