@@ -371,3 +371,77 @@ func TestAnalyzeLocals_StillRejectsUnsafe(t *testing.T) {
 		}
 	}
 }
+
+// --- try/except containment ---
+
+func TestAnalyzeLocals_TryShapesAccepted(t *testing.T) {
+	body := mustParse(t, "(do"+
+		" (try (do (= y (+ x 1)))"+
+		"      (except ValueError (do (= y 0)))"+
+		"      (except (tuple-literal TypeError KeyError) (do (= y 1)))"+
+		"      (except (do (= y 2)))"+
+		"      (else (do (= y (+ y 1))))"+
+		"      (finally (do (= z 9))))"+
+		" (return (+ y z)))")
+	res, ok := analyzeLocals([]string{"x"}, body, testIsSpecial)
+	if !ok {
+		t.Fatal("modern try shapes must be slot-compilable")
+	}
+	// Bindings inside try/except/else/finally bodies are ordinary locals
+	// (handlers run in the function context).
+	for _, name := range []string{"y", "z"} {
+		if _, has := res.slots[name]; !has {
+			t.Errorf("expected slot for %q; slots=%v", name, res.slots)
+		}
+	}
+	// Exception type names are not reads and never become locals.
+	if _, has := res.slots["ValueError"]; has {
+		t.Error("exception type name must not get a slot")
+	}
+}
+
+func TestAnalyzeLocals_TryRejectsUnsafeShapes(t *testing.T) {
+	cases := map[string]string{
+		"as binding":          "(do (try (do 1) (except ValueError as e (do (= y 1)))))",
+		"catch-all as":        "(do (try (do 1) (except as e (do 1))))",
+		"except*":             "(do (try (do 1) (except* ValueError (do 1))))",
+		"legacy var form":     "(do (try (do 1) (except somevar (do 1))))",
+		"type shadowed later": "(do (= ValueError 5) (try (do 1) (except ValueError (do 1))))",
+		"tuple type shadowed": "(do (= KeyError 5) (try (do 1) (except (tuple-literal KeyError) (do 1))))",
+		"no clauses":          "(do (try (do 1)))",
+		"body after clause":   "(do (try (do 1) (except (do 1)) (= x 2)))",
+	}
+	for name, src := range cases {
+		body := mustParse(t, src)
+		if _, ok := analyzeLocals(nil, body, testIsSpecial); ok {
+			t.Errorf("%s: expected the analyzer to reject this body", name)
+		}
+	}
+}
+
+func TestResolveBody_TryRewritesBodiesNotTypes(t *testing.T) {
+	body := mustParse(t, "(do (= a 1)"+
+		" (try (do (= a (+ a 1)))"+
+		"      (except ValueError (do (= a 0)))"+
+		"      (finally (do (= a (+ a 2)))))"+
+		" (return a))")
+	res, ok := analyzeLocals(nil, body, testIsSpecial)
+	if !ok {
+		t.Fatal("try body must analyze")
+	}
+	rewritten, ok := resolveBody(body, res.slots, testIsSpecial)
+	if !ok {
+		t.Fatal("try body must resolve")
+	}
+	refs, syms := collectResolved(rewritten)
+	if _, has := refs["a"]; !has {
+		t.Error("locals in try/except/finally bodies must be slot-rewritten")
+	}
+	if syms["a"] {
+		t.Error("no bare symbol a should remain")
+	}
+	// The type name survives verbatim for tryForm's structural parser.
+	if !syms["ValueError"] {
+		t.Error("exception type name must remain a bare symbol")
+	}
+}

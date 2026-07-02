@@ -119,6 +119,11 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 	// overlap with the final local set disqualifies the function (checked after
 	// the walk, when the local set is complete).
 	compFree := make(map[string]bool)
+	// tryTypeNames collects symbol-named exception types from except clauses.
+	// tryForm matches those BY NAME through the map chain at handling time, so
+	// a function local shadowing one would be invisible; overlap with the final
+	// local set disqualifies (checked post-walk, like compFree).
+	tryTypeNames := make(map[string]bool)
 	var walk func(core.Value)
 	walk = func(v core.Value) {
 		if !safe {
@@ -173,6 +178,17 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 			walk(items[1])
 			for _, it := range items[3:] {
 				walk(it)
+			}
+			return
+		}
+
+		// try/except/finally: handler bodies run in the SAME context as the
+		// function (tryForm's handlerCtx := ctx), so their assignments are
+		// ordinary locals. Only exact modern clause shapes are modeled;
+		// `as` bindings, except*, and the legacy variable forms bail.
+		if h == "try" {
+			if !walkTryForm(items, walk, tryTypeNames) {
+				safe = false
 			}
 			return
 		}
@@ -266,7 +282,141 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 			return localResolution{}, false
 		}
 	}
+	// Symbol-named exception types are matched by name through the map chain;
+	// a local shadowing one would be invisible to the match.
+	for name := range tryTypeNames {
+		if _, isLocal := slots[name]; isLocal {
+			return localResolution{}, false
+		}
+	}
 	return localResolution{slots: slots}, true
+}
+
+// tryClauseHead classifies a try-form item the way tryForm's partition does:
+// a list whose head symbol is except/except*/else/finally is a clause; the
+// head is returned ("" for non-clause items).
+func tryClauseHead(v core.Value) (string, *core.ListValue) {
+	lst, ok := unwrapLocated(v).(*core.ListValue)
+	if !ok || lst.Len() == 0 {
+		return "", nil
+	}
+	sym, ok := unwrapLocated(lst.ItemsRef()[0]).(core.SymbolValue)
+	if !ok {
+		return "", nil
+	}
+	switch string(sym) {
+	case "except", "except*", "else", "finally":
+		return string(sym), lst
+	}
+	return "", nil
+}
+
+// isDoBlock reports whether v is a (do ...) list — the shape the Python
+// frontend emits for every clause body.
+func isDoBlock(v core.Value) bool {
+	lst, ok := unwrapLocated(v).(*core.ListValue)
+	if !ok || lst.Len() == 0 {
+		return false
+	}
+	sym, ok := unwrapLocated(lst.ItemsRef()[0]).(core.SymbolValue)
+	return ok && string(sym) == "do"
+}
+
+// walkTryForm validates a try form during analysis, walking its value
+// positions. Modeled shapes (exactly what the Python frontend emits):
+//
+//	(try <body>... (except (do ...)) ...)                 bare handler
+//	(except TypeSym (do ...))                              symbol type
+//	(except (tuple-literal Sym...) (do ...))               tuple of types
+//	(except <expr-list> (do ...))                          expression type
+//	(else (do ...)) / (finally (do ...))                   plain blocks
+//
+// Anything else — `as` bindings (they Define into the map, invisible to
+// slots), except*, the legacy (except var ...) forms, multi-statement
+// handlers, trailing junk after clauses — returns false. Symbol and tuple
+// type names are recorded in typeNames (matched by name at runtime); a
+// symbol type must also classify as a type under the same predicates
+// tryForm uses, else the runtime would treat it as a legacy binding.
+func walkTryForm(items []core.Value, walkEnclosing func(core.Value), typeNames map[string]bool) bool {
+	if len(items) < 2 {
+		return false
+	}
+	seenClause := false
+	for _, it := range items[1:] {
+		head, clause := tryClauseHead(it)
+		if head == "" {
+			if seenClause {
+				// tryForm silently ignores trailing non-clause items; a body
+				// statement after clauses is degenerate source — bail.
+				return false
+			}
+			walkEnclosing(it)
+			continue
+		}
+		seenClause = true
+		cItems := clause.ItemsRef()
+		switch head {
+		case "except*":
+			return false
+		case "else", "finally":
+			for _, e := range cItems[1:] {
+				walkEnclosing(e)
+			}
+		case "except":
+			switch len(cItems) {
+			case 2:
+				// (except (do ...)): bare handler.
+				if !isDoBlock(cItems[1]) {
+					return false // legacy catch-all variable form
+				}
+				walkEnclosing(cItems[1])
+			case 3:
+				if !isDoBlock(cItems[2]) {
+					return false // as/legacy/multi-statement shapes
+				}
+				typeV := unwrapLocated(cItems[1])
+				if sym, ok := typeV.(core.SymbolValue); ok {
+					s := string(sym)
+					// A symbol that the runtime would not classify as a type
+					// becomes a legacy catch-all binding there — reject.
+					if s == "as" || !(isExceptionType(s) || isLikelyExceptionType(s)) {
+						return false
+					}
+					typeNames[s] = true
+					walkEnclosing(cItems[2])
+					continue
+				}
+				typeList, ok := typeV.(*core.ListValue)
+				if !ok || typeList.Len() == 0 {
+					return false // literal type: runtime raises; keep generic
+				}
+				if headSym, ok := unwrapLocated(typeList.ItemsRef()[0]).(core.SymbolValue); ok {
+					switch string(headSym) {
+					case "do":
+						// (except (do A) (do B)) runs both as handler
+						// statements — degenerate, keep generic.
+						return false
+					case "tuple-literal":
+						for _, e := range typeList.ItemsRef()[1:] {
+							tSym, ok := unwrapLocated(e).(core.SymbolValue)
+							if !ok {
+								return false
+							}
+							typeNames[string(tSym)] = true
+						}
+						walkEnclosing(cItems[2])
+						continue
+					}
+				}
+				// Expression type (e.g. (. self failureException)): a value.
+				walkEnclosing(cItems[1])
+				walkEnclosing(cItems[2])
+			default:
+				return false
+			}
+		}
+	}
+	return seenClause
 }
 
 // walkCompForm validates a comprehension form during analysis. The first
@@ -581,6 +731,14 @@ func resolveNode(v core.Value, slots map[string]int, isSpecialForm func(string) 
 			return rewriteItems(v, items, slots, isSpecialForm)
 		}
 
+		// try: rewrite body statements, handler/else/finally bodies, and
+		// expression types; symbol and tuple type names stay verbatim (tryForm
+		// classifies and matches them structurally by name). Shape checks
+		// mirror walkTryForm; disagreement bails to the safe fallback.
+		if h == "try" {
+			return resolveTryForm(items, slots, isSpecialForm)
+		}
+
 		// Any unmodeled special form should already have been rejected by
 		// analyzeLocals; bail defensively if the two passes ever disagree.
 		if isSpecialForm(h) && !slotSafeForms[h] {
@@ -740,6 +898,108 @@ func resolveCompForm(orig core.Value, items []core.Value, slots map[string]int, 
 	out := make([]core.Value, len(items))
 	copy(out, items)
 	out[3] = newIter
+	return core.NewList(out...), true
+}
+
+// resolveTryForm rewrites a try form's value positions, leaving the clause
+// structure — heads, symbol/tuple type names — byte-identical for tryForm's
+// structural parser. Shapes must match walkTryForm exactly.
+func resolveTryForm(items []core.Value, slots map[string]int, isSpecialForm func(string) bool) (core.Value, bool) {
+	if len(items) < 2 {
+		return nil, false
+	}
+	out := make([]core.Value, len(items))
+	out[0] = items[0]
+	seenClause := false
+	for i, it := range items[1:] {
+		idx := i + 1
+		head, clause := tryClauseHead(it)
+		if head == "" {
+			if seenClause {
+				return nil, false
+			}
+			r, ok := resolveNode(it, slots, isSpecialForm)
+			if !ok {
+				return nil, false
+			}
+			out[idx] = r
+			continue
+		}
+		seenClause = true
+		cItems := clause.ItemsRef()
+		newClause := make([]core.Value, len(cItems))
+		copy(newClause, cItems)
+		switch head {
+		case "except*":
+			return nil, false
+		case "else", "finally":
+			for j := 1; j < len(cItems); j++ {
+				r, ok := resolveNode(cItems[j], slots, isSpecialForm)
+				if !ok {
+					return nil, false
+				}
+				newClause[j] = r
+			}
+		case "except":
+			switch len(cItems) {
+			case 2:
+				if !isDoBlock(cItems[1]) {
+					return nil, false
+				}
+				r, ok := resolveNode(cItems[1], slots, isSpecialForm)
+				if !ok {
+					return nil, false
+				}
+				newClause[1] = r
+			case 3:
+				if !isDoBlock(cItems[2]) {
+					return nil, false
+				}
+				typeV := unwrapLocated(cItems[1])
+				rewriteType := false
+				if sym, ok := typeV.(core.SymbolValue); ok {
+					s := string(sym)
+					if s == "as" || !(isExceptionType(s) || isLikelyExceptionType(s)) {
+						return nil, false
+					}
+					// name stays verbatim
+				} else if typeList, ok := typeV.(*core.ListValue); ok && typeList.Len() > 0 {
+					if headSym, ok := unwrapLocated(typeList.ItemsRef()[0]).(core.SymbolValue); ok {
+						switch string(headSym) {
+						case "do":
+							return nil, false
+						case "tuple-literal":
+							// names stay verbatim
+						default:
+							rewriteType = true
+						}
+					} else {
+						rewriteType = true
+					}
+				} else {
+					return nil, false
+				}
+				if rewriteType {
+					r, ok := resolveNode(cItems[1], slots, isSpecialForm)
+					if !ok {
+						return nil, false
+					}
+					newClause[1] = r
+				}
+				r, ok := resolveNode(cItems[2], slots, isSpecialForm)
+				if !ok {
+					return nil, false
+				}
+				newClause[2] = r
+			default:
+				return nil, false
+			}
+		}
+		out[idx] = core.NewList(newClause...)
+	}
+	if !seenClause {
+		return nil, false
+	}
 	return core.NewList(out...), true
 }
 
