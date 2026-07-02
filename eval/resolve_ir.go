@@ -64,7 +64,7 @@ func compileIR(v core.Value) core.Value {
 		return &symbolNode{name: string(n)}
 
 	case core.NumberValue, core.StringValue, core.BoolValue, core.NilValue:
-		return &constNode{v: v}
+		return newConstNode(v)
 
 	case *core.ListValue:
 		return compileList(n, v)
@@ -123,10 +123,86 @@ func compileList(n *core.ListValue, orig core.Value) core.Value {
 	}
 }
 
+// --- the typed evaluation kernel (unboxing stage 2, M28-9pm.3) ---
+//
+// evalNumOf evaluates an expression preferring the unboxed path: numeric
+// results come back as a raw float64 plus kind (core.SlotInt/SlotFloat)
+// without ever materializing a box. THE CONTRACT: evaluation happens exactly
+// once — when the expression cannot stay unboxed, the boxed value it already
+// computed is returned (boxed != nil); callers must never re-evaluate.
+// Anything not modeled here falls to generic Eval and is classified after the
+// fact, which is free (two type asserts) and lets a numeric-returning call
+// feed an unboxed consumer.
+func evalNumOf(e core.Value, ctx *core.Context) (num float64, kind uint8, boxed core.Value, err error) {
+	if located, ok := e.(core.LocatedValue); ok {
+		if located.Location != nil {
+			ctx.PushLocation(located.Location)
+			defer ctx.PopLocation()
+		}
+		e = located.Unwrap()
+	}
+	switch n := e.(type) {
+	case *slotRef:
+		if f, k, ok := ctx.Locals.GetNum(n.slot); ok {
+			return f, k, nil, nil
+		}
+		v := ctx.Locals.Get(n.slot)
+		if v == nil {
+			return 0, 0, nil, core.WrapEvalError(
+				&core.UnboundLocalError{Name: n.name, Location: ctx.CurrentLocation()},
+				"unbound local", ctx)
+		}
+		return 0, core.SlotBoxed, v, nil
+	case *constNode:
+		if n.kind != core.SlotBoxed {
+			return n.num, n.kind, nil, nil
+		}
+		return 0, core.SlotBoxed, n.v, nil
+	case *operatorNode:
+		return n.evalNum(ctx)
+	default:
+		v, err := Eval(e, ctx)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		switch t := v.(type) {
+		case core.NumberValue:
+			return float64(t), core.SlotInt, nil, nil
+		case core.FloatValue:
+			return float64(t), core.SlotFloat, nil, nil
+		}
+		return 0, core.SlotBoxed, v, nil
+	}
+}
+
+// boxNum materializes an evalNumOf result that needs to escape.
+func boxNum(num float64, kind uint8) core.Value {
+	if kind == core.SlotFloat {
+		return core.FloatValue(num)
+	}
+	return core.BoxNumber(num)
+}
+
 // --- leaf nodes ---
 
-// constNode is a self-evaluating literal captured at compile time.
-type constNode struct{ v core.Value }
+// constNode is a self-evaluating literal captured at compile time. Numeric
+// constants carry their pre-classified kind and raw value so the typed kernel
+// reads them without unwrapping.
+type constNode struct {
+	v    core.Value
+	num  float64
+	kind uint8 // core.SlotInt / core.SlotFloat / core.SlotBoxed
+}
+
+func newConstNode(v core.Value) *constNode {
+	switch t := v.(type) {
+	case core.NumberValue:
+		return &constNode{v: v, num: float64(t), kind: core.SlotInt}
+	case core.FloatValue:
+		return &constNode{v: v, num: float64(t), kind: core.SlotFloat}
+	}
+	return &constNode{v: v, kind: core.SlotBoxed}
+}
 
 func (n *constNode) Type() core.Type                              { return n.v.Type() }
 func (n *constNode) String() string                               { return n.v.String() }
@@ -171,7 +247,27 @@ func (n *seqNode) String() string  { return "(do ...)" }
 func (n *seqNode) evalIR(ctx *core.Context) (core.Value, error) {
 	var result core.Value = core.Nil
 	var err error
-	for _, e := range n.items {
+	last := len(n.items) - 1
+	for i, e := range n.items {
+		// Non-final assignments are pure statements: their value is discarded,
+		// so skip materializing it (assignments never produce control
+		// sentinels). Everything else — and the final item, whose value is the
+		// block's value — evaluates normally.
+		if i < last {
+			if a, lv, ok := asAssignNode(e); ok {
+				if lv != nil && lv.Location != nil {
+					ctx.PushLocation(lv.Location)
+					err = a.execDiscard(ctx)
+					ctx.PopLocation()
+				} else {
+					err = a.execDiscard(ctx)
+				}
+				if err != nil {
+					return nil, err
+				}
+				continue
+			}
+		}
 		result, err = Eval(e, ctx)
 		if err != nil {
 			return nil, err
@@ -182,6 +278,22 @@ func (n *seqNode) evalIR(ctx *core.Context) (core.Value, error) {
 		}
 	}
 	return result, nil
+}
+
+// asAssignNode unwraps a possible LocatedValue and reports whether the node is
+// an assignNode, returning the wrapper (if any) so the caller can maintain the
+// location stack exactly as Eval would.
+func asAssignNode(e core.Value) (*assignNode, *core.LocatedValue, bool) {
+	if lv, ok := e.(core.LocatedValue); ok {
+		if a, ok := lv.Value.(*assignNode); ok {
+			return a, &lv, true
+		}
+		return nil, nil, false
+	}
+	if a, ok := e.(*assignNode); ok {
+		return a, nil, true
+	}
+	return nil, nil, false
 }
 
 func compileSeq(items []core.Value) core.Value {
@@ -200,13 +312,20 @@ type ifNode struct{ cond, then, els core.Value } // els nil => no else branch
 func (n *ifNode) Type() core.Type { return "if-node" }
 func (n *ifNode) String() string  { return "(if ...)" }
 func (n *ifNode) evalIR(ctx *core.Context) (core.Value, error) {
-	c, err := Eval(n.cond, ctx)
+	// A numeric condition short-circuits truthiness without boxing: f != 0
+	// matches bool(int)/bool(float) exactly (0/0.0/-0.0 falsy, NaN truthy).
+	num, kind, boxed, err := evalNumOf(n.cond, ctx)
 	if err != nil {
 		return nil, err
 	}
-	truthy, err := isTruthyWithErrors(c, ctx)
-	if err != nil {
-		return nil, err
+	var truthy bool
+	if boxed == nil && kind != core.SlotBoxed {
+		truthy = num != 0
+	} else {
+		truthy, err = isTruthyWithErrors(boxed, ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if truthy {
 		return Eval(n.then, ctx)
@@ -277,12 +396,28 @@ type assignNode struct {
 func (n *assignNode) Type() core.Type { return "assign-node" }
 func (n *assignNode) String() string  { return "(= ...)" }
 func (n *assignNode) evalIR(ctx *core.Context) (core.Value, error) {
-	v, err := Eval(n.val, ctx)
-	if err != nil {
+	if err := n.execDiscard(ctx); err != nil {
 		return nil, err
 	}
-	ctx.Locals.Set(n.slot, v)
-	return v, nil
+	// The assignment's value is demanded (expression position): Get memoizes
+	// the box into the frame, so this costs one boxing at most.
+	return ctx.Locals.Get(n.slot), nil
+}
+
+// execDiscard performs the assignment without materializing the result — the
+// statement-position path (seqNode), where the loop-carried accumulator win
+// lives: an unboxed numeric right-hand side stores as raw float64 + tag.
+func (n *assignNode) execDiscard(ctx *core.Context) error {
+	num, kind, boxed, err := evalNumOf(n.val, ctx)
+	if err != nil {
+		return err
+	}
+	if boxed != nil {
+		ctx.Locals.Set(n.slot, boxed)
+		return nil
+	}
+	ctx.Locals.SetNum(n.slot, num, kind)
+	return nil
 }
 
 func compileAssign(items []core.Value, orig core.Value) core.Value {
@@ -431,33 +566,112 @@ type operatorNode struct {
 func (n *operatorNode) Type() core.Type { return "op-node" }
 func (n *operatorNode) String() string  { return "(" + n.op + " ...)" }
 func (n *operatorNode) evalIR(ctx *core.Context) (core.Value, error) {
+	num, kind, boxed, err := n.evalNum(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if boxed != nil {
+		return boxed, nil
+	}
+	return boxNum(num, kind), nil
+}
+
+// evalNum is the operator's typed path: binary arithmetic and comparisons on
+// unboxed operands, exactly-once evaluation. Int op Int keeps int semantics
+// (PromoteIntOverflow for +,-,*); any float operand switches to float
+// semantics (raw IEEE — overflow goes to inf, NaN compares false), matching
+// the NumberValue/FloatValue fast paths this replaces. Everything else —
+// non-numeric operands, unmodeled operators, n-ary shapes — evaluates each
+// argument once, boxes as needed, and dispatches to the cached registry
+// operator, byte-identical to the previous evalIR.
+func (n *operatorNode) evalNum(ctx *core.Context) (float64, uint8, core.Value, error) {
 	if len(n.args) == 2 {
-		l, err := Eval(n.args[0], ctx)
+		lnum, lkind, lbox, err := evalNumOf(n.args[0], ctx)
 		if err != nil {
-			return nil, err
+			return 0, 0, nil, err
 		}
-		r, err := Eval(n.args[1], ctx)
+		rnum, rkind, rbox, err := evalNumOf(n.args[1], ctx)
 		if err != nil {
-			return nil, err
+			return 0, 0, nil, err
 		}
-		if ln, ok := l.(core.NumberValue); ok {
-			if rn, ok := r.(core.NumberValue); ok {
-				if res, ok := fastNumOp(n.op, ln, rn); ok {
-					return res, nil
+		if lbox == nil && rbox == nil {
+			// Both operands numeric and unboxed.
+			if lkind == core.SlotInt && rkind == core.SlotInt {
+				switch n.op {
+				case "+":
+					sum := lnum + rnum
+					if p, ok := core.PromoteIntOverflow("+", lnum, rnum, sum); ok {
+						return 0, core.SlotBoxed, p, nil
+					}
+					return sum, core.SlotInt, nil, nil
+				case "-":
+					diff := lnum - rnum
+					if p, ok := core.PromoteIntOverflow("-", lnum, rnum, diff); ok {
+						return 0, core.SlotBoxed, p, nil
+					}
+					return diff, core.SlotInt, nil, nil
+				case "*":
+					prod := lnum * rnum
+					if p, ok := core.PromoteIntOverflow("*", lnum, rnum, prod); ok {
+						return 0, core.SlotBoxed, p, nil
+					}
+					return prod, core.SlotInt, nil, nil
+				}
+			} else {
+				// At least one float operand: float semantics, no promotion.
+				switch n.op {
+				case "+":
+					return lnum + rnum, core.SlotFloat, nil, nil
+				case "-":
+					return lnum - rnum, core.SlotFloat, nil, nil
+				case "*":
+					return lnum * rnum, core.SlotFloat, nil, nil
 				}
 			}
+			// Comparisons share IEEE semantics across int/float kinds
+			// (1 == 1.0, NaN compares false). Booleans box statically.
+			switch n.op {
+			case "<":
+				return 0, core.SlotBoxed, core.BoolValue(lnum < rnum), nil
+			case "<=":
+				return 0, core.SlotBoxed, core.BoolValue(lnum <= rnum), nil
+			case ">":
+				return 0, core.SlotBoxed, core.BoolValue(lnum > rnum), nil
+			case ">=":
+				return 0, core.SlotBoxed, core.BoolValue(lnum >= rnum), nil
+			case "==":
+				return 0, core.SlotBoxed, core.BoolValue(lnum == rnum), nil
+			case "!=":
+				return 0, core.SlotBoxed, core.BoolValue(lnum != rnum), nil
+			}
 		}
-		return callValue(n.fn, []core.Value{l, r}, n.op, ctx)
+		// Mixed or non-numeric: box what needs boxing (each side was evaluated
+		// exactly once above) and dispatch to the registry operator.
+		if lbox == nil {
+			lbox = boxNum(lnum, lkind)
+		}
+		if rbox == nil {
+			rbox = boxNum(rnum, rkind)
+		}
+		v, err := callValue(n.fn, []core.Value{lbox, rbox}, n.op, ctx)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		return 0, core.SlotBoxed, v, nil
 	}
 	argv := make([]core.Value, len(n.args))
 	for i, a := range n.args {
 		v, err := Eval(a, ctx)
 		if err != nil {
-			return nil, err
+			return 0, 0, nil, err
 		}
 		argv[i] = v
 	}
-	return callValue(n.fn, argv, n.op, ctx)
+	v, err := callValue(n.fn, argv, n.op, ctx)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	return 0, core.SlotBoxed, v, nil
 }
 
 func compileOperator(op string, fn core.Value, items []core.Value) core.Value {

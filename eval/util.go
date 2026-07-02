@@ -79,6 +79,20 @@ func unwrapLocated(v core.Value) core.Value {
 // isTruthyWithErrors checks if a value is truthy, but propagates errors from __bool__
 // Unlike core.IsTruthy which silently treats errors as truthy, this propagates them
 func isTruthyWithErrors(v core.Value, ctx *core.Context) (bool, error) {
+	// Primitive fast path: these types cannot carry a user __bool__/__len__,
+	// and probing those dunders builds two discarded formatted errors per miss
+	// (92% of the compare-branch kernel's allocations before this check).
+	switch t := v.(type) {
+	case core.BoolValue:
+		return bool(t), nil
+	case core.NumberValue:
+		return float64(t) != 0, nil
+	case core.FloatValue:
+		return float64(t) != 0, nil
+	case core.NilValue:
+		return false, nil
+	}
+
 	// Try __bool__ dunder method first with error propagation
 	if result, found, err := types.CallBool(v, ctx); found {
 		if err != nil {

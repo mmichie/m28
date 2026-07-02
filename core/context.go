@@ -52,10 +52,11 @@ func NewSlotFrame(n int) SlotFrame {
 	}
 }
 
-// Set stores a value into slot i, classifying its kind. This is the ONLY
-// write path into a frame — every binder (call argument binding, assignment,
-// for-loop targets, unpacking, comprehension frames) must route here so the
-// tag invariant holds everywhere.
+// Set stores a boxed value into slot i, classifying its kind. Together with
+// SetNum this is the ONLY write path into a frame — every binder (call
+// argument binding, assignment, for-loop targets, unpacking, comprehension
+// frames) must route here so the tag invariant holds everywhere. The box in
+// hand is kept in refs so a later boxed read is free.
 func (f *SlotFrame) Set(i int, v Value) {
 	switch n := v.(type) {
 	case NumberValue:
@@ -70,25 +71,63 @@ func (f *SlotFrame) Set(i int, v Value) {
 	f.refs[i] = v
 }
 
-// Get returns the value in slot i (nil = unbound).
+// SetNum stores an unboxed numeric into slot i (kind is SlotInt or SlotFloat)
+// without materializing a box. refs is invalidated; a later boxed read
+// re-boxes on demand and memoizes (see Get). This is the stage-2 write path
+// for evalNum results — the allocation the unboxing campaign removes.
+func (f *SlotFrame) SetNum(i int, num float64, kind uint8) {
+	f.nums[i] = num
+	f.tags[i] = kind
+	f.refs[i] = nil
+}
+
+// GetNum returns the unboxed numeric in slot i, ok=false when the slot holds
+// a non-numeric (or unbound) value — the caller then uses Get.
+func (f *SlotFrame) GetNum(i int) (float64, uint8, bool) {
+	k := f.tags[i]
+	if k == SlotInt || k == SlotFloat {
+		return f.nums[i], k, true
+	}
+	return 0, k, false
+}
+
+// Get returns the boxed value in slot i (nil = unbound). Numeric slots whose
+// box was invalidated by SetNum re-box lazily and memoize, so read-heavy
+// patterns pay one boxing, not one per read.
 func (f *SlotFrame) Get(i int) Value {
 	if slotShadowVerify {
 		f.verify(i)
+	}
+	if f.refs[i] == nil {
+		switch f.tags[i] {
+		case SlotInt:
+			f.refs[i] = BoxNumber(f.nums[i])
+		case SlotFloat:
+			f.refs[i] = FloatValue(f.nums[i])
+		}
 	}
 	return f.refs[i]
 }
 
 // verify panics if slot i's tag or unboxed mirror disagrees with its boxed
-// value — a missed choke point or stale tag. Shadow mode only.
+// value — a missed choke point or stale tag. Shadow mode only. For numeric
+// tags refs is either nil (box invalidated by SetNum) or a memoized box that
+// must match the mirror.
 func (f *SlotFrame) verify(i int) {
 	v := f.refs[i]
 	switch f.tags[i] {
 	case SlotInt:
+		if v == nil {
+			return
+		}
 		n, ok := v.(NumberValue)
 		if !ok || float64(n) != f.nums[i] {
 			panic(fmt.Sprintf("slot %d tag=Int but ref=%T(%v), num=%v", i, v, v, f.nums[i]))
 		}
 	case SlotFloat:
+		if v == nil {
+			return
+		}
 		fl, ok := v.(FloatValue)
 		if !ok || (float64(fl) != f.nums[i] && (fl == fl || f.nums[i] == f.nums[i])) {
 			// NaN mirrors NaN: unequal floats are only a divergence when at
