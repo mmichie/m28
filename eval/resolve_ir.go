@@ -101,6 +101,8 @@ func compileList(n *core.ListValue, orig core.Value) core.Value {
 		return compileFor(items, orig)
 	case "while":
 		return compileWhile(items, orig)
+	case ".":
+		return compileDot(items, orig)
 	default:
 		// Any special form that analysis admits but this compiler does not
 		// model (dot access, and/or, literals, break/continue, comprehensions,
@@ -355,6 +357,44 @@ func compileCall(items []core.Value, name string) core.Value {
 		args[i-1] = compileIR(items[i])
 	}
 	return &callNode{callee: compileIR(items[0]), args: args, name: name}
+}
+
+// dotNode is a pre-parsed attribute access / method call. The handler args
+// list is built once at compile time — the object expression and method
+// arguments compiled to IR — and shared across evaluations: DotForm and its
+// helpers only ever read the list (audited: no mutation), and the dispatcher's
+// per-eval NewList copy plus the generic list-eval preamble (special-form map
+// lookup, macro/decorator checks) are exactly the overhead this node removes.
+// DotForm itself runs unchanged, so descriptor, property, classmethod/
+// staticmethod, super, and auto-call semantics are untouched.
+type dotNode struct{ args *core.ListValue }
+
+func (n *dotNode) Type() core.Type { return "dot-node" }
+func (n *dotNode) String() string  { return "(. ...)" }
+func (n *dotNode) evalIR(ctx *core.Context) (core.Value, error) {
+	return DotForm(n.args, ctx)
+}
+
+// compileDot builds a dotNode from (. obj attr args...). The attr name and
+// any StringValue argument stay raw: DotForm type-asserts core.StringValue
+// structurally (the attr itself, and the "__call__" no-arg-call marker), so
+// wrapping them in constNode would break that detection — and raw strings
+// self-evaluate in Eval's first switch case anyway.
+func compileDot(items []core.Value, orig core.Value) core.Value {
+	if len(items) < 3 {
+		return orig // malformed; let DotForm raise its own arity error
+	}
+	out := make([]core.Value, len(items)-1)
+	out[0] = compileIR(items[1]) // object expression
+	out[1] = items[2]            // attr name: structural, never compiled
+	for i := 3; i < len(items); i++ {
+		if _, isStr := unwrapLocated(items[i]).(core.StringValue); isStr {
+			out[i-1] = items[i]
+			continue
+		}
+		out[i-1] = compileIR(items[i])
+	}
+	return &dotNode{args: core.NewList(out...)}
 }
 
 // compileCallChecked guards compileCall against keyword/unpack markers, which
