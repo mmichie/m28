@@ -25,8 +25,9 @@ import (
 //     unchanged (still slot-rewritten), so Eval runs it the layer-2 way. This
 //     keeps the optimization a strict subset with a always-correct fallback.
 //   - Eligibility is unchanged: analyzeLocals already guarantees a body contains
-//     only do/begin/=/for/while/if/return special forms plus positional calls,
-//     so the heads compileIR must recognize are a closed set.
+//     only do/begin/=/for/while/if/return special forms, comprehension forms
+//     (compHeads, routed back to their handlers), and positional calls, so the
+//     heads compileIR must recognize are a closed set.
 
 // irNode is a compiled, self-evaluating expression node.
 type irNode interface {
@@ -101,6 +102,12 @@ func compileList(n *core.ListValue, orig core.Value) core.Value {
 	case "while":
 		return compileWhile(items, orig)
 	default:
+		// Comprehension forms pass analysis (closed sub-scopes) but must run
+		// through their special-form handlers — which have their own compiled
+		// fast path (compileCompExpr) — not as a function call.
+		if compHeads[h] {
+			return orig
+		}
 		// A non-special-form head: an operator or function call. analyzeLocals
 		// guarantees no unmodeled special form reaches here.
 		if fastOpNames[h] {

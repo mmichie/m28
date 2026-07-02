@@ -50,6 +50,20 @@ var dynamicScopeFns = map[string]bool{
 	"dir":        true,
 }
 
+// compHeads are the eagerly-evaluated comprehension forms the analyzer models
+// as closed sub-scopes instead of disqualifiers. Their loop variable binds a
+// child scope at runtime (comprehensionLoop's context or compileCompExpr's
+// one-slot frame), never the function frame, so a function containing one can
+// still be slot-compiled — provided the comprehension's innards (body,
+// condition, non-first iterables) read no function locals, which analyzeLocals
+// verifies via the free-name check. Generator expressions are excluded: they
+// evaluate lazily, possibly after the frame is gone. Dict comprehensions are
+// excluded until their argument shape is normalized.
+var compHeads = map[string]bool{
+	"list-comp": true,
+	"set-comp":  true,
+}
+
 // analyzeLocals computes the slot map for a function with the given (simple,
 // positional) parameter names and body. It returns ok=false if the body uses
 // any construct the slot model does not yet handle, in which case the caller
@@ -69,6 +83,11 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 	}
 
 	safe := true
+	// compFree collects the free names read inside comprehension innards; those
+	// run against the map-scope chain (where slot locals are invisible), so any
+	// overlap with the final local set disqualifies the function (checked after
+	// the walk, when the local set is complete).
+	compFree := make(map[string]bool)
 	var walk func(core.Value)
 	walk = func(v core.Value) {
 		if !safe {
@@ -92,8 +111,18 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 		}
 		h := string(head)
 
+		// A comprehension is a closed sub-scope: its first iterable runs in the
+		// enclosing scope (walked normally, and later slot-rewritten), while its
+		// innards bind only comprehension-local names at runtime.
+		if compHeads[h] {
+			if !walkCompForm(items, walk, compFree, isSpecialForm) {
+				safe = false
+			}
+			return
+		}
+
 		// Any special form we do not explicitly model disqualifies the function
-		// (def/lambda/global/nonlocal/del/with/try/yield/comprehensions/...).
+		// (def/lambda/global/nonlocal/del/with/try/yield/generator-exp/...).
 		if isSpecialForm(h) && !slotSafeForms[h] {
 			safe = false
 			return
@@ -149,7 +178,191 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 	if !safe {
 		return localResolution{}, false
 	}
+	// Comprehension innards resolve names through the map-scope chain at
+	// runtime; a function local read there would be invisible (slot frames have
+	// no name-addressable dict), so any overlap disqualifies the function.
+	for name := range compFree {
+		if _, isLocal := slots[name]; isLocal {
+			return localResolution{}, false
+		}
+	}
 	return localResolution{slots: slots}, true
+}
+
+// walkCompForm validates a comprehension form during analysis. The first
+// clause's iterable is enclosing-scope code and is walked with the normal
+// walker (walkEnclosing); the innards — body expression, conditions, and the
+// iterables of later clauses — execute in the comprehension's own child scope
+// and are walked by walkCompInnards, which records their free names in free.
+// Returns false for any shape or content the model cannot guarantee safe.
+// items includes the head, so positions are shifted one right of the form
+// handlers' args: (list-comp expr var iterable [cond]) has expr at items[1].
+func walkCompForm(items []core.Value, walkEnclosing func(core.Value), free map[string]bool, isSpecialForm func(string) bool) bool {
+	if len(items) < 3 {
+		return false
+	}
+	// Multi-clause form: items[2] is the clauses list (mirrors the handlers'
+	// detection, which type-asserts without unwrapping).
+	if clauses, ok := items[2].(*core.ListValue); ok {
+		if len(items) != 3 {
+			return false
+		}
+		cl := clauses.ItemsRef()
+		if len(cl) == 0 {
+			return false
+		}
+		bound := make(map[string]bool, len(cl))
+		for i, cv := range cl {
+			clause, ok := cv.(*core.ListValue)
+			if !ok || clause.Len() < 2 || clause.Len() > 3 {
+				return false
+			}
+			cItems := clause.ItemsRef()
+			varSym, ok := cItems[0].(core.SymbolValue)
+			if !ok || strings.HasPrefix(string(varSym), "(") {
+				// Tuple-pattern targets stay on the generic path.
+				return false
+			}
+			if i == 0 {
+				// First iterable: enclosing scope.
+				walkEnclosing(cItems[1])
+			} else if !walkCompInnards(cItems[1], bound, free, isSpecialForm) {
+				return false
+			}
+			bound[string(varSym)] = true
+			if clause.Len() == 3 && !walkCompInnards(cItems[2], bound, free, isSpecialForm) {
+				return false
+			}
+		}
+		return walkCompInnards(items[1], bound, free, isSpecialForm)
+	}
+	// Single-clause form: (head expr var iterable [cond]).
+	if len(items) < 4 || len(items) > 5 {
+		return false
+	}
+	varSym, ok := items[2].(core.SymbolValue)
+	if !ok || strings.HasPrefix(string(varSym), "(") {
+		return false
+	}
+	walkEnclosing(items[3])
+	bound := map[string]bool{string(varSym): true}
+	if len(items) == 5 && !walkCompInnards(items[4], bound, free, isSpecialForm) {
+		return false
+	}
+	return walkCompInnards(items[1], bound, free, isSpecialForm)
+}
+
+// walkCompInnards validates comprehension-scope code and records the names it
+// reads that are not comprehension variables (bound). Anything that could bind
+// a name, observe the namespace dynamically, or that the model does not fully
+// understand returns false. Call heads are recorded as free reads too — a
+// function local shadowing a callee name must disqualify.
+func walkCompInnards(v core.Value, bound, free map[string]bool, isSpecialForm func(string) bool) bool {
+	v = unwrapLocated(v)
+	switch n := v.(type) {
+	case core.SymbolValue:
+		if !bound[string(n)] {
+			free[string(n)] = true
+		}
+		return true
+	case *core.ListValue:
+		if n.Len() == 0 {
+			return true
+		}
+		items := n.ItemsRef()
+		head, headIsSym := unwrapLocated(items[0]).(core.SymbolValue)
+		if !headIsSym {
+			for _, it := range items {
+				if !walkCompInnards(it, bound, free, isSpecialForm) {
+					return false
+				}
+			}
+			return true
+		}
+		h := string(head)
+		if compHeads[h] {
+			return walkNestedCompInnards(items, bound, free, isSpecialForm)
+		}
+		if isSpecialForm(h) && !slotSafeForms[h] {
+			return false
+		}
+		if dynamicScopeFns[h] {
+			return false
+		}
+		// Bindings inside innards are comprehension-local at runtime; rather
+		// than model that interaction, reject and keep the function generic.
+		if h == "=" || h == "for" {
+			return false
+		}
+		if !bound[h] {
+			free[h] = true
+		}
+		for _, it := range items[1:] {
+			if !walkCompInnards(it, bound, free, isSpecialForm) {
+				return false
+			}
+		}
+		return true
+	default:
+		return true
+	}
+}
+
+// walkNestedCompInnards handles a comprehension nested inside another
+// comprehension's innards. Unlike the outermost case, even its first iterable
+// runs in the outer comprehension's scope, so every part is innards; its own
+// variables extend the bound set for its body and condition.
+func walkNestedCompInnards(items []core.Value, bound, free map[string]bool, isSpecialForm func(string) bool) bool {
+	if len(items) < 3 {
+		return false
+	}
+	inner := make(map[string]bool, len(bound)+2)
+	for k := range bound {
+		inner[k] = true
+	}
+	if clauses, ok := items[2].(*core.ListValue); ok {
+		if len(items) != 3 {
+			return false
+		}
+		cl := clauses.ItemsRef()
+		if len(cl) == 0 {
+			return false
+		}
+		for _, cv := range cl {
+			clause, ok := cv.(*core.ListValue)
+			if !ok || clause.Len() < 2 || clause.Len() > 3 {
+				return false
+			}
+			cItems := clause.ItemsRef()
+			varSym, ok := cItems[0].(core.SymbolValue)
+			if !ok || strings.HasPrefix(string(varSym), "(") {
+				return false
+			}
+			if !walkCompInnards(cItems[1], inner, free, isSpecialForm) {
+				return false
+			}
+			inner[string(varSym)] = true
+			if clause.Len() == 3 && !walkCompInnards(cItems[2], inner, free, isSpecialForm) {
+				return false
+			}
+		}
+		return walkCompInnards(items[1], inner, free, isSpecialForm)
+	}
+	if len(items) < 4 || len(items) > 5 {
+		return false
+	}
+	varSym, ok := items[2].(core.SymbolValue)
+	if !ok || strings.HasPrefix(string(varSym), "(") {
+		return false
+	}
+	if !walkCompInnards(items[3], inner, free, isSpecialForm) {
+		return false
+	}
+	inner[string(varSym)] = true
+	if len(items) == 5 && !walkCompInnards(items[4], inner, free, isSpecialForm) {
+		return false
+	}
+	return walkCompInnards(items[1], inner, free, isSpecialForm)
 }
 
 // slotRef is a resolved reference to a function-local stored in the slot frame
@@ -210,6 +423,14 @@ func resolveNode(v core.Value, slots map[string]int, isSpecialForm func(string) 
 			return rewriteItems(v, items, slots, isSpecialForm)
 		}
 		h := string(head)
+
+		// A comprehension: only its first iterable is enclosing-scope code, so
+		// only that position is rewritten. Its innards were verified by
+		// analyzeLocals to read no function locals; they are left untouched for
+		// the form handler (and its own compiled fast path, compileCompExpr).
+		if compHeads[h] {
+			return resolveCompForm(v, items, slots, isSpecialForm)
+		}
 
 		// Any unmodeled special form should already have been rejected by
 		// analyzeLocals; bail defensively if the two passes ever disagree.
@@ -298,6 +519,64 @@ func rewriteItems(orig core.Value, items []core.Value, slots map[string]int, isS
 	if !changed {
 		return orig, true
 	}
+	return core.NewList(out...), true
+}
+
+// resolveCompForm rewrites a comprehension form for a slot body: only the first
+// clause's iterable — the one position evaluated in the enclosing scope — is
+// resolved; the variable, body, condition, and later iterables are left intact
+// (they run in the comprehension's own scope). Shape checks mirror walkCompForm;
+// a mismatch means the passes disagree, so bail to the safe fallback.
+func resolveCompForm(orig core.Value, items []core.Value, slots map[string]int, isSpecialForm func(string) bool) (core.Value, bool) {
+	if len(items) < 3 {
+		return nil, false
+	}
+	// Multi-clause: rewrite the first clause's iterable in place.
+	if clauses, ok := items[2].(*core.ListValue); ok {
+		if len(items) != 3 {
+			return nil, false
+		}
+		cl := clauses.ItemsRef()
+		if len(cl) == 0 {
+			return nil, false
+		}
+		first, ok := cl[0].(*core.ListValue)
+		if !ok || first.Len() < 2 {
+			return nil, false
+		}
+		fItems := first.ItemsRef()
+		newIter, ok := resolveNode(fItems[1], slots, isSpecialForm)
+		if !ok {
+			return nil, false
+		}
+		if newIter == fItems[1] {
+			return orig, true
+		}
+		newFirst := make([]core.Value, len(fItems))
+		copy(newFirst, fItems)
+		newFirst[1] = newIter
+		newClauses := make([]core.Value, len(cl))
+		copy(newClauses, cl)
+		newClauses[0] = core.NewList(newFirst...)
+		out := make([]core.Value, len(items))
+		copy(out, items)
+		out[2] = core.NewList(newClauses...)
+		return core.NewList(out...), true
+	}
+	// Single-clause: (head expr var iterable [cond]).
+	if len(items) < 4 || len(items) > 5 {
+		return nil, false
+	}
+	newIter, ok := resolveNode(items[3], slots, isSpecialForm)
+	if !ok {
+		return nil, false
+	}
+	if newIter == items[3] {
+		return orig, true
+	}
+	out := make([]core.Value, len(items))
+	copy(out, items)
+	out[3] = newIter
 	return core.NewList(out...), true
 }
 

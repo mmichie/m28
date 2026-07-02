@@ -252,9 +252,11 @@ func comprehensionLoop(
 	callback func(loopCtx *core.Context) error,
 ) error {
 	loopCtx := core.NewContext(ctx)
+	// varName is either a plain identifier or a tuple pattern like "(x, y)";
+	// decide once, not per element.
+	isTuplePattern := strings.HasPrefix(varName, "(") && strings.HasSuffix(varName, ")")
 	for _, item := range items {
-		// Check if varName is a tuple pattern like "(x, y)" or "(x, (y, z))"
-		if strings.HasPrefix(varName, "(") && strings.HasSuffix(varName, ")") {
+		if isTuplePattern {
 			// Parse the tuple pattern and unpack the item
 			if err := unpackTuplePattern(varName, item, loopCtx); err != nil {
 				return fmt.Errorf("error unpacking loop variable: %w", err)
@@ -285,6 +287,54 @@ func comprehensionLoop(
 	return nil
 }
 
+// compileCompExpr rewrites a single-clause comprehension body or condition so
+// reads (and writes) of the comprehension variable become slot 0 of a one-slot
+// frame, then compiles it to IR (see resolve.go / resolve_ir.go). This lets the
+// per-element evaluation skip the map-scope Define/Lookup and the generic call
+// machinery entirely. ok=false when the expression contains anything the
+// resolver does not model (nested comprehensions, lambdas, keyword or unpack
+// calls, assignments to other names, unmodeled special forms); the caller must
+// then fall back to the generic comprehensionLoop, which preserves the old
+// behavior exactly.
+func compileCompExpr(expr core.Value, varName string) (core.Value, bool) {
+	rewritten, ok := resolveBody(expr, map[string]int{varName: 0}, isSpecialFormName)
+	if !ok {
+		return nil, false
+	}
+	return compileIR(rewritten), true
+}
+
+// runCompLoopCompiled drives a single-clause comprehension whose body and
+// optional condition were compiled by compileCompExpr. Per element it stores
+// the item into the one-slot frame and evaluates the compiled IR; sink receives
+// each produced value. Error wrapping mirrors the generic loop so messages are
+// unchanged. Like comprehensionLoop, the frame context is shared across
+// elements (each iteration rebinds the variable in the same scope).
+func runCompLoopCompiled(items []core.Value, expr, cond core.Value, ctx *core.Context, sink func(core.Value) error) error {
+	compCtx := core.NewContext(ctx)
+	compCtx.Locals = make([]core.Value, 1)
+	for _, item := range items {
+		compCtx.Locals[0] = item
+		if cond != nil {
+			condResult, err := Eval(cond, compCtx)
+			if err != nil {
+				return fmt.Errorf("error evaluating condition: %w", err)
+			}
+			if !core.IsTruthy(condResult) {
+				continue
+			}
+		}
+		exprResult, err := Eval(expr, compCtx)
+		if err != nil {
+			return fmt.Errorf("error evaluating expression: %w", err)
+		}
+		if err := sink(exprResult); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // listCompForm implements list comprehensions
 // Forms:
 //
@@ -296,13 +346,15 @@ func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, &core.TypeError{Message: "list-comp requires at least 2 arguments"}
 	}
 
-	// Check if this is multi-clause format (args.Items()[1] is a list)
-	if clausesList, ok := args.Items()[1].(*core.ListValue); ok {
+	argItems := args.ItemsRef()
+
+	// Check if this is multi-clause format (argItems[1] is a list)
+	if clausesList, ok := argItems[1].(*core.ListValue); ok {
 		// Multi-clause nested comprehension (2 args: expr, clauses)
 		if args.Len() != 2 {
 			return nil, &core.TypeError{Message: "multi-clause list-comp requires exactly 2 arguments"}
 		}
-		return listCompMultiClause(args.Items()[0], clausesList, ctx)
+		return listCompMultiClause(argItems[0], clausesList, ctx)
 	}
 
 	// Single-clause format (backward compatible)
@@ -312,14 +364,14 @@ func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get the variable name
-	varSym, ok := args.Items()[1].(core.SymbolValue)
+	varSym, ok := argItems[1].(core.SymbolValue)
 	if !ok {
 		return nil, &core.TypeError{Message: "list comprehension variable must be a symbol"}
 	}
 	varName := string(varSym)
 
 	// Evaluate the iterable
-	iterableExpr := args.Items()[2]
+	iterableExpr := argItems[2]
 	iterable, err := Eval(iterableExpr, ctx)
 	if err != nil {
 		// Debug: show what expression failed
@@ -336,19 +388,42 @@ func ListCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("list comprehension: %w", err)
 	}
 
-	// Create result list
-	result := make([]core.Value, 0)
+	expr := argItems[0]
 
 	// Get optional condition
 	var condition core.Value
 	if args.Len() == 4 {
-		condition = args.Items()[3]
+		condition = argItems[3]
 	}
 
-	// Execute the comprehension loop
+	// Create result list
+	result := make([]core.Value, 0, len(items))
+
+	// Fast path: compile the body and condition against a one-slot frame for
+	// the comprehension variable (tuple patterns like "(x, y)" stay generic).
+	if !strings.HasPrefix(varName, "(") {
+		if compiledExpr, ok := compileCompExpr(expr, varName); ok {
+			compiledCond, condOK := core.Value(nil), true
+			if condition != nil {
+				compiledCond, condOK = compileCompExpr(condition, varName)
+			}
+			if condOK {
+				err := runCompLoopCompiled(items, compiledExpr, compiledCond, ctx, func(v core.Value) error {
+					result = append(result, v)
+					return nil
+				})
+				if err != nil {
+					return nil, err
+				}
+				return core.NewList(result...), nil
+			}
+		}
+	}
+
+	// Generic path: map-scope loop.
 	err = comprehensionLoop(items, varName, condition, ctx, func(loopCtx *core.Context) error {
 		// Evaluate the expression
-		exprResult, err := Eval(args.Items()[0], loopCtx)
+		exprResult, err := Eval(expr, loopCtx)
 		if err != nil {
 			return fmt.Errorf("error evaluating expression: %w", err)
 		}
@@ -457,13 +532,15 @@ func DictCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, &core.TypeError{Message: "dict-comp requires at least 3 arguments"}
 	}
 
-	// Check if this is multi-clause format (args.Items()[2] is a list)
-	if clausesList, ok := args.Items()[2].(*core.ListValue); ok {
+	argItems := args.ItemsRef()
+
+	// Check if this is multi-clause format (argItems[2] is a list)
+	if clausesList, ok := argItems[2].(*core.ListValue); ok {
 		// Multi-clause nested comprehension (3 args: key-expr, value-expr, clauses)
 		if args.Len() != 3 {
 			return nil, &core.TypeError{Message: "multi-clause dict-comp requires exactly 3 arguments"}
 		}
-		return dictCompMultiClause(args.Items()[0], args.Items()[1], clausesList, ctx)
+		return dictCompMultiClause(argItems[0], argItems[1], clausesList, ctx)
 	}
 
 	// Single-clause format (backward compatible)
@@ -473,14 +550,14 @@ func DictCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get the variable name
-	varSym, ok := args.Items()[2].(core.SymbolValue)
+	varSym, ok := argItems[2].(core.SymbolValue)
 	if !ok {
 		return nil, &core.TypeError{Message: "dict comprehension variable must be a symbol"}
 	}
 	varName := string(varSym)
 
 	// Evaluate the iterable
-	iterable, err := Eval(args.Items()[3], ctx)
+	iterable, err := Eval(argItems[3], ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating iterable: %w", err)
 	}
@@ -491,25 +568,27 @@ func DictCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("dict comprehension: %w", err)
 	}
 
+	keyExpr, valueExpr := argItems[0], argItems[1]
+
 	// Create result dict
 	result := core.NewDict()
 
 	// Get optional condition
 	var condition core.Value
 	if args.Len() == 5 {
-		condition = args.Items()[4]
+		condition = argItems[4]
 	}
 
 	// Execute the comprehension loop
 	err = comprehensionLoop(items, varName, condition, ctx, func(loopCtx *core.Context) error {
 		// Evaluate the key expression
-		keyResult, err := Eval(args.Items()[0], loopCtx)
+		keyResult, err := Eval(keyExpr, loopCtx)
 		if err != nil {
 			return fmt.Errorf("error evaluating key expression: %w", err)
 		}
 
 		// Evaluate the value expression
-		valueResult, err := Eval(args.Items()[1], loopCtx)
+		valueResult, err := Eval(valueExpr, loopCtx)
 		if err != nil {
 			return fmt.Errorf("error evaluating value expression: %w", err)
 		}
@@ -624,13 +703,15 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, &core.TypeError{Message: "set-comp requires at least 2 arguments"}
 	}
 
-	// Check if this is multi-clause format (args.Items()[1] is a list)
-	if clausesList, ok := args.Items()[1].(*core.ListValue); ok {
+	argItems := args.ItemsRef()
+
+	// Check if this is multi-clause format (argItems[1] is a list)
+	if clausesList, ok := argItems[1].(*core.ListValue); ok {
 		// Multi-clause nested comprehension (2 args: expr, clauses)
 		if args.Len() != 2 {
 			return nil, &core.TypeError{Message: "multi-clause set-comp requires exactly 2 arguments"}
 		}
-		return setCompMultiClause(args.Items()[0], clausesList, ctx)
+		return setCompMultiClause(argItems[0], clausesList, ctx)
 	}
 
 	// Single-clause format (backward compatible)
@@ -640,14 +721,14 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	}
 
 	// Get the variable name
-	varSym, ok := args.Items()[1].(core.SymbolValue)
+	varSym, ok := argItems[1].(core.SymbolValue)
 	if !ok {
 		return nil, &core.TypeError{Message: "set comprehension variable must be a symbol"}
 	}
 	varName := string(varSym)
 
 	// Evaluate the iterable
-	iterableExpr := args.Items()[2]
+	iterableExpr := argItems[2]
 	iterable, err := Eval(iterableExpr, ctx)
 	if err != nil {
 		// Debug: show what expression failed
@@ -664,19 +745,42 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("set comprehension: %w", err)
 	}
 
+	expr := argItems[0]
+
 	// Create result set
 	result := core.NewSet()
 
 	// Get optional condition
 	var condition core.Value
 	if args.Len() == 4 {
-		condition = args.Items()[3]
+		condition = argItems[3]
 	}
 
-	// Execute the comprehension loop
+	// Fast path: compile the body and condition against a one-slot frame for
+	// the comprehension variable (tuple patterns like "(x, y)" stay generic).
+	if !strings.HasPrefix(varName, "(") {
+		if compiledExpr, ok := compileCompExpr(expr, varName); ok {
+			compiledCond, condOK := core.Value(nil), true
+			if condition != nil {
+				compiledCond, condOK = compileCompExpr(condition, varName)
+			}
+			if condOK {
+				err := runCompLoopCompiled(items, compiledExpr, compiledCond, ctx, func(v core.Value) error {
+					result.Add(v)
+					return nil
+				})
+				if err != nil {
+					return nil, err
+				}
+				return result, nil
+			}
+		}
+	}
+
+	// Generic path: map-scope loop.
 	err = comprehensionLoop(items, varName, condition, ctx, func(loopCtx *core.Context) error {
 		// Evaluate the expression
-		exprResult, err := Eval(args.Items()[0], loopCtx)
+		exprResult, err := Eval(expr, loopCtx)
 		if err != nil {
 			return fmt.Errorf("error evaluating expression: %w", err)
 		}
