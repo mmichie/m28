@@ -54,7 +54,9 @@ func NewListIterator(list *core.ListValue) *ListIterator {
 // Next returns the next value
 func (l *ListIterator) Next() (core.Value, error) {
 	if l.index < l.list.Len() {
-		val := l.list.Items()[l.index]
+		// ItemsRef avoids Items()'s full-list copy, which would make
+		// iterating a list O(n^2). The slice is only read, never retained.
+		val := l.list.ItemsRef()[l.index]
 		l.index++
 		return val, nil
 	}

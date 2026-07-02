@@ -183,7 +183,8 @@ func getListMethods() map[string]*MethodDescriptor {
 				if index < 0 || index >= list.Len() {
 					return nil, &IndexError{Index: int(idx), Length: list.Len()}
 				}
-				return list.Items()[index], nil
+				// Direct read: Items() would copy the whole list per access.
+				return list.items[index], nil
 			},
 		},
 		"contains": {
@@ -967,9 +968,10 @@ func listMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, error
 			return nil, err
 		}
 
-		// Extract slice
+		// Extract slice. ItemsRef is safe here: no user code runs between here
+		// and the end of the loop, and elements are copied into result.
 		var result []Value
-		items := list.Items()
+		items := list.ItemsRef()
 		if step > 0 {
 			for i := start; i < stop && i < list.Len(); i += step {
 				result = append(result, items[i])
@@ -1000,7 +1002,9 @@ func listMethodGetItem(receiver Value, args []Value, ctx *Context) (Value, error
 		return nil, &IndexError{Index: i, Length: list.Len()}
 	}
 
-	return list.Items()[i], nil
+	// Read the element directly: Items() would copy the whole list per access,
+	// turning indexed loops quadratic.
+	return list.items[i], nil
 }
 
 func listMethodSetItem(receiver Value, args []Value, ctx *Context) (Value, error) {
