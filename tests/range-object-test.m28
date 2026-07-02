@@ -182,3 +182,19 @@
   (print "Expected error for zero step:" e)))
 
 (print "\n=== All Range Object Tests Passed! ===")
+(print "\n=== Range Sum Closed Form ===")
+
+# sum(range) uses an O(1) arithmetic-series fast path; results must match
+# CPython exactly, including bigint results past float64's 2^53.
+(assert (== (sum (range 10)) 45) "sum of range(10)")
+(assert (== (sum (range 0)) 0) "sum of empty range")
+(assert (== (sum (range 3 3)) 0) "sum of empty bounded range")
+(assert (== (sum (range 5 50 7)) 182) "sum with positive step")
+(assert (== (sum (range 50 5 -7)) 203) "sum with negative step")
+(assert (== (sum (range -10 10 3)) -7) "sum crossing zero")
+(assert (== (sum (range 0 -10 -1)) -45) "sum of negative values")
+(assert (== (sum (range 10) 100) 145) "sum with start value")
+(assert (== (sum (range 10) 0.5) 45.5) "float start keeps float result")
+(assert (== (str (sum (range 1000000000))) "499999999500000000") "billion-sum exact past 2^53")
+(assert (== (str (sum (range 1 1000000000 3))) "166666666166666667") "billion-sum with step exact")
+(print "Range sum closed form: all cases match CPython")

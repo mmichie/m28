@@ -3,6 +3,7 @@ package builtin
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 
 	"github.com/mmichie/m28/common/types"
@@ -10,6 +11,59 @@ import (
 	"github.com/mmichie/m28/core"
 	"github.com/mmichie/m28/core/protocols"
 )
+
+// sumRangeClosedForm computes sum(range(...)) + start as an arithmetic series:
+// n*first + step*n*(n-1)/2, in big.Int so results past float64's exact-integer
+// range stay exact (CPython prints sum(range(10**9)) exactly). ok=false when
+// any bound is non-integral or outside 2^53 — the generic loop then preserves
+// today's behavior bit for bit. start must be an integer (float starts take
+// the generic loop for CPython-identical float accumulation order).
+func sumRangeClosedForm(r *core.RangeValue, start float64) (core.Value, bool) {
+	if !isExactInt(r.Start) || !isExactInt(r.Stop) || !isExactInt(r.Step) || !isExactInt(start) {
+		return nil, false
+	}
+	first, stop, step := int64(r.Start), int64(r.Stop), int64(r.Step)
+	if step == 0 {
+		return nil, false // constructor rejects this; defensive
+	}
+
+	// Element count via integer ceiling division (bounds are < 2^53, so the
+	// differences fit int64 comfortably).
+	var n int64
+	if step > 0 {
+		if first < stop {
+			n = (stop - first + step - 1) / step
+		}
+	} else {
+		if first > stop {
+			n = (first - stop - step - 1) / (-step)
+		}
+	}
+	if n == 0 {
+		return core.NumberValue(start), true
+	}
+
+	// total = n*first + step * n*(n-1)/2 + start, exactly.
+	bn := big.NewInt(n)
+	tri := new(big.Int).Mul(bn, big.NewInt(n-1))
+	tri.Rsh(tri, 1) // n*(n-1) is always even
+	tri.Mul(tri, big.NewInt(step))
+	total := new(big.Int).Mul(bn, big.NewInt(first))
+	total.Add(total, tri)
+	total.Add(total, big.NewInt(int64(start)))
+
+	bv := core.NewBigInt(total)
+	if num, ok := core.DemoteToNumber(bv); ok {
+		return num, true
+	}
+	return bv, true
+}
+
+// isExactInt reports whether f is an integer exactly representable in both
+// float64 and int64 (|f| below 2^53).
+func isExactInt(f float64) bool {
+	return f == math.Trunc(f) && math.Abs(f) < 1<<53
+}
 
 // bankersRound implements banker's rounding (round half to even)
 // This matches Python 3's default rounding behavior
@@ -256,6 +310,17 @@ func RegisterNumeric(ctx *core.Context) {
 		// A float start or any float element makes the result a float, matching
 		// CPython (sum([1.5, 2.5]) == 4.0, sum([1, 2]) == 3).
 		isFloat := v.Count() == 2 && core.IsFloatValue(v.Get(1))
+
+		// Fast path: an unmaterialized range is an arithmetic series with a
+		// closed form — O(1) instead of a boxed iteration per element, and
+		// exact past float64's 2^53 (sum(range(10**9)) needs a bigint). A
+		// float start keeps the generic loop: CPython accumulates in float
+		// sequentially, and matching its rounding requires the same order.
+		if r, ok := iterable.(*core.RangeValue); ok && !isFloat {
+			if result, ok := sumRangeClosedForm(r, start); ok {
+				return result, nil
+			}
+		}
 
 		if iter, ok := iterable.(core.Iterable); ok {
 			iterator := iter.Iterator()
