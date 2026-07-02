@@ -59,7 +59,7 @@ func addTwo(left, right core.Value, ctx *core.Context) (core.Value, error) {
 			if p, ok := core.PromoteIntOverflow("+", float64(l), float64(r), sum); ok {
 				return p, nil
 			}
-			return core.NumberValue(sum), nil
+			return core.BoxNumber(sum), nil
 		}
 	}
 
@@ -321,7 +321,7 @@ func subtractTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 			if p, ok := core.PromoteIntOverflow("-", float64(l), float64(r), diff); ok {
 				return p, nil
 			}
-			return core.NumberValue(diff), nil
+			return core.BoxNumber(diff), nil
 		}
 	}
 
@@ -409,7 +409,7 @@ func multiplyTwo(left, right core.Value, ctx *core.Context) (core.Value, error) 
 			if p, ok := core.PromoteIntOverflow("*", float64(l), float64(r), prod); ok {
 				return p, nil
 			}
-			return core.NumberValue(prod), nil
+			return core.BoxNumber(prod), nil
 		}
 	}
 

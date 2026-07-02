@@ -81,7 +81,7 @@ func (r *RangeValue) GetItem(index int) (Value, error) {
 
 	// Calculate the value at the index
 	value := r.Start + float64(index)*r.Step
-	return NumberValue(value), nil
+	return BoxNumber(value), nil
 }
 
 // Contains checks if a value is in the range
@@ -149,7 +149,9 @@ func (it *rangeIterator) Next() (Value, bool) {
 		}
 	}
 
-	val := NumberValue(it.current)
+	// BoxNumber reuses the shared small-int box: loop counters are the
+	// single hottest boxing site in the interpreter.
+	val := BoxNumber(it.current)
 	it.current += it.rang.Step
 	return val, true
 }

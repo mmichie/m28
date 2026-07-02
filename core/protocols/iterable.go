@@ -470,7 +470,9 @@ func (r *RangeIterator) Next() (core.Value, error) {
 		}
 	}
 
-	val := core.NumberValue(r.current)
+	// BoxNumber reuses the shared small-int box: loop counters are among the
+	// hottest boxing sites in the interpreter.
+	val := core.BoxNumber(r.current)
 	r.current += r.rang.Step
 	return val, nil
 }

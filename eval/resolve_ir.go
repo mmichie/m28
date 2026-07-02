@@ -303,13 +303,25 @@ func compileAssign(items []core.Value, orig core.Value) core.Value {
 // single-target, single-body shape is rewritten; for/else and multi-body forms
 // fall through to ForForm unchanged.
 func compileFor(items []core.Value, orig core.Value) core.Value {
-	if len(items) != 4 {
+	// Canonical Python lowering: (for target seq body). The s-expression
+	// surface also allows (for target in seq body); both compile.
+	switch len(items) {
+	case 4:
+		if _, ok := unwrapLocated(items[1]).(*slotRef); !ok {
+			return orig
+		}
+		return core.NewList(items[0], items[1], compileIR(items[2]), compileIR(items[3]))
+	case 5:
+		if _, ok := unwrapLocated(items[1]).(*slotRef); !ok {
+			return orig
+		}
+		if in, ok := unwrapLocated(items[2]).(core.SymbolValue); !ok || string(in) != "in" {
+			return orig
+		}
+		return core.NewList(items[0], items[1], items[2], compileIR(items[3]), compileIR(items[4]))
+	default:
 		return orig
 	}
-	if _, ok := unwrapLocated(items[1]).(*slotRef); !ok {
-		return orig
-	}
-	return core.NewList(items[0], items[1], compileIR(items[2]), compileIR(items[3]))
 }
 
 // compileWhile rebuilds a simple (while cond body) so WhileForm still drives the
@@ -467,19 +479,19 @@ func fastNumOp(op string, l, r core.NumberValue) (core.Value, bool) {
 		if p, ok := core.PromoteIntOverflow("+", float64(l), float64(r), sum); ok {
 			return p, true
 		}
-		return core.NumberValue(sum), true
+		return core.BoxNumber(sum), true
 	case "-":
 		diff := float64(l) - float64(r)
 		if p, ok := core.PromoteIntOverflow("-", float64(l), float64(r), diff); ok {
 			return p, true
 		}
-		return core.NumberValue(diff), true
+		return core.BoxNumber(diff), true
 	case "*":
 		prod := float64(l) * float64(r)
 		if p, ok := core.PromoteIntOverflow("*", float64(l), float64(r), prod); ok {
 			return p, true
 		}
-		return core.NumberValue(prod), true
+		return core.BoxNumber(prod), true
 	case "<":
 		return core.BoolValue(l < r), true
 	case "<=":

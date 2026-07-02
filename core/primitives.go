@@ -212,6 +212,31 @@ func PromoteToBigInt(n NumberValue) BigIntValue {
 	return NewBigIntFromInt64(int64(f))
 }
 
+// smallIntBoxes holds pre-boxed NumberValues for the CPython-interned small
+// integer range [-5, 256]. Converting a float64 to an interface allocates
+// (runtime.convT64 — Go's static box cache covers integer kinds, not
+// float64), and small loop counters and arithmetic results dominate the
+// interpreter's boxing traffic. Sharing boxes is safe: NumberValue is a value
+// type, so interface equality (and therefore `is`) compares values — and
+// CPython interns exactly this range.
+var smallIntBoxes [262]Value
+
+func init() {
+	for i := range smallIntBoxes {
+		smallIntBoxes[i] = NumberValue(i - 5)
+	}
+}
+
+// BoxNumber converts a numeric result to a Value, reusing the shared box for
+// small integers instead of allocating. Non-integral and out-of-range values
+// box normally; -0.0 canonicalizes to the +0 box (equal value, same dict key).
+func BoxNumber(f float64) Value {
+	if f >= -5 && f <= 256 && f == math.Trunc(f) {
+		return smallIntBoxes[int(f)+5]
+	}
+	return NumberValue(f)
+}
+
 // DemoteToNumber converts BigIntValue to NumberValue if it fits safely
 // Returns (NumberValue, true) if demotion is safe, (0, false) otherwise
 func DemoteToNumber(b BigIntValue) (NumberValue, bool) {
