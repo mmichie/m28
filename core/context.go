@@ -201,9 +201,9 @@ func (c *Context) Define(name string, value Value) {
 		if len(name) > 0 && name[0] == '_' {
 			return
 		}
-		// Add to module dict with proper key formatting
-		key := ValueToKey(StringValue(name))
-		c.ModuleDict.SetWithKey(key, StringValue(name), value)
+		// Add to module dict (SetStr is the allocation-light equivalent of
+		// SetWithKey with a ValueToKey string key).
+		c.ModuleDict.SetStr(name, value)
 	}
 }
 
@@ -337,8 +337,9 @@ func (c *Context) lookupWithDepth(name string, depth int, crossedFunction bool) 
 	// This ensures dynamic updates to module.__dict__ are visible to functions
 	// This is critical for Python's importlib._setup() which dynamically injects globals
 	if c.ModuleDict != nil {
-		key := ValueToKey(StringValue(name))
-		if val, ok := c.ModuleDict.Get(key); ok {
+		// GetStr avoids the per-lookup key-string allocation ValueToKey makes;
+		// this runs on nearly every module-global read.
+		if val, ok := c.ModuleDict.GetStr(name); ok {
 			if debugLookups && depth < 5 {
 				Log.Debug(SubsystemScope, "Variable found in ModuleDict", "name", name)
 			}
@@ -368,8 +369,7 @@ func (c *Context) lookupWithDepth(name string, depth int, crossedFunction bool) 
 	// check its ModuleDict as a last resort. This allows functions to access
 	// module-level variables that were defined after the function was created.
 	if c.Global != nil && c.Global.ModuleDict != nil && c.Global != c {
-		key := ValueToKey(StringValue(name))
-		if val, ok := c.Global.ModuleDict.Get(key); ok {
+		if val, ok := c.Global.ModuleDict.GetStr(name); ok {
 			return val, nil
 		}
 	}

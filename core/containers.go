@@ -446,6 +446,33 @@ func (d *DictValue) Get(key string) (Value, bool) {
 	return val, ok
 }
 
+// GetStr looks up the value stored under a plain string key — equivalent to
+// Get(ValueToKey(StringValue(name))) — without allocating: the "s:" prefix
+// concatenation stays inside the map index expression, which Go evaluates with
+// a stack-temporary string. This is the hot path for module-global lookups
+// (Context.lookupWithDepth), which run on nearly every name resolution.
+func (d *DictValue) GetStr(name string) (Value, bool) {
+	val, ok := d.entries["s:"+name]
+	return val, ok
+}
+
+// SetStr stores value under a plain string key — equivalent to
+// SetWithKey(ValueToKey(StringValue(name)), StringValue(name), value). The
+// existence probe uses the non-escaping concat; only a new key materializes
+// the escaping key string and order-tracking entries.
+func (d *DictValue) SetStr(name string, value Value) {
+	if _, exists := d.entries["s:"+name]; exists {
+		key := "s:" + name
+		d.entries[key] = value
+		return
+	}
+	key := "s:" + name
+	d.orderedKeys = append(d.orderedKeys, key)
+	d.modCount++
+	d.entries[key] = value
+	d.keys[key] = StringValue(name)
+}
+
 // Set sets a value by internal key representation
 // INTERNAL: Use SetWithKey for proper key tracking when you have the original key
 // This method will reconstruct the original key from the internal representation

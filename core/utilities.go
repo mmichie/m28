@@ -818,6 +818,19 @@ func getGoroutineID() uint64 {
 	return n
 }
 
+// numberKey formats a number's dict/set key. Integral values (the
+// overwhelmingly common case: loop counters, dict-of-int keys) format via
+// FormatInt; everything else via FormatFloat('g', -1), which produces exactly
+// what the previous fmt.Sprintf("n:%g") did without fmt's reflection overhead.
+// The integral fast path is capped where %g would switch to exponent notation
+// so all producers stay byte-compatible within a process.
+func numberKey(f float64) string {
+	if f == math.Trunc(f) && math.Abs(f) < 1e15 {
+		return "n:" + strconv.FormatInt(int64(f), 10)
+	}
+	return "n:" + strconv.FormatFloat(f, 'g', -1, 64)
+}
+
 // Thread-local recursion guard for ValueToKey
 // Use a simple counter per goroutine
 var valueToKeyInProgress sync.Map // map[goroutineID]int
@@ -833,11 +846,11 @@ func ValueToKey(v Value) string {
 	}
 	switch val := v.(type) {
 	case NumberValue:
-		return fmt.Sprintf("n:%g", float64(val))
+		return numberKey(float64(val))
 	case FloatValue:
 		// Same key space as NumberValue so an int and an equal float map to one
 		// dict/set slot (1 and 1.0 are the same key, matching CPython).
-		return fmt.Sprintf("n:%g", float64(val))
+		return numberKey(float64(val))
 	case StringValue:
 		return "s:" + string(val)
 	case BoolValue:
