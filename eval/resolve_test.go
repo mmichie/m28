@@ -17,6 +17,12 @@ var testSpecials = map[string]bool{
 	"del": true, "with": true, "try": true, "yield": true,
 	"list-comp": true, "set-comp": true, "dict-comp": true, "gen-expr": true,
 	"generator-exp": true,
+	"match-stmt": true, "quote": true, "quasiquote": true, ":=": true,
+	"annotated-assign": true, ".": true,
+	"and": true, "or": true, "break": true, "continue": true,
+	"get-item": true, "set-item": true, "del-item": true, "__slice__": true,
+	"dict-literal": true, "list-literal": true, "tuple-literal": true,
+	"isinstance": true, "issubclass": true, "raise": true,
 }
 
 func testIsSpecial(h string) bool { return testSpecials[h] }
@@ -282,5 +288,86 @@ func TestResolveBody_CompFirstIterableRewritten(t *testing.T) {
 	}
 	if !symbols["x"] {
 		t.Error("the comprehension variable should remain a symbol")
+	}
+}
+
+// --- widened form coverage (dot access, subscripts, literals, loop control) ---
+
+func TestAnalyzeLocals_MethodShapesAccepted(t *testing.T) {
+	// A typical method body: attribute reads/writes, subscripts, literals,
+	// and/or, break/continue — all now modeled.
+	body := mustParse(t, "(do"+
+		" (= (. self x) x)"+
+		" (= (get-item (. self d) k) 1)"+
+		" (= v (+ (get-item (. self d) k) (. self x)))"+
+		" (for i (list-literal 1 2 3) (do (if (and (> i 0) (< i 2)) (break)) (continue)))"+
+		" (if (or (isinstance v int) False) (raise (ValueError v)))"+
+		" (del (get-item (. self d) k))"+
+		" (return (tuple-literal v (dict-literal k v))))")
+	res, ok := analyzeLocals([]string{"self", "x", "k"}, body, testIsSpecial)
+	if !ok {
+		t.Fatal("method-shaped body must be slot-compilable")
+	}
+	// The attribute name x (in self.x) must not create a second slot: x is the
+	// param; the structural attr position is skipped.
+	if res.slots["x"] != 1 {
+		t.Errorf("param x should be slot 1, got %v", res.slots)
+	}
+	for _, name := range []string{"v", "i"} {
+		if _, has := res.slots[name]; !has {
+			t.Errorf("expected slot for local %q; slots=%v", name, res.slots)
+		}
+	}
+}
+
+func TestResolveBody_DotAttrNameNotRewritten(t *testing.T) {
+	// The attr name collides with a local; only the object and value positions
+	// may become slot refs.
+	body := mustParse(t, "(do (= x 1) (= (. obj x) x) (return (. obj x)))")
+	res, ok := analyzeLocals([]string{"obj"}, body, testIsSpecial)
+	if !ok {
+		t.Fatal("dot-target body must analyze")
+	}
+	rewritten, ok := resolveBody(body, res.slots, testIsSpecial)
+	if !ok {
+		t.Fatal("dot-target body must resolve")
+	}
+	refs, syms := collectResolved(rewritten)
+	if _, has := refs["obj"]; !has {
+		t.Error("object position should be slot-rewritten")
+	}
+	if _, has := refs["x"]; !has {
+		t.Error("value reads of x should be slot-rewritten")
+	}
+	// The structural attr name stays a bare symbol in both dot forms.
+	if !syms["x"] {
+		t.Error("the attr-name x must remain a bare symbol")
+	}
+}
+
+func TestAnalyzeLocals_StillRejectsUnsafe(t *testing.T) {
+	cases := map[string]string{
+		"bare del of local":     "(do (= x 1) (del x))",
+		"super aliased":         "(do (= s super) (return (s)))",
+		"locals aliased":        "(do (= f locals) (return (f)))",
+		"walrus":                "(do (return (:= y 5)))",
+		"annotated assign":      "(do (annotated-assign y int 5))",
+		"with":                  "(do (with (open f) as h) 1)",
+		"try":                   "(do (try (= x 1)))",
+		"match":                 "(do (match-stmt x))",
+		"quote":                 "(do (quote (a b)))",
+		"keyword method call":   "(do (return ((. obj m) **unpack (dict-literal k 1))))",
+		"tuple assign target":   "(do (= (a b) (tuple-literal 1 2)))",
+	}
+	for name, src := range cases {
+		body := mustParse(t, src)
+		res, ok := analyzeLocals(nil, body, testIsSpecial)
+		if !ok {
+			continue // rejected at analysis: good
+		}
+		// Some shapes pass analysis but must fail the rewrite (keyword calls).
+		if _, ok := resolveBody(body, res.slots, testIsSpecial); ok {
+			t.Errorf("%s: expected analysis or resolve to reject this body", name)
+		}
 	}
 }

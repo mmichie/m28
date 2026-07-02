@@ -297,11 +297,45 @@ func comprehensionLoop(
 // then fall back to the generic comprehensionLoop, which preserves the old
 // behavior exactly.
 func compileCompExpr(expr core.Value, varName string) (core.Value, bool) {
+	// A nested comprehension's innards (and its iterables) resolve names
+	// through the map-scope chain at runtime, but the outer variable lives
+	// only in this one-slot frame — invisible to that chain. If any nested
+	// comprehension reads it, keep the whole comprehension on the generic
+	// map-scope path.
+	if nestedCompReadsName(expr, varName) {
+		return nil, false
+	}
 	rewritten, ok := resolveBody(expr, map[string]int{varName: 0}, isSpecialFormName)
 	if !ok {
 		return nil, false
 	}
 	return compileIR(rewritten), true
+}
+
+// nestedCompReadsName reports whether a comprehension form nested anywhere
+// inside v reads name as a free variable (i.e. not bound by the nested
+// comprehension's own clause variables). Unanalyzable nested shapes answer
+// true, which safely forces the generic path.
+func nestedCompReadsName(v core.Value, name string) bool {
+	v = unwrapLocated(v)
+	lst, ok := v.(*core.ListValue)
+	if !ok || lst.Len() == 0 {
+		return false
+	}
+	items := lst.ItemsRef()
+	if head, ok := unwrapLocated(items[0]).(core.SymbolValue); ok && compHeads[string(head)] {
+		free := make(map[string]bool)
+		if !walkNestedCompInnards(items, map[string]bool{}, free, isSpecialFormName) {
+			return true
+		}
+		return free[name]
+	}
+	for _, it := range items {
+		if nestedCompReadsName(it, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // runCompLoopCompiled drives a single-clause comprehension whose body and

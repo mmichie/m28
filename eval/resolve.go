@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"reflect"
 	"strings"
 
 	"github.com/mmichie/m28/core"
@@ -27,6 +28,16 @@ type localResolution struct {
 // analyzer fully understands. A body containing any OTHER special form is
 // rejected (returns ok=false), because an unmodeled form might introduce a
 // binding or scope effect the slot frame would get wrong.
+//
+// Beyond the control forms, this includes every special form whose children
+// are pure value positions: their handlers evaluate each child through Eval
+// (where slotRefs self-evaluate), they bind no names, and any structural
+// markers they carry (`from` in raise, `*unpack`/`**unpack` in literals, the
+// "__call__" StringValue in dot calls) are either non-identifier symbols that
+// can never be locals or non-symbol values, so rewriteItems leaves them
+// intact. Forms that treat identifier symbols structurally (quote/quasiquote,
+// import, global/nonlocal) or bind names (def/lambda/class, with/try/except,
+// match-stmt, annotated-assign, :=) must stay out.
 var slotSafeForms = map[string]bool{
 	"do":     true,
 	"begin":  true,
@@ -35,6 +46,26 @@ var slotSafeForms = map[string]bool{
 	"while":  true,
 	"if":     true,
 	"return": true,
+	// Loop control: zero-argument statements; ForForm/WhileForm (and seqNode)
+	// already propagate their sentinel results.
+	"break":    true,
+	"continue": true,
+	// Short-circuit boolean forms: operands are value positions.
+	"and": true,
+	"or":  true,
+	// Subscript protocol: object, indices, and stored values are all values.
+	"get-item":  true,
+	"set-item":  true,
+	"del-item":  true,
+	"__slice__": true,
+	// Container literals: elements (and spread markers, see above) are values.
+	"dict-literal":  true,
+	"list-literal":  true,
+	"tuple-literal": true,
+	// Value-position builtin forms.
+	"isinstance": true,
+	"issubclass": true,
+	"raise":      true,
 }
 
 // dynamicScopeFns name builtins that read or mutate the local namespace by name
@@ -94,9 +125,19 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 			return
 		}
 		v = unwrapLocated(v)
+		if sym, ok := v.(core.SymbolValue); ok {
+			// A bare read of a dynamic-namespace builtin (or super) can smuggle
+			// a namespace observer past the head-position checks (f = locals;
+			// f()), and super() resolves self/cls by name at call time. A slot
+			// frame has no name-addressable dict for either, so disqualify.
+			if dynamicScopeFns[string(sym)] || string(sym) == "super" {
+				safe = false
+			}
+			return
+		}
 		lst, isList := v.(*core.ListValue)
 		if !isList || lst.Len() == 0 {
-			// Symbol reference, literal, etc. -- a read, never a binding.
+			// Literal or other non-list: a value, never a binding.
 			return
 		}
 		items := lst.ItemsRef()
@@ -121,8 +162,37 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 			return
 		}
 
+		// Attribute access / method call: (. obj attr args...). The attr at
+		// items[2] is structural — an identifier that may collide with a local
+		// name — and must not be treated as a read; obj and args are values.
+		if h == "." {
+			if lst.Len() < 3 {
+				safe = false
+				return
+			}
+			walk(items[1])
+			for _, it := range items[3:] {
+				walk(it)
+			}
+			return
+		}
+
+		// del: deleting an attribute or subscript ((del (. o a)) / (del
+		// (get-item d k))) touches no local binding — walk the target's value
+		// positions. Deleting a bare local would unbind a slot; reject.
+		if h == "del" {
+			for _, it := range items[1:] {
+				if _, isSym := unwrapLocated(it).(core.SymbolValue); isSym {
+					safe = false
+					return
+				}
+				walk(it)
+			}
+			return
+		}
+
 		// Any special form we do not explicitly model disqualifies the function
-		// (def/lambda/global/nonlocal/del/with/try/yield/generator-exp/...).
+		// (def/lambda/global/nonlocal/with/try/yield/generator-exp/...).
 		if isSpecialForm(h) && !slotSafeForms[h] {
 			safe = false
 			return
@@ -130,15 +200,25 @@ func analyzeLocals(paramNames []string, body core.Value, isSpecialForm func(stri
 
 		switch h {
 		case "=":
-			// (= target value): only a bare-symbol target binds a local here.
+			// (= target value): a bare-symbol target binds a local. An
+			// attribute or subscript target ((. obj attr) / (get-item d k))
+			// binds nothing local — its object/index positions are value reads.
 			if lst.Len() < 3 {
 				safe = false
 				return
 			}
-			if tgt, ok := unwrapLocated(items[1]).(core.SymbolValue); ok {
+			tgtV := unwrapLocated(items[1])
+			if tgt, ok := tgtV.(core.SymbolValue); ok {
 				addLocal(string(tgt))
+			} else if tgtList, ok := tgtV.(*core.ListValue); ok && tgtList.Len() > 0 {
+				tHead, ok := unwrapLocated(tgtList.ItemsRef()[0]).(core.SymbolValue)
+				if !ok || (string(tHead) != "." && string(tHead) != "get-item") {
+					// Tuple and other targets not modeled yet.
+					safe = false
+					return
+				}
+				walk(items[1])
 			} else {
-				// Tuple/attr/index targets not modeled yet.
 				safe = false
 				return
 			}
@@ -365,6 +445,34 @@ func walkNestedCompInnards(items []core.Value, bound, free map[string]bool, isSp
 	return walkCompInnards(items[1], inner, free, isSpecialForm)
 }
 
+// sameValue reports whether a rewrite returned the identical value (change
+// detection for alloc avoidance). Plain interface comparison panics when the
+// dynamic type is or CONTAINS something uncomparable — BytesValue/TupleValue
+// are slices, and LocatedValue is a struct whose interface field may hold one
+// — so compare only kinds that cannot panic: pointer identity and scalar
+// value types. Everything else answers "changed", which is always safe (it
+// only costs a rebuild) and runs at compile time, off the hot path.
+func sameValue(a, b core.Value) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	ra, rb := reflect.ValueOf(a), reflect.ValueOf(b)
+	if ra.Type() != rb.Type() {
+		return false
+	}
+	switch ra.Kind() {
+	case reflect.Pointer, reflect.Map, reflect.Chan, reflect.Func, reflect.UnsafePointer:
+		return ra.Pointer() == rb.Pointer()
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128:
+		return a == b
+	default:
+		return false
+	}
+}
+
 // slotRef is a resolved reference to a function-local stored in the slot frame
 // (Context.Locals). resolveBody replaces a local variable's SymbolValue with a
 // *slotRef at every read and assignment-target position in a slot-eligible
@@ -398,7 +506,7 @@ func resolveNode(v core.Value, slots map[string]int, isSpecialForm func(string) 
 		if !ok {
 			return nil, false
 		}
-		if inner == lv.Value {
+		if sameValue(inner, lv.Value) {
 			return v, true
 		}
 		return core.LocatedValue{Value: inner, Location: lv.Location}, true
@@ -419,7 +527,13 @@ func resolveNode(v core.Value, slots map[string]int, isSpecialForm func(string) 
 		items := n.ItemsRef()
 		head, headIsSym := unwrapLocated(items[0]).(core.SymbolValue)
 		if !headIsSym {
-			// Computed callee, e.g. ((get-fn) args): every element is a value.
+			// Computed callee, e.g. ((get-fn) args) — including keyword method
+			// calls, which lower to ((. obj m) **unpack (dict-literal ...)).
+			// Keyword/unpack markers are structural symbols, so such calls
+			// cannot be slot-rewritten (same contract as the named-call branch).
+			if callHasKeywordsOrUnpack(items) {
+				return nil, false
+			}
 			return rewriteItems(v, items, slots, isSpecialForm)
 		}
 		h := string(head)
@@ -432,6 +546,41 @@ func resolveNode(v core.Value, slots map[string]int, isSpecialForm func(string) 
 			return resolveCompForm(v, items, slots, isSpecialForm)
 		}
 
+		// Attribute access / method call: rewrite the object and argument
+		// positions; the attr name at items[2] is structural (it may equal a
+		// local's name and must stay a bare symbol for DotForm).
+		if h == "." {
+			if len(items) < 3 {
+				return nil, false
+			}
+			out := make([]core.Value, len(items))
+			copy(out, items)
+			changed := false
+			for i, it := range items {
+				if i == 0 || i == 2 {
+					continue // head and attr name stay verbatim
+				}
+				r, ok := resolveNode(it, slots, isSpecialForm)
+				if !ok {
+					return nil, false
+				}
+				if !sameValue(r, it) {
+					changed = true
+				}
+				out[i] = r
+			}
+			if !changed {
+				return v, true
+			}
+			return core.NewList(out...), true
+		}
+
+		// del of an attribute/subscript target: value positions only
+		// (analyzeLocals rejected bare-symbol deletes).
+		if h == "del" {
+			return rewriteItems(v, items, slots, isSpecialForm)
+		}
+
 		// Any unmodeled special form should already have been rejected by
 		// analyzeLocals; bail defensively if the two passes ever disagree.
 		if isSpecialForm(h) && !slotSafeForms[h] {
@@ -440,12 +589,26 @@ func resolveNode(v core.Value, slots map[string]int, isSpecialForm func(string) 
 
 		switch h {
 		case "=":
-			// (= target value): target is a bare local (analyzeLocals ensured it).
+			// (= target value): a bare local becomes a slot target; an
+			// attribute/subscript target list has its value positions rewritten
+			// (the "." case above skips the attr name).
 			if n.Len() < 3 {
 				return nil, false
 			}
-			tgt, ok := resolveTarget(items[1], slots)
-			if !ok {
+			var tgt core.Value
+			if _, isSym := unwrapLocated(items[1]).(core.SymbolValue); isSym {
+				t, ok := resolveTarget(items[1], slots)
+				if !ok {
+					return nil, false
+				}
+				tgt = t
+			} else if _, isList := unwrapLocated(items[1]).(*core.ListValue); isList {
+				t, ok := resolveNode(items[1], slots, isSpecialForm)
+				if !ok {
+					return nil, false
+				}
+				tgt = t
+			} else {
 				return nil, false
 			}
 			val, ok := resolveNode(items[2], slots, isSpecialForm)
@@ -511,7 +674,7 @@ func rewriteItems(orig core.Value, items []core.Value, slots map[string]int, isS
 		if !ok {
 			return nil, false
 		}
-		if r != it {
+		if !sameValue(r, it) {
 			changed = true
 		}
 		out[i] = r
@@ -549,7 +712,7 @@ func resolveCompForm(orig core.Value, items []core.Value, slots map[string]int, 
 		if !ok {
 			return nil, false
 		}
-		if newIter == fItems[1] {
+		if sameValue(newIter, fItems[1]) {
 			return orig, true
 		}
 		newFirst := make([]core.Value, len(fItems))
@@ -571,7 +734,7 @@ func resolveCompForm(orig core.Value, items []core.Value, slots map[string]int, 
 	if !ok {
 		return nil, false
 	}
-	if newIter == items[3] {
+	if sameValue(newIter, items[3]) {
 		return orig, true
 	}
 	out := make([]core.Value, len(items))

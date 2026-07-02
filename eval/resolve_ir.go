@@ -50,7 +50,7 @@ func compileIR(v core.Value) core.Value {
 	switch n := v.(type) {
 	case core.LocatedValue:
 		inner := compileIR(n.Value)
-		if inner == n.Value {
+		if sameValue(inner, n.Value) {
 			return v
 		}
 		// Keep the wrapper so Eval still tracks the source location.
@@ -85,7 +85,7 @@ func compileList(n *core.ListValue, orig core.Value) core.Value {
 	head, ok := unwrapLocated(items[0]).(core.SymbolValue)
 	if !ok {
 		// Computed callee, e.g. ((get-fn) args): a positional call.
-		return compileCall(items, "")
+		return compileCallChecked(items, "", orig)
 	}
 
 	switch h := string(head); h {
@@ -102,20 +102,22 @@ func compileList(n *core.ListValue, orig core.Value) core.Value {
 	case "while":
 		return compileWhile(items, orig)
 	default:
-		// Comprehension forms pass analysis (closed sub-scopes) but must run
-		// through their special-form handlers — which have their own compiled
-		// fast path (compileCompExpr) — not as a function call.
-		if compHeads[h] {
+		// Any special form that analysis admits but this compiler does not
+		// model (dot access, and/or, literals, break/continue, comprehensions,
+		// raise, subscripts, ...) must run through its handler via generic
+		// Eval — the rewritten tree still carries slotRefs, which
+		// self-evaluate. Compiling it as a call would misroute it to a
+		// same-named function lookup.
+		if isSpecialFormName(h) {
 			return orig
 		}
-		// A non-special-form head: an operator or function call. analyzeLocals
-		// guarantees no unmodeled special form reaches here.
+		// A non-special-form head: an operator or function call.
 		if fastOpNames[h] {
 			if fn, ok := core.GetOperatorFunc(h); ok {
 				return compileOperator(h, fn, items)
 			}
 		}
-		return compileCall(items, h)
+		return compileCallChecked(items, h, orig)
 	}
 }
 
@@ -353,6 +355,17 @@ func compileCall(items []core.Value, name string) core.Value {
 		args[i-1] = compileIR(items[i])
 	}
 	return &callNode{callee: compileIR(items[0]), args: args, name: name}
+}
+
+// compileCallChecked guards compileCall against keyword/unpack markers, which
+// callNode's positional evaluation would misread as name lookups. resolveBody
+// bails on such calls, so this is defense-in-depth for any path handing
+// compileIR an unrewritten tree.
+func compileCallChecked(items []core.Value, name string, orig core.Value) core.Value {
+	if callHasKeywordsOrUnpack(items) {
+		return orig
+	}
+	return compileCall(items, name)
 }
 
 // operatorNode is a binary (or unary/n-ary) operator call with a cached registry
