@@ -151,7 +151,7 @@ func (n *symbolNode) evalIR(ctx *core.Context) (core.Value, error) {
 
 // evalIR for *slotRef: a direct slot-frame read. Mirrors Eval's *slotRef case.
 func (s *slotRef) evalIR(ctx *core.Context) (core.Value, error) {
-	val := ctx.Locals[s.slot]
+	val := ctx.Locals.Get(s.slot)
 	if val == nil {
 		return nil, core.WrapEvalError(
 			&core.UnboundLocalError{Name: s.name, Location: ctx.CurrentLocation()},
@@ -281,7 +281,7 @@ func (n *assignNode) evalIR(ctx *core.Context) (core.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx.Locals[n.slot] = v
+	ctx.Locals.Set(n.slot, v)
 	return v, nil
 }
 

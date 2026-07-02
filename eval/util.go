@@ -823,7 +823,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 		if err != nil {
 			return nil, err
 		}
-		ctx.Locals[sr.slot] = value
+		ctx.Locals.Set(sr.slot, value)
 		return value, nil
 	}
 

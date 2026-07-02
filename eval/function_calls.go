@@ -134,10 +134,13 @@ func (f *UserFunction) callSlots(args []core.Value, ctx *core.Context) (core.Val
 	}
 
 	// Slots 0..numParams-1 hold the parameters in order; later slots start
-	// unbound (nil) until first assignment (read-before-assign => UnboundLocalError).
-	locals := make([]core.Value, f.numSlots)
-	copy(locals, args)
-	funcEnv.Locals = locals
+	// unbound until first assignment (read-before-assign => UnboundLocalError).
+	// Binding goes through SlotFrame.Set — the tag choke point.
+	frame := core.NewSlotFrame(f.numSlots)
+	for i, a := range args {
+		frame.Set(i, a)
+	}
+	funcEnv.Locals = frame
 
 	result, err := Eval(f.slotBody, funcEnv)
 	if err != nil {

@@ -346,9 +346,9 @@ func nestedCompReadsName(v core.Value, name string) bool {
 // elements (each iteration rebinds the variable in the same scope).
 func runCompLoopCompiled(items []core.Value, expr, cond core.Value, ctx *core.Context, sink func(core.Value) error) error {
 	compCtx := core.NewContext(ctx)
-	compCtx.Locals = make([]core.Value, 1)
+	compCtx.Locals = core.NewSlotFrame(1)
 	for _, item := range items {
-		compCtx.Locals[0] = item
+		compCtx.Locals.Set(0, item)
 		if cond != nil {
 			condResult, err := Eval(cond, compCtx)
 			if err != nil {

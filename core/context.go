@@ -9,6 +9,95 @@ import (
 
 var debugLookups = os.Getenv("M28_DEBUG_LOOKUPS") != ""
 
+// slotShadowVerify enables the slot-frame shadow-verification mode
+// (M28_DEBUG_SLOTS=1): every frame read re-checks that the slot's tag and
+// unboxed mirror agree with its boxed value, panicking on divergence. Run it
+// across the full test suites whenever a new write path (tag choke point) is
+// added. Read once at startup; zero cost when off.
+var slotShadowVerify = os.Getenv("M28_DEBUG_SLOTS") != ""
+
+// Slot kinds tag a SlotFrame entry's representation.
+const (
+	// SlotBoxed: refs[i] holds the value (nil = unbound local).
+	SlotBoxed uint8 = iota
+	// SlotInt: the value is a NumberValue; nums[i] mirrors it.
+	SlotInt
+	// SlotFloat: the value is a FloatValue; nums[i] mirrors it.
+	SlotFloat
+)
+
+// SlotFrame is the tagged local-variable frame of the value-unboxing campaign
+// (epic M28-9pm), laid out as parallel arrays — the stage-0 spike winner
+// (3.17ns vs 3.39ns for a tagged struct vs 50.7ns boxed, per guarded
+// read-add-write; the numeric hot data stays 9 bytes per slot with the cold
+// ref word out of line).
+//
+// Stage-1 invariant: refs[i] is ALWAYS coherent — every write passes a boxed
+// value through Set (the single tag choke point), every read returns refs[i]
+// unchanged — so execution behavior is identical to the previous []Value
+// frame while nums/tags are populated and verified. Stage 2's evalNum then
+// reads nums directly for Int/Float tags and relaxes refs to lazy.
+type SlotFrame struct {
+	nums []float64
+	tags []uint8
+	refs []Value
+}
+
+// NewSlotFrame allocates a frame with n slots, all unbound.
+func NewSlotFrame(n int) SlotFrame {
+	return SlotFrame{
+		nums: make([]float64, n),
+		tags: make([]uint8, n),
+		refs: make([]Value, n),
+	}
+}
+
+// Set stores a value into slot i, classifying its kind. This is the ONLY
+// write path into a frame — every binder (call argument binding, assignment,
+// for-loop targets, unpacking, comprehension frames) must route here so the
+// tag invariant holds everywhere.
+func (f *SlotFrame) Set(i int, v Value) {
+	switch n := v.(type) {
+	case NumberValue:
+		f.nums[i] = float64(n)
+		f.tags[i] = SlotInt
+	case FloatValue:
+		f.nums[i] = float64(n)
+		f.tags[i] = SlotFloat
+	default:
+		f.tags[i] = SlotBoxed
+	}
+	f.refs[i] = v
+}
+
+// Get returns the value in slot i (nil = unbound).
+func (f *SlotFrame) Get(i int) Value {
+	if slotShadowVerify {
+		f.verify(i)
+	}
+	return f.refs[i]
+}
+
+// verify panics if slot i's tag or unboxed mirror disagrees with its boxed
+// value — a missed choke point or stale tag. Shadow mode only.
+func (f *SlotFrame) verify(i int) {
+	v := f.refs[i]
+	switch f.tags[i] {
+	case SlotInt:
+		n, ok := v.(NumberValue)
+		if !ok || float64(n) != f.nums[i] {
+			panic(fmt.Sprintf("slot %d tag=Int but ref=%T(%v), num=%v", i, v, v, f.nums[i]))
+		}
+	case SlotFloat:
+		fl, ok := v.(FloatValue)
+		if !ok || (float64(fl) != f.nums[i] && (fl == fl || f.nums[i] == f.nums[i])) {
+			// NaN mirrors NaN: unequal floats are only a divergence when at
+			// least one side is not NaN.
+			panic(fmt.Sprintf("slot %d tag=Float but ref=%T(%v), num=%v", i, v, v, f.nums[i]))
+		}
+	}
+}
+
 // GetOperatorFunc is a hook to the operator registry's GetOperator function
 // This avoids circular imports while allowing fast operator lookup
 var GetOperatorFunc func(string) (Value, bool)
@@ -72,14 +161,14 @@ type Context struct {
 	Depth int
 
 	// Locals is the slot frame for a function executing under the resolution
-	// layer (see eval/resolve.go). When non-nil, the function's local variables
-	// live here, indexed by slot, instead of in Vars; the function body was
-	// rewritten at analysis time so each local read/write is a direct slice
-	// access (slotRef) rather than a map lookup. nil for every other context,
-	// and never propagated to child contexts by NewContext, so an inner call
-	// frame gets its own slots (or none). A nil entry means the local is unbound
-	// (read-before-assignment -> UnboundLocalError).
-	Locals []Value
+	// layer (see eval/resolve.go). When populated, the function's local
+	// variables live here, indexed by slot, instead of in Vars; the function
+	// body was rewritten at analysis time so each local read/write is a frame
+	// access (slotRef) rather than a map lookup. Zero-valued for every other
+	// context, and never propagated to child contexts by NewContext, so an
+	// inner call frame gets its own slots (or none). An unbound entry reads as
+	// nil (read-before-assignment -> UnboundLocalError).
+	Locals SlotFrame
 
 	// Optional module dict to sync definitions to (for circular import support)
 	// When set, Define() will also update this dict in real-time
