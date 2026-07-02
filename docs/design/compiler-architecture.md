@@ -202,9 +202,16 @@ Planned, in order:
 
 ### L4: Execution
 
-The resolved tree-walk is the engine. There is exactly one future execution
-addition on the books, and it is semantic, not speed:
+The resolved tree-walk is the engine. Two future additions are on the books —
+one for speed, one for semantics:
 
+- **Value unboxing** (epic M28-9pm): numeric locals live in tagged slot
+  frames as raw Go scalars, and the IR gains a typed evaluation kernel
+  (`evalNum`) so arithmetic runs unboxed end-to-end within a function,
+  boxing only at escape points (generic calls, containers). This is the
+  vmspike vm-unboxed rung (94x vs ~10x boxed — the gap is pure value model)
+  brought to the tree-walk, staged with an always-correct fallback and a
+  shadow-verification mode, exactly like resolution layers 1-3.
 - **Frame-based tier for resumable semantics** (M28-8jo, deferred).
   Generators currently run on a bespoke step machine
   (`eval/generator_exec.go`), async wraps goroutines, and recursion depth is
