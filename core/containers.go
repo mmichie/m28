@@ -1420,13 +1420,34 @@ func dictViewSetCompareCtx(v *DictView, other Value, op string, ctx *Context) (b
 		return false, err
 	}
 	myItems := v.snapshot()
-	containsAll := func(super, sub []Value) (bool, error) {
+	// Hash-based subset tests on the set engine: O(n+m) instead of the old
+	// pairwise O(n*m) EqualValues sweeps. Unhashable elements (an items()
+	// view can hold dict/list values) fall back to identity buckets inside
+	// Add/Contains, and equality still decides matches within a bucket.
+	toSet := func(items []Value) *SetValue {
+		s := NewSet()
+		for _, it := range items {
+			s.Add(it)
+		}
+		return s
+	}
+	containsAll := func(superSet *SetValue, superItems []Value, sub []Value) (bool, error) {
 		for _, x := range sub {
+			in, err := superSet.ContainsWithError(x, ctx)
+			if err == nil {
+				if !in {
+					return false, nil
+				}
+				continue
+			}
+			// Unhashable element (items() pairs carry arbitrary values;
+			// CPython's view comparison never hashes them): linear equality
+			// scan for this element only.
 			found := false
-			for _, y := range super {
-				eq, err := EqualValuesWithError(x, y, ctx)
-				if err != nil {
-					return false, err
+			for _, y := range superItems {
+				eq, eqErr := EqualValuesWithError(x, y, ctx)
+				if eqErr != nil {
+					return false, eqErr
 				}
 				if eq {
 					found = true
@@ -1439,11 +1460,12 @@ func dictViewSetCompareCtx(v *DictView, other Value, op string, ctx *Context) (b
 		}
 		return true, nil
 	}
-	mySubsetOf, err := containsAll(otherItems, myItems)
+	mySet, otherSet := toSet(myItems), toSet(otherItems)
+	mySubsetOf, err := containsAll(otherSet, otherItems, myItems)
 	if err != nil {
 		return false, err
 	}
-	otherSubsetOfMe, err := containsAll(myItems, otherItems)
+	otherSubsetOfMe, err := containsAll(mySet, myItems, otherItems)
 	if err != nil {
 		return false, err
 	}
