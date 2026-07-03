@@ -315,20 +315,27 @@ func formatSetRepr(set *SetValue) string {
 		return "set()"
 	}
 
-	// Sort by internal key for deterministic output. Python sets are unordered,
-	// but M28 sorts so str()/repr() are reproducible and identical to each other.
-	keys := make([]string, 0, len(set.items))
-	for k := range set.items {
-		keys = append(keys, k)
+	return formatSetElems(set.Items())
+}
+
+// formatSetElems renders set elements sorted by their legacy key encoding,
+// keeping repr output deterministic and byte-compatible with the previous
+// engine (Python sets are unordered; M28 sorts for reproducibility).
+func formatSetElems(elems []Value) string {
+	keys := make([]string, len(elems))
+	byKey := make(map[string]Value, len(elems))
+	for i, e := range elems {
+		k := serializeKeyRepr(e)
+		keys[i] = k
+		byKey[k] = e
 	}
 	sort.Strings(keys)
-
 	result := "{"
 	for i, k := range keys {
 		if i > 0 {
 			result += ", "
 		}
-		result += Repr(set.items[k])
+		result += Repr(byKey[k])
 	}
 	result += "}"
 	return result

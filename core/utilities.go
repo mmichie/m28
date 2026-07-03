@@ -650,24 +650,30 @@ func EqualValues(a, b Value) bool {
 			if aVal.Size() != size {
 				return false
 			}
-			for _, v := range aVal.items {
+			equal := true
+			aVal.ForEach(func(v Value) bool {
 				if !contains(v) {
+					equal = false
 					return false
 				}
-			}
-			return true
+				return true
+			})
+			return equal
 		}
 	case *FrozenSetValue:
 		if _, contains, size, ok := setOperandItems(b); ok {
 			if aVal.Size() != size {
 				return false
 			}
-			for _, v := range aVal.items {
+			equal := true
+			aVal.ForEach(func(v Value) bool {
 				if !contains(v) {
+					equal = false
 					return false
 				}
-			}
-			return true
+				return true
+			})
+			return equal
 		}
 	case *DictValue:
 		if bVal, ok := b.(*DictValue); ok {

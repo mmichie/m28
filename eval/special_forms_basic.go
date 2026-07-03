@@ -803,8 +803,7 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 			if condOK {
 				err := runCompLoopCompiled(items, compiledExpr, compiledCond, ctx, func(v core.Value) error {
-					result.Add(v)
-					return nil
+					return result.AddWithError(v, ctx)
 				})
 				if err != nil {
 					return nil, err
@@ -823,8 +822,7 @@ func SetCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Add to result set
-		result.Add(exprResult)
-		return nil
+		return result.AddWithError(exprResult, ctx)
 	})
 
 	if err != nil {
@@ -883,8 +881,7 @@ func setCompMultiClause(expr core.Value, clausesList *core.ListValue, ctx *core.
 			if err != nil {
 				return fmt.Errorf("error evaluating expression: %w", err)
 			}
-			result.Add(exprResult)
-			return nil
+			return result.AddWithError(exprResult, ctx)
 		}
 
 		// Evaluate the iterable for this clause

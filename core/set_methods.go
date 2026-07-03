@@ -5,6 +5,39 @@ import (
 	"log"
 )
 
+// setFromIterableArg converts a method argument (set, frozenset, or any
+// iterable) into a *SetValue for membership testing. Elements added from
+// iterables go through full hashing semantics with ctx.
+func setFromIterableArg(arg Value, method string, ctx *Context) (*SetValue, error) {
+	if s, ok := arg.(*SetValue); ok {
+		return s, nil
+	}
+	if fs, ok := arg.(*FrozenSetValue); ok {
+		out := NewSet()
+		var addErr error
+		fs.forEachEntry(func(h uint64, elem Value) bool {
+			addErr = out.addEntry(elem, h, ctx)
+			return addErr == nil
+		})
+		return out, addErr
+	}
+	if iterable, ok := arg.(Iterable); ok {
+		out := NewSet()
+		iter := iterable.Iterator()
+		for {
+			val, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+			if err := out.AddWithError(val, ctx); err != nil {
+				return nil, err
+			}
+		}
+		return out, nil
+	}
+	return nil, &TypeError{Message: fmt.Sprintf("%s() argument must be an iterable, not %s", method, arg.Type())}
+}
+
 // InitSetMethods adds additional methods to the set type descriptor
 func InitSetMethods() {
 	setType := GetTypeDescriptor("set")
@@ -24,33 +57,30 @@ func InitSetMethods() {
 			set := receiver.(*SetValue)
 			result := NewSet()
 
-			// Add all items from this set
-			for k, v := range set.items {
-				result.items[k] = v
+			// Add all items from this set (cached hashes, no rehash)
+			var err error
+			set.forEachEntry(func(h uint64, elem Value) bool {
+				err = result.addEntry(elem, h, ctx)
+				return err == nil
+			})
+			if err != nil {
+				return nil, err
 			}
 
 			// Add items from all other iterables
 			for _, arg := range args {
-				// Check if it's a set (fast path)
-				if other, ok := arg.(*SetValue); ok {
-					for k, v := range other.items {
-						result.items[k] = v
-					}
-					continue
+				other, err := setFromIterableArg(arg, "union", ctx)
+				if err != nil {
+					return nil, err
 				}
-				// Check if it's an iterable
-				if iterable, ok := arg.(Iterable); ok {
-					iter := iterable.Iterator()
-					for {
-						val, hasNext := iter.Next()
-						if !hasNext {
-							break
-						}
-						result.Add(val)
-					}
-					continue
+				var addErr error
+				other.forEachEntry(func(h uint64, elem Value) bool {
+					addErr = result.addEntry(elem, h, ctx)
+					return addErr == nil
+				})
+				if addErr != nil {
+					return nil, addErr
 				}
-				return nil, &TypeError{Message: fmt.Sprintf("union() argument must be an iterable, not %s", arg.Type())}
 			}
 
 			return result, nil
@@ -69,51 +99,42 @@ func InitSetMethods() {
 			// With no args, return a copy of the set
 			if len(args) == 0 {
 				result := NewSet()
-				for k, v := range set.items {
-					result.items[k] = v
-				}
-				return result, nil
+				var err error
+				set.forEachEntry(func(h uint64, elem Value) bool {
+					err = result.addEntry(elem, h, ctx)
+					return err == nil
+				})
+				return result, err
 			}
 
 			// Convert all args to sets for efficient membership testing
 			otherSets := make([]*SetValue, len(args))
 			for i, arg := range args {
-				// Check if it's already a set (fast path)
-				if other, ok := arg.(*SetValue); ok {
-					otherSets[i] = other
-					continue
+				other, err := setFromIterableArg(arg, "intersection", ctx)
+				if err != nil {
+					return nil, err
 				}
-				// Check if it's an iterable - convert to set
-				if iterable, ok := arg.(Iterable); ok {
-					other := NewSet()
-					iter := iterable.Iterator()
-					for {
-						val, hasNext := iter.Next()
-						if !hasNext {
-							break
-						}
-						other.Add(val)
-					}
-					otherSets[i] = other
-					continue
-				}
-				return nil, &TypeError{Message: fmt.Sprintf("intersection() argument must be an iterable, not %s", arg.Type())}
+				otherSets[i] = other
 			}
 
 			result := NewSet()
-
-			// Check each item in this set
-			for k, v := range set.items {
-				inAll := true
+			var walkErr error
+			set.forEachEntry(func(h uint64, elem Value) bool {
 				for _, other := range otherSets {
-					if !other.Contains(v) {
-						inAll = false
-						break
+					in, err := other.containsHashed(elem, h, ctx)
+					if err != nil {
+						walkErr = err
+						return false
+					}
+					if !in {
+						return true
 					}
 				}
-				if inAll {
-					result.items[k] = v
-				}
+				walkErr = result.addEntry(elem, h, ctx)
+				return walkErr == nil
+			})
+			if walkErr != nil {
+				return nil, walkErr
 			}
 
 			return result, nil
@@ -131,32 +152,29 @@ func InitSetMethods() {
 			result := NewSet()
 
 			// Add all items from this set
-			for k, v := range set.items {
-				result.items[k] = v
+			var err error
+			set.forEachEntry(func(h uint64, elem Value) bool {
+				err = result.addEntry(elem, h, ctx)
+				return err == nil
+			})
+			if err != nil {
+				return nil, err
 			}
 
 			// Remove items from other iterables
 			for _, arg := range args {
-				// Check if it's a set (fast path)
-				if other, ok := arg.(*SetValue); ok {
-					for k := range other.items {
-						delete(result.items, k)
-					}
-					continue
+				other, err := setFromIterableArg(arg, "difference", ctx)
+				if err != nil {
+					return nil, err
 				}
-				// Check if it's an iterable
-				if iterable, ok := arg.(Iterable); ok {
-					iter := iterable.Iterator()
-					for {
-						val, hasNext := iter.Next()
-						if !hasNext {
-							break
-						}
-						result.Remove(val)
-					}
-					continue
+				var remErr error
+				other.forEachEntry(func(h uint64, elem Value) bool {
+					_, remErr = result.removeHashed(elem, h, ctx)
+					return remErr == nil
+				})
+				if remErr != nil {
+					return nil, remErr
 				}
-				return nil, &TypeError{Message: fmt.Sprintf("difference() argument must be an iterable, not %s", arg.Type())}
 			}
 
 			return result, nil
@@ -171,46 +189,53 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-
-			// Convert arg to set if needed
-			var other *SetValue
-			if s, ok := args[0].(*SetValue); ok {
-				other = s
-			} else if iterable, ok := args[0].(Iterable); ok {
-				other = NewSet()
-				iter := iterable.Iterator()
-				for {
-					val, hasNext := iter.Next()
-					if !hasNext {
-						break
-					}
-					other.Add(val)
-				}
-			} else {
-				return nil, &TypeError{Message: fmt.Sprintf("symmetric_difference() argument must be an iterable, not %s", args[0].Type())}
+			other, err := setFromIterableArg(args[0], "symmetric_difference", ctx)
+			if err != nil {
+				return nil, err
 			}
 
 			result := NewSet()
+			var walkErr error
 
-			// Add items in this set but not in other
-			for k, v := range set.items {
-				if !other.Contains(v) {
-					result.items[k] = v
+			// Items in this set but not in other
+			set.forEachEntry(func(h uint64, elem Value) bool {
+				in, err := other.containsHashed(elem, h, ctx)
+				if err != nil {
+					walkErr = err
+					return false
 				}
+				if !in {
+					walkErr = result.addEntry(elem, h, ctx)
+					return walkErr == nil
+				}
+				return true
+			})
+			if walkErr != nil {
+				return nil, walkErr
 			}
 
-			// Add items in other but not in this set
-			for k, v := range other.items {
-				if !set.Contains(v) {
-					result.items[k] = v
+			// Items in other but not in this set
+			other.forEachEntry(func(h uint64, elem Value) bool {
+				in, err := set.containsHashed(elem, h, ctx)
+				if err != nil {
+					walkErr = err
+					return false
 				}
+				if !in {
+					walkErr = result.addEntry(elem, h, ctx)
+					return walkErr == nil
+				}
+				return true
+			})
+			if walkErr != nil {
+				return nil, walkErr
 			}
 
 			return result, nil
 		},
 	}
 
-	// Mutating methods (return new sets in functional style)
+	// Mutating methods
 
 	// add - add element to set (mutates in-place)
 	setType.Methods["add"] = &MethodDescriptor{
@@ -220,9 +245,9 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			// Mutate in-place
-			set.Add(args[0])
-			// Return None (Python's set.add returns None)
+			if err := set.AddWithError(args[0], ctx); err != nil {
+				return nil, err
+			}
 			return None, nil
 		},
 	}
@@ -235,8 +260,11 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			// Remove using the SetValue.Remove method which returns bool
-			if !set.Remove(args[0]) {
+			removed, err := set.RemoveWithError(args[0], ctx)
+			if err != nil {
+				return nil, err
+			}
+			if !removed {
 				return nil, &KeyError{Key: args[0]}
 			}
 			return None, nil
@@ -251,8 +279,9 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			// Discard using the SetValue.Remove method, ignore result
-			set.Remove(args[0])
+			if _, err := set.RemoveWithError(args[0], ctx); err != nil {
+				return nil, err
+			}
 			return None, nil
 		},
 	}
@@ -265,28 +294,19 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-			// Add from other sets/iterables
 			for _, arg := range args {
-				// Check if it's a set
-				if other, ok := arg.(*SetValue); ok {
-					for _, v := range other.items {
-						set.Add(v)
-					}
-					continue
+				other, err := setFromIterableArg(arg, "update", ctx)
+				if err != nil {
+					return nil, err
 				}
-				// Check if it's an iterable
-				if iterable, ok := arg.(Iterable); ok {
-					iter := iterable.Iterator()
-					for {
-						val, hasNext := iter.Next()
-						if !hasNext {
-							break
-						}
-						set.Add(val)
-					}
-					continue
+				var addErr error
+				other.forEachEntry(func(h uint64, elem Value) bool {
+					addErr = set.addEntry(elem, h, ctx)
+					return addErr == nil
+				})
+				if addErr != nil {
+					return nil, addErr
 				}
-				return nil, &TypeError{Message: fmt.Sprintf("update() argument must be an iterable, not %s", arg.Type())}
 			}
 			return None, nil
 		},
@@ -299,9 +319,7 @@ func InitSetMethods() {
 		Doc:     "Remove all elements (modifies set in-place)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			set := receiver.(*SetValue)
-			// Clear the items map
-			set.items = make(map[string]Value)
+			receiver.(*SetValue).Clear()
 			return None, nil
 		},
 	}
@@ -315,10 +333,12 @@ func InitSetMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
 			result := NewSet()
-			for k, v := range set.items {
-				result.items[k] = v
-			}
-			return result, nil
+			var err error
+			set.forEachEntry(func(h uint64, elem Value) bool {
+				err = result.addEntry(elem, h, ctx)
+				return err == nil
+			})
+			return result, err
 		},
 	}
 
@@ -332,33 +352,29 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-
-			// Convert arg to set if needed
-			var other *SetValue
-			if s, ok := args[0].(*SetValue); ok {
-				other = s
-			} else if iterable, ok := args[0].(Iterable); ok {
-				other = NewSet()
-				iter := iterable.Iterator()
-				for {
-					val, hasNext := iter.Next()
-					if !hasNext {
-						break
-					}
-					other.Add(val)
-				}
-			} else {
-				return nil, &TypeError{Message: fmt.Sprintf("issubset() argument must be an iterable, not %s", args[0].Type())}
+			other, err := setFromIterableArg(args[0], "issubset", ctx)
+			if err != nil {
+				return nil, err
 			}
 
-			// Check if all items in this set are in other
-			for _, v := range set.items {
-				if !other.Contains(v) {
-					return False, nil
+			subset := true
+			var walkErr error
+			set.forEachEntry(func(h uint64, elem Value) bool {
+				in, err := other.containsHashed(elem, h, ctx)
+				if err != nil {
+					walkErr = err
+					return false
 				}
+				if !in {
+					subset = false
+					return false
+				}
+				return true
+			})
+			if walkErr != nil {
+				return nil, walkErr
 			}
-
-			return True, nil
+			return BoolValue(subset), nil
 		},
 	}
 
@@ -371,17 +387,28 @@ func InitSetMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
 
-			// For issuperset, we iterate over the other iterable and check membership
-			// Check if it's a set (fast path)
+			// Sets and frozensets probe with cached hashes; other iterables
+			// stream elements through a membership check.
 			if other, ok := args[0].(*SetValue); ok {
-				for _, v := range other.items {
-					if !set.Contains(v) {
-						return False, nil
+				super := true
+				var walkErr error
+				other.forEachEntry(func(h uint64, elem Value) bool {
+					in, err := set.containsHashed(elem, h, ctx)
+					if err != nil {
+						walkErr = err
+						return false
 					}
+					if !in {
+						super = false
+						return false
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
-				return True, nil
+				return BoolValue(super), nil
 			}
-			// Check if it's an iterable
 			if iterable, ok := args[0].(Iterable); ok {
 				iter := iterable.Iterator()
 				for {
@@ -389,7 +416,11 @@ func InitSetMethods() {
 					if !hasNext {
 						break
 					}
-					if !set.Contains(val) {
+					in, err := set.ContainsWithError(val, ctx)
+					if err != nil {
+						return nil, err
+					}
+					if !in {
 						return False, nil
 					}
 				}
@@ -407,36 +438,29 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
+			other, err := setFromIterableArg(args[0], "isdisjoint", ctx)
+			if err != nil {
+				return nil, err
+			}
 
-			// Check if it's a set (fast path)
-			if other, ok := args[0].(*SetValue); ok {
-				for _, v := range set.items {
-					if other.Contains(v) {
-						return False, nil
-					}
+			disjoint := true
+			var walkErr error
+			set.forEachEntry(func(h uint64, elem Value) bool {
+				in, err := other.containsHashed(elem, h, ctx)
+				if err != nil {
+					walkErr = err
+					return false
 				}
-				return True, nil
+				if in {
+					disjoint = false
+					return false
+				}
+				return true
+			})
+			if walkErr != nil {
+				return nil, walkErr
 			}
-			// Check if it's an iterable - convert to set for membership testing
-			if iterable, ok := args[0].(Iterable); ok {
-				other := NewSet()
-				iter := iterable.Iterator()
-				for {
-					val, hasNext := iter.Next()
-					if !hasNext {
-						break
-					}
-					other.Add(val)
-				}
-				// Check if any item in this set is in other
-				for _, v := range set.items {
-					if other.Contains(v) {
-						return False, nil
-					}
-				}
-				return True, nil
-			}
-			return nil, &TypeError{Message: fmt.Sprintf("isdisjoint() argument must be an iterable, not %s", args[0].Type())}
+			return BoolValue(disjoint), nil
 		},
 	}
 
@@ -448,22 +472,11 @@ func InitSetMethods() {
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			set := receiver.(*SetValue)
-
-			if set.Size() == 0 {
+			elem, _, ok := set.table.popLast()
+			if !ok {
 				return nil, &KeyError{Message: "pop from an empty set"}
 			}
-
-			// Get first item (arbitrary)
-			var firstVal Value
-			for _, v := range set.items {
-				firstVal = v
-				break
-			}
-
-			// Remove the item from the set
-			set.Remove(firstVal)
-
-			return firstVal, nil
+			return elem, nil
 		},
 	}
 }

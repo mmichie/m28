@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"reflect"
-	"sort"
 
 	"strings"
 	"sync"
@@ -689,116 +688,6 @@ func (s *SliceValue) CallMethod(name string, args []Value, ctx *Context) (Value,
 	return nil, fmt.Errorf("slice has no method named %s", name)
 }
 
-// SetValue represents a set of unique values
-type SetValue struct {
-	BaseObject
-	items map[string]Value // Key is the string representation
-}
-
-// NewSet creates a new set
-func NewSet() *SetValue {
-	return &SetValue{
-		BaseObject: *NewBaseObject(SetType),
-		items:      make(map[string]Value),
-	}
-}
-
-// Type implements Value.Type
-func (s *SetValue) Type() Type {
-	return SetType
-}
-
-// String implements Value.String
-func (s *SetValue) String() string {
-	// In Python str(set) == repr(set): elements use repr (single-quoted strings).
-	// Delegate to formatSetRepr so str()/print() agree with repr().
-	return formatSetRepr(s)
-}
-
-// Add adds a value to the set
-func (s *SetValue) Add(value Value) {
-	key := ValueToKey(value)
-	s.items[key] = value
-}
-
-// Contains checks if a value is in the set
-func (s *SetValue) Contains(value Value) bool {
-	key := ValueToKey(value)
-	_, ok := s.items[key]
-	return ok
-}
-
-// Remove removes a value from the set
-func (s *SetValue) Remove(value Value) bool {
-	key := ValueToKey(value)
-	if _, ok := s.items[key]; ok {
-		delete(s.items, key)
-		return true
-	}
-	return false
-}
-
-// Size returns the number of elements
-func (s *SetValue) Size() int {
-	return len(s.items)
-}
-
-// Items returns all values in the set as a slice
-func (s *SetValue) Items() []Value {
-	values := make([]Value, 0, len(s.items))
-	for _, v := range s.items {
-		values = append(values, v)
-	}
-	return values
-}
-
-// GetAttr implements Object interface using TypeDescriptor
-func (s *SetValue) GetAttr(name string) (Value, bool) {
-	// Special M28 type protocol attributes that auto-call or return properties
-	// These are handled specially in eval
-	switch name {
-	case "length", "len", "contains", "add", "remove", "union", "intersection", "difference":
-		return nil, false
-	}
-
-	desc := GetTypeDescriptor(SetType)
-	if desc != nil {
-		val, err := desc.GetAttribute(s, name)
-		if err == nil {
-			return val, true
-		}
-	}
-	return s.BaseObject.GetAttr(name)
-}
-
-// Iterator implements Iterable
-func (s *SetValue) Iterator() Iterator {
-	// Create a slice of values from the set
-	values := make([]Value, 0, len(s.items))
-	for _, v := range s.items {
-		values = append(values, v)
-	}
-
-	return &setIterator{
-		values: values,
-		index:  0,
-	}
-}
-
-// IteratorValue returns the iterator as a Value
-func (s *SetValue) IteratorValue() Value {
-	// Create a slice of values from the set
-	values := make([]Value, 0, len(s.items))
-	for _, v := range s.items {
-		values = append(values, v)
-	}
-
-	return &setIterator{
-		values: values,
-		index:  0,
-	}
-}
-
 type setIterator struct {
 	values []Value
 	index  int
@@ -855,106 +744,6 @@ func (it *setIterator) GetAttr(name string) (Value, bool) {
 		}), true
 	}
 	return nil, false
-}
-
-// FrozenSetValue represents an immutable set of unique values
-type FrozenSetValue struct {
-	BaseObject
-	items map[string]Value // Key is the string representation
-	hash  uint64           // Cached hash value
-}
-
-// NewFrozenSet creates a new frozenset
-func NewFrozenSet() *FrozenSetValue {
-	return &FrozenSetValue{
-		BaseObject: *NewBaseObject(FrozenSetType),
-		items:      make(map[string]Value),
-		hash:       0, // Will be computed on first access
-	}
-}
-
-// Type implements Value.Type
-func (fs *FrozenSetValue) Type() Type {
-	return FrozenSetType
-}
-
-// String implements Value.String
-func (fs *FrozenSetValue) String() string {
-	if len(fs.items) == 0 {
-		return "frozenset()"
-	}
-
-	// Sort for consistent output
-	keys := make([]string, 0, len(fs.items))
-	for k := range fs.items {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	elements := make([]string, 0, len(keys))
-	for _, k := range keys {
-		// repr() of each element (single-quoted strings) so str()==repr().
-		elements = append(elements, Repr(fs.items[k]))
-	}
-
-	return "frozenset({" + strings.Join(elements, ", ") + "})"
-}
-
-// Add adds a value to the frozenset (internal use only during construction)
-func (fs *FrozenSetValue) Add(value Value) {
-	key := PrintValue(value)
-	fs.items[key] = value
-	fs.hash = 0 // Invalidate cached hash
-}
-
-// Contains checks if a value is in the frozenset
-func (fs *FrozenSetValue) Contains(value Value) bool {
-	key := PrintValue(value)
-	_, ok := fs.items[key]
-	return ok
-}
-
-// Size returns the number of elements
-func (fs *FrozenSetValue) Size() int {
-	return len(fs.items)
-}
-
-// Hash computes and caches the hash value for the frozenset
-func (fs *FrozenSetValue) Hash() uint64 {
-	// Delegates to the CPython-style element hash (cached); no ctx means
-	// instance elements with user __hash__ hash by identity, which is all
-	// this legacy entry point ever supported.
-	h, err := fs.hashWithCtx(nil)
-	if err != nil {
-		return 1 // degraded bucket; equality still decides matches
-	}
-	return h
-}
-
-// GetAttr implements Object interface using TypeDescriptor
-func (fs *FrozenSetValue) GetAttr(name string) (Value, bool) {
-	desc := GetTypeDescriptor(FrozenSetType)
-	if desc != nil {
-		val, err := desc.GetAttribute(fs, name)
-		if err == nil {
-			return val, true
-		}
-	}
-	return fs.BaseObject.GetAttr(name)
-}
-
-// Iterator implements Iterable
-func (fs *FrozenSetValue) Iterator() Iterator {
-	// Create a slice of values from the frozenset
-	values := make([]Value, 0, len(fs.items))
-	for _, v := range fs.items {
-		values = append(values, v)
-	}
-
-	return &setIterator{
-		values: values,
-		index:  0,
-	}
 }
 
 // Predefined empty collections
@@ -1288,11 +1077,7 @@ func iterableValues(v Value) ([]Value, error) {
 	case *SetValue:
 		return x.Items(), nil
 	case *FrozenSetValue:
-		out := make([]Value, 0, len(x.items))
-		for _, item := range x.items {
-			out = append(out, item)
-		}
-		return out, nil
+		return x.Items(), nil
 	case *DictView:
 		return x.snapshot(), nil
 	case *DictValue:
@@ -1351,11 +1136,7 @@ func iterableValuesCtx(v Value, ctx *Context) ([]Value, error) {
 	case *SetValue:
 		return x.Items(), nil
 	case *FrozenSetValue:
-		out := make([]Value, 0, len(x.items))
-		for _, item := range x.items {
-			out = append(out, item)
-		}
-		return out, nil
+		return x.Items(), nil
 	case *DictView:
 		return x.snapshot(), nil
 	case *DictValue:

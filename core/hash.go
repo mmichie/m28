@@ -408,11 +408,7 @@ func (fs *FrozenSetValue) hashWithCtx(ctx *Context) (uint64, error) {
 	if fs.hash != 0 {
 		return fs.hash, nil
 	}
-	elems := make([]Value, 0, len(fs.items))
-	for _, v := range fs.items {
-		elems = append(elems, v)
-	}
-	h, err := hashFrozensetElems(elems, ctx)
+	h, err := hashFrozensetElems(fs.Items(), ctx)
 	if err != nil {
 		return 0, err
 	}

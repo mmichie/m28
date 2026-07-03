@@ -1684,7 +1684,7 @@ func registerBytesType() {
 				case *SetValue:
 					// Convert set to bytes - iterate and collect byte values
 					result := make([]byte, 0, v.Size())
-					for _, val := range v.items {
+					for _, val := range v.Items() {
 						num, ok := val.(NumberValue)
 						if !ok {
 							return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", val.Type())}
@@ -1699,7 +1699,7 @@ func registerBytesType() {
 				case *FrozenSetValue:
 					// Convert frozenset to bytes - iterate and collect byte values
 					result := make([]byte, 0, v.Size())
-					for _, val := range v.items {
+					for _, val := range v.Items() {
 						num, ok := val.(NumberValue)
 						if !ok {
 							return nil, &TypeError{Message: fmt.Sprintf("'%s' object cannot be interpreted as an integer", val.Type())}

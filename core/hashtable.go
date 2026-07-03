@@ -281,6 +281,20 @@ func (t *hashTable) forEach(fn func(key, value Value) bool) {
 	}
 }
 
+// forEachEntry visits live entries in insertion order together with their
+// cached hashes, so set algebra can probe other tables without rehashing.
+func (t *hashTable) forEachEntry(fn func(hash uint64, key, value Value) bool) {
+	for i := range t.entries {
+		e := &t.entries[i]
+		if e.key == nil {
+			continue
+		}
+		if !fn(e.hash, e.key, e.value) {
+			return
+		}
+	}
+}
+
 // popLast removes and returns the most recently inserted live entry.
 func (t *hashTable) popLast() (Value, Value, bool) {
 	for i := len(t.entries) - 1; i >= 0; i-- {

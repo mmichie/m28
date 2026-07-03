@@ -2,8 +2,70 @@ package core
 
 import (
 	"fmt"
-	"strings"
 )
+
+// setOperand is a uniform view over set/frozenset operands: entry iteration
+// with cached hashes plus hashed membership, so set algebra never rehashes
+// and both types compare interchangeably (Python semantics).
+type setOperand struct {
+	forEachEntry   func(fn func(hash uint64, elem Value) bool)
+	containsHashed func(elem Value, hash uint64, ctx *Context) (bool, error)
+	size           int
+}
+
+// asSetOperand adapts a set or frozenset. ok is false for anything else.
+func asSetOperand(v Value) (setOperand, bool) {
+	switch s := v.(type) {
+	case *SetValue:
+		return setOperand{s.forEachEntry, s.containsHashed, s.Size()}, true
+	case *FrozenSetValue:
+		return setOperand{s.forEachEntry, s.containsHashed, s.Size()}, true
+	}
+	return setOperand{}, false
+}
+
+// frozensetFromOperandOrIterable builds a frozenset operand from a
+// set/frozenset (cached hashes) or any iterable (full hashing with ctx).
+func operandFromIterable(arg Value, method string, ctx *Context) (setOperand, error) {
+	if op, ok := asSetOperand(arg); ok {
+		return op, nil
+	}
+	if s, ok := arg.(StringValue); ok {
+		// Strings iterate as characters.
+		tmp := NewSet()
+		for _, ch := range string(s) {
+			if err := tmp.AddWithError(StringValue(string(ch)), ctx); err != nil {
+				return setOperand{}, err
+			}
+		}
+		return setOperand{tmp.forEachEntry, tmp.containsHashed, tmp.Size()}, nil
+	}
+	if iterable, ok := arg.(Iterable); ok {
+		tmp := NewSet()
+		iter := iterable.Iterator()
+		for {
+			val, hasNext := iter.Next()
+			if !hasNext {
+				break
+			}
+			if err := tmp.AddWithError(val, ctx); err != nil {
+				return setOperand{}, err
+			}
+		}
+		return setOperand{tmp.forEachEntry, tmp.containsHashed, tmp.Size()}, nil
+	}
+	return setOperand{}, fmt.Errorf("%s() argument must be an iterable", method)
+}
+
+// copyEntriesInto adds every element of op into any add-by-entry target.
+func copyEntriesInto(op setOperand, add func(elem Value, hash uint64, ctx *Context) error, ctx *Context) error {
+	var err error
+	op.forEachEntry(func(h uint64, elem Value) bool {
+		err = add(elem, h, ctx)
+		return err == nil
+	})
+	return err
+}
 
 // registerFrozenSetType registers the frozenset type descriptor with all its methods
 func registerFrozenSetType() {
@@ -17,35 +79,36 @@ func registerFrozenSetType() {
 				return NewFrozenSet(), nil
 			}
 			if len(args) == 1 {
-				// Convert iterable to frozenset
 				arg := args[0]
 				result := NewFrozenSet()
 
-				// Handle different iterable types
+				// Sets/frozensets copy with cached hashes.
+				if op, ok := asSetOperand(arg); ok {
+					if err := copyEntriesInto(op, result.addEntry, ctx); err != nil {
+						return nil, err
+					}
+					return result, nil
+				}
+
 				switch v := arg.(type) {
-				case *FrozenSetValue:
-					// Make a copy
-					for _, item := range v.items {
-						result.Add(item)
-					}
-				case *SetValue:
-					// Convert from set
-					for _, item := range v.items {
-						result.Add(item)
-					}
 				case *ListValue:
 					for _, item := range v.Items() {
-						result.Add(item)
+						if err := result.AddWithError(item, ctx); err != nil {
+							return nil, err
+						}
 					}
 				case TupleValue:
 					for _, item := range v {
-						result.Add(item)
+						if err := result.AddWithError(item, ctx); err != nil {
+							return nil, err
+						}
 					}
 				case StringValue:
 					// String is iterable, each character becomes an element
-					s := string(v)
-					for _, ch := range s {
-						result.Add(StringValue(string(ch)))
+					for _, ch := range string(v) {
+						if err := result.AddWithError(StringValue(string(ch)), ctx); err != nil {
+							return nil, err
+						}
 					}
 				default:
 					if iterable, ok := arg.(Iterable); ok {
@@ -55,7 +118,9 @@ func registerFrozenSetType() {
 							if !ok {
 								break
 							}
-							result.Add(val)
+							if err := result.AddWithError(val, ctx); err != nil {
+								return nil, err
+							}
 						}
 					} else {
 						return nil, fmt.Errorf("frozenset() argument must be an iterable")
@@ -66,53 +131,63 @@ func registerFrozenSetType() {
 			return nil, fmt.Errorf("frozenset() takes at most 1 argument (%d given)", len(args))
 		},
 		Repr: func(v Value) string {
-			fs := v.(*FrozenSetValue)
-			if fs.Size() == 0 {
-				return "frozenset()"
-			}
-			var items []string
-			for _, item := range fs.items {
-				items = append(items, Repr(item))
-			}
-			return "frozenset({" + strings.Join(items, ", ") + "})"
+			return v.(*FrozenSetValue).String()
 		},
 		Str: func(v Value) string {
-			fs := v.(*FrozenSetValue)
-			if fs.Size() == 0 {
-				return "frozenset()"
-			}
-			var items []string
-			for _, item := range fs.items {
-				items = append(items, Repr(item))
-			}
-			return "frozenset({" + strings.Join(items, ", ") + "})"
+			return v.(*FrozenSetValue).String()
 		},
 		Doc: "frozenset() -> new empty frozenset object\nfrozenset(iterable) -> new frozenset object\n\nBuild an immutable unordered collection of unique elements.",
 	})
 }
 
-// setOperandItems returns the elements, membership test and size of a set or
-// frozenset operand, so frozenset subset/superset comparisons accept either
-// type (Python compares frozensets and sets interchangeably).
-func setOperandItems(v Value) (items []Value, contains func(Value) bool, size int, ok bool) {
-	var m map[string]Value
-	switch s := v.(type) {
-	case *FrozenSetValue:
-		m, contains, size, ok = s.items, s.Contains, s.Size(), true
-	case *SetValue:
-		m, contains, size, ok = s.items, s.Contains, s.Size(), true
-	default:
-		return nil, nil, 0, false
-	}
-	items = make([]Value, 0, len(m))
-	for _, item := range m {
-		items = append(items, item)
-	}
-	return items, contains, size, ok
+// frozensetBinaryOp implements the shared shape of __sub__/__and__/__or__/
+// __xor__ and the named set-algebra methods.
+func frozensetSubsetOf(fs *FrozenSetValue, other setOperand, ctx *Context) (bool, error) {
+	result := true
+	var walkErr error
+	fs.forEachEntry(func(h uint64, elem Value) bool {
+		in, err := other.containsHashed(elem, h, ctx)
+		if err != nil {
+			walkErr = err
+			return false
+		}
+		if !in {
+			result = false
+			return false
+		}
+		return true
+	})
+	return result, walkErr
+}
+
+func frozensetSupersetOf(fs *FrozenSetValue, other setOperand, ctx *Context) (bool, error) {
+	result := true
+	var walkErr error
+	other.forEachEntry(func(h uint64, elem Value) bool {
+		in, err := fs.containsHashed(elem, h, ctx)
+		if err != nil {
+			walkErr = err
+			return false
+		}
+		if !in {
+			result = false
+			return false
+		}
+		return true
+	})
+	return result, walkErr
 }
 
 // getFrozenSetMethods returns all frozenset methods (read-only operations only)
 func getFrozenSetMethods() map[string]*MethodDescriptor {
+	requireSetOperand := func(arg Value, opName string) (setOperand, error) {
+		op, ok := asSetOperand(arg)
+		if !ok {
+			return setOperand{}, fmt.Errorf("unsupported operand type(s) for %s: 'frozenset' and '%s'", opName, arg.Type())
+		}
+		return op, nil
+	}
+
 	return map[string]*MethodDescriptor{
 		"copy": {
 			Name:    "copy",
@@ -122,8 +197,9 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
 				result := NewFrozenSet()
-				for _, item := range fs.items {
-					result.Add(item)
+				op, _ := asSetOperand(fs)
+				if err := copyEntriesInto(op, result.addEntry, ctx); err != nil {
+					return nil, err
 				}
 				return result, nil
 			},
@@ -132,70 +208,66 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Name: "__le__", Arity: 1, Doc: "Subset test (self <= other)", Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
-				_, contains, _, ok := setOperandItems(args[0])
+				other, ok := asSetOperand(args[0])
 				if !ok {
 					return nil, NewTypeError("set or frozenset", args[0], "__le__ argument")
 				}
-				for _, item := range fs.items {
-					if !contains(item) {
-						return False, nil
-					}
+				sub, err := frozensetSubsetOf(fs, other, ctx)
+				if err != nil {
+					return nil, err
 				}
-				return True, nil
+				return BoolValue(sub), nil
 			},
 		},
 		"__lt__": {
 			Name: "__lt__", Arity: 1, Doc: "Proper-subset test (self < other)", Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
-				_, contains, size, ok := setOperandItems(args[0])
+				other, ok := asSetOperand(args[0])
 				if !ok {
 					return nil, NewTypeError("set or frozenset", args[0], "__lt__ argument")
 				}
-				if fs.Size() >= size {
+				if fs.Size() >= other.size {
 					return False, nil
 				}
-				for _, item := range fs.items {
-					if !contains(item) {
-						return False, nil
-					}
+				sub, err := frozensetSubsetOf(fs, other, ctx)
+				if err != nil {
+					return nil, err
 				}
-				return True, nil
+				return BoolValue(sub), nil
 			},
 		},
 		"__ge__": {
 			Name: "__ge__", Arity: 1, Doc: "Superset test (self >= other)", Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
-				items, _, _, ok := setOperandItems(args[0])
+				other, ok := asSetOperand(args[0])
 				if !ok {
 					return nil, NewTypeError("set or frozenset", args[0], "__ge__ argument")
 				}
-				for _, item := range items {
-					if !fs.Contains(item) {
-						return False, nil
-					}
+				super, err := frozensetSupersetOf(fs, other, ctx)
+				if err != nil {
+					return nil, err
 				}
-				return True, nil
+				return BoolValue(super), nil
 			},
 		},
 		"__gt__": {
 			Name: "__gt__", Arity: 1, Doc: "Proper-superset test (self > other)", Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
-				items, _, size, ok := setOperandItems(args[0])
+				other, ok := asSetOperand(args[0])
 				if !ok {
 					return nil, NewTypeError("set or frozenset", args[0], "__gt__ argument")
 				}
-				if fs.Size() <= size {
+				if fs.Size() <= other.size {
 					return False, nil
 				}
-				for _, item := range items {
-					if !fs.Contains(item) {
-						return False, nil
-					}
+				super, err := frozensetSupersetOf(fs, other, ctx)
+				if err != nil {
+					return nil, err
 				}
-				return True, nil
+				return BoolValue(super), nil
 			},
 		},
 		"union": {
@@ -206,23 +278,17 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
 				result := NewFrozenSet()
-				// Add all items from this frozenset
-				for _, item := range fs.items {
-					result.Add(item)
+				self, _ := asSetOperand(fs)
+				if err := copyEntriesInto(self, result.addEntry, ctx); err != nil {
+					return nil, err
 				}
-				// Add items from other sets/frozensets
 				for _, arg := range args {
-					switch other := arg.(type) {
-					case *FrozenSetValue:
-						for _, item := range other.items {
-							result.Add(item)
-						}
-					case *SetValue:
-						for _, item := range other.items {
-							result.Add(item)
-						}
-					default:
+					op, ok := asSetOperand(arg)
+					if !ok {
 						return nil, fmt.Errorf("union() argument must be a set or frozenset")
+					}
+					if err := copyEntriesInto(op, result.addEntry, ctx); err != nil {
+						return nil, err
 					}
 				}
 				return result, nil
@@ -234,41 +300,42 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Return the intersection of frozensets",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
+				fs := receiver.(*FrozenSetValue)
+				result := NewFrozenSet()
+				self, _ := asSetOperand(fs)
 				if len(args) == 0 {
-					// Return a copy of the frozenset
-					fs := receiver.(*FrozenSetValue)
-					result := NewFrozenSet()
-					for _, item := range fs.items {
-						result.Add(item)
+					if err := copyEntriesInto(self, result.addEntry, ctx); err != nil {
+						return nil, err
 					}
 					return result, nil
 				}
 
-				fs := receiver.(*FrozenSetValue)
-				result := NewFrozenSet()
+				others := make([]setOperand, len(args))
+				for i, arg := range args {
+					op, ok := asSetOperand(arg)
+					if !ok {
+						return nil, fmt.Errorf("intersection() argument must be a set or frozenset")
+					}
+					others[i] = op
+				}
 
-				// Check each item in this frozenset
-				for _, item := range fs.items {
-					inAll := true
-					// Check if it's in all other sets
-					for _, arg := range args {
-						var contains bool
-						switch other := arg.(type) {
-						case *FrozenSetValue:
-							contains = other.Contains(item)
-						case *SetValue:
-							contains = other.Contains(item)
-						default:
-							return nil, fmt.Errorf("intersection() argument must be a set or frozenset")
+				var walkErr error
+				self.forEachEntry(func(h uint64, elem Value) bool {
+					for _, other := range others {
+						in, err := other.containsHashed(elem, h, ctx)
+						if err != nil {
+							walkErr = err
+							return false
 						}
-						if !contains {
-							inAll = false
-							break
+						if !in {
+							return true
 						}
 					}
-					if inAll {
-						result.Add(item)
-					}
+					walkErr = result.addEntry(elem, h, ctx)
+					return walkErr == nil
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
 				return result, nil
 			},
@@ -282,28 +349,32 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 				fs := receiver.(*FrozenSetValue)
 				result := NewFrozenSet()
 
-				// Add all items from this frozenset
-				for _, item := range fs.items {
-					shouldInclude := true
-					// Check if it's in any other set
-					for _, arg := range args {
-						var contains bool
-						switch other := arg.(type) {
-						case *FrozenSetValue:
-							contains = other.Contains(item)
-						case *SetValue:
-							contains = other.Contains(item)
-						default:
-							return nil, fmt.Errorf("difference() argument must be a set or frozenset")
+				others := make([]setOperand, len(args))
+				for i, arg := range args {
+					op, ok := asSetOperand(arg)
+					if !ok {
+						return nil, fmt.Errorf("difference() argument must be a set or frozenset")
+					}
+					others[i] = op
+				}
+
+				var walkErr error
+				fs.forEachEntry(func(h uint64, elem Value) bool {
+					for _, other := range others {
+						in, err := other.containsHashed(elem, h, ctx)
+						if err != nil {
+							walkErr = err
+							return false
 						}
-						if contains {
-							shouldInclude = false
-							break
+						if in {
+							return true
 						}
 					}
-					if shouldInclude {
-						result.Add(item)
-					}
+					walkErr = result.addEntry(elem, h, ctx)
+					return walkErr == nil
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
 				return result, nil
 			},
@@ -314,41 +385,45 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Return the symmetric difference of two frozensets",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("symmetric_difference() takes exactly one argument")
-				}
-
 				fs := receiver.(*FrozenSetValue)
-				result := NewFrozenSet()
-
-				var otherContains func(Value) bool
-				var otherItems map[string]Value
-
-				switch other := args[0].(type) {
-				case *FrozenSetValue:
-					otherContains = other.Contains
-					otherItems = other.items
-				case *SetValue:
-					otherContains = other.Contains
-					otherItems = other.items
-				default:
+				other, ok := asSetOperand(args[0])
+				if !ok {
 					return nil, fmt.Errorf("symmetric_difference() argument must be a set or frozenset")
 				}
+				result := NewFrozenSet()
+				var walkErr error
 
-				// Add items from this frozenset not in other
-				for _, item := range fs.items {
-					if !otherContains(item) {
-						result.Add(item)
+				fs.forEachEntry(func(h uint64, elem Value) bool {
+					in, err := other.containsHashed(elem, h, ctx)
+					if err != nil {
+						walkErr = err
+						return false
 					}
+					if !in {
+						walkErr = result.addEntry(elem, h, ctx)
+						return walkErr == nil
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
 
-				// Add items from other not in this frozenset
-				for _, item := range otherItems {
-					if !fs.Contains(item) {
-						result.Add(item)
+				other.forEachEntry(func(h uint64, elem Value) bool {
+					in, err := fs.containsHashed(elem, h, ctx)
+					if err != nil {
+						walkErr = err
+						return false
 					}
+					if !in {
+						walkErr = result.addEntry(elem, h, ctx)
+						return walkErr == nil
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
-
 				return result, nil
 			},
 		},
@@ -358,65 +433,16 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Check if this frozenset is a subset of another",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("issubset() takes exactly one argument")
-				}
-
 				fs := receiver.(*FrozenSetValue)
-
-				// Convert argument to a set of items for comparison
-				var otherItems map[string]Value
-				switch other := args[0].(type) {
-				case *FrozenSetValue:
-					otherItems = other.items
-				case *SetValue:
-					// A set keys its internal map by ValueToKey, but otherContains
-					// below looks up by PrintValue; rebuild with PrintValue keys so
-					// the schemes match (else frozenset.issubset(set) is always False).
-					otherItems = make(map[string]Value)
-					for _, item := range other.items {
-						otherItems[PrintValue(item)] = item
-					}
-				case StringValue:
-					// String is iterable - each character becomes an item
-					otherItems = make(map[string]Value)
-					for _, ch := range string(other) {
-						charVal := StringValue(string(ch))
-						key := PrintValue(charVal)
-						otherItems[key] = charVal
-					}
-				case *ListValue:
-					// Convert list to set
-					otherItems = make(map[string]Value)
-					for _, item := range other.Items() {
-						key := PrintValue(item)
-						otherItems[key] = item
-					}
-				case TupleValue:
-					// Convert tuple to set
-					otherItems = make(map[string]Value)
-					for _, item := range other {
-						key := PrintValue(item)
-						otherItems[key] = item
-					}
-				default:
-					return nil, fmt.Errorf("issubset() argument must be an iterable")
+				other, err := operandFromIterable(args[0], "issubset", ctx)
+				if err != nil {
+					return nil, err
 				}
-
-				// Create a lookup function
-				otherContains := func(v Value) bool {
-					key := PrintValue(v)
-					_, exists := otherItems[key]
-					return exists
+				sub, err := frozensetSubsetOf(fs, other, ctx)
+				if err != nil {
+					return nil, err
 				}
-
-				// Check if all items in this frozenset are in other
-				for _, item := range fs.items {
-					if !otherContains(item) {
-						return False, nil
-					}
-				}
-				return True, nil
+				return BoolValue(sub), nil
 			},
 		},
 		"issuperset": {
@@ -425,52 +451,16 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Check if this frozenset is a superset of another",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("issuperset() takes exactly one argument")
-				}
-
 				fs := receiver.(*FrozenSetValue)
-
-				// Convert argument to a set of items for comparison
-				var otherItems map[string]Value
-				switch other := args[0].(type) {
-				case *FrozenSetValue:
-					otherItems = other.items
-				case *SetValue:
-					otherItems = other.items
-				case StringValue:
-					// String is iterable - each character becomes an item
-					otherItems = make(map[string]Value)
-					for _, ch := range string(other) {
-						charVal := StringValue(string(ch))
-						key := PrintValue(charVal)
-						otherItems[key] = charVal
-					}
-				case *ListValue:
-					// Convert list to set
-					otherItems = make(map[string]Value)
-					for _, item := range other.Items() {
-						key := PrintValue(item)
-						otherItems[key] = item
-					}
-				case TupleValue:
-					// Convert tuple to set
-					otherItems = make(map[string]Value)
-					for _, item := range other {
-						key := PrintValue(item)
-						otherItems[key] = item
-					}
-				default:
-					return nil, fmt.Errorf("issuperset() argument must be an iterable")
+				other, err := operandFromIterable(args[0], "issuperset", ctx)
+				if err != nil {
+					return nil, err
 				}
-
-				// Check if all items in other are in this frozenset
-				for _, item := range otherItems {
-					if !fs.Contains(item) {
-						return False, nil
-					}
+				super, err := frozensetSupersetOf(fs, other, ctx)
+				if err != nil {
+					return nil, err
 				}
-				return True, nil
+				return BoolValue(super), nil
 			},
 		},
 		"isdisjoint": {
@@ -479,29 +469,29 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Check if two frozensets have no elements in common",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("isdisjoint() takes exactly one argument")
-				}
-
 				fs := receiver.(*FrozenSetValue)
-
-				var otherContains func(Value) bool
-				switch other := args[0].(type) {
-				case *FrozenSetValue:
-					otherContains = other.Contains
-				case *SetValue:
-					otherContains = other.Contains
-				default:
+				other, ok := asSetOperand(args[0])
+				if !ok {
 					return nil, fmt.Errorf("isdisjoint() argument must be a set or frozenset")
 				}
-
-				// Check if any item in this frozenset is in other
-				for _, item := range fs.items {
-					if otherContains(item) {
-						return False, nil
+				disjoint := true
+				var walkErr error
+				fs.forEachEntry(func(h uint64, elem Value) bool {
+					in, err := other.containsHashed(elem, h, ctx)
+					if err != nil {
+						walkErr = err
+						return false
 					}
+					if in {
+						disjoint = false
+						return false
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
-				return True, nil
+				return BoolValue(disjoint), nil
 			},
 		},
 		"__len__": {
@@ -524,7 +514,11 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 					return nil, fmt.Errorf("__contains__ takes exactly one argument")
 				}
 				fs := receiver.(*FrozenSetValue)
-				return BoolValue(fs.Contains(args[0])), nil
+				in, err := fs.ContainsWithError(args[0], ctx)
+				if err != nil {
+					return nil, err
+				}
+				return BoolValue(in), nil
 			},
 		},
 		"__iter__": {
@@ -534,10 +528,7 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
-				// Return the iterator (it now implements Value with __next__ support)
-				iter := fs.Iterator()
-				// Cast to *setIterator which is a Value
-				return iter.(*setIterator), nil
+				return fs.Iterator().(*setIterator), nil
 			},
 		},
 		"__hash__": {
@@ -547,7 +538,11 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				fs := receiver.(*FrozenSetValue)
-				return NumberValue(float64(fs.Hash())), nil
+				h, err := fs.hashWithCtx(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return NumberValue(float64(h)), nil
 			},
 		},
 		"__sub__": {
@@ -556,27 +551,27 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Return the difference of two frozensets (self - other)",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("__sub__ takes exactly one argument")
-				}
-
 				fs := receiver.(*FrozenSetValue)
-				result := NewFrozenSet()
-
-				var otherContains func(Value) bool
-				switch other := args[0].(type) {
-				case *FrozenSetValue:
-					otherContains = other.Contains
-				case *SetValue:
-					otherContains = other.Contains
-				default:
-					return nil, fmt.Errorf("unsupported operand type(s) for -: 'frozenset' and '%s'", args[0].Type())
+				other, err := requireSetOperand(args[0], "-")
+				if err != nil {
+					return nil, err
 				}
-
-				for _, item := range fs.items {
-					if !otherContains(item) {
-						result.Add(item)
+				result := NewFrozenSet()
+				var walkErr error
+				fs.forEachEntry(func(h uint64, elem Value) bool {
+					in, cErr := other.containsHashed(elem, h, ctx)
+					if cErr != nil {
+						walkErr = cErr
+						return false
 					}
+					if !in {
+						walkErr = result.addEntry(elem, h, ctx)
+						return walkErr == nil
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
 				return result, nil
 			},
@@ -587,29 +582,18 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Return the union of two frozensets (self | other)",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("__or__ takes exactly one argument")
-				}
-
 				fs := receiver.(*FrozenSetValue)
+				other, err := requireSetOperand(args[0], "|")
+				if err != nil {
+					return nil, err
+				}
 				result := NewFrozenSet()
-
-				for _, item := range fs.items {
-					result.Add(item)
+				self, _ := asSetOperand(fs)
+				if err := copyEntriesInto(self, result.addEntry, ctx); err != nil {
+					return nil, err
 				}
-
-				var otherItems map[string]Value
-				switch other := args[0].(type) {
-				case *FrozenSetValue:
-					otherItems = other.items
-				case *SetValue:
-					otherItems = other.items
-				default:
-					return nil, fmt.Errorf("unsupported operand type(s) for |: 'frozenset' and '%s'", args[0].Type())
-				}
-
-				for _, item := range otherItems {
-					result.Add(item)
+				if err := copyEntriesInto(other, result.addEntry, ctx); err != nil {
+					return nil, err
 				}
 				return result, nil
 			},
@@ -620,27 +604,27 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Return the intersection of two frozensets (self & other)",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("__and__ takes exactly one argument")
-				}
-
 				fs := receiver.(*FrozenSetValue)
-				result := NewFrozenSet()
-
-				var otherContains func(Value) bool
-				switch other := args[0].(type) {
-				case *FrozenSetValue:
-					otherContains = other.Contains
-				case *SetValue:
-					otherContains = other.Contains
-				default:
-					return nil, fmt.Errorf("unsupported operand type(s) for &: 'frozenset' and '%s'", args[0].Type())
+				other, err := requireSetOperand(args[0], "&")
+				if err != nil {
+					return nil, err
 				}
-
-				for _, item := range fs.items {
-					if otherContains(item) {
-						result.Add(item)
+				result := NewFrozenSet()
+				var walkErr error
+				fs.forEachEntry(func(h uint64, elem Value) bool {
+					in, cErr := other.containsHashed(elem, h, ctx)
+					if cErr != nil {
+						walkErr = cErr
+						return false
 					}
+					if in {
+						walkErr = result.addEntry(elem, h, ctx)
+						return walkErr == nil
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
 				return result, nil
 			},
@@ -651,42 +635,60 @@ func getFrozenSetMethods() map[string]*MethodDescriptor {
 			Doc:     "Return the symmetric difference of two frozensets (self ^ other)",
 			Builtin: true,
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-				if len(args) != 1 {
-					return nil, fmt.Errorf("__xor__ takes exactly one argument")
-				}
-
 				fs := receiver.(*FrozenSetValue)
+				other, err := requireSetOperand(args[0], "^")
+				if err != nil {
+					return nil, err
+				}
 				result := NewFrozenSet()
+				var walkErr error
 
-				var otherContains func(Value) bool
-				var otherItems map[string]Value
-				switch other := args[0].(type) {
-				case *FrozenSetValue:
-					otherContains = other.Contains
-					otherItems = other.items
-				case *SetValue:
-					otherContains = other.Contains
-					otherItems = other.items
-				default:
-					return nil, fmt.Errorf("unsupported operand type(s) for ^: 'frozenset' and '%s'", args[0].Type())
-				}
-
-				// Add items from this frozenset not in other
-				for _, item := range fs.items {
-					if !otherContains(item) {
-						result.Add(item)
+				fs.forEachEntry(func(h uint64, elem Value) bool {
+					in, cErr := other.containsHashed(elem, h, ctx)
+					if cErr != nil {
+						walkErr = cErr
+						return false
 					}
-				}
-
-				// Add items from other not in this frozenset
-				for _, item := range otherItems {
-					if !fs.Contains(item) {
-						result.Add(item)
+					if !in {
+						walkErr = result.addEntry(elem, h, ctx)
+						return walkErr == nil
 					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
 				}
 
+				other.forEachEntry(func(h uint64, elem Value) bool {
+					in, cErr := fs.containsHashed(elem, h, ctx)
+					if cErr != nil {
+						walkErr = cErr
+						return false
+					}
+					if !in {
+						walkErr = result.addEntry(elem, h, ctx)
+						return walkErr == nil
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
+				}
 				return result, nil
 			},
 		},
 	}
+}
+
+// setOperandItems returns the elements, membership test and size of a set or
+// frozenset operand, so subset/superset comparisons accept either type
+// (compat shim over the engine API; new code should use asSetOperand).
+func setOperandItems(v Value) (items []Value, contains func(Value) bool, size int, ok bool) {
+	switch s := v.(type) {
+	case *FrozenSetValue:
+		return s.Items(), s.Contains, s.Size(), true
+	case *SetValue:
+		return s.Items(), s.Contains, s.Size(), true
+	}
+	return nil, nil, 0, false
 }

@@ -402,14 +402,18 @@ func (s *SetType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 
 	if list, ok := types.AsList(arg); ok {
 		for _, elem := range list.Items() {
-			set.Add(elem)
+			if err := set.AddWithError(elem, ctx); err != nil {
+				return nil, err
+			}
 		}
 		return set, nil
 	}
 
 	if tuple, ok := types.AsTuple(arg); ok {
 		for _, elem := range tuple {
-			set.Add(elem)
+			if err := set.AddWithError(elem, ctx); err != nil {
+				return nil, err
+			}
 		}
 		return set, nil
 	}
@@ -417,8 +421,9 @@ func (s *SetType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 	if str, ok := types.AsString(arg); ok {
 		// Convert string to set of characters
 		for _, ch := range str {
-			charVal := core.StringValue(string(ch))
-			set.Add(charVal)
+			if err := set.AddWithError(core.StringValue(string(ch)), ctx); err != nil {
+				return nil, err
+			}
 		}
 		return set, nil
 	}
@@ -431,7 +436,9 @@ func (s *SetType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 			if !hasNext {
 				break
 			}
-			set.Add(val)
+			if err := set.AddWithError(val, ctx); err != nil {
+				return nil, err
+			}
 		}
 		return set, nil
 	}

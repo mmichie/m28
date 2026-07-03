@@ -2,27 +2,23 @@
   "python_version": "3.13.13",
   "last_updated": "2026-07-01",
   "summary": {
-    "tests_running": "943",
-    "tests_passing": "526",
+    "tests_running": "925",
+    "tests_passing": "458",
     "fully_passing_files": [
       "test_augassign (7/7)",
-      "test_call (4/184, 180 skipped)",
+      "test_call (4/4)",
       "test_decorators (16/16)",
-      "test_string (38/38)",
-      "test_unpack (1/1)"
+      "test_string (38/38)"
     ],
     "high_pass_files": [
       "test_with (50/51, 98%)",
       "test_compare (15/16, 94%)",
-      "test_binop (11/12, 92%)",
       "test_list (61/67, 91%)",
       "test_dictcomps (9/10, 90%)",
       "test_unary (5/6, 83%)",
       "test_contextlib (71/91, 78%)",
-      "test_dict (90/123, 73%)",
-      "test_scope (28/41, 68%)",
-      "test_grammar (52/79, 66%)",
-      "test_listcomps (36/59, 61%)"
+      "test_dict (88/123, 72%)",
+      "test_scope (28/41, 68%)"
     ],
     "running_but_low": [
       "test_descr (~23/159, 14%)",
@@ -36,39 +32,31 @@
       "priority": 1,
       "tests": {
         "test_grammar": {
-          "status": "partial",
-          "tests_run": 79,
-          "passing": 52,
-          "failures": 14,
-          "errors": 13,
-          "skipped": 0,
+          "status": "blocked",
+          "blocker": "Exception: no module named 'inspect'",
           "source": "cpython/Lib/test/test_grammar.py"
         },
         "test_syntax": {
-          "status": "partial",
-          "tests_run": 37,
-          "passing": 3,
-          "failures": 26,
-          "errors": 1,
-          "skipped": 7,
+          "status": "blocked",
+          "blocker": "Exception: no module named 'doctest'",
           "source": "cpython/Lib/test/test_syntax.py"
         },
         "test_types": {
           "status": "blocked",
-          "blocker": "submodule load failed: no module named 'test.support.iter_builtin_types'",
+          "blocker": "(submodule load failed: no module named 'test.support.iter_builtin_types')",
           "source": "cpython/Lib/test/test_types.py"
         },
         "test_builtin": {
           "status": "blocked",
-          "blocker": "LookupError: unknown encoding: raw-unicode-escape",
+          "blocker": "Exception: no module named 'typing'",
           "source": "cpython/Lib/test/test_builtin.py"
         },
         "test_binop": {
           "status": "partial",
           "tests_run": 12,
-          "passing": 11,
+          "passing": 3,
           "failures": 1,
-          "errors": 0,
+          "errors": 8,
           "skipped": 0,
           "notes": "Rat fraction class equality tests fail",
           "source": "cpython/Lib/test/test_binop.py"
@@ -111,16 +99,16 @@
         "test_dict": {
           "status": "partial",
           "tests_run": 123,
-          "passing": 90,
-          "failures": 7,
-          "errors": 12,
+          "passing": 88,
+          "failures": 10,
+          "errors": 11,
           "skipped": 14,
           "notes": "Pickling tests (6), __dict__ mutation, str subclass issues, exec(), hash-based key equality",
           "source": "cpython/Lib/test/test_dict.py"
         },
         "test_set": {
-          "status": "blocked",
-          "blocker": "crash: Go runtime error (pre-existing; also crashes on base build",
+          "status": "timeout",
+          "note": "timed out after 100s",
           "notes": "Many tests running; needs longer timeout to get full count",
           "source": "cpython/Lib/test/test_set.py"
         },
@@ -203,7 +191,7 @@
         },
         "test_functools": {
           "status": "blocked",
-          "blocker": "error evaluating dict key: NameError: name '**unpack' is not defined",
+          "blocker": "Exception: no module named 'typing'",
           "source": "cpython/Lib/test/test_functools.py"
         },
         "test_decorators": {
@@ -222,8 +210,13 @@
           "source": "cpython/Lib/test/test_class.py"
         },
         "test_descr": {
-          "status": "blocked",
-          "blocker": "crash: Go stack overflow / deep recursion (pre-existing",
+          "status": "partial",
+          "tests_run": 159,
+          "passing": 34,
+          "failures": 63,
+          "errors": 49,
+          "skipped": 11,
+          "expected_failures": 2,
           "notes": "No longer panics: str subclasses now carry a backing string (Instance.BackingStr), str methods unwrap it, and ==/str()/len/index/in work. Remaining failures are deeper descriptor/metaclass features.",
           "source": "cpython/Lib/test/test_descr.py"
         }
@@ -235,21 +228,17 @@
       "tests": {
         "test_generators": {
           "status": "blocked",
-          "blocker": "Exception: E",
+          "blocker": "Exception: no module named 'doctest'",
           "source": "cpython/Lib/test/test_generators.py"
         },
         "test_genexps": {
           "status": "blocked",
-          "blocker": "0 tests ran (doctest-based or no unittest cases)",
+          "blocker": "Exception: no module named 'doctest'",
           "source": "cpython/Lib/test/test_genexps.py"
         },
         "test_listcomps": {
-          "status": "partial",
-          "tests_run": 59,
-          "passing": 36,
-          "failures": 13,
-          "errors": 10,
-          "skipped": 0,
+          "status": "blocked",
+          "blocker": "Exception: no module named 'doctest'",
           "source": "cpython/Lib/test/test_listcomps.py"
         },
         "test_dictcomps": {
@@ -262,26 +251,18 @@
           "source": "cpython/Lib/test/test_dictcomps.py"
         },
         "test_setcomps": {
-          "status": "partial",
-          "tests_run": 1,
-          "passing": 0,
-          "failures": 0,
-          "errors": 1,
-          "skipped": 0,
+          "status": "blocked",
+          "blocker": "Exception: no module named 'doctest'",
           "source": "cpython/Lib/test/test_setcomps.py"
         },
         "test_unpack": {
-          "status": "passing",
-          "tests_run": 1,
-          "passing": 1,
-          "failures": 0,
-          "errors": 0,
-          "skipped": 0,
+          "status": "blocked",
+          "blocker": "Exception: no module named 'doctest'",
           "source": "cpython/Lib/test/test_unpack.py"
         },
         "test_unpack_ex": {
           "status": "blocked",
-          "blocker": "0 tests ran (doctest-based or no unittest cases)",
+          "blocker": "Exception: no module named 'doctest'",
           "source": "cpython/Lib/test/test_unpack_ex.py"
         },
         "test_iter": {
@@ -292,7 +273,7 @@
         },
         "test_itertools": {
           "status": "blocked",
-          "blocker": "AttributeError:",
+          "blocker": "Exception: no module named 'doctest'",
           "source": "cpython/Lib/test/test_itertools.py"
         },
         "test_contextlib": {

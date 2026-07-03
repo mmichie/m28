@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"strings"
 )
 
 // setFromIterable converts any iterable Value into a *SetValue.
@@ -14,9 +13,10 @@ func setFromIterable(v Value) (*SetValue, error) {
 	}
 	if fs, ok := v.(*FrozenSetValue); ok {
 		out := NewSet()
-		for _, item := range fs.items {
-			out.Add(item)
-		}
+		fs.forEachEntry(func(h uint64, elem Value) bool {
+			out.addEntry(elem, h, nil)
+			return true
+		})
 		return out, nil
 	}
 	items, err := iterableValues(v)
@@ -49,10 +49,11 @@ func registerSetType() {
 				// Handle different iterable types
 				switch v := arg.(type) {
 				case *SetValue:
-					// Make a copy
-					for _, item := range v.items {
-						result.Add(item)
-					}
+					// Make a copy (cached hashes, no rehash)
+					v.forEachEntry(func(h uint64, elem Value) bool {
+						result.addEntry(elem, h, ctx)
+						return true
+					})
 				case *ListValue:
 					for _, item := range v.Items() {
 						result.Add(item)
@@ -86,26 +87,10 @@ func registerSetType() {
 			return nil, &TypeError{Message: fmt.Sprintf("set() takes at most 1 argument (%d given)", len(args))}
 		},
 		Repr: func(v Value) string {
-			set := v.(*SetValue)
-			if set.Size() == 0 {
-				return "set()"
-			}
-			var items []string
-			for _, item := range set.items {
-				items = append(items, Repr(item))
-			}
-			return "{" + strings.Join(items, ", ") + "}"
+			return v.(*SetValue).String()
 		},
 		Str: func(v Value) string {
-			set := v.(*SetValue)
-			if set.Size() == 0 {
-				return "set()"
-			}
-			var items []string
-			for _, item := range set.items {
-				items = append(items, Repr(item))
-			}
-			return "{" + strings.Join(items, ", ") + "}"
+			return v.(*SetValue).String()
 		},
 		Doc: "set() -> new empty set object\nset(iterable) -> new set object\n\nBuild an unordered collection of unique elements.",
 	})
@@ -172,13 +157,11 @@ func getSetMethods() map[string]*MethodDescriptor {
 				if set.Size() == 0 {
 					return nil, &KeyError{Message: "pop from an empty set"}
 				}
-				// Return and remove the first element (get any key from the map)
-				for k, v := range set.items {
-					delete(set.items, k)
-					return v, nil
+				elem, _, ok := set.table.popLast()
+				if !ok {
+					return nil, &KeyError{Message: "pop from an empty set"}
 				}
-				// Should never reach here since we checked size > 0
-				return nil, &KeyError{Message: "pop from an empty set"}
+				return elem, nil
 			},
 		},
 		"clear": {
@@ -189,7 +172,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				set := receiver.(*SetValue)
 				// Mutate in-place
-				set.items = make(map[string]Value)
+				set.Clear()
 				return Nil, nil
 			},
 		},
@@ -201,7 +184,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				set := receiver.(*SetValue)
 				result := NewSet()
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					result.Add(item)
 				}
 				return result, nil
@@ -216,7 +199,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				set := receiver.(*SetValue)
 				result := NewSet()
 				// Add all items from this set
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					result.Add(item)
 				}
 				// Add items from other sets
@@ -225,7 +208,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 					if !ok {
 						return nil, &TypeError{Message: "union() argument must be a set"}
 					}
-					for _, item := range other.items {
+					for _, item := range other.Items() {
 						result.Add(item)
 					}
 				}
@@ -242,7 +225,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 					// Return a copy of the set
 					set := receiver.(*SetValue)
 					result := NewSet()
-					for _, item := range set.items {
+					for _, item := range set.Items() {
 						result.Add(item)
 					}
 					return result, nil
@@ -252,7 +235,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				result := NewSet()
 
 				// Check each item in this set
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					inAll := true
 					// Check if it's in all other sets
 					for _, arg := range args {
@@ -282,7 +265,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				result := NewSet()
 
 				// Add all items from this set
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					shouldInclude := true
 					// Check if it's in any other set
 					for _, arg := range args {
@@ -321,14 +304,14 @@ func getSetMethods() map[string]*MethodDescriptor {
 				result := NewSet()
 
 				// Add items from this set not in other
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					if !other.Contains(item) {
 						result.Add(item)
 					}
 				}
 
 				// Add items from other not in this set
-				for _, item := range other.items {
+				for _, item := range other.Items() {
 					if !set.Contains(item) {
 						result.Add(item)
 					}
@@ -348,52 +331,31 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-
-				// Convert argument to a set of items for comparison
-				var otherItems map[string]Value
-				switch other := args[0].(type) {
-				case *SetValue:
-					otherItems = other.items
-				case *FrozenSetValue:
-					otherItems = other.items
-				case StringValue:
-					// String is iterable - each character becomes an item
-					otherItems = make(map[string]Value)
-					for _, ch := range string(other) {
-						charVal := StringValue(string(ch))
-						key := PrintValue(charVal)
-						otherItems[key] = charVal
-					}
-				case *ListValue:
-					// Convert list to set
-					otherItems = make(map[string]Value)
-					for _, item := range other.Items() {
-						key := PrintValue(item)
-						otherItems[key] = item
-					}
-				case TupleValue:
-					// Convert tuple to set
-					otherItems = make(map[string]Value)
-					for _, item := range other {
-						key := PrintValue(item)
-						otherItems[key] = item
-					}
-				default:
-					return nil, &TypeError{Message: "issubset() argument must be an iterable"}
-				}
-
-				// Create a lookup function
-				otherContains := func(v Value) bool {
-					key := PrintValue(v)
-					_, exists := otherItems[key]
-					return exists
+				other, err := operandFromIterable(args[0], "issubset", ctx)
+				if err != nil {
+					return nil, err
 				}
 
 				// Check if all items in this set are in other
-				for _, item := range set.items {
-					if !otherContains(item) {
-						return False, nil
+				var walkErr error
+				subset := true
+				set.forEachEntry(func(h uint64, elem Value) bool {
+					in, cErr := other.containsHashed(elem, h, ctx)
+					if cErr != nil {
+						walkErr = cErr
+						return false
 					}
+					if !in {
+						subset = false
+						return false
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
+				}
+				if !subset {
+					return False, nil
 				}
 				return True, nil
 			},
@@ -409,45 +371,31 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				set := receiver.(*SetValue)
-
-				// Convert argument to a set of items for comparison
-				var otherItems map[string]Value
-				switch other := args[0].(type) {
-				case *SetValue:
-					otherItems = other.items
-				case *FrozenSetValue:
-					otherItems = other.items
-				case StringValue:
-					// String is iterable - each character becomes an item
-					otherItems = make(map[string]Value)
-					for _, ch := range string(other) {
-						charVal := StringValue(string(ch))
-						key := PrintValue(charVal)
-						otherItems[key] = charVal
-					}
-				case *ListValue:
-					// Convert list to set
-					otherItems = make(map[string]Value)
-					for _, item := range other.Items() {
-						key := PrintValue(item)
-						otherItems[key] = item
-					}
-				case TupleValue:
-					// Convert tuple to set
-					otherItems = make(map[string]Value)
-					for _, item := range other {
-						key := PrintValue(item)
-						otherItems[key] = item
-					}
-				default:
-					return nil, &TypeError{Message: "issuperset() argument must be an iterable"}
+				other, err := operandFromIterable(args[0], "issuperset", ctx)
+				if err != nil {
+					return nil, err
 				}
 
 				// Check if all items in other are in this set
-				for _, item := range otherItems {
-					if !set.Contains(item) {
-						return False, nil
+				var walkErr error
+				super := true
+				other.forEachEntry(func(h uint64, elem Value) bool {
+					in, cErr := set.containsHashed(elem, h, ctx)
+					if cErr != nil {
+						walkErr = cErr
+						return false
 					}
+					if !in {
+						super = false
+						return false
+					}
+					return true
+				})
+				if walkErr != nil {
+					return nil, walkErr
+				}
+				if !super {
+					return False, nil
 				}
 				return True, nil
 			},
@@ -469,7 +417,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				// Check if any item in this set is in other
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					if other.Contains(item) {
 						return False, nil
 					}
@@ -508,10 +456,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 			Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 				set := receiver.(*SetValue)
 				// Convert to list and return its iterator (not the list!)
-				items := make([]Value, 0, len(set.items))
-				for _, v := range set.items {
-					items = append(items, v)
-				}
+				items := set.Items()
 				list := NewList(items...)
 				// Get a proper iterator from the list
 				if iter, ok := list.GetAttr("__iter__"); ok {
@@ -542,7 +487,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				result := NewSet()
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					if !other.Contains(item) {
 						result.Add(item)
 					}
@@ -567,10 +512,10 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				result := NewSet()
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					result.Add(item)
 				}
-				for _, item := range other.items {
+				for _, item := range other.Items() {
 					result.Add(item)
 				}
 				return result, nil
@@ -593,7 +538,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				}
 
 				result := NewSet()
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					if other.Contains(item) {
 						result.Add(item)
 					}
@@ -620,14 +565,14 @@ func getSetMethods() map[string]*MethodDescriptor {
 				result := NewSet()
 
 				// Add items from this set not in other
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					if !other.Contains(item) {
 						result.Add(item)
 					}
 				}
 
 				// Add items from other not in this set
-				for _, item := range other.items {
+				for _, item := range other.Items() {
 					if !set.Contains(item) {
 						result.Add(item)
 					}
@@ -646,7 +591,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				// Add items from other iterables
 				for _, arg := range args {
 					if other, ok := arg.(*SetValue); ok {
-						for _, item := range other.items {
+						for _, item := range other.Items() {
 							set.Add(item)
 						}
 					} else if iterable, ok := arg.(Iterable); ok {
@@ -675,7 +620,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				// Remove items that are in any other iterable
 				for _, arg := range args {
 					if other, ok := arg.(*SetValue); ok {
-						for _, item := range other.items {
+						for _, item := range other.Items() {
 							set.Remove(item)
 						}
 					} else if iterable, ok := arg.(Iterable); ok {
@@ -707,7 +652,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				set := receiver.(*SetValue)
 				// Check each item in this set
 				toRemove := make([]Value, 0)
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					inAll := true
 					// Check if it's in all other sets
 					for _, arg := range args {
@@ -749,7 +694,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 
 				// Items to add (in other but not in set)
 				toAdd := make([]Value, 0)
-				for _, item := range other.items {
+				for _, item := range other.Items() {
 					if !set.Contains(item) {
 						toAdd = append(toAdd, item)
 					}
@@ -757,7 +702,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 
 				// Items to remove (in both sets)
 				toRemove := make([]Value, 0)
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					if other.Contains(item) {
 						toRemove = append(toRemove, item)
 					}
@@ -792,7 +737,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 
 				// Check if all items in this set are in other (subset). set and
 				// frozenset are comparable to each other, like CPython.
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					if !contains(item) {
 						return False, nil
 					}
@@ -845,7 +790,7 @@ func getSetMethods() map[string]*MethodDescriptor {
 				if set.Size() >= size {
 					return False, nil
 				}
-				for _, item := range set.items {
+				for _, item := range set.Items() {
 					if !contains(item) {
 						return False, nil
 					}
