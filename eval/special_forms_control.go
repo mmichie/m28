@@ -1176,7 +1176,7 @@ func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					}
 				} else if obj, ok := excObj.(*core.DictValue); ok {
 					// Fallback for dict-based exceptions
-					if msgVal, exists := obj.Get("message"); exists {
+					if msgVal, exists := obj.GetStr("message"); exists {
 						message = core.PrintValueWithoutQuotes(msgVal)
 					}
 				}

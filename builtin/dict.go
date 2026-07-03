@@ -43,16 +43,10 @@ func DictFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 		key := v.Get(i)
 		value := v.Get(i + 1)
 
-		// Check if key is hashable
-		if !types.IsHashable(key) {
-			return nil, errors.NewTypeError("dict", "hashable type", string(key.Type()))
+		// Full semantics: hashability check, user __hash__/__eq__, dedup
+		if err := dict.SetItem(key, value, ctx); err != nil {
+			return nil, err
 		}
-
-		// Convert key to string representation
-		keyStr := core.ValueToKey(key)
-
-		// Set the value
-		dict.SetWithKey(keyStr, key, value)
 	}
 
 	return dict, nil
@@ -72,16 +66,10 @@ func GetFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	key := v.Get(1)
-	// Check if key is hashable
-	if !types.IsHashable(key) {
-		return nil, errors.NewTypeError("get", "hashable type", string(key.Type()))
+	value, found, err := dict.GetItem(key, ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	// Convert key to string representation
-	keyStr := core.ValueToKey(key)
-
-	// Try to get the value
-	value, found := dict.Get(keyStr)
 	if found {
 		return value, nil
 	}
@@ -109,16 +97,9 @@ func SetFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	key := v.Get(1)
-	// Check if key is hashable
-	if !types.IsHashable(key) {
-		return nil, errors.NewTypeError("set", "hashable type", string(key.Type()))
+	if err := dict.SetItem(key, v.Get(2), ctx); err != nil {
+		return nil, err
 	}
-
-	// Convert key to string representation
-	keyStr := core.ValueToKey(key)
-
-	// Set the value
-	dict.SetWithKey(keyStr, key, v.Get(2))
 
 	// Return the dictionary
 	return dict, nil
@@ -138,16 +119,9 @@ func DeleteFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	key := v.Get(1)
-	// Check if key is hashable
-	if !types.IsHashable(key) {
-		return nil, errors.NewTypeError("delete", "hashable type", string(key.Type()))
+	if _, err := dict.DelItem(key, ctx); err != nil {
+		return nil, err
 	}
-
-	// Convert key to string representation
-	keyStr := core.ValueToKey(key)
-
-	// Delete the key
-	dict.Delete(keyStr)
 
 	// Return the dictionary
 	return dict, nil
@@ -167,16 +141,10 @@ func HasKeyFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 	}
 
 	key := v.Get(1)
-	// Check if key is hashable
-	if !types.IsHashable(key) {
-		return nil, errors.NewTypeError("has-key", "hashable type", string(key.Type()))
+	_, found, err := dict.GetItem(key, ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	// Convert key to string representation
-	keyStr := core.ValueToKey(key)
-
-	// Check if the key exists
-	_, found := dict.Get(keyStr)
 
 	// Return a boolean
 	return core.BoolValue(found), nil
@@ -272,6 +240,14 @@ func MergeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Merge all dictionaries
 	for i := 0; i < v.Count(); i++ {
+		// Real dicts merge directly (arbitrary keys, cached hashes).
+		if dv, ok := v.Get(i).(*core.DictValue); ok {
+			if err := result.UpdateWithContext(dv, ctx); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
 		dict := v.Get(i).(core.Object)
 
 		// Get the keys

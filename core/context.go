@@ -392,10 +392,10 @@ func (c *Context) SetRawVar(name string, value Value) {
 	c.ensureVars()[name] = value
 }
 
-// DefineKeyed is Define for a caller that pre-computed the ModuleDict key
-// ("s:" + name) and the export-sync decision (module-tier IR nodes do this at
-// compile time). Behavior is identical to Define.
-func (c *Context) DefineKeyed(name, key string, syncModule bool, value Value) {
+// DefineKeyed is Define for a caller that pre-computed the ModuleDict name
+// hash (HashStr) and the export-sync decision (module-tier IR nodes do this
+// at compile time). Behavior is identical to Define.
+func (c *Context) DefineKeyed(name string, nameHash uint64, syncModule bool, value Value) {
 	if c.Outer == nil {
 		if _, isBuiltin := value.(*BuiltinFunction); isBuiltin {
 			if err := builtinRegistry.RegisterWithDepth(name, value, 3); err != nil {
@@ -407,7 +407,7 @@ func (c *Context) DefineKeyed(name, key string, syncModule bool, value Value) {
 	}
 	c.ensureVars()[name] = value
 	if syncModule && c.ModuleDict != nil {
-		c.ModuleDict.SetStrKeyed(key, name, value)
+		c.ModuleDict.SetStrHashed(nameHash, name, value)
 	}
 }
 
@@ -547,7 +547,15 @@ func (c *Context) Lookup(name string) (Value, error) {
 // true once the walk has passed through a function-local scope; while it is
 // true, class-body scopes are skipped (except for __class__), implementing
 // Python's rule that the class namespace is invisible to bare names in methods.
+//
+// nameHash carries the dict-engine hash of name so a walk probing several
+// module dicts hashes the name once. 0 means "not computed yet" (hashString
+// returns 0 only for the empty string, which recomputes harmlessly).
 func (c *Context) lookupWithDepth(name string, depth int, crossedFunction bool) (Value, error) {
+	return c.lookupWithDepthHashed(name, 0, depth, crossedFunction)
+}
+
+func (c *Context) lookupWithDepthHashed(name string, nameHash uint64, depth int, crossedFunction bool) (Value, error) {
 	// Prevent infinite loops in context chain
 	if depth > 100 {
 		Log.Error(SubsystemScope, "Lookup depth exceeded - possible circular context chain", "name", name)
@@ -575,9 +583,12 @@ func (c *Context) lookupWithDepth(name string, depth int, crossedFunction bool) 
 	// This ensures dynamic updates to module.__dict__ are visible to functions
 	// This is critical for Python's importlib._setup() which dynamically injects globals
 	if c.ModuleDict != nil {
-		// GetStr avoids the per-lookup key-string allocation ValueToKey makes;
-		// this runs on nearly every module-global read.
-		if val, ok := c.ModuleDict.GetStr(name); ok {
+		// Hash the name once for the whole scope walk; this runs on nearly
+		// every module-global read.
+		if nameHash == 0 {
+			nameHash = HashStr(name)
+		}
+		if val, ok := c.ModuleDict.GetStrHashed(nameHash, name); ok {
 			if debugLookups && depth < 5 {
 				Log.Debug(SubsystemScope, "Variable found in ModuleDict", "name", name)
 			}
@@ -600,14 +611,17 @@ func (c *Context) lookupWithDepth(name string, depth int, crossedFunction bool) 
 
 	// Check outer scopes
 	if c.Outer != nil {
-		return c.Outer.lookupWithDepth(name, depth+1, crossedFunction || c.IsFunctionScope)
+		return c.Outer.lookupWithDepthHashed(name, nameHash, depth+1, crossedFunction || c.IsFunctionScope)
 	}
 
 	// If we reached the end of the scope chain and have a Global context,
 	// check its ModuleDict as a last resort. This allows functions to access
 	// module-level variables that were defined after the function was created.
 	if c.Global != nil && c.Global.ModuleDict != nil && c.Global != c {
-		if val, ok := c.Global.ModuleDict.GetStr(name); ok {
+		if nameHash == 0 {
+			nameHash = HashStr(name)
+		}
+		if val, ok := c.Global.ModuleDict.GetStrHashed(nameHash, name); ok {
 			return val, nil
 		}
 	}

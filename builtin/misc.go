@@ -244,36 +244,24 @@ func RegisterMisc(ctx *core.Context) {
 		return core.StringValue(result), nil
 	}))
 
-	// hash - return hash of object
+	// hash - return hash of object. Uses the same HashValue the dict/set
+	// engine uses, so hash() is consistent with container behavior and
+	// satisfies hash(1) == hash(1.0) == hash(True) == 1.
 	ctx.Define("hash", core.NewNamedBuiltinFunction("hash", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("hash", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err
 		}
-
-		obj := v.Get(0)
-
-		// Try __hash__ dunder method first
-		if hashVal, found, err := types.CallHash(obj, ctx); found {
-			if err != nil {
-				return nil, err
-			}
-			return core.NumberValue(hashVal), nil
+		h, err := core.PyHash(v.Get(0), ctx)
+		if err != nil {
+			return nil, err
 		}
-
-		if !core.IsHashable(obj) {
-			return nil, &core.TypeError{Message: fmt.Sprintf("unhashable type: '%s'", obj.Type())}
+		// Hashes span the 2^61 range; beyond float64's exact-integer range
+		// they must be BigInt to round-trip exactly.
+		if h > (1<<53) || h < -(1<<53) {
+			return core.NewBigIntFromInt64(h), nil
 		}
-
-		// For now, return a simple hash based on string representation
-		// In the future, should implement proper hashing
-		key := core.ValueToKey(obj)
-		hash := 0
-		for _, ch := range key {
-			hash = hash*31 + int(ch)
-		}
-
-		return core.NumberValue(hash), nil
+		return core.NumberValue(h), nil
 	}))
 
 	// id - return identity of object
@@ -367,10 +355,7 @@ func RegisterMisc(ctx *core.Context) {
 
 		// Add all variables from the current context
 		for name, value := range ctx.Vars {
-			// Use SetWithKey to properly track original keys for iteration
-			keyVal := core.StringValue(name)
-			keyRepr := core.ValueToKey(keyVal)
-			dict.SetWithKey(keyRepr, keyVal, value)
+			dict.SetStr(name, value)
 		}
 
 		return dict, nil
@@ -574,34 +559,24 @@ func RegisterMisc(ctx *core.Context) {
 
 		// If globals dict provided, populate the context
 		if globalsDict != nil {
-			// Use Keys() to iterate over all keys in the dict
-			for _, keyStr := range globalsDict.Keys() {
-				value, exists := globalsDict.Get(keyStr)
-				if exists {
-					// Strip "s:" prefix if present (for string keys)
-					cleanKey := keyStr
-					if len(keyStr) > 2 && keyStr[0:2] == "s:" {
-						cleanKey = keyStr[2:]
-					}
-					evalCtx.Define(cleanKey, value)
+			// Namespace dicts hold string keys; define each in the eval context.
+			globalsDict.ForEach(func(k, value core.Value) bool {
+				if ks, ok := k.(core.StringValue); ok {
+					evalCtx.Define(string(ks), value)
 				}
-			}
+				return true
+			})
 		}
 
 		// If locals dict provided, add those too (locals override globals)
 		if localsDict != nil {
-			// Use Keys() to iterate over all keys in the dict
-			for _, keyStr := range localsDict.Keys() {
-				value, exists := localsDict.Get(keyStr)
-				if exists {
-					// Strip "s:" prefix if present (for string keys)
-					cleanKey := keyStr
-					if len(keyStr) > 2 && keyStr[0:2] == "s:" {
-						cleanKey = keyStr[2:]
-					}
-					evalCtx.Define(cleanKey, value)
+			// Namespace dicts hold string keys; define each in the eval context.
+			localsDict.ForEach(func(k, value core.Value) bool {
+				if ks, ok := k.(core.StringValue); ok {
+					evalCtx.Define(string(ks), value)
 				}
-			}
+				return true
+			})
 		}
 
 		// Use EvalString which properly handles Python syntax including lambdas

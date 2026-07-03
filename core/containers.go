@@ -2,10 +2,10 @@ package core
 
 import (
 	"fmt"
-	"hash/fnv"
+
 	"reflect"
 	"sort"
-	"strconv"
+
 	"strings"
 	"sync"
 	"unsafe"
@@ -406,373 +406,6 @@ func (l *ListValue) GetItemAsList(index int) (*ListValue, bool) {
 	}
 	list, ok := val.(*ListValue)
 	return list, ok
-}
-
-// DictValue represents a dictionary mapping keys to values
-type DictValue struct {
-	BaseObject
-	entries     map[string]Value
-	keys        map[string]Value // Maps string representation to original key value
-	orderedKeys []string         // Tracks insertion order of keys
-	modCount    uint64           // Structural-modification counter (insert/delete of keys)
-}
-
-// NewDict creates a new dictionary
-func NewDict() *DictValue {
-	return &DictValue{
-		BaseObject:  *NewBaseObject(DictType),
-		entries:     make(map[string]Value),
-		keys:        make(map[string]Value),
-		orderedKeys: make([]string, 0),
-	}
-}
-
-// Type implements Value.Type
-func (d *DictValue) Type() Type {
-	return DictType
-}
-
-// String implements Value.String
-func (d *DictValue) String() string {
-	// In Python str(dict) == repr(dict): keys and values use repr (single-quoted
-	// strings). Delegate to formatDictRepr so str()/print() agree with repr().
-	return formatDictRepr(d)
-}
-
-// Get retrieves a value by internal key representation
-// INTERNAL: Callers should use ValueToKey() to convert keys first
-func (d *DictValue) Get(key string) (Value, bool) {
-	val, ok := d.entries[key]
-	return val, ok
-}
-
-// GetStr looks up the value stored under a plain string key — equivalent to
-// Get(ValueToKey(StringValue(name))) — without allocating: the "s:" prefix
-// concatenation stays inside the map index expression, which Go evaluates with
-// a stack-temporary string. This is the hot path for module-global lookups
-// (Context.lookupWithDepth), which run on nearly every name resolution.
-func (d *DictValue) GetStr(name string) (Value, bool) {
-	val, ok := d.entries["s:"+name]
-	return val, ok
-}
-
-// SetStrKeyed is SetStr for a caller that pre-computed the "s:"-prefixed key
-// (module-tier IR nodes hold it statically): no per-write concatenation.
-func (d *DictValue) SetStrKeyed(key, name string, value Value) {
-	if _, exists := d.entries[key]; exists {
-		d.entries[key] = value
-		return
-	}
-	d.orderedKeys = append(d.orderedKeys, key)
-	d.modCount++
-	d.entries[key] = value
-	d.keys[key] = StringValue(name)
-}
-
-// SetStr stores value under a plain string key — equivalent to
-// SetWithKey(ValueToKey(StringValue(name)), StringValue(name), value). The
-// existence probe uses the non-escaping concat; only a new key materializes
-// the escaping key string and order-tracking entries.
-func (d *DictValue) SetStr(name string, value Value) {
-	if _, exists := d.entries["s:"+name]; exists {
-		key := "s:" + name
-		d.entries[key] = value
-		return
-	}
-	key := "s:" + name
-	d.orderedKeys = append(d.orderedKeys, key)
-	d.modCount++
-	d.entries[key] = value
-	d.keys[key] = StringValue(name)
-}
-
-// Set sets a value by internal key representation
-// INTERNAL: Use SetWithKey for proper key tracking when you have the original key
-// This method will reconstruct the original key from the internal representation
-func (d *DictValue) Set(key string, value Value) {
-	// Track insertion order for new keys
-	if _, exists := d.entries[key]; !exists {
-		d.orderedKeys = append(d.orderedKeys, key)
-		d.modCount++
-	}
-	d.entries[key] = value
-	// Reconstruct original key from internal representation if not already tracked.
-	// NOTE: ValueToKey uses "n:" for numbers and "nil" (no prefix) for None.
-	if _, exists := d.keys[key]; !exists {
-		var origKey Value
-		if key == "nil" {
-			origKey = Nil
-		} else if len(key) > 2 && key[1] == ':' {
-			prefix := key[0:2]
-			cleanKey := key[2:]
-			switch prefix {
-			case "s:":
-				origKey = StringValue(cleanKey)
-			case "n:":
-				// Numbers — parsed as float, but use the simplest int form when exact.
-				if f, err := strconv.ParseFloat(cleanKey, 64); err == nil {
-					if f == float64(int64(f)) {
-						origKey = NumberValue(int64(f))
-					} else {
-						origKey = NumberValue(f)
-					}
-				} else {
-					origKey = StringValue(cleanKey)
-				}
-			case "i:":
-				if i, err := strconv.ParseInt(cleanKey, 10, 64); err == nil {
-					origKey = NumberValue(i)
-				} else {
-					origKey = StringValue(cleanKey)
-				}
-			case "f:":
-				if f, err := strconv.ParseFloat(cleanKey, 64); err == nil {
-					origKey = NumberValue(f)
-				} else {
-					origKey = StringValue(cleanKey)
-				}
-			case "b:":
-				origKey = BoolValue(cleanKey == "true")
-			default:
-				origKey = StringValue(key)
-			}
-		} else {
-			origKey = StringValue(key)
-		}
-		d.keys[key] = origKey
-	}
-}
-
-// SetWithKey sets a value with both key representation and original key
-// This is the preferred method for setting dict values
-func (d *DictValue) SetWithKey(keyRepr string, origKey Value, value Value) {
-	// Track insertion order and structural changes for new keys
-	if _, exists := d.entries[keyRepr]; !exists {
-		d.orderedKeys = append(d.orderedKeys, keyRepr)
-		d.modCount++
-	}
-	d.entries[keyRepr] = value
-	d.keys[keyRepr] = origKey
-}
-
-// Update copies every entry from other into d (like dict.update), preserving
-// each entry's original key object and insertion order.
-func (d *DictValue) Update(other *DictValue) {
-	for _, keyRepr := range other.orderedKeys {
-		d.SetWithKey(keyRepr, other.keys[keyRepr], other.entries[keyRepr])
-	}
-}
-
-// Delete removes a key by internal representation
-// INTERNAL: Callers should use ValueToKey() to convert keys first
-func (d *DictValue) Delete(key string) {
-	if _, existed := d.entries[key]; existed {
-		d.modCount++
-	}
-	delete(d.entries, key)
-	delete(d.keys, key)
-	// Remove from orderedKeys
-	for i, k := range d.orderedKeys {
-		if k == key {
-			d.orderedKeys = append(d.orderedKeys[:i], d.orderedKeys[i+1:]...)
-			break
-		}
-	}
-}
-
-// Keys returns all internal key representations in insertion order
-// INTERNAL: Use dict.keys() method instead which returns original keys
-func (d *DictValue) Keys() []string {
-	// Return keys in insertion order (Python 3.7+ behavior)
-	return d.orderedKeys
-}
-
-// Size returns the number of entries in the dictionary
-func (d *DictValue) Size() int {
-	return len(d.entries)
-}
-
-// GetValue retrieves a value by M28 value key (handles conversion)
-// This is the preferred public API for getting dict values
-func (d *DictValue) GetValue(key Value) (Value, bool) {
-	if !IsHashable(key) {
-		return nil, false
-	}
-	keyStr := ValueToKey(key)
-	return d.Get(keyStr)
-}
-
-// SetValue sets a value by M28 value key (handles conversion)
-// This is the preferred public API for setting dict values
-func (d *DictValue) SetValue(key Value, value Value) error {
-	if !IsHashable(key) {
-		return &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
-	}
-	keyStr := ValueToKey(key)
-	d.SetWithKey(keyStr, key, value)
-	return nil
-}
-
-// DeleteValue removes a key by M28 value (handles conversion)
-// This is the preferred public API for deleting dict values
-func (d *DictValue) DeleteValue(key Value) bool {
-	if !IsHashable(key) {
-		return false
-	}
-	keyStr := ValueToKey(key)
-	if _, exists := d.entries[keyStr]; exists {
-		d.Delete(keyStr)
-		return true
-	}
-	return false
-}
-
-// OriginalKeys returns all original key values (not internal representations)
-// This is what dict.keys() method uses
-func (d *DictValue) OriginalKeys() []Value {
-	internalKeys := d.Keys()
-	result := make([]Value, 0, len(internalKeys))
-	for _, k := range internalKeys {
-		if origKey, exists := d.keys[k]; exists {
-			result = append(result, origKey)
-		}
-	}
-	return result
-}
-
-// OriginalKeyValue returns the original (pre-conversion) key value for an
-// internal key representation, if known. Returns (nil, false) otherwise.
-func (d *DictValue) OriginalKeyValue(internalKey string) (Value, bool) {
-	v, ok := d.keys[internalKey]
-	return v, ok
-}
-
-// Clear removes all entries from the dict in place.
-func (d *DictValue) Clear() {
-	for _, k := range d.Keys() {
-		d.Delete(k)
-	}
-}
-
-// Iterator implements Iterable for dicts (iterates over keys)
-func (d *DictValue) Iterator() Iterator {
-	return &dictIterator{
-		dict:     d,
-		keys:     d.OriginalKeys(),
-		index:    0,
-		startMod: d.modCount,
-	}
-}
-
-type dictIterator struct {
-	dict     *DictValue
-	keys     []Value
-	index    int
-	startMod uint64
-}
-
-func (it *dictIterator) Next() (Value, bool) {
-	if it.index >= len(it.keys) {
-		return nil, false
-	}
-	val := it.keys[it.index]
-	it.index++
-	return val, true
-}
-
-func (it *dictIterator) Reset() {
-	it.index = 0
-}
-
-// Type implements Value.Type for dict iterator
-func (it *dictIterator) Type() Type {
-	return "dict_keyiterator"
-}
-
-// String implements Value.String for dict iterator
-func (it *dictIterator) String() string {
-	return "<dict_keyiterator>"
-}
-
-// GetAttr implements Object interface for dict iterator protocol
-func (it *dictIterator) GetAttr(name string) (Value, bool) {
-	if name == "__iter__" {
-		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			return it, nil
-		}), true
-	}
-	if name == "__next__" {
-		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			if it.dict != nil && it.dict.modCount != it.startMod {
-				return nil, &RuntimeError{Message: "dictionary changed size during iteration"}
-			}
-			val, ok := it.Next()
-			if !ok {
-				return nil, &StopIteration{}
-			}
-			return val, nil
-		}), true
-	}
-	if name == "__length_hint__" {
-		// PEP 424: Return estimated remaining length
-		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			remaining := len(it.keys) - it.index
-			if remaining < 0 {
-				remaining = 0
-			}
-			return NumberValue(remaining), nil
-		}), true
-	}
-	return nil, false
-}
-
-// GetAttr implements Object interface using TypeDescriptor
-func (d *DictValue) GetAttr(name string) (Value, bool) {
-	// Special M28 type protocol attributes that auto-call or return properties
-	// These are handled specially by getDictAttr in eval/dot_notation.go
-	switch name {
-	case "length", "len", "contains", "keys", "values", "items", "set", "delete", "clear", "update":
-		// Return not found so these fall through to getDictAttr
-		return nil, false
-	}
-
-	// IMPORTANT: Check methods FIRST, then keys
-	// This matches Python behavior where d.get always returns the method,
-	// even if the dict contains a key named "get".
-	// Use d['get'] to access keys that shadow methods.
-
-	// First check TypeDescriptor for methods
-	desc := GetTypeDescriptor(DictType)
-	if desc != nil {
-		val, err := desc.GetAttribute(d, name)
-		if err == nil {
-			return val, true
-		}
-	}
-
-	// Then try to find the key with string prefix
-	// This handles dot notation access like dict.key for non-method names
-	stringKey := fmt.Sprintf("s:%s", name)
-	if val, exists := d.entries[stringKey]; exists {
-		return val, true
-	}
-
-	// Also check without prefix (for backwards compatibility)
-	if val, exists := d.entries[name]; exists {
-		return val, true
-	}
-
-	// Finally check BaseObject
-	return d.BaseObject.GetAttr(name)
-}
-
-// SetAttr implements Object.SetAttr for dictionary key assignment
-func (d *DictValue) SetAttr(name string, value Value) error {
-	// Set as dictionary entry with proper key conversion
-	// Use string key since dot notation keys are always strings
-	stringKey := ValueToKey(StringValue(name))
-	d.SetWithKey(stringKey, StringValue(name), value)
-	return nil
 }
 
 // TupleValue represents an immutable sequence
@@ -1288,29 +921,14 @@ func (fs *FrozenSetValue) Size() int {
 
 // Hash computes and caches the hash value for the frozenset
 func (fs *FrozenSetValue) Hash() uint64 {
-	if fs.hash != 0 {
-		return fs.hash
+	// Delegates to the CPython-style element hash (cached); no ctx means
+	// instance elements with user __hash__ hash by identity, which is all
+	// this legacy entry point ever supported.
+	h, err := fs.hashWithCtx(nil)
+	if err != nil {
+		return 1 // degraded bucket; equality still decides matches
 	}
-
-	// Create a stable hash by sorting keys and hashing them
-	keys := make([]string, 0, len(fs.items))
-	for k := range fs.items {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	h := fnv.New64a()
-	for _, k := range keys {
-		h.Write([]byte(k))
-		h.Write([]byte{0}) // Separator
-	}
-
-	fs.hash = h.Sum64()
-	if fs.hash == 0 {
-		fs.hash = 1 // Avoid 0 as it's our "not computed" marker
-	}
-
-	return fs.hash
+	return h
 }
 
 // GetAttr implements Object interface using TypeDescriptor
@@ -1412,31 +1030,18 @@ func (v *DictView) Dict() *DictValue {
 
 // snapshot returns the current items the view exposes.
 func (v *DictView) snapshot() []Value {
-	keys := v.dict.Keys()
-	out := make([]Value, 0, len(keys))
-	for _, k := range keys {
+	out := make([]Value, 0, v.dict.Size())
+	v.dict.ForEach(func(k, val Value) bool {
 		switch v.kind {
 		case DictKeysViewKind:
-			if orig, ok := v.dict.keys[k]; ok {
-				out = append(out, orig)
-			} else {
-				out = append(out, StringValue(k))
-			}
+			out = append(out, k)
 		case DictValuesViewKind:
-			if val, ok := v.dict.Get(k); ok {
-				out = append(out, val)
-			}
+			out = append(out, val)
 		case DictItemsViewKind:
-			var keyVal Value
-			if orig, ok := v.dict.keys[k]; ok {
-				keyVal = orig
-			} else {
-				keyVal = StringValue(k)
-			}
-			val, _ := v.dict.Get(k)
-			out = append(out, TupleValue{keyVal, val})
+			out = append(out, TupleValue{k, val})
 		}
-	}
+		return true
+	})
 	return out
 }
 
@@ -1984,24 +1589,10 @@ func populateDictFromArgs(d *DictValue, args []Value, kwargs map[string]Value) e
 	if len(args) == 1 {
 		switch src := args[0].(type) {
 		case *DictValue:
-			for _, k := range src.Keys() {
-				v, _ := src.Get(k)
-				if orig, ok := src.keys[k]; ok {
-					d.SetWithKey(k, orig, v)
-				} else {
-					d.Set(k, v)
-				}
-			}
+			d.Update(src)
 		case *Instance:
 			if src.BackingDict != nil {
-				for _, k := range src.BackingDict.Keys() {
-					v, _ := src.BackingDict.Get(k)
-					if orig, ok := src.BackingDict.keys[k]; ok {
-						d.SetWithKey(k, orig, v)
-					} else {
-						d.Set(k, v)
-					}
-				}
+				d.Update(src.BackingDict)
 			} else {
 				return &TypeError{Message: "dict() argument must be a dict or iterable of pairs"}
 			}

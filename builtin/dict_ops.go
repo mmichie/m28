@@ -81,7 +81,7 @@ func RenameKeysBuilder() builders.BuiltinFunc {
 
 		// Check if mapper is a dict (mapping) or callable (function)
 		if mappingDict, ok := mapperArg.(*core.DictValue); ok {
-			return renameKeysWithMapping(dict, mappingDict)
+			return renameKeysWithMapping(dict, mappingDict, ctx)
 		}
 
 		if callable, ok := types.AsCallable(mapperArg); ok {
@@ -93,9 +93,8 @@ func RenameKeysBuilder() builders.BuiltinFunc {
 }
 
 // renameKeysWithMapping renames keys using a dict mapping
-func renameKeysWithMapping(dict *core.DictValue, mapping *core.DictValue) (core.Value, error) {
+func renameKeysWithMapping(dict *core.DictValue, mapping *core.DictValue, ctx *core.Context) (core.Value, error) {
 	result := core.NewDict()
-	seenKeys := make(map[string]bool)
 
 	// Process each key in original dict
 	for _, origKey := range dict.OriginalKeys() {
@@ -108,14 +107,16 @@ func renameKeysWithMapping(dict *core.DictValue, mapping *core.DictValue) (core.
 			newKey = origKey
 		}
 
-		// Check for collision
-		keyStr := core.ValueToKey(newKey)
-		if seenKeys[keyStr] {
+		// The result dict itself detects collisions (hash+eq identity)
+		if _, exists, err := result.GetItem(newKey, ctx); err != nil {
+			return nil, err
+		} else if exists {
 			return nil, core.NewValueError(fmt.Sprintf("rename-keys: key collision - key %v already exists after renaming", newKey))
 		}
-		seenKeys[keyStr] = true
 
-		result.SetValue(newKey, value)
+		if err := result.SetItem(newKey, value, ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	return result, nil
@@ -124,7 +125,6 @@ func renameKeysWithMapping(dict *core.DictValue, mapping *core.DictValue) (core.
 // renameKeysWithFunction renames keys using a function
 func renameKeysWithFunction(dict *core.DictValue, fn core.Callable, ctx *core.Context) (core.Value, error) {
 	result := core.NewDict()
-	seenKeys := make(map[string]bool)
 
 	// Process each key in original dict
 	for _, origKey := range dict.OriginalKeys() {
@@ -136,14 +136,16 @@ func renameKeysWithFunction(dict *core.DictValue, fn core.Callable, ctx *core.Co
 			return nil, fmt.Errorf("rename-keys: error applying function to key %v: %w", origKey, err)
 		}
 
-		// Check for collision
-		keyStr := core.ValueToKey(newKey)
-		if seenKeys[keyStr] {
+		// The result dict itself detects collisions (hash+eq identity)
+		if _, exists, err := result.GetItem(newKey, ctx); err != nil {
+			return nil, err
+		} else if exists {
 			return nil, core.NewValueError(fmt.Sprintf("rename-keys: key collision - key %v already exists after renaming", newKey))
 		}
-		seenKeys[keyStr] = true
 
-		result.SetValue(newKey, value)
+		if err := result.SetItem(newKey, value, ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	return result, nil

@@ -793,29 +793,17 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 			return nil, fmt.Errorf("error evaluating dict key: %w", err)
 		}
 
-		// Check if key is hashable
-		if !core.IsHashable(key) {
-			return nil, &core.TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
-		}
-
-		// For instances with custom __hash__, call it (may raise) and use result in key
-		if inst, ok := key.(*core.Instance); ok && core.InstanceNeedsEqComparison(key) {
-			if _, err := core.ComputeInstanceKey(inst, ctx); err != nil {
-				return nil, err
-			}
-		}
-
-		// Convert key to string representation
-		keyStr := core.ValueToKey(key)
-
 		// Evaluate the value
 		value, err := Eval(args.Items()[i+1], ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating dict value for key %v: %w", key, err)
 		}
 
-		// Set the key-value pair
-		dict.SetWithKey(keyStr, key, value)
+		// Set the key-value pair (full semantics: hashability, user
+		// __hash__/__eq__ with errors propagated, equal-key dedup)
+		if err := dict.SetItem(key, value, ctx); err != nil {
+			return nil, err
+		}
 
 		i += 2
 	}

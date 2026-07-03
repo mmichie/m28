@@ -568,7 +568,7 @@ type forNode struct {
 	target   core.Value // *slotRef or SymbolValue: the fallback pattern
 	slot     int        // slot index, or -1 for name binding (module scope)
 	bindName string     // set when slot < 0
-	bindKey  string     // "s:" + bindName, prebuilt
+	bindHash uint64     // HashStr(bindName), prebuilt
 	bindSync bool       // export-sync decision, precomputed
 	seq      core.Value // compiled sequence expression
 	body     core.Value // compiled body
@@ -584,7 +584,7 @@ func (n *forNode) bind(ctx *core.Context, cur float64) {
 	} else {
 		// Mirrors UnpackPattern's SymbolValue case (ctx.Define), with the
 		// ModuleDict key prebuilt.
-		ctx.DefineKeyed(n.bindName, n.bindKey, n.bindSync, core.BoxNumber(cur))
+		ctx.DefineKeyed(n.bindName, n.bindHash, n.bindSync, core.BoxNumber(cur))
 	}
 }
 
@@ -1128,7 +1128,7 @@ func introspectCallName(fn core.Value) string {
 // declarations, ModuleDict sync, builtin shadowing all live there).
 type globalAssignNode struct {
 	name       string
-	key        string // "s:" + name, prebuilt (no per-write concat)
+	nameHash   uint64 // HashStr(name), prebuilt (no per-write hashing)
 	syncModule bool   // Define's export-skip decision, precomputed
 	val        core.Value
 }
@@ -1159,7 +1159,7 @@ func (n *globalAssignNode) evalIR(ctx *core.Context) (core.Value, error) {
 		}
 		return boxed, nil
 	}
-	ctx.DefineKeyed(n.name, n.key, n.syncModule, boxed)
+	ctx.DefineKeyed(n.name, n.nameHash, n.syncModule, boxed)
 	return boxed, nil
 }
 
@@ -1214,7 +1214,7 @@ func compileModuleIR(v core.Value) core.Value {
 			if n.Len() == 3 {
 				if sym, ok := unwrapLocated(items[1]).(core.SymbolValue); ok {
 					name := string(sym)
-					return &globalAssignNode{name: name, key: "s:" + name, syncModule: moduleSyncable(name), val: compileIR(items[2])}
+					return &globalAssignNode{name: name, nameHash: core.HashStr(name), syncModule: moduleSyncable(name), val: compileIR(items[2])}
 				}
 			}
 			return v
@@ -1267,7 +1267,7 @@ func compileModuleFor(items []core.Value, orig core.Value) core.Value {
 			return orig
 		}
 		name := string(sym)
-		return &forNode{target: items[1], slot: -1, bindName: name, bindKey: "s:" + name, bindSync: moduleSyncable(name), seq: compileIR(items[2]), body: compileModuleIR(items[3])}
+		return &forNode{target: items[1], slot: -1, bindName: name, bindHash: core.HashStr(name), bindSync: moduleSyncable(name), seq: compileIR(items[2]), body: compileModuleIR(items[3])}
 	case 5:
 		sym, ok := unwrapLocated(items[1]).(core.SymbolValue)
 		if !ok {
@@ -1277,7 +1277,7 @@ func compileModuleFor(items []core.Value, orig core.Value) core.Value {
 			return orig
 		}
 		name := string(sym)
-		return &forNode{target: items[1], slot: -1, bindName: name, bindKey: "s:" + name, bindSync: moduleSyncable(name), seq: compileIR(items[3]), body: compileModuleIR(items[4])}
+		return &forNode{target: items[1], slot: -1, bindName: name, bindHash: core.HashStr(name), bindSync: moduleSyncable(name), seq: compileIR(items[3]), body: compileModuleIR(items[4])}
 	default:
 		return orig
 	}

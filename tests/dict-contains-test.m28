@@ -70,12 +70,19 @@
 (assert (not (in t5 d6)) "tuple (1, 2, 3) should not be in dict")
 (print "✓ Tuple keys passed")
 
-# Test 7: Unhashable types (should return False)
+# Test 7: Unhashable types raise TypeError, matching CPython
+# ([1, 2] in d is a TypeError, not False)
 (print "\n7. Testing unhashable types:")
 (= d7 {"a": 1, "b": 2})
-(assert (not (in [1, 2] d7)) "list should not be found (unhashable)")
-(assert (not (in {"x": 1} d7)) "dict should not be found (unhashable)")
-(assert (not (in (set [1, 2]) d7)) "set should not be found (unhashable)")
+(def check_unhashable (probe label)
+  (try
+    (in probe d7)
+    (assert False (+ label " membership should raise TypeError"))
+    (except TypeError
+      True)))
+(check_unhashable [1, 2] "list")
+(check_unhashable {"x": 1} "dict")
+(check_unhashable (set [1, 2]) "set")
 (print "✓ Unhashable types passed")
 
 # Test 8: Special numeric values

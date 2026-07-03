@@ -241,55 +241,34 @@ func DictEqualWithError(d1, d2 *DictValue, ctx *Context) (bool, error) {
 	if d1.Size() != d2.Size() {
 		return false, nil
 	}
-	// For each key in d1, find matching key in d2
-	for internalKey, v1 := range d1.entries {
-		origKey1 := d1.keys[internalKey]
-		if origKey1 == nil {
-			origKey1 = StringValue(internalKey)
-		}
-		// Try direct key lookup first (fast path for non-instance keys)
-		if v2, exists := d2.entries[internalKey]; exists {
-			// Keys match by string representation, compare values with full Python semantics
-			eq, err := equalWithReflection(v1, v2, ctx)
-			if err != nil {
-				return false, err
-			}
-			if !eq {
-				return false, nil
-			}
-			continue
-		}
-		// Slow path: search d2 for a key that's equal to origKey1 using __eq__
-		found := false
-		for internalKey2, v2 := range d2.entries {
-			origKey2 := d2.keys[internalKey2]
-			if origKey2 == nil {
-				origKey2 = StringValue(internalKey2)
-			}
-			// For key comparison, use EqualValuesWithError (not reflected)
-			// since keys should be self-equalizing via __eq__
-			eq, err := EqualValuesWithError(origKey1, origKey2, ctx)
-			if err != nil {
-				return false, err
-			}
-			if eq {
-				// Keys match, compare values with full Python semantics
-				valEq, err := equalWithReflection(v1, v2, ctx)
-				if err != nil {
-					return false, err
-				}
-				if !valEq {
-					return false, nil
-				}
-				found = true
-				break
-			}
+	// Every key of d1 must be in d2 (hash+eq lookup) with an equal value.
+	equal := true
+	var walkErr error
+	d1.ForEach(func(k, v1 Value) bool {
+		v2, found, err := d2.GetItem(k, ctx)
+		if err != nil {
+			walkErr = err
+			return false
 		}
 		if !found {
-			return false, nil
+			equal = false
+			return false
 		}
+		valEq, err := equalWithReflection(v1, v2, ctx)
+		if err != nil {
+			walkErr = err
+			return false
+		}
+		if !valEq {
+			equal = false
+			return false
+		}
+		return true
+	})
+	if walkErr != nil {
+		return false, walkErr
 	}
-	return true, nil
+	return equal, nil
 }
 
 // ComputeHash computes the hash of a value, calling __hash__ for instances
@@ -696,13 +675,16 @@ func EqualValues(a, b Value) bool {
 				return false
 			}
 			// Check if all key-value pairs in a are in b
-			for k, v1 := range aVal.entries {
-				v2, exists := bVal.entries[k]
+			equal := true
+			aVal.ForEach(func(k, v1 Value) bool {
+				v2, exists := bVal.GetValue(k)
 				if !exists || !EqualValues(v1, v2) {
+					equal = false
 					return false
 				}
-			}
-			return true
+				return true
+			})
+			return equal
 		}
 	case *SliceValue:
 		if bVal, ok := b.(*SliceValue); ok {
@@ -758,10 +740,9 @@ func EqualValues(a, b Value) bool {
 // IsHashable determines if a value can be used as a dictionary key
 func IsHashable(v Value) bool {
 	switch v.(type) {
-	case NumberValue, FloatValue, StringValue, BoolValue, NilValue, TupleValue, *FrozenSetValue, *Class, BytesValue, ComplexValue, *Module:
+	case NumberValue, FloatValue, BigIntValue, StringValue, SymbolValue, BoolValue, NilValue, TupleValue, *TupleInstance, *FrozenSetValue, *Class, BytesValue, ComplexValue, *Module:
 		// Modules (like classes and functions) are hashable by identity in
-		// Python, so they can be used as dict keys / set members. ValueToKey
-		// and ComputeHash already key them by pointer.
+		// Python, so they can be used as dict keys / set members.
 		return true
 	case *Instance:
 		// In Python, instances are hashable by default (using object ID)
@@ -851,6 +832,11 @@ func ValueToKey(v Value) string {
 		// Same key space as NumberValue so an int and an equal float map to one
 		// dict/set slot (1 and 1.0 are the same key, matching CPython).
 		return numberKey(float64(val))
+	case BigIntValue:
+		// Decimal digits, matching numberKey's integral formatting so a BigInt
+		// within float range shares its key with the equal NumberValue. (Sets
+		// still key by this encoding until they move to the hash engine.)
+		return "n:" + val.String()
 	case StringValue:
 		return "s:" + string(val)
 	case BoolValue:

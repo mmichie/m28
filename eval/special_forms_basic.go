@@ -72,7 +72,7 @@ func annotatedAssignForm(args *core.ListValue, ctx *core.Context) (core.Value, e
 		}
 
 		// Store the annotation (evaluated type object)
-		annotationsDict.Set(targetName, annotationType)
+		annotationsDict.SetStr(targetName, annotationType)
 
 		// If there's a value, evaluate and assign it
 		if args.Len() == 3 {
@@ -627,9 +627,11 @@ func DictCompForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			return fmt.Errorf("error evaluating value expression: %w", err)
 		}
 
-		// Add to result dict
-		keyStr := core.ValueToKey(keyResult)
-		result.SetWithKey(keyStr, keyResult, valueResult)
+		// Add to result dict (full semantics: hashability, user
+		// __hash__/__eq__, equal-key dedup)
+		if err := result.SetItem(keyResult, valueResult, loopCtx); err != nil {
+			return err
+		}
 		return nil
 	})
 
@@ -695,8 +697,9 @@ func dictCompMultiClause(keyExpr, valueExpr core.Value, clausesList *core.ListVa
 				return fmt.Errorf("error evaluating value expression: %w", err)
 			}
 
-			keyStr := core.ValueToKey(keyResult)
-			result.SetWithKey(keyStr, keyResult, valueResult)
+			if err := result.SetItem(keyResult, valueResult, loopCtx); err != nil {
+				return err
+			}
 			return nil
 		}
 

@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"strings"
 )
 
 // registerDictType registers the dict type descriptor
@@ -21,16 +20,9 @@ func registerDictType() {
 				// Try to convert from another dict or iterable of pairs
 				arg := args[0]
 				if dict, ok := arg.(*DictValue); ok {
-					// Make a copy with proper key tracking
 					result := NewDict()
-					for _, k := range dict.Keys() {
-						v, _ := dict.Get(k)
-						// Copy original key tracking
-						if origKey, exists := dict.keys[k]; exists {
-							result.SetWithKey(k, origKey, v)
-						} else {
-							result.Set(k, v)
-						}
+					if err := result.UpdateWithContext(dict, ctx); err != nil {
+						return nil, err
 					}
 					return result, nil
 				}
@@ -66,10 +58,7 @@ func registerDictType() {
 						return nil, fmt.Errorf("cannot convert dictionary update sequence element #%d to a sequence", i)
 					}
 
-					if !IsHashable(key) {
-						return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
-					}
-					if err := result.SetValue(key, val); err != nil {
+					if err := result.SetItem(key, val, ctx); err != nil {
 						return nil, err
 					}
 				}
@@ -77,50 +66,14 @@ func registerDictType() {
 			}
 			return nil, fmt.Errorf("dict() takes at most 1 argument (%d given)", len(args))
 		},
+		// Single source of truth for dict rendering: formatDictRepr walks in
+		// insertion order with Python repr quoting (str(dict) == repr(dict)).
 		Repr: func(v Value) string {
-			dict := v.(*DictValue)
-			if dict.Size() == 0 {
-				return "{}"
-			}
-			var items []string
-			for k, val := range dict.entries {
-				// Extract the actual key value from the string representation
-				var keyRepr string
-				if strings.HasPrefix(k, "s:") {
-					keyRepr = fmt.Sprintf("%q", k[2:])
-				} else if strings.HasPrefix(k, "n:") {
-					keyRepr = k[2:]
-				} else {
-					keyRepr = k
-				}
-				items = append(items, fmt.Sprintf("%s: %s", keyRepr, Repr(val)))
-			}
-			return "{" + strings.Join(items, ", ") + "}"
+			return formatDictRepr(v.(*DictValue))
 		},
 		Str: func(v Value) string {
-			// Same as Repr for dicts
-			dict := v.(*DictValue)
-			if dict.Size() == 0 {
-				return "{}"
-			}
-			var items []string
-			for k, val := range dict.entries {
-				// Extract the actual key value from the string representation
-				var keyRepr string
-				if strings.HasPrefix(k, "s:") {
-					keyRepr = fmt.Sprintf("%q", k[2:])
-				} else if strings.HasPrefix(k, "n:") {
-					keyRepr = k[2:]
-				} else {
-					keyRepr = k
-				}
-				items = append(items, fmt.Sprintf("%s: %s", keyRepr, Repr(val)))
-			}
-			return "{" + strings.Join(items, ", ") + "}"
+			return formatDictRepr(v.(*DictValue))
 		},
 		Doc: "dict() -> new empty dictionary\ndict(mapping) -> new dictionary initialized from a mapping object's (key, value) pairs",
 	})
 }
-
-// Note: All dict methods are now defined in dict_methods.go
-// This file only handles type registration (constructor, repr, str)

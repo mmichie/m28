@@ -297,23 +297,14 @@ func formatDictRepr(dict *DictValue) string {
 	return withCycleDetection(uintptr(unsafe.Pointer(dict)), func() string {
 		result := "{"
 		first := true
-		for _, k := range dict.orderedKeys {
-			v, ok := dict.entries[k]
-			if !ok {
-				continue
-			}
+		dict.ForEach(func(k, v Value) bool {
 			if !first {
 				result += ", "
 			}
 			first = false
-			var key Value
-			if orig, has := dict.keys[k]; has {
-				key = orig
-			} else {
-				key = dict.keyFromString(k)
-			}
-			result += Repr(key) + ": " + Repr(v)
-		}
+			result += Repr(k) + ": " + Repr(v)
+			return true
+		})
 		result += "}"
 		return result
 	})
@@ -341,32 +332,4 @@ func formatSetRepr(set *SetValue) string {
 	}
 	result += "}"
 	return result
-}
-
-// Helper method to extract key from internal representation
-func (d *DictValue) keyFromString(keyStr string) Value {
-	// This is a simple implementation - in practice we might want to store
-	// the original key alongside the string representation
-	if len(keyStr) > 2 {
-		prefix := keyStr[:2]
-		value := keyStr[2:]
-		switch prefix {
-		case "s:":
-			return StringValue(value)
-		case "n:":
-			var num float64
-			fmt.Sscanf(value, "%g", &num)
-			return NumberValue(num)
-		case "b:":
-			if value == "true" {
-				return True
-			}
-			return False
-		}
-	}
-	if keyStr == "nil" {
-		return Nil
-	}
-	// Fallback
-	return StringValue(keyStr)
 }

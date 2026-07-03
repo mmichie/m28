@@ -183,34 +183,33 @@ func deepMergeTwoDicts(dict1, dict2 *core.DictValue) (*core.DictValue, error) {
 func mergeWithFunction(fn core.Callable, dict1, dict2 *core.DictValue, ctx *core.Context) (*core.DictValue, error) {
 	result := core.NewDict()
 
-	// Track which keys we've seen
-	seenKeys := make(map[string]bool)
-
-	// Copy all keys from dict1
-	for _, key := range dict1.OriginalKeys() {
-		value, _ := dict1.GetValue(key)
-		result.SetValue(key, value)
-		seenKeys[core.ValueToKey(key)] = true
+	// Copy all entries from dict1; result itself tracks seen keys.
+	if err := result.UpdateWithContext(dict1, ctx); err != nil {
+		return nil, err
 	}
 
 	// Merge keys from dict2
 	for _, key := range dict2.OriginalKeys() {
 		value2, _ := dict2.GetValue(key)
-		keyStr := core.ValueToKey(key)
 
-		if seenKeys[keyStr] {
+		value1, exists, err := result.GetItem(key, ctx)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
 			// Key exists in both - apply function
-			value1, _ := result.GetValue(key)
-
 			mergedValue, err := fn.Call([]core.Value{value1, value2}, ctx)
 			if err != nil {
 				return nil, fmt.Errorf("merge-with: error applying function to key %v: %w", key, err)
 			}
-
-			result.SetValue(key, mergedValue)
+			if err := result.SetItem(key, mergedValue, ctx); err != nil {
+				return nil, err
+			}
 		} else {
 			// Key only in dict2 - add it
-			result.SetValue(key, value2)
+			if err := result.SetItem(key, value2, ctx); err != nil {
+				return nil, err
+			}
 		}
 	}
 

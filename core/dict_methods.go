@@ -9,101 +9,15 @@ import (
 // iterableToSliceForDict converts any iterable value (list, tuple, set, string,
 // generator) into a []Value so dict.fromkeys can iterate it.
 func iterableToSliceForDict(v Value) ([]Value, error) {
-	// Dicts iterate over keys (using OriginalKeyValue to get the real key).
+	// Dicts iterate over keys.
 	if d, ok := v.(*DictValue); ok {
-		out := make([]Value, 0, d.Size())
-		for _, k := range d.Keys() {
-			if origKey, ok := d.keys[k]; ok {
-				out = append(out, origKey)
-			}
-		}
-		return out, nil
+		return d.OriginalKeys(), nil
 	}
 	// Dict-subclass instances delegate to their backing dict.
 	if inst, ok := v.(*Instance); ok && inst.BackingDict != nil {
-		out := make([]Value, 0, inst.BackingDict.Size())
-		for _, k := range inst.BackingDict.Keys() {
-			if origKey, ok := inst.BackingDict.keys[k]; ok {
-				out = append(out, origKey)
-			}
-		}
-		return out, nil
+		return inst.BackingDict.OriginalKeys(), nil
 	}
 	return iterableValues(v)
-}
-
-// InstanceNeedsEqComparison is the exported version of instanceNeedsEqComparison.
-func InstanceNeedsEqComparison(v Value) bool {
-	return instanceNeedsEqComparison(v)
-}
-
-// ComputeInstanceKey is the exported version of computeInstanceKey.
-func ComputeInstanceKey(v *Instance, ctx *Context) (string, error) {
-	return computeInstanceKey(v, ctx)
-}
-
-// instanceNeedsEqComparison checks if an instance has a custom __hash__ that
-// could cause hash collisions requiring __eq__ comparison
-func instanceNeedsEqComparison(v Value) bool {
-	inst, ok := v.(*Instance)
-	if !ok {
-		return false
-	}
-	if inst.Class == nil {
-		return false
-	}
-	// Check if class defines __hash__ (not inherited from object)
-	_, hasOwnHash := inst.Class.Methods["__hash__"]
-	return hasOwnHash
-}
-
-// computeInstanceKey calls __hash__ on an instance that defines it, then
-// returns a string key derived from the hash value. Propagates exceptions.
-func computeInstanceKey(v *Instance, ctx *Context) (string, error) {
-	hashAttr, found := v.GetAttr("__hash__")
-	if !found {
-		return ValueToKey(v), nil
-	}
-	callable, ok := hashAttr.(interface {
-		Call([]Value, *Context) (Value, error)
-	})
-	if !ok {
-		return ValueToKey(v), nil
-	}
-	result, err := callable.Call(nil, ctx)
-	if err != nil {
-		return "", err
-	}
-	if num, ok := result.(NumberValue); ok {
-		return fmt.Sprintf("p:%d", int64(float64(num))), nil
-	}
-	return ValueToKey(v), nil
-}
-
-// dictFindKeyWithEq finds a key in the dict by comparing with __eq__
-// Returns the internal key string, the value, found bool, and any error from __eq__
-func dictFindKeyWithEq(dict *DictValue, searchKey Value, ctx *Context) (string, Value, bool, error) {
-	// For instances with custom __hash__, we need to compare with all stored keys
-	// using __eq__ because they might have the same hash
-	for internalKey, storedKey := range dict.keys {
-		// CPython compares keys with `is or ==`, so a key that is the same object
-		// is found even when its __eq__ never returns true (e.g. a NaN key).
-		if SameObject(storedKey, searchKey) {
-			val, _ := dict.Get(internalKey)
-			return internalKey, val, true, nil
-		}
-		// Use EqualValuesWithError to properly propagate __eq__ exceptions
-		equal, err := EqualValuesWithError(storedKey, searchKey, ctx)
-		if err != nil {
-			// Propagate exception from __eq__
-			return "", nil, false, err
-		}
-		if equal {
-			val, _ := dict.Get(internalKey)
-			return internalKey, val, true, nil
-		}
-	}
-	return "", nil, false, nil
 }
 
 // InitDictMethods adds additional methods to the dict type descriptor
@@ -115,112 +29,90 @@ func InitDictMethods() {
 
 	// Add update method
 	dictUpdatePositional := func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			dict := receiver.(*DictValue)
+		dict := receiver.(*DictValue)
 
-			if len(args) == 0 {
-				return None, nil
-			}
-			if len(args) > 1 {
-				return nil, &TypeError{Message: fmt.Sprintf("update() takes at most 1 argument (%d given)", len(args))}
-			}
+		if len(args) == 0 {
+			return None, nil
+		}
+		if len(args) > 1 {
+			return nil, &TypeError{Message: fmt.Sprintf("update() takes at most 1 argument (%d given)", len(args))}
+		}
 
-			// Real dict — fast path that preserves original key values.
-			if other, ok := args[0].(*DictValue); ok {
-				for _, k := range other.Keys() {
-					v, _ := other.Get(k)
-					origKey, exists := other.keys[k]
-					if !exists {
-						origKey = StringValue(k)
-					}
-					if instanceNeedsEqComparison(origKey) {
-						internalKey, _, found, err := dictFindKeyWithEq(dict, origKey, ctx)
-						if err != nil {
-							return nil, err
-						}
-						if found {
-							dict.SetWithKey(internalKey, origKey, v)
-						} else {
-							dict.SetWithKey(k, origKey, v)
-						}
-					} else {
-						dict.SetWithKey(k, origKey, v)
-					}
-				}
-				return None, nil
-			}
-
-			// Dict subclass instance (BackingDict).
-			if inst, ok := args[0].(*Instance); ok && inst.BackingDict != nil {
-				for _, k := range inst.BackingDict.Keys() {
-					v, _ := inst.BackingDict.Get(k)
-					if orig, ok := inst.BackingDict.keys[k]; ok {
-						dict.SetWithKey(k, orig, v)
-					} else {
-						dict.Set(k, v)
-					}
-				}
-				return None, nil
-			}
-
-			// Mapping protocol: anything with .keys() is treated as a mapping;
-			// values come from .__getitem__(k). Per CPython, .keys() runs
-			// before __getitem__ is required, so its exceptions propagate.
-			if obj, ok := args[0].(interface{ GetAttr(string) (Value, bool) }); ok {
-				if keysAttr, found := obj.GetAttr("keys"); found {
-					if keysCall, ok := keysAttr.(interface {
-						Call([]Value, *Context) (Value, error)
-					}); ok {
-						keys, err := keysCall.Call(nil, ctx)
-						if err != nil {
-							return nil, err
-						}
-						items, err := iterableValuesCtx(keys, ctx)
-						if err != nil {
-							return nil, err
-						}
-						getitemAttr, hasGetitem := obj.GetAttr("__getitem__")
-						getitemCall, _ := getitemAttr.(interface {
-							Call([]Value, *Context) (Value, error)
-						})
-						if !hasGetitem || getitemCall == nil {
-							return nil, &AttributeError{ObjType: string(args[0].Type()), Message: fmt.Sprintf("'%s' object has no attribute '__getitem__'", args[0].Type())}
-						}
-						for _, k := range items {
-							v, err := getitemCall.Call([]Value{k}, ctx)
-							if err != nil {
-								return nil, err
-							}
-							if err := dict.SetValue(k, v); err != nil {
-								return nil, err
-							}
-						}
-						return None, nil
-					}
-				}
-			}
-
-			// Iterable of 2-element sequences.
-			items, err := iterableValuesCtx(args[0], ctx)
-			if err != nil {
+		// Real dict — reuse cached hashes, preserve original key objects.
+		if other, ok := args[0].(*DictValue); ok {
+			if err := dict.UpdateWithContext(other, ctx); err != nil {
 				return nil, err
 			}
-			for i, item := range items {
-				if pair, ok := item.(TupleValue); ok && len(pair) == 2 {
-					if err := dict.SetValue(pair[0], pair[1]); err != nil {
-						return nil, err
-					}
-					continue
-				}
-				if lst, ok := item.(*ListValue); ok && lst.Len() == 2 {
-					if err := dict.SetValue(lst.Items()[0], lst.Items()[1]); err != nil {
-						return nil, err
-					}
-					continue
-				}
-				return nil, &ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, sequenceLength(item))}
-			}
-
 			return None, nil
+		}
+
+		// Dict subclass instance (BackingDict).
+		if inst, ok := args[0].(*Instance); ok && inst.BackingDict != nil {
+			if err := dict.UpdateWithContext(inst.BackingDict, ctx); err != nil {
+				return nil, err
+			}
+			return None, nil
+		}
+
+		// Mapping protocol: anything with .keys() is treated as a mapping;
+		// values come from .__getitem__(k). Per CPython, .keys() runs
+		// before __getitem__ is required, so its exceptions propagate.
+		if obj, ok := args[0].(interface{ GetAttr(string) (Value, bool) }); ok {
+			if keysAttr, found := obj.GetAttr("keys"); found {
+				if keysCall, ok := keysAttr.(interface {
+					Call([]Value, *Context) (Value, error)
+				}); ok {
+					keys, err := keysCall.Call(nil, ctx)
+					if err != nil {
+						return nil, err
+					}
+					items, err := iterableValuesCtx(keys, ctx)
+					if err != nil {
+						return nil, err
+					}
+					getitemAttr, hasGetitem := obj.GetAttr("__getitem__")
+					getitemCall, _ := getitemAttr.(interface {
+						Call([]Value, *Context) (Value, error)
+					})
+					if !hasGetitem || getitemCall == nil {
+						return nil, &AttributeError{ObjType: string(args[0].Type()), Message: fmt.Sprintf("'%s' object has no attribute '__getitem__'", args[0].Type())}
+					}
+					for _, k := range items {
+						v, err := getitemCall.Call([]Value{k}, ctx)
+						if err != nil {
+							return nil, err
+						}
+						if err := dict.SetItem(k, v, ctx); err != nil {
+							return nil, err
+						}
+					}
+					return None, nil
+				}
+			}
+		}
+
+		// Iterable of 2-element sequences.
+		items, err := iterableValuesCtx(args[0], ctx)
+		if err != nil {
+			return nil, err
+		}
+		for i, item := range items {
+			if pair, ok := item.(TupleValue); ok && len(pair) == 2 {
+				if err := dict.SetItem(pair[0], pair[1], ctx); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			if lst, ok := item.(*ListValue); ok && lst.Len() == 2 {
+				if err := dict.SetItem(lst.Items()[0], lst.Items()[1], ctx); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			return nil, &ValueError{Message: fmt.Sprintf("dictionary update sequence element #%d has length %d; 2 is required", i, sequenceLength(item))}
+		}
+
+		return None, nil
 	}
 	dictType.Methods["update"] = &MethodDescriptor{
 		Name:    "update",
@@ -234,9 +126,7 @@ func InitDictMethods() {
 			}
 			dict := receiver.(*DictValue)
 			for k, v := range kwargs {
-				if err := dict.SetValue(StringValue(k), v); err != nil {
-					return nil, err
-				}
+				dict.SetStr(k, v)
 			}
 			return None, nil
 		},
@@ -253,35 +143,10 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: "__setitem__ takes exactly 2 arguments"}
 			}
 			dict := receiver.(*DictValue)
-			key := args[0]
-			value := args[1]
-
-			// Check if key is hashable
-			if !IsHashable(key) {
-				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
+			if err := dict.SetItem(args[0], args[1], ctx); err != nil {
+				return nil, err
 			}
-
-			// For instances with custom __hash__, call __hash__ first (may raise),
-			// then check for existing key with __eq__
-			if inst, ok := key.(*Instance); ok && instanceNeedsEqComparison(key) {
-				if _, err := computeInstanceKey(inst, ctx); err != nil {
-					return nil, err
-				}
-				internalKey, _, found, err := dictFindKeyWithEq(dict, key, ctx)
-				if err != nil {
-					return nil, err // Propagate __eq__ exception
-				}
-				if found {
-					// Update existing key
-					dict.SetWithKey(internalKey, key, value)
-					return value, nil
-				}
-			}
-
-			// Use SetWithKey to properly track the original key
-			keyRepr := ValueToKey(key)
-			dict.SetWithKey(keyRepr, key, value)
-			return value, nil
+			return args[1], nil
 		},
 	}
 
@@ -296,33 +161,11 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: "get() takes 1 or 2 arguments"}
 			}
 			dict := receiver.(*DictValue)
-			searchKey := args[0]
-
-			// Check if key is hashable
-			if !IsHashable(searchKey) {
-				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
+			val, found, err := dict.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
 			}
-
-			// For instances with custom __hash__, call __hash__ first then use __eq__
-			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
-				if _, err := computeInstanceKey(inst, ctx); err != nil {
-					return nil, err
-				}
-				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
-				if err != nil {
-					return nil, err // Propagate __eq__ exception
-				}
-				if found {
-					return val, nil
-				}
-				if len(args) == 2 {
-					return args[1], nil
-				}
-				return Nil, nil
-			}
-
-			key := ValueToKey(searchKey)
-			if val, exists := dict.Get(key); exists {
+			if found {
 				return val, nil
 			}
 			if len(args) == 2 {
@@ -343,50 +186,17 @@ func InitDictMethods() {
 			if len(args) < 1 || len(args) > 2 {
 				return nil, &TypeError{Message: "pop expects 1 or 2 arguments"}
 			}
-
-			searchKey := args[0]
-
-			// Check if key is hashable
-			if !IsHashable(searchKey) {
-				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
+			val, removed, err := dict.Pop(args[0], ctx)
+			if err != nil {
+				return nil, err
 			}
-
-			// For instances with custom __hash__, call __hash__ first (may raise),
-			// then use __eq__ comparison
-			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
-				if _, err := computeInstanceKey(inst, ctx); err != nil {
-					return nil, err
-				}
-				internalKey, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
-				if err != nil {
-					return nil, err // Propagate __eq__ exception
-				}
-				if found {
-					dict.Delete(internalKey)
-					return val, nil
-				}
-				if len(args) > 1 {
-					return args[1], nil
-				}
-				return nil, &KeyError{Key: searchKey}
+			if removed {
+				return val, nil
 			}
-
-			// Convert key to string representation
-			keyStr := ValueToKey(searchKey)
-
-			// Try to get and remove the value
-			val, found := dict.Get(keyStr)
-			if !found {
-				if len(args) > 1 {
-					return args[1], nil
-				}
-				return nil, &KeyError{Key: searchKey}
+			if len(args) > 1 {
+				return args[1], nil
 			}
-
-			// Remove the key from the dictionary
-			dict.Delete(keyStr)
-
-			return val, nil
+			return nil, &KeyError{Key: args[0]}
 		},
 	}
 
@@ -401,54 +211,20 @@ func InitDictMethods() {
 			if len(args) < 1 || len(args) > 2 {
 				return nil, &TypeError{Message: "setdefault expects 1 or 2 arguments"}
 			}
-
-			searchKey := args[0]
-
-			// Check if key is hashable
-			if !IsHashable(searchKey) {
-				return nil, &TypeError{Message: fmt.Sprintf("unhashable type: '%s'", searchKey.Type())}
+			val, found, err := dict.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
 			}
-
-			// For instances with custom __hash__, call __hash__ first (may raise),
-			// then use __eq__ comparison
-			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
-				if _, err := computeInstanceKey(inst, ctx); err != nil {
-					return nil, err
-				}
-				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
-				if err != nil {
-					return nil, err // Propagate __eq__ exception
-				}
-				if found {
-					return val, nil
-				}
-				// Key not found, set default
-				var defaultVal Value = None
-				if len(args) > 1 {
-					defaultVal = args[1]
-				}
-				keyStr := ValueToKey(searchKey)
-				dict.SetWithKey(keyStr, searchKey, defaultVal)
-				return defaultVal, nil
-			}
-
-			// Convert key to string representation
-			keyStr := ValueToKey(searchKey)
-
-			val, found := dict.Get(keyStr)
 			if found {
 				return val, nil
 			}
-
-			// Key not found, use default
 			var defaultVal Value = None
 			if len(args) > 1 {
 				defaultVal = args[1]
 			}
-
-			// Set the default value in the dictionary
-			dict.SetWithKey(keyStr, searchKey, defaultVal)
-
+			if err := dict.SetItem(args[0], defaultVal, ctx); err != nil {
+				return nil, err
+			}
 			return defaultVal, nil
 		},
 	}
@@ -460,13 +236,7 @@ func InitDictMethods() {
 		Doc:     "Remove all items from dict (mutates in-place, returns None)",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			dict := receiver.(*DictValue)
-			// Clear all entries in-place
-			keys := dict.Keys()
-			for _, key := range keys {
-				dict.Delete(key)
-			}
-			// Return None (Python's dict.clear() returns None)
+			receiver.(*DictValue).Clear()
 			return Nil, nil
 		},
 	}
@@ -475,43 +245,18 @@ func InitDictMethods() {
 	dictType.Methods["popitem"] = &MethodDescriptor{
 		Name:    "popitem",
 		Arity:   0,
-		Doc:     "Remove and return an arbitrary (key, value) pair as a tuple. Raises KeyError if dict is empty",
+		Doc:     "Remove and return the last inserted (key, value) pair as a tuple. Raises KeyError if dict is empty",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			if len(args) != 0 {
 				return nil, &TypeError{Message: fmt.Sprintf("popitem() takes no arguments (%d given)", len(args))}
 			}
 			dict := receiver.(*DictValue)
-
-			keys := dict.Keys()
-			if len(keys) == 0 {
+			k, v, ok := dict.PopLast()
+			if !ok {
 				return nil, &KeyError{Key: StringValue("dictionary is empty"), Message: "popitem(): dictionary is empty"}
 			}
-
-			// Get the last key (LIFO behavior like Python 3.7+)
-			keyStr := keys[len(keys)-1]
-
-			// Get the value
-			val, _ := dict.Get(keyStr)
-
-			// Get the original key object from dict.keys map
-			var keyVal Value
-			if dict.keys != nil {
-				if origKey, ok := dict.keys[keyStr]; ok {
-					keyVal = origKey
-				} else {
-					// Fall back to string key
-					keyVal = StringValue(keyStr)
-				}
-			} else {
-				keyVal = StringValue(keyStr)
-			}
-
-			// Remove the key from the dictionary
-			dict.Delete(keyStr)
-
-			// Return (key, value) as a tuple
-			return TupleValue([]Value{keyVal, val}), nil
+			return TupleValue([]Value{k, v}), nil
 		},
 	}
 
@@ -524,14 +269,7 @@ func InitDictMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			dict := receiver.(*DictValue)
 			newDict := NewDict()
-			for _, k := range dict.Keys() {
-				v, _ := dict.Get(k)
-				if origKey, exists := dict.keys[k]; exists {
-					newDict.SetWithKey(k, origKey, v)
-				} else {
-					newDict.Set(k, v)
-				}
-			}
+			newDict.Update(dict)
 			return newDict, nil
 		},
 	}
@@ -558,7 +296,7 @@ func InitDictMethods() {
 				return nil, err
 			}
 			for _, k := range items {
-				if err := newDict.SetValue(k, defaultValue); err != nil {
+				if err := newDict.SetItem(k, defaultValue, ctx); err != nil {
 					return nil, err
 				}
 			}
@@ -617,8 +355,7 @@ func InitDictMethods() {
 		Doc:     "Return the number of items in the dictionary",
 		Builtin: true,
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-			dict := receiver.(*DictValue)
-			return NumberValue(dict.Size()), nil
+			return NumberValue(receiver.(*DictValue).Size()), nil
 		},
 	}
 
@@ -633,28 +370,14 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: "__getitem__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
-			searchKey := args[0]
-
-			// For instances with custom __hash__, call __hash__ first then use __eq__
-			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
-				if _, err := computeInstanceKey(inst, ctx); err != nil {
-					return nil, err
-				}
-				_, val, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
-				if err != nil {
-					return nil, err // Propagate __eq__ exception
-				}
-				if found {
-					return val, nil
-				}
-				return nil, &KeyError{Key: searchKey}
+			val, found, err := dict.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
 			}
-
-			key := ValueToKey(searchKey)
-			if val, exists := dict.Get(key); exists {
-				return val, nil
+			if !found {
+				return nil, &KeyError{Key: args[0]}
 			}
-			return nil, &KeyError{Key: searchKey}
+			return val, nil
 		},
 	}
 
@@ -669,32 +392,13 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: "__delitem__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
-			searchKey := args[0]
-
-			// For instances with custom __hash__, call __hash__ first then use __eq__
-			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
-				if _, err := computeInstanceKey(inst, ctx); err != nil {
-					return nil, err
-				}
-				internalKey, _, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
-				if err != nil {
-					return nil, err // Propagate __eq__ exception
-				}
-				if !found {
-					return nil, &KeyError{Key: searchKey}
-				}
-				dict.Delete(internalKey)
-				delete(dict.keys, internalKey)
-				return None, nil
+			removed, err := dict.DelItem(args[0], ctx)
+			if err != nil {
+				return nil, err
 			}
-
-			key := ValueToKey(searchKey)
-			if _, exists := dict.Get(key); !exists {
-				return nil, &KeyError{Key: searchKey}
+			if !removed {
+				return nil, &KeyError{Key: args[0]}
 			}
-			dict.Delete(key)
-			// Also remove from keys map
-			delete(dict.keys, key)
 			return None, nil
 		},
 	}
@@ -710,23 +414,11 @@ func InitDictMethods() {
 				return nil, &TypeError{Message: "__contains__ takes exactly 1 argument"}
 			}
 			dict := receiver.(*DictValue)
-			searchKey := args[0]
-
-			// For instances with custom __hash__, call __hash__ first then use __eq__
-			if inst, ok := searchKey.(*Instance); ok && instanceNeedsEqComparison(searchKey) {
-				if _, err := computeInstanceKey(inst, ctx); err != nil {
-					return nil, err
-				}
-				_, _, found, err := dictFindKeyWithEq(dict, searchKey, ctx)
-				if err != nil {
-					return nil, err // Propagate __eq__ exception
-				}
-				return BoolValue(found), nil
+			_, found, err := dict.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
 			}
-
-			key := ValueToKey(searchKey)
-			_, exists := dict.Get(key)
-			return BoolValue(exists), nil
+			return BoolValue(found), nil
 		},
 	}
 
@@ -776,26 +468,13 @@ func InitDictMethods() {
 			if !ok {
 				return NotImplemented, nil
 			}
-
 			result := NewDict()
-			for _, k := range dict.Keys() {
-				v, _ := dict.Get(k)
-				if origKey, exists := dict.keys[k]; exists {
-					result.SetWithKey(k, origKey, v)
-				} else {
-					result.Set(k, v)
-				}
+			if err := result.UpdateWithContext(dict, ctx); err != nil {
+				return nil, err
 			}
-
-			for _, k := range other.Keys() {
-				v, _ := other.Get(k)
-				if origKey, exists := other.keys[k]; exists {
-					result.SetWithKey(k, origKey, v)
-				} else {
-					result.Set(k, v)
-				}
+			if err := result.UpdateWithContext(other, ctx); err != nil {
+				return nil, err
 			}
-
 			return result, nil
 		},
 	}
@@ -816,21 +495,11 @@ func InitDictMethods() {
 				return NotImplemented, nil
 			}
 			result := NewDict()
-			for _, k := range other.Keys() {
-				v, _ := other.Get(k)
-				if origKey, exists := other.keys[k]; exists {
-					result.SetWithKey(k, origKey, v)
-				} else {
-					result.Set(k, v)
-				}
+			if err := result.UpdateWithContext(other, ctx); err != nil {
+				return nil, err
 			}
-			for _, k := range dict.Keys() {
-				v, _ := dict.Get(k)
-				if origKey, exists := dict.keys[k]; exists {
-					result.SetWithKey(k, origKey, v)
-				} else {
-					result.Set(k, v)
-				}
+			if err := result.UpdateWithContext(dict, ctx); err != nil {
+				return nil, err
 			}
 			return result, nil
 		},
@@ -848,13 +517,8 @@ func InitDictMethods() {
 			}
 			dict := receiver.(*DictValue)
 			if other, ok := args[0].(*DictValue); ok {
-				for _, k := range other.Keys() {
-					v, _ := other.Get(k)
-					if origKey, exists := other.keys[k]; exists {
-						dict.SetWithKey(k, origKey, v)
-					} else {
-						dict.Set(k, v)
-					}
+				if err := dict.UpdateWithContext(other, ctx); err != nil {
+					return nil, err
 				}
 				return dict, nil
 			}
@@ -865,11 +529,15 @@ func InitDictMethods() {
 			}
 			for i, item := range items {
 				if pair, ok := item.(TupleValue); ok && len(pair) == 2 {
-					dict.SetValue(pair[0], pair[1])
+					if err := dict.SetItem(pair[0], pair[1], ctx); err != nil {
+						return nil, err
+					}
 					continue
 				}
 				if lst, ok := item.(*ListValue); ok && lst.Len() == 2 {
-					dict.SetValue(lst.Items()[0], lst.Items()[1])
+					if err := dict.SetItem(lst.Items()[0], lst.Items()[1], ctx); err != nil {
+						return nil, err
+					}
 					continue
 				}
 				length := -1
@@ -913,34 +581,33 @@ func dictReprWithDepth(dict *DictValue, ctx *Context, depth int) (string, error)
 	if depth > maxDictReprDepth {
 		return "", &RecursionError{Message: "maximum recursion depth exceeded while getting the repr of an object"}
 	}
-	if len(dict.orderedKeys) == 0 {
+	if dict.Size() == 0 {
 		return "{}", nil
 	}
 	s, isCycle, err := withCycleDetectionErr(uintptr(unsafe.Pointer(dict)), "{...}", func() (string, error) {
 		result := "{"
 		first := true
-		for _, k := range dict.orderedKeys {
-			v, exists := dict.entries[k]
-			if !exists {
-				continue
-			}
-			origKey, _ := dict.keys[k]
-			if origKey == nil {
-				origKey = StringValue(k)
-			}
+		var walkErr error
+		dict.ForEach(func(k, v Value) bool {
 			if !first {
 				result += ", "
 			}
 			first = false
-			keyRepr, err := reprWithDepth(origKey, ctx, depth+1)
+			keyRepr, err := reprWithDepth(k, ctx, depth+1)
 			if err != nil {
-				return "", err
+				walkErr = err
+				return false
 			}
 			valRepr, err := reprWithDepth(v, ctx, depth+1)
 			if err != nil {
-				return "", err
+				walkErr = err
+				return false
 			}
 			result += keyRepr + ": " + valRepr
+			return true
+		})
+		if walkErr != nil {
+			return "", walkErr
 		}
 		return result + "}", nil
 	})

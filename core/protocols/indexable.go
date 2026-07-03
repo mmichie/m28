@@ -70,39 +70,27 @@ func NewDictIndexable(dict *core.DictValue) Indexable {
 	return &DictIndexable{dict: dict}
 }
 
-// GetIndex retrieves value by key
+// GetIndex retrieves value by key. This protocol has no ctx, so instance
+// keys with user dunders resolve by identity (the Python-visible indexing
+// paths go through dict.__getitem__, which has full semantics).
 func (d *DictIndexable) GetIndex(key core.Value) (core.Value, error) {
 	if !core.IsHashable(key) {
 		return nil, fmt.Errorf("unhashable type: '%s'", key.Type())
 	}
-
-	keyStr := core.ValueToKey(key)
-	if val, exists := d.dict.Get(keyStr); exists {
+	if val, exists := d.dict.GetValue(key); exists {
 		return val, nil
 	}
-
 	return nil, &core.KeyError{Key: key}
 }
 
 // SetIndex sets value by key
 func (d *DictIndexable) SetIndex(key, value core.Value) error {
-	if !core.IsHashable(key) {
-		return fmt.Errorf("unhashable type: '%s'", key.Type())
-	}
-
-	keyStr := core.ValueToKey(key)
-	d.dict.SetWithKey(keyStr, key, value)
-	return nil
+	return d.dict.SetValue(key, value)
 }
 
 // HasIndex checks if key exists
 func (d *DictIndexable) HasIndex(key core.Value) bool {
-	if !core.IsHashable(key) {
-		return false
-	}
-
-	keyStr := core.ValueToKey(key)
-	_, exists := d.dict.Get(keyStr)
+	_, exists := d.dict.GetValue(key)
 	return exists
 }
 
@@ -111,13 +99,9 @@ func (d *DictIndexable) DeleteIndex(key core.Value) error {
 	if !core.IsHashable(key) {
 		return fmt.Errorf("unhashable type: '%s'", key.Type())
 	}
-
-	keyStr := core.ValueToKey(key)
-	if _, exists := d.dict.Get(keyStr); !exists {
+	if !d.dict.DeleteValue(key) {
 		return &core.KeyError{Key: key}
 	}
-
-	d.dict.Delete(keyStr)
 	return nil
 }
 

@@ -353,8 +353,11 @@ func (c *Counter) GetAttr(name string) (core.Value, bool) {
 			if len(args) != 1 {
 				return nil, &core.TypeError{Message: "__getitem__ requires exactly 1 argument"}
 			}
-			key := core.ValueToKey(args[0])
-			if val, ok := c.counts.Get(key); ok {
+			val, ok, err := c.counts.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
 				return val, nil
 			}
 			return core.NumberValue(0), nil
@@ -364,8 +367,9 @@ func (c *Counter) GetAttr(name string) (core.Value, bool) {
 			if len(args) != 2 {
 				return nil, &core.TypeError{Message: "__setitem__ requires exactly 2 arguments"}
 			}
-			key := core.ValueToKey(args[0])
-			c.counts.Set(key, args[1])
+			if err := c.counts.SetItem(args[0], args[1], ctx); err != nil {
+				return nil, err
+			}
 			return core.Nil, nil
 		}), true
 	}
@@ -388,14 +392,13 @@ func (c *Counter) Update(args []core.Value) {
 	// If it's a list, count each element
 	if list, ok := arg.(*core.ListValue); ok {
 		for _, item := range list.Items() {
-			key := core.ValueToKey(item)
 			count := core.NumberValue(0)
-			if val, ok := c.counts.Get(key); ok {
+			if val, ok := c.counts.GetValue(item); ok {
 				if num, ok := val.(core.NumberValue); ok {
 					count = num
 				}
 			}
-			c.counts.Set(key, count+1)
+			c.counts.SetValue(item, count+1)
 		}
 	}
 }
@@ -403,22 +406,21 @@ func (c *Counter) Update(args []core.Value) {
 // MostCommon returns a list of the n most common elements and their counts
 func (c *Counter) MostCommon(n int) core.Value {
 	type pair struct {
-		key   string
+		key   core.Value
 		value float64
 	}
 
-	// Collect all key-value pairs
+	// Collect all key-value pairs (real key objects, any hashable type)
 	pairs := []pair{}
-	for _, key := range c.counts.Keys() {
-		if val, ok := c.counts.Get(key); ok {
-			if num, ok := val.(core.NumberValue); ok {
-				pairs = append(pairs, pair{key, float64(num)})
-			}
+	c.counts.ForEach(func(key, val core.Value) bool {
+		if num, ok := val.(core.NumberValue); ok {
+			pairs = append(pairs, pair{key, float64(num)})
 		}
-	}
+		return true
+	})
 
-	// Sort by count descending
-	sort.Slice(pairs, func(i, j int) bool {
+	// Sort by count descending (stable: ties keep insertion order, like CPython)
+	sort.SliceStable(pairs, func(i, j int) bool {
 		return pairs[i].value > pairs[j].value
 	})
 
@@ -430,9 +432,7 @@ func (c *Counter) MostCommon(n int) core.Value {
 	// Convert to list of tuples
 	result := make([]core.Value, len(pairs))
 	for i, p := range pairs {
-		// Reconstruct the key as a Value
-		keyVal := core.StringValue(p.key) // Simplified - assumes string keys
-		result[i] = core.TupleValue{keyVal, core.NumberValue(p.value)}
+		result[i] = core.TupleValue{p.key, core.NumberValue(p.value)}
 	}
 
 	return core.NewList(result...)
@@ -586,8 +586,9 @@ func (dd *DefaultDict) SetAttr(name string, value core.Value) error {
 
 // Get returns the value for a key, calling the factory if missing
 func (dd *DefaultDict) Get(key core.Value, ctx *core.Context) (core.Value, error) {
-	k := core.ValueToKey(key)
-	if val, ok := dd.dict.Get(k); ok {
+	if val, ok, err := dd.dict.GetItem(key, ctx); err != nil {
+		return nil, err
+	} else if ok {
 		return val, nil
 	}
 
@@ -1000,19 +1001,23 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 			if len(args) != 1 {
 				return nil, &core.TypeError{Message: "__getitem__ requires exactly 1 argument"}
 			}
-			key := core.ValueToKey(args[0])
-			if val, ok := od.dict.Get(key); ok {
+			val, ok, err := od.dict.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
 				return val, nil
 			}
-			return nil, &core.KeyError{Message: key}
+			return nil, &core.KeyError{Key: args[0]}
 		}), true
 	case "__setitem__":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) != 2 {
 				return nil, &core.TypeError{Message: "__setitem__ requires exactly 2 arguments"}
 			}
-			key := core.ValueToKey(args[0])
-			od.dict.Set(key, args[1])
+			if err := od.dict.SetItem(args[0], args[1], ctx); err != nil {
+				return nil, err
+			}
 			return core.Nil, nil
 		}), true
 	case "keys":
@@ -1023,25 +1028,20 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 		}), true
 	case "values":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			values := make([]core.Value, 0)
-			for _, key := range od.dict.Keys() {
-				if val, ok := od.dict.Get(key); ok {
-					values = append(values, val)
-				}
-			}
+			values := make([]core.Value, 0, od.dict.Size())
+			od.dict.ForEach(func(_, val core.Value) bool {
+				values = append(values, val)
+				return true
+			})
 			return core.NewList(values...), nil
 		}), true
 	case "items":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			items := make([]core.Value, 0)
-			// Get both internal and original keys to maintain order
-			internalKeys := od.dict.Keys()
-			originalKeys := od.dict.OriginalKeys()
-			for i, internalKey := range internalKeys {
-				if val, ok := od.dict.Get(internalKey); ok {
-					items = append(items, core.TupleValue{originalKeys[i], val})
-				}
-			}
+			items := make([]core.Value, 0, od.dict.Size())
+			od.dict.ForEach(func(key, val core.Value) bool {
+				items = append(items, core.TupleValue{key, val})
+				return true
+			})
 			return core.NewList(items...), nil
 		}), true
 	case "get":
@@ -1049,8 +1049,11 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 			if len(args) < 1 {
 				return nil, &core.TypeError{Message: "get() requires at least 1 argument"}
 			}
-			key := core.ValueToKey(args[0])
-			if val, ok := od.dict.Get(key); ok {
+			val, ok, err := od.dict.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
 				return val, nil
 			}
 			if len(args) > 1 {
@@ -1065,38 +1068,46 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 			if len(args) < 1 {
 				return nil, &core.TypeError{Message: "move_to_end() requires at least 1 argument"}
 			}
-			key := core.ValueToKey(args[0])
-			val, ok := od.dict.Get(key)
-			if !ok {
-				return nil, &core.KeyError{Message: key}
+			searchKey := args[0]
+			val, ok, err := od.dict.GetItem(searchKey, ctx)
+			if err != nil {
+				return nil, err
 			}
-			origKey := args[0]
+			if !ok {
+				return nil, &core.KeyError{Key: searchKey}
+			}
 			toEnd := true
 			if len(args) >= 2 {
 				if b, ok := args[1].(core.BoolValue); ok {
 					toEnd = bool(b)
 				}
 			}
-			od.dict.Delete(key)
+			if _, err := od.dict.DelItem(searchKey, ctx); err != nil {
+				return nil, err
+			}
 			if toEnd {
-				od.dict.SetWithKey(key, origKey, val)
+				if err := od.dict.SetItem(searchKey, val, ctx); err != nil {
+					return nil, err
+				}
 				return core.None, nil
 			}
 			// Prepending: re-insert this key, then re-insert everything else
 			// after it (preserving relative order).
-			savedKeys := od.dict.Keys()
-			savedOrig := od.dict.OriginalKeys()
-			savedVals := make([]core.Value, len(savedKeys))
-			for i, k := range savedKeys {
-				v, _ := od.dict.Get(k)
-				savedVals[i] = v
+			savedKeys := make([]core.Value, 0, od.dict.Size())
+			savedVals := make([]core.Value, 0, od.dict.Size())
+			od.dict.ForEach(func(k, v core.Value) bool {
+				savedKeys = append(savedKeys, k)
+				savedVals = append(savedVals, v)
+				return true
+			})
+			od.dict.Clear()
+			if err := od.dict.SetItem(searchKey, val, ctx); err != nil {
+				return nil, err
 			}
-			for _, k := range savedKeys {
-				od.dict.Delete(k)
-			}
-			od.dict.SetWithKey(key, origKey, val)
 			for i, k := range savedKeys {
-				od.dict.SetWithKey(k, savedOrig[i], savedVals[i])
+				if err := od.dict.SetItem(k, savedVals[i], ctx); err != nil {
+					return nil, err
+				}
 			}
 			return core.None, nil
 		}), true
@@ -1110,8 +1121,7 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 					toEnd = bool(b)
 				}
 			}
-			keys := od.dict.Keys()
-			origs := od.dict.OriginalKeys()
+			keys := od.dict.OriginalKeys()
 			if len(keys) == 0 {
 				return nil, &core.KeyError{Message: "dictionary is empty"}
 			}
@@ -1121,10 +1131,14 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 			} else {
 				idx = 0
 			}
-			k := keys[idx]
-			origKey := origs[idx]
-			val, _ := od.dict.Get(k)
-			od.dict.Delete(k)
+			origKey := keys[idx]
+			val, _, err := od.dict.GetItem(origKey, ctx)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := od.dict.DelItem(origKey, ctx); err != nil {
+				return nil, err
+			}
 			return core.TupleValue{origKey, val}, nil
 		}), true
 	case "pop":
@@ -1132,15 +1146,19 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 			if len(args) < 1 {
 				return nil, &core.TypeError{Message: "pop() requires at least 1 argument"}
 			}
-			key := core.ValueToKey(args[0])
-			val, ok := od.dict.Get(key)
+			val, ok, err := od.dict.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
+			}
 			if !ok {
 				if len(args) >= 2 {
 					return args[1], nil
 				}
-				return nil, &core.KeyError{Message: key}
+				return nil, &core.KeyError{Key: args[0]}
 			}
-			od.dict.Delete(key)
+			if _, err := od.dict.DelItem(args[0], ctx); err != nil {
+				return nil, err
+			}
 			return val, nil
 		}), true
 	case "setdefault":
@@ -1148,15 +1166,20 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 			if len(args) < 1 {
 				return nil, &core.TypeError{Message: "setdefault() requires at least 1 argument"}
 			}
-			key := core.ValueToKey(args[0])
-			if val, ok := od.dict.Get(key); ok {
+			val, ok, err := od.dict.GetItem(args[0], ctx)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
 				return val, nil
 			}
 			var def core.Value = core.None
 			if len(args) >= 2 {
 				def = args[1]
 			}
-			od.dict.SetWithKey(key, args[0], def)
+			if err := od.dict.SetItem(args[0], def, ctx); err != nil {
+				return nil, err
+			}
 			return def, nil
 		}), true
 	case "update":

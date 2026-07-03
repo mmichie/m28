@@ -324,47 +324,24 @@ func evalFunctionCallWithKeywords(expr *core.ListValue, ctx *core.Context) (core
 			return nil, &core.TypeError{Message: fmt.Sprintf("argument after ** must be a mapping, not %s", val.Type())}
 		}
 
-		// Unpack the dict into keyword arguments
-		for _, keyRepr := range dict.Keys() {
-			val, _ := dict.Get(keyRepr)
-
-			// For keyword arguments, we need the original key which should be a string
-			origKeys := dict.OriginalKeys()
-			var paramName string
-			found := false
-
-			// Find the original key that corresponds to this internal key
-			for _, origKey := range origKeys {
-				if core.ValueToKey(origKey) == keyRepr {
-					// Original key must be a string for keyword arguments
-					keyStr, ok := origKey.(core.StringValue)
-					if !ok {
-						return nil, &core.TypeError{Message: fmt.Sprintf("keywords must be strings (got %s)", origKey.Type())}
-					}
-					paramName = string(keyStr)
-					found = true
-					break
-				}
+		// Unpack the dict into keyword arguments (keys must be strings)
+		var unpackErr error
+		dict.ForEach(func(k, val core.Value) bool {
+			keyStr, ok := k.(core.StringValue)
+			if !ok {
+				unpackErr = &core.TypeError{Message: fmt.Sprintf("keywords must be strings (got %s)", k.Type())}
+				return false
 			}
-
-			// If original key not tracked, try to reconstruct it from the internal key
-			if !found {
-				// Strip type prefix to get clean parameter name
-				if len(keyRepr) > 2 && keyRepr[1] == ':' {
-					paramName = keyRepr[2:]
-					found = true
-				} else {
-					paramName = keyRepr
-					found = true
-				}
-			}
-
-			// Check for duplicates
+			paramName := string(keyStr)
 			if _, exists := keywordArgs[paramName]; exists {
-				return nil, fmt.Errorf("duplicate keyword argument: %s", paramName)
+				unpackErr = fmt.Errorf("duplicate keyword argument: %s", paramName)
+				return false
 			}
-
 			keywordArgs[paramName] = val
+			return true
+		})
+		if unpackErr != nil {
+			return nil, unpackErr
 		}
 	}
 

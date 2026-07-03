@@ -200,7 +200,7 @@ func resolveFormatField(field string, args []Value, kwargs map[string]Value, aut
 				}
 			} else {
 				if d, ok := val.(*DictValue); ok {
-					if v, exists := d.entries[key]; exists {
+					if v, exists := d.GetStr(key); exists {
 						val = v
 					} else {
 						return nil, &KeyError{Key: StringValue(key)}
@@ -1485,12 +1485,16 @@ func InitStringMethods() {
 			if len(args) != 1 {
 				return nil, &TypeError{Message: "format_map() takes exactly one argument"}
 			}
-			// Build kwargs from the mapping
+			// Build kwargs from the mapping (string keys only; format field
+			// names are always strings)
 			kwargs := make(map[string]Value)
 			if d, ok := args[0].(*DictValue); ok {
-				for k, v := range d.entries {
-					kwargs[k] = v
-				}
+				d.ForEach(func(k, v Value) bool {
+					if ks, ok := k.(StringValue); ok {
+						kwargs[string(ks)] = v
+					}
+					return true
+				})
 			}
 			return strFormat(s, nil, kwargs, ctx)
 		},
