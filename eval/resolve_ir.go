@@ -496,9 +496,27 @@ func compileAssign(items []core.Value, orig core.Value) core.Value {
 // falls back to ForForm, passing the ALREADY-EVALUATED sequence wrapped in a
 // constNode so the sequence expression's side effects fire exactly once.
 type forNode struct {
-	target *slotRef
-	seq    core.Value // compiled sequence expression
-	body   core.Value // compiled body
+	target   core.Value // *slotRef or SymbolValue: the fallback pattern
+	slot     int        // slot index, or -1 for name binding (module scope)
+	bindName string     // set when slot < 0
+	bindKey  string     // "s:" + bindName, prebuilt
+	bindSync bool       // export-sync decision, precomputed
+	seq      core.Value // compiled sequence expression
+	body     core.Value // compiled body
+}
+
+// bind writes one induction value, matching the generic path exactly:
+// slot targets mirror UnpackPattern's slotRef case; name targets mirror its
+// SymbolValue case (ctx.Define), which keeps module globals name-addressable
+// mid-loop (globals()/imports see every rebind).
+func (n *forNode) bind(ctx *core.Context, cur float64) {
+	if n.slot >= 0 {
+		ctx.Locals.SetNum(n.slot, cur, core.SlotInt)
+	} else {
+		// Mirrors UnpackPattern's SymbolValue case (ctx.Define), with the
+		// ModuleDict key prebuilt.
+		ctx.DefineKeyed(n.bindName, n.bindKey, n.bindSync, core.BoxNumber(cur))
+	}
 }
 
 func (n *forNode) Type() core.Type { return "for-node" }
@@ -517,7 +535,7 @@ func (n *forNode) evalIR(ctx *core.Context) (core.Value, error) {
 		// value is unreachable from the Python frontend.
 		step := rng.Step
 		for cur := rng.Start; (step > 0 && cur < rng.Stop) || (step < 0 && cur > rng.Stop); cur += step {
-			ctx.Locals.SetNum(n.target.slot, cur, core.SlotInt)
+			n.bind(ctx, cur)
 			control, err := evalStmt(n.body, ctx)
 			if err != nil {
 				return nil, err
@@ -565,7 +583,7 @@ func compileFor(items []core.Value, orig core.Value) core.Value {
 		if !ok {
 			return orig
 		}
-		return &forNode{target: sr, seq: compileIR(items[2]), body: compileIR(items[3])}
+		return &forNode{target: sr, slot: sr.slot, seq: compileIR(items[2]), body: compileIR(items[3])}
 	case 5:
 		sr, ok := unwrapLocated(items[1]).(*slotRef)
 		if !ok {
@@ -574,7 +592,7 @@ func compileFor(items []core.Value, orig core.Value) core.Value {
 		if in, ok := unwrapLocated(items[2]).(core.SymbolValue); !ok || string(in) != "in" {
 			return orig
 		}
-		return &forNode{target: sr, seq: compileIR(items[3]), body: compileIR(items[4])}
+		return &forNode{target: sr, slot: sr.slot, seq: compileIR(items[3]), body: compileIR(items[4])}
 	default:
 		return orig
 	}
@@ -1017,5 +1035,179 @@ func introspectCallName(fn core.Value) string {
 		return "<anonymous>"
 	default:
 		return "<anonymous>"
+	}
+}
+
+// --- module-scope compilation (the module tier, follow-on to M28-9pm) ---
+//
+// Module-level code cannot use slots: globals must stay name-addressable
+// during execution (a function called mid-loop reads and writes them through
+// globals(), imports see the live dict). But the statement SKELETON — loops,
+// branches, assignments, expressions — can still compile to the same IR,
+// with reads through symbolNode (ctx.Lookup) and writes through the exact
+// calls the generic handlers make (assignVariable / ctx.Define). Measured
+// before this existed: the same loop ran 39x slower at module level than in
+// a function.
+//
+// Compilation is per statement with per-construct fallback: anything not
+// modeled here (def, class, import, try, ...) evaluates generically,
+// unchanged.
+
+// globalAssignNode is (= name value) at module scope. The value expression
+// runs through the typed kernel; the store goes through assignVariable —
+// byte-identical to assignFormInternal's bare-symbol path (global/nonlocal
+// declarations, ModuleDict sync, builtin shadowing all live there).
+type globalAssignNode struct {
+	name       string
+	key        string // "s:" + name, prebuilt (no per-write concat)
+	syncModule bool   // Define's export-skip decision, precomputed
+	val        core.Value
+}
+
+func moduleSyncable(name string) bool {
+	if len(name) >= 2 && name[:2] == "__" && name[len(name)-2:] == "__" {
+		return false
+	}
+	return len(name) == 0 || name[0] != '_'
+}
+
+func (n *globalAssignNode) Type() core.Type { return "global-assign-node" }
+func (n *globalAssignNode) String() string  { return "(= " + n.name + " ...)" }
+func (n *globalAssignNode) evalIR(ctx *core.Context) (core.Value, error) {
+	num, kind, boxed, err := evalNumOf(n.val, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if boxed == nil {
+		boxed = boxNum(num, kind)
+	}
+	// Declared global/nonlocal names (rare at module scope) keep the exact
+	// generic path; everything else takes the keyed Define fast path, which
+	// is Define minus the per-write key concatenation.
+	if ctx.IsGlobal(n.name) || ctx.IsNonlocal(n.name) {
+		if err := assignVariable(ctx, n.name, boxed); err != nil {
+			return nil, err
+		}
+		return boxed, nil
+	}
+	ctx.DefineKeyed(n.name, n.key, n.syncModule, boxed)
+	return boxed, nil
+}
+
+// execStmt: the dict store needs the boxed value anyway; only the return
+// materialization is skipped.
+func (n *globalAssignNode) execStmt(ctx *core.Context) (core.Value, error) {
+	_, err := n.evalIR(ctx)
+	return nil, err
+}
+
+// EvalModuleStatement evaluates one top-level statement, compiling its
+// statement skeleton to IR first. Drop-in replacement for Eval at module
+// statement loops (file execution, module import).
+func EvalModuleStatement(stmt core.Value, ctx *core.Context) (core.Value, error) {
+	return Eval(compileModuleIR(stmt), ctx)
+}
+
+// compileModuleIR compiles a module-scope statement. Statement-bearing forms
+// (do, if, for, while, =) recurse in module mode; everything else delegates
+// to the expression compiler, whose unmodeled-form guard keeps special forms
+// on their handlers.
+func compileModuleIR(v core.Value) core.Value {
+	switch n := v.(type) {
+	case core.LocatedValue:
+		inner := compileModuleIR(n.Value)
+		if sameValue(inner, n.Value) {
+			return v
+		}
+		return core.LocatedValue{Value: inner, Location: n.Location}
+
+	case *core.ListValue:
+		if n.Len() == 0 {
+			return compileIR(v)
+		}
+		items := n.ItemsRef()
+		head, ok := unwrapLocated(items[0]).(core.SymbolValue)
+		if !ok {
+			return compileIR(v)
+		}
+		switch string(head) {
+		case "do", "begin":
+			body := make([]core.Value, n.Len()-1)
+			for i := 1; i < n.Len(); i++ {
+				body[i-1] = compileModuleIR(items[i])
+			}
+			return &seqNode{items: body}
+		case "if":
+			return compileModuleIf(n, items, v)
+		case "=":
+			// Only the bare (= name value) shape; chained, tuple, attribute,
+			// and subscript targets keep the generic handler.
+			if n.Len() == 3 {
+				if sym, ok := unwrapLocated(items[1]).(core.SymbolValue); ok {
+					name := string(sym)
+					return &globalAssignNode{name: name, key: "s:" + name, syncModule: moduleSyncable(name), val: compileIR(items[2])}
+				}
+			}
+			return v
+		case "for":
+			return compileModuleFor(items, v)
+		case "while":
+			if n.Len() != 3 {
+				return v
+			}
+			return &whileNode{cond: compileIR(items[1]), body: compileModuleIR(items[2])}
+		default:
+			return compileIR(v)
+		}
+
+	default:
+		return compileIR(v)
+	}
+}
+
+// compileModuleIf mirrors compileIf's shape checks with module-mode branches.
+func compileModuleIf(n *core.ListValue, items []core.Value, orig core.Value) core.Value {
+	switch n.Len() {
+	case 3:
+		return &ifNode{cond: compileIR(items[1]), then: compileModuleIR(items[2])}
+	case 4:
+		third := unwrapLocated(items[3])
+		if sym, ok := third.(core.SymbolValue); ok && (string(sym) == "elif" || string(sym) == "else") {
+			return orig
+		}
+		if lst, ok := third.(*core.ListValue); ok && lst.Len() > 0 {
+			if sym, ok := unwrapLocated(lst.ItemsRef()[0]).(core.SymbolValue); ok && string(sym) == "elif" {
+				return orig
+			}
+		}
+		return &ifNode{cond: compileIR(items[1]), then: compileModuleIR(items[2]), els: compileModuleIR(items[3])}
+	default:
+		return orig
+	}
+}
+
+// compileModuleFor lowers a module-scope for with a bare-symbol target to a
+// name-binding forNode. Tuple targets and other shapes keep ForForm.
+func compileModuleFor(items []core.Value, orig core.Value) core.Value {
+	switch len(items) {
+	case 4:
+		sym, ok := unwrapLocated(items[1]).(core.SymbolValue)
+		if !ok {
+			return orig
+		}
+		name := string(sym)
+		return &forNode{target: items[1], slot: -1, bindName: name, bindKey: "s:" + name, bindSync: moduleSyncable(name), seq: compileIR(items[2]), body: compileModuleIR(items[3])}
+	case 5:
+		sym, ok := unwrapLocated(items[1]).(core.SymbolValue)
+		if !ok {
+			return orig
+		}
+		if in, ok := unwrapLocated(items[2]).(core.SymbolValue); !ok || string(in) != "in" {
+			return orig
+		}
+		name := string(sym)
+		return &forNode{target: items[1], slot: -1, bindName: name, bindKey: "s:" + name, bindSync: moduleSyncable(name), seq: compileIR(items[3]), body: compileModuleIR(items[4])}
+	default:
+		return orig
 	}
 }

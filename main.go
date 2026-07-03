@@ -611,7 +611,7 @@ func initializeGlobalContext(ctx *core.Context) {
 	builtin.RegisterAllBuiltins(ctx)
 
 	// Initialize enhanced module loader with builtin Go modules
-	moduleLoader := core.NewModuleLoaderEnhanced(ctx, eval.Eval, func(code string) (core.Value, error) {
+	moduleLoader := core.NewModuleLoaderEnhanced(ctx, eval.EvalModuleStatement, func(code string) (core.Value, error) {
 		p := parser.NewParser()
 		return p.Parse(code)
 	}, modules.GetBuiltinModule)
@@ -687,7 +687,7 @@ func executeM28File(filename, content string, ctx *core.Context) error {
 	if ptokens, terr := parser.NewPythonTokenizer(content).Tokenize(); terr == nil {
 		if nodes, perr := parser.NewPythonParser(ptokens, filename, content).Parse(); perr == nil {
 			for _, node := range nodes {
-				if _, err := eval.Eval(node.ToIR(), ctx); err != nil {
+				if _, err := eval.EvalModuleStatement(node.ToIR(), ctx); err != nil {
 					return err
 				}
 			}
@@ -745,10 +745,11 @@ func executePythonFile(filename, content string, ctx *core.Context) error {
 		fmt.Println("=== End IR ===")
 	}
 
-	// Lower AST to IR and evaluate each statement
+	// Lower AST to IR and evaluate each statement. EvalModuleStatement compiles
+	// the statement skeleton to IR (module tier of the resolution layer).
 	for _, node := range nodes {
 		ir := node.ToIR()
-		_, err = eval.Eval(ir, ctx)
+		_, err = eval.EvalModuleStatement(ir, ctx)
 		if err != nil {
 			// Check if it's SystemExit - propagate it without wrapping
 			var sysExit *core.SystemExit

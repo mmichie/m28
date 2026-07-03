@@ -1,0 +1,38 @@
+# Module-tier IR compilation must preserve name-addressable global semantics:
+# functions called from module-level loops see and mutate the live module
+# namespace through globals(), and loop variables rebind per iteration.
+
+def peek():
+    return globals()["i"] * 100
+
+def poke():
+    globals()["i"] = 7
+
+total = 0
+for i in range(4):
+    total = total + peek()
+    if i == 2:
+        poke()
+assert total == 600, "module loop var visible via globals() mid-loop"
+assert i == 3, "range iterator unaffected by globals() mutation"
+
+count = 0
+while count < 3:
+    count = count + 1
+    x = globals()["count"]
+assert count == 3, "while-loop global writes visible"
+assert x == 3, "reads through globals() see live values"
+
+_private = 41
+_private = _private + 1
+assert _private == 42, "private module names assign correctly"
+
+acc = 0
+for j in range(10):
+    if j == 3:
+        continue
+    if j > 5:
+        break
+    acc = acc + j
+assert acc == 12, "break/continue in module-level compiled loops"
+print("module-scope compile semantics: all pass")

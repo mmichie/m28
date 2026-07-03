@@ -456,6 +456,19 @@ func (d *DictValue) GetStr(name string) (Value, bool) {
 	return val, ok
 }
 
+// SetStrKeyed is SetStr for a caller that pre-computed the "s:"-prefixed key
+// (module-tier IR nodes hold it statically): no per-write concatenation.
+func (d *DictValue) SetStrKeyed(key, name string, value Value) {
+	if _, exists := d.entries[key]; exists {
+		d.entries[key] = value
+		return
+	}
+	d.orderedKeys = append(d.orderedKeys, key)
+	d.modCount++
+	d.entries[key] = value
+	d.keys[key] = StringValue(name)
+}
+
 // SetStr stores value under a plain string key — equivalent to
 // SetWithKey(ValueToKey(StringValue(name)), StringValue(name), value). The
 // existence probe uses the non-escaping concat; only a new key materializes

@@ -301,6 +301,25 @@ func (c *Context) WithMetadata(metadata *IRMetadata) *Context {
 }
 
 // Define defines a new variable in the current scope
+// DefineKeyed is Define for a caller that pre-computed the ModuleDict key
+// ("s:" + name) and the export-sync decision (module-tier IR nodes do this at
+// compile time). Behavior is identical to Define.
+func (c *Context) DefineKeyed(name, key string, syncModule bool, value Value) {
+	if c.Outer == nil {
+		if _, isBuiltin := value.(*BuiltinFunction); isBuiltin {
+			if err := builtinRegistry.RegisterWithDepth(name, value, 3); err != nil {
+				if BuiltinLogging {
+					Log.Warn(SubsystemBuiltin, "Duplicate builtin registration", "error", err)
+				}
+			}
+		}
+	}
+	c.Vars[name] = value
+	if syncModule && c.ModuleDict != nil {
+		c.ModuleDict.SetStrKeyed(key, name, value)
+	}
+}
+
 func (c *Context) Define(name string, value Value) {
 	// If this is the global context and the value is a builtin function,
 	// register it in the builtin registry for tracking
