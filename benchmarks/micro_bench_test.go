@@ -122,6 +122,101 @@ func BenchmarkGetAttrMethod(b *testing.B) {
 	}
 }
 
+// BenchmarkDictSetGetInt isolates the dict engine's numeric-key path: one
+// replacing insert and one hit lookup per iteration against a steady-state
+// 1024-entry dict (no growth inside the loop). Keys are boxed once outside
+// the timed loop so allocs/op reflects the engine, not interface boxing.
+func BenchmarkDictSetGetInt(b *testing.B) {
+	d := core.NewDict()
+	keys := make([]core.Value, 1024)
+	for i := range keys {
+		keys[i] = core.NumberValue(i)
+		if err := d.SetItem(keys[i], keys[i], nil); err != nil {
+			b.Fatalf("seed: %v", err)
+		}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		k := keys[i&1023]
+		if err := d.SetItem(k, k, nil); err != nil {
+			b.Fatalf("set: %v", err)
+		}
+		if _, ok, err := d.GetItem(k, nil); err != nil || !ok {
+			b.Fatalf("get miss: %v", err)
+		}
+	}
+}
+
+// BenchmarkDictGetStr isolates the allocation-free string fast path that
+// module-global name resolution rides (GetStr -> GetStrHashed probe).
+func BenchmarkDictGetStr(b *testing.B) {
+	d := core.NewDict()
+	names := []string{
+		"alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta",
+		"iota", "kappa", "lambda", "mu", "nu", "xi", "omicron", "pi",
+	}
+	for _, n := range names {
+		d.SetStr(n, core.NumberValue(1))
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, ok := d.GetStr(names[i&15]); !ok {
+			b.Fatal("GetStr miss")
+		}
+	}
+}
+
+// BenchmarkDictSetGetTuple exercises the composite-key path: hashTuple runs on
+// every operation (tuples cache no hash), plus probe equality on hit.
+func BenchmarkDictSetGetTuple(b *testing.B) {
+	d := core.NewDict()
+	keys := make([]core.Value, 256)
+	for i := range keys {
+		keys[i] = core.TupleValue{core.NumberValue(i), core.StringValue("k")}
+		if err := d.SetItem(keys[i], core.NumberValue(i), nil); err != nil {
+			b.Fatalf("seed: %v", err)
+		}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		k := keys[i&255]
+		if err := d.SetItem(k, k, nil); err != nil {
+			b.Fatalf("set: %v", err)
+		}
+		if _, ok, err := d.GetItem(k, nil); err != nil || !ok {
+			b.Fatalf("get miss: %v", err)
+		}
+	}
+}
+
+// BenchmarkDictDeleteChurn exercises delete's tombstone path and the
+// trailing-trim/compaction logic: each iteration inserts one extra key into a
+// 512-entry dict and deletes it again (steady state, no net growth).
+func BenchmarkDictDeleteChurn(b *testing.B) {
+	d := core.NewDict()
+	keys := make([]core.Value, 512)
+	for i := range keys {
+		keys[i] = core.NumberValue(i)
+		if err := d.SetItem(keys[i], keys[i], nil); err != nil {
+			b.Fatalf("seed: %v", err)
+		}
+	}
+	extra := core.Value(core.NumberValue(100000))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := d.SetItem(extra, extra, nil); err != nil {
+			b.Fatalf("set: %v", err)
+		}
+		if removed, err := d.DelItem(extra, nil); err != nil || !removed {
+			b.Fatalf("del miss: %v", err)
+		}
+	}
+}
+
 // BenchmarkParseProgram measures parse throughput (a component of startup cost
 // and of every -e/-c invocation).
 func BenchmarkParseProgram(b *testing.B) {
