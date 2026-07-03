@@ -103,6 +103,10 @@ func compileList(n *core.ListValue, orig core.Value) core.Value {
 		return compileWhile(items, orig)
 	case ".":
 		return compileDot(items, orig)
+	case "try":
+		return compileTry(items, orig, compileIR)
+	case "raise":
+		return compileRaise(items, orig)
 	default:
 		// Any special form that analysis admits but this compiler does not
 		// model (dot access, and/or, literals, break/continue, comprehensions,
@@ -1156,6 +1160,8 @@ func compileModuleIR(v core.Value) core.Value {
 				return v
 			}
 			return &whileNode{cond: compileIR(items[1]), body: compileModuleIR(items[2])}
+		case "try":
+			return compileTry(items, v, compileModuleIR)
 		default:
 			return compileIR(v)
 		}
@@ -1210,4 +1216,130 @@ func compileModuleFor(items []core.Value, orig core.Value) core.Value {
 	default:
 		return orig
 	}
+}
+
+// --- compiled try (tryNode) ---
+
+// tryNode is a pre-partitioned try form: body statements, except clauses,
+// else and finally blocks are separated once at compile time (tryForm
+// re-partitioned on every execution), and every (do ...) block inside is
+// compiled to IR. Execution runs through execTry — tryForm's own machinery,
+// extracted verbatim — so matching, __context__ chaining, and finally
+// semantics are identical by construction. Clause TYPE positions stay
+// verbatim: the clause parser classifies them structurally at match time.
+type tryNode struct {
+	body    []core.Value
+	clauses []*core.ListValue
+	elseC   *core.ListValue
+	finC    *core.ListValue
+}
+
+func (n *tryNode) Type() core.Type { return "try-node" }
+func (n *tryNode) String() string  { return "(try ...)" }
+func (n *tryNode) evalIR(ctx *core.Context) (core.Value, error) {
+	return execTry(n.body, n.clauses, n.elseC, n.finC, ctx)
+}
+
+// execStmt: execTry already returns only sentinels or block values; in
+// statement position the non-sentinel value is dropped.
+func (n *tryNode) execStmt(ctx *core.Context) (core.Value, error) {
+	v, err := n.evalIR(ctx)
+	if err != nil {
+		return nil, err
+	}
+	switch v.(type) {
+	case *ReturnValue, *BreakValue, *ContinueValue:
+		return v, nil
+	}
+	return nil, nil
+}
+
+// compileTry builds a tryNode, compiling sub-blocks with compileStmt (the
+// caller's mode: compileIR for slot functions, compileModuleIR at module
+// scope). Compilation is best-effort per piece — anything unrecognized stays
+// raw and runs generically inside execTry. orig is returned only when the
+// partition itself fails, falling back to the tryForm handler's own error.
+func compileTry(items []core.Value, orig core.Value, compileStmt func(core.Value) core.Value) core.Value {
+	if len(items) < 2 {
+		return orig
+	}
+	body, clauses, elseC, finC, err := parseTryParts(items[1:])
+	if err != nil {
+		return orig
+	}
+	cbody := make([]core.Value, len(body))
+	for i, e := range body {
+		cbody[i] = compileStmt(e)
+	}
+	cclauses := make([]*core.ListValue, len(clauses))
+	for i, cl := range clauses {
+		cclauses[i] = compileTryClause(cl, compileStmt)
+	}
+	return &tryNode{
+		body:    cbody,
+		clauses: cclauses,
+		elseC:   compileClauseBlock(elseC, compileStmt),
+		finC:    compileClauseBlock(finC, compileStmt),
+	}
+}
+
+// compileTryClause rebuilds an except clause with its handler body compiled.
+// The handler is the trailing (do ...) block. Position 1 is structural — the
+// clause parser detects a bare except by finding a do-list there — so a
+// compiled bare-except body is re-wrapped in a literal (do ...) shell; later
+// positions hold the compiled block directly. Clauses that don't end in a
+// do-block (legacy shapes, except*) stay raw and run generically.
+func compileTryClause(cl *core.ListValue, compileStmt func(core.Value) core.Value) *core.ListValue {
+	n := cl.Len()
+	if n < 2 {
+		return cl
+	}
+	items := cl.ItemsRef()
+	last := n - 1
+	if !isDoBlock(items[last]) {
+		return cl
+	}
+	compiled := compileStmt(items[last])
+	out := make([]core.Value, n)
+	copy(out, items)
+	if last == 1 {
+		// Bare except: keep the structural (do ...) marker.
+		out[1] = core.NewList(core.SymbolValue("do"), compiled)
+	} else {
+		out[last] = compiled
+	}
+	return core.NewList(out...)
+}
+
+// compileClauseBlock rebuilds (else stmts...) / (finally stmts...) with each
+// statement compiled; execTry evaluates Items()[1:] unchanged.
+func compileClauseBlock(cl *core.ListValue, compileStmt func(core.Value) core.Value) *core.ListValue {
+	if cl == nil || cl.Len() < 2 {
+		return cl
+	}
+	items := cl.ItemsRef()
+	out := make([]core.Value, len(items))
+	out[0] = items[0]
+	for i := 1; i < len(items); i++ {
+		out[i] = compileStmt(items[i])
+	}
+	return core.NewList(out...)
+}
+
+// compileRaise rebuilds (raise expr [from cause]) with value positions
+// compiled; the `from` marker symbol stays verbatim for raiseForm's parser.
+func compileRaise(items []core.Value, orig core.Value) core.Value {
+	if len(items) == 1 {
+		return orig // bare re-raise: nothing to compile
+	}
+	out := make([]core.Value, len(items))
+	out[0] = items[0]
+	for i := 1; i < len(items); i++ {
+		if sym, ok := unwrapLocated(items[i]).(core.SymbolValue); ok && string(sym) == "from" {
+			out[i] = items[i]
+			continue
+		}
+		out[i] = compileIR(items[i])
+	}
+	return core.NewList(out...)
 }

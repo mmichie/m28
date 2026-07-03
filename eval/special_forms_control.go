@@ -46,25 +46,29 @@ func (e *Exception) ErrorWithChain() string {
 }
 
 // isExceptionType checks if a string is a known exception type
+// knownExceptionTypes is package-level: isExceptionType runs per clause per
+// raise (and in the resolver's try analysis); building the map per call was
+// 16% of the raise-catch loop.
+var knownExceptionTypes = map[string]bool{
+	"Exception":          true,
+	"Error":              true,
+	"NameError":          true,
+	"TypeError":          true,
+	"ValueError":         true,
+	"ZeroDivisionError":  true,
+	"KeyError":           true,
+	"IndexError":         true,
+	"AttributeError":     true,
+	"RuntimeError":       true,
+	"OSError":            true,
+	"FileNotFoundError":  true,
+	"NotADirectoryError": true,
+	"PermissionError":    true,
+	"AssertionError":     true,
+}
+
 func isExceptionType(name string) bool {
-	knownTypes := map[string]bool{
-		"Exception":         true,
-		"Error":             true,
-		"NameError":         true,
-		"TypeError":         true,
-		"ValueError":        true,
-		"ZeroDivisionError": true,
-		"KeyError":          true,
-		"IndexError":        true,
-		"AttributeError":    true,
-		"RuntimeError":       true,
-		"OSError":            true,
-		"FileNotFoundError":  true,
-		"NotADirectoryError": true,
-		"PermissionError":    true,
-		"AssertionError":     true,
-	}
-	return knownTypes[name]
+	return knownExceptionTypes[name]
 }
 
 // isLikelyExceptionType returns true if the name looks like an exception type
@@ -394,13 +398,19 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("try requires at least a body")
 	}
 
-	var tryBody []core.Value
-	var exceptClauses []*core.ListValue
-	var elseClause *core.ListValue
-	var finallyClause *core.ListValue
+	tryBody, exceptClauses, elseClause, finallyClause, err := parseTryParts(args.Items())
+	if err != nil {
+		return nil, err
+	}
+	return execTry(tryBody, exceptClauses, elseClause, finallyClause, ctx)
+}
 
-	// Parse the try form
-	for i, arg := range args.Items() {
+// parseTryParts partitions a try form's arguments (head-exclusive) into body
+// statements and clause lists, mirroring what tryForm always did: items whose
+// head is except/except*/else/finally are clauses; leading items are body;
+// trailing non-clause items after clauses are ignored.
+func parseTryParts(items []core.Value) (tryBody []core.Value, exceptClauses []*core.ListValue, elseClause, finallyClause *core.ListValue, err error) {
+	for i, arg := range items {
 		unwrappedArg := unwrapLocated(arg)
 		if list, ok := unwrappedArg.(*core.ListValue); ok && list.Len() > 0 {
 			firstElem := unwrapLocated(list.Items()[0])
@@ -408,19 +418,19 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				switch string(sym) {
 				case "except", "except*":
 					if i == 0 {
-						return nil, fmt.Errorf("try must have a body before except")
+						return nil, nil, nil, nil, fmt.Errorf("try must have a body before except")
 					}
 					exceptClauses = append(exceptClauses, list)
 					continue
 				case "else":
 					if i == 0 {
-						return nil, fmt.Errorf("try must have a body before else")
+						return nil, nil, nil, nil, fmt.Errorf("try must have a body before else")
 					}
 					elseClause = list
 					continue
 				case "finally":
 					if i == 0 {
-						return nil, fmt.Errorf("try must have a body before finally")
+						return nil, nil, nil, nil, fmt.Errorf("try must have a body before finally")
 					}
 					finallyClause = list
 					continue
@@ -433,7 +443,14 @@ func tryForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			tryBody = append(tryBody, arg)
 		}
 	}
+	return tryBody, exceptClauses, elseClause, finallyClause, nil
+}
 
+// execTry executes a partitioned try form. This is tryForm's original body,
+// extracted verbatim so the compiled tryNode (eval/resolve_ir.go) can run
+// pre-partitioned, pre-compiled pieces through the identical matching,
+// chaining, and finally machinery.
+func execTry(tryBody []core.Value, exceptClauses []*core.ListValue, elseClause, finallyClause *core.ListValue, ctx *core.Context) (core.Value, error) {
 	// Helper to run finally clause
 	// Returns (finallyResult, finallyErr)
 	// If finally block contains return/break/continue, finallyResult will be non-nil
