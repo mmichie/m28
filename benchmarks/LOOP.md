@@ -90,18 +90,35 @@ instead of a pass count, and the profiler tells you what to fix.
   startup (builtin registration, builtins preload). If its ratio is high, that
   is its own optimization.
 
-## Current targets (2026-07, epic M28-e42e)
+## Current targets (2026-07-02, epic M28-e42e)
 
-Campaign state: geomean ~3.7x CPython (from ~126x at campaign start). The
-original first targets are largely done: scope_lookup is near CPython parity
-(resolution layers 1-3), and the arith/attr/dict cases dropped 14-41x via the
-ValueToKey/getGoroutineID fix and the GOGC=400 default. Remaining, in order:
+Campaign state: geomean ~2.2x CPython (from ~126x at campaign start). The
+value-unboxing campaign (epic M28-9pm, stages 0-4; contract in
+`docs/design/ir-spec.md`) landed tagged slot frames, the evalNum typed
+kernel, forNode/whileNode, and the truthiness fast paths. M28 now BEATS
+CPython on `recursion_fib` (0.6x) and `scope_lookup` (0.8x); slot-compiled
+loop kernels run at fixed per-call allocations (28/op for-range, 9/op while
+— see the `Kernel*` micro benches, which are the campaign gates). Remaining,
+in rough value order:
 
-- `regex_match` — M28 interprets CPython's `re.py` wrapper per call; needs the
-  native c_sre fast path (M28-dgh), not micro-tweaks. Biggest remaining ratio.
-- `/`, `//`, `%`, `**` still lack native numeric fast paths (M28-2gb).
-- Value unboxing (the path past CPython; vmspike unboxed rung: 94x) is
-  deliberately last — re-profile from the current baseline before committing.
+- `regex_match` (6.4x) — M28 interprets CPython's `re.py` wrapper per call;
+  needs the native c_sre fast path (M28-dgh), not micro-tweaks. Biggest
+  remaining ratio; partially helped by containment (-14%) but walled.
+- `exceptions` (4.9x) — the raise/catch path costs ~21µs per exception
+  (instance construction, matching, context chaining; bead filed). tryNode
+  (pre-parsed clause structure) is the sibling bead.
+- `attr_method` (3.7x) — slot-call frame construction is 76% of call allocs
+  (frame-reuse bead: needs a funcEnv-escape proof before pooling);
+  remaining DotForm internals (BoundMethod per access, Class instantiation).
+- `arith_int` (2.9x) / `iteration` (2.5x) — MODULE-LEVEL code: it never
+  slot-compiles, so it kept none of the unboxing wins. The lever is
+  compiling module bodies like function bodies (module-as-frame), or
+  accepting that module top-level is cold in real programs.
+- `/`, `//`, `%`, `**` still lack typed-kernel fast paths (M28-2gb) — they
+  box and dispatch to the registry.
+- Slot-call frame reuse (see above) is the biggest single remaining lever
+  for call-heavy code: fib's residual 28 allocs/call are Context+SlotFrame
+  construction.
 
 ## Adding a case
 

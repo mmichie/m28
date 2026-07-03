@@ -55,9 +55,13 @@ Work items in this document reference beads issues (`bd show <id>`).
   forms). `.m28` files accept full Python syntax as well as s-expressions.
 - **Conformance:** 526/943 CPython-derived unit tests passing
   (`conformance.json`; campaign epic M28-a6b8, the active P0 work).
-- **Performance:** macro-benchmark geomean is ~3.7x CPython, down from ~126x
-  at campaign start (epic M28-e42e). The worst remaining case is
-  `regex_match` — M28 interprets CPython's `re.py` wrapper per call.
+- **Performance:** macro-benchmark geomean is ~2.2x CPython, down from ~126x
+  at campaign start (epic M28-e42e), and M28 beats CPython outright on
+  `recursion_fib` (0.6x) and `scope_lookup` (0.8x). The value-unboxing
+  campaign (epic M28-9pm) landed: tagged slot frames, the evalNum typed
+  kernel, and compiled loops — contract in `docs/design/ir-spec.md`. The
+  worst remaining case is `regex_match` — M28 interprets CPython's `re.py`
+  wrapper per call.
 - **The resolution layer exists** (layers 1-3): `eval/resolve.go`
   (`analyzeLocals`, `resolveBody` -> slot-indexed locals) and
   `eval/resolve_ir.go` (`compileIR` -> self-evaluating typed IR nodes), applied
@@ -205,13 +209,14 @@ Planned, in order:
 The resolved tree-walk is the engine. Two future additions are on the books —
 one for speed, one for semantics:
 
-- **Value unboxing** (epic M28-9pm): numeric locals live in tagged slot
-  frames as raw Go scalars, and the IR gains a typed evaluation kernel
-  (`evalNum`) so arithmetic runs unboxed end-to-end within a function,
-  boxing only at escape points (generic calls, containers). This is the
-  vmspike vm-unboxed rung (94x vs ~10x boxed — the gap is pure value model)
-  brought to the tree-walk, staged with an always-correct fallback and a
-  shadow-verification mode, exactly like resolution layers 1-3.
+- **Value unboxing** (epic M28-9pm): LANDED (stages 0-4, 2026-07-02).
+  Numeric locals live in tagged slot frames as raw Go scalars
+  (`core.SlotFrame`), the IR has a typed evaluation kernel (`evalNumOf`),
+  and compiled for/while loops run their bodies in statement position —
+  slot-compiled loop kernels execute at fixed per-call allocations.
+  Contract, invariants, and the shadow-verification mode:
+  `docs/design/ir-spec.md`. Remaining follow-up: slot-call frame reuse
+  (Context+frame construction dominates call-heavy profiles).
 - **Frame-based tier for resumable semantics** (M28-8jo, deferred).
   Generators currently run on a bespoke step machine
   (`eval/generator_exec.go`), async wraps goroutines, and recursion depth is
