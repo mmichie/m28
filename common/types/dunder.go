@@ -7,19 +7,31 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-// CallDunder calls a dunder (double underscore) method on an object if it exists
-// Returns (result, found, error) where found indicates if the method was found
-func CallDunder(obj core.Value, method string, args []core.Value, ctx *core.Context) (core.Value, bool, error) {
-	// Check if object has attributes
+// lookupDunder resolves an implicit special method. For class instances it
+// follows CPython's rule — special methods are looked up on the type, never
+// in the instance __dict__ (core.GetTypeDunder). Other values resolve through
+// their ordinary GetAttr.
+func lookupDunder(obj core.Value, method string) (core.Value, bool, error) {
+	if inst, ok := obj.(*core.Instance); ok {
+		return core.GetTypeDunder(inst, method)
+	}
 	attrObj, ok := obj.(interface {
 		GetAttr(string) (core.Value, bool)
 	})
 	if !ok {
 		return nil, false, nil
 	}
+	v, exists := attrObj.GetAttr(method)
+	return v, exists, nil
+}
 
-	// Look for the dunder method
-	methodVal, exists := attrObj.GetAttr(method)
+// CallDunder calls a dunder (double underscore) method on an object if it exists
+// Returns (result, found, error) where found indicates if the method was found
+func CallDunder(obj core.Value, method string, args []core.Value, ctx *core.Context) (core.Value, bool, error) {
+	methodVal, exists, err := lookupDunder(obj, method)
+	if err != nil {
+		return nil, true, err
+	}
 	if !exists {
 		return nil, false, nil
 	}
@@ -63,14 +75,10 @@ func CallDunder(obj core.Value, method string, args []core.Value, ctx *core.Cont
 // correctly (object.__ne__ must return NotImplemented when __eq__ does, so the
 // reflected __ne__ is tried before falling back to identity).
 func CallDunderRaw(obj core.Value, method string, args []core.Value, ctx *core.Context) (core.Value, bool, error) {
-	attrObj, ok := obj.(interface {
-		GetAttr(string) (core.Value, bool)
-	})
-	if !ok {
-		return nil, false, nil
+	methodVal, exists, err := lookupDunder(obj, method)
+	if err != nil {
+		return nil, true, err
 	}
-
-	methodVal, exists := attrObj.GetAttr(method)
 	if !exists {
 		return nil, false, nil
 	}
@@ -95,8 +103,13 @@ func CallDunderRaw(obj core.Value, method string, args []core.Value, ctx *core.C
 	return result, true, err
 }
 
-// HasDunder checks if an object has a dunder method
+// HasDunder checks if an object has a dunder method (type-level for
+// instances, like CallDunder).
 func HasDunder(obj core.Value, method string) bool {
+	if inst, ok := obj.(*core.Instance); ok {
+		_, exists, err := core.GetTypeDunder(inst, method)
+		return err == nil && exists
+	}
 	attrObj, ok := obj.(interface {
 		GetAttr(string) (core.Value, bool)
 	})

@@ -545,6 +545,14 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 	}
 
+	// An inconsistent hierarchy (e.g. class X(A, B) where B subclasses A) has
+	// no valid C3 linearization; CPython raises TypeError at creation.
+	if class != nil {
+		if _, mroErr := class.Linearization(); mroErr != nil {
+			return nil, mroErr
+		}
+	}
+
 	// Set __module__ to the defining module's name (the __name__ in scope),
 	// instead of the hard-coded "__main__". This makes cls.__module__ correct for
 	// classes defined in imported modules — needed by repr, pickling, and enum's
@@ -1153,14 +1161,11 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					result, err = callable.Call(args, callCtx)
 				}
 				if err != nil {
-					// Don't fail class creation if metaclass.__new__ fails
-					// This allows classes with metaclass=ABCMeta to work even if ABCMeta.__new__ uses unsupported syntax
-					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Warning: metaclass.__new__ failed: %v\n", err)
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Continuing with class creation anyway\n")
-					}
-					// Continue without calling __new__
-				} else {
+					// A metaclass __new__ that raises must abort class creation
+					// (CPython propagates; swallowing hid real errors).
+					return nil, err
+				}
+				{
 					// Check if __new__ returned a class or something else
 					if newClass, ok := result.(*core.Class); ok {
 						class = newClass
@@ -1259,10 +1264,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 					_, err = callable.Call(initArgs, callCtx)
 				}
 				if err != nil {
-					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Warning: metaclass.__init__ failed: %v\n", err)
-					}
-					// Continue without failing - __init__ errors are warnings in class creation
+					// Metaclass __init__ errors abort class creation like CPython.
+					return nil, err
 				}
 			}
 		}
@@ -1429,9 +1432,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Pass classKwargs (non-metaclass keywords from class definition)
 				_, err := userFunc.CallWithKwargs([]core.Value{class}, classKwargs, initSubclassCtx)
 				if err != nil {
-					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Error calling __init_subclass__: %v\n", err)
-					}
+					// __init_subclass__ raising aborts class creation (CPython).
+					return nil, err
 				}
 			} else if callable, ok := initSubclass.(interface {
 				Call([]core.Value, *core.Context) (core.Value, error)
@@ -1453,13 +1455,10 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// without args first to see if that works.
 				_, err := callable.Call([]core.Value{}, ctx)
 				if err != nil {
-					if debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Error calling __init_subclass__ with 0 args: %v\n", err)
-					}
-					// If that doesn't work, try with the new class
-					_, err2 := callable.Call([]core.Value{class}, ctx)
-					if err2 != nil && debugClass {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Error calling __init_subclass__ with 1 arg: %v\n", err2)
+					// If that doesn't work, try with the new class; if both
+					// fail, the hook genuinely raised — propagate it.
+					if _, err2 := callable.Call([]core.Value{class}, ctx); err2 != nil {
+						return nil, err2
 					}
 				}
 			}
@@ -1618,8 +1617,8 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	if args.Len() == 0 {
 		// First, check if __class__ is defined in the context
 		// This tells us which class's method we're currently executing in
-		classVal, classErr := ctx.Lookup("__class__")
-		if classErr == nil {
+		classVal, classFound := ctx.TryLookup("__class__")
+		if classFound {
 			if class, ok := classVal.(*core.Class); ok {
 				// We know which class we're in, use it for super()
 				// super() searches the MRO starting AFTER this class
@@ -1631,7 +1630,7 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				debugSuper := core.DebugSuperEnabled()
 
 				// Check for cls parameter first (used in __new__, __init_subclass__, classmethods, etc.)
-				if clsVal, err := ctx.Lookup("cls"); err == nil {
+				if clsVal, ok := ctx.TryLookup("cls"); ok {
 					if targetClass, ok := clsVal.(*core.Class); ok {
 						if debugSuper {
 							fmt.Fprintf(os.Stderr, "[DEBUG superForm] Creating SuperForClass(__class__=%s, targetClass=%s)\n",
@@ -1643,7 +1642,7 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 
 				// Check for self parameter (instance methods)
-				if selfVal, err := ctx.Lookup("self"); err == nil {
+				if selfVal, ok := ctx.TryLookup("self"); ok {
 					if instance, ok := selfVal.(*core.Instance); ok {
 						// Instance method - return super for current class with instance
 						// Super.GetAttr will search MRO starting AFTER this class
@@ -1664,19 +1663,13 @@ func superForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		}
 
 		// Fallback: Try to find the first parameter (could be self, cls, mcls, etc.)
-		// Try common names in order
-		var firstArg core.Value
-		var err error
-
-		// Try self first (for instance methods)
-		firstArg, err = ctx.Lookup("self")
-		if err != nil {
-			// Try cls (for class methods)
-			firstArg, err = ctx.Lookup("cls")
-			if err != nil {
-				// Try mcls (for metaclass methods)
-				firstArg, err = ctx.Lookup("mcls")
-				if err != nil {
+		// Try common names in order (existence probes: no NameError/suggestion cost)
+		firstArg, ok := ctx.TryLookup("self")
+		if !ok {
+			firstArg, ok = ctx.TryLookup("cls")
+			if !ok {
+				firstArg, ok = ctx.TryLookup("mcls")
+				if !ok {
 					return nil, &core.TypeError{Message: "super: no arguments given and cannot determine self/cls/mcls"}
 				}
 			}

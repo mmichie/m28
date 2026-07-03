@@ -134,6 +134,23 @@ func (e *PythonError) Error() string {
 	return className
 }
 
+// IsAttributeError reports whether err represents a Python AttributeError
+// (the Go-side error type, or a raised AttributeError instance / subclass).
+// CPython maps exactly this to the "attribute missing" fallback paths
+// (__getattr__, hasattr), while every other exception propagates.
+func IsAttributeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if _, ok := err.(*AttributeError); ok {
+		return true
+	}
+	if pe, ok := err.(*PythonError); ok && pe.Instance != nil {
+		return classInherits(pe.Instance.Class, "AttributeError")
+	}
+	return false
+}
+
 // GetExceptionType returns the class name of the wrapped exception
 func (e *PythonError) GetExceptionType() string {
 	if e.Instance == nil || e.Instance.Class == nil {

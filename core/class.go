@@ -23,6 +23,14 @@ type Class struct {
 	Constructor *MethodDescriptor // __init__ method
 	SlotNames   []string          // __slots__ attribute (if defined)
 	Metaclass   Value             // Metaclass of this class (type by default)
+
+	// C3 linearization cache (see mro.go); hierarchies are immutable after
+	// creation so this never invalidates in practice.
+	mro    []*Class
+	mroErr error
+	// slotsRestricted caches "every class in the MRO is fully slotted", the
+	// condition under which attribute creation outside __slots__ raises.
+	slotsRestricted *bool
 }
 
 // NewClass creates a new class
@@ -67,65 +75,60 @@ func (c *Class) String() string {
 	return c.Name
 }
 
-// GetMethod looks up a method in the class hierarchy
+// GetMethod looks up a method in the class hierarchy, following the C3 MRO.
 func (c *Class) GetMethod(name string) (Value, bool) {
-	// Check this class first
+	if mro := c.mroOrNil(); mro != nil {
+		for _, k := range mro {
+			if method, ok := k.Methods[name]; ok {
+				return method, true
+			}
+		}
+		return nil, false
+	}
+	// Inconsistent hierarchy (creation-time validation bypassed): legacy walk.
 	if method, ok := c.Methods[name]; ok {
 		return method, true
 	}
-
-	// Check parent classes using MRO (Method Resolution Order)
-	// Use breadth-first search to match Python's C3 linearization behavior
-	// This ensures we check all direct parents before checking grandparents
-	// First, check all direct parents (non-recursively)
-	for _, parent := range c.Parents {
-		if method, ok := parent.Methods[name]; ok {
-			return method, true
-		}
-	}
-	// Then check grandparents recursively
 	for _, parent := range c.Parents {
 		if method, ok := parent.GetMethod(name); ok {
 			return method, true
 		}
 	}
-
 	return nil, false
 }
 
-// GetMethodWithClass looks up a method and returns the class where it was defined
+// GetMethodWithClass looks up a method following the C3 MRO and returns the
+// class where it was defined. At each level it also consults Attributes for
+// dunder names, so the `__eq__ = None` blocking pattern works.
 func (c *Class) GetMethodWithClass(name string) (Value, *Class, bool) {
-	// Check this class first - look in both Methods and Attributes
-	// This is important for when a subclass sets __eq__ = None to block inherited __eq__
+	isDunder := strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__")
+	if mro := c.mroOrNil(); mro != nil {
+		for _, k := range mro {
+			if method, ok := k.Methods[name]; ok {
+				return method, k, true
+			}
+			if isDunder {
+				if attr, ok := k.Attributes[name]; ok {
+					return attr, k, true
+				}
+			}
+		}
+		return nil, nil, false
+	}
+	// Inconsistent hierarchy: legacy walk.
 	if method, ok := c.Methods[name]; ok {
 		return method, c, true
 	}
-
-	// Also check class attributes - needed for __eq__ = None pattern
-	// Only check for special methods (dunder methods) to avoid interference with regular methods
-	if strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") {
+	if isDunder {
 		if attr, ok := c.Attributes[name]; ok {
 			return attr, c, true
 		}
 	}
-
-	// Check parent classes using MRO (Method Resolution Order)
-	// Use breadth-first search to match Python's C3 linearization behavior
-	if len(c.Parents) > 0 {
-		// First, check all direct parents (non-recursively)
-		for _, parent := range c.Parents {
-			if method, ok := parent.Methods[name]; ok {
-				return method, parent, true
-			}
-		}
-		// Then check grandparents recursively
-		for _, parent := range c.Parents {
-			if method, defClass, ok := parent.GetMethodWithClass(name); ok {
-				return method, defClass, true
-			}
+	for _, parent := range c.Parents {
+		if method, defClass, ok := parent.GetMethodWithClass(name); ok {
+			return method, defClass, true
 		}
 	}
-
 	return nil, nil, false
 }
 
@@ -243,34 +246,38 @@ func (c *Class) SetMethod(name string, method Value) {
 	c.Methods[name] = method
 }
 
-// GetClassAttr gets a class attribute
+// GetClassAttr gets a class attribute, following the C3 MRO.
 func (c *Class) GetClassAttr(name string) (Value, bool) {
-	// Check this class first
+	if mro := c.mroOrNil(); mro != nil {
+		for _, k := range mro {
+			if attr, ok := k.Attributes[name]; ok {
+				return attr, true
+			}
+		}
+		return nil, false
+	}
+	// Inconsistent hierarchy: legacy walk.
 	if attr, ok := c.Attributes[name]; ok {
 		return attr, true
 	}
-
-	// Check parent classes using MRO (breadth-first)
-	if len(c.Parents) > 0 {
-		// First, check all direct parents (non-recursively)
-		for _, parent := range c.Parents {
-			if attr, ok := parent.Attributes[name]; ok {
-				return attr, true
-			}
-		}
-		// Then check grandparents recursively
-		for _, parent := range c.Parents {
-			if attr, ok := parent.GetClassAttr(name); ok {
-				return attr, true
-			}
+	for _, parent := range c.Parents {
+		if attr, ok := parent.GetClassAttr(name); ok {
+			return attr, true
 		}
 	}
-
 	return nil, false
 }
 
-// SetClassAttr sets a class attribute
+// SetClassAttr sets a class attribute. The class namespace is conceptually
+// one dict, but lookup consults Methods before Attributes — so when the name
+// already resolves as a method (own or inherited), the assignment must land
+// in this class's Methods or the stale def would keep shadowing it and
+// monkey-patching (`Cls.m = fn`) would silently no-op.
 func (c *Class) SetClassAttr(name string, value Value) {
+	if _, ok := c.GetMethod(name); ok {
+		c.Methods[name] = value
+		return
+	}
 	c.Attributes[name] = value
 }
 
@@ -454,61 +461,31 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return None, true
 	}
 
-	// Special handling for __mro__ (Method Resolution Order)
+	// Special handling for __mro__ (Method Resolution Order): the cached C3
+	// linearization, as a tuple of classes.
 	if name == "__mro__" {
-		// Build the MRO tuple using C3 linearization
-		// Simplified algorithm: breadth-first traversal with deduplication
-		mro := []Value{c}
-		seen := make(map[*Class]bool)
-		seen[c] = true
-
-		// Queue of classes to process
-		queue := []*Class{}
-
-		// Add direct parents to queue
-		queue = append(queue, c.Parents...)
-
-		// Process queue in breadth-first order
-		for len(queue) > 0 {
-			cls := queue[0]
-			queue = queue[1:]
-
-			if cls == nil || seen[cls] {
-				continue
+		if mro := c.mroOrNil(); mro != nil {
+			out := make([]Value, len(mro))
+			for i, k := range mro {
+				out[i] = k
 			}
-
-			mro = append(mro, cls)
-			seen[cls] = true
-
-			// Add this class's parents to the queue
-			queue = append(queue, cls.Parents...)
+			return TupleValue(out), true
 		}
-
-		return TupleValue(mro), true
+		return TupleValue([]Value{c}), true
 	}
 
 	// mro() method - returns the MRO as a list (unlike __mro__ which is a tuple)
 	if name == "mro" {
 		return NewBuiltinFunction(func(args []Value, ctx *Context) (Value, error) {
-			// Build the MRO list using the same algorithm as __mro__
-			mro := []Value{c}
-			seen := make(map[*Class]bool)
-			seen[c] = true
-			queue := []*Class{}
-			queue = append(queue, c.Parents...)
-
-			for len(queue) > 0 {
-				cls := queue[0]
-				queue = queue[1:]
-				if cls == nil || seen[cls] {
-					continue
-				}
-				mro = append(mro, cls)
-				seen[cls] = true
-				queue = append(queue, cls.Parents...)
+			mro, err := c.Linearization()
+			if err != nil {
+				return nil, err
 			}
-
-			return NewList(mro...), nil
+			out := make([]Value, len(mro))
+			for i, k := range mro {
+				out[i] = k
+			}
+			return NewList(out...), nil
 		}), true
 	}
 
@@ -1712,10 +1689,10 @@ func (i *Instance) callNoArgDunderStr(name string) (string, bool) {
 // 2. Instance __dict__
 // 3. Non-data descriptors from class (has __get__ only)
 // 4. Class attributes
-func (i *Instance) GetAttr(name string) (Value, bool) {
+func (i *Instance) getAttrImpl(name string, skipInstanceDict bool) (Value, bool, error) {
 	// Check special attributes first
 	if name == "__class__" {
-		return i.Class, true
+		return i.Class, true, nil
 	}
 
 	// Handle __traceback__ - return None by default for exceptions
@@ -1723,10 +1700,10 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 	if name == "__traceback__" {
 		// Check if it's already set in instance attributes
 		if attr, ok := i.Attributes[name]; ok {
-			return attr, true
+			return attr, true, nil
 		}
 		// Default to None for exception instances
-		return None, true
+		return None, true, nil
 	}
 
 	// Handle __dict__ - return instance attributes as a dict
@@ -1740,7 +1717,7 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 				dict.SetWithKey(k, StringValue(k), v)
 			}
 		}
-		return dict, true
+		return dict, true, nil
 	}
 
 	// Step 1: Check for data descriptor in class
@@ -1765,14 +1742,15 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 					if callable, ok := getMethod.(Callable); ok {
 						// Call descriptor.__get__(instance, type)
 						result, err := callable.Call([]Value{i, i.Class}, nil)
-						if err == nil {
-							return result, true
+						if err != nil {
+							return nil, false, err
 						}
+						return result, true, nil
 					}
 				}
 			}
-			// If __get__ doesn't exist or fails, return the descriptor itself
-			return classAttr, true
+			// If __get__ doesn't exist, return the descriptor itself
+			return classAttr, true, nil
 		}
 	} else if classAttr, ok := i.Class.GetClassAttr(name); ok {
 		// Check class attributes for data descriptors too
@@ -1794,20 +1772,24 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 					if callable, ok := getMethod.(Callable); ok {
 						// Call descriptor.__get__(instance, type)
 						result, err := callable.Call([]Value{i, i.Class}, nil)
-						if err == nil {
-							return result, true
+						if err != nil {
+							return nil, false, err
 						}
+						return result, true, nil
 					}
 				}
 			}
-			// If __get__ doesn't exist or fails, return the descriptor itself
-			return classAttr, true
+			// If __get__ doesn't exist, return the descriptor itself
+			return classAttr, true, nil
 		}
 	}
 
-	// Step 2: Check instance __dict__
-	if attr, ok := i.Attributes[name]; ok {
-		return attr, true
+	// Step 2: Check instance __dict__ (skipped for implicit dunder dispatch,
+	// which per CPython resolves special methods on the type only)
+	if !skipInstanceDict {
+		if attr, ok := i.Attributes[name]; ok {
+			return attr, true, nil
+		}
 	}
 
 	// Step 3: Check for non-data descriptor in class (has __get__ but not __set__ or __delete__)
@@ -1819,16 +1801,17 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 				if callable, ok := getMethod.(Callable); ok {
 					// Call descriptor.__get__(instance, type)
 					result, err := callable.Call([]Value{i, i.Class}, nil)
-					if err == nil {
-						return result, true
+					if err != nil {
+						return nil, false, err
 					}
+					return result, true, nil
 				}
 			}
 		}
 
 		// Static methods should not be bound to the instance
 		if sm, ok := classAttr.(*StaticMethodValue); ok {
-			return sm.Function, true
+			return sm.Function, true, nil
 		}
 
 		// Not a descriptor, check if it's a regular method that needs binding
@@ -1841,9 +1824,9 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 				Method:        callable,
 				DefiningClass: defClass,
 			}
-			return boundMethod, true
+			return boundMethod, true, nil
 		}
-		return classAttr, true
+		return classAttr, true, nil
 	}
 
 	// Step 4: Check class attributes (non-descriptors)
@@ -1854,20 +1837,21 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 				if callable, ok := getMethod.(Callable); ok {
 					// Call descriptor.__get__(instance, type)
 					result, err := callable.Call([]Value{i, i.Class}, nil)
-					if err == nil {
-						return result, true
+					if err != nil {
+						return nil, false, err
 					}
+					return result, true, nil
 				}
 			}
 		}
-		return attr, true
+		return attr, true, nil
 	}
 
 	// Step 4.5: Forward dict methods to BackingDict for dict-subclass instances.
 	// Lets `class D(dict): pass; d=D({1:2}); d.get(1)` work as expected.
 	if i.BackingDict != nil {
 		if v, ok := dictMethodOnInstance(i, name); ok {
-			return v, true
+			return v, true, nil
 		}
 	}
 
@@ -1885,11 +1869,13 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 			}
 			// Call with the attribute name
 			result, err := boundMethod.Call([]Value{StringValue(name)}, nil)
-			if err == nil {
-				return result, true
+			if err != nil {
+				// Propagate: an AttributeError here carries the hook's own
+				// message, and any other exception type (e.g. ValueError)
+				// must surface unchanged, not be masked as a lookup miss.
+				return nil, false, err
 			}
-			// If __getattr__ raises AttributeError, we should still return nil, false
-			// to maintain consistent error reporting
+			return result, true, nil
 		}
 	}
 
@@ -1907,13 +1893,45 @@ func (i *Instance) GetAttr(name string) (Value, bool) {
 					Instance: i,
 					Method:   callable,
 				}
-				return boundMethod, true
+				return boundMethod, true, nil
 			}
-			return classAttr, true
+			return classAttr, true, nil
 		}
 	}
 
-	return nil, false
+	return nil, false, nil
+}
+
+// GetAttr implements Object interface for instances
+// Implements Python's descriptor protocol lookup order:
+// 1. Data descriptors from class (has __set__ or __delete__)
+// 2. Instance __dict__
+// 3. Non-data descriptors from class (has __get__ only)
+// 4. Class attributes
+// Errors from user hooks (descriptor __get__, __getattr__) are dropped by
+// this legacy boolean API; error-aware callers use GetAttrWithError.
+func (i *Instance) GetAttr(name string) (Value, bool) {
+	v, ok, err := i.getAttrImpl(name, false)
+	if err != nil {
+		return nil, false
+	}
+	return v, ok
+}
+
+// GetAttrWithError is GetAttr with user-hook errors propagated: a raising
+// descriptor __get__ or __getattr__ surfaces its exception instead of being
+// reported as a plain lookup miss.
+func (i *Instance) GetAttrWithError(name string) (Value, bool, error) {
+	return i.getAttrImpl(name, false)
+}
+
+// GetTypeDunder resolves an implicit special method for inst per CPython's
+// rule: the lookup starts at the type — the instance __dict__ is never
+// consulted — while still honoring descriptors, BackingDict forwarding and
+// synthesized defaults. Operator and protocol dispatch (types.CallDunder)
+// goes through here.
+func GetTypeDunder(inst *Instance, name string) (Value, bool, error) {
+	return inst.getAttrImpl(name, true)
 }
 
 // SetAttr implements Object interface for instances
@@ -1990,6 +2008,11 @@ func validateExceptionSetAttr(name string, value Value) error {
 // StringValue on every attribute write just to reach SetAttrDefault.
 var DefaultObjectSetAttr Value
 
+// DefaultObjectGetAttribute is object's default __getattribute__ builtin,
+// identity-checked by dot access so only user-defined hooks pay the boxed
+// dunder call.
+var DefaultObjectGetAttribute Value
+
 func (i *Instance) SetAttr(name string, value Value) error {
 	// Check for custom __setattr__ in the class hierarchy
 	// Look in class methods (not GetAttr which returns the builtin fallback)
@@ -2052,6 +2075,13 @@ func (i *Instance) SetAttrDefault(name string, value Value) error {
 				}
 			}
 		}
+	}
+
+	// A fully slotted class (every class in the MRO declares __slots__, none
+	// includes "__dict__") rejects attributes outside its slots; slot names
+	// themselves were handled above by their SlotDescriptor's __set__.
+	if i.Class.slotsRestrict() {
+		return &AttributeError{ObjType: i.Class.Name, Message: fmt.Sprintf("'%s' object has no attribute '%s'", i.Class.Name, name)}
 	}
 
 	// No descriptor with __set__, set in instance __dict__
@@ -2506,14 +2536,14 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 	// When super() is called in ArgumentParser, s.Class = _AttributeHolder
 	// We should search [_AttributeHolder, _ActionsContainer, object]
 	if s.Instance != nil {
-		// Get the instance's MRO
-		mroVal, hasMRO := s.Instance.Class.GetAttr("__mro__")
-		if hasMRO {
-			if mro, ok := mroVal.(TupleValue); ok {
+		// The cached C3 linearization of type(self); no per-lookup rebuild.
+		mro := s.Instance.Class.mroOrNil()
+		if mro != nil {
+			{
 				// Find s.Class in the MRO
 				startIdx := -1
 				for i, cls := range mro {
-					if c, ok := cls.(*Class); ok && c == s.Class {
+					if cls == s.Class {
 						startIdx = i
 						break
 					}
@@ -2523,7 +2553,8 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 					// Search the MRO starting AFTER s.Class (not inclusive)
 					// super() in a method should find parent class methods, not the current class
 					for i := startIdx + 1; i < len(mro); i++ {
-						if cls, ok := mro[i].(*Class); ok {
+						cls := mro[i]
+						{
 							if debugSuperGetAttr {
 								fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] Checking MRO[%d] = %s\n", i, cls.Name)
 							}

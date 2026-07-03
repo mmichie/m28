@@ -556,15 +556,32 @@ func (c *Context) lookupWithDepth(name string, depth int, crossedFunction bool) 
 }
 
 func (c *Context) lookupWithDepthHashed(name string, nameHash uint64, depth int, crossedFunction bool) (Value, error) {
+	if v, ok := c.tryLookupHashed(name, nameHash, depth, crossedFunction); ok {
+		return v, nil
+	}
+	// Miss: build the NameError with a "did you mean" suggestion. This is
+	// deliberately outside the walk — computing suggestions runs Levenshtein
+	// over every visible name, which existence probes must never pay.
+	availableNames := c.GetAllAvailableNames()
+	suggestion := generateNameSuggestion(name, availableNames)
+	return nil, &NameError{
+		Name:       name,
+		Suggestion: suggestion,
+	}
+}
+
+// TryLookup resolves a name like Lookup but reports a miss as a boolean,
+// without constructing a NameError or computing suggestions. Existence
+// probes (zero-arg super's self/cls search, hasattr-style checks) use this.
+func (c *Context) TryLookup(name string) (Value, bool) {
+	return c.tryLookupHashed(name, 0, 0, false)
+}
+
+func (c *Context) tryLookupHashed(name string, nameHash uint64, depth int, crossedFunction bool) (Value, bool) {
 	// Prevent infinite loops in context chain
 	if depth > 100 {
 		Log.Error(SubsystemScope, "Lookup depth exceeded - possible circular context chain", "name", name)
-		availableNames := c.GetAllAvailableNames()
-		suggestion := generateNameSuggestion(name, availableNames)
-		return nil, &NameError{
-			Name:       name,
-			Suggestion: suggestion,
-		}
+		return nil, false
 	}
 
 	// DEBUG: Log lookups that exceed a certain depth
@@ -592,7 +609,7 @@ func (c *Context) lookupWithDepthHashed(name string, nameHash uint64, depth int,
 			if debugLookups && depth < 5 {
 				Log.Debug(SubsystemScope, "Variable found in ModuleDict", "name", name)
 			}
-			return val, nil
+			return val, true
 		}
 	}
 
@@ -605,13 +622,13 @@ func (c *Context) lookupWithDepthHashed(name string, nameHash uint64, depth int,
 			if debugLookups && depth < 5 {
 				Log.Debug(SubsystemScope, "Variable found in local scope", "name", name)
 			}
-			return val, nil
+			return val, true
 		}
 	}
 
 	// Check outer scopes
 	if c.Outer != nil {
-		return c.Outer.lookupWithDepthHashed(name, nameHash, depth+1, crossedFunction || c.IsFunctionScope)
+		return c.Outer.tryLookupHashed(name, nameHash, depth+1, crossedFunction || c.IsFunctionScope)
 	}
 
 	// If we reached the end of the scope chain and have a Global context,
@@ -622,17 +639,12 @@ func (c *Context) lookupWithDepthHashed(name string, nameHash uint64, depth int,
 			nameHash = HashStr(name)
 		}
 		if val, ok := c.Global.ModuleDict.GetStrHashed(nameHash, name); ok {
-			return val, nil
+			return val, true
 		}
 	}
 
-	// Variable not found - generate suggestion
-	availableNames := c.GetAllAvailableNames()
-	suggestion := generateNameSuggestion(name, availableNames)
-	return nil, &NameError{
-		Name:       name,
-		Suggestion: suggestion,
-	}
+	// Variable not found
+	return nil, false
 }
 
 // PushStack adds a new entry to the call stack

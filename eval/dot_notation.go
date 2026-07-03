@@ -58,7 +58,40 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	var value core.Value
 	var found bool
 
-	if objWithAttrs, ok := obj.(core.Object); ok {
+	if inst, ok := obj.(*core.Instance); ok {
+		// A user-defined __getattribute__ intercepts EVERY attribute access
+		// (object's default is identity-checked so ordinary classes skip the
+		// boxed call). An AttributeError from it falls back to __getattr__
+		// when defined; any other exception propagates unchanged.
+		if gaMethod, _, hasGA := inst.Class.GetMethodWithClass("__getattribute__"); hasGA && gaMethod != core.DefaultObjectGetAttribute {
+			if callable, ok := gaMethod.(interface {
+				Call([]core.Value, *core.Context) (core.Value, error)
+			}); ok {
+				result, err := callable.Call([]core.Value{inst, core.StringValue(string(propName))}, ctx)
+				if err == nil {
+					return result, nil
+				}
+				if !core.IsAttributeError(err) {
+					return nil, err
+				}
+				if gattr, _, hasHook := inst.Class.GetMethodWithClass("__getattr__"); hasHook {
+					if gcall, ok := gattr.(interface {
+						Call([]core.Value, *core.Context) (core.Value, error)
+					}); ok {
+						return gcall.Call([]core.Value{inst, core.StringValue(string(propName))}, ctx)
+					}
+				}
+				return nil, err
+			}
+		}
+		// Default lookup, with user-hook errors (descriptor __get__,
+		// __getattr__) propagated instead of masked as lookup misses.
+		var attrErr error
+		value, found, attrErr = inst.GetAttrWithError(string(propName))
+		if attrErr != nil {
+			return nil, attrErr
+		}
+	} else if objWithAttrs, ok := obj.(core.Object); ok {
 		// Full Object interface
 		value, found = objWithAttrs.GetAttr(string(propName))
 	} else if objWithGetAttr, ok := obj.(interface {

@@ -193,27 +193,47 @@ func hashFrozensetElems(elems []Value, ctx *Context) (uint64, error) {
 // explicitly None (unhashable), and (nil, false) when nothing user-defined
 // exists.
 func findUserHash(class *Class) (Value, bool) {
-	seen := map[*Class]bool{}
-	queue := []*Class{class}
-	for len(queue) > 0 {
-		c := queue[0]
-		queue = queue[1:]
-		if c == nil || seen[c] {
-			continue
-		}
-		seen[c] = true
-		if attr, ok := c.Attributes["__hash__"]; ok {
-			if _, isNil := attr.(NilValue); isNil {
-				return nil, true
+	mro := class.mroOrNil()
+	if mro == nil {
+		// Inconsistent hierarchy: fall back to a defensive BFS.
+		seen := map[*Class]bool{}
+		queue := []*Class{class}
+		for len(queue) > 0 {
+			c := queue[0]
+			queue = queue[1:]
+			if c == nil || seen[c] {
+				continue
 			}
-			return attr, true
+			seen[c] = true
+			if h, decided, found := ownHashEntry(c); found {
+				return h, decided
+			}
+			queue = append(queue, c.Parents...)
 		}
-		if m, ok := c.Methods["__hash__"]; ok {
-			return m, true
+		return nil, false
+	}
+	for _, c := range mro {
+		if h, decided, found := ownHashEntry(c); found {
+			return h, decided
 		}
-		queue = append(queue, c.Parents...)
 	}
 	return nil, false
+}
+
+// ownHashEntry checks a single class's own namespace for __hash__.
+// found reports a definition exists; the Value is nil for __hash__ = None
+// (unhashable), mirroring findUserHash's contract.
+func ownHashEntry(c *Class) (Value, bool, bool) {
+	if attr, ok := c.Attributes["__hash__"]; ok {
+		if _, isNil := attr.(NilValue); isNil {
+			return nil, true, true
+		}
+		return attr, true, true
+	}
+	if m, ok := c.Methods["__hash__"]; ok {
+		return m, true, true
+	}
+	return nil, false, false
 }
 
 // unhashableError builds the standard TypeError for a value.

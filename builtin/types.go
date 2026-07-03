@@ -478,7 +478,7 @@ func RegisterTypes(ctx *core.Context) {
 
 	// Add __getattribute__ method to object
 	// object.__getattribute__(self, name) - gets an attribute from the instance
-	objectClass.SetMethod("__getattribute__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	defaultGetAttribute := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, &core.TypeError{Message: "__getattribute__() takes exactly 2 arguments"}
 		}
@@ -497,7 +497,9 @@ func RegisterTypes(ctx *core.Context) {
 			}
 		}
 		return nil, &core.AttributeError{ObjType: string(self.Type()), AttrName: string(name)}
-	}))
+	})
+	core.DefaultObjectGetAttribute = defaultGetAttribute
+	objectClass.SetMethod("__getattribute__", defaultGetAttribute)
 
 	ctx.Define("object", objectClass)
 

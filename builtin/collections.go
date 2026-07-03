@@ -169,11 +169,24 @@ func RegisterCollections(ctx *core.Context) {
 
 		arg := args[0]
 
-		// Try to get __len__ method
-		if obj, ok := arg.(interface {
+		// Resolve __len__. For class instances the lookup is type-level
+		// (CPython's implicit special-method rule: the instance dict is
+		// never consulted for dunders).
+		var lenMethod core.Value
+		var found bool
+		if inst, ok := arg.(*core.Instance); ok {
+			var lookupErr error
+			lenMethod, found, lookupErr = core.GetTypeDunder(inst, "__len__")
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
+		} else if obj, ok := arg.(interface {
 			GetAttr(string) (core.Value, bool)
 		}); ok {
-			if lenMethod, found := obj.GetAttr("__len__"); found {
+			lenMethod, found = obj.GetAttr("__len__")
+		}
+		{
+			if found {
 				// Call the __len__ method
 				if callable, ok := types.AsCallable(lenMethod); ok {
 					result, err := callable.Call([]core.Value{}, ctx)
