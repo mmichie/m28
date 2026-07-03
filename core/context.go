@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/mmichie/m28/common/suggestions"
 )
@@ -137,6 +138,80 @@ func (f *SlotFrame) verify(i int) {
 	}
 }
 
+// frameCtxPool recycles slot-call frame contexts (unboxing follow-up
+// M28-xi1): Context and frame-array construction measured 76% of call-path
+// allocations. A context is recycled ONLY after an error-free slot call — the
+// escape audit holds for that path (no error type retains *Context; slot
+// functions cannot create closures, generators, or super bindings; results
+// are plain Values) — while error returns simply fall to the GC.
+// M28_DEBUG_FRAMES=1 disables reuse and poisons released frames so any
+// retained pointer trips loudly in tests.
+var frameCtxPool = sync.Pool{New: func() any { return new(Context) }}
+
+var frameCanary = os.Getenv("M28_DEBUG_FRAMES") != ""
+
+// AcquireFrameContext returns a function-scope context with an n-slot frame,
+// equivalent to NewContext(outer) + IsFunctionScope + NewSlotFrame(n). The
+// caller sets Depth.
+func AcquireFrameContext(outer *Context, numSlots int) *Context {
+	c := frameCtxPool.Get().(*Context)
+	c.Outer = outer
+	c.Global = outer.Global
+	c.Metadata = outer.Metadata
+	c.IsFunctionScope = true
+	if cap(c.Locals.nums) >= numSlots {
+		// Reuse the arrays: release cleared tags/refs across the full
+		// capacity, so every slot reads as unbound; nums is never read while
+		// a tag is SlotBoxed.
+		c.Locals.nums = c.Locals.nums[:numSlots]
+		c.Locals.tags = c.Locals.tags[:numSlots]
+		c.Locals.refs = c.Locals.refs[:numSlots]
+	} else {
+		c.Locals = NewSlotFrame(numSlots)
+	}
+	return c
+}
+
+// poisonValue trips on any use of a released frame slot (canary mode).
+type poisonValue struct{}
+
+func (poisonValue) Type() Type      { panic("use of released slot-frame context (M28_DEBUG_FRAMES)") }
+func (poisonValue) String() string  { panic("use of released slot-frame context (M28_DEBUG_FRAMES)") }
+
+// ReleaseFrameContext returns a frame context to the pool after a clean slot
+// call. All value references are dropped here so the pool retains nothing.
+func ReleaseFrameContext(c *Context) {
+	refs := c.Locals.refs[:cap(c.Locals.refs)]
+	tags := c.Locals.tags[:cap(c.Locals.tags)]
+	if frameCanary {
+		for i := range refs {
+			refs[i] = poisonValue{}
+		}
+		c.Outer, c.Global, c.Metadata = nil, nil, nil
+		return // never reused in canary mode
+	}
+	for i := range refs {
+		refs[i] = nil
+		tags[i] = SlotBoxed
+	}
+	c.Outer, c.Global, c.Metadata = nil, nil, nil
+	c.CurrentFunction = ""
+	c.EvalCount = 0
+	c.ExcType, c.ExcValue, c.ExcTb = nil, nil, nil
+	c.ModuleDict = nil
+	c.BuiltinSnapshot = nil
+	c.IsClassScope = false
+	c.IsFunctionScope = false
+	c.Depth = 0
+	if len(c.Vars) > 0 {
+		clear(c.Vars)
+	}
+	c.GlobalVars, c.NonlocalVars = nil, nil
+	c.LocationStack = c.LocationStack[:0]
+	c.CallStack = nil
+	frameCtxPool.Put(c)
+}
+
 // GetOperatorFunc is a hook to the operator registry's GetOperator function
 // This avoids circular imports while allowing fast operator lookup
 var GetOperatorFunc func(string) (Value, bool)
@@ -248,11 +323,12 @@ func (c *Context) SnapshotBuiltins() {
 
 // NewContext creates a new evaluation context
 func NewContext(outer *Context) *Context {
+	// Vars, GlobalVars, and NonlocalVars are allocated lazily on first write
+	// (ensureVars / DeclareGlobal / DeclareNonlocal): most contexts — slot-call
+	// frames, comprehension frames — never write any of them, and reads of nil
+	// maps are safe. This turns four allocations per context into one.
 	ctx := &Context{
-		Vars:         make(map[string]Value),
-		Outer:        outer,
-		GlobalVars:   make(map[string]bool),
-		NonlocalVars: make(map[string]bool),
+		Outer: outer,
 	}
 
 	// If this is the global context, set Global to self and create new metadata
@@ -301,6 +377,21 @@ func (c *Context) WithMetadata(metadata *IRMetadata) *Context {
 }
 
 // Define defines a new variable in the current scope
+// ensureVars lazily allocates the Vars map on first write.
+func (c *Context) ensureVars() map[string]Value {
+	if c.Vars == nil {
+		c.Vars = make(map[string]Value, 4)
+	}
+	return c.Vars
+}
+
+// SetRawVar writes a name directly into this context's Vars map, bypassing
+// Define's ModuleDict sync and builtin tracking. Used for interpreter-internal
+// names (e.g. __current_exception__) that must not be exported.
+func (c *Context) SetRawVar(name string, value Value) {
+	c.ensureVars()[name] = value
+}
+
 // DefineKeyed is Define for a caller that pre-computed the ModuleDict key
 // ("s:" + name) and the export-sync decision (module-tier IR nodes do this at
 // compile time). Behavior is identical to Define.
@@ -314,7 +405,7 @@ func (c *Context) DefineKeyed(name, key string, syncModule bool, value Value) {
 			}
 		}
 	}
-	c.Vars[name] = value
+	c.ensureVars()[name] = value
 	if syncModule && c.ModuleDict != nil {
 		c.ModuleDict.SetStrKeyed(key, name, value)
 	}
@@ -335,7 +426,7 @@ func (c *Context) Define(name string, value Value) {
 			}
 		}
 	}
-	c.Vars[name] = value
+	c.ensureVars()[name] = value
 
 	// If this context has a ModuleDict, sync the definition to it in real-time
 	// This enables circular imports to see partially-populated modules
@@ -370,7 +461,7 @@ func (c *Context) DefineBuiltin(name string, value Value) error {
 			return err
 		}
 	}
-	c.Vars[name] = value
+	c.ensureVars()[name] = value
 	return nil
 }
 
@@ -378,7 +469,7 @@ func (c *Context) DefineBuiltin(name string, value Value) error {
 func (c *Context) Set(name string, value Value) error {
 	// Check current scope
 	if _, ok := c.Vars[name]; ok {
-		c.Vars[name] = value
+		c.ensureVars()[name] = value
 		return nil
 	}
 
@@ -403,7 +494,7 @@ func (c *Context) Delete(name string) error {
 			// the original builtin rather than deleting it (which would corrupt
 			// the builtin for every module). Otherwise remove it.
 			if orig, isBuiltin := c.BuiltinSnapshot[name]; isBuiltin {
-				c.Vars[name] = orig
+				c.ensureVars()[name] = orig
 			} else {
 				delete(c.Vars, name)
 			}
@@ -644,6 +735,9 @@ func (c *Context) DeclareGlobal(name string) {
 	if c.GlobalVars == nil {
 		c.GlobalVars = make(map[string]bool)
 	}
+	if c.GlobalVars == nil {
+		c.GlobalVars = make(map[string]bool, 2)
+	}
 	c.GlobalVars[name] = true
 }
 
@@ -664,6 +758,9 @@ func (c *Context) DeclareNonlocal(name string) error {
 		return fmt.Errorf("no binding for nonlocal '%s' found", name)
 	}
 
+	if c.NonlocalVars == nil {
+		c.NonlocalVars = make(map[string]bool, 2)
+	}
 	c.NonlocalVars[name] = true
 	return nil
 }

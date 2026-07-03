@@ -482,15 +482,80 @@ func (n *assignNode) execDiscard(ctx *core.Context) error {
 }
 
 func compileAssign(items []core.Value, orig core.Value) core.Value {
-	// Only the slot-target single assignment (= <slotRef> value) is modeled;
-	// resolveBody emits exactly this for a bare local. Anything else (multiple
-	// assignment, tuple/attr/index targets) stays on the AssignForm path.
+	// Modeled single assignments: a slot target (emitted by resolveBody for a
+	// bare local) or an attribute target. Everything else (multiple
+	// assignment, tuple/index targets) stays on the AssignForm path.
 	if len(items) == 3 {
 		if sr, ok := unwrapLocated(items[1]).(*slotRef); ok {
 			return &assignNode{slot: sr.slot, val: compileIR(items[2])}
 		}
+		if tgt, ok := unwrapLocated(items[1]).(*core.ListValue); ok && tgt.Len() == 3 {
+			tItems := tgt.ItemsRef()
+			if h, ok := unwrapLocated(tItems[0]).(core.SymbolValue); ok && string(h) == "." {
+				var attr string
+				switch a := unwrapLocated(tItems[2]).(type) {
+				case core.SymbolValue:
+					attr = string(a)
+				case core.StringValue:
+					attr = string(a)
+				default:
+					return orig
+				}
+				return &dotAssignNode{obj: compileIR(tItems[1]), attr: attr, val: compileIR(items[2])}
+			}
+		}
 	}
 	return orig
+}
+
+// dotAssignNode is (= (. obj attr) value) with the attribute name pre-parsed:
+// the generic path re-parsed the target list (three Items() copies per write
+// in __init__-shaped code) before dispatching. Dispatch mirrors
+// assignComplexTarget's "." case exactly: dict attribute-style set first,
+// then the SetAttr interface.
+type dotAssignNode struct {
+	obj  core.Value
+	attr string
+	val  core.Value
+}
+
+func (n *dotAssignNode) Type() core.Type { return "dot-assign-node" }
+func (n *dotAssignNode) String() string  { return "(= (. ... " + n.attr + ") ...)" }
+
+func (n *dotAssignNode) assign(ctx *core.Context) (core.Value, error) {
+	objV, err := Eval(n.obj, ctx)
+	if err != nil {
+		return nil, err
+	}
+	num, kind, boxed, err := evalNumOf(n.val, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if boxed == nil {
+		boxed = boxNum(num, kind)
+	}
+	if dict, ok := objV.(*core.DictValue); ok {
+		dict.Set(n.attr, boxed)
+		return boxed, nil
+	}
+	if objWithAttrs, ok := objV.(interface {
+		SetAttr(string, core.Value) error
+	}); ok {
+		if err := objWithAttrs.SetAttr(n.attr, boxed); err != nil {
+			return nil, err
+		}
+		return boxed, nil
+	}
+	return nil, &core.AttributeError{ObjType: string(objV.Type()), Message: fmt.Sprintf("'%s' does not support attribute assignment", objV.Type())}
+}
+
+func (n *dotAssignNode) evalIR(ctx *core.Context) (core.Value, error) {
+	return n.assign(ctx)
+}
+
+func (n *dotAssignNode) execStmt(ctx *core.Context) (core.Value, error) {
+	_, err := n.assign(ctx)
+	return nil, err
 }
 
 // forNode is the compiled simple for loop: single slot target, one body, no

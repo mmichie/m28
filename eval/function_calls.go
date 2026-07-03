@@ -121,8 +121,10 @@ func (f *UserFunction) simpleParamNames() ([]string, bool) {
 func (f *UserFunction) callSlots(args []core.Value, ctx *core.Context) (core.Value, error) {
 	core.TraceEnterFunction(f.name, args)
 
-	funcEnv := core.NewContext(f.env)
-	funcEnv.IsFunctionScope = true
+	// Pooled frame context (M28-xi1): recycled only on the clean-return paths
+	// below; error returns leave the context to the GC (see the escape audit
+	// at core.frameCtxPool).
+	funcEnv := core.AcquireFrameContext(f.env, f.numSlots)
 	// Track call depth to raise RecursionError before the Go stack overflows.
 	callerDepth := 0
 	if ctx != nil {
@@ -136,11 +138,9 @@ func (f *UserFunction) callSlots(args []core.Value, ctx *core.Context) (core.Val
 	// Slots 0..numParams-1 hold the parameters in order; later slots start
 	// unbound until first assignment (read-before-assign => UnboundLocalError).
 	// Binding goes through SlotFrame.Set — the tag choke point.
-	frame := core.NewSlotFrame(f.numSlots)
 	for i, a := range args {
-		frame.Set(i, a)
+		funcEnv.Locals.Set(i, a)
 	}
-	funcEnv.Locals = frame
 
 	result, err := Eval(f.slotBody, funcEnv)
 	if err != nil {
@@ -150,6 +150,7 @@ func (f *UserFunction) callSlots(args []core.Value, ctx *core.Context) (core.Val
 
 	if ret, ok := result.(*ReturnValue); ok {
 		core.TraceExitFunction(f.name, ret.Value, nil)
+		core.ReleaseFrameContext(funcEnv)
 		return ret.Value, nil
 	}
 	if _, ok := result.(*core.YieldValue); ok {
@@ -158,9 +159,11 @@ func (f *UserFunction) callSlots(args []core.Value, ctx *core.Context) (core.Val
 	// Lambda bodies implicitly return their value; def bodies return None.
 	if f.isLambda {
 		core.TraceExitFunction(f.name, result, nil)
+		core.ReleaseFrameContext(funcEnv)
 		return result, nil
 	}
 	core.TraceExitFunction(f.name, core.None, nil)
+	core.ReleaseFrameContext(funcEnv)
 	return core.None, nil
 }
 

@@ -461,10 +461,10 @@ func execTry(tryBody []core.Value, exceptClauses []*core.ListValue, elseClause, 
 			// __context__ to it (PEP 3134).
 			if activeErr != nil {
 				prev, hadPrev := ctx.Vars["__current_exception__"]
-				ctx.Vars["__current_exception__"] = errorToExceptionInstance(activeErr, ctx)
+				ctx.SetRawVar("__current_exception__", errorToExceptionInstance(activeErr, ctx))
 				defer func() {
 					if hadPrev {
-						ctx.Vars["__current_exception__"] = prev
+						ctx.SetRawVar("__current_exception__", prev)
 					} else {
 						delete(ctx.Vars, "__current_exception__")
 					}

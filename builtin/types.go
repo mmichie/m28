@@ -422,7 +422,7 @@ func RegisterTypes(ctx *core.Context) {
 	// object.__setattr__(self, name, value) - sets an attribute on the instance
 	// This is the default implementation that super().__setattr__() calls
 	// IMPORTANT: Must call SetAttrDefault to avoid infinite recursion
-	objectClass.SetMethod("__setattr__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	defaultSetAttr := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 3 {
 			return nil, &core.TypeError{Message: "__setattr__() takes exactly 3 arguments"}
 		}
@@ -449,7 +449,9 @@ func RegisterTypes(ctx *core.Context) {
 			return core.None, nil
 		}
 		return nil, &core.TypeError{Message: fmt.Sprintf("'%s' object has no attribute '%s'", self.Type(), name)}
-	}))
+	})
+	core.DefaultObjectSetAttr = defaultSetAttr
+	objectClass.SetMethod("__setattr__", defaultSetAttr)
 
 	// Add __delattr__ method to object
 	// object.__delattr__(self, name) - deletes an attribute from the instance

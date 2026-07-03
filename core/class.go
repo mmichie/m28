@@ -166,18 +166,25 @@ func hasNonObjectBuiltinAncestor(c *Class) bool {
 // parent.GetAttr for dunder methods (which are provided by type's defaults,
 // not in any Methods/Attributes map).
 func classInheritsType(cls *Class, names ...string) bool {
-	if cls == nil {
-		return false
-	}
 	target := "type"
 	if len(names) > 0 {
 		target = names[0]
+	}
+	return classInherits(cls, target)
+}
+
+// classInherits is the non-variadic core of classInheritsType: the variadic
+// wrapper allocates a slice per call, and instantiation checks it three times
+// per instance.
+func classInherits(cls *Class, target string) bool {
+	if cls == nil {
+		return false
 	}
 	if cls.Name == target {
 		return true
 	}
 	for _, p := range cls.Parents {
-		if classInheritsType(p, target) {
+		if classInherits(p, target) {
 			return true
 		}
 	}
@@ -198,7 +205,7 @@ func IsIntValue(v Value) bool {
 	case BigIntValue, BoolValue:
 		return true
 	case *Instance:
-		return classInheritsType(val.Class, "int")
+		return classInherits(val.Class, "int")
 	}
 	return false
 }
@@ -1026,7 +1033,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 	// __init__ is taking over the storage, attach a backing dict so the
 	// instance can be subscripted and used as a mapping. If args were
 	// passed, populate from them following the dict() constructor rules.
-	if inst, ok := instance.(*Instance); ok && classInheritsType(c, "dict") && inst.BackingDict == nil {
+	if inst, ok := instance.(*Instance); ok && classInherits(c, "dict") && inst.BackingDict == nil {
 		inst.BackingDict = NewDict()
 		// Seed the backing dict from constructor args, the way dict() does.
 		// Only do this when the subclass doesn't define its own __init__.
@@ -1050,7 +1057,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 	// If the class inherits from str (transitively), attach a backing string so
 	// the instance behaves like the string it wraps. str is immutable, so the
 	// value comes from the constructor argument (str(arg)); default to "".
-	if inst, ok := instance.(*Instance); ok && (classInheritsType(c, "string") || classInheritsType(c, "str")) && inst.BackingStr == nil {
+	if inst, ok := instance.(*Instance); ok && (classInherits(c, "string") || classInherits(c, "str")) && inst.BackingStr == nil {
 		_, definingClass, hasInit := c.GetMethodWithClass("__init__")
 		userInit := hasInit && definingClass.Name != "object" && definingClass.Name != "str" && definingClass.Name != "string"
 		s := StringValue("")
@@ -1977,10 +1984,19 @@ func validateExceptionSetAttr(name string, value Value) error {
 	return nil
 }
 
+// DefaultObjectSetAttr is object's default __setattr__ builtin, registered at
+// startup (builtin/types.go). Instance.SetAttr identity-checks it: resolving
+// the default through a boxed dunder call allocated an argument slice and a
+// StringValue on every attribute write just to reach SetAttrDefault.
+var DefaultObjectSetAttr Value
+
 func (i *Instance) SetAttr(name string, value Value) error {
 	// Check for custom __setattr__ in the class hierarchy
 	// Look in class methods (not GetAttr which returns the builtin fallback)
 	if setAttrMethod, _, ok := i.Class.GetMethodWithClass("__setattr__"); ok {
+		if setAttrMethod == DefaultObjectSetAttr {
+			return i.SetAttrDefault(name, value)
+		}
 		// Found custom __setattr__, call it
 		if callable, ok := setAttrMethod.(Callable); ok {
 			_, err := callable.Call([]Value{i, StringValue(name), value}, nil)
