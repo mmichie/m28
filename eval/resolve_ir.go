@@ -242,6 +242,40 @@ func (s *slotRef) evalIR(ctx *core.Context) (core.Value, error) {
 // propagation of return/break/continue sentinels.
 type seqNode struct{ items []core.Value }
 
+// stmtNode is implemented by IR nodes that can execute in statement position
+// — result discarded — without materializing it. execStmt returns a non-nil
+// control value ONLY for flow sentinels (Return/Break/Continue), which the
+// caller must propagate; ordinary results are dropped at the source, which is
+// where the loop-carried rebox-per-iteration would otherwise happen.
+type stmtNode interface {
+	execStmt(ctx *core.Context) (control core.Value, err error)
+}
+
+// evalStmt evaluates e in statement position: stmtNodes skip materializing
+// their result; everything else evaluates normally and reports sentinels.
+// LocatedValue wrappers maintain the location stack exactly as Eval would.
+func evalStmt(e core.Value, ctx *core.Context) (control core.Value, err error) {
+	if lv, ok := e.(core.LocatedValue); ok {
+		if lv.Location != nil {
+			ctx.PushLocation(lv.Location)
+			defer ctx.PopLocation()
+		}
+		e = lv.Value
+	}
+	if s, ok := e.(stmtNode); ok {
+		return s.execStmt(ctx)
+	}
+	v, err := Eval(e, ctx)
+	if err != nil {
+		return nil, err
+	}
+	switch v.(type) {
+	case *ReturnValue, *BreakValue, *ContinueValue:
+		return v, nil
+	}
+	return nil, nil
+}
+
 func (n *seqNode) Type() core.Type { return "do-seq" }
 func (n *seqNode) String() string  { return "(do ...)" }
 func (n *seqNode) evalIR(ctx *core.Context) (core.Value, error) {
@@ -249,24 +283,17 @@ func (n *seqNode) evalIR(ctx *core.Context) (core.Value, error) {
 	var err error
 	last := len(n.items) - 1
 	for i, e := range n.items {
-		// Non-final assignments are pure statements: their value is discarded,
-		// so skip materializing it (assignments never produce control
-		// sentinels). Everything else — and the final item, whose value is the
-		// block's value — evaluates normally.
+		// Non-final items are statements; the final item's value is the
+		// block's value and evaluates normally.
 		if i < last {
-			if a, lv, ok := asAssignNode(e); ok {
-				if lv != nil && lv.Location != nil {
-					ctx.PushLocation(lv.Location)
-					err = a.execDiscard(ctx)
-					ctx.PopLocation()
-				} else {
-					err = a.execDiscard(ctx)
-				}
-				if err != nil {
-					return nil, err
-				}
-				continue
+			control, err := evalStmt(e, ctx)
+			if err != nil {
+				return nil, err
 			}
+			if control != nil {
+				return control, nil
+			}
+			continue
 		}
 		result, err = Eval(e, ctx)
 		if err != nil {
@@ -280,20 +307,20 @@ func (n *seqNode) evalIR(ctx *core.Context) (core.Value, error) {
 	return result, nil
 }
 
-// asAssignNode unwraps a possible LocatedValue and reports whether the node is
-// an assignNode, returning the wrapper (if any) so the caller can maintain the
-// location stack exactly as Eval would.
-func asAssignNode(e core.Value) (*assignNode, *core.LocatedValue, bool) {
-	if lv, ok := e.(core.LocatedValue); ok {
-		if a, ok := lv.Value.(*assignNode); ok {
-			return a, &lv, true
+// execStmt: a block in statement position discards every item's value,
+// including the last (its value only mattered as the block's value, which the
+// caller is discarding).
+func (n *seqNode) execStmt(ctx *core.Context) (core.Value, error) {
+	for _, e := range n.items {
+		control, err := evalStmt(e, ctx)
+		if err != nil {
+			return nil, err
 		}
-		return nil, nil, false
+		if control != nil {
+			return control, nil
+		}
 	}
-	if a, ok := e.(*assignNode); ok {
-		return a, nil, true
-	}
-	return nil, nil, false
+	return nil, nil
 }
 
 func compileSeq(items []core.Value) core.Value {
@@ -334,6 +361,31 @@ func (n *ifNode) evalIR(ctx *core.Context) (core.Value, error) {
 		return core.Nil, nil
 	}
 	return Eval(n.els, ctx)
+}
+
+// execStmt: an if in statement position runs the taken branch in statement
+// position too — the branch value was only ever the if's value.
+func (n *ifNode) execStmt(ctx *core.Context) (core.Value, error) {
+	num, kind, boxed, err := evalNumOf(n.cond, ctx)
+	if err != nil {
+		return nil, err
+	}
+	var truthy bool
+	if boxed == nil && kind != core.SlotBoxed {
+		truthy = num != 0
+	} else {
+		truthy, err = isTruthyWithErrors(boxed, ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if truthy {
+		return evalStmt(n.then, ctx)
+	}
+	if n.els == nil {
+		return nil, nil
+	}
+	return evalStmt(n.els, ctx)
 }
 
 func compileIf(n *core.ListValue, items []core.Value, orig core.Value) core.Value {
@@ -404,9 +456,14 @@ func (n *assignNode) evalIR(ctx *core.Context) (core.Value, error) {
 	return ctx.Locals.Get(n.slot), nil
 }
 
+// execStmt: assignment in statement position — never a control sentinel.
+func (n *assignNode) execStmt(ctx *core.Context) (core.Value, error) {
+	return nil, n.execDiscard(ctx)
+}
+
 // execDiscard performs the assignment without materializing the result — the
-// statement-position path (seqNode), where the loop-carried accumulator win
-// lives: an unboxed numeric right-hand side stores as raw float64 + tag.
+// statement-position path, where the loop-carried accumulator win lives: an
+// unboxed numeric right-hand side stores as raw float64 + tag.
 func (n *assignNode) execDiscard(ctx *core.Context) error {
 	num, kind, boxed, err := evalNumOf(n.val, ctx)
 	if err != nil {
@@ -432,28 +489,92 @@ func compileAssign(items []core.Value, orig core.Value) core.Value {
 	return orig
 }
 
-// compileFor rebuilds a simple (for <slot> seq body) so ForForm still drives
-// iteration (its iterator protocol, unpacking, and flow control are reused),
-// while the sequence and body run as compiled IR. Only the canonical
-// single-target, single-body shape is rewritten; for/else and multi-body forms
-// fall through to ForForm unchanged.
+// forNode is the compiled simple for loop: single slot target, one body, no
+// else clause (compileFor only accepts that shape). Iteration over a range
+// runs as a raw float64 counting loop writing the induction variable unboxed
+// (SetNum) — no counter boxing, no iterator protocol. Every other sequence
+// falls back to ForForm, passing the ALREADY-EVALUATED sequence wrapped in a
+// constNode so the sequence expression's side effects fire exactly once.
+type forNode struct {
+	target *slotRef
+	seq    core.Value // compiled sequence expression
+	body   core.Value // compiled body
+}
+
+func (n *forNode) Type() core.Type { return "for-node" }
+func (n *forNode) String() string  { return "(for ...)" }
+func (n *forNode) evalIR(ctx *core.Context) (core.Value, error) {
+	seqVal, err := Eval(n.seq, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if rng, ok := seqVal.(*core.RangeValue); ok {
+		// Mirrors rangeIterator exactly: float64 counter advanced by Step,
+		// yielding int-kind values (range always yields NumberValue). The body
+		// runs in statement position: Python for-statements have no value, and
+		// the loop's own value (Nil) matches an empty loop; sentinels still
+		// propagate. A for in expression position with a non-Nil last body
+		// value is unreachable from the Python frontend.
+		step := rng.Step
+		for cur := rng.Start; (step > 0 && cur < rng.Stop) || (step < 0 && cur > rng.Stop); cur += step {
+			ctx.Locals.SetNum(n.target.slot, cur, core.SlotInt)
+			control, err := evalStmt(n.body, ctx)
+			if err != nil {
+				return nil, err
+			}
+			if control != nil {
+				switch control.(type) {
+				case *BreakValue:
+					return core.Nil, nil
+				case *ContinueValue:
+					continue
+				default: // *ReturnValue
+					return control, nil
+				}
+			}
+		}
+		return core.Nil, nil
+	}
+	// Generic sequence: reuse ForForm's full driver (iterator protocol, dict
+	// keys, strings, ...) on the evaluated value.
+	return ForForm(core.NewList(n.target, newConstNode(seqVal), n.body), ctx)
+}
+
+// execStmt: a for loop in statement position — evalIR already discards body
+// values; only sentinels differ (Return propagates, the loop value is dropped).
+func (n *forNode) execStmt(ctx *core.Context) (core.Value, error) {
+	v, err := n.evalIR(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := v.(*ReturnValue); ok {
+		return v, nil
+	}
+	return nil, nil
+}
+
+// compileFor lowers a simple (for <slot> seq body) to a forNode. Only the
+// canonical single-target, single-body shape compiles; for/else and
+// multi-body forms fall through to ForForm unchanged.
 func compileFor(items []core.Value, orig core.Value) core.Value {
 	// Canonical Python lowering: (for target seq body). The s-expression
 	// surface also allows (for target in seq body); both compile.
 	switch len(items) {
 	case 4:
-		if _, ok := unwrapLocated(items[1]).(*slotRef); !ok {
+		sr, ok := unwrapLocated(items[1]).(*slotRef)
+		if !ok {
 			return orig
 		}
-		return core.NewList(items[0], items[1], compileIR(items[2]), compileIR(items[3]))
+		return &forNode{target: sr, seq: compileIR(items[2]), body: compileIR(items[3])}
 	case 5:
-		if _, ok := unwrapLocated(items[1]).(*slotRef); !ok {
+		sr, ok := unwrapLocated(items[1]).(*slotRef)
+		if !ok {
 			return orig
 		}
 		if in, ok := unwrapLocated(items[2]).(core.SymbolValue); !ok || string(in) != "in" {
 			return orig
 		}
-		return core.NewList(items[0], items[1], items[2], compileIR(items[3]), compileIR(items[4]))
+		return &forNode{target: sr, seq: compileIR(items[3]), body: compileIR(items[4])}
 	default:
 		return orig
 	}
