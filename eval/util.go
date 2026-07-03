@@ -398,6 +398,11 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Try to parse as new-style parameter list with defaults
 		signature, err := ParseParameterList(paramListSlice)
+		if err == nil {
+			if derr := EvaluateSignatureDefaults(signature, ctx); derr != nil {
+				return nil, derr
+			}
+		}
 		if err != nil {
 			// Fall back to legacy simple parameter parsing
 			params := make([]core.SymbolValue, 0, fnDef.Len()-1)
@@ -503,6 +508,11 @@ func DefForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 			// Try to parse as new-style parameter list with defaults
 			signature, err := ParseParameterList(paramList.Items())
+			if err == nil {
+				if derr := EvaluateSignatureDefaults(signature, ctx); derr != nil {
+					return nil, derr
+				}
+			}
 			if err != nil {
 				// Fall back to legacy simple parameter parsing
 				params := make([]core.SymbolValue, 0, paramList.Len())

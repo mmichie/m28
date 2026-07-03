@@ -9,73 +9,6 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-// createLRUDecorator creates a decorator function for lru_cache
-func createLRUDecorator(maxsizeInt int) core.Value {
-	return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		if len(args) != 1 {
-			return nil, errors.NewRuntimeError("lru_cache", "decorator takes exactly one function argument")
-		}
-
-		function, ok := args[0].(core.Callable)
-		if !ok {
-			return nil, errors.NewRuntimeError("lru_cache", "argument must be callable")
-		}
-
-		// Create cache for this function
-		cache := make(map[string]core.Value)
-		order := make([]string, 0, maxsizeInt)
-
-		cachedFunc := core.NewBuiltinFunction(func(callArgs []core.Value, callCtx *core.Context) (core.Value, error) {
-			key := makeCacheKey(callArgs)
-
-			// Check cache
-			if cached, found := cache[key]; found {
-				// Move to end (most recently used)
-				for i, k := range order {
-					if k == key {
-						order = append(order[:i], order[i+1:]...)
-						break
-					}
-				}
-				order = append(order, key)
-				return cached, nil
-			}
-
-			// Call function
-			result, err := function.Call(callArgs, callCtx)
-			if err != nil {
-				return nil, err
-			}
-
-			// Add to cache
-			if len(cache) >= maxsizeInt {
-				// Remove least recently used
-				oldest := order[0]
-				delete(cache, oldest)
-				order = order[1:]
-			}
-
-			cache[key] = result
-			order = append(order, key)
-
-			return result, nil
-		})
-
-		// Add cache_clear method as an attribute
-		// Python's lru_cache adds this to allow clearing the cache
-		cache_clear := core.NewBuiltinFunction(func(clearArgs []core.Value, clearCtx *core.Context) (core.Value, error) {
-			// Clear the cache
-			for k := range cache {
-				delete(cache, k)
-			}
-			order = order[:0]
-			return core.None, nil
-		})
-		cachedFunc.SetAttr("cache_clear", cache_clear)
-
-		return cachedFunc, nil
-	})
-}
 
 // Init_FunctoolsModule creates and returns the _functools C extension stub
 // This provides the C functions that Python's functools.py imports
@@ -137,46 +70,6 @@ func Init_FunctoolsModule() *core.DictValue {
 	functoolsModule.Set("partial", &partialBuiltin{})
 
 	// cache - Simple memoization decorator (limited version)
-	functoolsModule.Set("cache", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		v := validation.NewArgs("cache", args)
-		if err := v.Exact(1); err != nil {
-			return nil, err
-		}
-
-		function, err := types.RequireCallable(v.Get(0), "cache() argument")
-		if err != nil {
-			return nil, err
-		}
-
-		// Create cache storage
-		cache := make(map[string]core.Value)
-
-		// Create cached version
-		cachedFunc := core.NewBuiltinFunction(func(callArgs []core.Value, callCtx *core.Context) (core.Value, error) {
-			// Create cache key from arguments
-			key := makeCacheKey(callArgs)
-
-			// Check cache
-			if cached, found := cache[key]; found {
-				return cached, nil
-			}
-
-			// Call function and cache result
-			result, err := function.Call(callArgs, callCtx)
-			if err != nil {
-				return nil, err
-			}
-
-			cache[key] = result
-			return result, nil
-		})
-
-		return cachedFunc, nil
-	}))
-
-	// lru_cache - LRU cache decorator with size limit
-	// Can be used as @lru_cache or @lru_cache(maxsize=N, typed=True)
-	functoolsModule.Set("lru_cache", &lruCacheBuiltin{})
 
 	// cmp_to_key - NOT exported from _functools so that functools.py uses its
 	// pure Python implementation (which creates a proper class with __lt__ etc.)
@@ -229,9 +122,11 @@ func Init_FunctoolsModule() *core.DictValue {
 		return decorator, nil
 	}))
 
-	// _lru_cache_wrapper - Internal LRU cache wrapper class
-	// Used by lru_cache implementation in functools.py
-	functoolsModule.Set("_lru_cache_wrapper", &lruCacheBuiltin{})
+	// NOTE: deliberately NOT exporting _lru_cache_wrapper. CPython's
+	// functools.py treats it as an optional C accelerator; when absent it
+	// uses its own pure-Python wrapper, which runs correctly on M28 (the
+	// previous export had the decorator-factory signature, so maxsize was
+	// silently ignored and keys were %v strings that collided across types).
 
 	// total_ordering - Class decorator that fills in missing ordering methods
 	// Takes a class with __eq__ and one ordering method and generates the rest
@@ -253,25 +148,6 @@ func Init_FunctoolsModule() *core.DictValue {
 	return functoolsModule
 }
 
-// makeCacheKey creates a string key from function arguments
-func makeCacheKey(args []core.Value) string {
-	if len(args) == 0 {
-		return "()"
-	}
-
-	key := "("
-	for i, arg := range args {
-		if i > 0 {
-			key += ", "
-		}
-		// Use string representation for key
-		// This is simple but may have collisions for complex objects
-		key += fmt.Sprintf("%v", arg)
-	}
-	key += ")"
-
-	return key
-}
 
 // partialBuiltin implements partial with keyword argument support
 type partialBuiltin struct {
@@ -448,102 +324,3 @@ func (pf *partialFunction) GetAttr(name string) (core.Value, bool) {
 	return nil, false
 }
 
-// lruCacheBuiltin implements lru_cache with keyword argument support
-type lruCacheBuiltin struct {
-	core.BaseObject
-}
-
-func (l *lruCacheBuiltin) Type() core.Type {
-	return core.FunctionType
-}
-
-func (l *lruCacheBuiltin) String() string {
-	return "<builtin function lru_cache>"
-}
-
-func (l *lruCacheBuiltin) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
-	return l.CallWithKeywords(args, nil, ctx)
-}
-
-func (l *lruCacheBuiltin) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-	// Extract maxsize from kwargs or use default
-	maxsizeInt := 128 // default
-	if kwargs != nil {
-		if maxsizeVal, ok := kwargs["maxsize"]; ok {
-			if maxsize, ok := maxsizeVal.(core.NumberValue); ok {
-				maxsizeInt = int(maxsize)
-			}
-		}
-		// Ignore 'typed' parameter for now
-	}
-
-	// If keyword arguments were provided, always return a decorator
-	// even if we also have positional args
-	if kwargs != nil && len(kwargs) > 0 {
-		return createLRUDecorator(maxsizeInt), nil
-	}
-
-	// If we have positional args and first arg is callable, decorate it directly
-	if len(args) > 0 {
-		if callable, ok := args[0].(core.Callable); ok {
-			// Direct decoration: @lru_cache (no parens)
-			// Apply the cache to the function
-			cache := make(map[string]core.Value)
-			order := make([]string, 0, maxsizeInt)
-
-			cachedFunc := core.NewBuiltinFunction(func(callArgs []core.Value, callCtx *core.Context) (core.Value, error) {
-				key := makeCacheKey(callArgs)
-
-				// Check cache
-				if cached, found := cache[key]; found {
-					// Move to end (most recently used)
-					for i, k := range order {
-						if k == key {
-							order = append(order[:i], order[i+1:]...)
-							break
-						}
-					}
-					order = append(order, key)
-					return cached, nil
-				}
-
-				// Call function
-				result, err := callable.Call(callArgs, callCtx)
-				if err != nil {
-					return nil, err
-				}
-
-				// Add to cache
-				if len(cache) >= maxsizeInt {
-					// Remove least recently used
-					oldest := order[0]
-					delete(cache, oldest)
-					order = order[1:]
-				}
-
-				cache[key] = result
-				order = append(order, key)
-
-				return result, nil
-			})
-
-			// Add cache_clear method as an attribute
-			// Python's lru_cache adds this to allow clearing the cache
-			cache_clear := core.NewBuiltinFunction(func(clearArgs []core.Value, clearCtx *core.Context) (core.Value, error) {
-				// Clear the cache
-				for k := range cache {
-					delete(cache, k)
-				}
-				order = order[:0]
-				return core.None, nil
-			})
-			cachedFunc.SetAttr("cache_clear", cache_clear)
-
-			return cachedFunc, nil
-		}
-	}
-
-	// Called with no arguments or non-callable positional arg
-	// Return a decorator function
-	return createLRUDecorator(maxsizeInt), nil
-}

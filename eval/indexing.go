@@ -10,9 +10,15 @@ import (
 
 // handleSliceAssignment handles slice assignment (obj[start:end] = values)
 func handleSliceAssignment(obj core.Value, slice *core.SliceValue, value core.Value, ctx *core.Context) (core.Value, error) {
-	// Only support slice assignment for lists
-	list, ok := obj.(*core.ListValue)
-	if !ok {
+	// Lists, and list subclasses via their backing list (e.g. functools'
+	// _HashedSeq does self[:] = tup in __init__).
+	var list *core.ListValue
+	switch o := obj.(type) {
+	case *core.ListValue:
+		list = o
+	case *core.ListInstance:
+		list = o.Data
+	default:
 		return nil, &core.TypeError{Message: fmt.Sprintf("slice assignment only supported for lists, not %s", obj.Type())}
 	}
 

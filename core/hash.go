@@ -300,6 +300,13 @@ func HashValue(v Value, ctx *Context) (uint64, error) {
 			return hashTuple(val.Data, ctx)
 		}
 		return 0, unhashableError(v)
+	case *ListInstance:
+		// list.__hash__ is None, so list subclasses are hashable only when
+		// they define __hash__ themselves (e.g. functools._HashedSeq).
+		if h, handled, err := classUserHash(val.Class, v, ctx); handled {
+			return h, err
+		}
+		return 0, unhashableError(v)
 	case *Instance:
 		if h, handled, err := classUserHash(val.Class, v, ctx); handled {
 			return h, err

@@ -1530,6 +1530,11 @@ func createMethod(name string, params *core.ListValue, body []core.Value, ctx *c
 
 	// Try to parse as new-style parameter list with defaults
 	signature, err := ParseParameterList(params.Items())
+	if err == nil {
+		if derr := EvaluateSignatureDefaults(signature, ctx); derr != nil {
+			return nil, derr
+		}
+	}
 	if err != nil {
 		// Fall back to legacy simple parameter parsing
 		paramSyms := make([]core.SymbolValue, 0, params.Len())

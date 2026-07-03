@@ -14,6 +14,10 @@ type ParameterInfo struct {
 	Name           core.SymbolValue
 	DefaultValue   core.Value // nil if no default
 	HasDefault     bool
+	// DefaultEvaluated marks DefaultValue as the def-time evaluated value
+	// (Python semantics: defaults are computed once in the defining scope).
+	// When false, legacy paths still hold the unevaluated expression.
+	DefaultEvaluated bool
 	KeywordOnly    bool // true if parameter can only be passed by keyword (after *)
 	PositionalOnly bool // true if parameter can only be passed positionally (before /, PEP 570)
 }
@@ -41,6 +45,39 @@ func (sig *FunctionSignature) MaxArgs() int {
 
 // ParseParameterList parses a parameter list into a FunctionSignature
 // Supports: (a b c=10 d=20 *args **kwargs)
+// EvaluateSignatureDefaults evaluates default-parameter expressions once in
+// the defining context — Python semantics: `def f(x=[])` computes the default
+// at definition time and shares it across calls (the previous per-call
+// re-evaluation broke identity-sensitive defaults like functools' kwd_mark
+// sentinel, silently defeating every lru_cache keyword hit).
+func EvaluateSignatureDefaults(sig *FunctionSignature, ctx *core.Context) error {
+	for i := range sig.OptionalParams {
+		p := &sig.OptionalParams[i]
+		if !p.HasDefault || p.DefaultValue == nil || p.DefaultEvaluated {
+			continue
+		}
+		expr := p.DefaultValue
+		if located, ok := expr.(core.LocatedValue); ok {
+			expr = located.Unwrap()
+		}
+		v, err := Eval(expr, ctx)
+		if err != nil {
+			// Defer to call-time evaluation (legacy behavior) instead of
+			// failing the definition. CPython would raise here, but M28's
+			// module system resolves `from . import sub` lazily, so during
+			// a circular package init a default like `_parser.TYPE_FLAGS`
+			// (re/_compiler.py) is not yet resolvable at def time even
+			// though it will be by first call. Tracked as the eager-
+			// submodule-import gap; when that lands this fallback can
+			// become a hard error.
+			continue
+		}
+		p.DefaultValue = v
+		p.DefaultEvaluated = true
+	}
+	return nil
+}
+
 func ParseParameterList(paramList []core.Value) (*FunctionSignature, error) {
 
 	// First, transform Python-style parameters (name=value) to M28 style ((name value))
@@ -548,6 +585,11 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 			// If it's still unevaluated (symbol/expression), evaluate it now in function's env
 			// If it was already evaluated at definition time, use it directly
 			defaultVal := param.DefaultValue
+			if param.DefaultEvaluated {
+				bindCtx.Define(paramName, defaultVal)
+				boundParams[paramName] = true
+				continue
+			}
 
 			// Unwrap LocatedValue if present (Python AST wraps values with source location)
 			if located, ok := defaultVal.(core.LocatedValue); ok {

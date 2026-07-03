@@ -750,6 +750,15 @@ func IsHashable(v Value) bool {
 		// Modules (like classes and functions) are hashable by identity in
 		// Python, so they can be used as dict keys / set members.
 		return true
+	case *ListInstance:
+		// list.__hash__ is None; a subclass is hashable only if it defines
+		// its own __hash__ (functools._HashedSeq pattern).
+		if v.(*ListInstance).Class != nil {
+			if h, found := findUserHash(v.(*ListInstance).Class); found && h != nil {
+				return true
+			}
+		}
+		return false
 	case *Instance:
 		// In Python, instances are hashable by default (using object ID)
 		// unless they define __hash__ = None or __eq__ without __hash__

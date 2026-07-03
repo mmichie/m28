@@ -917,6 +917,11 @@ func lambdaForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 	// Try to parse as new-style parameter list with defaults
 	signature, err := ParseParameterList(paramItems)
+	if err == nil {
+		if derr := EvaluateSignatureDefaults(signature, ctx); derr != nil {
+			return nil, derr
+		}
+	}
 	if err != nil {
 		// Fall back to legacy simple parameter parsing
 		params := make([]core.SymbolValue, 0, len(paramItems))
