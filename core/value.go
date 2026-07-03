@@ -100,11 +100,13 @@ type BaseObject struct {
 	mu    sync.RWMutex // For thread safety
 }
 
-// NewBaseObject creates a new base object
+// NewBaseObject creates a new base object. The attribute map is allocated
+// lazily on first SetAttr: most BaseObjects (instances, bound methods,
+// containers) never receive direct base-level attributes, and reads/deletes
+// on a nil map are safe no-ops in Go.
 func NewBaseObject(typ Type) *BaseObject {
 	return &BaseObject{
-		attrs: make(map[string]Value),
-		typ:   typ,
+		typ: typ,
 	}
 }
 
@@ -136,7 +138,10 @@ func (o *BaseObject) SetAttr(name string, value Value) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	// Normal attribute
+	// Normal attribute (map allocated on first write)
+	if o.attrs == nil {
+		o.attrs = make(map[string]Value)
+	}
 	o.attrs[name] = value
 	return nil
 }

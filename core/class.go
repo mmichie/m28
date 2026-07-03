@@ -31,7 +31,17 @@ type Class struct {
 	// slotsRestricted caches "every class in the MRO is fully slotted", the
 	// condition under which attribute creation outside __slots__ raises.
 	slotsRestricted *bool
+	// gaCache holds the resolved user __getattribute__ (nil when only
+	// object's default applies), validated against dunderNSGen so a late
+	// (re)definition anywhere in a hierarchy invalidates every cache.
+	gaCache    Value
+	gaCacheGen uint64
 }
+
+// dunderNSGen is bumped whenever any class (re)defines __getattribute__,
+// invalidating every per-class gaCache at once. Starts at 1 so the zero
+// value of gaCacheGen means "never computed".
+var dunderNSGen uint64 = 1
 
 // NewClass creates a new class
 func NewClass(name string, parent *Class) *Class {
@@ -243,7 +253,26 @@ func IsStrictSubclass(child, parent *Class) bool {
 
 // SetMethod adds a method to the class
 func (c *Class) SetMethod(name string, method Value) {
+	if name == "__getattribute__" {
+		dunderNSGen++
+	}
 	c.Methods[name] = method
+}
+
+// CustomGetAttribute returns the user-defined __getattribute__ governing
+// instances of c, or nil when only object's default applies. Dot access runs
+// this on every instance attribute read, so the MRO probe is cached.
+func (c *Class) CustomGetAttribute() Value {
+	if c.gaCacheGen == dunderNSGen {
+		return c.gaCache
+	}
+	var custom Value
+	if m, _, ok := c.GetMethodWithClass("__getattribute__"); ok && m != DefaultObjectGetAttribute {
+		custom = m
+	}
+	c.gaCache = custom
+	c.gaCacheGen = dunderNSGen
+	return custom
 }
 
 // GetClassAttr gets a class attribute, following the C3 MRO.
@@ -274,6 +303,9 @@ func (c *Class) GetClassAttr(name string) (Value, bool) {
 // in this class's Methods or the stale def would keep shadowing it and
 // monkey-patching (`Cls.m = fn`) would silently no-op.
 func (c *Class) SetClassAttr(name string, value Value) {
+	if name == "__getattribute__" {
+		dunderNSGen++
+	}
 	if _, ok := c.GetMethod(name); ok {
 		c.Methods[name] = value
 		return
@@ -1104,13 +1136,13 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				}
 			}
 
-			// CRITICAL: Set __class__ to the DEFINING class, not the instance's class
-			// This is required for super() to work correctly in inherited methods
-			// When Child has no __init__ but inherits Parent.__init__, and Parent.__init__
-			// calls super().__init__(), super() must search from Parent's position in MRO,
-			// not Child's position
-			initCtx := NewContext(ctx)
-			initCtx.Define("__class__", definingClass)
+			// __class__ resolution for super() comes from the method's own
+			// captured environment (the class-body context Defines it at
+			// creation), so the call context needs no per-instantiation
+			// wrapper; methods execute in a frame chained to their env, and
+			// the caller context contributes only depth/stack.
+			initCtx := ctx
+			_ = definingClass
 
 			// Prepend instance as first argument (self)
 			initArgs := append([]Value{instance}, args...)
@@ -1720,67 +1752,17 @@ func (i *Instance) getAttrImpl(name string, skipInstanceDict bool) (Value, bool,
 		return dict, true, nil
 	}
 
-	// Step 1: Check for data descriptor in class
-	// A data descriptor has __set__ or __delete__ methods
-	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
-		// Check if it's a data descriptor (has __set__ or __delete__)
-		hasSet := false
-		hasDelete := false
-		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-			if _, exists := obj.GetAttr("__set__"); exists {
-				hasSet = true
-			}
-			if _, exists := obj.GetAttr("__delete__"); exists {
-				hasDelete = true
-			}
+	// Step 1: Check for data descriptor in class (property, slot, user
+	// descriptor with __set__/__delete__). Type-switched: plain methods and
+	// constants pass through with no protocol probes and no allocation.
+	classAttr, defClass, foundInClass := i.Class.GetMethodWithClass(name)
+	if foundInClass {
+		if v, handled, err := i.dataDescriptorGet(classAttr); handled || err != nil {
+			return v, handled, err
 		}
-
-		// If it's a data descriptor, invoke __get__
-		if hasSet || hasDelete {
-			if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-				if getMethod, exists := obj.GetAttr("__get__"); exists {
-					if callable, ok := getMethod.(Callable); ok {
-						// Call descriptor.__get__(instance, type)
-						result, err := callable.Call([]Value{i, i.Class}, nil)
-						if err != nil {
-							return nil, false, err
-						}
-						return result, true, nil
-					}
-				}
-			}
-			// If __get__ doesn't exist, return the descriptor itself
-			return classAttr, true, nil
-		}
-	} else if classAttr, ok := i.Class.GetClassAttr(name); ok {
-		// Check class attributes for data descriptors too
-		hasSet := false
-		hasDelete := false
-		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-			if _, exists := obj.GetAttr("__set__"); exists {
-				hasSet = true
-			}
-			if _, exists := obj.GetAttr("__delete__"); exists {
-				hasDelete = true
-			}
-		}
-
-		// If it's a data descriptor, invoke __get__
-		if hasSet || hasDelete {
-			if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-				if getMethod, exists := obj.GetAttr("__get__"); exists {
-					if callable, ok := getMethod.(Callable); ok {
-						// Call descriptor.__get__(instance, type)
-						result, err := callable.Call([]Value{i, i.Class}, nil)
-						if err != nil {
-							return nil, false, err
-						}
-						return result, true, nil
-					}
-				}
-			}
-			// If __get__ doesn't exist, return the descriptor itself
-			return classAttr, true, nil
+	} else if attr, ok := i.Class.GetClassAttr(name); ok {
+		if v, handled, err := i.dataDescriptorGet(attr); handled || err != nil {
+			return v, handled, err
 		}
 	}
 
@@ -1792,41 +1774,15 @@ func (i *Instance) getAttrImpl(name string, skipInstanceDict bool) (Value, bool,
 		}
 	}
 
-	// Step 3: Check for non-data descriptor in class (has __get__ but not __set__ or __delete__)
-	if classAttr, defClass, ok := i.Class.GetMethodWithClass(name); ok {
-
-		// Check if it has __get__ (making it a non-data descriptor)
-		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-			if getMethod, exists := obj.GetAttr("__get__"); exists {
-				if callable, ok := getMethod.(Callable); ok {
-					// Call descriptor.__get__(instance, type)
-					result, err := callable.Call([]Value{i, i.Class}, nil)
-					if err != nil {
-						return nil, false, err
-					}
-					return result, true, nil
-				}
-			}
+	// Step 3: Non-data descriptors and methods from the class: type-switched
+	// binding (static/classmethod unwrap, user descriptors' __get__, plain
+	// callables bound) with no protocol probes for the common cases.
+	if foundInClass {
+		v, err := i.bindClassValue(classAttr, defClass)
+		if err != nil {
+			return nil, false, err
 		}
-
-		// Static methods should not be bound to the instance
-		if sm, ok := classAttr.(*StaticMethodValue); ok {
-			return sm.Function, true, nil
-		}
-
-		// Not a descriptor, check if it's a regular method that needs binding
-		if callable, ok := classAttr.(interface {
-			Call([]Value, *Context) (Value, error)
-		}); ok {
-			// Create bound method
-			boundMethod := &BoundInstanceMethod{
-				Instance:      i,
-				Method:        callable,
-				DefiningClass: defClass,
-			}
-			return boundMethod, true, nil
-		}
-		return classAttr, true, nil
+		return v, true, nil
 	}
 
 	// Step 4: Check class attributes (non-descriptors)
@@ -2053,27 +2009,15 @@ func (i *Instance) SetAttrDefault(name string, value Value) error {
 		}
 	}
 
-	// Check for data descriptor in class with __set__
+	// Check for data descriptor in class with __set__ (type-switched: plain
+	// values skip all protocol probes)
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
-		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-			if setMethod, exists := obj.GetAttr("__set__"); exists {
-				if callable, ok := setMethod.(Callable); ok {
-					// Call descriptor.__set__(instance, value)
-					_, err := callable.Call([]Value{i, value}, nil)
-					return err
-				}
-			}
+		if handled, err := i.dataDescriptorSet(classAttr, value); handled {
+			return err
 		}
 	} else if classAttr, ok := i.Class.GetClassAttr(name); ok {
-		// Check class attributes for descriptors with __set__
-		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-			if setMethod, exists := obj.GetAttr("__set__"); exists {
-				if callable, ok := setMethod.(Callable); ok {
-					// Call descriptor.__set__(instance, value)
-					_, err := callable.Call([]Value{i, value}, nil)
-					return err
-				}
-			}
+		if handled, err := i.dataDescriptorSet(classAttr, value); handled {
+			return err
 		}
 	}
 
@@ -2127,27 +2071,15 @@ func (i *Instance) DelAttrDefault(name string) error {
 		return &TypeError{Message: fmt.Sprintf("%s may not be deleted", name)}
 	}
 
-	// Check for descriptor in class with __delete__
+	// Check for descriptor in class with __delete__ (type-switched: plain
+	// values skip all protocol probes)
 	if classAttr, _, ok := i.Class.GetMethodWithClass(name); ok {
-		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-			if deleteMethod, exists := obj.GetAttr("__delete__"); exists {
-				if callable, ok := deleteMethod.(Callable); ok {
-					// Call descriptor.__delete__(instance)
-					_, err := callable.Call([]Value{i}, nil)
-					return err
-				}
-			}
+		if handled, err := i.dataDescriptorDelete(classAttr); handled {
+			return err
 		}
 	} else if classAttr, ok := i.Class.GetClassAttr(name); ok {
-		// Check class attributes for descriptors with __delete__
-		if obj, ok := classAttr.(interface{ GetAttr(string) (Value, bool) }); ok {
-			if deleteMethod, exists := obj.GetAttr("__delete__"); exists {
-				if callable, ok := deleteMethod.(Callable); ok {
-					// Call descriptor.__delete__(instance)
-					_, err := callable.Call([]Value{i}, nil)
-					return err
-				}
-			}
+		if handled, err := i.dataDescriptorDelete(classAttr); handled {
+			return err
 		}
 	}
 
@@ -2355,9 +2287,10 @@ type BoundSuperMethod struct {
 
 // Call implements Callable interface for BoundSuperMethod
 func (bsm *BoundSuperMethod) Call(args []Value, ctx *Context) (Value, error) {
-	// Create a new context with __class__ set
-	methodCtx := NewContext(ctx)
-	methodCtx.Define("__class__", bsm.Class)
+	// The wrapped method's captured environment carries __class__ for
+	// super(); the caller context contributes only depth/stack, so no
+	// per-call wrapper context is needed.
+	methodCtx := ctx
 
 	// Call the underlying method
 	if callable, ok := bsm.Method.(interface {
@@ -2370,9 +2303,8 @@ func (bsm *BoundSuperMethod) Call(args []Value, ctx *Context) (Value, error) {
 
 // CallWithKeywords implements CallWithKeywords interface for BoundSuperMethod
 func (bsm *BoundSuperMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
-	// Create a new context with __class__ set
-	methodCtx := NewContext(ctx)
-	methodCtx.Define("__class__", bsm.Class)
+	// See Call: the callee env carries __class__; no wrapper context.
+	methodCtx := ctx
 
 	// Check if the underlying method supports keyword arguments
 	if kwargsMethod, ok := bsm.Method.(interface {
@@ -2490,18 +2422,14 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 		if callable, ok := method.(interface {
 			Call([]Value, *Context) (Value, error)
 		}); ok {
-			// Create bound method if we have an instance
+			// Create bound method if we have an instance. __class__ for
+			// super() inside the target method comes from its captured env,
+			// so no BoundSuperMethod wrapper is needed.
 			if s.Instance != nil {
-				// Use BoundSuperMethod to ensure __class__ is set correctly
-				// This allows super() to work correctly in parent class methods
-				return &BoundSuperMethod{
-					BaseObject: *NewBaseObject(MethodType),
-					Method: &BoundInstanceMethod{
-						Instance:      s.Instance,
-						Method:        callable,
-						DefiningClass: defClass,
-					},
-					Class: defClass,
+				return &BoundInstanceMethod{
+					Instance:      s.Instance,
+					Method:        callable,
+					DefiningClass: defClass,
 				}
 			}
 			// For class methods (like __init_subclass__), bind to TargetClass

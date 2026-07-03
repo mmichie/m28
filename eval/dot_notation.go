@@ -63,7 +63,7 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// (object's default is identity-checked so ordinary classes skip the
 		// boxed call). An AttributeError from it falls back to __getattr__
 		// when defined; any other exception propagates unchanged.
-		if gaMethod, _, hasGA := inst.Class.GetMethodWithClass("__getattribute__"); hasGA && gaMethod != core.DefaultObjectGetAttribute {
+		if gaMethod := inst.Class.CustomGetAttribute(); gaMethod != nil {
 			if callable, ok := gaMethod.(interface {
 				Call([]core.Value, *core.Context) (core.Value, error)
 			}); ok {
@@ -125,19 +125,23 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 		// 2. The value is a function in an instance's __dict__ - these should not be bound as methods
 		//    (Python only binds functions found in the class, not in instance __dict__)
 		if _, isClass := value.(*core.Class); !isClass {
-			// Check if this is a function stored in instance __dict__
-			// Functions in instance __dict__ should NOT be bound as methods
 			skipDescriptor := false
+			// Instance receivers already ran the full descriptor protocol in
+			// Instance.getAttrImpl — the returned value is final (methods
+			// bound, properties resolved, __getattr__ results returned as-is
+			// per CPython). Re-running __get__ here would double-dispatch.
 			if _, isInst := obj.(*core.Instance); isInst {
-				// A raw function reaching here came from the instance __dict__ or
-				// from __getattr__, never from the class (Instance.GetAttr already
-				// returns class methods bound). Python binds only functions found
-				// in the class, so neither of these is bound as a method.
-				if _, isFunc := value.(*UserFunction); isFunc {
-					skipDescriptor = true
-				} else if _, isGenFunc := value.(*core.GeneratorFunction); isGenFunc {
-					skipDescriptor = true
-				}
+				skipDescriptor = true
+			}
+			// Primitive values and already-bound methods are never
+			// descriptors; probing __get__ on them walks the whole type
+			// registry (and its fmt-formatting miss path) per access.
+			switch value.(type) {
+			case core.NumberValue, core.FloatValue, core.StringValue, core.BoolValue,
+				core.NilValue, core.BytesValue, core.BigIntValue, core.TupleValue,
+				*core.ListValue, *core.DictValue, *core.SetValue,
+				*core.BoundInstanceMethod, *core.BoundClassMethod:
+				skipDescriptor = true
 			}
 
 			if !skipDescriptor {
@@ -255,24 +259,9 @@ func DotForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
-		// If the object is a Super, wrap the method to inject __class__ when called
-		// BUT skip wrapping if Super.GetAttr already returned a properly wrapped method
-		if superObj, ok := obj.(*core.Super); ok {
-			// Don't double-wrap - Super.GetAttr.bindMethod already returns
-			// BoundSuperMethod for instance methods and BoundClassMethod for class methods
-			if _, isBoundSuperMethod := value.(*core.BoundSuperMethod); !isBoundSuperMethod {
-				if _, isBoundClassMethod := value.(*core.BoundClassMethod); !isBoundClassMethod {
-					if _, ok := value.(interface {
-						Call([]core.Value, *core.Context) (core.Value, error)
-					}); ok {
-						value = &core.BoundSuperMethod{
-							Method: value,
-							Class:  superObj.Class,
-						}
-					}
-				}
-			}
-		}
+		// Super attribute access: Super.GetAttr already returns fully bound
+		// methods; __class__ for nested super() comes from each method's
+		// captured environment, so no additional wrapping is needed.
 
 		// If there are more arguments (even if just __call__ marker), it's a method call
 		if args.Len() > 2 {
