@@ -1034,6 +1034,20 @@ func IsTruthy(v Value) bool {
 		return false
 	}
 
+	// Primitive fast path: these types cannot carry a user __bool__/__len__,
+	// and probing those dunders builds two discarded formatted errors per
+	// miss. `while cond:` evaluates this on every iteration.
+	switch t := v.(type) {
+	case BoolValue:
+		return bool(t)
+	case NumberValue:
+		return float64(t) != 0
+	case FloatValue:
+		return float64(t) != 0
+	case NilValue:
+		return false
+	}
+
 	// First, check if the value has a __bool__ or __len__ method. Use the narrow
 	// GetAttr interface rather than the full Object interface: Go-backed types
 	// like collections.deque expose __bool__/__len__ via GetAttr but don't

@@ -580,14 +580,93 @@ func compileFor(items []core.Value, orig core.Value) core.Value {
 	}
 }
 
-// compileWhile rebuilds a simple (while cond body) so WhileForm still drives the
-// loop while the condition and body run as compiled IR. while/else and
-// multi-body forms fall through to WhileForm unchanged.
+// whileNode is the compiled simple while loop: condition and single body, no
+// else clause (compileWhile only accepts that shape). The condition runs
+// through the typed kernel — a numeric condition is f != 0 without boxing —
+// and truthiness of boxed values uses core.IsTruthy, exactly as WhileForm
+// does (unlike IfForm, WhileForm does not propagate __bool__ errors; that
+// difference is preserved).
+type whileNode struct {
+	cond core.Value
+	body core.Value
+}
+
+func (n *whileNode) Type() core.Type { return "while-node" }
+func (n *whileNode) String() string  { return "(while ...)" }
+
+// test reports one evaluation of the loop condition.
+func (n *whileNode) test(ctx *core.Context) (bool, error) {
+	num, kind, boxed, err := evalNumOf(n.cond, ctx)
+	if err != nil {
+		return false, err
+	}
+	if boxed == nil && kind != core.SlotBoxed {
+		return num != 0, nil
+	}
+	return core.IsTruthy(boxed), nil
+}
+
+func (n *whileNode) evalIR(ctx *core.Context) (core.Value, error) {
+	var lastResult core.Value = core.Nil
+	for {
+		truthy, err := n.test(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !truthy {
+			return lastResult, nil
+		}
+		result, err := Eval(n.body, ctx)
+		if err != nil {
+			return nil, err
+		}
+		switch result.(type) {
+		case *BreakValue:
+			return lastResult, nil
+		case *ContinueValue:
+			continue
+		case *ReturnValue:
+			return result, nil
+		}
+		lastResult = result
+	}
+}
+
+// execStmt: a while in statement position runs its body in statement position
+// too — no per-iteration result materialization.
+func (n *whileNode) execStmt(ctx *core.Context) (core.Value, error) {
+	for {
+		truthy, err := n.test(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !truthy {
+			return nil, nil
+		}
+		control, err := evalStmt(n.body, ctx)
+		if err != nil {
+			return nil, err
+		}
+		if control != nil {
+			switch control.(type) {
+			case *BreakValue:
+				return nil, nil
+			case *ContinueValue:
+				continue
+			default: // *ReturnValue
+				return control, nil
+			}
+		}
+	}
+}
+
+// compileWhile lowers a simple (while cond body) to a whileNode. while/else
+// and multi-body forms fall through to WhileForm unchanged.
 func compileWhile(items []core.Value, orig core.Value) core.Value {
 	if len(items) != 3 {
 		return orig
 	}
-	return core.NewList(items[0], compileIR(items[1]), compileIR(items[2]))
+	return &whileNode{cond: compileIR(items[1]), body: compileIR(items[2])}
 }
 
 // --- call nodes ---

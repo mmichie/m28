@@ -329,3 +329,19 @@ func BenchmarkFrameBoxed(b *testing.B) {
 	}
 	spikeSink = acc
 }
+
+// BenchmarkKernelWhileLoop: the while-loop analogue of KernelLoopAccum — the
+// condition runs through the typed kernel and the body in statement position
+// (stage 4, whileNode).
+func BenchmarkKernelWhileLoop(b *testing.B) {
+	fn := kernelFn(b, "(def kwl (n) (do (= total 0) (= i 0) (while (< i n) (do (= total (+ total (* i 2))) (= i (+ i 1)))) (return total)))", "kwl")
+	ctx := benchContext()
+	args := []core.Value{core.NumberValue(1000)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := fn.Call(args, ctx); err != nil {
+			b.Fatalf("call: %v", err)
+		}
+	}
+}
