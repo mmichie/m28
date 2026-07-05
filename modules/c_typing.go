@@ -23,7 +23,7 @@ func Init_TypingModule() *core.DictValue {
 	typeVarClass.SetMethod("__init__", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "TypeVar.__init__",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			if len(args) < 2 {
 				return core.None, nil
 			}
@@ -43,15 +43,15 @@ func Init_TypingModule() *core.DictValue {
 			}
 			// Handle kwargs: bound, covariant, contravariant
 			self.Attributes["__bound__"] = core.None
-			if bound, ok := kwargs["bound"]; ok {
+			if bound, ok := kwargs.Get("bound"); ok {
 				self.Attributes["__bound__"] = bound
 			}
 			self.Attributes["__covariant__"] = core.BoolValue(false)
-			if cov, ok := kwargs["covariant"]; ok {
+			if cov, ok := kwargs.Get("covariant"); ok {
 				self.Attributes["__covariant__"] = cov
 			}
 			self.Attributes["__contravariant__"] = core.BoolValue(false)
-			if contra, ok := kwargs["contravariant"]; ok {
+			if contra, ok := kwargs.Get("contravariant"); ok {
 				self.Attributes["__contravariant__"] = contra
 			}
 			return core.None, nil

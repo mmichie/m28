@@ -12,7 +12,7 @@ type simpleEnumWithKwargs struct {
 }
 
 // CallWithKeywords implements keyword argument support for _simple_enum
-func (s *simpleEnumWithKwargs) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (s *simpleEnumWithKwargs) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// _simple_enum accepts keyword arguments but we ignore them in the stub
 	// Just call the underlying function with positional args only
 	return s.BuiltinFunction.Call(args, ctx)

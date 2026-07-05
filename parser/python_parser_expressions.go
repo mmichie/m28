@@ -558,11 +558,10 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 	core.Log.Trace(core.SubsystemParser, "Desugaring Pythonic function call", "file", p.filename, "callee", fmt.Sprintf("%T", callee), "line", tok.Line, "col", tok.Col)
 
 	args := []ast.ASTNode{callee}
-	var kwargs []ast.ASTNode            // keyword arguments as (keyword value) pairs
 	seenKwargs := make(map[string]bool) // track keyword names for duplicate detection
+	seenKeyword := false
 
 	if !p.check(TOKEN_RPAREN) {
-		seenKeyword := false
 		for {
 			// Check for **kwargs unpacking
 			if p.check(TOKEN_DOUBLESTAR) {
@@ -597,12 +596,15 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 				p.expect(TOKEN_ASSIGN)
 				value := p.parseExpression()
 
-				// Store as a keyword-value pair
-				kwPair := ast.NewSExpr([]ast.ASTNode{
-					ast.NewLiteral(core.StringValue(nameTok.Lexeme), p.makeLocation(nameTok), ast.SyntaxPython),
+				// Emit the keyword inline at its source position using the
+				// s-expression convention (name = value) that kwarg_eval
+				// parses, so named keywords and ** unpackings keep their
+				// relative source order (PEP 468).
+				args = append(args,
+					ast.NewIdentifier(nameTok.Lexeme, p.makeLocation(nameTok), ast.SyntaxPython),
+					ast.NewIdentifier("=", p.makeLocation(nameTok), ast.SyntaxPython),
 					value,
-				}, p.makeLocation(nameTok), ast.SyntaxPython)
-				kwargs = append(kwargs, kwPair)
+				)
 			} else {
 				if seenKeyword {
 					// Match CPython's exact wording (and eval/kwarg_eval.go) so
@@ -637,20 +639,6 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 
 	p.expect(TOKEN_RPAREN)
 
-	// If we have keyword arguments, append them as a special **unpack node
-	if len(kwargs) > 0 {
-		// Create a dict-literal for the keyword arguments
-		dictSym := ast.NewIdentifier("dict-literal", p.makeLocation(tok), ast.SyntaxPython)
-		dictArgs := append([]ast.ASTNode{dictSym}, kwargs...)
-		kwDict := ast.NewSExpr(dictArgs, p.makeLocation(tok), ast.SyntaxPython)
-
-		// Append **unpack marker and the dict
-		args = append(args,
-			ast.NewIdentifier("**unpack", p.makeLocation(tok), ast.SyntaxPython),
-			kwDict,
-		)
-	}
-
 	// Special handling: if callee is a SIMPLE attribute access (. obj "name"),
 	// convert it to a method call form: (. obj "name" args...)
 	// This handles: {}.keys() -> (. {} "keys" __call__) instead of ((. {} "keys"))
@@ -672,10 +660,12 @@ func (p *PythonParser) parseCall(callee ast.ASTNode) ast.ASTNode {
 					}
 				}
 
-				// Only use dot notation for simple cases (no unpacking)
-				if !hasUnpacking {
+				// Only use dot notation for simple cases (no unpacking, no
+				// keywords — keyword triples would be misread as positional
+				// args by the method-call form)
+				if !hasUnpacking && !seenKeyword {
 					// No args (empty call): convert to (. obj "name" __call__)
-					if len(args) == 1 && len(kwargs) == 0 {
+					if len(args) == 1 {
 						return ast.NewSExpr(append(sexpr.Elements,
 							ast.NewLiteral(core.StringValue("__call__"), p.makeLocation(tok), ast.SyntaxPython)),
 							p.makeLocation(tok), ast.SyntaxPython)

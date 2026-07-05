@@ -36,7 +36,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 	var parentClasses []*core.Class
 	var explicitBaseValues []core.Value // Raw base values for metaclass.__new__ (may include non-classes)
 	var metaclass *core.Class
-	var classKwargs = make(map[string]core.Value) // Non-metaclass kwargs for __init_subclass__
+	classKwargs := core.NewKwargs(0) // Non-metaclass kwargs for __init_subclass__
 	bodyStart := 1
 
 	if args.Len() > 1 {
@@ -305,7 +305,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						if err != nil {
 							return nil, &core.TypeError{Message: fmt.Sprintf("error evaluating class keyword %s: %v", kwName, err)}
 						}
-						classKwargs[string(kwName)] = kwValue
+						classKwargs.Set(string(kwName), kwValue)
 					}
 				}
 			}
@@ -448,7 +448,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 						}
 					} else {
 						// Collect non-metaclass kwargs using the actual key name
-						classKwargs[actualKey] = val
+						classKwargs.Set(actualKey, val)
 						if debugClass {
 							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Collected class kwarg: %s = %T\n", actualKey, val)
 						}
@@ -1138,16 +1138,16 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				// Call with kwargs if available
 				var result core.Value
 				var err error
-				if len(classKwargs) > 0 {
+				if classKwargs.Len() > 0 {
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Calling metaclass.__new__ with kwargs:\n")
-						for k, v := range classKwargs {
-							fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   %s = %T\n", k, v)
+						for _, e := range classKwargs.Entries() {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   %s = %T\n", e.Name, e.Value)
 						}
 					}
 					// Try CallWithKwargs if supported
 					if kwargsCallable, ok := callable.(interface {
-						CallWithKwargs([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+						CallWithKwargs([]core.Value, *core.Kwargs, *core.Context) (core.Value, error)
 					}); ok {
 						result, err = kwargsCallable.CallWithKwargs(args, classKwargs, callCtx)
 					} else {
@@ -1241,16 +1241,16 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 				// Call with kwargs if available
 				var err error
-				if len(classKwargs) > 0 {
+				if classKwargs.Len() > 0 {
 					if debugClass {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Calling metaclass.__init__ with kwargs:\n")
-						for k, v := range classKwargs {
-							fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   %s = %T\n", k, v)
+						for _, e := range classKwargs.Entries() {
+							fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   %s = %T\n", e.Name, e.Value)
 						}
 					}
 					// Try CallWithKwargs if supported
 					if kwargsCallable, ok := callable.(interface {
-						CallWithKwargs([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+						CallWithKwargs([]core.Value, *core.Kwargs, *core.Context) (core.Value, error)
 					}); ok {
 						_, err = kwargsCallable.CallWithKwargs(initArgs, classKwargs, callCtx)
 					} else {

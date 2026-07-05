@@ -29,7 +29,7 @@ func applyKey(keyFunc core.Value, value core.Value, ctx *core.Context) (core.Val
 }
 
 // SortedWithKwargs is the keyword-argument version of sorted
-func SortedWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func SortedWithKwargs(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("sorted requires at least 1 argument")
 	}
@@ -38,14 +38,14 @@ func SortedWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core
 	var keyFunc core.Value
 	reverse := false
 
-	if key, hasKey := kwargs["key"]; hasKey {
+	if key, hasKey := kwargs.Get("key"); hasKey {
 		if !isCallable(key) {
 			return nil, fmt.Errorf("key argument must be a callable function")
 		}
 		keyFunc = key
 	}
 
-	if rev, hasRev := kwargs["reverse"]; hasRev {
+	if rev, hasRev := kwargs.Get("reverse"); hasRev {
 		if b, ok := rev.(core.BoolValue); ok {
 			reverse = bool(b)
 		} else {
@@ -54,9 +54,9 @@ func SortedWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core
 	}
 
 	// Check for unknown keyword arguments
-	for k := range kwargs {
-		if k != "key" && k != "reverse" {
-			return nil, fmt.Errorf("sorted() got an unexpected keyword argument '%s'", k)
+	for _, e := range kwargs.Entries() {
+		if e.Name != "key" && e.Name != "reverse" {
+			return nil, fmt.Errorf("sorted() got an unexpected keyword argument '%s'", e.Name)
 		}
 	}
 
@@ -119,7 +119,7 @@ func SortedWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core
 }
 
 // MinWithKwargs is the keyword-argument version of min
-func MinWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func MinWithKwargs(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("min expected at least 1 argument, got 0")
 	}
@@ -127,7 +127,7 @@ func MinWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Co
 	// Extract keyword arguments
 	var keyFunc core.Value
 
-	if key, hasKey := kwargs["key"]; hasKey {
+	if key, hasKey := kwargs.Get("key"); hasKey {
 		if !isCallable(key) {
 			return nil, fmt.Errorf("key argument must be a callable function")
 		}
@@ -135,9 +135,9 @@ func MinWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Co
 	}
 
 	// Check for unknown keyword arguments
-	for k := range kwargs {
-		if k != "key" {
-			return nil, fmt.Errorf("min() got an unexpected keyword argument '%s'", k)
+	for _, e := range kwargs.Entries() {
+		if e.Name != "key" {
+			return nil, fmt.Errorf("min() got an unexpected keyword argument '%s'", e.Name)
 		}
 	}
 
@@ -185,7 +185,7 @@ func MinWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Co
 }
 
 // MaxWithKwargs is the keyword-argument version of max
-func MaxWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func MaxWithKwargs(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("max expected at least 1 argument, got 0")
 	}
@@ -193,7 +193,7 @@ func MaxWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Co
 	// Extract keyword arguments
 	var keyFunc core.Value
 
-	if key, hasKey := kwargs["key"]; hasKey {
+	if key, hasKey := kwargs.Get("key"); hasKey {
 		if !isCallable(key) {
 			return nil, fmt.Errorf("key argument must be a callable function")
 		}
@@ -201,9 +201,9 @@ func MaxWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Co
 	}
 
 	// Check for unknown keyword arguments
-	for k := range kwargs {
-		if k != "key" {
-			return nil, fmt.Errorf("max() got an unexpected keyword argument '%s'", k)
+	for _, e := range kwargs.Entries() {
+		if e.Name != "key" {
+			return nil, fmt.Errorf("max() got an unexpected keyword argument '%s'", e.Name)
 		}
 	}
 

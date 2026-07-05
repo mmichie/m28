@@ -389,7 +389,7 @@ func (f *KwargsPosixStat) Call(args []core.Value, ctx *core.Context) (core.Value
 }
 
 // CallWithKeywords implements keyword argument support
-func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	if len(args) == 0 {
 		return nil, fmt.Errorf("stat() missing required argument: 'path'")
 	}
@@ -407,7 +407,7 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs map[string]
 
 	// Check follow_symlinks keyword argument (default from instance)
 	followSymlinks := f.followSymlinks
-	if val, ok := kwargs["follow_symlinks"]; ok {
+	if val, ok := kwargs.Get("follow_symlinks"); ok {
 		if boolVal, ok := val.(core.BoolValue); ok {
 			followSymlinks = bool(boolVal)
 		}

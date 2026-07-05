@@ -722,17 +722,17 @@ func RegisterMisc(ctx *core.Context) {
 	ctx.Define("compile", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "compile",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			// compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1)
 			// M28's compile() is a placeholder that ignores flags/dont_inherit/
 			// optimize, but it must accept them -- positionally or by keyword --
 			// rather than reject the call (CPython accepts both forms).
-			for k := range kwargs {
-				switch k {
+			for _, e := range kwargs.Entries() {
+				switch e.Name {
 				case "flags", "dont_inherit", "optimize", "_feature_version":
 					// accepted and ignored
 				default:
-					return nil, &core.TypeError{Message: fmt.Sprintf("compile() got an unexpected keyword argument '%s'", k)}
+					return nil, &core.TypeError{Message: fmt.Sprintf("compile() got an unexpected keyword argument '%s'", e.Name)}
 				}
 			}
 			v := validation.NewArgs("compile", args)

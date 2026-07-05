@@ -197,7 +197,7 @@ func InitCollectionsModule() *core.DictValue {
 	collectionsModule.Set("_tuplegetter", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "_tuplegetter",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			// Get index - could be positional or keyword argument
 			var index core.NumberValue
 			var ok bool
@@ -212,7 +212,7 @@ func InitCollectionsModule() *core.DictValue {
 					tupleGetterCounter++
 					ok = true
 				}
-			} else if indexVal, found := kwargs["index"]; found {
+			} else if indexVal, found := kwargs.Get("index"); found {
 				index, ok = indexVal.(core.NumberValue)
 			}
 
@@ -226,7 +226,7 @@ func InitCollectionsModule() *core.DictValue {
 				if docVal, ok := args[1].(core.StringValue); ok {
 					doc = string(docVal)
 				}
-			} else if docVal, found := kwargs["doc"]; found {
+			} else if docVal, found := kwargs.Get("doc"); found {
 				if docStr, ok := docVal.(core.StringValue); ok {
 					doc = string(docStr)
 				}

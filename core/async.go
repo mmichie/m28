@@ -450,7 +450,7 @@ type Coroutine struct {
 	BaseObject
 	Function Value
 	Args     []Value
-	Kwargs   map[string]Value
+	Kwargs   *Kwargs
 	Name     string
 	closed   bool
 	registry *MethodRegistry
@@ -469,7 +469,7 @@ func NewCoroutine(function Value, args []Value, name string) *Coroutine {
 }
 
 // NewCoroutineWithKwargs creates a new coroutine with keyword arguments
-func NewCoroutineWithKwargs(function Value, args []Value, kwargs map[string]Value, name string) *Coroutine {
+func NewCoroutineWithKwargs(function Value, args []Value, kwargs *Kwargs, name string) *Coroutine {
 	c := &Coroutine{
 		BaseObject: *NewBaseObject(Type("coroutine")),
 		Function:   function,
@@ -537,9 +537,9 @@ func (c *Coroutine) createRegistry() *MethodRegistry {
 
 				// Execute the coroutine's function
 				// First try CallWithKeywords if we have kwargs
-				if len(coro.Kwargs) > 0 {
+				if coro.Kwargs.Len() > 0 {
 					if kwargsCallable, ok := coro.Function.(interface {
-						CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+						CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 					}); ok {
 						result, err := kwargsCallable.CallWithKeywords(coro.Args, coro.Kwargs, ctx)
 						if err != nil {
@@ -633,10 +633,10 @@ func (af *AsyncFunction) Call(args []Value, ctx *Context) (Value, error) {
 
 // CallWithKeywords creates a coroutine object with keyword arguments
 // This matches Python behavior where calling an async function with kwargs returns a coroutine
-func (af *AsyncFunction) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func (af *AsyncFunction) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	// Return a coroutine object with kwargs, not a running task
 	// The coroutine can be awaited later or closed
-	if len(kwargs) == 0 {
+	if kwargs.Len() == 0 {
 		return NewCoroutine(af.Function, args, af.Name), nil
 	}
 	return NewCoroutineWithKwargs(af.Function, args, kwargs, af.Name), nil

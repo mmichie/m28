@@ -67,13 +67,22 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 			// This allows the code to run without errors
 		}
 
-		// Extract kwargs if provided
-		kwargsMap := make(map[string]core.Value)
+		// Extract kwargs if provided (mapping keys must be strings)
+		kwargsMap := core.NewKwargs(0)
 		if v.Count() == 3 {
 			dict, _ := types.AsDict(v.Get(2)) // Already validated above
-			for _, key := range dict.Keys() {
-				value, _ := dict.Get(key)
-				kwargsMap[key] = value
+			var keyErr error
+			dict.ForEach(func(k, val core.Value) bool {
+				ks, ok := k.(core.StringValue)
+				if !ok {
+					keyErr = fmt.Errorf("apply() keywords must be strings, got %s", k.Type())
+					return false
+				}
+				kwargsMap.Set(string(ks), val)
+				return true
+			})
+			if keyErr != nil {
+				return nil, keyErr
 			}
 		}
 
@@ -87,16 +96,16 @@ func RegisterUtilityFunctions(ctx *core.Context) {
 }
 
 // ApplyWithKwargs handles calling functions with keyword arguments
-func ApplyWithKwargs(fn core.Value, args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func ApplyWithKwargs(fn core.Value, args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// Check if function supports CallWithKwargs
 	if kwFunc, ok := fn.(interface {
-		CallWithKwargs([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+		CallWithKwargs([]core.Value, *core.Kwargs, *core.Context) (core.Value, error)
 	}); ok {
 		return kwFunc.CallWithKwargs(args, kwargs, ctx)
 	}
 
 	// Otherwise, fall back to regular Call
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		// Function doesn't support kwargs, but some were provided
 		// For compatibility, we just ignore them rather than error
 	}

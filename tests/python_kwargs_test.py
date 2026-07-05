@@ -39,4 +39,43 @@ def func5(**kwargs):
 func5()
 print("Test 5 passed: Empty **kwargs")
 
+# Test 6: PEP 468 - kwargs preserve call-site keyword order (M28-acf)
+d = dict(z=1, m=2, a=3, k=4, b=5, q=6, c=7, w=8)
+assert list(d.keys()) == ["z", "m", "a", "k", "b", "q", "c", "w"]
+print("Test 6 passed: dict() kwargs keep call-site order")
+
+# Test 7: **kwargs parameter sees keys in call-site order
+def kw_names(**kw):
+    return list(kw.keys())
+
+assert kw_names(z=1, a=2, m=3) == ["z", "a", "m"]
+print("Test 7 passed: **kwargs keeps call-site order")
+
+# Test 8: forwarding through **kw preserves order
+def kw_forward(**kw):
+    return kw_names(**kw)
+
+assert kw_forward(w=9, e=8, r=7) == ["w", "e", "r"]
+print("Test 8 passed: **kw forwarding keeps order")
+
+# Test 9: named keywords and ** unpacking merge in source order
+mid = {"b": 2}
+assert list(dict(a=1, **mid, c=3).keys()) == ["a", "b", "c"]
+print("Test 9 passed: named and ** merge in source order")
+
+# Test 10: consumed names do not reach **kwargs; order kept for the rest
+def kw_mixed(x, y=0, **rest):
+    return list(rest.keys())
+
+assert kw_mixed(1, m=5, y=2, k=6) == ["m", "k"]
+print("Test 10 passed: consumed keywords removed, order kept")
+
+# Test 11: functools.partial merges fixed and call kwargs in CPython order
+import functools
+
+pk = functools.partial(kw_names, q=1, z=2)
+assert pk(a=3, z=9) == ["q", "z", "a"]
+assert list(pk.keywords.keys()) == ["q", "z"]
+print("Test 11 passed: partial kwargs merge order")
+
 print("\nAll Python **kwargs tests passed!")

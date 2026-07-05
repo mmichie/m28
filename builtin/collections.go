@@ -15,8 +15,8 @@ type classmethodValue struct {
 	fn func([]core.Value, *core.Context) (core.Value, error)
 }
 
-func (c *classmethodValue) Type() core.Type  { return "classmethod_descriptor" }
-func (c *classmethodValue) String() string   { return "<classmethod_descriptor>" }
+func (c *classmethodValue) Type() core.Type { return "classmethod_descriptor" }
+func (c *classmethodValue) String() string  { return "<classmethod_descriptor>" }
 func (c *classmethodValue) Call(args []core.Value, ctx *core.Context) (core.Value, error) {
 	return c.fn(args, ctx)
 }
@@ -316,9 +316,9 @@ func (l *ListType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
 // to ensure our custom Call is used instead of the generic class instantiation
-func (l *ListType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (l *ListType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// For list, keyword arguments are not supported in the constructor
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		return nil, &core.TypeError{Message: "list() does not accept keyword arguments"}
 	}
 	// Use the custom Call method which handles multiple arguments
@@ -356,10 +356,10 @@ func (t *TupleType) Call(args []core.Value, ctx *core.Context) (core.Value, erro
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
 // to ensure our custom Call is used instead of the generic class instantiation
-func (t *TupleType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (t *TupleType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// For tuple, keyword arguments are not supported in the constructor
 	// Just ignore kwargs and call our custom Call method
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		return nil, &core.TypeError{Message: "tuple() does not accept keyword arguments"}
 	}
 	return t.Call(args, ctx)
@@ -448,10 +448,10 @@ func (s *SetType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
 // to ensure our custom Call is used instead of the generic class instantiation
-func (s *SetType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (s *SetType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// For set, keyword arguments are not supported in the constructor
 	// Just ignore kwargs and call our custom Call method
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		return nil, &core.TypeError{Message: "set() does not accept keyword arguments"}
 	}
 	return s.Call(args, ctx)
@@ -489,10 +489,10 @@ func (b *ByteArrayTypeClass) Call(args []core.Value, ctx *core.Context) (core.Va
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
 // to ensure our custom Call is used instead of the generic class instantiation
-func (b *ByteArrayTypeClass) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (b *ByteArrayTypeClass) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// For bytearray, keyword arguments are not supported in the constructor
 	// Just ignore kwargs and call our custom Call method
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		return nil, &core.TypeError{Message: "bytearray() does not accept keyword arguments"}
 	}
 	return b.Call(args, ctx)
@@ -735,7 +735,7 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
 // to ensure our custom Call is used instead of the generic class instantiation
-func (d *DictType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (d *DictType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// First create dict from positional arguments
 	dict, err := d.Call(args, ctx)
 	if err != nil {
@@ -744,17 +744,13 @@ func (d *DictType) CallWithKeywords(args []core.Value, kwargs map[string]core.Va
 
 	// Then add keyword arguments as key-value pairs
 	// dict(a=1, b=2) creates {'a': 1, 'b': 2}
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		dictVal, ok := dict.(*core.DictValue)
 		if !ok {
 			return nil, fmt.Errorf("dict() Call did not return a DictValue")
 		}
-		for key, value := range kwargs {
-			// Use SetValue to properly format the key with ValueToKey
-			err := dictVal.SetValue(core.StringValue(key), value)
-			if err != nil {
-				return nil, fmt.Errorf("error setting dict kwarg %s: %w", key, err)
-			}
+		for _, e := range kwargs.Entries() {
+			dictVal.SetStr(e.Name, e.Value)
 		}
 	}
 
@@ -878,9 +874,9 @@ func (b *BytesType) Call(args []core.Value, ctx *core.Context) (core.Value, erro
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
 // to ensure our custom Call is used instead of the generic class instantiation
-func (b *BytesType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (b *BytesType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// For bytes, keyword arguments are not supported in the constructor
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		return nil, &core.TypeError{Message: "bytes() does not accept keyword arguments"}
 	}
 	return b.Call(args, ctx)

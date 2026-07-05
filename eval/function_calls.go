@@ -387,12 +387,12 @@ func (f *UserFunction) Call(args []core.Value, ctx *core.Context) (core.Value, e
 }
 
 // CallWithKwargs calls the function with positional and keyword arguments
-func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// Resolution layer: when called purely positionally with the right arity, a
 	// slot-eligible function uses the slot frame. Any keyword arguments fall
 	// through to the map-based path, which binds them correctly.
 	f.ensureResolved()
-	if f.slotBody != nil && len(kwargs) == 0 && len(args) == f.numParams {
+	if f.slotBody != nil && kwargs.Len() == 0 && len(args) == f.numParams {
 		return f.callSlots(args, ctx)
 	}
 
@@ -426,7 +426,7 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 		}
 	} else {
 		// Legacy: simple parameter binding - no kwargs support
-		if len(kwargs) > 0 {
+		if kwargs.Len() > 0 {
 			err := fmt.Errorf("function %s does not support keyword arguments", f.name)
 			core.TraceExitFunction(f.name, nil, err)
 			return nil, err
@@ -468,7 +468,7 @@ func (f *UserFunction) CallWithKwargs(args []core.Value, kwargs map[string]core.
 }
 
 // CallWithKeywords is an alias for CallWithKwargs for interface compatibility
-func (f *UserFunction) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (f *UserFunction) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	return f.CallWithKwargs(args, kwargs, ctx)
 }
 

@@ -435,28 +435,26 @@ func RegisterNumeric(ctx *core.Context) {
 }
 
 // extremeWithKwargs is a helper for min/max with keyword argument support
-func extremeWithKwargs(funcName string, isMin bool) func([]core.Value, map[string]core.Value, *core.Context) (core.Value, error) {
-	return func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func extremeWithKwargs(funcName string, isMin bool) func([]core.Value, *core.Kwargs, *core.Context) (core.Value, error) {
+	return func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 		// Check for key parameter
 		var keyFunc core.Value
-		if k, ok := kwargs["key"]; ok {
+		if k, ok := kwargs.Get("key"); ok {
 			keyFunc = k
-			delete(kwargs, "key")
 		}
 
 		// Check for default parameter
 		var defaultValue core.Value
 		var hasDefault bool
-		if d, ok := kwargs["default"]; ok {
+		if d, ok := kwargs.Get("default"); ok {
 			defaultValue = d
 			hasDefault = true
-			delete(kwargs, "default")
 		}
 
-		// Check for any remaining kwargs
-		if len(kwargs) > 0 {
-			for k := range kwargs {
-				return nil, &core.TypeError{Message: fmt.Sprintf("%s() got an unexpected keyword argument '%s'", funcName, k)}
+		// Check for any unexpected kwargs (must not mutate the caller's kwargs)
+		for _, e := range kwargs.Entries() {
+			if e.Name != "key" && e.Name != "default" {
+				return nil, &core.TypeError{Message: fmt.Sprintf("%s() got an unexpected keyword argument '%s'", funcName, e.Name)}
 			}
 		}
 

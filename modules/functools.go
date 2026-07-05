@@ -9,7 +9,6 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-
 // Init_FunctoolsModule creates and returns the _functools C extension stub
 // This provides the C functions that Python's functools.py imports
 func Init_FunctoolsModule() *core.DictValue {
@@ -148,7 +147,6 @@ func Init_FunctoolsModule() *core.DictValue {
 	return functoolsModule
 }
 
-
 // partialBuiltin implements partial with keyword argument support
 type partialBuiltin struct {
 	core.BaseObject
@@ -166,7 +164,7 @@ func (p *partialBuiltin) Call(args []core.Value, ctx *core.Context) (core.Value,
 	return p.CallWithKeywords(args, nil, ctx)
 }
 
-func (p *partialBuiltin) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (p *partialBuiltin) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	v := validation.NewArgs("partial", args)
 	if err := v.Min(1); err != nil {
 		return nil, err
@@ -183,13 +181,8 @@ func (p *partialBuiltin) CallWithKeywords(args []core.Value, kwargs map[string]c
 		fixedArgs[i-1] = v.Get(i)
 	}
 
-	// Capture the fixed keyword arguments
-	fixedKwargs := make(map[string]core.Value)
-	if kwargs != nil {
-		for k, v := range kwargs {
-			fixedKwargs[k] = v
-		}
-	}
+	// Capture the fixed keyword arguments (insertion order preserved)
+	fixedKwargs := kwargs.Clone()
 
 	// Create a new function that prepends the fixed arguments
 	partialFunc := &partialFunction{
@@ -206,7 +199,7 @@ type partialFunction struct {
 	core.BaseObject
 	function    core.Callable
 	fixedArgs   []core.Value
-	fixedKwargs map[string]core.Value
+	fixedKwargs *core.Kwargs
 }
 
 func (pf *partialFunction) Type() core.Type {
@@ -221,35 +214,31 @@ func (pf *partialFunction) Call(args []core.Value, ctx *core.Context) (core.Valu
 	return pf.CallWithKeywords(args, nil, ctx)
 }
 
-func (pf *partialFunction) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (pf *partialFunction) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// Combine fixed args with new args
 	allArgs := make([]core.Value, 0, len(pf.fixedArgs)+len(args))
 	allArgs = append(allArgs, pf.fixedArgs...)
 	allArgs = append(allArgs, args...)
 
-	// Combine fixed kwargs with new kwargs (new kwargs override fixed ones)
-	allKwargs := make(map[string]core.Value)
-	for k, v := range pf.fixedKwargs {
-		allKwargs[k] = v
-	}
-	if kwargs != nil {
-		for k, v := range kwargs {
-			allKwargs[k] = v
-		}
+	// Combine fixed kwargs with new kwargs (new kwargs override fixed ones,
+	// keeping the fixed keyword's position, like CPython's {**fixed, **new})
+	allKwargs := pf.fixedKwargs.Clone()
+	for _, e := range kwargs.Entries() {
+		allKwargs.Set(e.Name, e.Value)
 	}
 
 	// Call the underlying function with combined args
 	// Try CallWithKwargs first (UserFunction)
 	if kwCallable, ok := pf.function.(interface {
-		CallWithKwargs([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
-	}); ok && len(allKwargs) > 0 {
+		CallWithKwargs([]core.Value, *core.Kwargs, *core.Context) (core.Value, error)
+	}); ok && allKwargs.Len() > 0 {
 		return kwCallable.CallWithKwargs(allArgs, allKwargs, ctx)
 	}
 
 	// Try CallWithKeywords (builtins)
 	if kwCallable, ok := pf.function.(interface {
-		CallWithKeywords([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
-	}); ok && len(allKwargs) > 0 {
+		CallWithKeywords([]core.Value, *core.Kwargs, *core.Context) (core.Value, error)
+	}); ok && allKwargs.Len() > 0 {
 		return kwCallable.CallWithKeywords(allArgs, allKwargs, ctx)
 	}
 
@@ -275,11 +264,7 @@ func (pf *partialFunction) GetAttr(name string) (core.Value, bool) {
 		return core.NewList(pf.fixedArgs...), true
 	case "keywords":
 		// The fixed keyword arguments
-		dict := core.NewDict()
-		for k, v := range pf.fixedKwargs {
-			dict.Set(k, v)
-		}
-		return dict, true
+		return pf.fixedKwargs.ToDict(), true
 	case "__name__":
 		return core.StringValue("partial"), true
 	case "__qualname__":
@@ -323,4 +308,3 @@ func (pf *partialFunction) GetAttr(name string) (core.Value, bool) {
 
 	return nil, false
 }
-

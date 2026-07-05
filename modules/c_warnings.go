@@ -51,7 +51,7 @@ func Init_WarningsModule() *core.DictValue {
 	showwarningFunc := &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "showwarning",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			// Default implementation - calls _showwarnmsg_impl
 			// The Python warnings module may replace this
 			return core.None, nil

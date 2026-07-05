@@ -16,8 +16,8 @@ import (
 // when given, otherwise the current sys.stdout (which Python code may have
 // reassigned, e.g. via contextlib.redirect_stdout). Returns nil when neither is
 // available (very early init), in which case the caller falls back to os.Stdout.
-func printTarget(kwargs map[string]core.Value) core.Value {
-	if fileVal, ok := kwargs["file"]; ok && fileVal != core.None {
+func printTarget(kwargs *core.Kwargs) core.Value {
+	if fileVal, ok := kwargs.Get("file"); ok && fileVal != core.None {
 		return fileVal
 	}
 	if sysMod, ok := modules.GetBuiltinModule("sys"); ok {
@@ -58,13 +58,13 @@ func RegisterIO(ctx *core.Context) {
 	printFunc := &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "print",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			// Default values for sep and end (Python defaults)
 			sep := " "
 			end := "\n"
 
 			// Check for sep= kwarg
-			if sepVal, ok := kwargs["sep"]; ok {
+			if sepVal, ok := kwargs.Get("sep"); ok {
 				if sepVal == core.None {
 					sep = " " // None means use default
 				} else if s, ok := sepVal.(core.StringValue); ok {
@@ -75,7 +75,7 @@ func RegisterIO(ctx *core.Context) {
 			}
 
 			// Check for end= kwarg
-			if endVal, ok := kwargs["end"]; ok {
+			if endVal, ok := kwargs.Get("end"); ok {
 				if endVal == core.None {
 					end = "\n" // None means use default
 				} else if s, ok := endVal.(core.StringValue); ok {
@@ -86,9 +86,9 @@ func RegisterIO(ctx *core.Context) {
 			}
 
 			// Check for unexpected kwargs
-			for key := range kwargs {
-				if key != "sep" && key != "end" && key != "file" && key != "flush" {
-					return nil, fmt.Errorf("print() got an unexpected keyword argument '%s'", key)
+			for _, e := range kwargs.Entries() {
+				if e.Name != "sep" && e.Name != "end" && e.Name != "file" && e.Name != "flush" {
+					return nil, fmt.Errorf("print() got an unexpected keyword argument '%s'", e.Name)
 				}
 			}
 
@@ -157,8 +157,8 @@ func RegisterIO(ctx *core.Context) {
 }
 
 // OpenBuilderWithKwargs creates the open function with keyword argument support
-func OpenBuilderWithKwargs() func([]core.Value, map[string]core.Value, *core.Context) (core.Value, error) {
-	return func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func OpenBuilderWithKwargs() func([]core.Value, *core.Kwargs, *core.Context) (core.Value, error) {
+	return func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("open", args)
 
 		if err := v.Range(1, 3); err != nil {
@@ -184,7 +184,7 @@ func OpenBuilderWithKwargs() func([]core.Value, map[string]core.Value, *core.Con
 		// Get encoding from kwargs (default "utf-8") - accepted but ignored for now
 		// encoding := "utf-8"
 		// if kwargs != nil {
-		// 	if encVal, ok := kwargs["encoding"]; ok {
+		// 	if encVal, ok := kwargs.Get("encoding"); ok {
 		// 		if encStr, ok := encVal.(core.StringValue); ok {
 		// 			encoding = string(encStr)
 		// 		}

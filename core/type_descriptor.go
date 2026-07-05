@@ -10,7 +10,7 @@ import (
 type MethodHandler func(receiver Value, args []Value, ctx *Context) (Value, error)
 
 // MethodHandlerWithKwargs is a function that implements a method with keyword argument support
-type MethodHandlerWithKwargs func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error)
+type MethodHandlerWithKwargs func(receiver Value, args []Value, kwargs *Kwargs, ctx *Context) (Value, error)
 
 // ConstructorFunc creates a new instance of a type
 type ConstructorFunc func(args []Value, ctx *Context) (Value, error)
@@ -296,7 +296,7 @@ func (bm *BoundMethod) Call(args []Value, ctx *Context) (Value, error) {
 }
 
 // CallWithKeywords implements keyword argument support for bound methods
-func (bm *BoundMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func (bm *BoundMethod) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	if bm.Method == nil {
 		return nil, fmt.Errorf("bound method has nil method descriptor")
 	}
@@ -307,7 +307,7 @@ func (bm *BoundMethod) CallWithKeywords(args []Value, kwargs map[string]Value, c
 	}
 
 	// Otherwise, if there are no keyword arguments, use the regular handler
-	if len(kwargs) == 0 && bm.Method.Handler != nil {
+	if kwargs.Len() == 0 && bm.Method.Handler != nil {
 		// Check arity
 		if bm.Method.Arity >= 0 && len(args) != bm.Method.Arity {
 			return nil, &TypeError{Message: fmt.Sprintf("%s() takes %d arguments (%d given)",

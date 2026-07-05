@@ -508,7 +508,7 @@ func addOSProcessStubs(osModule *core.DictValue) {
 	osModule.Set("chmod", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "chmod",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			if len(args) < 2 {
 				return nil, &core.TypeError{Message: "chmod expected at least 2 arguments"}
 			}
@@ -539,7 +539,7 @@ func addOSProcessStubs(osModule *core.DictValue) {
 	osModule.Set("utime", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "utime",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			if len(args) < 1 {
 				return nil, &core.TypeError{Message: "utime: missing path argument"}
 			}
@@ -554,7 +554,7 @@ func addOSProcessStubs(osModule *core.DictValue) {
 			}
 			now := time.Now()
 			atime, mtime := now, now
-			if nsVal, ok := kwargs["ns"]; ok && nsVal != core.None {
+			if nsVal, ok := kwargs.Get("ns"); ok && nsVal != core.None {
 				if tup, ok := nsVal.(core.TupleValue); ok && len(tup) == 2 {
 					if a, ok := tup[0].(core.NumberValue); ok {
 						atime = time.Unix(0, int64(a))
@@ -603,7 +603,7 @@ func (f *KwargsOSStat) Call(args []core.Value, ctx *core.Context) (core.Value, e
 }
 
 // CallWithKeywords implements keyword argument support
-func (f *KwargsOSStat) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (f *KwargsOSStat) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	if len(args) != 1 {
 		return nil, core.NewTypeError("str", nil, "stat() argument")
 	}
@@ -614,7 +614,7 @@ func (f *KwargsOSStat) CallWithKeywords(args []core.Value, kwargs map[string]cor
 
 	// Check follow_symlinks keyword argument (default: true)
 	followSymlinks := true
-	if val, ok := kwargs["follow_symlinks"]; ok {
+	if val, ok := kwargs.Get("follow_symlinks"); ok {
 		if boolVal, ok := val.(core.BoolValue); ok {
 			followSymlinks = bool(boolVal)
 		}

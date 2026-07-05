@@ -11,15 +11,15 @@ import (
 
 // ParameterInfo holds information about a function parameter
 type ParameterInfo struct {
-	Name           core.SymbolValue
-	DefaultValue   core.Value // nil if no default
-	HasDefault     bool
+	Name         core.SymbolValue
+	DefaultValue core.Value // nil if no default
+	HasDefault   bool
 	// DefaultEvaluated marks DefaultValue as the def-time evaluated value
 	// (Python semantics: defaults are computed once in the defining scope).
 	// When false, legacy paths still hold the unevaluated expression.
 	DefaultEvaluated bool
-	KeywordOnly    bool // true if parameter can only be passed by keyword (after *)
-	PositionalOnly bool // true if parameter can only be passed positionally (before /, PEP 570)
+	KeywordOnly      bool // true if parameter can only be passed by keyword (after *)
+	PositionalOnly   bool // true if parameter can only be passed positionally (before /, PEP 570)
 }
 
 // FunctionSignature holds the full signature of a function
@@ -452,10 +452,18 @@ func missingRequiredError(funcName string, missing []string) *core.TypeError {
 	return &core.TypeError{Message: fmt.Sprintf("%s() missing %d required positional argument%s: %s", callableName(funcName), n, plural, names)}
 }
 
-func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, kwargs map[string]core.Value, evalCtx *core.Context, bindCtx *core.Context) error {
+func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, kwargs *core.Kwargs, evalCtx *core.Context, bindCtx *core.Context) error {
 	// Track which parameters have been bound
 	boundParams := make(map[string]bool)
 	argIndex := 0
+
+	// Names of keyword arguments consumed by named parameters. Binding must not
+	// mutate the caller's kwargs: the same collection may be passed to both
+	// __new__ and __init__, and partial() reuses its stored keywords per call.
+	var consumedKw map[string]bool
+	if kwargs.Len() > 0 {
+		consumedKw = make(map[string]bool, kwargs.Len())
+	}
 
 	// Calculate max positional arguments (excluding keyword-only params)
 	maxPositional := 0
@@ -481,14 +489,14 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 	debugBind := os.Getenv("M28_DEBUG_BIND") != ""
 	if debugBind {
 		core.Log.Debug(core.SubsystemEval, "Binding arguments to function signature",
-			"args_count", len(args), "kwargs_count", len(kwargs),
+			"args_count", len(args), "kwargs_count", kwargs.Len(),
 			"required_params", len(sig.RequiredParams), "optional_params", len(sig.OptionalParams))
 		// Print only types, not values, to avoid recursion
 		for i, arg := range args {
 			core.Log.Debug(core.SubsystemEval, "Positional argument", "index", i, "type", fmt.Sprintf("%T", arg))
 		}
-		for k := range kwargs {
-			core.Log.Debug(core.SubsystemEval, "Keyword argument", "name", k)
+		for _, e := range kwargs.Entries() {
+			core.Log.Debug(core.SubsystemEval, "Keyword argument", "name", e.Name)
 		}
 		for _, p := range sig.RequiredParams {
 			core.Log.Debug(core.SubsystemEval, "Required parameter", "name", p.Name)
@@ -510,7 +518,7 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 		paramName := string(param.Name)
 
 		// Check if provided as keyword argument
-		kwValue, hasKw := kwargs[paramName]
+		kwValue, hasKw := kwargs.Get(paramName)
 		if hasKw && param.PositionalOnly {
 			// PEP 570: a keyword that matches a positional-only parameter name
 			// is only an error if there is no **kwargs to absorb it. Otherwise
@@ -531,7 +539,7 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 		if hasKw {
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
-			delete(kwargs, paramName)
+			consumedKw[paramName] = true
 		} else if param.KeywordOnly {
 			// Keyword-only parameters cannot be bound from positional arguments
 			return &core.TypeError{
@@ -557,7 +565,7 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 		paramName := string(param.Name)
 
 		// Check if provided as keyword argument
-		kwValue, hasKw := kwargs[paramName]
+		kwValue, hasKw := kwargs.Get(paramName)
 		if hasKw && param.PositionalOnly {
 			// PEP 570: see note above — leave the keyword for **kwargs unless
 			// there is no **kwargs, in which case it is an error.
@@ -574,7 +582,7 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 		if hasKw {
 			bindCtx.Define(paramName, kwValue)
 			boundParams[paramName] = true
-			delete(kwargs, paramName)
+			consumedKw[paramName] = true
 		} else if !param.KeywordOnly && argIndex < len(args) {
 			// Bind from positional arguments (only for non-keyword-only params)
 			bindCtx.Define(paramName, args[argIndex])
@@ -636,21 +644,25 @@ func (sig *FunctionSignature) BindArguments(funcName string, args []core.Value, 
 		return tooManyPositionalError(funcName, sig, len(args))
 	}
 
-	// 4. Collect remaining keyword arguments into **kwargs if present
+	// 4. Collect unconsumed keyword arguments into **kwargs if present. The
+	// dict is always fresh (callee mutations must not alias the call site) and
+	// preserves call-site keyword order (PEP 468).
 	if sig.KeywordParam != nil {
 		kwargsDict := core.NewDict()
-		for k, v := range kwargs {
-			// Use SetValue to properly convert string key to Value and use ValueToKey
-			err := kwargsDict.SetValue(core.StringValue(k), v)
-			if err != nil {
-				return fmt.Errorf("error setting kwarg %s: %v", k, err)
+		for _, e := range kwargs.Entries() {
+			if consumedKw[e.Name] {
+				continue
 			}
+			kwargsDict.SetStr(e.Name, e.Value)
 		}
 		bindCtx.Define(string(*sig.KeywordParam), kwargsDict)
-	} else if len(kwargs) > 0 {
-		// Unexpected keyword arguments (CPython raises TypeError).
-		for k := range kwargs {
-			return &core.TypeError{Message: fmt.Sprintf("%s() got an unexpected keyword argument '%s'", callableName(funcName), k)}
+	} else if kwargs.Len() > len(consumedKw) {
+		// Unexpected keyword arguments (CPython raises TypeError). Report the
+		// first unconsumed keyword in call order.
+		for _, e := range kwargs.Entries() {
+			if !consumedKw[e.Name] {
+				return &core.TypeError{Message: fmt.Sprintf("%s() got an unexpected keyword argument '%s'", callableName(funcName), e.Name)}
+			}
 		}
 	}
 

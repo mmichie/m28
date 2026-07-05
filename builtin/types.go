@@ -320,11 +320,11 @@ func RegisterTypes(ctx *core.Context) {
 	objectInit := &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "__init__",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			// Python validation: object.__init__ only accepts extra args if:
 			// - Class has custom __new__ (args are meant for it), OR
 			// - Class has custom __init__ (we're being called via super().__init__)
-			if len(args) > 1 || len(kwargs) > 0 {
+			if len(args) > 1 || kwargs.Len() > 0 {
 				// Get the class from self
 				var cls *core.Class
 				if inst, ok := args[0].(*core.Instance); ok {
@@ -1220,10 +1220,10 @@ func (s *StrType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 
 // CallWithKeywords overrides the embedded Class's CallWithKeywords
 // to ensure our custom Call is used instead of the generic class instantiation
-func (s *StrType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (s *StrType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// For str, keyword arguments are not supported in the constructor
 	// Just ignore kwargs and call our custom Call method
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		return nil, &core.TypeError{Message: "str() does not accept keyword arguments"}
 	}
 	return s.Call(args, ctx)
@@ -1241,10 +1241,10 @@ func (t *TypeType) GetClass() *core.Class {
 
 // CallWithKeywords implements keyword argument support for type()
 // This takes precedence over Class.CallWithKeywords
-func (t *TypeType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (t *TypeType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// For type(), keyword arguments are only valid when creating a new class (3+ args)
 	// For type(obj), ignore kwargs
-	if len(args) == 1 && len(kwargs) == 0 {
+	if len(args) == 1 && kwargs.Len() == 0 {
 		return t.Call(args, ctx)
 	} else if len(args) == 3 {
 		// type(name, bases, dict, **kwargs) - delegate to type.__new__
@@ -1520,7 +1520,7 @@ func createTypeMetaclass() *TypeType {
 	// Add __new__ method to type metaclass
 	// type.__new__(cls, name, bases, dict, **kwargs) creates a new class
 	// Create a wrapper that supports keyword arguments
-	typeNewFunc := NewKwargsBuiltinFunction("type.__new__", func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	typeNewFunc := NewKwargsBuiltinFunction("type.__new__", func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 		// type.__new__(cls, name, bases, dict, **kwargs)
 		// We need at least cls, name, bases, dict
 		if len(args) < 4 {
@@ -1790,11 +1790,11 @@ func (i *IntType) Call(args []core.Value, ctx *core.Context) (core.Value, error)
 // int([x]) -> integer
 // int(x, base=10) -> integer
 // int(x=...) or int(x=..., base=...) are all valid
-func (i *IntType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func (i *IntType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// Validate keyword argument names
-	for key := range kwargs {
-		if key != "x" && key != "base" {
-			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' is an invalid keyword argument for int()", key)}
+	for _, e := range kwargs.Entries() {
+		if e.Name != "x" && e.Name != "base" {
+			return nil, &core.TypeError{Message: fmt.Sprintf("'%s' is an invalid keyword argument for int()", e.Name)}
 		}
 	}
 
@@ -1804,11 +1804,11 @@ func (i *IntType) CallWithKeywords(args []core.Value, kwargs map[string]core.Val
 	// Handle 'x' argument
 	if len(args) > 0 {
 		// x provided positionally
-		if _, hasX := kwargs["x"]; hasX {
+		if _, hasX := kwargs.Get("x"); hasX {
 			return nil, &core.TypeError{Message: "int() got multiple values for argument 'x'"}
 		}
 		finalArgs = append(finalArgs, args[0])
-	} else if xVal, hasX := kwargs["x"]; hasX {
+	} else if xVal, hasX := kwargs.Get("x"); hasX {
 		// x provided as keyword
 		finalArgs = append(finalArgs, xVal)
 	}
@@ -1816,11 +1816,11 @@ func (i *IntType) CallWithKeywords(args []core.Value, kwargs map[string]core.Val
 	// Handle 'base' argument
 	if len(args) > 1 {
 		// base provided positionally
-		if _, hasBase := kwargs["base"]; hasBase {
+		if _, hasBase := kwargs.Get("base"); hasBase {
 			return nil, &core.TypeError{Message: "int() got multiple values for argument 'base'"}
 		}
 		finalArgs = append(finalArgs, args[1])
-	} else if baseVal, hasBase := kwargs["base"]; hasBase {
+	} else if baseVal, hasBase := kwargs.Get("base"); hasBase {
 		// base provided as keyword - need x first if not already there
 		if len(finalArgs) == 0 {
 			// If base is given but x isn't, that's an error in Python
@@ -2282,8 +2282,8 @@ func (b *BoolType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 }
 
 // CallWithKeywords delegates to Call since bool() doesn't accept keyword arguments
-func (b *BoolType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-	if len(kwargs) > 0 {
+func (b *BoolType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
+	if kwargs.Len() > 0 {
 		return nil, &core.TypeError{
 			Message: "bool() takes no keyword argument",
 		}
@@ -2414,8 +2414,8 @@ func (f *FloatType) Call(args []core.Value, ctx *core.Context) (core.Value, erro
 
 // CallWithKeywords delegates to Call since float() doesn't accept keyword arguments
 // This prevents primitive floats from being wrapped in Instance objects
-func (f *FloatType) CallWithKeywords(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
-	if len(kwargs) > 0 {
+func (f *FloatType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
+	if kwargs.Len() > 0 {
 		return nil, &core.TypeError{Message: "float() does not accept keyword arguments"}
 	}
 	return f.Call(args, ctx)

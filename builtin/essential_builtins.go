@@ -381,7 +381,7 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 	importFunc := &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "__import__",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, innerCtx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, innerCtx *core.Context) (core.Value, error) {
 			if len(args) < 1 {
 				return nil, fmt.Errorf("__import__() requires at least 1 argument (0 given)")
 			}
@@ -421,7 +421,7 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			var fromlistVal core.Value
 			if len(args) > 3 {
 				fromlistVal = args[3]
-			} else if fl, ok := kwargs["fromlist"]; ok {
+			} else if fl, ok := kwargs.Get("fromlist"); ok {
 				fromlistVal = fl
 			}
 			if fromlistVal != nil {

@@ -62,7 +62,7 @@ func InitIOModule() *core.DictValue {
 	ioOpenFunc := &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "open",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			v := validation.NewArgs("open", args)
 
 			if err := v.Range(1, 3); err != nil {
@@ -86,7 +86,7 @@ func InitIOModule() *core.DictValue {
 			}
 
 			// Check for opener kwarg (used by tempfile.NamedTemporaryFile)
-			if opener, ok := kwargs["opener"]; ok && opener != nil && opener != core.None {
+			if opener, ok := kwargs.Get("opener"); ok && opener != nil && opener != core.None {
 				// Call the opener with (filename, flags)
 				// The opener should return a file descriptor
 				if callable, ok := opener.(core.Callable); ok {
@@ -438,7 +438,7 @@ type TextIOWrapper struct {
 	buffer_io core.Value // Underlying binary stream
 }
 
-func newTextIOWrapper(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func newTextIOWrapper(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	v := validation.NewArgs("TextIOWrapper", args)
 
 	// TextIOWrapper(buffer, encoding=None, errors=None, newline=None, line_buffering=False)
@@ -508,7 +508,9 @@ func (t *TextIOWrapper) read(args []core.Value, ctx *core.Context) (core.Value, 
 func (t *TextIOWrapper) readline(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// Read from underlying buffer_io if available
 	if t.buffer_io != nil {
-		if attrProvider, ok := t.buffer_io.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if attrProvider, ok := t.buffer_io.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if callable, ok := attrProvider.GetAttr("readline"); ok {
 				if fn, ok := callable.(core.Callable); ok {
 					result, err := fn.Call(nil, ctx)
@@ -535,7 +537,9 @@ func (t *TextIOWrapper) readlines(args []core.Value, ctx *core.Context) (core.Va
 	// Read all lines from underlying buffer_io
 	result := core.NewList()
 	if t.buffer_io != nil {
-		if attrProvider, ok := t.buffer_io.(interface{ GetAttr(string) (core.Value, bool) }); ok {
+		if attrProvider, ok := t.buffer_io.(interface {
+			GetAttr(string) (core.Value, bool)
+		}); ok {
 			if callable, ok := attrProvider.GetAttr("readlines"); ok {
 				if fn, ok := callable.(core.Callable); ok {
 					lines, err := fn.Call(nil, ctx)

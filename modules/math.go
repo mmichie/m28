@@ -298,7 +298,7 @@ func InitMathModule() *core.DictValue {
 	mathModule.Set("isclose", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.BuiltinFunctionType),
 		Name:       "isclose",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			if len(args) != 2 {
 				return nil, errors.NewTypeError("isclose", "exactly 2 positional arguments", "got different count")
 			}
@@ -309,7 +309,7 @@ func InitMathModule() *core.DictValue {
 			}
 			relTol, absTol := 1e-09, 0.0
 			for name, dst := range map[string]*float64{"rel_tol": &relTol, "abs_tol": &absTol} {
-				if v, ok := kwargs[name]; ok {
+				if v, ok := kwargs.Get(name); ok {
 					n, ok := core.AsFloat(v)
 					if !ok {
 						return nil, errors.NewTypeError("isclose", "number", name)
@@ -394,12 +394,12 @@ func InitMathModule() *core.DictValue {
 	mathModule.Set("prod", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.BuiltinFunctionType),
 		Name:       "prod",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			if len(args) != 1 {
 				return nil, errors.NewTypeError("prod", "exactly 1 positional argument", "got different count")
 			}
 			result := 1.0
-			if v, ok := kwargs["start"]; ok {
+			if v, ok := kwargs.Get("start"); ok {
 				n, ok := core.AsFloat(v)
 				if !ok {
 					return nil, errors.NewTypeError("prod", "number", "start")

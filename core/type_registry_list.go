@@ -778,7 +778,7 @@ func listMethodSort(receiver Value, args []Value, ctx *Context) (Value, error) {
 }
 
 // listMethodSortWithKwargs implements list.sort() with keyword arguments (key=, reverse=)
-func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func listMethodSortWithKwargs(receiver Value, args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	list := receiver.(*ListValue)
 
 	// sort() takes no positional arguments
@@ -790,7 +790,7 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 	var keyFunc Value
 	reverse := false
 
-	if key, hasKey := kwargs["key"]; hasKey {
+	if key, hasKey := kwargs.Get("key"); hasKey {
 		// Verify it's callable
 		if _, ok := key.(Callable); !ok {
 			// Also check for __call__ method
@@ -805,7 +805,7 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 		keyFunc = key
 	}
 
-	if rev, hasRev := kwargs["reverse"]; hasRev {
+	if rev, hasRev := kwargs.Get("reverse"); hasRev {
 		if b, ok := rev.(BoolValue); ok {
 			reverse = bool(b)
 		} else {
@@ -814,9 +814,9 @@ func listMethodSortWithKwargs(receiver Value, args []Value, kwargs map[string]Va
 	}
 
 	// Check for unknown keyword arguments
-	for k := range kwargs {
-		if k != "key" && k != "reverse" {
-			return nil, &TypeError{Message: fmt.Sprintf("sort() got an unexpected keyword argument '%s'", k)}
+	for _, e := range kwargs.Entries() {
+		if e.Name != "key" && e.Name != "reverse" {
+			return nil, &TypeError{Message: fmt.Sprintf("sort() got an unexpected keyword argument '%s'", e.Name)}
 		}
 	}
 

@@ -586,16 +586,14 @@ func (f *BuiltinFunction) Call(args []Value, ctx *Context) (Value, error) {
 // CallWithKeywords implements keyword argument support for BuiltinFunction
 // By default, errors on unexpected keyword arguments (matching Python's behavior).
 // Use NewBuiltinFunctionIgnoringKwargs for legacy builtins that need to accept any kwargs.
-func (f *BuiltinFunction) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
-	if len(kwargs) > 0 {
+func (f *BuiltinFunction) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
+	if kwargs.Len() > 0 {
 		if f.acceptsAnyKwargs {
 			// Legacy behavior: silently ignore kwargs
 			return f.fn(args, ctx)
 		}
 		// Error on unexpected kwargs (matches Python behavior)
-		for key := range kwargs {
-			return nil, fmt.Errorf("%s() got an unexpected keyword argument '%s'", f.name, key)
-		}
+		return nil, fmt.Errorf("%s() got an unexpected keyword argument '%s'", f.name, kwargs.Entries()[0].Name)
 	}
 	return f.fn(args, ctx)
 }
@@ -604,7 +602,7 @@ func (f *BuiltinFunction) CallWithKeywords(args []Value, kwargs map[string]Value
 type BuiltinFunctionWithKwargs struct {
 	BaseObject
 	Name string
-	Fn   func(args []Value, kwargs map[string]Value, ctx *Context) (Value, error)
+	Fn   func(args []Value, kwargs *Kwargs, ctx *Context) (Value, error)
 }
 
 // Call implements Callable.Call
@@ -613,7 +611,7 @@ func (f *BuiltinFunctionWithKwargs) Call(args []Value, ctx *Context) (Value, err
 }
 
 // CallWithKeywords implements keyword argument support
-func (f *BuiltinFunctionWithKwargs) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func (f *BuiltinFunctionWithKwargs) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	return f.Fn(args, kwargs, ctx)
 }
 

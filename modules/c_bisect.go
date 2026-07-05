@@ -72,14 +72,14 @@ type bisectParams struct {
 	lo, hi    int
 }
 
-func parseBisectArgs(name string, args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (*bisectParams, error) {
+func parseBisectArgs(name string, args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (*bisectParams, error) {
 	p := &bisectParams{}
 
 	get := func(idx int, kw string) (core.Value, bool) {
 		if idx < len(args) {
 			return args[idx], true
 		}
-		if v, ok := kwargs[kw]; ok {
+		if v, ok := kwargs.Get(kw); ok {
 			return v, true
 		}
 		return nil, false
@@ -120,7 +120,7 @@ func parseBisectArgs(name string, args []core.Value, kwargs map[string]core.Valu
 		p.hi = n
 	}
 
-	p.key = kwargs["key"]
+	p.key, _ = kwargs.Get("key")
 	return p, nil
 }
 
@@ -185,7 +185,7 @@ func newBisectFunc(name string, left, insort bool) *core.BuiltinFunctionWithKwar
 	return &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.BuiltinFunctionType),
 		Name:       name,
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			p, err := parseBisectArgs(name, args, kwargs, ctx)
 			if err != nil {
 				return nil, err

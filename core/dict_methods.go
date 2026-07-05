@@ -120,13 +120,13 @@ func InitDictMethods() {
 		Doc:     "Update dict with key/value pairs from another dict, mapping, or iterable of pairs, plus keyword args (mutates in place, returns None)",
 		Builtin: true,
 		Handler: dictUpdatePositional,
-		KwargHandler: func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+		KwargHandler: func(receiver Value, args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 			if _, err := dictUpdatePositional(receiver, args, ctx); err != nil {
 				return nil, err
 			}
 			dict := receiver.(*DictValue)
-			for k, v := range kwargs {
-				dict.SetStr(k, v)
+			for _, e := range kwargs.Entries() {
+				dict.SetStr(e.Name, e.Value)
 			}
 			return None, nil
 		},

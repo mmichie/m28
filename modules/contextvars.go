@@ -17,7 +17,7 @@ func Init_ContextvarsModule() *core.DictValue {
 	contextVarClass.SetMethod("__init__", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "ContextVar.__init__",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			if len(args) < 2 {
 				return nil, &core.TypeError{Message: "ContextVar() takes a name argument"}
 			}
@@ -27,7 +27,7 @@ func Init_ContextvarsModule() *core.DictValue {
 			}
 			self.Attributes["__name__"] = args[1]
 			self.Attributes["_value"] = core.Value(contextVarMissing)
-			if def, ok := kwargs["default"]; ok {
+			if def, ok := kwargs.Get("default"); ok {
 				self.Attributes["_default"] = def
 			} else {
 				self.Attributes["_default"] = core.Value(contextVarMissing)

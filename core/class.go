@@ -758,7 +758,7 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		return &BuiltinFunctionWithKwargs{
 			BaseObject: *NewBaseObject(FunctionType),
 			Name:       "__init__",
-			Fn: func(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+			Fn: func(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 				// Default __init__ does nothing, just return None
 				return None, nil
 			},
@@ -875,7 +875,7 @@ func (c *Class) checkAbstractInstantiation() error {
 
 // CallWithKeywords implements keyword argument support for class instantiation
 // This is the generic solution that unlocks full Python compatibility for all classes
-func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func (c *Class) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	// PEP 3119: a class with unimplemented abstract methods cannot be
 	// instantiated (CPython raises this in object.__new__). Checked before the
 	// metaclass __call__ dispatch so it fires for ABCMeta classes too (ABCMeta
@@ -900,13 +900,13 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 
 				// Try CallWithKeywords first if method supports it
 				if kwargsCallable, ok := callMethod.(interface {
-					CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+					CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 				}); ok {
 					return kwargsCallable.CallWithKeywords(callArgs, kwargs, callCtx)
 				} else if callable, ok := callMethod.(interface {
 					Call([]Value, *Context) (Value, error)
 				}); ok {
-					if len(kwargs) > 0 {
+					if kwargs.Len() > 0 {
 						return nil, &TypeError{Message: "metaclass __call__ does not support keyword arguments"}
 					}
 					return callable.Call(callArgs, callCtx)
@@ -922,7 +922,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 
 	// Python validation: if neither __init__ nor __new__ is overridden,
 	// the class takes no arguments
-	if len(args) > 0 || len(kwargs) > 0 {
+	if len(args) > 0 || kwargs.Len() > 0 {
 		hasCustomInit := false
 		hasCustomNew := false
 
@@ -966,7 +966,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 		// keyword args.
 		if !hasCustomInit && !hasCustomNew && !hasBuiltinParent {
 			if c.Name == "BaseException" {
-				if len(kwargs) > 0 {
+				if kwargs.Len() > 0 {
 					return nil, &TypeError{Message: fmt.Sprintf("%s() takes no keyword arguments", c.Name)}
 				}
 			} else {
@@ -976,7 +976,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 
 		// If kwargs are provided but neither __init__ nor __new__ accepts them,
 		// and the parent is a list-like type that doesn't accept kwargs, raise TypeError.
-		if len(kwargs) > 0 && !hasCustomInit && !hasCustomNew {
+		if kwargs.Len() > 0 && !hasCustomInit && !hasCustomNew {
 			for _, parent := range c.Parents {
 				if parent.Name == "list" {
 					return nil, &TypeError{Message: fmt.Sprintf("%s() takes no keyword arguments", c.Name)}
@@ -1010,7 +1010,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 		var newErr error
 		if userDefinedNew {
 			if kwargsCallable, ok := newMethod.(interface {
-				CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+				CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 			}); ok {
 				instance, newErr = kwargsCallable.CallWithKeywords(newArgs, kwargs, ctx)
 			} else if callable, ok := newMethod.(interface {
@@ -1055,9 +1055,9 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			// Args were consumed by dict-init; don't pass to a no-op __init__.
 			args = nil
 			kwargs = nil
-		} else if !userInit && len(kwargs) > 0 {
-			for k, v := range kwargs {
-				inst.BackingDict.SetValue(StringValue(k), v)
+		} else if !userInit && kwargs.Len() > 0 {
+			for _, e := range kwargs.Entries() {
+				inst.BackingDict.SetStr(e.Name, e.Value)
 			}
 			kwargs = nil
 		}
@@ -1093,7 +1093,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 				initCtx.Define("__class__", definingClass)
 				initArgs := append([]Value{listInst}, args...)
 				if kwargsCallable, ok := initMethod.(interface {
-					CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+					CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 				}); ok {
 					_, err := kwargsCallable.CallWithKeywords(initArgs, kwargs, initCtx)
 					if err != nil {
@@ -1149,7 +1149,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 
 			// Try CallWithKeywords first if method supports it
 			if kwargsCallable, ok := initMethod.(interface {
-				CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+				CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 			}); ok {
 				if c.Name == "TestProgram" {
 					Log.Debug(SubsystemEval, "About to call __init__", "class", c.Name)
@@ -1167,7 +1167,7 @@ func (c *Class) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Con
 			}); ok {
 				// __init__ doesn't support kwargs - call with positional args only
 				// If kwargs were provided, this is an error
-				if len(kwargs) > 0 {
+				if kwargs.Len() > 0 {
 					return nil, &TypeError{Message: fmt.Sprintf("%s.__init__ does not support keyword arguments (method type: %T)", c.Name, initMethod)}
 				}
 				_, err := callable.Call(initArgs, initCtx)
@@ -1983,7 +1983,7 @@ func (i *Instance) SetAttr(name string, value Value) error {
 		}
 		// Also support CallWithKeywords for user functions
 		if kwCallable, ok := setAttrMethod.(interface {
-			CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+			CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 		}); ok {
 			_, err := kwCallable.CallWithKeywords([]Value{i, StringValue(name), value}, nil, nil)
 			return err
@@ -2048,7 +2048,7 @@ func (i *Instance) DelAttr(name string) error {
 		}
 		// Also support CallWithKeywords for user functions
 		if kwCallable, ok := delAttrMethod.(interface {
-			CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+			CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 		}); ok {
 			_, err := kwCallable.CallWithKeywords([]Value{i, StringValue(name)}, nil, nil)
 			return err
@@ -2135,21 +2135,21 @@ func (bm *BoundInstanceMethod) Call(args []Value, ctx *Context) (Value, error) {
 }
 
 // CallWithKeywords implements keyword argument support for bound instance methods
-func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func (bm *BoundInstanceMethod) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	// As in Call, the method's captured environment already carries __class__
 	// for super(), so no per-call wrapper context is allocated to inject it.
 	callArgs := append([]Value{bm.Instance}, args...)
 
 	// Check if the underlying method supports keyword arguments
 	if kwargsMethod, ok := bm.Method.(interface {
-		CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+		CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 	}); ok {
 		return kwargsMethod.CallWithKeywords(callArgs, kwargs, ctx)
 	}
 
 	// If method doesn't support kwargs but is a Callable, try calling it with kwargs as positional
 	// This handles cases where the method's Call interface may internally support kwargs
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		// For now, we just error. TODO(M28-8da4): integrate with kwarg_eval
 		return nil, &TypeError{Message: "method does not support keyword arguments"}
 	}
@@ -2302,19 +2302,19 @@ func (bsm *BoundSuperMethod) Call(args []Value, ctx *Context) (Value, error) {
 }
 
 // CallWithKeywords implements CallWithKeywords interface for BoundSuperMethod
-func (bsm *BoundSuperMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func (bsm *BoundSuperMethod) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	// See Call: the callee env carries __class__; no wrapper context.
 	methodCtx := ctx
 
 	// Check if the underlying method supports keyword arguments
 	if kwargsMethod, ok := bsm.Method.(interface {
-		CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+		CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 	}); ok {
 		return kwargsMethod.CallWithKeywords(args, kwargs, methodCtx)
 	}
 
 	// If method doesn't support kwargs but we have kwargs, error
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		return nil, &TypeError{Message: "method does not support keyword arguments"}
 	}
 

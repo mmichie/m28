@@ -460,7 +460,7 @@ func createCatchWarningsClass() core.Value {
 	return &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "catch_warnings",
-		Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 			// Parse arguments - support both positional and keyword argument
 			record := false
 
@@ -473,7 +473,7 @@ func createCatchWarningsClass() core.Value {
 
 			// Check keyword argument (overrides positional)
 			if kwargs != nil {
-				if recordVal, ok := kwargs["record"]; ok {
+				if recordVal, ok := kwargs.Get("record"); ok {
 					if b, ok := recordVal.(core.BoolValue); ok {
 						record = bool(b)
 					}

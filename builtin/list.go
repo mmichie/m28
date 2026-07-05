@@ -145,7 +145,7 @@ func RegisterList(ctx *core.Context) {
 
 	// sorted - returns sorted copy with optional reverse and key parameters
 	// sorted(iterable, *, key=None, reverse=False)
-	ctx.Define("sorted", NewKwargsBuiltinFunction("sorted", func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+	ctx.Define("sorted", NewKwargsBuiltinFunction("sorted", func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, errors.NewArgumentError("sorted", 1, len(args))
 		}
@@ -191,14 +191,14 @@ func RegisterList(ctx *core.Context) {
 
 		// Handle reverse parameter (default is False)
 		reverse := false
-		if reverseVal, ok := kwargs["reverse"]; ok {
+		if reverseVal, ok := kwargs.Get("reverse"); ok {
 			reverse = core.IsTruthy(reverseVal)
 		}
 
 		// Handle key parameter (default is None)
 		// For now, we'll keep the simple string-based sort if no key is provided
 		var keyFunc core.Callable
-		if keyVal, ok := kwargs["key"]; ok {
+		if keyVal, ok := kwargs.Get("key"); ok {
 			if keyVal != core.Nil && keyVal != core.None {
 				if callable, ok := keyVal.(core.Callable); ok {
 					keyFunc = callable

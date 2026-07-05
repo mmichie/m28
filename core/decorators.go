@@ -252,7 +252,7 @@ func (b *BoundClassMethod) Call(args []Value, ctx *Context) (Value, error) {
 
 // CallWithKeywords implements keyword argument support for classmethods
 // Automatically injects the class as the first argument
-func (b *BoundClassMethod) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func (b *BoundClassMethod) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	// Prepend the class to the positional arguments
 	classMethodArgs := make([]Value, len(args)+1)
 	classMethodArgs[0] = b.Class
@@ -268,13 +268,13 @@ func (b *BoundClassMethod) CallWithKeywords(args []Value, kwargs map[string]Valu
 
 	// Call the underlying function with class as first arg and keywords
 	if kwargsFunc, ok := b.Function.(interface {
-		CallWithKeywords([]Value, map[string]Value, *Context) (Value, error)
+		CallWithKeywords([]Value, *Kwargs, *Context) (Value, error)
 	}); ok {
 		return kwargsFunc.CallWithKeywords(classMethodArgs, kwargs, callCtx)
 	}
 
 	// Fallback: if underlying function doesn't support keywords, only allow empty kwargs
-	if len(kwargs) > 0 {
+	if kwargs.Len() > 0 {
 		return nil, fmt.Errorf("classmethod function does not support keyword arguments")
 	}
 

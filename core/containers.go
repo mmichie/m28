@@ -1353,7 +1353,7 @@ func dictViewSetOp(v *DictView, other Value, op string) (Value, error) {
 // PopulateDictFromArgs is the exported form of populateDictFromArgs, used by the
 // dict class's __init__ (in the builtin package) so super().__init__(...) in a
 // dict subclass populates the backing dict.
-func PopulateDictFromArgs(d *DictValue, args []Value, kwargs map[string]Value) error {
+func PopulateDictFromArgs(d *DictValue, args []Value, kwargs *Kwargs) error {
 	return populateDictFromArgs(d, args, kwargs)
 }
 
@@ -1363,7 +1363,7 @@ func PopulateDictFromArgs(d *DictValue, args []Value, kwargs map[string]Value) e
 //   - 1 arg that's a mapping -> copy items
 //   - 1 arg that's an iterable of pairs -> add each pair
 //   - kwargs always overlay last
-func populateDictFromArgs(d *DictValue, args []Value, kwargs map[string]Value) error {
+func populateDictFromArgs(d *DictValue, args []Value, kwargs *Kwargs) error {
 	if len(args) > 1 {
 		return &TypeError{Message: fmt.Sprintf("dict expected at most 1 argument, got %d", len(args))}
 	}
@@ -1395,8 +1395,8 @@ func populateDictFromArgs(d *DictValue, args []Value, kwargs map[string]Value) e
 			}
 		}
 	}
-	for k, v := range kwargs {
-		d.SetValue(StringValue(k), v)
+	for _, e := range kwargs.Entries() {
+		d.SetStr(e.Name, e.Value)
 	}
 	return nil
 }

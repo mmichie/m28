@@ -1020,7 +1020,7 @@ func callValue(fn core.Value, args []core.Value, name string, ctx *core.Context)
 	}
 
 	if kwargsFunc, ok := fn.(interface {
-		CallWithKeywords([]core.Value, map[string]core.Value, *core.Context) (core.Value, error)
+		CallWithKeywords([]core.Value, *core.Kwargs, *core.Context) (core.Value, error)
 	}); ok {
 		funcName := name
 		if funcName == "" {

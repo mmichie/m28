@@ -57,7 +57,7 @@ func InitThreadModule() *core.DictValue {
 		&core.BuiltinFunctionWithKwargs{
 			BaseObject: *core.NewBaseObject(core.FunctionType),
 			Name:       "start_joinable_thread",
-			Fn: func(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+			Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 				if len(args) < 1 {
 					return nil, &core.TypeError{Message: "start_joinable_thread() missing required argument: 'function'"}
 				}
@@ -68,7 +68,7 @@ func InitThreadModule() *core.DictValue {
 					return nil, &core.TypeError{Message: "start_joinable_thread() argument must be callable"}
 				}
 				var handle *ThreadHandle
-				if h, ok := kwargs["handle"]; ok {
+				if h, ok := kwargs.Get("handle"); ok {
 					handle, _ = h.(*ThreadHandle)
 				}
 				if handle == nil {

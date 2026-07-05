@@ -15,7 +15,7 @@ import (
 // strFormat implements str.format(args, **kwargs) with full Python semantics:
 // positional {0}/{} and keyword {name} field access, conversion (!r/!s/!a),
 // format specs (:>10.2f), and attribute/index sub-fields (e.g. {obj.attr}).
-func strFormat(s string, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func strFormat(s string, args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	result := &strings.Builder{}
 	autoIdx := 0
 	i := 0
@@ -113,7 +113,7 @@ func strFormat(s string, args []Value, kwargs map[string]Value, ctx *Context) (V
 
 // resolveFormatField resolves a format field expression like "0", "name",
 // "obj.attr", "obj[key]" against positional args and kwargs.
-func resolveFormatField(field string, args []Value, kwargs map[string]Value, autoIdx *int) (Value, error) {
+func resolveFormatField(field string, args []Value, kwargs *Kwargs, autoIdx *int) (Value, error) {
 	if field == "" {
 		// Auto-numbering: {}
 		idx := *autoIdx
@@ -147,9 +147,7 @@ func resolveFormatField(field string, args []Value, kwargs map[string]Value, aut
 		val = args[idx]
 	} else if root != "" {
 		var ok bool
-		if kwargs != nil {
-			val, ok = kwargs[root]
-		}
+		val, ok = kwargs.Get(root)
 		if !ok {
 			return nil, &KeyError{Key: StringValue(root)}
 		}
@@ -222,7 +220,7 @@ func resolveFormatField(field string, args []Value, kwargs map[string]Value, aut
 // they consume positional arguments in order alongside the outer fields. A
 // nested field may carry a conversion (!r/!s/!a) but, per Python, not a further
 // nested format spec.
-func resolveNestedSpec(spec string, args []Value, kwargs map[string]Value, autoIdx *int) (string, error) {
+func resolveNestedSpec(spec string, args []Value, kwargs *Kwargs, autoIdx *int) (string, error) {
 	var b strings.Builder
 	i := 0
 	for i < len(spec) {
@@ -1466,7 +1464,7 @@ func InitStringMethods() {
 		Arity:   -1,
 		Doc:     "Return a formatted version of the string",
 		Builtin: true,
-		KwargHandler: func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+		KwargHandler: func(receiver Value, args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 			return strFormat(string(receiver.(StringValue)), args, kwargs, ctx)
 		},
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
@@ -1487,11 +1485,11 @@ func InitStringMethods() {
 			}
 			// Build kwargs from the mapping (string keys only; format field
 			// names are always strings)
-			kwargs := make(map[string]Value)
+			kwargs := NewKwargs(0)
 			if d, ok := args[0].(*DictValue); ok {
 				d.ForEach(func(k, v Value) bool {
 					if ks, ok := k.(StringValue); ok {
-						kwargs[string(ks)] = v
+						kwargs.Set(string(ks), v)
 					}
 					return true
 				})
@@ -1845,7 +1843,7 @@ func InitStringMethods() {
 		Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
 			return stringSplitlinesImpl(receiver, args, nil)
 		},
-		KwargHandler: func(receiver Value, args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+		KwargHandler: func(receiver Value, args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 			return stringSplitlinesImpl(receiver, args, kwargs)
 		},
 	}
@@ -2517,13 +2515,13 @@ func InitStringMethods() {
 }
 
 // stringSplitlinesImpl implements str.splitlines() with support for keyword arguments
-func stringSplitlinesImpl(receiver Value, args []Value, kwargs map[string]Value) (Value, error) {
+func stringSplitlinesImpl(receiver Value, args []Value, kwargs *Kwargs) (Value, error) {
 	s := string(receiver.(StringValue))
 	keepends := false
 
 	// Check for keyword argument first
 	if kwargs != nil {
-		if keependsVal, hasKeepends := kwargs["keepends"]; hasKeepends {
+		if keependsVal, hasKeepends := kwargs.Get("keepends"); hasKeepends {
 			if keependsVal == True {
 				keepends = true
 			} else if keependsVal == False {
@@ -2535,9 +2533,9 @@ func stringSplitlinesImpl(receiver Value, args []Value, kwargs map[string]Value)
 			}
 		}
 		// Check for unknown keyword arguments
-		for k := range kwargs {
-			if k != "keepends" {
-				return nil, &TypeError{Message: fmt.Sprintf("splitlines() got an unexpected keyword argument '%s'", k)}
+		for _, e := range kwargs.Entries() {
+			if e.Name != "keepends" {
+				return nil, &TypeError{Message: fmt.Sprintf("splitlines() got an unexpected keyword argument '%s'", e.Name)}
 			}
 		}
 	}

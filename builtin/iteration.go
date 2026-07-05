@@ -164,22 +164,21 @@ func EnumerateBuilder() builders.BuiltinFunc {
 }
 
 // enumerateWithKwargs implements enumerate() with keyword argument support
-func enumerateWithKwargs(args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.Value, error) {
+func enumerateWithKwargs(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
 	// Check for start parameter in kwargs
 	start := 0
-	if startVal, ok := kwargs["start"]; ok {
+	if startVal, ok := kwargs.Get("start"); ok {
 		if num, ok := startVal.(core.NumberValue); ok {
 			start = int(num)
 		} else {
 			return nil, errors.NewTypeError("enumerate", "start parameter must be an integer", string(startVal.Type()))
 		}
-		delete(kwargs, "start")
 	}
 
-	// Check for any remaining kwargs
-	if len(kwargs) > 0 {
-		for k := range kwargs {
-			return nil, errors.NewTypeError("enumerate", "'"+k+"' is an invalid keyword argument", "")
+	// Check for any unexpected kwargs
+	for _, e := range kwargs.Entries() {
+		if e.Name != "start" {
+			return nil, errors.NewTypeError("enumerate", "'"+e.Name+"' is an invalid keyword argument", "")
 		}
 	}
 

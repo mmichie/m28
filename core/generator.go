@@ -16,7 +16,7 @@ type GeneratorExecutor interface {
 // GeneratorExecFactory creates a GeneratorExecutor for a given function, its
 // positional arguments and keyword arguments
 // This is set by the eval package to avoid circular dependency
-var GeneratorExecFactory func(function Value, args []Value, kwargs map[string]Value, ctx *Context) (GeneratorExecutor, error)
+var GeneratorExecFactory func(function Value, args []Value, kwargs *Kwargs, ctx *Context) (GeneratorExecutor, error)
 
 // Generator represents a generator object
 type Generator struct {
@@ -944,9 +944,9 @@ func (gf *GeneratorFunction) Call(args []Value, ctx *Context) (Value, error) {
 }
 
 // CallWithKeywords creates and returns a new generator with keyword arguments
-func (gf *GeneratorFunction) CallWithKeywords(args []Value, kwargs map[string]Value, ctx *Context) (Value, error) {
+func (gf *GeneratorFunction) CallWithKeywords(args []Value, kwargs *Kwargs, ctx *Context) (Value, error) {
 	// If no kwargs, just use regular Call
-	if len(kwargs) == 0 {
+	if kwargs.Len() == 0 {
 		return gf.Call(args, ctx)
 	}
 
@@ -965,10 +965,7 @@ func (gf *GeneratorFunction) CallWithKeywords(args []Value, kwargs map[string]Va
 	} else {
 		// Fallback: Store the arguments for old-style execution
 		gen.SetAttr("__args__", NewList(args...))
-		kwargsDict := NewDict()
-		for k, v := range kwargs {
-			kwargsDict.Set(k, v)
-		}
+		kwargsDict := kwargs.ToDict()
 		gen.SetAttr("__kwargs__", kwargsDict)
 		gen.SetAttr("__function__", gf.Function)
 	}

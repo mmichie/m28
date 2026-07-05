@@ -57,7 +57,7 @@ func (a *protocolsIteratorAdapter) Reset() {
 }
 
 // createGeneratorExecState is the factory function for creating generator execution state
-func createGeneratorExecState(function core.Value, args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (core.GeneratorExecutor, error) {
+func createGeneratorExecState(function core.Value, args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.GeneratorExecutor, error) {
 	// The function should be a UserFunction
 	userFunc, ok := function.(*UserFunction)
 	if !ok {
@@ -182,7 +182,7 @@ func wrapBodyStopIteration(err error, ctx *core.Context) error {
 }
 
 // NewGeneratorExecState creates a new execution state for a generator
-func NewGeneratorExecState(function *UserFunction, args []core.Value, kwargs map[string]core.Value, ctx *core.Context) (*GeneratorExecState, error) {
+func NewGeneratorExecState(function *UserFunction, args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (*GeneratorExecState, error) {
 	// Create local context with function's environment as parent
 	locals := core.NewContext(function.env)
 	locals.IsFunctionScope = true
@@ -196,7 +196,7 @@ func NewGeneratorExecState(function *UserFunction, args []core.Value, kwargs map
 		}
 	} else {
 		// Legacy parameter binding
-		if len(kwargs) > 0 {
+		if kwargs.Len() > 0 {
 			return nil, fmt.Errorf("%s() does not accept keyword arguments", function.name)
 		}
 		if len(args) != len(function.params) {
