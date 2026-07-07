@@ -2387,6 +2387,18 @@ func defaultObjectNew() Value {
 	})
 }
 
+// defaultObjectInitSubclass returns object.__init_subclass__: a no-op that
+// accepts any arguments and returns None. Every class ultimately inherits it,
+// so super().__init_subclass__() resolves here when no class in the MRO defines
+// its own — mirroring the object.__new__ fallback. This matters for Go-backed
+// stub classes (e.g. _typing.Generic) that are created without an explicit
+// object parent, so the MRO walk alone would not reach object.
+func defaultObjectInitSubclass() Value {
+	return NewNamedBuiltinFunction("__init_subclass__", func(args []Value, ctx *Context) (Value, error) {
+		return None, nil
+	})
+}
+
 func (s *Super) GetAttr(name string) (Value, bool) {
 	debugSuperGetAttr := debugSuper
 	if debugSuperGetAttr {
@@ -2536,6 +2548,11 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 					if name == "__new__" {
 						return defaultObjectNew(), true
 					}
+					// Likewise every class inherits object.__init_subclass__
+					// (a no-op), so super().__init_subclass__() resolves here.
+					if name == "__init_subclass__" {
+						return defaultObjectInitSubclass(), true
+					}
 					// Not found in MRO
 					if debugSuperGetAttr {
 						fmt.Fprintf(os.Stderr, "[DEBUG Super.GetAttr] %s not found in MRO\n", name)
@@ -2625,6 +2642,12 @@ func (s *Super) GetAttr(name string) (Value, bool) {
 	// hierarchy defines its own.
 	if name == "__new__" {
 		return defaultObjectNew(), true
+	}
+	// Every class inherits object.__init_subclass__ (a no-op). This resolves
+	// super().__init_subclass__() in class-method contexts (cls-based super),
+	// e.g. typing.Protocol.__init_subclass__ chaining up through Generic.
+	if name == "__init_subclass__" {
+		return defaultObjectInitSubclass(), true
 	}
 
 	if debugSuperGetAttr {
