@@ -231,6 +231,17 @@ func compareEqual(left, right core.Value, ctx *core.Context) (core.Value, error)
 		return core.BoolValue(false), nil
 	}
 
+	// Both operands are instances whose __eq__ were already tried above (both
+	// the forward and reflected calls returned NotImplemented, or neither class
+	// defines __eq__). Python's final fallback is object identity, NOT another
+	// __eq__ call — routing through EqualValues here would redundantly re-invoke
+	// __eq__ a third time (it falls back to identity anyway). Compare directly.
+	if _, lok := left.(*core.Instance); lok {
+		if _, rok := right.(*core.Instance); rok {
+			return core.BoolValue(left == right), nil
+		}
+	}
+
 	// Fall back to built-in equality
 	return core.BoolValue(core.EqualValues(left, right)), nil
 }
@@ -356,16 +367,53 @@ func LessThan() func([]core.Value, *core.Context) (core.Value, error) {
 }
 
 // compareLessThan compares if left < right
+// tryOrderedComparison applies Python's rich-comparison operand ordering for an
+// ordered comparison: leftMethod is the operator's dunder on the left operand
+// (e.g. "__le__") and rightMethod is its reflection on the right (e.g. "__ge__").
+// Normally the left operand's method is tried first, then the right's reflected
+// method. But when the right operand's class is a strict (real, MRO-based)
+// subclass of the left operand's class, the reflected method on the right is
+// tried FIRST (PEP 207 subclass precedence) — so e.g. B() <= C(), with C a
+// subclass of B, calls C.__ge__ before B.__le__. Virtual/ABC-registered
+// subclasses are not real subtypes and keep normal order. Returns (result,
+// handled, err); handled is false only when neither dunder produced a usable
+// (non-NotImplemented) result, so the caller can continue to other fallbacks.
+func tryOrderedComparison(left, right core.Value, leftMethod, rightMethod string, ctx *core.Context) (core.Value, bool, error) {
+	var leftClass, rightClass *core.Class
+	if li, ok := left.(*core.Instance); ok {
+		leftClass = li.Class
+	}
+	if ri, ok := right.(*core.Instance); ok {
+		rightClass = ri.Class
+	}
+
+	if leftClass != nil && rightClass != nil && core.IsStrictSubclass(rightClass, leftClass) {
+		// Reflected method on the subclass (right) first, then the left's method.
+		if result, found, err := types.CallDunder(right, rightMethod, []core.Value{left}, ctx); found {
+			return result, true, err
+		}
+		if result, found, err := types.CallDunder(left, leftMethod, []core.Value{right}, ctx); found {
+			return result, true, err
+		}
+		return nil, false, nil
+	}
+
+	// Normal order: left's method first, then the right's reflected method.
+	if result, found, err := types.CallDunder(left, leftMethod, []core.Value{right}, ctx); found {
+		return result, true, err
+	}
+	if result, found, err := types.CallDunder(right, rightMethod, []core.Value{left}, ctx); found {
+		return result, true, err
+	}
+	return nil, false, nil
+}
+
 func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, error) {
 	left = core.UnwrapTupleInstance(left)
 	right = core.UnwrapTupleInstance(right)
-	// Try __lt__ on left operand
-	if result, found, err := types.CallDunder(left, "__lt__", []core.Value{right}, ctx); found {
-		return result, err
-	}
-
-	// Try __gt__ on right operand (reverse comparison)
-	if result, found, err := types.CallDunder(right, "__gt__", []core.Value{left}, ctx); found {
+	// Try __lt__ on the left / reflected __gt__ on the right, honoring subclass
+	// precedence (right's method first when right is a strict subclass of left).
+	if result, handled, err := tryOrderedComparison(left, right, "__lt__", "__gt__", ctx); handled {
 		return result, err
 	}
 
@@ -478,13 +526,9 @@ func LessThanOrEqual() func([]core.Value, *core.Context) (core.Value, error) {
 func compareLessThanOrEqual(left, right core.Value, ctx *core.Context) (core.Value, error) {
 	left = core.UnwrapTupleInstance(left)
 	right = core.UnwrapTupleInstance(right)
-	// Try __le__ on left operand
-	if result, found, err := types.CallDunder(left, "__le__", []core.Value{right}, ctx); found {
-		return result, err
-	}
-
-	// Try __ge__ on right operand (reverse comparison)
-	if result, found, err := types.CallDunder(right, "__ge__", []core.Value{left}, ctx); found {
+	// Try __le__ on the left / reflected __ge__ on the right, honoring subclass
+	// precedence (right's method first when right is a strict subclass of left).
+	if result, handled, err := tryOrderedComparison(left, right, "__le__", "__ge__", ctx); handled {
 		return result, err
 	}
 
@@ -566,13 +610,9 @@ func GreaterThan() func([]core.Value, *core.Context) (core.Value, error) {
 func compareGreaterThan(left, right core.Value, ctx *core.Context) (core.Value, error) {
 	left = core.UnwrapTupleInstance(left)
 	right = core.UnwrapTupleInstance(right)
-	// Try __gt__ on left operand
-	if result, found, err := types.CallDunder(left, "__gt__", []core.Value{right}, ctx); found {
-		return result, err
-	}
-
-	// Try __lt__ on right operand (reverse comparison)
-	if result, found, err := types.CallDunder(right, "__lt__", []core.Value{left}, ctx); found {
+	// Try __gt__ on the left / reflected __lt__ on the right, honoring subclass
+	// precedence (right's method first when right is a strict subclass of left).
+	if result, handled, err := tryOrderedComparison(left, right, "__gt__", "__lt__", ctx); handled {
 		return result, err
 	}
 
@@ -684,13 +724,9 @@ func GreaterThanOrEqual() func([]core.Value, *core.Context) (core.Value, error) 
 func compareGreaterThanOrEqual(left, right core.Value, ctx *core.Context) (core.Value, error) {
 	left = core.UnwrapTupleInstance(left)
 	right = core.UnwrapTupleInstance(right)
-	// Try __ge__ on left operand
-	if result, found, err := types.CallDunder(left, "__ge__", []core.Value{right}, ctx); found {
-		return result, err
-	}
-
-	// Try __le__ on right operand (reverse comparison)
-	if result, found, err := types.CallDunder(right, "__le__", []core.Value{left}, ctx); found {
+	// Try __ge__ on the left / reflected __le__ on the right, honoring subclass
+	// precedence (right's method first when right is a strict subclass of left).
+	if result, handled, err := tryOrderedComparison(left, right, "__ge__", "__le__", ctx); handled {
 		return result, err
 	}
 

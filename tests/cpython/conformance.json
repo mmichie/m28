@@ -3,9 +3,10 @@
   "last_updated": "2026-07-01",
   "summary": {
     "tests_running": "1102",
-    "tests_passing": "558",
+    "tests_passing": "560",
     "fully_passing_files": [
       "test_augassign (7/7)",
+      "test_binop (12/12)",
       "test_call (4/4)",
       "test_decorators (16/16)",
       "test_string (38/38)",
@@ -14,12 +15,11 @@
     "high_pass_files": [
       "test_with (50/51, 98%)",
       "test_compare (15/16, 94%)",
-      "test_binop (11/12, 92%)",
       "test_list (61/67, 91%)",
       "test_dictcomps (9/10, 90%)",
       "test_unary (5/6, 83%)",
       "test_contextlib (71/91, 78%)",
-      "test_dict (87/123, 71%)",
+      "test_dict (88/123, 72%)",
       "test_scope (28/41, 68%)",
       "test_grammar (52/79, 66%)",
       "test_listcomps (37/59, 63%)"
@@ -64,10 +64,10 @@
           "source": "cpython/Lib/test/test_builtin.py"
         },
         "test_binop": {
-          "status": "partial",
+          "status": "passing",
           "tests_run": 12,
-          "passing": 11,
-          "failures": 1,
+          "passing": 12,
+          "failures": 0,
           "errors": 0,
           "skipped": 0,
           "notes": "Rat fraction class equality tests fail",
@@ -111,8 +111,8 @@
         "test_dict": {
           "status": "partial",
           "tests_run": 123,
-          "passing": 87,
-          "failures": 11,
+          "passing": 88,
+          "failures": 10,
           "errors": 11,
           "skipped": 14,
           "notes": "Pickling tests (6), __dict__ mutation, str subclass issues, exec(), hash-based key equality",

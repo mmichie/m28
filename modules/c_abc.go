@@ -138,10 +138,19 @@ func InitAbcModule() *core.DictValue {
 		return core.NilValue{}, nil
 	}))
 
-	// _abc_register - register a virtual subclass
+	// _abc_register(cls, subclass) - register subclass as a virtual subclass of
+	// the ABC cls, then return subclass (so ABCMeta.register works as a
+	// decorator). Recorded on cls so isinstance/issubclass recognize it.
 	module.Set("_abc_register", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// No-op for now - would update ABC registries
-		return core.NilValue{}, nil
+		if len(args) < 2 {
+			return nil, core.NewTypeError("_abc_register", nil, "_abc_register() takes exactly 2 arguments")
+		}
+		if cls, ok := args[0].(*core.Class); ok {
+			if sub, ok := args[1].(*core.Class); ok {
+				cls.RegisterVirtualSubclass(sub)
+			}
+		}
+		return args[1], nil
 	}))
 
 	// _abc_instancecheck - check if an instance is of a type

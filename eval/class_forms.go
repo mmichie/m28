@@ -2388,8 +2388,11 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		return core.False, nil
 	}
 
-	// Check inheritance chain
-	return core.BoolValue(core.IsInstanceOf(instance, class)), nil
+	// Check inheritance chain (real MRO plus ABC virtual-subclass registration).
+	if core.IsInstanceOf(instance, class) || core.IsSubclassVirtual(instance.Class, class) {
+		return core.True, nil
+	}
+	return core.False, nil
 }
 
 // issubclassForm checks if a class is a subclass of another
@@ -2463,8 +2466,9 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				continue
 			}
 
-			// Check if subClass is a subclass of itemClass using BFS
-			if core.IsSubclass(subClass, itemClass) {
+			// Check if subClass is a subclass of itemClass (real MRO plus ABC
+			// virtual-subclass registration).
+			if core.IsSubclassVirtual(subClass, itemClass) {
 				return core.True, nil
 			}
 		}
@@ -2541,8 +2545,8 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		return nil, &core.TypeError{Message: "issubclass() arg 2 must be a class, a tuple of classes, or a union"}
 	}
 
-	// Check inheritance chain using BFS
-	if core.IsSubclass(subClass, baseClass) {
+	// Check inheritance chain (real MRO plus ABC virtual-subclass registration).
+	if core.IsSubclassVirtual(subClass, baseClass) {
 		return core.True, nil
 	}
 

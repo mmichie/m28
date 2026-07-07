@@ -31,6 +31,11 @@ type Class struct {
 	// slotsRestricted caches "every class in the MRO is fully slotted", the
 	// condition under which attribute creation outside __slots__ raises.
 	slotsRestricted *bool
+	// abcRegistry holds classes registered as ABC virtual subclasses via
+	// ABCMeta.register(cls, subclass) (see modules/c_abc.go). It affects
+	// isinstance/issubclass ONLY — never real MRO inheritance or operator
+	// dispatch ordering (Python uses real subtype for those).
+	abcRegistry []*Class
 	// gaCache holds the resolved user __getattribute__ (nil when only
 	// object's default applies), validated against dunderNSGen so a late
 	// (re)definition anywhere in a hierarchy invalidates every cache.
@@ -234,6 +239,49 @@ func IsSubclass(child, parent *Class) bool {
 	}
 	for _, p := range child.Parents {
 		if IsSubclass(p, parent) {
+			return true
+		}
+	}
+	return false
+}
+
+// RegisterVirtualSubclass records sub as an ABC virtual subclass of c
+// (ABCMeta.register). Duplicates are ignored. This influences
+// isinstance/issubclass but not real inheritance.
+func (c *Class) RegisterVirtualSubclass(sub *Class) {
+	if sub == nil || sub == c {
+		return
+	}
+	for _, existing := range c.abcRegistry {
+		if existing == sub {
+			return
+		}
+	}
+	c.abcRegistry = append(c.abcRegistry, sub)
+}
+
+// IsSubclassVirtual reports whether child is a subclass of parent counting both
+// real (MRO) inheritance and ABC virtual-subclass registrations. Registration
+// is transitive: a real or virtual subclass of a registered class also
+// qualifies. Use this for isinstance/issubclass; use IsSubclass (real only) for
+// operator-dispatch ordering, where CPython requires a real subtype.
+func IsSubclassVirtual(child, parent *Class) bool {
+	return isSubclassVirtual(child, parent, make(map[*Class]bool))
+}
+
+func isSubclassVirtual(child, parent *Class, seen map[*Class]bool) bool {
+	if child == nil || parent == nil {
+		return false
+	}
+	if IsSubclass(child, parent) {
+		return true
+	}
+	if seen[parent] {
+		return false
+	}
+	seen[parent] = true
+	for _, reg := range parent.abcRegistry {
+		if isSubclassVirtual(child, reg, seen) {
 			return true
 		}
 	}
