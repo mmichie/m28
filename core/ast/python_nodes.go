@@ -1193,6 +1193,102 @@ func (c *ClassForm) String() string {
 	return "(def-class " + c.Name + " ...)"
 }
 
+// manglePrivateName applies CPython name mangling to a single identifier.
+// A name is private if it begins with two or more underscores and does not end
+// in two or more underscores; such a name is rewritten to
+// manglePrefix+name (manglePrefix is "_"+ClassName with leading underscores of
+// the class name stripped). Non-private names are returned unchanged.
+func manglePrivateName(name, manglePrefix string) string {
+	if !strings.HasPrefix(name, "__") || strings.HasSuffix(name, "__") {
+		return name
+	}
+	return manglePrefix + name
+}
+
+// mangleValue recursively rewrites private-name identifiers in a lowered IR
+// value, scoped to one class body. It matches CPython's textual name mangling:
+// any "__name" identifier — a bare reference or a def/assignment target
+// (SymbolValue), or the attribute name in (. obj __name) (a StringValue) —
+// becomes "_ClassName__name". Ordinary string literals (call arguments, data)
+// are left untouched, since only the attribute-name position of a "." form is
+// treated as an identifier. It deliberately does NOT descend into a nested
+// (class ...) form: a nested class re-scopes mangling to its own name, and
+// since ToIR is bottom-up that inner class has already mangled its own body.
+func mangleValue(v core.Value, manglePrefix string) core.Value {
+	switch val := v.(type) {
+	case core.LocatedValue:
+		// ToIR wraps nodes to preserve source locations; unwrap, mangle, rewrap.
+		val.Value = mangleValue(val.Value, manglePrefix)
+		return val
+	case core.SymbolValue:
+		// Bare identifiers: assignment targets, references, def/param names.
+		return core.SymbolValue(manglePrivateName(string(val), manglePrefix))
+	case *core.ListValue:
+		items := val.Items()
+		if len(items) > 0 {
+			if head, ok := unwrapSymbol(items[0]); ok {
+				switch {
+				case head == "class":
+					// Nested class re-scopes mangling to its own name; its body
+					// was already mangled bottom-up by its own ToIR.
+					return v
+				case head == "." && len(items) >= 3:
+					// (. obj attr [args...]) is attribute access or a method
+					// call. ONLY element 2 is an attribute name — a string
+					// literal that mangles. Element 1 is the object and
+					// elements 3+ are call args / the __call__ marker, so
+					// recurse them generally (which leaves ordinary string
+					// literal arguments untouched).
+					newItems := make([]core.Value, len(items))
+					newItems[0] = items[0]
+					newItems[1] = mangleValue(items[1], manglePrefix)
+					newItems[2] = mangleAttrName(items[2], manglePrefix)
+					for i := 3; i < len(items); i++ {
+						newItems[i] = mangleValue(items[i], manglePrefix)
+					}
+					return core.NewList(newItems...)
+				}
+			}
+		}
+		newItems := make([]core.Value, len(items))
+		for i, item := range items {
+			newItems[i] = mangleValue(item, manglePrefix)
+		}
+		return core.NewList(newItems...)
+	default:
+		return v
+	}
+}
+
+// mangleAttrName mangles a value in the attribute-name position of a (. obj
+// attr) form. Attribute names are stored as string literals, so unlike the
+// general walk (which mangles only symbols) this also mangles StringValue.
+func mangleAttrName(v core.Value, manglePrefix string) core.Value {
+	switch val := v.(type) {
+	case core.LocatedValue:
+		val.Value = mangleAttrName(val.Value, manglePrefix)
+		return val
+	case core.StringValue:
+		return core.StringValue(manglePrivateName(string(val), manglePrefix))
+	case core.SymbolValue:
+		return core.SymbolValue(manglePrivateName(string(val), manglePrefix))
+	default:
+		return v
+	}
+}
+
+// unwrapSymbol returns the symbol name of v, seeing through LocatedValue
+// wrappers, and whether v was a symbol.
+func unwrapSymbol(v core.Value) (string, bool) {
+	if lv, ok := v.(core.LocatedValue); ok {
+		v = lv.Unwrap()
+	}
+	if s, ok := v.(core.SymbolValue); ok {
+		return string(s), true
+	}
+	return "", false
+}
+
 // ToIR lowers class definition to IR
 func (c *ClassForm) ToIR() core.Value {
 	// Build base class list
@@ -1205,6 +1301,18 @@ func (c *ClassForm) ToIR() core.Value {
 	bodyIR := make([]core.Value, 0, len(c.Body))
 	for _, item := range c.Body {
 		bodyIR = append(bodyIR, item.ToIR())
+	}
+
+	// Apply CPython name mangling to the class body. A private identifier
+	// "__name" (not ending in "__") becomes "_<ClassName>__name", with leading
+	// underscores stripped from the class name; if the class name is all
+	// underscores, no mangling occurs. This is what lets self.__num reach the
+	// pre-mangled "_Rat__num" slot in classes that declare __slots__.
+	if trimmed := strings.TrimLeft(c.Name, "_"); trimmed != "" {
+		manglePrefix := "_" + trimmed
+		for i := range bodyIR {
+			bodyIR[i] = mangleValue(bodyIR[i], manglePrefix)
+		}
 	}
 
 	// Build keywords (e.g., metaclass=ABCMeta)
