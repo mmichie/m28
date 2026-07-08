@@ -2503,6 +2503,18 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 		}
 	}
 
+	// ABC virtual subclass: issubclass(<builtin type>, ABC) when that builtin
+	// type (int/float/complex/...) was registered via ABCMeta.register, e.g.
+	// numbers.py's Integral.register(int). Mirrors the isinstance path; the
+	// builtin-type registry is consulted here only, not in real subclass logic.
+	if !ok1 {
+		if typeName, ok := core.TypeObjectName(subClassVal); ok {
+			if bc, ok := baseClassVal.(*core.Class); ok && core.IsBuiltinTypeRegisteredUnder(typeName, bc) {
+				return core.True, nil
+			}
+		}
+	}
+
 	// Special handling for builtin type constructors
 	// If either argument is a builtin type constructor, we can't really check subclass relationships
 	// but we can check for equality
@@ -2552,7 +2564,11 @@ func issubclassForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 	}
 
 	// Check inheritance chain (real MRO plus ABC virtual-subclass registration).
-	if core.IsSubclassVirtual(subClass, baseClass) {
+	// A builtin type wrapper (int/float/...) resolves to its canonical *Class
+	// above, so also consult the global builtin-type ABC registry by name — this
+	// is what makes issubclass(int, numbers.Integral) agree with isinstance.
+	if core.IsSubclassVirtual(subClass, baseClass) ||
+		core.IsBuiltinTypeRegisteredUnder(subClass.Name, baseClass) {
 		return core.True, nil
 	}
 
