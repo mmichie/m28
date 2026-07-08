@@ -674,6 +674,12 @@ func (f *BuiltinFunctionWithKwargs) SetAttr(name string, value Value) {
 }
 
 // String implements Value.String
+// Name returns the builtin function's name (e.g. "int" for the int
+// constructor). Empty for anonymous builtins.
+func (f *BuiltinFunction) Name() string {
+	return f.name
+}
+
 func (f *BuiltinFunction) String() string {
 	// Match repr() (reprBuiltinFunction): "<built-in function name>". Previously
 	// String() said "<builtin function ...>" (no hyphen), so str()/dict display

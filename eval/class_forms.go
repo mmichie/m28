@@ -2385,6 +2385,12 @@ func isinstanceForm(args *core.ListValue, ctx *core.Context) (core.Value, error)
 				}
 			}
 		}
+		// ABC virtual subclass: a builtin value (int/float/complex/...) whose
+		// type was registered via ABCMeta.register(cls, <builtin type>), e.g.
+		// numbers.py's Integral.register(int) makes isinstance(1, Integral) true.
+		if core.IsBuiltinTypeRegisteredUnder(core.GetPythonTypeName(obj), class) {
+			return core.True, nil
+		}
 		return core.False, nil
 	}
 

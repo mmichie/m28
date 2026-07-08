@@ -288,6 +288,77 @@ func isSubclassVirtual(child, parent *Class, seen map[*Class]bool) bool {
 	return false
 }
 
+// Builtin types (int, float, complex, str, ...) are not *Class values, so they
+// cannot live in a class's abcRegistry. ABCMeta.register(cls, int) records the
+// builtin type's NAME here instead, mapping it to the ABC(s) it was registered
+// on. isinstance/issubclass then match a builtin value/type by its type name.
+var (
+	builtinAbcRegMu sync.RWMutex
+	builtinAbcReg   = map[string][]*Class{}
+)
+
+// RegisterBuiltinVirtualSubclass records that the builtin type named typeName
+// (e.g. "int") was registered as a virtual subclass of the ABC parent.
+func RegisterBuiltinVirtualSubclass(typeName string, parent *Class) {
+	if typeName == "" || parent == nil {
+		return
+	}
+	builtinAbcRegMu.Lock()
+	defer builtinAbcRegMu.Unlock()
+	for _, p := range builtinAbcReg[typeName] {
+		if p == parent {
+			return
+		}
+	}
+	builtinAbcReg[typeName] = append(builtinAbcReg[typeName], parent)
+}
+
+// IsBuiltinTypeRegisteredUnder reports whether a builtin type named typeName is
+// an ABC virtual subclass of parent: it was registered on parent, or on any ABC
+// that is itself a (real or virtual) subclass of parent. This gives the
+// numbers-tower transitivity — numbers.py registers int only on Integral, yet
+// isinstance(1, numbers.Real) holds because Integral is a real subclass of Real.
+func IsBuiltinTypeRegisteredUnder(typeName string, parent *Class) bool {
+	if typeName == "" || parent == nil {
+		return false
+	}
+	builtinAbcRegMu.RLock()
+	regs := builtinAbcReg[typeName]
+	builtinAbcRegMu.RUnlock()
+	for _, abc := range regs {
+		if IsSubclassVirtual(abc, parent) {
+			return true
+		}
+	}
+	return false
+}
+
+// TypeObjectName extracts the type name of a builtin type OBJECT (as passed to
+// ABCMeta.register or issubclass) — e.g. the int constructor -> "int". Returns
+// ("", false) for a *Class (a user class, handled via the per-class registry)
+// and for non-type values.
+func TypeObjectName(v Value) (string, bool) {
+	switch tv := v.(type) {
+	case *Class:
+		return "", false
+	case *BuiltinFunction:
+		if n := tv.Name(); n != "" {
+			return n, true
+		}
+		return "", false
+	default:
+		// Builtin type wrappers (*builtin.IntType, *FloatType, ...) expose
+		// GetClass(); its name ("int", "float") matches GetPythonTypeName of
+		// the corresponding values.
+		if gc, ok := v.(interface{ GetClass() *Class }); ok {
+			if c := gc.GetClass(); c != nil {
+				return c.Name, true
+			}
+		}
+		return "", false
+	}
+}
+
 // IsStrictSubclass checks if child is a strict subclass of parent (child != parent)
 func IsStrictSubclass(child, parent *Class) bool {
 	if child == nil || parent == nil {

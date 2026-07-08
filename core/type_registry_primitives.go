@@ -47,6 +47,35 @@ func registerNumberType() {
 		Name:       "number",
 		PythonName: "int",
 		BaseType:   NumberType,
+		// The numbers.Integral read-only view: int.real/numerator are the value
+		// itself, imag is 0, denominator is 1. These let int participate in the
+		// numeric tower (e.g. Fraction/int comparison reads other.numerator).
+		Properties: map[string]*PropertyDescriptor{
+			"real": {
+				Name:     "real",
+				ReadOnly: true,
+				Doc:      "the real part of a complex number (the int itself)",
+				Getter:   func(v Value) (Value, error) { return v, nil },
+			},
+			"imag": {
+				Name:     "imag",
+				ReadOnly: true,
+				Doc:      "the imaginary part of a complex number (always 0)",
+				Getter:   func(v Value) (Value, error) { return NumberValue(0), nil },
+			},
+			"numerator": {
+				Name:     "numerator",
+				ReadOnly: true,
+				Doc:      "the numerator of a rational number in lowest terms (the int itself)",
+				Getter:   func(v Value) (Value, error) { return v, nil },
+			},
+			"denominator": {
+				Name:     "denominator",
+				ReadOnly: true,
+				Doc:      "the denominator of a rational number in lowest terms (always 1)",
+				Getter:   func(v Value) (Value, error) { return NumberValue(1), nil },
+			},
+		},
 		Methods: map[string]*MethodDescriptor{
 			"__add__": {
 				Name:    "__add__",
@@ -2227,7 +2256,8 @@ func registerComplexType() {
 				Doc:  "Return the real part of the complex number",
 				Getter: func(receiver Value) (Value, error) {
 					c := receiver.(ComplexValue)
-					return NumberValue(real(complex128(c))), nil
+					// CPython: complex.real is always a float.
+					return FloatValue(real(complex128(c))), nil
 				},
 			},
 			"imag": {
@@ -2235,7 +2265,8 @@ func registerComplexType() {
 				Doc:  "Return the imaginary part of the complex number",
 				Getter: func(receiver Value) (Value, error) {
 					c := receiver.(ComplexValue)
-					return NumberValue(imag(complex128(c))), nil
+					// CPython: complex.imag is always a float.
+					return FloatValue(imag(complex128(c))), nil
 				},
 			},
 		},
@@ -2339,7 +2370,9 @@ func registerComplexType() {
 						}
 						return BoolValue(i == 0 && r == v), nil
 					}
-					return False, nil
+					// Unknown type (e.g. a Fraction/Decimal instance): defer to the
+					// other operand's reflected __eq__ rather than answering False.
+					return NotImplemented, nil
 				},
 			},
 			"__rmul__": {

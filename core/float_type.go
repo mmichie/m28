@@ -61,6 +61,21 @@ func registerFloatType() {
 		BaseType:   FloatType,
 		Repr:       func(v Value) string { return PyFloatRepr(float64(v.(FloatValue))) },
 		Str:        func(v Value) string { return PyFloatRepr(float64(v.(FloatValue))) },
+		// numbers.Real read-only view: float.real is the value, imag is 0.0.
+		Properties: map[string]*PropertyDescriptor{
+			"real": {
+				Name:     "real",
+				ReadOnly: true,
+				Doc:      "the real part of a complex number (the float itself)",
+				Getter:   func(v Value) (Value, error) { return v, nil },
+			},
+			"imag": {
+				Name:     "imag",
+				ReadOnly: true,
+				Doc:      "the imaginary part of a complex number (always 0.0)",
+				Getter:   func(v Value) (Value, error) { return FloatValue(0), nil },
+			},
+		},
 		Methods: map[string]*MethodDescriptor{
 			"__neg__": floatUnary("__neg__", "Return -self", func(n float64) float64 { return -n }),
 			"__pos__": floatUnary("__pos__", "Return +self", func(n float64) float64 { return n }),

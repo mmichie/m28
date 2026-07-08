@@ -147,7 +147,12 @@ func InitAbcModule() *core.DictValue {
 		}
 		if cls, ok := args[0].(*core.Class); ok {
 			if sub, ok := args[1].(*core.Class); ok {
+				// User class: record on the ABC directly.
 				cls.RegisterVirtualSubclass(sub)
+			} else if typeName, ok := core.TypeObjectName(args[1]); ok {
+				// Builtin type (int/float/complex/...): record by name in the
+				// global builtin-type registry (numbers.py registers these).
+				core.RegisterBuiltinVirtualSubclass(typeName, cls)
 			}
 		}
 		return args[1], nil

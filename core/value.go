@@ -198,6 +198,8 @@ func GetPythonTypeName(val Value) string {
 		return "int"
 	case FloatValue:
 		return "float"
+	case ComplexValue:
+		return "complex"
 	case BigIntValue:
 		return "int"
 	case StringValue:
