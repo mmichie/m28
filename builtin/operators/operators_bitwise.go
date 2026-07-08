@@ -40,6 +40,15 @@ func invertValue(value core.Value, ctx *core.Context) (core.Value, error) {
 		return result, nil
 	}
 
+	// float has no __invert__: ~ is defined only for integers (and bool). Reject
+	// FloatValue explicitly — the Number branch below coerces via AsNumber and
+	// would otherwise invert a whole-valued float (~2.0 -> -3 instead of raising).
+	if _, ok := value.(core.FloatValue); ok {
+		return nil, errors.NewTypeError("~",
+			"bad operand type for unary ~",
+			"'float'")
+	}
+
 	// Fall back to integer bitwise inversion
 	return types.Switch(value).
 		Bool(func(b bool) (core.Value, error) {
