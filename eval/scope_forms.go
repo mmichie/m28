@@ -115,6 +115,17 @@ func resolveSlice(slice *core.SliceValue, length int) (start, stop, step int, er
 func deleteTarget(target core.Value, ctx *core.Context) error {
 	target = unwrapLocated(target)
 	switch t := target.(type) {
+	case core.TupleValue:
+		// An empty target list `del ()` lowers to an empty tuple; a non-empty
+		// one is normally a (tuple-literal ...) list handled below. Delete each
+		// element (empty -> no-op).
+		for _, elem := range t {
+			if err := deleteTarget(elem, ctx); err != nil {
+				return err
+			}
+		}
+		return nil
+
 	case core.SymbolValue:
 		// Delete variable from appropriate scope
 		// del x
@@ -319,6 +330,18 @@ func deleteTarget(target core.Value, ctx *core.Context) error {
 			}
 
 			return &core.TypeError{Message: fmt.Sprintf("'%s' object does not support item deletion", obj.Type())}
+		}
+
+		// Handle a parenthesized/bracketed target list: del (a, b), del [a, b],
+		// del x, y, (z, w). Each element is deleted independently (recursively,
+		// for nested tuples); an empty tuple `del ()` is a no-op.
+		if sym, ok := first.(core.SymbolValue); ok && (string(sym) == "tuple-literal" || string(sym) == "list-literal") {
+			for _, elem := range t.Items()[1:] {
+				if err := deleteTarget(elem, ctx); err != nil {
+					return err
+				}
+			}
+			return nil
 		}
 
 		return &core.ValueError{Message: fmt.Sprintf("cannot delete complex expression: %v", target)}
