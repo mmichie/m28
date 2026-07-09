@@ -1841,9 +1841,13 @@ func (t *PythonTokenizer) scanFStringExpression(value *strings.Builder, outerQuo
 	}
 }
 
-// pythonIsAlpha checks if a character can start an identifier (Python style)
+// pythonIsAlpha checks if a character can start an identifier (Python style).
+// Any byte >= 0x80 is a UTF-8 lead/continuation byte for a non-ASCII character;
+// we accept it so PEP 3131 Unicode identifiers (e.g. Ĭñıçöđë) tokenize. Byte-level
+// acceptance does not validate XID_Start/XID_Continue categories, but it lets
+// valid Unicode identifiers pass through the byte-based tokenizer.
 func pythonIsAlpha(ch byte) bool {
-	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_'
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_' || ch >= 0x80
 }
 
 // pythonIsAlphaNumeric checks if a character can be in an identifier
