@@ -2,8 +2,8 @@
   "python_version": "3.13.13",
   "last_updated": "2026-07-09",
   "summary": {
-    "tests_running": "1893",
-    "tests_passing": "753",
+    "tests_running": "2038",
+    "tests_passing": "772",
     "fully_passing_files": [
       "test_augassign (7/7)",
       "test_binop (12/12)",
@@ -323,8 +323,12 @@
           "source": "cpython/Lib/test/test_iter.py"
         },
         "test_itertools": {
-          "status": "blocked",
-          "blocker": "crash: Go stack overflow (deep recursion)",
+          "status": "partial",
+          "tests_run": 145,
+          "passing": 19,
+          "failures": 18,
+          "errors": 92,
+          "skipped": 16,
           "source": "cpython/Lib/test/test_itertools.py"
         },
         "test_contextlib": {

@@ -34,6 +34,42 @@ func (c *countIterator) GetAttr(name string) (core.Value, bool) {
 	return nil, false
 }
 
+// repeatIterator is a lazy implementation of itertools.repeat(value[, times]).
+// When infinite is true it yields value forever; otherwise it yields value
+// exactly remaining more times. Being lazy, repeat(value, huge) allocates
+// nothing up front (the old eager version panicked in makeslice for very large
+// or overflowed counts and could not represent the infinite form at all).
+type repeatIterator struct {
+	value     core.Value
+	remaining int
+	infinite  bool
+}
+
+func (r *repeatIterator) Type() core.Type { return "repeat" }
+
+func (r *repeatIterator) String() string {
+	if r.infinite {
+		return fmt.Sprintf("repeat(%s)", r.value.String())
+	}
+	return fmt.Sprintf("repeat(%s, %d)", r.value.String(), r.remaining)
+}
+
+func (r *repeatIterator) Iterator() core.Iterator { return r }
+
+func (r *repeatIterator) Next() (core.Value, bool) {
+	if r.infinite {
+		return r.value, true
+	}
+	if r.remaining <= 0 {
+		return nil, false
+	}
+	r.remaining--
+	return r.value, true
+}
+
+// Reset is a no-op: itertools iterators are single-pass and do not restart.
+func (r *repeatIterator) Reset() {}
+
 // InitItertoolsModule creates and returns the itertools module
 func InitItertoolsModule() *core.DictValue {
 	itertoolsModule := core.NewDict()
@@ -249,13 +285,33 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		value := v.Get(0)
-		times, _ := v.GetNumberOrDefault(1, 10) // Default to 10 for safety
 
-		result := make([]core.Value, 0, int(times))
-		for i := 0; i < int(times); i++ {
-			result = append(result, value)
+		// repeat(value) with no count is an infinite iterator.
+		if v.Count() < 2 {
+			return &repeatIterator{value: value, infinite: true}, nil
 		}
-		return core.NewList(result...), nil
+
+		timesVal, err := v.GetNumber(1)
+		if err != nil {
+			return nil, err
+		}
+		// Clamp to a valid slice-free range: negative counts yield nothing,
+		// and counts beyond int range are treated as "very large" (still lazy,
+		// so nothing is materialized) rather than overflowing into makeslice.
+		var times int
+		maxInt := int(^uint(0) >> 1)
+		switch {
+		case timesVal <= 0:
+			times = 0
+		case timesVal >= float64(maxInt):
+			// float64 cannot represent maxInt exactly (it rounds up to 2^63),
+			// so use >= to catch sys.maxsize-sized counts that would otherwise
+			// overflow int conversion into a negative value.
+			times = maxInt
+		default:
+			times = int(timesVal)
+		}
+		return &repeatIterator{value: value, remaining: times}, nil
 	}))
 
 	// takewhile - yield elements while predicate is true
