@@ -302,6 +302,27 @@ func (g *Generator) createRegistry() *MethodRegistry {
 				excTb = args[2]
 			}
 
+			// CPython validates throw(cls) the same way raise does: the class
+			// must derive from BaseException, and instantiating it must yield a
+			// BaseException instance (a __new__ returning a non-exception is a
+			// TypeError). Only intervene for the single class argument form so
+			// the instance and 3-argument forms (used by contextlib) are
+			// unaffected; valid classes fall through to the existing path.
+			if class, ok := excType.(*Class); ok && (excValue == None || excValue == Nil) {
+				if !IsBaseExceptionClass(class) {
+					return nil, &TypeError{Message: "exceptions must derive from BaseException"}
+				}
+				inst, ierr := class.Call(nil, ctx)
+				if ierr != nil {
+					return nil, ierr
+				}
+				if !IsBaseExceptionInstance(inst) {
+					return nil, &TypeError{Message: fmt.Sprintf(
+						"calling %s() should have returned an instance of BaseException, not '%s'",
+						class.Name, GetPythonTypeName(inst))}
+				}
+			}
+
 			return gen.Throw(excType, excValue, excTb)
 		}),
 	)

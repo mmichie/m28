@@ -2,8 +2,8 @@
   "python_version": "3.13.13",
   "last_updated": "2026-07-09",
   "summary": {
-    "tests_running": "1846",
-    "tests_passing": "743",
+    "tests_running": "1893",
+    "tests_passing": "753",
     "fully_passing_files": [
       "test_augassign (7/7)",
       "test_binop (12/12)",
@@ -19,7 +19,7 @@
       "test_list (61/67, 91%)",
       "test_dictcomps (9/10, 90%)",
       "test_contextlib (71/91, 78%)",
-      "test_dict (88/123, 72%)",
+      "test_dict (89/123, 72%)",
       "test_grammar (56/79, 71%)",
       "test_scope (28/41, 68%)",
       "test_listcomps (37/59, 63%)",
@@ -116,8 +116,8 @@
         "test_dict": {
           "status": "partial",
           "tests_run": 123,
-          "passing": 88,
-          "failures": 10,
+          "passing": 89,
+          "failures": 9,
           "errors": 11,
           "skipped": 14,
           "notes": "Pickling tests (6), __dict__ mutation, str subclass issues, exec(), hash-based key equality",
@@ -248,8 +248,8 @@
           "status": "partial",
           "tests_run": 159,
           "passing": 34,
-          "failures": 61,
-          "errors": 51,
+          "failures": 62,
+          "errors": 50,
           "skipped": 11,
           "expected_failures": 2,
           "notes": "No longer panics: str subclasses now carry a backing string (Instance.BackingStr), str methods unwrap it, and ==/str()/len/index/in work. Remaining failures are deeper descriptor/metaclass features.",
@@ -262,8 +262,12 @@
       "priority": 5,
       "tests": {
         "test_generators": {
-          "status": "blocked",
-          "blocker": "Exception: E",
+          "status": "partial",
+          "tests_run": 47,
+          "passing": 9,
+          "failures": 12,
+          "errors": 25,
+          "skipped": 1,
           "source": "cpython/Lib/test/test_generators.py"
         },
         "test_genexps": {
