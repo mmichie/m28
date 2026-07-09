@@ -108,6 +108,14 @@ func InitCodecsModule() *core.DictValue {
 			return codecInfo, nil
 		}
 
+		// raw-unicode-escape: bytes map to code points 0-255, with \uXXXX and
+		// \UXXXXXXXX escapes for code points above Latin-1.
+		if encoding == "rawunicodeescape" {
+			encodeFunc := core.NewNamedBuiltinFunction("raw_unicode_escape_encode", rawUnicodeEscapeEncode)
+			decodeFunc := core.NewNamedBuiltinFunction("raw_unicode_escape_decode", rawUnicodeEscapeDecode)
+			return core.TupleValue{encodeFunc, decodeFunc, core.None, core.None}, nil
+		}
+
 		// If we don't recognize the encoding, try calling registered search functions
 		searchItems := codecSearchRegistry.Items()
 		for i := 0; i < len(searchItems); i++ {
@@ -403,4 +411,48 @@ func latin1Decode(args []core.Value, ctx *core.Context) (core.Value, error) {
 	// Return (string, length)
 	length := core.NumberValue(len(str))
 	return core.TupleValue{str, length}, nil
+}
+
+// codecInputBytes extracts the raw bytes of a codec argument (a bytes-like
+// value or, as a fallback, its printed form).
+func codecInputBytes(v core.Value) []byte {
+	switch b := v.(type) {
+	case core.BytesValue:
+		return []byte(b)
+	case *core.ByteArrayValue:
+		return b.GetData()
+	case core.StringValue:
+		return []byte(b)
+	default:
+		return []byte(core.PrintValue(v))
+	}
+}
+
+// rawUnicodeEscapeDecode decodes bytes via the canonical core codec.
+func rawUnicodeEscapeDecode(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, core.NewTypeError("raw_unicode_escape_decode", nil, "raw_unicode_escape_decode() takes 1 to 2 arguments")
+	}
+	raw := codecInputBytes(args[0])
+	s, _, err := core.DecodeBytes(raw, "raw-unicode-escape")
+	if err != nil {
+		return nil, err
+	}
+	return core.TupleValue{core.StringValue(s), core.NumberValue(len(raw))}, nil
+}
+
+// rawUnicodeEscapeEncode encodes a string via the canonical core codec.
+func rawUnicodeEscapeEncode(args []core.Value, ctx *core.Context) (core.Value, error) {
+	if len(args) < 1 || len(args) > 2 {
+		return nil, core.NewTypeError("raw_unicode_escape_encode", nil, "raw_unicode_escape_encode() takes 1 to 2 arguments")
+	}
+	str, ok := args[0].(core.StringValue)
+	if !ok {
+		str = core.StringValue(core.PrintValue(args[0]))
+	}
+	out, _, err := core.EncodeString(string(str), "raw-unicode-escape")
+	if err != nil {
+		return nil, err
+	}
+	return core.TupleValue{core.BytesValue(out), core.NumberValue(len([]rune(string(str))))}, nil
 }

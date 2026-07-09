@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -52,6 +53,21 @@ func EncodeString(s, encoding string) (result []byte, ok bool, err error) {
 			pos++
 		}
 		return out, true, nil
+	case "rawunicodeescape":
+		// Code points 0-255 map to their byte; higher ones become \uXXXX (BMP)
+		// or \UXXXXXXXX escapes.
+		var out []byte
+		for _, r := range s {
+			switch {
+			case r < 0x100:
+				out = append(out, byte(r))
+			case r <= 0xFFFF:
+				out = append(out, fmt.Sprintf("\\u%04x", r)...)
+			default:
+				out = append(out, fmt.Sprintf("\\U%08x", r)...)
+			}
+		}
+		return out, true, nil
 	}
 	return nil, false, nil
 }
@@ -79,6 +95,29 @@ func DecodeBytes(b []byte, encoding string) (result string, ok bool, err error) 
 					"'ascii' codec can't decode byte 0x%02x in position %d: ordinal not in range(128)", c, i)}
 			}
 			sb.WriteByte(c)
+		}
+		return sb.String(), true, nil
+	case "rawunicodeescape":
+		// Each byte is code point 0-255; \uXXXX and \UXXXXXXXX escapes decode to
+		// the corresponding code point.
+		var sb strings.Builder
+		i := 0
+		for i < len(b) {
+			if b[i] == '\\' && i+1 < len(b) && (b[i+1] == 'u' || b[i+1] == 'U') {
+				width := 4
+				if b[i+1] == 'U' {
+					width = 8
+				}
+				if i+2+width <= len(b) {
+					if cp, perr := strconv.ParseUint(string(b[i+2:i+2+width]), 16, 32); perr == nil {
+						sb.WriteRune(rune(cp))
+						i += 2 + width
+						continue
+					}
+				}
+			}
+			sb.WriteRune(rune(b[i]))
+			i++
 		}
 		return sb.String(), true, nil
 	}

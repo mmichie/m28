@@ -2,8 +2,8 @@
   "python_version": "3.13.13",
   "last_updated": "2026-07-01",
   "summary": {
-    "tests_running": "1102",
-    "tests_passing": "571",
+    "tests_running": "1226",
+    "tests_passing": "591",
     "fully_passing_files": [
       "test_augassign (7/7)",
       "test_binop (12/12)",
@@ -39,8 +39,8 @@
           "status": "partial",
           "tests_run": 79,
           "passing": 56,
-          "failures": 11,
-          "errors": 12,
+          "failures": 12,
+          "errors": 11,
           "skipped": 0,
           "source": "cpython/Lib/test/test_grammar.py"
         },
@@ -59,8 +59,12 @@
           "source": "cpython/Lib/test/test_types.py"
         },
         "test_builtin": {
-          "status": "blocked",
-          "blocker": "LookupError: unknown encoding: raw-unicode-escape",
+          "status": "partial",
+          "tests_run": 124,
+          "passing": 20,
+          "failures": 31,
+          "errors": 66,
+          "skipped": 7,
           "source": "cpython/Lib/test/test_builtin.py"
         },
         "test_binop": {
@@ -120,13 +124,13 @@
         },
         "test_set": {
           "status": "timeout",
-          "note": "timed out after 100s",
+          "note": "timed out after 120s",
           "notes": "Many tests running; needs longer timeout to get full count",
           "source": "cpython/Lib/test/test_set.py"
         },
         "test_tuple": {
           "status": "timeout",
-          "note": "timed out after 100s",
+          "note": "timed out after 120s",
           "notes": "Many tests running; some hash-distribution tests are slow",
           "source": "cpython/Lib/test/test_tuple.py"
         },
@@ -291,7 +295,7 @@
         },
         "test_iter": {
           "status": "timeout",
-          "note": "timed out after 100s",
+          "note": "timed out after 120s",
           "notes": "Started running after BrokenIter added but is very slow",
           "source": "cpython/Lib/test/test_iter.py"
         },

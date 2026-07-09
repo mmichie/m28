@@ -89,13 +89,39 @@ func (p *PropertyType) Call(args []core.Value, ctx *core.Context) (core.Value, e
 	return prop, nil
 }
 
-// CallWithKeywords delegates to Call since property() doesn't accept keyword arguments
-// This prevents property descriptors from being wrapped in Instance objects
+// CallWithKeywords supports property(fget=None, fset=None, fdel=None, doc=None):
+// all four parameters may be given positionally or by keyword, and all are
+// optional (property() with no arguments is valid). doc is accepted but not
+// stored (PropertyValue has no doc field yet).
 func (p *PropertyType) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
-	if kwargs.Len() > 0 {
-		return nil, fmt.Errorf("property() does not accept keyword arguments")
+	var getter, setter, deleter core.Value
+	if len(args) >= 1 {
+		getter = args[0]
 	}
-	return p.Call(args, ctx)
+	if len(args) >= 2 {
+		setter = args[1]
+	}
+	if len(args) >= 3 {
+		deleter = args[2]
+	}
+	if len(args) > 4 {
+		return nil, fmt.Errorf("property() takes at most 4 arguments (%d given)", len(args))
+	}
+	for _, e := range kwargs.Entries() {
+		switch e.Name {
+		case "fget":
+			getter = e.Value
+		case "fset":
+			setter = e.Value
+		case "fdel":
+			deleter = e.Value
+		case "doc":
+			// accepted, not stored
+		default:
+			return nil, fmt.Errorf("'%s' is an invalid keyword argument for property()", e.Name)
+		}
+	}
+	return &core.PropertyValue{Getter: getter, Setter: setter, Deleter: deleter}, nil
 }
 
 // StaticmethodType represents the staticmethod class
