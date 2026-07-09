@@ -756,8 +756,15 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 	// Process entries sequentially
 	i := 0
 	for i < args.Len() {
-		// Check for **unpack marker
-		if sym, ok := args.Items()[i].(core.SymbolValue); ok && string(sym) == "**unpack" {
+		// Check for **unpack marker. Unwrap any LocatedValue first: the IR wraps
+		// symbols to carry source locations, and without this the marker for
+		// {**d} / {'a': 1, **d} is not recognized and gets evaluated as the name
+		// "**unpack" (NameError).
+		marker := args.Items()[i]
+		if located, ok := marker.(core.LocatedValue); ok {
+			marker = located.Unwrap()
+		}
+		if sym, ok := marker.(core.SymbolValue); ok && string(sym) == "**unpack" {
 			if i+1 >= args.Len() {
 				return nil, &core.TypeError{Message: "**unpack requires a dict expression"}
 			}

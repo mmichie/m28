@@ -801,8 +801,32 @@ def collision_stats(nbins, nballs):
     return mean, sdev
 
 
+# CPython builds without docstrings set this; M28 keeps them, so it is False.
+MISSING_C_DOCSTRINGS = False
+HAVE_PY_DOCSTRINGS = True
+HAVE_DOCSTRINGS = True
+
+
+def iter_builtin_types():
+    # Yield the builtin type objects (CPython iterates __builtins__; M28's
+    # __builtins__ is not a plain dict, so enumerate the known types directly).
+    for cls in (object, int, float, bool, complex, str, bytes, bytearray,
+                list, tuple, dict, set, frozenset, type, range, slice,
+                memoryview, Exception, BaseException):
+        yield cls
+
+
+def iter_slot_wrappers(cls):
+    # M28 does not model C slot wrappers, so yield nothing. This lets modules
+    # that import the helper load; tests that specifically exercise slot
+    # wrappers will simply see an empty sequence.
+    return iter(())
+
+
 # Re-export common things via the test.support namespace
 __all__ = [
+    'MISSING_C_DOCSTRINGS', 'HAVE_PY_DOCSTRINGS', 'HAVE_DOCSTRINGS',
+    'iter_builtin_types', 'iter_slot_wrappers',
     'verbose', 'is_jython', 'is_android', 'is_emscripten', 'is_wasi',
     'check_impl_detail', 'cpython_only', 'impl_detail',
     'requires', 'requires_resource', 'requires_subprocess',
