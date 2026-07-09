@@ -1,5 +1,6 @@
 # Minimal stub for test.support.warnings_helper.
 
+import contextlib
 import warnings
 
 
@@ -48,3 +49,13 @@ def import_deprecated(name):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=DeprecationWarning)
         return __import__(name)
+
+
+@contextlib.contextmanager
+def save_restore_warnings_filters():
+    """Save the warnings filters on entry and restore them on exit."""
+    old_filters = warnings.filters[:]
+    try:
+        yield
+    finally:
+        warnings.filters[:] = old_filters

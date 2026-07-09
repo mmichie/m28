@@ -1,9 +1,9 @@
 {
   "python_version": "3.13.13",
-  "last_updated": "2026-07-01",
+  "last_updated": "2026-07-09",
   "summary": {
-    "tests_running": "1514",
-    "tests_passing": "686",
+    "tests_running": "1809",
+    "tests_passing": "721",
     "fully_passing_files": [
       "test_augassign (7/7)",
       "test_binop (12/12)",
@@ -19,7 +19,7 @@
       "test_list (61/67, 91%)",
       "test_dictcomps (9/10, 90%)",
       "test_contextlib (71/91, 78%)",
-      "test_dict (89/123, 72%)",
+      "test_dict (88/123, 72%)",
       "test_grammar (56/79, 71%)",
       "test_scope (28/41, 68%)",
       "test_listcomps (37/59, 63%)"
@@ -115,8 +115,8 @@
         "test_dict": {
           "status": "partial",
           "tests_run": 123,
-          "passing": 89,
-          "failures": 9,
+          "passing": 88,
+          "failures": 10,
           "errors": 11,
           "skipped": 14,
           "notes": "Pickling tests (6), __dict__ mutation, str subclass issues, exec(), hash-based key equality",
@@ -146,8 +146,18 @@
         },
         "test_bytes": {
           "status": "blocked",
-          "blocker": "Check for hidden control characters or use proper encoding",
+          "blocker": "SkipTest: module '_testlimitedcapi' not available",
           "source": "cpython/Lib/test/test_bytes.py"
+        },
+        "test_ordered_dict": {
+          "status": "partial",
+          "tests_run": 295,
+          "passing": 36,
+          "failures": 41,
+          "errors": 210,
+          "skipped": 8,
+          "notes": "unblocked by test.support sizeof helpers (calcobjsize/check_sizeof); OrderedDict via collections",
+          "source": "cpython/Lib/test/test_ordered_dict.py"
         }
       }
     },
@@ -233,8 +243,8 @@
           "status": "partial",
           "tests_run": 159,
           "passing": 34,
-          "failures": 61,
-          "errors": 51,
+          "failures": 62,
+          "errors": 50,
           "skipped": 11,
           "expected_failures": 2,
           "notes": "No longer panics: str subclasses now carry a backing string (Instance.BackingStr), str methods unwrap it, and ==/str()/len/index/in work. Remaining failures are deeper descriptor/metaclass features.",
@@ -305,7 +315,7 @@
         },
         "test_itertools": {
           "status": "blocked",
-          "blocker": "AttributeError:",
+          "blocker": "crash: Go stack overflow (deep recursion)",
           "source": "cpython/Lib/test/test_itertools.py"
         },
         "test_contextlib": {

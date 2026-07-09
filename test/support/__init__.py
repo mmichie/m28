@@ -182,6 +182,30 @@ def cpython_only(test):
     return unittest.skip("CPython-specific test, skipped on M28")(test)
 
 
+# Object-size helpers. These mirror CPython's struct-format-based size math so
+# that class bodies referencing them (e.g. `check_sizeof = support.check_sizeof`)
+# import cleanly. The tests that call them are @cpython_only and thus skipped on
+# M28, so exact values are irrelevant; the names simply need to exist.
+_header = 'nP'
+_align = '0P'
+_vheader = _header + 'n'
+
+
+def calcobjsize(fmt):
+    import struct
+    return struct.calcsize(_header + fmt + _align)
+
+
+def calcvobjsize(fmt):
+    import struct
+    return struct.calcsize(_vheader + fmt + _align)
+
+
+def check_sizeof(test, o, size):
+    result = sys.getsizeof(o)
+    test.assertEqual(result, size)
+
+
 def impl_detail(msg=None, **guards):
     """Decorator skipping the test when implementation doesn't match guards."""
     if check_impl_detail(**guards):
@@ -829,6 +853,7 @@ __all__ = [
     'iter_builtin_types', 'iter_slot_wrappers',
     'verbose', 'is_jython', 'is_android', 'is_emscripten', 'is_wasi',
     'check_impl_detail', 'cpython_only', 'impl_detail',
+    'calcobjsize', 'calcvobjsize', 'check_sizeof',
     'requires', 'requires_resource', 'requires_subprocess',
     'requires_freebsd_version', 'requires_linux_version', 'requires_mac_ver',
     'requires_docstrings', 'requires_working_socket', 'requires_gil_enabled',
