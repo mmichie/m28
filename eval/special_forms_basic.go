@@ -23,6 +23,18 @@ func annotatedAssignForm(args *core.ListValue, ctx *core.Context) (core.Value, e
 		target = located.Unwrap()
 	}
 
+	// In a function scope, Python neither evaluates nor stores a variable
+	// annotation: `def f(): x: 1/0` never evaluates 1/0, and f.__annotations__
+	// stays empty. Only the value assignment, if any, takes effect; a bare
+	// `x: T` is a complete no-op (it does not even bind x). AssignForm handles
+	// symbol, attribute and subscript targets uniformly.
+	if ctx.IsFunctionScope {
+		if args.Len() == 3 {
+			return AssignForm(core.NewList(target, args.Items()[2]), ctx)
+		}
+		return core.Nil, nil
+	}
+
 	// Get the annotation (can be a string or symbol)
 	annotationVal := args.Items()[1]
 	var annotationType core.Value
