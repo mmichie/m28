@@ -584,7 +584,9 @@ func (g *Generator) getIterator(val Value) (Iterator, error) {
 	if iterable, ok := val.(Iterable); ok {
 		return iterable.Iterator(), nil
 	}
-	return nil, fmt.Errorf("value is not iterable: %s", val.Type())
+	// A real TypeError (not a bare Go error) so `except TypeError` catches
+	// iterating a non-iterable in a generator expression, e.g. (a for d in a).
+	return nil, &TypeError{Message: fmt.Sprintf("'%s' object is not iterable", GetPythonTypeName(val))}
 }
 
 // bindClauseVar binds the loop variable(s) for a clause
