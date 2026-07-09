@@ -109,7 +109,11 @@ func (p *PythonParser) parseReturnStatement() ast.ASTNode {
 	tok := p.expect(TOKEN_RETURN)
 
 	var value ast.ASTNode
-	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
+	// A value follows only if the next token is not a statement terminator.
+	// DEDENT/SEMICOLON matter for a valueless `return` ending a nested block
+	// (e.g. `class C:\n  if 0: return`), where the trailing DEDENT would
+	// otherwise be misparsed as the return expression.
+	if !p.check(TOKEN_NEWLINE) && !p.check(TOKEN_DEDENT) && !p.check(TOKEN_SEMICOLON) && !p.isAtEnd() {
 		// Parse first expression (may include star unpacking)
 		first := p.parseListElement()
 
@@ -161,7 +165,9 @@ func (p *PythonParser) parseYieldStatement() ast.ASTNode {
 	}
 
 	var args []ast.ASTNode
-	if !p.check(TOKEN_NEWLINE) && !p.isAtEnd() {
+	// As in return: a valueless `yield` may be followed by DEDENT/SEMICOLON
+	// (end of a nested block), which must not be parsed as the yield expression.
+	if !p.check(TOKEN_NEWLINE) && !p.check(TOKEN_DEDENT) && !p.check(TOKEN_SEMICOLON) && !p.isAtEnd() {
 		// Parse first expression (may include star unpacking)
 		first := p.parseListElement()
 

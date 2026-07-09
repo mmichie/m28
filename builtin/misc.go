@@ -42,6 +42,124 @@ func checkAssertPatterns(source, filename string, ctx *core.Context) error {
 	return nil
 }
 
+// checkStatementContextErrors parses source and raises SyntaxError for control
+// statements used out of context: return/yield outside a function, break/continue
+// outside a loop -- the semantic checks CPython's compiler performs. It runs only
+// when the source parses cleanly; a parse error leaves compile()'s existing
+// behavior untouched (this only ADDS the out-of-context diagnostics).
+func checkStatementContextErrors(source, filename string, ctx *core.Context) (retErr error) {
+	tokenizer := parser.NewPythonTokenizer(source)
+	tokens, err := tokenizer.Tokenize()
+	if err != nil {
+		return nil
+	}
+	nodes, err := parser.NewPythonParser(tokens, filename, source).Parse()
+	if err != nil {
+		return nil
+	}
+	// ToIR is not robust to every parse tree (some produce a nil element that
+	// nil-derefs in SExpr.ToIR). This diagnostic is purely additive, so recover
+	// and skip it rather than crash compile() -- falling back to the prior
+	// "return a code object" behavior for that input.
+	defer func() {
+		if recover() != nil {
+			retErr = nil
+		}
+	}()
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		if err := checkStatementContext(node.ToIR(), false, false, filename, ctx, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkStatementContext walks lowered IR tracking whether it is inside a function
+// (inFunc) and inside a loop (inLoop), reporting the first out-of-context control
+// statement. Entering def/lambda starts a function scope and resets the loop
+// scope; a class body is neither a function nor a loop; for/while start a loop
+// scope. loc carries the source location of the nearest enclosing LocatedValue,
+// used for the break/continue line number.
+func checkStatementContext(v core.Value, inFunc, inLoop bool, filename string, ctx *core.Context, loc *core.SourceLocation) error {
+	if lv, ok := v.(core.LocatedValue); ok {
+		next := loc
+		if lv.Location != nil {
+			next = lv.Location
+		}
+		return checkStatementContext(lv.Value, inFunc, inLoop, filename, ctx, next)
+	}
+	lst, ok := v.(*core.ListValue)
+	if !ok {
+		return nil
+	}
+	items := lst.Items()
+	if len(items) == 0 {
+		return nil
+	}
+	head, hasHead := unwrapIRSymbol(items[0])
+
+	lineOf := func() int {
+		if loc != nil && loc.Line > 0 {
+			return loc.Line
+		}
+		return 1
+	}
+
+	if hasHead {
+		switch head {
+		case "return":
+			if !inFunc {
+				return createSyntaxError("'return' outside function", filename, lineOf(), 0, ctx)
+			}
+		case "yield":
+			if !inFunc {
+				return createSyntaxError("'yield' outside function", filename, lineOf(), 0, ctx)
+			}
+		case "break":
+			if !inLoop {
+				return createSyntaxError("'break' outside loop", filename, lineOf(), 0, ctx)
+			}
+		case "continue":
+			if !inLoop {
+				return createSyntaxError("'continue' not properly in loop", filename, lineOf(), 0, ctx)
+			}
+		case "def", "lambda":
+			// New function scope: return/yield allowed, loop context reset.
+			return checkStatementContextChildren(items[1:], true, false, filename, ctx, loc)
+		case "class":
+			// Class body is neither a function nor a loop.
+			return checkStatementContextChildren(items[1:], false, false, filename, ctx, loc)
+		case "for", "while":
+			return checkStatementContextChildren(items[1:], inFunc, true, filename, ctx, loc)
+		}
+	}
+	// if/do/try/with/expressions and the args of return/yield: same scope.
+	return checkStatementContextChildren(items[1:], inFunc, inLoop, filename, ctx, loc)
+}
+
+func checkStatementContextChildren(items []core.Value, inFunc, inLoop bool, filename string, ctx *core.Context, loc *core.SourceLocation) error {
+	for _, e := range items {
+		if err := checkStatementContext(e, inFunc, inLoop, filename, ctx, loc); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// unwrapIRSymbol returns the symbol name of v (seeing through a LocatedValue).
+func unwrapIRSymbol(v core.Value) (string, bool) {
+	if lv, ok := v.(core.LocatedValue); ok {
+		v = lv.Unwrap()
+	}
+	if s, ok := v.(core.SymbolValue); ok {
+		return string(s), true
+	}
+	return "", false
+}
+
 // createSyntaxError creates a SyntaxError from an error message
 func createSyntaxError(msg, filename string, lineno, offset int, ctx *core.Context) error {
 	// Try to look up SyntaxError class and create a proper instance
@@ -836,6 +954,13 @@ func RegisterMisc(ctx *core.Context) {
 						}
 					}
 				}
+				return nil, err
+			}
+
+			// Semantic checks CPython's compiler performs: return/yield outside
+			// a function, break/continue outside a loop. Only fires on cleanly
+			// parsing source, so it purely adds diagnostics.
+			if err := checkStatementContextErrors(source, filename, ctx); err != nil {
 				return nil, err
 			}
 

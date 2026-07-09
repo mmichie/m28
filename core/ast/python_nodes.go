@@ -102,9 +102,14 @@ func (b *BreakForm) String() string {
 	return "(break)"
 }
 
-// ToIR lowers break to IR
+// ToIR lowers break to IR, preserving its source location (used for the
+// "'break' outside loop" SyntaxError line number).
 func (b *BreakForm) ToIR() core.Value {
-	return core.NewList(core.SymbolValue("break"))
+	v := core.NewList(core.SymbolValue("break"))
+	if b.Loc != nil {
+		return core.LocatedValue{Value: v, Location: b.Loc}
+	}
+	return v
 }
 
 // ContinueForm represents the continue statement
@@ -132,9 +137,14 @@ func (c *ContinueForm) String() string {
 	return "(continue)"
 }
 
-// ToIR lowers continue to IR
+// ToIR lowers continue to IR, preserving its source location (used for the
+// "'continue' not properly in loop" SyntaxError line number).
 func (c *ContinueForm) ToIR() core.Value {
-	return core.NewList(core.SymbolValue("continue"))
+	v := core.NewList(core.SymbolValue("continue"))
+	if c.Loc != nil {
+		return core.LocatedValue{Value: v, Location: c.Loc}
+	}
+	return v
 }
 
 // ReturnForm represents the return statement
@@ -167,12 +177,19 @@ func (r *ReturnForm) String() string {
 	return "(return " + r.Value.String() + ")"
 }
 
-// ToIR lowers return to IR
+// ToIR lowers return to IR, preserving its source location (used for the
+// "'return' outside function" SyntaxError line number).
 func (r *ReturnForm) ToIR() core.Value {
+	var v core.Value
 	if r.Value == nil {
-		return core.NewList(core.SymbolValue("return"), core.None)
+		v = core.NewList(core.SymbolValue("return"), core.None)
+	} else {
+		v = core.NewList(core.SymbolValue("return"), r.Value.ToIR())
 	}
-	return core.NewList(core.SymbolValue("return"), r.Value.ToIR())
+	if r.Loc != nil {
+		return core.LocatedValue{Value: v, Location: r.Loc}
+	}
+	return v
 }
 
 // RaiseForm represents the raise statement

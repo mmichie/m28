@@ -30,8 +30,8 @@ func TestBreakForm(t *testing.T) {
 		t.Error("SyntaxKind should be Python")
 	}
 
-	// Check ToIR
-	ir := breakStmt.ToIR()
+	// Check ToIR (located: ToIR wraps in a LocatedValue carrying b.Loc)
+	ir := unwrapPython(breakStmt.ToIR())
 	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
@@ -49,8 +49,8 @@ func TestContinueForm(t *testing.T) {
 	loc := &core.SourceLocation{Line: 1, Column: 1}
 	continueStmt := NewContinueForm(loc, SyntaxPython)
 
-	// Check ToIR
-	ir := continueStmt.ToIR()
+	// Check ToIR (located: ToIR wraps in a LocatedValue carrying c.Loc)
+	ir := unwrapPython(continueStmt.ToIR())
 	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
@@ -69,8 +69,8 @@ func TestReturnForm_WithValue(t *testing.T) {
 	value := NewLiteral(core.NumberValue(42), loc, SyntaxPython)
 	returnStmt := NewReturnForm(value, loc, SyntaxPython)
 
-	// Check ToIR: (return 42)
-	ir := returnStmt.ToIR()
+	// Check ToIR: (return 42) (located: wrapped in a LocatedValue)
+	ir := unwrapPython(returnStmt.ToIR())
 	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
@@ -91,8 +91,8 @@ func TestReturnForm_Bare(t *testing.T) {
 	loc := &core.SourceLocation{Line: 1, Column: 1}
 	returnStmt := NewReturnForm(nil, loc, SyntaxPython)
 
-	// Check ToIR: (return None)
-	ir := returnStmt.ToIR()
+	// Check ToIR: (return None) (located: wrapped in a LocatedValue)
+	ir := unwrapPython(returnStmt.ToIR())
 	list, ok := ir.(*core.ListValue)
 	if !ok {
 		t.Fatalf("Expected ListValue, got %T", ir)
