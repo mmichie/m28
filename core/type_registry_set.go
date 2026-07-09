@@ -445,7 +445,14 @@ func getSetMethods() map[string]*MethodDescriptor {
 					return nil, &TypeError{Message: "__contains__ takes exactly one argument"}
 				}
 				set := receiver.(*SetValue)
-				return BoolValue(set.Contains(args[0])), nil
+				// Use the ctx-aware variant (like frozenset) so a member's custom
+				// __eq__ is consulted on a hash collision and its exceptions
+				// propagate -- Contains passes a nil ctx, which skips __eq__.
+				in, err := set.ContainsWithError(args[0], ctx)
+				if err != nil {
+					return nil, err
+				}
+				return BoolValue(in), nil
 			},
 		},
 		"__iter__": {
