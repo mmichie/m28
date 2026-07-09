@@ -408,6 +408,35 @@ func tryOrderedComparison(left, right core.Value, leftMethod, rightMethod string
 	return nil, false, nil
 }
 
+// bigIntCmp compares left and right as big integers when at least one is a
+// BigInt (promoting an integral NumberValue). Returns (cmp -1/0/1, handled,
+// err); handled is false when neither operand is a BigInt so the caller keeps
+// its normal path. A non-integer operand yields a comparison TypeError. This
+// mirrors the inline BigInt block in compareLessThan/compareGreaterThan so
+// that >= and <= (whose fallback type-switch does not match BigInt) also work.
+func bigIntCmp(left, right core.Value, op string) (int, bool, error) {
+	leftBig, leftIsBig := left.(core.BigIntValue)
+	rightBig, rightIsBig := right.(core.BigIntValue)
+	if !leftIsBig && !rightIsBig {
+		return 0, false, nil
+	}
+	if !leftIsBig {
+		n, ok := left.(core.NumberValue)
+		if !ok || !core.IsInteger(float64(n)) {
+			return 0, true, core.NewComparisonError(op, left, right)
+		}
+		leftBig = core.PromoteToBigInt(n)
+	}
+	if !rightIsBig {
+		n, ok := right.(core.NumberValue)
+		if !ok || !core.IsInteger(float64(n)) {
+			return 0, true, core.NewComparisonError(op, left, right)
+		}
+		rightBig = core.PromoteToBigInt(n)
+	}
+	return leftBig.GetBigInt().Cmp(rightBig.GetBigInt()), true, nil
+}
+
 func compareLessThan(left, right core.Value, ctx *core.Context) (core.Value, error) {
 	left = core.UnwrapTupleInstance(left)
 	right = core.UnwrapTupleInstance(right)
@@ -538,6 +567,14 @@ func compareLessThanOrEqual(left, right core.Value, ctx *core.Context) (core.Val
 		if err == nil {
 			return core.BoolValue(cmp <= 0), nil
 		}
+	}
+
+	// Handle BigInt (the fallback type-switch below does not match BigInt).
+	if cmp, ok, err := bigIntCmp(left, right, "<="); ok {
+		if err != nil {
+			return nil, err
+		}
+		return core.BoolValue(cmp <= 0), nil
 	}
 
 	// str and str-subclass instances order by their backing string value.
@@ -736,6 +773,14 @@ func compareGreaterThanOrEqual(left, right core.Value, ctx *core.Context) (core.
 		if err == nil {
 			return core.BoolValue(cmp >= 0), nil
 		}
+	}
+
+	// Handle BigInt (the fallback type-switch below does not match BigInt).
+	if cmp, ok, err := bigIntCmp(left, right, ">="); ok {
+		if err != nil {
+			return nil, err
+		}
+		return core.BoolValue(cmp >= 0), nil
 	}
 
 	// str and str-subclass instances order by their backing string value.

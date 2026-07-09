@@ -120,8 +120,10 @@ func InitSysModule() *core.DictValue {
 	// Set to False since M28 is not a framework build
 	sysModule.SetWithKey("_framework", core.StringValue("_framework"), core.BoolValue(false))
 
-	// System constants
-	sysModule.SetWithKey("maxsize", core.StringValue("maxsize"), core.NumberValue(int64(^uint(0)>>1)))
+	// System constants. maxsize is 2**63-1 on 64-bit, which exceeds float64's
+	// exact-integer range, so it must be a BigInt -- NumberValue (float64) would
+	// round it to 9223372036854775808 and lose the exact value.
+	sysModule.SetWithKey("maxsize", core.StringValue("maxsize"), core.NewBigIntFromInt64(int64(^uint(0)>>1)))
 	if runtime.GOARCH == "386" || runtime.GOARCH == "arm" {
 		sysModule.SetWithKey("byteorder", core.StringValue("byteorder"), core.StringValue("little"))
 	} else if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {

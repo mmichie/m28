@@ -3,7 +3,7 @@
   "last_updated": "2026-07-01",
   "summary": {
     "tests_running": "1102",
-    "tests_passing": "568",
+    "tests_passing": "569",
     "fully_passing_files": [
       "test_augassign (7/7)",
       "test_binop (12/12)",
@@ -20,8 +20,8 @@
       "test_dictcomps (9/10, 90%)",
       "test_contextlib (71/91, 78%)",
       "test_dict (89/123, 72%)",
+      "test_grammar (54/79, 68%)",
       "test_scope (28/41, 68%)",
-      "test_grammar (53/79, 67%)",
       "test_listcomps (37/59, 63%)"
     ],
     "running_but_low": [
@@ -38,8 +38,8 @@
         "test_grammar": {
           "status": "partial",
           "tests_run": 79,
-          "passing": 53,
-          "failures": 13,
+          "passing": 54,
+          "failures": 12,
           "errors": 13,
           "skipped": 0,
           "source": "cpython/Lib/test/test_grammar.py"
