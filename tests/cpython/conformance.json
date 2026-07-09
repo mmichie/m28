@@ -2,8 +2,8 @@
   "python_version": "3.13.13",
   "last_updated": "2026-07-09",
   "summary": {
-    "tests_running": "1809",
-    "tests_passing": "721",
+    "tests_running": "1846",
+    "tests_passing": "743",
     "fully_passing_files": [
       "test_augassign (7/7)",
       "test_binop (12/12)",
@@ -22,7 +22,8 @@
       "test_dict (88/123, 72%)",
       "test_grammar (56/79, 71%)",
       "test_scope (28/41, 68%)",
-      "test_listcomps (37/59, 63%)"
+      "test_listcomps (37/59, 63%)",
+      "test_raise (22/37, 59%)"
     ],
     "running_but_low": [
       "test_descr (~23/159, 14%)",
@@ -176,8 +177,12 @@
           "source": "cpython/Lib/test/test_exceptions.py"
         },
         "test_raise": {
-          "status": "blocked",
-          "blocker": "Exception: MyException",
+          "status": "partial",
+          "tests_run": 37,
+          "passing": 22,
+          "failures": 7,
+          "errors": 8,
+          "skipped": 0,
           "source": "cpython/Lib/test/test_raise.py"
         },
         "test_with": {
@@ -243,8 +248,8 @@
           "status": "partial",
           "tests_run": 159,
           "passing": 34,
-          "failures": 62,
-          "errors": 50,
+          "failures": 61,
+          "errors": 51,
           "skipped": 11,
           "expected_failures": 2,
           "notes": "No longer panics: str subclasses now carry a backing string (Instance.BackingStr), str methods unwrap it, and ==/str()/len/index/in work. Remaining failures are deeper descriptor/metaclass features.",

@@ -2032,6 +2032,19 @@ func isBaseExceptionInstance(v Value) bool {
 	return false
 }
 
+// IsBaseExceptionInstance reports whether v is an instance of a BaseException
+// subclass. Exported for the raise special form, which must reject raising a
+// value that is not a BaseException (CPython: "exceptions must derive from
+// BaseException").
+func IsBaseExceptionInstance(v Value) bool {
+	return isBaseExceptionInstance(v)
+}
+
+// IsBaseExceptionClass reports whether cls derives from BaseException.
+func IsBaseExceptionClass(cls *Class) bool {
+	return isClassSubclassOf(cls, "BaseException")
+}
+
 // isIterableValue reports whether v can be iterated (used to validate that an
 // exception's args is set to an iterable, matching CPython).
 func isIterableValue(v Value) bool {

@@ -1198,10 +1198,31 @@ func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 		// Check if it's an exception class
 		if class, ok := val.(*core.Class); ok {
+			// CPython: the raise target class must derive from BaseException.
+			if !core.IsBaseExceptionClass(class) {
+				return nil, &Exception{
+					Type:    "TypeError",
+					Message: "exceptions must derive from BaseException",
+				}
+			}
+
 			// Instantiate the exception class
 			instance, err := class.Call([]core.Value{}, ctx)
 			if err != nil {
 				return nil, err
+			}
+
+			// CPython: instantiating the class must yield a BaseException
+			// instance. A __new__ that returns a non-exception (or any other
+			// path producing a non-BaseException value) is a TypeError, not an
+			// uncatchable escape.
+			if !core.IsBaseExceptionInstance(instance) {
+				return nil, &Exception{
+					Type: "TypeError",
+					Message: fmt.Sprintf(
+						"calling %s() should have returned an instance of BaseException, not '%s'",
+						class.Name, core.GetPythonTypeName(instance)),
+				}
 			}
 
 			// Add __traceback__ attribute to the instance
@@ -1245,7 +1266,9 @@ func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
-		// Single string argument - generic exception with message
+		// Single string argument - generic exception with message.
+		// (M28 convenience; CPython 3 rejects `raise "x"`, but M28 has long
+		// supported it, so it is preserved here.)
 		if msg, ok := val.(core.StringValue); ok {
 			return nil, &Exception{
 				Type:    "Exception",
@@ -1253,10 +1276,12 @@ func raiseForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			}
 		}
 
-		// If it's not a string, convert to string
+		// Any other value (tuple, int, dict, ...) cannot be raised. CPython:
+		// "exceptions must derive from BaseException". Emit a catchable
+		// TypeError rather than an uncatchable wrapped value.
 		return nil, &Exception{
-			Type:    "Exception",
-			Message: core.PrintValueWithoutQuotes(val),
+			Type:    "TypeError",
+			Message: "exceptions must derive from BaseException",
 		}
 	}
 
