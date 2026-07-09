@@ -50,8 +50,16 @@ func dictKeysEqual(stored, search Value, ctx *Context) (bool, error) {
 	if ctx != nil {
 		_, si := stored.(*Instance)
 		_, ti := search.(*Instance)
-		if si || ti {
+		if si {
 			return EqualValuesWithError(stored, search, ctx)
+		}
+		if ti {
+			// EqualValuesWithError dispatches on (and reflects from) its FIRST
+			// operand, so when only the search key is an Instance put it first;
+			// otherwise its custom __eq__ is skipped and any exception it raises
+			// swallowed (a dict lookup would wrongly miss / stay silent). Mirrors
+			// core.ContainsEqual, the same fix for the `in` operator.
+			return EqualValuesWithError(search, stored, ctx)
 		}
 	}
 	return EqualValues(stored, search), nil
