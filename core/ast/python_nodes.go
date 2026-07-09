@@ -373,6 +373,9 @@ type ForForm struct {
 	Iterable  ASTNode
 	Body      []ASTNode
 	ElseBody  []ASTNode // Optional else clause (Python feature)
+	// IsTuple marks the target as a tuple pattern that must unpack even with a
+	// single element: `for (x,) in [(1,)]` binds x=1, unlike `for x in ...`.
+	IsTuple bool
 }
 
 // NewForForm creates a new for loop with a single variable (backward compatible)
@@ -408,6 +411,7 @@ func NewForFormMulti(variables []string, iterable ASTNode, body, elseBody []ASTN
 		Iterable:  iterable,
 		Body:      body,
 		ElseBody:  elseBody,
+		IsTuple:   true, // multi-form is always a tuple pattern (unpacks)
 	}
 }
 
@@ -432,7 +436,7 @@ func (f *ForForm) ToIR() core.Value {
 
 	var result []core.Value
 
-	if len(f.Variables) == 1 {
+	if len(f.Variables) == 1 && !f.IsTuple {
 		// Single variable: (for var iterable body)
 		// Variable might be nested tuple like "(x, y)"
 		varPattern := parseVariablePattern(f.Variables[0])

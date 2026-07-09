@@ -1285,10 +1285,12 @@ func (p *PythonParser) parseLoopVariables() string {
 			p.advance() // consume (
 
 			parts := []string{}
+			sawComma := false
 			parts = append(parts, p.parseLoopVariableElement())
 
 			for p.check(TOKEN_COMMA) {
 				p.advance()
+				sawComma = true
 				if p.check(TOKEN_RPAREN) {
 					break // Trailing comma
 				}
@@ -1296,6 +1298,16 @@ func (p *PythonParser) parseLoopVariables() string {
 			}
 
 			p.expect(TOKEN_RPAREN)
+
+			// A single element with no comma is just grouping: (x) == x. A single
+			// element WITH a comma is the 1-tuple pattern (x,), which must unpack;
+			// keep the trailing comma so the caller tells it apart from grouping.
+			if len(parts) == 1 {
+				if sawComma {
+					return "(" + parts[0] + ",)"
+				}
+				return parts[0]
+			}
 
 			// Format as "(x, y, z)"
 			result := "(" + parts[0]
@@ -1338,7 +1350,13 @@ func (p *PythonParser) parseLoopVariables() string {
 			parts = append(parts, next)
 		}
 
-		// Format as "(x, y, z)" or "(key, (begin, end))" or "(x,)" for trailing comma
+		// A single element reached here only via a trailing comma: for x, in ...
+		// -- the 1-tuple pattern (x,). Keep the comma so the dispatch unpacks it.
+		if len(parts) == 1 {
+			return "(" + parts[0] + ",)"
+		}
+
+		// Format as "(x, y, z)" or "(key, (begin, end))"
 		result := "(" + parts[0]
 		for i := 1; i < len(parts); i++ {
 			result += ", " + parts[i]

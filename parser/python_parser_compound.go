@@ -250,11 +250,13 @@ func (p *PythonParser) parseForStatement() ast.ASTNode {
 	//      "x" -> ["x"]
 	variables := splitLoopVariables(variable)
 
-	if len(variables) == 1 {
+	// A parenthesized target is a tuple pattern that must unpack, even with one
+	// element: `for (x,) in [(1,)]` binds x=1. A bare name `x` (grouping (x) is
+	// unwrapped to it) is a single target that takes each element whole.
+	if len(variables) == 1 && !strings.HasPrefix(strings.TrimSpace(variable), "(") {
 		return ast.NewForForm(variables[0], iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
-	} else {
-		return ast.NewForFormMulti(variables, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
 	}
+	return ast.NewForFormMulti(variables, iterable, body, elseBody, p.makeLocation(tok), ast.SyntaxPython)
 }
 
 // forTargetHasComplexPattern peeks ahead from the current position (which should

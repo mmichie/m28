@@ -3,7 +3,7 @@
   "last_updated": "2026-07-01",
   "summary": {
     "tests_running": "1102",
-    "tests_passing": "570",
+    "tests_passing": "571",
     "fully_passing_files": [
       "test_augassign (7/7)",
       "test_binop (12/12)",
@@ -20,7 +20,7 @@
       "test_dictcomps (9/10, 90%)",
       "test_contextlib (71/91, 78%)",
       "test_dict (89/123, 72%)",
-      "test_grammar (55/79, 70%)",
+      "test_grammar (56/79, 71%)",
       "test_scope (28/41, 68%)",
       "test_listcomps (37/59, 63%)"
     ],
@@ -38,8 +38,8 @@
         "test_grammar": {
           "status": "partial",
           "tests_run": 79,
-          "passing": 55,
-          "failures": 12,
+          "passing": 56,
+          "failures": 11,
           "errors": 12,
           "skipped": 0,
           "source": "cpython/Lib/test/test_grammar.py"
@@ -225,8 +225,8 @@
           "status": "partial",
           "tests_run": 159,
           "passing": 34,
-          "failures": 61,
-          "errors": 51,
+          "failures": 62,
+          "errors": 50,
           "skipped": 11,
           "expected_failures": 2,
           "notes": "No longer panics: str subclasses now carry a backing string (Instance.BackingStr), str methods unwrap it, and ==/str()/len/index/in work. Remaining failures are deeper descriptor/metaclass features.",
