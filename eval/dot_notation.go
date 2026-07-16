@@ -712,12 +712,12 @@ func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.List
 		return core.Nil, nil
 
 	case "clear":
-		// Clear all entries by deleting each key
-		// Make a copy of keys to avoid modifying while iterating
-		keys := make([]string, len(dict.Keys()))
-		copy(keys, dict.Keys())
-		for _, key := range keys {
-			dict.Delete(key)
+		// Clear all entries by deleting each key. Snapshot the keys first, then
+		// remove them one at a time via DeleteValue -- this preserves the backing
+		// index array (rather than nil-ing it, as dict.Clear does), which keeps a
+		// re-entrant clear() called from a key's __eq__ mid-insert from crashing.
+		for _, key := range dict.OriginalKeys() {
+			dict.DeleteValue(key)
 		}
 		return core.Nil, nil
 
@@ -727,7 +727,7 @@ func getDictAttr(dict *core.DictValue, attr string, isCall bool, args *core.List
 	}
 
 	// First, check if it's a dictionary key access
-	if val, exists := dict.Get(attr); exists {
+	if val, exists := dict.GetStr(attr); exists {
 		return val, nil
 	}
 

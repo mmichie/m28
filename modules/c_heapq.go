@@ -121,7 +121,7 @@ func Init_HeapqModule() *core.DictValue {
 	heapqModule := core.NewDict()
 
 	// heappush(heap, item) - Push item onto heap, maintaining heap invariant
-	heapqModule.Set("heappush", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	heapqModule.SetStr("heappush", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("heappush expected 2 arguments, got %d", len(args))
 		}
@@ -141,7 +141,7 @@ func Init_HeapqModule() *core.DictValue {
 	}))
 
 	// heappop(heap) - Pop and return smallest item from heap
-	heapqModule.Set("heappop", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	heapqModule.SetStr("heappop", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("heappop expected 1 argument, got %d", len(args))
 		}
@@ -166,7 +166,7 @@ func Init_HeapqModule() *core.DictValue {
 	}))
 
 	// heapify(x) - Transform list into heap in-place, in O(n) time
-	heapqModule.Set("heapify", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	heapqModule.SetStr("heapify", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("heapify expected 1 argument, got %d", len(args))
 		}
@@ -184,7 +184,7 @@ func Init_HeapqModule() *core.DictValue {
 	}))
 
 	// heapreplace(heap, item) - Pop smallest, then push new item (more efficient than pop + push)
-	heapqModule.Set("heapreplace", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	heapqModule.SetStr("heapreplace", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("heapreplace expected 2 arguments, got %d", len(args))
 		}
@@ -213,7 +213,7 @@ func Init_HeapqModule() *core.DictValue {
 	}))
 
 	// heappushpop(heap, item) - Push item, then pop and return smallest (more efficient than push + pop)
-	heapqModule.Set("heappushpop", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	heapqModule.SetStr("heappushpop", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("heappushpop expected 2 arguments, got %d", len(args))
 		}
@@ -245,7 +245,7 @@ func Init_HeapqModule() *core.DictValue {
 	}))
 
 	// _heappop_max(heap) - Pop and return largest item from max heap
-	heapqModule.Set("_heappop_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	heapqModule.SetStr("_heappop_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("_heappop_max expected 1 argument, got %d", len(args))
 		}
@@ -270,7 +270,7 @@ func Init_HeapqModule() *core.DictValue {
 	}))
 
 	// _heapify_max(x) - Transform list into max heap in-place
-	heapqModule.Set("_heapify_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	heapqModule.SetStr("_heapify_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("_heapify_max expected 1 argument, got %d", len(args))
 		}
@@ -288,7 +288,7 @@ func Init_HeapqModule() *core.DictValue {
 	}))
 
 	// _heapreplace_max(heap, item) - Pop largest from max heap, then push new item
-	heapqModule.Set("_heapreplace_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	heapqModule.SetStr("_heapreplace_max", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("_heapreplace_max expected 2 arguments, got %d", len(args))
 		}

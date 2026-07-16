@@ -13,14 +13,14 @@ func Init_PylongModule() *core.DictValue {
 
 	// int_to_decimal - convert int to Decimal (would need decimal module)
 	// We stub this but it won't be called if test_int checks for None
-	module.Set("int_to_decimal", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("int_to_decimal", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// This would convert a large int to decimal.Decimal
 		// For now, just return None to indicate not implemented
 		return core.None, nil
 	}))
 
 	// int_to_decimal_string - convert int to decimal string
-	module.Set("int_to_decimal_string", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("int_to_decimal_string", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// This would convert a large int to a decimal string representation
 		// For now, use str() as fallback
 		if len(args) != 1 {
@@ -30,7 +30,7 @@ func Init_PylongModule() *core.DictValue {
 	}))
 
 	// _str_to_int_inner - asymptotically fast string to int conversion
-	module.Set("_str_to_int_inner", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("_str_to_int_inner", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// This would do fast string to int conversion for huge numbers
 		// For now, just return None to indicate not implemented
 		return core.None, nil

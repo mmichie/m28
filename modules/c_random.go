@@ -112,7 +112,7 @@ func InitRandomModule() *core.DictValue {
 		return core.NilValue{}, nil
 	}))
 
-	randomModule.Set("Random", randomClass)
+	randomModule.SetStr("Random", randomClass)
 
 	return randomModule
 }

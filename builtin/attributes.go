@@ -76,16 +76,14 @@ func RegisterAttributes(ctx *core.Context) {
 		if module, ok := val.(*core.Module); ok {
 			nameSet := make(map[string]bool)
 
-			// Add contents from module's __dict__
+			// Add contents from module's __dict__ (namespace keys are strings)
 			if module.Dict != nil {
-				for _, key := range module.Dict.Keys() {
-					// Keys() returns []string (internal key representation like "s:BoolTest")
-					// Strip the prefix to get the original name
-					if len(key) > 2 && key[0] != 'p' { // 'p' prefix is for complex types
-						name := key[2:] // Strip "s:", "n:", "b:", etc.
-						nameSet[name] = true
+				module.Dict.ForEach(func(key, _ core.Value) bool {
+					if s, ok := key.(core.StringValue); ok {
+						nameSet[string(s)] = true
 					}
-				}
+					return true
+				})
 			}
 
 			// Add contents from module's Exports

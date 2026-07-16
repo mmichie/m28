@@ -14,23 +14,23 @@ func InitPickleModule() *core.DictValue {
 	pickleModule := core.NewDict()
 
 	// Protocol constants
-	pickleModule.Set("HIGHEST_PROTOCOL", core.NumberValue(5))
-	pickleModule.Set("DEFAULT_PROTOCOL", core.NumberValue(4))
+	pickleModule.SetStr("HIGHEST_PROTOCOL", core.NumberValue(5))
+	pickleModule.SetStr("DEFAULT_PROTOCOL", core.NumberValue(4))
 
 	// PickleError base exception - create a simple class
 	pickleError := createPickleException("PickleError", nil)
-	pickleModule.Set("PickleError", pickleError)
+	pickleModule.SetStr("PickleError", pickleError)
 
 	// PicklingError - error during pickling
 	picklingError := createPickleException("PicklingError", pickleError)
-	pickleModule.Set("PicklingError", picklingError)
+	pickleModule.SetStr("PicklingError", picklingError)
 
 	// UnpicklingError - error during unpickling
 	unpicklingError := createPickleException("UnpicklingError", pickleError)
-	pickleModule.Set("UnpicklingError", unpicklingError)
+	pickleModule.SetStr("UnpicklingError", unpicklingError)
 
 	// dumps(obj, protocol=None, *, fix_imports=True) - serialize object to bytes
-	pickleModule.Set("dumps", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	pickleModule.SetStr("dumps", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("dumps() requires at least 1 argument")
 		}
@@ -46,7 +46,7 @@ func InitPickleModule() *core.DictValue {
 	}))
 
 	// loads(data, *, fix_imports=True, encoding="ASCII", errors="strict") - deserialize bytes
-	pickleModule.Set("loads", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	pickleModule.SetStr("loads", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("loads() requires at least 1 argument")
 		}
@@ -70,7 +70,7 @@ func InitPickleModule() *core.DictValue {
 	}))
 
 	// dump(obj, file, protocol=None) - serialize to file
-	pickleModule.Set("dump", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	pickleModule.SetStr("dump", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("dump() requires at least 2 arguments")
 		}
@@ -102,7 +102,7 @@ func InitPickleModule() *core.DictValue {
 	}))
 
 	// load(file) - deserialize from file
-	pickleModule.Set("load", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	pickleModule.SetStr("load", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("load() requires at least 1 argument")
 		}
@@ -139,7 +139,7 @@ func InitPickleModule() *core.DictValue {
 	}))
 
 	// Pickler class stub
-	pickleModule.Set("Pickler", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	pickleModule.SetStr("Pickler", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("Pickler() requires a file argument")
 		}
@@ -147,7 +147,7 @@ func InitPickleModule() *core.DictValue {
 	}))
 
 	// Unpickler class stub
-	pickleModule.Set("Unpickler", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	pickleModule.SetStr("Unpickler", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("Unpickler() requires a file argument")
 		}
@@ -155,7 +155,7 @@ func InitPickleModule() *core.DictValue {
 	}))
 
 	// PickleBuffer class - wraps a buffer for zero-copy pickling
-	pickleModule.Set("PickleBuffer", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	pickleModule.SetStr("PickleBuffer", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("PickleBuffer() requires a buffer argument")
 		}
@@ -297,7 +297,7 @@ func fromSerializable(v interface{}) (core.Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			result.Set(k, val)
+			result.SetStr(k, val)
 		}
 		return result, nil
 	default:
@@ -310,10 +310,10 @@ func createPicklerInstance(file core.Value, ctx *core.Context) (core.Value, erro
 	pickler := core.NewDict()
 
 	// Store the file
-	pickler.Set("_file", file)
+	pickler.SetStr("_file", file)
 
 	// dump method
-	pickler.Set("dump", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	pickler.SetStr("dump", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("dump() requires an object argument")
 		}
@@ -324,7 +324,7 @@ func createPicklerInstance(file core.Value, ctx *core.Context) (core.Value, erro
 		}
 
 		// Get the file from the pickler
-		storedFile, _ := pickler.Get("_file")
+		storedFile, _ := pickler.GetStr("_file")
 		if writer, ok := storedFile.(interface {
 			GetAttr(string) (core.Value, bool)
 		}); ok {
@@ -349,12 +349,12 @@ func createUnpicklerInstance(file core.Value, ctx *core.Context) (core.Value, er
 	unpickler := core.NewDict()
 
 	// Store the file
-	unpickler.Set("_file", file)
+	unpickler.SetStr("_file", file)
 
 	// load method
-	unpickler.Set("load", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	unpickler.SetStr("load", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Get the file from the unpickler
-		storedFile, _ := unpickler.Get("_file")
+		storedFile, _ := unpickler.GetStr("_file")
 		if reader, ok := storedFile.(interface {
 			GetAttr(string) (core.Value, bool)
 		}); ok {
@@ -432,17 +432,17 @@ func createPickleBufferInstance(buffer core.Value) (core.Value, error) {
 		}
 	}
 
-	pickleBuffer.Set("_data", core.BytesValue(data))
+	pickleBuffer.SetStr("_data", core.BytesValue(data))
 
 	// raw() method - return the underlying buffer
-	pickleBuffer.Set("raw", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		d, _ := pickleBuffer.Get("_data")
+	pickleBuffer.SetStr("raw", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		d, _ := pickleBuffer.GetStr("_data")
 		return d, nil
 	}))
 
 	// release() method - release the buffer
-	pickleBuffer.Set("release", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		pickleBuffer.Set("_data", core.None)
+	pickleBuffer.SetStr("release", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		pickleBuffer.SetStr("_data", core.None)
 		return core.None, nil
 	}))
 

@@ -56,20 +56,20 @@ func InitWarningsModule() *core.DictValue {
 	globalRegistry.mu.Unlock()
 
 	// Register functions
-	warningsModule.Set("warn", core.NewBuiltinFunction(warnFunc))
-	warningsModule.Set("warn_explicit", core.NewBuiltinFunction(warnExplicitFunc))
-	warningsModule.Set("simplefilter", core.NewBuiltinFunction(simplefilterFunc))
-	warningsModule.Set("filterwarnings", core.NewBuiltinFunction(filterwarningsFunc))
-	warningsModule.Set("resetwarnings", core.NewBuiltinFunction(resetwarningsFunc))
+	warningsModule.SetStr("warn", core.NewBuiltinFunction(warnFunc))
+	warningsModule.SetStr("warn_explicit", core.NewBuiltinFunction(warnExplicitFunc))
+	warningsModule.SetStr("simplefilter", core.NewBuiltinFunction(simplefilterFunc))
+	warningsModule.SetStr("filterwarnings", core.NewBuiltinFunction(filterwarningsFunc))
+	warningsModule.SetStr("resetwarnings", core.NewBuiltinFunction(resetwarningsFunc))
 
 	// Expose filters as a list-like object (for compatibility with CPython)
 	// Create a FiltersProxy that wraps the global filters
 	filtersProxy := createFiltersProxy()
-	warningsModule.Set("filters", filtersProxy)
+	warningsModule.SetStr("filters", filtersProxy)
 
 	// catch_warnings is a class-like callable
 	catchWarningsClass := createCatchWarningsClass()
-	warningsModule.Set("catch_warnings", catchWarningsClass)
+	warningsModule.SetStr("catch_warnings", catchWarningsClass)
 
 	return warningsModule
 }
@@ -490,8 +490,8 @@ func createCatchWarningsClass() core.Value {
 
 			// Return as dict with __enter__ and __exit__ methods
 			obj := core.NewDict()
-			obj.Set("__enter__", core.NewBuiltinFunction(instance.enter))
-			obj.Set("__exit__", core.NewBuiltinFunction(instance.exit))
+			obj.SetStr("__enter__", core.NewBuiltinFunction(instance.enter))
+			obj.SetStr("__exit__", core.NewBuiltinFunction(instance.exit))
 
 			return obj, nil
 		},
@@ -598,7 +598,7 @@ func WarnExplicit(message string, category string, filename string, lineno int, 
 			return nil
 		}
 	} else if warningsDict, ok := warningsVal.(*core.DictValue); ok {
-		warnExplicitFunc, found = warningsDict.Get("warn_explicit")
+		warnExplicitFunc, found = warningsDict.GetStr("warn_explicit")
 		if !found {
 			fmt.Fprintf(os.Stderr, "%s:%d: %s: %s\n", filename, lineno, category, "warning")
 			return nil
@@ -683,7 +683,7 @@ func Warn(message string, category string, ctx *core.Context) error {
 		}
 	} else if warningsDict, ok := warningsVal.(*core.DictValue); ok {
 		// Fallback to dict access
-		warnFunc, found = warningsDict.Get("warn")
+		warnFunc, found = warningsDict.GetStr("warn")
 		if !found {
 			if debugWarnings {
 				core.Log.Debug(core.SubsystemBuiltin, "warnings.warn not found in dict")

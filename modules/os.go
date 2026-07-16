@@ -18,35 +18,35 @@ func InitOSModule() *core.DictValue {
 	pathModule := core.NewDict()
 
 	// Register os.path functions
-	pathModule.SetWithKey("exists", core.StringValue("exists"), core.NewBuiltinFunction(osPathExists))
-	pathModule.SetWithKey("join", core.StringValue("join"), core.NewBuiltinFunction(osPathJoin))
-	pathModule.SetWithKey("dirname", core.StringValue("dirname"), core.NewBuiltinFunction(osPathDirname))
-	pathModule.SetWithKey("basename", core.StringValue("basename"), core.NewBuiltinFunction(osPathBasename))
-	pathModule.SetWithKey("abspath", core.StringValue("abspath"), core.NewBuiltinFunction(osPathAbspath))
-	pathModule.SetWithKey("isfile", core.StringValue("isfile"), core.NewBuiltinFunction(osPathIsFile))
-	pathModule.SetWithKey("isdir", core.StringValue("isdir"), core.NewBuiltinFunction(osPathIsDir))
-	pathModule.SetWithKey("getsize", core.StringValue("getsize"), core.NewBuiltinFunction(osPathGetsize))
-	pathModule.SetWithKey("getmtime", core.StringValue("getmtime"), core.NewBuiltinFunction(osPathGetmtime))
+	pathModule.SetStr("exists", core.NewBuiltinFunction(osPathExists))
+	pathModule.SetStr("join", core.NewBuiltinFunction(osPathJoin))
+	pathModule.SetStr("dirname", core.NewBuiltinFunction(osPathDirname))
+	pathModule.SetStr("basename", core.NewBuiltinFunction(osPathBasename))
+	pathModule.SetStr("abspath", core.NewBuiltinFunction(osPathAbspath))
+	pathModule.SetStr("isfile", core.NewBuiltinFunction(osPathIsFile))
+	pathModule.SetStr("isdir", core.NewBuiltinFunction(osPathIsDir))
+	pathModule.SetStr("getsize", core.NewBuiltinFunction(osPathGetsize))
+	pathModule.SetStr("getmtime", core.NewBuiltinFunction(osPathGetmtime))
 
 	// Register os attributes
 	// os.name should be 'posix' on Unix/Linux/macOS or 'nt' on Windows
-	osModule.SetWithKey("name", core.StringValue("name"), core.StringValue("posix"))
+	osModule.SetStr("name", core.StringValue("posix"))
 
 	// Register os functions
-	osModule.SetWithKey("path", core.StringValue("path"), pathModule)
-	osModule.SetWithKey("getcwd", core.StringValue("getcwd"), core.NewBuiltinFunction(osGetcwd))
-	osModule.SetWithKey("chdir", core.StringValue("chdir"), core.NewBuiltinFunction(osChdir))
-	osModule.SetWithKey("listdir", core.StringValue("listdir"), core.NewBuiltinFunction(osListdir))
-	osModule.SetWithKey("mkdir", core.StringValue("mkdir"), core.NewBuiltinFunction(osMkdir))
-	osModule.SetWithKey("makedirs", core.StringValue("makedirs"), core.NewBuiltinFunction(osMakedirs))
-	osModule.SetWithKey("remove", core.StringValue("remove"), core.NewBuiltinFunction(osRemove))
-	osModule.SetWithKey("rename", core.StringValue("rename"), core.NewBuiltinFunction(osRename))
-	osModule.SetWithKey("getenv", core.StringValue("getenv"), core.NewBuiltinFunction(osGetenv))
+	osModule.SetStr("path", pathModule)
+	osModule.SetStr("getcwd", core.NewBuiltinFunction(osGetcwd))
+	osModule.SetStr("chdir", core.NewBuiltinFunction(osChdir))
+	osModule.SetStr("listdir", core.NewBuiltinFunction(osListdir))
+	osModule.SetStr("mkdir", core.NewBuiltinFunction(osMkdir))
+	osModule.SetStr("makedirs", core.NewBuiltinFunction(osMakedirs))
+	osModule.SetStr("remove", core.NewBuiltinFunction(osRemove))
+	osModule.SetStr("rename", core.NewBuiltinFunction(osRename))
+	osModule.SetStr("getenv", core.NewBuiltinFunction(osGetenv))
 	// Initialize environ as a dict (will be wrapped by _Environ class in Python's os.py)
 	environDict := osEnvironDict()
-	osModule.SetWithKey("environ", core.StringValue("environ"), environDict)
-	osModule.SetWithKey("isfile", core.StringValue("isfile"), core.NewBuiltinFunction(osPathIsFile))
-	osModule.SetWithKey("isdir", core.StringValue("isdir"), core.NewBuiltinFunction(osPathIsDir))
+	osModule.SetStr("environ", environDict)
+	osModule.SetStr("isfile", core.NewBuiltinFunction(osPathIsFile))
+	osModule.SetStr("isdir", core.NewBuiltinFunction(osPathIsDir))
 
 	// Add all extended os module functions for full CPython compatibility
 	addExtendedOSFunctions(osModule)
@@ -429,9 +429,7 @@ func osEnvironDict() *core.DictValue {
 				value := e[i+1:]
 				// posix.environ is bytes-keyed (the OS environment is bytes);
 				// os.py's _Environ looks up data[key.encode()], so the dict must
-				// use bytes keys/values for os.environ['HOME'] to resolve. Use
-				// SetValue so the internal key matches ValueToKey (SetWithKey with
-				// a raw string stored entries lookups never found).
+				// use bytes keys/values for os.environ['HOME'] to resolve.
 				_ = result.SetValue(core.BytesValue(key), core.BytesValue(value))
 				break
 			}

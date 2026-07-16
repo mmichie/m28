@@ -228,12 +228,12 @@ func InitItertoolsModule() *core.DictValue {
 	// Wrap the function as a classmethod
 	chainClass.SetClassAttr("from_iterable", fromIterableFunc)
 
-	itertoolsModule.Set("chain", chainClass)
+	itertoolsModule.SetStr("chain", chainClass)
 
 	// cycle - repeat elements from the iterable endlessly (CPython semantics).
 	// On the first pass elements are yielded and saved; once the source is
 	// exhausted the saved copy is replayed forever.
-	itertoolsModule.Set("cycle", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("cycle", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("cycle", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err
@@ -266,7 +266,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// islice - slice an iterable
-	itertoolsModule.Set("islice", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("islice", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("islice", args)
 		if err := v.Range(2, 4); err != nil {
 			return nil, err
@@ -344,7 +344,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// count - infinite arithmetic sequence start, start+step, start+2*step, ...
-	itertoolsModule.Set("count", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("count", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("count", args)
 		if err := v.Range(0, 2); err != nil {
 			return nil, err
@@ -361,7 +361,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// repeat - repeat an object n times
-	itertoolsModule.Set("repeat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("repeat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("repeat", args)
 		if err := v.Range(1, 2); err != nil {
 			return nil, err
@@ -398,7 +398,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// takewhile - yield elements while predicate is true
-	itertoolsModule.Set("takewhile", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("takewhile", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("takewhile", args)
 		if err := v.Exact(2); err != nil {
 			return nil, err
@@ -437,7 +437,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// dropwhile - drop elements while predicate is true, then yield all
-	itertoolsModule.Set("dropwhile", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("dropwhile", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("dropwhile", args)
 		if err := v.Exact(2); err != nil {
 			return nil, err
@@ -477,7 +477,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// compress - filter iterable by selectors
-	itertoolsModule.Set("compress", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("compress", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("compress", args)
 		if err := v.Exact(2); err != nil {
 			return nil, err
@@ -510,7 +510,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// product - Cartesian product of input iterables
-	itertoolsModule.Set("product", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("product", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("product", args)
 		if err := v.Min(1); err != nil {
 			return nil, err
@@ -557,7 +557,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// combinations - r-length tuples from input iterable
-	itertoolsModule.Set("combinations", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("combinations", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("combinations", args)
 		if err := v.Exact(2); err != nil {
 			return nil, err
@@ -607,7 +607,7 @@ func InitItertoolsModule() *core.DictValue {
 
 	// starmap - map function over iterable where each item is unpacked as function arguments
 	// starmap(pow, [(2,5), (3,2), (10,3)]) --> 32 9 1000
-	itertoolsModule.Set("starmap", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("starmap", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("starmap", args)
 		if err := v.Exact(2); err != nil {
 			return nil, err
@@ -651,7 +651,7 @@ func InitItertoolsModule() *core.DictValue {
 
 	// permutations - r-length permutations from input iterable
 	// permutations(iterable, r=None) -> iterator of tuples
-	itertoolsModule.Set("permutations", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("permutations", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("permutations", args)
 		if err := v.Range(1, 2); err != nil {
 			return nil, err
@@ -718,7 +718,7 @@ func InitItertoolsModule() *core.DictValue {
 	// accumulate - make an iterator that returns accumulated sums/results
 	// accumulate([1,2,3,4,5]) --> 1 3 6 10 15
 	// accumulate([1,2,3,4,5], operator.mul) --> 1 2 6 24 120
-	itertoolsModule.Set("accumulate", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("accumulate", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("accumulate", args)
 		if err := v.Range(1, 2); err != nil {
 			return nil, err
@@ -770,7 +770,7 @@ func InitItertoolsModule() *core.DictValue {
 	}))
 
 	// filterfalse - filter elements where predicate is false
-	itertoolsModule.Set("filterfalse", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	itertoolsModule.SetStr("filterfalse", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("filterfalse", args)
 		if err := v.Exact(2); err != nil {
 			return nil, err

@@ -14,7 +14,7 @@ func Init_PosixsubprocessModule() *core.DictValue {
 	// fork_exec(args, executable_list, close_fds, ...) - stub
 	// This is used by subprocess.Popen to create child processes
 	// For now, just return a stub that raises NotImplementedError when called
-	posixsubprocessModule.SetWithKey("fork_exec", core.StringValue("fork_exec"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixsubprocessModule.SetStr("fork_exec", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("NotImplementedError: _posixsubprocess.fork_exec not implemented in M28")
 	}))
 

@@ -584,16 +584,12 @@ func (d *DictType) Call(args []core.Value, ctx *core.Context) (core.Value, error
 		// Convert from another dict or iterable of pairs
 		switch v := args[0].(type) {
 		case *core.DictValue:
-			// Copy the dictionary by iterating over items
-			for _, key := range v.Keys() {
-				if val, ok := v.Get(key); ok {
-					if orig, ok2 := v.OriginalKeyValue(key); ok2 {
-						dict.SetWithKey(key, orig, val)
-					} else {
-						dict.Set(key, val)
-					}
-				}
-			}
+			// Copy the dictionary by iterating over items, preserving each
+			// original key object.
+			v.ForEach(func(key, val core.Value) bool {
+				_ = dict.SetValue(key, val)
+				return true
+			})
 		case *core.ListValue:
 			// Expect list of pairs
 			for i, item := range v.Items() {

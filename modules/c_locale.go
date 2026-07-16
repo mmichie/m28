@@ -18,17 +18,17 @@ func Init_LocaleModule() *core.DictValue {
 	localeModule := core.NewDict()
 
 	// LC_* category constants (match Python's locale module)
-	localeModule.Set("LC_ALL", core.NumberValue(0))
-	localeModule.Set("LC_COLLATE", core.NumberValue(1))
-	localeModule.Set("LC_CTYPE", core.NumberValue(2))
-	localeModule.Set("LC_MONETARY", core.NumberValue(3))
-	localeModule.Set("LC_NUMERIC", core.NumberValue(4))
-	localeModule.Set("LC_TIME", core.NumberValue(5))
-	localeModule.Set("LC_MESSAGES", core.NumberValue(6))
+	localeModule.SetStr("LC_ALL", core.NumberValue(0))
+	localeModule.SetStr("LC_COLLATE", core.NumberValue(1))
+	localeModule.SetStr("LC_CTYPE", core.NumberValue(2))
+	localeModule.SetStr("LC_MONETARY", core.NumberValue(3))
+	localeModule.SetStr("LC_NUMERIC", core.NumberValue(4))
+	localeModule.SetStr("LC_TIME", core.NumberValue(5))
+	localeModule.SetStr("LC_MESSAGES", core.NumberValue(6))
 
 	// getencoding() - Return current text encoding
 	// New in Python 3.11 - returns current locale's encoding
-	localeModule.Set("getencoding", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	localeModule.SetStr("getencoding", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Default to UTF-8 on modern systems
 		// Check environment variables that might indicate encoding
 		if lang := os.Getenv("LANG"); lang != "" {
@@ -42,7 +42,7 @@ func Init_LocaleModule() *core.DictValue {
 	}))
 
 	// setlocale(category, locale=None) - Get or set locale for category
-	localeModule.Set("setlocale", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	localeModule.SetStr("setlocale", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("setlocale() takes at least 1 argument (0 given)")
 		}
@@ -90,36 +90,36 @@ func Init_LocaleModule() *core.DictValue {
 
 	// localeconv() - Return locale-specific formatting conventions
 	// Returns a dict with decimal_point, thousands_sep, grouping, etc.
-	localeModule.Set("localeconv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	localeModule.SetStr("localeconv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		result := core.NewDict()
 
 		// For UTF-8/modern locales, use standard formatting
 		// In a full implementation, this would query the system's locale database
-		result.SetWithKey("decimal_point", core.StringValue("decimal_point"), core.StringValue("."))
-		result.SetWithKey("thousands_sep", core.StringValue("thousands_sep"), core.StringValue(","))
-		result.SetWithKey("grouping", core.StringValue("grouping"), core.NewList(core.NumberValue(3), core.NumberValue(0))) // Group by 3 digits
-		result.SetWithKey("int_curr_symbol", core.StringValue("int_curr_symbol"), core.StringValue(""))
-		result.SetWithKey("currency_symbol", core.StringValue("currency_symbol"), core.StringValue(""))
-		result.SetWithKey("mon_decimal_point", core.StringValue("mon_decimal_point"), core.StringValue("."))
-		result.SetWithKey("mon_thousands_sep", core.StringValue("mon_thousands_sep"), core.StringValue(","))
-		result.SetWithKey("mon_grouping", core.StringValue("mon_grouping"), core.NewList(core.NumberValue(3), core.NumberValue(0)))
-		result.SetWithKey("positive_sign", core.StringValue("positive_sign"), core.StringValue(""))
-		result.SetWithKey("negative_sign", core.StringValue("negative_sign"), core.StringValue("-"))
-		result.SetWithKey("int_frac_digits", core.StringValue("int_frac_digits"), core.NumberValue(2))
-		result.SetWithKey("frac_digits", core.StringValue("frac_digits"), core.NumberValue(2))
-		result.SetWithKey("p_cs_precedes", core.StringValue("p_cs_precedes"), core.NumberValue(1))
-		result.SetWithKey("p_sep_by_space", core.StringValue("p_sep_by_space"), core.NumberValue(0))
-		result.SetWithKey("n_cs_precedes", core.StringValue("n_cs_precedes"), core.NumberValue(1))
-		result.SetWithKey("n_sep_by_space", core.StringValue("n_sep_by_space"), core.NumberValue(0))
-		result.SetWithKey("p_sign_posn", core.StringValue("p_sign_posn"), core.NumberValue(1))
-		result.SetWithKey("n_sign_posn", core.StringValue("n_sign_posn"), core.NumberValue(1))
+		result.SetStr("decimal_point", core.StringValue("."))
+		result.SetStr("thousands_sep", core.StringValue(","))
+		result.SetStr("grouping", core.NewList(core.NumberValue(3), core.NumberValue(0))) // Group by 3 digits
+		result.SetStr("int_curr_symbol", core.StringValue(""))
+		result.SetStr("currency_symbol", core.StringValue(""))
+		result.SetStr("mon_decimal_point", core.StringValue("."))
+		result.SetStr("mon_thousands_sep", core.StringValue(","))
+		result.SetStr("mon_grouping", core.NewList(core.NumberValue(3), core.NumberValue(0)))
+		result.SetStr("positive_sign", core.StringValue(""))
+		result.SetStr("negative_sign", core.StringValue("-"))
+		result.SetStr("int_frac_digits", core.NumberValue(2))
+		result.SetStr("frac_digits", core.NumberValue(2))
+		result.SetStr("p_cs_precedes", core.NumberValue(1))
+		result.SetStr("p_sep_by_space", core.NumberValue(0))
+		result.SetStr("n_cs_precedes", core.NumberValue(1))
+		result.SetStr("n_sep_by_space", core.NumberValue(0))
+		result.SetStr("p_sign_posn", core.NumberValue(1))
+		result.SetStr("n_sign_posn", core.NumberValue(1))
 
 		return result, nil
 	}))
 
 	// strcoll(string1, string2) - Compare strings using locale collation
 	// Stub: falls back to regular string comparison
-	localeModule.Set("strcoll", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	localeModule.SetStr("strcoll", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("strcoll() takes exactly 2 arguments (%d given)", len(args))
 		}
@@ -141,7 +141,7 @@ func Init_LocaleModule() *core.DictValue {
 
 	// strxfrm(string) - Transform string for locale-aware comparison
 	// Stub: returns the string unchanged
-	localeModule.Set("strxfrm", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	localeModule.SetStr("strxfrm", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("strxfrm() takes exactly 1 argument (0 given)")
 		}

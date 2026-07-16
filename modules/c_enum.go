@@ -27,7 +27,7 @@ func InitEnumModule() *core.DictValue {
 	enumClass := core.NewClassWithParents("Enum", []*core.Class{})
 	// Add __members__ as an empty dict (will be populated when enum members are created)
 	enumClass.SetAttr("__members__", core.NewDict())
-	module.Set("Enum", enumClass)
+	module.SetStr("Enum", enumClass)
 
 	// Create IntFlag class (subclass of Enum)
 	intFlagClass := core.NewClassWithParents("IntFlag", []*core.Class{enumClass})
@@ -40,29 +40,29 @@ func InitEnumModule() *core.DictValue {
 		return core.None, nil
 	}))
 
-	module.Set("IntFlag", intFlagClass)
+	module.SetStr("IntFlag", intFlagClass)
 
 	// Create Flag class (subclass of Enum)
 	flagClass := core.NewClassWithParents("Flag", []*core.Class{enumClass})
-	module.Set("Flag", flagClass)
+	module.SetStr("Flag", flagClass)
 
 	// Create StrEnum class (subclass of Enum)
 	strEnumClass := core.NewClassWithParents("StrEnum", []*core.Class{enumClass})
-	module.Set("StrEnum", strEnumClass)
+	module.SetStr("StrEnum", strEnumClass)
 
 	// FlagBoundary enum values
 	// For now, these are just string constants
-	module.Set("STRICT", core.StringValue("STRICT"))
-	module.Set("CONFORM", core.StringValue("CONFORM"))
-	module.Set("EJECT", core.StringValue("EJECT"))
-	module.Set("KEEP", core.StringValue("KEEP"))
+	module.SetStr("STRICT", core.StringValue("STRICT"))
+	module.SetStr("CONFORM", core.StringValue("CONFORM"))
+	module.SetStr("EJECT", core.StringValue("EJECT"))
+	module.SetStr("KEEP", core.StringValue("KEEP"))
 
 	// Create FlagBoundary class
 	flagBoundaryClass := core.NewClassWithParents("FlagBoundary", []*core.Class{strEnumClass})
-	module.Set("FlagBoundary", flagBoundaryClass)
+	module.SetStr("FlagBoundary", flagBoundaryClass)
 
 	// global_enum decorator - for now, just returns the class unchanged
-	module.Set("global_enum", core.NewNamedBuiltinFunction("global_enum", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("global_enum", core.NewNamedBuiltinFunction("global_enum", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("global_enum", nil, "global_enum() takes at least 1 argument")
 		}
@@ -71,7 +71,7 @@ func InitEnumModule() *core.DictValue {
 	}))
 
 	// global_flag_repr decorator
-	module.Set("global_flag_repr", core.NewNamedBuiltinFunction("global_flag_repr", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("global_flag_repr", core.NewNamedBuiltinFunction("global_flag_repr", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("global_flag_repr", nil, "global_flag_repr() takes at least 1 argument")
 		}
@@ -79,7 +79,7 @@ func InitEnumModule() *core.DictValue {
 	}))
 
 	// global_enum_repr decorator
-	module.Set("global_enum_repr", core.NewNamedBuiltinFunction("global_enum_repr", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("global_enum_repr", core.NewNamedBuiltinFunction("global_enum_repr", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("global_enum_repr", nil, "global_enum_repr() takes at least 1 argument")
 		}
@@ -87,7 +87,7 @@ func InitEnumModule() *core.DictValue {
 	}))
 
 	// global_str decorator
-	module.Set("global_str", core.NewNamedBuiltinFunction("global_str", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("global_str", core.NewNamedBuiltinFunction("global_str", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("global_str", nil, "global_str() takes at least 1 argument")
 		}
@@ -112,17 +112,17 @@ func InitEnumModule() *core.DictValue {
 	simpleEnumWrapper := &simpleEnumWithKwargs{
 		BuiltinFunction: simpleEnumFunc,
 	}
-	module.Set("_simple_enum", simpleEnumWrapper)
+	module.SetStr("_simple_enum", simpleEnumWrapper)
 
 	// auto() function - returns incrementing integers
 	autoCounter := 0
-	module.Set("auto", core.NewNamedBuiltinFunction("auto", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("auto", core.NewNamedBuiltinFunction("auto", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		autoCounter++
 		return core.NumberValue(autoCounter), nil
 	}))
 
 	// nonmember decorator - marks a member as not part of the enum
-	module.Set("nonmember", core.NewNamedBuiltinFunction("nonmember", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("nonmember", core.NewNamedBuiltinFunction("nonmember", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("nonmember", nil, "nonmember() takes exactly 1 argument")
 		}
@@ -130,7 +130,7 @@ func InitEnumModule() *core.DictValue {
 	}))
 
 	// member decorator - marks a member as part of the enum
-	module.Set("member", core.NewNamedBuiltinFunction("member", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("member", core.NewNamedBuiltinFunction("member", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("member", nil, "member() takes exactly 1 argument")
 		}
@@ -138,7 +138,7 @@ func InitEnumModule() *core.DictValue {
 	}))
 
 	// property decorator for enum members
-	module.Set("property", core.NewNamedBuiltinFunction("property", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("property", core.NewNamedBuiltinFunction("property", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("property", nil, "property() takes at least 1 argument")
 		}
@@ -196,10 +196,19 @@ func InitEnumModule() *core.DictValue {
 		// Create __members__ dict to store enum members
 		members := core.NewDict()
 
-		// Process namespace to create enum members
+		// Process namespace to create enum members. Collect the member names in
+		// insertion order first, then look each up (ForEach can't be interrupted
+		// with `continue`, and the body below needs it).
+		var memberNames []string
+		namespace.ForEach(func(k, _ core.Value) bool {
+			if s, ok := k.(core.StringValue); ok {
+				memberNames = append(memberNames, string(s))
+			}
+			return true
+		})
 		memberCount := 0
-		for _, keyStr := range namespace.Keys() {
-			value, _ := namespace.Get(keyStr)
+		for _, keyStr := range memberNames {
+			value, _ := namespace.GetStr(keyStr)
 
 			// Skip dunder methods and regular methods
 			if len(keyStr) >= 2 && keyStr[0] == '_' && keyStr[1] == '_' {
@@ -385,7 +394,7 @@ func InitEnumModule() *core.DictValue {
 
 			// Add the member to the class and __members__ dict
 			enumClass.SetClassAttr(keyStr, member)
-			members.Set(keyStr, member)
+			members.SetStr(keyStr, member)
 			memberCount++
 		}
 
@@ -395,15 +404,14 @@ func InitEnumModule() *core.DictValue {
 		// Create a value-to-member map for singleton lookup
 		// This enables Color(1) to return the existing Color.RED instance
 		valueMap := core.NewDict()
-		for _, keyStr := range members.Keys() {
-			if member, ok := members.Get(keyStr); ok {
-				if memberObj, ok := member.(core.Object); ok {
-					if val, ok := memberObj.GetAttr("value"); ok {
-						valueMap.SetValue(val, member)
-					}
+		members.ForEach(func(_, member core.Value) bool {
+			if memberObj, ok := member.(core.Object); ok {
+				if val, ok := memberObj.GetAttr("value"); ok {
+					_ = valueMap.SetValue(val, member)
 				}
 			}
-		}
+			return true
+		})
 		enumClass.SetClassAttr("_value2member_map_", valueMap)
 
 		return enumClass, nil
@@ -443,14 +451,14 @@ func InitEnumModule() *core.DictValue {
 		return nil, fmt.Errorf("'%v' is not a valid enum value", value)
 	}))
 
-	module.Set("EnumType", enumTypeClass)
+	module.SetStr("EnumType", enumTypeClass)
 
 	// EnumMeta metaclass (alias for EnumType)
-	module.Set("EnumMeta", enumTypeClass)
+	module.SetStr("EnumMeta", enumTypeClass)
 
 	// ReprEnum class
 	reprEnumClass := core.NewClassWithParents("ReprEnum", []*core.Class{enumClass})
-	module.Set("ReprEnum", reprEnumClass)
+	module.SetStr("ReprEnum", reprEnumClass)
 
 	// IntEnum class - uses EnumType as metaclass
 	// IntEnum is a base class for creating integer-valued enums
@@ -471,10 +479,10 @@ func InitEnumModule() *core.DictValue {
 		return core.None, nil
 	}))
 
-	module.Set("IntEnum", intEnumClass)
+	module.SetStr("IntEnum", intEnumClass)
 
 	// unique decorator - ensures all enum values are unique
-	module.Set("unique", core.NewNamedBuiltinFunction("unique", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("unique", core.NewNamedBuiltinFunction("unique", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("unique", nil, "unique() takes exactly 1 argument")
 		}
@@ -482,7 +490,7 @@ func InitEnumModule() *core.DictValue {
 	}))
 
 	// verify decorator - verifies enum constraints
-	module.Set("verify", core.NewNamedBuiltinFunction("verify", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("verify", core.NewNamedBuiltinFunction("verify", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("verify", nil, "verify() takes at least 1 argument")
 		}
@@ -497,9 +505,9 @@ func InitEnumModule() *core.DictValue {
 	}))
 
 	// CONTINUOUS, NAMED_FLAGS, UNIQUE - verification flags
-	module.Set("CONTINUOUS", core.StringValue("CONTINUOUS"))
-	module.Set("NAMED_FLAGS", core.StringValue("NAMED_FLAGS"))
-	module.Set("UNIQUE", core.StringValue("UNIQUE"))
+	module.SetStr("CONTINUOUS", core.StringValue("CONTINUOUS"))
+	module.SetStr("NAMED_FLAGS", core.StringValue("NAMED_FLAGS"))
+	module.SetStr("UNIQUE", core.StringValue("UNIQUE"))
 
 	return module
 }

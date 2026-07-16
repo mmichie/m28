@@ -15,7 +15,7 @@ func Init_FunctoolsModule() *core.DictValue {
 	functoolsModule := core.NewDict()
 
 	// reduce - Apply function cumulatively to items
-	functoolsModule.Set("reduce", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	functoolsModule.SetStr("reduce", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("reduce", args)
 		if err := v.Range(2, 3); err != nil {
 			return nil, err
@@ -66,7 +66,7 @@ func Init_FunctoolsModule() *core.DictValue {
 	}))
 
 	// partial - Create partial function with fixed arguments
-	functoolsModule.Set("partial", &partialBuiltin{})
+	functoolsModule.SetStr("partial", &partialBuiltin{})
 
 	// cache - Simple memoization decorator (limited version)
 
@@ -77,7 +77,7 @@ func Init_FunctoolsModule() *core.DictValue {
 
 	// wraps - Decorator that updates wrapper function to look like wrapped
 	// Copies metadata from wrapped to wrapper function
-	functoolsModule.Set("wraps", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	functoolsModule.SetStr("wraps", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("wraps", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err
@@ -129,7 +129,7 @@ func Init_FunctoolsModule() *core.DictValue {
 
 	// total_ordering - Class decorator that fills in missing ordering methods
 	// Takes a class with __eq__ and one ordering method and generates the rest
-	functoolsModule.Set("total_ordering", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	functoolsModule.SetStr("total_ordering", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("total_ordering", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err

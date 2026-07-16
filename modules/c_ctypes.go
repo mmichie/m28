@@ -11,7 +11,7 @@ func Init_CtypesModule() *core.DictValue {
 	module := core.NewDict()
 
 	// Version info
-	module.Set("__version__", core.StringValue("1.1.0"))
+	module.SetStr("__version__", core.StringValue("1.1.0"))
 
 	// _SimpleCData - base class for simple C data types (c_int, c_char, etc.)
 	simpleCDataClass := core.NewClass("_SimpleCData", nil)
@@ -38,65 +38,65 @@ func Init_CtypesModule() *core.DictValue {
 		}
 		return core.None, nil
 	}))
-	module.Set("_SimpleCData", simpleCDataClass)
+	module.SetStr("_SimpleCData", simpleCDataClass)
 
 	// PyCSimpleType - metaclass for simple C types
 	pyCSimpleType := core.NewClass("PyCSimpleType", nil)
 	pyCSimpleType.Module = "_ctypes"
-	module.Set("PyCSimpleType", pyCSimpleType)
+	module.SetStr("PyCSimpleType", pyCSimpleType)
 
 	// PyCStructType - metaclass for Structure
 	pyCStructType := core.NewClass("PyCStructType", nil)
 	pyCStructType.Module = "_ctypes"
-	module.Set("PyCStructType", pyCStructType)
+	module.SetStr("PyCStructType", pyCStructType)
 
 	// PyCArrayType - metaclass for Array
 	pyCArrayType := core.NewClass("PyCArrayType", nil)
 	pyCArrayType.Module = "_ctypes"
-	module.Set("PyCArrayType", pyCArrayType)
+	module.SetStr("PyCArrayType", pyCArrayType)
 
 	// PyCPointerType - metaclass for pointer types
 	pyCPointerType := core.NewClass("PyCPointerType", nil)
 	pyCPointerType.Module = "_ctypes"
-	module.Set("PyCPointerType", pyCPointerType)
+	module.SetStr("PyCPointerType", pyCPointerType)
 
 	// PyCFuncPtrType - metaclass for function pointer types
 	pyCFuncPtrType := core.NewClass("PyCFuncPtrType", nil)
 	pyCFuncPtrType.Module = "_ctypes"
-	module.Set("PyCFuncPtrType", pyCFuncPtrType)
+	module.SetStr("PyCFuncPtrType", pyCFuncPtrType)
 
 	// dlopen - open a shared library
-	module.Set("dlopen", core.NewBuiltinFunction(
+	module.SetStr("dlopen", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Return a dummy handle
 			return core.NumberValue(1), nil
 		}))
 
 	// dlclose - close a shared library
-	module.Set("dlclose", core.NewBuiltinFunction(
+	module.SetStr("dlclose", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.NumberValue(0), nil
 		}))
 
 	// dlsym - get symbol from shared library
-	module.Set("dlsym", core.NewBuiltinFunction(
+	module.SetStr("dlsym", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Return a dummy address
 			return core.NumberValue(0), nil
 		}))
 
 	// RTLD constants for dynamic library loading
-	module.Set("RTLD_LOCAL", core.NumberValue(0))
-	module.Set("RTLD_GLOBAL", core.NumberValue(256))
+	module.SetStr("RTLD_LOCAL", core.NumberValue(0))
+	module.SetStr("RTLD_GLOBAL", core.NumberValue(256))
 
 	// FUNCFLAG constants
-	module.Set("FUNCFLAG_CDECL", core.NumberValue(1))
-	module.Set("FUNCFLAG_PYTHONAPI", core.NumberValue(4))
-	module.Set("FUNCFLAG_USE_ERRNO", core.NumberValue(8))
-	module.Set("FUNCFLAG_USE_LASTERROR", core.NumberValue(16))
+	module.SetStr("FUNCFLAG_CDECL", core.NumberValue(1))
+	module.SetStr("FUNCFLAG_PYTHONAPI", core.NumberValue(4))
+	module.SetStr("FUNCFLAG_USE_ERRNO", core.NumberValue(8))
+	module.SetStr("FUNCFLAG_USE_LASTERROR", core.NumberValue(16))
 
 	// SIZEOF constants
-	module.Set("SIZEOF_TIME_T", core.NumberValue(8))
+	module.SetStr("SIZEOF_TIME_T", core.NumberValue(8))
 
 	// Base ctypes classes - these are base classes for C data types
 	// Create simple placeholder classes for now
@@ -104,22 +104,22 @@ func Init_CtypesModule() *core.DictValue {
 	// Union - base class for C unions
 	unionClass := core.NewClass("Union", nil)
 	unionClass.Module = "_ctypes"
-	module.Set("Union", unionClass)
+	module.SetStr("Union", unionClass)
 
 	// Structure - base class for C structures
 	structureClass := core.NewClass("Structure", nil)
 	structureClass.Module = "_ctypes"
-	module.Set("Structure", structureClass)
+	module.SetStr("Structure", structureClass)
 
 	// Array - base class for C arrays
 	arrayClass := core.NewClass("Array", nil)
 	arrayClass.Module = "_ctypes"
-	module.Set("Array", arrayClass)
+	module.SetStr("Array", arrayClass)
 
 	// _Pointer - internal pointer type
 	pointerClass := core.NewClass("_Pointer", nil)
 	pointerClass.Module = "_ctypes"
-	module.Set("_Pointer", pointerClass)
+	module.SetStr("_Pointer", pointerClass)
 
 	// CFuncPtr - base class for C function pointers
 	cfuncptrClass := core.NewClass("CFuncPtr", nil)
@@ -144,21 +144,21 @@ func Init_CtypesModule() *core.DictValue {
 		// Stub - just return None for now
 		return core.None, nil
 	}))
-	module.Set("CFuncPtr", cfuncptrClass)
+	module.SetStr("CFuncPtr", cfuncptrClass)
 
 	// ArgumentError - exception raised for invalid arguments
 	argErrorClass := core.NewClass("ArgumentError", nil)
 	argErrorClass.Module = "_ctypes"
-	module.Set("ArgumentError", argErrorClass)
+	module.SetStr("ArgumentError", argErrorClass)
 
 	// FormatError - platform-specific (Windows)
 	// Only available on Windows, but we'll provide it for compatibility
 	formatErrorClass := core.NewClass("FormatError", nil)
 	formatErrorClass.Module = "_ctypes"
-	module.Set("FormatError", formatErrorClass)
+	module.SetStr("FormatError", formatErrorClass)
 
 	// LoadLibrary - function to load dynamic libraries (platform-specific)
-	module.Set("LoadLibrary", core.NewBuiltinFunction(
+	module.SetStr("LoadLibrary", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Minimal stub - just return None
 			// Real implementation would use dlopen/LoadLibrary
@@ -166,51 +166,51 @@ func Init_CtypesModule() *core.DictValue {
 		}))
 
 	// get_errno, set_errno - errno handling
-	module.Set("get_errno", core.NewBuiltinFunction(
+	module.SetStr("get_errno", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.NumberValue(0), nil
 		}))
 
-	module.Set("set_errno", core.NewBuiltinFunction(
+	module.SetStr("set_errno", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.None, nil
 		}))
 
 	// get_last_error, set_last_error - Windows-specific error handling
-	module.Set("get_last_error", core.NewBuiltinFunction(
+	module.SetStr("get_last_error", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.NumberValue(0), nil
 		}))
 
-	module.Set("set_last_error", core.NewBuiltinFunction(
+	module.SetStr("set_last_error", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.None, nil
 		}))
 
 	// _memmove_addr, _memset_addr, _string_at_addr, _cast_addr, _wstring_at_addr
 	// These are internal C function pointers - provide dummy values
-	module.Set("_memmove_addr", core.NumberValue(0))
-	module.Set("_memset_addr", core.NumberValue(0))
-	module.Set("_string_at_addr", core.NumberValue(0))
-	module.Set("_cast_addr", core.NumberValue(0))
-	module.Set("_wstring_at_addr", core.NumberValue(0))
+	module.SetStr("_memmove_addr", core.NumberValue(0))
+	module.SetStr("_memset_addr", core.NumberValue(0))
+	module.SetStr("_string_at_addr", core.NumberValue(0))
+	module.SetStr("_cast_addr", core.NumberValue(0))
+	module.SetStr("_wstring_at_addr", core.NumberValue(0))
 
 	// addressof - get the address of a ctypes instance
-	module.Set("addressof", core.NewBuiltinFunction(
+	module.SetStr("addressof", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Return a dummy address
 			return core.NumberValue(0), nil
 		}))
 
 	// alignment - get the alignment requirement of a ctypes type
-	module.Set("alignment", core.NewBuiltinFunction(
+	module.SetStr("alignment", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Return a reasonable default alignment
 			return core.NumberValue(8), nil
 		}))
 
 	// byref - create a byref pointer to an object
-	module.Set("byref", core.NewBuiltinFunction(
+	module.SetStr("byref", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Return the object itself for now
 			if len(args) > 0 {
@@ -220,7 +220,7 @@ func Init_CtypesModule() *core.DictValue {
 		}))
 
 	// sizeof - get the size of a ctypes type or instance
-	module.Set("sizeof", core.NewBuiltinFunction(
+	module.SetStr("sizeof", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) < 1 {
 				return nil, &core.TypeError{Message: "sizeof() takes exactly 1 argument"}
@@ -260,26 +260,26 @@ func Init_CtypesModule() *core.DictValue {
 		}))
 
 	// resize - resize a ctypes object
-	module.Set("resize", core.NewBuiltinFunction(
+	module.SetStr("resize", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.None, nil
 		}))
 
 	// pointer - create a pointer to a ctypes instance
-	module.Set("pointer", core.NewBuiltinFunction(
+	module.SetStr("pointer", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Create a simple pointer wrapper
 			if len(args) > 0 {
 				ptr := core.NewDict()
-				ptr.Set("_obj", args[0])
-				ptr.Set("contents", args[0])
+				ptr.SetStr("_obj", args[0])
+				ptr.SetStr("contents", args[0])
 				return ptr, nil
 			}
 			return core.None, nil
 		}))
 
 	// POINTER - create a pointer type
-	module.Set("POINTER", core.NewBuiltinFunction(
+	module.SetStr("POINTER", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Create a new pointer type class for each call
 			// This allows setting attributes like from_param on individual pointer types
@@ -301,10 +301,10 @@ func Init_CtypesModule() *core.DictValue {
 	// _pointer_type_cache - dict used to cache pointer types
 	// This is imported by ctypes/__init__.py
 	pointerTypeCache := core.NewDict()
-	module.Set("_pointer_type_cache", pointerTypeCache)
+	module.SetStr("_pointer_type_cache", pointerTypeCache)
 
 	// _cast - internal cast function
-	module.Set("_cast", core.NewBuiltinFunction(
+	module.SetStr("_cast", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) < 2 {
 				return core.None, nil
@@ -314,13 +314,13 @@ func Init_CtypesModule() *core.DictValue {
 		}))
 
 	// _string_at - get string at address
-	module.Set("_string_at", core.NewBuiltinFunction(
+	module.SetStr("_string_at", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.BytesValue(""), nil
 		}))
 
 	// _wstring_at - get wstring at address
-	module.Set("_wstring_at", core.NewBuiltinFunction(
+	module.SetStr("_wstring_at", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return core.StringValue(""), nil
 		}))

@@ -422,19 +422,16 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 			if kwargsDict, ok := kwargsResult.(*core.DictValue); ok {
 				if debugClass {
 					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] kwargs dict keys:\n")
-					for _, k := range kwargsDict.Keys() {
-						v, _ := kwargsDict.Get(k)
+					kwargsDict.ForEach(func(k, v core.Value) bool {
 						fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   %v (%T) -> %T\n", k, k, v)
-					}
+						return true
+					})
 				}
 				// Process all keys from **kwargs
-				for _, keyStr := range kwargsDict.Keys() {
-					val, _ := kwargsDict.Get(keyStr)
-					// Extract actual key name from internal representation
-					// String keys have format "s:keyname"
-					actualKey := keyStr
-					if strings.HasPrefix(keyStr, "s:") {
-						actualKey = keyStr[2:]
+				kwargsDict.ForEach(func(k, val core.Value) bool {
+					var actualKey string
+					if s, ok := k.(core.StringValue); ok {
+						actualKey = string(s)
 					}
 					if actualKey == "metaclass" {
 						// Extract metaclass
@@ -453,7 +450,8 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 							fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Collected class kwarg: %s = %T\n", actualKey, val)
 						}
 					}
-				}
+					return true
+				})
 			} else {
 				return nil, &core.TypeError{Message: fmt.Sprintf("**kwargs must be a dict, got %T", kwargsResult)}
 			}
@@ -946,7 +944,7 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 
 						// Add annotation to class.__annotations__
 						keyStr := core.StringValue(string(name))
-						class.Annotations.SetWithKey(core.ValueToKey(keyStr), keyStr, annotationType)
+						class.Annotations.SetValue(keyStr, annotationType)
 
 						if s.Len() == 4 {
 							// Has a value: x: int = 5
@@ -1113,9 +1111,10 @@ func classForm(args *core.ListValue, ctx *core.Context) (core.Value, error) {
 				}
 				if debugClass {
 					fmt.Fprintf(os.Stderr, "[DEBUG CLASS] Namespace for metaclass.__new__ call:\n")
-					for _, key := range namespace.Keys() {
-						fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   - %s\n", key)
-					}
+					namespace.ForEach(func(key, _ core.Value) bool {
+						fmt.Fprintf(os.Stderr, "[DEBUG CLASS]   - %v\n", key)
+						return true
+					})
 				}
 
 				// Build bases tuple - use explicit base values (what user specified)

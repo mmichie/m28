@@ -18,7 +18,7 @@ func Init_PythonAsyncioModule() *core.DictValue {
 
 	// Provide a stub iscoroutinefunction that always returns False
 	// unittest.mock checks this to determine if a function is async
-	asyncioModule.Set("iscoroutinefunction", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	asyncioModule.SetStr("iscoroutinefunction", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Stub: return False for all inputs
 		// Real implementation would check if arg is a coroutine function
 		return core.False, nil

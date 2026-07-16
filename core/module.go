@@ -85,8 +85,7 @@ func (m *Module) SetAll(names []string) {
 func (m *Module) SetAttr(name string, value Value) error {
 	// If we have a shared dict (like __main__), set there
 	if m.Dict != nil && m.Context != nil && m.Context.ModuleDict == m.Dict {
-		key := ValueToKey(StringValue(name))
-		m.Dict.Set(key, value)
+		m.Dict.SetStr(name, value)
 		// Also set in context for consistency
 		m.Context.Define(name, value)
 		return nil
@@ -97,8 +96,7 @@ func (m *Module) SetAttr(name string, value Value) error {
 
 	// Also set in Dict if it exists
 	if m.Dict != nil {
-		key := ValueToKey(StringValue(name))
-		m.Dict.Set(key, value)
+		m.Dict.SetStr(name, value)
 	}
 
 	return nil
@@ -114,8 +112,7 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 			// This is __main__ or a module with a shared dict
 			// Make sure the dict is synchronized with the context
 			for k, v := range m.Context.Vars {
-				key := ValueToKey(StringValue(k))
-				m.Dict.Set(key, v)
+				m.Dict.SetStr(k, v)
 			}
 			return m.Dict, true
 		}
@@ -125,7 +122,7 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 
 		// Add all exports
 		for k, v := range m.Exports {
-			dict.Set(ValueToKey(StringValue(k)), v)
+			dict.SetStr(k, v)
 		}
 
 		// Add all context bindings (for __main__ and dynamically executed modules)
@@ -134,10 +131,9 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 			ctx := m.Context
 			for ctx != nil {
 				for k, v := range ctx.Vars {
-					key := ValueToKey(StringValue(k))
 					// Only set if not already present (inner scopes take precedence)
-					if _, exists := dict.Get(key); !exists {
-						dict.Set(key, v)
+					if _, exists := dict.GetStr(k); !exists {
+						dict.SetStr(k, v)
 					}
 				}
 				ctx = ctx.Outer
@@ -146,11 +142,10 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 
 		// Override with Dict values if present (Dict has higher priority)
 		if m.Dict != nil {
-			for _, key := range m.Dict.Keys() {
-				if val, ok := m.Dict.Get(key); ok {
-					dict.Set(key, val)
-				}
-			}
+			m.Dict.ForEach(func(key, val Value) bool {
+				_ = dict.SetValue(key, val)
+				return true
+			})
 		}
 
 		return dict, true
@@ -160,8 +155,7 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 	if name == "__doc__" {
 		// Check if __doc__ is in Dict or Exports
 		if m.Dict != nil {
-			key := ValueToKey(StringValue("__doc__"))
-			if val, ok := m.Dict.Get(key); ok {
+			if val, ok := m.Dict.GetStr("__doc__"); ok {
 				return val, true
 			}
 		}
@@ -176,8 +170,7 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 	if name == "__file__" {
 		// Check if __file__ is in Dict or Exports first
 		if m.Dict != nil {
-			key := ValueToKey(StringValue("__file__"))
-			if val, ok := m.Dict.Get(key); ok {
+			if val, ok := m.Dict.GetStr("__file__"); ok {
 				return val, true
 			}
 		}
@@ -196,8 +189,7 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 	if name == "__name__" {
 		// Check if __name__ is in Dict or Exports first
 		if m.Dict != nil {
-			key := ValueToKey(StringValue("__name__"))
-			if val, ok := m.Dict.Get(key); ok {
+			if val, ok := m.Dict.GetStr("__name__"); ok {
 				return val, true
 			}
 		}
@@ -212,8 +204,7 @@ func (m *Module) GetAttr(name string) (Value, bool) {
 	// This allows Python's importlib._setup() to dynamically inject module globals
 	// Dict takes priority over Exports to support dynamic attribute updates via setattr()
 	if m.Dict != nil {
-		key := ValueToKey(StringValue(name))
-		if val, ok := m.Dict.Get(key); ok {
+		if val, ok := m.Dict.GetStr(name); ok {
 			return val, true
 		}
 	}

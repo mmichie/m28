@@ -225,34 +225,3 @@ func TestDictEngineChurn(t *testing.T) {
 		t.Fatalf("PopLast = %v, want %d", k, n-1)
 	}
 }
-
-// TestDictLegacyAdapters covers the deprecated keyRepr API still used by
-// modules/*.go namespace code.
-func TestDictLegacyAdapters(t *testing.T) {
-	d := NewDict()
-	d.SetWithKey("s:alpha", StringValue("alpha"), NumberValue(1))
-	d.Set("s:beta", NumberValue(2))
-	d.Set("rawname", NumberValue(3)) // unprefixed legacy use
-	d.Set("n:7", StringValue("seven"))
-
-	if v, ok := d.Get("s:alpha"); !ok || int(v.(NumberValue)) != 1 {
-		t.Error("adapter Get s:alpha failed")
-	}
-	if v, ok := d.GetStr("beta"); !ok || int(v.(NumberValue)) != 2 {
-		t.Error("adapter Set should store plain string keys")
-	}
-	if v, ok := d.Get("rawname"); !ok || int(v.(NumberValue)) != 3 {
-		t.Error("raw-name round trip failed")
-	}
-	if v, ok := d.GetValue(NumberValue(7)); !ok || v.(StringValue) != "seven" {
-		t.Error("n:7 should resolve to number key 7")
-	}
-	keys := d.Keys()
-	if len(keys) != 4 || keys[0] != "s:alpha" || keys[3] != "n:7" {
-		t.Errorf("legacy Keys() = %v", keys)
-	}
-	d.Delete("s:beta")
-	if _, ok := d.GetStr("beta"); ok {
-		t.Error("adapter Delete failed")
-	}
-}

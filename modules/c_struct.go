@@ -28,7 +28,7 @@ func InitStructModule() *core.DictValue {
 	structModule := core.NewDict()
 
 	// pack(format, v1, v2, ...) - pack values into bytes
-	structModule.Set("pack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("pack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, &core.TypeError{Message: "pack() missing required argument: 'format' (pos 1)"}
 		}
@@ -48,7 +48,7 @@ func InitStructModule() *core.DictValue {
 	}))
 
 	// unpack(format, buffer) - unpack bytes into tuple
-	structModule.Set("unpack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("unpack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, &core.TypeError{Message: fmt.Sprintf("unpack() takes exactly 2 arguments (%d given)", len(args))}
 		}
@@ -72,7 +72,7 @@ func InitStructModule() *core.DictValue {
 	}))
 
 	// calcsize(format) - return size of struct
-	structModule.Set("calcsize", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("calcsize", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, &core.TypeError{Message: fmt.Sprintf("calcsize() takes exactly 1 argument (%d given)", len(args))}
 		}
@@ -91,7 +91,7 @@ func InitStructModule() *core.DictValue {
 	}))
 
 	// error - exception class for struct errors
-	structModule.Set("error", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("error", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		msg := "struct.error"
 		if len(args) > 0 {
 			if s, ok := args[0].(core.StringValue); ok {
@@ -102,29 +102,29 @@ func InitStructModule() *core.DictValue {
 	}))
 
 	// _clearcache - clear format cache (no-op for now)
-	structModule.Set("_clearcache", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("_clearcache", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// In CPython this clears the compiled format cache
 		// We don't have one yet, so this is a no-op
 		return core.NilValue{}, nil
 	}))
 
 	// pack_into - pack into existing buffer (stub for now)
-	structModule.Set("pack_into", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("pack_into", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, &core.ValueError{Message: "pack_into() not yet implemented"}
 	}))
 
 	// unpack_from - unpack from buffer at offset (stub for now)
-	structModule.Set("unpack_from", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("unpack_from", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, &core.ValueError{Message: "unpack_from() not yet implemented"}
 	}))
 
 	// iter_unpack - iterator for repeated unpacking (stub for now)
-	structModule.Set("iter_unpack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("iter_unpack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, &core.ValueError{Message: "iter_unpack() not yet implemented"}
 	}))
 
 	// Struct class - compiled format strings
-	structModule.Set("Struct", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	structModule.SetStr("Struct", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, &core.TypeError{Message: "Struct() requires a format string"}
 		}
@@ -144,13 +144,13 @@ func InitStructModule() *core.DictValue {
 		structObj := core.NewDict()
 
 		// format property
-		structObj.Set("format", core.BytesValue(formatStr))
+		structObj.SetStr("format", core.BytesValue(formatStr))
 
 		// size property
-		structObj.Set("size", core.NumberValue(float64(size)))
+		structObj.SetStr("size", core.NumberValue(float64(size)))
 
 		// pack(*args) method
-		structObj.Set("pack", core.NewBuiltinFunction(func(packArgs []core.Value, ctx *core.Context) (core.Value, error) {
+		structObj.SetStr("pack", core.NewBuiltinFunction(func(packArgs []core.Value, ctx *core.Context) (core.Value, error) {
 			result, err := structPack(formatStr, packArgs)
 			if err != nil {
 				return nil, err
@@ -159,7 +159,7 @@ func InitStructModule() *core.DictValue {
 		}))
 
 		// unpack(buffer) method
-		structObj.Set("unpack", core.NewBuiltinFunction(func(unpackArgs []core.Value, ctx *core.Context) (core.Value, error) {
+		structObj.SetStr("unpack", core.NewBuiltinFunction(func(unpackArgs []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(unpackArgs) != 1 {
 				return nil, &core.TypeError{Message: "unpack() takes exactly 1 argument"}
 			}
@@ -177,12 +177,12 @@ func InitStructModule() *core.DictValue {
 		}))
 
 		// pack_into(buffer, offset, *args) method (stub)
-		structObj.Set("pack_into", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		structObj.SetStr("pack_into", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return nil, &core.ValueError{Message: "pack_into() not yet implemented"}
 		}))
 
 		// unpack_from(buffer, offset=0) method
-		structObj.Set("unpack_from", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		structObj.SetStr("unpack_from", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) < 1 {
 				return nil, &core.TypeError{Message: "unpack_from() requires at least 1 argument"}
 			}
@@ -214,7 +214,7 @@ func InitStructModule() *core.DictValue {
 		}))
 
 		// iter_unpack(buffer) method (stub)
-		structObj.Set("iter_unpack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		structObj.SetStr("iter_unpack", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			return nil, &core.ValueError{Message: "iter_unpack() not yet implemented"}
 		}))
 
@@ -222,10 +222,10 @@ func InitStructModule() *core.DictValue {
 	}))
 
 	// __doc__ - module documentation
-	structModule.Set("__doc__", core.StringValue("Functions to convert between Python values and C structs."))
+	structModule.SetStr("__doc__", core.StringValue("Functions to convert between Python values and C structs."))
 
 	// __name__ - module name
-	structModule.Set("__name__", core.StringValue("_struct"))
+	structModule.SetStr("__name__", core.StringValue("_struct"))
 
 	return structModule
 }

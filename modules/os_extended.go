@@ -28,31 +28,31 @@ func envString(v core.Value) (string, bool) {
 // to match CPython's os module interface
 func addExtendedOSFunctions(osModule *core.DictValue) {
 	// Process management
-	osModule.Set("getpid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("getpid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(os.Getpid()), nil
 	}))
 
-	osModule.Set("getppid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("getppid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(os.Getppid()), nil
 	}))
 
-	osModule.Set("getuid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("getuid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(os.Getuid()), nil
 	}))
 
-	osModule.Set("geteuid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("geteuid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(os.Geteuid()), nil
 	}))
 
-	osModule.Set("getgid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("getgid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(os.Getgid()), nil
 	}))
 
-	osModule.Set("getegid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("getegid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(os.Getegid()), nil
 	}))
 
-	osModule.Set("getgroups", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("getgroups", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		groups, err := os.Getgroups()
 		if err != nil {
 			return nil, err
@@ -64,7 +64,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return result, nil
 	}))
 
-	osModule.Set("getlogin", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("getlogin", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		u, err := user.Current()
 		if err != nil {
 			return core.StringValue("unknown"), nil
@@ -73,14 +73,14 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 	}))
 
 	// uname - CRITICAL for test.support
-	osModule.Set("uname", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("uname", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Return a uname_result-like object
 		result := core.NewDict()
 
 		// Get system info
-		result.Set("sysname", core.StringValue(runtime.GOOS))
+		result.SetStr("sysname", core.StringValue(runtime.GOOS))
 		hostname, _ := os.Hostname()
-		result.Set("nodename", core.StringValue(hostname))
+		result.SetStr("nodename", core.StringValue(hostname))
 
 		// Get actual uname info using system uname command
 		if runtime.GOOS != "windows" {
@@ -88,9 +88,9 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 			if cmd := exec.Command("uname", "-r"); cmd != nil {
 				if output, err := cmd.Output(); err == nil {
 					release := strings.TrimSpace(string(output))
-					result.Set("release", core.StringValue(release))
+					result.SetStr("release", core.StringValue(release))
 				} else {
-					result.Set("release", core.StringValue("24.0.0"))
+					result.SetStr("release", core.StringValue("24.0.0"))
 				}
 			}
 
@@ -98,18 +98,18 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 			if cmd := exec.Command("uname", "-v"); cmd != nil {
 				if output, err := cmd.Output(); err == nil {
 					version := strings.TrimSpace(string(output))
-					result.Set("version", core.StringValue(version))
+					result.SetStr("version", core.StringValue(version))
 				} else {
-					result.Set("version", core.StringValue("Darwin Kernel"))
+					result.SetStr("version", core.StringValue("Darwin Kernel"))
 				}
 			}
 		} else {
 			// Windows fallback
-			result.Set("release", core.StringValue("10.0.0"))
-			result.Set("version", core.StringValue("Windows"))
+			result.SetStr("release", core.StringValue("10.0.0"))
+			result.SetStr("version", core.StringValue("Windows"))
 		}
 
-		result.Set("machine", core.StringValue(runtime.GOARCH))
+		result.SetStr("machine", core.StringValue(runtime.GOARCH))
 
 		return result, nil
 	}))
@@ -150,10 +150,10 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		self.Attributes["lines"] = lines
 		return core.None, nil
 	}))
-	osModule.Set("terminal_size", terminalSizeClass)
+	osModule.SetStr("terminal_size", terminalSizeClass)
 
 	// Environment variables
-	osModule.Set("putenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("putenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, &core.TypeError{Message: "putenv() takes exactly 2 arguments"}
 		}
@@ -168,7 +168,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.None, nil
 	}))
 
-	osModule.Set("unsetenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("unsetenv", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, &core.TypeError{Message: "unsetenv() takes exactly 1 argument"}
 		}
@@ -181,7 +181,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 	}))
 
 	// File operations
-	osModule.Set("open", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("open", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("str", nil, "open() argument")
 		}
@@ -202,7 +202,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.NumberValue(fd), nil
 	}))
 
-	osModule.Set("close", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("close", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("int", nil, "close() argument")
 		}
@@ -214,7 +214,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.None, nil
 	}))
 
-	osModule.Set("read", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("read", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, core.NewTypeError("int", nil, "read() arguments")
 		}
@@ -231,7 +231,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.StringValue(string(buf[:nread])), nil
 	}))
 
-	osModule.Set("write", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("write", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, core.NewTypeError("int/bytes", nil, "write() arguments")
 		}
@@ -255,14 +255,14 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.NumberValue(nwritten), nil
 	}))
 
-	osModule.Set("lseek", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("lseek", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 3 {
 			return nil, core.NewTypeError("int", nil, "lseek() arguments")
 		}
 		return core.NumberValue(0), nil // Stub
 	}))
 
-	osModule.Set("fstat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("fstat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, &core.TypeError{Message: "fstat() takes exactly 1 argument"}
 		}
@@ -275,20 +275,20 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 			return nil, core.OSErrorFromGo(err, "")
 		}
 		result := core.NewDict()
-		result.Set("st_mode", core.NumberValue(float64(st.Mode)))
-		result.Set("st_ino", core.NumberValue(float64(st.Ino)))
-		result.Set("st_dev", core.NumberValue(float64(st.Dev)))
-		result.Set("st_nlink", core.NumberValue(float64(st.Nlink)))
-		result.Set("st_uid", core.NumberValue(float64(st.Uid)))
-		result.Set("st_gid", core.NumberValue(float64(st.Gid)))
-		result.Set("st_size", core.NumberValue(float64(st.Size)))
+		result.SetStr("st_mode", core.NumberValue(float64(st.Mode)))
+		result.SetStr("st_ino", core.NumberValue(float64(st.Ino)))
+		result.SetStr("st_dev", core.NumberValue(float64(st.Dev)))
+		result.SetStr("st_nlink", core.NumberValue(float64(st.Nlink)))
+		result.SetStr("st_uid", core.NumberValue(float64(st.Uid)))
+		result.SetStr("st_gid", core.NumberValue(float64(st.Gid)))
+		result.SetStr("st_size", core.NumberValue(float64(st.Size)))
 		return result, nil
 	}))
 
 	// os.stat with keyword argument support for follow_symlinks
-	osModule.Set("stat", &KwargsOSStat{})
+	osModule.SetStr("stat", &KwargsOSStat{})
 
-	osModule.Set("lstat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("lstat", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("str", nil, "lstat() argument")
 		}
@@ -306,13 +306,13 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 			return nil, core.NewOSError(err.Error(), string(path))
 		}
 		result := core.NewDict()
-		result.Set("st_mode", core.NumberValue(fileModeToUnixMode(info.Mode())))
-		result.Set("st_size", core.NumberValue(info.Size()))
+		result.SetStr("st_mode", core.NumberValue(fileModeToUnixMode(info.Mode())))
+		result.SetStr("st_size", core.NumberValue(info.Size()))
 		return result, nil
 	}))
 
 	// Directory operations
-	osModule.Set("rmdir", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("rmdir", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("str", nil, "rmdir() argument")
 		}
@@ -323,7 +323,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.None, core.OSErrorFromGo(os.Remove(string(path)), string(path))
 	}))
 
-	osModule.Set("removedirs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("removedirs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("str", nil, "removedirs() argument")
 		}
@@ -335,7 +335,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 	}))
 
 	// Path operations
-	osModule.Set("unlink", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("unlink", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("str", nil, "unlink() argument")
 		}
@@ -346,14 +346,14 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.None, os.Remove(string(path))
 	}))
 
-	osModule.Set("link", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("link", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, core.NewTypeError("str", nil, "link() arguments")
 		}
 		return core.None, nil // Stub
 	}))
 
-	osModule.Set("symlink", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("symlink", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, core.NewTypeError("str", nil, "symlink() arguments")
 		}
@@ -365,7 +365,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.None, os.Symlink(string(src), string(dst))
 	}))
 
-	osModule.Set("readlink", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("readlink", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("str", nil, "readlink() argument")
 		}
@@ -382,11 +382,11 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 	}))
 
 	// System
-	osModule.Set("system", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("system", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0), nil // Stub - always success
 	}))
 
-	osModule.Set("urandom", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("urandom", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("int", nil, "urandom() argument")
 		}
@@ -402,7 +402,7 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 		return core.BytesValue(data), nil
 	}))
 
-	osModule.Set("cpu_count", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("cpu_count", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(runtime.NumCPU()), nil
 	}))
 
@@ -415,29 +415,29 @@ func addExtendedOSFunctions(osModule *core.DictValue) {
 
 func addOSConstants(osModule *core.DictValue) {
 	// File access modes
-	osModule.Set("F_OK", core.NumberValue(0))
-	osModule.Set("R_OK", core.NumberValue(4))
-	osModule.Set("W_OK", core.NumberValue(2))
-	osModule.Set("X_OK", core.NumberValue(1))
+	osModule.SetStr("F_OK", core.NumberValue(0))
+	osModule.SetStr("R_OK", core.NumberValue(4))
+	osModule.SetStr("W_OK", core.NumberValue(2))
+	osModule.SetStr("X_OK", core.NumberValue(1))
 
 	// Open flags
-	osModule.Set("O_RDONLY", core.NumberValue(os.O_RDONLY))
-	osModule.Set("O_WRONLY", core.NumberValue(os.O_WRONLY))
-	osModule.Set("O_RDWR", core.NumberValue(os.O_RDWR))
-	osModule.Set("O_APPEND", core.NumberValue(os.O_APPEND))
-	osModule.Set("O_CREATE", core.NumberValue(os.O_CREATE))
-	osModule.Set("O_CREAT", core.NumberValue(os.O_CREATE)) // Python uses O_CREAT, Go uses O_CREATE
-	osModule.Set("O_EXCL", core.NumberValue(os.O_EXCL))
-	osModule.Set("O_TRUNC", core.NumberValue(os.O_TRUNC))
-	osModule.Set("O_SYNC", core.NumberValue(os.O_SYNC))
+	osModule.SetStr("O_RDONLY", core.NumberValue(os.O_RDONLY))
+	osModule.SetStr("O_WRONLY", core.NumberValue(os.O_WRONLY))
+	osModule.SetStr("O_RDWR", core.NumberValue(os.O_RDWR))
+	osModule.SetStr("O_APPEND", core.NumberValue(os.O_APPEND))
+	osModule.SetStr("O_CREATE", core.NumberValue(os.O_CREATE))
+	osModule.SetStr("O_CREAT", core.NumberValue(os.O_CREATE)) // Python uses O_CREAT, Go uses O_CREATE
+	osModule.SetStr("O_EXCL", core.NumberValue(os.O_EXCL))
+	osModule.SetStr("O_TRUNC", core.NumberValue(os.O_TRUNC))
+	osModule.SetStr("O_SYNC", core.NumberValue(os.O_SYNC))
 
 	// Path separator
-	osModule.Set("sep", core.StringValue(string(os.PathSeparator)))
-	osModule.Set("pathsep", core.StringValue(string(os.PathListSeparator)))
-	osModule.Set("linesep", core.StringValue("\n"))
+	osModule.SetStr("sep", core.StringValue(string(os.PathSeparator)))
+	osModule.SetStr("pathsep", core.StringValue(string(os.PathListSeparator)))
+	osModule.SetStr("linesep", core.StringValue("\n"))
 
 	// Device null
-	osModule.Set("devnull", core.StringValue(os.DevNull))
+	osModule.SetStr("devnull", core.StringValue(os.DevNull))
 }
 
 func addOSFileDescriptorStubs(osModule *core.DictValue) {
@@ -445,11 +445,11 @@ func addOSFileDescriptorStubs(osModule *core.DictValue) {
 		return core.None, nil
 	}
 
-	osModule.Set("dup", core.NewBuiltinFunction(stub))
-	osModule.Set("dup2", core.NewBuiltinFunction(stub))
-	osModule.Set("fdopen", core.NewBuiltinFunction(stub))
-	osModule.Set("isatty", core.NewBuiltinFunction(stub))
-	osModule.Set("pipe", core.NewBuiltinFunction(stub))
+	osModule.SetStr("dup", core.NewBuiltinFunction(stub))
+	osModule.SetStr("dup2", core.NewBuiltinFunction(stub))
+	osModule.SetStr("fdopen", core.NewBuiltinFunction(stub))
+	osModule.SetStr("isatty", core.NewBuiltinFunction(stub))
+	osModule.SetStr("pipe", core.NewBuiltinFunction(stub))
 }
 
 func addOSPathStubs(osModule *core.DictValue) {
@@ -460,9 +460,9 @@ func addOSPathStubs(osModule *core.DictValue) {
 		return core.StringValue(""), nil
 	}
 
-	osModule.Set("fspath", core.NewBuiltinFunction(stub))
-	osModule.Set("fsencode", core.NewBuiltinFunction(stub))
-	osModule.Set("fsdecode", core.NewBuiltinFunction(stub))
+	osModule.SetStr("fspath", core.NewBuiltinFunction(stub))
+	osModule.SetStr("fsencode", core.NewBuiltinFunction(stub))
+	osModule.SetStr("fsdecode", core.NewBuiltinFunction(stub))
 }
 
 func addOSProcessStubs(osModule *core.DictValue) {
@@ -470,19 +470,19 @@ func addOSProcessStubs(osModule *core.DictValue) {
 		return core.None, nil
 	}
 
-	osModule.Set("abort", core.NewBuiltinFunction(stub))
-	osModule.Set("fork", core.NewBuiltinFunction(stub))
-	osModule.Set("kill", core.NewBuiltinFunction(stub))
-	osModule.Set("wait", core.NewBuiltinFunction(stub))
-	osModule.Set("waitpid", core.NewBuiltinFunction(stub))
-	osModule.Set("execv", core.NewBuiltinFunction(stub))
-	osModule.Set("execve", core.NewBuiltinFunction(stub))
-	osModule.Set("_exit", core.NewBuiltinFunction(stub))
+	osModule.SetStr("abort", core.NewBuiltinFunction(stub))
+	osModule.SetStr("fork", core.NewBuiltinFunction(stub))
+	osModule.SetStr("kill", core.NewBuiltinFunction(stub))
+	osModule.SetStr("wait", core.NewBuiltinFunction(stub))
+	osModule.SetStr("waitpid", core.NewBuiltinFunction(stub))
+	osModule.SetStr("execv", core.NewBuiltinFunction(stub))
+	osModule.SetStr("execve", core.NewBuiltinFunction(stub))
+	osModule.SetStr("_exit", core.NewBuiltinFunction(stub))
 
 	// os.access(path, mode): test real accessibility via access(2). mode is the
 	// bitwise OR of F_OK/R_OK/W_OK/X_OK. Returns False (not an error) when the
 	// check fails, matching CPython.
-	osModule.Set("access", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	osModule.SetStr("access", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, &core.TypeError{Message: "access expected at least 2 arguments"}
 		}
@@ -505,7 +505,7 @@ func addOSProcessStubs(osModule *core.DictValue) {
 	// os.chmod(path, mode, *, follow_symlinks=True): change file mode bits via
 	// chmod(2). follow_symlinks is accepted (shutil.copystat passes it) but only
 	// the follow=True behaviour is implemented (lchmod is not).
-	osModule.Set("chmod", &core.BuiltinFunctionWithKwargs{
+	osModule.SetStr("chmod", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "chmod",
 		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
@@ -536,7 +536,7 @@ func addOSProcessStubs(osModule *core.DictValue) {
 	// access and modified times. ns=(atime_ns, mtime_ns) takes precedence over
 	// times=(atime, mtime) seconds; both omitted sets the current time. Needed by
 	// shutil.copystat/copy2 to propagate timestamps.
-	osModule.Set("utime", &core.BuiltinFunctionWithKwargs{
+	osModule.SetStr("utime", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "utime",
 		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
@@ -579,9 +579,9 @@ func addOSProcessStubs(osModule *core.DictValue) {
 			return core.None, nil
 		},
 	})
-	osModule.Set("chown", core.NewBuiltinFunction(stub))
-	osModule.Set("umask", core.NewBuiltinFunction(stub))
-	osModule.Set("sync", core.NewBuiltinFunction(stub))
+	osModule.SetStr("chown", core.NewBuiltinFunction(stub))
+	osModule.SetStr("umask", core.NewBuiltinFunction(stub))
+	osModule.SetStr("sync", core.NewBuiltinFunction(stub))
 }
 
 // KwargsOSStat implements os.stat with follow_symlinks keyword argument support
@@ -633,8 +633,8 @@ func (f *KwargsOSStat) CallWithKeywords(args []core.Value, kwargs *core.Kwargs, 
 	}
 
 	result := core.NewDict()
-	result.Set("st_mode", core.NumberValue(fileModeToUnixMode(info.Mode())))
-	result.Set("st_size", core.NumberValue(info.Size()))
-	result.Set("st_mtime", core.NumberValue(info.ModTime().Unix()))
+	result.SetStr("st_mode", core.NumberValue(fileModeToUnixMode(info.Mode())))
+	result.SetStr("st_size", core.NumberValue(info.Size()))
+	result.SetStr("st_mtime", core.NumberValue(info.ModTime().Unix()))
 	return result, nil
 }

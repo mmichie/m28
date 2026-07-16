@@ -1,9 +1,5 @@
 package core
 
-import (
-	"strconv"
-)
-
 // hashTable is the storage engine behind DictValue (and, in a later phase,
 // sets): a CPython-shaped compact ordered hash table. Entries live in
 // insertion order in a slice; an open-addressed index of power-of-two size
@@ -322,50 +318,10 @@ func (t *hashTable) clear() {
 	t.fill = 0
 }
 
-// --- Deprecated keyRepr adapters -------------------------------------------
-//
-// The old engine identified keys by ValueToKey strings ("s:name", "n:1", ...)
-// and several hundred call sites (mostly modules/*.go namespace setup) still
-// pass such strings around. parseKeyRepr recovers the primitive key value —
-// exact for strings, numbers, bools and None, which covers every current
-// external use. Composite reprs ("t:(...)", "p:0x...") are not resolvable and
-// report false; they were silently corrupted by the old reconstruction too.
-
-func parseKeyRepr(keyRepr string) (Value, bool) {
-	if keyRepr == "nil" {
-		return Nil, true
-	}
-	if len(keyRepr) < 2 || keyRepr[1] != ':' {
-		return nil, false
-	}
-	body := keyRepr[2:]
-	switch keyRepr[0] {
-	case 's':
-		return StringValue(body), true
-	case 'n':
-		if f, err := strconv.ParseFloat(body, 64); err == nil {
-			return NumberValue(f), true
-		}
-		return nil, false
-	case 'i':
-		if n, err := strconv.ParseInt(body, 10, 64); err == nil {
-			return NumberValue(n), true
-		}
-		return nil, false
-	case 'f':
-		if f, err := strconv.ParseFloat(body, 64); err == nil {
-			return FloatValue(f), true
-		}
-		return nil, false
-	case 'b':
-		return BoolValue(body == "true"), true
-	default:
-		return nil, false
-	}
-}
-
-// serializeKeyRepr renders a key in the legacy keyRepr form for the
-// deprecated Keys() []string adapter.
+// serializeKeyRepr renders a key in the legacy keyRepr form ("s:name", "n:1",
+// ...). It is retained only to give set/frozenset repr a deterministic,
+// byte-stable element ordering (see formatSetElems in repr.go); it is no longer
+// used to identify keys in the hash table.
 func serializeKeyRepr(key Value) string {
 	switch k := key.(type) {
 	case StringValue:

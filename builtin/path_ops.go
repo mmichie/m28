@@ -135,23 +135,12 @@ func setAtPath(data core.Value, segments []interface{}, value core.Value) (core.
 		// Handle dict
 		if dict, ok := data.(*core.DictValue); ok {
 			newDict := core.NewDict()
-			// Copy all existing key-value pairs
-			for _, k := range dict.Keys() {
-				val, _ := dict.Get(k)
-				origKey, hasOrig := dict.OriginalKeys()[0], false
-				for _, ok := range dict.OriginalKeys() {
-					if core.ValueToKey(ok) == k {
-						origKey = ok
-						hasOrig = true
-						break
-					}
-				}
-				if hasOrig {
-					newDict.SetValue(origKey, val)
-				} else {
-					newDict.Set(k, val)
-				}
-			}
+			// Copy all existing key-value pairs, preserving each original key
+			// object and insertion order.
+			dict.ForEach(func(k, val core.Value) bool {
+				_ = newDict.SetValue(k, val)
+				return true
+			})
 
 			// Get current value at this segment
 			current, _ := dict.GetValue(core.StringValue(seg))

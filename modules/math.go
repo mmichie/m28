@@ -15,29 +15,29 @@ func InitMathModule() *core.DictValue {
 	mathModule := core.NewDict()
 
 	// Trigonometric functions
-	mathModule.Set("sqrt", core.NewBuiltinFunction(builders.UnaryFloat("sqrt", func(n float64) (float64, error) {
+	mathModule.SetStr("sqrt", core.NewBuiltinFunction(builders.UnaryFloat("sqrt", func(n float64) (float64, error) {
 		if n < 0 {
 			return 0, errors.NewValueError("sqrt", "math domain error")
 		}
 		return math.Sqrt(n), nil
 	})))
-	mathModule.Set("sin", core.NewBuiltinFunction(builders.UnaryNumberSimple("sin", math.Sin)))
-	mathModule.Set("cos", core.NewBuiltinFunction(builders.UnaryNumberSimple("cos", math.Cos)))
-	mathModule.Set("tan", core.NewBuiltinFunction(builders.UnaryNumberSimple("tan", math.Tan)))
-	mathModule.Set("asin", core.NewBuiltinFunction(builders.UnaryNumberSimple("asin", math.Asin)))
-	mathModule.Set("acos", core.NewBuiltinFunction(builders.UnaryNumberSimple("acos", math.Acos)))
-	mathModule.Set("atan", core.NewBuiltinFunction(builders.UnaryNumberSimple("atan", math.Atan)))
-	mathModule.Set("atan2", core.NewBuiltinFunction(builders.BinaryNumberSimple("atan2", math.Atan2)))
+	mathModule.SetStr("sin", core.NewBuiltinFunction(builders.UnaryNumberSimple("sin", math.Sin)))
+	mathModule.SetStr("cos", core.NewBuiltinFunction(builders.UnaryNumberSimple("cos", math.Cos)))
+	mathModule.SetStr("tan", core.NewBuiltinFunction(builders.UnaryNumberSimple("tan", math.Tan)))
+	mathModule.SetStr("asin", core.NewBuiltinFunction(builders.UnaryNumberSimple("asin", math.Asin)))
+	mathModule.SetStr("acos", core.NewBuiltinFunction(builders.UnaryNumberSimple("acos", math.Acos)))
+	mathModule.SetStr("atan", core.NewBuiltinFunction(builders.UnaryNumberSimple("atan", math.Atan)))
+	mathModule.SetStr("atan2", core.NewBuiltinFunction(builders.BinaryNumberSimple("atan2", math.Atan2)))
 
 	// Power and exponential functions
-	mathModule.Set("pow", core.NewBuiltinFunction(builders.BinaryNumberSimple("pow", math.Pow)))
-	mathModule.Set("exp", core.NewBuiltinFunction(builders.UnaryNumberSimple("exp", math.Exp)))
-	mathModule.Set("log", core.NewBuiltinFunction(builders.UnaryNumberSimple("log", math.Log)))
-	mathModule.Set("log10", core.NewBuiltinFunction(builders.UnaryNumberSimple("log10", math.Log10)))
-	mathModule.Set("log2", core.NewBuiltinFunction(builders.UnaryNumberSimple("log2", math.Log2)))
+	mathModule.SetStr("pow", core.NewBuiltinFunction(builders.BinaryNumberSimple("pow", math.Pow)))
+	mathModule.SetStr("exp", core.NewBuiltinFunction(builders.UnaryNumberSimple("exp", math.Exp)))
+	mathModule.SetStr("log", core.NewBuiltinFunction(builders.UnaryNumberSimple("log", math.Log)))
+	mathModule.SetStr("log10", core.NewBuiltinFunction(builders.UnaryNumberSimple("log10", math.Log10)))
+	mathModule.SetStr("log2", core.NewBuiltinFunction(builders.UnaryNumberSimple("log2", math.Log2)))
 
 	// Rounding functions - check for __floor__, __ceil__, __trunc__ dunder methods first
-	mathModule.Set("floor", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("floor", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("floor", "exactly 1 argument", "got different count")
 		}
@@ -56,7 +56,7 @@ func InitMathModule() *core.DictValue {
 		}
 		return core.NumberValue(math.Floor(float64(num))), nil
 	}))
-	mathModule.Set("ceil", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("ceil", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("ceil", "exactly 1 argument", "got different count")
 		}
@@ -75,7 +75,7 @@ func InitMathModule() *core.DictValue {
 		}
 		return core.NumberValue(math.Ceil(float64(num))), nil
 	}))
-	mathModule.Set("trunc", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("trunc", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("trunc", "exactly 1 argument", "got different count")
 		}
@@ -94,7 +94,7 @@ func InitMathModule() *core.DictValue {
 		}
 		return core.NumberValue(math.Trunc(float64(num))), nil
 	}))
-	mathModule.Set("modf", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("modf", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("modf", "exactly 1 argument", "got different count")
 		}
@@ -107,28 +107,28 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// Other math functions
-	mathModule.Set("abs", core.NewBuiltinFunction(builders.UnaryNumberSimple("abs", math.Abs)))
-	mathModule.Set("fabs", core.NewBuiltinFunction(builders.UnaryNumberSimple("fabs", math.Abs))) // fabs is abs for floats
-	mathModule.Set("hypot", core.NewBuiltinFunction(builders.BinaryNumberSimple("hypot", math.Hypot)))
-	mathModule.Set("copysign", core.NewBuiltinFunction(builders.BinaryNumberSimple("copysign", math.Copysign)))
+	mathModule.SetStr("abs", core.NewBuiltinFunction(builders.UnaryNumberSimple("abs", math.Abs)))
+	mathModule.SetStr("fabs", core.NewBuiltinFunction(builders.UnaryNumberSimple("fabs", math.Abs))) // fabs is abs for floats
+	mathModule.SetStr("hypot", core.NewBuiltinFunction(builders.BinaryNumberSimple("hypot", math.Hypot)))
+	mathModule.SetStr("copysign", core.NewBuiltinFunction(builders.BinaryNumberSimple("copysign", math.Copysign)))
 
 	// Hyperbolic functions
-	mathModule.Set("sinh", core.NewBuiltinFunction(builders.UnaryNumberSimple("sinh", math.Sinh)))
-	mathModule.Set("cosh", core.NewBuiltinFunction(builders.UnaryNumberSimple("cosh", math.Cosh)))
-	mathModule.Set("tanh", core.NewBuiltinFunction(builders.UnaryNumberSimple("tanh", math.Tanh)))
-	mathModule.Set("asinh", core.NewBuiltinFunction(builders.UnaryNumberSimple("asinh", math.Asinh)))
-	mathModule.Set("acosh", core.NewBuiltinFunction(builders.UnaryNumberSimple("acosh", math.Acosh)))
-	mathModule.Set("atanh", core.NewBuiltinFunction(builders.UnaryNumberSimple("atanh", math.Atanh)))
+	mathModule.SetStr("sinh", core.NewBuiltinFunction(builders.UnaryNumberSimple("sinh", math.Sinh)))
+	mathModule.SetStr("cosh", core.NewBuiltinFunction(builders.UnaryNumberSimple("cosh", math.Cosh)))
+	mathModule.SetStr("tanh", core.NewBuiltinFunction(builders.UnaryNumberSimple("tanh", math.Tanh)))
+	mathModule.SetStr("asinh", core.NewBuiltinFunction(builders.UnaryNumberSimple("asinh", math.Asinh)))
+	mathModule.SetStr("acosh", core.NewBuiltinFunction(builders.UnaryNumberSimple("acosh", math.Acosh)))
+	mathModule.SetStr("atanh", core.NewBuiltinFunction(builders.UnaryNumberSimple("atanh", math.Atanh)))
 
 	// Gamma functions (needed by random module)
-	mathModule.Set("lgamma", core.NewBuiltinFunction(builders.UnaryFloat("lgamma", func(x float64) (float64, error) {
+	mathModule.SetStr("lgamma", core.NewBuiltinFunction(builders.UnaryFloat("lgamma", func(x float64) (float64, error) {
 		if x <= 0 && x == math.Floor(x) {
 			return 0, errors.NewValueError("lgamma", "math domain error")
 		}
 		result, _ := math.Lgamma(x) // Ignore sign, return log of absolute value
 		return result, nil
 	})))
-	mathModule.Set("gamma", core.NewBuiltinFunction(builders.UnaryFloat("gamma", func(x float64) (float64, error) {
+	mathModule.SetStr("gamma", core.NewBuiltinFunction(builders.UnaryFloat("gamma", func(x float64) (float64, error) {
 		if x <= 0 && x == math.Floor(x) {
 			return 0, errors.NewValueError("gamma", "math domain error")
 		}
@@ -136,30 +136,30 @@ func InitMathModule() *core.DictValue {
 	})))
 
 	// Error functions
-	mathModule.Set("erf", core.NewBuiltinFunction(builders.UnaryNumberSimple("erf", math.Erf)))
-	mathModule.Set("erfc", core.NewBuiltinFunction(builders.UnaryNumberSimple("erfc", math.Erfc)))
+	mathModule.SetStr("erf", core.NewBuiltinFunction(builders.UnaryNumberSimple("erf", math.Erf)))
+	mathModule.SetStr("erfc", core.NewBuiltinFunction(builders.UnaryNumberSimple("erfc", math.Erfc)))
 
 	// Angle conversion
-	mathModule.Set("degrees", core.NewBuiltinFunction(builders.UnaryFloat("degrees", func(x float64) (float64, error) {
+	mathModule.SetStr("degrees", core.NewBuiltinFunction(builders.UnaryFloat("degrees", func(x float64) (float64, error) {
 		return x * 180.0 / math.Pi, nil
 	})))
-	mathModule.Set("radians", core.NewBuiltinFunction(builders.UnaryFloat("radians", func(x float64) (float64, error) {
+	mathModule.SetStr("radians", core.NewBuiltinFunction(builders.UnaryFloat("radians", func(x float64) (float64, error) {
 		return x * math.Pi / 180.0, nil
 	})))
 
 	// Floating point inspection
-	mathModule.Set("isnan", core.NewBuiltinFunction(builders.UnaryBool("isnan", func(x float64) bool {
+	mathModule.SetStr("isnan", core.NewBuiltinFunction(builders.UnaryBool("isnan", func(x float64) bool {
 		return math.IsNaN(x)
 	})))
-	mathModule.Set("isinf", core.NewBuiltinFunction(builders.UnaryBool("isinf", func(x float64) bool {
+	mathModule.SetStr("isinf", core.NewBuiltinFunction(builders.UnaryBool("isinf", func(x float64) bool {
 		return math.IsInf(x, 0)
 	})))
-	mathModule.Set("isfinite", core.NewBuiltinFunction(builders.UnaryBool("isfinite", func(x float64) bool {
+	mathModule.SetStr("isfinite", core.NewBuiltinFunction(builders.UnaryBool("isfinite", func(x float64) bool {
 		return !math.IsNaN(x) && !math.IsInf(x, 0)
 	})))
 
 	// Integer math functions
-	mathModule.Set("factorial", core.NewBuiltinFunction(builders.UnaryNumber("factorial", func(x float64) (float64, error) {
+	mathModule.SetStr("factorial", core.NewBuiltinFunction(builders.UnaryNumber("factorial", func(x float64) (float64, error) {
 		n := int(x)
 		if x != float64(n) || n < 0 {
 			return 0, errors.NewValueError("factorial", "factorial() only accepts non-negative integers")
@@ -174,7 +174,7 @@ func InitMathModule() *core.DictValue {
 		return float64(result), nil
 	})))
 
-	mathModule.Set("gcd", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("gcd", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, errors.NewRuntimeError("gcd", "gcd expected 2 arguments")
 		}
@@ -204,7 +204,7 @@ func InitMathModule() *core.DictValue {
 	// ---- Additional CPython math functions ----
 
 	// ldexp(x, i) returns x * (2**i)
-	mathModule.Set("ldexp", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("ldexp", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, errors.NewTypeError("ldexp", "exactly 2 arguments", "got different count")
 		}
@@ -217,7 +217,7 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// frexp(x) returns (m, e) such that x == m * 2**e and 0.5 <= abs(m) < 1
-	mathModule.Set("frexp", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("frexp", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("frexp", "exactly 1 argument", "got different count")
 		}
@@ -229,16 +229,16 @@ func InitMathModule() *core.DictValue {
 		return core.TupleValue{core.NumberValue(frac), core.NumberValue(exp)}, nil
 	}))
 
-	mathModule.Set("fmod", core.NewBuiltinFunction(builders.BinaryNumberSimple("fmod", math.Mod)))
-	mathModule.Set("remainder", core.NewBuiltinFunction(builders.BinaryNumberSimple("remainder", math.Remainder)))
-	mathModule.Set("expm1", core.NewBuiltinFunction(builders.UnaryNumberSimple("expm1", math.Expm1)))
-	mathModule.Set("log1p", core.NewBuiltinFunction(builders.UnaryNumberSimple("log1p", math.Log1p)))
-	mathModule.Set("cbrt", core.NewBuiltinFunction(builders.UnaryNumberSimple("cbrt", math.Cbrt)))
-	mathModule.Set("exp2", core.NewBuiltinFunction(builders.UnaryNumberSimple("exp2", math.Exp2)))
-	mathModule.Set("nextafter", core.NewBuiltinFunction(builders.BinaryNumberSimple("nextafter", math.Nextafter)))
+	mathModule.SetStr("fmod", core.NewBuiltinFunction(builders.BinaryNumberSimple("fmod", math.Mod)))
+	mathModule.SetStr("remainder", core.NewBuiltinFunction(builders.BinaryNumberSimple("remainder", math.Remainder)))
+	mathModule.SetStr("expm1", core.NewBuiltinFunction(builders.UnaryNumberSimple("expm1", math.Expm1)))
+	mathModule.SetStr("log1p", core.NewBuiltinFunction(builders.UnaryNumberSimple("log1p", math.Log1p)))
+	mathModule.SetStr("cbrt", core.NewBuiltinFunction(builders.UnaryNumberSimple("cbrt", math.Cbrt)))
+	mathModule.SetStr("exp2", core.NewBuiltinFunction(builders.UnaryNumberSimple("exp2", math.Exp2)))
+	mathModule.SetStr("nextafter", core.NewBuiltinFunction(builders.BinaryNumberSimple("nextafter", math.Nextafter)))
 
 	// fma(x, y, z): fused multiply-add (x*y + z) with a single rounding step
-	mathModule.Set("fma", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("fma", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 3 {
 			return nil, errors.NewTypeError("fma", "exactly 3 arguments", "got different count")
 		}
@@ -252,7 +252,7 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// ulp(x): value of the least significant bit of x
-	mathModule.Set("ulp", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("ulp", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("ulp", "exactly 1 argument", "got different count")
 		}
@@ -276,7 +276,7 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// isqrt(n): integer square root (floor of the exact square root of n)
-	mathModule.Set("isqrt", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("isqrt", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("isqrt", "exactly 1 argument", "got different count")
 		}
@@ -295,7 +295,7 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// isclose(a, b, *, rel_tol=1e-09, abs_tol=0.0)
-	mathModule.Set("isclose", &core.BuiltinFunctionWithKwargs{
+	mathModule.SetStr("isclose", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.BuiltinFunctionType),
 		Name:       "isclose",
 		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
@@ -334,7 +334,7 @@ func InitMathModule() *core.DictValue {
 	})
 
 	// comb(n, k): binomial coefficient "n choose k"
-	mathModule.Set("comb", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("comb", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, errors.NewTypeError("comb", "exactly 2 arguments", "got different count")
 		}
@@ -364,7 +364,7 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// perm(n, k=None): number of k-permutations of n; full factorial when k is None
-	mathModule.Set("perm", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("perm", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 2 {
 			return nil, errors.NewTypeError("perm", "1 or 2 arguments", "got different count")
 		}
@@ -391,7 +391,7 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// prod(iterable, *, start=1): product of all elements
-	mathModule.Set("prod", &core.BuiltinFunctionWithKwargs{
+	mathModule.SetStr("prod", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.BuiltinFunctionType),
 		Name:       "prod",
 		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
@@ -422,7 +422,7 @@ func InitMathModule() *core.DictValue {
 	})
 
 	// dist(p, q): Euclidean distance between two points given as coordinate sequences
-	mathModule.Set("dist", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("dist", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, errors.NewTypeError("dist", "exactly 2 arguments", "got different count")
 		}
@@ -451,7 +451,7 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// fsum(iterable): accurate floating-point sum (Shewchuk's algorithm)
-	mathModule.Set("fsum", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("fsum", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, errors.NewTypeError("fsum", "exactly 1 argument", "got different count")
 		}
@@ -471,7 +471,7 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// lcm(*integers): least common multiple
-	mathModule.Set("lcm", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	mathModule.SetStr("lcm", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		result := int64(1)
 		for _, a := range args {
 			n, err := mathIntArg("lcm", a)
@@ -491,11 +491,11 @@ func InitMathModule() *core.DictValue {
 	}))
 
 	// Constants
-	mathModule.Set("pi", core.NumberValue(math.Pi))
-	mathModule.Set("e", core.NumberValue(math.E))
-	mathModule.Set("tau", core.NumberValue(2*math.Pi)) // Python 3.6+
-	mathModule.Set("inf", core.NumberValue(math.Inf(1)))
-	mathModule.Set("nan", core.NumberValue(math.NaN()))
+	mathModule.SetStr("pi", core.NumberValue(math.Pi))
+	mathModule.SetStr("e", core.NumberValue(math.E))
+	mathModule.SetStr("tau", core.NumberValue(2*math.Pi)) // Python 3.6+
+	mathModule.SetStr("inf", core.NumberValue(math.Inf(1)))
+	mathModule.SetStr("nan", core.NumberValue(math.NaN()))
 
 	return mathModule
 }

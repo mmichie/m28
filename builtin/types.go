@@ -1589,15 +1589,18 @@ func createTypeMetaclass() *TypeType {
 			newClass = core.NewClass(name, nil)
 		}
 
-		// Add methods and attributes from namespace
-		for _, keyStr := range namespace.Keys() {
-			value, _ := namespace.Get(keyStr)
-
-			// Strip the "s:" prefix from string keys to get the actual attribute name
-			keyName := keyStr
-			if strings.HasPrefix(keyStr, "s:") {
-				keyName = keyStr[2:] // Remove "s:" prefix
+		// Add methods and attributes from namespace. Collect the member names in
+		// insertion order first (the body below uses `continue`, which a ForEach
+		// closure can't express).
+		var nsKeys []string
+		namespace.ForEach(func(k, _ core.Value) bool {
+			if s, ok := k.(core.StringValue); ok {
+				nsKeys = append(nsKeys, string(s))
 			}
+			return true
+		})
+		for _, keyName := range nsKeys {
+			value, _ := namespace.GetStr(keyName)
 
 			// SPECIAL CASE: __init__ must always be a method (but NOT for metaclasses!)
 			// Skip descriptor check for __init__ UNLESS the class is a metaclass

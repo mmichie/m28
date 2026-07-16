@@ -66,13 +66,13 @@ func Init_ASTModule() *core.DictValue {
 	// Create a simple stub class for each node type
 	for _, nodeType := range nodeTypes {
 		class := core.NewClass(nodeType, nil)
-		astModule.Set(nodeType, class)
+		astModule.SetStr(nodeType, class)
 	}
 
 	// Add PyCF_ constants used for compilation flags
-	astModule.Set("PyCF_ONLY_AST", core.NumberValue(1024))
-	astModule.Set("PyCF_TYPE_COMMENTS", core.NumberValue(4096))
-	astModule.Set("PyCF_ALLOW_TOP_LEVEL_AWAIT", core.NumberValue(8192))
+	astModule.SetStr("PyCF_ONLY_AST", core.NumberValue(1024))
+	astModule.SetStr("PyCF_TYPE_COMMENTS", core.NumberValue(4096))
+	astModule.SetStr("PyCF_ALLOW_TOP_LEVEL_AWAIT", core.NumberValue(8192))
 
 	return astModule
 }

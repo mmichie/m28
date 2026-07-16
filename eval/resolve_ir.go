@@ -535,7 +535,7 @@ func (n *dotAssignNode) assign(ctx *core.Context) (core.Value, error) {
 		boxed = boxNum(num, kind)
 	}
 	if dict, ok := objV.(*core.DictValue); ok {
-		dict.Set(n.attr, boxed)
+		dict.SetStr(n.attr, boxed)
 		return boxed, nil
 	}
 	if objWithAttrs, ok := objV.(interface {

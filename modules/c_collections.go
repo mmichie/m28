@@ -18,7 +18,7 @@ func InitCollectionsModule() *core.DictValue {
 	tupleGetterCounter = 0 // Reset counter
 
 	// Register Counter class
-	collectionsModule.Set("Counter", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	collectionsModule.SetStr("Counter", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Counter() or Counter(iterable) or Counter(mapping)
 		counter := NewCounter()
 
@@ -27,13 +27,12 @@ func InitCollectionsModule() *core.DictValue {
 
 			// If it's a dict, copy the counts
 			if dict, ok := arg.(*core.DictValue); ok {
-				for _, key := range dict.Keys() {
-					if val, ok := dict.Get(key); ok {
-						if num, ok := val.(core.NumberValue); ok {
-							counter.counts.Set(key, num)
-						}
+				dict.ForEach(func(key, val core.Value) bool {
+					if num, ok := val.(core.NumberValue); ok {
+						_ = counter.counts.SetValue(key, num)
 					}
-				}
+					return true
+				})
 			} else if _, ok := arg.(*core.ListValue); ok {
 				// Count elements from iterable
 				counter.Update([]core.Value{arg})
@@ -51,7 +50,7 @@ func InitCollectionsModule() *core.DictValue {
 	}))
 
 	// Register defaultdict class
-	collectionsModule.Set("defaultdict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	collectionsModule.SetStr("defaultdict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// defaultdict([default_factory[, ...]]): default_factory defaults to None
 		// (a missing key then raises KeyError, like a plain dict).
 		var factory core.Value = core.None
@@ -66,11 +65,10 @@ func InitCollectionsModule() *core.DictValue {
 		// Any remaining argument initializes the dict (mapping of pairs).
 		if len(rest) > 0 {
 			if dict, ok := rest[0].(*core.DictValue); ok {
-				for _, key := range dict.Keys() {
-					if val, ok := dict.Get(key); ok {
-						dd.dict.Set(key, val)
-					}
-				}
+				dict.ForEach(func(key, val core.Value) bool {
+					_ = dd.dict.SetValue(key, val)
+					return true
+				})
 			}
 		}
 
@@ -78,7 +76,7 @@ func InitCollectionsModule() *core.DictValue {
 	}))
 
 	// Register deque class
-	collectionsModule.Set("deque", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	collectionsModule.SetStr("deque", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		dq := NewDeque()
 
 		// If there's an iterable argument, add all items
@@ -106,7 +104,7 @@ func InitCollectionsModule() *core.DictValue {
 
 	// Register _deque_iterator type (constructor function)
 	// This is the type returned by iter(deque)
-	collectionsModule.Set("_deque_iterator", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	collectionsModule.SetStr("_deque_iterator", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, &core.TypeError{Message: "_deque_iterator() requires exactly 1 argument"}
 		}
@@ -118,7 +116,7 @@ func InitCollectionsModule() *core.DictValue {
 	}))
 
 	// Register OrderedDict class
-	collectionsModule.Set("OrderedDict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	collectionsModule.SetStr("OrderedDict", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		od := NewOrderedDict()
 
 		// If there's an argument, it should be a dict or iterable of pairs
@@ -126,11 +124,10 @@ func InitCollectionsModule() *core.DictValue {
 			switch v := args[0].(type) {
 			case *core.DictValue:
 				// Copy from existing dict
-				for _, key := range v.Keys() {
-					if val, ok := v.Get(key); ok {
-						od.dict.Set(key, val)
-					}
-				}
+				v.ForEach(func(key, val core.Value) bool {
+					_ = od.dict.SetValue(key, val)
+					return true
+				})
 			case *core.ListValue:
 				// Build from list of pairs
 				for i, item := range v.Items() {
@@ -194,7 +191,7 @@ func InitCollectionsModule() *core.DictValue {
 	// Register _tuplegetter type (for namedtuple field access)
 	// This is a callable that retrieves a specific index from a tuple
 	// Note: Must support keyword arguments for Python compatibility
-	collectionsModule.Set("_tuplegetter", &core.BuiltinFunctionWithKwargs{
+	collectionsModule.SetStr("_tuplegetter", &core.BuiltinFunctionWithKwargs{
 		BaseObject: *core.NewBaseObject(core.FunctionType),
 		Name:       "_tuplegetter",
 		Fn: func(args []core.Value, kwargs *core.Kwargs, ctx *core.Context) (core.Value, error) {
@@ -238,7 +235,7 @@ func InitCollectionsModule() *core.DictValue {
 
 	// Register _count_elements helper function for Counter
 	// This tallies elements from an iterable into a mapping
-	collectionsModule.Set("_count_elements", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	collectionsModule.SetStr("_count_elements", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, &core.TypeError{Message: "_count_elements() requires exactly 2 arguments (mapping, iterable)"}
 		}
@@ -441,31 +438,27 @@ func (c *Counter) MostCommon(n int) core.Value {
 // Elements returns an iterator over elements repeating each as many times as its count
 func (c *Counter) Elements() core.Value {
 	result := make([]core.Value, 0)
-	for _, key := range c.counts.Keys() {
-		if val, ok := c.counts.Get(key); ok {
-			if num, ok := val.(core.NumberValue); ok {
-				count := int(num)
-				for i := 0; i < count; i++ {
-					// Reconstruct the key as a Value
-					keyVal := core.StringValue(key) // Simplified
-					result = append(result, keyVal)
-				}
+	c.counts.ForEach(func(key, val core.Value) bool {
+		if num, ok := val.(core.NumberValue); ok {
+			count := int(num)
+			for i := 0; i < count; i++ {
+				result = append(result, key)
 			}
 		}
-	}
+		return true
+	})
 	return core.NewList(result...)
 }
 
 // Total returns the sum of all counts
 func (c *Counter) Total() core.Value {
 	total := 0.0
-	for _, key := range c.counts.Keys() {
-		if val, ok := c.counts.Get(key); ok {
-			if num, ok := val.(core.NumberValue); ok {
-				total += float64(num)
-			}
+	c.counts.ForEach(func(_, val core.Value) bool {
+		if num, ok := val.(core.NumberValue); ok {
+			total += float64(num)
 		}
-	}
+		return true
+	})
 	return core.NumberValue(total)
 }
 
@@ -530,23 +523,19 @@ func (dd *DefaultDict) GetAttr(name string) (core.Value, bool) {
 	case "values":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			values := make([]core.Value, 0)
-			for _, key := range dd.dict.Keys() {
-				if val, ok := dd.dict.Get(key); ok {
-					values = append(values, val)
-				}
-			}
+			dd.dict.ForEach(func(_, val core.Value) bool {
+				values = append(values, val)
+				return true
+			})
 			return core.NewList(values...), nil
 		}), true
 	case "items":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			origKeys := dd.dict.OriginalKeys()
-			internalKeys := dd.dict.Keys()
-			items := make([]core.Value, 0, len(origKeys))
-			for i, k := range internalKeys {
-				if val, ok := dd.dict.Get(k); ok {
-					items = append(items, core.TupleValue{origKeys[i], val})
-				}
-			}
+			items := make([]core.Value, 0, dd.dict.Size())
+			dd.dict.ForEach(func(k, val core.Value) bool {
+				items = append(items, core.TupleValue{k, val})
+				return true
+			})
 			return core.NewList(items...), nil
 		}), true
 	case "default_factory":
@@ -641,13 +630,10 @@ func (dd *DefaultDict) Missing(key core.Value, ctx *core.Context) (core.Value, e
 // same key/value pairs.
 func (dd *DefaultDict) Copy() *DefaultDict {
 	clone := NewDefaultDict(dd.defaultFactory)
-	internalKeys := dd.dict.Keys()
-	origKeys := dd.dict.OriginalKeys()
-	for i, k := range internalKeys {
-		if val, ok := dd.dict.Get(k); ok {
-			_ = clone.dict.SetValue(origKeys[i], val)
-		}
-	}
+	dd.dict.ForEach(func(k, val core.Value) bool {
+		_ = clone.dict.SetValue(k, val)
+		return true
+	})
 	return clone
 }
 
@@ -1189,23 +1175,15 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 			}
 			switch other := args[0].(type) {
 			case *core.DictValue:
-				for _, k := range other.Keys() {
-					v, _ := other.Get(k)
-					origKey, ok := other.OriginalKeyValue(k)
-					if !ok {
-						origKey = core.StringValue(k)
-					}
-					od.dict.SetWithKey(k, origKey, v)
-				}
+				other.ForEach(func(k, v core.Value) bool {
+					_ = od.dict.SetValue(k, v)
+					return true
+				})
 			case *OrderedDict:
-				for _, k := range other.dict.Keys() {
-					v, _ := other.dict.Get(k)
-					origKey, ok := other.dict.OriginalKeyValue(k)
-					if !ok {
-						origKey = core.StringValue(k)
-					}
-					od.dict.SetWithKey(k, origKey, v)
-				}
+				other.dict.ForEach(func(k, v core.Value) bool {
+					_ = od.dict.SetValue(k, v)
+					return true
+				})
 			}
 			return core.None, nil
 		}), true
@@ -1217,14 +1195,10 @@ func (od *OrderedDict) GetAttr(name string) (core.Value, bool) {
 	case "copy":
 		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			newOd := NewOrderedDict()
-			for _, k := range od.dict.Keys() {
-				v, _ := od.dict.Get(k)
-				origKey, ok := od.dict.OriginalKeyValue(k)
-				if !ok {
-					origKey = core.StringValue(k)
-				}
-				newOd.dict.SetWithKey(k, origKey, v)
-			}
+			od.dict.ForEach(func(k, v core.Value) bool {
+				_ = newOd.dict.SetValue(k, v)
+				return true
+			})
 			return newOd, nil
 		}), true
 	}

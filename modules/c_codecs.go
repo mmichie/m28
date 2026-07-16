@@ -30,7 +30,7 @@ func InitCodecsModule() *core.DictValue {
 	errorHandlerRegistry.SetValue(core.StringValue("surrogatepass"), core.NewNamedBuiltinFunction("surrogatepass_errors", ignoreErrorHandler))
 
 	// register(search_function) - register a codec search function
-	module.Set("register", core.NewNamedBuiltinFunction("register", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("register", core.NewNamedBuiltinFunction("register", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("register", nil, "register() takes exactly 1 argument")
 		}
@@ -40,7 +40,7 @@ func InitCodecsModule() *core.DictValue {
 	}))
 
 	// unregister(search_function) - remove a previously registered search function
-	module.Set("unregister", core.NewNamedBuiltinFunction("unregister", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("unregister", core.NewNamedBuiltinFunction("unregister", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("unregister", nil, "unregister() takes exactly 1 argument")
 		}
@@ -50,7 +50,7 @@ func InitCodecsModule() *core.DictValue {
 	}))
 
 	// lookup(encoding) - lookup a codec by encoding name
-	module.Set("lookup", core.NewNamedBuiltinFunction("lookup", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("lookup", core.NewNamedBuiltinFunction("lookup", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("lookup", nil, "lookup() takes exactly 1 argument")
 		}
@@ -141,7 +141,7 @@ func InitCodecsModule() *core.DictValue {
 	}))
 
 	// register_error(name, handler) - register an error handler
-	module.Set("register_error", core.NewNamedBuiltinFunction("register_error", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("register_error", core.NewNamedBuiltinFunction("register_error", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, core.NewTypeError("register_error", nil, "register_error() takes exactly 2 arguments")
 		}
@@ -159,7 +159,7 @@ func InitCodecsModule() *core.DictValue {
 	}))
 
 	// lookup_error(name) - lookup an error handler
-	module.Set("lookup_error", core.NewNamedBuiltinFunction("lookup_error", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("lookup_error", core.NewNamedBuiltinFunction("lookup_error", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("lookup_error", nil, "lookup_error() takes exactly 1 argument")
 		}
@@ -179,7 +179,7 @@ func InitCodecsModule() *core.DictValue {
 	}))
 
 	// encode(obj, encoding='utf-8', errors='strict') - encode an object
-	module.Set("encode", core.NewNamedBuiltinFunction("encode", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("encode", core.NewNamedBuiltinFunction("encode", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 3 {
 			return nil, core.NewTypeError("encode", nil, "encode() takes 1 to 3 arguments")
 		}
@@ -219,7 +219,7 @@ func InitCodecsModule() *core.DictValue {
 	}))
 
 	// decode(obj, encoding='utf-8', errors='strict') - decode an object
-	module.Set("decode", core.NewNamedBuiltinFunction("decode", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("decode", core.NewNamedBuiltinFunction("decode", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 3 {
 			return nil, core.NewTypeError("decode", nil, "decode() takes 1 to 3 arguments")
 		}
@@ -258,7 +258,7 @@ func InitCodecsModule() *core.DictValue {
 	}))
 
 	// escape_encode(data, errors='strict') - used for string_escape codec
-	module.Set("escape_encode", core.NewNamedBuiltinFunction("escape_encode", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("escape_encode", core.NewNamedBuiltinFunction("escape_encode", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 2 {
 			return nil, core.NewTypeError("escape_encode", nil, "escape_encode() takes 1 to 2 arguments")
 		}
@@ -275,7 +275,7 @@ func InitCodecsModule() *core.DictValue {
 	}))
 
 	// escape_decode(data, errors='strict') - used for string_escape codec
-	module.Set("escape_decode", core.NewNamedBuiltinFunction("escape_decode", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("escape_decode", core.NewNamedBuiltinFunction("escape_decode", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 2 {
 			return nil, core.NewTypeError("escape_decode", nil, "escape_decode() takes 1 to 2 arguments")
 		}

@@ -26,8 +26,8 @@ func InitBinasciiModule() *core.DictValue {
 
 		return core.BytesValue(hex.EncodeToString(data)), nil
 	})
-	binasciiModule.Set("hexlify", hexlifyFunc)
-	binasciiModule.Set("b2a_hex", hexlifyFunc)
+	binasciiModule.SetStr("hexlify", hexlifyFunc)
+	binasciiModule.SetStr("b2a_hex", hexlifyFunc)
 
 	// unhexlify(hexstr) / a2b_hex(hexstr) - convert hex string to binary
 	unhexlifyFunc := core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -52,11 +52,11 @@ func InitBinasciiModule() *core.DictValue {
 
 		return core.BytesValue(data), nil
 	})
-	binasciiModule.Set("unhexlify", unhexlifyFunc)
-	binasciiModule.Set("a2b_hex", unhexlifyFunc)
+	binasciiModule.SetStr("unhexlify", unhexlifyFunc)
+	binasciiModule.SetStr("a2b_hex", unhexlifyFunc)
 
 	// b2a_base64(data, newline=True) - convert binary to base64
-	binasciiModule.Set("b2a_base64", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	binasciiModule.SetStr("b2a_base64", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("b2a_base64() requires at least 1 argument")
 		}
@@ -84,7 +84,7 @@ func InitBinasciiModule() *core.DictValue {
 	}))
 
 	// a2b_base64(string) - convert base64 to binary
-	binasciiModule.Set("a2b_base64", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	binasciiModule.SetStr("a2b_base64", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("a2b_base64() requires at least 1 argument")
 		}
@@ -108,7 +108,7 @@ func InitBinasciiModule() *core.DictValue {
 	}))
 
 	// crc32(data, value=0) - compute CRC-32 checksum
-	binasciiModule.Set("crc32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	binasciiModule.SetStr("crc32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("crc32() requires at least 1 argument")
 		}
@@ -133,7 +133,7 @@ func InitBinasciiModule() *core.DictValue {
 	}))
 
 	// Error exception class
-	binasciiModule.Set("Error", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	binasciiModule.SetStr("Error", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		msg := ""
 		if len(args) > 0 {
 			if s, ok := args[0].(core.StringValue); ok {
@@ -144,7 +144,7 @@ func InitBinasciiModule() *core.DictValue {
 	}))
 
 	// Incomplete exception class
-	binasciiModule.Set("Incomplete", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	binasciiModule.SetStr("Incomplete", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		msg := ""
 		if len(args) > 0 {
 			if s, ok := args[0].(core.StringValue); ok {

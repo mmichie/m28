@@ -883,7 +883,7 @@ func InitArrayModule() *core.DictValue {
 	arrayClass := core.NewClass("array", nil)
 
 	// array.array(typecode, [initializer]) constructor
-	arrayModule.Set("array", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	arrayModule.SetStr("array", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("array() missing required argument: 'typecode'")
 		}
@@ -975,10 +975,10 @@ func InitArrayModule() *core.DictValue {
 	}))
 
 	// ArrayType for isinstance checks
-	arrayModule.Set("ArrayType", arrayClass)
+	arrayModule.SetStr("ArrayType", arrayClass)
 
 	// typecodes - string of all available type codes
-	arrayModule.Set("typecodes", core.StringValue("bBuhHiIlLqQfd"))
+	arrayModule.SetStr("typecodes", core.StringValue("bBuhHiIlLqQfd"))
 
 	// _array_reconstructor(arraytype, typecode, mformat_code, items)
 	// Internal function used for pickling support
@@ -989,7 +989,7 @@ func InitArrayModule() *core.DictValue {
 	// 12=SIGNED_INT64_LE, 13=SIGNED_INT64_BE, 14=IEEE_754_FLOAT_LE, 15=IEEE_754_FLOAT_BE,
 	// 16=IEEE_754_DOUBLE_LE, 17=IEEE_754_DOUBLE_BE, 18=UTF16_LE, 19=UTF16_BE,
 	// 20=UTF32_LE, 21=UTF32_BE
-	arrayModule.Set("_array_reconstructor", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	arrayModule.SetStr("_array_reconstructor", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 4 {
 			return nil, fmt.Errorf("_array_reconstructor() requires 4 arguments")
 		}

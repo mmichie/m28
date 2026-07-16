@@ -85,33 +85,33 @@ func RegisterMathModuleWithBuilders(ctx *core.Context) {
 	mathModule := core.NewDict()
 
 	// Trigonometric functions - each was 12 lines, now 1 line
-	mathModule.Set("sin", core.NewBuiltinFunction(builders.UnaryNumberSimple("sin", math.Sin)))
-	mathModule.Set("cos", core.NewBuiltinFunction(builders.UnaryNumberSimple("cos", math.Cos)))
-	mathModule.Set("tan", core.NewBuiltinFunction(builders.UnaryNumberSimple("tan", math.Tan)))
-	mathModule.Set("asin", core.NewBuiltinFunction(builders.UnaryNumberSimple("asin", math.Asin)))
-	mathModule.Set("acos", core.NewBuiltinFunction(builders.UnaryNumberSimple("acos", math.Acos)))
-	mathModule.Set("atan", core.NewBuiltinFunction(builders.UnaryNumberSimple("atan", math.Atan)))
+	mathModule.SetStr("sin", core.NewBuiltinFunction(builders.UnaryNumberSimple("sin", math.Sin)))
+	mathModule.SetStr("cos", core.NewBuiltinFunction(builders.UnaryNumberSimple("cos", math.Cos)))
+	mathModule.SetStr("tan", core.NewBuiltinFunction(builders.UnaryNumberSimple("tan", math.Tan)))
+	mathModule.SetStr("asin", core.NewBuiltinFunction(builders.UnaryNumberSimple("asin", math.Asin)))
+	mathModule.SetStr("acos", core.NewBuiltinFunction(builders.UnaryNumberSimple("acos", math.Acos)))
+	mathModule.SetStr("atan", core.NewBuiltinFunction(builders.UnaryNumberSimple("atan", math.Atan)))
 
 	// Power and logarithmic functions
-	mathModule.Set("sqrt", core.NewBuiltinFunction(builders.UnaryNumberSimple("sqrt", math.Sqrt)))
-	mathModule.Set("pow", core.NewBuiltinFunction(builders.BinaryNumberSimple("pow", math.Pow)))
-	mathModule.Set("exp", core.NewBuiltinFunction(builders.UnaryNumberSimple("exp", math.Exp)))
-	mathModule.Set("log", core.NewBuiltinFunction(builders.UnaryNumberSimple("log", math.Log)))
-	mathModule.Set("log10", core.NewBuiltinFunction(builders.UnaryNumberSimple("log10", math.Log10)))
+	mathModule.SetStr("sqrt", core.NewBuiltinFunction(builders.UnaryNumberSimple("sqrt", math.Sqrt)))
+	mathModule.SetStr("pow", core.NewBuiltinFunction(builders.BinaryNumberSimple("pow", math.Pow)))
+	mathModule.SetStr("exp", core.NewBuiltinFunction(builders.UnaryNumberSimple("exp", math.Exp)))
+	mathModule.SetStr("log", core.NewBuiltinFunction(builders.UnaryNumberSimple("log", math.Log)))
+	mathModule.SetStr("log10", core.NewBuiltinFunction(builders.UnaryNumberSimple("log10", math.Log10)))
 
 	// Rounding functions
-	mathModule.Set("ceil", core.NewBuiltinFunction(builders.UnaryNumberSimple("ceil", math.Ceil)))
-	mathModule.Set("floor", core.NewBuiltinFunction(builders.UnaryNumberSimple("floor", math.Floor)))
-	mathModule.Set("round", core.NewBuiltinFunction(builders.UnaryNumberSimple("round", math.Round)))
-	mathModule.Set("trunc", core.NewBuiltinFunction(builders.UnaryNumberSimple("trunc", math.Trunc)))
+	mathModule.SetStr("ceil", core.NewBuiltinFunction(builders.UnaryNumberSimple("ceil", math.Ceil)))
+	mathModule.SetStr("floor", core.NewBuiltinFunction(builders.UnaryNumberSimple("floor", math.Floor)))
+	mathModule.SetStr("round", core.NewBuiltinFunction(builders.UnaryNumberSimple("round", math.Round)))
+	mathModule.SetStr("trunc", core.NewBuiltinFunction(builders.UnaryNumberSimple("trunc", math.Trunc)))
 
 	// Other math functions
-	mathModule.Set("abs", core.NewBuiltinFunction(builders.UnaryNumberSimple("abs", math.Abs)))
-	mathModule.Set("atan2", core.NewBuiltinFunction(builders.BinaryNumberSimple("atan2", math.Atan2)))
+	mathModule.SetStr("abs", core.NewBuiltinFunction(builders.UnaryNumberSimple("abs", math.Abs)))
+	mathModule.SetStr("atan2", core.NewBuiltinFunction(builders.BinaryNumberSimple("atan2", math.Atan2)))
 
 	// Constants
-	mathModule.Set("pi", core.NumberValue(math.Pi))
-	mathModule.Set("e", core.NumberValue(math.E))
+	mathModule.SetStr("pi", core.NumberValue(math.Pi))
+	mathModule.SetStr("e", core.NumberValue(math.E))
 
 	// Register the module
 	registry := core.GetModuleRegistry()

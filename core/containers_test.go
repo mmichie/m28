@@ -178,9 +178,9 @@ func TestNewDict(t *testing.T) {
 func TestDictSetGet(t *testing.T) {
 	d := NewDict()
 
-	d.Set("key1", NumberValue(42))
+	d.SetStr("key1", NumberValue(42))
 
-	val, ok := d.Get("key1")
+	val, ok := d.GetStr("key1")
 	if !ok {
 		t.Error("Key should exist")
 	}
@@ -189,7 +189,7 @@ func TestDictSetGet(t *testing.T) {
 	}
 
 	// Non-existent key
-	_, ok = d.Get("nonexistent")
+	_, ok = d.GetStr("nonexistent")
 	if ok {
 		t.Error("Non-existent key should return false")
 	}
@@ -216,11 +216,11 @@ func TestDictSetValueGetValue(t *testing.T) {
 
 func TestDictDelete(t *testing.T) {
 	d := NewDict()
-	d.Set("key", NumberValue(1))
+	d.SetStr("key", NumberValue(1))
 
-	d.Delete("key")
+	d.DeleteStr("key")
 
-	_, ok := d.Get("key")
+	_, ok := d.GetStr("key")
 	if ok {
 		t.Error("Key should be deleted")
 	}
@@ -243,10 +243,10 @@ func TestDictDeleteValue(t *testing.T) {
 
 func TestDictKeys(t *testing.T) {
 	d := NewDict()
-	d.Set("a", NumberValue(1))
-	d.Set("b", NumberValue(2))
+	d.SetStr("a", NumberValue(1))
+	d.SetStr("b", NumberValue(2))
 
-	keys := d.Keys()
+	keys := d.OriginalKeys()
 	if len(keys) != 2 {
 		t.Errorf("Expected 2 keys, got %d", len(keys))
 	}
@@ -277,8 +277,8 @@ func TestDictOriginalKeys(t *testing.T) {
 
 func TestDictIterator(t *testing.T) {
 	d := NewDict()
-	d.Set("a", NumberValue(1))
-	d.Set("b", NumberValue(2))
+	d.SetStr("a", NumberValue(1))
+	d.SetStr("b", NumberValue(2))
 
 	iter := d.Iterator()
 	count := 0
@@ -297,7 +297,7 @@ func TestDictIterator(t *testing.T) {
 
 func TestDictString(t *testing.T) {
 	d := NewDict()
-	d.Set("key", NumberValue(42))
+	d.SetStr("key", NumberValue(42))
 
 	str := d.String()
 	// Dict string format may vary, just check it contains key-value

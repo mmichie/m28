@@ -13,41 +13,41 @@ func InitZlibModule() *core.DictValue {
 	module := core.NewDict()
 
 	// Module metadata
-	module.Set("__name__", core.StringValue("zlib"))
-	module.Set("__doc__", core.StringValue("zlib compression/decompression (stub)"))
+	module.SetStr("__name__", core.StringValue("zlib"))
+	module.SetStr("__doc__", core.StringValue("zlib compression/decompression (stub)"))
 
 	// Constants
-	module.Set("Z_DEFAULT_COMPRESSION", core.NumberValue(-1))
-	module.Set("MAX_WBITS", core.NumberValue(15))
-	module.Set("DEFLATED", core.NumberValue(8))
+	module.SetStr("Z_DEFAULT_COMPRESSION", core.NumberValue(-1))
+	module.SetStr("MAX_WBITS", core.NumberValue(15))
+	module.SetStr("DEFLATED", core.NumberValue(8))
 
 	// compress function stub
-	module.Set("compress", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("compress", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("NotImplementedError: zlib compression not yet implemented in M28")
 	}))
 
 	// decompress function stub
-	module.Set("decompress", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("decompress", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("NotImplementedError: zlib decompression not yet implemented in M28")
 	}))
 
 	// compressobj function stub
-	module.Set("compressobj", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("compressobj", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("NotImplementedError: zlib compressobj not yet implemented in M28")
 	}))
 
 	// decompressobj function stub
-	module.Set("decompressobj", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("decompressobj", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("NotImplementedError: zlib decompressobj not yet implemented in M28")
 	}))
 
 	// crc32 function stub
-	module.Set("crc32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("crc32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("NotImplementedError: zlib crc32 not yet implemented in M28")
 	}))
 
 	// adler32 function stub
-	module.Set("adler32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("adler32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return nil, fmt.Errorf("NotImplementedError: zlib adler32 not yet implemented in M28")
 	}))
 

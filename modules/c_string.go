@@ -20,7 +20,7 @@ func Init_StringModule() *core.DictValue {
 	// Grammar (simplified): "literal {field[!conv][:spec]}literal..." with
 	// {{ and }} for literal braces. Supports nested braces in format_spec for
 	// format strings like "{x:{width}}".
-	stringModule.Set("formatter_parser", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	stringModule.SetStr("formatter_parser", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("str", nil, "formatter_parser() argument")
 		}
@@ -59,7 +59,7 @@ func Init_StringModule() *core.DictValue {
 	// and rest is an iterator of (is_attr, key) pairs for chained access.
 	// e.g. "foo.bar[0]" -> ("foo", [(True, "bar"), (False, 0)])
 	//      "0.name"     -> (0,     [(True, "name")])
-	stringModule.Set("formatter_field_name_split", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	stringModule.SetStr("formatter_field_name_split", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("str", nil, "formatter_field_name_split() argument")
 		}

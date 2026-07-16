@@ -17,7 +17,7 @@ func Init_FrozenImportlibExternalModule() *core.DictValue {
 
 	// _install() - No-op function for import machinery setup
 	// CPython uses this to install the frozen external import machinery, but M28 has its own system
-	frozenImportlibExternalModule.Set("_install", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	frozenImportlibExternalModule.SetStr("_install", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// No-op: M28 uses its own import system
 		return core.None, nil
 	}))
@@ -25,7 +25,7 @@ func Init_FrozenImportlibExternalModule() *core.DictValue {
 	// _pack_uint32(x) - Pack a uint32 into 4 bytes (little-endian)
 	// Used by CPython for .pyc file generation. M28 doesn't use .pyc files,
 	// but importlib may call this, so we provide a working implementation.
-	frozenImportlibExternalModule.Set("_pack_uint32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	frozenImportlibExternalModule.SetStr("_pack_uint32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("_pack_uint32 expected 1 argument, got %d", len(args))
 		}
@@ -51,7 +51,7 @@ func Init_FrozenImportlibExternalModule() *core.DictValue {
 
 	// _unpack_uint32(data) - Unpack 4 bytes (little-endian) into a uint32
 	// Companion to _pack_uint32, used by CPython's importlib for reading .pyc files
-	frozenImportlibExternalModule.Set("_unpack_uint32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	frozenImportlibExternalModule.SetStr("_unpack_uint32", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("_unpack_uint32 expected 1 argument, got %d", len(args))
 		}
@@ -78,16 +78,16 @@ func Init_FrozenImportlibExternalModule() *core.DictValue {
 	// Stub bootstrap loaders as empty classes/dicts
 	// These are part of CPython's import machinery that M28 doesn't need
 	// But some code might try to access them, so we provide empty stubs
-	frozenImportlibExternalModule.Set("SourceFileLoader", core.NewDict())
-	frozenImportlibExternalModule.Set("ExtensionFileLoader", core.NewDict())
-	frozenImportlibExternalModule.Set("ModuleSpec", core.NewDict())
-	frozenImportlibExternalModule.Set("FileFinder", core.NewDict())
+	frozenImportlibExternalModule.SetStr("SourceFileLoader", core.NewDict())
+	frozenImportlibExternalModule.SetStr("ExtensionFileLoader", core.NewDict())
+	frozenImportlibExternalModule.SetStr("ModuleSpec", core.NewDict())
+	frozenImportlibExternalModule.SetStr("FileFinder", core.NewDict())
 
 	// __name__ - Module name attribute
-	frozenImportlibExternalModule.Set("__name__", core.StringValue("_frozen_importlib_external"))
+	frozenImportlibExternalModule.SetStr("__name__", core.StringValue("_frozen_importlib_external"))
 
 	// __doc__ - Module docstring
-	frozenImportlibExternalModule.Set("__doc__", core.StringValue("Stub for CPython's frozen external import machinery. M28 uses its own import system."))
+	frozenImportlibExternalModule.SetStr("__doc__", core.StringValue("Stub for CPython's frozen external import machinery. M28 uses its own import system."))
 
 	return frozenImportlibExternalModule
 }

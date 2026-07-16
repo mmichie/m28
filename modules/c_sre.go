@@ -42,7 +42,7 @@ func buildSreMatchObject(input string, m []int, groupNames []string) *core.DictV
 			return 0, 0, fmt.Errorf("group argument must be int or str")
 		}
 	}
-	matchObj.Set("start", core.NewNamedBuiltinFunction("start", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	matchObj.SetStr("start", core.NewNamedBuiltinFunction("start", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		var arg core.Value = core.NumberValue(0)
 		if len(args) > 0 {
 			arg = args[0]
@@ -53,7 +53,7 @@ func buildSreMatchObject(input string, m []int, groupNames []string) *core.DictV
 		}
 		return core.NumberValue(float64(s)), nil
 	}))
-	matchObj.Set("end", core.NewNamedBuiltinFunction("end", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	matchObj.SetStr("end", core.NewNamedBuiltinFunction("end", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		var arg core.Value = core.NumberValue(0)
 		if len(args) > 0 {
 			arg = args[0]
@@ -73,7 +73,7 @@ func buildSreMatchObject(input string, m []int, groupNames []string) *core.DictV
 			groupPresent[i] = true
 		}
 	}
-	matchObj.Set("group", core.NewNamedBuiltinFunction("group", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	matchObj.SetStr("group", core.NewNamedBuiltinFunction("group", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.StringValue(matchText), nil
 		}
@@ -116,7 +116,7 @@ func buildSreMatchObject(input string, m []int, groupNames []string) *core.DictV
 		}
 		return core.TupleValue(results), nil
 	}))
-	matchObj.Set("groups", core.NewNamedBuiltinFunction("groups", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	matchObj.SetStr("groups", core.NewNamedBuiltinFunction("groups", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		def := core.Value(core.None)
 		if len(args) > 0 {
 			def = args[0]
@@ -131,7 +131,7 @@ func buildSreMatchObject(input string, m []int, groupNames []string) *core.DictV
 		}
 		return result, nil
 	}))
-	matchObj.Set("groupdict", core.NewNamedBuiltinFunction("groupdict", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	matchObj.SetStr("groupdict", core.NewNamedBuiltinFunction("groupdict", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		def := core.Value(core.None)
 		if len(args) > 0 {
 			def = args[0]
@@ -145,14 +145,14 @@ func buildSreMatchObject(input string, m []int, groupNames []string) *core.DictV
 				continue
 			}
 			if groupPresent[i] {
-				d.Set(name, core.StringValue(allGroups[i]))
+				d.SetStr(name, core.StringValue(allGroups[i]))
 			} else {
-				d.Set(name, def)
+				d.SetStr(name, def)
 			}
 		}
 		return d, nil
 	}))
-	matchObj.Set("span", core.NewNamedBuiltinFunction("span", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	matchObj.SetStr("span", core.NewNamedBuiltinFunction("span", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.TupleValue{core.NumberValue(float64(m[0])), core.NumberValue(float64(m[1]))}, nil
 	}))
 	return matchObj
@@ -253,7 +253,7 @@ func expandSreReplacement(repl string, input string, m []int, groupNames []strin
 // of common features Go's regexp doesn't support natively (lookaheads).
 // patternFlags reads the integer flags stored on a compiled-pattern dict.
 func patternFlags(pattern *core.DictValue) int {
-	if fv, ok := pattern.Get(core.ValueToKey(core.StringValue("flags"))); ok {
+	if fv, ok := pattern.GetStr("flags"); ok {
 		if fn, ok := fv.(core.NumberValue); ok {
 			return int(fn)
 		}
@@ -497,19 +497,19 @@ func Init_SREModule() *core.DictValue {
 	//   Python 3.12 = 20221023
 	//   Python 3.13 = 20230612
 	// We default to 20230612 since we typically run against Python 3.13 stdlib.
-	module.Set("MAGIC", core.NumberValue(20230612))
+	module.SetStr("MAGIC", core.NumberValue(20230612))
 
 	// CODESIZE - size of regex opcode in bytes (typically 2 or 4)
-	module.Set("CODESIZE", core.NumberValue(4))
+	module.SetStr("CODESIZE", core.NumberValue(4))
 
 	// MAXREPEAT - maximum repeat count
-	module.Set("MAXREPEAT", core.NumberValue(4294967295)) // 2^32 - 1
+	module.SetStr("MAXREPEAT", core.NumberValue(4294967295)) // 2^32 - 1
 
 	// MAXGROUPS - maximum number of groups
-	module.Set("MAXGROUPS", core.NumberValue(2147483647)) // 2^31 - 1
+	module.SetStr("MAXGROUPS", core.NumberValue(2147483647)) // 2^31 - 1
 
 	// unicode_iscased - check if a Unicode character has case
-	module.Set("unicode_iscased", core.NewNamedBuiltinFunction("unicode_iscased", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("unicode_iscased", core.NewNamedBuiltinFunction("unicode_iscased", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("unicode_iscased", nil, "unicode_iscased() takes exactly 1 argument")
 		}
@@ -536,7 +536,7 @@ func Init_SREModule() *core.DictValue {
 	}))
 
 	// unicode_tolower - convert Unicode character to lowercase
-	module.Set("unicode_tolower", core.NewNamedBuiltinFunction("unicode_tolower", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("unicode_tolower", core.NewNamedBuiltinFunction("unicode_tolower", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("unicode_tolower", nil, "unicode_tolower() takes exactly 1 argument")
 		}
@@ -561,7 +561,7 @@ func Init_SREModule() *core.DictValue {
 	}))
 
 	// ascii_iscased - check if an ASCII character has case
-	module.Set("ascii_iscased", core.NewNamedBuiltinFunction("ascii_iscased", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("ascii_iscased", core.NewNamedBuiltinFunction("ascii_iscased", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("ascii_iscased", nil, "ascii_iscased() takes exactly 1 argument")
 		}
@@ -587,7 +587,7 @@ func Init_SREModule() *core.DictValue {
 	}))
 
 	// ascii_tolower - convert ASCII character to lowercase
-	module.Set("ascii_tolower", core.NewNamedBuiltinFunction("ascii_tolower", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("ascii_tolower", core.NewNamedBuiltinFunction("ascii_tolower", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("ascii_tolower", nil, "ascii_tolower() takes exactly 1 argument")
 		}
@@ -616,7 +616,7 @@ func Init_SREModule() *core.DictValue {
 
 	// compile - compile a regex pattern (stub)
 	// Returns a minimal pattern object
-	module.Set("compile", core.NewNamedBuiltinFunction("compile", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("compile", core.NewNamedBuiltinFunction("compile", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("compile", nil, "compile() takes at least 1 argument")
 		}
@@ -649,8 +649,7 @@ func Init_SREModule() *core.DictValue {
 		// Add stub methods - use SetValue for proper key formatting
 		pattern.SetValue(core.StringValue("match"), core.NewNamedBuiltinFunction("match", func(matchArgs []core.Value, matchCtx *core.Context) (core.Value, error) {
 			// Get the pattern string from the pattern object
-			patternKey := core.ValueToKey(core.StringValue("pattern"))
-			patternVal, ok := pattern.Get(patternKey)
+			patternVal, ok := pattern.GetStr("pattern")
 			if !ok {
 				return nil, fmt.Errorf("pattern object has no pattern string")
 			}
@@ -720,7 +719,7 @@ func Init_SREModule() *core.DictValue {
 		}))
 
 		pattern.SetValue(core.StringValue("fullmatch"), core.NewNamedBuiltinFunction("fullmatch", func(fmArgs []core.Value, fmCtx *core.Context) (core.Value, error) {
-			patternVal, ok := pattern.Get(core.ValueToKey(core.StringValue("pattern")))
+			patternVal, ok := pattern.GetStr("pattern")
 			if !ok {
 				return nil, fmt.Errorf("pattern object has no pattern string")
 			}
@@ -762,8 +761,7 @@ func Init_SREModule() *core.DictValue {
 
 		pattern.SetValue(core.StringValue("search"), core.NewNamedBuiltinFunction("search", func(searchArgs []core.Value, searchCtx *core.Context) (core.Value, error) {
 			// Get the pattern string from the pattern object
-			patternKey := core.ValueToKey(core.StringValue("pattern"))
-			patternVal, ok := pattern.Get(patternKey)
+			patternVal, ok := pattern.GetStr("pattern")
 			if !ok {
 				return nil, fmt.Errorf("pattern object has no pattern string")
 			}
@@ -836,8 +834,7 @@ func Init_SREModule() *core.DictValue {
 
 		pattern.SetValue(core.StringValue("findall"), core.NewNamedBuiltinFunction("findall", func(findallArgs []core.Value, findallCtx *core.Context) (core.Value, error) {
 			// Get the pattern string from the pattern object
-			patternKey := core.ValueToKey(core.StringValue("pattern"))
-			patternVal, ok := pattern.Get(patternKey)
+			patternVal, ok := pattern.GetStr("pattern")
 			if !ok {
 				return nil, fmt.Errorf("pattern object has no pattern string")
 			}
@@ -847,8 +844,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Get the flags from the pattern object
-			flagsKey := core.ValueToKey(core.StringValue("flags"))
-			flagsVal, _ := pattern.Get(flagsKey)
+			flagsVal, _ := pattern.GetStr("flags")
 			flags := 0
 			if f, ok := flagsVal.(core.NumberValue); ok {
 				flags = int(f)
@@ -1021,8 +1017,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Get pattern string and flags from the closed-over pattern dict
-			patternKey := core.ValueToKey(core.StringValue("pattern"))
-			patternVal, ok := pattern.Get(patternKey)
+			patternVal, ok := pattern.GetStr("pattern")
 			if !ok {
 				return nil, fmt.Errorf("pattern object has no pattern string")
 			}
@@ -1030,8 +1025,7 @@ func Init_SREModule() *core.DictValue {
 			if !ok {
 				return nil, fmt.Errorf("pattern must be a string")
 			}
-			flagsKey := core.ValueToKey(core.StringValue("flags"))
-			flagsVal, _ := pattern.Get(flagsKey)
+			flagsVal, _ := pattern.GetStr("flags")
 			flags := 0
 			if f, ok := flagsVal.(core.NumberValue); ok {
 				flags = int(f)
@@ -1115,8 +1109,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Get the pattern string from the pattern object
-			patternKey := core.ValueToKey(core.StringValue("pattern"))
-			patternVal, ok := pattern.Get(patternKey)
+			patternVal, ok := pattern.GetStr("pattern")
 			if !ok {
 				return nil, fmt.Errorf("pattern object has no pattern string")
 			}
@@ -1196,8 +1189,7 @@ func Init_SREModule() *core.DictValue {
 		// finditer - return iterator over all matches (returns list of match objects for now)
 		pattern.SetValue(core.StringValue("finditer"), core.NewNamedBuiltinFunction("finditer", func(finditerArgs []core.Value, finditerCtx *core.Context) (core.Value, error) {
 			// Get the pattern string from the pattern object
-			patternKey := core.ValueToKey(core.StringValue("pattern"))
-			patternVal, ok := pattern.Get(patternKey)
+			patternVal, ok := pattern.GetStr("pattern")
 			if !ok {
 				return nil, fmt.Errorf("pattern object has no pattern string")
 			}
@@ -1207,8 +1199,7 @@ func Init_SREModule() *core.DictValue {
 			}
 
 			// Get the flags from the pattern object
-			flagsKey := core.ValueToKey(core.StringValue("flags"))
-			flagsVal, _ := pattern.Get(flagsKey)
+			flagsVal, _ := pattern.GetStr("flags")
 			flags := 0
 			if f, ok := flagsVal.(core.NumberValue); ok {
 				flags = int(f)
@@ -1320,7 +1311,7 @@ func Init_SREModule() *core.DictValue {
 	}))
 
 	// getlower - get lowercase version of character (with locale)
-	module.Set("getlower", core.NewNamedBuiltinFunction("getlower", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("getlower", core.NewNamedBuiltinFunction("getlower", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, core.NewTypeError("getlower", nil, "getlower() takes at least 2 arguments")
 		}
@@ -1346,12 +1337,12 @@ func Init_SREModule() *core.DictValue {
 	}))
 
 	// getcodesize - get the size of compiled regex code
-	module.Set("getcodesize", core.NewNamedBuiltinFunction("getcodesize", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("getcodesize", core.NewNamedBuiltinFunction("getcodesize", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(4), nil
 	}))
 
 	// getlower_locale - lowercase with locale (stub - just uses regular lowercase)
-	module.Set("getlower_locale", core.NewNamedBuiltinFunction("getlower_locale", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("getlower_locale", core.NewNamedBuiltinFunction("getlower_locale", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("getlower_locale", nil, "getlower_locale() takes at least 1 argument")
 		}

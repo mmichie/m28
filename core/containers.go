@@ -848,13 +848,15 @@ func (v *DictView) Contains(x Value) bool {
 		_, ok := v.dict.GetValue(x)
 		return ok
 	case DictValuesViewKind:
-		for _, k := range v.dict.Keys() {
-			val, _ := v.dict.Get(k)
+		found := false
+		v.dict.ForEach(func(_, val Value) bool {
 			if EqualValues(val, x) {
-				return true
+				found = true
+				return false
 			}
-		}
-		return false
+			return true
+		})
+		return found
 	case DictItemsViewKind:
 		pair, ok := x.(TupleValue)
 		if !ok || len(pair) != 2 {

@@ -80,7 +80,7 @@ func Init_TokenizeModule() *core.DictValue {
 		}, nil
 	})
 
-	tokenizeModule.Set("TokenizerIter", tokenizerIterClass)
+	tokenizeModule.SetStr("TokenizerIter", tokenizerIterClass)
 
 	return tokenizeModule
 }

@@ -13,7 +13,7 @@ func InitUnicodedataModule() *core.DictValue {
 	// normalize(form, string) -> string
 	// Unicode normalization - for now, just return the string unchanged
 	// This is sufficient for test.support.os_helper which uses it for test filenames
-	module.Set("normalize", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("normalize", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, core.NewTypeError("normalize", nil, "normalize() takes exactly 2 arguments")
 		}
@@ -25,7 +25,7 @@ func InitUnicodedataModule() *core.DictValue {
 
 	// name(character[, default]) -> string
 	// Return the name assigned to the character, or default if not found
-	module.Set("name", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("name", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("name", nil, "name() takes at least 1 argument")
 		}
@@ -38,7 +38,7 @@ func InitUnicodedataModule() *core.DictValue {
 
 	// lookup(name) -> character
 	// Look up character by name
-	module.Set("lookup", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("lookup", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("lookup", nil, "lookup() takes exactly 1 argument")
 		}
@@ -48,7 +48,7 @@ func InitUnicodedataModule() *core.DictValue {
 
 	// category(character) -> string
 	// Return general category assigned to the character
-	module.Set("category", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("category", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("category", nil, "category() takes exactly 1 argument")
 		}

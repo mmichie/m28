@@ -633,7 +633,7 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 			globalsDict = core.NewDict()
 			for name, value := range globalCtx.Vars {
 				keyVal := core.StringValue(name)
-				globalsDict.SetWithKey(core.ValueToKey(keyVal), keyVal, value)
+				globalsDict.SetValue(keyVal, value)
 			}
 		} else {
 			// No global context, return empty dict
@@ -650,7 +650,7 @@ func (f *UserFunction) GetAttr(name string) (core.Value, bool) {
 		// Return tuple of closure cells (or None for no closure)
 		// For now, return a tuple with a dummy cell to avoid subscript errors
 		dummyCell := core.NewDict()
-		dummyCell.Set("cell_contents", core.None)
+		dummyCell.SetStr("cell_contents", core.None)
 		return core.TupleValue{dummyCell}, true
 	case "__annotations__":
 		// Check if __annotations__ was explicitly set

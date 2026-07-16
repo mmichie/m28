@@ -282,7 +282,7 @@ func MergeFunc(args []core.Value, ctx *core.Context) (core.Value, error) {
 			// Get the value for this key
 			value, found := dict.GetAttr(keyStr)
 			if found {
-				result.Set(keyStr, value)
+				result.SetStr(keyStr, value)
 			}
 		}
 	}

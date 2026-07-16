@@ -398,10 +398,9 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 			if moduleName == "__main__" {
 				// Try to get sys.modules
 				if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
-					if sysModulesVal, ok := sysModule.Get("modules"); ok {
+					if sysModulesVal, ok := sysModule.GetStr("modules"); ok {
 						if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
-							key := core.ValueToKey(core.StringValue("__main__"))
-							if mainModule, ok := sysModulesDict.Get(key); ok {
+							if mainModule, ok := sysModulesDict.GetStr("__main__"); ok {
 								return mainModule, nil
 							}
 						}
@@ -410,9 +409,9 @@ func RegisterEssentialBuiltins(ctx *core.Context) {
 
 				// Fallback: return a mock __main__ module if not found in sys.modules
 				mainModule := core.NewDict()
-				mainModule.Set("__name__", core.StringValue("__main__"))
-				mainModule.Set("__file__", core.StringValue("<stdin>"))
-				mainModule.Set("__package__", core.None)
+				mainModule.SetStr("__name__", core.StringValue("__main__"))
+				mainModule.SetStr("__file__", core.StringValue("<stdin>"))
+				mainModule.SetStr("__package__", core.None)
 				return mainModule, nil
 			}
 

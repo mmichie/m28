@@ -25,16 +25,16 @@ func Init_WarningsModule() *core.DictValue {
 	// project rule of letting pure-Python stdlib run directly.
 
 	// filters - list of warning filters
-	warningsModule.Set("filters", core.NewList())
+	warningsModule.SetStr("filters", core.NewList())
 
 	// _defaultaction - default warning action
-	warningsModule.Set("_defaultaction", core.StringValue("default"))
+	warningsModule.SetStr("_defaultaction", core.StringValue("default"))
 
 	// _onceregistry - registry for "once" warnings
-	warningsModule.Set("_onceregistry", core.NewDict())
+	warningsModule.SetStr("_onceregistry", core.NewDict())
 
 	// _filters_mutated - called when filters list is modified
-	warningsModule.Set("_filters_mutated", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	warningsModule.SetStr("_filters_mutated", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// No-op for now - would normally invalidate warning caches
 		return core.None, nil
 	}))
@@ -45,7 +45,7 @@ func Init_WarningsModule() *core.DictValue {
 		// Default: just ignore warnings
 		return core.None, nil
 	})
-	warningsModule.Set("_showwarnmsg_impl", showwarnmsgImpl)
+	warningsModule.SetStr("_showwarnmsg_impl", showwarnmsgImpl)
 
 	// showwarning - show a warning
 	showwarningFunc := &core.BuiltinFunctionWithKwargs{
@@ -57,11 +57,11 @@ func Init_WarningsModule() *core.DictValue {
 			return core.None, nil
 		},
 	}
-	warningsModule.Set("showwarning", showwarningFunc)
+	warningsModule.SetStr("showwarning", showwarningFunc)
 
 	// _showwarning_orig - original showwarning implementation
 	// Used by catch_warnings to reset
-	warningsModule.Set("_showwarning_orig", showwarningFunc)
+	warningsModule.SetStr("_showwarning_orig", showwarningFunc)
 
 	return warningsModule
 }

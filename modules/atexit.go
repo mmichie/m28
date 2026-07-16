@@ -17,7 +17,7 @@ func InitAtexitModule() *core.DictValue {
 	registeredFuncs := []core.Value{}
 
 	// register(func, *args, **kwargs) - register a function to be called at exit
-	atexitModule.SetWithKey("register", core.StringValue("register"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	atexitModule.SetStr("register", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("register", args)
 		if err := v.Min(1); err != nil {
 			return nil, err
@@ -41,7 +41,7 @@ func InitAtexitModule() *core.DictValue {
 	}))
 
 	// unregister(func) - unregister a function
-	atexitModule.SetWithKey("unregister", core.StringValue("unregister"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	atexitModule.SetStr("unregister", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("unregister", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err
@@ -64,7 +64,7 @@ func InitAtexitModule() *core.DictValue {
 	}))
 
 	// _ncallbacks() - return number of registered callbacks
-	atexitModule.SetWithKey("_ncallbacks", core.StringValue("_ncallbacks"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	atexitModule.SetStr("_ncallbacks", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("_ncallbacks", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -74,7 +74,7 @@ func InitAtexitModule() *core.DictValue {
 	}))
 
 	// _run_exitfuncs() - run all registered exit functions
-	atexitModule.SetWithKey("_run_exitfuncs", core.StringValue("_run_exitfuncs"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	atexitModule.SetStr("_run_exitfuncs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("_run_exitfuncs", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -97,7 +97,7 @@ func InitAtexitModule() *core.DictValue {
 	}))
 
 	// _clear() - clear all registered callbacks
-	atexitModule.SetWithKey("_clear", core.StringValue("_clear"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	atexitModule.SetStr("_clear", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("_clear", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err

@@ -14,7 +14,7 @@ func InitOperatorModule() *core.DictValue {
 	module := core.NewDict()
 
 	// Module docstring
-	module.Set("__doc__", core.StringValue("Operator interface"))
+	module.SetStr("__doc__", core.StringValue("Operator interface"))
 
 	// index(a) - return a converted to an integer via the __index__ protocol
 	// (CPython's PyNumber_Index). Integers and int subclasses are returned
@@ -24,7 +24,7 @@ func InitOperatorModule() *core.DictValue {
 	// raised. operator.py defines a pure-Python index() that simply calls
 	// a.__index__() with no validation; importing this one via
 	// `from _operator import *` overrides it with the validating version.
-	module.Set("index", core.NewNamedBuiltinFunction("index", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("index", core.NewNamedBuiltinFunction("index", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("index", nil, "index expected 1 argument")
 		}
@@ -46,7 +46,7 @@ func InitOperatorModule() *core.DictValue {
 	}))
 
 	// length_hint(obj, default=0) - get length hint for iteration (PEP 424)
-	module.Set("length_hint", core.NewNamedBuiltinFunction("length_hint", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("length_hint", core.NewNamedBuiltinFunction("length_hint", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 || len(args) > 2 {
 			return nil, core.NewTypeError("length_hint", nil, "length_hint expected 1 or 2 arguments")
 		}

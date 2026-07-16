@@ -16,14 +16,14 @@ func Init_CompatPickleModule() *core.DictValue {
 	reverseImportMapping := core.NewDict()
 	reverseNameMapping := core.NewDict()
 
-	module.Set("IMPORT_MAPPING", importMapping)
-	module.Set("NAME_MAPPING", nameMapping)
-	module.Set("REVERSE_IMPORT_MAPPING", reverseImportMapping)
-	module.Set("REVERSE_NAME_MAPPING", reverseNameMapping)
+	module.SetStr("IMPORT_MAPPING", importMapping)
+	module.SetStr("NAME_MAPPING", nameMapping)
+	module.SetStr("REVERSE_IMPORT_MAPPING", reverseImportMapping)
+	module.SetStr("REVERSE_NAME_MAPPING", reverseNameMapping)
 
 	// __name__ and __doc__
-	module.Set("__name__", core.StringValue("_compat_pickle"))
-	module.Set("__doc__", core.StringValue("Compatibility mappings for pickle between Python 2 and 3"))
+	module.SetStr("__name__", core.StringValue("_compat_pickle"))
+	module.SetStr("__doc__", core.StringValue("Compatibility mappings for pickle between Python 2 and 3"))
 
 	return module
 }

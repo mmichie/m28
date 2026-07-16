@@ -20,8 +20,8 @@ func InitPosixModule() *core.DictValue {
 	// Map os module functions to posix module
 	// These are the core POSIX functions that Python's os.py expects
 	copyFunction := func(name string) {
-		if val, found := osModule.Get(name); found {
-			posixModule.SetWithKey(name, core.StringValue(name), val)
+		if val, found := osModule.GetStr(name); found {
+			posixModule.SetStr(name, val)
 		}
 	}
 
@@ -104,11 +104,11 @@ func InitPosixModule() *core.DictValue {
 	copyFunction("devnull")
 
 	// Add stat function with keyword argument support
-	posixModule.SetWithKey("stat", core.StringValue("stat"), &KwargsPosixStat{followSymlinks: true})
-	posixModule.SetWithKey("lstat", core.StringValue("lstat"), &KwargsPosixStat{followSymlinks: false})
+	posixModule.SetStr("stat", &KwargsPosixStat{followSymlinks: true})
+	posixModule.SetStr("lstat", &KwargsPosixStat{followSymlinks: false})
 
 	// Add scandir - returns iterator of directory entries
-	posixModule.SetWithKey("scandir", core.StringValue("scandir"), core.NewBuiltinFunction(posixScandir))
+	posixModule.SetStr("scandir", core.NewBuiltinFunction(posixScandir))
 
 	// Add DirEntry as a type object so isinstance(x, os.DirEntry) works. The
 	// entries yielded by scandir report Type() == "DirEntry", which the generic
@@ -116,18 +116,18 @@ func InitPosixModule() *core.DictValue {
 	// relies on isinstance(path, os.DirEntry) and otherwise raises AttributeError.
 	dirEntryType := core.NewClass("DirEntry", nil)
 	dirEntryType.Module = "posix"
-	posixModule.SetWithKey("DirEntry", core.StringValue("DirEntry"), dirEntryType)
+	posixModule.SetStr("DirEntry", dirEntryType)
 
 	// Add filesystem encoding functions
-	posixModule.SetWithKey("getfilesystemencoding", core.StringValue("getfilesystemencoding"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("getfilesystemencoding", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.StringValue("utf-8"), nil
 	}))
-	posixModule.SetWithKey("getfilesystemencodeerrors", core.StringValue("getfilesystemencodeerrors"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("getfilesystemencodeerrors", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.StringValue("surrogateescape"), nil
 	}))
 
 	// Add fspath - convert path-like object to string or bytes
-	posixModule.SetWithKey("fspath", core.StringValue("fspath"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("fspath", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("fspath() takes exactly one argument")
 		}
@@ -152,20 +152,20 @@ func InitPosixModule() *core.DictValue {
 	}))
 
 	// Add required constants
-	posixModule.SetWithKey("name", core.StringValue("name"), core.StringValue("posix"))
+	posixModule.SetStr("name", core.StringValue("posix"))
 
 	// Add feature support sets that os.py expects
 	// These indicate which functions support optional parameters
 	emptySet := core.NewSet()
-	posixModule.SetWithKey("supports_dir_fd", core.StringValue("supports_dir_fd"), emptySet)
-	posixModule.SetWithKey("supports_effective_ids", core.StringValue("supports_effective_ids"), emptySet)
-	posixModule.SetWithKey("supports_fd", core.StringValue("supports_fd"), emptySet)
-	posixModule.SetWithKey("supports_follow_symlinks", core.StringValue("supports_follow_symlinks"), emptySet)
+	posixModule.SetStr("supports_dir_fd", emptySet)
+	posixModule.SetStr("supports_effective_ids", emptySet)
+	posixModule.SetStr("supports_fd", emptySet)
+	posixModule.SetStr("supports_follow_symlinks", emptySet)
 
 	// Add stat_result class
 	// This is used by shutil to check for platform-specific attributes
 	statResultClass := core.NewClass("stat_result", nil)
-	posixModule.SetWithKey("stat_result", core.StringValue("stat_result"), statResultClass)
+	posixModule.SetStr("stat_result", statResultClass)
 
 	// Add terminal_size class for argparse HelpFormatter
 	terminalSizeClass := core.NewClass("terminal_size", nil)
@@ -203,12 +203,12 @@ func InitPosixModule() *core.DictValue {
 		self.Attributes["lines"] = lines
 		return core.None, nil
 	}))
-	posixModule.SetWithKey("terminal_size", core.StringValue("terminal_size"), terminalSizeClass)
+	posixModule.SetStr("terminal_size", terminalSizeClass)
 
 	// Add missing functions/attributes that Python expects
 
 	// _exit(status) - exit without cleanup
-	posixModule.SetWithKey("_exit", core.StringValue("_exit"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("_exit", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		status := 0
 		if len(args) > 0 {
 			if num, ok := args[0].(core.NumberValue); ok {
@@ -220,7 +220,7 @@ func InitPosixModule() *core.DictValue {
 	}))
 
 	// _path_normpath(path) - normalize a pathname
-	posixModule.SetWithKey("_path_normpath", core.StringValue("_path_normpath"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("_path_normpath", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("_path_normpath() takes exactly 1 argument")
 		}
@@ -251,34 +251,34 @@ func InitPosixModule() *core.DictValue {
 		core.StringValue("HAVE_UNLINKAT"),
 		core.StringValue("HAVE_UTIMENSAT"),
 	)
-	posixModule.SetWithKey("_have_functions", core.StringValue("_have_functions"), haveFuncs)
+	posixModule.SetStr("_have_functions", haveFuncs)
 
 	// waitpid(pid, options) - wait for child process to complete (stub)
 	// Used by subprocess module
-	posixModule.SetWithKey("waitpid", core.StringValue("waitpid"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("waitpid", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Return stub (pid, status) tuple
 		// status = 0 means successful completion
 		return core.TupleValue{core.NumberValue(0), core.NumberValue(0)}, nil
 	}))
 
 	// waitstatus_to_exitcode(status) - convert wait status to exit code (stub)
-	posixModule.SetWithKey("waitstatus_to_exitcode", core.StringValue("waitstatus_to_exitcode"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("waitstatus_to_exitcode", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Return 0 (success) as stub
 		return core.NumberValue(0), nil
 	}))
 
 	// WIFSTOPPED(status) - check if process was stopped (stub constant function)
-	posixModule.SetWithKey("WIFSTOPPED", core.StringValue("WIFSTOPPED"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("WIFSTOPPED", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.False, nil
 	}))
 
 	// WSTOPSIG(status) - get stop signal (stub constant function)
-	posixModule.SetWithKey("WSTOPSIG", core.StringValue("WSTOPSIG"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	posixModule.SetStr("WSTOPSIG", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0), nil
 	}))
 
 	// WNOHANG constant - for non-blocking waitpid
-	posixModule.SetWithKey("WNOHANG", core.StringValue("WNOHANG"), core.NumberValue(1))
+	posixModule.SetStr("WNOHANG", core.NumberValue(1))
 
 	// Add __all__ list with exported function names
 	exportsList := core.NewList(
@@ -306,7 +306,7 @@ func InitPosixModule() *core.DictValue {
 		core.StringValue("WSTOPSIG"),
 		core.StringValue("WNOHANG"),
 	)
-	posixModule.SetWithKey("__all__", core.StringValue("__all__"), exportsList)
+	posixModule.SetStr("__all__", exportsList)
 
 	return posixModule
 }
@@ -431,10 +431,10 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs *core.Kwarg
 
 	// Create a stat_result object (as a dict for now)
 	statResult := core.NewDict()
-	statResult.SetWithKey("st_size", core.StringValue("st_size"), core.NumberValue(float64(info.Size())))
-	statResult.SetWithKey("st_mtime", core.StringValue("st_mtime"), core.NumberValue(float64(info.ModTime().Unix())))
+	statResult.SetStr("st_size", core.NumberValue(float64(info.Size())))
+	statResult.SetStr("st_mtime", core.NumberValue(float64(info.ModTime().Unix())))
 	// Convert Go's FileMode to Unix st_mode
-	statResult.SetWithKey("st_mode", core.StringValue("st_mode"), core.NumberValue(float64(fileModeToUnixMode(info.Mode()))))
+	statResult.SetStr("st_mode", core.NumberValue(float64(fileModeToUnixMode(info.Mode()))))
 
 	// Full timestamp + identity fields from the underlying syscall stat, so
 	// st_atime/st_ctime, the nanosecond variants (st_*_ns, required by
@@ -444,7 +444,7 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs *core.Kwarg
 		atNano := sys.Atim.Nano()
 		mtNano := sys.Mtim.Nano()
 		ctNano := sys.Ctim.Nano()
-		set := func(name string, v core.Value) { statResult.SetWithKey(name, core.StringValue(name), v) }
+		set := func(name string, v core.Value) { statResult.SetStr(name, v) }
 		set("st_atime", core.NumberValue(float64(atNano)/1e9))
 		set("st_mtime", core.NumberValue(float64(mtNano)/1e9))
 		set("st_ctime", core.NumberValue(float64(ctNano)/1e9))
@@ -460,7 +460,7 @@ func (f *KwargsPosixStat) CallWithKeywords(args []core.Value, kwargs *core.Kwarg
 
 	// Add is_dir method
 	isDir := info.IsDir()
-	statResult.SetWithKey("st_isdir", core.StringValue("st_isdir"), core.BoolValue(isDir))
+	statResult.SetStr("st_isdir", core.BoolValue(isDir))
 
 	return statResult, nil
 }

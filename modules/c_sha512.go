@@ -74,7 +74,7 @@ func InitSHA512Module() *core.DictValue {
 	sha512Module := core.NewDict()
 
 	// sha512(data=b'') - create a new SHA-512 hash object
-	sha512Module.Set("sha512", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sha512Module.SetStr("sha512", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		obj := &sha512Object{data: []byte{}}
 
 		if len(args) >= 1 {

@@ -66,14 +66,14 @@ func InitErrnoModule() *core.DictValue {
 	}
 	for _, c := range codes {
 		val := core.NumberValue(int(c.num))
-		errnoModule.Set(c.name, val)
+		errnoModule.SetStr(c.name, val)
 		// errorcode is keyed by the integer value (errorcode[errno.EXXX]).
 		if _, exists := errorcode.GetValue(val); !exists {
 			_ = errorcode.SetValue(val, core.StringValue(c.name))
 		}
 	}
 
-	errnoModule.Set("errorcode", errorcode)
+	errnoModule.SetStr("errorcode", errorcode)
 
 	return errnoModule
 }

@@ -13,7 +13,7 @@ func InitFcntlModule() *core.DictValue {
 	fcntlModule := core.NewDict()
 
 	// fcntl(fd, cmd, arg=0) - perform file control operation
-	fcntlModule.Set("fcntl", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	fcntlModule.SetStr("fcntl", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("fcntl() requires at least 2 arguments")
 		}
@@ -44,7 +44,7 @@ func InitFcntlModule() *core.DictValue {
 	}))
 
 	// ioctl(fd, request, arg=0) - perform I/O control operation
-	fcntlModule.Set("ioctl", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	fcntlModule.SetStr("ioctl", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("ioctl() requires at least 2 arguments")
 		}
@@ -54,7 +54,7 @@ func InitFcntlModule() *core.DictValue {
 	}))
 
 	// flock(fd, operation) - apply or remove advisory lock
-	fcntlModule.Set("flock", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	fcntlModule.SetStr("flock", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("flock() requires 2 arguments")
 		}
@@ -78,7 +78,7 @@ func InitFcntlModule() *core.DictValue {
 	}))
 
 	// lockf(fd, cmd, len) - apply, test, or remove POSIX lock
-	fcntlModule.Set("lockf", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	fcntlModule.SetStr("lockf", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("lockf() requires at least 2 arguments")
 		}
@@ -87,31 +87,31 @@ func InitFcntlModule() *core.DictValue {
 	}))
 
 	// Constants for fcntl operations
-	fcntlModule.Set("F_DUPFD", core.NumberValue(syscall.F_DUPFD))
-	fcntlModule.Set("F_GETFD", core.NumberValue(syscall.F_GETFD))
-	fcntlModule.Set("F_SETFD", core.NumberValue(syscall.F_SETFD))
-	fcntlModule.Set("F_GETFL", core.NumberValue(syscall.F_GETFL))
-	fcntlModule.Set("F_SETFL", core.NumberValue(syscall.F_SETFL))
-	fcntlModule.Set("F_GETLK", core.NumberValue(syscall.F_GETLK))
-	fcntlModule.Set("F_SETLK", core.NumberValue(syscall.F_SETLK))
-	fcntlModule.Set("F_SETLKW", core.NumberValue(syscall.F_SETLKW))
-	fcntlModule.Set("F_GETOWN", core.NumberValue(syscall.F_GETOWN))
-	fcntlModule.Set("F_SETOWN", core.NumberValue(syscall.F_SETOWN))
+	fcntlModule.SetStr("F_DUPFD", core.NumberValue(syscall.F_DUPFD))
+	fcntlModule.SetStr("F_GETFD", core.NumberValue(syscall.F_GETFD))
+	fcntlModule.SetStr("F_SETFD", core.NumberValue(syscall.F_SETFD))
+	fcntlModule.SetStr("F_GETFL", core.NumberValue(syscall.F_GETFL))
+	fcntlModule.SetStr("F_SETFL", core.NumberValue(syscall.F_SETFL))
+	fcntlModule.SetStr("F_GETLK", core.NumberValue(syscall.F_GETLK))
+	fcntlModule.SetStr("F_SETLK", core.NumberValue(syscall.F_SETLK))
+	fcntlModule.SetStr("F_SETLKW", core.NumberValue(syscall.F_SETLKW))
+	fcntlModule.SetStr("F_GETOWN", core.NumberValue(syscall.F_GETOWN))
+	fcntlModule.SetStr("F_SETOWN", core.NumberValue(syscall.F_SETOWN))
 
 	// Constants for flock operations
-	fcntlModule.Set("LOCK_SH", core.NumberValue(syscall.LOCK_SH))
-	fcntlModule.Set("LOCK_EX", core.NumberValue(syscall.LOCK_EX))
-	fcntlModule.Set("LOCK_NB", core.NumberValue(syscall.LOCK_NB))
-	fcntlModule.Set("LOCK_UN", core.NumberValue(syscall.LOCK_UN))
+	fcntlModule.SetStr("LOCK_SH", core.NumberValue(syscall.LOCK_SH))
+	fcntlModule.SetStr("LOCK_EX", core.NumberValue(syscall.LOCK_EX))
+	fcntlModule.SetStr("LOCK_NB", core.NumberValue(syscall.LOCK_NB))
+	fcntlModule.SetStr("LOCK_UN", core.NumberValue(syscall.LOCK_UN))
 
 	// FD_CLOEXEC flag
-	fcntlModule.Set("FD_CLOEXEC", core.NumberValue(syscall.FD_CLOEXEC))
+	fcntlModule.SetStr("FD_CLOEXEC", core.NumberValue(syscall.FD_CLOEXEC))
 
 	// Constants for lockf
-	fcntlModule.Set("F_LOCK", core.NumberValue(1))
-	fcntlModule.Set("F_TLOCK", core.NumberValue(2))
-	fcntlModule.Set("F_ULOCK", core.NumberValue(0))
-	fcntlModule.Set("F_TEST", core.NumberValue(3))
+	fcntlModule.SetStr("F_LOCK", core.NumberValue(1))
+	fcntlModule.SetStr("F_TLOCK", core.NumberValue(2))
+	fcntlModule.SetStr("F_ULOCK", core.NumberValue(0))
+	fcntlModule.SetStr("F_TEST", core.NumberValue(3))
 
 	return fcntlModule
 }

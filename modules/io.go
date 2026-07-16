@@ -15,35 +15,35 @@ func InitIOModule() *core.DictValue {
 	ioModule := core.NewDict()
 
 	// Constants
-	ioModule.Set("DEFAULT_BUFFER_SIZE", core.NumberValue(8192))
+	ioModule.SetStr("DEFAULT_BUFFER_SIZE", core.NumberValue(8192))
 
 	// Base I/O classes - these are abstract base classes in Python
 	// They define the interface but don't provide implementations
 	ioBaseClass := core.NewClass("IOBase", nil)
-	ioModule.Set("IOBase", ioBaseClass)
+	ioModule.SetStr("IOBase", ioBaseClass)
 
 	rawIOBaseClass := core.NewClass("RawIOBase", ioBaseClass)
-	ioModule.Set("RawIOBase", rawIOBaseClass)
+	ioModule.SetStr("RawIOBase", rawIOBaseClass)
 
 	bufferedIOBaseClass := core.NewClass("BufferedIOBase", ioBaseClass)
-	ioModule.Set("BufferedIOBase", bufferedIOBaseClass)
+	ioModule.SetStr("BufferedIOBase", bufferedIOBaseClass)
 
 	textIOBaseClass := core.NewClass("TextIOBase", ioBaseClass)
-	ioModule.Set("TextIOBase", textIOBaseClass)
+	ioModule.SetStr("TextIOBase", textIOBaseClass)
 
 	// Register StringIO class
-	ioModule.SetWithKey("StringIO", core.StringValue("StringIO"), core.NewBuiltinFunction(newStringIO))
+	ioModule.SetStr("StringIO", core.NewBuiltinFunction(newStringIO))
 	// Register BytesIO class
-	ioModule.SetWithKey("BytesIO", core.StringValue("BytesIO"), core.NewBuiltinFunction(newBytesIO))
+	ioModule.SetStr("BytesIO", core.NewBuiltinFunction(newBytesIO))
 	// Register TextIOWrapper class - supports kwargs like encoding=, line_buffering=
-	ioModule.SetWithKey("TextIOWrapper", core.StringValue("TextIOWrapper"), &core.BuiltinFunctionWithKwargs{
+	ioModule.SetStr("TextIOWrapper", &core.BuiltinFunctionWithKwargs{
 		Name: "TextIOWrapper",
 		Fn:   newTextIOWrapper,
 	})
 
 	// text_encoding(encoding, stacklevel=2) - returns encoding or 'locale' if None
 	// Added in Python 3.10, used by tempfile and other modules
-	ioModule.SetWithKey("text_encoding", core.StringValue("text_encoding"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	ioModule.SetStr("text_encoding", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) == 0 {
 			return core.StringValue("locale"), nil
 		}
@@ -121,11 +121,11 @@ func InitIOModule() *core.DictValue {
 			return file, nil
 		},
 	}
-	ioModule.SetWithKey("open", core.StringValue("open"), ioOpenFunc)
+	ioModule.SetStr("open", ioOpenFunc)
 
 	// FileIO class - used by tempfile
 	fileIOClass := core.NewClass("FileIO", rawIOBaseClass)
-	ioModule.Set("FileIO", fileIOClass)
+	ioModule.SetStr("FileIO", fileIOClass)
 
 	// IncrementalNewlineDecoder - codec for universal newlines mode
 	// Translates \r\n and \r into \n
@@ -208,7 +208,7 @@ func InitIOModule() *core.DictValue {
 	incrementalNewlineDecoderClass.SetMethod("setstate", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
-	ioModule.Set("IncrementalNewlineDecoder", incrementalNewlineDecoderClass)
+	ioModule.SetStr("IncrementalNewlineDecoder", incrementalNewlineDecoderClass)
 
 	return ioModule
 }
@@ -233,15 +233,15 @@ func newStringIO(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Create dict with methods
 	obj := core.NewDict()
-	obj.SetWithKey("write", core.StringValue("write"), core.NewBuiltinFunction(s.write))
-	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(s.read))
-	obj.SetWithKey("getvalue", core.StringValue("getvalue"), core.NewBuiltinFunction(s.getvalue))
-	obj.SetWithKey("flush", core.StringValue("flush"), core.NewBuiltinFunction(s.flush))
-	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		obj.SetWithKey("closed", core.StringValue("closed"), core.BoolValue(true))
+	obj.SetStr("write", core.NewBuiltinFunction(s.write))
+	obj.SetStr("read", core.NewBuiltinFunction(s.read))
+	obj.SetStr("getvalue", core.NewBuiltinFunction(s.getvalue))
+	obj.SetStr("flush", core.NewBuiltinFunction(s.flush))
+	obj.SetStr("close", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		obj.SetStr("closed", core.BoolValue(true))
 		return core.NilValue{}, nil
 	}))
-	obj.SetWithKey("closed", core.StringValue("closed"), core.BoolValue(false))
+	obj.SetStr("closed", core.BoolValue(false))
 
 	return obj, nil
 }
@@ -300,19 +300,19 @@ func newBytesIO(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Create dict with methods
 	obj := core.NewDict()
-	obj.SetWithKey("write", core.StringValue("write"), core.NewBuiltinFunction(b.write))
-	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(b.read))
-	obj.SetWithKey("readline", core.StringValue("readline"), core.NewBuiltinFunction(b.readline))
-	obj.SetWithKey("getvalue", core.StringValue("getvalue"), core.NewBuiltinFunction(b.getvalue))
-	obj.SetWithKey("flush", core.StringValue("flush"), core.NewBuiltinFunction(b.flush))
-	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		obj.SetWithKey("closed", core.StringValue("closed"), core.BoolValue(true))
+	obj.SetStr("write", core.NewBuiltinFunction(b.write))
+	obj.SetStr("read", core.NewBuiltinFunction(b.read))
+	obj.SetStr("readline", core.NewBuiltinFunction(b.readline))
+	obj.SetStr("getvalue", core.NewBuiltinFunction(b.getvalue))
+	obj.SetStr("flush", core.NewBuiltinFunction(b.flush))
+	obj.SetStr("close", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		obj.SetStr("closed", core.BoolValue(true))
 		return core.NilValue{}, nil
 	}))
-	obj.SetWithKey("tell", core.StringValue("tell"), core.NewBuiltinFunction(b.tell))
-	obj.SetWithKey("seek", core.StringValue("seek"), core.NewBuiltinFunction(b.seek))
-	obj.SetWithKey("getbuffer", core.StringValue("getbuffer"), core.NewBuiltinFunction(b.getbuffer))
-	obj.SetWithKey("closed", core.StringValue("closed"), core.BoolValue(false))
+	obj.SetStr("tell", core.NewBuiltinFunction(b.tell))
+	obj.SetStr("seek", core.NewBuiltinFunction(b.seek))
+	obj.SetStr("getbuffer", core.NewBuiltinFunction(b.getbuffer))
+	obj.SetStr("closed", core.BoolValue(false))
 
 	return obj, nil
 }
@@ -456,19 +456,19 @@ func newTextIOWrapper(args []core.Value, kwargs *core.Kwargs, ctx *core.Context)
 
 	// Create dict with methods
 	obj := core.NewDict()
-	obj.SetWithKey("write", core.StringValue("write"), core.NewBuiltinFunction(t.write))
-	obj.SetWithKey("read", core.StringValue("read"), core.NewBuiltinFunction(t.read))
-	obj.SetWithKey("readline", core.StringValue("readline"), core.NewBuiltinFunction(t.readline))
-	obj.SetWithKey("readlines", core.StringValue("readlines"), core.NewBuiltinFunction(t.readlines))
-	obj.SetWithKey("close", core.StringValue("close"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		obj.SetWithKey("closed", core.StringValue("closed"), core.BoolValue(true))
+	obj.SetStr("write", core.NewBuiltinFunction(t.write))
+	obj.SetStr("read", core.NewBuiltinFunction(t.read))
+	obj.SetStr("readline", core.NewBuiltinFunction(t.readline))
+	obj.SetStr("readlines", core.NewBuiltinFunction(t.readlines))
+	obj.SetStr("close", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+		obj.SetStr("closed", core.BoolValue(true))
 		return core.None, nil
 	}))
-	obj.SetWithKey("flush", core.StringValue("flush"), core.NewBuiltinFunction(t.flush))
-	obj.SetWithKey("tell", core.StringValue("tell"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	obj.SetStr("flush", core.NewBuiltinFunction(t.flush))
+	obj.SetStr("tell", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(t.pos), nil
 	}))
-	obj.SetWithKey("seek", core.StringValue("seek"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	obj.SetStr("seek", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) > 0 {
 			if posVal, ok := args[0].(core.NumberValue); ok {
 				t.pos = int(posVal)
@@ -476,12 +476,12 @@ func newTextIOWrapper(args []core.Value, kwargs *core.Kwargs, ctx *core.Context)
 		}
 		return core.NumberValue(t.pos), nil
 	}))
-	obj.SetWithKey("__enter__", core.StringValue("__enter__"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	obj.SetStr("__enter__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Return self (the wrapper object) for context manager protocol
 		return obj, nil
 	}))
-	obj.SetWithKey("__exit__", core.StringValue("__exit__"), core.NewBuiltinFunction(t.exit))
-	obj.SetWithKey("closed", core.StringValue("closed"), core.BoolValue(false))
+	obj.SetStr("__exit__", core.NewBuiltinFunction(t.exit))
+	obj.SetStr("closed", core.BoolValue(false))
 
 	return obj, nil
 }

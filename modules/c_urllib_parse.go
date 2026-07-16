@@ -13,7 +13,7 @@ func Init_UrllibParseModule() *core.DictValue {
 
 	// quote_from_bytes: URL-encode bytes
 	// pathlib uses this for file:// URIs
-	module.Set("quote_from_bytes", core.NewBuiltinFunction(
+	module.SetStr("quote_from_bytes", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) < 1 {
 				return nil, core.NewTypeError("bytes", nil, "quote_from_bytes() missing required positional argument")
@@ -36,7 +36,7 @@ func Init_UrllibParseModule() *core.DictValue {
 		}))
 
 	// unquote_to_bytes: URL-decode to bytes
-	module.Set("unquote_to_bytes", core.NewBuiltinFunction(
+	module.SetStr("unquote_to_bytes", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) < 1 {
 				return nil, core.NewTypeError("str", nil, "unquote_to_bytes() missing required positional argument")
@@ -57,7 +57,7 @@ func Init_UrllibParseModule() *core.DictValue {
 
 	// urlparse: Parse a URL into components
 	// Minimal implementation for basic use
-	module.Set("urlparse", core.NewBuiltinFunction(
+	module.SetStr("urlparse", core.NewBuiltinFunction(
 		func(args []core.Value, ctx *core.Context) (core.Value, error) {
 			if len(args) < 1 {
 				return nil, core.NewTypeError("str", nil, "urlparse() missing required positional argument")
@@ -75,11 +75,11 @@ func Init_UrllibParseModule() *core.DictValue {
 
 			// Return a simple namespace-like dict with url components
 			result := core.NewDict()
-			result.Set("scheme", core.StringValue(parsed.Scheme))
-			result.Set("netloc", core.StringValue(parsed.Host))
-			result.Set("path", core.StringValue(parsed.Path))
-			result.Set("query", core.StringValue(parsed.RawQuery))
-			result.Set("fragment", core.StringValue(parsed.Fragment))
+			result.SetStr("scheme", core.StringValue(parsed.Scheme))
+			result.SetStr("netloc", core.StringValue(parsed.Host))
+			result.SetStr("path", core.StringValue(parsed.Path))
+			result.SetStr("query", core.StringValue(parsed.RawQuery))
+			result.SetStr("fragment", core.StringValue(parsed.Fragment))
 
 			return result, nil
 		}))

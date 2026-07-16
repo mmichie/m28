@@ -112,7 +112,7 @@ func (l *ModuleLoaderEnhanced) checkModuleCache(registry *ModuleRegistry, cacheN
 		Log.Warn(SubsystemImport, "Circular import detected", "module", cacheName)
 		// Return the partial module that's currently being loaded
 		if partialModule, found := registry.GetModule(cacheName); found {
-			Log.Debug(SubsystemImport, "Returning partial module for circular import", "module", cacheName, "keys", len(partialModule.Keys()))
+			Log.Debug(SubsystemImport, "Returning partial module for circular import", "module", cacheName, "keys", partialModule.Size())
 			return partialModule, nil
 		}
 		// If not in registry yet, return empty dict (will be populated later)
@@ -139,7 +139,7 @@ func (l *ModuleLoaderEnhanced) registerInSysModules(name string, module *DictVal
 	}
 
 	// Get sys.modules dict
-	sysModulesVal, ok := sysModule.Get("modules")
+	sysModulesVal, ok := sysModule.GetStr("modules")
 	if !ok {
 		return // sys.modules not available
 	}
@@ -149,9 +149,8 @@ func (l *ModuleLoaderEnhanced) registerInSysModules(name string, module *DictVal
 		return // sys.modules is not a dict
 	}
 
-	// Register the module with proper key format
-	key := ValueToKey(StringValue(name))
-	sysModulesDict.SetWithKey(key, StringValue(name), module)
+	// Register the module
+	sysModulesDict.SetStr(name, module)
 	DebugLog("[DEBUG] Registered module '%s' in sys.modules\n", name)
 
 	// For dotted module names (e.g., "test.test_bool"), set the submodule
@@ -170,8 +169,7 @@ func (l *ModuleLoaderEnhanced) registerInSysModules(name string, module *DictVal
 		childName := name[lastDot+1:]
 
 		// Try to get existing parent module
-		parentKey := ValueToKey(StringValue(parentName))
-		parentModule, parentExists := sysModulesDict.Get(parentKey)
+		parentModule, parentExists := sysModulesDict.GetStr(parentName)
 
 		// Only set child on parent if parent already exists as a real module
 		// Don't create placeholder parent modules - they block the real module from loading
@@ -180,9 +178,9 @@ func (l *ModuleLoaderEnhanced) registerInSysModules(name string, module *DictVal
 				// Only set if the child doesn't already exist OR if it's also a dict (module)
 				// This prevents overwriting attributes like 'collections.namedtuple' (a function)
 				// with partial module dicts when 'collections.namedtuple' fails to load as a module
-				existingChild, childExists := parentDict.Get(childName)
+				existingChild, childExists := parentDict.GetStr(childName)
 				if !childExists || isModuleLike(existingChild) {
-					parentDict.Set(childName, module)
+					parentDict.SetStr(childName, module)
 					DebugLog("[DEBUG] Set '%s' as attribute on parent module '%s'\n", childName, parentName)
 				} else {
 					DebugLog("[DEBUG] Skipped setting '%s' on parent '%s' (already exists as non-module: %T)\n", childName, parentName, existingChild)
@@ -217,8 +215,7 @@ func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
 	}
 
 	// Get sys.modules dict
-	// Use direct string key "modules" not ValueToKey which would be "s:modules"
-	sysModulesVal, ok := sysModule.Get("modules")
+	sysModulesVal, ok := sysModule.GetStr("modules")
 	if !ok {
 		Log.Debug(SubsystemImport, "sys.modules not found in sys", "module", name)
 		return nil
@@ -231,9 +228,8 @@ func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
 	}
 
 	// Check if module exists in sys.modules
-	moduleKey := ValueToKey(StringValue(name))
-	Log.Trace(SubsystemImport, "Looking up module key in sys.modules", "module", name, "key", moduleKey)
-	moduleVal, ok := sysModulesDict.Get(moduleKey)
+	Log.Trace(SubsystemImport, "Looking up module key in sys.modules", "module", name)
+	moduleVal, ok := sysModulesDict.GetStr(name)
 	if !ok {
 		Log.Trace(SubsystemImport, "Module not found in sys.modules", "module", name)
 		return nil
@@ -257,7 +253,7 @@ func (l *ModuleLoaderEnhanced) checkSysModules(name string) *DictValue {
 		// Fallback: just use exports if __dict__ doesn't work
 		dict := NewDict()
 		for name, val := range module.Exports {
-			dict.Set(name, val)
+			dict.SetStr(name, val)
 		}
 		return dict
 	}
@@ -347,7 +343,7 @@ func (l *ModuleLoaderEnhanced) tryLoadPythonModuleWithoutPartial(registry *Modul
 			// Or it may be available as an attribute of the parent
 			if parentMod, found := registry.GetModule(parentName); found {
 				childName := name[lastDot+1:]
-				if childVal, ok := parentMod.Get(childName); ok {
+				if childVal, ok := parentMod.GetStr(childName); ok {
 					if childDict, ok := childVal.(*DictValue); ok {
 						Log.Info(SubsystemImport, "Module found as attribute of parent", "module", name, "parent", parentName)
 						registry.StoreModule(cacheName, childDict, fmt.Sprintf("<from parent %s>", parentName), []string{})
@@ -463,7 +459,7 @@ func exportNamedVars(moduleDict *DictValue, moduleCtx *Context, exportsVal Value
 		}
 
 		if val, err := moduleCtx.Lookup(name); err == nil {
-			moduleDict.Set(name, val)
+			moduleDict.SetStr(name, val)
 		}
 	}
 }
@@ -485,7 +481,7 @@ func exportAllPublicVars(moduleDict *DictValue, moduleCtx *Context) {
 		if isPrivateVar(name) {
 			continue
 		}
-		moduleDict.Set(name, value)
+		moduleDict.SetStr(name, value)
 	}
 }
 

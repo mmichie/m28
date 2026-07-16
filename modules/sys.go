@@ -72,22 +72,22 @@ func InitSysModule() *core.DictValue {
 	stderr := createFileObject(os.Stderr)
 	stdin := createFileObject(os.Stdin)
 
-	sysModule.SetWithKey("stdout", core.StringValue("stdout"), stdout)
-	sysModule.SetWithKey("stderr", core.StringValue("stderr"), stderr)
-	sysModule.SetWithKey("stdin", core.StringValue("stdin"), stdin)
+	sysModule.SetStr("stdout", stdout)
+	sysModule.SetStr("stderr", stderr)
+	sysModule.SetStr("stdin", stdin)
 
 	// Exception handling
-	sysModule.SetWithKey("exc_info", core.StringValue("exc_info"), core.NewBuiltinFunction(excInfo))
-	sysModule.SetWithKey("excepthook", core.StringValue("excepthook"), core.NewBuiltinFunction(excepthook))
+	sysModule.SetStr("exc_info", core.NewBuiltinFunction(excInfo))
+	sysModule.SetStr("excepthook", core.NewBuiltinFunction(excepthook))
 
 	// Command line arguments (empty list for now, populated by main)
-	sysModule.SetWithKey("argv", core.StringValue("argv"), core.NewList())
+	sysModule.SetStr("argv", core.NewList())
 
 	// Warning options (empty list for now)
-	sysModule.SetWithKey("warnoptions", core.StringValue("warnoptions"), core.NewList())
+	sysModule.SetStr("warnoptions", core.NewList())
 
 	// Version information
-	sysModule.SetWithKey("version", core.StringValue("version"), core.StringValue("M28 0.1.0"))
+	sysModule.SetStr("version", core.StringValue("M28 0.1.0"))
 	// version_info should be a tuple that supports both subscripting and attribute access
 	// For now, use Python 3.12 version to match the stdlib we're using
 	// Format: (major, minor, micro, releaselevel, serial)
@@ -98,56 +98,56 @@ func InitSysModule() *core.DictValue {
 		core.StringValue("final"), // releaselevel
 		core.NumberValue(0),       // serial
 	}
-	sysModule.SetWithKey("version_info", core.StringValue("version_info"), versionInfo)
+	sysModule.SetStr("version_info", versionInfo)
 
 	// Implementation info
 	implDict := core.NewDict()
-	implDict.Set("name", core.StringValue("m28"))
-	implDict.Set("version", core.StringValue("0.1.0"))
-	implDict.Set("cache_tag", core.StringValue("m28"))
-	sysModule.SetWithKey("implementation", core.StringValue("implementation"), implDict)
+	implDict.SetStr("name", core.StringValue("m28"))
+	implDict.SetStr("version", core.StringValue("0.1.0"))
+	implDict.SetStr("cache_tag", core.StringValue("m28"))
+	sysModule.SetStr("implementation", implDict)
 
 	// Platform information
-	sysModule.SetWithKey("platform", core.StringValue("platform"), core.StringValue(runtime.GOOS))
+	sysModule.SetStr("platform", core.StringValue(runtime.GOOS))
 	execPath, _ := os.Executable()
-	sysModule.SetWithKey("executable", core.StringValue("executable"), core.StringValue(execPath))
-	sysModule.SetWithKey("prefix", core.StringValue("prefix"), core.StringValue("/usr/local"))
-	sysModule.SetWithKey("exec_prefix", core.StringValue("exec_prefix"), core.StringValue("/usr/local"))
-	sysModule.SetWithKey("base_prefix", core.StringValue("base_prefix"), core.StringValue("/usr/local"))
-	sysModule.SetWithKey("base_exec_prefix", core.StringValue("base_exec_prefix"), core.StringValue("/usr/local"))
+	sysModule.SetStr("executable", core.StringValue(execPath))
+	sysModule.SetStr("prefix", core.StringValue("/usr/local"))
+	sysModule.SetStr("exec_prefix", core.StringValue("/usr/local"))
+	sysModule.SetStr("base_prefix", core.StringValue("/usr/local"))
+	sysModule.SetStr("base_exec_prefix", core.StringValue("/usr/local"))
 
 	// Framework info (for macOS Python framework builds)
 	// Set to False since M28 is not a framework build
-	sysModule.SetWithKey("_framework", core.StringValue("_framework"), core.BoolValue(false))
+	sysModule.SetStr("_framework", core.BoolValue(false))
 
 	// System constants. maxsize is 2**63-1 on 64-bit, which exceeds float64's
 	// exact-integer range, so it must be a BigInt -- NumberValue (float64) would
 	// round it to 9223372036854775808 and lose the exact value.
-	sysModule.SetWithKey("maxsize", core.StringValue("maxsize"), core.NewBigIntFromInt64(int64(^uint(0)>>1)))
+	sysModule.SetStr("maxsize", core.NewBigIntFromInt64(int64(^uint(0)>>1)))
 	if runtime.GOARCH == "386" || runtime.GOARCH == "arm" {
-		sysModule.SetWithKey("byteorder", core.StringValue("byteorder"), core.StringValue("little"))
+		sysModule.SetStr("byteorder", core.StringValue("little"))
 	} else if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
-		sysModule.SetWithKey("byteorder", core.StringValue("byteorder"), core.StringValue("little"))
+		sysModule.SetStr("byteorder", core.StringValue("little"))
 	} else {
-		sysModule.SetWithKey("byteorder", core.StringValue("byteorder"), core.StringValue("little"))
+		sysModule.SetStr("byteorder", core.StringValue("little"))
 	}
 
 	// hash_info - information about the hash implementation
 	hashInfo := core.NewDict()
-	hashInfo.Set("width", core.NumberValue(64))
-	hashInfo.Set("modulus", core.NumberValue(2305843009213693951))
-	hashInfo.Set("inf", core.NumberValue(314159))
-	hashInfo.Set("nan", core.NumberValue(0))
-	hashInfo.Set("imag", core.NumberValue(1000003))
-	hashInfo.Set("algorithm", core.StringValue("siphash13"))
-	hashInfo.Set("hash_bits", core.NumberValue(64))
-	hashInfo.Set("seed_bits", core.NumberValue(128))
-	hashInfo.Set("cutoff", core.NumberValue(0))
-	sysModule.SetWithKey("hash_info", core.StringValue("hash_info"), hashInfo)
+	hashInfo.SetStr("width", core.NumberValue(64))
+	hashInfo.SetStr("modulus", core.NumberValue(2305843009213693951))
+	hashInfo.SetStr("inf", core.NumberValue(314159))
+	hashInfo.SetStr("nan", core.NumberValue(0))
+	hashInfo.SetStr("imag", core.NumberValue(1000003))
+	hashInfo.SetStr("algorithm", core.StringValue("siphash13"))
+	hashInfo.SetStr("hash_bits", core.NumberValue(64))
+	hashInfo.SetStr("seed_bits", core.NumberValue(128))
+	hashInfo.SetStr("cutoff", core.NumberValue(0))
+	sysModule.SetStr("hash_info", hashInfo)
 
 	// Module tracking
-	sysModule.SetWithKey("modules", core.StringValue("modules"), sysModules)
-	sysModule.SetWithKey("path", core.StringValue("path"), sysPath)
+	sysModule.SetStr("modules", sysModules)
+	sysModule.SetStr("path", sysPath)
 
 	// Builtin module names - static list matching registry.go
 	builtinNamesList := core.NewList(
@@ -178,20 +178,20 @@ func InitSysModule() *core.DictValue {
 		core.StringValue("_signal"),
 		core.StringValue("sysconfig"),
 	)
-	sysModule.SetWithKey("builtin_module_names", core.StringValue("builtin_module_names"), builtinNamesList)
+	sysModule.SetStr("builtin_module_names", builtinNamesList)
 
 	// Functions
-	sysModule.SetWithKey("exit", core.StringValue("exit"), core.NewBuiltinFunction(exitFunc))
-	sysModule.SetWithKey("getrecursionlimit", core.StringValue("getrecursionlimit"), core.NewBuiltinFunction(getRecursionLimit))
-	sysModule.SetWithKey("setrecursionlimit", core.StringValue("setrecursionlimit"), core.NewBuiltinFunction(setRecursionLimit))
-	sysModule.SetWithKey("getdefaultencoding", core.StringValue("getdefaultencoding"), core.NewBuiltinFunction(getDefaultEncoding))
-	sysModule.SetWithKey("getfilesystemencoding", core.StringValue("getfilesystemencoding"), core.NewBuiltinFunction(getFilesystemEncoding))
-	sysModule.SetWithKey("getfilesystemencodeerrors", core.StringValue("getfilesystemencodeerrors"), core.NewBuiltinFunction(getFilesystemEncodeErrors))
-	sysModule.SetWithKey("getsizeof", core.StringValue("getsizeof"), core.NewBuiltinFunction(getSizeOf))
+	sysModule.SetStr("exit", core.NewBuiltinFunction(exitFunc))
+	sysModule.SetStr("getrecursionlimit", core.NewBuiltinFunction(getRecursionLimit))
+	sysModule.SetStr("setrecursionlimit", core.NewBuiltinFunction(setRecursionLimit))
+	sysModule.SetStr("getdefaultencoding", core.NewBuiltinFunction(getDefaultEncoding))
+	sysModule.SetStr("getfilesystemencoding", core.NewBuiltinFunction(getFilesystemEncoding))
+	sysModule.SetStr("getfilesystemencodeerrors", core.NewBuiltinFunction(getFilesystemEncodeErrors))
+	sysModule.SetStr("getsizeof", core.NewBuiltinFunction(getSizeOf))
 
 	// intern function - intern strings for memory optimization
 	// In M28, we just return the same string since we don't have string interning yet
-	sysModule.SetWithKey("intern", core.StringValue("intern"), core.NewNamedBuiltinFunction("intern", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("intern", core.NewNamedBuiltinFunction("intern", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("string", nil, "intern() argument")
 		}
@@ -207,7 +207,7 @@ func InitSysModule() *core.DictValue {
 	// _getframe function - get frame object at given depth
 	// Used by traceback and other stdlib modules for introspection
 	// Returns a minimal frame object to avoid errors in stdlib code
-	sysModule.SetWithKey("_getframe", core.StringValue("_getframe"), core.NewNamedBuiltinFunction("_getframe", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("_getframe", core.NewNamedBuiltinFunction("_getframe", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Takes optional depth argument (defaults to 0)
 		// Returns a frame object with minimal attributes
 
@@ -220,42 +220,42 @@ func InitSysModule() *core.DictValue {
 			// Create a dict from the global context vars
 			globals = core.NewDict()
 			for k, v := range ctx.Global.Vars {
-				globals.Set(k, v)
+				globals.SetStr(k, v)
 			}
 			// Ensure __name__ exists
-			if _, ok := globals.Get(core.ValueToKey(core.StringValue("__name__"))); !ok {
-				globals.Set("__name__", core.StringValue("__main__"))
+			if _, ok := globals.GetStr("__name__"); !ok {
+				globals.SetStr("__name__", core.StringValue("__main__"))
 			}
 		} else {
 			globals = core.NewDict()
-			globals.Set("__name__", core.StringValue("__main__"))
+			globals.SetStr("__name__", core.StringValue("__main__"))
 		}
 
 		// Create a code object with necessary attributes
 		codeObj := core.NewDict()
-		codeObj.Set("co_filename", core.StringValue("<string>"))
-		codeObj.Set("co_name", core.StringValue("<module>"))
-		codeObj.Set("co_firstlineno", core.NumberValue(1))
+		codeObj.SetStr("co_filename", core.StringValue("<string>"))
+		codeObj.SetStr("co_name", core.StringValue("<module>"))
+		codeObj.SetStr("co_firstlineno", core.NumberValue(1))
 
 		// Create a minimal frame object as a dict
 		frame := core.NewDict()
 
 		// Add required frame attributes that traceback and warnings expect
-		frame.Set("f_code", codeObj)               // code object with co_filename
-		frame.Set("f_lineno", core.NumberValue(1)) // line number
-		frame.Set("f_locals", core.NewDict())      // local vars
-		frame.Set("f_globals", globals)            // global vars with __name__
-		frame.Set("f_back", core.None)             // previous frame (None = top of stack)
+		frame.SetStr("f_code", codeObj)               // code object with co_filename
+		frame.SetStr("f_lineno", core.NumberValue(1)) // line number
+		frame.SetStr("f_locals", core.NewDict())      // local vars
+		frame.SetStr("f_globals", globals)            // global vars with __name__
+		frame.SetStr("f_back", core.None)             // previous frame (None = top of stack)
 
 		// Add tb_frame attribute that some code expects
-		frame.Set("tb_frame", frame)
+		frame.SetStr("tb_frame", frame)
 
 		return frame, nil
 	}))
 
 	// _getframemodulename function - get module name at given frame depth
 	// Used by difflib and other stdlib modules for introspection
-	sysModule.SetWithKey("_getframemodulename", core.StringValue("_getframemodulename"), core.NewNamedBuiltinFunction("_getframemodulename", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("_getframemodulename", core.NewNamedBuiltinFunction("_getframemodulename", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Takes one argument: depth (int)
 		// Returns module name (str) or None
 		// For now, always return "__main__" since we don't track frames yet
@@ -280,18 +280,18 @@ func createFileObject(f *os.File) *core.DictValue {
 	// Store the underlying file
 	fileWrapper := &fileObject{file: f}
 
-	obj.SetWithKey("write", core.StringValue("write"), core.NewBuiltinFunction(fileWrapper.write))
-	obj.SetWithKey("flush", core.StringValue("flush"), core.NewBuiltinFunction(fileWrapper.flush))
-	obj.SetWithKey("getvalue", core.StringValue("getvalue"), core.NewBuiltinFunction(fileWrapper.getvalue))
+	obj.SetStr("write", core.NewBuiltinFunction(fileWrapper.write))
+	obj.SetStr("flush", core.NewBuiltinFunction(fileWrapper.flush))
+	obj.SetStr("getvalue", core.NewBuiltinFunction(fileWrapper.getvalue))
 
 	// Add encoding attribute (Python stdout/stderr have this)
-	obj.SetWithKey("encoding", core.StringValue("encoding"), core.StringValue("utf-8"))
+	obj.SetStr("encoding", core.StringValue("utf-8"))
 
 	// Add other standard file attributes
-	obj.SetWithKey("errors", core.StringValue("errors"), core.StringValue("strict"))
-	obj.SetWithKey("newlines", core.StringValue("newlines"), core.None)
-	obj.SetWithKey("buffer", core.StringValue("buffer"), core.None)
-	obj.SetWithKey("line_buffering", core.StringValue("line_buffering"), core.BoolValue(true))
+	obj.SetStr("errors", core.StringValue("strict"))
+	obj.SetStr("newlines", core.None)
+	obj.SetStr("buffer", core.None)
+	obj.SetStr("line_buffering", core.BoolValue(true))
 
 	return obj
 }

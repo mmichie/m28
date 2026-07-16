@@ -126,7 +126,7 @@ func InitTimeModule() *core.DictValue {
 	timeModule := core.NewDict()
 
 	// time() - return current time in seconds since epoch
-	timeModule.SetWithKey("time", core.StringValue("time"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("time", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("time", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -139,7 +139,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// sleep() - sleep for given number of seconds
-	timeModule.SetWithKey("sleep", core.StringValue("sleep"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("sleep", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("sleep", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err
@@ -159,7 +159,7 @@ func InitTimeModule() *core.DictValue {
 	// monotonic() - return monotonic time in seconds (Python 3.3+)
 	// Used for measuring elapsed time, not affected by system clock adjustments
 	var startTime = time.Now()
-	timeModule.SetWithKey("monotonic", core.StringValue("monotonic"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("monotonic", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("monotonic", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -172,7 +172,7 @@ func InitTimeModule() *core.DictValue {
 
 	// perf_counter() - return performance counter in seconds (Python 3.3+)
 	// Similar to monotonic() but with highest available resolution
-	timeModule.SetWithKey("perf_counter", core.StringValue("perf_counter"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("perf_counter", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("perf_counter", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -185,7 +185,7 @@ func InitTimeModule() *core.DictValue {
 
 	// process_time() - return CPU time of the current process in seconds (Python 3.3+)
 	// Go doesn't have direct CPU time measurement, so we approximate with elapsed time
-	timeModule.SetWithKey("process_time", core.StringValue("process_time"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("process_time", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("process_time", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -197,7 +197,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// process_time_ns() - return CPU time in nanoseconds (Python 3.7+)
-	timeModule.SetWithKey("process_time_ns", core.StringValue("process_time_ns"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("process_time_ns", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("process_time_ns", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -208,7 +208,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// perf_counter_ns() - return performance counter in nanoseconds (Python 3.7+)
-	timeModule.SetWithKey("perf_counter_ns", core.StringValue("perf_counter_ns"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("perf_counter_ns", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("perf_counter_ns", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -219,7 +219,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// monotonic_ns() - return monotonic time in nanoseconds (Python 3.7+)
-	timeModule.SetWithKey("monotonic_ns", core.StringValue("monotonic_ns"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("monotonic_ns", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("monotonic_ns", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -231,7 +231,7 @@ func InitTimeModule() *core.DictValue {
 
 	// localtime() - convert seconds since epoch to local time struct
 	// Returns struct_time: (tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst)
-	timeModule.SetWithKey("localtime", core.StringValue("localtime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("localtime", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("localtime", args)
 		if err := v.Range(0, 1); err != nil {
 			return nil, err
@@ -262,7 +262,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// gmtime() - convert seconds since epoch to UTC time struct
-	timeModule.SetWithKey("gmtime", core.StringValue("gmtime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("gmtime", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("gmtime", args)
 		if err := v.Range(0, 1); err != nil {
 			return nil, err
@@ -289,7 +289,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// strftime() - format time according to a format string
-	timeModule.SetWithKey("strftime", core.StringValue("strftime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("strftime", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("strftime", args)
 		if err := v.Range(1, 2); err != nil {
 			return nil, err
@@ -326,7 +326,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// mktime() - convert struct_time to seconds since epoch
-	timeModule.SetWithKey("mktime", core.StringValue("mktime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("mktime", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("mktime", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err
@@ -351,7 +351,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// strptime() - parse a string into struct_time according to format
-	timeModule.SetWithKey("strptime", core.StringValue("strptime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("strptime", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("strptime", args)
 		if err := v.Exact(2); err != nil {
 			return nil, err
@@ -377,7 +377,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// time_ns() - return current time in nanoseconds since epoch (Python 3.7+)
-	timeModule.SetWithKey("time_ns", core.StringValue("time_ns"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("time_ns", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("time_ns", args)
 		if err := v.Exact(0); err != nil {
 			return nil, err
@@ -389,7 +389,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// ctime() - convert seconds since epoch to string representation
-	timeModule.SetWithKey("ctime", core.StringValue("ctime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("ctime", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("ctime", args)
 		if err := v.Range(0, 1); err != nil {
 			return nil, err
@@ -414,7 +414,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// asctime() - convert struct_time to string representation
-	timeModule.SetWithKey("asctime", core.StringValue("asctime"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("asctime", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("asctime", args)
 		if err := v.Range(0, 1); err != nil {
 			return nil, err
@@ -443,7 +443,7 @@ func InitTimeModule() *core.DictValue {
 	}))
 
 	// struct_time(sequence) - construct a struct_time from a 9-element sequence
-	timeModule.SetWithKey("struct_time", core.StringValue("struct_time"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	timeModule.SetStr("struct_time", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("struct_time", args)
 		if err := v.Exact(1); err != nil {
 			return nil, err

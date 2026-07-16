@@ -511,9 +511,7 @@ func RegisterMisc(ctx *core.Context) {
 		// Also add ALL variables from ctx.Vars to ensure globals() is complete
 		// This includes private and dunder names that aren't in ModuleDict
 		for name, value := range targetCtx.Vars {
-			// Use SetWithKey to properly track original keys for iteration
-			keyVal := core.StringValue(name)
-			dict.SetWithKey(core.ValueToKey(keyVal), keyVal, value)
+			dict.SetStr(name, value)
 		}
 
 		return dict, nil
@@ -752,38 +750,26 @@ func RegisterMisc(ctx *core.Context) {
 		// Track which variables existed before exec so we only write back new ones
 		existingVars := make(map[string]bool)
 
-		// If globals dict provided, populate the context
+		// If globals dict provided, populate the context (namespace keys are strings)
 		if globalsDict != nil {
-			// Use Keys() to iterate over all keys in the dict
-			for _, keyStr := range globalsDict.Keys() {
-				value, exists := globalsDict.Get(keyStr)
-				if exists {
-					// Strip "s:" prefix if present (for string keys)
-					cleanKey := keyStr
-					if len(keyStr) > 2 && keyStr[0:2] == "s:" {
-						cleanKey = keyStr[2:]
-					}
-					execCtx.Define(cleanKey, value)
-					existingVars[cleanKey] = true
+			globalsDict.ForEach(func(k, value core.Value) bool {
+				if s, ok := k.(core.StringValue); ok {
+					execCtx.Define(string(s), value)
+					existingVars[string(s)] = true
 				}
-			}
+				return true
+			})
 		}
 
 		// If locals dict provided, add those too (locals override globals)
 		if localsDict != nil {
-			// Use Keys() to iterate over all keys in the dict
-			for _, keyStr := range localsDict.Keys() {
-				value, exists := localsDict.Get(keyStr)
-				if exists {
-					// Strip "s:" prefix if present (for string keys)
-					cleanKey := keyStr
-					if len(keyStr) > 2 && keyStr[0:2] == "s:" {
-						cleanKey = keyStr[2:]
-					}
-					execCtx.Define(cleanKey, value)
-					existingVars[cleanKey] = true
+			localsDict.ForEach(func(k, value core.Value) bool {
+				if s, ok := k.(core.StringValue); ok {
+					execCtx.Define(string(s), value)
+					existingVars[string(s)] = true
 				}
-			}
+				return true
+			})
 		}
 
 		// Execute the code using EvalString
@@ -806,9 +792,7 @@ func RegisterMisc(ctx *core.Context) {
 				if existingVars[name] {
 					continue
 				}
-				keyVal := core.StringValue(name)
-				keyRepr := core.ValueToKey(keyVal)
-				localsDict.SetWithKey(keyRepr, keyVal, value)
+				localsDict.SetStr(name, value)
 			}
 		} else if globalsDict != nil {
 			// Write back to globals (when no locals dict is provided)
@@ -819,9 +803,7 @@ func RegisterMisc(ctx *core.Context) {
 				if existingVars[name] {
 					continue
 				}
-				keyVal := core.StringValue(name)
-				keyRepr := core.ValueToKey(keyVal)
-				globalsDict.SetWithKey(keyRepr, keyVal, value)
+				globalsDict.SetStr(name, value)
 			}
 		}
 

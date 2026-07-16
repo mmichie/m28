@@ -32,7 +32,7 @@ func InitMarshalModule() *core.DictValue {
 	marshalModule := core.NewDict()
 
 	// dumps - serialize object to bytes
-	marshalModule.Set("dumps", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	marshalModule.SetStr("dumps", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("dumps() takes exactly 1 argument (%d given)", len(args))
 		}
@@ -47,7 +47,7 @@ func InitMarshalModule() *core.DictValue {
 	}))
 
 	// loads - deserialize object from bytes
-	marshalModule.Set("loads", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	marshalModule.SetStr("loads", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("loads() takes exactly 1 argument (%d given)", len(args))
 		}
@@ -66,7 +66,7 @@ func InitMarshalModule() *core.DictValue {
 	}))
 
 	// dump - serialize object to file
-	marshalModule.Set("dump", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	marshalModule.SetStr("dump", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("dump() takes exactly 2 arguments (%d given)", len(args))
 		}
@@ -88,7 +88,7 @@ func InitMarshalModule() *core.DictValue {
 	}))
 
 	// load - deserialize object from file
-	marshalModule.Set("load", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	marshalModule.SetStr("load", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("load() takes exactly 1 argument (%d given)", len(args))
 		}
@@ -98,7 +98,7 @@ func InitMarshalModule() *core.DictValue {
 	}))
 
 	// version - marshal format version
-	marshalModule.Set("version", core.NumberValue(4))
+	marshalModule.SetStr("version", core.NumberValue(4))
 
 	return marshalModule
 }
@@ -181,17 +181,17 @@ func marshalWrite(val core.Value, buf []byte) ([]byte, error) {
 
 	case *core.DictValue:
 		buf = append(buf, TYPE_DICT)
-		for _, key := range v.Keys() {
-			var err error
-			buf, err = marshalWrite(core.StringValue(key), buf)
-			if err != nil {
-				return nil, err
+		var walkErr error
+		v.ForEach(func(key, value core.Value) bool {
+			buf, walkErr = marshalWrite(key, buf)
+			if walkErr != nil {
+				return false
 			}
-			value, _ := v.Get(key)
-			buf, err = marshalWrite(value, buf)
-			if err != nil {
-				return nil, err
-			}
+			buf, walkErr = marshalWrite(value, buf)
+			return walkErr == nil
+		})
+		if walkErr != nil {
+			return nil, walkErr
 		}
 		buf = append(buf, TYPE_NULL) // Dict terminator
 		return buf, nil
@@ -328,7 +328,7 @@ func marshalRead(buf []byte) (core.Value, int, error) {
 			}
 			pos += n
 
-			dict.Set(string(keyStr), value)
+			dict.SetStr(string(keyStr), value)
 		}
 		return dict, pos, nil
 

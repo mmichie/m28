@@ -48,30 +48,30 @@ func RegisterDecimalModule(ctx *core.Context) {
 	decimalModule := core.NewDict()
 
 	// Decimal constructor
-	decimalModule.Set("Decimal", core.NewBuiltinFunction(decimalConstructor))
+	decimalModule.SetStr("Decimal", core.NewBuiltinFunction(decimalConstructor))
 
 	// Context management
-	decimalModule.Set("getcontext", core.NewBuiltinFunction(getContext))
-	decimalModule.Set("setcontext", core.NewBuiltinFunction(setContext))
-	decimalModule.Set("Context", core.NewBuiltinFunction(newContextConstructor))
+	decimalModule.SetStr("getcontext", core.NewBuiltinFunction(getContext))
+	decimalModule.SetStr("setcontext", core.NewBuiltinFunction(setContext))
+	decimalModule.SetStr("Context", core.NewBuiltinFunction(newContextConstructor))
 
 	// Rounding mode constants
-	decimalModule.Set("ROUND_UP", core.StringValue(RoundUp))
-	decimalModule.Set("ROUND_DOWN", core.StringValue(RoundDown))
-	decimalModule.Set("ROUND_CEILING", core.StringValue(RoundCeiling))
-	decimalModule.Set("ROUND_FLOOR", core.StringValue(RoundFloor))
-	decimalModule.Set("ROUND_HALF_UP", core.StringValue(RoundHalfUp))
-	decimalModule.Set("ROUND_HALF_DOWN", core.StringValue(RoundHalfDown))
-	decimalModule.Set("ROUND_HALF_EVEN", core.StringValue(RoundHalfEven))
-	decimalModule.Set("ROUND_05UP", core.StringValue(Round05Up))
+	decimalModule.SetStr("ROUND_UP", core.StringValue(RoundUp))
+	decimalModule.SetStr("ROUND_DOWN", core.StringValue(RoundDown))
+	decimalModule.SetStr("ROUND_CEILING", core.StringValue(RoundCeiling))
+	decimalModule.SetStr("ROUND_FLOOR", core.StringValue(RoundFloor))
+	decimalModule.SetStr("ROUND_HALF_UP", core.StringValue(RoundHalfUp))
+	decimalModule.SetStr("ROUND_HALF_DOWN", core.StringValue(RoundHalfDown))
+	decimalModule.SetStr("ROUND_HALF_EVEN", core.StringValue(RoundHalfEven))
+	decimalModule.SetStr("ROUND_05UP", core.StringValue(Round05Up))
 
 	// Special values
 	inf, _ := core.NewDecimalFromString("Infinity")
 	negInf, _ := core.NewDecimalFromString("-Infinity")
 	nan, _ := core.NewDecimalFromString("NaN")
-	decimalModule.Set("Infinity", inf)
-	decimalModule.Set("NegInfinity", negInf)
-	decimalModule.Set("NaN", nan)
+	decimalModule.SetStr("Infinity", inf)
+	decimalModule.SetStr("NegInfinity", negInf)
+	decimalModule.SetStr("NaN", nan)
 
 	// Register in global context
 	ctx.Define("Decimal", core.NewBuiltinFunction(decimalConstructor))
@@ -208,10 +208,10 @@ func getContext(args []core.Value, ctx *core.Context) (core.Value, error) {
 
 	// Return a context object
 	contextDict := core.NewDict()
-	contextDict.Set("precision", core.NumberValue(currentContext.Precision))
-	contextDict.Set("rounding", core.StringValue(currentContext.Rounding))
-	contextDict.Set("Emin", core.NumberValue(currentContext.Emin))
-	contextDict.Set("Emax", core.NumberValue(currentContext.Emax))
+	contextDict.SetStr("precision", core.NumberValue(currentContext.Precision))
+	contextDict.SetStr("rounding", core.StringValue(currentContext.Rounding))
+	contextDict.SetStr("Emin", core.NumberValue(currentContext.Emin))
+	contextDict.SetStr("Emax", core.NumberValue(currentContext.Emax))
 
 	return contextDict, nil
 }
@@ -232,28 +232,28 @@ func setContext(args []core.Value, ctx *core.Context) (core.Value, error) {
 	defer contextMu.Unlock()
 
 	// Update precision if provided
-	if precVal, exists := contextDict.Get("precision"); exists {
+	if precVal, exists := contextDict.GetStr("precision"); exists {
 		if prec, ok := precVal.(core.NumberValue); ok {
 			currentContext.Precision = int32(prec)
 		}
 	}
 
 	// Update rounding if provided
-	if roundVal, exists := contextDict.Get("rounding"); exists {
+	if roundVal, exists := contextDict.GetStr("rounding"); exists {
 		if round, ok := roundVal.(core.StringValue); ok {
 			currentContext.Rounding = string(round)
 		}
 	}
 
 	// Update Emin if provided
-	if eminVal, exists := contextDict.Get("Emin"); exists {
+	if eminVal, exists := contextDict.GetStr("Emin"); exists {
 		if emin, ok := eminVal.(core.NumberValue); ok {
 			currentContext.Emin = int32(emin)
 		}
 	}
 
 	// Update Emax if provided
-	if emaxVal, exists := contextDict.Get("Emax"); exists {
+	if emaxVal, exists := contextDict.GetStr("Emax"); exists {
 		if emax, ok := emaxVal.(core.NumberValue); ok {
 			currentContext.Emax = int32(emax)
 		}
@@ -299,10 +299,10 @@ func newContextConstructor(args []core.Value, ctx *core.Context) (core.Value, er
 		}
 	}
 
-	contextDict.Set("precision", core.NumberValue(precision))
-	contextDict.Set("rounding", core.StringValue(rounding))
-	contextDict.Set("Emin", core.NumberValue(emin))
-	contextDict.Set("Emax", core.NumberValue(emax))
+	contextDict.SetStr("precision", core.NumberValue(precision))
+	contextDict.SetStr("rounding", core.StringValue(rounding))
+	contextDict.SetStr("Emin", core.NumberValue(emin))
+	contextDict.SetStr("Emax", core.NumberValue(emax))
 
 	return contextDict, nil
 }

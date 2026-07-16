@@ -187,7 +187,7 @@ func assignComplexTarget(target *core.ListValue, value core.Value, ctx *core.Con
 			return &core.TypeError{Message: fmt.Sprintf("attribute name must be a string or symbol, got %T", attrNameVal)}
 		}
 		if dict, ok := obj.(*core.DictValue); ok {
-			dict.Set(attrName, value)
+			dict.SetStr(attrName, value)
 			return nil
 		}
 		if objWithAttrs, ok := obj.(interface {

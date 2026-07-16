@@ -29,47 +29,47 @@ func InitSSLModule() *core.DictValue {
 	// Add reason attribute (required by some code that checks SSLError.reason)
 	sslErrorClass.SetAttr("reason", core.None)
 
-	sslModule.Set("SSLError", sslErrorClass)
+	sslModule.SetStr("SSLError", sslErrorClass)
 
 	// SSLZeroReturnError - SSL connection has been closed cleanly
 	sslZeroReturnErrorClass := core.NewClass("SSLZeroReturnError", sslErrorClass)
-	sslModule.Set("SSLZeroReturnError", sslZeroReturnErrorClass)
+	sslModule.SetStr("SSLZeroReturnError", sslZeroReturnErrorClass)
 
 	// SSLWantReadError - non-blocking SSL socket needs to read more data before the operation can be completed
 	sslWantReadErrorClass := core.NewClass("SSLWantReadError", sslErrorClass)
-	sslModule.Set("SSLWantReadError", sslWantReadErrorClass)
+	sslModule.SetStr("SSLWantReadError", sslWantReadErrorClass)
 
 	// SSLWantWriteError - non-blocking SSL socket needs to write more data before the operation can be completed
 	sslWantWriteErrorClass := core.NewClass("SSLWantWriteError", sslErrorClass)
-	sslModule.Set("SSLWantWriteError", sslWantWriteErrorClass)
+	sslModule.SetStr("SSLWantWriteError", sslWantWriteErrorClass)
 
 	// SSLSyscallError - system error occurred (errno)
 	sslSyscallErrorClass := core.NewClass("SSLSyscallError", sslErrorClass)
-	sslModule.Set("SSLSyscallError", sslSyscallErrorClass)
+	sslModule.SetStr("SSLSyscallError", sslSyscallErrorClass)
 
 	// SSLEOFError - EOF occurred in violation of protocol
 	sslEOFErrorClass := core.NewClass("SSLEOFError", sslErrorClass)
-	sslModule.Set("SSLEOFError", sslEOFErrorClass)
+	sslModule.SetStr("SSLEOFError", sslEOFErrorClass)
 
 	// SSLCertVerificationError - certificate verification failed
 	// In Python, this inherits from both SSLError and ValueError
 	// For now, we'll inherit from SSLError only (M28 doesn't fully support multiple inheritance yet)
 	sslCertVerificationErrorClass := core.NewClass("SSLCertVerificationError", sslErrorClass)
-	sslModule.Set("SSLCertVerificationError", sslCertVerificationErrorClass)
+	sslModule.SetStr("SSLCertVerificationError", sslCertVerificationErrorClass)
 
 	// CertificateError - certificate error occurred
 	// In Python, this also inherits from both SSLError and ValueError
 	certificateErrorClass := core.NewClass("CertificateError", sslErrorClass)
-	sslModule.Set("CertificateError", certificateErrorClass)
+	sslModule.SetStr("CertificateError", certificateErrorClass)
 
 	// SSLErrorNumber - not actually an exception but a constant/enum
 	// Used by some code to check SSL error numbers
 	// For now, just define it as an integer constant
-	sslModule.Set("SSLErrorNumber", core.NumberValue(0))
+	sslModule.SetStr("SSLErrorNumber", core.NumberValue(0))
 
 	// Add module metadata
-	sslModule.Set("__name__", core.StringValue("ssl"))
-	sslModule.Set("__doc__", core.StringValue("Stub implementation of ssl module with exception classes"))
+	sslModule.SetStr("__name__", core.StringValue("ssl"))
+	sslModule.SetStr("__doc__", core.StringValue("Stub implementation of ssl module with exception classes"))
 
 	return sslModule
 }

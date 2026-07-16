@@ -10,7 +10,7 @@ func Init_TypingModule() *core.DictValue {
 	typingModule := core.NewDict()
 
 	// _idfunc - identity function used internally by typing module
-	typingModule.SetWithKey("_idfunc", core.StringValue("_idfunc"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	typingModule.SetStr("_idfunc", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, core.NewTypeError("1 argument", core.TupleValue(args), "_idfunc() takes exactly 1 argument")
 		}
@@ -68,7 +68,7 @@ func Init_TypingModule() *core.DictValue {
 		}
 		return core.StringValue("TypeVar"), nil
 	}))
-	typingModule.SetWithKey("TypeVar", core.StringValue("TypeVar"), typeVarClass)
+	typingModule.SetStr("TypeVar", typeVarClass)
 
 	// ParamSpec - class for parameter specifications
 	paramSpecClass := core.NewClass("ParamSpec", nil)
@@ -83,7 +83,7 @@ func Init_TypingModule() *core.DictValue {
 		self.Attributes["__name__"] = args[1]
 		return core.None, nil
 	}))
-	typingModule.SetWithKey("ParamSpec", core.StringValue("ParamSpec"), paramSpecClass)
+	typingModule.SetStr("ParamSpec", paramSpecClass)
 
 	// TypeVarTuple - class for type variable tuples
 	typeVarTupleClass := core.NewClass("TypeVarTuple", nil)
@@ -98,23 +98,23 @@ func Init_TypingModule() *core.DictValue {
 		self.Attributes["__name__"] = args[1]
 		return core.None, nil
 	}))
-	typingModule.SetWithKey("TypeVarTuple", core.StringValue("TypeVarTuple"), typeVarTupleClass)
+	typingModule.SetStr("TypeVarTuple", typeVarTupleClass)
 
 	// ParamSpecArgs - class for ParamSpec args
 	paramSpecArgsClass := core.NewClass("ParamSpecArgs", nil)
-	typingModule.SetWithKey("ParamSpecArgs", core.StringValue("ParamSpecArgs"), paramSpecArgsClass)
+	typingModule.SetStr("ParamSpecArgs", paramSpecArgsClass)
 
 	// ParamSpecKwargs - class for ParamSpec kwargs
 	paramSpecKwargsClass := core.NewClass("ParamSpecKwargs", nil)
-	typingModule.SetWithKey("ParamSpecKwargs", core.StringValue("ParamSpecKwargs"), paramSpecKwargsClass)
+	typingModule.SetStr("ParamSpecKwargs", paramSpecKwargsClass)
 
 	// TypeAliasType - class for type aliases
 	typeAliasTypeClass := core.NewClass("TypeAliasType", nil)
-	typingModule.SetWithKey("TypeAliasType", core.StringValue("TypeAliasType"), typeAliasTypeClass)
+	typingModule.SetStr("TypeAliasType", typeAliasTypeClass)
 
 	// Generic - base class for generic types
 	genericClass := core.NewClass("Generic", nil)
-	typingModule.SetWithKey("Generic", core.StringValue("Generic"), genericClass)
+	typingModule.SetStr("Generic", genericClass)
 
 	// NoDefault - sentinel singleton used by typing.py to distinguish
 	// "no default" from a default of None for TypeVars/ParamSpecs.
@@ -122,7 +122,7 @@ func Init_TypingModule() *core.DictValue {
 	// identity is what matters, so a unique dict serves the purpose.
 	noDefaultType := core.NewClass("NoDefaultType", nil)
 	noDefault := core.NewInstance(noDefaultType)
-	typingModule.SetWithKey("NoDefault", core.StringValue("NoDefault"), noDefault)
+	typingModule.SetStr("NoDefault", noDefault)
 
 	return typingModule
 }

@@ -831,8 +831,7 @@ func formatStringWithPercent(formatStr string, values Value) (Value, error) {
 
 			// Look up the value in the dictionary
 			var found bool
-			keyStr := ValueToKey(StringValue(keyName))
-			value, found = valueDict.Get(keyStr)
+			value, found = valueDict.GetStr(keyName)
 			if !found {
 				return nil, &KeyError{Key: StringValue(keyName)}
 			}
@@ -2016,7 +2015,7 @@ func InitStringMethods() {
 			for _, r := range s {
 				// Look up the character code in the translation table
 				key := NumberValue(r)
-				if replacement, ok := table.Get(ValueToKey(key)); ok {
+				if replacement, ok := table.GetValue(key); ok {
 					// Check if replacement is None (delete the character)
 					if _, isNil := replacement.(NilValue); isNil {
 						continue // Skip this character
@@ -2482,8 +2481,7 @@ func InitStringMethods() {
 					}
 
 					// Look up in mapping
-					key := ValueToKey(StringValue(fieldName))
-					value, found := mapping.Get(key)
+					value, found := mapping.GetStr(fieldName)
 					if !found {
 						return nil, &KeyError{Key: StringValue(fieldName)}
 					}

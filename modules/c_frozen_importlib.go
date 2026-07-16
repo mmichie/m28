@@ -15,27 +15,27 @@ func Init_FrozenImportlibModule() *core.DictValue {
 
 	// _install() - No-op function for import machinery setup
 	// CPython uses this to install the frozen import machinery, but M28 has its own system
-	frozenImportlibModule.Set("_install", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	frozenImportlibModule.SetStr("_install", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// No-op: M28 uses its own import system
 		return core.None, nil
 	}))
 
 	// _init_module_attrs() - No-op function for initializing module attributes
 	// CPython uses this to set __name__, __loader__, etc. on modules
-	frozenImportlibModule.Set("_init_module_attrs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	frozenImportlibModule.SetStr("_init_module_attrs", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// No-op: M28 handles module attributes differently
 		return core.None, nil
 	}))
 
 	// _bootstrap - Empty module object representing the bootstrap import machinery
 	// This is just a placeholder - CPython's frozen bootstrap code
-	frozenImportlibModule.Set("_bootstrap", core.NewDict())
+	frozenImportlibModule.SetStr("_bootstrap", core.NewDict())
 
 	// __name__ - Module name attribute
-	frozenImportlibModule.Set("__name__", core.StringValue("_frozen_importlib"))
+	frozenImportlibModule.SetStr("__name__", core.StringValue("_frozen_importlib"))
 
 	// __doc__ - Module docstring
-	frozenImportlibModule.Set("__doc__", core.StringValue("Stub for CPython's frozen import machinery. M28 uses its own import system."))
+	frozenImportlibModule.SetStr("__doc__", core.StringValue("Stub for CPython's frozen import machinery. M28 uses its own import system."))
 
 	return frozenImportlibModule
 }

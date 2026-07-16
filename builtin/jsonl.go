@@ -330,7 +330,7 @@ func goToM28Value(v interface{}) (core.Value, error) {
 			if err != nil {
 				return nil, err
 			}
-			dict.SetWithKey(core.ValueToKey(core.StringValue(key)), core.StringValue(key), m28Value)
+			dict.SetStr(key, m28Value)
 		}
 		return dict, nil
 	default:
@@ -368,16 +368,25 @@ func m28ValueToGo(v core.Value) (interface{}, error) {
 	}
 	if dict, ok := types.AsDict(v); ok {
 		result := make(map[string]interface{})
-		keys := dict.Keys()
-		for _, k := range keys {
-			v, _ := dict.Get(k)
-			// For JSON, we need string keys
-			keyStr := strings.TrimPrefix(k, "s:") // Remove s: prefix if present
+		var walkErr error
+		dict.ForEach(func(k, v core.Value) bool {
+			// For JSON, we need string keys.
+			var keyStr string
+			if s, ok := k.(core.StringValue); ok {
+				keyStr = string(s)
+			} else {
+				keyStr = core.PrintValueWithoutQuotes(k)
+			}
 			goValue, err := m28ValueToGo(v)
 			if err != nil {
-				return nil, err
+				walkErr = err
+				return false
 			}
 			result[keyStr] = goValue
+			return true
+		})
+		if walkErr != nil {
+			return nil, walkErr
 		}
 		return result, nil
 	}

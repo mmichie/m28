@@ -68,7 +68,7 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 		DebugLog("[DEBUG] Circular import detected for '%s', returning partial module\n", cacheName)
 		// Return the partial module that's currently being loaded
 		if partialModule, found := registry.GetModule(cacheName); found {
-			DebugLog("[DEBUG] Found partial module in registry with %d keys\n", len(partialModule.Keys()))
+			DebugLog("[DEBUG] Found partial module in registry with %d keys\n", partialModule.Size())
 			return partialModule, nil
 		}
 		// If not in registry yet, return empty dict (will be populated later)
@@ -140,12 +140,12 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 				if nameStr, ok := item.(StringValue); ok {
 					name := string(nameStr)
 					if val, err := moduleCtx.Lookup(name); err == nil {
-						moduleDict.Set(name, val)
+						moduleDict.SetStr(name, val)
 					}
 				} else if nameSym, ok := item.(SymbolValue); ok {
 					name := string(nameSym)
 					if val, err := moduleCtx.Lookup(name); err == nil {
-						moduleDict.Set(name, val)
+						moduleDict.SetStr(name, val)
 					}
 				}
 			}
@@ -161,7 +161,7 @@ func (l *DefaultModuleLoader) LoadModule(name string, ctx *Context) (*DictValue,
 			if len(name) > 0 && name[0] == '_' {
 				continue
 			}
-			moduleDict.Set(name, value)
+			moduleDict.SetStr(name, value)
 		}
 	}
 

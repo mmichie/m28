@@ -123,8 +123,7 @@ func assignVariable(ctx *core.Context, name string, value core.Value) error {
 		// Also sync to ModuleDict for private variables (Define() skips them)
 		// This ensures module-level access like module._var reflects changes
 		if ctx.Global.ModuleDict != nil && len(name) > 0 && name[0] == '_' {
-			key := core.ValueToKey(core.StringValue(name))
-			ctx.Global.ModuleDict.SetWithKey(key, core.StringValue(name), value)
+			ctx.Global.ModuleDict.SetStr(name, value)
 		}
 		return nil
 	}
@@ -702,17 +701,12 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 							return nil, &core.TypeError{Message: fmt.Sprintf("**unpack requires a dict, got %s", unpackVal.Type())}
 						}
 
-						// Merge all key-value pairs from unpacked dict
-						for _, keyRepr := range unpackDict.Keys() {
-							val, _ := unpackDict.Get(keyRepr)
-							origKeys := unpackDict.OriginalKeys()
-							for _, origKey := range origKeys {
-								if core.ValueToKey(origKey) == keyRepr {
-									dict.SetWithKey(keyRepr, origKey, val)
-									break
-								}
-							}
-						}
+						// Merge all key-value pairs from unpacked dict, preserving
+						// each original key object and insertion order.
+						unpackDict.ForEach(func(origKey, val core.Value) bool {
+							_ = dict.SetValue(origKey, val)
+							return true
+						})
 
 						i++ // Skip the next item (the unpacked dict)
 						continue
@@ -735,9 +729,6 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 						return nil, &core.TypeError{Message: fmt.Sprintf("unhashable type: '%s'", key.Type())}
 					}
 
-					// Convert key to string representation
-					keyStr := core.ValueToKey(key)
-
 					// Evaluate the value
 					value, err := Eval(pairList.Items()[1], ctx)
 					if err != nil {
@@ -745,7 +736,7 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 					}
 
 					// Set the key-value pair
-					dict.SetWithKey(keyStr, key, value)
+					dict.SetValue(key, value)
 				}
 				return dict, nil
 			}
@@ -781,19 +772,12 @@ func DictLiteralForm(args *core.ListValue, ctx *core.Context) (core.Value, error
 				return nil, &core.TypeError{Message: fmt.Sprintf("**unpack requires a dict, got %s", unpackVal.Type())}
 			}
 
-			// Merge all key-value pairs from unpacked dict
-			for _, keyRepr := range unpackDict.Keys() {
-				val, _ := unpackDict.Get(keyRepr)
-
-				// Find the original key
-				origKeys := unpackDict.OriginalKeys()
-				for _, origKey := range origKeys {
-					if core.ValueToKey(origKey) == keyRepr {
-						dict.SetWithKey(keyRepr, origKey, val)
-						break
-					}
-				}
-			}
+			// Merge all key-value pairs from unpacked dict, preserving each
+			// original key object and insertion order.
+			unpackDict.ForEach(func(origKey, val core.Value) bool {
+				_ = dict.SetValue(origKey, val)
+				return true
+			})
 
 			i += 2 // Skip marker and dict expression
 			continue
@@ -1188,7 +1172,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 				// Special handling for dicts
 				if dict, ok := obj.(*core.DictValue); ok {
-					dict.Set(propName, value)
+					dict.SetStr(propName, value)
 					return value, nil
 				}
 
@@ -1376,7 +1360,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 								// Special handling for dicts
 								if dict, ok := obj.(*core.DictValue); ok {
-									dict.Set(attrName, values[valIdx])
+									dict.SetStr(attrName, values[valIdx])
 									valIdx++
 									continue
 								}
@@ -1452,7 +1436,7 @@ func assignFormInternal(args *core.ListValue, ctx *core.Context) (core.Value, er
 
 							// Special handling for dicts
 							if dict, ok := obj.(*core.DictValue); ok {
-								dict.Set(attrName, values[i])
+								dict.SetStr(attrName, values[i])
 								continue
 							}
 

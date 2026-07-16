@@ -175,8 +175,8 @@ func AcquireFrameContext(outer *Context, numSlots int) *Context {
 // poisonValue trips on any use of a released frame slot (canary mode).
 type poisonValue struct{}
 
-func (poisonValue) Type() Type      { panic("use of released slot-frame context (M28_DEBUG_FRAMES)") }
-func (poisonValue) String() string  { panic("use of released slot-frame context (M28_DEBUG_FRAMES)") }
+func (poisonValue) Type() Type     { panic("use of released slot-frame context (M28_DEBUG_FRAMES)") }
+func (poisonValue) String() string { panic("use of released slot-frame context (M28_DEBUG_FRAMES)") }
 
 // ReleaseFrameContext returns a frame context to the pool after a clean slot
 // call. All value references are dropped here so the pool retains nothing.
@@ -439,8 +439,7 @@ func (c *Context) Define(name string, value Value) {
 		if len(name) > 0 && name[0] == '_' {
 			return
 		}
-		// Add to module dict (SetStr is the allocation-light equivalent of
-		// SetWithKey with a ValueToKey string key).
+		// Add to module dict (SetStr avoids allocating a StringValue key).
 		c.ModuleDict.SetStr(name, value)
 	}
 }
@@ -486,9 +485,8 @@ func (c *Context) Set(name string, value Value) error {
 func (c *Context) Delete(name string) error {
 	// Check if variable exists in ModuleDict first (since Lookup checks it first)
 	if c.ModuleDict != nil {
-		key := ValueToKey(StringValue(name))
-		if _, ok := c.ModuleDict.Get(key); ok {
-			c.ModuleDict.Delete(key)
+		if _, ok := c.ModuleDict.GetStr(name); ok {
+			c.ModuleDict.DeleteStr(name)
 			// Keep Vars in sync. In the main module, builtins live in Vars
 			// alongside module globals; if this name shadows a builtin, restore
 			// the original builtin rather than deleting it (which would corrupt
@@ -841,18 +839,24 @@ func (c *Context) GetAllAvailableNames() []string {
 		}
 		// Add from ModuleDict if present
 		if ctx.ModuleDict != nil {
-			for _, keyStr := range ctx.ModuleDict.Keys() {
-				names[keyStr] = true
-			}
+			ctx.ModuleDict.ForEach(func(k, _ Value) bool {
+				if s, ok := k.(StringValue); ok {
+					names[string(s)] = true
+				}
+				return true
+			})
 		}
 		ctx = ctx.Outer
 	}
 
 	// Check global context ModuleDict as well
 	if c.Global != nil && c.Global.ModuleDict != nil && c.Global != c {
-		for _, keyStr := range c.Global.ModuleDict.Keys() {
-			names[keyStr] = true
-		}
+		c.Global.ModuleDict.ForEach(func(k, _ Value) bool {
+			if s, ok := k.(StringValue); ok {
+				names[string(s)] = true
+			}
+			return true
+		})
 	}
 
 	// Convert to slice

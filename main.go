@@ -284,7 +284,7 @@ func main() {
 	if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
 		// Default: just the program name
 		defaultArgv := core.NewList(core.StringValue(""))
-		sysDict.SetWithKey("argv", core.StringValue("argv"), defaultArgv)
+		sysDict.SetStr("argv", defaultArgv)
 	}
 
 	// Register all special forms
@@ -350,10 +350,9 @@ func main() {
 		mainModule.Context = globalCtx
 		mainModule.Dict = mainDict
 		if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
-			if sysModulesVal, ok := sysModule.Get("modules"); ok {
+			if sysModulesVal, ok := sysModule.GetStr("modules"); ok {
 				if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
-					key := core.ValueToKey(core.StringValue("__main__"))
-					sysModulesDict.SetWithKey(key, core.StringValue("__main__"), mainModule)
+					sysModulesDict.SetStr("__main__", mainModule)
 				}
 			}
 		}
@@ -385,10 +384,9 @@ func main() {
 		mainModule.Context = globalCtx
 		mainModule.Dict = mainDict
 		if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
-			if sysModulesVal, ok := sysModule.Get("modules"); ok {
+			if sysModulesVal, ok := sysModule.GetStr("modules"); ok {
 				if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
-					key := core.ValueToKey(core.StringValue("__main__"))
-					sysModulesDict.SetWithKey(key, core.StringValue("__main__"), mainModule)
+					sysModulesDict.SetStr("__main__", mainModule)
 				}
 			}
 		}
@@ -421,13 +419,13 @@ func main() {
 
 		// Also populate sys.argv
 		if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
-			sysDict.SetWithKey("argv", core.StringValue("argv"), argsList)
+			sysDict.SetStr("argv", argsList)
 		}
 
 		// Get sys.path for module search
 		var sysPathDirs []string
 		if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
-			if sysPathVal, ok := sysDict.Get("path"); ok {
+			if sysPathVal, ok := sysDict.GetStr("path"); ok {
 				if sysPathList, ok := sysPathVal.(*core.ListValue); ok {
 					for _, item := range sysPathList.Items() {
 						if strVal, ok := item.(core.StringValue); ok {
@@ -488,7 +486,7 @@ func main() {
 
 		// Also populate sys.argv directly in the builtin module cache
 		if sysDict, ok := modules.GetBuiltinModule("sys"); ok {
-			sysDict.SetWithKey("argv", core.StringValue("argv"), argsList)
+			sysDict.SetStr("argv", argsList)
 		}
 
 		// Parse-only mode: just parse and print AST
@@ -658,10 +656,9 @@ func executeFile(filename string, ctx *core.Context, errorFormatter *parser.Erro
 
 	// Register in sys.modules
 	if sysModule, ok := modules.GetBuiltinModule("sys"); ok {
-		if sysModulesVal, ok := sysModule.Get("modules"); ok {
+		if sysModulesVal, ok := sysModule.GetStr("modules"); ok {
 			if sysModulesDict, ok := sysModulesVal.(*core.DictValue); ok {
-				key := core.ValueToKey(core.StringValue("__main__"))
-				sysModulesDict.SetWithKey(key, core.StringValue("__main__"), mainModule)
+				sysModulesDict.SetStr("__main__", mainModule)
 			}
 		}
 	}

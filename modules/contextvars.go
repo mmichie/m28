@@ -81,18 +81,18 @@ func Init_ContextvarsModule() *core.DictValue {
 		self.Attributes["_value"] = args[1]
 		return core.None, nil
 	}))
-	contextvarsModule.SetWithKey("ContextVar", core.StringValue("ContextVar"), contextVarClass)
+	contextvarsModule.SetStr("ContextVar", contextVarClass)
 
 	// Context - class representing an execution context
 	contextClass := core.NewClass("Context", nil)
-	contextvarsModule.SetWithKey("Context", core.StringValue("Context"), contextClass)
+	contextvarsModule.SetStr("Context", contextClass)
 
 	// Token - class for context variable tokens
 	tokenClass := core.NewClass("Token", nil)
-	contextvarsModule.SetWithKey("Token", core.StringValue("Token"), tokenClass)
+	contextvarsModule.SetStr("Token", tokenClass)
 
 	// copy_context() - returns a copy of the current context
-	contextvarsModule.SetWithKey("copy_context", core.StringValue("copy_context"), core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	contextvarsModule.SetStr("copy_context", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Return a stub Context instance
 		contextInstance, err := contextClass.Call([]core.Value{}, ctx)
 		if err != nil {

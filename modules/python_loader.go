@@ -98,7 +98,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		for _, fnName := range builtinNames {
 			val, err := ctx.Lookup(fnName)
 			if err == nil {
-				moduleDict.Set(fnName, val)
+				moduleDict.SetStr(fnName, val)
 			}
 		}
 
@@ -148,7 +148,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 	// Get sys.path for runtime search paths
 	var sysPathDirs []string
 	if sysModule, ok := GetBuiltinModule("sys"); ok {
-		if sysPathVal, ok := sysModule.Get("path"); ok {
+		if sysPathVal, ok := sysModule.GetStr("path"); ok {
 			if sysPathList, ok := sysPathVal.(*core.ListValue); ok {
 				for _, item := range sysPathList.Items() {
 					if strVal, ok := item.(core.StringValue); ok {
@@ -197,14 +197,14 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		core.Log.Debug(core.SubsystemImport, "Path is a directory, creating namespace package", "module", name, "path", pyPath)
 		// Create an empty module dict for the namespace package
 		// Set __path__ to allow submodule imports
-		partialModule.Set("__name__", core.StringValue(name))
-		partialModule.Set("__path__", core.NewList(core.StringValue(pyPath)))
-		partialModule.Set("__file__", core.NilValue{})
+		partialModule.SetStr("__name__", core.StringValue(name))
+		partialModule.SetStr("__path__", core.NewList(core.StringValue(pyPath)))
+		partialModule.SetStr("__file__", core.NilValue{})
 		// For "." import, __package__ should be None, not "." to avoid trying to import ""
 		if name == "." {
-			partialModule.Set("__package__", core.NilValue{})
+			partialModule.SetStr("__package__", core.NilValue{})
 		} else {
-			partialModule.Set("__package__", core.StringValue(name))
+			partialModule.SetStr("__package__", core.StringValue(name))
 		}
 		// Register in sys.modules
 		registerModuleInSysModules(name, partialModule)
@@ -378,8 +378,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		}
 		// Only process private names (starting with _) - public names already synced
 		if len(varName) > 0 && varName[0] == '_' {
-			key := core.ValueToKey(core.StringValue(varName))
-			partialModule.SetWithKey(key, core.StringValue(varName), value)
+			partialModule.SetStr(varName, value)
 		}
 	}
 
@@ -390,8 +389,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		core.DebugLog("[PYTHON_LOADER] Applying post-load fix for 'inspect' module\n")
 
 		// Get Signature class from the inspect module
-		sigKey := core.ValueToKey(core.StringValue("Signature"))
-		if sigClass, ok := partialModule.Get(sigKey); ok {
+		if sigClass, ok := partialModule.GetStr("Signature"); ok {
 			// Create an empty Signature instance
 			if callable, ok := sigClass.(interface {
 				Call([]core.Value, *core.Context) (core.Value, error)
@@ -414,9 +412,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 		// The @enum.global_enum decorator in re/__init__.py doesn't work in M28
 		// It's supposed to export enum members to module level, but fails
 		// Manually add the missing T and DEBUG flags from _compiler
-		compilerKey := core.ValueToKey(core.StringValue("_compiler"))
-		// 		fmt.Printf("[DEBUG] Looking for _compiler with key: %s\n", compilerKey)
-		if compilerVal, ok := partialModule.Get(compilerKey); ok {
+		if compilerVal, ok := partialModule.GetStr("_compiler"); ok {
 			// 			fmt.Printf("[DEBUG] Found _compiler in re module, type: %T\n", compilerVal)
 
 			// _compiler can be either a *core.Module or *core.DictValue
@@ -430,8 +426,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 			} else if compilerDict, ok := compilerVal.(*core.DictValue); ok {
 				// 				fmt.Printf("[DEBUG] _compiler is a DictValue\n")
 				getCompilerAttr = func(name string) (core.Value, bool) {
-					key := core.ValueToKey(core.StringValue(name))
-					return compilerDict.Get(key)
+					return compilerDict.GetStr(name)
 				}
 			} else {
 				// 				fmt.Printf("[DEBUG] _compiler is neither Module nor DictValue\n")
@@ -460,7 +455,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 					if flagVal, ok := getCompilerAttr(mapping.srcName); ok {
 						// 						fmt.Printf("[DEBUG] Found %s: %v, adding %v\n", mapping.srcName, flagVal, mapping.dstNames)
 						for _, dstName := range mapping.dstNames {
-							partialModule.Set(dstName, flagVal)
+							partialModule.SetStr(dstName, flagVal)
 							if moduleCtx != nil {
 								moduleCtx.Define(dstName, flagVal)
 							}
@@ -476,7 +471,7 @@ func LoadPythonModule(name string, ctx *core.Context, evalFunc func(core.Value, 
 
 		// Add NOFLAG = 0 (defined in re/__init__.py but not exported by @enum.global_enum)
 		// 		fmt.Printf("[DEBUG] Adding NOFLAG = 0\n")
-		partialModule.Set("NOFLAG", core.NumberValue(0))
+		partialModule.SetStr("NOFLAG", core.NumberValue(0))
 		if moduleCtx != nil {
 			moduleCtx.Define("NOFLAG", core.NumberValue(0))
 		}
@@ -503,7 +498,7 @@ func lookupSysModule(name string) *core.DictValue {
 	if !ok {
 		return nil
 	}
-	sysModulesVal, ok := sysModule.Get("modules")
+	sysModulesVal, ok := sysModule.GetStr("modules")
 	if !ok {
 		return nil
 	}
@@ -511,8 +506,7 @@ func lookupSysModule(name string) *core.DictValue {
 	if !ok {
 		return nil
 	}
-	key := core.ValueToKey(core.StringValue(name))
-	v, ok := sysModulesDict.Get(key)
+	v, ok := sysModulesDict.GetStr(name)
 	if !ok {
 		return nil
 	}
@@ -540,7 +534,7 @@ func registerModuleInSysModules(name string, moduleDict *core.DictValue) {
 	}
 
 	// Get sys.modules dict
-	sysModulesVal, ok := sysModule.Get("modules")
+	sysModulesVal, ok := sysModule.GetStr("modules")
 	if !ok {
 		return // sys.modules not available
 	}
@@ -551,9 +545,7 @@ func registerModuleInSysModules(name string, moduleDict *core.DictValue) {
 	}
 
 	// Register the module
-	// Use ValueToKey to generate the proper key format (e.g., "s:importlib._bootstrap")
-	key := core.ValueToKey(core.StringValue(name))
-	sysModulesDict.SetWithKey(key, core.StringValue(name), moduleDict)
+	sysModulesDict.SetStr(name, moduleDict)
 	core.DebugLog("[DEBUG] Registered module '%s' in sys.modules\n", name)
 
 	// For dotted module names (e.g., "test.test_bool"), set the submodule
@@ -572,8 +564,7 @@ func registerModuleInSysModules(name string, moduleDict *core.DictValue) {
 		childName := name[lastDot+1:]
 
 		// Try to get existing parent module
-		parentKey := core.ValueToKey(core.StringValue(parentName))
-		parentModule, parentExists := sysModulesDict.Get(parentKey)
+		parentModule, parentExists := sysModulesDict.GetStr(parentName)
 
 		// Only set child on parent if parent already exists as a real module
 		// Don't create placeholder parent modules - they block the real module from loading
@@ -582,9 +573,9 @@ func registerModuleInSysModules(name string, moduleDict *core.DictValue) {
 				// Only set if the child doesn't already exist OR if it's also a dict (module)
 				// This prevents overwriting attributes like 'collections.namedtuple' (a function)
 				// with partial module dicts when 'collections.namedtuple' fails to load as a module
-				existingChild, childExists := parentDict.Get(childName)
+				existingChild, childExists := parentDict.GetStr(childName)
 				if !childExists || isModuleLike(existingChild) {
-					parentDict.Set(childName, moduleDict)
+					parentDict.SetStr(childName, moduleDict)
 					core.DebugLog("[DEBUG] Set '%s' as attribute on parent module '%s'\n", childName, parentName)
 				} else {
 					core.DebugLog("[DEBUG] Skipped setting '%s' on parent '%s' (already exists as non-module: %T)\n", childName, parentName, existingChild)

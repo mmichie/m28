@@ -645,42 +645,37 @@ func (c *Class) GetAttr(name string) (Value, bool) {
 		dict := NewDict()
 		// Add all methods with proper key conversion
 		for methodName, method := range c.Methods {
-			// Use SetWithKey to ensure proper key storage with original key tracking
 			keyStr := StringValue(methodName)
-			dict.SetWithKey(ValueToKey(keyStr), keyStr, method)
+			dict.SetValue(keyStr, method)
 		}
 		// Add all attributes with proper key conversion
 		for attrName, attr := range c.Attributes {
 			keyStr := StringValue(attrName)
-			dict.SetWithKey(ValueToKey(keyStr), keyStr, attr)
+			dict.SetValue(keyStr, attr)
 		}
 
 		// Add special class attributes that are computed on-the-fly
 		// These must be included in __dict__ for CPython compatibility
 
 		// __name__
-		nameKey := ValueToKey(StringValue("__name__"))
-		dict.SetWithKey(nameKey, StringValue("__name__"), StringValue(c.Name))
+		dict.SetStr("__name__", StringValue(c.Name))
 
 		// __mro__ - Method Resolution Order
 		// Use a descriptor so that type.__dict__['__mro__'].__get__ works
 		mroDescriptor := NewMRODescriptor(c)
-		mroKey := ValueToKey(StringValue("__mro__"))
-		dict.SetWithKey(mroKey, StringValue("__mro__"), mroDescriptor)
+		dict.SetStr("__mro__", mroDescriptor)
 
 		// __dict__ - Add a descriptor for __dict__ itself
 		// This allows type.__dict__['__dict__'].__get__ to work (used by inspect.py)
 		dictDescriptor := NewDictDescriptor()
-		dictKey := ValueToKey(StringValue("__dict__"))
-		dict.SetWithKey(dictKey, StringValue("__dict__"), dictDescriptor)
+		dict.SetStr("__dict__", dictDescriptor)
 
 		// __bases__ - Direct parent classes
 		bases := make([]Value, len(c.Parents))
 		for i, parent := range c.Parents {
 			bases[i] = parent
 		}
-		basesKey := ValueToKey(StringValue("__bases__"))
-		dict.SetWithKey(basesKey, StringValue("__bases__"), TupleValue(bases))
+		dict.SetStr("__bases__", TupleValue(bases))
 
 		return dict, true
 	}
@@ -1479,14 +1474,16 @@ func dictEqual(a, b *DictValue) bool {
 	if a.Size() != b.Size() {
 		return false
 	}
-	for _, k := range a.Keys() {
-		av, _ := a.Get(k)
-		bv, ok := b.Get(k)
+	equal := true
+	a.ForEach(func(k, av Value) bool {
+		bv, ok := b.GetValue(k)
 		if !ok || !EqualValues(av, bv) {
+			equal = false
 			return false
 		}
-	}
-	return true
+		return true
+	})
+	return equal
 }
 
 // NewInstance creates a new instance of a class
@@ -1861,12 +1858,7 @@ func (i *Instance) getAttrImpl(name string, skipInstanceDict bool) (Value, bool,
 	if name == "__dict__" {
 		dict := NewDict()
 		for k, v := range i.Attributes {
-			// Use SetValue to properly format the key with ValueToKey
-			err := dict.SetValue(StringValue(k), v)
-			if err != nil {
-				// If SetValue fails, fall back to SetWithKey
-				dict.SetWithKey(k, StringValue(k), v)
-			}
+			dict.SetStr(k, v)
 		}
 		return dict, true, nil
 	}
@@ -3025,11 +3017,11 @@ func (d *DictDescriptor) GetAttr(name string) (Value, bool) {
 				dict := NewDict()
 				for methodName, method := range targetClass.Methods {
 					keyStr := StringValue(methodName)
-					dict.SetWithKey(ValueToKey(keyStr), keyStr, method)
+					dict.SetValue(keyStr, method)
 				}
 				for attrName, attr := range targetClass.Attributes {
 					keyStr := StringValue(attrName)
-					dict.SetWithKey(ValueToKey(keyStr), keyStr, attr)
+					dict.SetValue(keyStr, attr)
 				}
 				return dict, nil
 			}
@@ -3040,7 +3032,7 @@ func (d *DictDescriptor) GetAttr(name string) (Value, bool) {
 				dict := NewDict()
 				for attrName, attrValue := range instance.Attributes {
 					keyStr := StringValue(attrName)
-					dict.SetWithKey(ValueToKey(keyStr), keyStr, attrValue)
+					dict.SetValue(keyStr, attrValue)
 				}
 				return dict, nil
 			}
@@ -3050,11 +3042,11 @@ func (d *DictDescriptor) GetAttr(name string) (Value, bool) {
 				dict := NewDict()
 				for methodName, method := range class.Methods {
 					keyStr := StringValue(methodName)
-					dict.SetWithKey(ValueToKey(keyStr), keyStr, method)
+					dict.SetValue(keyStr, method)
 				}
 				for attrName, attr := range class.Attributes {
 					keyStr := StringValue(attrName)
-					dict.SetWithKey(ValueToKey(keyStr), keyStr, attr)
+					dict.SetValue(keyStr, attr)
 				}
 				return dict, nil
 			}

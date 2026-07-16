@@ -220,9 +220,9 @@ func newBisectFunc(name string, left, insort bool) *core.BuiltinFunctionWithKwar
 // InitBisectModule creates the _bisect C extension module
 func InitBisectModule() *core.DictValue {
 	bisectModule := core.NewDict()
-	bisectModule.Set("bisect_left", newBisectFunc("bisect_left", true, false))
-	bisectModule.Set("bisect_right", newBisectFunc("bisect_right", false, false))
-	bisectModule.Set("insort_left", newBisectFunc("insort_left", true, true))
-	bisectModule.Set("insort_right", newBisectFunc("insort_right", false, true))
+	bisectModule.SetStr("bisect_left", newBisectFunc("bisect_left", true, false))
+	bisectModule.SetStr("bisect_right", newBisectFunc("bisect_right", false, false))
+	bisectModule.SetStr("insort_left", newBisectFunc("insort_left", true, true))
+	bisectModule.SetStr("insort_right", newBisectFunc("insort_right", false, true))
 	return bisectModule
 }

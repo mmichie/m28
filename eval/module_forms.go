@@ -268,11 +268,7 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 			// Strategy 1: Try to get as an attribute from parent module (most common case)
 			if parentModule != nil {
 				// Try to extract the name from the parent module
-				val, ok := parentModule.Get(spec.name)
-				if !ok {
-					// Also try with "s:" prefix (symbol key format)
-					val, ok = parentModule.Get("s:" + spec.name)
-				}
+				val, ok := parentModule.GetStr(spec.name)
 				if !ok {
 					// Standard module dunders are defined in the module's context
 					// but Context.Define deliberately keeps them out of the export
@@ -346,19 +342,17 @@ func enhancedImportForm(args *core.ListValue, ctx *core.Context) (core.Value, er
 			return nil, err
 		}
 		// Import all exported names
-		for _, key := range dictModule.Keys() {
-			if val, ok := dictModule.Get(key); ok {
-				// Extract the actual key name (remove prefix if any)
-				keyName := key
-				if strings.HasPrefix(key, "s:") {
-					keyName = key[2:]
-				}
-				// Skip private names
-				if !strings.HasPrefix(keyName, "_") {
-					ctx.Define(keyName, val)
-				}
+		dictModule.ForEach(func(k, val core.Value) bool {
+			keyName, ok := k.(core.StringValue)
+			if !ok {
+				return true
 			}
-		}
+			// Skip private names
+			if !strings.HasPrefix(string(keyName), "_") {
+				ctx.Define(string(keyName), val)
+			}
+			return true
+		})
 
 		// Python behavior: for "from .module import *", the module object is also made available
 		// For example, "from .events import *" makes both the exported names AND the events module available
@@ -480,16 +474,12 @@ func wrapDictAsModule(name string, dict *core.DictValue) *core.Module {
 	module.Dict = dict
 
 	// Copy all items from dict to module exports
-	for _, key := range dict.Keys() {
-		if val, ok := dict.Get(key); ok {
-			// Remove prefix if present
-			cleanKey := key
-			if strings.HasPrefix(key, "s:") {
-				cleanKey = key[2:]
-			}
-			module.Export(cleanKey, val)
+	dict.ForEach(func(k, val core.Value) bool {
+		if cleanKey, ok := k.(core.StringValue); ok {
+			module.Export(string(cleanKey), val)
 		}
-	}
+		return true
+	})
 
 	return module
 }

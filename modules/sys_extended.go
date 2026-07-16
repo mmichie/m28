@@ -10,97 +10,97 @@ import (
 // that aren't in the base implementation to match CPython
 func addExtendedSysAttributes(sysModule *core.DictValue) {
 	// Additional version/implementation info
-	sysModule.Set("abiflags", core.StringValue(""))
-	sysModule.Set("api_version", core.NumberValue(1013))
-	sysModule.Set("hexversion", core.NumberValue(0x030c0000)) // Python 3.12
-	sysModule.Set("copyright", core.StringValue("M28 Language Runtime"))
-	sysModule.Set("maxunicode", core.NumberValue(0x10ffff)) // Max Unicode code point
+	sysModule.SetStr("abiflags", core.StringValue(""))
+	sysModule.SetStr("api_version", core.NumberValue(1013))
+	sysModule.SetStr("hexversion", core.NumberValue(0x030c0000)) // Python 3.12
+	sysModule.SetStr("copyright", core.StringValue("M28 Language Runtime"))
+	sysModule.SetStr("maxunicode", core.NumberValue(0x10ffff)) // Max Unicode code point
 
 	// Flags object (stub)
 	flags := core.NewDict()
-	flags.Set("debug", core.NumberValue(0))
-	flags.Set("inspect", core.NumberValue(0))
-	flags.Set("interactive", core.NumberValue(0))
-	flags.Set("optimize", core.NumberValue(0))
-	flags.Set("dont_write_bytecode", core.NumberValue(1))
-	flags.Set("no_user_site", core.NumberValue(0))
-	flags.Set("no_site", core.NumberValue(0))
-	flags.Set("ignore_environment", core.NumberValue(0))
-	flags.Set("verbose", core.NumberValue(0))
-	flags.Set("bytes_warning", core.NumberValue(0))
-	flags.Set("quiet", core.NumberValue(0))
-	flags.Set("hash_randomization", core.NumberValue(1))
-	flags.Set("isolated", core.NumberValue(0))
-	flags.Set("dev_mode", core.NumberValue(0))
-	flags.Set("utf8_mode", core.NumberValue(0))
-	sysModule.Set("flags", flags)
+	flags.SetStr("debug", core.NumberValue(0))
+	flags.SetStr("inspect", core.NumberValue(0))
+	flags.SetStr("interactive", core.NumberValue(0))
+	flags.SetStr("optimize", core.NumberValue(0))
+	flags.SetStr("dont_write_bytecode", core.NumberValue(1))
+	flags.SetStr("no_user_site", core.NumberValue(0))
+	flags.SetStr("no_site", core.NumberValue(0))
+	flags.SetStr("ignore_environment", core.NumberValue(0))
+	flags.SetStr("verbose", core.NumberValue(0))
+	flags.SetStr("bytes_warning", core.NumberValue(0))
+	flags.SetStr("quiet", core.NumberValue(0))
+	flags.SetStr("hash_randomization", core.NumberValue(1))
+	flags.SetStr("isolated", core.NumberValue(0))
+	flags.SetStr("dev_mode", core.NumberValue(0))
+	flags.SetStr("utf8_mode", core.NumberValue(0))
+	sysModule.SetStr("flags", flags)
 
 	// float_info object
 	floatInfo := core.NewDict()
-	floatInfo.Set("max", core.NumberValue(1.7976931348623157e+308))
-	floatInfo.Set("max_exp", core.NumberValue(1024))
-	floatInfo.Set("max_10_exp", core.NumberValue(308))
-	floatInfo.Set("min", core.NumberValue(2.2250738585072014e-308))
-	floatInfo.Set("min_exp", core.NumberValue(-1021))
-	floatInfo.Set("min_10_exp", core.NumberValue(-307))
-	floatInfo.Set("dig", core.NumberValue(15))
-	floatInfo.Set("mant_dig", core.NumberValue(53))
-	floatInfo.Set("epsilon", core.NumberValue(2.220446049250313e-16))
-	floatInfo.Set("radix", core.NumberValue(2))
-	floatInfo.Set("rounds", core.NumberValue(1))
-	sysModule.Set("float_info", floatInfo)
+	floatInfo.SetStr("max", core.NumberValue(1.7976931348623157e+308))
+	floatInfo.SetStr("max_exp", core.NumberValue(1024))
+	floatInfo.SetStr("max_10_exp", core.NumberValue(308))
+	floatInfo.SetStr("min", core.NumberValue(2.2250738585072014e-308))
+	floatInfo.SetStr("min_exp", core.NumberValue(-1021))
+	floatInfo.SetStr("min_10_exp", core.NumberValue(-307))
+	floatInfo.SetStr("dig", core.NumberValue(15))
+	floatInfo.SetStr("mant_dig", core.NumberValue(53))
+	floatInfo.SetStr("epsilon", core.NumberValue(2.220446049250313e-16))
+	floatInfo.SetStr("radix", core.NumberValue(2))
+	floatInfo.SetStr("rounds", core.NumberValue(1))
+	sysModule.SetStr("float_info", floatInfo)
 
 	// int_info object
 	intInfo := core.NewDict()
-	intInfo.Set("bits_per_digit", core.NumberValue(30))
-	intInfo.Set("sizeof_digit", core.NumberValue(4))
-	sysModule.Set("int_info", intInfo)
+	intInfo.SetStr("bits_per_digit", core.NumberValue(30))
+	intInfo.SetStr("sizeof_digit", core.NumberValue(4))
+	sysModule.SetStr("int_info", intInfo)
 
 	// thread_info object
 	threadInfo := core.NewDict()
-	threadInfo.Set("name", core.StringValue("pthread"))
-	threadInfo.Set("lock", core.StringValue("mutex+cond"))
-	threadInfo.Set("version", core.None)
-	sysModule.Set("thread_info", threadInfo)
+	threadInfo.SetStr("name", core.StringValue("pthread"))
+	threadInfo.SetStr("lock", core.StringValue("mutex+cond"))
+	threadInfo.SetStr("version", core.None)
+	sysModule.SetStr("thread_info", threadInfo)
 
 	// Path/import related
-	sysModule.Set("meta_path", core.NewList())
-	sysModule.Set("path_hooks", core.NewList())
-	sysModule.Set("path_importer_cache", core.NewDict())
-	sysModule.Set("dont_write_bytecode", core.True)
-	sysModule.Set("pycache_prefix", core.None)
-	sysModule.Set("platlibdir", core.StringValue("lib"))
+	sysModule.SetStr("meta_path", core.NewList())
+	sysModule.SetStr("path_hooks", core.NewList())
+	sysModule.SetStr("path_importer_cache", core.NewDict())
+	sysModule.SetStr("dont_write_bytecode", core.True)
+	sysModule.SetStr("pycache_prefix", core.None)
+	sysModule.SetStr("platlibdir", core.StringValue("lib"))
 
 	// Standard library module names
 	stdlibModules := core.NewList()
-	sysModule.Set("stdlib_module_names", stdlibModules)
+	sysModule.SetStr("stdlib_module_names", stdlibModules)
 
 	// Original argv (before any modifications)
-	sysModule.Set("orig_argv", core.NewList())
+	sysModule.SetStr("orig_argv", core.NewList())
 
 	// Monitoring (Python 3.12+)
-	sysModule.Set("monitoring", core.NewDict())
+	sysModule.SetStr("monitoring", core.NewDict())
 
 	// Float repr style
-	sysModule.Set("float_repr_style", core.StringValue("short"))
+	sysModule.SetStr("float_repr_style", core.StringValue("short"))
 }
 
 // addExtendedSysFunctions adds all the additional sys module functions
 func addExtendedSysFunctions(sysModule *core.DictValue) {
 	// Profiling/tracing functions (stubs)
-	sysModule.Set("getprofile", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("getprofile", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
-	sysModule.Set("setprofile", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("setprofile", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
-	sysModule.Set("gettrace", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("gettrace", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
-	sysModule.Set("settrace", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("settrace", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
@@ -113,9 +113,9 @@ func addExtendedSysFunctions(sysModule *core.DictValue) {
 		}
 		return core.None, nil
 	})
-	sysModule.Set("displayhook", displayhookFn)
+	sysModule.SetStr("displayhook", displayhookFn)
 	// __displayhook__ is the original displayhook (sys.displayhook can be replaced, this is always the original)
-	sysModule.Set("__displayhook__", displayhookFn)
+	sysModule.SetStr("__displayhook__", displayhookFn)
 
 	// __excepthook__ is the original excepthook (sys.excepthook can be replaced, this is always the original)
 	// excepthook is already defined in sys.go, we need to get a reference or create a similar one
@@ -126,65 +126,65 @@ func addExtendedSysFunctions(sysModule *core.DictValue) {
 		// For now, just return None (the real implementation is in sys.go)
 		return core.None, nil
 	})
-	sysModule.Set("__excepthook__", excepthookFn)
+	sysModule.SetStr("__excepthook__", excepthookFn)
 
-	sysModule.Set("unraisablehook", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("unraisablehook", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
-	sysModule.Set("breakpointhook", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("breakpointhook", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
 	// Reference counting/memory (stubs)
-	sysModule.Set("getrefcount", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("getrefcount", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(2), nil // Stub value
 	}))
 
-	sysModule.Set("getallocatedblocks", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("getallocatedblocks", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0), nil
 	}))
 
-	sysModule.Set("getunicodeinternedsize", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("getunicodeinternedsize", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0), nil
 	}))
 
 	// Switch interval (for threading)
-	sysModule.Set("getswitchinterval", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("getswitchinterval", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0.005), nil
 	}))
 
-	sysModule.Set("setswitchinterval", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("setswitchinterval", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
 	// Async generator hooks
-	sysModule.Set("get_asyncgen_hooks", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("get_asyncgen_hooks", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		hooks := core.NewDict()
-		hooks.Set("firstiter", core.None)
-		hooks.Set("finalizer", core.None)
+		hooks.SetStr("firstiter", core.None)
+		hooks.SetStr("finalizer", core.None)
 		return hooks, nil
 	}))
 
-	sysModule.Set("set_asyncgen_hooks", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("set_asyncgen_hooks", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
 	// Coroutine origin tracking
-	sysModule.Set("get_coroutine_origin_tracking_depth", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("get_coroutine_origin_tracking_depth", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0), nil
 	}))
 
-	sysModule.Set("set_coroutine_origin_tracking_depth", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("set_coroutine_origin_tracking_depth", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
 	// Int max str digits (Python 3.11+)
-	sysModule.Set("get_int_max_str_digits", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("get_int_max_str_digits", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(float64(core.IntMaxStrDigits)), nil
 	}))
 
-	sysModule.Set("set_int_max_str_digits", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("set_int_max_str_digits", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) != 1 {
 			return nil, &core.TypeError{Message: fmt.Sprintf("set_int_max_str_digits() takes exactly one argument (%d given)", len(args))}
 		}
@@ -202,16 +202,16 @@ func addExtendedSysFunctions(sysModule *core.DictValue) {
 	}))
 
 	// Dynamic library loading (Unix-specific stubs)
-	sysModule.Set("getdlopenflags", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("getdlopenflags", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.NumberValue(0), nil
 	}))
 
-	sysModule.Set("setdlopenflags", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("setdlopenflags", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
 	// Call tracing
-	sysModule.Set("call_tracing", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("call_tracing", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 2 {
 			return nil, core.NewTypeError("function", nil, "call_tracing() argument")
 		}
@@ -227,35 +227,35 @@ func addExtendedSysFunctions(sysModule *core.DictValue) {
 	}))
 
 	// Audit hooks (Python 3.8+)
-	sysModule.Set("addaudithook", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("addaudithook", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
-	sysModule.Set("audit", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("audit", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
 	// Finalizing check
-	sysModule.Set("is_finalizing", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("is_finalizing", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.False, nil
 	}))
 
 	// Stack trampoline (Python 3.12+)
-	sysModule.Set("is_stack_trampoline_active", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("is_stack_trampoline_active", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.False, nil
 	}))
 
-	sysModule.Set("activate_stack_trampoline", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("activate_stack_trampoline", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
-	sysModule.Set("deactivate_stack_trampoline", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("deactivate_stack_trampoline", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 
 	// Exception (Python 3.11+)
 	// Returns the exception instance currently being handled, or None
-	sysModule.Set("exception", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	sysModule.SetStr("exception", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		// Return the current exception value if one is being handled
 		if ctx.ExcValue != nil {
 			return ctx.ExcValue, nil

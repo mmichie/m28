@@ -7,7 +7,7 @@ func InitOpcodeModule() *core.DictValue {
 	module := core.NewDict()
 
 	// Module docstring
-	module.Set("__doc__", core.StringValue("Opcode support module"))
+	module.SetStr("__doc__", core.StringValue("Opcode support module"))
 
 	// CPython 3.12 opcodes - minimal set needed by dis module
 	// These are just the most common ones; add more as needed
@@ -118,14 +118,14 @@ func InitOpcodeModule() *core.DictValue {
 	}
 
 	for name, value := range opcodes {
-		module.Set(name, core.NumberValue(float64(value)))
+		module.SetStr(name, core.NumberValue(float64(value)))
 	}
 
 	// Add HAVE_ARGUMENT constant
-	module.Set("HAVE_ARGUMENT", core.NumberValue(90))
+	module.SetStr("HAVE_ARGUMENT", core.NumberValue(90))
 
 	// stack_effect(opcode, oparg=None, *, jump=None) - compute stack effect of opcode
-	module.Set("stack_effect", core.NewNamedBuiltinFunction("stack_effect", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("stack_effect", core.NewNamedBuiltinFunction("stack_effect", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		if len(args) < 1 {
 			return nil, core.NewTypeError("stack_effect", nil, "stack_effect() takes at least 1 argument")
 		}
@@ -144,14 +144,14 @@ func InitOpcodeModule() *core.DictValue {
 			return core.BoolValue(false), nil
 		})
 	}
-	module.Set("has_arg", stubPredicate("has_arg"))
-	module.Set("has_const", stubPredicate("has_const"))
-	module.Set("has_name", stubPredicate("has_name"))
-	module.Set("has_jump", stubPredicate("has_jump"))
-	module.Set("has_free", stubPredicate("has_free"))
-	module.Set("has_local", stubPredicate("has_local"))
-	module.Set("has_exc", stubPredicate("has_exc"))
-	module.Set("is_valid", stubPredicate("is_valid"))
+	module.SetStr("has_arg", stubPredicate("has_arg"))
+	module.SetStr("has_const", stubPredicate("has_const"))
+	module.SetStr("has_name", stubPredicate("has_name"))
+	module.SetStr("has_jump", stubPredicate("has_jump"))
+	module.SetStr("has_free", stubPredicate("has_free"))
+	module.SetStr("has_local", stubPredicate("has_local"))
+	module.SetStr("has_exc", stubPredicate("has_exc"))
+	module.SetStr("is_valid", stubPredicate("is_valid"))
 
 	// get_intrinsic1_descs / get_intrinsic2_descs / get_nb_ops return tuples of
 	// strings describing CPython intrinsic calls and numeric binary ops. They're
@@ -162,19 +162,19 @@ func InitOpcodeModule() *core.DictValue {
 			return core.TupleValue{}, nil
 		})
 	}
-	module.Set("get_intrinsic1_descs", emptyTupleFn("get_intrinsic1_descs"))
-	module.Set("get_intrinsic2_descs", emptyTupleFn("get_intrinsic2_descs"))
-	module.Set("get_nb_ops", emptyTupleFn("get_nb_ops"))
+	module.SetStr("get_intrinsic1_descs", emptyTupleFn("get_intrinsic1_descs"))
+	module.SetStr("get_intrinsic2_descs", emptyTupleFn("get_intrinsic2_descs"))
+	module.SetStr("get_nb_ops", emptyTupleFn("get_nb_ops"))
 
 	// ENABLE_SPECIALIZATION is a build-time flag - report as False (no specialization)
-	module.Set("ENABLE_SPECIALIZATION", core.BoolValue(false))
+	module.SetStr("ENABLE_SPECIALIZATION", core.BoolValue(false))
 
 	// get_executor / get_specialization_stats - tier 2 interpreter introspection.
 	// M28 has no tier 2; these always return None so dis.py's import doesn't fail.
-	module.Set("get_executor", core.NewNamedBuiltinFunction("get_executor", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("get_executor", core.NewNamedBuiltinFunction("get_executor", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
-	module.Set("get_specialization_stats", core.NewNamedBuiltinFunction("get_specialization_stats", func(args []core.Value, ctx *core.Context) (core.Value, error) {
+	module.SetStr("get_specialization_stats", core.NewNamedBuiltinFunction("get_specialization_stats", func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		return core.None, nil
 	}))
 

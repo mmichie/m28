@@ -78,13 +78,13 @@ func TestEqualValuesTuples(t *testing.T) {
 
 func TestEqualValuesDicts(t *testing.T) {
 	d1 := NewDict()
-	d1.Set("key", NumberValue(1))
+	d1.SetStr("key", NumberValue(1))
 
 	d2 := NewDict()
-	d2.Set("key", NumberValue(1))
+	d2.SetStr("key", NumberValue(1))
 
 	d3 := NewDict()
-	d3.Set("key", NumberValue(2))
+	d3.SetStr("key", NumberValue(2))
 
 	if !EqualValues(d1, d2) {
 		t.Error("Equal dicts should be equal")
@@ -253,7 +253,7 @@ func TestIsTruthyLists(t *testing.T) {
 
 func TestIsTruthyDicts(t *testing.T) {
 	d := NewDict()
-	d.Set("key", NumberValue(1))
+	d.SetStr("key", NumberValue(1))
 	if !IsTruthy(d) {
 		t.Error("Non-empty dict should be truthy")
 	}
