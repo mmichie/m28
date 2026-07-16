@@ -543,27 +543,19 @@ func registerBoolType() {
 			},
 		},
 		Methods: map[string]*MethodDescriptor{
-			// Comparison operators - bools compare as ints (False=0, True=1)
+			// Comparison operators - bool is an int subclass, so it orders by
+			// numeric value against any real number (False=0.0, True=1.0).
 			"__lt__": {
 				Name:    "__lt__",
 				Arity:   1,
 				Doc:     "Return self<value",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					a := 0
-					if bool(receiver.(BoolValue)) {
-						a = 1
-					}
-					// Handle bool < bool or bool < number
-					var b int
-					switch v := args[0].(type) {
-					case BoolValue:
-						if bool(v) {
-							b = 1
-						}
-					case NumberValue:
-						b = int(v)
-					default:
+					// bool is an int subclass, so it orders against any real number
+					// (bool/int/float/bigint) by numeric value: True < 2.5, etc.
+					a, _ := AsFloat(receiver)
+					b, ok := AsFloat(args[0])
+					if !ok {
 						return nil, &TypeError{Message: fmt.Sprintf("'<' not supported between instances of 'bool' and '%s'", args[0].Type())}
 					}
 					return BoolValue(a < b), nil
@@ -575,19 +567,11 @@ func registerBoolType() {
 				Doc:     "Return self<=value",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					a := 0
-					if bool(receiver.(BoolValue)) {
-						a = 1
-					}
-					var b int
-					switch v := args[0].(type) {
-					case BoolValue:
-						if bool(v) {
-							b = 1
-						}
-					case NumberValue:
-						b = int(v)
-					default:
+					// bool is an int subclass, so it orders against any real number
+					// (bool/int/float/bigint) by numeric value: True < 2.5, etc.
+					a, _ := AsFloat(receiver)
+					b, ok := AsFloat(args[0])
+					if !ok {
 						return nil, &TypeError{Message: fmt.Sprintf("'<=' not supported between instances of 'bool' and '%s'", args[0].Type())}
 					}
 					return BoolValue(a <= b), nil
@@ -599,19 +583,11 @@ func registerBoolType() {
 				Doc:     "Return self>value",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					a := 0
-					if bool(receiver.(BoolValue)) {
-						a = 1
-					}
-					var b int
-					switch v := args[0].(type) {
-					case BoolValue:
-						if bool(v) {
-							b = 1
-						}
-					case NumberValue:
-						b = int(v)
-					default:
+					// bool is an int subclass, so it orders against any real number
+					// (bool/int/float/bigint) by numeric value: True < 2.5, etc.
+					a, _ := AsFloat(receiver)
+					b, ok := AsFloat(args[0])
+					if !ok {
 						return nil, &TypeError{Message: fmt.Sprintf("'>' not supported between instances of 'bool' and '%s'", args[0].Type())}
 					}
 					return BoolValue(a > b), nil
@@ -623,19 +599,11 @@ func registerBoolType() {
 				Doc:     "Return self>=value",
 				Builtin: true,
 				Handler: func(receiver Value, args []Value, ctx *Context) (Value, error) {
-					a := 0
-					if bool(receiver.(BoolValue)) {
-						a = 1
-					}
-					var b int
-					switch v := args[0].(type) {
-					case BoolValue:
-						if bool(v) {
-							b = 1
-						}
-					case NumberValue:
-						b = int(v)
-					default:
+					// bool is an int subclass, so it orders against any real number
+					// (bool/int/float/bigint) by numeric value: True < 2.5, etc.
+					a, _ := AsFloat(receiver)
+					b, ok := AsFloat(args[0])
+					if !ok {
 						return nil, &TypeError{Message: fmt.Sprintf("'>=' not supported between instances of 'bool' and '%s'", args[0].Type())}
 					}
 					return BoolValue(a >= b), nil

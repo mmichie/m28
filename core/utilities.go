@@ -561,6 +561,21 @@ func EqualValues(a, b Value) bool {
 			}
 			return float64(bVal) == 0.0
 		}
+		// bool compares by numeric value against a float too: True == 1.0.
+		if bVal, ok := b.(FloatValue); ok {
+			if bool(aVal) {
+				return float64(bVal) == 1.0
+			}
+			return float64(bVal) == 0.0
+		}
+		// bool compares by numeric value against a big int as well.
+		if bVal, ok := b.(BigIntValue); ok {
+			v := 0.0
+			if bool(aVal) {
+				v = 1.0
+			}
+			return floatEqualsBigInt(v, bVal)
+		}
 		// Bool can also be compared to complex
 		if bVal, ok := b.(ComplexValue); ok {
 			expected := complex(0, 0)
