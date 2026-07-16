@@ -227,6 +227,64 @@ func enumerateWithKwargs(args []core.Value, kwargs *core.Kwargs, ctx *core.Conte
 	return nil, errors.NewTypeError("enumerate", "argument must be iterable", string(obj.Type()))
 }
 
+// ZipIterator is a lazy iterator yielding tuples of the i-th element from each
+// input iterator, stopping as soon as any input is exhausted. Being lazy,
+// zip() over infinite iterators (e.g. zip(count(), count())) no longer hangs.
+type ZipIterator struct {
+	iterators []core.Iterator
+	originals []core.Iterable
+	exhausted bool
+}
+
+func (z *ZipIterator) Type() core.Type { return "zip" }
+
+func (z *ZipIterator) String() string { return "<zip object>" }
+
+func (z *ZipIterator) Iterator() core.Iterator { return z }
+
+func (z *ZipIterator) Next() (core.Value, bool) {
+	// zip() with no arguments (or once any input is exhausted) yields nothing.
+	if z.exhausted || len(z.iterators) == 0 {
+		z.exhausted = true
+		return nil, false
+	}
+	values := make(core.TupleValue, len(z.iterators))
+	for i, iter := range z.iterators {
+		val, hasNext := iter.Next()
+		if !hasNext {
+			z.exhausted = true
+			return nil, false
+		}
+		values[i] = val
+	}
+	return values, true
+}
+
+func (z *ZipIterator) Reset() {
+	z.exhausted = false
+	for i, o := range z.originals {
+		z.iterators[i] = o.Iterator()
+	}
+}
+
+func (z *ZipIterator) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return z, nil
+		}), true
+	case "__next__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			val, ok := z.Next()
+			if !ok {
+				return nil, &core.StopIteration{}
+			}
+			return val, nil
+		}), true
+	}
+	return nil, false
+}
+
 // ZipBuilder creates the zip function
 func ZipBuilder() builders.BuiltinFunc {
 	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -247,29 +305,11 @@ func ZipBuilder() builders.BuiltinFunc {
 			iterables[i] = iter
 		}
 
-		// TODO(M28-5beb): Return proper zip iterator when implemented
-		// For now, return a simple implementation
-		if len(iterables) == 0 {
-			return core.NewList(), nil
-		}
-
-		result := make([]core.Value, 0)
 		iters := make([]core.Iterator, len(iterables))
 		for i, iterable := range iterables {
 			iters[i] = iterable.Iterator()
 		}
-
-		for {
-			values := make(core.TupleValue, len(iters))
-			for i, iter := range iters {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					return core.NewList(result...), nil
-				}
-				values[i] = val
-			}
-			result = append(result, values)
-		}
+		return &ZipIterator{iterators: iters, originals: iterables}, nil
 	}
 }
 

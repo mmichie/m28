@@ -37,11 +37,11 @@ func RegisterFunctional(ctx *core.Context) {
 
 // MapIterator is a lazy iterator that applies a function to each element
 type MapIterator struct {
-	fn               core.Callable
-	iterators        []core.Iterator
+	fn                core.Callable
+	iterators         []core.Iterator
 	originalIterables []core.Iterable
-	ctx              *core.Context
-	exhausted        bool
+	ctx               *core.Context
+	exhausted         bool
 }
 
 // Type returns the type name
@@ -152,6 +152,105 @@ func MapBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 	}
 }
 
+// FilterIterator is a lazy iterator that yields the elements of an iterable for
+// which the predicate is truthy (or, when the predicate is nil, the elements
+// that are themselves truthy). Being lazy, filter() over an infinite iterator
+// (e.g. filter(pred, itertools.count())) no longer hangs.
+type FilterIterator struct {
+	predicate  core.Callable // nil means "keep truthy elements"
+	iterator   core.Iterator
+	original   core.Iterable
+	ctx        *core.Context
+	exhausted  bool
+	pendingErr error
+}
+
+func (f *FilterIterator) Type() core.Type { return "filter" }
+
+func (f *FilterIterator) String() string { return "<filter object>" }
+
+func (f *FilterIterator) Iterator() core.Iterator { return f }
+
+// advance pulls the next kept element. It can return an error (from the
+// predicate) which the plain Next() records and the __next__ path re-raises.
+func (f *FilterIterator) advance() (core.Value, bool, error) {
+	for {
+		val, hasNext := f.iterator.Next()
+		if !hasNext {
+			return nil, false, nil
+		}
+		keep := true
+		if f.predicate == nil {
+			keep = types.IsTruthy(val)
+		} else {
+			res, err := f.predicate.Call([]core.Value{val}, f.ctx)
+			if err != nil {
+				return nil, false, err
+			}
+			keep = types.IsTruthy(res)
+		}
+		if keep {
+			return val, true, nil
+		}
+	}
+}
+
+func (f *FilterIterator) Next() (core.Value, bool) {
+	if f.exhausted {
+		return nil, false
+	}
+	val, ok, err := f.advance()
+	if err != nil {
+		f.pendingErr = err
+		f.exhausted = true
+		return nil, false
+	}
+	if !ok {
+		f.exhausted = true
+		return nil, false
+	}
+	return val, true
+}
+
+// Reset restarts iteration from the beginning of the original iterable.
+func (f *FilterIterator) Reset() {
+	f.exhausted = false
+	f.iterator = f.original.Iterator()
+}
+
+// GetAttr exposes __iter__/__next__ so filter objects work with the Python
+// iterator protocol; __next__ propagates a predicate error (unlike Next()).
+func (f *FilterIterator) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return f, nil
+		}), true
+	case "__next__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if f.exhausted {
+				if f.pendingErr != nil {
+					err := f.pendingErr
+					f.pendingErr = nil
+					return nil, err
+				}
+				return nil, &core.StopIteration{}
+			}
+			val, ok, err := f.advance()
+			if err != nil {
+				f.exhausted = true
+				return nil, err
+			}
+			if !ok {
+				f.exhausted = true
+				return nil, &core.StopIteration{}
+			}
+			return val, nil
+		}), true
+	}
+	return nil, false
+}
+
 // FilterBuilder creates the filter function
 func FilterBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 	return func(args []core.Value, ctx *core.Context) (core.Value, error) {
@@ -177,31 +276,12 @@ func FilterBuilder() func([]core.Value, *core.Context) (core.Value, error) {
 			return nil, err
 		}
 
-		// TODO(M28-5beb): Return filter iterator when implemented
-		// For now, return a simple list implementation
-		result := make([]core.Value, 0)
-		iter := iterable.Iterator()
-		for {
-			val, hasNext := iter.Next()
-			if !hasNext {
-				break
-			}
-			// If predicate is nil, use truthiness
-			if predicate == nil {
-				if types.IsTruthy(val) {
-					result = append(result, val)
-				}
-			} else {
-				keep, err := predicate.Call([]core.Value{val}, ctx)
-				if err != nil {
-					return nil, err
-				}
-				if types.IsTruthy(keep) {
-					result = append(result, val)
-				}
-			}
-		}
-		return core.NewList(result...), nil
+		return &FilterIterator{
+			predicate: predicate,
+			iterator:  iterable.Iterator(),
+			original:  iterable,
+			ctx:       ctx,
+		}, nil
 	}
 }
 

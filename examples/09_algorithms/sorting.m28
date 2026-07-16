@@ -95,9 +95,9 @@
     lst
     (do
       (= pivot (nth lst (int (/ (len lst) 2))))
-      (= less (filter (lambda (x) (< x pivot)) lst))
-      (= equal (filter (lambda (x) (== x pivot)) lst))
-      (= greater (filter (lambda (x) (> x pivot)) lst))
+      (= less (list (filter (lambda (x) (< x pivot)) lst)))
+      (= equal (list (filter (lambda (x) (== x pivot)) lst)))
+      (= greater (list (filter (lambda (x) (> x pivot)) lst)))
       (+ (quicksort less) equal (quicksort greater))))))
 
 # Merge Sort

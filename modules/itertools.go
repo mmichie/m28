@@ -9,31 +9,6 @@ import (
 	"github.com/mmichie/m28/core"
 )
 
-// countIterator implements itertools.count() - infinite iterator
-type countIterator struct {
-	current float64
-	step    float64
-}
-
-func (c *countIterator) Type() core.Type {
-	return "count_iterator"
-}
-
-func (c *countIterator) String() string {
-	return fmt.Sprintf("<count object at %.0f>", c.current)
-}
-
-func (c *countIterator) GetAttr(name string) (core.Value, bool) {
-	if name == "__next__" {
-		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-			val := c.current
-			c.current += c.step
-			return core.NumberValue(val), nil
-		}), true
-	}
-	return nil, false
-}
-
 // repeatIterator is a lazy implementation of itertools.repeat(value[, times]).
 // When infinite is true it yields value forever; otherwise it yields value
 // exactly remaining more times. Being lazy, repeat(value, huge) allocates
@@ -70,6 +45,113 @@ func (r *repeatIterator) Next() (core.Value, bool) {
 // Reset is a no-op: itertools iterators are single-pass and do not restart.
 func (r *repeatIterator) Reset() {}
 
+// itertoolsIterator is a generic lazy iterator driven by a next closure. It is
+// used to make the itertools combinators return true iterators (matching
+// CPython, where e.g. next(chain(...)) works and iter(x) is x) instead of
+// eagerly materialized lists, and to support infinite inputs.
+//
+// The closure returns (value, ok, err). An error is surfaced through the Python
+// __next__ path (which the for-loop and next() use and which can propagate
+// errors); the plain Iterator.Next() path cannot return an error, so it records
+// the error in pendingErr and stops, mirroring the existing map()/filter()
+// iterators while still letting __next__ re-raise it.
+type itertoolsIterator struct {
+	name       string
+	next       func() (core.Value, bool, error)
+	pendingErr error
+	done       bool
+}
+
+func (it *itertoolsIterator) Type() core.Type { return core.Type(it.name) }
+
+func (it *itertoolsIterator) String() string {
+	return fmt.Sprintf("<itertools.%s object>", it.name)
+}
+
+func (it *itertoolsIterator) Iterator() core.Iterator { return it }
+
+func (it *itertoolsIterator) Next() (core.Value, bool) {
+	if it.done {
+		return nil, false
+	}
+	v, ok, err := it.next()
+	if err != nil {
+		it.pendingErr = err
+		it.done = true
+		return nil, false
+	}
+	if !ok {
+		it.done = true
+		return nil, false
+	}
+	return v, true
+}
+
+// Reset is a no-op: itertools iterators are single-pass and do not restart.
+func (it *itertoolsIterator) Reset() {}
+
+func (it *itertoolsIterator) GetAttr(name string) (core.Value, bool) {
+	switch name {
+	case "__iter__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			return it, nil
+		}), true
+	case "__next__":
+		return core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
+			if it.done {
+				if it.pendingErr != nil {
+					err := it.pendingErr
+					it.pendingErr = nil
+					return nil, err
+				}
+				return nil, &core.StopIteration{}
+			}
+			v, ok, err := it.next()
+			if err != nil {
+				it.done = true
+				return nil, err
+			}
+			if !ok {
+				it.done = true
+				return nil, &core.StopIteration{}
+			}
+			return v, nil
+		}), true
+	}
+	return nil, false
+}
+
+// sliceIter returns a lazy iterator over an already-computed slice of values.
+// It is used by the combinatoric builders (product/combinations/permutations)
+// whose results must be fully enumerated anyway but should still be returned as
+// iterators rather than lists.
+func sliceIter(name string, items []core.Value) *itertoolsIterator {
+	i := 0
+	return &itertoolsIterator{name: name, next: func() (core.Value, bool, error) {
+		if i >= len(items) {
+			return nil, false, nil
+		}
+		v := items[i]
+		i++
+		return v, true, nil
+	}}
+}
+
+// collectIterable eagerly drains an iterable into a slice. Used by combinators
+// (product/combinations/permutations) that must see all input up front.
+func collectIterable(it core.Iterable) []core.Value {
+	items := make([]core.Value, 0)
+	iter := it.Iterator()
+	for {
+		v, ok := iter.Next()
+		if !ok {
+			break
+		}
+		items = append(items, v)
+	}
+	return items
+}
+
 // InitItertoolsModule creates and returns the itertools module
 func InitItertoolsModule() *core.DictValue {
 	itertoolsModule := core.NewDict()
@@ -77,30 +159,35 @@ func InitItertoolsModule() *core.DictValue {
 	// chain - chain multiple iterables together (class with from_iterable classmethod)
 	chainClass := core.NewClass("chain", nil)
 
-	// __new__ method handles chain(*iterables)
+	// __new__ method handles chain(*iterables) lazily: iterables are consumed
+	// one after another on demand, so chain accepts (and defers) infinite inputs.
 	chainClass.SetMethod("__new__", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
-		// args[0] is the class itself
+		// args[0] is the class itself; args[1:] are the iterables to chain.
 		if len(args) < 1 {
 			return nil, fmt.Errorf("chain() missing class argument")
 		}
-
-		// Collect all values from all iterables
-		result := make([]core.Value, 0)
-		for i := 1; i < len(args); i++ {
-			iterable, err := types.RequireIterable(args[i], "chain() argument")
-			if err != nil {
-				return nil, err
-			}
-			iter := iterable.Iterator()
+		sources := args[1:]
+		idx := 0
+		var cur core.Iterator
+		return &itertoolsIterator{name: "chain", next: func() (core.Value, bool, error) {
 			for {
-				val, hasNext := iter.Next()
-				if !hasNext {
-					break
+				if cur == nil {
+					if idx >= len(sources) {
+						return nil, false, nil
+					}
+					iterable, err := types.RequireIterable(sources[idx], "chain() argument")
+					if err != nil {
+						return nil, false, err
+					}
+					idx++
+					cur = iterable.Iterator()
 				}
-				result = append(result, val)
+				if val, ok := cur.Next(); ok {
+					return val, true, nil
+				}
+				cur = nil
 			}
-		}
-		return core.NewList(result...), nil
+		}}, nil
 	}))
 
 	// from_iterable classmethod handles chain.from_iterable(iterable_of_iterables)
@@ -115,29 +202,27 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make([]core.Value, 0)
 		outerIter := iterableOfIterables.Iterator()
-		for {
-			iterableVal, hasNext := outerIter.Next()
-			if !hasNext {
-				break
-			}
-
-			iterable, err := types.RequireIterable(iterableVal, "from_iterable() argument item")
-			if err != nil {
-				return nil, err
-			}
-
-			iter := iterable.Iterator()
+		var cur core.Iterator
+		return &itertoolsIterator{name: "chain", next: func() (core.Value, bool, error) {
 			for {
-				val, hasInner := iter.Next()
-				if !hasInner {
-					break
+				if cur == nil {
+					iterableVal, ok := outerIter.Next()
+					if !ok {
+						return nil, false, nil
+					}
+					iterable, err := types.RequireIterable(iterableVal, "from_iterable() argument item")
+					if err != nil {
+						return nil, false, err
+					}
+					cur = iterable.Iterator()
 				}
-				result = append(result, val)
+				if val, ok := cur.Next(); ok {
+					return val, true, nil
+				}
+				cur = nil
 			}
-		}
-		return core.NewList(result...), nil
+		}}, nil
 	})
 
 	// Wrap the function as a classmethod
@@ -145,10 +230,12 @@ func InitItertoolsModule() *core.DictValue {
 
 	itertoolsModule.Set("chain", chainClass)
 
-	// cycle - repeat elements from iterable n times (limited version)
+	// cycle - repeat elements from the iterable endlessly (CPython semantics).
+	// On the first pass elements are yielded and saved; once the source is
+	// exhausted the saved copy is replayed forever.
 	itertoolsModule.Set("cycle", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("cycle", args)
-		if err := v.Range(1, 2); err != nil {
+		if err := v.Exact(1); err != nil {
 			return nil, err
 		}
 
@@ -157,29 +244,25 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		// Get the number of cycles (default 3 for safety)
-		cycles, _ := v.GetNumberOrDefault(1, 3)
-		if cycles < 0 {
-			return nil, errors.NewRuntimeError("cycle", "cycles must be non-negative")
-		}
-
-		// Collect items
-		items := make([]core.Value, 0)
 		iter := iterable.Iterator()
-		for {
-			val, hasNext := iter.Next()
-			if !hasNext {
-				break
+		saved := make([]core.Value, 0)
+		firstPass := true
+		idx := 0
+		return &itertoolsIterator{name: "cycle", next: func() (core.Value, bool, error) {
+			if firstPass {
+				if val, ok := iter.Next(); ok {
+					saved = append(saved, val)
+					return val, true, nil
+				}
+				firstPass = false
 			}
-			items = append(items, val)
-		}
-
-		// Repeat items
-		result := make([]core.Value, 0)
-		for i := 0; i < int(cycles); i++ {
-			result = append(result, items...)
-		}
-		return core.NewList(result...), nil
+			if len(saved) == 0 {
+				return nil, false, nil
+			}
+			val := saved[idx]
+			idx = (idx + 1) % len(saved)
+			return val, true, nil
+		}}, nil
 	}))
 
 	// islice - slice an iterable
@@ -194,76 +277,73 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		var start, stop, step int
-
+		// Parse start/stop/step. Any of them may be None, meaning unbounded
+		// start (0), unbounded stop (consume forever), or default step (1).
+		start, step := 0, 1
+		stop, bounded := 0, false
+		idxAt := func(i int) (int, bool, error) {
+			val := v.Get(i)
+			if val == core.None || val == core.Nil {
+				return 0, false, nil
+			}
+			n, err := v.GetNumber(i)
+			if err != nil {
+				return 0, false, err
+			}
+			return int(n), true, nil
+		}
 		if v.Count() == 2 {
 			// islice(iterable, stop)
-			start = 0
-			stopVal, err := v.GetNumber(1)
+			s, ok, err := idxAt(1)
 			if err != nil {
 				return nil, err
 			}
-			stop = int(stopVal)
-			step = 1
-		} else if v.Count() == 3 {
-			// islice(iterable, start, stop)
-			startVal, err := v.GetNumber(1)
-			if err != nil {
-				return nil, err
-			}
-			start = int(startVal)
-
-			stopVal, err := v.GetNumber(2)
-			if err != nil {
-				return nil, err
-			}
-			stop = int(stopVal)
-			step = 1
+			stop, bounded = s, ok
 		} else {
-			// islice(iterable, start, stop, step)
-			startVal, err := v.GetNumber(1)
+			// islice(iterable, start, stop[, step])
+			if s, ok, err := idxAt(1); err != nil {
+				return nil, err
+			} else if ok {
+				start = s
+			}
+			s2, ok2, err := idxAt(2)
 			if err != nil {
 				return nil, err
 			}
-			start = int(startVal)
-
-			stopVal, err := v.GetNumber(2)
-			if err != nil {
-				return nil, err
-			}
-			stop = int(stopVal)
-
-			stepVal, err := v.GetNumber(3)
-			if err != nil {
-				return nil, err
-			}
-			step = int(stepVal)
-
-			if step <= 0 {
-				return nil, errors.NewRuntimeError("islice", "step must be positive")
+			stop, bounded = s2, ok2
+			if v.Count() >= 4 {
+				st, _, err := idxAt(3)
+				if err != nil {
+					return nil, err
+				}
+				step = st
+				if step <= 0 {
+					return nil, errors.NewRuntimeError("islice", "step must be positive")
+				}
 			}
 		}
 
-		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		index := 0
-
-		for {
-			val, hasNext := iter.Next()
-			if !hasNext || index >= stop {
-				break
+		return &itertoolsIterator{name: "islice", next: func() (core.Value, bool, error) {
+			for {
+				if bounded && index >= stop {
+					return nil, false, nil
+				}
+				val, ok := iter.Next()
+				if !ok {
+					return nil, false, nil
+				}
+				cur := index
+				index++
+				if cur >= start && (cur-start)%step == 0 {
+					return val, true, nil
+				}
 			}
-
-			if index >= start && (index-start)%step == 0 {
-				result = append(result, val)
-			}
-			index++
-		}
-
-		return core.NewList(result...), nil
+		}}, nil
 	}))
 
-	// count - count from start with step (returns list of n values)
+	// count - infinite arithmetic sequence start, start+step, start+2*step, ...
 	itertoolsModule.Set("count", core.NewBuiltinFunction(func(args []core.Value, ctx *core.Context) (core.Value, error) {
 		v := validation.NewArgs("count", args)
 		if err := v.Range(0, 2); err != nil {
@@ -272,9 +352,12 @@ func InitItertoolsModule() *core.DictValue {
 
 		start, _ := v.GetNumberOrDefault(0, 0)
 		step, _ := v.GetNumberOrDefault(1, 1)
-
-		// Return an infinite count iterator
-		return &countIterator{current: start, step: step}, nil
+		cur := start
+		return &itertoolsIterator{name: "count", next: func() (core.Value, bool, error) {
+			val := cur
+			cur += step
+			return core.NumberValue(val), true, nil
+		}}, nil
 	}))
 
 	// repeat - repeat an object n times
@@ -331,29 +414,26 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
-
-		for {
-			val, hasNext := iter.Next()
-			if !hasNext {
-				break
+		stopped := false
+		return &itertoolsIterator{name: "takewhile", next: func() (core.Value, bool, error) {
+			if stopped {
+				return nil, false, nil
 			}
-
-			// Call predicate
-			predicateResult, err := predicate.Call([]core.Value{val}, ctx)
+			val, ok := iter.Next()
+			if !ok {
+				return nil, false, nil
+			}
+			res, err := predicate.Call([]core.Value{val}, ctx)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
-
-			if !core.IsTruthy(predicateResult) {
-				break
+			if !core.IsTruthy(res) {
+				stopped = true
+				return nil, false, nil
 			}
-
-			result = append(result, val)
-		}
-
-		return core.NewList(result...), nil
+			return val, true, nil
+		}}, nil
 	}))
 
 	// dropwhile - drop elements while predicate is true, then yield all
@@ -373,33 +453,27 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		dropping := true
-
-		for {
-			val, hasNext := iter.Next()
-			if !hasNext {
-				break
-			}
-
-			if dropping {
-				// Call predicate
-				predicateResult, err := predicate.Call([]core.Value{val}, ctx)
-				if err != nil {
-					return nil, err
+		return &itertoolsIterator{name: "dropwhile", next: func() (core.Value, bool, error) {
+			for {
+				val, ok := iter.Next()
+				if !ok {
+					return nil, false, nil
 				}
-
-				if !core.IsTruthy(predicateResult) {
+				if dropping {
+					res, err := predicate.Call([]core.Value{val}, ctx)
+					if err != nil {
+						return nil, false, err
+					}
+					if core.IsTruthy(res) {
+						continue
+					}
 					dropping = false
-					result = append(result, val)
 				}
-			} else {
-				result = append(result, val)
+				return val, true, nil
 			}
-		}
-
-		return core.NewList(result...), nil
+		}}, nil
 	}))
 
 	// compress - filter iterable by selectors
@@ -419,24 +493,20 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make([]core.Value, 0)
 		dataIter := data.Iterator()
 		selectorsIter := selectors.Iterator()
-
-		for {
-			val, hasData := dataIter.Next()
-			sel, hasSelector := selectorsIter.Next()
-
-			if !hasData || !hasSelector {
-				break
+		return &itertoolsIterator{name: "compress", next: func() (core.Value, bool, error) {
+			for {
+				val, hasData := dataIter.Next()
+				sel, hasSel := selectorsIter.Next()
+				if !hasData || !hasSel {
+					return nil, false, nil
+				}
+				if core.IsTruthy(sel) {
+					return val, true, nil
+				}
 			}
-
-			if core.IsTruthy(sel) {
-				result = append(result, val)
-			}
-		}
-
-		return core.NewList(result...), nil
+		}}, nil
 	}))
 
 	// product - Cartesian product of input iterables
@@ -483,7 +553,7 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		generate(0, []core.Value{})
-		return core.NewList(result...), nil
+		return sliceIter("product", result), nil
 	}))
 
 	// combinations - r-length tuples from input iterable
@@ -532,7 +602,7 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		generate(0, 0, []core.Value{})
-		return core.NewList(result...), nil
+		return sliceIter("combinations", result), nil
 	}))
 
 	// starmap - map function over iterable where each item is unpacked as function arguments
@@ -553,16 +623,13 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
-
-		for {
-			val, hasNext := iter.Next()
-			if !hasNext {
-				break
+		return &itertoolsIterator{name: "starmap", next: func() (core.Value, bool, error) {
+			val, ok := iter.Next()
+			if !ok {
+				return nil, false, nil
 			}
-
-			// Unpack the value as arguments
+			// Unpack the value as arguments.
 			var callArgs []core.Value
 			switch item := val.(type) {
 			case *core.ListValue:
@@ -570,30 +637,16 @@ func InitItertoolsModule() *core.DictValue {
 			case core.TupleValue:
 				callArgs = []core.Value(item)
 			case core.Iterable:
-				// Convert iterable to list
-				callArgs = make([]core.Value, 0)
-				itemIter := item.Iterator()
-				for {
-					elem, hasElem := itemIter.Next()
-					if !hasElem {
-						break
-					}
-					callArgs = append(callArgs, elem)
-				}
+				callArgs = collectIterable(item)
 			default:
-				return nil, fmt.Errorf("starmap() argument after * must be an iterable, not %s", val.Type())
+				return nil, false, fmt.Errorf("starmap() argument after * must be an iterable, not %s", val.Type())
 			}
-
-			// Call function with unpacked arguments
-			funcResult, err := function.Call(callArgs, ctx)
+			res, err := function.Call(callArgs, ctx)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
-
-			result = append(result, funcResult)
-		}
-
-		return core.NewList(result...), nil
+			return res, true, nil
+		}}, nil
 	}))
 
 	// permutations - r-length permutations from input iterable
@@ -659,7 +712,7 @@ func InitItertoolsModule() *core.DictValue {
 		}
 
 		generate([]int{}, []core.Value{})
-		return core.NewList(result...), nil
+		return sliceIter("permutations", result), nil
 	}))
 
 	// accumulate - make an iterator that returns accumulated sums/results
@@ -685,40 +738,35 @@ func InitItertoolsModule() *core.DictValue {
 			}
 		}
 
-		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
 		var total core.Value
-
-		for {
-			val, hasNext := iter.Next()
-			if !hasNext {
-				break
+		started := false
+		return &itertoolsIterator{name: "accumulate", next: func() (core.Value, bool, error) {
+			val, ok := iter.Next()
+			if !ok {
+				return nil, false, nil
 			}
-
-			if total == nil {
-				// First element
+			if !started {
+				started = true
 				total = val
-			} else if fn != nil {
-				// Apply custom function
+				return total, true, nil
+			}
+			if fn != nil {
 				newTotal, err := fn.Call([]core.Value{total, val}, ctx)
 				if err != nil {
-					return nil, err
+					return nil, false, err
 				}
 				total = newTotal
 			} else {
-				// Default: addition
 				totalNum, ok1 := total.(core.NumberValue)
 				valNum, ok2 := val.(core.NumberValue)
 				if !ok1 || !ok2 {
-					return nil, errors.NewRuntimeError("accumulate", "default accumulate requires numeric values")
+					return nil, false, errors.NewRuntimeError("accumulate", "default accumulate requires numeric values")
 				}
 				total = core.NumberValue(float64(totalNum) + float64(valNum))
 			}
-
-			result = append(result, total)
-		}
-
-		return core.NewList(result...), nil
+			return total, true, nil
+		}}, nil
 	}))
 
 	// filterfalse - filter elements where predicate is false
@@ -738,28 +786,22 @@ func InitItertoolsModule() *core.DictValue {
 			return nil, err
 		}
 
-		result := make([]core.Value, 0)
 		iter := iterable.Iterator()
-
-		for {
-			val, hasNext := iter.Next()
-			if !hasNext {
-				break
+		return &itertoolsIterator{name: "filterfalse", next: func() (core.Value, bool, error) {
+			for {
+				val, ok := iter.Next()
+				if !ok {
+					return nil, false, nil
+				}
+				res, err := predicate.Call([]core.Value{val}, ctx)
+				if err != nil {
+					return nil, false, err
+				}
+				if !core.IsTruthy(res) {
+					return val, true, nil
+				}
 			}
-
-			// Call predicate
-			predicateResult, err := predicate.Call([]core.Value{val}, ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			// Include element if predicate is FALSE
-			if !core.IsTruthy(predicateResult) {
-				result = append(result, val)
-			}
-		}
-
-		return core.NewList(result...), nil
+		}}, nil
 	}))
 
 	return itertoolsModule
